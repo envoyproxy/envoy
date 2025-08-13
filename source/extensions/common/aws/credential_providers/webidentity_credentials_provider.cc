@@ -142,8 +142,7 @@ void WebIdentityCredentialsProvider::extractCredentials(
   // Set receiver state in statistics
   stats_->metadata_refresh_state_.set(uint64_t(refresh_state_));
 
-  const auto expiration =
-      Utility::getIntegerFromJsonOrDefault(credentials.value(), WEB_IDENTITY_EXPIRATION, 0);
+  const auto expiration = Utility::getIntegerFromJsonOrDefault(credentials.value(), EXPIRATION, 0);
 
   if (expiration != 0) {
     expiration_time_ =

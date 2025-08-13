@@ -409,6 +409,18 @@ void javaByteArrayToByteVector(JniHelper& jni_helper, jbyteArray array, std::vec
   std::copy(bytes, bytes + len, out->begin());
 }
 
+void javaLongArrayToInt64Vector(JniHelper& jni_helper, jlongArray array,
+                                std::vector<int64_t>* out) {
+  const size_t len = jni_helper.getArrayLength(array);
+  out->resize(len);
+  ArrayElementsUniquePtr<jlongArray, jlong> jlongs =
+      jni_helper.getLongArrayElements(array, /* is_copy= */ nullptr);
+
+  for (size_t i = 0; i < len; ++i) {
+    (*out)[i] = static_cast<int64_t>(jlongs.get()[i]);
+  }
+}
+
 MatcherData::Type StringToType(std::string type_as_string) {
   if (type_as_string.length() != 4) {
     ASSERT("conversion failure failure");

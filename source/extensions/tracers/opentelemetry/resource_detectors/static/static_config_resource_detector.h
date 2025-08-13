@@ -20,7 +20,7 @@ class StaticConfigResourceDetector : public ResourceDetector,
 public:
   StaticConfigResourceDetector(const envoy::extensions::tracers::opentelemetry::resource_detectors::
                                    v3::StaticConfigResourceDetectorConfig& config,
-                               Server::Configuration::TracerFactoryContext&)
+                               Server::Configuration::ServerFactoryContext&)
       : attributes_(config.attributes().begin(), config.attributes().end()) {}
   Resource detect() override;
 

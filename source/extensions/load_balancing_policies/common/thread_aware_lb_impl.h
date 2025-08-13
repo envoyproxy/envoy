@@ -8,6 +8,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/http/hash_policy.h"
 #include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
 
 #include "absl/strings/string_view.h"
@@ -18,6 +19,9 @@ namespace Upstream {
 
 using NormalizedHostWeightVector = std::vector<std::pair<HostConstSharedPtr, double>>;
 using NormalizedHostWeightMap = std::map<HostConstSharedPtr, double>;
+
+using HashPolicyProto = envoy::config::route::v3::RouteAction::HashPolicy;
+using HashPolicySharedPtr = std::shared_ptr<Http::HashPolicy>;
 
 class ThreadAwareLoadBalancerBase : public LoadBalancerBase, public ThreadAwareLoadBalancer {
 public:
@@ -109,9 +113,10 @@ public:
 protected:
   ThreadAwareLoadBalancerBase(const PrioritySet& priority_set, ClusterLbStats& stats,
                               Runtime::Loader& runtime, Random::RandomGenerator& random,
-                              uint32_t healthy_panic_threshold, bool locality_weighted_balancing)
+                              uint32_t healthy_panic_threshold, bool locality_weighted_balancing,
+                              HashPolicySharedPtr hash_policy)
       : LoadBalancerBase(priority_set, stats, runtime, random, healthy_panic_threshold),
-        factory_(new LoadBalancerFactoryImpl(stats, random)),
+        factory_(new LoadBalancerFactoryImpl(stats, random, std::move(hash_policy))),
         locality_weighted_balancing_(locality_weighted_balancing) {}
 
 private:
@@ -122,8 +127,9 @@ private:
   using PerPriorityStatePtr = std::unique_ptr<PerPriorityState>;
 
   struct LoadBalancerImpl : public LoadBalancer {
-    LoadBalancerImpl(ClusterLbStats& stats, Random::RandomGenerator& random)
-        : stats_(stats), random_(random) {}
+    LoadBalancerImpl(ClusterLbStats& stats, Random::RandomGenerator& random,
+                     HashPolicySharedPtr hash_policy)
+        : stats_(stats), random_(random), hash_policy_(std::move(hash_policy)) {}
 
     // Upstream::LoadBalancer
     HostSelectionResponse chooseHost(LoadBalancerContext* context) override;
@@ -141,14 +147,17 @@ private:
 
     ClusterLbStats& stats_;
     Random::RandomGenerator& random_;
+    HashPolicySharedPtr hash_policy_;
+
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_;
     std::shared_ptr<HealthyLoad> healthy_per_priority_load_;
     std::shared_ptr<DegradedLoad> degraded_per_priority_load_;
   };
 
   struct LoadBalancerFactoryImpl : public LoadBalancerFactory {
-    LoadBalancerFactoryImpl(ClusterLbStats& stats, Random::RandomGenerator& random)
-        : stats_(stats), random_(random) {}
+    LoadBalancerFactoryImpl(ClusterLbStats& stats, Random::RandomGenerator& random,
+                            std::shared_ptr<Http::HashPolicy> hash_policy)
+        : stats_(stats), random_(random), hash_policy_(std::move(hash_policy)) {}
 
     // Upstream::LoadBalancerFactory
     // Ignore the params for the thread-aware LB.
@@ -156,6 +165,7 @@ private:
 
     ClusterLbStats& stats_;
     Random::RandomGenerator& random_;
+    std::shared_ptr<Http::HashPolicy> hash_policy_;
     absl::Mutex mutex_;
     std::shared_ptr<std::vector<PerPriorityStatePtr>> per_priority_state_ ABSL_GUARDED_BY(mutex_);
     // This is split out of PerPriorityState so LoadBalancerBase::ChoosePriority can be reused.
@@ -171,6 +181,15 @@ private:
   std::shared_ptr<LoadBalancerFactoryImpl> factory_;
   const bool locality_weighted_balancing_{};
   Common::CallbackHandlePtr priority_update_cb_;
+};
+
+class TypedHashLbConfigBase : public LoadBalancerConfig {
+public:
+  TypedHashLbConfigBase() = default;
+  TypedHashLbConfigBase(absl::Span<const HashPolicyProto* const> hash_policy,
+                        Regex::Engine& regex_engine, absl::Status& creation_status);
+
+  HashPolicySharedPtr hash_policy_;
 };
 
 } // namespace Upstream

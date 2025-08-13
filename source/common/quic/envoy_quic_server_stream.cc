@@ -97,14 +97,12 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
 }
 
 void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trailers) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_remove_empty_trailers")) {
-    if (trailers.empty()) {
-      ENVOY_STREAM_LOG(debug, "skipping submitting empty trailers", *this);
-      // Instead of submitting empty trailers, we send empty data with end_stream=true instead.
-      Buffer::OwnedImpl empty_buffer;
-      encodeData(empty_buffer, true);
-      return;
-    }
+  if (trailers.empty()) {
+    ENVOY_STREAM_LOG(debug, "skipping submitting empty trailers", *this);
+    // Instead of submitting empty trailers, we send empty data with end_stream=true instead.
+    Buffer::OwnedImpl empty_buffer;
+    encodeData(empty_buffer, true);
+    return;
   }
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
   encodeTrailersImpl(envoyHeadersToHttp2HeaderBlock(trailers));
@@ -359,10 +357,7 @@ bool EnvoyQuicServerStream::OnStopSending(quic::QuicResetStreamError error) {
     // Treat this as a remote reset, since the stream will be closed in both directions.
     runResetCallbacks(
         quicRstErrorToEnvoyRemoteResetReason(error.internal_code()),
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
-            ? absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()),
-                           "|FROM_PEER")
-            : absl::string_view());
+        absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()), "|FROM_PEER"));
   }
   return true;
 }
@@ -380,9 +375,7 @@ void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame)
     // stream callback.
     runResetCallbacks(
         quicRstErrorToEnvoyRemoteResetReason(frame.error_code),
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
-            ? absl::StrCat(quic::QuicRstStreamErrorCodeToString(frame.error_code), "|FROM_PEER")
-            : absl::string_view());
+        absl::StrCat(quic::QuicRstStreamErrorCodeToString(frame.error_code), "|FROM_PEER"));
   }
 }
 
@@ -395,10 +388,7 @@ void EnvoyQuicServerStream::ResetWithError(quic::QuicResetStreamError error) {
     // Upper layers expect calling resetStream() to immediately raise reset callbacks.
     runResetCallbacks(
         quicRstErrorToEnvoyLocalResetReason(error.internal_code()),
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
-            ? absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()),
-                           "|FROM_SELF")
-            : absl::string_view());
+        absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()), "|FROM_SELF"));
   }
   quic::QuicSpdyServerStreamBase::ResetWithError(error);
 }

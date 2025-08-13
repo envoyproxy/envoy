@@ -62,7 +62,7 @@ public:
 
       TestUtility::loadFromYaml(tracing_config_yaml, tracing_config);
 
-      tracing_config_ = std::make_unique<Tracing::ConnectionManagerTracingConfigImpl>(
+      tracing_config_ = std::make_unique<Tracing::ConnectionManagerTracingConfig>(
           envoy::config::core::v3::TrafficDirection::OUTBOUND, tracing_config);
     }
 

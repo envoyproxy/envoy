@@ -9,6 +9,7 @@
 #include "envoy/server/fatal_action_config.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/notification.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
@@ -24,6 +25,7 @@
 #include "test/integration/server.h"
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/common.h"
+#include "test/mocks/config/xds_manager.h"
 #include "test/mocks/server/bootstrap_extension_factory.h"
 #include "test/mocks/server/fatal_action_factory.h"
 #include "test/mocks/server/hot_restart.h"
@@ -230,14 +232,15 @@ public:
     EXPECT_CALL(cm_, setInitializedCb(_)).WillOnce(SaveArg<0>(&cm_init_callback_));
     ON_CALL(server_, shutdown()).WillByDefault(Assign(&shutdown_, true));
 
-    helper_ = std::make_unique<RunHelper>(server_, options_, dispatcher_, cm_, access_log_manager_,
-                                          init_manager_, overload_manager_, null_overload_manager_,
-                                          [this] { start_workers_.ready(); });
+    helper_ = std::make_unique<RunHelper>(
+        server_, options_, dispatcher_, xds_manager_, cm_, access_log_manager_, init_manager_,
+        overload_manager_, null_overload_manager_, [this] { start_workers_.ready(); });
   }
 
   NiceMock<MockInstance> server_;
   testing::NiceMock<MockOptions> options_;
   NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Config::MockXdsManager> xds_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   NiceMock<MockOverloadManager> overload_manager_;
@@ -846,6 +849,10 @@ TEST_P(ServerInstanceImplTest, Stats) {
   EXPECT_EQ(2L, TestUtility::findGauge(stats_store_, "server.concurrency")->value());
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.hot_restart_epoch")->value());
 
+  ENVOY_NOTIFICATION("name", "stuff");
+  ENVOY_NOTIFICATION("name1", "stuff1");
+  ENVOY_NOTIFICATION("name3", "stuff3");
+  EXPECT_EQ(3L, TestUtility::findCounter(stats_store_, "server.envoy_notifications")->value());
 // The ENVOY_BUG stat works in release mode.
 #if defined(NDEBUG)
   // Test exponential back-off on a fixed line ENVOY_BUG.

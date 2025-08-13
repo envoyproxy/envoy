@@ -291,6 +291,29 @@ TEST_P(WasmHttpFilterTest, HeadersStopAndContinue) {
   filter().onDestroy();
 }
 
+TEST_P(WasmHttpFilterTest, HeadersStopAndContinueAllowStopIteration) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(PiotrSikora): This hand off is not currently possible in the Rust SDK.
+    return;
+  }
+  setAllowOnHeadersStopIteration(true);
+  setupTest("", "headers");
+  setupFilter();
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(request_stream_info_));
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::debug, Eq(absl::string_view("onRequestHeaders 2 headers"))));
+  EXPECT_CALL(filter(), log_(spdlog::level::info, Eq(absl::string_view("header path /"))));
+  EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("onDone 2"))));
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}, {"server", "envoy-wasm-pause"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter().decodeHeaders(request_headers, true));
+  root_context_->onTick(0);
+  filter().clearRouteCache();
+  EXPECT_THAT(request_headers.get_("newheader"), Eq("newheadervalue"));
+  EXPECT_THAT(request_headers.get_("server"), Eq("envoy-wasm-continue"));
+  filter().onDestroy();
+}
+
 #if 0
 TEST_P(WasmHttpFilterTest, HeadersStopAndEndStream) {
   if (std::get<1>(GetParam()) == "rust") {

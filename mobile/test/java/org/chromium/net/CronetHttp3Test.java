@@ -2,6 +2,7 @@ package org.chromium.net;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 
 import android.Manifest;
 
@@ -61,6 +62,7 @@ public class CronetHttp3Test {
   // Optional reloadable flags to set.
   private boolean drainOnNetworkChange = false;
   private boolean resetBrokennessOnNetworkChange = false;
+  private boolean disableDnsRefreshOnNetworkChange = false;
 
   @BeforeClass
   public static void loadJniLibrary() {
@@ -100,6 +102,7 @@ public class CronetHttp3Test {
         new NativeCronvoyEngineBuilderImpl(ApplicationProvider.getApplicationContext());
     nativeCronetEngineBuilder.addRuntimeGuard("drain_pools_on_network_change",
                                               drainOnNetworkChange);
+    nativeCronetEngineBuilder.setDisableDnsRefreshOnNetworkChange(disableDnsRefreshOnNetworkChange);
 
     if (setUpLogging) {
       nativeCronetEngineBuilder.setLogger(logger);
@@ -108,6 +111,8 @@ public class CronetHttp3Test {
     // Make sure the handshake will work despite lack of real certs.
     nativeCronetEngineBuilder.setMockCertVerifierForTesting();
     cronvoyEngine = new CronvoyUrlRequestContext(nativeCronetEngineBuilder);
+    // Clear network states in ConnectivityManager.
+    cronvoyEngine.getEnvoyEngine().resetConnectivityState();
   }
 
   @After
@@ -286,6 +291,9 @@ public class CronetHttp3Test {
   @SmallTest
   @Feature({"Cronet"})
   public void networkChangeNoDrains() throws Exception {
+    // Disable dns refreshment so that the engine will attempt immediate draining.
+    disableDnsRefreshOnNetworkChange = true;
+    drainOnNetworkChange = false;
     setUp(printEnvoyLogs);
 
     // Do the initial handshake dance
@@ -298,7 +306,7 @@ public class CronetHttp3Test {
 
     // There should be one HTTP/3 connection
     String postStats = cronvoyEngine.getEnvoyEngine().dumpStats();
-    assertTrue(postStats.contains("cluster.base.upstream_cx_http3_total: 1"));
+    assertTrue(postStats, postStats.contains("cluster.base.upstream_cx_http3_total: 1"));
 
     // Force a network change
     cronvoyEngine.getEnvoyEngine().onDefaultNetworkUnavailable();
@@ -310,15 +318,20 @@ public class CronetHttp3Test {
     assertEquals(200, get2Callback.mResponseInfo.getHttpStatusCode());
     assertEquals("h3", get2Callback.mResponseInfo.getNegotiatedProtocol());
 
-    // There should still only be one HTTP/3 connection.
+    // There should be 2 HTTP/3 connections because the 2nd request was hashed to a different
+    // connection pool. But the 1st HTTP/3 connection which is idle now shouldn't have been drained
+    // or closed.
     postStats = cronvoyEngine.getEnvoyEngine().dumpStats();
-    assertTrue(postStats.contains("cluster.base.upstream_cx_http3_total: 1"));
+    assertTrue(postStats, postStats.contains("cluster.base.upstream_cx_http3_total: 2"));
+    assertFalse(postStats, postStats.contains("cluster.base.upstream_cx_destroy"));
   }
 
   @Test
   @SmallTest
   @Feature({"Cronet"})
   public void networkChangeWithDrains() throws Exception {
+    // Disable dns refreshment so that the engine will attempt immediate draining.
+    disableDnsRefreshOnNetworkChange = true;
     drainOnNetworkChange = true;
     setUp(printEnvoyLogs);
 
@@ -344,9 +357,13 @@ public class CronetHttp3Test {
     assertEquals(200, get2Callback.mResponseInfo.getHttpStatusCode());
     assertEquals("h3", get2Callback.mResponseInfo.getNegotiatedProtocol());
 
-    // There should still only be one HTTP/3 connection.
+    // There should be 2 HTTP/3 connections because the 1st HTTP/3 connection which is idle now
+    // should have been drained and closed.
     postStats = cronvoyEngine.getEnvoyEngine().dumpStats();
-    assertTrue(postStats.contains("cluster.base.upstream_cx_http3_total: 1"));
+    assertTrue(postStats, postStats.contains("cluster.base.upstream_cx_http3_total: 2"));
+    // The 1st HTTP/3 connection and the TCP connection are both idle now, so they should have been
+    // closed during draining.
+    assertTrue(postStats, postStats.contains("cluster.base.upstream_cx_destroy: 2"));
   }
 
   @Test

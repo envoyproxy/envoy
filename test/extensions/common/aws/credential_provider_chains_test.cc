@@ -398,6 +398,35 @@ TEST_F(CustomCredentialsProviderChainTest, ContainerOnly) {
   EXPECT_EQ(1, chain.value()->getNumProviders());
 }
 
+TEST_F(CustomCredentialsProviderChainTest, AssumeRoleOnly) {
+  envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
+  credential_provider_config.set_custom_credential_provider_chain(true);
+  credential_provider_config.mutable_assume_role_credential_provider()->set_role_arn(
+      "test-role-arn");
+  credential_provider_config.mutable_assume_role_credential_provider()->set_role_session_name(
+      "test-session");
+
+  auto chain = Envoy::Extensions::Common::Aws::CommonCredentialsProviderChain::
+      customCredentialsProviderChain(context_, "us-east-1", credential_provider_config);
+  EXPECT_TRUE(chain.ok());
+  EXPECT_EQ(1, chain.value()->getNumProviders());
+}
+
+TEST_F(CustomCredentialsProviderChainTest, AssumeRoleWithEnvironment) {
+  envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
+  credential_provider_config.set_custom_credential_provider_chain(true);
+  credential_provider_config.mutable_assume_role_credential_provider()->set_role_arn(
+      "test-role-arn");
+  credential_provider_config.mutable_assume_role_credential_provider()->set_role_session_name(
+      "test-session");
+  credential_provider_config.mutable_environment_credential_provider();
+
+  auto chain = Envoy::Extensions::Common::Aws::CommonCredentialsProviderChain::
+      customCredentialsProviderChain(context_, "us-east-1", credential_provider_config);
+  EXPECT_TRUE(chain.ok());
+  EXPECT_EQ(2, chain.value()->getNumProviders());
+}
+
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

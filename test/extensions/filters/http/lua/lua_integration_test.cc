@@ -11,8 +11,6 @@
 
 #include "gtest/gtest.h"
 
-using Envoy::Http::HeaderValueOf;
-
 namespace Envoy {
 namespace {
 
@@ -75,8 +73,27 @@ public:
           response_header->set_key("fake_header");
           response_header->set_value("fake_value");
 
-          const std::string key = "envoy.filters.http.lua";
-          const std::string yaml =
+          // Metadata variables for the virtual host and route.
+          const std::string key = "lua";
+          ProtobufWkt::Struct value;
+          std::string yaml;
+
+          // Sets the virtual host's metadata.
+          yaml =
+              R"EOF(
+            foo.bar:
+              foo: vhost_bar
+              baz: vhost_bat
+          )EOF";
+          TestUtility::loadFromYaml(yaml, value);
+          hcm.mutable_route_config()
+              ->mutable_virtual_hosts(0)
+              ->mutable_metadata()
+              ->mutable_filter_metadata()
+              ->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(key, value));
+
+          // Sets the route's metadata.
+          yaml =
               R"EOF(
             foo.bar:
               foo: bar
@@ -84,11 +101,7 @@ public:
             keyset:
               foo: MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAp0cSZtAdFgMI1zQJwG8ujTXFMcRY0+SA6fMZGEfQYuxcz/e8UelJ1fLDVAwYmk7KHoYzpizy0JIxAcJ+OAE+cd6a6RpwSEm/9/vizlv0vWZv2XMRAqUxk/5amlpQZE/4sRg/qJdkZZjKrSKjf5VEUQg2NytExYyYWG+3FEYpzYyUeVktmW0y/205XAuEQuxaoe+AUVKeoON1iDzvxywE42C0749XYGUFicqBSRj2eO7jm4hNWvgTapYwpswM3hV9yOAPOVQGKNXzNbLDbFTHyLw3OKayGs/4FUBa+ijlGD9VDawZq88RRaf5ztmH22gOSiKcrHXe40fsnrzh/D27uwIDAQAB
           )EOF";
-
-          ProtobufWkt::Struct value;
           TestUtility::loadFromYaml(yaml, value);
-
-          // Sets the route's metadata.
           hcm.mutable_route_config()
               ->mutable_virtual_hosts(0)
               ->mutable_routes(0)
@@ -184,10 +197,10 @@ public:
       RELEASE_ASSERT(result, result.message());
       xds_stream_->startGrpcStream();
 
-      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
+      EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TestTypeUrl::get().RouteConfiguration, "",
                                               {route_config_name}, true));
       sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-          Config::TypeUrl::get().RouteConfiguration,
+          Config::TestTypeUrl::get().RouteConfiguration,
           {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
               initial_route_config)},
           "1");
@@ -329,6 +342,80 @@ typed_config:
   EXPECT_TRUE(response.find("HTTP/1.1 400 Bad Request\r\n") == 0);
 }
 
+// Test that handle:metadata() falls back to metadata under the filter canonical name
+// (envoy.filters.http.lua) when no metadata is present under the filter configured name.
+TEST_P(LuaIntegrationTest, MetadataFallbackToCanonicalName) {
+  const std::string filter_config =
+      R"EOF(
+name: lua-filter-custom-name
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        local foo_bar = request_handle:metadata():get("foo.bar")
+        request_handle:logTrace(foo_bar["name"])
+        request_handle:logTrace(foo_bar["prop"])
+      end
+      function envoy_on_response(response_handle)
+        local baz_bat = response_handle:metadata():get("baz.bat")
+        response_handle:logTrace(baz_bat["name"])
+        response_handle:logTrace(baz_bat["prop"])
+      end
+)EOF";
+
+  const std::string route_config =
+      R"EOF(
+name: test_routes
+virtual_hosts:
+- name: test_vhost
+  domains: ["foo.lyft.com"]
+  routes:
+  - match:
+      path: "/test/long/url"
+    metadata:
+      filter_metadata:
+        envoy.filters.http.lua:
+          foo.bar:
+            name: foo
+            prop: bar
+          baz.bat:
+            name: baz
+            prop: bat
+    route:
+      cluster: cluster_0
+)EOF";
+
+  initializeWithYaml(filter_config, route_config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "foo.lyft.com"},
+                                                 {"x-forwarded-for", "10.0.0.1"}};
+
+  IntegrationStreamDecoderPtr response;
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "foo"},
+                                 {"trace", "bar"},
+                                 {"trace", "baz"},
+                                 {"trace", "bat"},
+                             }),
+                             {
+                               response = codec_client_->makeHeaderOnlyRequest(request_headers);
+                               waitForNextUpstreamRequest();
+
+                               upstream_request_->encodeHeaders(default_response_headers_, true);
+                               ASSERT_TRUE(response->waitForEndStream());
+                             });
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanup();
+}
+
 // Basic request and response.
 TEST_P(LuaIntegrationTest, RequestAndResponse) {
   const std::string FILTER_AND_CODE =
@@ -346,6 +433,8 @@ typed_config:
         request_handle:logErr("log test")
         request_handle:logCritical("log test")
 
+        local vhost_metadata = request_handle:virtualHost():metadata():get("foo.bar")
+        local route_metadata = request_handle:route():metadata():get("foo.bar")
         local metadata = request_handle:metadata():get("foo.bar")
         local body_length = request_handle:body():length()
 
@@ -367,6 +456,10 @@ typed_config:
         request_handle:headers():add("cookie_size", request_handle:headers():getNumValues("set-cookie"))
 
         request_handle:headers():add("request_body_size", body_length)
+        request_handle:headers():add("request_vhost_metadata_foo", vhost_metadata["foo"])
+        request_handle:headers():add("request_vhost_metadata_baz", vhost_metadata["baz"])
+        request_handle:headers():add("request_route_metadata_foo", route_metadata["foo"])
+        request_handle:headers():add("request_route_metadata_baz", route_metadata["baz"])
         request_handle:headers():add("request_metadata_foo", metadata["foo"])
         request_handle:headers():add("request_metadata_baz", metadata["baz"])
         if request_handle:connection():ssl() == nil then
@@ -389,8 +482,14 @@ typed_config:
       end
 
       function envoy_on_response(response_handle)
+        local vhost_metadata = response_handle:virtualHost():metadata():get("foo.bar")
+        local route_metadata = response_handle:route():metadata():get("foo.bar")
         local metadata = response_handle:metadata():get("foo.bar")
         local body_length = response_handle:body():length()
+        response_handle:headers():add("response_vhost_metadata_foo", vhost_metadata["foo"])
+        response_handle:headers():add("response_vhost_metadata_baz", vhost_metadata["baz"])
+        response_handle:headers():add("response_route_metadata_foo", route_metadata["foo"])
+        response_handle:headers():add("response_route_metadata_baz", route_metadata["baz"])
         response_handle:headers():add("response_metadata_foo", metadata["foo"])
         response_handle:headers():add("response_metadata_baz", metadata["baz"])
         response_handle:headers():add("response_body_size", body_length)
@@ -469,6 +568,26 @@ typed_config:
                       ->value()
                       .getStringView());
 
+  EXPECT_EQ("vhost_bar", upstream_request_->headers()
+                             .get(Http::LowerCaseString("request_vhost_metadata_foo"))[0]
+                             ->value()
+                             .getStringView());
+
+  EXPECT_EQ("vhost_bat", upstream_request_->headers()
+                             .get(Http::LowerCaseString("request_vhost_metadata_baz"))[0]
+                             ->value()
+                             .getStringView());
+
+  EXPECT_EQ("bar", upstream_request_->headers()
+                       .get(Http::LowerCaseString("request_route_metadata_foo"))[0]
+                       ->value()
+                       .getStringView());
+
+  EXPECT_EQ("bat", upstream_request_->headers()
+                       .get(Http::LowerCaseString("request_route_metadata_baz"))[0]
+                       ->value()
+                       .getStringView());
+
   EXPECT_EQ("bar", upstream_request_->headers()
                        .get(Http::LowerCaseString("request_metadata_foo"))[0]
                        ->value()
@@ -543,6 +662,22 @@ typed_config:
                      .get(Http::LowerCaseString("response_body_size"))[0]
                      ->value()
                      .getStringView());
+  EXPECT_EQ("vhost_bar", response->headers()
+                             .get(Http::LowerCaseString("response_vhost_metadata_foo"))[0]
+                             ->value()
+                             .getStringView());
+  EXPECT_EQ("vhost_bat", response->headers()
+                             .get(Http::LowerCaseString("response_vhost_metadata_baz"))[0]
+                             ->value()
+                             .getStringView());
+  EXPECT_EQ("bar", response->headers()
+                       .get(Http::LowerCaseString("response_route_metadata_foo"))[0]
+                       ->value()
+                       .getStringView());
+  EXPECT_EQ("bat", response->headers()
+                       .get(Http::LowerCaseString("response_route_metadata_baz"))[0]
+                       ->value()
+                       .getStringView());
   EXPECT_EQ("bar", response->headers()
                        .get(Http::LowerCaseString("response_metadata_foo"))[0]
                        ->value()
@@ -748,8 +883,8 @@ typed_config:
   ASSERT_TRUE(fake_lua_connection_->waitForNewStream(*dispatcher_, lua_request_));
   ASSERT_TRUE(lua_request_->waitForEndStream(*dispatcher_));
   // Sanity checking that we sent the expected data.
-  EXPECT_THAT(lua_request_->headers(), HeaderValueOf(Http::Headers::get().Method, "POST"));
-  EXPECT_THAT(lua_request_->headers(), HeaderValueOf(Http::Headers::get().Path, "/"));
+  EXPECT_THAT(lua_request_->headers(), ContainsHeader(Http::Headers::get().Method, "POST"));
+  EXPECT_THAT(lua_request_->headers(), ContainsHeader(Http::Headers::get().Path, "/"));
 
   waitForNextUpstreamRequest();
 
@@ -1244,7 +1379,7 @@ TEST_P(LuaIntegrationTest, RdsTestOfLuaPerRoute) {
 
   // Update route config by RDS. Test whether RDS can work normally.
   sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
-      Config::TypeUrl::get().RouteConfiguration,
+      Config::TestTypeUrl::get().RouteConfiguration,
       {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(UPDATE_ROUTE_CONFIG)},
       "2");
   test_server_->waitForCounterGe("http.config_test.rds.basic_lua_routes.update_success", 2);
@@ -2025,6 +2160,338 @@ typed_config:
 
   cleanup();
 }
+
+// Test ``filterState()`` functionality with simple string values.
+TEST_P(LuaIntegrationTest, FilterStateBasic) {
+  const std::string FILTER_AND_CODE = R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        local stream_info = request_handle:streamInfo()
+
+        -- Test filterState() function with non-existent key
+        local missing_state = stream_info:filterState():get("nonexistent_key")
+        if missing_state == nil then
+          request_handle:headers():add("missing_state", "nil")
+        else
+          request_handle:headers():add("missing_state", "unexpected")
+        end
+
+        -- Test with another non-existent key
+        local another_missing = stream_info:filterState():get("another_missing")
+        if another_missing == nil then
+          request_handle:headers():add("another_missing", "nil")
+        else
+          request_handle:headers():add("another_missing", "unexpected")
+        end
+      end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE);
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest();
+
+  // Verify both calls return nil as expected for non-existent keys.
+  EXPECT_EQ("nil", upstream_request_->headers()
+                       .get(Http::LowerCaseString("missing_state"))[0]
+                       ->value()
+                       .getStringView());
+
+  EXPECT_EQ("nil", upstream_request_->headers()
+                       .get(Http::LowerCaseString("another_missing"))[0]
+                       ->value()
+                       .getStringView());
+
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanup();
+}
+
+// Test that handle:virtualHost():metadata() returns valid metadata when virtual host matches
+// but route doesn't, ensuring metadata access works correctly.
+TEST_P(LuaIntegrationTest, VirtualHostValidWhenNoRouteMatch) {
+  if (!testing_downstream_filter_) {
+    GTEST_SKIP() << "This is a local reply test that does not go upstream";
+  }
+
+  const std::string filter_config =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        local metadata = request_handle:virtualHost():metadata()
+        request_handle:logTrace(metadata:get("foo.bar")["name"])
+        request_handle:logTrace(metadata:get("foo.bar")["prop"])
+      end
+      function envoy_on_response(response_handle)
+        local metadata = response_handle:virtualHost():metadata()
+        response_handle:logTrace(metadata:get("baz.bat")["name"])
+        response_handle:logTrace(metadata:get("baz.bat")["prop"])
+      end
+)EOF";
+
+  const std::string route_config =
+      R"EOF(
+name: test_routes
+virtual_hosts:
+- name: test_vhost
+  domains: ["foo.lyft.com"]
+  metadata:
+    filter_metadata:
+      lua:
+        foo.bar:
+          name: foo
+          prop: bar
+        baz.bat:
+          name: baz
+          prop: bat
+  routes:
+  - match:
+      path: "/existing/route"
+    route:
+      cluster: cluster_0
+)EOF";
+
+  initializeWithYaml(filter_config, route_config);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/non/existing/path"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "foo.lyft.com"},
+                                                 {"x-forwarded-for", "10.0.0.1"}};
+
+  IntegrationStreamDecoderPtr response;
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "foo"},
+                                 {"trace", "bar"},
+                                 {"trace", "baz"},
+                                 {"trace", "bat"},
+                             }),
+                             {
+                               auto encoder_decoder = codec_client_->startRequest(request_headers);
+                               response = std::move(encoder_decoder.second);
+
+                               ASSERT_TRUE(response->waitForEndStream());
+                             });
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("404", response->headers().getStatusValue());
+  cleanup();
+}
+
+// Test that handle:virtualHost() returns a valid object when no virtual host matches the request
+// authority. This verifies that metadata() returns an empty metadata object that can be safely
+// iterated.
+TEST_P(LuaIntegrationTest, VirtualHostValidWhenNoVirtualHostMatch) {
+  if (!testing_downstream_filter_) {
+    GTEST_SKIP() << "This is a local reply test that does not go upstream";
+  }
+
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        local virtual_host = request_handle:virtualHost()
+        for _, _ in pairs(virtual_host:metadata()) do
+          return
+        end
+        request_handle:logTrace("No metadata found during request handling")
+      end
+      function envoy_on_response(response_handle)
+        local virtual_host = response_handle:virtualHost()
+        for _, _ in pairs(virtual_host:metadata()) do
+          return
+        end
+        response_handle:logTrace("No metadata found during response handling")
+      end
+
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE, "foo.lyft.com");
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "bar.lyft.com"},
+                                                 {"x-forwarded-for", "10.0.0.1"}};
+
+  IntegrationStreamDecoderPtr response;
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "No metadata found during request handling"},
+                                 {"trace", "No metadata found during response handling"},
+                             }),
+                             {
+                               auto encoder_decoder = codec_client_->startRequest(request_headers);
+                               response = std::move(encoder_decoder.second);
+
+                               ASSERT_TRUE(response->waitForEndStream());
+                             });
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("404", response->headers().getStatusValue());
+  cleanup();
+}
+
+// Test that handle:route() returns a valid object when no route matches the request.
+// This verifies that metadata() returns an empty metadata object that can be safely
+// iterated.
+TEST_P(LuaIntegrationTest, RouteValidWhenNoRouteMatch) {
+  if (!testing_downstream_filter_) {
+    GTEST_SKIP() << "This is a local reply test that does not go upstream";
+  }
+
+  const std::string filter_config =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        local route = request_handle:route()
+        for _, _ in pairs(route:metadata()) do
+          return
+        end
+        request_handle:logTrace("No metadata found during request handling")
+      end
+      function envoy_on_response(response_handle)
+        local route = response_handle:route()
+        for _, _ in pairs(route:metadata()) do
+          return
+        end
+        response_handle:logTrace("No metadata found during response handling")
+      end
+)EOF";
+
+  const std::string route_config =
+      R"EOF(
+name: test_routes
+virtual_hosts:
+- name: test_vhost
+  domains: ["foo.lyft.com"]
+  routes:
+  - match:
+      path: "/existing/route"
+    metadata:
+      filter_metadata:
+        lua:
+          foo.bar:
+            name: foo
+            prop: bar
+          baz.bat:
+            name: baz
+            prop: bat
+    route:
+      cluster: cluster_0
+)EOF";
+
+  initializeWithYaml(filter_config, route_config);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/non/existing/path"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "foo.lyft.com"},
+                                                 {"x-forwarded-for", "10.0.0.1"}};
+
+  IntegrationStreamDecoderPtr response;
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "No metadata found during request handling"},
+                                 {"trace", "No metadata found during response handling"},
+                             }),
+                             {
+                               auto encoder_decoder = codec_client_->startRequest(request_headers);
+                               response = std::move(encoder_decoder.second);
+
+                               ASSERT_TRUE(response->waitForEndStream());
+                             });
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("404", response->headers().getStatusValue());
+
+  cleanup();
+}
+
+#ifdef NDEBUG
+// This test is only run in release mode because in debug mode,
+// the code reaches ENVOY_BUG() which triggers a forced abort
+// that stops execution.
+TEST_P(LuaIntegrationTest, ModifyResponseBodyAndRemoveStatusHeader) {
+  if (downstream_protocol_ != Http::CodecType::HTTP1) {
+    GTEST_SKIP() << "This is a test that only supports http1";
+  }
+  if (!testing_downstream_filter_) {
+    GTEST_SKIP() << "This is a local reply test that does not go upstream";
+  }
+  const std::string filter_config =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_response(response_handle)
+        local response_headers = response_handle:headers()
+        response_headers:remove(":status")
+        response_handle:body(true):setBytes("hello world")
+      end
+)EOF";
+
+  const std::string route_config =
+      R"EOF(
+name: basic_lua_routes
+virtual_hosts:
+- name: rds_vhost_1
+  domains: ["lua.per.route"]
+  routes:
+  - match:
+      prefix: "/lua"
+    direct_response:
+      status: 200
+      body:
+        inline_string: "hello"
+)EOF";
+
+  initializeWithYaml(filter_config, route_config);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl default_headers{{":method", "GET"},
+                                                 {":path", "/lua"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "lua.per.route"},
+                                                 {"x-forwarded-for", "10.0.0.1"}};
+
+  auto encoder_decoder = codec_client_->startRequest(default_headers);
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("502", response->headers().getStatusValue());
+  EXPECT_THAT(response->body(), testing::HasSubstr("missing required header: :status"));
+
+  cleanup();
+}
+#endif
 
 } // namespace
 } // namespace Envoy

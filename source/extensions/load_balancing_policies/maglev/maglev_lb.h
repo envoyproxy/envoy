@@ -24,11 +24,12 @@ using LegacyMaglevLbProto = envoy::config::cluster::v3::Cluster::MaglevLbConfig;
 /**
  * Load balancer config that used to wrap typed maglev config.
  */
-class TypedMaglevLbConfig : public Upstream::LoadBalancerConfig {
+class TypedMaglevLbConfig : public Upstream::TypedHashLbConfigBase {
 public:
-  TypedMaglevLbConfig(const MaglevLbProto& config);
   TypedMaglevLbConfig(const CommonLbConfigProto& common_lb_config,
                       const LegacyMaglevLbProto& lb_config);
+  TypedMaglevLbConfig(const MaglevLbProto& config, Regex::Engine& regex_engine,
+                      absl::Status& creation_status);
 
   MaglevLbProto lb_config_;
 };
@@ -168,13 +169,8 @@ class MaglevLoadBalancer : public ThreadAwareLoadBalancerBase {
 public:
   MaglevLoadBalancer(const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
                      Runtime::Loader& runtime, Random::RandomGenerator& random,
-                     OptRef<const envoy::config::cluster::v3::Cluster::MaglevLbConfig> config,
-                     const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
-
-  MaglevLoadBalancer(const PrioritySet& priority_set, ClusterLbStats& stats, Stats::Scope& scope,
-                     Runtime::Loader& runtime, Random::RandomGenerator& random,
-                     uint32_t healthy_panic_threshold,
-                     const envoy::extensions::load_balancing_policies::maglev::v3::Maglev& config);
+                     uint32_t healthy_panic_threshold, const MaglevLbProto& config,
+                     HashPolicySharedPtr hash_policy);
 
   const MaglevLoadBalancerStats& stats() const { return stats_; }
   uint64_t tableSize() const { return table_size_; }

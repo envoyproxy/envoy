@@ -9,9 +9,6 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-constexpr char ACCESS_KEY_ID[] = "AccessKeyId";
-constexpr char SECRET_ACCESS_KEY[] = "SecretAccessKey";
-constexpr char TOKEN[] = "Token";
 constexpr char EXPIRATION_FORMAT[] = "%E4Y-%m-%dT%H:%M:%S%z";
 
 #define ALL_METADATACREDENTIALSPROVIDER_STATS(COUNTER, GAUGE)                                      \

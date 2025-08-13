@@ -7,6 +7,9 @@
 #include "source/common/common/statusor.h"
 #include "source/common/protobuf/protobuf.h"
 
+#include "absl/container/flat_hash_map.h"
+#include "absl/container/flat_hash_set.h"
+
 namespace Envoy {
 namespace Json {
 
@@ -28,6 +31,11 @@ public:
    * See: https://github.com/msgpack/msgpack/blob/master/spec.md
    */
   static std::vector<uint8_t> jsonToMsgpack(const std::string& json);
+
+  /*
+   * Constructs a JSON string from a list of strings.
+   */
+  static const std::string listAsJsonString(const std::list<std::string>& items);
 };
 
 } // namespace Json

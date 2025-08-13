@@ -23,7 +23,7 @@ TEST(ConnectionManagerTracingConfigImplTest, SimpleTest) {
     custom_tag->set_tag("foo");
     custom_tag->mutable_literal()->set_value("bar");
 
-    ConnectionManagerTracingConfigImpl config(traffic_direction, tracing_config);
+    ConnectionManagerTracingConfig config(traffic_direction, tracing_config);
 
     EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
     EXPECT_EQ(true, config.verbose());
@@ -45,7 +45,7 @@ TEST(ConnectionManagerTracingConfigImplTest, SimpleTest) {
     custom_tag->set_tag("foo");
     custom_tag->mutable_literal()->set_value("bar");
 
-    ConnectionManagerTracingConfigImpl config(traffic_direction, tracing_config);
+    ConnectionManagerTracingConfig config(traffic_direction, tracing_config);
 
     EXPECT_EQ(Tracing::OperationName::Egress, config.operationName());
     EXPECT_EQ(true, config.verbose());

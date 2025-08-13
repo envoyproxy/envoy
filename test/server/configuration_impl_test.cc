@@ -63,9 +63,9 @@ protected:
   ConfigurationImplTest()
       : api_(Api::createApiForTest()), ads_mux_(std::make_shared<NiceMock<Config::MockGrpcMux>>()),
         cluster_manager_factory_(
-            server_context_, server_.stats(), server_.threadLocal(), server_.httpContext(),
+            server_context_,
             [this]() -> Network::DnsResolverSharedPtr { return this->server_.dnsResolver(); },
-            server_.sslContextManager(), server_.quic_stat_names_, server_) {
+            server_.quic_stat_names_) {
     ON_CALL(server_context_.api_, threadFactory())
         .WillByDefault(
             Invoke([this]() -> Thread::ThreadFactory& { return api_->threadFactory(); }));

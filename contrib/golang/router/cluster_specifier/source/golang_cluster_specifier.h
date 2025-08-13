@@ -38,7 +38,8 @@ public:
 
   RouteConstSharedPtr route(RouteEntryAndRouteConstSharedPtr parent,
                             const Http::RequestHeaderMap& header,
-                            const StreamInfo::StreamInfo& stream_info) const override;
+                            const StreamInfo::StreamInfo& stream_info,
+                            uint64_t random) const override;
 
   void log(absl::string_view& msg) const;
 

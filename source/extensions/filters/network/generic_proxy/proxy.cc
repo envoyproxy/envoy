@@ -89,9 +89,15 @@ Tracing::OperationName ActiveStream::operationName() const {
   return conn_manager_tracing_config_->operationName();
 }
 
-const Tracing::CustomTagMap* ActiveStream::customTags() const {
+void ActiveStream::modifySpan(Tracing::Span& span) const {
   ASSERT(conn_manager_tracing_config_.has_value());
-  return &conn_manager_tracing_config_->getCustomTags();
+
+  const TraceContextBridge trace_context{*request_header_frame_};
+  const Tracing::CustomTagContext ctx{trace_context, stream_info_};
+
+  for (const auto& it : conn_manager_tracing_config_->getCustomTags()) {
+    it.second->applySpan(span, ctx);
+  }
 }
 
 bool ActiveStream::verbose() const {
@@ -621,8 +627,7 @@ void ActiveStream::completeStream(absl::optional<DownstreamStreamResetReason> re
   parent_.stats_helper_.onRequestComplete(stream_info_, local_reply_, error_reply);
 
   if (active_span_) {
-    const TraceContextBridge context{*request_header_frame_};
-    Tracing::TracerUtility::finalizeSpan(*active_span_, context, stream_info_, *this, false);
+    Tracing::TracerUtility::finalizeSpan(*active_span_, stream_info_, *this, false);
   }
 
   for (const auto& access_log : parent_.config_->accessLogs()) {

@@ -7,6 +7,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -350,9 +351,21 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, assignmentOperator) {
   EXPECT_EQ(ann.annotationType(), ann2.annotationType());
 }
 
+class MockTracer : public TracerInterface {
+public:
+  MOCK_METHOD(SpanPtr, startSpan,
+              (const Tracing::Config&, const std::string& span_name, SystemTime timestamp), ());
+  MOCK_METHOD(SpanPtr, startSpan,
+              (const Tracing::Config&, const std::string& span_name, SystemTime timestamp,
+               const SpanContext& parent_context),
+              ());
+  MOCK_METHOD(void, reportSpan, (Span && span), ());
+};
+
 TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   Event::SimulatedTimeSystem test_time;
-  Span span(test_time.timeSystem());
+  MockTracer tracer;
+  Span span(test_time.timeSystem(), tracer);
   Util::Replacements replacements;
 
   EXPECT_EQ(0ULL, span.id());
@@ -575,85 +588,10 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   EXPECT_EQ(6, replacements.size());
 }
 
-TEST(ZipkinCoreTypesSpanTest, copyConstructor) {
-  Event::SimulatedTimeSystem test_time;
-  Span span(test_time.timeSystem());
-  Util::Replacements replacements;
-
-  uint64_t id = Util::generateRandom64(test_time.timeSystem());
-  std::string id_hex = Hex::uint64ToHex(id);
-  span.setId(id);
-  span.setParentId(id);
-  span.setTraceId(id);
-  int64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                          test_time.timeSystem().systemTime().time_since_epoch())
-                          .count();
-  span.setTimestamp(timestamp);
-  span.setDuration(3000LL);
-  span.setName("span_name");
-
-  Span span2(span);
-
-  EXPECT_EQ(span.id(), span2.id());
-  EXPECT_EQ(span.parentId(), span2.parentId());
-  EXPECT_EQ(span.traceId(), span2.traceId());
-  EXPECT_EQ(span.name(), span2.name());
-  EXPECT_EQ(span.annotations().size(), span2.annotations().size());
-  EXPECT_EQ(span.binaryAnnotations().size(), span2.binaryAnnotations().size());
-  EXPECT_EQ(span.idAsHexString(), span2.idAsHexString());
-  EXPECT_EQ(span.parentIdAsHexString(), span2.parentIdAsHexString());
-  EXPECT_EQ(span.traceIdAsHexString(), span2.traceIdAsHexString());
-  EXPECT_EQ(span.timestamp(), span2.timestamp());
-  EXPECT_EQ(span.duration(), span2.duration());
-  EXPECT_EQ(span.startTime(), span2.startTime());
-  EXPECT_EQ(span.debug(), span2.debug());
-  EXPECT_EQ(span.isSetDuration(), span2.isSetDuration());
-  EXPECT_EQ(span.isSetParentId(), span2.isSetParentId());
-  EXPECT_EQ(span.isSetTimestamp(), span2.isSetTimestamp());
-  EXPECT_EQ(span.isSetTraceIdHigh(), span2.isSetTraceIdHigh());
-}
-
-TEST(ZipkinCoreTypesSpanTest, assignmentOperator) {
-  Event::SimulatedTimeSystem test_time;
-  Span span(test_time.timeSystem());
-  Util::Replacements replacements;
-
-  uint64_t id = Util::generateRandom64(test_time.timeSystem());
-  std::string id_hex = Hex::uint64ToHex(id);
-  span.setId(id);
-  span.setParentId(id);
-  span.setTraceId(id);
-  int64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                          test_time.timeSystem().systemTime().time_since_epoch())
-                          .count();
-  span.setTimestamp(timestamp);
-  span.setDuration(3000LL);
-  span.setName("span_name");
-
-  Span span2 = span;
-
-  EXPECT_EQ(span.id(), span2.id());
-  EXPECT_EQ(span.parentId(), span2.parentId());
-  EXPECT_EQ(span.traceId(), span2.traceId());
-  EXPECT_EQ(span.name(), span2.name());
-  EXPECT_EQ(span.annotations().size(), span2.annotations().size());
-  EXPECT_EQ(span.binaryAnnotations().size(), span2.binaryAnnotations().size());
-  EXPECT_EQ(span.idAsHexString(), span2.idAsHexString());
-  EXPECT_EQ(span.parentIdAsHexString(), span2.parentIdAsHexString());
-  EXPECT_EQ(span.traceIdAsHexString(), span2.traceIdAsHexString());
-  EXPECT_EQ(span.timestamp(), span2.timestamp());
-  EXPECT_EQ(span.duration(), span2.duration());
-  EXPECT_EQ(span.startTime(), span2.startTime());
-  EXPECT_EQ(span.debug(), span2.debug());
-  EXPECT_EQ(span.isSetDuration(), span2.isSetDuration());
-  EXPECT_EQ(span.isSetParentId(), span2.isSetParentId());
-  EXPECT_EQ(span.isSetTimestamp(), span2.isSetTimestamp());
-  EXPECT_EQ(span.isSetTraceIdHigh(), span2.isSetTraceIdHigh());
-}
-
 TEST(ZipkinCoreTypesSpanTest, setTag) {
   Event::SimulatedTimeSystem test_time;
-  Span span(test_time.timeSystem());
+  MockTracer tracer;
+  Span span(test_time.timeSystem(), tracer);
 
   span.setTag("key1", "value1");
   span.setTag("key2", "value2");

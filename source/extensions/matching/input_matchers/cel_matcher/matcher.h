@@ -44,6 +44,8 @@ private:
   Filters::Common::Expr::BuilderInstanceSharedPtr builder_;
   // Expression proto must outlive the compiled expression.
   CelMatcherSharedPtr cel_matcher_;
+  // Store converted expression for legacy formats to ensure proper lifetime.
+  absl::optional<cel::expr::Expr> converted_expr_;
   CompiledExpressionPtr compiled_expr_;
 };
 

@@ -15,6 +15,7 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         ":network_type_socket_option_lib",
+        ":network_types_lib",
         ":proxy_settings_lib",
         "//library/common:engine_types_lib",
         "//library/common/network:src_addr_socket_option_lib",
@@ -113,6 +114,14 @@ envoy_cc_library(
     deps = [
         "@envoy//source/common/network:utility_lib",
     ],
+)
+
+envoy_cc_library(
+    name = "network_types_lib",
+    hdrs = [
+        "network_types.h",
+    ],
+    repository = "@envoy",
 )
 
 envoy_cc_library(

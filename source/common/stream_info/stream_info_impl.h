@@ -94,7 +94,7 @@ struct UpstreamInfoImpl : public UpstreamInfo {
   void setUpstreamProtocol(Http::Protocol protocol) override { upstream_protocol_ = protocol; }
   absl::optional<Http::Protocol> upstreamProtocol() const override { return upstream_protocol_; }
 
-  Upstream::HostDescriptionConstSharedPtr upstream_host_{};
+  Upstream::HostDescriptionConstSharedPtr upstream_host_;
   Network::Address::InstanceConstSharedPtr upstream_local_address_;
   Network::Address::InstanceConstSharedPtr upstream_remote_address_;
   UpstreamTiming upstream_timing_;
@@ -299,6 +299,8 @@ struct StreamInfoImpl : public StreamInfo {
     return *downstream_connection_info_provider_;
   }
 
+  const Router::VirtualHostConstSharedPtr& virtualHost() const override { return vhost_; }
+
   Router::RouteConstSharedPtr route() const override { return route_; }
 
   envoy::config::core::v3::Metadata& dynamicMetadata() override { return metadata_; };
@@ -418,6 +420,7 @@ struct StreamInfoImpl : public StreamInfo {
                            other_response_flags.end());
     health_check_request_ = info.healthCheck();
     route_ = info.route();
+    vhost_ = info.virtualHost();
     metadata_ = info.dynamicMetadata();
     filter_state_ = info.filterState();
     request_headers_ = request_headers;
@@ -478,10 +481,11 @@ private:
   absl::optional<std::string> connection_termination_details_;
 
 public:
-  absl::InlinedVector<ResponseFlag, 4> response_flags_{};
+  absl::InlinedVector<ResponseFlag, 4> response_flags_;
   std::string custom_flags_;
   Router::RouteConstSharedPtr route_;
-  envoy::config::core::v3::Metadata metadata_{};
+  Router::VirtualHostConstSharedPtr vhost_;
+  envoy::config::core::v3::Metadata metadata_;
   FilterStateSharedPtr filter_state_;
 
 private:

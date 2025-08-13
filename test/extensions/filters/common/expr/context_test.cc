@@ -932,6 +932,8 @@ TEST(Context, XDSAttributes) {
   info.upstreamInfo()->setUpstreamHost(upstream_host);
   std::shared_ptr<NiceMock<Router::MockRoute>> route{new NiceMock<Router::MockRoute>()};
   EXPECT_CALL(info, route()).WillRepeatedly(Return(route));
+  info.virtual_host_ = route->virtual_host_;
+
   const std::string chain_name = "fake_filter_chain_name";
 
   auto filter_chain_info = std::make_shared<NiceMock<Network::MockFilterChainInfo>>();
@@ -982,7 +984,7 @@ TEST(Context, XDSAttributes) {
     const auto value = wrapper[CelValue::CreateStringView(VirtualHostMetadata)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsMessage());
-    EXPECT_EQ(&route->virtual_host_.metadata_, value.value().MessageOrDie());
+    EXPECT_EQ(&route->virtual_host_->metadata_, value.value().MessageOrDie());
   }
   {
     const auto value = wrapper[CelValue::CreateStringView(UpstreamHostMetadata)];

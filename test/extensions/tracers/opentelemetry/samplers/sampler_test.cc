@@ -156,7 +156,7 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
   // So the dynamic_cast should be safe.
   std::unique_ptr<Span> span(dynamic_cast<Span*>(tracing_span.release()));
   EXPECT_TRUE(span->sampled());
-  EXPECT_STREQ(span->tracestate().c_str(), "this_is=tracesate");
+  EXPECT_EQ(span->tracestate(), "this_is=tracesate");
 
   // shouldSamples return a result containing additional attributes and Decision::Drop
   EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, _, _, _))
@@ -184,7 +184,7 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
                                    {Tracing::Reason::Sampling, true});
   std::unique_ptr<Span> unsampled_span(dynamic_cast<Span*>(tracing_span.release()));
   EXPECT_FALSE(unsampled_span->sampled());
-  EXPECT_STREQ(unsampled_span->tracestate().c_str(), "this_is=another_tracesate");
+  EXPECT_EQ(unsampled_span->tracestate(), "this_is=another_tracesate");
   auto proto_span = unsampled_span->spanForTest();
 
   auto get_attr_value =

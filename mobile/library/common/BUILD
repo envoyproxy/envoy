@@ -32,6 +32,7 @@ envoy_cc_library(
         "//library/common/http:header_utility_lib",
         "//library/common/logger:logger_delegate_lib",
         "//library/common/network:connectivity_manager_lib",
+        "//library/common/network:network_types_lib",
         "//library/common/network:proxy_api_lib",
         "//library/common/stats:utility_lib",
         "//library/common/types:c_types_lib",

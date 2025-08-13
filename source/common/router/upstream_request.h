@@ -143,7 +143,6 @@ public:
   };
 
   void readEnable();
-  void encodeBodyAndTrailers();
 
   // Getters and setters
   Upstream::HostDescriptionOptConstRef upstreamHost() {

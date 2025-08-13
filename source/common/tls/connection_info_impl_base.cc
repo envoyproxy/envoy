@@ -17,6 +17,16 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
+namespace {
+// There must be an version of this function for each type possible in variant `CachedValue`.
+bool shouldRecalculateCachedEntry(const std::string& str) { return str.empty(); }
+bool shouldRecalculateCachedEntry(const std::vector<std::string>& vec) { return vec.empty(); }
+bool shouldRecalculateCachedEntry(const Ssl::ParsedX509NamePtr& ptr) { return ptr == nullptr; }
+bool shouldRecalculateCachedEntry(const bssl::UniquePtr<GENERAL_NAMES>& ptr) {
+  return ptr == nullptr;
+}
+} // namespace
+
 template <typename ValueType>
 const ValueType&
 ConnectionInfoImplBase::getCachedValueOrCreate(CachedValueTag tag,
@@ -26,6 +36,16 @@ ConnectionInfoImplBase::getCachedValueOrCreate(CachedValueTag tag,
     const ValueType* val = absl::get_if<ValueType>(&it->second);
     ASSERT(val != nullptr, "Incorrect type in variant");
     if (val != nullptr) {
+
+      // Some values are retrieved too early, for example if properties of a peer certificate are
+      // retrieved before the handshake is complete, an empty value is cached. The value must be
+      // in the cache, so that we can return a valid reference, but in those cases if another caller
+      // later retrieves the same value, we must recalculate the value.
+      if (shouldRecalculateCachedEntry(*val)) {
+        it->second = create(ssl());
+        val = &absl::get<ValueType>(it->second);
+      }
+
       return *val;
     }
   }

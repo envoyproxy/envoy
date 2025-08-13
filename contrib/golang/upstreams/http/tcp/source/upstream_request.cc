@@ -547,7 +547,7 @@ CAPIStatus HttpTcpBridge::getStringValue(int id, uint64_t* value_data, int* valu
   // it on the Go side.
   switch (static_cast<EnvoyValue>(id)) {
   case EnvoyValue::RouteName:
-    str_value_ = upstream_request_->route().virtualHost().routeConfig().name();
+    str_value_ = upstream_request_->route().virtualHost()->routeConfig().name();
     break;
   case EnvoyValue::ClusterName: {
     str_value_ = route_entry_->clusterName();

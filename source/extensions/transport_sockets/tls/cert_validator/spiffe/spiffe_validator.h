@@ -43,7 +43,8 @@ public:
       : spiffe_data_(std::make_shared<SpiffeData>()), api_(context.api()), stats_(stats),
         time_source_(context.timeSource()) {};
   SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
-                  Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope);
+                  Server::Configuration::CommonFactoryContext& context, Stats::Scope& scope,
+                  absl::Status& creation_status);
 
   ~SPIFFEValidator() override = default;
 
@@ -84,7 +85,7 @@ private:
                                             X509_VERIFY_PARAM* verify_param,
                                             std::string& error_details);
 
-  void initializeCertificateRefresh(Server::Configuration::CommonFactoryContext& context);
+  absl::Status initializeCertificateRefresh(Server::Configuration::CommonFactoryContext& context);
   void initializeCertExpirationStats(Stats::Scope& scope, const std::string& cert_name);
   absl::StatusOr<std::shared_ptr<SpiffeData>>
   parseTrustBundles(const std::string& trust_bundles_str);

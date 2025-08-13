@@ -77,7 +77,7 @@ message QuicProtocolOptions {
       [(validate.rules).uint32 = {lte: 16777216 gte: 1}];
 
   // Similar to ``initial_stream_window_size``, but for connection-level
-  // flow-control. Valid values rage from 1 to 25165824 (24MB, maximum supported by QUICHE) and defaults
+  // flow-control. Valid values range from 1 to 25165824 (24MB, maximum supported by QUICHE) and defaults
   // to 25165824 (24 * 1024 * 1024).
   //
   // .. note::
@@ -420,7 +420,7 @@ message Http1ProtocolOptions {
   // envoy.reloadable_features.http1_use_balsa_parser.
   // See issue #21245.
   google.protobuf.BoolValue use_balsa_parser = 9
-      [(xds.annotations.v3.field_status).work_in_progress = true];
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // [#not-implemented-hide:] Hiding so that field can be removed.
   // If true, and BalsaParser is used (either `use_balsa_parser` above is true,
@@ -674,7 +674,7 @@ message GrpcProtocolOptions {
 }
 
 // A message which allows using HTTP/3.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message Http3ProtocolOptions {
   QuicProtocolOptions quic_protocol_options = 1;
 
@@ -709,6 +709,10 @@ message Http3ProtocolOptions {
   // No huffman encoding, zero dynamic table capacity and no cookie crumbing.
   // This can be useful for trading off CPU vs bandwidth when an upstream HTTP/3 connection multiplexes multiple downstream connections.
   bool disable_qpack = 7;
+
+  // Disables connection level flow control for HTTP/3 streams. This is useful in situations where the streams share the same connection
+  // but originate from different end-clients, so that each stream can make progress independently at non-front-line proxies.
+  bool disable_connection_flow_control_for_streams = 8;
 }
 
 // A message to control transformations to the :scheme header

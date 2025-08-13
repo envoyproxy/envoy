@@ -113,10 +113,10 @@ public:
   virtual Stats::Scope& serverScope() PURE;
 
   /**
-   * @return ThreadLocal::SlotAllocator& the thread local storage engine for the server. This is
+   * @return ThreadLocal::Instance& the thread local storage engine for the server. This is
    *         used to allow runtime lockless updates to configuration, etc. across multiple threads.
    */
-  virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
+  virtual ThreadLocal::Instance& threadLocal() PURE;
 
   /**
    * @return Upstream::ClusterManager& singleton for use by the entire server.

@@ -45,14 +45,13 @@ public:
         cluster_config.cluster_type().typed_config(), ProtobufMessage::getStrictValidationVisitor(),
         config));
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               true);
 
     ON_CALL(server_context_, api()).WillByDefault(testing::ReturnRef(*api_));
 
     if (uses_tls) {
-      EXPECT_CALL(ssl_context_manager_, createSslClientContext(_, _));
+      EXPECT_CALL(server_context_.ssl_context_manager_, createSslClientContext(_, _));
     }
     EXPECT_CALL(*dns_cache_manager_, getCache(_));
     // Below we return a nullptr handle which has no effect on the code under test but isn't
@@ -63,7 +62,7 @@ public:
     absl::Status creation_status = absl::OkStatus();
     cluster_.reset(new Cluster(cluster_config, std::move(cache), config, factory_context,
                                this->get(), creation_status));
-    THROW_IF_NOT_OK(creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
     thread_aware_lb_ = std::make_unique<Cluster::ThreadAwareLoadBalancer>(*cluster_);
     lb_factory_ = thread_aware_lb_->factory();
     refreshLb();
@@ -661,9 +660,8 @@ protected:
   void createCluster(const std::string& yaml_config) {
     envoy::config::cluster::v3::Cluster cluster_config =
         Upstream::parseClusterFromV3Yaml(yaml_config);
-    Upstream::ClusterFactoryContextImpl cluster_factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        true);
+    Upstream::ClusterFactoryContextImpl cluster_factory_context(server_context_, nullptr, nullptr,
+                                                                true);
     std::unique_ptr<Upstream::ClusterFactory> cluster_factory = std::make_unique<ClusterFactory>();
 
     auto result = cluster_factory->create(cluster_config, cluster_factory_context);
@@ -680,7 +678,6 @@ private:
   Stats::TestUtil::TestStore& stats_store_ = server_context_.store_;
   Api::ApiPtr api_{Api::createApiForTest(stats_store_)};
 
-  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   Upstream::ClusterSharedPtr cluster_;
   Upstream::ThreadAwareLoadBalancerPtr thread_aware_lb_;
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;

@@ -52,6 +52,8 @@ routing PRs, questions, etc. to the right place.
   * Lua, ExtAuthZ, Matchers, CI, Dependencies, Docs.
 * Paul Ogilby ([paul-r-gall](https://github.com/paul-r-gall)) (pgal@google.com)
   * Request mirroring, data plane
+* Mike Krinkin ([krinkinmu](https://github.com/krinkinmu)) (krinkin.m.u@gmail.com)
+  * Build, tooling.
 
 # Envoy mobile maintainers
 

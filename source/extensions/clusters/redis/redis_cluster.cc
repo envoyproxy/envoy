@@ -45,7 +45,7 @@ RedisCluster::RedisCluster(
     Network::DnsResolverSharedPtr dns_resolver, ClusterSlotUpdateCallBackSharedPtr lb_factory,
     absl::Status& creation_status)
     : Upstream::BaseDynamicClusterImpl(cluster, context, creation_status),
-      cluster_manager_(context.clusterManager()),
+      cluster_manager_(context.serverFactoryContext().clusterManager()),
       cluster_refresh_rate_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(redis_cluster, cluster_refresh_rate, 5000))),
       cluster_refresh_timeout_(std::chrono::milliseconds(
@@ -69,16 +69,12 @@ RedisCluster::RedisCluster(
           info(), context.serverFactoryContext().api())),
       auth_password_(NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authPassword(
           info(), context.serverFactoryContext().api())),
-      cluster_name_(cluster.name()),
-      refresh_manager_(Common::Redis::getClusterRefreshManager(
-          context.serverFactoryContext().singletonManager(),
-          context.serverFactoryContext().mainThreadDispatcher(), context.clusterManager(),
-          context.serverFactoryContext().api().timeSource())),
-      registration_handle_(refresh_manager_->registerCluster(
-          cluster_name_, redirect_refresh_interval_, redirect_refresh_threshold_,
-          failure_refresh_threshold_, host_degraded_refresh_threshold_, [&]() {
-            redis_discovery_session_->resolve_timer_->enableTimer(std::chrono::milliseconds(0));
-          })) {
+      cluster_name_(cluster.name()), refresh_manager_(Common::Redis::getClusterRefreshManager(
+                                         context.serverFactoryContext().singletonManager(),
+                                         context.serverFactoryContext().mainThreadDispatcher(),
+                                         context.serverFactoryContext().clusterManager(),
+                                         context.serverFactoryContext().api().timeSource())),
+      registration_handle_(nullptr) {
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
@@ -87,6 +83,32 @@ RedisCluster::RedisCluster(
           *this, host.socket_address().address(), host.socket_address().port_value()));
     }
   }
+
+  // Register the cluster callback using weak_ptr to avoid use-after-free
+  std::weak_ptr<RedisDiscoverySession> weak_session = redis_discovery_session_;
+  registration_handle_ = refresh_manager_->registerCluster(
+      cluster_name_, redirect_refresh_interval_, redirect_refresh_threshold_,
+      failure_refresh_threshold_, host_degraded_refresh_threshold_, [weak_session]() {
+        // Try to lock the weak pointer to ensure the session is still alive
+        auto session = weak_session.lock();
+        if (session && session->resolve_timer_) {
+          session->resolve_timer_->enableTimer(std::chrono::milliseconds(0));
+        }
+      });
+}
+
+RedisCluster::~RedisCluster() {
+  // Set flag to prevent any callbacks from executing during destruction
+  is_destroying_.store(true);
+
+  // Reset redis_discovery_session_ before other members are destroyed
+  // to ensure any pending callbacks from refresh_manager_ don't access it.
+  // This matches the approach in PR #39625.
+  redis_discovery_session_.reset();
+
+  // Also clear DNS discovery targets to prevent their callbacks from
+  // accessing the destroyed cluster.
+  dns_discovery_resolve_targets_.clear();
 }
 
 void RedisCluster::startPreInit() {
@@ -198,7 +220,7 @@ RedisCluster::DnsDiscoveryResolveTarget::~DnsDiscoveryResolveTarget() {
     active_query_->cancel(Network::ActiveDnsQuery::CancelReason::QueryAbandoned);
   }
   // Disable timer for mock tests.
-  if (resolve_timer_) {
+  if (resolve_timer_ && resolve_timer_->enabled()) {
     resolve_timer_->disableTimer();
   }
 }
@@ -220,8 +242,13 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
           }
 
           if (!resolve_timer_) {
-            resolve_timer_ =
-                parent_.dispatcher_.createTimer([this]() -> void { startResolveDns(); });
+            resolve_timer_ = parent_.dispatcher_.createTimer([this]() -> void {
+              // Check if the parent cluster is being destroyed
+              if (parent_.is_destroying_.load()) {
+                return;
+              }
+              startResolveDns();
+            });
           }
           // if the initial dns resolved to empty, we'll skip the redis discovery phase and
           // treat it as an empty cluster.
@@ -244,7 +271,13 @@ RedisCluster::RedisDiscoverySession::RedisDiscoverySession(
     Envoy::Extensions::Clusters::Redis::RedisCluster& parent,
     NetworkFilters::Common::Redis::Client::ClientFactory& client_factory)
     : parent_(parent), dispatcher_(parent.dispatcher_),
-      resolve_timer_(parent.dispatcher_.createTimer([this]() -> void { startResolveRedis(); })),
+      resolve_timer_(parent.dispatcher_.createTimer([this]() -> void {
+        // Check if the parent cluster is being destroyed
+        if (parent_.is_destroying_.load()) {
+          return;
+        }
+        startResolveRedis();
+      })),
       client_factory_(client_factory), buffer_timeout_(0),
       redis_command_stats_(
           NetworkFilters::Common::Redis::RedisCommandStats::createRedisCommandStats(

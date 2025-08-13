@@ -96,6 +96,12 @@ void Filter::populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descript
     return;
   }
 
+  // Rate Limit config in typed_per_filter_config takes precedence over route's rate limit.
+  if (config_.get()->hasRateLimitConfigs()) {
+    config_.get()->populateDescriptors(headers, callbacks_->streamInfo(), descriptors);
+    return;
+  }
+
   // Get all applicable rate limit policy entries for the route.
   populateRateLimitDescriptorsForPolicy(route_entry->rateLimitPolicy(), descriptors, headers,
                                         on_stream_done);
@@ -104,12 +110,12 @@ void Filter::populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descript
   case VhRateLimitOptions::Ignore:
     break;
   case VhRateLimitOptions::Include:
-    populateRateLimitDescriptorsForPolicy(route_->virtualHost().rateLimitPolicy(), descriptors,
+    populateRateLimitDescriptorsForPolicy(route_->virtualHost()->rateLimitPolicy(), descriptors,
                                           headers, on_stream_done);
     break;
   case VhRateLimitOptions::Override:
     if (route_entry->rateLimitPolicy().empty()) {
-      populateRateLimitDescriptorsForPolicy(route_->virtualHost().rateLimitPolicy(), descriptors,
+      populateRateLimitDescriptorsForPolicy(route_->virtualHost()->rateLimitPolicy(), descriptors,
                                             headers, on_stream_done);
     }
   }
