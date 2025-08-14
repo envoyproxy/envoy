@@ -50,6 +50,12 @@ bug_fixes:
     when used with other listener filters. The bug was triggered when a previous listener filter processed more data
     than the TLS inspector had requested, causing the TLS inspector to incorrectly calculate its buffer growth strategy.
     The fix ensures that buffer growth is now based on actual bytes available rather than the previously requested amount.
+- area: oauth2
+  change: |
+    Fixed a bug introduced in PR [#40228](https://github.com/envoyproxy/envoy/pull/40228), where OAuth2 cookies were
+    removed for requests matching the ``pass_through_matcher`` configuration. This broke setups with multiple OAuth2
+    filter instances using different ``pass_through_matcher`` configurations, because the first matching instance removed
+    the OAuth2 cookies--even when a passthrough was intended--impacting subsequent filters that still needed those cookies.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
