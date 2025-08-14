@@ -29,8 +29,8 @@ GO_VERSION = "1.23.1"
 JQ_VERSION = "1.7"
 YQ_VERSION = "4.24.4"
 
-BUF_SHA = "736e74d1697dcf253bc60b2f0fb4389c39dbc7be68472a7d564a953df8b19d12"
-BUF_VERSION = "v1.50.0"
+BUF_SHA = "5790beb45aaf51a6d7e68ca2255b22e1b14c9ae405a6c472cdcfc228c66abfc1"
+BUF_VERSION = "v1.56.0"
 
 def envoy_dependency_imports(
         go_version = GO_VERSION,
