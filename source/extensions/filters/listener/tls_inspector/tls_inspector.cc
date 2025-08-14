@@ -175,6 +175,12 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
   return Network::FilterStatus::StopIteration;
 }
 
+void Filter::setFilterState(FilterState::ErrorType error_type) {
+  cb_->filterState().setData(FilterState::key(), std::make_unique<FilterState>(error_type),
+                             StreamInfo::FilterState::StateType::Mutable,
+                             StreamInfo::FilterState::LifeSpan::Connection);
+}
+
 ParseState Filter::parseClientHello(const void* data, size_t len,
                                     uint64_t bytes_already_processed) {
   // Ownership remains here though we pass a reference to it in `SSL_set0_rbio()`.
@@ -198,6 +204,7 @@ ParseState Filter::parseClientHello(const void* data, size_t len,
         // We've hit the specified size limit. This is an unreasonably large ClientHello;
         // indicate failure.
         config_->stats().client_hello_too_large_.inc();
+        setFilterState(FilterState::ErrorType::ClientHelloTooLarge);
         return ParseState::Error;
       }
       if (read_ >= requested_read_bytes_) {
@@ -219,9 +226,11 @@ ParseState Filter::parseClientHello(const void* data, size_t len,
           // We've hit the specified size limit. This is an unreasonably large ClientHello;
           // indicate failure.
           config_->stats().client_hello_too_large_.inc();
+          setFilterState(FilterState::ErrorType::ClientHelloTooLarge);
           return ParseState::Error;
         }
         config_->stats().tls_not_found_.inc();
+        setFilterState(FilterState::ErrorType::ClientHelloNotDetected);
         ENVOY_LOG(
             debug, "tls inspector: parseClientHello failed: {}",
             Extensions::TransportSockets::Tls::Utility::getLastCryptoError().value_or("unknown"));
@@ -367,6 +376,10 @@ void Filter::createJA4Hash(const SSL_CLIENT_HELLO* ssl_client_hello) {
   std::string fingerprint = JA4Fingerprinter::create(ssl_client_hello);
   ENVOY_LOG(trace, "tls:createJA4Hash(), fingerprint: {}", fingerprint);
   cb_->socket().setJA4Hash(fingerprint);
+}
+
+const std::string& FilterState::key() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tls_inspector_filter_state");
 }
 
 } // namespace TlsInspector
