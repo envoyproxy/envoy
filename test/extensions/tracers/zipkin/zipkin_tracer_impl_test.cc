@@ -5,11 +5,8 @@
 
 #include "envoy/config/trace/v3/zipkin.pb.h"
 
-#include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
-#include "source/common/runtime/runtime_impl.h"
-#include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 #include "source/extensions/tracers/zipkin/zipkin_tracer_impl.h"
 
@@ -206,11 +203,11 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
   }
 }
 
-TEST_F(ZipkinDriverTest, W3cFallbackConfiguration) {
+TEST_F(ZipkinDriverTest, TraceContextOptionConfiguration) {
   cm_.initializeClusters({"fake_cluster"}, {});
 
   {
-    // Test default w3c_fallback value (false).
+    // Test default trace_context_option value (USE_B3) - W3C fallback should be disabled.
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     collector_endpoint: /api/v2/spans
@@ -220,38 +217,84 @@ TEST_F(ZipkinDriverTest, W3cFallbackConfiguration) {
     TestUtility::loadFromYaml(yaml_string, zipkin_config);
 
     setup(zipkin_config, true);
-    EXPECT_FALSE(driver_->w3cFallbackEnabled());
+    EXPECT_FALSE(driver_->w3cFallbackEnabled()); // W3C fallback should be disabled by default
+    EXPECT_EQ(driver_->traceContextOption(), envoy::config::trace::v3::ZipkinConfig::USE_B3);
   }
 
   {
-    // Test w3c_fallback explicitly set to false.
+    // Test trace_context_option explicitly set to USE_B3 - W3C fallback should be disabled.
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     collector_endpoint: /api/v2/spans
     collector_endpoint_version: HTTP_JSON
-    w3c_fallback: false
+    trace_context_option: USE_B3
     )EOF";
     envoy::config::trace::v3::ZipkinConfig zipkin_config;
     TestUtility::loadFromYaml(yaml_string, zipkin_config);
 
     setup(zipkin_config, true);
-    EXPECT_FALSE(driver_->w3cFallbackEnabled());
+    EXPECT_FALSE(driver_->w3cFallbackEnabled()); // W3C fallback should be disabled
+    EXPECT_EQ(driver_->traceContextOption(), envoy::config::trace::v3::ZipkinConfig::USE_B3);
   }
 
   {
-    // Test w3c_fallback explicitly set to true.
+    // Test trace_context_option set to USE_B3_WITH_W3C_PROPAGATION - W3C fallback should be enabled.
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     collector_endpoint: /api/v2/spans
     collector_endpoint_version: HTTP_JSON
-    w3c_fallback: true
+    trace_context_option: USE_B3_WITH_W3C_PROPAGATION
     )EOF";
     envoy::config::trace::v3::ZipkinConfig zipkin_config;
     TestUtility::loadFromYaml(yaml_string, zipkin_config);
 
     setup(zipkin_config, true);
-    EXPECT_TRUE(driver_->w3cFallbackEnabled());
+    EXPECT_TRUE(driver_->w3cFallbackEnabled()); // W3C fallback should be enabled
+    EXPECT_EQ(driver_->traceContextOption(), envoy::config::trace::v3::ZipkinConfig::USE_B3_WITH_W3C_PROPAGATION);
   }
+}
+
+TEST_F(ZipkinDriverTest, DualHeaderInjection) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  // Test dual header injection when USE_B3_WITH_W3C_PROPAGATION is enabled
+  const std::string yaml_string = R"EOF(
+  collector_cluster: fake_cluster
+  collector_endpoint: /api/v2/spans
+  collector_endpoint_version: HTTP_JSON
+  trace_context_option: USE_B3_WITH_W3C_PROPAGATION
+  )EOF";
+  envoy::config::trace::v3::ZipkinConfig zipkin_config;
+  TestUtility::loadFromYaml(yaml_string, zipkin_config);
+
+  setup(zipkin_config, true);
+
+  // Create a span and test W3C header injection
+  Tracing::TestTraceContextImpl trace_context{{}};
+  
+  Tracing::SpanPtr span = driver_->startSpan(config_, trace_context, stream_info_,
+                                             "ingress", {Tracing::Reason::Sampling, true});
+  
+  // Inject context into headers (simulating upstream request)
+  Tracing::UpstreamContext upstream_context;
+  span->injectContext(trace_context, upstream_context);
+  
+  // Verify W3C traceparent header is set
+  auto traceparent = trace_context.get("traceparent");
+  EXPECT_TRUE(traceparent.has_value());
+  EXPECT_FALSE(traceparent.value().empty());
+  
+  // Verify traceparent format: 00-{32 hex trace-id}-{16 hex span-id}-{2 hex flags}
+  const std::string traceparent_value = std::string(traceparent.value());
+  EXPECT_EQ(traceparent_value.length(), 55); // 2+1+32+1+16+1+2
+  EXPECT_EQ(traceparent_value.substr(0, 3), "00-"); // version
+  EXPECT_EQ(traceparent_value[35], '-'); // separator after trace-id
+  EXPECT_EQ(traceparent_value[52], '-'); // separator after span-id
+  
+  // Verify B3 headers are ALSO set when dual propagation is enabled
+  EXPECT_TRUE(trace_context.get("x-b3-traceid").has_value());
+  EXPECT_TRUE(trace_context.get("x-b3-spanid").has_value());
+  EXPECT_TRUE(trace_context.get("x-b3-sampled").has_value());
 }
 
 TEST_F(ZipkinDriverTest, AllowCollectorClusterToBeAddedViaApi) {

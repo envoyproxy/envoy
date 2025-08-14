@@ -25,6 +25,18 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message ZipkinConfig {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.trace.v2.ZipkinConfig";
 
+  // Available trace context options for handling different trace header formats.
+  enum TraceContextOption {
+    // Use B3 headers only (default behavior).
+    USE_B3 = 0;
+
+    // Enable B3 and W3C dual header support:
+    // - For downstream: Extract from B3 headers first, fallback to W3C traceparent if B3 is unavailable.
+    // - For upstream: Inject both B3 and W3C traceparent headers.
+    // When this option is NOT set, only B3 headers are used for both extraction and injection.
+    USE_B3_WITH_W3C_PROPAGATION = 1;
+  }
+
   // Available Zipkin collector endpoint versions.
   enum CollectorEndpointVersion {
     // Zipkin API v1, JSON over HTTP.
@@ -89,11 +101,9 @@ message ZipkinConfig {
   bool split_spans_for_request = 7
       [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
-  // Determines whether to fallback to extracting trace information from W3C trace headers
-  // (traceparent and tracestate) when B3 headers (x-b3-\*) are not present or cannot be extracted.
+  // Determines which trace context format to use for trace header extraction and propagation.
+  // This controls both downstream request header extraction and upstream request header injection.
   // Here is the spec for W3C trace headers: https://www.w3.org/TR/trace-context/
-  // When enabled, the Zipkin tracer will attempt to extract trace context from W3C headers as a
-  // secondary option if B3 headers are unavailable. B3 headers always take precedence when present.
-  // The default value is false to maintain backward compatibility.
-  bool w3c_fallback = 8;
+  // The default value is USE_B3 to maintain backward compatibility.
+  TraceContextOption trace_context_option = 8;
 }

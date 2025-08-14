@@ -8,12 +8,7 @@
 #include "envoy/tracing/trace_driver.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "source/common/common/empty_string.h"
 #include "source/common/http/async_client_utility.h"
-#include "source/common/http/header_map_impl.h"
-#include "source/common/json/json_loader.h"
-#include "source/common/tracing/common_values.h"
-#include "source/common/tracing/null_span_impl.h"
 #include "source/common/upstream/cluster_update_tracker.h"
 #include "source/extensions/tracers/zipkin/span_buffer.h"
 #include "source/extensions/tracers/zipkin/tracer.h"
@@ -72,7 +67,12 @@ public:
   const std::string& hostname() { return hostname_; }
   Runtime::Loader& runtime() { return runtime_; }
   ZipkinTracerStats& tracerStats() { return tracer_stats_; }
-  bool w3cFallbackEnabled() const { return w3c_fallback_enabled_; }
+  bool w3cFallbackEnabled() const { 
+    return trace_context_option_ == envoy::config::trace::v3::ZipkinConfig::USE_B3_WITH_W3C_PROPAGATION; 
+  }
+  envoy::config::trace::v3::ZipkinConfig::TraceContextOption traceContextOption() const { 
+    return trace_context_option_; 
+  }
 
 private:
   /**
@@ -93,7 +93,7 @@ private:
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
   TimeSource& time_source_;
-  bool w3c_fallback_enabled_;
+  envoy::config::trace::v3::ZipkinConfig::TraceContextOption trace_context_option_;
 };
 
 /**

@@ -192,10 +192,11 @@ new_features:
     :ref:`Virtual host object API <config_http_filters_lua_virtual_host_wrapper>` for more details.
 - area: tracing
   change: |
-    Added :ref:`w3c_fallback <envoy_v3_api_field_config.trace.v3.ZipkinConfig.w3c_fallback>`
-    to the Zipkin tracer config. This allows the Zipkin tracer to extract trace information from W3C trace headers
-    when x-b3 headers are not present or cannot be extracted. This feature is disabled by default to maintain
-    backward compatibility.
+    Added :ref:`trace_context_option <envoy_v3_api_field_config.trace.v3.ZipkinConfig.trace_context_option>` enum
+    in the Zipkin tracer config. When set to ``USE_B3_WITH_W3C_PROPAGATION``, the tracer will:
+    extract trace information from W3C trace headers when B3 headers are not present (downstream),
+    and inject both B3 and W3C trace headers for upstream requests to maximize compatibility.
+    The default value ``USE_B3`` maintains backward compatibility with B3-only behavior.
 - area: rbac
   change: |
     Switch the IP matcher to use LC-Trie for performance improvements.

@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/trace/v3/zipkin.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/tracing/trace_config.h"
 
@@ -69,6 +70,12 @@ public:
    */
   virtual SpanPtr startSpan(const Tracing::Config&, const std::string& span_name,
                             SystemTime timestamp, const SpanContext& previous_context) PURE;
+
+  /**
+   * Gets the current trace context option for header injection behavior.
+   * @return The current trace context option.
+   */
+  virtual envoy::config::trace::v3::ZipkinConfig::TraceContextOption traceContextOption() const PURE;
 };
 
 /**

@@ -572,6 +572,11 @@ public:
   std::string getTraceId() const override { return traceIdAsHexString(); };
 
 private:
+  /**
+   * Injects W3C trace context headers based on this span's context.
+   * @param trace_context The trace context to inject headers into.
+   */
+  void injectW3CContext(Tracing::TraceContext& trace_context);
   static const std::string EMPTY_HEX_STRING_;
   uint64_t trace_id_{0};
   std::string name_;
