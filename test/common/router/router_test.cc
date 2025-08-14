@@ -12,6 +12,7 @@
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/buffer/copy_on_write_buffer.h"
 #include "source/common/common/base64.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/config/metadata.h"
@@ -28,6 +29,7 @@
 #include "source/common/router/config_impl.h"
 #include "source/common/router/debug_config.h"
 #include "source/common/router/router.h"
+#include "source/common/router/router_cluster_config.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
 #include "source/common/stream_info/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
@@ -231,6 +233,49 @@ TEST_F(RouterTest, SenselessTestForCoverage) {
 
   router_->route();
   router_->timeSource();
+}
+
+TEST_F(RouterTest, CopyOnWriteEnabledDoesNotCrash) {
+  // Enable COW via cluster typed extension protocol options.
+  auto protocol_options = std::make_shared<Router::RouterClusterProtocolOptionsConfig>(true);
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_,
+              extensionProtocolOptions("envoy.filters.http.router"))
+      .WillRepeatedly(Return(protocol_options));
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+
+  Buffer::OwnedImpl body(std::string(256, 'X'));
+  auto st = router_->decodeData(body, true);
+  EXPECT_TRUE(st == Http::FilterDataStatus::StopIterationNoBuffer ||
+              st == Http::FilterDataStatus::Continue);
+  router_->onDestroy();
+}
+
+TEST_F(RouterTest, CopyOnWriteDefaultDisabledDoesNotCrash) {
+  // COW is disabled by default (no protocol options configured).
+  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_,
+              extensionProtocolOptions("envoy.filters.http.router"))
+      .WillRepeatedly(Return(nullptr));
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, false);
+
+  Buffer::OwnedImpl body(std::string(128, 'Y'));
+  auto st = router_->decodeData(body, true);
+  EXPECT_TRUE(st == Http::FilterDataStatus::StopIterationNoBuffer ||
+              st == Http::FilterDataStatus::Continue);
+  router_->onDestroy();
 }
 
 TEST_F(RouterTest, UpdateServerNameFilterStateWithoutHeaderOverride) {
