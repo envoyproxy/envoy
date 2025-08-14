@@ -1,7 +1,7 @@
 #pragma once
 
-#include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
 #include "source/common/runtime/runtime_protos.h"
+#include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -54,8 +54,8 @@ protected:
   void refresh(uint32_t priority) override {
     // Cache runtime value for performance
     force_weighted_algorithm_ = force_weighted_algorithm_runtime_ != absl::nullopt
-                                   ? force_weighted_algorithm_runtime_.value().enabled()
-                                   : false;
+                                    ? force_weighted_algorithm_runtime_.value().enabled()
+                                    : false;
 
     active_request_bias_ = active_request_bias_runtime_ != absl::nullopt
                                ? active_request_bias_runtime_.value().value()
@@ -93,10 +93,10 @@ private:
   const absl::optional<Runtime::Double> active_request_bias_runtime_;
   const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::SelectionMethod
       selection_method_{};
-  
+
   // Runtime support for force_weighted_algorithm flag
   const absl::optional<Runtime::FeatureFlag> force_weighted_algorithm_runtime_;
-  
+
   // Cached value for performance, updated in refresh()
   bool force_weighted_algorithm_{};
 };
