@@ -21,8 +21,8 @@ public:
   absl::optional<std::string>
   formatWithContext(const Envoy::Formatter::HttpFormatterContext& context,
                     const StreamInfo::StreamInfo&) const override;
-  ProtobufWkt::Value formatValueWithContext(const Envoy::Formatter::HttpFormatterContext& context,
-                                            const StreamInfo::StreamInfo&) const override;
+  Protobuf::Value formatValueWithContext(const Envoy::Formatter::HttpFormatterContext& context,
+                                         const StreamInfo::StreamInfo&) const override;
 
 private:
   const ::Envoy::LocalInfo::LocalInfo& local_info_;

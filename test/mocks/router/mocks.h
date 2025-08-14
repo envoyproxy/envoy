@@ -368,7 +368,7 @@ public:
   // Router::MetadataMatchCriteria
   MOCK_METHOD(const std::vector<MetadataMatchCriterionConstSharedPtr>&, metadataMatchCriteria, (),
               (const));
-  MOCK_METHOD(MetadataMatchCriteriaConstPtr, mergeMatchCriteria, (const ProtobufWkt::Struct&),
+  MOCK_METHOD(MetadataMatchCriteriaConstPtr, mergeMatchCriteria, (const Protobuf::Struct&),
               (const));
   MOCK_METHOD(MetadataMatchCriteriaConstPtr, filterMatchCriteria, (const std::set<std::string>&),
               (const));
@@ -759,7 +759,7 @@ public:
                Server::Configuration::ServerFactoryContext& context));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
 
   std::string name() const override { return "envoy.router.cluster_specifier_plugin.mock"; }

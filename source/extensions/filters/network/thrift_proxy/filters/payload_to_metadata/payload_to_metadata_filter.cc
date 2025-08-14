@@ -242,7 +242,7 @@ const std::string& PayloadToMetadataFilter::decideNamespace(const std::string& n
 
 bool PayloadToMetadataFilter::addMetadata(const std::string& meta_namespace, const std::string& key,
                                           std::string value, ValueType type) {
-  ProtobufWkt::Value val;
+  Protobuf::Value val;
   ASSERT(!value.empty());
 
   if (value.size() >= MAX_PAYLOAD_VALUE_LEN) {

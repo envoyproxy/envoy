@@ -2165,11 +2165,11 @@ protected:
 
     // Set the feature flag in SetUp as store_ is constructed in HistogramTest::SetUp.
     api_ = Api::createApiForTest(*store_);
-    ProtobufWkt::Struct base = TestUtility::parseYaml<ProtobufWkt::Struct>(
-        GetParam() == EnableIncludeHistograms::Yes ? R"EOF(
+    Protobuf::Struct base =
+        TestUtility::parseYaml<Protobuf::Struct>(GetParam() == EnableIncludeHistograms::Yes ? R"EOF(
     envoy.reloadable_features.enable_include_histograms: true
     )EOF"
-                                                   : R"EOF(
+                                                                                            : R"EOF(
     envoy.reloadable_features.enable_include_histograms: false
     )EOF");
     envoy::config::bootstrap::v3::LayeredRuntime layered_runtime;

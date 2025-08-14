@@ -28,7 +28,7 @@ namespace HeaderToMetadataFilter {
 namespace {
 
 MATCHER_P(MapEq, rhs, "") {
-  const ProtobufWkt::Struct& obj = arg;
+  const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
     EXPECT_EQ(obj.fields().at(entry.first).string_value(), entry.second);
@@ -37,7 +37,7 @@ MATCHER_P(MapEq, rhs, "") {
 }
 
 MATCHER_P(MapEqNum, rhs, "") {
-  const ProtobufWkt::Struct& obj = arg;
+  const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
     EXPECT_EQ(obj.fields().at(entry.first).number_value(), entry.second);
@@ -46,7 +46,7 @@ MATCHER_P(MapEqNum, rhs, "") {
 }
 
 MATCHER_P(MapEqValue, rhs, "") {
-  const ProtobufWkt::Struct& obj = arg;
+  const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
     EXPECT_TRUE(TestUtility::protoEqual(obj.fields().at(entry.first), entry.second));
@@ -289,10 +289,10 @@ response_rules:
 )EOF";
   EXPECT_TRUE(initializeFilter(response_config_yaml).ok());
 
-  ProtobufWkt::Value value;
+  Protobuf::Value value;
   auto* s = value.mutable_struct_value();
 
-  ProtobufWkt::Value v;
+  Protobuf::Value v;
   v.set_string_value("blafoo");
   (*s->mutable_fields())["k1"] = v;
   v.set_number_value(2019.07);
@@ -304,7 +304,7 @@ response_rules:
   ASSERT_TRUE(value.SerializeToString(&data));
   const auto encoded = Base64::encode(data.c_str(), data.size());
   Http::TestResponseHeaderMapImpl incoming_headers{{"x-authenticated", encoded}};
-  std::map<std::string, ProtobufWkt::Value> expected = {{"auth", value}};
+  std::map<std::string, Protobuf::Value> expected = {{"auth", value}};
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,

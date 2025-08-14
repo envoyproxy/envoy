@@ -115,14 +115,14 @@ public:
   /**
    * Sets the aws metadata field of the Span.
    */
-  void setAwsMetadata(const absl::flat_hash_map<std::string, ProtobufWkt::Value>& aws_metadata) {
+  void setAwsMetadata(const absl::flat_hash_map<std::string, Protobuf::Value>& aws_metadata) {
     aws_metadata_ = aws_metadata;
   }
 
   /*
    * Adds to the http request annotation field of the Span.
    */
-  void addToHttpRequestAnnotations(absl::string_view key, const ProtobufWkt::Value& value) {
+  void addToHttpRequestAnnotations(absl::string_view key, const Protobuf::Value& value) {
     http_request_annotations_.emplace(std::string(key), value);
   }
 
@@ -136,7 +136,7 @@ public:
   /*
    * Adds to the http response annotation field of the Span.
    */
-  void addToHttpResponseAnnotations(absl::string_view key, const ProtobufWkt::Value& value) {
+  void addToHttpResponseAnnotations(absl::string_view key, const Protobuf::Value& value) {
     http_response_annotations_.emplace(std::string(key), value);
   }
 
@@ -260,9 +260,9 @@ private:
   std::string name_;
   std::string origin_;
   std::string type_;
-  absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
-  absl::flat_hash_map<std::string, ProtobufWkt::Value> http_request_annotations_;
-  absl::flat_hash_map<std::string, ProtobufWkt::Value> http_response_annotations_;
+  absl::flat_hash_map<std::string, Protobuf::Value> aws_metadata_;
+  absl::flat_hash_map<std::string, Protobuf::Value> http_request_annotations_;
+  absl::flat_hash_map<std::string, Protobuf::Value> http_response_annotations_;
   absl::flat_hash_map<std::string, std::string> custom_annotations_;
   bool server_error_{false};
   uint64_t response_status_code_{0};
@@ -274,7 +274,7 @@ using SpanPtr = std::unique_ptr<Span>;
 class Tracer {
 public:
   Tracer(absl::string_view segment_name, absl::string_view origin,
-         const absl::flat_hash_map<std::string, ProtobufWkt::Value>& aws_metadata,
+         const absl::flat_hash_map<std::string, Protobuf::Value>& aws_metadata,
          DaemonBrokerPtr daemon_broker, TimeSource& time_source, Random::RandomGenerator& random)
       : segment_name_(segment_name), origin_(origin), aws_metadata_(aws_metadata),
         daemon_broker_(std::move(daemon_broker)), time_source_(time_source), random_(random) {}
@@ -296,7 +296,7 @@ public:
 private:
   const std::string segment_name_;
   const std::string origin_;
-  const absl::flat_hash_map<std::string, ProtobufWkt::Value> aws_metadata_;
+  const absl::flat_hash_map<std::string, Protobuf::Value> aws_metadata_;
   const DaemonBrokerPtr daemon_broker_;
   Envoy::TimeSource& time_source_;
   Random::RandomGenerator& random_;

@@ -62,7 +62,7 @@ void UdpTapSink::UdpTapSinkHandle::setStreamedTraceDataAndSubmit(
   // Set data from original trace to new trace.
   dst_streamed_trace.set_trace_id(src_streamed_trace.trace_id());
 
-  ProtobufWkt::Timestamp* dst_ts = dst_streamed_trace.mutable_event()->mutable_timestamp();
+  Protobuf::Timestamp* dst_ts = dst_streamed_trace.mutable_event()->mutable_timestamp();
   dst_ts->CopyFrom(src_streamed_trace.event().timestamp());
   dst_ts->set_nanos(dst_ts->nanos() + new_trace_cnt);
 

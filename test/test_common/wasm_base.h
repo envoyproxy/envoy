@@ -76,7 +76,7 @@ public:
     auto vm_config = plugin_config.mutable_vm_config();
     vm_config->set_vm_id("vm_id");
     vm_config->set_runtime(absl::StrCat("envoy.wasm.runtime.", runtime));
-    ProtobufWkt::StringValue vm_configuration_string;
+    Protobuf::StringValue vm_configuration_string;
     vm_configuration_string.set_value(vm_configuration_);
     vm_config->mutable_configuration()->PackFrom(vm_configuration_string);
     vm_config->mutable_code()->mutable_local()->set_inline_bytes(code);

@@ -1739,7 +1739,7 @@ public:
           // link time.
           auto& filter = *src_listener_config.add_listener_filters();
           filter.set_name("envoy.filters.listener.original_dst");
-          filter.mutable_typed_config()->PackFrom(ProtobufWkt::Struct());
+          filter.mutable_typed_config()->PackFrom(Protobuf::Struct());
           auto& virtual_listener_config = *bootstrap.mutable_static_resources()->add_listeners();
           virtual_listener_config = src_listener_config;
           virtual_listener_config.mutable_use_original_dst()->set_value(false);

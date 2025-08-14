@@ -24,8 +24,8 @@ Endpoint& Endpoint::operator=(const Endpoint& ep) {
   return *this;
 }
 
-const ProtobufWkt::Struct Endpoint::toStruct(Util::Replacements&) const {
-  ProtobufWkt::Struct endpoint;
+const Protobuf::Struct Endpoint::toStruct(Util::Replacements&) const {
+  Protobuf::Struct endpoint;
   auto* fields = endpoint.mutable_fields();
   if (!address_) {
     (*fields)[ENDPOINT_IPV4] = ValueUtil::stringValue("");
@@ -65,8 +65,8 @@ void Annotation::changeEndpointServiceName(const std::string& service_name) {
   }
 }
 
-const ProtobufWkt::Struct Annotation::toStruct(Util::Replacements& replacements) const {
-  ProtobufWkt::Struct annotation;
+const Protobuf::Struct Annotation::toStruct(Util::Replacements& replacements) const {
+  Protobuf::Struct annotation;
   auto* fields = annotation.mutable_fields();
   (*fields)[ANNOTATION_TIMESTAMP] = Util::uint64Value(timestamp_, SPAN_TIMESTAMP, replacements);
   (*fields)[ANNOTATION_VALUE] = ValueUtil::stringValue(value_);
@@ -97,8 +97,8 @@ BinaryAnnotation& BinaryAnnotation::operator=(const BinaryAnnotation& ann) {
   return *this;
 }
 
-const ProtobufWkt::Struct BinaryAnnotation::toStruct(Util::Replacements& replacements) const {
-  ProtobufWkt::Struct binary_annotation;
+const Protobuf::Struct BinaryAnnotation::toStruct(Util::Replacements& replacements) const {
+  Protobuf::Struct binary_annotation;
   auto* fields = binary_annotation.mutable_fields();
   (*fields)[BINARY_ANNOTATION_KEY] = ValueUtil::stringValue(key_);
   (*fields)[BINARY_ANNOTATION_VALUE] = ValueUtil::stringValue(value_);
@@ -119,8 +119,8 @@ void Span::setServiceName(const std::string& service_name) {
   }
 }
 
-const ProtobufWkt::Struct Span::toStruct(Util::Replacements& replacements) const {
-  ProtobufWkt::Struct span;
+const Protobuf::Struct Span::toStruct(Util::Replacements& replacements) const {
+  Protobuf::Struct span;
   auto* fields = span.mutable_fields();
   (*fields)[SPAN_TRACE_ID] = ValueUtil::stringValue(traceIdAsHexString());
   (*fields)[SPAN_NAME] = ValueUtil::stringValue(name_);
@@ -131,7 +131,7 @@ const ProtobufWkt::Struct Span::toStruct(Util::Replacements& replacements) const
   }
 
   if (timestamp_.has_value()) {
-    // Usually we store number to a ProtobufWkt::Struct object via ValueUtil::numberValue.
+    // Usually we store number to a Protobuf::Struct object via ValueUtil::numberValue.
     // However, due to the possibility of rendering that to a number with scientific notation, we
     // chose to store it as a string and keeping track the corresponding replacement.
     (*fields)[SPAN_TIMESTAMP] = Util::uint64Value(timestamp_.value(), SPAN_TIMESTAMP, replacements);
@@ -144,7 +144,7 @@ const ProtobufWkt::Struct Span::toStruct(Util::Replacements& replacements) const
   }
 
   if (!annotations_.empty()) {
-    std::vector<ProtobufWkt::Value> annotation_list;
+    std::vector<Protobuf::Value> annotation_list;
     annotation_list.reserve(annotations_.size());
     for (auto& annotation : annotations_) {
       annotation_list.push_back(ValueUtil::structValue(annotation.toStruct(replacements)));
@@ -153,7 +153,7 @@ const ProtobufWkt::Struct Span::toStruct(Util::Replacements& replacements) const
   }
 
   if (!binary_annotations_.empty()) {
-    std::vector<ProtobufWkt::Value> binary_annotation_list;
+    std::vector<Protobuf::Value> binary_annotation_list;
     binary_annotation_list.reserve(binary_annotations_.size());
     for (auto& binary_annotation : binary_annotations_) {
       binary_annotation_list.push_back(

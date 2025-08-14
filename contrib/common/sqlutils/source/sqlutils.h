@@ -24,7 +24,7 @@ public:
    *         stored in metadata.mutable_fields.
    **/
   static bool setMetadata(const std::string& query, const DecoderAttributes& attr,
-                          ProtobufWkt::Struct& metadata);
+                          Protobuf::Struct& metadata);
 };
 
 } // namespace SQLUtils

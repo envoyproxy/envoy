@@ -298,7 +298,7 @@ public:
    * Get type URL from a typed config.
    * @param typed_config for the extension config.
    */
-  static std::string getFactoryType(const ProtobufWkt::Any& typed_config) {
+  static std::string getFactoryType(const Protobuf::Any& typed_config) {
     static const std::string typed_struct_type(
         xds::type::v3::TypedStruct::default_instance().GetTypeName());
     static const std::string legacy_typed_struct_type(
@@ -324,7 +324,7 @@ public:
    * Get a Factory from the registry by type URL.
    * @param typed_config for the extension config.
    */
-  template <class Factory> static Factory* getFactoryByType(const ProtobufWkt::Any& typed_config) {
+  template <class Factory> static Factory* getFactoryByType(const Protobuf::Any& typed_config) {
     if (typed_config.type_url().empty()) {
       return nullptr;
     }
@@ -367,7 +367,7 @@ public:
    */
   template <class Factory>
   static ProtobufTypes::MessagePtr
-  translateAnyToFactoryConfig(const ProtobufWkt::Any& typed_config,
+  translateAnyToFactoryConfig(const Protobuf::Any& typed_config,
                               ProtobufMessage::ValidationVisitor& validation_visitor,
                               Factory& factory) {
     ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
@@ -413,7 +413,7 @@ public:
    * @param out_proto the proto message instantiated by extensions
    * @return a status indicating if translation was a success
    */
-  static absl::Status translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
+  static absl::Status translateOpaqueConfig(const Protobuf::Any& typed_config,
                                             ProtobufMessage::ValidationVisitor& validation_visitor,
                                             Protobuf::Message& out_proto);
 

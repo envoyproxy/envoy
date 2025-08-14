@@ -122,7 +122,7 @@ api_listener:
 
   const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
 
-  ProtobufWkt::Any expected_any_proto;
+  Protobuf::Any expected_any_proto;
   envoy::config::cluster::v3::Cluster expected_cluster_proto;
   expected_cluster_proto.set_name("cluster1");
   expected_cluster_proto.set_type(envoy::config::cluster::v3::Cluster::EDS);

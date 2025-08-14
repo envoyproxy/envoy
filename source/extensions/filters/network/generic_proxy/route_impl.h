@@ -52,7 +52,7 @@ public:
   const RetryPolicy& retryPolicy() const override { return retry_policy_; }
 
   RouteSpecificFilterConfigConstSharedPtr
-  createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
+  createRouteSpecificFilterConfig(const std::string& name, const Protobuf::Any& typed_config,
                                   Server::Configuration::ServerFactoryContext& factory_context,
                                   ProtobufMessage::ValidationVisitor& validator);
 

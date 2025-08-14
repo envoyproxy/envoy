@@ -651,7 +651,7 @@ protected:
   }
 
   absl::StatusOr<ProtobufTypes::MessagePtr>
-  getDefaultConfig(const ProtobufWkt::Any& proto_config, const std::string& filter_config_name,
+  getDefaultConfig(const Protobuf::Any& proto_config, const std::string& filter_config_name,
                    Server::Configuration::ServerFactoryContext& server_context,
                    bool last_filter_in_filter_chain, const std::string& filter_chain_type,
                    const absl::flat_hash_set<std::string>& require_type_urls) const {
