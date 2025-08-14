@@ -1064,6 +1064,7 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
   ENVOY_LOG(debug, "Failed to create upstream stream: {}", failure_reason);
 
   conn_pool_.reset();
+  upstream_.reset();
 
   switch (reason) {
   case ConnectionPool::PoolFailureReason::Overflow:
@@ -1076,7 +1077,9 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
     onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
     break;
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
-    udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
+    if (connecting_) {
+      udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
+    }
     host.outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectFailed);
     onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
     break;
