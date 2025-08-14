@@ -1327,11 +1327,12 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, TooManyRequestReset
   encoder_decoders.reserve(pending_streams);
 
   for (size_t i = 0; i < 4; i++) {
-    for (size_t j = 0; j < 5000; ++j) {
+    for (size_t j = 0; j < pending_streams / 4; ++j) {
       // Send and wait
       encoder_decoders.emplace_back(codec_client_->startRequest(headers));
     }
-    test_server_->waitForCounterEq("http.config_test.downstream_rq_total", 5000 * (i + 1),
+    test_server_->waitForCounterEq("http.config_test.downstream_rq_total",
+                                   (pending_streams / 4) * (i + 1),
                                    TestUtility::DefaultTimeout * 5);
   }
 
