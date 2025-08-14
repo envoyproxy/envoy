@@ -194,6 +194,12 @@ new_features:
 - area: dns_filter, redis_proxy and prefix_matcher_map
   change: |
     Switch to using Radix Tree instead of Trie for performance improvements.
+- area: header_to_metadata
+  change: |
+    Added optional statistics collection for the Header-To-Metadata filter. When the :ref:`stat_prefix
+    <envoy_v3_api_field_extensions.filters.http.header_to_metadata.v3.Config.stat_prefix>` field is configured,
+    the filter emits detailed counters for rule processing, metadata operations, etc. See
+    :ref:`Header-To-Metadata filter statistics <config_http_filters_header_to_metadata>` for details.
 - area: load_reporting
   change: |
     Added support for endpoint-level load stats and metrics reporting. Locality load reports now include per
@@ -228,7 +234,6 @@ new_features:
     Added ``route()`` to the Stream handle API, allowing Lua scripts to retrieve route information. So far, the only method
     implemented is ``metadata()``, allowing Lua scripts to access route metadata scoped to the specific filter name. See
     :ref:`Route object API <config_http_filters_lua_route_wrapper>` for more details.
-
 - area: dynamic_modules
   change: |
     Added a new Logging ABI that allows modules to emit logs in the standard Envoy logging stream under "dynamic_modules" ID.
