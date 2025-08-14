@@ -221,12 +221,7 @@ protected:
     cleanupUpstreamAndDownstream();
   }
 
-  void cleanupStaticState() { global_tls_stores_.clear(); }
-
-  void TearDown() override {
-    cleanUp();
-    cleanupStaticState();
-  }
+  void TearDown() override { cleanUp(); }
 
   bool expectDeniedRequest(int expected_status_code,
                            std::vector<std::pair<std::string, std::string>> expected_headers = {},

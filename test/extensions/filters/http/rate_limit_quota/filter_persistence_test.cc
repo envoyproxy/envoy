@@ -183,8 +183,6 @@ protected:
       hcm_filter->mutable_typed_config()->PackFrom(hcm_config);
     });
     absl::SleepFor(absl::Seconds(1));
-    simTime().advanceTimeWait(std::chrono::seconds(10));
-    absl::SleepFor(absl::Seconds(1));
     EXPECT_EQ(GlobalTlsStores::size(), 0);
   }
 

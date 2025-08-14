@@ -25,6 +25,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
+using TlsStore = GlobalTlsStores::TlsStore;
+
 Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig&
         filter_config,

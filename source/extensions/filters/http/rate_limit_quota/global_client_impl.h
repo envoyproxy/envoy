@@ -66,7 +66,11 @@ public:
                             std::chrono::milliseconds send_reports_interval,
                             ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_tls,
                             Envoy::Event::Dispatcher& main_dispatcher);
-  ~GlobalRateLimitClientImpl() = default;
+  ~GlobalRateLimitClientImpl() {
+    if (stream_ != nullptr) {
+      stream_.resetStream();
+    }
+  }
 
   void onReceiveMessage(RateLimitQuotaResponsePtr&& response) override;
 

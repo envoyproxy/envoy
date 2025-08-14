@@ -23,19 +23,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
-// Object to hold TLS slots after the factory itself has been cleaned up.
-struct TlsStore : public Event::DeferredDeletable {
-  TlsStore(Server::Configuration::FactoryContext& context)
-      : buckets_tls(context.serverFactoryContext().threadLocal()) {}
-
-  std::unique_ptr<GlobalRateLimitClientImpl> global_client = nullptr;
-  ThreadLocal::TypedSlot<ThreadLocalBucketsCache> buckets_tls;
-
-  // Timer checking this index in the static map of TLS stores. If this store is
-  // no longer in-use by a filter factory, then it will be cleaned up.
-  Event::TimerPtr garbage_collector;
-};
-
 // GlobalTlsStores holds a singleton hashmap of rate_limit_quota TLS stores,
 // indexed by their combined RLQS server targets & domains.
 //
@@ -49,6 +36,35 @@ struct TlsStore : public Event::DeferredDeletable {
 // which config will be selected for the client creation.
 class GlobalTlsStores : public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
+  // Object to hold TLS slots after the factory itself has been cleaned up.
+  struct TlsStore {
+    TlsStore(Server::Configuration::FactoryContext& context, absl::string_view target_address,
+             absl::string_view domain)
+        : buckets_tls(context.serverFactoryContext().threadLocal()),
+          target_address_(target_address), domain_(domain),
+          main_dispatcher_(context.serverFactoryContext().mainThreadDispatcher()) {}
+
+    ~TlsStore() {
+      // Clean up the index from the global map. This is not thread-safe, so
+      // it's only called after asserting that we're on the main thread.
+      ASSERT_IS_MAIN_OR_TEST_THREAD();
+      // The global client must be cleaned up by the server main thread before
+      // it shuts down.
+      if (global_client != nullptr) {
+        main_dispatcher_.deferredDelete(std::move(global_client));
+      }
+      GlobalTlsStores::clearTlsStore(std::make_pair(target_address_, domain_));
+    }
+
+    std::unique_ptr<GlobalRateLimitClientImpl> global_client = nullptr;
+    ThreadLocal::TypedSlot<ThreadLocalBucketsCache> buckets_tls;
+
+  private:
+    std::string target_address_;
+    std::string domain_;
+    Envoy::Event::Dispatcher& main_dispatcher_;
+  };
+
   // Get an existing TLS store by index, or create one if not found.
   static std::shared_ptr<TlsStore>
   getTlsStore(Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
@@ -62,13 +78,7 @@ public:
   // state. A safer alternative is to delete all rate_limit_quota filters from
   // config with LDS & let the garbage collector handle cleanup.
   static void clear() {
-    // Ensure all watcher timers are disabled first.
-    for (auto& [index, tls_store] : stores()) {
-      if (tls_store->garbage_collector->enabled()) {
-        tls_store->garbage_collector->disableTimer();
-      }
-    }
-    // Wipe out all indices.
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
     stores().clear();
   }
 
@@ -77,7 +87,7 @@ private:
   using TlsStoreIndex = std::pair<std::string, std::string>;
 
   // Map of rate_limit_quota TLS stores & looping garbage collection timer.
-  using TlsStoreMap = absl::flat_hash_map<TlsStoreIndex, std::shared_ptr<TlsStore>>;
+  using TlsStoreMap = absl::flat_hash_map<TlsStoreIndex, std::weak_ptr<TlsStore>>;
 
   // Static reference to shared map of rate_limit_quota TLS stores (follows the
   // data sharing model of FactoryRegistry::factories()).
@@ -92,16 +102,9 @@ private:
                   Server::Configuration::FactoryContext& context, TlsStoreIndex& index,
                   bool* new_store_out);
 
-  // Setup the index's garbage collection timer. This does not enable the timer
-  // itself, just returns the static reference. The context input is only used
-  // for Timer initialization so does not need to be provided if the Timer is
-  // already guaranteed to exist.
-  static void initGarbageCollector(Server::Configuration::FactoryContext& context,
-                                   TlsStoreIndex& index, TlsStore* expected_tls_store);
-
   // Clear a specified index when it is no longer captured by any filter factory
   // cbs.
-  static void clearTlsStore(TlsStoreIndex& index) { stores().erase(index); }
+  static void clearTlsStore(const TlsStoreIndex& index) { stores().erase(index); }
 };
 
 } // namespace RateLimitQuota

@@ -63,13 +63,7 @@ GlobalRateLimitClientImpl::GlobalRateLimitClientImpl(
       time_source_(context.serverFactoryContext().mainThreadDispatcher().timeSource()),
       main_dispatcher_(main_dispatcher) {}
 
-void GlobalRateLimitClientImpl::deleteIsPending() {
-  // Ensure the stream is deleted on the main thread before the Global client is deleted.
-  if (stream_ != nullptr) {
-    stream_.resetStream();
-  }
-  async_client_.reset();
-}
+void GlobalRateLimitClientImpl::deleteIsPending() { async_client_.reset(); }
 
 void getUsageFromBucket(const CachedBucket& cached_bucket, TimeSource& time_source,
                         BucketQuotaUsage& usage) {

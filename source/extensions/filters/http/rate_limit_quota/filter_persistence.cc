@@ -20,15 +20,17 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
+using TlsStore = GlobalTlsStores::TlsStore;
+
 // Helper to initialize a new TLS store based on a rate_limit_quota config's
 // settings.
 std::shared_ptr<TlsStore> initTlsStore(Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                                        Server::Configuration::FactoryContext& context,
-                                       absl::string_view domain) {
+                                       absl::string_view target_address, absl::string_view domain) {
   // Quota bucket & global client TLS objects are created with the config and
   // kept alive via shared_ptr to a storage struct. The local rate limit client
   // in each filter instance assumes that the slot will outlive them.
-  std::shared_ptr<TlsStore> tls_store = std::make_shared<TlsStore>(context);
+  std::shared_ptr<TlsStore> tls_store = std::make_shared<TlsStore>(context, target_address, domain);
   auto tl_buckets_cache =
       std::make_shared<ThreadLocalBucketsCache>(std::make_shared<BucketsCache>());
   tls_store->buckets_tls.set(
@@ -62,47 +64,15 @@ GlobalTlsStores::getTlsStore(Grpc::GrpcServiceConfigWithHashKey& config_with_has
   if (it != stores().end()) {
     ENVOY_LOG(debug, "Found existing cache & RLQS client for target ({}) and domain ({}).",
               index.first, index.second);
-    return it->second;
+    return it->second.lock();
   }
   ENVOY_LOG(debug, "Creating a new cache & RLQS client for target ({}) and domain ({}).",
             index.first, index.second);
-  stores()[index] = initTlsStore(config_with_hash_key, context, index.second);
-  initGarbageCollector(context, index, stores()[index].get());
-  return stores()[index];
-}
-
-void GlobalTlsStores::initGarbageCollector(Server::Configuration::FactoryContext& context,
-                                           TlsStoreIndex& index, TlsStore* expected_tls_store) {
-  stores()[index]->garbage_collector =
-      context.serverFactoryContext().mainThreadDispatcher().createTimer(
-          [index, expected_tls_store,
-           &main_dispatcher = context.serverFactoryContext().mainThreadDispatcher()]() {
-            // If only the map owns a copy of the shared_ptr, then the cache
-            // isn't in-use by any active filter factories & can be safely
-            // cleaned up.
-            auto it = stores().find(index);
-            if (it == stores().end() || it->second.get() != expected_tls_store) {
-              return;
-            }
-            if (it->second.use_count() > 1) {
-              it->second->garbage_collector->enableTimer(std::chrono::seconds(10));
-              return;
-            }
-            ENVOY_LOG(debug,
-                      "A filter cache & global client are no longer needed "
-                      "after previous filters were deleted from config or had "
-                      "their RLQS server destination or domain changed. The "
-                      "cache & client for destination ({}) and domain ({}) "
-                      "will be cleaned up.",
-                      index.first, index.second);
-            // Temporarily hold the shared_ptr to make sure this Timer (inside
-            // the TlsStore) doesn't delete itself while still running.
-            std::shared_ptr<TlsStore> tls_store_tmp = std::move(it->second);
-            stores().erase(index);
-            // Take ownership of the global client & mark it for deletion on the main thread.
-            main_dispatcher.deferredDelete(std::move(tls_store_tmp->global_client));
-          });
-  stores()[index]->garbage_collector->enableTimer(std::chrono::seconds(10));
+  std::shared_ptr<TlsStore> tls_store =
+      initTlsStore(config_with_hash_key, context, index.first, index.second);
+  // Save weak_ptr as an unowned reference.
+  stores()[index] = tls_store;
+  return tls_store;
 }
 
 } // namespace RateLimitQuota
