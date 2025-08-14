@@ -116,21 +116,23 @@ void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
         /* Notify waiting signers on completion of credential setting above */
         [this]() {
           credentials_pending_.store(false);
-          std::list<CredentialSubscriberCallbacks*> subscribers_copy;
+          std::list<std::weak_ptr<CredentialSubscriberCallbacks>> subscribers_copy;
           {
             Thread::LockGuard guard(mu_);
             subscribers_copy = credentials_subscribers_;
           }
-          for (auto& cb : subscribers_copy) {
-            ENVOY_LOG(debug, "Notifying subscriber of credential update");
-            cb->onCredentialUpdate();
+          for (auto& weak_cb : subscribers_copy) {
+            if (auto cb = weak_cb.lock()) {
+              ENVOY_LOG(debug, "Notifying subscriber of credential update");
+              cb->onCredentialUpdate();
+            }
           }
         });
   }
 }
 
 CredentialSubscriberCallbacksHandlePtr
-MetadataCredentialsProviderBase::subscribeToCredentialUpdates(CredentialSubscriberCallbacks& cs) {
+MetadataCredentialsProviderBase::subscribeToCredentialUpdates(CredentialSubscriberCallbacksSharedPtr cs) {
   Thread::LockGuard guard(mu_);
   return std::make_unique<CredentialSubscriberCallbacksHandle>(cs, credentials_subscribers_);
 }

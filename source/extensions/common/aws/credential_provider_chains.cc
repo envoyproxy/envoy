@@ -267,7 +267,8 @@ CredentialsProviderSharedPtr CommonCredentialsProviderChain::createAssumeRoleCre
     credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
   }
 
-  storeSubscription(credential_provider->subscribeToCredentialUpdates(*this));
+  storeSubscription(credential_provider->subscribeToCredentialUpdates(
+      std::static_pointer_cast<CredentialSubscriberCallbacks>(shared_from_this())));
 
   return credential_provider;
 };
@@ -303,7 +304,8 @@ CredentialsProviderSharedPtr CommonCredentialsProviderChain::createContainerCred
     credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
   }
 
-  storeSubscription(credential_provider->subscribeToCredentialUpdates(*this));
+  storeSubscription(credential_provider->subscribeToCredentialUpdates(
+      std::static_pointer_cast<CredentialSubscriberCallbacks>(shared_from_this())));
 
   return credential_provider;
 }
@@ -337,7 +339,8 @@ CommonCredentialsProviderChain::createInstanceProfileCredentialsProvider(
     credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
   }
 
-  storeSubscription(credential_provider->subscribeToCredentialUpdates(*this));
+  storeSubscription(credential_provider->subscribeToCredentialUpdates(
+      std::static_pointer_cast<CredentialSubscriberCallbacks>(shared_from_this())));
 
   return credential_provider;
 }
@@ -369,7 +372,8 @@ CredentialsProviderSharedPtr CommonCredentialsProviderChain::createWebIdentityCr
     credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
   }
 
-  storeSubscription(credential_provider->subscribeToCredentialUpdates(*this));
+  storeSubscription(credential_provider->subscribeToCredentialUpdates(
+      std::static_pointer_cast<CredentialSubscriberCallbacks>(shared_from_this())));
 
   return credential_provider;
 };

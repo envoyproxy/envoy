@@ -180,7 +180,7 @@ TEST_F(AsyncCredentialHandlingTest, ChainCallbackCalledWhenCredentialsReturned) 
   }
   )EOF";
 
-  auto handle = provider_->subscribeToCredentialUpdates(*chain);
+  auto handle = provider_->subscribeToCredentialUpdates(chain);
 
   auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
       "vpc-lattice-svcs", "ap-southeast-2", chain, context_,
@@ -249,8 +249,8 @@ TEST_F(AsyncCredentialHandlingTest, SubscriptionsCleanedUp) {
   }
   )EOF";
 
-  auto handle = provider_->subscribeToCredentialUpdates(*chain);
-  auto handle2 = provider_->subscribeToCredentialUpdates(*chain);
+  auto handle = provider_->subscribeToCredentialUpdates(chain);
+  auto handle2 = provider_->subscribeToCredentialUpdates(chain);
 
   auto signer = std::make_unique<Extensions::Common::Aws::SigV4SignerImpl>(
       "vpc-lattice-svcs", "ap-southeast-2", chain, context_,
@@ -396,6 +396,70 @@ TEST(CredentialsProviderChainTest, CheckChainReturnsPendingInCorrectOrder) {
   auto creds = chain.chainGetCredentials();
   EXPECT_EQ(creds.accessKeyId(), "provider1");
   EXPECT_EQ(creds.secretAccessKey(), "1");
+}
+
+TEST_F(AsyncCredentialHandlingTest, NoDanglingPointerAfterSubscriberDestruction) {
+  MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+      MetadataFetcher::MetadataReceiver::RefreshState::Ready;
+  std::chrono::seconds initialization_timer = std::chrono::seconds(2);
+
+  envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider cred_provider = {};
+  cred_provider.mutable_web_identity_token_data_source()->set_inline_string("abced");
+  cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
+  cred_provider.set_role_session_name("role-session-name");
+
+  mock_manager_ = std::make_shared<MockAwsClusterManager>();
+  EXPECT_CALL(*mock_manager_, getUriFromClusterName(_)).WillRepeatedly(Return("uri_2"));
+
+  provider_ = std::make_shared<WebIdentityCredentialsProvider>(
+      context_, mock_manager_, "cluster_2",
+      [this](Upstream::ClusterManager&, absl::string_view) {
+        metadata_fetcher_.reset(raw_metadata_fetcher_);
+        return std::move(metadata_fetcher_);
+      },
+      refresh_state, initialization_timer, cred_provider);
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+
+  timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+  timer_->enableTimer(std::chrono::milliseconds(1), nullptr);
+
+  // Create a subscriber chain and subscribe to updates
+  auto chain = std::make_shared<MockCredentialsProviderChain>();
+  EXPECT_CALL(*chain, onCredentialUpdate()).Times(0); // Should not be called after destruction
+  auto handle = provider_->subscribeToCredentialUpdates(chain);
+
+  // Destroy the subscriber before credentials are updated
+  chain.reset();
+  handle.reset();
+
+  auto document = R"EOF(
+  {
+    "AssumeRoleWithWebIdentityResponse": {
+      "AssumeRoleWithWebIdentityResult": {
+        "Credentials": {
+          "AccessKeyId": "akid",
+          "SecretAccessKey": "secret",
+          "SessionToken": "token",
+          "Expiration": 1.514869445E9
+        }
+      }
+    }
+  }
+  )EOF";
+
+  EXPECT_CALL(*raw_metadata_fetcher_, fetch(_, _, _))
+      .WillRepeatedly(
+          Invoke([&, document = std::move(document)](Http::RequestMessage&, Tracing::Span&,
+                                                     MetadataFetcher::MetadataReceiver& receiver) {
+            receiver.onMetadataSuccess(std::move(document));
+          }));
+
+  // This should not crash even though the subscriber was destroyed
+  provider_friend.onClusterAddOrUpdate();
+  timer_->invokeCallback();
+  
+  // Test passes if no segfault occurs
+  SUCCEED();
 }
 
 } // namespace Aws

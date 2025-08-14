@@ -53,7 +53,7 @@ public:
   }
 
   CredentialSubscriberCallbacksHandlePtr
-  subscribeToCredentialUpdates(CredentialSubscriberCallbacks& cs);
+  subscribeToCredentialUpdates(CredentialSubscriberCallbacksSharedPtr cs);
 
 protected:
   struct ThreadLocalCredentialsCache : public ThreadLocal::ThreadLocalObject {
@@ -120,7 +120,7 @@ protected:
   // Are credentials pending?
   std::atomic<bool> credentials_pending_ = true;
   Thread::MutexBasicLockable mu_;
-  std::list<CredentialSubscriberCallbacks*> credentials_subscribers_ ABSL_GUARDED_BY(mu_);
+  std::list<std::weak_ptr<CredentialSubscriberCallbacks>> credentials_subscribers_ ABSL_GUARDED_BY(mu_);
 };
 
 } // namespace Aws
