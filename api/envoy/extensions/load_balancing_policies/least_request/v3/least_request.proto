@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // This configuration allows the built-in LEAST_REQUEST LB policy to be configured via the LB policy
 // extension point. See the :ref:`load balancing architecture overview
 // <arch_overview_load_balancing_types>` for more information.
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message LeastRequest {
   // Available methods for selecting the host set from which to return the host with the
   // fewest active requests.
@@ -94,4 +94,23 @@ message LeastRequest {
   //
   // Defaults to ``N_CHOICES``.
   SelectionMethod selection_method = 6 [(validate.rules).enum = {defined_only: true}];
+
+  // Force the use of weighted EDF algorithm even when all hosts have equal weights.
+  // When enabled, this allows the ``active_request_bias`` parameter to take effect
+  // regardless of host weight equality, enabling more aggressive load balancing
+  // based on active request counts.
+  //
+  // This is useful when you want to leverage active request bias for load balancing
+  // but don't have different host weights configured (e.g., in service mesh scenarios
+  // where all hosts are treated equally by default).
+  //
+  // When disabled (default), the load balancer uses the standard behavior:
+  // - Equal weights + no slow start = unweighted P2C algorithm
+  // - Unequal weights or slow start = weighted EDF algorithm
+  //
+  // When enabled, the weighted EDF algorithm is always used (unless in slow start),
+  // allowing active_request_bias to influence load distribution.
+  //
+  // This field supports runtime configuration for gradual rollout.
+  config.core.v3.RuntimeFeatureFlag force_weighted_algorithm = 7;
 }

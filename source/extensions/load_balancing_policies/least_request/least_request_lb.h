@@ -1,6 +1,7 @@
 #pragma once
 
 #include "source/extensions/load_balancing_policies/common/load_balancer_impl.h"
+#include "source/common/runtime/runtime_protos.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -40,12 +41,22 @@ public:
                 ? absl::optional<Runtime::Double>(
                       {least_request_config.active_request_bias(), runtime})
                 : absl::nullopt),
-        selection_method_(least_request_config.selection_method()) {
+        selection_method_(least_request_config.selection_method()),
+        force_weighted_algorithm_runtime_(
+            least_request_config.has_force_weighted_algorithm()
+                ? absl::optional<Runtime::FeatureFlag>(
+                      {least_request_config.force_weighted_algorithm(), runtime})
+                : absl::nullopt) {
     initialize();
   }
 
 protected:
   void refresh(uint32_t priority) override {
+    // Cache runtime value for performance
+    force_weighted_algorithm_ = force_weighted_algorithm_runtime_ != absl::nullopt
+                                   ? force_weighted_algorithm_runtime_.value().enabled()
+                                   : false;
+
     active_request_bias_ = active_request_bias_runtime_ != absl::nullopt
                                ? active_request_bias_runtime_.value().value()
                                : 1.0;
@@ -59,6 +70,8 @@ protected:
 
     EdfLoadBalancerBase::refresh(priority);
   }
+
+  bool shouldForceWeightedAlgorithm() const override { return force_weighted_algorithm_; }
 
 private:
   void refreshHostSource(const HostsSource&) override {}
@@ -80,6 +93,12 @@ private:
   const absl::optional<Runtime::Double> active_request_bias_runtime_;
   const envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest::SelectionMethod
       selection_method_{};
+  
+  // Runtime support for force_weighted_algorithm flag
+  const absl::optional<Runtime::FeatureFlag> force_weighted_algorithm_runtime_;
+  
+  // Cached value for performance, updated in refresh()
+  bool force_weighted_algorithm_{};
 };
 
 } // namespace Upstream

@@ -929,7 +929,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     // case EDF creation is skipped. When all original weights are equal and no hosts are in slow
     // start mode we can rely on unweighted host pick to do optimal round robin and least-loaded
     // host selection with lower memory and CPU overhead.
-    if (hostWeightsAreEqual(hosts) && noHostsAreInSlowStart()) {
+    if (!shouldForceWeightedAlgorithm() && hostWeightsAreEqual(hosts) && noHostsAreInSlowStart()) {
       // Skip edf creation.
       return;
     }
