@@ -44,6 +44,12 @@ bug_fixes:
     Fixed a bug where access log gets skipped for HTTP/3 requests when the stream is half closed. This behavior can be
     reverted by setting the runtime guard
     ``envoy.reloadable_features.quic_fix_defer_logging_miss_for_half_closed_stream`` to ``false``.
+- area: listeners
+  change: |
+    Fixed issue where :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` timed out
+    when used with other listener filters. The bug was triggered when a previous listener filter processed more data
+    than the TLS inspector had requested, causing the TLS inspector to incorrectly calculate its buffer growth strategy.
+    The fix ensures that buffer growth is now based on actual bytes available rather than the previously requested amount.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -227,5 +233,8 @@ new_features:
   change: |
     Added a new Logging ABI that allows modules to emit logs in the standard Envoy logging stream under "dynamic_modules" ID.
     In the Rust SDK, they are available as ``envoy_log_info``, etc.
+- area: http
+  change: |
+    Added ``upstream_rq_per_cx`` histogram to track requests per connection for monitoring connection reuse efficiency.
 
 deprecated:
