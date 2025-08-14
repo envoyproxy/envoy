@@ -142,6 +142,7 @@ protected:
     // Create an input file stream
     std::ifstream file(descriptor_path, std::ios::in | std::ios::binary);
     if (!file) {
+      // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
       LOG(ERROR) << "Failed to open the file: " << descriptor_path << std::endl;
     }
 
@@ -152,11 +153,13 @@ protected:
 
     FileDescriptorSet descriptor_set;
     if (!descriptor_set.ParseFromString(file_contents)) {
+      // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
       LOG(ERROR) << "Unable to parse proto descriptor from file " << descriptor_path;
     }
 
     for (const auto& file : descriptor_set.file()) {
       if (descriptor_pool_->BuildFile(file) == nullptr) {
+        // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
         LOG(ERROR) << "Unable to build proto descriptor pool";
       }
     }
@@ -168,6 +171,7 @@ protected:
     type_finder_ = std::bind_front(&ExtractionUtilTest::findType, this);
 
     if (!Protobuf::TextFormat::ParseFromString(kTestRequest, &test_request_proto_)) {
+      // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
       LOG(ERROR) << "Failed to parse textproto: " << kTestRequest;
     }
     test_request_raw_proto_ = CordMessageData(test_request_proto_.SerializeAsCord());
@@ -175,6 +179,7 @@ protected:
                                  "extraction.TestRequest");
 
     if (!Protobuf::TextFormat::ParseFromString(kTestResponse, &test_response_proto_)) {
+      // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
       LOG(ERROR) << "Failed to parse textproto: " << kTestResponse;
     }
     test_response_raw_proto_ = CordMessageData(test_response_proto_.SerializeAsCord());
@@ -849,6 +854,7 @@ TEST(ExtractUtilTest, RedactPaths_Basic) {
                                     "  }"
                                     "}";
   Struct proto_struct;
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   CHECK(Protobuf::TextFormat::ParseFromString(proto_struct_string, &proto_struct));
 
   std::vector<std::string> paths_to_redact = {"nested.deeper_nest"};
@@ -868,6 +874,7 @@ TEST(ExtractUtilTest, RedactPaths_Basic) {
                                        "  }"
                                        "}";
   Struct expected_struct;
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   CHECK(Protobuf::TextFormat::ParseFromString(expected_struct_string, &expected_struct));
   EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(expected_struct, proto_struct));
 }
@@ -887,6 +894,7 @@ TEST(ExtractUtilTest, RedactPaths_HandlesOneOfFields) {
                                     "  }"
                                     "}";
   Struct proto_struct;
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   CHECK(Protobuf::TextFormat::ParseFromString(proto_struct_string, &proto_struct));
 
   std::vector<std::string> paths_to_redact = {"nested_value"};
@@ -899,6 +907,7 @@ TEST(ExtractUtilTest, RedactPaths_HandlesOneOfFields) {
                                        "  }"
                                        "}";
   Struct expected_struct;
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   CHECK(Protobuf::TextFormat::ParseFromString(expected_struct_string, &expected_struct));
   EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(expected_struct, proto_struct));
 }
@@ -932,6 +941,7 @@ TEST(ExtractUtilTest, RedactPaths_AllowsRepeatedLeafMessageType) {
                                     "  }"
                                     "}";
   Struct proto_struct;
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   CHECK(Protobuf::TextFormat::ParseFromString(proto_struct_string, &proto_struct));
 
   std::vector<std::string> paths_to_redact = {"repeated_message_field"};
@@ -951,6 +961,7 @@ TEST(ExtractUtilTest, RedactPaths_AllowsRepeatedLeafMessageType) {
                                        "  }"
                                        "}";
   Struct expected_struct;
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   CHECK(Protobuf::TextFormat::ParseFromString(expected_struct_string, &expected_struct));
   EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(expected_struct, proto_struct));
 }
@@ -997,6 +1008,7 @@ TEST(ExtractUtilTest, RedactPaths_AllowsRepeatedNonLeafMessageType) {
                                     "  }"
                                     "}";
   Struct proto_struct;
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   CHECK(Protobuf::TextFormat::ParseFromString(proto_struct_string, &proto_struct));
 
   std::vector<std::string> paths_to_redact = {"repeated_message_field.deeper_nest"};
@@ -1036,6 +1048,7 @@ TEST(ExtractUtilTest, RedactPaths_AllowsRepeatedNonLeafMessageType) {
                                        "  }"
                                        "}";
   Struct expected_struct;
+  // NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange)
   CHECK(Protobuf::TextFormat::ParseFromString(expected_struct_string, &expected_struct));
   EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(expected_struct, proto_struct));
 }

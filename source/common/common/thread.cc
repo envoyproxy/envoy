@@ -67,7 +67,7 @@ struct ThreadIds {
 
 private:
   mutable absl::Mutex mutex_;
-  std::atomic<uint32_t> skip_asserts_{};
+  std::atomic<uint32_t> skip_asserts_;
   absl::flat_hash_map<std::thread::id, uint32_t>
       main_threads_to_usage_count_ ABSL_GUARDED_BY(mutex_);
 };

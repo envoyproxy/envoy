@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <string>
@@ -125,8 +126,14 @@ void GetMonitoredResourceLabels(absl::string_view label_extractor,
 }
 
 WireFormatLite::WireType getWireType(const Field& field_desc) {
+  if (field_desc.kind() == Field::TYPE_UNKNOWN) {
+    // Return an invalid wire type for unknown field types
+    // Using max value to indicate invalid rather than -1
+    return static_cast<WireFormatLite::WireType>(std::numeric_limits<int>::max());
+  }
+
   static WireFormatLite::WireType field_kind_to_wire_type[] = {
-      static_cast<WireFormatLite::WireType>(-1), // TYPE_UNKNOWN
+      WireFormatLite::WIRETYPE_VARINT,           // Placeholder for TYPE_UNKNOWN (index 0)
       WireFormatLite::WIRETYPE_FIXED64,          // TYPE_DOUBLE
       WireFormatLite::WIRETYPE_FIXED32,          // TYPE_FLOAT
       WireFormatLite::WIRETYPE_VARINT,           // TYPE_INT64

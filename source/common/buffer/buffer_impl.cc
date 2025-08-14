@@ -590,7 +590,7 @@ bool OwnedImpl::startsWith(absl::string_view data) const {
     return false;
   }
 
-  if (data.length() == 0) {
+  if (data.empty()) {
     return true;
   }
 
