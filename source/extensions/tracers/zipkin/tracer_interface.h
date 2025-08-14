@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/trace/v3/zipkin.pb.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/trace/v3/zipkin.pb.h"
 #include "envoy/tracing/trace_config.h"
 
 #include "source/extensions/tracers/zipkin/span_context.h"
@@ -75,7 +75,8 @@ public:
    * Gets the current trace context option for header injection behavior.
    * @return The current trace context option.
    */
-  virtual envoy::config::trace::v3::ZipkinConfig::TraceContextOption traceContextOption() const PURE;
+  virtual envoy::config::trace::v3::ZipkinConfig::TraceContextOption
+  traceContextOption() const PURE;
 };
 
 /**

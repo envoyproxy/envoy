@@ -1,8 +1,8 @@
 #pragma once
 
-#include "envoy/config/trace/v3/zipkin.pb.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
+#include "envoy/config/trace/v3/zipkin.pb.h"
 
 #include "source/extensions/tracers/zipkin/span_context.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_types.h"
@@ -46,7 +46,8 @@ public:
    * Sets the trace context option for header injection behavior.
    * @param trace_context_option The trace context option from ZipkinConfig.
    */
-  void setTraceContextOption(envoy::config::trace::v3::ZipkinConfig::TraceContextOption trace_context_option) {
+  void setTraceContextOption(
+      envoy::config::trace::v3::ZipkinConfig::TraceContextOption trace_context_option) {
     trace_context_option_ = trace_context_option;
   }
 

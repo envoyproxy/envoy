@@ -67,11 +67,12 @@ public:
   const std::string& hostname() { return hostname_; }
   Runtime::Loader& runtime() { return runtime_; }
   ZipkinTracerStats& tracerStats() { return tracer_stats_; }
-  bool w3cFallbackEnabled() const { 
-    return trace_context_option_ == envoy::config::trace::v3::ZipkinConfig::USE_B3_WITH_W3C_PROPAGATION; 
+  bool w3cFallbackEnabled() const {
+    return trace_context_option_ ==
+           envoy::config::trace::v3::ZipkinConfig::USE_B3_WITH_W3C_PROPAGATION;
   }
-  envoy::config::trace::v3::ZipkinConfig::TraceContextOption traceContextOption() const { 
-    return trace_context_option_; 
+  envoy::config::trace::v3::ZipkinConfig::TraceContextOption traceContextOption() const {
+    return trace_context_option_;
   }
 
 private:

@@ -238,7 +238,8 @@ TEST_F(ZipkinDriverTest, TraceContextOptionConfiguration) {
   }
 
   {
-    // Test trace_context_option set to USE_B3_WITH_W3C_PROPAGATION - W3C fallback should be enabled.
+    // Test trace_context_option set to USE_B3_WITH_W3C_PROPAGATION - W3C fallback should be
+    // enabled.
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     collector_endpoint: /api/v2/spans
@@ -250,7 +251,8 @@ TEST_F(ZipkinDriverTest, TraceContextOptionConfiguration) {
 
     setup(zipkin_config, true);
     EXPECT_TRUE(driver_->w3cFallbackEnabled()); // W3C fallback should be enabled
-    EXPECT_EQ(driver_->traceContextOption(), envoy::config::trace::v3::ZipkinConfig::USE_B3_WITH_W3C_PROPAGATION);
+    EXPECT_EQ(driver_->traceContextOption(),
+              envoy::config::trace::v3::ZipkinConfig::USE_B3_WITH_W3C_PROPAGATION);
   }
 }
 
@@ -271,26 +273,26 @@ TEST_F(ZipkinDriverTest, DualHeaderInjection) {
 
   // Create a span and test W3C header injection
   Tracing::TestTraceContextImpl trace_context{{}};
-  
-  Tracing::SpanPtr span = driver_->startSpan(config_, trace_context, stream_info_,
-                                             "ingress", {Tracing::Reason::Sampling, true});
-  
+
+  Tracing::SpanPtr span = driver_->startSpan(config_, trace_context, stream_info_, "ingress",
+                                             {Tracing::Reason::Sampling, true});
+
   // Inject context into headers (simulating upstream request)
   Tracing::UpstreamContext upstream_context;
   span->injectContext(trace_context, upstream_context);
-  
+
   // Verify W3C traceparent header is set
   auto traceparent = trace_context.get("traceparent");
   EXPECT_TRUE(traceparent.has_value());
   EXPECT_FALSE(traceparent.value().empty());
-  
+
   // Verify traceparent format: 00-{32 hex trace-id}-{16 hex span-id}-{2 hex flags}
   const std::string traceparent_value = std::string(traceparent.value());
-  EXPECT_EQ(traceparent_value.length(), 55); // 2+1+32+1+16+1+2
+  EXPECT_EQ(traceparent_value.length(), 55);        // 2+1+32+1+16+1+2
   EXPECT_EQ(traceparent_value.substr(0, 3), "00-"); // version
-  EXPECT_EQ(traceparent_value[35], '-'); // separator after trace-id
-  EXPECT_EQ(traceparent_value[52], '-'); // separator after span-id
-  
+  EXPECT_EQ(traceparent_value[35], '-');            // separator after trace-id
+  EXPECT_EQ(traceparent_value[52], '-');            // separator after span-id
+
   // Verify B3 headers are ALSO set when dual propagation is enabled
   EXPECT_TRUE(trace_context.get("x-b3-traceid").has_value());
   EXPECT_TRUE(trace_context.get("x-b3-spanid").has_value());

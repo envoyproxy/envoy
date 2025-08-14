@@ -2,12 +2,13 @@
 
 #include <vector>
 
-#include "absl/strings/str_cat.h"
-#include "fmt/format.h"
 #include "source/extensions/tracers/zipkin/span_context.h"
 #include "source/extensions/tracers/zipkin/util.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 #include "source/extensions/tracers/zipkin/zipkin_json_field_names.h"
+
+#include "absl/strings/str_cat.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -215,7 +216,7 @@ void Span::log(SystemTime timestamp, const std::string& event) {
 
 void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
   auto trace_context_option = tracer_.traceContextOption();
-  
+
   // Always inject B3 headers
   ZipkinCoreConstants::get().X_B3_TRACE_ID.setRefKey(trace_context, traceIdAsHexString());
   ZipkinCoreConstants::get().X_B3_SPAN_ID.setRefKey(trace_context, idAsHexString());
@@ -248,7 +249,7 @@ SpanContext Span::spanContext() const {
 void Span::injectW3CContext(Tracing::TraceContext& trace_context) {
   // Convert Zipkin span context to W3C traceparent format
   // W3C traceparent format: 00-{trace-id}-{span-id}-{trace-flags}
-  
+
   // Construct the 128-bit trace ID (32 hex chars)
   std::string trace_id_str;
   if (trace_id_high_.has_value() && trace_id_high_.value() != 0) {
@@ -267,7 +268,8 @@ void Span::injectW3CContext(Tracing::TraceContext& trace_context) {
   std::string trace_flags = sampled() ? "01" : "00";
 
   // Construct the traceparent header value
-  std::string traceparent_value = absl::StrCat("00-", trace_id_str, "-", span_id_str, "-", trace_flags);
+  std::string traceparent_value =
+      absl::StrCat("00-", trace_id_str, "-", span_id_str, "-", trace_flags);
 
   // Set the W3C traceparent header
   ZipkinCoreConstants::get().TRACE_PARENT.setRefKey(trace_context, traceparent_value);
