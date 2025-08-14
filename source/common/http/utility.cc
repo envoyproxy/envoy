@@ -199,8 +199,14 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
   }
   ASSERT(options_clone.hpack_table_size().value() <= OptionsLimits::MAX_HPACK_TABLE_SIZE);
   if (!options_clone.has_max_concurrent_streams()) {
-    options_clone.mutable_max_concurrent_streams()->set_value(
-        OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.safe_http2_max_concurrent_streams")) {
+      options_clone.mutable_max_concurrent_streams()->set_value(
+          OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
+    } else {
+      options_clone.mutable_max_concurrent_streams()->set_value(
+          OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS_LEGACY);
+    }
   }
   ASSERT(
       options_clone.max_concurrent_streams().value() >= OptionsLimits::MIN_MAX_CONCURRENT_STREAMS &&

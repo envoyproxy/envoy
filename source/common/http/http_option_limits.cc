@@ -10,6 +10,7 @@ const uint32_t OptionsLimits::DEFAULT_HPACK_TABLE_SIZE;
 const uint32_t OptionsLimits::MAX_HPACK_TABLE_SIZE;
 const uint32_t OptionsLimits::MIN_MAX_CONCURRENT_STREAMS;
 const uint32_t OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS;
+const uint32_t OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS_LEGACY;
 const uint32_t OptionsLimits::MAX_MAX_CONCURRENT_STREAMS;
 const uint32_t OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE;
 const uint32_t OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE;
