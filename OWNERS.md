@@ -63,6 +63,8 @@ The following Envoy maintainers have final say over any changes only affecting /
   * xDS, C++ integration tests.
 * Fredy Wijaya ([fredyw](https://github.com/fredyw)) (fredyw@google.com)
   * Android, Java, Kotlin, JNI.
+* Dan Zhang ([danzh2010](https://github.com/danzh2010)) (danzh@google.com)
+  * Envoy Mobile, QUIC, HTTP/3.
 
 # Senior extension maintainers
 
