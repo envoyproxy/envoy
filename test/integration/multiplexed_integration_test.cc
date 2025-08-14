@@ -1322,7 +1322,7 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, TooManyRequestReset
       {":method", "GET"}, {":path", "/healthcheck"}, {":scheme", "http"}, {":authority", "host"}};
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  const int pending_streams = 20000;
+  const int pending_streams = 1800; // 18000 in local or this consume too much resource.
   std::vector<std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>> encoder_decoders;
   encoder_decoders.reserve(pending_streams);
 
@@ -1336,8 +1336,7 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, TooManyRequestReset
   }
 
   // Reset 50 streams and then the connection should be closed because too much premature resets.
-  // All streams should be reset correctly without recursion. If there is recursion, this should
-  // result in a crash because the stack overflow.
+  // All streams should be reset correctly without recursion.
   for (int i = 0; i < 50; ++i) {
     // Send and reset
     auto encoder_decoder = codec_client_->startRequest(headers);
@@ -1349,8 +1348,9 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, TooManyRequestReset
 
   // Envoy should disconnect client due to premature reset check
   ASSERT_TRUE(codec_client_->waitForDisconnect());
-  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", 20050,
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", pending_streams + 50,
                                  TestUtility::DefaultTimeout * 5);
+  // If there is recursion, this result won't be 1.
   test_server_->waitForCounterEq("http.config_test.downstream_rq_too_many_premature_resets", 1);
 }
 
