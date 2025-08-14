@@ -317,11 +317,11 @@ void HeaderToMetadataFilter::applyKeyValue(std::string&& value, const Rule& rule
   } else {
     const auto& matcher = rule.regexRewrite();
     if (matcher != nullptr) {
-      std::string original_value = value;
+      const bool was_non_empty = !value.empty();
       value = matcher->replaceAll(value, rule.regexSubstitution());
       // If we had a non-empty input but got an empty result from regex, it could indicate a
       // failure.
-      if (!original_value.empty() && value.empty()) {
+      if (was_non_empty && value.empty()) {
         config->chargeStat(StatsEvent::RegexSubstitutionFailed, direction);
       }
     }
