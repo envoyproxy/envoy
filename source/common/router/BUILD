@@ -111,6 +111,7 @@ envoy_cc_library(
         "//envoy/server:factory_context_interface",
         "//envoy/server:filter_config_interface",
         "//source/common/config:utility_lib",
+        "//source/common/runtime:runtime_protos_lib",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/status:statusor",
     ],

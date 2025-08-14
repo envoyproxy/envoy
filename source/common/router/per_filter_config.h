@@ -2,6 +2,8 @@
 
 #include "envoy/server/factory_context.h"
 
+#include "source/common/runtime/runtime_protos.h"
+
 #include "absl/container/flat_hash_map.h"
 #include "absl/status/statusor.h"
 
@@ -16,7 +18,15 @@ public:
 
   struct FilterConfig {
     RouteSpecificFilterConfigConstSharedPtr config_;
-    bool disabled_{};
+
+    FilterConfig(RouteSpecificFilterConfigConstSharedPtr route_specific_config,
+                 const envoy::config::route::v3::FilterConfig& filter_config,
+                 Runtime::Loader& runtime);
+    bool isEnabled() const;
+
+  private:
+    const absl::optional<Runtime::FractionalPercent> filter_enabled_;
+    bool disabled_;
   };
 
   const RouteSpecificFilterConfig* get(absl::string_view name) const;
@@ -39,6 +49,7 @@ private:
                                   Server::Configuration::ServerFactoryContext& factory_context,
                                   ProtobufMessage::ValidationVisitor& validator);
   absl::flat_hash_map<std::string, FilterConfig> configs_;
+  Runtime::Loader& runtime_;
 };
 
 } // namespace Router
