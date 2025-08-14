@@ -1326,13 +1326,14 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, TooManyRequestReset
   std::vector<std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>> encoder_decoders;
   encoder_decoders.reserve(pending_streams);
 
+  const int pending_streams_per_iteration = pending_streams / 4;
   for (size_t i = 0; i < 4; i++) {
-    for (size_t j = 0; j < pending_streams / 4; ++j) {
+    for (size_t j = 0; j < pending_streams_per_iteration; ++j) {
       // Send and wait
       encoder_decoders.emplace_back(codec_client_->startRequest(headers));
     }
     test_server_->waitForCounterEq("http.config_test.downstream_rq_total",
-                                   (pending_streams / 4) * (i + 1),
+                                   pending_streams_per_iteration * (i + 1),
                                    TestUtility::DefaultTimeout * 5);
   }
 
