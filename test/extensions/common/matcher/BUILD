@@ -21,15 +21,15 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "trie_matcher_test",
-    srcs = ["trie_matcher_test.cc"],
+    name = "ip_range_matcher_test",
+    srcs = ["ip_range_matcher_test.cc"],
     rbe_pool = "6gig",
     deps = [
         "//source/common/matcher:matcher_lib",
         "//source/common/network:address_lib",
         "//source/common/network/matching:data_impl_lib",
         "//source/common/network/matching:inputs_lib",
-        "//source/extensions/common/matcher:trie_matcher_lib",
+        "//source/extensions/common/matcher:ip_range_matcher_lib",
         "//source/extensions/matching/network/application_protocol:config",
         "//test/common/matcher:test_utility_lib",
         "//test/mocks/http:http_mocks",

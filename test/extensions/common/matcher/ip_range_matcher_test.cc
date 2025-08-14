@@ -8,7 +8,7 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/matching/data_impl.h"
 #include "source/common/protobuf/utility.h"
-#include "source/extensions/common/matcher/trie_matcher.h"
+#include "source/extensions/common/matcher/ip_range_matcher.h"
 
 #include "test/common/matcher/test_utility.h"
 #include "test/mocks/matcher/mocks.h"
@@ -40,16 +40,17 @@ using ::Envoy::Matcher::MatchTreeFactory;
 using ::Envoy::Matcher::MatchTreePtr;
 using ::Envoy::Matcher::MatchTreeSharedPtr;
 using ::Envoy::Matcher::MockMatchTreeValidationVisitor;
+using ::Envoy::Matcher::SkippedMatchCb;
 using ::Envoy::Matcher::StringActionFactory;
 using ::Envoy::Matcher::TestData;
 using ::Envoy::Matcher::TestDataInputBoolFactory;
 using ::Envoy::Matcher::TestDataInputStringFactory;
 using ::testing::ElementsAre;
 
-class TrieMatcherTest : public ::testing::Test {
+class IpRangeMatcherTest : public ::testing::Test {
 public:
-  TrieMatcherTest()
-      : inject_action_(action_factory_), inject_matcher_(trie_matcher_factory_),
+  IpRangeMatcherTest()
+      : inject_action_(action_factory_), inject_matcher_(ip_range_matcher_factory_),
         factory_(context_, factory_context_, validation_visitor_) {
     EXPECT_CALL(validation_visitor_, performDataInputValidation(_, _)).Times(testing::AnyNumber());
   }
@@ -66,7 +67,7 @@ public:
 
   StringActionFactory action_factory_;
   Registry::InjectFactory<ActionFactory<absl::string_view>> inject_action_;
-  TrieMatcherFactoryBase<TestData> trie_matcher_factory_;
+  IpRangeMatcherFactoryBase<TestData> ip_range_matcher_factory_;
   Registry::InjectFactory<CustomMatcherFactory<TestData>> inject_matcher_;
   MockMatchTreeValidationVisitor<TestData> validation_visitor_;
 
@@ -78,7 +79,7 @@ public:
   SkippedMatchCb skipped_match_cb_ = nullptr;
 };
 
-TEST_F(TrieMatcherTest, TestMatcher) {
+TEST_F(IpRangeMatcherTest, TestMatcher) {
   const std::string yaml = R"EOF(
 matcher_tree:
   input:
@@ -129,7 +130,7 @@ matcher_tree:
   }
 }
 
-TEST_F(TrieMatcherTest, TestInvalidMatcher) {
+TEST_F(IpRangeMatcherTest, TestInvalidMatcher) {
   const std::string yaml = R"EOF(
 matcher_tree:
   input:
@@ -164,11 +165,11 @@ matcher_tree:
   auto input_factory = ::Envoy::Matcher::TestDataInputFloatFactory(3.14);
   auto match_tree = factory_.create(matcher_);
   std::string error_message = absl::StrCat("Unsupported data input type: float, currently only "
-                                           "string type is supported in trie matcher");
+                                           "string type is supported in IP range matcher");
   EXPECT_THROW_WITH_MESSAGE(match_tree(), EnvoyException, error_message);
 }
 
-TEST_F(TrieMatcherTest, TestMatcherOnNoMatch) {
+TEST_F(IpRangeMatcherTest, TestMatcherOnNoMatch) {
   const std::string yaml = R"EOF(
 matcher_tree:
   input:
@@ -220,7 +221,7 @@ on_no_match:
   }
 }
 
-TEST_F(TrieMatcherTest, OverlappingMatcher) {
+TEST_F(IpRangeMatcherTest, OverlappingMatcher) {
   const std::string yaml = R"EOF(
 matcher_tree:
   input:
@@ -275,7 +276,7 @@ matcher_tree:
   }
 }
 
-TEST_F(TrieMatcherTest, NestedInclusiveMatcher) {
+TEST_F(IpRangeMatcherTest, NestedInclusiveMatcher) {
   const std::string yaml = R"EOF(
 matcher_tree:
   input:
@@ -333,7 +334,7 @@ matcher_tree:
   }
 }
 
-TEST_F(TrieMatcherTest, NestedExclusiveMatcher) {
+TEST_F(IpRangeMatcherTest, NestedExclusiveMatcher) {
   const std::string yaml = R"EOF(
 matcher_tree:
   input:
@@ -393,7 +394,7 @@ matcher_tree:
   }
 }
 
-TEST_F(TrieMatcherTest, RecursiveMatcherTree) {
+TEST_F(IpRangeMatcherTest, RecursiveMatcherTree) {
   const std::string yaml = R"EOF(
 matcher_tree:
   input:
@@ -466,7 +467,7 @@ matcher_tree:
   }
 }
 
-TEST_F(TrieMatcherTest, NoData) {
+TEST_F(IpRangeMatcherTest, NoData) {
   const std::string yaml = R"EOF(
 matcher_tree:
   input:
@@ -530,7 +531,7 @@ matcher_tree:
   }
 }
 
-TEST_F(TrieMatcherTest, ExerciseKeepMatching) {
+TEST_F(IpRangeMatcherTest, ExerciseKeepMatching) {
   const std::string yaml = R"EOF(
 matcher_tree:
   input:
@@ -615,7 +616,7 @@ on_no_match:
               ElementsAre(IsStringAction("foo"), IsStringAction("baz"), IsStringAction("bag")));
 }
 
-TEST(TrieMatcherIntegrationTest, NetworkMatchingData) {
+TEST(IpRangeMatcherIntegrationTest, NetworkMatchingData) {
   const std::string yaml = R"EOF(
 matcher_tree:
   input:
@@ -661,7 +662,7 @@ matcher_tree:
   EXPECT_THAT(result, HasStringAction("foo"));
 }
 
-TEST(TrieMatcherIntegrationTest, UdpNetworkMatchingData) {
+TEST(IpRangeMatcherIntegrationTest, UdpNetworkMatchingData) {
   const std::string yaml = R"EOF(
 matcher_tree:
   input:
@@ -704,7 +705,7 @@ matcher_tree:
   EXPECT_THAT(result, HasStringAction("foo"));
 }
 
-TEST(TrieMatcherIntegrationTest, HttpMatchingData) {
+TEST(IpRangeMatcherIntegrationTest, HttpMatchingData) {
   const std::string yaml = R"EOF(
 matcher_tree:
   input:

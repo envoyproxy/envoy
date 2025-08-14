@@ -16,6 +16,7 @@ envoy_cc_library(
     deps = [
         "//envoy/config:grpc_mux_interface",
         "//envoy/config:subscription_interface",
+        "//envoy/config:xds_manager_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:resource_name_lib",

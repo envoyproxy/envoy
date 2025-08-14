@@ -49,6 +49,7 @@ envoy_cc_library(
         "//source/common/common:matchers_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/network:cidr_range_lib",
+        "//source/common/network:lc_trie_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
         "//source/extensions/path/match/uri_template:uri_template_match_lib",
         "@com_google_absl//absl/types:optional",

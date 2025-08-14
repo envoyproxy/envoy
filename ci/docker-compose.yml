@@ -11,6 +11,7 @@ x-envoy-build-base: &envoy-build-base
   - BUILD_DIR=/build
   - ENVOY_DOCKER_SOURCE_DIR=${ENVOY_DOCKER_SOURCE_DIR:-/source}
   - ENVOY_DOCKER_BUILD_DIR="${ENVOY_DOCKER_BUILD_DIR:-/tmp/envoy-docker-build}"
+  - ENVOY_OCI_DIR
 
   # Proxy settings
   - HTTP_PROXY
