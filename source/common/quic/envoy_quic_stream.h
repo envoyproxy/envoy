@@ -223,11 +223,7 @@ protected:
   }
 
   void addDecompressedHeaderBytesReceived(const quic::QuicHeaderList& header_list) {
-    uint64_t total_header_bytes = 0;
-    for (const auto& [key, value] : header_list) {
-      total_header_bytes += key.size() + value.size();
-    }
-    bytes_meter_->addDecompressedHeaderBytesReceived(total_header_bytes);
+    bytes_meter_->addDecompressedHeaderBytesReceived(header_list.uncompressed_header_bytes());
   }
 
   void encodeTrailersImpl(quiche::HttpHeaderBlock&& trailers);
