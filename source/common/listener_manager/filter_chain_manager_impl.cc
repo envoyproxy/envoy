@@ -32,7 +32,7 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
 }
 
 struct FilterChainNameAction
-    : public Matcher::ActionBase<ProtobufWkt::StringValue, Configuration::FilterChainBaseAction> {
+    : public Matcher::ActionBase<Protobuf::StringValue, Configuration::FilterChainBaseAction> {
   explicit FilterChainNameAction(const std::string& name) : name_(name) {}
   const Network::FilterChain* get(const FilterChainsByName& filter_chains_by_name,
                                   const StreamInfo::StreamInfo&) const override {
@@ -53,10 +53,10 @@ public:
                                              FilterChainActionFactoryContext&,
                                              ProtobufMessage::ValidationVisitor&) override {
     return std::make_shared<FilterChainNameAction>(
-        dynamic_cast<const ProtobufWkt::StringValue&>(config).value());
+        dynamic_cast<const Protobuf::StringValue&>(config).value());
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
 };
 

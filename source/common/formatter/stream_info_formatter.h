@@ -26,8 +26,8 @@ public:
   formatWithContext(const Context&, const StreamInfo::StreamInfo& stream_info) const override {
     return format(stream_info);
   }
-  ProtobufWkt::Value
-  formatValueWithContext(const Context&, const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValueWithContext(const Context&,
+                                         const StreamInfo::StreamInfo& stream_info) const override {
     return formatValue(stream_info);
   }
 
@@ -42,9 +42,9 @@ public:
   /**
    * Format the value with the given stream info.
    * @param stream_info supplies the stream info.
-   * @return ProtobufWkt::Value containing a single value extracted from the given stream info.
+   * @return Protobuf::Value containing a single value extracted from the given stream info.
    */
-  virtual ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo& stream_info) const PURE;
+  virtual Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 using StreamInfoFormatterProviderPtr = std::unique_ptr<StreamInfoFormatterProvider>;
@@ -68,12 +68,12 @@ public:
 
   // StreamInfoFormatterProvider
   absl::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override;
-  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override;
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override;
 
 protected:
   absl::optional<std::string>
   formatMetadata(const envoy::config::core::v3::Metadata& metadata) const;
-  ProtobufWkt::Value formatMetadataValue(const envoy::config::core::v3::Metadata& metadata) const;
+  Protobuf::Value formatMetadataValue(const envoy::config::core::v3::Metadata& metadata) const;
 
 private:
   std::string filter_namespace_;
@@ -128,7 +128,7 @@ public:
 
   // StreamInfoFormatterProvider
   absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
-  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo&) const override;
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
 
 private:
   const Envoy::StreamInfo::FilterState::Object*
@@ -156,7 +156,7 @@ public:
 
   // StreamInfoFormatterProvider
   absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
-  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo&) const override;
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
 
   static const absl::flat_hash_map<absl::string_view, TimePointGetter> KnownTimePointGetters;
 
@@ -210,7 +210,7 @@ public:
 
   // StreamInfoFormatterProvider
   absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
-  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo&) const override;
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
 
 private:
   const Envoy::DateFormatter date_formatter_;
@@ -272,10 +272,10 @@ public:
 
   // StreamInfoFormatterProvider
   absl::optional<std::string> format(const StreamInfo::StreamInfo&) const override;
-  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo&) const override;
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo&) const override;
 
 private:
-  ProtobufWkt::Value str_;
+  Protobuf::Value str_;
 };
 
 class DefaultBuiltInStreamInfoCommandParserFactory : public BuiltInCommandParserFactory {

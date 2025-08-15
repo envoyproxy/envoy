@@ -231,11 +231,11 @@ protected:
                                                  options_, creation_status);
   }
 
-  FakeResourceMonitorFactory<Envoy::ProtobufWkt::Struct> factory1_;
-  FakeResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory2_;
-  FakeResourceMonitorFactory<Envoy::ProtobufWkt::Duration> factory3_;
-  FakeResourceMonitorFactory<Envoy::ProtobufWkt::StringValue> factory4_;
-  FakeProactiveResourceMonitorFactory<Envoy::ProtobufWkt::BoolValue> factory5_;
+  FakeResourceMonitorFactory<Envoy::Protobuf::Struct> factory1_;
+  FakeResourceMonitorFactory<Envoy::Protobuf::Timestamp> factory2_;
+  FakeResourceMonitorFactory<Envoy::Protobuf::Duration> factory3_;
+  FakeResourceMonitorFactory<Envoy::Protobuf::StringValue> factory4_;
+  FakeProactiveResourceMonitorFactory<Envoy::Protobuf::BoolValue> factory5_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory1_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory2_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory3_;

@@ -97,7 +97,7 @@ public:
   }
 
   FakeUpstream* grpc_receiver_upstream_{};
-  ProtobufWkt::Struct otel_runtime_config_;
+  Protobuf::Struct otel_runtime_config_;
 
   FakeHttpConnectionPtr connection_;
   std::vector<FakeStreamPtr> streams_;

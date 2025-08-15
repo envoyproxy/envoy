@@ -12,8 +12,8 @@
 
 namespace Envoy {
 
+using Envoy::Protobuf::Any;
 using Envoy::Protobuf::MapPair;
-using Envoy::ProtobufWkt::Any;
 
 class CompressorIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                   public Event::SimulatedTimeSystem,

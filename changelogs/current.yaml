@@ -13,7 +13,7 @@ behavior_changes:
     unmarked as traced after the tracing refresh.
 - area: ext_proc
   change: |
-    Reverted https://github.com/envoyproxy/envoy/pull/39740 to re-enable fail_open+FULL_DUPLEX_STREAMED configuraton combination.
+    Reverted https://github.com/envoyproxy/envoy/pull/39740 to re-enable fail_open+FULL_DUPLEX_STREAMED configuration combination.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -31,6 +31,10 @@ minor_behavior_changes:
     Generic proxy codec add the same buffer limit as connection buffer limit, if the buffer limit is
     exceeded, the connection is disconnected. This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.generic_proxy_codec_buffer_limit`` to ``false``.
+- area: http3
+  change: |
+    turn off HTTP/3 happy eyeball in upstream via runtime guard ``envoy.reloadable_features.http3_happy_eyeballs``.
+    It is found to favor TCP over QUIC when UDP does not work on v6 network but works on v4.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -95,6 +99,9 @@ removed_config_or_runtime:
 - area: http3
   change: |
     Removed runtime guard ``envoy.reloadable_features.http3_remove_empty_trailers`` and legacy code paths.
+- area: stats
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.enable_include_histograms`` and legacy code paths.
 - area: network
   change: |
     Removed runtime guard ``envoy.reloadable_features.udp_socket_apply_aggregated_read_limit`` and legacy code paths.
@@ -145,6 +152,12 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.proxy_104`` and legacy code paths.
 
 new_features:
+- area: stats
+  change: |
+    Added support to remove unused metrics from memory for extensions that
+    support evictable metrics. This is done :ref:`periodically
+    <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_eviction_interval>`
+    during the metric flush.
 - area: quic
   change: |
     Added new option to support :ref:`base64 encoded server ID
@@ -194,6 +207,12 @@ new_features:
 - area: dns_filter, redis_proxy and prefix_matcher_map
   change: |
     Switch to using Radix Tree instead of Trie for performance improvements.
+- area: header_to_metadata
+  change: |
+    Added optional statistics collection for the Header-To-Metadata filter. When the :ref:`stat_prefix
+    <envoy_v3_api_field_extensions.filters.http.header_to_metadata.v3.Config.stat_prefix>` field is configured,
+    the filter emits detailed counters for rule processing, metadata operations, etc. See
+    :ref:`Header-To-Metadata filter statistics <config_http_filters_header_to_metadata>` for details.
 - area: load_reporting
   change: |
     Added support for endpoint-level load stats and metrics reporting. Locality load reports now include per
@@ -228,7 +247,6 @@ new_features:
     Added ``route()`` to the Stream handle API, allowing Lua scripts to retrieve route information. So far, the only method
     implemented is ``metadata()``, allowing Lua scripts to access route metadata scoped to the specific filter name. See
     :ref:`Route object API <config_http_filters_lua_route_wrapper>` for more details.
-
 - area: dynamic_modules
   change: |
     Added a new Logging ABI that allows modules to emit logs in the standard Envoy logging stream under "dynamic_modules" ID.

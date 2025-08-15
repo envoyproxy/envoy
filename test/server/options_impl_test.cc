@@ -666,7 +666,7 @@ public:
   ~TestFactory() override = default;
   std::string category() const override { return "test"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
 };
 
@@ -680,7 +680,7 @@ public:
   ~TestingFactory() override = default;
   std::string category() const override { return "testing"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
 };
 

@@ -790,12 +790,12 @@ public:
    * Creates a new MetadataMatchCriteria, merging existing
    * metadata criteria with the provided criteria. The result criteria is the
    * combination of both sets of criteria, with those from the metadata_matches
-   * ProtobufWkt::Struct taking precedence.
+   * Protobuf::Struct taking precedence.
    * @param metadata_matches supplies the new criteria.
    * @return MetadataMatchCriteriaConstPtr the result criteria.
    */
   virtual MetadataMatchCriteriaConstPtr
-  mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const PURE;
+  mergeMatchCriteria(const Protobuf::Struct& metadata_matches) const PURE;
 
   /**
    * Creates a new MetadataMatchCriteria with criteria vector reduced to given names

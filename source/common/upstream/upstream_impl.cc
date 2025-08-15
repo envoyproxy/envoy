@@ -94,7 +94,7 @@ parseTcpKeepaliveConfig(const envoy::config::cluster::v3::Cluster& config) {
 }
 
 absl::StatusOr<ProtocolOptionsConfigConstSharedPtr>
-createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
+createProtocolOptionsConfig(const std::string& name, const Protobuf::Any& typed_config,
                             Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
   Server::Configuration::ProtocolOptionsFactory* factory =
       Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(

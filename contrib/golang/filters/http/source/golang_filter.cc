@@ -1225,8 +1225,8 @@ CAPIStatus Filter::setDynamicMetadata(std::string filter_name, std::string key,
 
 void Filter::setDynamicMetadataInternal(std::string filter_name, std::string key,
                                         const absl::string_view& buf) {
-  ProtobufWkt::Struct value;
-  ProtobufWkt::Value v;
+  Protobuf::Struct value;
+  Protobuf::Value v;
   v.ParseFromArray(buf.data(), buf.length());
 
   (*value.mutable_fields())[key] = v;

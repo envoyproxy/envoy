@@ -389,7 +389,7 @@ TEST_F(HttpConnManFinalizerImplTest, SpanCustomTags) {
                                                     {":scheme", "https"},
                                                     {"x-bb", "b"}};
 
-  ProtobufWkt::Struct fake_struct;
+  Protobuf::Struct fake_struct;
   std::string yaml = R"EOF(
 ree:
   foo: bar

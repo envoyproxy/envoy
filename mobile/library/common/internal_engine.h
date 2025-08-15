@@ -157,8 +157,8 @@ public:
   void onNetworkConnectAndroid(ConnectionType connection_type, int64_t net_id);
 
   /**
-   * The callback that gets executed when the device decides that the given list of networks should
-   * be forgotten.
+   * The callback that gets executed when the device decides to forget all networks other than the
+   * given list.
    */
   void purgeActiveNetworkListAndroid(const std::vector<int64_t>& active_network_ids);
 
@@ -228,6 +228,9 @@ private:
   // there is no connectivity for the `domain`, a null pointer will be returned.
   static Network::Address::InstanceConstSharedPtr probeAndGetLocalAddr(int domain);
 
+  // Called when it's been determined that the default network has changed.
+  void resetHttpPropertiesAndDrainHosts(bool has_ipv6_connectivity);
+
   Thread::PosixThreadFactoryPtr thread_factory_;
   Event::Dispatcher* event_dispatcher_{};
   Stats::ScopeSharedPtr client_scope_;
@@ -241,7 +244,7 @@ private:
   Thread::MutexBasicLockable mutex_;
   Thread::CondVar cv_;
   Http::ClientPtr http_client_;
-  Network::ConnectivityManagerSharedPtr connectivity_manager_;
+  Network::ConnectivityManagerImplSharedPtr connectivity_manager_;
   Event::ProvisionalDispatcherPtr dispatcher_;
   // Used by the cerr logger to ensure logs don't overwrite each other.
   absl::Mutex log_mutex_;

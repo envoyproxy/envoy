@@ -35,11 +35,11 @@ public:
 
   /**
    * All classes defining Zipkin abstractions need to implement this method to convert
-   * the corresponding abstraction to a ProtobufWkt::Struct.
+   * the corresponding abstraction to a Protobuf::Struct.
    * @param replacements A container that is used to hold the required replacements when this object
    * is serialized.
    */
-  virtual const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const PURE;
+  virtual const Protobuf::Struct toStruct(Util::Replacements& replacements) const PURE;
 
   /**
    * Serializes the a type as a Zipkin-compliant JSON representation as a string.
@@ -110,7 +110,7 @@ public:
    *
    * @return a protobuf struct.
    */
-  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
+  const Protobuf::Struct toStruct(Util::Replacements& replacements) const override;
 
 private:
   std::string service_name_;
@@ -202,7 +202,7 @@ public:
    *
    * @return a protobuf struct.
    */
-  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
+  const Protobuf::Struct toStruct(Util::Replacements& replacements) const override;
 
 private:
   uint64_t timestamp_{0};
@@ -290,7 +290,7 @@ public:
    * @param replacements Used to hold the required replacements on serialization step.
    * @return a protobuf struct.
    */
-  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
+  const Protobuf::Struct toStruct(Util::Replacements& replacements) const override;
 
 private:
   std::string key_;
@@ -533,7 +533,7 @@ public:
    *
    * @return a protobuf struct.
    */
-  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
+  const Protobuf::Struct toStruct(Util::Replacements& replacements) const override;
 
   /**
    * @return the span's context.
