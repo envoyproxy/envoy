@@ -44,7 +44,6 @@ public:
   std::shared_ptr<CachedBucket> getBucket(size_t id) override;
 
 private:
-  inline GlobalRateLimitClientImpl* getGlobalClient() { return global_client_; }
   inline std::shared_ptr<BucketsCache> getBucketsCache() {
     return (buckets_cache_tls_.get().has_value()) ? buckets_cache_tls_.get()->quota_buckets_
                                                   : nullptr;
