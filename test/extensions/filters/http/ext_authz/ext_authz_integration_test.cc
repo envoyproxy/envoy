@@ -143,11 +143,11 @@ public:
       labels["label_1"] = "value_1";
       labels["label_2"] = "value_2";
 
-      ProtobufWkt::Struct metadata;
-      ProtobufWkt::Value val;
-      ProtobufWkt::Struct* labels_obj = val.mutable_struct_value();
+      Protobuf::Struct metadata;
+      Protobuf::Value val;
+      Protobuf::Struct* labels_obj = val.mutable_struct_value();
       for (const auto& pair : labels) {
-        ProtobufWkt::Value val;
+        Protobuf::Value val;
         val.set_string_value(pair.second);
         (*labels_obj->mutable_fields())[pair.first] = val;
       }
@@ -188,10 +188,10 @@ public:
       config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
         auto* layer = bootstrap.mutable_layered_runtime()->add_layers();
         layer->set_name("enable layer");
-        ProtobufWkt::Struct& runtime = *layer->mutable_static_layer();
+        Protobuf::Struct& runtime = *layer->mutable_static_layer();
         bootstrap.mutable_layered_runtime()->mutable_layers(0)->set_name("base layer");
 
-        ProtobufWkt::Struct& enable =
+        Protobuf::Struct& enable =
             *(*runtime.mutable_fields())["envoy.ext_authz.enable"].mutable_struct_value();
         (*enable.mutable_fields())["numerator"].set_number_value(0);
       });

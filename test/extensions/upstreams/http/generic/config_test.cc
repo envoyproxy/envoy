@@ -24,7 +24,7 @@ protected:
   Upstream::ResourcePriority priority_ = Upstream::ResourcePriority::Default;
   Upstream::HostConstSharedPtr host_;
   GenericGenericConnPoolFactory factory_;
-  ProtobufTypes::MessagePtr message_{new Envoy::ProtobufWkt::Struct()};
+  ProtobufTypes::MessagePtr message_{new Envoy::Protobuf::Struct()};
 };
 
 TEST_F(GenericGenericConnPoolFactoryTest, CreateValidHttpConnPool) {

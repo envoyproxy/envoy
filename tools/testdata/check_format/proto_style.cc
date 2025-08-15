@@ -8,8 +8,8 @@ Protobuf::StringValue stringvalue;
 Protobuf::Struct struct;
 Protobuf::Value value;
 Protobuf::MapPair mappair;
-ProtobufWkt::Map map;
-ProtobufWkt::MapPair mappair;
+Protobuf::Map map;
+Protobuf::MapPair mappair;
 ProtobufUtil::MessageDifferencer messagedifferencer;
 
 } // namespace Envoy

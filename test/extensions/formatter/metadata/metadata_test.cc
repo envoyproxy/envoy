@@ -18,7 +18,7 @@ class MetadataFormatterTest : public ::testing::Test {
 public:
   MetadataFormatterTest() : metadata_(std::make_shared<envoy::config::core::v3::Metadata>()) {
     // Create metadata object with test values.
-    ProtobufWkt::Struct struct_obj;
+    Protobuf::Struct struct_obj;
     auto& fields_map = *struct_obj.mutable_fields();
     fields_map["test_key"] = ValueUtil::stringValue("test_value");
     (*metadata_->mutable_filter_metadata())["metadata.test"] = struct_obj;

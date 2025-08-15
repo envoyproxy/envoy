@@ -18,7 +18,7 @@ namespace NetworkFilters {
 namespace GenericProxy {
 
 RouteSpecificFilterConfigConstSharedPtr RouteEntryImpl::createRouteSpecificFilterConfig(
-    const std::string& name, const ProtobufWkt::Any& typed_config,
+    const std::string& name, const Protobuf::Any& typed_config,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
 
