@@ -194,7 +194,12 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
 
 Filters::Common::ExtAuthz::ClientPtr
 Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grpc_service) {
-  // Server context is always available when constructing per-route clients.
+  if (server_context_ == nullptr) {
+    ENVOY_STREAM_LOG(
+        debug, "ext_authz filter: server context not available for per-route gRPC client creation.",
+        *decoder_callbacks_);
+    return nullptr;
+  }
 
   // Use the timeout from the gRPC service configuration, use default if not specified.
   const uint32_t timeout_ms =
@@ -228,7 +233,12 @@ Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grp
 
 Filters::Common::ExtAuthz::ClientPtr Filter::createPerRouteHttpClient(
     const envoy::extensions::filters::http::ext_authz::v3::HttpService& http_service) {
-  // Server context is always available when constructing per-route clients.
+  if (server_context_ == nullptr) {
+    ENVOY_STREAM_LOG(
+        debug, "ext_authz filter: server context not available for per-route HTTP client creation.",
+        *decoder_callbacks_);
+    return nullptr;
+  }
 
   // Use the timeout from the HTTP service configuration, use default if not specified.
   const uint32_t timeout_ms =
