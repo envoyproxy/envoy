@@ -656,17 +656,16 @@ TEST(HttpUtility, parseHttp2Settings) {
   {
 
     TestScopedRuntime scoped_runtime;
-    scoped_runtime.mergeValues(
-        {{"envoy.reloadable_features.safe_http2_max_concurrent_streams", "false"}});
+    scoped_runtime.mergeValues({{"envoy.reloadable_features.safe_http2_options", "false"}});
 
     using ::Envoy::Http2::Utility::OptionsLimits;
     auto http2_options = parseHttp2OptionsFromV3Yaml("{}");
     EXPECT_EQ(OptionsLimits::DEFAULT_HPACK_TABLE_SIZE, http2_options.hpack_table_size().value());
     EXPECT_EQ(OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS_LEGACY,
               http2_options.max_concurrent_streams().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE,
+    EXPECT_EQ(OptionsLimits::DEFAULT_INITIAL_STREAM_WINDOW_SIZE_LEGACY,
               http2_options.initial_stream_window_size().value());
-    EXPECT_EQ(OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE,
+    EXPECT_EQ(OptionsLimits::DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE_LEGACY,
               http2_options.initial_connection_window_size().value());
     EXPECT_EQ(OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES,
               http2_options.max_outbound_frames().value());
