@@ -65,6 +65,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "locality_wrr_lib",
+    srcs = ["locality_wrr.cc"],
+    hdrs = ["locality_wrr.h"],
+    deps = [
+        ":scheduler_lib",
+        "//envoy/upstream:upstream_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "cluster_discovery_manager_lib",
     srcs = ["cluster_discovery_manager.cc"],
     hdrs = ["cluster_discovery_manager.h"],
@@ -437,8 +447,8 @@ envoy_cc_library(
     ],
     deps = [
         ":load_balancer_context_base_lib",
+        ":locality_wrr_lib",
         ":resource_manager_lib",
-        ":scheduler_lib",
         ":upstream_factory_context_lib",
         "//envoy/event:timer_interface",
         "//envoy/filter:config_provider_manager_interface",

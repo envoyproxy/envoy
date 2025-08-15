@@ -60,6 +60,7 @@
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/upstream/edf_scheduler.h"
 #include "source/common/upstream/load_balancer_context_base.h"
+#include "source/common/upstream/locality_wrr.h"
 #include "source/common/upstream/resource_manager_impl.h"
 #include "source/common/upstream/transport_socket_match_impl.h"
 #include "source/common/upstream/upstream_factory_context_impl.h"
@@ -630,15 +631,6 @@ protected:
   }
 
 private:
-  // Weight for a locality taking into account health status using the provided eligible hosts per
-  // locality.
-  static double effectiveLocalityWeight(uint32_t index,
-                                        const HostsPerLocality& eligible_hosts_per_locality,
-                                        const HostsPerLocality& excluded_hosts_per_locality,
-                                        const HostsPerLocality& all_hosts_per_locality,
-                                        const LocalityWeights& locality_weights,
-                                        uint32_t overprovisioning_factor);
-
   const uint32_t priority_;
   uint32_t overprovisioning_factor_;
   bool weighted_priority_health_;
@@ -655,46 +647,11 @@ private:
       member_update_cb_helper_;
   // Locality weights (used to build WRR locality_scheduler_);
   LocalityWeightsConstSharedPtr locality_weights_;
+
   // WRR locality scheduler state.
-  struct LocalityEntry {
-    LocalityEntry(uint32_t index, double effective_weight)
-        : index_(index), effective_weight_(effective_weight) {}
-    const uint32_t index_;
-    const double effective_weight_;
-  };
-
-  // Rebuilds the provided locality scheduler with locality entries based on the locality weights
-  // and eligible hosts.
-  //
-  // @param locality_scheduler the locality scheduler to rebuild. Will be set to nullptr if no
-  // localities are eligible.
-  // @param locality_entries the vector that holds locality entries. Will be reset and populated
-  // with entries corresponding to the new scheduler.
-  // @param eligible_hosts_per_locality eligible hosts for this scheduler grouped by locality.
-  // @param eligible_hosts all eligible hosts for this scheduler.
-  // @param all_hosts_per_locality all hosts for this HostSet grouped by locality.
-  // @param locality_weights the weighting of each locality.
-  // @param overprovisioning_factor the overprovisioning factor to use when computing the effective
-  // weight of a locality.
-  // @param seed a random number of initial picks to "invoke" on the locality scheduler. This
-  // allows to distribute the load between different localities across worker threads and a fleet
-  // of Envoys.
-  static void
-  rebuildLocalityScheduler(std::unique_ptr<EdfScheduler<LocalityEntry>>& locality_scheduler,
-                           std::vector<std::shared_ptr<LocalityEntry>>& locality_entries,
-                           const HostsPerLocality& eligible_hosts_per_locality,
-                           const HostVector& eligible_hosts,
-                           HostsPerLocalityConstSharedPtr all_hosts_per_locality,
-                           HostsPerLocalityConstSharedPtr excluded_hosts_per_locality,
-                           LocalityWeightsConstSharedPtr locality_weights,
-                           uint32_t overprovisioning_factor, uint64_t seed);
-
-  static absl::optional<uint32_t> chooseLocality(EdfScheduler<LocalityEntry>* locality_scheduler);
-
-  std::vector<std::shared_ptr<LocalityEntry>> healthy_locality_entries_;
-  std::unique_ptr<EdfScheduler<LocalityEntry>> healthy_locality_scheduler_;
-  std::vector<std::shared_ptr<LocalityEntry>> degraded_locality_entries_;
-  std::unique_ptr<EdfScheduler<LocalityEntry>> degraded_locality_scheduler_;
+  std::unique_ptr<LocalityWrr> locality_wrr_;
+  const bool locality_scheduler_on_lb_{
+      Runtime::runtimeFeatureEnabled("envoy.restart_features.move_locality_schedulers_to_lb")};
 };
 
 using HostSetImplPtr = std::unique_ptr<HostSetImpl>;
