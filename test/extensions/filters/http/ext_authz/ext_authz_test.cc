@@ -71,7 +71,8 @@ public:
     config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(),
                                              "ext_authz_prefix", factory_context_);
     client_ = new NiceMock<Filters::Common::ExtAuthz::MockClient>();
-    filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
+    filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_},
+                                       factory_context_);
     ON_CALL(decoder_filter_callbacks_, filterConfigName()).WillByDefault(Return(FilterConfigName));
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
@@ -439,9 +440,13 @@ public:
     EXPECT_EQ(1U, config_->stats().invalid_.value());
   }
 
-  const std::string invalid_key_ = "invalid-\nkey";
-  const uint8_t invalid_value_bytes_[3]{0x7f, 0x7f, 0};
+  static constexpr const char* invalid_key_ = "invalid-\nkey";
+  static constexpr uint8_t invalid_value_bytes_[3]{0x7f, 0x7f, 0};
   const std::string invalid_value_;
+
+  static std::string getInvalidValue() {
+    return std::string(reinterpret_cast<const char*>(invalid_value_bytes_));
+  }
 };
 
 TEST_F(HttpFilterTest, DisableDynamicMetadataIngestion) {
@@ -484,139 +489,149 @@ TEST_F(HttpFilterTest, DisableDynamicMetadataIngestion) {
 
 // Tests that the filter rejects authz responses with mutations with an invalid key when
 // validate_authz_response is set to true in config.
-TEST_F(InvalidMutationTest, HeadersToSetKey) {
+// Parameterized test for invalid mutation scenarios to reduce redundancy.
+class InvalidMutationParamTest
+    : public InvalidMutationTest,
+      public testing::WithParamInterface<
+          std::tuple<std::string,                                               // test name
+                     std::function<void(Filters::Common::ExtAuthz::Response&)>, // setup func
+                     Filters::Common::ExtAuthz::CheckStatus                     // status
+                     >> {};
+
+TEST_P(InvalidMutationParamTest, InvalidMutationFields) {
+  const auto& [test_name, setup_func, status] = GetParam();
+
+  Filters::Common::ExtAuthz::Response response;
+  response.status = status;
+  setup_func(response);
+  testResponse(response);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    InvalidMutationScenarios, InvalidMutationParamTest,
+    testing::Values(
+        // Invalid key tests
+        std::make_tuple(
+            "HeadersToSetKey",
+            [](Filters::Common::ExtAuthz::Response& r) {
+              r.headers_to_set = {{InvalidMutationTest::invalid_key_, "bar"}};
+            },
+            Filters::Common::ExtAuthz::CheckStatus::OK),
+        std::make_tuple(
+            "HeadersToAddKey",
+            [](Filters::Common::ExtAuthz::Response& r) {
+              r.headers_to_add = {{InvalidMutationTest::invalid_key_, "bar"}};
+            },
+            Filters::Common::ExtAuthz::CheckStatus::OK),
+        std::make_tuple(
+            "HeadersToSetKeyDenied",
+            [](Filters::Common::ExtAuthz::Response& r) {
+              r.headers_to_set = {{InvalidMutationTest::invalid_key_, "bar"}};
+            },
+            Filters::Common::ExtAuthz::CheckStatus::Denied),
+        std::make_tuple(
+            "HeadersToAppendKey",
+            [](Filters::Common::ExtAuthz::Response& r) {
+              r.headers_to_append = {{InvalidMutationTest::invalid_key_, "bar"}};
+            },
+            Filters::Common::ExtAuthz::CheckStatus::OK),
+        std::make_tuple(
+            "ResponseHeadersToAddKey",
+            [](Filters::Common::ExtAuthz::Response& r) {
+              r.response_headers_to_set = {{InvalidMutationTest::invalid_key_, "bar"}};
+            },
+            Filters::Common::ExtAuthz::CheckStatus::OK),
+        std::make_tuple(
+            "ResponseHeadersToSetKey",
+            [](Filters::Common::ExtAuthz::Response& r) {
+              r.response_headers_to_set = {{InvalidMutationTest::invalid_key_, "bar"}};
+            },
+            Filters::Common::ExtAuthz::CheckStatus::OK),
+        std::make_tuple(
+            "ResponseHeadersToAddIfAbsentKey",
+            [](Filters::Common::ExtAuthz::Response& r) {
+              r.response_headers_to_add_if_absent = {{InvalidMutationTest::invalid_key_, "bar"}};
+            },
+            Filters::Common::ExtAuthz::CheckStatus::OK),
+        std::make_tuple(
+            "ResponseHeadersToOverwriteIfExistsKey",
+            [](Filters::Common::ExtAuthz::Response& r) {
+              r.response_headers_to_overwrite_if_exists = {
+                  {InvalidMutationTest::invalid_key_, "bar"}};
+            },
+            Filters::Common::ExtAuthz::CheckStatus::OK),
+        std::make_tuple(
+            "QueryParametersToSetKey",
+            [](Filters::Common::ExtAuthz::Response& r) {
+              r.query_parameters_to_set = {{"f o o", "bar"}};
+            },
+            Filters::Common::ExtAuthz::CheckStatus::OK),
+        // Invalid value tests
+        std::make_tuple(
+            "HeadersToSetValue",
+            [](Filters::Common::ExtAuthz::Response& r) {
+              r.headers_to_set = {{"foo", InvalidMutationTest::getInvalidValue()}};
+            },
+            Filters::Common::ExtAuthz::CheckStatus::OK),
+        std::make_tuple(
+            "HeadersToAddValue",
+            [](Filters::Common::ExtAuthz::Response& r) {
+              r.headers_to_add = {{"foo", InvalidMutationTest::getInvalidValue()}};
+            },
+            Filters::Common::ExtAuthz::CheckStatus::OK),
+        std::make_tuple(
+            "HeadersToSetValueDenied",
+            [](Filters::Common::ExtAuthz::Response& r) {
+              r.headers_to_set = {{"foo", InvalidMutationTest::getInvalidValue()}};
+            },
+            Filters::Common::ExtAuthz::CheckStatus::Denied),
+        std::make_tuple(
+            "HeadersToAppendValue",
+            [](Filters::Common::ExtAuthz::Response& r) {
+              r.headers_to_append = {{"foo", InvalidMutationTest::getInvalidValue()}};
+            },
+            Filters::Common::ExtAuthz::CheckStatus::OK),
+        std::make_tuple(
+            "ResponseHeadersToAddValue",
+            [](Filters::Common::ExtAuthz::Response& r) {
+              r.response_headers_to_set = {{"foo", InvalidMutationTest::getInvalidValue()}};
+            },
+            Filters::Common::ExtAuthz::CheckStatus::OK),
+        std::make_tuple(
+            "ResponseHeadersToSetValue",
+            [](Filters::Common::ExtAuthz::Response& r) {
+              r.response_headers_to_set = {{"foo", InvalidMutationTest::getInvalidValue()}};
+            },
+            Filters::Common::ExtAuthz::CheckStatus::OK),
+        std::make_tuple(
+            "ResponseHeadersToAddIfAbsentValue",
+            [](Filters::Common::ExtAuthz::Response& r) {
+              r.response_headers_to_add_if_absent = {
+                  {"foo", InvalidMutationTest::getInvalidValue()}};
+            },
+            Filters::Common::ExtAuthz::CheckStatus::OK),
+        std::make_tuple(
+            "ResponseHeadersToOverwriteIfExistsValue",
+            [](Filters::Common::ExtAuthz::Response& r) {
+              r.response_headers_to_overwrite_if_exists = {
+                  {"foo", InvalidMutationTest::getInvalidValue()}};
+            },
+            Filters::Common::ExtAuthz::CheckStatus::OK),
+        std::make_tuple(
+            "QueryParametersToSetValue",
+            [](Filters::Common::ExtAuthz::Response& r) {
+              r.query_parameters_to_set = {{"foo", "b a r"}};
+            },
+            Filters::Common::ExtAuthz::CheckStatus::OK)),
+    [](const testing::TestParamInfo<InvalidMutationParamTest::ParamType>& info) {
+      return std::get<0>(info.param);
+    });
+
+// Keep one simple focused test to ensure backward compatibility.
+TEST_F(InvalidMutationTest, BasicInvalidKey) {
   Filters::Common::ExtAuthz::Response response;
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   response.headers_to_set = {{invalid_key_, "bar"}};
-  testResponse(response);
-}
-
-// Same as above, setting a different field...
-TEST_F(InvalidMutationTest, HeadersToAddKey) {
-  Filters::Common::ExtAuthz::Response response;
-  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_add = {{invalid_key_, "bar"}};
-  testResponse(response);
-}
-
-// headers_to_set is also used when the authz response has status denied.
-TEST_F(InvalidMutationTest, HeadersToSetKeyDenied) {
-  Filters::Common::ExtAuthz::Response response;
-  response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
-  response.headers_to_set = {{invalid_key_, "bar"}};
-  testResponse(response);
-}
-
-TEST_F(InvalidMutationTest, HeadersToAppendKey) {
-  Filters::Common::ExtAuthz::Response response;
-  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_append = {{invalid_key_, "bar"}};
-  testResponse(response);
-}
-
-TEST_F(InvalidMutationTest, ResponseHeadersToAddKey) {
-  Filters::Common::ExtAuthz::Response response;
-  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.response_headers_to_set = {{invalid_key_, "bar"}};
-  testResponse(response);
-}
-
-TEST_F(InvalidMutationTest, ResponseHeadersToSetKey) {
-  Filters::Common::ExtAuthz::Response response;
-  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.response_headers_to_set = {{invalid_key_, "bar"}};
-  testResponse(response);
-}
-
-TEST_F(InvalidMutationTest, ResponseHeadersToAddIfAbsentKey) {
-  Filters::Common::ExtAuthz::Response response;
-  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.response_headers_to_add_if_absent = {{invalid_key_, "bar"}};
-  testResponse(response);
-}
-
-TEST_F(InvalidMutationTest, ResponseHeadersToOverwriteIfExistsKey) {
-  Filters::Common::ExtAuthz::Response response;
-  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.response_headers_to_overwrite_if_exists = {{invalid_key_, "bar"}};
-  testResponse(response);
-}
-
-TEST_F(InvalidMutationTest, QueryParametersToSetKey) {
-  Filters::Common::ExtAuthz::Response response;
-  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.query_parameters_to_set = {{"f o o", "bar"}};
-  testResponse(response);
-}
-
-// Test that the filter rejects mutations with an invalid value
-TEST_F(InvalidMutationTest, HeadersToSetValueOk) {
-  Filters::Common::ExtAuthz::Response response;
-  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_set = {{"foo", invalid_value_}};
-  testResponse(response);
-}
-
-// Same as above, setting a different field...
-TEST_F(InvalidMutationTest, HeadersToAddValue) {
-  Filters::Common::ExtAuthz::Response response;
-  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_add = {{"foo", invalid_value_}};
-  testResponse(response);
-}
-
-// headers_to_set is also used when the authz response has status denied.
-TEST_F(InvalidMutationTest, HeadersToSetValueDenied) {
-  Filters::Common::ExtAuthz::Response response;
-  response.status = Filters::Common::ExtAuthz::CheckStatus::Denied;
-  response.headers_to_set = {{"foo", invalid_value_}};
-  testResponse(response);
-}
-
-TEST_F(InvalidMutationTest, HeadersToAppendValue) {
-  Filters::Common::ExtAuthz::Response response;
-  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  response.headers_to_append = {{"foo", invalid_value_}};
-  testResponse(response);
-}
-
-TEST_F(InvalidMutationTest, ResponseHeadersToAddValue) {
-  Filters::Common::ExtAuthz::Response response;
-  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  // Add a valid header to see if it gets added to the downstream response.
-  response.response_headers_to_set = {{"foo", invalid_value_}};
-  testResponse(response);
-}
-
-TEST_F(InvalidMutationTest, ResponseHeadersToSetValue) {
-  Filters::Common::ExtAuthz::Response response;
-  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  // Add a valid header to see if it gets added to the downstream response.
-  response.response_headers_to_set = {{"foo", invalid_value_}};
-  testResponse(response);
-}
-
-TEST_F(InvalidMutationTest, ResponseHeadersToAddIfAbsentValue) {
-  Filters::Common::ExtAuthz::Response response;
-  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  // Add a valid header to see if it gets added to the downstream response.
-  response.response_headers_to_add_if_absent = {{"foo", invalid_value_}};
-  testResponse(response);
-}
-
-TEST_F(InvalidMutationTest, ResponseHeadersToOverwriteIfExistsValue) {
-  Filters::Common::ExtAuthz::Response response;
-  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  // Add a valid header to see if it gets added to the downstream response.
-  response.response_headers_to_overwrite_if_exists = {{"foo", invalid_value_}};
-  testResponse(response);
-}
-
-TEST_F(InvalidMutationTest, QueryParametersToSetValue) {
-  Filters::Common::ExtAuthz::Response response;
-  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
-  // Add a valid header to see if it gets added to the downstream response.
-  response.query_parameters_to_set = {{"foo", "b a r"}};
   testResponse(response);
 }
 
@@ -824,68 +839,55 @@ TEST_F(DecoderHeaderMutationRulesTest, DisallowAll) {
   runTest(opts);
 }
 
-TEST_F(DecoderHeaderMutationRulesTest, RejectResponseAdd) {
-  DecoderHeaderMutationRulesTestOpts opts;
-  opts.rules = envoy::config::common::mutation_rules::v3::HeaderMutationRules();
-  opts.rules->mutable_disallow_all()->set_value(true);
-  opts.rules->mutable_disallow_is_error()->set_value(true);
-  opts.expect_reject_response = true;
+// Consolidated rejection test that covers all the scenarios previously tested individually.
+TEST_F(DecoderHeaderMutationRulesTest, RejectResponseOperations) {
+  // Test data structure for all rejection scenarios
+  struct TestCase {
+    std::string name;
+    bool use_disallow_all;
+    std::function<void(DecoderHeaderMutationRulesTestOpts&)> setup_func;
+  };
 
-  opts.disallowed_headers_to_add = {{"cant-add-me", "sad"}};
-  runTest(opts);
-}
+  std::vector<TestCase> test_cases = {
+      {"RejectResponseAdd", true,
+       [](DecoderHeaderMutationRulesTestOpts& opts) {
+         opts.disallowed_headers_to_add = {{"cant-add-me", "sad"}};
+       }},
+      {"RejectResponseAppend", true,
+       [](DecoderHeaderMutationRulesTestOpts& opts) {
+         opts.disallowed_headers_to_append = {{"cant-append-to-me", "fail"}};
+       }},
+      {"RejectResponseAppendPseudoheader", false,
+       [](DecoderHeaderMutationRulesTestOpts& opts) {
+         opts.disallowed_headers_to_append = {{":fake-pseudo-header", "fail"}};
+       }},
+      {"RejectResponseSet", true,
+       [](DecoderHeaderMutationRulesTestOpts& opts) {
+         opts.disallowed_headers_to_set = {{"cant-override-me", "nope"}};
+       }},
+      {"RejectResponseRemove", true,
+       [](DecoderHeaderMutationRulesTestOpts& opts) {
+         opts.disallowed_headers_to_remove = {"cant-delete-me"};
+       }},
+      {"RejectResponseRemovePseudoHeader", false, [](DecoderHeaderMutationRulesTestOpts& opts) {
+         opts.disallowed_headers_to_remove = {":fake-pseudo-header"};
+       }}};
 
-TEST_F(DecoderHeaderMutationRulesTest, RejectResponseAppend) {
-  DecoderHeaderMutationRulesTestOpts opts;
-  opts.rules = envoy::config::common::mutation_rules::v3::HeaderMutationRules();
-  opts.rules->mutable_disallow_all()->set_value(true);
-  opts.rules->mutable_disallow_is_error()->set_value(true);
-  opts.expect_reject_response = true;
+  // Run all test cases
+  for (const auto& test_case : test_cases) {
+    SCOPED_TRACE(test_case.name);
 
-  opts.disallowed_headers_to_append = {{"cant-append-to-me", "fail"}};
-  runTest(opts);
-}
+    DecoderHeaderMutationRulesTestOpts opts;
+    opts.rules = envoy::config::common::mutation_rules::v3::HeaderMutationRules();
+    if (test_case.use_disallow_all) {
+      opts.rules->mutable_disallow_all()->set_value(true);
+    }
+    opts.rules->mutable_disallow_is_error()->set_value(true);
+    opts.expect_reject_response = true;
 
-TEST_F(DecoderHeaderMutationRulesTest, RejectResponseAppendPseudoheader) {
-  DecoderHeaderMutationRulesTestOpts opts;
-  opts.rules = envoy::config::common::mutation_rules::v3::HeaderMutationRules();
-  opts.rules->mutable_disallow_is_error()->set_value(true);
-  opts.expect_reject_response = true;
-
-  opts.disallowed_headers_to_append = {{":fake-pseudo-header", "fail"}};
-  runTest(opts);
-}
-
-TEST_F(DecoderHeaderMutationRulesTest, RejectResponseSet) {
-  DecoderHeaderMutationRulesTestOpts opts;
-  opts.rules = envoy::config::common::mutation_rules::v3::HeaderMutationRules();
-  opts.rules->mutable_disallow_all()->set_value(true);
-  opts.rules->mutable_disallow_is_error()->set_value(true);
-  opts.expect_reject_response = true;
-
-  opts.disallowed_headers_to_set = {{"cant-override-me", "nope"}};
-  runTest(opts);
-}
-
-TEST_F(DecoderHeaderMutationRulesTest, RejectResponseRemove) {
-  DecoderHeaderMutationRulesTestOpts opts;
-  opts.rules = envoy::config::common::mutation_rules::v3::HeaderMutationRules();
-  opts.rules->mutable_disallow_all()->set_value(true);
-  opts.rules->mutable_disallow_is_error()->set_value(true);
-  opts.expect_reject_response = true;
-
-  opts.disallowed_headers_to_remove = {"cant-delete-me"};
-  runTest(opts);
-}
-
-TEST_F(DecoderHeaderMutationRulesTest, RejectResponseRemovePseudoHeader) {
-  DecoderHeaderMutationRulesTestOpts opts;
-  opts.rules = envoy::config::common::mutation_rules::v3::HeaderMutationRules();
-  opts.rules->mutable_disallow_is_error()->set_value(true);
-  opts.expect_reject_response = true;
-
-  opts.disallowed_headers_to_remove = {":fake-pseudo-header"};
-  runTest(opts);
+    test_case.setup_func(opts);
+    runTest(opts);
+  }
 }
 
 TEST_F(DecoderHeaderMutationRulesTest, DisallowExpression) {
@@ -2828,19 +2830,20 @@ TEST_P(HttpFilterTestParam, ContextExtensions) {
 // Test that filter can be disabled with route config.
 TEST_P(HttpFilterTestParam, DisabledOnRoute) {
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
-  FilterConfigPerRoute auth_per_route(settings);
+  std::unique_ptr<FilterConfigPerRoute> auth_per_route =
+      std::make_unique<FilterConfigPerRoute>(settings);
 
   prepareCheck();
-
-  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillByDefault(Return(&auth_per_route));
 
   auto test_disable = [&](bool disabled) {
     initialize("");
     // Set disabled
     settings.set_disabled(disabled);
     // Initialize the route's per filter config.
-    auth_per_route = FilterConfigPerRoute(settings);
+    auth_per_route = std::make_unique<FilterConfigPerRoute>(settings);
+    // Update the mock to return the new pointer
+    ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+        .WillByDefault(Return(auth_per_route.get()));
   };
 
   // baseline: make sure that when not disabled, check is called
@@ -2861,10 +2864,8 @@ TEST_P(HttpFilterTestParam, DisabledOnRoute) {
 // Test that filter can be disabled with route config.
 TEST_P(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
-  FilterConfigPerRoute auth_per_route(settings);
-
-  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillByDefault(Return(&auth_per_route));
+  std::unique_ptr<FilterConfigPerRoute> auth_per_route =
+      std::make_unique<FilterConfigPerRoute>(settings);
 
   auto test_disable = [&](bool disabled) {
     initialize(R"EOF(
@@ -2880,7 +2881,10 @@ TEST_P(HttpFilterTestParam, DisabledOnRouteWithRequestBody) {
     // Set the filter disabled setting.
     settings.set_disabled(disabled);
     // Initialize the route's per filter config.
-    auth_per_route = FilterConfigPerRoute(settings);
+    auth_per_route = std::make_unique<FilterConfigPerRoute>(settings);
+    // Update the mock to return the new pointer.
+    ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+        .WillByDefault(Return(auth_per_route.get()));
   };
 
   test_disable(false);
@@ -3914,6 +3918,31 @@ TEST_F(HttpFilterTest, PerRouteCheckSettingsWorks) {
 }
 
 // Checks that the per-route filter can override the check_settings set on the main filter.
+TEST_F(HttpFilterTest, NullRouteSkipsCheck) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  stat_prefix: "ext_authz"
+  )EOF");
+
+  prepareCheck();
+
+  // Set up a null route return value.
+  ON_CALL(decoder_filter_callbacks_, route()).WillByDefault(Return(nullptr));
+
+  // With null route, no authorization check should be performed.
+  EXPECT_CALL(*client_, check(_, _, _, _)).Times(0);
+
+  // Call the filter directly.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {"host", "example.com"}};
+
+  // With null route, the filter should continue without an auth check.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+}
+
 TEST_F(HttpFilterTest, PerRouteCheckSettingsOverrideWorks) {
   InSequence s;
 
@@ -3975,10 +4004,8 @@ TEST_F(HttpFilterTest, PerRouteCheckSettingsOverrideWorks) {
 // Verify that request body buffering can be skipped per route.
 TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
   envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute settings;
-  FilterConfigPerRoute auth_per_route(settings);
-
-  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillByDefault(Return(&auth_per_route));
+  std::unique_ptr<FilterConfigPerRoute> auth_per_route =
+      std::make_unique<FilterConfigPerRoute>(settings);
 
   auto test_disable_request_body_buffering = [&](bool bypass) {
     initialize(R"EOF(
@@ -3994,7 +4021,10 @@ TEST_P(HttpFilterTestParam, DisableRequestBodyBufferingOnRoute) {
     // Set bypass request body buffering for this route.
     settings.mutable_check_settings()->set_disable_request_body_buffering(bypass);
     // Initialize the route's per filter config.
-    auth_per_route = FilterConfigPerRoute(settings);
+    auth_per_route = std::make_unique<FilterConfigPerRoute>(settings);
+    // Update the mock to return the new pointer.
+    ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+        .WillByDefault(Return(auth_per_route.get()));
   };
 
   test_disable_request_body_buffering(false);
@@ -4158,6 +4188,801 @@ TEST_P(EmitFilterStateTest, PreexistingFilterStateSameTypeMutable) {
 }
 
 TEST_P(ExtAuthzLoggingInfoTest, FieldTest) { test(); }
+
+// Test per-route gRPC service override with null server context (fallback to default client)
+TEST_P(HttpFilterTestParam, PerRouteGrpcServiceOverrideWithNullServerContext) {
+  if (std::get<1>(GetParam())) {
+    // Skip HTTP client test - per-route gRPC service only applies to gRPC clients
+    return;
+  }
+
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  per_route_config.mutable_check_settings()
+      ->mutable_grpc_service()
+      ->mutable_envoy_grpc()
+      ->set_cluster_name("per_route_ext_authz_cluster");
+
+  std::unique_ptr<FilterConfigPerRoute> per_route_filter_config =
+      std::make_unique<FilterConfigPerRoute>(per_route_config);
+
+  // Set up route to return per-route config
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(per_route_filter_config.get()));
+
+  prepareCheck();
+
+  // Mock the default client check call (should fall back to default since server context is null)
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        Filters::Common::ExtAuthz::Response response{};
+        response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+}
+
+// Test per-route configuration merging with context extensions
+TEST_P(HttpFilterTestParam, PerRouteConfigurationMergingWithContextExtensions) {
+  if (std::get<1>(GetParam())) {
+    // Skip HTTP client test - configuration merging applies to gRPC clients
+    return;
+  }
+
+  // Create base configuration with context extensions
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute base_config;
+  base_config.mutable_check_settings()->mutable_context_extensions()->insert(
+      {"base_key", "base_value"});
+  base_config.mutable_check_settings()->mutable_context_extensions()->insert(
+      {"shared_key", "base_shared_value"});
+
+  // Create more specific configuration with context extensions
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute specific_config;
+  specific_config.mutable_check_settings()->mutable_context_extensions()->insert(
+      {"specific_key", "specific_value"});
+  specific_config.mutable_check_settings()->mutable_context_extensions()->insert(
+      {"shared_key", "specific_shared_value"});
+
+  // Test merging using the merge constructor
+  FilterConfigPerRoute base_filter_config(base_config);
+  FilterConfigPerRoute specific_filter_config(specific_config);
+  FilterConfigPerRoute merged_config(base_filter_config, specific_filter_config);
+
+  // Verify merged context extensions
+  const auto& merged_extensions = merged_config.contextExtensions();
+  EXPECT_EQ(merged_extensions.size(), 3);
+  EXPECT_EQ(merged_extensions.at("base_key"), "base_value");
+  EXPECT_EQ(merged_extensions.at("specific_key"), "specific_value");
+  EXPECT_EQ(merged_extensions.at("shared_key"), "specific_shared_value"); // More specific wins
+}
+
+// Test per-route configuration merging with gRPC service override
+TEST_P(HttpFilterTestParam, PerRouteConfigurationMergingWithGrpcServiceOverride) {
+  if (std::get<1>(GetParam())) {
+    // Skip HTTP client test - gRPC service override applies to gRPC clients
+    return;
+  }
+
+  // Create base configuration without gRPC service
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute base_config;
+  base_config.mutable_check_settings()->mutable_context_extensions()->insert(
+      {"base_key", "base_value"});
+
+  // Create more specific configuration with gRPC service
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute specific_config;
+  specific_config.mutable_check_settings()
+      ->mutable_grpc_service()
+      ->mutable_envoy_grpc()
+      ->set_cluster_name("specific_cluster");
+  specific_config.mutable_check_settings()->mutable_context_extensions()->insert(
+      {"specific_key", "specific_value"});
+
+  // Test merging using the merge constructor
+  FilterConfigPerRoute base_filter_config(base_config);
+  FilterConfigPerRoute specific_filter_config(specific_config);
+  FilterConfigPerRoute merged_config(base_filter_config, specific_filter_config);
+
+  // Verify gRPC service override is from more specific config
+  EXPECT_TRUE(merged_config.grpcService().has_value());
+  EXPECT_EQ(merged_config.grpcService().value().envoy_grpc().cluster_name(), "specific_cluster");
+
+  // Verify context extensions are merged
+  const auto& merged_extensions = merged_config.contextExtensions();
+  EXPECT_EQ(merged_extensions.size(), 2);
+  EXPECT_EQ(merged_extensions.at("base_key"), "base_value");
+  EXPECT_EQ(merged_extensions.at("specific_key"), "specific_value");
+}
+
+// Test per-route configuration merging with request body settings
+TEST_P(HttpFilterTestParam, PerRouteConfigurationMergingWithRequestBodySettings) {
+  if (std::get<1>(GetParam())) {
+    // Skip HTTP client test - request body settings apply to gRPC clients
+    return;
+  }
+
+  // Create base configuration with request body settings
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute base_config;
+  base_config.mutable_check_settings()->mutable_with_request_body()->set_max_request_bytes(1000);
+  base_config.mutable_check_settings()->mutable_with_request_body()->set_allow_partial_message(
+      true);
+
+  // Create more specific configuration with different request body settings
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute specific_config;
+  specific_config.mutable_check_settings()->mutable_with_request_body()->set_max_request_bytes(
+      2000);
+  specific_config.mutable_check_settings()->mutable_with_request_body()->set_allow_partial_message(
+      false);
+
+  // Test merging using the merge constructor
+  FilterConfigPerRoute base_filter_config(base_config);
+  FilterConfigPerRoute specific_filter_config(specific_config);
+  FilterConfigPerRoute merged_config(base_filter_config, specific_filter_config);
+
+  // Verify request body settings are from more specific config
+  const auto& merged_check_settings = merged_config.checkSettings();
+  EXPECT_TRUE(merged_check_settings.has_with_request_body());
+  EXPECT_EQ(merged_check_settings.with_request_body().max_request_bytes(), 2000);
+  EXPECT_EQ(merged_check_settings.with_request_body().allow_partial_message(), false);
+}
+
+// Test per-route configuration merging with disable_request_body_buffering
+TEST_P(HttpFilterTestParam, PerRouteConfigurationMergingWithDisableRequestBodyBuffering) {
+  if (std::get<1>(GetParam())) {
+    // Skip HTTP client test - disable request body buffering applies to gRPC clients
+    return;
+  }
+
+  // Create base configuration without disable_request_body_buffering
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute base_config;
+  base_config.mutable_check_settings()->mutable_context_extensions()->insert(
+      {"base_key", "base_value"});
+
+  // Create more specific configuration with disable_request_body_buffering
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute specific_config;
+  specific_config.mutable_check_settings()->set_disable_request_body_buffering(true);
+
+  // Test merging using the merge constructor
+  FilterConfigPerRoute base_filter_config(base_config);
+  FilterConfigPerRoute specific_filter_config(specific_config);
+  FilterConfigPerRoute merged_config(base_filter_config, specific_filter_config);
+
+  // Verify disable_request_body_buffering is from more specific config
+  const auto& merged_check_settings = merged_config.checkSettings();
+  EXPECT_TRUE(merged_check_settings.disable_request_body_buffering());
+}
+
+// Test per-route configuration merging with multiple levels
+TEST_P(HttpFilterTestParam, PerRouteConfigurationMergingMultipleLevels) {
+  if (std::get<1>(GetParam())) {
+    // Skip HTTP client test - configuration merging applies to gRPC clients
+    return;
+  }
+
+  // Create virtual host level configuration
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute vh_config;
+  vh_config.mutable_check_settings()->mutable_context_extensions()->insert({"vh_key", "vh_value"});
+  vh_config.mutable_check_settings()->mutable_context_extensions()->insert(
+      {"shared_key", "vh_shared_value"});
+
+  // Create route level configuration
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute route_config;
+  route_config.mutable_check_settings()->mutable_context_extensions()->insert(
+      {"route_key", "route_value"});
+  route_config.mutable_check_settings()->mutable_context_extensions()->insert(
+      {"shared_key", "route_shared_value"});
+  route_config.mutable_check_settings()
+      ->mutable_grpc_service()
+      ->mutable_envoy_grpc()
+      ->set_cluster_name("route_cluster");
+
+  // Create weighted cluster level configuration
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute wc_config;
+  wc_config.mutable_check_settings()->mutable_context_extensions()->insert({"wc_key", "wc_value"});
+  wc_config.mutable_check_settings()->mutable_context_extensions()->insert(
+      {"shared_key", "wc_shared_value"});
+
+  // Test merging from least specific to most specific
+  FilterConfigPerRoute vh_filter_config(vh_config);
+  FilterConfigPerRoute route_filter_config(route_config);
+  FilterConfigPerRoute wc_filter_config(wc_config);
+
+  // First merge: vh + route
+  FilterConfigPerRoute vh_route_merged(vh_filter_config, route_filter_config);
+
+  // Second merge: (vh + route) + weighted cluster
+  FilterConfigPerRoute final_merged(vh_route_merged, wc_filter_config);
+
+  // Verify final merged context extensions
+  const auto& merged_extensions = final_merged.contextExtensions();
+  EXPECT_EQ(merged_extensions.size(), 4);
+  EXPECT_EQ(merged_extensions.at("vh_key"), "vh_value");
+  EXPECT_EQ(merged_extensions.at("route_key"), "route_value");
+  EXPECT_EQ(merged_extensions.at("wc_key"), "wc_value");
+  EXPECT_EQ(merged_extensions.at("shared_key"), "wc_shared_value"); // Most specific wins
+
+  // Verify gRPC service override is NOT inherited from less specific levels.
+  EXPECT_FALSE(final_merged.grpcService().has_value());
+}
+
+// Test per-route context extensions take precedence over check_settings context extensions.
+TEST_P(HttpFilterTestParam, PerRouteContextExtensionsPrecedence) {
+  if (std::get<1>(GetParam())) {
+    // Skip HTTP client test as context extensions apply to gRPC clients.
+    return;
+  }
+
+  // Create configuration with context extensions in both places.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute base_config;
+  base_config.mutable_check_settings()->mutable_context_extensions()->insert(
+      {"check_key", "check_value"});
+  base_config.mutable_check_settings()->mutable_context_extensions()->insert(
+      {"shared_key", "check_shared_value"});
+
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute specific_config;
+  specific_config.mutable_check_settings()->mutable_context_extensions()->insert(
+      {"specific_check_key", "specific_check_value"});
+  specific_config.mutable_check_settings()->mutable_context_extensions()->insert(
+      {"shared_key", "specific_check_shared_value"});
+
+  // Test merging using the merge constructor.
+  FilterConfigPerRoute base_filter_config(base_config);
+  FilterConfigPerRoute specific_filter_config(specific_config);
+  FilterConfigPerRoute merged_config(base_filter_config, specific_filter_config);
+
+  // Verify context extensions are properly merged.
+  const auto& merged_extensions = merged_config.contextExtensions();
+  EXPECT_EQ(merged_extensions.size(), 3);
+  EXPECT_EQ(merged_extensions.at("check_key"), "check_value");
+  EXPECT_EQ(merged_extensions.at("specific_check_key"), "specific_check_value");
+  EXPECT_EQ(merged_extensions.at("shared_key"),
+            "specific_check_shared_value"); // More specific wins
+}
+
+// Test per-route Google gRPC service configuration.
+TEST_P(HttpFilterTestParam, PerRouteGoogleGrpcServiceConfiguration) {
+  if (std::get<1>(GetParam())) {
+    // Skip HTTP client test as per-route gRPC service only applies to gRPC clients.
+    return;
+  }
+
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  per_route_config.mutable_check_settings()
+      ->mutable_grpc_service()
+      ->mutable_google_grpc()
+      ->set_target_uri("https://ext-authz.googleapis.com");
+
+  std::unique_ptr<FilterConfigPerRoute> per_route_filter_config =
+      std::make_unique<FilterConfigPerRoute>(per_route_config);
+
+  // Verify Google gRPC service is properly configured
+  EXPECT_TRUE(per_route_filter_config->grpcService().has_value());
+  EXPECT_TRUE(per_route_filter_config->grpcService().value().has_google_grpc());
+  EXPECT_EQ(per_route_filter_config->grpcService().value().google_grpc().target_uri(),
+            "https://ext-authz.googleapis.com");
+}
+
+// Test existing functionality still works with new logic.
+TEST_P(HttpFilterTestParam, ExistingFunctionalityWithNewLogic) {
+  // Test that the existing functionality still works with our new per-route merging logic.
+  prepareCheck();
+
+  // Mock the default client check call (no per-route config).
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        Filters::Common::ExtAuthz::Response response{};
+        response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
+
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+}
+
+// Test per-route configuration merging with empty configurations.
+TEST_P(HttpFilterTestParam, PerRouteConfigurationMergingWithEmptyConfigurations) {
+  if (std::get<1>(GetParam())) {
+    // Skip HTTP client test as configuration merging applies to gRPC clients.
+    return;
+  }
+
+  // Create empty base configuration.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute base_config;
+
+  // Create empty specific configuration.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute specific_config;
+
+  // Test merging using the merge constructor.
+  FilterConfigPerRoute base_filter_config(base_config);
+  FilterConfigPerRoute specific_filter_config(specific_config);
+  FilterConfigPerRoute merged_config(base_filter_config, specific_filter_config);
+
+  // Verify merged configuration has empty context extensions.
+  const auto& merged_extensions = merged_config.contextExtensions();
+  EXPECT_EQ(merged_extensions.size(), 0);
+
+  // Verify no gRPC service override
+  EXPECT_FALSE(merged_config.grpcService().has_value());
+}
+
+// Test per-route gRPC service configuration merging functionality.
+TEST_P(HttpFilterTestParam, PerRouteGrpcServiceMergingWithBaseConfiguration) {
+  if (std::get<1>(GetParam())) {
+    // Skip HTTP client test as per-route gRPC service only applies to gRPC clients.
+    return;
+  }
+
+  // Create base per-route configuration.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute base_config;
+  (*base_config.mutable_check_settings()->mutable_context_extensions())["base"] = "value";
+  FilterConfigPerRoute base_filter_config(base_config);
+
+  // Create per-route configuration with gRPC service.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  per_route_config.mutable_check_settings()
+      ->mutable_grpc_service()
+      ->mutable_envoy_grpc()
+      ->set_cluster_name("per_route_cluster");
+  (*per_route_config.mutable_check_settings()->mutable_context_extensions())["route"] = "override";
+
+  // Test merging constructor.
+  FilterConfigPerRoute merged_config(base_filter_config, per_route_config);
+
+  // Verify the merged configuration has the gRPC service from the per-route config.
+  EXPECT_TRUE(merged_config.grpcService().has_value());
+  EXPECT_TRUE(merged_config.grpcService().value().has_envoy_grpc());
+  EXPECT_EQ(merged_config.grpcService().value().envoy_grpc().cluster_name(), "per_route_cluster");
+
+  // Verify that context extensions are properly merged.
+  const auto& merged_settings = merged_config.checkSettings();
+  EXPECT_TRUE(merged_settings.context_extensions().contains("route"));
+  EXPECT_EQ(merged_settings.context_extensions().at("route"), "override");
+}
+
+// Test focused integration test to verify per-route configuration is processed correctly.
+TEST_P(HttpFilterTestParam, PerRouteConfigurationIntegrationTest) {
+  if (std::get<1>(GetParam())) {
+    // Skip HTTP client test - per-route gRPC service only applies to gRPC clients.
+    return;
+  }
+
+  // This test covers the per-route configuration processing in initiateCall
+  // which exercises the lines where getAllPerFilterConfig is called and processed.
+
+  // Set up per-route configuration with gRPC service override
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  per_route_config.mutable_check_settings()
+      ->mutable_grpc_service()
+      ->mutable_envoy_grpc()
+      ->set_cluster_name("per_route_cluster");
+
+  // Add context extensions to test that path too.
+  (*per_route_config.mutable_check_settings()->mutable_context_extensions())["test_key"] =
+      "test_value";
+
+  std::unique_ptr<FilterConfigPerRoute> per_route_filter_config =
+      std::make_unique<FilterConfigPerRoute>(per_route_config);
+
+  // Mock decoder callbacks to return per-route config.
+  ON_CALL(decoder_filter_callbacks_, mostSpecificPerFilterConfig())
+      .WillByDefault(Return(per_route_filter_config.get()));
+
+  // Mock perFilterConfigs to return the per-route config vector.
+  Router::RouteSpecificFilterConfigs per_route_configs;
+  per_route_configs.push_back(per_route_filter_config.get());
+  ON_CALL(decoder_filter_callbacks_, perFilterConfigs()).WillByDefault(Return(per_route_configs));
+
+  // Set up basic request headers.
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "https"}, {"host", "example.com"}};
+
+  prepareCheck();
+
+  // Mock client check to capture and verify the check request has proper context extensions.
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest& check_request,
+                           Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
+        // Verify that per-route context extensions were merged correctly
+        auto context_extensions = check_request.attributes().context_extensions();
+        EXPECT_TRUE(context_extensions.contains("test_key"));
+        EXPECT_EQ(context_extensions.at("test_key"), "test_value");
+
+        // Return OK to complete the test
+        auto response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+        response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
+        callbacks.onComplete(std::move(response));
+      }));
+
+  // This exercises the per-route configuration processing logic which includes
+  // the getAllPerFilterConfig call and per-route gRPC service detection.
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+}
+
+// Test per-route gRPC client creation and usage.
+TEST_P(HttpFilterTestParam, PerRouteGrpcClientCreationAndUsage) {
+  if (std::get<1>(GetParam())) {
+    // Skip HTTP client test as per-route gRPC service only applies to gRPC clients.
+    return;
+  }
+
+  // Create per-route configuration with valid gRPC service.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  per_route_config.mutable_check_settings()
+      ->mutable_grpc_service()
+      ->mutable_envoy_grpc()
+      ->set_cluster_name("per_route_ext_authz_cluster");
+
+  // Add context extensions to test merging.
+  (*per_route_config.mutable_check_settings()->mutable_context_extensions())["test_key"] =
+      "test_value";
+
+  std::unique_ptr<FilterConfigPerRoute> per_route_filter_config =
+      std::make_unique<FilterConfigPerRoute>(per_route_config);
+
+  // Set up route to return per-route config.
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(per_route_filter_config.get()));
+
+  // Mock perFilterConfigs to return the per-route config vector which exercises
+  // getAllPerFilterConfig.
+  Router::RouteSpecificFilterConfigs per_route_configs;
+  per_route_configs.push_back(per_route_filter_config.get());
+  ON_CALL(decoder_filter_callbacks_, perFilterConfigs()).WillByDefault(Return(per_route_configs));
+
+  prepareCheck();
+
+  // Create a filter with server context for per-route gRPC client creation.
+  auto new_client = std::make_unique<Filters::Common::ExtAuthz::MockClient>();
+  auto* new_client_ptr = new_client.get();
+  auto new_filter = std::make_unique<Filter>(config_, std::move(new_client), factory_context_);
+  new_filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  // Mock successful gRPC async client manager access.
+  auto mock_grpc_client_manager = std::make_shared<Grpc::MockAsyncClientManager>();
+  ON_CALL(factory_context_, clusterManager()).WillByDefault(ReturnRef(cm_));
+  ON_CALL(cm_, grpcAsyncClientManager()).WillByDefault(ReturnRef(*mock_grpc_client_manager));
+
+  // Mock successful raw gRPC client creation which exercises createPerRouteGrpcClient.
+  auto mock_raw_grpc_client = std::make_shared<Grpc::MockAsyncClient>();
+  EXPECT_CALL(*mock_grpc_client_manager, getOrCreateRawAsyncClientWithHashKey(_, _, true))
+      .WillOnce(Return(absl::StatusOr<Grpc::RawAsyncClientSharedPtr>(mock_raw_grpc_client)));
+
+  // Set up expectations for the sendRaw call that will be made by the GrpcClientImpl.
+  EXPECT_CALL(*mock_raw_grpc_client, sendRaw(_, _, _, _, _, _))
+      .WillOnce(
+          Invoke([](absl::string_view /*service_full_name*/, absl::string_view /*method_name*/,
+                    Buffer::InstancePtr&& /*request*/, Grpc::RawAsyncRequestCallbacks& callbacks,
+                    Tracing::Span& parent_span,
+                    const Http::AsyncClient::RequestOptions& /*options*/) -> Grpc::AsyncRequest* {
+            envoy::service::auth::v3::CheckResponse check_response;
+            check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+            check_response.mutable_ok_response();
+
+            // Serialize the response to a buffer.
+            std::string serialized_response;
+            check_response.SerializeToString(&serialized_response);
+            auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
+
+            callbacks.onSuccessRaw(std::move(response), parent_span);
+            return nullptr; // No async request handle needed for immediate response.
+          }));
+
+  // Since per-route gRPC client creation succeeds, the per-route client should be used
+  // instead of the default client. We won't see a call to new_client_ptr.
+  EXPECT_CALL(*new_client_ptr, check(_, _, _, _)).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            new_filter->decodeHeaders(request_headers_, false));
+}
+
+// Test per-route HTTP service configuration parsing.
+TEST_P(HttpFilterTestParam, PerRouteHttpServiceConfigurationParsing) {
+  if (!std::get<1>(GetParam())) {
+    // Skip gRPC client test as per-route HTTP service only applies to HTTP clients.
+    return;
+  }
+
+  // Create per-route configuration with valid HTTP service.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  per_route_config.mutable_check_settings()->mutable_http_service()->mutable_server_uri()->set_uri(
+      "https://per-route-ext-authz.example.com");
+  per_route_config.mutable_check_settings()
+      ->mutable_http_service()
+      ->mutable_server_uri()
+      ->set_cluster("per_route_http_cluster");
+  per_route_config.mutable_check_settings()->mutable_http_service()->set_path_prefix(
+      "/api/v2/auth");
+
+  std::unique_ptr<FilterConfigPerRoute> per_route_filter_config =
+      std::make_unique<FilterConfigPerRoute>(per_route_config);
+
+  // Verify the per-route HTTP service configuration is correctly parsed
+  EXPECT_TRUE(per_route_filter_config->httpService().has_value());
+  EXPECT_FALSE(per_route_filter_config->grpcService().has_value());
+
+  const auto& http_service = per_route_filter_config->httpService().value();
+  EXPECT_EQ(http_service.server_uri().uri(), "https://per-route-ext-authz.example.com");
+  EXPECT_EQ(http_service.server_uri().cluster(), "per_route_http_cluster");
+  EXPECT_EQ(http_service.path_prefix(), "/api/v2/auth");
+}
+
+// Test error handling when server context is not available for per-route gRPC client.
+TEST_P(HttpFilterTestParam, PerRouteGrpcClientCreationNoServerContext) {
+  if (std::get<1>(GetParam())) {
+    // Skip HTTP client test - per-route gRPC service only applies to gRPC clients.
+    return;
+  }
+
+  // Create per-route configuration with gRPC service.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  per_route_config.mutable_check_settings()
+      ->mutable_grpc_service()
+      ->mutable_envoy_grpc()
+      ->set_cluster_name("per_route_grpc_cluster");
+
+  std::unique_ptr<FilterConfigPerRoute> per_route_filter_config =
+      std::make_unique<FilterConfigPerRoute>(per_route_config);
+
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(per_route_filter_config.get()));
+
+  Router::RouteSpecificFilterConfigs per_route_configs;
+  per_route_configs.push_back(per_route_filter_config.get());
+  ON_CALL(decoder_filter_callbacks_, perFilterConfigs()).WillByDefault(Return(per_route_configs));
+
+  prepareCheck();
+
+  // Create filter without server context. This should cause per-route client creation to fail.
+  auto new_client = std::make_unique<Filters::Common::ExtAuthz::MockClient>();
+  auto* new_client_ptr = new_client.get();
+  auto new_filter = std::make_unique<Filter>(config_, std::move(new_client)); // No server context
+  new_filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  // Since per-route client creation fails (no server context), should fall back to default client.
+  EXPECT_CALL(*new_client_ptr, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        // Verify this is using the default client.
+        auto response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+        response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
+        callbacks.onComplete(std::move(response));
+      }));
+
+  Http::TestRequestHeaderMapImpl request_headers_{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {"host", "example.com"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            new_filter->decodeHeaders(request_headers_, false));
+}
+
+// Test error handling when server context is not available for per-route HTTP client.
+TEST_P(HttpFilterTestParam, PerRouteHttpClientCreationNoServerContext) {
+  if (!std::get<1>(GetParam())) {
+    // Skip gRPC client test as per-route HTTP service only applies to HTTP clients.
+    return;
+  }
+
+  // Create per-route configuration with HTTP service.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  per_route_config.mutable_check_settings()->mutable_http_service()->mutable_server_uri()->set_uri(
+      "https://per-route-ext-authz.example.com");
+  per_route_config.mutable_check_settings()
+      ->mutable_http_service()
+      ->mutable_server_uri()
+      ->set_cluster("per_route_http_cluster");
+
+  std::unique_ptr<FilterConfigPerRoute> per_route_filter_config =
+      std::make_unique<FilterConfigPerRoute>(per_route_config);
+
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(per_route_filter_config.get()));
+
+  Router::RouteSpecificFilterConfigs per_route_configs;
+  per_route_configs.push_back(per_route_filter_config.get());
+  ON_CALL(decoder_filter_callbacks_, perFilterConfigs()).WillByDefault(Return(per_route_configs));
+
+  prepareCheck();
+
+  // Create filter without server context.
+  auto new_client = std::make_unique<Filters::Common::ExtAuthz::MockClient>();
+  auto* new_client_ptr = new_client.get();
+  auto new_filter = std::make_unique<Filter>(config_, std::move(new_client)); // No server context
+  new_filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  // Since per-route client creation fails, should fall back to default client.
+  EXPECT_CALL(*new_client_ptr, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        auto response = std::make_unique<Filters::Common::ExtAuthz::Response>();
+        response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
+        callbacks.onComplete(std::move(response));
+      }));
+
+  Http::TestRequestHeaderMapImpl request_headers_{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {"host", "example.com"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            new_filter->decodeHeaders(request_headers_, false));
+}
+
+// Test gRPC client error handling for per-route config.
+TEST_F(HttpFilterTest, GrpcClientPerRouteError) {
+  // Initialize with gRPC client configuration.
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  failure_mode_allow: false
+  stat_prefix: "ext_authz"
+  )EOF");
+
+  prepareCheck();
+
+  // Create per-route configuration with gRPC service override.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  auto* grpc_service = per_route_config.mutable_check_settings()->mutable_grpc_service();
+  grpc_service->mutable_envoy_grpc()->set_cluster_name("nonexistent_cluster");
+
+  FilterConfigPerRoute per_route_filter_config(per_route_config);
+
+  // Set up route config to use the per-route configuration.
+  ON_CALL(decoder_filter_callbacks_, mostSpecificPerFilterConfig())
+      .WillByDefault(Return(&per_route_filter_config));
+
+  // Since cluster doesn't exist, per-route client creation should fail
+  // and we'll use the default client instead.
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        Filters::Common::ExtAuthz::Response response{};
+        response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
+
+  // Verify filter processes the request with the default client.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {"host", "example.com"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+// Test HTTP client with per-route configuration.
+TEST_F(HttpFilterTest, HttpClientPerRouteOverride) {
+  // Initialize with HTTP client configuration.
+  initialize(R"EOF(
+  http_service:
+    server_uri:
+      uri: "https://ext-authz.example.com"
+      cluster: "ext_authz_server"
+    path_prefix: "/api/v1/auth"
+  failure_mode_allow: false
+  stat_prefix: "ext_authz"
+  )EOF");
+
+  prepareCheck();
+
+  // Create per-route configuration with HTTP service override.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  auto* http_service = per_route_config.mutable_check_settings()->mutable_http_service();
+  http_service->mutable_server_uri()->set_uri("https://per-route-ext-authz.example.com");
+  http_service->mutable_server_uri()->set_cluster("per_route_http_cluster");
+  http_service->set_path_prefix("/api/v2/auth");
+
+  FilterConfigPerRoute per_route_filter_config(per_route_config);
+
+  // Set up route config to use the per-route configuration.
+  ON_CALL(decoder_filter_callbacks_, mostSpecificPerFilterConfig())
+      .WillByDefault(Return(&per_route_filter_config));
+
+  // Set up a check expectation that will be satisfied by the default client.
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                           const StreamInfo::StreamInfo&) -> void {
+        Filters::Common::ExtAuthz::Response response{};
+        response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+        callbacks.onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+      }));
+
+  // Verify filter processes the request.
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {"host", "example.com"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+// Test invalid response header validation via response_headers_to_add.
+TEST_F(InvalidMutationTest, InvalidResponseHeadersToAddName) {
+  Filters::Common::ExtAuthz::Response r;
+  r.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  r.response_headers_to_add = {{"invalid header name", "value"}};
+  testResponse(r);
+}
+
+// Test invalid response header validation via response_headers_to_add value.
+TEST_F(InvalidMutationTest, InvalidResponseHeadersToAddValue) {
+  Filters::Common::ExtAuthz::Response r;
+  r.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  r.response_headers_to_add = {{"valid-name", getInvalidValue()}};
+  testResponse(r);
+}
+
+// Test per-route timeout configuration is correctly used in gRPC client creation.
+TEST_P(HttpFilterTestParam, PerRouteGrpcClientTimeoutConfiguration) {
+  if (std::get<1>(GetParam())) {
+    // Skip HTTP client test as per-route gRPC service only applies to gRPC clients.
+    return;
+  }
+
+  // Create per-route configuration with custom timeout.
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  auto* grpc_service = per_route_config.mutable_check_settings()->mutable_grpc_service();
+  grpc_service->mutable_envoy_grpc()->set_cluster_name("per_route_grpc_cluster");
+  grpc_service->mutable_timeout()->set_seconds(30); // Custom 30s timeout
+
+  std::unique_ptr<FilterConfigPerRoute> per_route_filter_config =
+      std::make_unique<FilterConfigPerRoute>(per_route_config);
+
+  ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
+      .WillByDefault(Return(per_route_filter_config.get()));
+
+  Router::RouteSpecificFilterConfigs per_route_configs;
+  per_route_configs.push_back(per_route_filter_config.get());
+  ON_CALL(decoder_filter_callbacks_, perFilterConfigs()).WillByDefault(Return(per_route_configs));
+
+  prepareCheck();
+
+  auto new_client = std::make_unique<Filters::Common::ExtAuthz::MockClient>();
+  auto* new_client_ptr = new_client.get();
+  auto new_filter = std::make_unique<Filter>(config_, std::move(new_client), factory_context_);
+  new_filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
+
+  // Mock gRPC client manager.
+  auto mock_grpc_client_manager = std::make_shared<Grpc::MockAsyncClientManager>();
+  ON_CALL(factory_context_, clusterManager()).WillByDefault(ReturnRef(cm_));
+  ON_CALL(cm_, grpcAsyncClientManager()).WillByDefault(ReturnRef(*mock_grpc_client_manager));
+
+  auto mock_raw_grpc_client = std::make_shared<Grpc::MockAsyncClient>();
+  EXPECT_CALL(*mock_grpc_client_manager, getOrCreateRawAsyncClientWithHashKey(_, _, true))
+      .WillOnce(Return(absl::StatusOr<Grpc::RawAsyncClientSharedPtr>(mock_raw_grpc_client)));
+
+  // Mock the sendRaw call and verify the timeout is used correctly.
+  EXPECT_CALL(*mock_raw_grpc_client, sendRaw(_, _, _, _, _, _))
+      .WillOnce(Invoke([](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
+                          Grpc::RawAsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
+                          const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
+        // Verify that the timeout from the per-route config is used (30s = 30000ms)
+        EXPECT_TRUE(options.timeout.has_value());
+        EXPECT_EQ(options.timeout->count(), 30000);
+
+        envoy::service::auth::v3::CheckResponse check_response;
+        check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+        check_response.mutable_ok_response();
+
+        std::string serialized_response;
+        check_response.SerializeToString(&serialized_response);
+        auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
+
+        callbacks.onSuccessRaw(std::move(response), parent_span);
+        return nullptr;
+      }));
+
+  EXPECT_CALL(*new_client_ptr, check(_, _, _, _)).Times(0);
+
+  Http::TestRequestHeaderMapImpl request_headers_{
+      {":method", "GET"}, {":path", "/test"}, {":scheme", "http"}, {"host", "example.com"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+            new_filter->decodeHeaders(request_headers_, false));
+}
 
 } // namespace
 } // namespace ExtAuthz
