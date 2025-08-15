@@ -8,11 +8,6 @@ namespace Http {
 namespace McpSseSessionState {
 namespace Envelope {
 
-constexpr absl::string_view CRLFCRLF = "\r\n\r\n";
-constexpr absl::string_view CRCR = "\r\r";
-constexpr absl::string_view LFLF = "\n\n";
-constexpr uint64_t MAX_PENDING_CHUNK_SIZE = 4 * 1024; // 4KB
-
 void EnvelopeSessionStateFactory::SessionStateImpl::onUpdateHeader(
     absl::string_view host_address, Envoy::Http::ResponseHeaderMap& headers) {
   // Store response headers for SSE detection
@@ -34,7 +29,7 @@ Envoy::Http::FilterDataStatus EnvelopeSessionStateFactory::SessionStateImpl::onU
 
   // check the pending chunk size
   // in case of wrong configuration on this filter
-  if (pending_chunk_.length() + data.length() > MAX_PENDING_CHUNK_SIZE) {
+  if (pending_chunk_.length() + data.length() > factory_.max_pending_chunk_size_) {
     ENVOY_LOG(error, "Pending chunk size exceeds max pending chunk size: {}",
               pending_chunk_.length() + data.length());
     pending_chunk_.add(data);
@@ -60,22 +55,15 @@ Envoy::Http::FilterDataStatus EnvelopeSessionStateFactory::SessionStateImpl::onU
     size_t chunk_end_and_end_str;
     std::string chunk_end_string;
 
-    // Check different line ending patterns
-    // according to the HTML standard, the end of a server-sent-events' chunk can be
-    // - CRLFCRLF (two CRLFs)
-    // - CRCR (two CRs)
-    // - LFLF (two LFs)
-    // https://html.spec.whatwg.org/multipage/server-sent-events.html#parsing-an-event-stream
-    if ((chunk_end_pos = pending_chunk_str.find(CRLFCRLF)) != std::string::npos) {
-      chunk_end_string = CRLFCRLF;
-      chunk_end_and_end_str = chunk_end_pos + CRLFCRLF.length();
-    } else if ((chunk_end_pos = pending_chunk_str.find(CRCR)) != std::string::npos) {
-      chunk_end_string = CRCR;
-      chunk_end_and_end_str = chunk_end_pos + CRCR.length();
-    } else if ((chunk_end_pos = pending_chunk_str.find(LFLF)) != std::string::npos) {
-      chunk_end_string = LFLF;
-      chunk_end_and_end_str = chunk_end_pos + LFLF.length();
-    } else {
+    for (const auto& chunk_end_pattern : factory_.chunk_end_patterns_) {
+      if ((chunk_end_pos = pending_chunk_str.find(chunk_end_pattern)) != std::string::npos) {
+        chunk_end_string = chunk_end_pattern;
+        chunk_end_and_end_str = chunk_end_pos + chunk_end_pattern.length();
+        break;
+      }
+    }
+
+    if (chunk_end_string.empty()) {
       ENVOY_LOG(trace, "No complete chunk found, waiting for more data");
       break;
     }
@@ -129,7 +117,9 @@ Envoy::Http::FilterDataStatus EnvelopeSessionStateFactory::SessionStateImpl::onU
 }
 
 EnvelopeSessionStateFactory::EnvelopeSessionStateFactory(const EnvelopeSessionStateProto& config)
-    : param_name_(config.param_name()) {}
+    : param_name_(config.param_name()),
+      chunk_end_patterns_(config.chunk_end_patterns().begin(), config.chunk_end_patterns().end()),
+      max_pending_chunk_size_(config.max_pending_chunk_size()) {}
 
 absl::optional<std::string>
 EnvelopeSessionStateFactory::parseAddress(Envoy::Http::RequestHeaderMap& headers) const {

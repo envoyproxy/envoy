@@ -94,6 +94,7 @@ typed_config:
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.http.mcp_sse_stateful_session.envelope.v3alpha.EnvelopeSessionState
       param_name: sessionId
+      chunk_end_patterns: ["\r\n\r\n", "\n\n", "\r\r"]
 )EOF";
 
 static const std::string STATEFUL_SESSION_STRICT_MODE =
@@ -124,6 +125,7 @@ mcp_sse_stateful_session:
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.http.mcp_sse_stateful_session.envelope.v3alpha.EnvelopeSessionState
       param_name: sessionId
+      chunk_end_patterns: ["\r\n\r\n", "\n\n", "\r\r"]
   strict: true
 )EOF";
 

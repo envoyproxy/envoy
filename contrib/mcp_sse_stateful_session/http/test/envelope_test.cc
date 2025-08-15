@@ -18,6 +18,9 @@ constexpr char SEPARATOR = '.'; // separate session ID and host address in sse m
 TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestOnUpdateDataSse) {
   EnvelopeSessionStateProto config;
   config.set_param_name("sessionId");
+  config.add_chunk_end_patterns("\r\n\r\n");
+  config.add_chunk_end_patterns("\n\n");
+  config.add_chunk_end_patterns("\r\r");
   EnvelopeSessionStateFactory factory(config);
   Envoy::Http::TestRequestHeaderMapImpl request_headers;
   auto session_state = factory.create(request_headers);
@@ -198,7 +201,9 @@ TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestSse) {
   {
     EnvelopeSessionStateProto config;
     config.set_param_name("sessionId");
-
+    config.add_chunk_end_patterns("\r\n\r\n");
+    config.add_chunk_end_patterns("\n\n");
+    config.add_chunk_end_patterns("\r\r");
     EnvelopeSessionStateFactory factory(config);
 
     // Case 1: Path not exist
@@ -244,6 +249,9 @@ TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestSse) {
 TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestMaxPendingChunkSize) {
   EnvelopeSessionStateProto config;
   config.set_param_name("sessionId");
+  config.add_chunk_end_patterns("\r\n\r\n");
+  config.add_chunk_end_patterns("\n\n");
+  config.add_chunk_end_patterns("\r\r");
   EnvelopeSessionStateFactory factory(config);
   Envoy::Http::TestRequestHeaderMapImpl request_headers;
   auto session_state = factory.create(request_headers);
@@ -278,6 +286,9 @@ TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestMaxPendingChunkSiz
 TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestEndStream) {
   EnvelopeSessionStateProto config;
   config.set_param_name("sessionId");
+  config.add_chunk_end_patterns("\r\n\r\n");
+  config.add_chunk_end_patterns("\n\n");
+  config.add_chunk_end_patterns("\r\r");
   EnvelopeSessionStateFactory factory(config);
   Envoy::Http::TestRequestHeaderMapImpl request_headers;
   auto session_state = factory.create(request_headers);
@@ -305,6 +316,61 @@ TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestEndStream) {
   // data_buffer should not be drained, because it's end of stream
   EXPECT_NE(data_buffer.length(), 0);
 
+  data_buffer.drain(data_buffer.length());
+}
+
+TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestCustomizedChunkEndPatterns) {
+  EnvelopeSessionStateProto config;
+  config.set_param_name("sessionId");
+  config.add_chunk_end_patterns("chunk_end_pattern1");
+  config.add_chunk_end_patterns("chunk_end_pattern2");
+  EnvelopeSessionStateFactory factory(config);
+  Envoy::Http::TestRequestHeaderMapImpl request_headers;
+  auto session_state = factory.create(request_headers);
+
+  const std::string host_address = "1.2.3.4:80";
+
+  Envoy::Http::TestResponseHeaderMapImpl headers{{":status", "200"},
+                                                 {"content-type", "text/event-stream"}};
+
+  session_state->onUpdateHeader(host_address, headers);
+
+  Buffer::OwnedImpl data_buffer;
+
+  // Case 1: data contain chunk_end_pattern1
+  data_buffer.add("data: http://example.com?sessionId=abcdefg.chunk_end_pattern1");
+
+  // Call onUpdateData
+  EXPECT_EQ(session_state->onUpdateData(host_address, data_buffer, true),
+            Envoy::Http::FilterDataStatus::Continue);
+
+  // sessionId should be found
+  EXPECT_TRUE(session_state->sessionIdFound());
+  session_state->resetSessionIdFound();
+  data_buffer.drain(data_buffer.length());
+
+  // Case 2: data contain chunk_end_pattern2
+  data_buffer.add("data: http://example.com?sessionId=abcdefg.chunk_end_pattern2");
+
+  // Call onUpdateData
+  EXPECT_EQ(session_state->onUpdateData(host_address, data_buffer, true),
+            Envoy::Http::FilterDataStatus::Continue);
+
+  // sessionId should be found
+  EXPECT_TRUE(session_state->sessionIdFound());
+  session_state->resetSessionIdFound();
+  data_buffer.drain(data_buffer.length());
+
+  // Case 3: data contain both chunk_end_pattern1 and chunk_end_pattern2
+  data_buffer.add("data: http://example.com?sessionId=abcdefg\n\n");
+
+  // Call onUpdateData
+  EXPECT_EQ(session_state->onUpdateData(host_address, data_buffer, true),
+            Envoy::Http::FilterDataStatus::Continue);
+
+  // sessionId should not be found, cause \n\n nolonger a valid chunk end pattern
+  EXPECT_FALSE(session_state->sessionIdFound());
+  session_state->resetSessionIdFound();
   data_buffer.drain(data_buffer.length());
 }
 

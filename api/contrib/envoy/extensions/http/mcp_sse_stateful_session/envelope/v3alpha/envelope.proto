@@ -51,4 +51,22 @@ message EnvelopeSessionState {
   //
   // Note: Uses Base64Url encoding for the host address and '.' as separator.
   string param_name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The list of patterns to match the chunk end in the SSE data stream.
+  // Any of these patterns matched will be considered as the end of a chunk.
+  // recommended value is ["\r\n\r\n", "\n\n", "\r\r"]
+  // according to the HTML standard, the end of a server-sent-events' chunk can be
+  // - CRLFCRLF (two CRLFs)
+  // - CRCR (two CRs)
+  // - LFLF (two LFs)
+  // https://html.spec.whatwg.org/multipage/server-sent-events.html#parsing-an-event-stream
+  // Customized patterns can be added to match the chunk end pattern.
+  repeated string chunk_end_patterns = 2;
+
+  // The maximum size of the pending chunk.
+  // If the pending chunk size is greater than this value, this filter will be disabled.
+  // This is to prevent the filter from consuming too much memory when the SSE data stream is large.
+  // In normal cases, the sessionId should be the initialize message and be in a small chunk.
+  // The default value is 4KB.
+  int32 max_pending_chunk_size = 3 [(validate.rules).int32 = {gt: 0}] [default = 4096];
 }

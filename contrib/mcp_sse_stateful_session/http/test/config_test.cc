@@ -20,6 +20,7 @@ TEST(EnvelopeSessionStateFactoryConfigTest, BasicSse) {
   EnvelopeSessionStateProto proto_config;
   const std::string yaml = R"EOF(
       param_name: custom-endpoint-param-name
+      chunk_end_patterns: ["\r\n\r\n", "\n\n", "\r\r"]
     )EOF";
   TestUtility::loadFromYaml(yaml, proto_config);
 
