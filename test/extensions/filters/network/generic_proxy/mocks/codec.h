@@ -55,6 +55,7 @@ public:
   }
 
   MOCK_METHOD(void, setCodecCallbacks, (ServerCodecCallbacks & callbacks));
+  MOCK_METHOD(void, onConnected, ());
   MOCK_METHOD(void, decode, (Buffer::Instance & buffer, bool end_stream));
   MOCK_METHOD(EncodingResult, encode, (const StreamFrame&, EncodingContext& ctx));
   MOCK_METHOD(ResponseHeaderFramePtr, respond,
