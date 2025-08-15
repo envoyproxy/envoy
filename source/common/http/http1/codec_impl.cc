@@ -550,7 +550,6 @@ Status ConnectionImpl::completeCurrentHeader() {
 
   // Account for ":" and "\r\n" bytes between the header key value pair.
   getBytesMeter().addHeaderBytesReceived(CRLF_SIZE + 1);
-  getBytesMeter().addDecompressedHeaderBytesReceived(CRLF_SIZE + 1);
 
   // TODO(10646): Switch to use HeaderUtility::checkHeaderNameForUnderscores().
   RETURN_IF_ERROR(checkHeaderNameForUnderscores());
@@ -784,7 +783,6 @@ Status ConnectionImpl::onHeaderFieldImpl(const char* data, size_t length) {
   ASSERT(dispatching_);
 
   getBytesMeter().addHeaderBytesReceived(length);
-  getBytesMeter().addDecompressedHeaderBytesReceived(length);
 
   // We previously already finished up the headers, these headers are
   // now trailers.
@@ -810,7 +808,6 @@ Status ConnectionImpl::onHeaderValueImpl(const char* data, size_t length) {
   ASSERT(dispatching_);
 
   getBytesMeter().addHeaderBytesReceived(length);
-  getBytesMeter().addDecompressedHeaderBytesReceived(length);
 
   if (header_parsing_state_ == HeaderParsingState::Done && !enableTrailers()) {
     // Ignore trailers.
@@ -843,6 +840,10 @@ StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
   ASSERT(dispatching_);
   ENVOY_CONN_LOG(trace, "onHeadersCompleteImpl", connection_);
   RETURN_IF_ERROR(completeCurrentHeader());
+
+  // There is no header field compression in HTTP/1.1, so the wire representation is the same as the
+  // decompressed representation.
+  getBytesMeter().addDecompressedHeaderBytesReceived(getBytesMeter().headerBytesReceived());
 
   if (!parser_->isHttp11()) {
     // This is not necessarily true, but it's good enough since higher layers only care if this is

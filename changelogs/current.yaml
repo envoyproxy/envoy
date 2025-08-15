@@ -34,9 +34,9 @@ minor_behavior_changes:
 - area: http
   change: |
     Adds accounting for decompressed HTTP header bytes sent and received. Existing stats only count wire-encoded header bytes.
-    This can be accessed through the `%UPSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED%`,
-    `%DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED%`, `%UPSTREAM_DECOMPRESSED_HEADER_BYTES_SENT%`, and the
-    `%DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_SENT%` access_log command operators.
+    This can be accessed through the ``%UPSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED%``,
+    ``%DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED%``, ``%UPSTREAM_DECOMPRESSED_HEADER_BYTES_SENT%``, and the
+    ``%DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_SENT%`` access_log command operators.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
