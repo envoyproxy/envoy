@@ -877,7 +877,7 @@ void ListenerImpl::buildOriginalDstListenerFilter(
             "envoy.filters.listener.original_dst");
 
     Network::ListenerFilterFactoryCb callback = factory.createListenerFilterFactoryFromProto(
-        Envoy::ProtobufWkt::Empty(), nullptr, *listener_factory_context_);
+        Envoy::Protobuf::Empty(), nullptr, *listener_factory_context_);
     auto* cfg_provider_manager = parent_.factory_->getTcpListenerConfigProviderManager();
     auto filter_config_provider = cfg_provider_manager->createStaticFilterConfigProvider(
         callback, "envoy.filters.listener.original_dst");
@@ -974,7 +974,7 @@ bool ListenerImpl::createQuicListenerFilterChain(Network::QuicListenerFilterMana
   return false;
 }
 
-void ListenerImpl::dumpListenerConfig(ProtobufWkt::Any& dump) const {
+void ListenerImpl::dumpListenerConfig(Protobuf::Any& dump) const {
   dump.PackFrom(config_maybe_partial_filter_chains_);
 }
 

@@ -69,13 +69,13 @@ TEST_P(AdsIntegrationTest, BasicClusterInitialWarmingWithResourceWrapper) {
   EXPECT_TRUE(compareDiscoveryRequest(cds_type_url, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       cds_type_url, {buildCluster("cluster_0")}, {buildCluster("cluster_0")}, {}, "1",
-      {{"test", ProtobufWkt::Any()}});
+      {{"test", Protobuf::Any()}});
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 1);
   test_server_->waitForGaugeEq("cluster.cluster_0.warming_state", 1);
   EXPECT_TRUE(compareDiscoveryRequest(eds_type_url, "", {"cluster_0"}, {"cluster_0"}, {}));
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
       eds_type_url, {buildClusterLoadAssignment("cluster_0")},
-      {buildClusterLoadAssignment("cluster_0")}, {}, "1", {{"test", ProtobufWkt::Any()}});
+      {buildClusterLoadAssignment("cluster_0")}, {}, "1", {{"test", Protobuf::Any()}});
 
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 2);

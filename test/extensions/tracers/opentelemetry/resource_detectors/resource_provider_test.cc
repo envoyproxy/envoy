@@ -33,7 +33,7 @@ public:
                Server::Configuration::ServerFactoryContext& context));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
 
   std::string name() const override { return "envoy.tracers.opentelemetry.resource_detectors.a"; }
@@ -46,7 +46,7 @@ public:
                Server::Configuration::ServerFactoryContext& context));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
 
   std::string name() const override { return "envoy.tracers.opentelemetry.resource_detectors.b"; }

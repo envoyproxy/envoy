@@ -18,7 +18,7 @@ public:
       : broker_name_(broker_name), read_queue_nums_(read_queue_num),
         write_queue_nums_(write_queue_num), perm_(perm) {}
 
-  void encode(ProtobufWkt::Struct& data_struct);
+  void encode(Protobuf::Struct& data_struct);
 
   const std::string& brokerName() const { return broker_name_; }
 
@@ -41,7 +41,7 @@ public:
              absl::node_hash_map<int64_t, std::string>&& broker_addrs)
       : cluster_(cluster), broker_name_(broker_name), broker_addrs_(broker_addrs) {}
 
-  void encode(ProtobufWkt::Struct& data_struct);
+  void encode(Protobuf::Struct& data_struct);
 
   const std::string& cluster() const { return cluster_; }
 
@@ -57,7 +57,7 @@ private:
 
 class TopicRouteData {
 public:
-  void encode(ProtobufWkt::Struct& data_struct);
+  void encode(Protobuf::Struct& data_struct);
 
   TopicRouteData() = default;
 

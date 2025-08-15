@@ -102,7 +102,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-void Filter::setExtractedData(const ProtobufWkt::Struct& extracted_data) {
+void Filter::setExtractedData(const Protobuf::Struct& extracted_data) {
   decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.http.jwt_authn",
                                                       extracted_data);
 }

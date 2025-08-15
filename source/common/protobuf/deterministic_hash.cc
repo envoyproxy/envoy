@@ -176,7 +176,7 @@ absl::string_view typeUrlToDescriptorFullName(absl::string_view url) {
   return url;
 }
 
-std::unique_ptr<Protobuf::Message> unpackAnyForReflection(const ProtobufWkt::Any& any) {
+std::unique_ptr<Protobuf::Message> unpackAnyForReflection(const Protobuf::Any& any) {
   const Protobuf::Descriptor* descriptor =
       Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(
           typeUrlToDescriptorFullName(any.type_url()));
@@ -202,7 +202,7 @@ uint64_t reflectionHashMessage(const Protobuf::Message& message, uint64_t seed) 
   const Protobuf::Descriptor* descriptor = message.GetDescriptor();
   seed = HashUtil::xxHash64(descriptor->full_name(), seed);
   if (descriptor->well_known_type() == Protobuf::Descriptor::WELLKNOWNTYPE_ANY) {
-    const ProtobufWkt::Any* any = Protobuf::DynamicCastMessage<ProtobufWkt::Any>(&message);
+    const Protobuf::Any* any = Protobuf::DynamicCastMessage<Protobuf::Any>(&message);
     ASSERT(any != nullptr, "casting to any should always work for WELLKNOWNTYPE_ANY");
     std::unique_ptr<Protobuf::Message> submsg = unpackAnyForReflection(*any);
     if (submsg == nullptr) {

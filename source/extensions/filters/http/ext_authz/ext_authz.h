@@ -54,10 +54,10 @@ struct ExtAuthzFilterStats {
 
 class ExtAuthzLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
 public:
-  explicit ExtAuthzLoggingInfo(const absl::optional<Envoy::ProtobufWkt::Struct> filter_metadata)
+  explicit ExtAuthzLoggingInfo(const absl::optional<Envoy::Protobuf::Struct> filter_metadata)
       : filter_metadata_(filter_metadata) {}
 
-  const absl::optional<ProtobufWkt::Struct>& filterMetadata() const { return filter_metadata_; }
+  const absl::optional<Protobuf::Struct>& filterMetadata() const { return filter_metadata_; }
   absl::optional<std::chrono::microseconds> latency() const { return latency_; };
   absl::optional<uint64_t> bytesSent() const { return bytes_sent_; }
   absl::optional<uint64_t> bytesReceived() const { return bytes_received_; }
@@ -99,7 +99,7 @@ public:
   void clearUpstreamHost() { upstream_host_ = nullptr; }
 
 private:
-  const absl::optional<Envoy::ProtobufWkt::Struct> filter_metadata_;
+  const absl::optional<Envoy::Protobuf::Struct> filter_metadata_;
   absl::optional<std::chrono::microseconds> latency_;
   // The following stats are populated for ext_authz filters using Envoy gRPC only.
   absl::optional<uint64_t> bytes_sent_;
@@ -198,7 +198,7 @@ public:
   bool includeTLSSession() const { return include_tls_session_; }
   const LabelsMap& destinationLabels() const { return destination_labels_; }
 
-  const absl::optional<ProtobufWkt::Struct>& filterMetadata() const { return filter_metadata_; }
+  const absl::optional<Protobuf::Struct>& filterMetadata() const { return filter_metadata_; }
 
   bool emitFilterStateStats() const { return emit_filter_state_stats_; }
 
@@ -252,7 +252,7 @@ private:
   Runtime::Loader& runtime_;
   Http::Context& http_context_;
   LabelsMap destination_labels_;
-  const absl::optional<ProtobufWkt::Struct> filter_metadata_;
+  const absl::optional<Protobuf::Struct> filter_metadata_;
   const bool emit_filter_state_stats_;
 
   const absl::optional<Runtime::FractionalPercent> filter_enabled_;

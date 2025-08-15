@@ -525,8 +525,8 @@ TEST(ABIImpl, metadata) {
   auto upstream_host = std::make_shared<Upstream::MockHostDescription>();
   EXPECT_CALL(*upstream_info, upstreamHost).WillRepeatedly(testing::Return(upstream_host));
   auto locality_metadata = std::make_shared<envoy::config::core::v3::Metadata>();
-  locality_metadata->mutable_filter_metadata()->insert({namespace_str, ProtobufWkt::Struct()});
-  ProtobufWkt::Value lbendpoint_value_proto;
+  locality_metadata->mutable_filter_metadata()->insert({namespace_str, Protobuf::Struct()});
+  Protobuf::Value lbendpoint_value_proto;
   lbendpoint_value_proto.set_string_value(lbendpoint_value);
   locality_metadata->mutable_filter_metadata()
       ->at(namespace_str)

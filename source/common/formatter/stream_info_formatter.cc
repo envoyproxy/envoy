@@ -47,14 +47,14 @@ MetadataFormatter::MetadataFormatter(absl::string_view filter_namespace,
 
 absl::optional<std::string>
 MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metadata) const {
-  ProtobufWkt::Value value = formatMetadataValue(metadata);
-  if (value.kind_case() == ProtobufWkt::Value::kNullValue) {
+  Protobuf::Value value = formatMetadataValue(metadata);
+  if (value.kind_case() == Protobuf::Value::kNullValue) {
     return absl::nullopt;
   }
 
   std::string str;
   str.reserve(256);
-  if (value.kind_case() == ProtobufWkt::Value::kStringValue) {
+  if (value.kind_case() == Protobuf::Value::kStringValue) {
     str = value.string_value();
   } else {
     Json::Utility::appendValueToString(value, str);
@@ -63,21 +63,20 @@ MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metad
   return str;
 }
 
-ProtobufWkt::Value
+Protobuf::Value
 MetadataFormatter::formatMetadataValue(const envoy::config::core::v3::Metadata& metadata) const {
   if (path_.empty()) {
     const auto filter_it = metadata.filter_metadata().find(filter_namespace_);
     if (filter_it == metadata.filter_metadata().end()) {
       return SubstitutionFormatUtils::unspecifiedValue();
     }
-    ProtobufWkt::Value output;
+    Protobuf::Value output;
     output.mutable_struct_value()->CopyFrom(filter_it->second);
     return output;
   }
 
-  const ProtobufWkt::Value& val =
-      Config::Metadata::metadataValue(&metadata, filter_namespace_, path_);
-  if (val.kind_case() == ProtobufWkt::Value::KindCase::KIND_NOT_SET) {
+  const Protobuf::Value& val = Config::Metadata::metadataValue(&metadata, filter_namespace_, path_);
+  if (val.kind_case() == Protobuf::Value::KindCase::KIND_NOT_SET) {
     return SubstitutionFormatUtils::unspecifiedValue();
   }
 
@@ -90,7 +89,7 @@ MetadataFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
   return (metadata != nullptr) ? formatMetadata(*metadata) : absl::nullopt;
 }
 
-ProtobufWkt::Value MetadataFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) const {
+Protobuf::Value MetadataFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) const {
   auto metadata = get_func_(stream_info);
   return formatMetadataValue((metadata != nullptr) ? *metadata
                                                    : envoy::config::core::v3::Metadata());
@@ -259,8 +258,7 @@ FilterStateFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
   }
 }
 
-ProtobufWkt::Value
-FilterStateFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) const {
+Protobuf::Value FilterStateFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) const {
   const Envoy::StreamInfo::FilterState::Object* state = filterState(stream_info);
   if (!state) {
     return SubstitutionFormatUtils::unspecifiedValue();
@@ -282,7 +280,7 @@ FilterStateFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) con
     }
 
 #ifdef ENVOY_ENABLE_YAML
-    ProtobufWkt::Value val;
+    Protobuf::Value val;
     if (MessageUtil::jsonConvertValue(*proto, val)) {
       return val;
     }
@@ -476,7 +474,7 @@ CommonDurationFormatter::format(const StreamInfo::StreamInfo& info) const {
   }
   return fmt::format_int(duration.value()).str();
 }
-ProtobufWkt::Value CommonDurationFormatter::formatValue(const StreamInfo::StreamInfo& info) const {
+Protobuf::Value CommonDurationFormatter::formatValue(const StreamInfo::StreamInfo& info) const {
   auto duration = getDurationCount(info);
   if (!duration.has_value()) {
     return SubstitutionFormatUtils::unspecifiedValue();
@@ -561,8 +559,7 @@ SystemTimeFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
   return date_formatter_.fromTime(time_field.value());
 }
 
-ProtobufWkt::Value
-SystemTimeFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) const {
+Protobuf::Value SystemTimeFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) const {
   return ValueUtil::optionalStringValue(format(stream_info));
 }
 
@@ -584,7 +581,7 @@ EnvironmentFormatter::EnvironmentFormatter(absl::string_view key,
 absl::optional<std::string> EnvironmentFormatter::format(const StreamInfo::StreamInfo&) const {
   return str_.string_value();
 }
-ProtobufWkt::Value EnvironmentFormatter::formatValue(const StreamInfo::StreamInfo&) const {
+Protobuf::Value EnvironmentFormatter::formatValue(const StreamInfo::StreamInfo&) const {
   return str_;
 }
 
@@ -599,7 +596,7 @@ public:
   absl::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override {
     return field_extractor_(stream_info);
   }
-  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
     return ValueUtil::optionalStringValue(field_extractor_(stream_info));
   }
 
@@ -624,7 +621,7 @@ public:
 
     return fmt::format_int(millis.value()).str();
   }
-  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
     const auto millis = extractMillis(stream_info);
     if (!millis) {
       return SubstitutionFormatUtils::unspecifiedValue();
@@ -656,7 +653,7 @@ public:
   absl::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override {
     return fmt::format_int(field_extractor_(stream_info)).str();
   }
-  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
     return ValueUtil::numberValue(field_extractor_(stream_info));
   }
 
@@ -698,7 +695,7 @@ public:
 
     return toString(*address);
   }
-  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
     Network::Address::InstanceConstSharedPtr address = field_extractor_(stream_info);
     if (!address) {
       return SubstitutionFormatUtils::unspecifiedValue();
@@ -753,7 +750,7 @@ public:
     return value;
   }
 
-  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
     if (stream_info.downstreamAddressProvider().sslConnection() == nullptr) {
       return SubstitutionFormatUtils::unspecifiedValue();
     }
@@ -791,7 +788,7 @@ public:
     return value;
   }
 
-  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
     if (!stream_info.upstreamInfo() ||
         stream_info.upstreamInfo()->upstreamSslConnection() == nullptr) {
       return SubstitutionFormatUtils::unspecifiedValue();

@@ -329,7 +329,7 @@ public:
 
   void sendHttpFilterEcdsResponseWithFullYaml(const std::string& name, const std::string& version,
                                               const std::string& full_yaml) {
-    const auto configuration = TestUtility::parseYaml<ProtobufWkt::Any>(full_yaml);
+    const auto configuration = TestUtility::parseYaml<Protobuf::Any>(full_yaml);
     envoy::config::core::v3::TypedExtensionConfig typed_config;
     typed_config.set_name(name);
     typed_config.mutable_typed_config()->MergeFrom(configuration);

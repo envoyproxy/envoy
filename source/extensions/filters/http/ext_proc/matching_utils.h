@@ -31,17 +31,17 @@ public:
 
   bool hasResponseExpr() const { return !response_expr_.empty(); };
 
-  ProtobufWkt::Struct
+  Protobuf::Struct
   evaluateRequestAttributes(const Filters::Common::Expr::Activation& activation) const {
     return evaluateAttributes(activation, request_expr_);
   }
 
-  ProtobufWkt::Struct
+  Protobuf::Struct
   evaluateResponseAttributes(const Filters::Common::Expr::Activation& activation) const {
     return evaluateAttributes(activation, response_expr_);
   }
 
-  static ProtobufWkt::Struct
+  static Protobuf::Struct
   evaluateAttributes(const Filters::Common::Expr::Activation& activation,
                      const absl::flat_hash_map<std::string, CelExpression>& expr);
 

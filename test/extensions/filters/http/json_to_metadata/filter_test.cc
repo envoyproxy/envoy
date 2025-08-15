@@ -22,7 +22,7 @@ namespace HttpFilters {
 namespace JsonToMetadata {
 
 MATCHER_P(MapEq, rhs, "") {
-  const ProtobufWkt::Struct& obj = arg;
+  const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
     EXPECT_EQ(obj.fields().at(entry.first).string_value(), entry.second);
@@ -31,7 +31,7 @@ MATCHER_P(MapEq, rhs, "") {
 }
 
 MATCHER_P2(MapEqType, rhs, getter, "") {
-  const ProtobufWkt::Struct& obj = arg;
+  const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
     EXPECT_EQ(getter(obj.fields().at(entry.first)), entry.second);
@@ -208,11 +208,10 @@ TEST_F(FilterTest, BasicBoolMatch) {
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(
-      stream_info_,
-      setDynamicMetadata("envoy.lb", MapEqType(expected, [](const ProtobufWkt::Value& value) {
-                           return value.bool_value();
-                         })));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", MapEqType(expected, [](const Protobuf::Value& value) {
+                                   return value.bool_value();
+                                 })));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -230,11 +229,10 @@ TEST_F(FilterTest, BasicIntegerMatch) {
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(
-      stream_info_,
-      setDynamicMetadata("envoy.lb", MapEqType(expected, [](const ProtobufWkt::Value& value) {
-                           return value.number_value();
-                         })));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", MapEqType(expected, [](const Protobuf::Value& value) {
+                                   return value.number_value();
+                                 })));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -252,11 +250,10 @@ TEST_F(FilterTest, BasicDoubleMatch) {
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(
-      stream_info_,
-      setDynamicMetadata("envoy.lb", MapEqType(expected, [](const ProtobufWkt::Value& value) {
-                           return value.number_value();
-                         })));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", MapEqType(expected, [](const Protobuf::Value& value) {
+                                   return value.number_value();
+                                 })));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -374,11 +371,10 @@ request_rules:
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(
-      stream_info_,
-      setDynamicMetadata("envoy.lb", MapEqType(expected, [](const ProtobufWkt::Value& value) {
-                           return value.number_value();
-                         })));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", MapEqType(expected, [](const Protobuf::Value& value) {
+                                   return value.number_value();
+                                 })));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -409,11 +405,10 @@ request_rules:
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(
-      stream_info_,
-      setDynamicMetadata("envoy.lb", MapEqType(expected, [](const ProtobufWkt::Value& value) {
-                           return value.number_value();
-                         })));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", MapEqType(expected, [](const Protobuf::Value& value) {
+                                   return value.number_value();
+                                 })));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -467,11 +462,10 @@ request_rules:
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(
-      stream_info_,
-      setDynamicMetadata("envoy.lb", MapEqType(expected, [](const ProtobufWkt::Value& value) {
-                           return value.number_value();
-                         })));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", MapEqType(expected, [](const Protobuf::Value& value) {
+                                   return value.number_value();
+                                 })));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -525,11 +519,10 @@ request_rules:
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(
-      stream_info_,
-      setDynamicMetadata("envoy.lb", MapEqType(expected, [](const ProtobufWkt::Value& value) {
-                           return value.number_value();
-                         })));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", MapEqType(expected, [](const Protobuf::Value& value) {
+                                   return value.number_value();
+                                 })));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);
@@ -583,11 +576,10 @@ request_rules:
             filter_->decodeHeaders(incoming_headers_, false));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
-  EXPECT_CALL(
-      stream_info_,
-      setDynamicMetadata("envoy.lb", MapEqType(expected, [](const ProtobufWkt::Value& value) {
-                           return value.number_value();
-                         })));
+  EXPECT_CALL(stream_info_,
+              setDynamicMetadata("envoy.lb", MapEqType(expected, [](const Protobuf::Value& value) {
+                                   return value.number_value();
+                                 })));
   testRequestWithBody(request_body);
 
   EXPECT_EQ(getCounterValue("json_to_metadata.rq.success"), 1);

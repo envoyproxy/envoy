@@ -58,7 +58,7 @@ struct ExtProcFilterStats {
 
 class ExtProcLoggingInfo : public Envoy::StreamInfo::FilterState::Object {
 public:
-  explicit ExtProcLoggingInfo(const Envoy::ProtobufWkt::Struct& filter_metadata)
+  explicit ExtProcLoggingInfo(const Envoy::Protobuf::Struct& filter_metadata)
       : filter_metadata_(filter_metadata) {}
 
   // gRPC call stats for headers and trailers.
@@ -120,7 +120,7 @@ public:
   Upstream::ClusterInfoConstSharedPtr clusterInfo() const { return cluster_info_; }
   Upstream::HostDescriptionConstSharedPtr upstreamHost() const { return upstream_host_; }
   const GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction) const;
-  const Envoy::ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
+  const Envoy::Protobuf::Struct& filterMetadata() const { return filter_metadata_; }
   const std::string& httpResponseCodeDetails() const { return http_response_code_details_; }
 
   ProtobufTypes::MessagePtr serializeAsProto() const override;
@@ -135,7 +135,7 @@ private:
   GrpcCalls& grpcCalls(envoy::config::core::v3::TrafficDirection traffic_direction);
   GrpcCalls decoding_processor_grpc_calls_;
   GrpcCalls encoding_processor_grpc_calls_;
-  const Envoy::ProtobufWkt::Struct filter_metadata_;
+  const Envoy::Protobuf::Struct filter_metadata_;
   // The following stats are populated for ext_proc filters using Envoy gRPC only.
   // The bytes sent and received are for the entire stream.
   uint64_t bytes_sent_{0}, bytes_received_{0};
@@ -264,7 +264,7 @@ public:
     return disallowed_headers_;
   }
 
-  const ProtobufWkt::Struct& filterMetadata() const { return filter_metadata_; }
+  const Protobuf::Struct& filterMetadata() const { return filter_metadata_; }
 
   const ExpressionManager& expressionManager() const { return expression_manager_; }
 
@@ -327,7 +327,7 @@ private:
   ExtProcFilterStats stats_;
   const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode processing_mode_;
   const Filters::Common::MutationRules::Checker mutation_checker_;
-  const ProtobufWkt::Struct filter_metadata_;
+  const Protobuf::Struct filter_metadata_;
   // If set to true, allow the processing mode to be modified by the ext_proc response.
   const bool allow_mode_override_;
   // If set to true, disable the immediate response from the ext_proc server, which means
@@ -475,7 +475,7 @@ public:
   void logStreamInfo() override;
 
   void onMessageTimeout();
-  void onNewTimeout(const ProtobufWkt::Duration& override_message_timeout);
+  void onNewTimeout(const Protobuf::Duration& override_message_timeout);
 
   envoy::service::ext_proc::v3::ProcessingRequest
   setupBodyChunk(ProcessorState& state, const Buffer::Instance& data, bool end_stream);

@@ -212,7 +212,7 @@ stat_prefix: test
         config_, random_, filter_callbacks_.connection_.dispatcher_.timeSource(), drain_decision_);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
     ON_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
-        .WillByDefault(Invoke([this](const std::string& key, const ProtobufWkt::Struct& obj) {
+        .WillByDefault(Invoke([this](const std::string& key, const Protobuf::Struct& obj) {
           (*filter_callbacks_.connection_.stream_info_.metadata_.mutable_filter_metadata())[key]
               .MergeFrom(obj);
         }));
