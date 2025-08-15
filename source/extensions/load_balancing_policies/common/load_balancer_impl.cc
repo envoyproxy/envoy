@@ -645,8 +645,8 @@ ZoneAwareLoadBalancerBase::calculateLocalityPercentages(
   uint64_t total_local_weight = 0;
   for (const auto& locality_hosts : local_hosts_per_locality.get()) {
     uint64_t locality_weight = 0;
-    // If locality_basis_ is set to HOST_WEIGHT, we use the host's weight to calculate the locality percentage.
-    // Otherwise, we count the number of hosts in the locality.
+    // If locality_basis_ is set to HOST_WEIGHT, we use the host's weight to calculate the locality
+    // percentage. Otherwise, we count the number of hosts in the locality.
     if (locality_basis_ == LocalityLbConfig::ZoneAwareLbConfig::HOST_WEIGHT) {
       for (const auto& host : locality_hosts) {
         locality_weight += host->weight();
@@ -663,8 +663,8 @@ ZoneAwareLoadBalancerBase::calculateLocalityPercentages(
   uint64_t total_upstream_weight = 0;
   for (const auto& locality_hosts : upstream_hosts_per_locality.get()) {
     uint64_t locality_weight = 0;
-    // If locality_basis_ is set to HOST_WEIGHT, we use the host's weight to calculate the locality percentage.
-    // Otherwise, we count the number of hosts in the locality.
+    // If locality_basis_ is set to HOST_WEIGHT, we use the host's weight to calculate the locality
+    // percentage. Otherwise, we count the number of hosts in the locality.
     if (locality_basis_ == LocalityLbConfig::ZoneAwareLbConfig::HOST_WEIGHT) {
       for (const auto& host : locality_hosts) {
         locality_weight += host->weight();
