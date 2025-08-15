@@ -9,18 +9,20 @@ namespace JNI {
 void initialize(JavaVM* jvm) {
   JniHelper::initialize(jvm);
   JniUtility::initCache();
-  JniHelper::addToCache("io/envoyproxy/envoymobile/utilities/AndroidNetworkLibrary",
-                        /* methods= */ {},
-                        /* static_methods= */
-                        {{"isCleartextTrafficPermitted", "(Ljava/lang/String;)Z"},
-                         {"tagSocket", "(III)V"},
-                         {"verifyServerCertificates",
-                          "([[B[B[B)Lio/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult;"},
-                         {"addTestRootCertificate", "([B)V"},
-                         {"clearTestRootCertificates", "()V"},
-                         {"getDefaultNetworkHandle", "()J"},
-                         {"getAllConnectedNetworks", "()[[J"}},
-                        /* fields= */ {}, /* static_fields= */ {});
+  JniHelper::addToCache(
+      "io/envoyproxy/envoymobile/utilities/AndroidNetworkLibrary",
+      /* methods= */ {},
+      /* static_methods= */
+      {
+          {"isCleartextTrafficPermitted", "(Ljava/lang/String;)Z"},
+          {"tagSocket", "(III)V"},
+          {"verifyServerCertificates",
+           "([[B[B[B)Lio/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult;"},
+          {"addTestRootCertificate", "([B)V"},
+          {"clearTestRootCertificates", "()V"},
+
+      },
+      /* fields= */ {}, /* static_fields= */ {});
   JniHelper::addToCache("io/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult",
                         /* methods= */
                         {
