@@ -12,6 +12,8 @@
 
 #include "contrib/envoy/extensions/http/mcp_sse_stateful_session/envelope/v3alpha/envelope.pb.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Http {
@@ -43,7 +45,10 @@ public:
   private:
     bool isSSEResponse() const {
       return response_headers_ && response_headers_->ContentType() &&
-             response_headers_->ContentType()->value().getStringView() == "text/event-stream";
+             absl::StrContains(
+                 absl::AsciiStrToLower(response_headers_->ContentType()->value().getStringView()),
+                 absl::AsciiStrToLower(
+                     Envoy::Http::Headers::get().ContentTypeValues.TextEventStream));
     }
     absl::optional<std::string> upstream_address_;
     const EnvelopeSessionStateFactory& factory_;
