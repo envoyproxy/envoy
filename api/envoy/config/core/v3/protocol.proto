@@ -516,8 +516,7 @@ message Http2ProtocolOptions {
 
   // `Initial stream-level flow-control window
   // <https://httpwg.org/specs/rfc7540.html#rfc.section.6.9.2>`_ size. Valid values range from 65535
-  // (2^16 - 1, HTTP/2 default) to 2147483647 (2^31 - 1, HTTP/2 maximum) and defaults to 268435456
-  // (256 * 1024 * 1024).
+  // (2^16 - 1, HTTP/2 default) to 2147483647 (2^31 - 1, HTTP/2 maximum) and defaults to 1MiB (1024 * 1024).
   //
   // .. note::
   //
