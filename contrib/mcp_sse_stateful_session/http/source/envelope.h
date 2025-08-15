@@ -63,7 +63,7 @@ private:
   absl::optional<std::string> parseAddress(Envoy::Http::RequestHeaderMap& headers) const;
   const std::string param_name_;
   const std::vector<std::string> chunk_end_patterns_;
-  const size_t max_pending_chunk_size_;
+  const size_t max_pending_chunk_size_{4096};
   static constexpr char SEPARATOR = '.'; // separate session ID and host address
 };
 
