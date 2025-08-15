@@ -6,7 +6,6 @@
 #include "envoy/tracing/tracer.h"
 
 #include "source/extensions/tracers/zipkin/span_context.h"
-#include "source/extensions/tracers/zipkin/tracer_interface.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_types.h"
 
@@ -14,29 +13,6 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
-
-/**
- * Abstract class that delegates to users of the Tracer class the responsibility
- * of "reporting" a Zipkin span that has ended its life cycle. "Reporting" can mean that the
- * span will be sent to out to Zipkin, or buffered so that it can be sent out later.
- */
-class Reporter {
-public:
-  /**
-   * Destructor.
-   */
-  virtual ~Reporter() = default;
-
-  /**
-   * Method that a concrete Reporter class must implement to handle finished spans.
-   * For example, a span-buffer management policy could be implemented.
-   *
-   * @param span The span that needs action.
-   */
-  virtual void reportSpan(Span&& span) PURE;
-};
-
-using ReporterPtr = std::unique_ptr<Reporter>;
 
 /**
  * This class implements the Zipkin tracer. It has methods to create the appropriate Zipkin span
@@ -68,33 +44,11 @@ public:
         shared_span_context_(shared_span_context), time_source_(time_source),
         split_spans_for_request_(split_spans_for_request) {}
 
-  /**
-   * Creates a "root" Zipkin span.
-   *
-   * @param config The tracing configuration
-   * @param span_name Name of the new span.
-   * @param start_time The time indicating the beginning of the span.
-   * @return SpanPtr The root span.
-   */
-  SpanPtr startSpan(const Tracing::Config&, const std::string& span_name, SystemTime timestamp);
-
-  /**
-   * Depending on the given context, creates either a "child" or a "shared-context" Zipkin span.
-   *
-   * @param config The tracing configuration
-   * @param span_name Name of the new span.
-   * @param start_time The time indicating the beginning of the span.
-   * @param previous_context The context of the span preceding the one to be created.
-   * @return SpanPtr The child span.
-   */
+  // TracerInterface
+  SpanPtr startSpan(const Tracing::Config&, const std::string& span_name,
+                    SystemTime timestamp) override;
   SpanPtr startSpan(const Tracing::Config&, const std::string& span_name, SystemTime timestamp,
-                    const SpanContext& previous_context);
-
-  /**
-   * TracerInterface::reportSpan.
-   *
-   * @param span The span to be reported.
-   */
+                    const SpanContext& previous_context) override;
   void reportSpan(Span&& span) override;
 
   /**

@@ -133,9 +133,9 @@ public:
    *        initialized. The cluster manager can use this for post-init processing.
    */
   ClusterManagerInitHelper(
-      ClusterManager& cm,
+      Config::XdsManager& xds_manager,
       const std::function<absl::Status(ClusterManagerCluster&)>& per_cluster_init_callback)
-      : cm_(cm), per_cluster_init_callback_(per_cluster_init_callback) {}
+      : xds_manager_(xds_manager), per_cluster_init_callback_(per_cluster_init_callback) {}
 
   enum class State {
     // Initial state. During this state all static clusters are loaded. Any primary clusters
@@ -179,7 +179,7 @@ private:
   void maybeFinishInitialize();
   absl::Status onClusterInit(ClusterManagerCluster& cluster);
 
-  ClusterManager& cm_;
+  Config::XdsManager& xds_manager_;
   std::function<absl::Status(ClusterManagerCluster& cluster)> per_cluster_init_callback_;
   CdsApi* cds_{};
   ClusterManager::PrimaryClustersReadyCallback primary_clusters_initialized_callback_;

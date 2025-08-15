@@ -1,7 +1,9 @@
 #include "envoy/extensions/filters/http/aws_request_signing/v3/aws_request_signing.pb.h"
 #include "envoy/upstream/load_balancer.h"
 
-#include "source/extensions/clusters/logical_dns/logical_dns_cluster.h"
+#include "source/common/common/logger.h"
+#include "source/common/upstream/cluster_factory_impl.h"
+#include "source/extensions/clusters/dns/dns_cluster.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/registry.h"
@@ -359,7 +361,7 @@ TEST_P(AwsRequestSigningIntegrationTest, SigV4AIntegrationUpstream) {
   EXPECT_FALSE(
       upstream_request_->headers().get(Http::LowerCaseString("x-amz-content-sha256")).empty());
 }
-class MockLogicalDnsClusterFactory : public Upstream::LogicalDnsClusterFactory {
+class MockLogicalDnsClusterFactory : public Upstream::DnsClusterFactory {
 public:
   MockLogicalDnsClusterFactory() = default;
   ~MockLogicalDnsClusterFactory() override = default;
@@ -384,7 +386,7 @@ public:
     use_lds_ = false;
   }
   NiceMock<MockLogicalDnsClusterFactory> logical_dns_cluster_factory_;
-  Registry::InjectFactory<Envoy::Upstream::LogicalDnsClusterFactory> dns_cluster_factory_;
+  Registry::InjectFactory<Envoy::Upstream::DnsClusterFactory> dns_cluster_factory_;
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
 
@@ -865,7 +867,7 @@ public:
   }
 
   NiceMock<MockLogicalDnsClusterFactory> logical_dns_cluster_factory_;
-  Registry::InjectFactory<Envoy::Upstream::LogicalDnsClusterFactory> dns_cluster_factory_;
+  Registry::InjectFactory<Envoy::Upstream::DnsClusterFactory> dns_cluster_factory_;
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
 

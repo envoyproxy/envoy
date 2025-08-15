@@ -10,6 +10,7 @@
 #include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/grpc/status.h"
+#include "envoy/http/codec_runtime_overrides.h"
 #include "envoy/http/header_formatter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/metadata_interface.h"
@@ -36,20 +37,6 @@ struct CodecStats;
 namespace Http3 {
 struct CodecStats;
 }
-
-// Legacy default value of 60K is safely under both codec default limits.
-static constexpr uint32_t DEFAULT_MAX_REQUEST_HEADERS_KB = 60;
-// Default maximum number of headers.
-static constexpr uint32_t DEFAULT_MAX_HEADERS_COUNT = 100;
-
-constexpr absl::string_view MaxRequestHeadersCountOverrideKey =
-    "envoy.reloadable_features.max_request_headers_count";
-constexpr absl::string_view MaxResponseHeadersCountOverrideKey =
-    "envoy.reloadable_features.max_response_headers_count";
-constexpr absl::string_view MaxRequestHeadersSizeOverrideKey =
-    "envoy.reloadable_features.max_request_headers_size_kb";
-constexpr absl::string_view MaxResponseHeadersSizeOverrideKey =
-    "envoy.reloadable_features.max_response_headers_size_kb";
 
 class Stream;
 class RequestDecoder;

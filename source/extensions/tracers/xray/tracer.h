@@ -153,6 +153,9 @@ public:
    */
   void setSampled(bool sampled) override { sampled_ = sampled; };
 
+  // X-Ray tracer does not use the sampling decision from Envoy anyway.
+  bool useLocalDecision() const override { return false; }
+
   /**
    * Sets the server error as true for the traced operation/request.
    */

@@ -296,7 +296,7 @@ private:
   // returned by the public tracingConfig() method.
   // Tracing::TracingConfig
   Tracing::OperationName operationName() const override;
-  const Tracing::CustomTagMap* customTags() const override;
+  void modifySpan(Tracing::Span& span) const override;
   bool verbose() const override;
   uint32_t maxPathTagLength() const override;
   bool spawnUpstreamSpan() const override;
@@ -442,7 +442,7 @@ private:
 
   bool downstream_connection_closed_{};
 
-  FilterConfigSharedPtr config_{};
+  FilterConfigSharedPtr config_;
   GenericFilterStatsHelper stats_helper_;
 
   const Network::DrainDecision& drain_decision_;

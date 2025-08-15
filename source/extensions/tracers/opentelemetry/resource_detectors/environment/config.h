@@ -26,7 +26,7 @@ public:
    */
   ResourceDetectorPtr
   createResourceDetector(const Protobuf::Message& message,
-                         Server::Configuration::TracerFactoryContext& context) override;
+                         Server::Configuration::ServerFactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::extensions::tracers::opentelemetry::resource_detectors::v3::

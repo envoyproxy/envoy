@@ -25,12 +25,14 @@ ExpressionManager::initExpressions(const Protobuf::RepeatedPtrField<std::string>
                            parse_status.status().ToString());
     }
 
-    Filters::Common::Expr::ExpressionPtr expression =
-        Extensions::Filters::Common::Expr::createExpression(builder_->builder(),
-                                                            parse_status.value().expr());
+    const auto& parsed_expr = parse_status.value();
+    const cel::expr::Expr& cel_expr = parsed_expr.expr();
+
+    Filters::Common::Expr::ExpressionPtr compiled_expression =
+        Extensions::Filters::Common::Expr::createExpression(builder_->builder(), cel_expr);
 
     expressions.emplace(
-        matcher, ExpressionManager::CelExpression{parse_status.value(), std::move(expression)});
+        matcher, ExpressionManager::CelExpression{parsed_expr, std::move(compiled_expression)});
   }
 #else
   ENVOY_LOG(warn, "CEL expression parsing is not available for use in this environment."

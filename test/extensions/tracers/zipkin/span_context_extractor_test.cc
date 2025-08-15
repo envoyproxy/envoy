@@ -31,7 +31,7 @@ TEST(ZipkinSpanContextExtractorTest, Largest) {
   EXPECT_EQ(1, context.first.traceId());
   EXPECT_EQ(9, context.first.traceIdHigh());
   EXPECT_TRUE(context.first.sampled());
-  EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
+  EXPECT_TRUE(extractor.extractSampled().value());
 }
 
 TEST(ZipkinSpanContextExtractorTest, WithoutParentDebug) {
@@ -46,7 +46,7 @@ TEST(ZipkinSpanContextExtractorTest, WithoutParentDebug) {
   EXPECT_EQ(1, context.first.traceId());
   EXPECT_EQ(9, context.first.traceIdHigh());
   EXPECT_TRUE(context.first.sampled());
-  EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
+  EXPECT_TRUE(extractor.extractSampled().value());
 }
 
 TEST(ZipkinSpanContextExtractorTest, MalformedUuid) {
@@ -54,7 +54,7 @@ TEST(ZipkinSpanContextExtractorTest, MalformedUuid) {
   SpanContextExtractor extractor(request_headers);
   EXPECT_THROW_WITH_MESSAGE(extractor.extractSpanContext(true), ExtractorException,
                             "Invalid input: invalid trace id b970dafd-0d95-40");
-  EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, true}));
+  EXPECT_FALSE(extractor.extractSampled().has_value());
 }
 
 TEST(ZipkinSpanContextExtractorTest, MiddleOfString) {
@@ -63,7 +63,7 @@ TEST(ZipkinSpanContextExtractorTest, MiddleOfString) {
   SpanContextExtractor extractor(request_headers);
   EXPECT_THROW_WITH_MESSAGE(extractor.extractSpanContext(true), ExtractorException,
                             "Invalid input: truncated");
-  EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, true}));
+  EXPECT_FALSE(extractor.extractSampled().has_value());
 }
 
 TEST(ZipkinSpanContextExtractorTest, DebugOnly) {
@@ -77,7 +77,7 @@ TEST(ZipkinSpanContextExtractorTest, DebugOnly) {
   EXPECT_EQ(0, context.first.traceId());
   EXPECT_EQ(0, context.first.traceIdHigh());
   EXPECT_FALSE(context.first.sampled());
-  EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
+  EXPECT_TRUE(extractor.extractSampled().value());
 }
 
 TEST(ZipkinSpanContextExtractorTest, Sampled) {
@@ -91,7 +91,7 @@ TEST(ZipkinSpanContextExtractorTest, Sampled) {
   EXPECT_EQ(0, context.first.traceId());
   EXPECT_EQ(0, context.first.traceIdHigh());
   EXPECT_FALSE(context.first.sampled());
-  EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
+  EXPECT_TRUE(extractor.extractSampled().value());
 }
 
 TEST(ZipkinSpanContextExtractorTest, SampledFalse) {
@@ -105,7 +105,7 @@ TEST(ZipkinSpanContextExtractorTest, SampledFalse) {
   EXPECT_EQ(0, context.first.traceId());
   EXPECT_EQ(0, context.first.traceIdHigh());
   EXPECT_FALSE(context.first.sampled());
-  EXPECT_FALSE(extractor.extractSampled({Tracing::Reason::Sampling, true}));
+  EXPECT_FALSE(extractor.extractSampled().value());
 }
 
 TEST(ZipkinSpanContextExtractorTest, IdNotYetSampled128) {
@@ -120,7 +120,7 @@ TEST(ZipkinSpanContextExtractorTest, IdNotYetSampled128) {
   EXPECT_EQ(1, context.first.traceId());
   EXPECT_EQ(9, context.first.traceIdHigh());
   EXPECT_TRUE(context.first.sampled());
-  EXPECT_FALSE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
+  EXPECT_FALSE(extractor.extractSampled().has_value());
 }
 
 TEST(ZipkinSpanContextExtractorTest, IdsUnsampled) {
@@ -134,7 +134,7 @@ TEST(ZipkinSpanContextExtractorTest, IdsUnsampled) {
   EXPECT_EQ(1, context.first.traceId());
   EXPECT_EQ(0, context.first.traceIdHigh());
   EXPECT_TRUE(context.first.sampled());
-  EXPECT_FALSE(extractor.extractSampled({Tracing::Reason::Sampling, true}));
+  EXPECT_FALSE(extractor.extractSampled().value());
 }
 
 TEST(ZipkinSpanContextExtractorTest, ParentUnsampled) {
@@ -149,7 +149,7 @@ TEST(ZipkinSpanContextExtractorTest, ParentUnsampled) {
   EXPECT_EQ(1, context.first.traceId());
   EXPECT_EQ(0, context.first.traceIdHigh());
   EXPECT_TRUE(context.first.sampled());
-  EXPECT_FALSE(extractor.extractSampled({Tracing::Reason::Sampling, true}));
+  EXPECT_FALSE(extractor.extractSampled().value());
 }
 
 TEST(ZipkinSpanContextExtractorTest, ParentDebug) {
@@ -164,7 +164,7 @@ TEST(ZipkinSpanContextExtractorTest, ParentDebug) {
   EXPECT_EQ(1, context.first.traceId());
   EXPECT_EQ(0, context.first.traceIdHigh());
   EXPECT_TRUE(context.first.sampled());
-  EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
+  EXPECT_TRUE(extractor.extractSampled().value());
 }
 
 TEST(ZipkinSpanContextExtractorTest, IdsWithDebug) {
@@ -178,7 +178,7 @@ TEST(ZipkinSpanContextExtractorTest, IdsWithDebug) {
   EXPECT_EQ(1, context.first.traceId());
   EXPECT_EQ(0, context.first.traceIdHigh());
   EXPECT_TRUE(context.first.sampled());
-  EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
+  EXPECT_TRUE(extractor.extractSampled().value());
 }
 
 TEST(ZipkinSpanContextExtractorTest, WithoutSampled) {
@@ -192,7 +192,7 @@ TEST(ZipkinSpanContextExtractorTest, WithoutSampled) {
   EXPECT_EQ(1, context.first.traceId());
   EXPECT_EQ(0, context.first.traceIdHigh());
   EXPECT_FALSE(context.first.sampled());
-  EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, true}));
+  EXPECT_FALSE(extractor.extractSampled().has_value());
 }
 
 TEST(ZipkinSpanContextExtractorTest, TooBig) {
@@ -202,7 +202,7 @@ TEST(ZipkinSpanContextExtractorTest, TooBig) {
     SpanContextExtractor extractor(request_headers);
     EXPECT_THROW_WITH_MESSAGE(extractor.extractSpanContext(true), ExtractorException,
                               "Invalid input: too long");
-    EXPECT_FALSE(extractor.extractSampled({Tracing::Reason::Sampling, false}));
+    EXPECT_FALSE(extractor.extractSampled().has_value());
   }
 
   {
@@ -310,7 +310,7 @@ TEST(ZipkinSpanContextExtractorTest, InvalidInput) {
   {
     Tracing::TestTraceContextImpl request_headers{{"b3", "-"}};
     SpanContextExtractor extractor(request_headers);
-    EXPECT_TRUE(extractor.extractSampled({Tracing::Reason::Sampling, true}));
+    EXPECT_FALSE(extractor.extractSampled().has_value());
     EXPECT_THROW_WITH_MESSAGE(extractor.extractSpanContext(true), ExtractorException,
                               "Invalid input: invalid sampling flag -");
   }

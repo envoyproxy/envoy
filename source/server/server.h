@@ -72,6 +72,7 @@ struct ServerCompilationSettingsStats {
 #define ALL_SERVER_STATS(COUNTER, GAUGE, HISTOGRAM)                                                \
   COUNTER(debug_assertion_failures)                                                                \
   COUNTER(envoy_bug_failures)                                                                      \
+  COUNTER(envoy_notifications)                                                                     \
   COUNTER(dynamic_unknown_fields)                                                                  \
   COUNTER(static_unknown_fields)                                                                   \
   COUNTER(wip_protos)                                                                              \
@@ -160,9 +161,10 @@ public:
 class RunHelper : Logger::Loggable<Logger::Id::main> {
 public:
   RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
-            Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
-            Init::Manager& init_manager, OverloadManager& overload_manager,
-            OverloadManager& null_overload_manager, std::function<void()> workers_start_cb);
+            Config::XdsManager& xds_manager, Upstream::ClusterManager& cm,
+            AccessLog::AccessLogManager& access_log_manager, Init::Manager& init_manager,
+            OverloadManager& overload_manager, OverloadManager& null_overload_manager,
+            std::function<void()> workers_start_cb);
 
 private:
   Init::WatcherImpl init_watcher_;
@@ -392,6 +394,7 @@ private:
       server_compilation_settings_stats_;
   Assert::ActionRegistrationPtr assert_action_registration_;
   Assert::ActionRegistrationPtr envoy_bug_action_registration_;
+  Assert::ActionRegistrationPtr envoy_notification_registration_;
   ThreadLocal::Instance& thread_local_;
   Random::RandomGeneratorPtr random_generator_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
