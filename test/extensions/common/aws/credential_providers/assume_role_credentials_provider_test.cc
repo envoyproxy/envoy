@@ -632,7 +632,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, Coverage) {
 TEST_F(AssumeRoleCredentialsProviderTest, WithSessionDuration) {
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
 
-  // Custom matcher for request with session duration parameter
+  // Custom matcher for request with session duration parameter.
   Http::TestRequestHeaderMapImpl headers_with_duration{
       {":path", "/?Version=2011-06-15&Action=AssumeRole&RoleArn=aws:iam::123456789012:role/"
                 "arn&RoleSessionName=role-session-name&DurationSeconds=3600"},
@@ -648,7 +648,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, WithSessionDuration) {
        "SignedHeaders=accept;host;x-amz-content-sha256;x-amz-date;x-amz-security-token, "
        "Signature=88533b93b82077848fa88b5d1fe69540a0916960fdd48a1df66b764dc73a6d9a"}};
 
-  // Use a custom expectation for this test to verify the DurationSeconds parameter
+  // Use a custom expectation for this test to verify the DurationSeconds parameter.
   EXPECT_CALL(*raw_metadata_fetcher_, fetch(messageMatches(headers_with_duration), _, _))
       .WillRepeatedly(Invoke(
           [](Http::RequestMessage&, Tracing::Span&, MetadataFetcher::MetadataReceiver& receiver) {
@@ -886,7 +886,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, CredentialsPendingReturn) {
 TEST_F(AssumeRoleCredentialsProviderTest, WithExternalId) {
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
 
-  // Custom matcher for request with external ID parameter
+  // Custom matcher for request with external ID parameter.
   Http::TestRequestHeaderMapImpl headers_with_external_id{
       {":path", "/?Version=2011-06-15&Action=AssumeRole&RoleArn=aws:iam::123456789012:role/"
                 "arn&RoleSessionName=role-session-name&ExternalId=test-external-id"},
@@ -920,7 +920,7 @@ TEST_F(AssumeRoleCredentialsProviderTest, WithExternalId) {
 )EOF"));
           }));
 
-  // Setup provider with external ID
+  // Setup provider with external ID.
   ON_CALL(context_, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
   envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider cred_provider = {};
   cred_provider.set_role_arn("aws:iam::123456789012:role/arn");

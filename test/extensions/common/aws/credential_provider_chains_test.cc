@@ -432,7 +432,7 @@ TEST_F(CustomCredentialsProviderChainTest, AssumeRoleWithoutSessionName) {
   credential_provider_config.set_custom_credential_provider_chain(true);
   credential_provider_config.mutable_assume_role_credential_provider()->set_role_arn(
       "test-role-arn");
-  // Intentionally not setting role_session_name to test auto-generation
+  // Intentionally not setting role_session_name to test auto-generation.
 
   std::string role_session_name;
   time_system_.setSystemTime(std::chrono::milliseconds(1234567890));
@@ -449,7 +449,7 @@ TEST_F(CustomCredentialsProviderChainTest, AssumeRoleWithoutSessionName) {
   CommonCredentialsProviderChain chain(context_, "us-east-1", credential_provider_config,
                                        factories_);
 
-  // Verify that a session name was auto-generated based on the timestamp
+  // Verify that a session name was auto-generated based on the timestamp.
   EXPECT_FALSE(role_session_name.empty());
   EXPECT_EQ(role_session_name, "1234567890000000");
 }
