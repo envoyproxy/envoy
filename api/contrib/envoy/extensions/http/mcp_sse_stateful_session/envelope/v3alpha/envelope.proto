@@ -61,12 +61,10 @@ message EnvelopeSessionState {
   // - LFLF (two LFs)
   // https://html.spec.whatwg.org/multipage/server-sent-events.html#parsing-an-event-stream
   // Customized patterns can be added to match the chunk end pattern.
-  repeated string chunk_end_patterns = 2 [
-    (validate.rules).repeated = {
-      min_items: 1,
-      items: { string: { min_len: 1 } }
-    }
-  ];
+  repeated string chunk_end_patterns = 2 [(validate.rules).repeated = {
+    min_items: 1,
+    items: { string: { min_len: 1 } }
+  }];
 
   // The maximum size of the pending chunk.
   // If the pending chunk size is greater than this value, this filter will be disabled.

@@ -119,9 +119,8 @@ Envoy::Http::FilterDataStatus EnvelopeSessionStateFactory::SessionStateImpl::onU
 EnvelopeSessionStateFactory::EnvelopeSessionStateFactory(const EnvelopeSessionStateProto& config)
     : param_name_(config.param_name()),
       chunk_end_patterns_(config.chunk_end_patterns().begin(), config.chunk_end_patterns().end()),
-      max_pending_chunk_size_(config.max_pending_chunk_size() > 0
-                                  ? config.max_pending_chunk_size()
-                                  : 4096) {
+      max_pending_chunk_size_(config.max_pending_chunk_size() > 0 ? config.max_pending_chunk_size()
+                                                                  : 4096) {
   ENVOY_LOG(debug, "max_pending_chunk_size: {}", max_pending_chunk_size_);
 }
 
