@@ -46,8 +46,7 @@ public:
    * Sets the trace context option for header injection behavior.
    * @param trace_context_option The trace context option from ZipkinConfig.
    */
-  void setTraceContextOption(
-      envoy::config::trace::v3::ZipkinConfig::TraceContextOption trace_context_option) {
+  void setTraceContextOption(TraceContextOption trace_context_option) {
     trace_context_option_ = trace_context_option;
   }
 
@@ -55,7 +54,7 @@ public:
    * Gets the current trace context option.
    * @return The current trace context option.
    */
-  envoy::config::trace::v3::ZipkinConfig::TraceContextOption traceContextOption() const override {
+  TraceContextOption traceContextOption() const override {
     return trace_context_option_;
   }
 
@@ -82,8 +81,7 @@ private:
   const bool shared_span_context_;
   TimeSource& time_source_;
   const bool split_spans_for_request_{};
-  envoy::config::trace::v3::ZipkinConfig::TraceContextOption trace_context_option_{
-      envoy::config::trace::v3::ZipkinConfig::USE_B3};
+  TraceContextOption trace_context_option_{envoy::config::trace::v3::ZipkinConfig::USE_B3};
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;

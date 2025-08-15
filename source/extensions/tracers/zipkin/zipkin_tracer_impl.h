@@ -68,10 +68,9 @@ public:
   Runtime::Loader& runtime() { return runtime_; }
   ZipkinTracerStats& tracerStats() { return tracer_stats_; }
   bool w3cFallbackEnabled() const {
-    return trace_context_option_ ==
-           envoy::config::trace::v3::ZipkinConfig::USE_B3_WITH_W3C_PROPAGATION;
+    return trace_context_option_ == envoy::config::trace::v3::ZipkinConfig::USE_B3_WITH_W3C_PROPAGATION;
   }
-  envoy::config::trace::v3::ZipkinConfig::TraceContextOption traceContextOption() const {
+  TraceContextOption traceContextOption() const {
     return trace_context_option_;
   }
 
@@ -94,7 +93,7 @@ private:
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
   TimeSource& time_source_;
-  envoy::config::trace::v3::ZipkinConfig::TraceContextOption trace_context_option_;
+  TraceContextOption trace_context_option_;
 };
 
 /**

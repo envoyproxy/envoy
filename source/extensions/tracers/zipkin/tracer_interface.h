@@ -15,6 +15,8 @@ namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
 
+using TraceContextOption = envoy::config::trace::v3::ZipkinConfig::TraceContextOption;
+
 class Span;
 using SpanPtr = std::unique_ptr<Span>;
 
@@ -75,8 +77,7 @@ public:
    * Gets the current trace context option for header injection behavior.
    * @return The current trace context option.
    */
-  virtual envoy::config::trace::v3::ZipkinConfig::TraceContextOption
-  traceContextOption() const PURE;
+  virtual TraceContextOption traceContextOption() const PURE;
 };
 
 /**

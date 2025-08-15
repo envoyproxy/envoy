@@ -1,5 +1,7 @@
 #include "source/extensions/tracers/zipkin/span_context_extractor.h"
 
+#include <charconv>
+
 #include "source/common/common/assert.h"
 #include "source/common/common/utility.h"
 #include "source/extensions/tracers/zipkin/span_context.h"
@@ -11,6 +13,7 @@ namespace Tracers {
 namespace Zipkin {
 namespace {
 constexpr int FormatMaxLength = 32 + 1 + 16 + 3 + 16; // traceid128-spanid-1-parentid
+
 bool validSamplingFlags(char c) {
   if (c == '1' || c == '0' || c == 'd') {
     return true;
@@ -24,6 +27,14 @@ absl::optional<bool> getSamplingFlags(char c) {
   } else {
     return absl::nullopt;
   }
+}
+
+// Helper function to parse hex string_view to uint64_t using std::from_chars
+bool parseHexStringView(absl::string_view hex_str, uint64_t& result) {
+  const char* begin = hex_str.data();
+  const char* end = begin + hex_str.size();
+  auto [ptr, ec] = std::from_chars(begin, end, result, 16);
+  return ec == std::errc{} && ptr == end;
 }
 
 } // namespace
@@ -261,31 +272,31 @@ SpanContextExtractor::extractSpanContextFromB3SingleFormat(bool is_sampled) {
 std::pair<SpanContext, bool> SpanContextExtractor::convertW3CToZipkin(
     const Extensions::Tracers::OpenTelemetry::SpanContext& w3c_context, bool fallback_sampled) {
   // Convert W3C 128-bit trace ID (32 hex chars) to Zipkin format.
-  const std::string& trace_id_str = w3c_context.traceId();
+  const absl::string_view trace_id_str = w3c_context.traceId();
 
   if (trace_id_str.length() != 32) {
     throw ExtractorException(fmt::format("Invalid W3C trace ID length: {}", trace_id_str.length()));
   }
 
   // Split 128-bit trace ID into high and low 64-bit parts for Zipkin.
-  const std::string trace_id_high_str = trace_id_str.substr(0, 16);
-  const std::string trace_id_low_str = trace_id_str.substr(16, 16);
+  const absl::string_view trace_id_high_str = absl::string_view(trace_id_str).substr(0, 16);
+  const absl::string_view trace_id_low_str = absl::string_view(trace_id_str).substr(16, 16);
 
   uint64_t trace_id_high(0);
   uint64_t trace_id(0);
-  if (!StringUtil::atoull(trace_id_high_str.c_str(), trace_id_high, 16) ||
-      !StringUtil::atoull(trace_id_low_str.c_str(), trace_id, 16)) {
+  if (!parseHexStringView(trace_id_high_str, trace_id_high) ||
+      !parseHexStringView(trace_id_low_str, trace_id)) {
     throw ExtractorException(fmt::format("Invalid W3C trace ID: {}", trace_id_str));
   }
 
   // Convert W3C span ID (16 hex chars) to Zipkin span ID.
-  const std::string& span_id_str = w3c_context.spanId();
+  const absl::string_view span_id_str = w3c_context.spanId();
   if (span_id_str.length() != 16) {
     throw ExtractorException(fmt::format("Invalid W3C span ID length: {}", span_id_str.length()));
   }
 
   uint64_t span_id(0);
-  if (!StringUtil::atoull(span_id_str.c_str(), span_id, 16)) {
+  if (!parseHexStringView(span_id_str, span_id)) {
     throw ExtractorException(fmt::format("Invalid W3C span ID: {}", span_id_str));
   }
 

@@ -256,10 +256,11 @@ TEST_F(ZipkinDriverTest, TraceContextOptionConfiguration) {
   }
 }
 
-TEST_F(ZipkinDriverTest, DualHeaderInjection) {
+
+TEST_F(ZipkinDriverTest, DualHeaderExtractionAndInjection) {
   cm_.initializeClusters({"fake_cluster"}, {});
 
-  // Test dual header injection when USE_B3_WITH_W3C_PROPAGATION is enabled
+  // Test complete dual header cycle: extract from B3 headers, then inject both B3 and W3C headers
   const std::string yaml_string = R"EOF(
   collector_cluster: fake_cluster
   collector_endpoint: /api/v2/spans
@@ -271,32 +272,70 @@ TEST_F(ZipkinDriverTest, DualHeaderInjection) {
 
   setup(zipkin_config, true);
 
-  // Create a span and test W3C header injection
-  Tracing::TestTraceContextImpl trace_context{{}};
+  // Step 1: Simulate incoming request with B3 headers (extraction phase)
+  Tracing::TestTraceContextImpl incoming_trace_context{
+      {"x-b3-traceid", "463ac35c9f6413ad48485a3953bb6124"},
+      {"x-b3-spanid", "a2fb4a1d1a96d312"},
+      {"x-b3-sampled", "1"}};
 
-  Tracing::SpanPtr span = driver_->startSpan(config_, trace_context, stream_info_, "ingress",
-                                             {Tracing::Reason::Sampling, true});
+  // Create a span from the incoming B3 headers
+  Tracing::SpanPtr span = driver_->startSpan(config_, incoming_trace_context, stream_info_,
+                                             "test_operation", {Tracing::Reason::Sampling, true});
 
-  // Inject context into headers (simulating upstream request)
+  // Step 2: Inject context for outgoing request (injection phase)
+  Tracing::TestTraceContextImpl outgoing_trace_context{{}};
   Tracing::UpstreamContext upstream_context;
-  span->injectContext(trace_context, upstream_context);
+  span->injectContext(outgoing_trace_context, upstream_context);
 
-  // Verify W3C traceparent header is set
-  auto traceparent = trace_context.get("traceparent");
+  // Step 3: Verify both B3 and W3C headers are injected
+  
+  // Verify B3 headers are injected
+  auto b3_traceid = outgoing_trace_context.get("x-b3-traceid");
+  auto b3_spanid = outgoing_trace_context.get("x-b3-spanid");
+  auto b3_sampled = outgoing_trace_context.get("x-b3-sampled");
+  
+  EXPECT_TRUE(b3_traceid.has_value());
+  EXPECT_TRUE(b3_spanid.has_value());
+  EXPECT_TRUE(b3_sampled.has_value());
+  
+  // Verify the trace ID is preserved from extraction
+  EXPECT_EQ(b3_traceid.value(), "463ac35c9f6413ad48485a3953bb6124");
+  EXPECT_EQ(b3_sampled.value(), "1");
+  
+  // Verify W3C traceparent header is also injected
+  auto traceparent = outgoing_trace_context.get("traceparent");
   EXPECT_TRUE(traceparent.has_value());
   EXPECT_FALSE(traceparent.value().empty());
-
-  // Verify traceparent format: 00-{32 hex trace-id}-{16 hex span-id}-{2 hex flags}
+  
+  // Verify traceparent format and contains the same trace ID
   const std::string traceparent_value = std::string(traceparent.value());
   EXPECT_EQ(traceparent_value.length(), 55);        // 2+1+32+1+16+1+2
   EXPECT_EQ(traceparent_value.substr(0, 3), "00-"); // version
+  EXPECT_EQ(traceparent_value.substr(3, 32), "463ac35c9f6413ad48485a3953bb6124"); // same trace ID
   EXPECT_EQ(traceparent_value[35], '-');            // separator after trace-id
   EXPECT_EQ(traceparent_value[52], '-');            // separator after span-id
-
-  // Verify B3 headers are ALSO set when dual propagation is enabled
-  EXPECT_TRUE(trace_context.get("x-b3-traceid").has_value());
-  EXPECT_TRUE(trace_context.get("x-b3-spanid").has_value());
-  EXPECT_TRUE(trace_context.get("x-b3-sampled").has_value());
+  EXPECT_EQ(traceparent_value.substr(53, 2), "01"); // sampled flag
+  
+  // Step 4: Test W3C extraction fallback when B3 headers are not present
+  Tracing::TestTraceContextImpl w3c_only_context{
+      {"traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"}};
+      
+  Tracing::SpanPtr w3c_span = driver_->startSpan(config_, w3c_only_context, stream_info_,
+                                                 "w3c_test_operation", {Tracing::Reason::Sampling, true});
+  
+  // Inject context for W3C extracted span
+  Tracing::TestTraceContextImpl w3c_outgoing_context{{}};
+  w3c_span->injectContext(w3c_outgoing_context, upstream_context);
+  
+  // Verify both B3 and W3C headers are injected even when extracted from W3C
+  EXPECT_TRUE(w3c_outgoing_context.get("x-b3-traceid").has_value());
+  EXPECT_TRUE(w3c_outgoing_context.get("x-b3-spanid").has_value());
+  EXPECT_TRUE(w3c_outgoing_context.get("x-b3-sampled").has_value());
+  EXPECT_TRUE(w3c_outgoing_context.get("traceparent").has_value());
+  
+  // Verify the trace ID is preserved from W3C extraction
+  auto w3c_b3_traceid = w3c_outgoing_context.get("x-b3-traceid");
+  EXPECT_EQ(w3c_b3_traceid.value(), "4bf92f3577b34da6a3ce929d0e0e4736");
 }
 
 TEST_F(ZipkinDriverTest, AllowCollectorClusterToBeAddedViaApi) {
