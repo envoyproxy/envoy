@@ -1211,5 +1211,43 @@ TEST_F(MultiConnectionBaseImplTest, SetSocketOptionFailedTest) {
   EXPECT_FALSE(impl_->setSocketOption(sockopt_name, sockopt_val));
 }
 
+TEST_F(MultiConnectionBaseImplTest, MoveSocket) {
+  setupMultiConnectionImpl(2);
+
+  EXPECT_EQ(impl_->moveSocket(), nullptr);
+}
+
+TEST_F(MultiConnectionBaseImplTest, SetSocketReused) {
+  setupMultiConnectionImpl(2);
+  impl_->setSocketReused(true);
+}
+
+TEST_F(MultiConnectionBaseImplTest, IsSocketReused) {
+  setupMultiConnectionImpl(2);
+  EXPECT_EQ(impl_->isSocketReused(), false);
+}
+
+TEST_F(MultiConnectionBaseImplTest, GetSocketPanics) {
+  setupMultiConnectionImpl(2);
+
+  // getSocket() should panic as it's not implemented for MultiConnectionBaseImpl.
+  EXPECT_DEATH(impl_->getSocket(), "not implemented");
+}
+
+TEST_F(MultiConnectionBaseImplTest, SocketReuseFlagToggle) {
+  setupMultiConnectionImpl(2);
+
+  // Test default state.
+  EXPECT_FALSE(impl_->isSocketReused());
+
+  // Test setting to true.
+  impl_->setSocketReused(true);
+  EXPECT_FALSE(impl_->isSocketReused()); // Should remain false for MultiConnectionBaseImpl.
+
+  // Test setting to false.
+  impl_->setSocketReused(false);
+  EXPECT_FALSE(impl_->isSocketReused());
+}
+
 } // namespace Network
 } // namespace Envoy
