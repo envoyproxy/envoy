@@ -27,92 +27,93 @@ Envoy::Http::FilterDataStatus EnvelopeSessionStateFactory::SessionStateImpl::onU
     return Envoy::Http::FilterDataStatus::Continue;
   }
 
-  // check the pending chunk size
+  // Check the pending chunk size to prevent memory issues
   // in case of wrong configuration on this filter
   if (pending_chunk_.length() + data.length() > factory_.max_pending_chunk_size_) {
     ENVOY_LOG(error, "Pending chunk size exceeds max pending chunk size: {}",
               pending_chunk_.length() + data.length());
-    pending_chunk_.add(data);
-    data.drain(data.length());
+    pending_chunk_.move(data);
     data.move(pending_chunk_);
-    session_id_found_ = true; // skip the rest of the data
+    session_id_found_ = true; // Skip the rest of the data
     return Envoy::Http::FilterDataStatus::Continue;
   }
 
   // Append new data to pending buffer
-  pending_chunk_.add(data);
-
-  data.drain(data.length());
+  pending_chunk_.move(data);
 
   while (pending_chunk_.length() > 0) {
-    // Get pending chunk as string
-    const std::string pending_chunk_str(
-        static_cast<const char*>(pending_chunk_.linearize(pending_chunk_.length())),
-        pending_chunk_.length());
+    // Find next complete chunk by searching for chunk end patterns
+    ssize_t chunk_end_pos = -1;
+    size_t chunk_end_pattern_length = 0;
+    const std::string* found_pattern = nullptr;
 
-    // Find next complete chunk
-    size_t chunk_end_pos;
-    size_t chunk_end_and_end_str;
-    std::string chunk_end_string;
-
+    // Search for the first occurrence of any chunk end pattern
     for (const auto& chunk_end_pattern : factory_.chunk_end_patterns_) {
-      if ((chunk_end_pos = pending_chunk_str.find(chunk_end_pattern)) != std::string::npos) {
-        chunk_end_string = chunk_end_pattern;
-        chunk_end_and_end_str = chunk_end_pos + chunk_end_pattern.length();
-        break;
+      ssize_t pos =
+          pending_chunk_.search(chunk_end_pattern.data(), chunk_end_pattern.length(), 0, 0);
+      if (pos >= 0 && (chunk_end_pos == -1 || pos < chunk_end_pos)) {
+        chunk_end_pos = pos;
+        chunk_end_pattern_length = chunk_end_pattern.length();
+        found_pattern = &chunk_end_pattern;
       }
     }
 
-    if (chunk_end_string.empty()) {
+    if (chunk_end_pos == -1) {
       ENVOY_LOG(trace, "No complete chunk found, waiting for more data");
       break;
     }
 
     // Process current complete chunk
     Buffer::OwnedImpl chunk_buffer;
-    chunk_buffer.add(pending_chunk_str.substr(0, chunk_end_pos));
-    pending_chunk_.drain(chunk_end_and_end_str);
+    // Move chunk content (excluding the end pattern) to avoid copying
+    chunk_buffer.move(pending_chunk_, chunk_end_pos);
+    pending_chunk_.drain(chunk_end_pattern_length);
 
-    const std::string chunk_buffer_str(
-        static_cast<const char*>(chunk_buffer.linearize(chunk_buffer.length())),
-        chunk_buffer.length());
+    // Search for the parameter name in the chunk
+    const std::string param_search = factory_.param_name_ + "=";
+    ssize_t param_pos = chunk_buffer.search(param_search.data(), param_search.length(), 0, 0);
 
-    // Search for the parameter name in the URL
-    const std::string param_name = factory_.param_name_;
-    size_t param_pos = chunk_buffer_str.find(param_name + "=");
-    if (param_pos != std::string::npos) {
-      size_t value_start = param_pos + param_name.length() + 1;
-      size_t value_end = chunk_buffer_str.find('&', value_start);
-      if (value_end == std::string::npos) {
-        value_end = chunk_buffer_str.length();
+    if (param_pos >= 0) {
+      // Found the parameter, extract its value
+      size_t value_start = param_pos + param_search.length();
+
+      // Search for the end of the parameter value (either '&' or end of string)
+      const char ampersand = '&';
+      ssize_t value_end = chunk_buffer.search(&ampersand, 1, value_start, 0);
+
+      if (value_end == -1) {
+        // No '&' found, parameter value extends to end of chunk
+        value_end = chunk_buffer.length();
       }
 
-      // Get original session ID
-      const std::string original_session_id =
-          chunk_buffer_str.substr(value_start, value_end - value_start);
+      // Encode host address using Base64Url
       const char* host_address_c = host_address.data();
       uint64_t host_address_length = static_cast<uint64_t>(host_address.size());
+      const std::string encoded_host =
+          Envoy::Base64Url::encode(host_address_c, host_address_length);
 
-      // Build new URL with encoded host address
-      const std::string modified_url = absl::StrCat(
-          chunk_buffer_str.substr(0, param_pos), param_name, "=", original_session_id,
-          std::string(1, SEPARATOR), Envoy::Base64Url::encode(host_address_c, host_address_length),
-          chunk_buffer_str.substr(value_end));
+      // Build modified URL by moving buffers and adding encoded host
+      data.move(chunk_buffer, value_end);
+      // Add separator and encoded host
+      data.add(std::string(1, SEPARATOR));
+      data.add(encoded_host);
+      // Move suffix (after parameter value)
+      data.move(chunk_buffer);
 
-      data.add(modified_url);
       session_id_found_ = true;
     } else {
-      // If parameter not found, keep chunk unchanged
-      data.add(chunk_buffer);
+      // Parameter not found, keep chunk unchanged
+      data.move(chunk_buffer);
     }
 
-    // Add chunk ending
-    data.add(chunk_end_string);
+    // Add chunk ending pattern
+    data.add(*found_pattern);
   }
+
   if (end_stream) {
-    data.add(pending_chunk_);
-    pending_chunk_.drain(pending_chunk_.length());
+    data.move(pending_chunk_);
   }
+
   return Envoy::Http::FilterDataStatus::Continue;
 }
 
@@ -159,9 +160,20 @@ EnvelopeSessionStateFactory::parseAddress(Envoy::Http::RequestHeaderMap& headers
 
   // Build new query
   std::string new_query;
+  // Estimate size to avoid multiple reallocations
+  size_t estimated_size = param_name_.length() + 1 + original_session_id.length();
+  for (const auto& param : params) {
+    if (param.first != param_name_) {
+      estimated_size += param.first.length() + 1; // "&" + param_name
+      for (const auto& value : param.second) {
+        estimated_size += value.length() + 1; // "=" + value
+      }
+    }
+  }
+  new_query.reserve(estimated_size);
 
   // First add the session ID parameter
-  new_query += absl::StrCat(param_name_, "=", original_session_id);
+  absl::StrAppend(&new_query, param_name_, "=", original_session_id);
 
   // Then append all other parameters
   for (const auto& param : params) {
@@ -169,13 +181,16 @@ EnvelopeSessionStateFactory::parseAddress(Envoy::Http::RequestHeaderMap& headers
       continue; // Skip the session ID as we already added it
     }
     for (const auto& value : param.second) {
-      new_query += "&" + absl::StrCat(param.first, "=", value);
+      absl::StrAppend(&new_query, "&", param.first, "=", value);
     }
   }
 
+  // Build final path
   const auto path_str = path->value().getStringView();
   auto query_start = path_str.find('?');
-  std::string new_path = absl::StrCat(path_str.substr(0, query_start + 1), new_query);
+  std::string new_path;
+  new_path.reserve(query_start + 1 + new_query.length());
+  absl::StrAppend(&new_path, path_str.substr(0, query_start + 1), new_query);
 
   headers.setPath(new_path);
   ENVOY_LOG(debug, "Restored session ID: {}, host: {}", original_session_id, host_address);
