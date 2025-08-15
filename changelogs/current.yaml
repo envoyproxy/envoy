@@ -13,7 +13,7 @@ behavior_changes:
     unmarked as traced after the tracing refresh.
 - area: ext_proc
   change: |
-    Reverted https://github.com/envoyproxy/envoy/pull/39740 to re-enable fail_open+FULL_DUPLEX_STREAMED configuraton combination.
+    Reverted https://github.com/envoyproxy/envoy/pull/39740 to re-enable fail_open+FULL_DUPLEX_STREAMED configuration combination.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -31,6 +31,10 @@ minor_behavior_changes:
     Generic proxy codec add the same buffer limit as connection buffer limit, if the buffer limit is
     exceeded, the connection is disconnected. This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.generic_proxy_codec_buffer_limit`` to ``false``.
+- area: http3
+  change: |
+    turn off HTTP/3 happy eyeball in upstream via runtime guard ``envoy.reloadable_features.http3_happy_eyeballs``.
+    It is found to favor TCP over QUIC when UDP does not work on v6 network but works on v4.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

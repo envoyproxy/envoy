@@ -49,7 +49,6 @@ RUNTIME_GUARD(envoy_reloadable_features_http1_balsa_disallow_lone_cr_in_chunk_ex
 RUNTIME_GUARD(envoy_reloadable_features_http2_discard_host_header);
 RUNTIME_GUARD(envoy_reloadable_features_http2_propagate_reset_events);
 RUNTIME_GUARD(envoy_reloadable_features_http2_use_oghttp2);
-RUNTIME_GUARD(envoy_reloadable_features_http3_happy_eyeballs);
 RUNTIME_GUARD(envoy_reloadable_features_http3_remove_empty_cookie);
 // Delay deprecation and decommission until UHV is enabled.
 RUNTIME_GUARD(envoy_reloadable_features_http_reject_path_with_fragment);
@@ -128,6 +127,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_drain_pools_on_network_change);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_no_tcp_delay);
 // Adding runtime flag to use balsa_parser for http_inspector.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http_inspector_use_balsa_parser);
+// TODO(danzh) re-enable it when the issue of preferring TCP over v6 rather than QUIC over v4 is
+// fixed.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_http3_happy_eyeballs);
 // TODO(renjietang): Evaluate and make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_use_canonical_suffix_for_quic_brokenness);
 // TODO(abeyad): Evaluate and make this a config knob or remove.
