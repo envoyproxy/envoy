@@ -82,31 +82,24 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
   // Phase 1: Create a canonical request
   const auto credential_scope = createCredentialScope(short_date, override_region);
 
-  auto query_params =
-      Envoy::Http::Utility::QueryParamsMulti::parseQueryString(headers.getPathValue());
+  // Replace '+' with '%2B' in query string - #40523
+  std::string path_with_query = std::string(headers.getPathValue());
+  size_t query_start = path_with_query.find('?');
+  if (query_start != std::string::npos) {
+    size_t fragment_start = path_with_query.find('#', query_start);
+    size_t query_end =
+        (fragment_start != std::string::npos) ? fragment_start : path_with_query.length();
 
-  // Replace '+' with '%2B' in query parameter keys and values - #40523
-  for (auto& param : query_params.data()) {
-    std::string key = param.first;
-    absl::StrReplaceAll({{std::make_pair("+", "%2B")}}, &key);
+    std::string query_part = path_with_query.substr(query_start + 1, query_end - query_start - 1);
+    absl::StrReplaceAll({{std::make_pair("+", "%2B")}}, &query_part);
 
-    std::vector<std::string> new_values;
-    for (const auto& value : param.second) {
-      std::string new_value = value;
-      absl::StrReplaceAll({{std::make_pair("+", "%2B")}}, &new_value);
-      new_values.push_back(new_value);
-    }
-
-    // Update the parameter if changed
-    if (key != param.first || new_values != param.second) {
-      query_params.remove(param.first);
-      for (const auto& value : new_values) {
-        query_params.add(key, value);
-      }
-    }
+    path_with_query =
+        path_with_query.substr(0, query_start + 1) + query_part + path_with_query.substr(query_end);
+    headers.setPath(path_with_query);
   }
 
-  headers.setPath(query_params.replaceQueryString(headers.Path()->value()));
+  auto query_params =
+      Envoy::Http::Utility::QueryParamsMulti::parseQueryString(headers.getPathValue());
 
   if (query_string_) {
     // Handle query string parameters by appending them all to the path. Case is important for these
