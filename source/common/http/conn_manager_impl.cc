@@ -682,7 +682,7 @@ bool ConnectionManagerImpl::isPrematureRstStream(const ActiveStream& stream) con
 // connection.
 void ConnectionManagerImpl::maybeDrainDueToPrematureResets() {
   // If the connection has been drained due to premature resets, do not check this again.
-  // If no this flag, then the recursion may happens in following stack:
+  // Without this flag, recursion may occur, as shown in the following stack trace:
   //
   //   maybeDrainDueToPrematureResets()
   //   doConnectionClose()
