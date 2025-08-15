@@ -12,7 +12,6 @@
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.pb.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
-#include "test/integration/utility.h"
 
 #include "gtest/gtest.h"
 
