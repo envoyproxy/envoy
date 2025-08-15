@@ -205,10 +205,10 @@ Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grp
   Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
       Envoy::Grpc::GrpcServiceConfigWithHashKey(grpc_service);
 
-  auto client_or_error = server_context_.clusterManager()
+  auto client_or_error = server_context_->clusterManager()
                              .grpcAsyncClientManager()
                              .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key,
-                                                                   server_context_.scope(), true);
+                                                                   server_context_->scope(), true);
   if (!client_or_error.ok()) {
     ENVOY_STREAM_LOG(warn,
                      "ext_authz filter: failed to create per-route gRPC client: {}. Falling back "
@@ -238,10 +238,10 @@ Filters::Common::ExtAuthz::ClientPtr Filter::createPerRouteHttpClient(
                    *decoder_callbacks_, http_service.server_uri().uri());
 
   const auto client_config = std::make_shared<Extensions::Filters::Common::ExtAuthz::ClientConfig>(
-      http_service, config_->headersAsBytes(), timeout_ms, server_context_);
+      http_service, config_->headersAsBytes(), timeout_ms, *server_context_);
 
   return std::make_unique<Extensions::Filters::Common::ExtAuthz::RawHttpClientImpl>(
-      server_context_.clusterManager(), client_config);
+      server_context_->clusterManager(), client_config);
 }
 
 void Filter::initiateCall(const Http::RequestHeaderMap& headers) {

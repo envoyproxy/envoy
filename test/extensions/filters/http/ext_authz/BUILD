@@ -99,6 +99,7 @@ envoy_proto_library(
     srcs = ["ext_authz_fuzz.proto"],
     deps = [
         "//test/fuzz:common_proto",
+        "@com_envoyproxy_protoc_gen_validate//validate:validate_proto",
         "@envoy_api//envoy/config/core/v3:pkg",
         "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg",
         "@envoy_api//envoy/service/auth/v3:pkg",

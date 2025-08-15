@@ -378,10 +378,13 @@ class Filter : public Logger::Loggable<Logger::Id::ext_authz>,
                public Http::StreamFilter,
                public Filters::Common::ExtAuthz::RequestCallbacks {
 public:
+  Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client)
+      : config_(config), client_(std::move(client)), stats_(config->stats()) {}
+
   // Constructor that includes server context for per-route service support.
   Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client,
          Server::Configuration::ServerFactoryContext& server_context)
-      : config_(config), client_(std::move(client)), server_context_(server_context),
+      : config_(config), client_(std::move(client)), server_context_(&server_context),
         stats_(config->stats()) {}
 
   // Http::StreamFilterBase
@@ -457,7 +460,7 @@ private:
   // Per-route gRPC client that overrides the default client when specified.
   Filters::Common::ExtAuthz::ClientPtr per_route_client_;
   // Server context for creating per-route clients.
-  Server::Configuration::ServerFactoryContext& server_context_;
+  Server::Configuration::ServerFactoryContext* server_context_{nullptr};
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Http::RequestHeaderMap* request_headers_;
