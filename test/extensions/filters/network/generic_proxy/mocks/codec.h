@@ -100,7 +100,7 @@ public:
               (const Protobuf::Message&, Server::Configuration::ServerFactoryContext&));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
   std::set<std::string> configTypes() override { return {"envoy.generic_proxy.codecs.mock.type"}; }
   std::string name() const override { return "envoy.generic_proxy.codecs.mock"; }

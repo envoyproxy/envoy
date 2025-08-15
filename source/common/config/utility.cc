@@ -273,10 +273,10 @@ absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSour
   return async_client_manager.factoryForGrpcService(grpc_service, scope, skip_cluster_check);
 }
 
-absl::Status Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
+absl::Status Utility::translateOpaqueConfig(const Protobuf::Any& typed_config,
                                             ProtobufMessage::ValidationVisitor& validation_visitor,
                                             Protobuf::Message& out_proto) {
-  static const std::string struct_type(ProtobufWkt::Struct::default_instance().GetTypeName());
+  static const std::string struct_type(Protobuf::Struct::default_instance().GetTypeName());
   static const std::string typed_struct_type(
       xds::type::v3::TypedStruct::default_instance().GetTypeName());
   static const std::string legacy_typed_struct_type(
@@ -322,7 +322,7 @@ absl::Status Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config
       RETURN_IF_NOT_OK(MessageUtil::unpackTo(typed_config, out_proto));
     } else {
 #ifdef ENVOY_ENABLE_YAML
-      ProtobufWkt::Struct struct_config;
+      Protobuf::Struct struct_config;
       RETURN_IF_NOT_OK(MessageUtil::unpackTo(typed_config, struct_config));
       MessageUtil::jsonConvert(struct_config, validation_visitor, out_proto);
 #else

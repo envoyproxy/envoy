@@ -89,8 +89,7 @@ protected:
 
   // The delta style API helper.
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>
-  anyToResource(Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                const std::string& version) {
+  anyToResource(Protobuf::RepeatedPtrField<Protobuf::Any>& resources, const std::string& version) {
     Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
     for (const auto& resource_any : resources) {
       auto config =

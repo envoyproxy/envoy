@@ -44,20 +44,20 @@ ValueMatcher::create(const envoy::type::matcher::v3::ValueMatcher& v,
   PANIC("unexpected");
 }
 
-bool NullMatcher::match(const ProtobufWkt::Value& value) const {
-  return value.kind_case() == ProtobufWkt::Value::kNullValue;
+bool NullMatcher::match(const Protobuf::Value& value) const {
+  return value.kind_case() == Protobuf::Value::kNullValue;
 }
 
-bool BoolMatcher::match(const ProtobufWkt::Value& value) const {
-  return value.kind_case() == ProtobufWkt::Value::kBoolValue && matcher_ == value.bool_value();
+bool BoolMatcher::match(const Protobuf::Value& value) const {
+  return value.kind_case() == Protobuf::Value::kBoolValue && matcher_ == value.bool_value();
 }
 
-bool PresentMatcher::match(const ProtobufWkt::Value& value) const {
-  return matcher_ && value.kind_case() != ProtobufWkt::Value::KIND_NOT_SET;
+bool PresentMatcher::match(const Protobuf::Value& value) const {
+  return matcher_ && value.kind_case() != Protobuf::Value::KIND_NOT_SET;
 }
 
-bool DoubleMatcher::match(const ProtobufWkt::Value& value) const {
-  if (value.kind_case() != ProtobufWkt::Value::kNumberValue) {
+bool DoubleMatcher::match(const Protobuf::Value& value) const {
+  if (value.kind_case() != Protobuf::Value::kNumberValue) {
     return false;
   }
 
@@ -81,8 +81,8 @@ ListMatcher::ListMatcher(const envoy::type::matcher::v3::ListMatcher& matcher,
   oneof_value_matcher_ = ValueMatcher::create(matcher.one_of(), context);
 }
 
-bool ListMatcher::match(const ProtobufWkt::Value& value) const {
-  if (value.kind_case() != ProtobufWkt::Value::kListValue) {
+bool ListMatcher::match(const Protobuf::Value& value) const {
+  if (value.kind_case() != Protobuf::Value::kListValue) {
     return false;
   }
 
@@ -104,7 +104,7 @@ OrMatcher::OrMatcher(const envoy::type::matcher::v3::OrMatcher& matcher,
   }
 }
 
-bool OrMatcher::match(const ProtobufWkt::Value& value) const {
+bool OrMatcher::match(const Protobuf::Value& value) const {
   for (const auto& or_matcher : or_matchers_) {
     if (or_matcher->match(value)) {
       return true;

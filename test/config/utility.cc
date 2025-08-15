@@ -773,7 +773,7 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version,
   }
 }
 
-void ConfigHelper::addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value) {
+void ConfigHelper::addListenerTypedMetadata(absl::string_view key, Protobuf::Any& packed_value) {
   RELEASE_ASSERT(!finalized_, "");
   auto* static_resources = bootstrap_.mutable_static_resources();
   ASSERT_TRUE(static_resources->listeners_size() > 0);
@@ -786,7 +786,7 @@ void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
                                             absl::string_view cluster_name) {
 #ifdef ENVOY_ENABLE_YAML
   RELEASE_ASSERT(!finalized_, "");
-  ProtobufWkt::Struct cluster_metadata;
+  Protobuf::Struct cluster_metadata;
   TestUtility::loadFromYaml(std::string(metadata_yaml), cluster_metadata);
 
   auto* static_resources = bootstrap_.mutable_static_resources();
@@ -796,7 +796,7 @@ void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
       continue;
     }
     for (const auto& kvp : cluster_metadata.fields()) {
-      ASSERT_TRUE(kvp.second.kind_case() == ProtobufWkt::Value::KindCase::kStructValue);
+      ASSERT_TRUE(kvp.second.kind_case() == Protobuf::Value::KindCase::kStructValue);
       cluster->mutable_metadata()->mutable_filter_metadata()->insert(
           {kvp.first, kvp.second.struct_value()});
     }
@@ -1728,7 +1728,7 @@ void ConfigHelper::setLds(absl::string_view version_info) {
   envoy::service::discovery::v3::DiscoveryResponse lds;
   lds.set_version_info(std::string(version_info));
   for (auto& listener : bootstrap_.static_resources().listeners()) {
-    ProtobufWkt::Any* resource = lds.add_resources();
+    Protobuf::Any* resource = lds.add_resources();
     resource->PackFrom(listener);
   }
 

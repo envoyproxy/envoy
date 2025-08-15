@@ -308,7 +308,7 @@ EngineBuilder& EngineBuilder::addNativeFilter(std::string name, std::string type
 }
 
 EngineBuilder& EngineBuilder::addNativeFilter(const std::string& name,
-                                              const ProtobufWkt::Any& typed_config) {
+                                              const Protobuf::Any& typed_config) {
   native_filter_chain_.push_back(NativeFilterConfig(name, typed_config));
   return *this;
 }
@@ -324,7 +324,7 @@ std::string EngineBuilder::nativeNameToConfig(absl::string_view name) {
   proto_config.set_platform_filter_name(name);
   std::string ret;
   proto_config.SerializeToString(&ret);
-  ProtobufWkt::Any any_config;
+  Protobuf::Any any_config;
   any_config.set_type_url(
       "type.googleapis.com/envoymobile.extensions.filters.http.platform_bridge.PlatformBridge");
   any_config.set_value(ret);
@@ -833,7 +833,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   auto* node = bootstrap->mutable_node();
   node->set_id("envoy-mobile");
   node->set_cluster("envoy-mobile");
-  ProtobufWkt::Struct& metadata = *node->mutable_metadata();
+  Protobuf::Struct& metadata = *node->mutable_metadata();
   (*metadata.mutable_fields())["app_id"].set_string_value(app_id_);
   (*metadata.mutable_fields())["app_version"].set_string_value(app_version_);
   (*metadata.mutable_fields())["device_os"].set_string_value(device_os_);
@@ -841,16 +841,16 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
   // Set up runtime.
   auto* runtime = bootstrap->mutable_layered_runtime()->add_layers();
   runtime->set_name("static_layer_0");
-  ProtobufWkt::Struct envoy_layer;
-  ProtobufWkt::Struct& runtime_values =
+  Protobuf::Struct envoy_layer;
+  Protobuf::Struct& runtime_values =
       *(*envoy_layer.mutable_fields())["envoy"].mutable_struct_value();
-  ProtobufWkt::Struct& reloadable_features =
+  Protobuf::Struct& reloadable_features =
       *(*runtime_values.mutable_fields())["reloadable_features"].mutable_struct_value();
   for (auto& guard_and_value : runtime_guards_) {
     (*reloadable_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);
   }
-  ProtobufWkt::Struct& restart_features =
+  Protobuf::Struct& restart_features =
       *(*runtime_values.mutable_fields())["restart_features"].mutable_struct_value();
   (*runtime_values.mutable_fields())["disallow_global_stats"].set_bool_value(true);
   (*runtime_values.mutable_fields())["enable_dfp_dns_trace"].set_bool_value(true);
@@ -858,7 +858,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
     (*restart_features.mutable_fields())[guard_and_value.first].set_bool_value(
         guard_and_value.second);
   }
-  ProtobufWkt::Struct& overload_values =
+  Protobuf::Struct& overload_values =
       *(*envoy_layer.mutable_fields())["overload"].mutable_struct_value();
   (*overload_values.mutable_fields())["global_downstream_max_connections"].set_string_value(
       "4294967295");

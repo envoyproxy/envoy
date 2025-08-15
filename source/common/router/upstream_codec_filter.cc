@@ -165,8 +165,15 @@ void UpstreamCodecFilter::CodecBridge::decodeHeaders(Http::ResponseHeaderMapPtr&
       // handshake is finished and continue the data processing.
       filter_.callbacks_->upstreamCallbacks()->setPausedForWebsocketUpgrade(false);
       filter_.callbacks_->continueDecoding();
+    } else if (Runtime::runtimeFeatureEnabled(
+                   "envoy.reloadable_features.websocket_allow_4xx_5xx_through_filter_chain") &&
+               status >= 400) {
+      maybeEndDecode(end_stream);
+      filter_.callbacks_->encodeHeaders(std::move(headers), end_stream,
+                                        StreamInfo::ResponseCodeDetails::get().ViaUpstream);
+      return;
     } else {
-      // Other status, e.g., 426 or 200, indicate a failed handshake, Envoy as a proxy will proxy
+      // Other status, e.g., 200, indicate a failed handshake, Envoy as a proxy will proxy
       // back the response header to downstream and then close the request, since WebSocket
       // just needs headers for handshake per RFC-6455. Note: HTTP/2 200 will be normalized to
       // 101 before this point in codec and this patch will skip this scenario from the above

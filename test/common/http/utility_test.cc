@@ -709,7 +709,7 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
                   .value());
 
   // If the HCM value is present it will take precedence over the old value.
-  ProtobufWkt::BoolValue hcm_value;
+  Protobuf::BoolValue hcm_value;
   hcm_value.set_value(false);
   EXPECT_FALSE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, true, hcm_value)
                    .value()
@@ -732,7 +732,7 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
 
 TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
   envoy::config::core::v3::Http1ProtocolOptions http1_options;
-  ProtobufWkt::BoolValue hcm_value;
+  Protobuf::BoolValue hcm_value;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
 
@@ -772,7 +772,7 @@ TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
 
 TEST(HttpUtility, AllowCustomMethods) {
   envoy::config::core::v3::Http1ProtocolOptions http1_options;
-  ProtobufWkt::BoolValue hcm_value;
+  Protobuf::BoolValue hcm_value;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
 

@@ -139,7 +139,7 @@ TEST_F(GrpcAccessLoggerImplTest, Log) {
                 .value(),
             1);
   // TCP logging shouldn't do anything.
-  logger_->log(ProtobufWkt::Empty());
+  logger_->log(Protobuf::Empty());
   EXPECT_EQ(stats_store_.findCounterByString("access_logs.open_telemetry_access_log.logs_written")
                 .value()
                 .get()

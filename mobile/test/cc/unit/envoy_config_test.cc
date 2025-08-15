@@ -461,7 +461,7 @@ TEST(TestConfig, AddNativeFilters) {
 
   envoy::extensions::filters::http::buffer::v3::Buffer buffer;
   buffer.mutable_max_request_bytes()->set_value(5242880);
-  ProtobufWkt::Any typed_config;
+  Protobuf::Any typed_config;
   typed_config.set_type_url("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer");
   std::string serialized_buffer;
   buffer.SerializeToString(&serialized_buffer);
