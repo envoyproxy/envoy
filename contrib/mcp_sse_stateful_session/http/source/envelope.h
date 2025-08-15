@@ -12,8 +12,6 @@
 
 #include "contrib/envoy/extensions/http/mcp_sse_stateful_session/envelope/v3alpha/envelope.pb.h"
 
-#include "absl/strings/match.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Http {
