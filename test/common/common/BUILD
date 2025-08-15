@@ -448,7 +448,6 @@ envoy_benchmark_test(
     benchmark_binary = "utility_speed_test",
 )
 
-## Removed: trie_lookup_table_speed_test and its benchmark harness.
 
 envoy_cc_benchmark_binary(
     name = "radix_tree_speed_test",
