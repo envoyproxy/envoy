@@ -64,6 +64,7 @@ security_postures:
 categories:
 - envoy.access_loggers
 - envoy.bootstrap
+- envoy.built_in_formatters
 - envoy.clusters
 - envoy.compression.compressor
 - envoy.compression.decompressor
