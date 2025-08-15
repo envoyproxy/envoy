@@ -14,6 +14,10 @@ behavior_changes:
 - area: ext_proc
   change: |
     Reverted https://github.com/envoyproxy/envoy/pull/39740 to re-enable fail_open+FULL_DUPLEX_STREAMED configuraton combination.
+- area: http
+  change: |
+    Changing the default reset code from NO_ERROR to INTERNAL_ERROR. This behavioral change can be reverted by setting runtime
+    guard ``envoy.reloadable_features.reset_with_error`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
