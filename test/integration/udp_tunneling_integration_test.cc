@@ -540,14 +540,11 @@ typed_config:
   }
 
   void drainListeners() {
-    Network::Address::InstanceConstSharedPtr admin = test_server_->adminAddress();
-    if (admin != nullptr) {
-      BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
-          admin, "POST", "/drain_listeners", "", Http::CodecType::HTTP1);
-      ASSERT_TRUE(response->complete());
-      EXPECT_EQ("200", response->headers().getStatusValue());
-      test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
-    }
+    BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
+        lookupPort("admin"), "POST", "/drain_listeners", "", downstreamProtocol(), version_);
+    ASSERT_TRUE(admin_response->complete());
+    EXPECT_EQ("200", admin_response->headers().getStatusValue());
+    test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
   }
 
   TestConfig config_;
