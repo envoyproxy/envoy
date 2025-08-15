@@ -540,10 +540,7 @@ typed_config:
   }
 
   void drainListeners() {
-    BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
-        lookupPort("admin"), "POST", "/drain_listeners", "", downstreamProtocol(), version_);
-    ASSERT_TRUE(admin_response->complete());
-    EXPECT_EQ("200", admin_response->headers().getStatusValue());
+    test_server_->server().dispatcher().post([this]() { test_server_->server().drainListeners(); });
     test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
   }
 
