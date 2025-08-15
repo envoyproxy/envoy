@@ -126,7 +126,7 @@ struct ConnectionManagerTracingStats {
   CONN_MAN_TRACING_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-using TracingConnectionManagerConfig = Tracing::ConnectionManagerTracingConfigImpl;
+using TracingConnectionManagerConfig = Tracing::ConnectionManagerTracingConfig;
 using TracingConnectionManagerConfigPtr = std::unique_ptr<TracingConnectionManagerConfig>;
 
 /**

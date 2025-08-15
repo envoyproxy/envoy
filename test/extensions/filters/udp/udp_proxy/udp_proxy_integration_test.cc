@@ -338,30 +338,6 @@ TEST_P(UdpProxyIntegrationTest, DownstreamDrop) {
   }
 }
 
-// Verify upstream drops are handled correctly with stats.
-TEST_P(UdpProxyIntegrationTest, UpstreamDrop) {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.udp_socket_apply_aggregated_read_limit")) {
-    return;
-  }
-  setup(1);
-  const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = *Network::Utility::resolveUrl(
-      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
-  Network::Test::UdpSyncPeer client(version_);
-
-  client.write("hello", *listener_address);
-  Network::UdpRecvData request_datagram;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
-  EXPECT_EQ("hello", request_datagram.buffer_->toString());
-
-  const uint64_t large_datagram_size =
-      (Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE * Network::NUM_DATAGRAMS_PER_RECEIVE) + 1024;
-  fake_upstreams_[0]->sendUdpDatagram(std::string(large_datagram_size, 'a'),
-                                      request_datagram.addresses_.peer_);
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams_dropped", 1);
-}
-
 // Test with large packet sizes.
 TEST_P(UdpProxyIntegrationTest, LargePacketSizesOnLoopback) {
   // The following tests large packets end to end. We use a size larger than

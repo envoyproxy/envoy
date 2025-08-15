@@ -146,7 +146,7 @@ checks:
     name: >-
       Envoy/Publish and verify
     on-run:
-    - publish
+    - release
     - verify
     required: true
 
@@ -336,7 +336,7 @@ run:
   precheck-publish:
     paths:
     - "**/*"
-  publish:
+  release:
     paths:
     - .bazelrc
     - .bazelversion
@@ -345,6 +345,7 @@ run:
     - bazel/**/*
     - ci/**/*
     - contrib/**/*
+    - distribution/**/*
     - envoy/**/*
     - examples/**/*
     - source/**/*
@@ -359,6 +360,7 @@ run:
     - bazel/**/*
     - ci/**/*
     - contrib/**/*
+    - distribution/**/*
     - envoy/**/*
     - examples/**/*
     - source/**/*

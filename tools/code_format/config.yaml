@@ -90,7 +90,7 @@ paths:
     - source/common/filter/config_discovery_impl.h
     - source/common/config/utility.h
     - source/common/matcher/matcher.h
-    - source/extensions/common/matcher/trie_matcher.h
+    - source/extensions/common/matcher/ip_range_matcher.h
     - envoy/common/exception.h
     - source/common/protobuf/utility.h
     # legacy core files which throw exceptions. We can add to this list but strongly prefer

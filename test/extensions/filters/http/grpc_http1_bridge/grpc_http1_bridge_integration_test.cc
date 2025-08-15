@@ -42,7 +42,7 @@ TEST_P(GrpcIntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
   EXPECT_THAT(response->headers(),
-              HeaderValueOf(Http::Headers::get().GrpcStatus, "2")); // Unknown gRPC error
+              ContainsHeader(Http::Headers::get().GrpcStatus, "2")); // Unknown gRPC error
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcIntegrationTest,

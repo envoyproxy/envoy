@@ -488,7 +488,7 @@ EXTENSIONS = {
     # Custom matchers
     #
 
-    "envoy.matching.custom_matchers.trie_matcher":     "//source/extensions/common/matcher:trie_matcher_lib",
+    "envoy.matching.custom_matchers.ip_range_matcher":     "//source/extensions/common/matcher:ip_range_matcher_lib",
     "envoy.matching.custom_matchers.domain_matcher":   "//source/extensions/common/matcher:domain_matcher_lib",
 
     #

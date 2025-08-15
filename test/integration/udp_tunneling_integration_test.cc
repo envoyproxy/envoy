@@ -225,7 +225,7 @@ TEST_P(ConnectUdpTerminationIntegrationTest, DropUnknownCapsules) {
   setUpConnection();
   Network::UdpRecvData request_datagram;
   const std::string unknown_capsule_fragment =
-      absl::HexStringToBytes("01"             // DATAGRAM Capsule Type
+      absl::HexStringToBytes("17"             // Reserved UNKNOWN Capsule Type
                              "08"             // Capsule Length
                              "00"             // Context ID
                              "a1a2a3a4a5a6a7" // UDP Proxying Payload
