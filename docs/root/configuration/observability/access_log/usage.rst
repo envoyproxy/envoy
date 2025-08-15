@@ -571,6 +571,7 @@ HTTP only
   **DropOverload**, **DO**, The request was terminated in addition to 503 response code due to :ref:`drop_overloads<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.drop_overloads>`.
   **DownstreamRemoteReset**, **DR**, The response details are ``http2.remote_reset`` or ``http2.remote_refuse``.
   **UnconditionalDropOverload**, **UDO**, The request was terminated in addition to 503 response code due to :ref:`drop_overloads<envoy_v3_api_field_config.endpoint.v3.ClusterLoadAssignment.Policy.drop_overloads>` is set to 100%.
+  **ResetWithNoError**, **RNE**, The stream was reset with the NO_ERROR code.
 
 UDP
   Not implemented ("-").

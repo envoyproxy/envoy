@@ -1564,6 +1564,8 @@ Filter::streamResetReasonToResponseFlag(Http::StreamResetReason reset_reason) {
     return StreamInfo::CoreResponseFlag::UpstreamProtocolError;
   case Http::StreamResetReason::OverloadManager:
     return StreamInfo::CoreResponseFlag::OverloadManager;
+  case Http::StreamResetReason::RemoteResetNoError:
+    return StreamInfo::CoreResponseFlag::ResetWithNoError;
   }
 
   PANIC_DUE_TO_CORRUPT_ENUM;
