@@ -65,7 +65,12 @@ static constexpr uint32_t kMaxOutboundResponses = 2;
 using Http1ResponseCodeDetails = ConstSingleton<Http1ResponseCodeDetailValues>;
 using Http1HeaderTypes = ConstSingleton<Http1HeaderTypesValues>;
 
-const StringUtil::CaseUnorderedSet& caseUnorderdSetContainingUpgradeAndHttp2Settings() {
+const StringUtil::CaseUnorderedSet& caseUnorderedSetContainingUpgrade() {
+  CONSTRUCT_ON_FIRST_USE(StringUtil::CaseUnorderedSet,
+                         Http::Headers::get().ConnectionValues.Upgrade);
+}
+
+const StringUtil::CaseUnorderedSet& caseUnorderedSetContainingUpgradeAndHttp2Settings() {
   CONSTRUCT_ON_FIRST_USE(StringUtil::CaseUnorderedSet,
                          Http::Headers::get().ConnectionValues.Upgrade,
                          Http::Headers::get().ConnectionValues.Http2Settings);
@@ -846,24 +851,33 @@ StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
   RequestOrResponseHeaderMap& request_or_response_headers = requestOrResponseHeaders();
   const Http::HeaderValues& header_values = Http::Headers::get();
   if (Utility::isUpgrade(request_or_response_headers) && upgradeAllowed()) {
+    auto upgrade_value = request_or_response_headers.getUpgradeValue();
+    const bool is_h2c = absl::EqualsIgnoreCase(upgrade_value, header_values.UpgradeValues.H2c);
+
     // Ignore h2c upgrade requests until we support them.
     // See https://github.com/envoyproxy/envoy/issues/7161 for details.
-    if (absl::EqualsIgnoreCase(request_or_response_headers.getUpgradeValue(),
-                               header_values.UpgradeValues.H2c)) {
+    // Upgrades are rejected unless ignore_http_11_upgrade is configured.
+    // See https://github.com/envoyproxy/envoy/issues/36305 for details.
+    if (is_h2c) {
       ENVOY_CONN_LOG(trace, "removing unsupported h2c upgrade headers.", connection_);
       request_or_response_headers.removeUpgrade();
-      if (request_or_response_headers.Connection()) {
-        const auto& tokens_to_remove = caseUnorderdSetContainingUpgradeAndHttp2Settings();
-        std::string new_value = StringUtil::removeTokens(
-            request_or_response_headers.getConnectionValue(), ",", tokens_to_remove, ",");
-        if (new_value.empty()) {
-          request_or_response_headers.removeConnection();
-        } else {
-          request_or_response_headers.setConnection(new_value);
-        }
-      }
+      Utility::removeConnectionUpgrade(request_or_response_headers,
+                                       caseUnorderedSetContainingUpgradeAndHttp2Settings());
       request_or_response_headers.remove(header_values.Http2Settings);
-    } else {
+    } else if (codec_settings_.ignore_upgrade_matchers_ != nullptr &&
+               !codec_settings_.ignore_upgrade_matchers_->empty()) {
+      ENVOY_CONN_LOG(trace, "removing ignored upgrade headers.", connection_);
+
+      Utility::removeUpgrade(request_or_response_headers,
+                             *codec_settings_.ignore_upgrade_matchers_);
+
+      if (!request_or_response_headers.Upgrade()) {
+        Utility::removeConnectionUpgrade(request_or_response_headers,
+                                         caseUnorderedSetContainingUpgrade());
+      }
+    }
+
+    if (Utility::isUpgrade(request_or_response_headers)) {
       ENVOY_CONN_LOG(trace, "codec entering upgrade mode.", connection_);
       handling_upgrade_ = true;
     }

@@ -19,5 +19,10 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: http
+  change: |
+    Added :ref:`ignore_http_11_upgrade
+    <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.ignore_http_11_upgrade>`
+    to ignore HTTP/1.1 Upgrade values matching any of the supplied matchers.
 
 deprecated:

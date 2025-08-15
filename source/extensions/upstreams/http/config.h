@@ -35,6 +35,7 @@ public:
       const envoy::config::core::v3::HttpProtocolOptions& common_options,
       const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
       bool use_downstream_protocol, bool use_http2,
+      Server::Configuration::ServerFactoryContext& server_context,
       ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Given the supplied cluster config, and protocol options configuration,
@@ -74,6 +75,7 @@ private:
       const envoy::config::core::v3::HttpProtocolOptions& common_options,
       const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
       bool use_downstream_protocol, bool use_http2,
+      Server::Configuration::ServerFactoryContext& server_context,
       ProtobufMessage::ValidationVisitor& validation_visitor);
 };
 
