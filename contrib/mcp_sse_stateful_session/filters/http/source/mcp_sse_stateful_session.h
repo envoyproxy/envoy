@@ -53,7 +53,7 @@ public:
                                 Server::Configuration::GenericFactoryContext& context);
 
   bool disabled() const { return disabled_; }
-  McpSseStatefulSessionConfig* statefuleSessionConfig() const { return config_.get(); }
+  McpSseStatefulSessionConfig* statefulSessionConfig() const { return config_.get(); }
 
 private:
   bool disabled_{};
