@@ -95,6 +95,9 @@ removed_config_or_runtime:
 - area: http3
   change: |
     Removed runtime guard ``envoy.reloadable_features.http3_remove_empty_trailers`` and legacy code paths.
+- area: stats
+  change: |
+    Removed runtime guard ``envoy.reloadable_features.enable_include_histograms`` and legacy code paths.
 - area: network
   change: |
     Removed runtime guard ``envoy.reloadable_features.udp_socket_apply_aggregated_read_limit`` and legacy code paths.
