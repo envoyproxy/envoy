@@ -360,6 +360,13 @@ private:
   };
 
   const std::string resolveTargetTunnelPath();
+
+  /**
+   * Resets the encoder for the upstream connection.
+   * @param event the event that caused the reset.
+   * @param by_local_close whether the reset was initiated by a local close (e.g. session idle
+   * timeout, envoy termination, etc.) or by upstream close.
+   */
   void resetEncoder(Network::ConnectionEvent event, bool by_local_close = false);
 
   ResponseDecoder response_decoder_;
