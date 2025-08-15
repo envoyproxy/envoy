@@ -52,25 +52,25 @@ PerRouteMcpSseStatefulSession::PerRouteMcpSseStatefulSession(
 
 Envoy::Http::FilterHeadersStatus
 McpSseStatefulSession::decodeHeaders(Envoy::Http::RequestHeaderMap& headers, bool) {
-  const McpSseStatefulSessionConfig* config = config_.get();
-  auto route_config =
+  const auto route_config =
       Envoy::Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteMcpSseStatefulSession>(
           decoder_callbacks_);
 
-  if (route_config != nullptr) {
-    if (route_config->disabled()) {
-      return Envoy::Http::FilterHeadersStatus::Continue;
-    }
-    config = route_config->statefulSessionConfig();
+  if (route_config != nullptr && route_config->disabled()) {
+    return Envoy::Http::FilterHeadersStatus::Continue;
   }
-  session_state_ = config->createSessionState(headers);
+
+  const McpSseStatefulSessionConfig& effective_config =
+      (route_config != nullptr) ? *route_config->statefulSessionConfig() : *config_;
+
+  session_state_ = effective_config.createSessionState(headers);
   if (session_state_ == nullptr) {
     return Envoy::Http::FilterHeadersStatus::Continue;
   }
 
   if (auto upstream_address = session_state_->upstreamAddress(); upstream_address.has_value()) {
     decoder_callbacks_->setUpstreamOverrideHost(
-        std::make_pair(upstream_address.value(), config->isStrict()));
+        std::make_pair(upstream_address.value(), effective_config.isStrict()));
   }
   return Envoy::Http::FilterHeadersStatus::Continue;
 }
