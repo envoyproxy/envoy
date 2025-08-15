@@ -26,6 +26,15 @@ message LocalityLbConfig {
   // <arch_overview_load_balancing_zone_aware_routing>`.
   // [#next-free-field: 7]
   message ZoneAwareLbConfig {
+    // Basis for computing per-locality percentages in zone-aware routing.
+    enum LocalityBasis {
+      // Use the number of healthy hosts in each locality.
+      NUM_HEALTHY_HOSTS = 0;
+
+      // Use the weights of healthy hosts in each locality.
+      HOST_WEIGHT = 1;
+    }
+
     // Configures Envoy to always route requests to the local zone regardless of the
     // upstream zone structure. In Envoy's default configuration, traffic is distributed proportionally
     // across all upstream hosts while trying to maximize local routing when possible. The approach
@@ -41,15 +50,6 @@ message LocalityLbConfig {
       // * :ref:`runtime values <config_cluster_manager_cluster_runtime_zone_routing>`.
       // * :ref:`Zone aware routing support <arch_overview_load_balancing_zone_aware_routing>`.
       google.protobuf.UInt32Value min_size = 1;
-    }
-
-    // Basis for computing per-locality percentages in zone-aware routing.
-    enum LocalityBasis {
-      // Use the number of healthy hosts in each locality.
-      NUM_HEALTHY_HOSTS = 0;
-
-      // Use the weights of healthy hosts in each locality.
-      HOST_WEIGHT = 1;
     }
 
     // Configures percentage of requests that will be considered for zone aware routing
