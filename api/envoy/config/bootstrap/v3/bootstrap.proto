@@ -41,7 +41,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <config_overview_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 42]
+// [#next-free-field: 43]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -228,6 +228,14 @@ message Bootstrap {
     // a flush timer is not created. Only one of ``stats_flush_on_admin`` or
     // ``stats_flush_interval`` can be set.
     bool stats_flush_on_admin = 29 [(validate.rules).bool = {const: true}];
+  }
+
+  oneof stats_eviction {
+    // Optional duration to perform metric eviction. At every interval, during the stats flush
+    // the unused metrics are removed from the worker caches and the used metrics
+    // are marked as unused. Must be a multiple of the ``stats_flush_interval``.
+    google.protobuf.Duration stats_eviction_interval = 42
+        [(validate.rules).duration = {gte {nanos: 1000000}}];
   }
 
   // Optional watchdog configuration.
