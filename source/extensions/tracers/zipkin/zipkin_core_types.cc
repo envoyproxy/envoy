@@ -262,10 +262,8 @@ void Span::injectW3CContext(Tracing::TraceContext& trace_context) {
   }
 
   // Construct the traceparent header value in W3C format: version-traceid-spanid-flags
-  std::string traceparent_value = fmt::format("00-{}-{:016x}-{}", 
-                                               trace_id_str, 
-                                               id_, 
-                                               sampled() ? "01" : "00");
+  std::string traceparent_value =
+      fmt::format("00-{}-{:016x}-{}", trace_id_str, id_, sampled() ? "01" : "00");
 
   // Set the W3C traceparent header
   ZipkinCoreConstants::get().TRACE_PARENT.setRefKey(trace_context, traceparent_value);

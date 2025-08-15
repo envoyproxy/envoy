@@ -54,9 +54,7 @@ public:
    * Gets the current trace context option.
    * @return The current trace context option.
    */
-  TraceContextOption traceContextOption() const override {
-    return trace_context_option_;
-  }
+  TraceContextOption traceContextOption() const override { return trace_context_option_; }
 
   // TracerInterface
   SpanPtr startSpan(const Tracing::Config&, const std::string& span_name,
