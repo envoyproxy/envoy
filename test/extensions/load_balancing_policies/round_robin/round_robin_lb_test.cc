@@ -1021,7 +1021,7 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareUseHostWeight) {
       ->set_value(2);
   round_robin_lb_config_.mutable_locality_lb_config()
       ->mutable_zone_aware_lb_config()
-      ->set_use_host_weight(true);
+      ->set_locality_basis(envoy::extensions::load_balancing_policies::common::v3::LocalityLbConfig::ZoneAwareLbConfig::HOST_WEIGHT);
   init(true);
   updateHosts(local_hosts, local_hosts_per_locality);
 

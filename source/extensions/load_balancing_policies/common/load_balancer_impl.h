@@ -459,8 +459,8 @@ private:
   const absl::optional<uint32_t> force_local_zone_min_size_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const uint32_t routing_enabled_;
+  const uint32_t locality_basis_;
   const bool fail_traffic_on_panic_ : 1;
-  const bool use_host_weight_ : 1;
 
   // If locality weight aware routing is enabled.
   const bool locality_weighted_balancing_ : 1;

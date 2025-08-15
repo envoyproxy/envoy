@@ -417,12 +417,12 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
                            ? PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
                                  locality_config->zone_aware_lb_config(), routing_enabled, 100, 100)
                            : 100),
+      locality_basis_(locality_config.has_value()
+                          ? locality_config->zone_aware_lb_config().locality_basis()
+                          : LocalityLbConfig::ZoneAwareLbConfig::NUM_HEALTHY_HOSTS),
       fail_traffic_on_panic_(locality_config.has_value()
                                  ? locality_config->zone_aware_lb_config().fail_traffic_on_panic()
                                  : false),
-      use_host_weight_(locality_config.has_value()
-                           ? locality_config->zone_aware_lb_config().use_host_weight()
-                           : false),
       locality_weighted_balancing_(locality_config.has_value() &&
                                    locality_config->has_locality_weighted_lb_config()) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
@@ -644,10 +644,10 @@ ZoneAwareLoadBalancerBase::calculateLocalityPercentages(
   std::map<envoy::config::core::v3::Locality, uint64_t, LocalityLess> upstream_weights;
   uint64_t total_local_weight = 0;
   for (const auto& locality_hosts : local_hosts_per_locality.get()) {
-    // If use_host_weight_ is true, we use the host's weight to calculate the locality percentage.
-    // Otherwise, we count the number of hosts in the locality.
     uint64_t locality_weight = 0;
-    if (use_host_weight_) {
+    // If locality_basis_ is set to HOST_WEIGHT, we use the host's weight to calculate the locality percentage.
+    // Otherwise, we count the number of hosts in the locality.
+    if (locality_basis_ == LocalityLbConfig::ZoneAwareLbConfig::HOST_WEIGHT) {
       for (const auto& host : locality_hosts) {
         locality_weight += host->weight();
       }
@@ -663,9 +663,9 @@ ZoneAwareLoadBalancerBase::calculateLocalityPercentages(
   uint64_t total_upstream_weight = 0;
   for (const auto& locality_hosts : upstream_hosts_per_locality.get()) {
     uint64_t locality_weight = 0;
-    // If use_host_weight_ is true, we use the host's weight to calculate the locality percentage.
+    // If locality_basis_ is set to HOST_WEIGHT, we use the host's weight to calculate the locality percentage.
     // Otherwise, we count the number of hosts in the locality.
-    if (use_host_weight_) {
+    if (locality_basis_ == LocalityLbConfig::ZoneAwareLbConfig::HOST_WEIGHT) {
       for (const auto& host : locality_hosts) {
         locality_weight += host->weight();
       }

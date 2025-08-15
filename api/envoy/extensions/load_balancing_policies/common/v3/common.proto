@@ -43,6 +43,15 @@ message LocalityLbConfig {
       google.protobuf.UInt32Value min_size = 1;
     }
 
+    // Basis for computing per-locality percentages in zone-aware routing.
+    enum LocalityBasis {
+      // Use the number of healthy hosts in each locality.
+      NUM_HEALTHY_HOSTS = 0;
+
+      // Use the weights of healthy hosts in each locality.
+      HOST_WEIGHT = 1;
+    }
+
     // Configures percentage of requests that will be considered for zone aware routing
     // if zone aware routing is configured. If not specified, the default is 100%.
     // * :ref:`runtime values <config_cluster_manager_cluster_runtime_zone_routing>`.
@@ -68,9 +77,10 @@ message LocalityLbConfig {
 
     ForceLocalZone force_local_zone = 5;
 
-    // If set to true, Envoy will use the weight of each healthy host to calculate locality percentages
-    // in zone aware routing. Default value is false.
-    bool use_host_weight = 6;
+    // Determines how locality percentages are computed:
+    // - NUM_HEALTHY_HOSTS: proportional to the count of healthy hosts.
+    // - HOST_WEIGHT:       proportional to the weights of healthy hosts.
+    LocalityBasis locality_basis = 6;
   }
 
   // Configuration for :ref:`locality weighted load balancing
