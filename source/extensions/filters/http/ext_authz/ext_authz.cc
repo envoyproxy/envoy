@@ -194,7 +194,8 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
 
 Filters::Common::ExtAuthz::ClientPtr
 Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grpc_service) {
-  if (server_context_ == nullptr) {
+  // Server context must be available when constructing per-route clients.
+  if (&server_context_ == nullptr) {
     ENVOY_STREAM_LOG(
         debug, "ext_authz filter: server context not available for per-route gRPC client creation.",
         *decoder_callbacks_);
@@ -233,7 +234,8 @@ Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grp
 
 Filters::Common::ExtAuthz::ClientPtr Filter::createPerRouteHttpClient(
     const envoy::extensions::filters::http::ext_authz::v3::HttpService& http_service) {
-  if (server_context_ == nullptr) {
+  // Server context must be available when constructing per-route clients.
+  if (&server_context_ == nullptr) {
     ENVOY_STREAM_LOG(
         debug, "ext_authz filter: server context not available for per-route HTTP client creation.",
         *decoder_callbacks_);
@@ -247,12 +249,8 @@ Filters::Common::ExtAuthz::ClientPtr Filter::createPerRouteHttpClient(
   ENVOY_STREAM_LOG(debug, "ext_authz filter: creating per-route HTTP client for URI: {}.",
                    *decoder_callbacks_, http_service.server_uri().uri());
 
-  // Create a temporary ExtAuthz config with the HTTP service for the ClientConfig constructor.
-  envoy::extensions::filters::http::ext_authz::v3::ExtAuthz temp_config;
-  temp_config.mutable_http_service()->CopyFrom(http_service);
-
   const auto client_config = std::make_shared<Extensions::Filters::Common::ExtAuthz::ClientConfig>(
-      temp_config, timeout_ms, http_service.path_prefix(), *server_context_);
+      http_service, config_->headersAsBytes(), timeout_ms, *server_context_);
 
   return std::make_unique<Extensions::Filters::Common::ExtAuthz::RawHttpClientImpl>(
       server_context_->clusterManager(), client_config);
@@ -304,7 +302,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   }
 
   // Check if we need to use a per-route service override (gRPC or HTTP).
-  Filters::Common::ExtAuthz::ClientPtr* client_to_use = &client_;
+  Filters::Common::ExtAuthz::Client* client_to_use = client_.get();
   if (maybe_merged_per_route_config) {
     if (maybe_merged_per_route_config->grpcService().has_value()) {
       const auto& grpc_service = maybe_merged_per_route_config->grpcService().value();
@@ -314,7 +312,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
       // Create a new gRPC client for this route.
       per_route_client_ = createPerRouteGrpcClient(grpc_service);
       if (per_route_client_ != nullptr) {
-        client_to_use = &per_route_client_;
+        client_to_use = per_route_client_.get();
         ENVOY_STREAM_LOG(debug, "ext_authz filter: successfully created per-route gRPC client.",
                          *decoder_callbacks_);
       } else {
@@ -331,7 +329,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
       // Create a new HTTP client for this route.
       per_route_client_ = createPerRouteHttpClient(http_service);
       if (per_route_client_ != nullptr) {
-        client_to_use = &per_route_client_;
+        client_to_use = per_route_client_.get();
         ENVOY_STREAM_LOG(debug, "ext_authz filter: successfully created per-route HTTP client.",
                          *decoder_callbacks_);
       } else {
@@ -377,9 +375,8 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
                                                // going to invoke check call.
   cluster_ = decoder_callbacks_->clusterInfo();
   initiating_call_ = true;
-  (*client_to_use)
-      ->check(*this, check_request_, decoder_callbacks_->activeSpan(),
-              decoder_callbacks_->streamInfo());
+  client_to_use->check(*this, check_request_, decoder_callbacks_->activeSpan(),
+                       decoder_callbacks_->streamInfo());
   initiating_call_ = false;
 }
 

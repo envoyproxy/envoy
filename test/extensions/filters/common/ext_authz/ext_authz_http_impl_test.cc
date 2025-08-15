@@ -146,6 +146,27 @@ public:
     client_->onSuccess(async_request_, std::move(http_response));
   }
 
+  // Verify that we could build ClientConfig directly from HttpService and that the
+  // fields get wired correctly.
+  TEST_F(ExtAuthzHttpClientTest, ClientConfigFromHttpService) {
+    envoy::extensions::filters::http::ext_authz::v3::HttpService http_service;
+    http_service.mutable_server_uri()->set_uri("ext_authz:9000");
+    http_service.mutable_server_uri()->set_cluster("ext_authz");
+    http_service.mutable_server_uri()->mutable_timeout()->set_seconds(0);
+    http_service.mutable_path_prefix()->assign("/prefix");
+    // Add one header to add to request to exercise header parser creation.
+    auto* add = http_service.mutable_authorization_request()->add_headers_to_add();
+    add->mutable_header()->set_key("x-added");
+    add->mutable_header()->set_value("v");
+
+    auto cfg = std::make_shared<ClientConfig>(http_service, /*encode_raw_headers=*/true,
+                                              /*timeout_ms=*/123, factory_context_);
+    EXPECT_EQ(cfg->cluster(), "ext_authz");
+    EXPECT_EQ(cfg->pathPrefix(), "/prefix");
+    EXPECT_EQ(cfg->timeout(), std::chrono::milliseconds{123});
+    EXPECT_TRUE(cfg->encodeRawHeaders());
+  }
+
   Http::RequestMessagePtr sendRequest(absl::node_hash_map<std::string, std::string>&& headers,
                                       SendRequestOpts opts = {}) {
     envoy::service::auth::v3::CheckRequest request{};

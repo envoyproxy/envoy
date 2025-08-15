@@ -39,7 +39,8 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoWithServ
                 &server_context](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Extensions::Filters::Common::ExtAuthz::RawHttpClientImpl>(
           server_context.clusterManager(), client_config);
-      callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
+      callbacks.addStreamFilter(
+          std::make_shared<Filter>(filter_config, std::move(client), server_context));
     };
   } else {
     // gRPC client.

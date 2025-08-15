@@ -71,7 +71,8 @@ public:
     config_ = std::make_shared<FilterConfig>(proto_config, *stats_store_.rootScope(),
                                              "ext_authz_prefix", factory_context_);
     client_ = new NiceMock<Filters::Common::ExtAuthz::MockClient>();
-    filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_});
+    filter_ = std::make_unique<Filter>(config_, Filters::Common::ExtAuthz::ClientPtr{client_},
+                                       factory_context_);
     ON_CALL(decoder_filter_callbacks_, filterConfigName()).WillByDefault(Return(FilterConfigName));
     filter_->setDecoderFilterCallbacks(decoder_filter_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_filter_callbacks_);
