@@ -1209,13 +1209,13 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         project_desc = "Performance-portable, length-agnostic SIMD with runtime dispatch",
         project_url = "https://github.com/google/highway",
         # NOTE: Update together with v8 and proxy_wasm_cpp_host.
-        version = "1.2.0",
+        version = "1.3.0",
         strip_prefix = "highway-{version}",
-        sha256 = "7e0be78b8318e8bdbf6fa545d2ecb4c90f947df03f7aadc42c1967f019e63343",
+        sha256 = "07b3c1ba2c1096878a85a31a5b9b3757427af963b1141ca904db2f9f4afe0bc2",
         urls = ["https://github.com/google/highway/archive/refs/tags/{version}.tar.gz"],
         use_category = ["dataplane_ext"],
         extensions = ["envoy.wasm.runtime.v8"],
-        release_date = "2024-05-31",
+        release_date = "2025-08-14",
         cpe = "N/A",
     ),
     dragonbox = dict(
