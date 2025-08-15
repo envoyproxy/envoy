@@ -31,6 +31,10 @@ minor_behavior_changes:
     Generic proxy codec add the same buffer limit as connection buffer limit, if the buffer limit is
     exceeded, the connection is disconnected. This behavior can be reverted by setting the runtime guard
     ``envoy.reloadable_features.generic_proxy_codec_buffer_limit`` to ``false``.
+- area: oauth2
+  change: |
+    Cookies are now deleted with ``secure`` header. This behavior can
+    be reverted by setting the runtime guard ``envoy.reloadable_features.oauth2_secure_cookie_delete`` to ``false``.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
