@@ -90,7 +90,7 @@ envoy_cc_library(
     alwayslink = True,
 )
 
-# Cert verification related functions which call into AndroidNetworkLibrary. And network retrieval functions which call into AndroidNetworkMonitorV2.
+# Cert verification related functions which call into AndroidNetworkLibrary.
 envoy_cc_library(
     name = "android_network_utility_lib",
     srcs = [
@@ -105,7 +105,6 @@ envoy_cc_library(
         ":jni_utility_lib",
         "//library/common/bridge:utility_lib",
         "//library/common/extensions/cert_validator/platform_bridge:c_types_lib",
-        "//library/common/network:network_types_lib",
         "//library/common/types:c_types_lib",
         "@envoy//bazel:boringssl",
     ],

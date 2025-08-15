@@ -102,10 +102,6 @@ public:
     helper_handle_ = test::SystemHelperPeer::replaceSystemHelper();
     EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_))
         .WillRepeatedly(Return(true));
-    EXPECT_CALL(helper_handle_->mock_helper(), getDefaultNetworkHandle())
-        .Times(testing::AtMost(1))
-        .WillOnce(Return(-1));
-    EXPECT_CALL(helper_handle_->mock_helper(), getAllConnectedNetworks()).Times(testing::AtMost(1));
   }
 
   envoy_status_t runEngine(const std::unique_ptr<InternalEngine>& engine,

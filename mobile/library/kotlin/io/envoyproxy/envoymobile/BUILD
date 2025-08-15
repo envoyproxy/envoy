@@ -39,7 +39,6 @@ kt_android_library(
         "//library/java/io/envoyproxy/envoymobile/engine:envoy_engine_lib",
         "//library/java/io/envoyproxy/envoymobile/engine/types:envoy_c_types_lib",
         "//library/java/io/envoyproxy/envoymobile/utilities",
-        "//library/java/io/envoyproxy/envoymobile/utilities:network_utilities",
     ],
 )
 

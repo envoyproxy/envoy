@@ -22,7 +22,6 @@ android_library(
         "EnvoyStatus.java",
         "EnvoyStreamIntel.java",
         "EnvoyStringAccessor.java",
-        "NetworkWithType.java",
     ],
     visibility = ["//visibility:public"],
 )
