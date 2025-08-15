@@ -488,7 +488,6 @@ envoy_cc_library(
     ],
 )
 
-
 envoy_cc_library(
     name = "radix_tree_lib",
     hdrs = ["radix_tree.h"],

@@ -306,7 +306,6 @@ envoy_cc_test(
     ],
 )
 
-
 envoy_cc_test(
     name = "radix_tree_test",
     srcs = ["radix_tree_test.cc"],
@@ -447,7 +446,6 @@ envoy_benchmark_test(
     name = "utility_speed_test_benchmark_test",
     benchmark_binary = "utility_speed_test",
 )
-
 
 envoy_cc_benchmark_binary(
     name = "radix_tree_speed_test",
