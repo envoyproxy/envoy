@@ -58,7 +58,7 @@ std::string getFullTypeWithUrl(absl::string_view simple_type) {
   return absl::StrCat(kTypeServiceBaseUrl, "/", simple_type);
 }
 
-void fillStructWithType(const ::Envoy::ProtobufWkt::Type& type, ::Envoy::ProtobufWkt::Struct& out) {
+void fillStructWithType(const ::Envoy::Protobuf::Type& type, ::Envoy::Protobuf::Struct& out) {
   (*out.mutable_fields())[kTypeProperty].set_string_value(getFullTypeWithUrl(type.name()));
 }
 

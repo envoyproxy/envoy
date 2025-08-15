@@ -743,20 +743,20 @@ absl::StatusOr<ObjectSharedPtr> Factory::loadFromString(const std::string& json)
 }
 
 absl::StatusOr<FieldSharedPtr>
-loadFromProtobufStructInternal(const ProtobufWkt::Struct& protobuf_struct);
+loadFromProtobufStructInternal(const Protobuf::Struct& protobuf_struct);
 
 absl::StatusOr<FieldSharedPtr>
-loadFromProtobufValueInternal(const ProtobufWkt::Value& protobuf_value) {
+loadFromProtobufValueInternal(const Protobuf::Value& protobuf_value) {
   switch (protobuf_value.kind_case()) {
-  case ProtobufWkt::Value::kStringValue:
+  case Protobuf::Value::kStringValue:
     return Field::createValue(protobuf_value.string_value());
-  case ProtobufWkt::Value::kNumberValue:
+  case Protobuf::Value::kNumberValue:
     return Field::createValue(protobuf_value.number_value());
-  case ProtobufWkt::Value::kBoolValue:
+  case Protobuf::Value::kBoolValue:
     return Field::createValue(protobuf_value.bool_value());
-  case ProtobufWkt::Value::kNullValue:
+  case Protobuf::Value::kNullValue:
     return Field::createNull();
-  case ProtobufWkt::Value::kListValue: {
+  case Protobuf::Value::kListValue: {
     FieldSharedPtr array = Field::createArray();
     for (const auto& list_value : protobuf_value.list_value().values()) {
       absl::StatusOr<FieldSharedPtr> proto_or_error = loadFromProtobufValueInternal(list_value);
@@ -765,16 +765,16 @@ loadFromProtobufValueInternal(const ProtobufWkt::Value& protobuf_value) {
     }
     return array;
   }
-  case ProtobufWkt::Value::kStructValue:
+  case Protobuf::Value::kStructValue:
     return loadFromProtobufStructInternal(protobuf_value.struct_value());
-  case ProtobufWkt::Value::KIND_NOT_SET:
+  case Protobuf::Value::KIND_NOT_SET:
     break;
   }
   return absl::InvalidArgumentError("Protobuf value case not implemented");
 }
 
 absl::StatusOr<FieldSharedPtr>
-loadFromProtobufStructInternal(const ProtobufWkt::Struct& protobuf_struct) {
+loadFromProtobufStructInternal(const Protobuf::Struct& protobuf_struct) {
   auto root = Field::createObject();
   for (const auto& field : protobuf_struct.fields()) {
     absl::StatusOr<FieldSharedPtr> proto_or_error = loadFromProtobufValueInternal(field.second);
@@ -785,7 +785,7 @@ loadFromProtobufStructInternal(const ProtobufWkt::Struct& protobuf_struct) {
   return root;
 }
 
-ObjectSharedPtr Factory::loadFromProtobufStruct(const ProtobufWkt::Struct& protobuf_struct) {
+ObjectSharedPtr Factory::loadFromProtobufStruct(const Protobuf::Struct& protobuf_struct) {
   return THROW_OR_RETURN_VALUE(loadFromProtobufStructInternal(protobuf_struct), ObjectSharedPtr);
 }
 

@@ -40,7 +40,7 @@ ReqWithoutQuery::formatWithContext(const Envoy::Formatter::HttpFormatterContext&
   return val;
 }
 
-ProtobufWkt::Value
+Protobuf::Value
 ReqWithoutQuery::formatValueWithContext(const Envoy::Formatter::HttpFormatterContext& context,
                                         const StreamInfo::StreamInfo&) const {
   const Http::HeaderEntry* header = findHeader(context.requestHeaders());

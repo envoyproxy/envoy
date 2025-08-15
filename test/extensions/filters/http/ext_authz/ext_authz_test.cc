@@ -80,7 +80,7 @@ public:
 
   static envoy::extensions::filters::http::ext_authz::v3::ExtAuthz
   getFilterConfig(bool failure_mode_allow, bool http_client, bool emit_filter_state_stats = false,
-                  absl::optional<Envoy::ProtobufWkt::Struct> filter_metadata = absl::nullopt) {
+                  absl::optional<Envoy::Protobuf::Struct> filter_metadata = absl::nullopt) {
     const std::string http_config = R"EOF(
     failure_mode_allow_header_add: true
     http_service:
@@ -270,12 +270,12 @@ class EmitFilterStateTest
 public:
   EmitFilterStateTest() : expected_output_(filterMetadata()) {}
 
-  absl::optional<Envoy::ProtobufWkt::Struct> filterMetadata() const {
+  absl::optional<Envoy::Protobuf::Struct> filterMetadata() const {
     if (!std::get<2>(GetParam())) {
       return absl::nullopt;
     }
 
-    auto filter_metadata = Envoy::ProtobufWkt::Struct();
+    auto filter_metadata = Envoy::Protobuf::Struct();
     *(*filter_metadata.mutable_fields())["foo"].mutable_string_value() = "bar";
     return filter_metadata;
   }
@@ -3660,7 +3660,7 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
 
   decoder_filter_callbacks_.dispatcher_.globalTimeSystem().advanceTimeWait(
       std::chrono::milliseconds(10));
-  ProtobufWkt::Value ext_authz_duration_value;
+  Protobuf::Value ext_authz_duration_value;
   ext_authz_duration_value.set_number_value(10);
 
   Filters::Common::ExtAuthz::Response response{};
@@ -3672,7 +3672,7 @@ TEST_F(HttpFilterTest, EmitDynamicMetadata) {
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([&response](const std::string& ns,
-                                   const ProtobufWkt::Struct& returned_dynamic_metadata) {
+                                   const Protobuf::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
         // Check timing metadata correctness
         EXPECT_TRUE(returned_dynamic_metadata.fields().at("ext_authz_duration").has_number_value());
@@ -3726,7 +3726,7 @@ TEST_F(HttpFilterTest, EmitDynamicMetadataWhenDenied) {
 
   EXPECT_CALL(decoder_filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([&response](const std::string& ns,
-                                   const ProtobufWkt::Struct& returned_dynamic_metadata) {
+                                   const Protobuf::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.ext_authz");
         // Check timing metadata correctness
         EXPECT_FALSE(returned_dynamic_metadata.fields().contains("ext_authz_duration"));

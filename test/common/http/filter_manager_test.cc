@@ -66,7 +66,7 @@ public:
             LocalReplyFilterStateKey);
     EXPECT_EQ(fs_value->serializeAsString(), expected_name);
 
-    auto expected = std::make_unique<ProtobufWkt::StringValue>();
+    auto expected = std::make_unique<Protobuf::StringValue>();
     expected->set_value(expected_name);
     EXPECT_TRUE(MessageDifferencer::Equals(*(fs_value->serializeAsProto()), *expected));
   }

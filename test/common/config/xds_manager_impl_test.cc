@@ -64,14 +64,14 @@ class FakeConfigValidatorFactory : public Config::ConfigValidatorFactory {
 public:
   FakeConfigValidatorFactory() = default;
 
-  Config::ConfigValidatorPtr createConfigValidator(const ProtobufWkt::Any&,
+  Config::ConfigValidatorPtr createConfigValidator(const Protobuf::Any&,
                                                    ProtobufMessage::ValidationVisitor&) override {
     return nullptr;
   }
 
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     // Using Value instead of a custom empty config proto. This is only allowed in tests.
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Value()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Value()};
   }
 
   std::string name() const override { return "envoy.fake_validator"; }

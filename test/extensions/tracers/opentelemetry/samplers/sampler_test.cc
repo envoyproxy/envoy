@@ -41,7 +41,7 @@ public:
                Server::Configuration::TracerFactoryContext& context));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
 
   std::string name() const override { return "envoy.tracers.opentelemetry.samplers.testsampler"; }

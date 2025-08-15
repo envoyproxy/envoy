@@ -147,7 +147,7 @@ public:
 
 private:
   DynamicMetadataMapWrapper& parent_;
-  Protobuf::Map<std::string, ProtobufWkt::Struct>::const_iterator current_;
+  Protobuf::Map<std::string, Protobuf::Struct>::const_iterator current_;
 };
 
 /**
@@ -165,7 +165,7 @@ public:
 
 private:
   ConnectionDynamicMetadataMapWrapper& parent_;
-  Protobuf::Map<std::string, ProtobufWkt::Struct>::const_iterator current_;
+  Protobuf::Map<std::string, Protobuf::Struct>::const_iterator current_;
 };
 
 /**
@@ -468,7 +468,7 @@ private:
    */
   DECLARE_LUA_FUNCTION(VirtualHostWrapper, luaMetadata);
 
-  const ProtobufWkt::Struct& getMetadata() const;
+  const Protobuf::Struct& getMetadata() const;
 
   // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override { metadata_wrapper_.reset(); }
@@ -492,7 +492,7 @@ private:
    */
   DECLARE_LUA_FUNCTION(RouteWrapper, luaMetadata);
 
-  const ProtobufWkt::Struct& getMetadata() const;
+  const Protobuf::Struct& getMetadata() const;
 
   // Filters::Common::Lua::BaseLuaObject
   void onMarkDead() override { metadata_wrapper_.reset(); }
