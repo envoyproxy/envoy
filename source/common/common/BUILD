@@ -488,7 +488,6 @@ envoy_cc_library(
     ],
 )
 
-## Removed: trie_lookup_table_lib (regular Trie) has been deprecated in favor of RadixTree.
 
 envoy_cc_library(
     name = "radix_tree_lib",
