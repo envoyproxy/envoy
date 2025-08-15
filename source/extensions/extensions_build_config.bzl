@@ -27,6 +27,7 @@ EXTENSIONS = {
     "envoy.clusters.strict_dns":                        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
     "envoy.clusters.original_dst":                      "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
     "envoy.clusters.logical_dns":                       "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
+    "envoy.clusters.reverse_connection": "//source/extensions/clusters/reverse_connection:reverse_connection_lib",
 
     #
     # Compression
@@ -56,6 +57,12 @@ EXTENSIONS = {
     #
 
     "envoy.bootstrap.wasm":                             "//source/extensions/bootstrap/wasm:config",
+
+    #
+    # Reverse Connection
+    #
+
+    "envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface": "//source/extensions/bootstrap/reverse_tunnel:reverse_tunnel_acceptor_lib",
 
     #
     # Health checkers
