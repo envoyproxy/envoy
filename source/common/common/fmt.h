@@ -27,3 +27,19 @@ template <> struct formatter<absl::string_view> : formatter<string_view> {
 template <> struct formatter<absl::Status> : ostream_formatter {};
 
 } // namespace fmt
+
+namespace std {
+template <> struct formatter<absl::Status, char> {
+  template <class ParseContext> constexpr ParseContext::iterator parse(ParseContext& ctx) {
+    return ctx.begin();
+  }
+
+  template <class FmtContext>
+  FmtContext::iterator format(const absl::Status& s, FmtContext& ctx) const {
+    std::ostringstream out;
+    out << s;
+    return std::ranges::copy(std::move(out).str(), ctx.out()).out;
+  }
+};
+
+} // namespace std
