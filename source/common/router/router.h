@@ -4,45 +4,35 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
-#include <optional>
 #include <string>
 
 #include "envoy/common/random_generator.h"
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
-#include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/filter_factory.h"
 #include "envoy/http/hash_policy.h"
-#include "envoy/http/stateful_session.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/router_filter_interface.h"
 #include "envoy/router/shadow_writer.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/factory_context.h"
-#include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "source/common/access_log/access_log_impl.h"
-#include "source/common/buffer/watermark_buffer.h"
-#include "source/common/common/cleanup.h"
 #include "source/common/common/hash.h"
 #include "source/common/common/hex.h"
-#include "source/common/common/linked_object.h"
 #include "source/common/common/logger.h"
-#include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/filter_chain_helper.h"
 #include "source/common/http/sidestream_watermark.h"
 #include "source/common/http/utility.h"
-#include "source/common/router/config_impl.h"
 #include "source/common/router/context_impl.h"
+#include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/router/upstream_request.h"
 #include "source/common/stats/symbol_table.h"
-#include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_factory_context_impl.h"
 
