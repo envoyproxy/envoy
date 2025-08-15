@@ -488,10 +488,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
-    name = "trie_lookup_table_lib",
-    hdrs = ["trie_lookup_table.h"],
-)
+## Removed: trie_lookup_table_lib (regular Trie) has been deprecated in favor of RadixTree.
 
 envoy_cc_library(
     name = "radix_tree_lib",
