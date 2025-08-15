@@ -166,63 +166,6 @@ envoy_cert_validation_result verifyX509CertChain(const std::vector<std::string>&
   }
 }
 
-int64_t getDefaultNetworkHandle() {
-  JniHelper jni_helper(JniHelper::getThreadLocalEnv());
-  jclass jcls_AndroidNetworkLibrary =
-      jni_helper.findClassFromCache("io/envoyproxy/envoymobile/utilities/AndroidNetworkLibrary");
-  jmethodID jmid_getDefaultNetworkHandle = jni_helper.getStaticMethodIdFromCache(
-      jcls_AndroidNetworkLibrary, "getDefaultNetworkHandle", "()J");
-  jlong defaultNetwork =
-      jni_helper.callStaticLongMethod(jcls_AndroidNetworkLibrary, jmid_getDefaultNetworkHandle);
-  return static_cast<int64_t>(defaultNetwork);
-}
-
-std::vector<std::pair<int64_t, ConnectionType>> getAllConnectedNetworks() {
-  std::vector<std::pair<int64_t, ConnectionType>> connected_networks;
-  Envoy::JNI::JniHelper jni_helper(Envoy::JNI::JniHelper::getThreadLocalEnv());
-
-  // Use a unique_ptr to automatically release the class reference.
-  jclass jcls_android_network_library =
-      jni_helper.findClassFromCache("io/envoyproxy/envoymobile/utilities/AndroidNetworkLibrary");
-  if (jcls_android_network_library == nullptr) {
-    return connected_networks;
-  }
-
-  jmethodID jmid_get_all_connected_networks = jni_helper.getStaticMethodIdFromCache(
-      jcls_android_network_library, "getAllConnectedNetworks", "()[[J");
-  if (jmid_get_all_connected_networks == nullptr) {
-    return connected_networks;
-  }
-
-  // Call the static Java method to get the long[][] array.
-  Envoy::JNI::LocalRefUniquePtr<jobjectArray> java_network_array =
-      jni_helper.callStaticObjectMethod<jobjectArray>(jcls_android_network_library,
-                                                      jmid_get_all_connected_networks);
-  if (java_network_array == nullptr) {
-    return connected_networks;
-  }
-
-  jsize num_networks = jni_helper.getArrayLength(java_network_array.get());
-
-  for (jsize i = 0; i < num_networks; ++i) {
-    // Each entry is a jlongArray (long[2]).
-    Envoy::JNI::LocalRefUniquePtr<jlongArray> network_info_array =
-        jni_helper.getObjectArrayElement<jlongArray>(java_network_array.get(), i);
-    if (network_info_array == nullptr) {
-      continue;
-    }
-
-    std::vector<int64_t> network_info;
-    Envoy::JNI::javaLongArrayToInt64Vector(jni_helper, network_info_array.get(), &network_info);
-
-    if (network_info.size() == 2) {
-      connected_networks.emplace_back(network_info[0],
-                                      static_cast<ConnectionType>(network_info[1]));
-    }
-  }
-  return connected_networks;
-}
-
 void jvmDetachThread() { JniHelper::detachCurrentThread(); }
 
 } // namespace JNI
