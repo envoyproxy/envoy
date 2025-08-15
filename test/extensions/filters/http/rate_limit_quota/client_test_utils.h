@@ -76,6 +76,8 @@ public:
           .Times(times)
           .WillRepeatedly(Invoke(this, &RateLimitTestClient::mockStartRaw));
     }
+    // The stream object is only directly reset when undergoing filter shutdown.
+    EXPECT_CALL(stream_, resetStream());
   }
 
   // We don't know the eventual intent of each timer at creation time. Expect
