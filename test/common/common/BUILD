@@ -306,7 +306,6 @@ envoy_cc_test(
     ],
 )
 
-## Removed: trie_lookup_table_test since regular Trie has been removed.
 
 envoy_cc_test(
     name = "radix_tree_test",
