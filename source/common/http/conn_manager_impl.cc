@@ -273,6 +273,9 @@ void ConnectionManagerImpl::doEndStream(ActiveStream& stream, bool check_for_def
       if (stream.filter_manager_.streamInfo().hasResponseFlag(
               StreamInfo::CoreResponseFlag::UpstreamProtocolError)) {
         stream.response_encoder_->getStream().resetStream(StreamResetReason::ProtocolError);
+      } else if (stream.filter_manager_.streamInfo().hasResponseFlag(
+                     StreamInfo::CoreResponseFlag::ResetWithNoError)) {
+        stream.response_encoder_->getStream().resetStream(StreamResetReason::RemoteResetNoError);
       } else {
         stream.response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
       }
@@ -1221,6 +1224,8 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers(RequestTrailerMap& tr
   // TODO(#24466): Make H/2 behavior consistent with H/1 and H/3.
   if (failure_details == UhvResponseCodeDetail::get().InvalidUnderscore &&
       connection_manager_.codec_->protocol() == Protocol::Http2) {
+    filter_manager_.streamInfo().setResponseFlag(
+        StreamInfo::CoreResponseFlag::DownstreamProtocolError);
     filter_manager_.streamInfo().setResponseCodeDetails(failure_details);
     resetStream();
   } else {
@@ -1229,6 +1234,8 @@ bool ConnectionManagerImpl::ActiveStream::validateTrailers(RequestTrailerMap& tr
       sendLocalReply(response_code, "", nullptr, grpc_status, failure_details);
     } else {
       filter_manager_.streamInfo().setResponseCodeDetails(failure_details);
+      filter_manager_.streamInfo().setResponseFlag(
+          StreamInfo::CoreResponseFlag::DownstreamProtocolError);
       resetStream();
     }
     if (!response_encoder_->streamErrorOnInvalidHttpMessage()) {

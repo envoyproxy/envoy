@@ -99,8 +99,10 @@ enum CoreResponseFlag : uint16_t {
   DownstreamRemoteReset,
   // Unconditionally drop all traffic due to drop_overload is set to 100%.
   UnconditionalDropOverload,
+  // The request was reset with the "NO_ERROR" code
+  ResetWithNoError,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = UnconditionalDropOverload,
+  LastFlag = ResetWithNoError,
 };
 
 class ResponseFlagUtils;
