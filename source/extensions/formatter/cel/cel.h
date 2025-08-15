@@ -27,7 +27,7 @@ public:
 private:
   const ::Envoy::LocalInfo::LocalInfo& local_info_;
   const absl::optional<size_t> max_length_;
-  Extensions::Filters::Common::Expr::CompiledExpression compiled_expr_;
+  const Extensions::Filters::Common::Expr::CompiledExpression compiled_expr_;
 };
 
 class CELFormatterCommandParser : public ::Envoy::Formatter::CommandParser {
