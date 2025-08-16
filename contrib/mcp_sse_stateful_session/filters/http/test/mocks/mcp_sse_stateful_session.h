@@ -1,11 +1,9 @@
 #pragma once
 
 #include "envoy/http/mcp_sse_stateful_session.h"
-
-#include "source/common/protobuf/protobuf.h"
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Http {
@@ -35,7 +33,7 @@ public:
   MockSessionStateFactoryConfig();
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Envoy::ProtobufWkt::Struct>();
+    return std::make_unique<ProtobufWkt::Struct>();
   }
 
   MOCK_METHOD(Envoy::Http::McpSseSessionStateFactorySharedPtr, createSessionStateFactory,
