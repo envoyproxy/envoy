@@ -178,7 +178,7 @@ TEST_F(CELFormatterTest, TestComplexCelExpression) {
   EXPECT_EQ("true /original false", formatter->formatWithContext(formatter_context_, stream_info_));
 }
 
-TEST_F(CELFormatterTest, TestInvalidExpression) {
+TEST_F(CELFormatterTest, TestInvalidSyntaxExpression) {
   const std::string yaml = R"EOF(
   text_format_source:
     inline_string: "%CEL(+++++)%"
@@ -188,6 +188,18 @@ TEST_F(CELFormatterTest, TestInvalidExpression) {
   EXPECT_THROW_WITH_REGEX(
       *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
       EnvoyException, "Not able to parse filter expression: .*");
+}
+
+TEST_F(CELFormatterTest, TestInvalidSemanticExpression) {
+  const std::string yaml = R"EOF(
+  text_format_source:
+    inline_string: "%CEL(f())%"
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  EXPECT_THROW_WITH_REGEX(
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
+      EnvoyException, "failed to create an expression: .*");
 }
 
 TEST_F(CELFormatterTest, TestRegexExtFunctions) {
