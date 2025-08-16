@@ -14,5 +14,6 @@ envoy_cc_mock(
     hdrs = ["mcp_sse_stateful_session.h"],
     deps = [
         "//envoy/http:mcp_sse_stateful_session_interface",
+        "//source/common/protobuf:protobuf",
     ],
 )
