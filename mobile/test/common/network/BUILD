@@ -10,7 +10,6 @@ envoy_cc_test(
     repository = "@envoy",
     deps = [
         "//library/common/network:connectivity_manager_lib",
-        "//test/common/mocks/common:common_mocks",
         "@envoy//test/extensions/common/dynamic_forward_proxy:mocks",
         "@envoy//test/mocks/upstream:cluster_manager_mocks",
     ],

@@ -23,9 +23,6 @@ import java.security.cert.CertificateException;
 
 import java.nio.charset.StandardCharsets;
 
-import io.envoyproxy.envoymobile.engine.AndroidNetworkMonitorV2;
-import io.envoyproxy.envoymobile.engine.types.NetworkWithType;
-
 /**
  * This class implements net utilities required by the net component.
  */
@@ -126,32 +123,6 @@ public final class AndroidNetworkLibrary {
       // The host-specific API was implemented in Android N (which came after Android M).
       return NetworkSecurityPolicy.getInstance().isCleartextTrafficPermitted(host);
     }
-  }
-
-  public static long getDefaultNetworkHandle() {
-    if (io.envoyproxy.envoymobile.engine.AndroidNetworkMonitorV2.getInstance() == null) {
-      return -1;
-    }
-    return io.envoyproxy.envoymobile.engine.AndroidNetworkMonitorV2.getInstance().getDefaultNetId();
-  }
-
-  public static long[][] getAllConnectedNetworks() {
-    if (io.envoyproxy.envoymobile.engine.AndroidNetworkMonitorV2.getInstance() == null) {
-      return new long[0][0];
-    }
-    NetworkWithType[] networks =
-        io.envoyproxy.envoymobile.engine.AndroidNetworkMonitorV2.getInstance()
-            .getAllNetworksAndTypes();
-    if (networks == null || networks.length == 0) {
-      return new long[0][0];
-    }
-
-    long[][] result = new long[networks.length][2];
-    for (int i = 0; i < networks.length; i++) {
-      result[i][0] = networks[i].getNetId();
-      result[i][1] = networks[i].getConnectionType().getValue();
-    }
-    return result;
   }
 
   /**

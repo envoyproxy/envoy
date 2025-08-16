@@ -1177,8 +1177,7 @@ void ThreadLocalStoreImpl::forEachSinkedTextReadout(SizeFn f_size,
 
 void ThreadLocalStoreImpl::forEachSinkedHistogram(SizeFn f_size,
                                                   StatFn<ParentHistogram> f_stat) const {
-  if (sink_predicates_.has_value() &&
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_include_histograms")) {
+  if (sink_predicates_.has_value()) {
     Thread::LockGuard lock(hist_mutex_);
 
     if (f_size != nullptr) {
