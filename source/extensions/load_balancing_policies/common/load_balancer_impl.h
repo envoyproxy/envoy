@@ -511,6 +511,9 @@ protected:
 
   virtual void refresh(uint32_t priority);
 
+  // Virtual method for derived classes to override force weighted algorithm behavior
+  virtual bool shouldForceWeightedAlgorithm() const { return false; }
+
   bool isSlowStartEnabled() const;
   bool noHostsAreInSlowStart() const;
 
