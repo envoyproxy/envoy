@@ -239,6 +239,13 @@ new_features:
     Added ``virtualHost()`` to the Stream handle API, allowing Lua scripts to retrieve virtual host information. So far, the only method
     implemented is ``metadata()``, allowing Lua scripts to access virtual host metadata scoped to the specific filter name. See
     :ref:`Virtual host object API <config_http_filters_lua_virtual_host_wrapper>` for more details.
+- area: tracing
+  change: |
+    Added :ref:`trace_context_option <envoy_v3_api_field_config.trace.v3.ZipkinConfig.trace_context_option>` enum
+    in the Zipkin tracer config. When set to ``USE_B3_WITH_W3C_PROPAGATION``, the tracer will:
+    extract trace information from W3C trace headers when B3 headers are not present (downstream),
+    and inject both B3 and W3C trace headers for upstream requests to maximize compatibility.
+    The default value ``USE_B3`` maintains backward compatibility with B3-only behavior.
 - area: rbac
   change: |
     Switch the IP matcher to use LC-Trie for performance improvements.
@@ -254,5 +261,6 @@ new_features:
 - area: http
   change: |
     Added ``upstream_rq_per_cx`` histogram to track requests per connection for monitoring connection reuse efficiency.
+
 
 deprecated:
