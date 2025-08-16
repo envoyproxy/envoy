@@ -12,24 +12,25 @@ def external_http_archive(name, **kwargs):
         **kwargs
     )
 
-def api_dependencies():
-    external_http_archive(
-        name = "bazel_skylib",
-    )
-    external_http_archive(
-        name = "rules_jvm_external",
-    )
-    external_http_archive(
-        name = "com_envoyproxy_protoc_gen_validate",
-        patch_args = ["-p1"],
-        patches = ["@envoy_api//bazel:pgv.patch"],
-    )
-    external_http_archive(
-        name = "com_google_googleapis",
-    )
-    external_http_archive(
-        name = "com_github_cncf_xds",
-    )
+def api_dependencies(bzlmod = False):
+    if not bzlmod:
+        external_http_archive(
+            name = "bazel_skylib",
+        )
+        external_http_archive(
+            name = "rules_jvm_external",
+        )
+        external_http_archive(
+            name = "com_envoyproxy_protoc_gen_validate",
+            patch_args = ["-p1"],
+            patches = ["@envoy_api//bazel:pgv.patch"],
+        )
+        external_http_archive(
+            name = "com_google_googleapis",
+        )
+        external_http_archive(
+            name = "com_github_cncf_xds",
+        )
     external_http_archive(
         name = "prometheus_metrics_model",
         build_file_content = PROMETHEUSMETRICS_BUILD_CONTENT,
@@ -37,23 +38,28 @@ def api_dependencies():
     external_http_archive(
         name = "rules_buf",
     )
-    external_http_archive(
-        name = "rules_proto",
-    )
-    external_http_archive(
-        name = "com_github_openzipkin_zipkinapi",
-        build_file_content = ZIPKINAPI_BUILD_CONTENT,
-    )
-    external_http_archive(
-        name = "opentelemetry_proto",
-        build_file_content = OPENTELEMETRY_BUILD_CONTENT,
-    )
-    external_http_archive(
-        name = "dev_cel",
-    )
+    if not bzlmod:
+        external_http_archive(
+            name = "rules_proto",
+        )
+        external_http_archive(
+            name = "com_github_openzipkin_zipkinapi",
+            build_file_content = ZIPKINAPI_BUILD_CONTENT,
+        )
+        external_http_archive(
+            name = "opentelemetry_proto",
+            build_file_content = OPENTELEMETRY_BUILD_CONTENT,
+        )
+        external_http_archive(
+            name = "dev_cel",
+        )
     external_http_archive(
         name = "com_github_chrusty_protoc_gen_jsonschema",
     )
+    if bzlmod:
+        external_http_archive(
+            name = "envoy_toolshed",
+        )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")

@@ -71,7 +71,7 @@ default_envoy_build_config = repository_rule(
 )
 
 # Bazel native C++ dependencies. For the dependencies that doesn't provide autoconf/automake builds.
-def _cc_deps():
+def _cc_deps(bzlmod = False):
     external_http_archive("grpc_httpjson_transcoding")
     external_http_archive(
         name = "com_google_protoconverter",
@@ -92,14 +92,15 @@ def _cc_deps():
         patches = ["@envoy//bazel:proto_processing_lib.patch"],
     )
     external_http_archive("ocp")
-    native.bind(
-        name = "path_matcher",
-        actual = "@grpc_httpjson_transcoding//src:path_matcher",
-    )
-    native.bind(
-        name = "grpc_transcoding",
-        actual = "@grpc_httpjson_transcoding//src:transcoding",
-    )
+    if not bzlmod:
+        native.bind(
+            name = "path_matcher",
+            actual = "@grpc_httpjson_transcoding//src:path_matcher",
+        )
+        native.bind(
+            name = "grpc_transcoding",
+            actual = "@grpc_httpjson_transcoding//src:transcoding",
+        )
 
 def _go_deps(skip_targets):
     # Keep the skip_targets check around until Istio Proxy has stopped using
@@ -114,7 +115,7 @@ def _rust_deps():
         patches = ["@envoy//bazel:rules_rust.patch", "@envoy//bazel:rules_rust_ppc64le.patch"],
     )
 
-def envoy_dependencies(skip_targets = []):
+def envoy_dependencies(skip_targets = [], bzlmod = False):
     # Treat Envoy's overall build config as an external repo, so projects that
     # build Envoy as a subcomponent can easily override the config.
     if "envoy_build_config" not in native.existing_rules().keys():
@@ -135,14 +136,16 @@ def envoy_dependencies(skip_targets = []):
     _boringssl()
     _boringssl_fips()
     _aws_lc()
-    native.bind(
-        name = "ssl",
-        actual = "@envoy//bazel:boringssl",
-    )
-    native.bind(
-        name = "crypto",
-        actual = "@envoy//bazel:boringcrypto",
-    )
+
+    if not bzlmod:
+        native.bind(
+            name = "ssl",
+            actual = "@envoy//bazel:boringssl",
+        )
+        native.bind(
+            name = "crypto",
+            actual = "@envoy//bazel:boringcrypto",
+        )
 
     # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
     # semi-standard in the Bazel community, intended to avoid both duplicate
@@ -164,7 +167,7 @@ def envoy_dependencies(skip_targets = []):
     _com_github_google_libsxg()
     _com_github_google_tcmalloc()
     _com_github_gperftools_gperftools()
-    _com_github_grpc_grpc()
+    _com_github_grpc_grpc(bzlmod)
     _rules_proto_grpc()
     _com_github_unicode_org_icu()
     _com_github_intel_ipp_crypto_crypto_mb()
@@ -175,17 +178,17 @@ def envoy_dependencies(skip_targets = []):
     _com_github_jbeder_yaml_cpp()
     _com_github_libevent_libevent()
     _com_github_luajit_luajit()
-    _com_github_nghttp2_nghttp2()
+    _com_github_nghttp2_nghttp2(bzlmod)
     _com_github_msgpack_cpp()
     _com_github_skyapm_cpp2sky()
     _com_github_alibaba_hessian2_codec()
     _com_github_nlohmann_json()
     _com_github_ncopa_suexec()
-    _com_google_absl()
-    _com_google_googletest()
-    _com_google_protobuf()
-    _com_github_envoyproxy_sqlparser()
-    _v8()
+    _com_google_absl(bzlmod)
+    if not bzlmod:
+        _com_google_googletest()
+    _com_google_protobuf(bzlmod)
+    _v8(bzlmod)
     _fast_float()
     _highway()
     _dragonbox()
@@ -199,19 +202,20 @@ def envoy_dependencies(skip_targets = []):
     _io_opentelemetry_api_cpp()
     _net_colm_open_source_colm()
     _net_colm_open_source_ragel()
-    _net_zlib()
+    _net_zlib(bzlmod)
     _intel_dlb()
     _com_github_zlib_ng_zlib_ng()
     _org_boost()
     _org_brotli()
     _com_github_facebook_zstd()
-    _re2()
+    _re2(bzlmod)
     _proxy_wasm_cpp_sdk()
     _proxy_wasm_cpp_host()
     _emsdk()
-    _rules_fuzzing()
+    if not bzlmod:
+        _rules_fuzzing()
     external_http_archive("proxy_wasm_rust_sdk")
-    _com_google_cel_cpp()
+    _com_google_cel_cpp(bzlmod)
     _com_github_google_perfetto()
     _rules_ruby()
     external_http_archive("com_github_google_flatbuffers")
@@ -237,24 +241,30 @@ def envoy_dependencies(skip_targets = []):
     # Unconditional, since we use this only for compiler-agnostic fuzzing utils.
     _org_llvm_releases_compiler_rt()
 
-    _cc_deps()
+    _cc_deps(bzlmod)
     _go_deps(skip_targets)
     _rust_deps()
     _kafka_deps()
-    _com_github_wamr()
-    _com_github_wasmtime()
+    _com_github_wamr(bzlmod)
+    _com_github_wasmtime(bzlmod)
 
-    switched_rules_by_language(
-        name = "com_google_googleapis_imports",
-        cc = True,
-        go = True,
-        python = True,
-        grpc = True,
-    )
-    native.bind(
-        name = "bazel_runfiles",
-        actual = "@bazel_tools//tools/cpp/runfiles",
-    )
+
+    if not bzlmod:
+        switched_rules_by_language(
+            name = "com_google_googleapis_imports",
+            cc = True,
+            go = True,
+            python = True,
+            grpc = True,
+        )
+        native.bind(
+            name = "com_google_googleapis_imports",
+            actual = "@com_google_googleapis_imports//:all",
+        )
+        native.bind(
+            name = "bazel_runfiles",
+            actual = "@bazel_tools//tools/cpp/runfiles",
+        )
 
 def _boringssl():
     external_http_archive(name = "boringssl")
@@ -446,7 +456,7 @@ def _net_colm_open_source_ragel():
         build_file_content = BUILD_ALL_CONTENT,
     )
 
-def _net_zlib():
+def _net_zlib(bzlmod = False):
     external_http_archive(
         name = "net_zlib",
         build_file_content = BUILD_ALL_CONTENT,
@@ -454,17 +464,18 @@ def _net_zlib():
         patches = ["@envoy//bazel/foreign_cc:zlib.patch"],
     )
 
-    # Bind for grpc.
-    native.bind(
-        name = "madler_zlib",
-        actual = "@envoy//bazel/foreign_cc:zlib",
-    )
+    if not bzlmod:
+        # Bind for grpc.
+        native.bind(
+            name = "madler_zlib",
+            actual = "@envoy//bazel/foreign_cc:zlib",
+        )
 
-    # Bind for protobuf.
-    native.bind(
-        name = "zlib",
-        actual = "@envoy//bazel/foreign_cc:zlib",
-    )
+        # Bind for protobuf.
+        native.bind(
+            name = "zlib",
+            actual = "@envoy//bazel/foreign_cc:zlib",
+        )
 
 def _com_github_zlib_ng_zlib_ng():
     external_http_archive(
@@ -504,7 +515,7 @@ def _com_github_facebook_zstd():
         build_file_content = BUILD_ALL_CONTENT,
     )
 
-def _com_google_cel_cpp():
+def _com_google_cel_cpp(bzlmod = False):
     external_http_archive(
         name = "com_google_cel_cpp",
         patch_args = ["-p1"],
@@ -514,22 +525,23 @@ def _com_google_cel_cpp():
     # Load required dependencies that cel-cpp expects.
     external_http_archive("com_google_cel_spec")
 
-    # cel-cpp references ``@antlr4-cpp-runtime//:antlr4-cpp-runtime`` but it internally
-    # defines ``antlr4_runtimes`` with a cpp target.
-    # We are creating a repository alias to avoid duplicating the ANTLR4 dependency.
-    native.new_local_repository(
-        name = "antlr4-cpp-runtime",
-        path = ".",
-        build_file_content = """
-package(default_visibility = ["//visibility:public"])
+    if not bzlmod:
+        # cel-cpp references ``@antlr4-cpp-runtime//:antlr4-cpp-runtime`` but it internally
+        # defines ``antlr4_runtimes`` with a cpp target.
+        # We are creating a repository alias to avoid duplicating the ANTLR4 dependency.
+        native.new_local_repository(
+            name = "antlr4-cpp-runtime",
+            path = ".",
+            build_file_content = """
+    package(default_visibility = ["//visibility:public"])
 
-# Alias to cel-cpp's embedded ANTLR4 runtime.
-alias(
-    name = "antlr4-cpp-runtime",
-    actual = "@antlr4_runtimes//:cpp",
-)
-""",
+    # Alias to cel-cpp's embedded ANTLR4 runtime.
+    alias(
+        name = "antlr4-cpp-runtime",
+        actual = "@antlr4_runtimes//:cpp",
     )
+    """,
+        )
 
 def _com_github_google_perfetto():
     external_http_archive(
@@ -544,7 +556,7 @@ cc_library(
 """,
     )
 
-def _com_github_nghttp2_nghttp2():
+def _com_github_nghttp2_nghttp2(bzlmod = False):
     external_http_archive(
         name = "com_github_nghttp2_nghttp2",
         build_file_content = BUILD_ALL_CONTENT,
@@ -554,10 +566,11 @@ def _com_github_nghttp2_nghttp2():
         # https://github.com/envoyproxy/envoy/pull/8572#discussion_r334067786
         patches = ["@envoy//bazel/foreign_cc:nghttp2.patch"],
     )
-    native.bind(
-        name = "nghttp2",
-        actual = "@envoy//bazel/foreign_cc:nghttp2",
-    )
+    if not bzlmod:
+        native.bind(
+            name = "nghttp2",
+            actual = "@envoy//bazel/foreign_cc:nghttp2",
+        )
 
 def _com_github_msgpack_cpp():
     external_http_archive(
@@ -631,33 +644,35 @@ def _com_google_googletest():
 # the direct Bazel path at all sites.  This will make it easier to
 # pull in more bits of abseil as needed, and is now the preferred
 # method for pure Bazel deps.
-def _com_google_absl():
-    external_http_archive(
-        name = "com_google_absl",
-        patches = ["@envoy//bazel:abseil.patch"],
-        patch_args = ["-p1"],
-        repo_mapping = {"@googletest": "@com_google_googletest"},
-    )
+def _com_google_absl(bzlmod = False):
+    if not bzlmod:
+        external_http_archive(
+            name = "com_google_absl",
+            patches = ["@envoy//bazel:abseil.patch"],
+            patch_args = ["-p1"],
+            repo_mapping = {"@googletest": "@com_google_googletest"},
+        )
 
-    # keep these until jwt_verify_lib is updated.
-    native.bind(
-        name = "abseil_flat_hash_map",
-        actual = "@com_google_absl//absl/container:flat_hash_map",
-    )
-    native.bind(
-        name = "abseil_flat_hash_set",
-        actual = "@com_google_absl//absl/container:flat_hash_set",
-    )
-    native.bind(
-        name = "abseil_strings",
-        actual = "@com_google_absl//absl/strings:strings",
-    )
-    native.bind(
-        name = "abseil_time",
-        actual = "@com_google_absl//absl/time:time",
-    )
+    if not bzlmod:
+        # keep these until jwt_verify_lib is updated.
+        native.bind(
+            name = "abseil_flat_hash_map",
+            actual = "@com_google_absl//absl/container:flat_hash_map",
+        )
+        native.bind(
+            name = "abseil_flat_hash_set",
+            actual = "@com_google_absl//absl/container:flat_hash_set",
+        )
+        native.bind(
+            name = "abseil_strings",
+            actual = "@com_google_absl//absl/strings:strings",
+        )
+        native.bind(
+            name = "abseil_time",
+            actual = "@com_google_absl//absl/time:time",
+        )
 
-def _com_google_protobuf():
+def _com_google_protobuf(bzlmod = False):
     external_http_archive(
         name = "rules_python",
     )
@@ -685,59 +700,61 @@ def _com_google_protobuf():
         patch_args = ["-p1"],
     )
 
-    # Needed by grpc, jwt_verify_lib, maybe others.
-    native.bind(
-        name = "protobuf",
-        actual = "@com_google_protobuf//:protobuf",
-    )
-    native.bind(
-        name = "protobuf_clib",
-        actual = "@com_google_protobuf//:protoc_lib",
-    )
-    native.bind(
-        name = "protocol_compiler",
-        actual = "@com_google_protobuf//:protoc",
-    )
+    if not bzlmod:
+        # Needed by grpc, jwt_verify_lib, maybe others.
+        native.bind(
+            name = "protobuf",
+            actual = "@com_google_protobuf//:protobuf",
+        )
+        native.bind(
+            name = "protobuf_clib",
+            actual = "@com_google_protobuf//:protoc_lib",
+        )
+        native.bind(
+            name = "protocol_compiler",
+            actual = "@com_google_protobuf//:protoc",
+        )
 
-    # Needed for `bazel fetch` to work with @com_google_protobuf
-    # https://github.com/google/protobuf/blob/v3.6.1/util/python/BUILD#L6-L9
-    native.bind(
-        name = "python_headers",
-        actual = "//bazel:python_headers",
-    )
+        # Needed for `bazel fetch` to work with @com_google_protobuf
+        # https://github.com/google/protobuf/blob/v3.6.1/util/python/BUILD#L6-L9
+        native.bind(
+            name = "python_headers",
+            actual = "//bazel:python_headers",
+        )
 
-    # Needed by grpc until we update again.
-    native.bind(
-        name = "upb_base_lib",
-        actual = "@com_google_protobuf//upb:base",
-    )
-    native.bind(
-        name = "upb_mem_lib",
-        actual = "@com_google_protobuf//upb:mem",
-    )
-    native.bind(
-        name = "upb_message_lib",
-        actual = "@com_google_protobuf//upb:message",
-    )
-    native.bind(
-        name = "upb_json_lib",
-        actual = "@com_google_protobuf//upb:json",
-    )
-    native.bind(
-        name = "upb_textformat_lib",
-        actual = "@com_google_protobuf//upb:text",
-    )
-    native.bind(
-        name = "upb_reflection",
-        actual = "@com_google_protobuf//upb:reflection",
-    )
+        # Needed by grpc until we update again.
+        native.bind(
+            name = "upb_base_lib",
+            actual = "@com_google_protobuf//upb:base",
+        )
+        native.bind(
+            name = "upb_mem_lib",
+            actual = "@com_google_protobuf//upb:mem",
+        )
+        native.bind(
+            name = "upb_message_lib",
+            actual = "@com_google_protobuf//upb:message",
+        )
+        native.bind(
+            name = "upb_json_lib",
+            actual = "@com_google_protobuf//upb:json",
+        )
+        native.bind(
+            name = "upb_textformat_lib",
+            actual = "@com_google_protobuf//upb:text",
+        )
+        native.bind(
+            name = "upb_reflection",
+            actual = "@com_google_protobuf//upb:reflection",
+        )
 
-def _v8():
-    external_http_archive(
-        name = "v8",
-        patches = [
-            "@envoy//bazel:v8.patch",
-            "@envoy//bazel:v8_ppc64le.patch",
+def _v8(bzlmod = False):
+    if not bzlmod:
+        external_http_archive(
+            name = "v8",
+            patches = [
+                "@envoy//bazel:v8.patch",
+                "@envoy//bazel:v8_ppc64le.patch",
         ],
         patch_args = ["-p1"],
         patch_cmds = [
@@ -751,12 +768,29 @@ def _v8():
             "@icu": "@com_github_unicode_org_icu",
         },
     )
-
-    # Needed by proxy_wasm_cpp_host.
-    native.bind(
-        name = "wee8",
-        actual = "@v8//:wee8",
+    else:
+        external_http_archive(
+            name = "v8",
+            patches = [
+                "@envoy//bazel:v8.patch",
+                "@envoy//bazel:v8_ppc64le.patch",
+        ],
+        patch_args = ["-p1"],
+        patch_cmds = [
+            "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/simdutf/simdutf.h\"!#include \"simdutf.h\"!' {} \\;",
+            "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/fp16/src/include/fp16.h\"!#include \"fp16.h\"!' {} \\;",
+            "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/dragonbox/src/include/dragonbox/dragonbox.h\"!#include \"dragonbox/dragonbox.h\"!' {} \\;",
+            "find ./src ./include -type f -exec sed -i.bak -e 's!#include \"third_party/fast_float/src/include/fast_float/!#include \"fast_float/!' {} \\;",
+        ],
     )
+
+
+    if not bzlmod:
+        # Needed by proxy_wasm_cpp_host.
+        native.bind(
+            name = "wee8",
+            actual = "@v8//:wee8",
+        )
 
 def _fast_float():
     external_http_archive(
@@ -812,74 +846,77 @@ def _org_llvm_releases_compiler_rt():
         build_file = "@envoy//bazel/external:compiler_rt.BUILD",
     )
 
-def _com_github_grpc_grpc():
-    external_http_archive(
-        name = "com_github_grpc_grpc",
-        patch_args = ["-p1"],
-        patches = ["@envoy//bazel:grpc.patch"],
-        repo_mapping = {"@openssl": "@boringssl"},
-    )
+def _com_github_grpc_grpc(bzlmod = False):
+    if not bzlmod: 
+        external_http_archive(
+            name = "com_github_grpc_grpc",
+            patch_args = ["-p1"],
+            patches = ["@envoy//bazel:grpc.patch"],
+            repo_mapping = {"@openssl": "@boringssl"},
+        )
     external_http_archive(
         "build_bazel_rules_apple",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:rules_apple.patch"],
     )
 
-    # Rebind some stuff to match what the gRPC Bazel is expecting.
-    native.bind(
-        name = "protobuf_headers",
-        actual = "@com_google_protobuf//:protobuf_headers",
-    )
-    native.bind(
-        name = "libssl",
-        actual = "//external:ssl",
-    )
-    native.bind(
-        name = "libcrypto",
-        actual = "//external:crypto",
-    )
+    if not bzlmod:
+        # Rebind some stuff to match what the gRPC Bazel is expecting.
+        native.bind(
+            name = "protobuf_headers",
+            actual = "@com_google_protobuf//:protobuf_headers",
+        )
+        native.bind(
+            name = "libssl",
+            actual = "//external:ssl",
+        )
+        native.bind(
+            name = "libcrypto",
+            actual = "//external:crypto",
+        )
 
-    native.bind(
-        name = "cares",
-        actual = "@envoy//bazel/foreign_cc:ares",
-    )
+        native.bind(
+            name = "cares",
+            actual = "@envoy//bazel/foreign_cc:ares",
+        )
 
-    native.bind(
-        name = "grpc",
-        actual = "@com_github_grpc_grpc//:grpc++",
-    )
+        native.bind(
+            name = "grpc",
+            actual = "@com_github_grpc_grpc//:grpc++",
+        )
 
-    native.bind(
-        name = "grpc_health_proto",
-        actual = "@envoy//bazel:grpc_health_proto",
-    )
+        native.bind(
+            name = "grpc_health_proto",
+            actual = "@envoy//bazel:grpc_health_proto",
+        )
 
-    native.bind(
-        name = "grpc_alts_fake_handshaker_server",
-        actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:fake_handshaker_lib",
-    )
+        native.bind(
+            name = "grpc_alts_fake_handshaker_server",
+            actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:fake_handshaker_lib",
+        )
 
-    native.bind(
-        name = "grpc_alts_handshaker_proto",
-        actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:handshaker_proto",
-    )
+        native.bind(
+            name = "grpc_alts_handshaker_proto",
+            actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:handshaker_proto",
+        )
 
-    native.bind(
-        name = "grpc_alts_transport_security_common_proto",
-        actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:transport_security_common_proto",
-    )
+        native.bind(
+            name = "grpc_alts_transport_security_common_proto",
+            actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:transport_security_common_proto",
+        )
 
 def _rules_proto_grpc():
     external_http_archive("rules_proto_grpc")
 
-def _re2():
+def _re2(bzlmod = False):
     external_http_archive("com_googlesource_code_re2")
 
     # Needed by grpc.
-    native.bind(
-        name = "re2",
-        actual = "@com_googlesource_code_re2//:re2",
-    )
+    if not bzlmod:
+        native.bind(
+            name = "re2",
+            actual = "@com_googlesource_code_re2//:re2",
+        )
 
 def _proxy_wasm_cpp_sdk():
     external_http_archive(
@@ -931,26 +968,28 @@ def _com_github_gperftools_gperftools():
         build_file_content = BUILD_ALL_CONTENT,
     )
 
-def _com_github_wamr():
+def _com_github_wamr(bzlmod = False):
     external_http_archive(
         name = "com_github_wamr",
         build_file_content = BUILD_ALL_CONTENT,
     )
-    native.bind(
-        name = "wamr",
-        actual = "@envoy//bazel/foreign_cc:wamr",
-    )
+    if not bzlmod:
+        native.bind(
+            name = "wamr",
+            actual = "@envoy//bazel/foreign_cc:wamr",
+        )
 
-def _com_github_wasmtime():
+def _com_github_wasmtime(bzlmod = False):
     external_http_archive(
         name = "com_github_wasmtime",
         build_file = "@proxy_wasm_cpp_host//:bazel/external/wasmtime.BUILD",
     )
 
-    native.bind(
-        name = "wasmtime",
-        actual = "@com_github_wasmtime//:wasmtime_lib",
-    )
+    if not bzlmod:
+        native.bind(
+            name = "wasmtime",
+            actual = "@com_github_wasmtime//:wasmtime_lib",
+        )
 
 def _intel_dlb():
     external_http_archive(

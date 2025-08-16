@@ -65,6 +65,8 @@ load(
     _envoy_sh_test = "envoy_sh_test",
 )
 
+_IS_BZLMOD = str(Label("//:invalid")).startswith("@@")
+
 def envoy_package(default_visibility = ["//visibility:public"]):
     native.package(default_visibility = default_visibility)
 
@@ -195,18 +197,26 @@ def envoy_proto_descriptor(name, out, srcs = [], external_deps = []):
     include_paths = [".", native.package_name()]
 
     if "api_httpbody_protos" in external_deps:
-        srcs.append("@com_google_googleapis//google/api:httpbody.proto")
-        include_paths.append("external/com_google_googleapis")
+        if _IS_BZLMOD:
+            srcs.append("@com_google_googleapis//google/api:httpbody_proto")
+        else:
+            srcs.append("@com_google_googleapis//google/api:httpbody.proto")
+            include_paths.append("external/com_google_googleapis")
 
     if "http_api_protos" in external_deps:
-        srcs.append("@com_google_googleapis//google/api:annotations.proto")
-        srcs.append("@com_google_googleapis//google/api:http.proto")
-        include_paths.append("external/com_google_googleapis")
+        if _IS_BZLMOD:
+            srcs.append("@com_google_googleapis//google/api:annotations_proto")
+            srcs.append("@com_google_googleapis//google/api:http_proto")
+        else:
+            srcs.append("@com_google_googleapis//google/api:annotations.proto")
+            srcs.append("@com_google_googleapis//google/api:http.proto")
+            include_paths.append("external/com_google_googleapis")
 
     if "well_known_protos" in external_deps:
         srcs.append("@com_google_protobuf//:well_known_type_protos")
         srcs.append("@com_google_protobuf//:descriptor_proto_srcs")
-        include_paths.append("external/com_google_protobuf/src")
+        if not _IS_BZLMOD:
+            include_paths.append("external/com_google_protobuf/src")
 
     options = ["--include_imports"]
     options.extend(["-I" + include_path for include_path in include_paths])
