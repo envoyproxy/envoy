@@ -113,7 +113,7 @@ private:
         envoy::config::core::v3::Address addr_proto;
         addr_proto.mutable_socket_address()->set_address(proxy_info_hostname);
         addr_proto.mutable_socket_address()->set_port_value(1234);
-        ProtobufWkt::Any anypb;
+        Protobuf::Any anypb;
         anypb.PackFrom(addr_proto);
         metadata->mutable_typed_filter_metadata()->emplace(std::make_pair(metadata_key, anypb));
         EXPECT_CALL(*host, metadata()).Times(AnyNumber()).WillRepeatedly(Return(metadata));
@@ -150,14 +150,6 @@ TEST_P(Http11ConnectTest, InjectsHeaderOnlyOnceTransportSocketOpts) {
 
 TEST_P(Http11ConnectTest, HostWithPort) {
   initialize(false, 443);
-  injectHeaderOnceTest();
-}
-
-TEST_P(Http11ConnectTest, ProxySslPortRuntimeGuardDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.proxy_ssl_port", "false"}});
-
-  initialize();
   injectHeaderOnceTest();
 }
 

@@ -267,7 +267,7 @@ TEST_F(CelMatcherTest, CelMatcherDynamicMetadataNotMatched) {
 TEST_F(CelMatcherTest, CelMatcherTypedDynamicMetadataMatched) {
   ::envoy::config::core::v3::Pipe pipe;
   pipe.set_path("/foo/bar/baz.fads");
-  ProtobufWkt::Any typed_metadata;
+  Protobuf::Any typed_metadata;
   typed_metadata.PackFrom(pipe);
   stream_info_.metadata_.mutable_typed_filter_metadata()->insert(
       {std::string(kFilterNamespace), typed_metadata});
@@ -475,6 +475,52 @@ TEST_F(CelMatcherTest, CelMatcherRequestResponseNotMatchedWithParsedExprUseCel) 
 TEST_F(CelMatcherTest, NoCelExpression) {
   EXPECT_DEATH(buildMatcherTree(RequestHeaderCelExprString, ExpressionType::NoExpression),
                ".*panic: unset oneof.*");
+}
+
+// Add a test case specifically for testing format conversion
+TEST_F(CelMatcherTest, FormatConversionV1AlphaToDevCel) {
+  // Use RequestHeaderCelExprString which is already defined and works
+  auto matcher_tree = buildMatcherTree(RequestHeaderCelExprString);
+
+  TestRequestHeaderMapImpl request_headers = default_headers_;
+  buildCustomHeader({{"authenticated_user", "staging"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  const auto result = matcher_tree->match(data_);
+  // The match was complete, match found since user is "staging"
+  EXPECT_TRUE(result.isMatch());
+  EXPECT_NE(result.action(), nullptr);
+}
+
+// Test that we can parse and evaluate expressions in dev.cel format
+TEST_F(CelMatcherTest, DevCelExpressionFormat) {
+  // Use the same RequestHeaderCelExprString with use_cel=true
+  auto matcher_tree =
+      buildMatcherTree(RequestHeaderCelExprString, ExpressionType::ParsedExpression, true);
+
+  TestRequestHeaderMapImpl request_headers = default_headers_;
+  buildCustomHeader({{"authenticated_user", "staging"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  const auto result = matcher_tree->match(data_);
+  // The match was complete, match found
+  EXPECT_TRUE(result.isMatch());
+  EXPECT_NE(result.action(), nullptr);
+}
+
+// Test with different types of expressions and formats
+TEST_F(CelMatcherTest, MixedFormatExpressions) {
+  // Use RequestHeaderCelExprString with CheckedExpression format
+  auto matcher_tree1 =
+      buildMatcherTree(RequestHeaderCelExprString, ExpressionType::CheckedExpression);
+
+  TestRequestHeaderMapImpl request_headers = default_headers_;
+  buildCustomHeader({{"authenticated_user", "staging"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  const auto result1 = matcher_tree1->match(data_);
+  EXPECT_TRUE(result1.isMatch());
+  EXPECT_NE(result1.action(), nullptr);
 }
 
 } // namespace CelMatcher

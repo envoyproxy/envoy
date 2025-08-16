@@ -70,7 +70,8 @@ addDenyResponseHeadersCb(const DenyResponseSettings& settings) {
 Http::FilterHeadersStatus sendDenyResponse(Http::StreamDecoderFilterCallbacks* cb,
                                            const DenyResponseSettings& settings,
                                            StreamInfo::CoreResponseFlag flag) {
-  cb->sendLocalReply(getDenyResponseCode(settings), settings.http_body().value(),
+  cb->sendLocalReply(getDenyResponseCode(settings),
+                     MessageUtil::bytesToString(settings.http_body().value()),
                      addDenyResponseHeadersCb(settings), absl::nullopt, "");
   cb->streamInfo().setResponseFlag(flag);
   return Envoy::Http::FilterHeadersStatus::StopIteration;
@@ -111,7 +112,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
             bucket_id, bucket_id_proto.DebugString());
 
   // Add the matched bucket_id to dynamic metadata for logging.
-  ProtobufWkt::Struct bucket_log;
+  Protobuf::Struct bucket_log;
   auto* bucket_log_fields = bucket_log.mutable_fields();
   for (const auto& bucket : bucket_id_proto.bucket()) {
     (*bucket_log_fields)[bucket.first] = ValueUtil::stringValue(bucket.second);

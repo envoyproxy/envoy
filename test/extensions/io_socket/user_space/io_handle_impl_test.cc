@@ -1205,8 +1205,8 @@ public:
 
 TEST_F(IoHandleImplTest, PassthroughState) {
   auto source_metadata = std::make_unique<envoy::config::core::v3::Metadata>();
-  ProtobufWkt::Struct& map = (*source_metadata->mutable_filter_metadata())["envoy.test"];
-  ProtobufWkt::Value val;
+  Protobuf::Struct& map = (*source_metadata->mutable_filter_metadata())["envoy.test"];
+  Protobuf::Value val;
   val.set_string_value("val");
   (*map.mutable_fields())["key"] = val;
   StreamInfo::FilterState::Objects source_filter_state;

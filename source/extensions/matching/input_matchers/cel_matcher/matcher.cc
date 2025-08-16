@@ -14,21 +14,51 @@ CelInputMatcher::CelInputMatcher(CelMatcherSharedPtr cel_matcher,
     : builder_(builder), cel_matcher_(std::move(cel_matcher)) {
   const CelExpression& input_expr = cel_matcher_->expr_match();
 
+  // First try to get expression from the new CEL canonical format
   auto expr = Filters::Common::Expr::getExpr(input_expr);
   if (expr.has_value()) {
     compiled_expr_ = Filters::Common::Expr::createExpression(builder_->builder(), expr.value());
     return;
   }
 
+  // Fallback to handling legacy formats for backward compatibility
   switch (input_expr.expr_specifier_case()) {
-  case CelExpression::ExprSpecifierCase::kParsedExpr:
-    compiled_expr_ = Filters::Common::Expr::createExpression(builder_->builder(),
-                                                             input_expr.parsed_expr().expr());
+  case CelExpression::ExprSpecifierCase::kParsedExpr: {
+    // For legacy parsed_expr, we need to convert to the new format
+    const auto& legacy_parsed = input_expr.parsed_expr();
+
+    // Convert legacy expr to cel::expr::Expr format
+    std::string serialized_expr;
+    if (!legacy_parsed.expr().SerializeToString(&serialized_expr)) {
+      throw EnvoyException("Failed to serialize legacy expression");
+    }
+
+    converted_expr_ = cel::expr::Expr();
+    if (!converted_expr_->ParseFromString(serialized_expr)) {
+      throw EnvoyException("Failed to convert legacy expression to new format");
+    }
+
+    compiled_expr_ = Filters::Common::Expr::createExpression(builder_->builder(), *converted_expr_);
     return;
-  case CelExpression::ExprSpecifierCase::kCheckedExpr:
-    compiled_expr_ = Filters::Common::Expr::createExpression(builder_->builder(),
-                                                             input_expr.checked_expr().expr());
+  }
+  case CelExpression::ExprSpecifierCase::kCheckedExpr: {
+    // For legacy checked_expr, we need to convert to the new format
+    const auto& legacy_checked = input_expr.checked_expr();
+
+    // Convert legacy expr to cel::expr::Expr format
+    std::string serialized_expr;
+    if (!legacy_checked.expr().SerializeToString(&serialized_expr)) {
+      throw EnvoyException("Failed to serialize legacy expression");
+    }
+
+    converted_expr_ = cel::expr::Expr();
+    if (!converted_expr_->ParseFromString(serialized_expr)) {
+      throw EnvoyException("Failed to convert legacy expression to new format");
+    }
+
+    compiled_expr_ = Filters::Common::Expr::createExpression(builder_->builder(), *converted_expr_);
     return;
+  }
   case CelExpression::ExprSpecifierCase::EXPR_SPECIFIER_NOT_SET:
     PANIC_DUE_TO_PROTO_UNSET;
   }

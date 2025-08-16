@@ -10,7 +10,7 @@
 namespace Envoy {
 namespace {
 
-std::vector<std::string> stringsFromListValue(const ProtobufWkt::Value& value) {
+std::vector<std::string> stringsFromListValue(const Protobuf::Value& value) {
   std::vector<std::string> strings;
   for (const auto& elt : value.list_value().values()) {
     strings.push_back(elt.string_value());
@@ -30,8 +30,8 @@ TEST(CheckExtensionsAgainstRegistry, CorrectMetadata) {
   const std::string manifest_path =
       TestEnvironment::runfilesPath("source/extensions/extensions_metadata.yaml");
   const std::string manifest = TestEnvironment::readFileToStringForTest(manifest_path);
-  ProtobufWkt::Value value = ValueUtil::loadFromYaml(manifest);
-  ASSERT_EQ(ProtobufWkt::Value::kStructValue, value.kind_case());
+  Protobuf::Value value = ValueUtil::loadFromYaml(manifest);
+  ASSERT_EQ(Protobuf::Value::kStructValue, value.kind_case());
   const auto& json = value.struct_value();
 
   for (const auto& ext : Registry::FactoryCategoryRegistry::registeredFactories()) {
@@ -45,7 +45,7 @@ TEST(CheckExtensionsAgainstRegistry, CorrectMetadata) {
         ENVOY_LOG_MISC(warn, "Missing extension '{}' from category '{}'.", name, ext.first);
         continue;
       }
-      ASSERT_EQ(ProtobufWkt::Value::kStructValue, it->second.kind_case())
+      ASSERT_EQ(Protobuf::Value::kStructValue, it->second.kind_case())
           << "Malformed extension metadata for: " << name;
       const auto& extension_fields = it->second.struct_value().fields();
 

@@ -326,7 +326,7 @@ ExtProcLoggingInfo::grpcCalls(envoy::config::core::v3::TrafficDirection traffic_
 }
 
 ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
-  auto struct_msg = std::make_unique<ProtobufWkt::Struct>();
+  auto struct_msg = std::make_unique<Protobuf::Struct>();
 
   if (decoding_processor_grpc_calls_.header_stats_) {
     (*struct_msg->mutable_fields())[RequestHeaderLatencyUsField].set_number_value(
@@ -1311,7 +1311,7 @@ void Filter::logStreamInfo() {
   }
 }
 
-void Filter::onNewTimeout(const ProtobufWkt::Duration& override_message_timeout) {
+void Filter::onNewTimeout(const Protobuf::Duration& override_message_timeout) {
   const auto result = DurationUtil::durationToMillisecondsNoThrow(override_message_timeout);
   if (!result.ok()) {
     ENVOY_STREAM_LOG(warn,

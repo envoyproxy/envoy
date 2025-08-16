@@ -385,7 +385,7 @@ UdpProxyFilter::ActiveSession::createDownstreamConnectionInfoProvider() {
 }
 
 void UdpProxyFilter::ActiveSession::fillSessionStreamInfo() {
-  ProtobufWkt::Struct stats_obj;
+  Protobuf::Struct stats_obj;
   auto& fields_map = *stats_obj.mutable_fields();
   if (cluster_ != nullptr) {
     fields_map["cluster_name"] = ValueUtil::stringValue(cluster_->cluster_info_->name());
@@ -402,7 +402,7 @@ void UdpProxyFilter::ActiveSession::fillSessionStreamInfo() {
 }
 
 void UdpProxyFilter::fillProxyStreamInfo() {
-  ProtobufWkt::Struct stats_obj;
+  Protobuf::Struct stats_obj;
   auto& fields_map = *stats_obj.mutable_fields();
   fields_map["bytes_sent"] =
       ValueUtil::numberValue(config_->stats().downstream_sess_tx_bytes_.value());
@@ -1070,20 +1070,14 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamFailure(
     break;
   case ConnectionPool::PoolFailureReason::Timeout:
     udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.enable_udp_proxy_outlier_detection")) {
-      host.outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginTimeout);
-    }
+    host.outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginTimeout);
     onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
     break;
   case ConnectionPool::PoolFailureReason::RemoteConnectionFailure:
     if (connecting_) {
       udp_session_info_.setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamConnectionFailure);
     }
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.enable_udp_proxy_outlier_detection")) {
-      host.outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectFailed);
-    }
+    host.outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectFailed);
     onUpstreamEvent(Network::ConnectionEvent::RemoteClose);
     break;
   }
@@ -1105,10 +1099,7 @@ void UdpProxyFilter::TunnelingActiveSession::onStreamReady(StreamInfo::StreamInf
   connecting_ = false;
   can_send_upstream_ = true;
   cluster_->cluster_stats_.sess_tunnel_success_.inc();
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.enable_udp_proxy_outlier_detection")) {
-    host.outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccessFinal);
-  }
+  host.outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccessFinal);
 
   if (filter_.config_->flushAccessLogOnTunnelConnected()) {
     fillSessionStreamInfo();

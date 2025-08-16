@@ -22,6 +22,7 @@
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/xds_resource.h"
 #include "source/common/http/conn_manager_config.h"
 #include "source/common/http/conn_manager_utility.h"
 #include "source/common/http/default_server_string.h"
@@ -204,6 +205,20 @@ createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::
   }
 #endif
   return header_validator_factory;
+}
+
+// Validates that an RDS config either has a config_source or an xdstp
+// route_config_name defined.
+absl::Status
+validateRds(const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds) {
+  if (!rds.has_config_source() &&
+      !Config::XdsResourceIdentifier::hasXdsTpScheme(rds.route_config_name())) {
+    return absl::InvalidArgumentError(
+        fmt::format("An RDS config must have either a 'config_source' or an xDS-TP based "
+                    "'route_config_name'. Error while parsing RDS config:\n{}",
+                    rds.DebugString()));
+  }
+  return absl::OkStatus();
 }
 
 } // namespace
@@ -545,6 +560,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   switch (config.route_specifier_case()) {
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kRds:
+    SET_AND_RETURN_IF_NOT_OK(validateRds(config.rds()), creation_status);
     route_config_provider_ = route_config_provider_manager.createRdsRouteConfigProvider(
         // At the creation of a RDS route config provider, the factory_context's initManager is
         // always valid, though the init manager may go away later when the listener goes away.

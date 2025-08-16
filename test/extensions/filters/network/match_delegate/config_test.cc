@@ -46,7 +46,7 @@ struct TestFactory : public Envoy::Server::Configuration::NamedNetworkFilterConf
   std::string name() const override { return "test"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
 
   absl::StatusOr<Envoy::Network::FilterFactoryCb>
@@ -376,7 +376,7 @@ TEST(DelegatingNetworkFilterManager, RemoveReadFilterAndInitializeReadFilters) {
 }
 
 // Custom action type for testing non-skip action
-class TestAction : public Matcher::ActionBase<ProtobufWkt::StringValue> {
+class TestAction : public Matcher::ActionBase<Protobuf::StringValue> {
 public:
   explicit TestAction(const std::string& value = "test_value") : value_(value) {}
 

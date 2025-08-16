@@ -90,7 +90,7 @@ paths:
     - source/common/filter/config_discovery_impl.h
     - source/common/config/utility.h
     - source/common/matcher/matcher.h
-    - source/extensions/common/matcher/trie_matcher.h
+    - source/extensions/common/matcher/ip_range_matcher.h
     - envoy/common/exception.h
     - source/common/protobuf/utility.h
     # legacy core files which throw exceptions. We can add to this list but strongly prefer
@@ -414,17 +414,6 @@ replacements:
     "absl::make_unique<": "std::make_unique<"
 
   protobuf_type_errors:
-    # Well-known types should be referenced from the ProtobufWkt namespace.
-    "Protobuf::Any": "ProtobufWkt::Any"
-    "Protobuf::Empty": "ProtobufWkt::Empty"
-    "Protobuf::ListValue": "ProtobufWkt::ListValue"
-    "Protobuf::NULL_VALUE": "ProtobufWkt::NULL_VALUE"
-    "Protobuf::StringValue": "ProtobufWkt::StringValue"
-    "Protobuf::Struct": "ProtobufWkt::Struct"
-    "Protobuf::Value": "ProtobufWkt::Value"
-    # Other common mis-namespacing of protobuf types.
-    "ProtobufWkt::Map": "Protobuf::Map"
-    "ProtobufWkt::MapPair": "Protobuf::MapPair"
     "ProtobufUtil::MessageDifferencer": "Protobuf::util::MessageDifferencer"
 
 include_angle: "#include <"

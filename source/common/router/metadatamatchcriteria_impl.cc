@@ -4,7 +4,7 @@ namespace Envoy {
 namespace Router {
 std::vector<MetadataMatchCriterionConstSharedPtr>
 MetadataMatchCriteriaImpl::extractMetadataMatchCriteria(const MetadataMatchCriteriaImpl* parent,
-                                                        const ProtobufWkt::Struct& matches) {
+                                                        const Protobuf::Struct& matches) {
   std::vector<MetadataMatchCriterionConstSharedPtr> v;
 
   // Track locations of each name (from the parent) in v to make it

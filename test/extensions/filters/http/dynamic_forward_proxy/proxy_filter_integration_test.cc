@@ -12,6 +12,7 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 using testing::HasSubstr;
@@ -1277,6 +1278,8 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndTestHappyEyeballs) {
 
 #if defined(ENVOY_ENABLE_QUIC)
 TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndHttp3) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http3_happy_eyeballs", "true"}});
   upstream_cert_name_ = ""; // Force standard TLS
   dns_hostname_ = "sni.lyft.com";
   autonomous_upstream_ = true;

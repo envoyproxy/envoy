@@ -31,7 +31,7 @@ using ::Envoy::Http::MockStreamDecoderFilterCallbacks;
 using ::Envoy::Http::MockStreamEncoderFilterCallbacks;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
-using ::Envoy::ProtobufWkt::Struct;
+using ::Envoy::Protobuf::Struct;
 using ::testing::Eq;
 
 inline constexpr const char kApiKeysDescriptorRelativePath[] = "test/proto/apikeys.descriptor";

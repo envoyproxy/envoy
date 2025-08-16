@@ -516,8 +516,8 @@ TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
   EXPECT_EQ("test_value",
             Config::Metadata::metadataValue(&stream_info.dynamicMetadata(), "com.test", "test_key")
                 .string_value());
-  ProtobufWkt::Struct struct_obj2;
-  ProtobufWkt::Value val2;
+  Protobuf::Struct struct_obj2;
+  Protobuf::Value val2;
   val2.set_string_value("another_value");
   (*struct_obj2.mutable_fields())["another_key"] = val2;
   stream_info.setDynamicMetadata("com.test", struct_obj2);

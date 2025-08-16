@@ -373,10 +373,7 @@ bool ActiveStreamEncoderFilter::canContinue() {
   // As with ActiveStreamDecoderFilter::canContinue() make sure we do not
   // continue if a local reply has been sent or ActiveStreamDecoderFilter::recreateStream() is
   // called, etc.
-  return !parent_.state_.encoder_filter_chain_complete_ &&
-         (!Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.filter_chain_aborted_can_not_continue") ||
-          !parent_.stopEncoderFilterChain());
+  return !parent_.state_.encoder_filter_chain_complete_ && !parent_.stopEncoderFilterChain();
 }
 
 Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
@@ -1014,9 +1011,7 @@ void DownstreamFilterManager::sendLocalReply(
 
   if (!filter_manager_callbacks_.responseHeaders().has_value() &&
       (!filter_manager_callbacks_.informationalHeaders().has_value() ||
-       (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.local_reply_traverses_filter_chain_after_1xx") &&
-        !(state_.filter_call_state_ & FilterCallState::IsEncodingMask)))) {
+       !(state_.filter_call_state_ & FilterCallState::IsEncodingMask))) {
     // If the response has not started at all, or if the only response so far is an informational
     // 1xx that has already been fully processed, send the response through the filter chain.
 

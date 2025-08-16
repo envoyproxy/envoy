@@ -23,9 +23,9 @@ INSTANTIATE_TEST_SUITE_P(Protocols, ListenerTypedMetadataIntegrationTest,
 
 TEST_P(ListenerTypedMetadataIntegrationTest, Hello) {
   // Add some typed metadata to the listener.
-  ProtobufWkt::StringValue value;
+  Protobuf::StringValue value;
   value.set_value("hello world");
-  ProtobufWkt::Any packed_value;
+  Protobuf::Any packed_value;
   packed_value.PackFrom(value);
   config_helper_.addListenerTypedMetadata("test.listener.typed.metadata", packed_value);
 
@@ -77,9 +77,9 @@ TEST_P(ListenerTypedMetadataIntegrationTest, ListenerMetadataPlumbingToAccessLog
   Registry::InjectFactory<AccessLog::AccessLogInstanceFactory> factory_register(factory);
 
   // Add some typed metadata to the listener.
-  ProtobufWkt::StringValue value;
+  Protobuf::StringValue value;
   value.set_value("hello world");
-  ProtobufWkt::Any packed_value;
+  Protobuf::Any packed_value;
   packed_value.PackFrom(value);
   config_helper_.addListenerTypedMetadata("test.listener.typed.metadata", packed_value);
 

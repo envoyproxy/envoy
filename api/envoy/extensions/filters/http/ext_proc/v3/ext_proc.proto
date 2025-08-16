@@ -168,11 +168,7 @@ message ExternalProcessor {
     (xds.annotations.v3.field_status).work_in_progress = true
   ];
 
-  // If the ``BodySendMode`` in the
-  // :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
-  // is set to ``FULL_DUPLEX_STREAMED``, ``failure_mode_allow`` can not be set to true.
-  //
-  // Otherwise, by default, if in the following cases:
+  // By default, if in the following cases:
   //
   // 1. The gRPC stream cannot be established.
   //

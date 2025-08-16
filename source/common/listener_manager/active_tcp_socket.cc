@@ -173,13 +173,11 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
   }
 }
 
-void ActiveTcpSocket::setDynamicMetadata(const std::string& name,
-                                         const ProtobufWkt::Struct& value) {
+void ActiveTcpSocket::setDynamicMetadata(const std::string& name, const Protobuf::Struct& value) {
   stream_info_->setDynamicMetadata(name, value);
 }
 
-void ActiveTcpSocket::setDynamicTypedMetadata(const std::string& name,
-                                              const ProtobufWkt::Any& value) {
+void ActiveTcpSocket::setDynamicTypedMetadata(const std::string& name, const Protobuf::Any& value) {
   stream_info_->setDynamicTypedMetadata(name, value);
 }
 

@@ -23,7 +23,7 @@ public:
 
 class PoliteFilter : public Network::Filter, Logger::Loggable<Logger::Id::filter> {
 public:
-  PoliteFilter(TestParent& parent, const ProtobufWkt::StringValue& value)
+  PoliteFilter(TestParent& parent, const Protobuf::StringValue& value)
       : parent_(parent), greeting_(value.value()) {}
 
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override {
@@ -80,14 +80,14 @@ public:
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message& proto_config,
                                Server::Configuration::UpstreamFactoryContext&) override {
-    auto config = dynamic_cast<const ProtobufWkt::StringValue&>(proto_config);
+    auto config = dynamic_cast<const Protobuf::StringValue&>(proto_config);
     return [this, config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addFilter(std::make_shared<PoliteFilter>(test_parent_, config));
     };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
 
   std::string name() const override { return "envoy.upstream.polite"; }
@@ -139,7 +139,7 @@ public:
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
       auto* filter = cluster_0->add_filters();
       filter->set_name("envoy.upstream.polite");
-      ProtobufWkt::StringValue config;
+      Protobuf::StringValue config;
       config.set_value("surely ");
       filter->mutable_typed_config()->PackFrom(config);
     });
@@ -199,7 +199,7 @@ public:
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
       auto* filter = cluster_0->add_filters();
       filter->set_name("envoy.upstream.polite");
-      ProtobufWkt::StringValue config;
+      Protobuf::StringValue config;
       config.set_value("");
       filter->mutable_typed_config()->PackFrom(config);
     });

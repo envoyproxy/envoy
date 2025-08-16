@@ -22,11 +22,11 @@ namespace HttpFilters {
 namespace JwtAuthn {
 namespace {
 
-ProtobufWkt::Struct getExpectedPayload(const std::string& name) {
-  ProtobufWkt::Struct expected_payload;
+Protobuf::Struct getExpectedPayload(const std::string& name) {
+  Protobuf::Struct expected_payload;
   TestUtility::loadFromJson(ExpectedPayloadJSON, expected_payload);
 
-  ProtobufWkt::Struct struct_obj;
+  Protobuf::Struct struct_obj;
   *(*struct_obj.mutable_fields())[name].mutable_struct_value() = expected_payload;
   return struct_obj;
 }
@@ -60,10 +60,9 @@ TEST_F(ProviderVerifierTest, TestOkJWT) {
   createVerifier();
   MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, PublicKey);
 
-  EXPECT_CALL(mock_cb_, setExtractedData(_))
-      .WillOnce(Invoke([](const ProtobufWkt::Struct& payload) {
-        EXPECT_TRUE(TestUtility::protoEqual(payload, getExpectedPayload("my_payload")));
-      }));
+  EXPECT_CALL(mock_cb_, setExtractedData(_)).WillOnce(Invoke([](const Protobuf::Struct& payload) {
+    EXPECT_TRUE(TestUtility::protoEqual(payload, getExpectedPayload("my_payload")));
+  }));
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
 
@@ -91,14 +90,13 @@ TEST_F(ProviderVerifierTest, TestOkJWTWithExtractedHeaderAndPayload) {
   createVerifier();
   MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, PublicKey);
 
-  EXPECT_CALL(mock_cb_, setExtractedData(_))
-      .WillOnce(Invoke([](const ProtobufWkt::Struct& payload) {
-        // The expected payload is a merged struct of the extracted (from the JWT) payload and
-        // header data with "my_payload" and "my_header" as the keys.
-        ProtobufWkt::Struct expected_payload;
-        MessageUtil::loadFromJson(ExpectedPayloadAndHeaderJSON, expected_payload);
-        EXPECT_TRUE(TestUtility::protoEqual(payload, expected_payload));
-      }));
+  EXPECT_CALL(mock_cb_, setExtractedData(_)).WillOnce(Invoke([](const Protobuf::Struct& payload) {
+    // The expected payload is a merged struct of the extracted (from the JWT) payload and
+    // header data with "my_payload" and "my_header" as the keys.
+    Protobuf::Struct expected_payload;
+    MessageUtil::loadFromJson(ExpectedPayloadAndHeaderJSON, expected_payload);
+    EXPECT_TRUE(TestUtility::protoEqual(payload, expected_payload));
+  }));
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
 
@@ -119,13 +117,12 @@ TEST_F(ProviderVerifierTest, TestExpiredJWTWithFailedStatusInMetadata) {
   createVerifier();
   MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, PublicKey);
 
-  EXPECT_CALL(mock_cb_, setExtractedData(_))
-      .WillOnce(Invoke([](const ProtobufWkt::Struct& payload) {
-        ProtobufWkt::Struct expected_payload;
-        MessageUtil::loadFromJson(ExpectedJWTExpiredStatusJSON, expected_payload);
+  EXPECT_CALL(mock_cb_, setExtractedData(_)).WillOnce(Invoke([](const Protobuf::Struct& payload) {
+    Protobuf::Struct expected_payload;
+    MessageUtil::loadFromJson(ExpectedJWTExpiredStatusJSON, expected_payload);
 
-        EXPECT_TRUE(TestUtility::protoEqual(payload, expected_payload));
-      }));
+    EXPECT_TRUE(TestUtility::protoEqual(payload, expected_payload));
+  }));
 
   EXPECT_CALL(mock_cb_, onComplete(Status::JwtExpired));
 
@@ -142,10 +139,9 @@ TEST_F(ProviderVerifierTest, TestSpanPassedDown) {
   createVerifier();
   MockUpstream mock_pubkey(mock_factory_ctx_.server_factory_context_.cluster_manager_, PublicKey);
 
-  EXPECT_CALL(mock_cb_, setExtractedData(_))
-      .WillOnce(Invoke([](const ProtobufWkt::Struct& payload) {
-        EXPECT_TRUE(TestUtility::protoEqual(payload, getExpectedPayload("my_payload")));
-      }));
+  EXPECT_CALL(mock_cb_, setExtractedData(_)).WillOnce(Invoke([](const Protobuf::Struct& payload) {
+    EXPECT_TRUE(TestUtility::protoEqual(payload, getExpectedPayload("my_payload")));
+  }));
 
   EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
 

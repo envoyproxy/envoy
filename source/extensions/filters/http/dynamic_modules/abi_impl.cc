@@ -283,7 +283,7 @@ void envoy_dynamic_module_callback_http_send_response(
  * each variant differs in the returned type of the metadata. For example, route metadata will
  * return OptRef vs upstream host metadata will return a shared pointer.
  */
-const ProtobufWkt::Struct*
+const Protobuf::Struct*
 getMetadataNamespaceImpl(const envoy::config::core::v3::Metadata& metadata,
                          envoy_dynamic_module_type_buffer_module_ptr namespace_ptr,
                          size_t namespace_length) {
@@ -306,7 +306,7 @@ getMetadataNamespaceImpl(const envoy::config::core::v3::Metadata& metadata,
  * @param namespace_length is the length of the namespace.
  * @return the metadata namespace if it exists, nullptr otherwise.
  */
-const ProtobufWkt::Struct*
+const Protobuf::Struct*
 getMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
                      envoy_dynamic_module_type_metadata_source metadata_source,
                      envoy_dynamic_module_type_buffer_module_ptr namespace_ptr,
@@ -379,7 +379,7 @@ getMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envo
  * @param namespace_length is the length of the namespace.
  * @return the metadata namespace if it exists, nullptr otherwise.
  */
-ProtobufWkt::Struct*
+Protobuf::Struct*
 getDynamicMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
                             envoy_dynamic_module_type_buffer_module_ptr namespace_ptr,
                             size_t namespace_length) {
@@ -394,7 +394,7 @@ getDynamicMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filt
   absl::string_view namespace_view(static_cast<const char*>(namespace_ptr), namespace_length);
   auto metadata_namespace = metadata->find(namespace_view);
   if (metadata_namespace == metadata->end()) {
-    metadata_namespace = metadata->emplace(namespace_view, ProtobufWkt::Struct{}).first;
+    metadata_namespace = metadata->emplace(namespace_view, Protobuf::Struct{}).first;
   }
   return &metadata_namespace->second;
 }
@@ -410,7 +410,7 @@ getDynamicMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filt
  * @param key_length is the length of the key.
  * @return the metadata value if it exists, nullptr otherwise.
  */
-const ProtobufWkt::Value*
+const Protobuf::Value*
 getMetadataValue(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
                  envoy_dynamic_module_type_metadata_source metadata_source,
                  envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
@@ -441,7 +441,7 @@ bool envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
     return false;
   }
   absl::string_view key_view(static_cast<const char*>(key_ptr), key_length);
-  ProtobufWkt::Struct metadata_value;
+  Protobuf::Struct metadata_value;
   (*metadata_value.mutable_fields())[key_view].set_number_value(value);
   metadata_namespace->MergeFrom(metadata_value);
   return true;
@@ -481,7 +481,7 @@ bool envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
   }
   absl::string_view key_view(static_cast<const char*>(key_ptr), key_length);
   absl::string_view value_view(static_cast<const char*>(value_ptr), value_length);
-  ProtobufWkt::Struct metadata_value;
+  Protobuf::Struct metadata_value;
   (*metadata_value.mutable_fields())[key_view].set_string_value(value_view);
   metadata_namespace->MergeFrom(metadata_value);
   return true;
@@ -1078,6 +1078,36 @@ void envoy_dynamic_module_callback_http_filter_continue_encoding(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   filter->continueEncoding();
+}
+
+bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level level) {
+  return Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules).level() <=
+         static_cast<spdlog::level::level_enum>(level);
+}
+
+void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level,
+                                       const char* message_ptr, size_t message_length) {
+  absl::string_view message_view(static_cast<const char*>(message_ptr), message_length);
+  spdlog::logger& logger = Envoy::Logger::Registry::getLog(Envoy::Logger::Id::dynamic_modules);
+  switch (level) {
+  case envoy_dynamic_module_type_log_level_Debug:
+    ENVOY_LOG_TO_LOGGER(logger, debug, message_view);
+    break;
+  case envoy_dynamic_module_type_log_level_Info:
+    ENVOY_LOG_TO_LOGGER(logger, info, message_view);
+    break;
+  case envoy_dynamic_module_type_log_level_Warn:
+    ENVOY_LOG_TO_LOGGER(logger, warn, message_view);
+    break;
+  case envoy_dynamic_module_type_log_level_Error:
+    ENVOY_LOG_TO_LOGGER(logger, error, message_view);
+    break;
+  case envoy_dynamic_module_type_log_level_Critical:
+    ENVOY_LOG_TO_LOGGER(logger, critical, message_view);
+    break;
+  default:
+    break;
+  }
 }
 }
 } // namespace HttpFilters

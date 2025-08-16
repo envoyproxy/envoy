@@ -14,6 +14,7 @@
 #include "quiche/common/http/http_header_block.h"
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"
+#include "quiche/quic/core/quic_types.h"
 
 namespace Envoy {
 namespace Quic {
@@ -257,10 +258,7 @@ bool EnvoyQuicClientStream::OnStopSending(quic::QuicResetStreamError error) {
     // Treat this as a remote reset, since the stream will be closed in both directions.
     runResetCallbacks(
         quicRstErrorToEnvoyRemoteResetReason(error.internal_code()),
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
-            ? absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()),
-                           "|FROM_PEER")
-            : absl::string_view());
+        absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()), "|FROM_PEER"));
   }
   return true;
 }
@@ -360,9 +358,7 @@ void EnvoyQuicClientStream::OnStreamReset(const quic::QuicRstStreamFrame& frame)
   if (write_side_closed() && !end_stream_decoded_and_encoded) {
     runResetCallbacks(
         quicRstErrorToEnvoyRemoteResetReason(frame.error_code),
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
-            ? absl::StrCat(quic::QuicRstStreamErrorCodeToString(frame.error_code), "|FROM_PEER")
-            : absl::string_view());
+        absl::StrCat(quic::QuicRstStreamErrorCodeToString(frame.error_code), "|FROM_PEER"));
   }
 }
 
@@ -374,9 +370,7 @@ void EnvoyQuicClientStream::ResetWithError(quic::QuicResetStreamError error) {
   // Upper layers expect calling resetStream() to immediately raise reset callbacks.
   runResetCallbacks(
       quicRstErrorToEnvoyLocalResetReason(error.internal_code()),
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
-          ? absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()), "|FROM_SELF")
-          : absl::string_view());
+      absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()), "|FROM_SELF"));
   if (session()->connection()->connected()) {
     quic::QuicSpdyClientStream::ResetWithError(error);
   }
