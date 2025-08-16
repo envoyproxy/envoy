@@ -23,14 +23,10 @@ CELSamplerFactory::createSampler(const Protobuf::Message& config,
       const envoy::extensions::tracers::opentelemetry::samplers::v3::CELSamplerConfig&>(
       *mptr, context.messageValidationVisitor());
 
-  auto expr = Expr::getExpr(proto_config.expression());
-  if (!expr.has_value()) {
-    throw EnvoyException("CEL expression not set");
-  }
-
   return std::make_unique<CELSampler>(
       context.serverFactoryContext().localInfo(),
-      Extensions::Filters::Common::Expr::getBuilder(context.serverFactoryContext()), expr.value());
+      Extensions::Filters::Common::Expr::getBuilder(context.serverFactoryContext()),
+      proto_config.expression());
 }
 
 /**

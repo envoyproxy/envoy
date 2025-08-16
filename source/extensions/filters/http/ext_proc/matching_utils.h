@@ -14,10 +14,7 @@ namespace ExternalProcessing {
 
 class ExpressionManager : public Logger::Loggable<Logger::Id::ext_proc> {
 public:
-  struct CelExpression {
-    cel::expr::ParsedExpr parsed_expr_;
-    Filters::Common::Expr::ExpressionPtr compiled_expr_;
-  };
+  using CelExpression = Filters::Common::Expr::CompiledExpression;
 
   ExpressionManager(Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
                     const LocalInfo::LocalInfo& local_info,

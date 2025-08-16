@@ -140,9 +140,7 @@ protected:
     }
     config_ = std::make_shared<FilterConfig>(
         proto_config, 200ms, 10000, *stats_store_.rootScope(), "", is_upstream_filter,
-        std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
-            Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
-        factory_context_);
+        Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr), factory_context_);
     filter_ = std::make_unique<Filter>(config_, std::move(client_));
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(Return(BufferSize));

@@ -24,7 +24,6 @@ using ::Envoy::Matcher::InputMatcherFactoryCb;
 using ::Envoy::Matcher::MatchingDataType;
 
 using CelMatcher = ::xds::type::matcher::v3::CelMatcher;
-using CompiledExpressionPtr = std::unique_ptr<google::api::expr::runtime::CelExpression>;
 using BaseActivationPtr = std::unique_ptr<google::api::expr::runtime::BaseActivation>;
 using CelMatcherSharedPtr = std::shared_ptr<::xds::type::matcher::v3::CelMatcher>;
 
@@ -41,12 +40,7 @@ public:
   }
 
 private:
-  Filters::Common::Expr::BuilderInstanceSharedPtr builder_;
-  // Expression proto must outlive the compiled expression.
-  CelMatcherSharedPtr cel_matcher_;
-  // Store converted expression for legacy formats to ensure proper lifetime.
-  absl::optional<cel::expr::Expr> converted_expr_;
-  CompiledExpressionPtr compiled_expr_;
+  const Filters::Common::Expr::CompiledExpression compiled_expr_;
 };
 
 } // namespace CelMatcher

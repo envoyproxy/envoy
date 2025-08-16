@@ -23,21 +23,16 @@ class ExpressionDescriptor : public RateLimit::DescriptorProducer {
 public:
   ExpressionDescriptor(
       const envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor& config,
-      Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr& builder,
-      const cel::expr::Expr& input_expr)
-      : builder_(builder), input_expr_(input_expr), descriptor_key_(config.descriptor_key()),
-        skip_if_error_(config.skip_if_error()) {
-    compiled_expr_ =
-        Extensions::Filters::Common::Expr::createExpression(builder_->builder(), input_expr_);
-  }
+      Extensions::Filters::Common::Expr::CompiledExpression&& compiled_expr)
+      : descriptor_key_(config.descriptor_key()), skip_if_error_(config.skip_if_error()),
+        compiled_expr_(std::move(compiled_expr)) {}
 
   // Ratelimit::DescriptorProducer
   bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry, const std::string&,
                           const Http::RequestHeaderMap& headers,
                           const StreamInfo::StreamInfo& info) const override {
     Protobuf::Arena arena;
-    const auto result = Filters::Common::Expr::evaluate(*compiled_expr_.get(), arena, nullptr, info,
-                                                        &headers, nullptr, nullptr);
+    const auto result = compiled_expr_.evaluate(arena, nullptr, info, &headers, nullptr, nullptr);
     if (!result.has_value() || result.value().IsError()) {
       // If result is an error and if skip_if_error is true skip this descriptor,
       // while calling rate limiting service. If skip_if_error is false, do not call rate limiting
@@ -49,11 +44,9 @@ public:
   }
 
 private:
-  Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder_;
-  const cel::expr::Expr input_expr_;
   const std::string descriptor_key_;
   const bool skip_if_error_;
-  Extensions::Filters::Common::Expr::ExpressionPtr compiled_expr_;
+  const Extensions::Filters::Common::Expr::CompiledExpression compiled_expr_;
 };
 
 } // namespace
@@ -79,20 +72,23 @@ ExprDescriptorFactory::createDescriptorProducerFromProto(
       return absl::InvalidArgumentError(absl::StrCat("Unable to parse descriptor expression: ",
                                                      parse_status.status().ToString()));
     }
-
-    return std::make_unique<ExpressionDescriptor>(config, builder, parse_status.value().expr());
+    auto compiled_expr = Extensions::Filters::Common::Expr::CompiledExpression::Create(
+        builder, parse_status.value().expr());
+    if (!compiled_expr.ok()) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("failed to create an expression: ", compiled_expr.status().message()));
+    }
+    return std::make_unique<ExpressionDescriptor>(config, std::move(compiled_expr.value()));
   }
 #endif
   case envoy::extensions::rate_limit_descriptors::expr::v3::Descriptor::kParsed: {
-    std::string serialized;
-    if (!config.parsed().SerializeToString(&serialized)) {
-      return absl::InvalidArgumentError("Failed to serialize parsed expression");
+    auto compiled_expr =
+        Extensions::Filters::Common::Expr::CompiledExpression::Create(builder, config.parsed());
+    if (!compiled_expr.ok()) {
+      return absl::InvalidArgumentError(
+          absl::StrCat("failed to create an expression: ", compiled_expr.status().message()));
     }
-    cel::expr::Expr new_expr;
-    if (!new_expr.ParseFromString(serialized)) {
-      return absl::InvalidArgumentError("Failed to convert parsed expression to new format");
-    }
-    return std::make_unique<ExpressionDescriptor>(config, builder, new_expr);
+    return std::make_unique<ExpressionDescriptor>(config, std::move(compiled_expr.value()));
   }
   default:
     return absl::InvalidArgumentError(
