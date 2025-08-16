@@ -31,6 +31,7 @@ AssumeRoleCredentialsProvider::AssumeRoleCredentialsProvider(
                                       initialization_timer),
       role_arn_(assume_role_config.role_arn()),
       role_session_name_(assume_role_config.role_session_name()), region_(region),
+      external_id_(assume_role_config.external_id()),
       assume_role_signer_(std::move(assume_role_signer)) {
 
   if (assume_role_config.has_session_duration()) {
@@ -71,10 +72,20 @@ void AssumeRoleCredentialsProvider::continueRefresh() {
   message.headers().setScheme(Http::Headers::get().SchemeValues.Https);
   message.headers().setMethod(Http::Headers::get().MethodValues.Get);
   message.headers().setHost(Http::Utility::parseAuthority(uri.value()).host_);
-  message.headers().setPath(
+  std::string path =
       fmt::format("/?Version=2011-06-15&Action=AssumeRole&RoleArn={}&RoleSessionName={}",
                   Envoy::Http::Utility::PercentEncoding::encode(role_arn_),
-                  Envoy::Http::Utility::PercentEncoding::encode(role_session_name_)));
+                  Envoy::Http::Utility::PercentEncoding::encode(role_session_name_));
+  if (session_duration_) {
+    path += fmt::format("&DurationSeconds={}", session_duration_.value());
+  }
+
+  if (!external_id_.empty()) {
+    path +=
+        fmt::format("&ExternalId={}", Envoy::Http::Utility::PercentEncoding::encode(external_id_));
+  }
+
+  message.headers().setPath(path);
   // Use the Accept header to ensure that AssumeRoleResponse is returned as JSON.
   message.headers().setReference(Http::CustomHeaders::get().Accept,
                                  Http::Headers::get().ContentTypeValues.Json);
