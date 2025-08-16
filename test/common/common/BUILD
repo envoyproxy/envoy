@@ -307,13 +307,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "trie_lookup_table_test",
-    srcs = ["trie_lookup_table_test.cc"],
-    rbe_pool = "6gig",
-    deps = ["//source/common/common:trie_lookup_table_lib"],
-)
-
-envoy_cc_test(
     name = "radix_tree_test",
     srcs = ["radix_tree_test.cc"],
     rbe_pool = "6gig",
@@ -455,22 +448,6 @@ envoy_benchmark_test(
 )
 
 envoy_cc_benchmark_binary(
-    name = "trie_lookup_table_speed_test",
-    srcs = ["trie_lookup_table_speed_test.cc"],
-    rbe_pool = "6gig",
-    deps = [
-        "//source/common/common:trie_lookup_table_lib",
-        "@com_github_google_benchmark//:benchmark",
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-envoy_benchmark_test(
-    name = "trie_lookup_table_speed_test_benchmark_test",
-    benchmark_binary = "trie_lookup_table_speed_test",
-)
-
-envoy_cc_benchmark_binary(
     name = "radix_tree_speed_test",
     srcs = ["radix_tree_speed_test.cc"],
     rbe_pool = "6gig",
@@ -492,7 +469,6 @@ envoy_cc_benchmark_binary(
     rbe_pool = "6gig",
     deps = [
         "//source/common/common:radix_tree_lib",
-        "//source/common/common:trie_lookup_table_lib",
         "//source/common/http:headers_lib",
         "@com_github_google_benchmark//:benchmark",
         "@com_google_absl//absl/strings",
