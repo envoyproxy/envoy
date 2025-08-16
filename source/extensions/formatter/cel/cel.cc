@@ -55,12 +55,12 @@ CELFormatter::formatValueWithContext(const Envoy::Formatter::HttpFormatterContex
       return ValueUtil::nullValue();
     }
 
-    ProtobufWkt::Value proto_value;
+    Protobuf::Value proto_value;
     if (!ExportAsProtoValue(eval_status.value(), &proto_value).ok()) {
       return ValueUtil::nullValue();
     }
 
-    if (max_length_ && proto_value.kind_case() == ProtobufWkt::Value::kStringValue) {
+    if (max_length_ && proto_value.kind_case() == Protobuf::Value::kStringValue) {
       proto_value.set_string_value(proto_value.string_value().substr(0, max_length_.value()));
     }
     return proto_value;
