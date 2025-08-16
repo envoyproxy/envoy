@@ -104,6 +104,14 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, MultiplexedIntegrationTestWithSimulatedTime
                              {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
+class MultiplexedIntegrationTestWithSimulatedTimeHttp2Only : public Event::TestUsingSimulatedTime,
+                                                             public MultiplexedIntegrationTest {};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, MultiplexedIntegrationTestWithSimulatedTimeHttp2Only,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
+                             {Http::CodecType::HTTP2}, {Http::CodecType::HTTP2})),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
 TEST_P(MultiplexedIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
   testRouterRequestAndResponseWithBody(1024, 512, false, false);
 }
@@ -1261,7 +1269,7 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayAfterTooManyResets) {
   test_server_->waitForCounterEq("http.config_test.downstream_rq_too_many_premature_resets", 1);
 }
 
-TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayQuicklyAfterTooManyResets) {
+TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, GoAwayQuicklyAfterTooManyResets) {
   EXCLUDE_DOWNSTREAM_HTTP3; // Need to wait for the server to reset the stream
                             // before opening new one.
   const int total_streams = 100;
@@ -1284,6 +1292,67 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTime, GoAwayQuicklyAfterTooManyRes
   // Envoy should disconnect client due to premature reset check
   ASSERT_TRUE(codec_client_->waitForDisconnect());
   test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", num_reset_streams);
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_too_many_premature_resets", 1);
+}
+
+TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, TooManyRequestResetAndNoRecursion) {
+  if (downstreamProtocol() != Http::CodecType::HTTP2 ||
+      upstreamProtocol() != Http::CodecType::HTTP2) {
+    // This test is only valid for HTTP/2 and HTTP/3.
+    return;
+  }
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(0)
+        ->mutable_circuit_breakers()
+        ->add_thresholds()
+        ->mutable_max_requests()
+        ->set_value(60000);
+  });
+
+  config_helper_.addRuntimeOverride("overload.premature_reset_total_stream_count",
+                                    absl::StrCat(100));
+
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  initialize();
+
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "GET"}, {":path", "/healthcheck"}, {":scheme", "http"}, {":authority", "host"}};
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  const int pending_streams = 1800; // 18000 in local or this consume too much resource.
+  std::vector<std::pair<Http::RequestEncoder&, IntegrationStreamDecoderPtr>> encoder_decoders;
+  encoder_decoders.reserve(pending_streams);
+
+  const int pending_streams_per_iteration = pending_streams / 4;
+  for (size_t i = 0; i < 4; i++) {
+    for (size_t j = 0; j < pending_streams_per_iteration; ++j) {
+      // Send and wait
+      encoder_decoders.emplace_back(codec_client_->startRequest(headers));
+    }
+    test_server_->waitForCounterEq("http.config_test.downstream_rq_total",
+                                   pending_streams_per_iteration * (i + 1),
+                                   TestUtility::DefaultTimeout * 5);
+  }
+
+  // Reset 50 streams and then the connection should be closed because too much premature resets.
+  // All streams should be reset correctly without recursion.
+  for (int i = 0; i < 50; ++i) {
+    // Send and reset
+    auto encoder_decoder = codec_client_->startRequest(headers);
+    request_encoder_ = &encoder_decoder.first;
+    auto response = std::move(encoder_decoder.second);
+    codec_client_->sendReset(*request_encoder_);
+    ASSERT_TRUE(response->waitForReset());
+  }
+
+  // Envoy should disconnect client due to premature reset check
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_rx_reset", pending_streams + 50,
+                                 TestUtility::DefaultTimeout * 5);
+  // If there is recursion, this result won't be 1.
   test_server_->waitForCounterEq("http.config_test.downstream_rq_too_many_premature_resets", 1);
 }
 

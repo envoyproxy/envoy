@@ -681,6 +681,23 @@ bool ConnectionManagerImpl::isPrematureRstStream(const ActiveStream& stream) con
 // Sends a GOAWAY if too many streams have been reset prematurely on this
 // connection.
 void ConnectionManagerImpl::maybeDrainDueToPrematureResets() {
+  // If the connection has been drained due to premature resets, do not check this again.
+  // Without this flag, recursion may occur, as shown in the following stack trace:
+  //
+  //   maybeDrainDueToPrematureResets()
+  //   doConnectionClose()
+  //   resetAllStreams()
+  //   onResetStream()
+  //   doDeferredStreamDestroy()
+  //   maybeDrainDueToPrematureResets()
+  //   ...
+  //
+  // The recursion will continue until all streams are destroyed. If there are many streams
+  // that may result in a stack overflow. This flag is used to avoid above recursion.
+  if (drained_due_to_premature_resets_) {
+    return;
+  }
+
   if (closed_non_internally_destroyed_requests_ == 0) {
     return;
   }
@@ -703,6 +720,10 @@ void ConnectionManagerImpl::maybeDrainDueToPrematureResets() {
 
   if (read_callbacks_->connection().state() == Network::Connection::State::Open) {
     stats_.named_.downstream_rq_too_many_premature_resets_.inc();
+
+    // Mark the the connection has been drained due to too many premature resets.
+    drained_due_to_premature_resets_ = true;
+
     doConnectionClose(Network::ConnectionCloseType::Abort, absl::nullopt,
                       "too_many_premature_resets");
   }
