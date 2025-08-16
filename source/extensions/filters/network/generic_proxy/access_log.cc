@@ -24,7 +24,7 @@ StringValueFormatterProvider::formatWithContext(const FormatterContext& context,
   }
   return optional_str;
 }
-ProtobufWkt::Value StringValueFormatterProvider::formatValueWithContext(
+Protobuf::Value StringValueFormatterProvider::formatValueWithContext(
     const FormatterContext& context, const StreamInfo::StreamInfo& stream_info) const {
   return ValueUtil::optionalStringValue(formatWithContext(context, stream_info));
 }
@@ -37,7 +37,7 @@ GenericStatusCodeFormatterProvider::formatWithContext(const FormatterContext& co
   return std::to_string(code);
 }
 
-ProtobufWkt::Value
+Protobuf::Value
 GenericStatusCodeFormatterProvider::formatValueWithContext(const FormatterContext& context,
                                                            const StreamInfo::StreamInfo&) const {
   CHECK_DATA_OR_RETURN(context, response_, ValueUtil::nullValue());

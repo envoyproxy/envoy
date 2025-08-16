@@ -966,16 +966,16 @@ TEST_P(TcpProxyTest, StreamDecoderFilterCallbacks) {
 }
 
 TEST_P(TcpProxyTest, RouteWithMetadataMatch) {
-  auto v1 = ProtobufWkt::Value();
+  auto v1 = Protobuf::Value();
   v1.set_string_value("v1");
-  auto v2 = ProtobufWkt::Value();
+  auto v2 = Protobuf::Value();
   v2.set_number_value(2.0);
-  auto v3 = ProtobufWkt::Value();
+  auto v3 = Protobuf::Value();
   v3.set_bool_value(true);
 
   std::vector<Router::MetadataMatchCriterionImpl> criteria = {{"a", v1}, {"b", v2}, {"c", v3}};
 
-  auto metadata_struct = ProtobufWkt::Struct();
+  auto metadata_struct = Protobuf::Struct();
   auto mutable_fields = metadata_struct.mutable_fields();
 
   for (const auto& criterion : criteria) {
@@ -1032,7 +1032,7 @@ TEST_P(TcpProxyTest, WeightedClusterWithMetadataMatch) {
       {"cluster1", "cluster2"});
   config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
 
-  ProtobufWkt::Value v0, v1, v2;
+  Protobuf::Value v0, v1, v2;
   v0.set_string_value("v0");
   v1.set_string_value("v1");
   v2.set_string_value("v2");
@@ -1105,11 +1105,11 @@ TEST_P(TcpProxyTest, WeightedClusterWithMetadataMatch) {
 TEST_P(TcpProxyTest, StreamInfoDynamicMetadata) {
   configure(defaultConfig());
 
-  ProtobufWkt::Value val;
+  Protobuf::Value val;
   val.set_string_value("val");
 
   envoy::config::core::v3::Metadata metadata;
-  ProtobufWkt::Struct& map =
+  Protobuf::Struct& map =
       (*metadata.mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB];
   (*map.mutable_fields())["test"] = val;
   EXPECT_CALL(filter_callbacks_.connection_.stream_info_, dynamicMetadata())
@@ -1158,14 +1158,14 @@ TEST_P(TcpProxyTest, StreamInfoDynamicMetadataAndConfigMerged) {
       {"cluster1"});
   config_ = std::make_shared<Config>(constructConfigFromYaml(yaml, factory_context_));
 
-  ProtobufWkt::Value v0, v1, v2;
+  Protobuf::Value v0, v1, v2;
   v0.set_string_value("v0");
   v1.set_string_value("from_streaminfo"); // 'v1' is overridden with this value by streamInfo.
   v2.set_string_value("v2");
   HashedValue hv0(v0), hv1(v1), hv2(v2);
 
   envoy::config::core::v3::Metadata metadata;
-  ProtobufWkt::Struct& map =
+  Protobuf::Struct& map =
       (*metadata.mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB];
   (*map.mutable_fields())["k1"] = v1;
   (*map.mutable_fields())["k2"] = v2;

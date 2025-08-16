@@ -27,7 +27,7 @@ public:
   MockSessionStateFactoryConfig();
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
 
   MOCK_METHOD(SessionStateFactorySharedPtr, createSessionStateFactory,

@@ -105,9 +105,9 @@ void parseOptionsFromTable(lua_State* state, int index,
   }
 }
 
-const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
+const Protobuf::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
   if (callbacks->route() == nullptr) {
-    return ProtobufWkt::Struct::default_instance();
+    return Protobuf::Struct::default_instance();
   }
   const auto& metadata = callbacks->route()->metadata();
 
@@ -123,7 +123,7 @@ const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
     }
   }
 
-  return ProtobufWkt::Struct::default_instance();
+  return Protobuf::Struct::default_instance();
 }
 
 // Okay to return non-const reference because this doesn't ever get changed.
@@ -988,7 +988,7 @@ void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buf
                              HttpResponseCodeDetails::get().LuaResponse);
 }
 
-const ProtobufWkt::Struct& Filter::DecoderCallbacks::metadata() const {
+const Protobuf::Struct& Filter::DecoderCallbacks::metadata() const {
   return getMetadata(callbacks_);
 }
 
@@ -999,7 +999,7 @@ void Filter::EncoderCallbacks::respond(Http::ResponseHeaderMapPtr&&, Buffer::Ins
   luaL_error(state, "respond not currently supported in the response path");
 }
 
-const ProtobufWkt::Struct& Filter::EncoderCallbacks::metadata() const {
+const Protobuf::Struct& Filter::EncoderCallbacks::metadata() const {
   return getMetadata(callbacks_);
 }
 

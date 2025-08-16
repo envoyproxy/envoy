@@ -59,7 +59,7 @@ void setLambdaHeaders(Http::RequestHeaderMap& headers, const absl::optional<Arn>
  * Determines if the target cluster has the AWS Lambda metadata on it.
  */
 bool isTargetClusterLambdaGateway(Upstream::ClusterInfo const& cluster_info) {
-  using ProtobufWkt::Value;
+  using Protobuf::Value;
   const auto& filter_metadata_map = cluster_info.metadata().filter_metadata();
   auto metadata_it = filter_metadata_map.find(filter_metadata_key);
   if (metadata_it == filter_metadata_map.end()) {

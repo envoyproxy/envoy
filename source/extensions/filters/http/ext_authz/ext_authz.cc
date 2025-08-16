@@ -488,7 +488,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     } else {
       // Add duration of call to dynamic metadata if applicable
       if (start_time_.has_value() && response->status == CheckStatus::OK) {
-        ProtobufWkt::Value ext_authz_duration_value;
+        Protobuf::Value ext_authz_duration_value;
         auto duration =
             decoder_callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value();
         ext_authz_duration_value.set_number_value(

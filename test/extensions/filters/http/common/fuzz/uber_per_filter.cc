@@ -93,7 +93,7 @@ void UberFilterFuzzer::guideAnyProtoType(test::fuzz::HttpData* mutable_data, uin
       "type.googleapis.com/google.protobuf.Empty",
       "type.googleapis.com/google.api.HttpBody",
   };
-  ProtobufWkt::Any* mutable_any = mutable_data->mutable_proto_body()->mutable_message();
+  Protobuf::Any* mutable_any = mutable_data->mutable_proto_body()->mutable_message();
   const std::string& type_url = expected_types[choice % expected_types.size()];
   mutable_any->set_type_url(type_url);
 }

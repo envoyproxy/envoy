@@ -863,14 +863,14 @@ public:
    * @param value the struct to set on the namespace. A merge will be performed with new values for
    * the same key overriding existing.
    */
-  virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
+  virtual void setDynamicMetadata(const std::string& name, const Protobuf::Struct& value) PURE;
 
   /**
    * @param name the namespace used in the metadata in reverse DNS format, for example:
    * envoy.test.my_filter.
    * @param value of type protobuf any to set on the namespace.
    */
-  virtual void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) PURE;
+  virtual void setDynamicTypedMetadata(const std::string& name, const Protobuf::Any& value) PURE;
 
   /**
    * Object on which filters can share data on a per-request basis. For singleton data objects, only

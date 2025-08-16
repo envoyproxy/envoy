@@ -296,17 +296,17 @@ on_no_match:
 
   void setMetadata() {
     ON_CALL(req_info_, setDynamicMetadata("envoy.filters.http.rbac", _))
-        .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
+        .WillByDefault(Invoke([this](const std::string&, const Protobuf::Struct& obj) {
           req_info_.metadata_.mutable_filter_metadata()->insert(
-              Protobuf::MapPair<std::string, ProtobufWkt::Struct>("envoy.filters.http.rbac", obj));
+              Protobuf::MapPair<std::string, Protobuf::Struct>("envoy.filters.http.rbac", obj));
         }));
 
     ON_CALL(req_info_,
             setDynamicMetadata(
                 Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace, _))
-        .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
+        .WillByDefault(Invoke([this](const std::string&, const Protobuf::Struct& obj) {
           req_info_.metadata_.mutable_filter_metadata()->insert(
-              Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
+              Protobuf::MapPair<std::string, Protobuf::Struct>(
                   Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace, obj));
         }));
   }

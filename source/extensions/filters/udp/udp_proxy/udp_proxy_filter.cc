@@ -385,7 +385,7 @@ UdpProxyFilter::ActiveSession::createDownstreamConnectionInfoProvider() {
 }
 
 void UdpProxyFilter::ActiveSession::fillSessionStreamInfo() {
-  ProtobufWkt::Struct stats_obj;
+  Protobuf::Struct stats_obj;
   auto& fields_map = *stats_obj.mutable_fields();
   if (cluster_ != nullptr) {
     fields_map["cluster_name"] = ValueUtil::stringValue(cluster_->cluster_info_->name());
@@ -402,7 +402,7 @@ void UdpProxyFilter::ActiveSession::fillSessionStreamInfo() {
 }
 
 void UdpProxyFilter::fillProxyStreamInfo() {
-  ProtobufWkt::Struct stats_obj;
+  Protobuf::Struct stats_obj;
   auto& fields_map = *stats_obj.mutable_fields();
   fields_map["bytes_sent"] =
       ValueUtil::numberValue(config_->stats().downstream_sess_tx_bytes_.value());
