@@ -218,6 +218,14 @@ protected:
 
   StreamInfo::BytesMeterSharedPtr& mutableBytesMeter() { return bytes_meter_; }
 
+  void addDecompressedHeaderBytesSent(const quiche::HttpHeaderBlock& headers) {
+    bytes_meter_->addDecompressedHeaderBytesSent(headers.TotalBytesUsed());
+  }
+
+  void addDecompressedHeaderBytesReceived(const quic::QuicHeaderList& header_list) {
+    bytes_meter_->addDecompressedHeaderBytesReceived(header_list.uncompressed_header_bytes());
+  }
+
   void encodeTrailersImpl(quiche::HttpHeaderBlock&& trailers);
 
   // Converts `header_list` into a new `Http::MetadataMap`.

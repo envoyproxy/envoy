@@ -102,6 +102,7 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
     }
   }
 #endif
+  addDecompressedHeaderBytesSent(spdy_headers);
   {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
     size_t bytes_sent = WriteHeaders(std::move(spdy_headers), end_stream, nullptr);
@@ -119,7 +120,9 @@ Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& 
 
 void EnvoyQuicClientStream::encodeTrailers(const Http::RequestTrailerMap& trailers) {
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
-  encodeTrailersImpl(envoyHeadersToHttp2HeaderBlock(trailers));
+  quiche::HttpHeaderBlock trailer_block = envoyHeadersToHttp2HeaderBlock(trailers);
+  addDecompressedHeaderBytesSent(trailer_block);
+  encodeTrailersImpl(std::move(trailer_block));
 }
 
 void EnvoyQuicClientStream::resetStream(Http::StreamResetReason reason) {
@@ -148,6 +151,7 @@ void EnvoyQuicClientStream::switchStreamBlockState() {
 void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
                                                      const quic::QuicHeaderList& header_list) {
   mutableBytesMeter()->addHeaderBytesReceived(frame_len);
+  addDecompressedHeaderBytesReceived(header_list);
   if (read_side_closed()) {
     return;
   }
@@ -314,6 +318,7 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
 void EnvoyQuicClientStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                                       const quic::QuicHeaderList& header_list) {
   mutableBytesMeter()->addHeaderBytesReceived(frame_len);
+  addDecompressedHeaderBytesReceived(header_list);
   if (read_side_closed()) {
     return;
   }

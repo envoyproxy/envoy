@@ -280,17 +280,22 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponseWithAccounting) {
   EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->wireBytesSent());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->headerBytesSent());
+  EXPECT_EQ(0, quic_stream_->bytesMeter()->decompressedHeaderBytesSent());
   const auto result = quic_stream_->encodeHeaders(request_headers_, false);
   EXPECT_TRUE(result.ok());
   EXPECT_EQ(quic_stream_->stream_bytes_written(), quic_stream_->bytesMeter()->wireBytesSent());
   EXPECT_EQ(quic_stream_->stream_bytes_written(), quic_stream_->bytesMeter()->headerBytesSent());
+  EXPECT_LE(quic_stream_->stream_bytes_written(),
+            quic_stream_->bytesMeter()->decompressedHeaderBytesSent());
 
-  uint64_t body_bytes = quic_stream_->stream_bytes_written();
+  uint64_t header_bytes = quic_stream_->stream_bytes_written();
   quic_stream_->encodeData(request_body_, false);
-  body_bytes = quic_stream_->stream_bytes_written() - body_bytes;
+  uint64_t body_bytes = quic_stream_->stream_bytes_written() - header_bytes;
   EXPECT_EQ(quic_stream_->stream_bytes_written(), quic_stream_->bytesMeter()->wireBytesSent());
   EXPECT_EQ(quic_stream_->stream_bytes_written() - body_bytes,
             quic_stream_->bytesMeter()->headerBytesSent());
+  EXPECT_LE(quic_stream_->stream_bytes_written() - body_bytes,
+            quic_stream_->bytesMeter()->decompressedHeaderBytesSent());
   quic_stream_->encodeTrailers(request_trailers_);
   EXPECT_EQ(quic_stream_->stream_bytes_written(), quic_stream_->bytesMeter()->wireBytesSent());
   EXPECT_EQ(quic_stream_->stream_bytes_written() - body_bytes,
@@ -298,11 +303,14 @@ TEST_F(EnvoyQuicClientStreamTest, PostRequestAndResponseWithAccounting) {
 
   EXPECT_EQ(0, quic_stream_->bytesMeter()->wireBytesReceived());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->headerBytesReceived());
+  EXPECT_EQ(0, quic_stream_->bytesMeter()->decompressedHeaderBytesReceived());
 
   size_t offset = receiveResponseHeaders(false);
   // Received header bytes do not include the HTTP/3 frame overhead.
   EXPECT_EQ(quic_stream_->stream_bytes_read() - 2,
             quic_stream_->bytesMeter()->headerBytesReceived());
+  EXPECT_LE(quic_stream_->stream_bytes_read() - 2,
+            quic_stream_->bytesMeter()->decompressedHeaderBytesReceived());
   EXPECT_EQ(quic_stream_->stream_bytes_read(), quic_stream_->bytesMeter()->wireBytesReceived());
   EXPECT_CALL(stream_decoder_, decodeTrailers_(_))
       .WillOnce(Invoke([](const Http::ResponseTrailerMapPtr& headers) {
