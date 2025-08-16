@@ -405,6 +405,15 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "ip_address_parsing_test",
+    srcs = ["ip_address_parsing_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/network:ip_address_parsing_lib",
+    ],
+)
+
 envoy_cc_fuzz_test(
     name = "udp_fuzz_test",
     srcs = ["udp_fuzz.cc"],
