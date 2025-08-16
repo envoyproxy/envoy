@@ -3737,6 +3737,38 @@ TEST_F(OAuth2Test, CookiesDecryptedBeforeForwardingWithCleanupOAuthCookiesDisabl
   EXPECT_EQ(cookies.at("RefreshToken"), "some-refresh-token");
 }
 
+// Verifies that requests matching the pass_through_matcher configuration are not modified by the
+// filter. The request headers and cookies remain unchanged, and only the oauth_passthrough metric
+// is incremented. This ensures correct behavior when the filter is configured to skip processing
+// for specific requests.
+TEST_F(OAuth2Test, RequestIsUnchangedWhenPassThroughMatcherMatches) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Options},
+      {Http::Headers::get().Cookie.get(), "OauthHMAC=some_oauth_hmac_value"},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=some_oauth_expires_value"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken=some_refresh_token_value"},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=some_oauth_nonce_value"},
+      {Http::Headers::get().Cookie.get(), "CodeVerifier=some_code_verifier_value"}};
+
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Options},
+      {Http::Headers::get().Cookie.get(), "OauthHMAC=some_oauth_hmac_value"},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=some_oauth_expires_value"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken=some_refresh_token_value"},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=some_oauth_nonce_value"},
+      {Http::Headers::get().Cookie.get(), "CodeVerifier=some_code_verifier_value"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(request_headers, expected_headers);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_failure").value(), 0);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_passthrough").value(), 1);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 0);
+}
+
 } // namespace Oauth2
 } // namespace HttpFilters
 } // namespace Extensions
