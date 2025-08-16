@@ -2,8 +2,6 @@
 
 #include "envoy/http/mcp_sse_stateful_session.h"
 
-#include "source/common/protobuf/protobuf.h"
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -35,7 +33,7 @@ public:
   MockSessionStateFactoryConfig();
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
 
   MOCK_METHOD(Envoy::Http::McpSseSessionStateFactorySharedPtr, createSessionStateFactory,
