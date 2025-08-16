@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+package envoy.extensions.http.mcp_sse_stateful_session.envelope.v3alpha;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.mcp_sse_stateful_session.envelope.v3alpha";
+option java_outer_classname = "EnvelopeProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/http/mcp_sse_stateful_session/envelope/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Model Context Protocol(MCP) server-side events(SSE) stateful session extension]
+
+// The extension implements MCP 241105 spec for SSE-based session tracking.
+// It enables Envoy to handle session context in SSE event streams, allowing session ID
+// and upstream host to be encoded/decoded as required by the protocol.
+//
+// When processing the response from the upstream, Envoy will check if the SSE data stream contains
+// the session context. If the SSE data stream contains the session context, Envoy will join it and
+// the upstream host as new session context using a separator.
+//
+// When processing the request from the downstream, Envoy will check if the url query params contain
+// the session context. If the request contains the session context, Envoy will strip the
+// upstream host from the session context.
+// [#extension: envoy.http.mcp_sse_stateful_session.envelope]
+message EnvelopeSessionState {
+  // The query parameter name used to track the session state in SSE data streams.
+  // If the query parameter specified by this field is present in the SSE data stream,
+  // the upstream host address will be encoded in following format:
+  //
+  // .. code-block:: none
+  //
+  //   sessionId={original_value}.{encoded_host}
+  //
+  // Where {encoded_host} is the Base64Url encoded host address.
+  //
+  // When processing the request from downstream, this extension will:
+  // 1. Split the value at the last dot
+  // 2. Decode the host address for upstream routing
+  // 3. Keep only the original session ID in the request
+  //
+  // For example:
+  //
+  // .. code-block:: none
+  //
+  //   GET /path?sessionId=original_session_id.{encoded_host}
+  //   # after processing:
+  //   GET /path?sessionId=original_session_id
+  //
+  // Note: Uses Base64Url encoding for the host address and '.' as separator.
+  string param_name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The list of patterns to match the chunk end in the SSE data stream.
+  // Any of these patterns matched will be considered as the end of a chunk.
+  // recommended value is ["\r\n\r\n", "\n\n", "\r\r"]
+  // according to the HTML standard, the end of a server-sent-events' chunk can be
+  // - \r\n\r\n (double Carriage-Return Line-Feed)
+  // - \n\n (double Line-Feed)
+  // - \r\r (double Carriage-Return)
+  // https://html.spec.whatwg.org/multipage/server-sent-events.html#parsing-an-event-stream
+  // Customized patterns can be added to match the chunk end pattern.
+  repeated string chunk_end_patterns = 2 [(validate.rules).repeated = {
+    min_items: 1
+    items {string {min_len: 1}}
+  }];
+
+  // The maximum size of the pending chunk.
+  // If the pending chunk size is greater than this value, this filter will be disabled.
+  // This is to prevent the filter from consuming too much memory when the SSE data stream is large.
+  // In normal cases, the sessionId should be the initialize message and be in a small chunk.
+  // The default value is 4KB.
+  int32 max_pending_chunk_size = 3;
+}
