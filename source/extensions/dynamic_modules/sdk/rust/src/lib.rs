@@ -272,13 +272,17 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
 /// mapping with the Envoy Http filter config object as well as [`HttpFilterConfig`] object.
 pub trait EnvoyHttpFilterConfig {
   /// Define a new counter scoped to this filter config with the given name.
-  fn new_counter(&self, name: &str) -> EnvoyCounter;
+  // TODO what to do in these APIs when counter creation is frozen and we get a
+  // nullptr back? Unlike other APIs used so far in dynamic modules that can
+  // return nullptrs, it always indicates a programming error. Is it really
+  // correct to surface such an error in this trait? Or should we panic?
+  fn define_counter(&self, name: &str) -> EnvoyCounter;
 
   /// Define a new gauge scoped to this filter config with the given name.
-  fn new_gauge(&self, name: &str) -> EnvoyGauge;
+  fn define_gauge(&self, name: &str) -> EnvoyGauge;
 
   /// Define a new histogram scoped to this filter config with the given name.
-  fn new_histogram(&self, name: &str) -> EnvoyHistogram;
+  fn define_histogram(&self, name: &str) -> EnvoyHistogram;
 }
 
 pub struct EnvoyHttpFilterConfigImpl {
@@ -286,11 +290,11 @@ pub struct EnvoyHttpFilterConfigImpl {
 }
 
 impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
-  fn new_counter(&self, name: &str) -> EnvoyCounter {
+  fn define_counter(&self, name: &str) -> EnvoyCounter {
     let name_ptr = name.as_ptr();
     let name_size = name.len();
     let counter_ptr = unsafe {
-      abi::envoy_dynamic_module_callback_metric_counter_new(
+      abi::envoy_dynamic_module_callback_metric_define_counter(
         self.raw_ptr,
         name_ptr as *const _ as *mut _,
         name_size,
@@ -301,11 +305,11 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
     }
   }
 
-  fn new_gauge(&self, name: &str) -> EnvoyGauge {
+  fn define_gauge(&self, name: &str) -> EnvoyGauge {
     let name_ptr = name.as_ptr();
     let name_size = name.len();
     let gauge_ptr = unsafe {
-      abi::envoy_dynamic_module_callback_metric_gauge_new(
+      abi::envoy_dynamic_module_callback_metric_define_gauge(
         self.raw_ptr,
         name_ptr as *const _ as *mut _,
         name_size,
@@ -314,11 +318,11 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
     EnvoyGauge { raw_ptr: gauge_ptr }
   }
 
-  fn new_histogram(&self, name: &str) -> EnvoyHistogram {
+  fn define_histogram(&self, name: &str) -> EnvoyHistogram {
     let name_ptr = name.as_ptr();
     let name_size = name.len();
     let histogram_ptr = unsafe {
-      abi::envoy_dynamic_module_callback_metric_histogram_new(
+      abi::envoy_dynamic_module_callback_metric_define_histogram(
         self.raw_ptr,
         name_ptr as *const _ as *mut _,
         name_size,
@@ -339,7 +343,7 @@ pub struct EnvoyCounter {
 
 impl EnvoyCounter {
   /// Increment this counter by the given value.
-  pub fn increment(self, value: u64) {
+  pub fn increment(&self, value: u64) {
     unsafe { abi::envoy_dynamic_module_callback_metric_increment_counter(self.raw_ptr, value) }
   }
 }
@@ -353,17 +357,17 @@ pub struct EnvoyGauge {
 
 impl EnvoyGauge {
   /// Increase this gauge by the given value.
-  pub fn increase(self, value: u64) {
+  pub fn increase(&self, value: u64) {
     unsafe { abi::envoy_dynamic_module_callback_metric_increase_gauge(self.raw_ptr, value) }
   }
 
   /// Decrease this gauge by the given value.
-  pub fn decrease(self, value: u64) {
+  pub fn decrease(&self, value: u64) {
     unsafe { abi::envoy_dynamic_module_callback_metric_decrease_gauge(self.raw_ptr, value) }
   }
 
   /// Set this gauge to the given value.
-  pub fn set(self, value: u64) {
+  pub fn set(&self, value: u64) {
     unsafe { abi::envoy_dynamic_module_callback_metric_set_gauge(self.raw_ptr, value) }
   }
 }
@@ -377,7 +381,7 @@ pub struct EnvoyHistogram {
 
 impl EnvoyHistogram {
   /// Record the given value in this histogram.
-  pub fn record_value(self, value: u64) {
+  pub fn record_value(&self, value: u64) {
     unsafe { abi::envoy_dynamic_module_callback_metric_record_histogram_value(self.raw_ptr, value) }
   }
 }

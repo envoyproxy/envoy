@@ -78,9 +78,12 @@ public:
   OnHttpFilterScheduled on_http_filter_scheduled_ = nullptr;
 
   Envoy::Upstream::ClusterManager& cluster_manager_;
-  Stats::Scope& stats_scope_;
+  const Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNamePool stat_name_pool_;
   const Stats::StatName custom_stat_namespace_;
+  // We only allow the module to create stats during envoy_dynamic_module_on_http_filter_config_new,
+  // and not later during request handling, so that we don't have to wrap the stat storage in a lock.
+  bool stat_creation_frozen_ = false;
 
 private:
   // The name of the filter passed in the constructor.

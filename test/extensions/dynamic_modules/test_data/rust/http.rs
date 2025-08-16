@@ -20,9 +20,9 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
 ) -> Option<Box<dyn HttpFilterConfig<EC, EHF>>> {
   match name {
     "stats_callbacks" => Some(Box::new(StatsCallbacksFilterConfig {
-      streams_total: envoy_filter_config.new_counter("streams_total"),
-      concurrent_streams: envoy_filter_config.new_gauge("concurrent_streams"),
-      ones: envoy_filter_config.new_histogram("ones"),
+      streams_total: envoy_filter_config.define_counter("streams_total"),
+      concurrent_streams: envoy_filter_config.define_gauge("concurrent_streams"),
+      ones: envoy_filter_config.define_histogram("ones"),
     })),
     "header_callbacks" => Some(Box::new(HeaderCallbacksFilterConfig {})),
     "send_response" => Some(Box::new(SendResponseFilterConfig {})),

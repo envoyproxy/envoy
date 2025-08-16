@@ -9,8 +9,8 @@ DynamicModuleHttpFilterConfig::DynamicModuleHttpFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
     Server::Configuration::ServerFactoryContext& context)
-    : cluster_manager_(context.clusterManager()), stats_scope_(stats_scope),
-      stat_name_pool_(stats_scope_.symbolTable()),
+    : cluster_manager_(context.clusterManager()), stats_scope_(stats_scope.createScope("")),
+      stat_name_pool_(stats_scope_->symbolTable()),
       custom_stat_namespace_(stat_name_pool_.add(CustomStatNamespace)), filter_name_(filter_name),
       filter_config_(filter_config), dynamic_module_(std::move(dynamic_module)) {};
 
@@ -118,6 +118,8 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
   if (filter_config_envoy_ptr == nullptr) {
     return absl::InvalidArgumentError("Failed to initialize dynamic module");
   }
+
+  config->stat_creation_frozen_ = true;
 
   config->in_module_config_ = filter_config_envoy_ptr;
   config->on_http_filter_config_destroy_ = on_config_destroy.value();
