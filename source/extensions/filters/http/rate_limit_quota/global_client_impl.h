@@ -57,6 +57,7 @@ public:
 // worker threads' local RateLimitClients.
 class GlobalRateLimitClientImpl : public Grpc::AsyncStreamCallbacks<
                                       envoy::service::rate_limit_quota::v3::RateLimitQuotaResponse>,
+                                  public Event::DeferredDeletable,
                                   public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
   GlobalRateLimitClientImpl(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
@@ -65,7 +66,11 @@ public:
                             std::chrono::milliseconds send_reports_interval,
                             ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_tls,
                             Envoy::Event::Dispatcher& main_dispatcher);
-  ~GlobalRateLimitClientImpl() = default;
+  ~GlobalRateLimitClientImpl() {
+    if (stream_ != nullptr) {
+      stream_.resetStream();
+    }
+  }
 
   void onReceiveMessage(RateLimitQuotaResponsePtr&& response) override;
 
@@ -74,6 +79,11 @@ public:
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
+
+  // DeferredDeletable
+  // Cleanup resources that have to be deleted on the main thread before this deferred deletion.
+  // Not thread-safe & should only be called by the main thread.
+  void deleteIsPending() override;
 
   // Functions needed by LocalRateLimitClientImpl to make unsafe modifications
   // to global resources. All are non-blocking & safely callable by worker
@@ -155,7 +165,7 @@ private:
   std::string domain_name_;
   // Client is stored as the bare object since there is no ownership transfer
   // involved.
-  GrpcAsyncClient aync_client_;
+  GrpcAsyncClient async_client_;
   Grpc::AsyncStream<RateLimitQuotaUsageReports> stream_{};
 
   // Reference to TLS slot for the global quota bucket cache. It outlives
@@ -180,28 +190,17 @@ private:
  * Create a shared rate limit client. It should be shared to each worker
  * thread via TLS.
  */
-inline std::shared_ptr<GlobalRateLimitClientImpl>
+inline std::unique_ptr<GlobalRateLimitClientImpl>
 createGlobalRateLimitClientImpl(Server::Configuration::FactoryContext& context,
                                 absl::string_view domain_name,
                                 std::chrono::milliseconds send_reports_interval,
                                 ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_tls,
                                 Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key) {
   Envoy::Event::Dispatcher& main_dispatcher = context.serverFactoryContext().mainThreadDispatcher();
-  return std::make_shared<GlobalRateLimitClientImpl>(config_with_hash_key, context, domain_name,
+  return std::make_unique<GlobalRateLimitClientImpl>(config_with_hash_key, context, domain_name,
                                                      send_reports_interval, buckets_tls,
                                                      main_dispatcher);
 }
-
-struct ThreadLocalGlobalRateLimitClientImpl : public Envoy::ThreadLocal::ThreadLocalObject,
-                                              Logger::Loggable<Logger::Id::rate_limit_quota> {
-public:
-  ThreadLocalGlobalRateLimitClientImpl(std::shared_ptr<GlobalRateLimitClientImpl> global_client)
-      : global_client(global_client) {}
-
-  // Thread-unsafe operations like index creation should only be done by the
-  // global ThreadLocalClient.
-  std::shared_ptr<GlobalRateLimitClientImpl> global_client;
-};
 
 } // namespace RateLimitQuota
 } // namespace HttpFilters
