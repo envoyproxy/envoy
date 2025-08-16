@@ -44,9 +44,8 @@ using ::proto_processing_lib::proto_scrubber::FieldMaskPathChecker;
 using ::proto_processing_lib::proto_scrubber::ScrubberContext;
 using ::proto_processing_lib::proto_scrubber::UnknownFieldChecker;
 
-const google::protobuf::FieldMask&
-ProtoExtractor::FindWithDefault(ExtractedMessageDirective directive) {
-  static const google::protobuf::FieldMask default_field_mask;
+const Protobuf::FieldMask& ProtoExtractor::FindWithDefault(ExtractedMessageDirective directive) {
+  static const Protobuf::FieldMask default_field_mask;
 
   auto it = directives_mapping_.find(directive);
   if (it != directives_mapping_.end()) {
@@ -145,8 +144,7 @@ ProtoExtractor::ExtractMessage(const Protobuf::field_extraction::MessageData& ra
   // property.
   if (scrubber_ == nullptr) {
     (*extracted_message_metadata.extracted_message.mutable_fields())[kTypeProperty]
-        .set_string_value(
-            google::protobuf::util::converter::GetFullTypeWithUrl(message_type_->name()));
+        .set_string_value(ProtobufUtil::converter::GetFullTypeWithUrl(message_type_->name()));
     return extracted_message_metadata;
   }
 
@@ -164,7 +162,7 @@ ProtoExtractor::ExtractMessage(const Protobuf::field_extraction::MessageData& ra
     // resulting proto struct keys are in camel case.
     std::vector<std::string> redact_paths_camel_case;
     for (const std::string& path : redact_field_mask->second.paths()) {
-      redact_paths_camel_case.push_back(google::protobuf::util::converter::ToCamelCase(path));
+      redact_paths_camel_case.push_back(ProtobufUtil::converter::ToCamelCase(path));
     }
     RedactPaths(redact_paths_camel_case, &extracted_message_metadata.extracted_message);
   }
