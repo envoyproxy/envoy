@@ -1633,7 +1633,7 @@ void FilterManager::callLowWatermarkCallbacks() {
   }
 }
 
-void FilterManager::setBufferLimit(uint32_t new_limit) {
+void FilterManager::setBufferLimit(uint64_t new_limit) {
   ENVOY_STREAM_LOG(debug, "setting buffer limit to {}", *this, new_limit);
   buffer_limit_ = new_limit;
   if (buffered_request_data_) {
@@ -1748,11 +1748,11 @@ void ActiveStreamDecoderFilter::removeDownstreamWatermarkCallbacks(
   parent_.watermark_callbacks_.remove(&watermark_callbacks);
 }
 
-void ActiveStreamDecoderFilter::setDecoderBufferLimit(uint32_t limit) {
+void ActiveStreamDecoderFilter::setDecoderBufferLimit(uint64_t limit) {
   parent_.setBufferLimit(limit);
 }
 
-uint32_t ActiveStreamDecoderFilter::decoderBufferLimit() { return parent_.buffer_limit_; }
+uint64_t ActiveStreamDecoderFilter::decoderBufferLimit() { return parent_.buffer_limit_; }
 
 bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers) {
   // Because the filter's and the HCM view of if the stream has a body and if

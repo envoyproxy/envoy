@@ -289,8 +289,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
   void
   removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
-  void setDecoderBufferLimit(uint32_t limit) override;
-  uint32_t decoderBufferLimit() override;
+  void setDecoderBufferLimit(uint64_t limit) override;
+  uint64_t decoderBufferLimit() override;
   bool recreateStream(const Http::ResponseHeaderMap* original_response_headers) override;
 
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) override;
@@ -682,7 +682,7 @@ public:
   FilterManager(FilterManagerCallbacks& filter_manager_callbacks, Event::Dispatcher& dispatcher,
                 OptRef<const Network::Connection> connection, uint64_t stream_id,
                 Buffer::BufferMemoryAccountSharedPtr account, bool proxy_100_continue,
-                uint32_t buffer_limit)
+                uint64_t buffer_limit)
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
         connection_(connection), stream_id_(stream_id), account_(std::move(account)),
         proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit) {}
@@ -800,7 +800,7 @@ public:
   virtual void executeLocalReplyIfPrepared() PURE;
 
   // Possibly increases buffer_limit_ to the value of limit.
-  void setBufferLimit(uint32_t limit);
+  void setBufferLimit(uint64_t limit);
 
   /**
    * @return bool whether any above high watermark triggers are currently active
@@ -1114,7 +1114,7 @@ private:
   std::unique_ptr<MetadataMapVector> request_metadata_map_vector_;
   Buffer::InstancePtr buffered_response_data_;
   Buffer::InstancePtr buffered_request_data_;
-  uint32_t buffer_limit_{0};
+  uint64_t buffer_limit_{0};
   uint32_t high_watermark_count_{0};
   std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;
   Network::Socket::OptionsSharedPtr upstream_options_ =
