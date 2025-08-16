@@ -189,6 +189,9 @@ new_features:
     Added :ref:``network_namespace_filepath <envoy_v3_api_msg_config.core.v3.SocketAddress.network_namespace_filepath>`` to
     :ref:`SocketAddress <envoy_v3_api_msg_config.core.v3.SocketAddress>`. This field allows specifying a Linux network namespace filepath
     for socket creation, enabling network isolation in containerized environments.
+- area: tap
+  change: |
+    Submit captured transport streamed strace data as smoothly as possible with the configured chunk size.
 - area: ratelimit
   change: |
     Add the :ref:`rate_limits
