@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package envoy.extensions.bootstrap.cel;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.bootstrap.cel";
+option java_outer_classname = "CelProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/bootstrap/cel;celv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: CEL Evaluator Configuration]
+// Configuration for the Common Expression Language (CEL) evaluator bootstrap extension.
+// This configuration allows fine-tuning of CEL expression evaluation behavior and enabling
+// string extension functions.
+
+// Configuration for the CEL evaluator.
+message CelEvaluatorConfig {
+  // Whether to enable string conversion in CEL expressions. When enabled, CEL expressions
+  // can convert values to strings using the ``string()`` function.
+  //
+  // This is disabled by default for security reasons.
+  bool enable_string_conversion = 1;
+
+  // Whether to enable string concatenation in CEL expressions. When enabled, CEL expressions
+  // can concatenate strings using the ``+`` operator.
+  //
+  // This is disabled by default for security reasons.
+  bool enable_string_concat = 2;
+
+  // Whether to enable string extension functions in CEL expressions. When enabled, CEL
+  // expressions can use string manipulation functions such as:
+  // * ``replace()`` - replaces occurrences of substring.
+  // * ``split()`` - splits string into list based on delimiter.
+  // * ``lowerAscii()`` - converts string to lowercase.
+  // * ``upperAscii()`` - converts string to uppercase.
+  // * ``contains()`` - checks if string contains substring.
+  // * ``startsWith()`` - checks if string starts with prefix.
+  // * ``endsWith()`` - checks if string ends with suffix.
+  //
+  // This is disabled by default for security reasons.
+  bool enable_string_functions = 3;
+}
