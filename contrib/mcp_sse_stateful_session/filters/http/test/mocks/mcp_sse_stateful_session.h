@@ -5,6 +5,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+#include "source/common/protobuf/protobuf.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -33,7 +35,7 @@ public:
   MockSessionStateFactoryConfig();
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<google::protobuf::Struct>();
+    return std::make_unique<ProtobufWkt::Struct>();
   }
 
   MOCK_METHOD(Envoy::Http::McpSseSessionStateFactorySharedPtr, createSessionStateFactory,
