@@ -1,6 +1,7 @@
 #pragma once
 
 #include "source/extensions/filters/common/ratelimit/ratelimit.h"
+#include <cstdint>
 
 namespace Envoy {
 namespace Extensions {
@@ -13,7 +14,7 @@ public:
 
 private:
   static uint32_t
-  convertRateLimitUnit(envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::Unit unit);
+  convertRateLimitUnit(envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::Unit unit, uint32_t unit_multiplier);
 };
 
 } // namespace RateLimitFilter
