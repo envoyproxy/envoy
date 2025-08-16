@@ -2608,7 +2608,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::UInt32Value>();
+    return std::make_unique<Protobuf::UInt32Value>();
   }
 
   std::string name() const override {
@@ -2624,7 +2624,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::UInt32Value>();
+    return std::make_unique<Protobuf::UInt32Value>();
   }
 
   std::string name() const override {
@@ -3234,7 +3234,7 @@ public:
   createFromProto(const Protobuf::Message& message,
                   Server::Configuration::ServerFactoryContext& server_context) override {
     auto mptr = ::Envoy::Config::Utility::translateAnyToFactoryConfig(
-        dynamic_cast<const ProtobufWkt::Any&>(message), server_context.messageValidationVisitor(),
+        dynamic_cast<const Protobuf::Any&>(message), server_context.messageValidationVisitor(),
         *this);
     const auto& proto_config =
         MessageUtil::downcastAndValidate<const ::envoy::extensions::http::header_validators::

@@ -862,7 +862,7 @@ class QuicFailHandshakeCryptoServerStreamFactory
     : public Quic::EnvoyQuicCryptoServerStreamFactoryInterface {
 public:
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
   std::string name() const override { return "envoy.quic.crypto_stream.server.fail_handshake"; }
 
@@ -901,7 +901,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamDisconnectDuringEarlyData) {
   envoy::config::listener::v3::QuicProtocolOptions options;
   auto* crypto_stream_config = options.mutable_crypto_stream_config();
   crypto_stream_config->set_name("envoy.quic.crypto_stream.server.fail_handshake");
-  crypto_stream_config->mutable_typed_config()->PackFrom(ProtobufWkt::Struct());
+  crypto_stream_config->mutable_typed_config()->PackFrom(Protobuf::Struct());
   mergeOptions(options);
 
   initialize();

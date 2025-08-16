@@ -4,7 +4,6 @@
 #include "source/common/stream_info/utility.h"
 
 #include "test/mocks/stream_info/mocks.h"
-#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -365,7 +364,6 @@ TEST(ProxyStatusErrorToString, TestAll) {
 }
 
 TEST(ProxyStatusFromStreamInfo, TestAllWithExpandedResponseFlags) {
-  TestScopedRuntime scoped_runtime;
   for (const auto& [response_flag, proxy_status_error] :
        std::vector<std::pair<ResponseFlag, ProxyStatusError>>{
            {CoreResponseFlag::FailedLocalHealthCheck, ProxyStatusError::DestinationUnavailable},

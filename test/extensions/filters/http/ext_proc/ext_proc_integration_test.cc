@@ -39,8 +39,8 @@ using envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute;
 using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
 using envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
 using Envoy::Extensions::HttpFilters::ExternalProcessing::verifyMultipleHeaderValues;
+using Envoy::Protobuf::Any;
 using Envoy::Protobuf::MapPair;
-using Envoy::ProtobufWkt::Any;
 using envoy::service::ext_proc::v3::BodyResponse;
 using envoy::service::ext_proc::v3::CommonResponse;
 using envoy::service::ext_proc::v3::HeadersResponse;
@@ -187,7 +187,7 @@ protected:
         auto* untyped_md = set_metadata_config.add_metadata();
         untyped_md->set_metadata_namespace("forwarding_ns_untyped");
         untyped_md->set_allow_overwrite(true);
-        ProtobufWkt::Struct test_md_val;
+        Protobuf::Struct test_md_val;
         (*test_md_val.mutable_fields())["foo"].set_string_value("value from set_metadata");
         (*untyped_md->mutable_value()) = test_md_val;
 
@@ -254,7 +254,7 @@ protected:
       processing_response_factory_registration_ =
           std::make_unique<Envoy::Registry::InjectFactory<OnProcessingResponseFactory>>(
               *processing_response_factory_);
-      ProtobufWkt::Struct config;
+      Protobuf::Struct config;
       proto_config_.mutable_on_processing_response()->set_name("test-on-processing-response");
       proto_config_.mutable_on_processing_response()->mutable_typed_config()->PackFrom(config);
     }
@@ -721,10 +721,10 @@ protected:
   }
 
   void testSendDyanmicMetadata() {
-    ProtobufWkt::Struct test_md_struct;
+    Protobuf::Struct test_md_struct;
     (*test_md_struct.mutable_fields())["foo"].set_string_value("value from ext_proc");
 
-    ProtobufWkt::Value md_val;
+    Protobuf::Value md_val;
     *(md_val.mutable_struct_value()) = test_md_struct;
 
     processGenericMessage(
@@ -732,7 +732,7 @@ protected:
         [md_val](const ProcessingRequest& req, ProcessingResponse& resp) {
           // Verify the processing request contains the untyped metadata we injected.
           EXPECT_TRUE(req.metadata_context().filter_metadata().contains("forwarding_ns_untyped"));
-          const ProtobufWkt::Struct& fwd_metadata =
+          const Protobuf::Struct& fwd_metadata =
               req.metadata_context().filter_metadata().at("forwarding_ns_untyped");
           EXPECT_EQ(1, fwd_metadata.fields_size());
           EXPECT_TRUE(fwd_metadata.fields().contains("foo"));
@@ -741,7 +741,7 @@ protected:
           // Verify the processing request contains the typed metadata we injected.
           EXPECT_TRUE(
               req.metadata_context().typed_filter_metadata().contains("forwarding_ns_typed"));
-          const ProtobufWkt::Any& fwd_typed_metadata =
+          const Protobuf::Any& fwd_typed_metadata =
               req.metadata_context().typed_filter_metadata().at("forwarding_ns_typed");
           EXPECT_EQ("type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Metadata",
                     fwd_typed_metadata.type_url());

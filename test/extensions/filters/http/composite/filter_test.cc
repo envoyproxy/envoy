@@ -80,7 +80,7 @@ public:
   void expectFilterStateInfo(std::shared_ptr<StreamInfo::FilterState> filter_state) {
     auto* info = filter_state->getDataMutable<MatchedActionInfo>(MatchedActionsFilterStateKey);
     EXPECT_NE(nullptr, info);
-    ProtobufWkt::Struct expected;
+    Protobuf::Struct expected;
     auto& fields = *expected.mutable_fields();
     fields["rootFilterName"] = ValueUtil::stringValue("actionName");
     EXPECT_TRUE(MessageDifferencer::Equals(expected, *(info->serializeAsProto())));
@@ -740,7 +740,7 @@ TEST_F(FilterTest, MatchingActionShouldNotCollitionWithOtherRootFilter) {
 
   auto* info = filter_state->getDataMutable<MatchedActionInfo>(MatchedActionsFilterStateKey);
   EXPECT_NE(nullptr, info);
-  ProtobufWkt::Struct expected;
+  Protobuf::Struct expected;
   auto& fields = *expected.mutable_fields();
   fields["otherRootFilterName"] = ValueUtil::stringValue("anyActionName");
   fields["rootFilterName"] = ValueUtil::stringValue("actionName");

@@ -138,4 +138,15 @@ message Config {
 
   // The list of rules to apply to responses.
   repeated Rule response_rules = 2;
+
+  // Optional prefix to use when emitting filter statistics. When configured,
+  // statistics are emitted with the prefix ``http_filter_name.<stat_prefix>``.
+  //
+  // This emits statistics such as:
+  //
+  // - ``http_filter_name.my_header_converter.rules_processed``
+  // - ``http_filter_name.my_header_converter.metadata_added``
+  //
+  // If not configured, no statistics are emitted.
+  string stat_prefix = 3;
 }

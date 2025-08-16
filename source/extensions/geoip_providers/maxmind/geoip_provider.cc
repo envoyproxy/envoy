@@ -126,31 +126,27 @@ GeoipProvider::GeoipProvider(Event::Dispatcher& dispatcher, Api::Api& api,
   mmdb_reload_thread_ = api.threadFactory().createThread(
       [this]() -> void {
         ENVOY_LOG_MISC(debug, "Started mmdb_reload_routine");
-        if (config_->cityDbPath() &&
-            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.mmdb_files_reload_enabled")) {
+        if (config_->cityDbPath()) {
           THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
               config_->cityDbPath().value(), Filesystem::Watcher::Events::MovedTo,
               [this](uint32_t) {
                 return onMaxmindDbUpdate(config_->cityDbPath().value(), CITY_DB_TYPE);
               }));
         }
-        if (config_->ispDbPath() &&
-            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.mmdb_files_reload_enabled")) {
+        if (config_->ispDbPath()) {
           THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
               config_->ispDbPath().value(), Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
                 return onMaxmindDbUpdate(config_->ispDbPath().value(), ISP_DB_TYPE);
               }));
         }
-        if (config_->anonDbPath() &&
-            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.mmdb_files_reload_enabled")) {
+        if (config_->anonDbPath()) {
           THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
               config_->anonDbPath().value(), Filesystem::Watcher::Events::MovedTo,
               [this](uint32_t) {
                 return onMaxmindDbUpdate(config_->anonDbPath().value(), ANON_DB_TYPE);
               }));
         }
-        if (config_->asnDbPath() &&
-            Runtime::runtimeFeatureEnabled("envoy.reloadable_features.mmdb_files_reload_enabled")) {
+        if (config_->asnDbPath()) {
           THROW_IF_NOT_OK(mmdb_watcher_->addWatch(
               config_->asnDbPath().value(), Filesystem::Watcher::Events::MovedTo, [this](uint32_t) {
                 return onMaxmindDbUpdate(config_->asnDbPath().value(), ASN_DB_TYPE);

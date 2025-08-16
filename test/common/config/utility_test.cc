@@ -729,11 +729,11 @@ TEST(UtilityTest, PrepareJitteredExponentialBackOffStrategyCustomValues) {
 
 // Validate that an opaque config of the wrong type throws during conversion.
 TEST(UtilityTest, AnyWrongType) {
-  ProtobufWkt::Duration source_duration;
+  Protobuf::Duration source_duration;
   source_duration.set_seconds(42);
-  ProtobufWkt::Any typed_config;
+  Protobuf::Any typed_config;
   typed_config.PackFrom(source_duration);
-  ProtobufWkt::Timestamp out;
+  Protobuf::Timestamp out;
   EXPECT_THAT(
       Utility::translateOpaqueConfig(typed_config, ProtobufMessage::getStrictValidationVisitor(),
                                      out)
@@ -743,14 +743,14 @@ TEST(UtilityTest, AnyWrongType) {
 }
 
 TEST(UtilityTest, TranslateAnyWrongToFactoryConfig) {
-  ProtobufWkt::Duration source_duration;
+  Protobuf::Duration source_duration;
   source_duration.set_seconds(42);
-  ProtobufWkt::Any typed_config;
+  Protobuf::Any typed_config;
   typed_config.PackFrom(source_duration);
 
   MockTypedFactory factory;
   EXPECT_CALL(factory, createEmptyConfigProto()).WillOnce(Invoke([]() -> ProtobufTypes::MessagePtr {
-    return ProtobufTypes::MessagePtr{new ProtobufWkt::Timestamp()};
+    return ProtobufTypes::MessagePtr{new Protobuf::Timestamp()};
   }));
 
   EXPECT_THROW_WITH_REGEX(
@@ -761,14 +761,14 @@ TEST(UtilityTest, TranslateAnyWrongToFactoryConfig) {
 }
 
 TEST(UtilityTest, TranslateAnyToFactoryConfig) {
-  ProtobufWkt::Duration source_duration;
+  Protobuf::Duration source_duration;
   source_duration.set_seconds(42);
-  ProtobufWkt::Any typed_config;
+  Protobuf::Any typed_config;
   typed_config.PackFrom(source_duration);
 
   MockTypedFactory factory;
   EXPECT_CALL(factory, createEmptyConfigProto()).WillOnce(Invoke([]() -> ProtobufTypes::MessagePtr {
-    return ProtobufTypes::MessagePtr{new ProtobufWkt::Duration()};
+    return ProtobufTypes::MessagePtr{new Protobuf::Duration()};
   }));
 
   auto config = Utility::translateAnyToFactoryConfig(
@@ -779,8 +779,7 @@ TEST(UtilityTest, TranslateAnyToFactoryConfig) {
 
 template <typename T> class UtilityTypedStructTest : public ::testing::Test {
 public:
-  static void packTypedStructIntoAny(ProtobufWkt::Any& typed_config,
-                                     const Protobuf::Message& inner) {
+  static void packTypedStructIntoAny(Protobuf::Any& typed_config, const Protobuf::Message& inner) {
     T typed_struct;
     (*typed_struct.mutable_type_url()) =
         absl::StrCat("type.googleapis.com/", inner.GetDescriptor()->full_name());
@@ -794,12 +793,12 @@ TYPED_TEST_SUITE(UtilityTypedStructTest, TypedStructTypes);
 
 // Verify that TypedStruct can be translated into google.protobuf.Struct
 TYPED_TEST(UtilityTypedStructTest, TypedStructToStruct) {
-  ProtobufWkt::Any typed_config;
-  ProtobufWkt::Struct untyped_struct;
+  Protobuf::Any typed_config;
+  Protobuf::Struct untyped_struct;
   (*untyped_struct.mutable_fields())["foo"].set_string_value("bar");
   this->packTypedStructIntoAny(typed_config, untyped_struct);
 
-  ProtobufWkt::Struct out;
+  Protobuf::Struct out;
   EXPECT_TRUE(Utility::translateOpaqueConfig(typed_config,
                                              ProtobufMessage::getStrictValidationVisitor(), out)
                   .ok());
@@ -810,7 +809,7 @@ TYPED_TEST(UtilityTypedStructTest, TypedStructToStruct) {
 // Verify that TypedStruct can be translated into an arbitrary message of correct type
 // (v2 API, no upgrading).
 TYPED_TEST(UtilityTypedStructTest, TypedStructToClusterV2) {
-  ProtobufWkt::Any typed_config;
+  Protobuf::Any typed_config;
   API_NO_BOOST(envoy::api::v2::Cluster) cluster;
   const std::string cluster_config_yaml = R"EOF(
     drain_connections_on_host_removal: true
@@ -837,7 +836,7 @@ TYPED_TEST(UtilityTypedStructTest, TypedStructToClusterV2) {
 // Verify that TypedStruct can be translated into an arbitrary message of correct type
 // (v3 API, upgrading).
 TYPED_TEST(UtilityTypedStructTest, TypedStructToClusterV3) {
-  ProtobufWkt::Any typed_config;
+  Protobuf::Any typed_config;
   API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
   const std::string cluster_config_yaml = R"EOF(
     ignore_health_on_host_removal: true
@@ -863,7 +862,7 @@ TYPED_TEST(UtilityTypedStructTest, TypedStructToClusterV3) {
 
 // Verify that translation from TypedStruct into message of incorrect type fails
 TYPED_TEST(UtilityTypedStructTest, TypedStructToInvalidType) {
-  ProtobufWkt::Any typed_config;
+  Protobuf::Any typed_config;
   envoy::config::bootstrap::v3::Bootstrap bootstrap;
   const std::string bootstrap_config_yaml = R"EOF(
     admin:
@@ -879,7 +878,7 @@ TYPED_TEST(UtilityTypedStructTest, TypedStructToInvalidType) {
   TestUtility::loadFromYaml(bootstrap_config_yaml, bootstrap);
   this->packTypedStructIntoAny(typed_config, bootstrap);
 
-  ProtobufWkt::Any out;
+  Protobuf::Any out;
   EXPECT_THROW_WITH_REGEX(Utility::translateOpaqueConfig(
                               typed_config, ProtobufMessage::getStrictValidationVisitor(), out)
                               .IgnoreError(),
@@ -889,7 +888,7 @@ TYPED_TEST(UtilityTypedStructTest, TypedStructToInvalidType) {
 // Verify that Any can be translated into an arbitrary message of correct type
 // (v2 API, no upgrading).
 TEST(UtilityTest, AnyToClusterV2) {
-  ProtobufWkt::Any typed_config;
+  Protobuf::Any typed_config;
   API_NO_BOOST(envoy::api::v2::Cluster) cluster;
   const std::string cluster_config_yaml = R"EOF(
     drain_connections_on_host_removal: true
@@ -907,7 +906,7 @@ TEST(UtilityTest, AnyToClusterV2) {
 // Verify that Any can be translated into an arbitrary message of correct type
 // (v3 API, upgrading).
 TEST(UtilityTest, AnyToClusterV3) {
-  ProtobufWkt::Any typed_config;
+  Protobuf::Any typed_config;
   API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
   const std::string cluster_config_yaml = R"EOF(
     ignore_health_on_host_removal: true
@@ -922,10 +921,10 @@ TEST(UtilityTest, AnyToClusterV3) {
   EXPECT_THAT(out, ProtoEq(cluster));
 }
 
-// Verify that ProtobufWkt::Empty can load into a typed factory with an empty config proto
+// Verify that Protobuf::Empty can load into a typed factory with an empty config proto
 TEST(UtilityTest, EmptyToEmptyConfig) {
-  ProtobufWkt::Any typed_config;
-  ProtobufWkt::Empty empty_config;
+  Protobuf::Any typed_config;
+  Protobuf::Empty empty_config;
   typed_config.PackFrom(empty_config);
 
   envoy::extensions::filters::http::cors::v3::Cors out;

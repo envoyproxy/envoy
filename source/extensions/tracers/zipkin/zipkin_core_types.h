@@ -35,11 +35,11 @@ public:
 
   /**
    * All classes defining Zipkin abstractions need to implement this method to convert
-   * the corresponding abstraction to a ProtobufWkt::Struct.
+   * the corresponding abstraction to a Protobuf::Struct.
    * @param replacements A container that is used to hold the required replacements when this object
    * is serialized.
    */
-  virtual const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const PURE;
+  virtual const Protobuf::Struct toStruct(Util::Replacements& replacements) const PURE;
 
   /**
    * Serializes the a type as a Zipkin-compliant JSON representation as a string.
@@ -110,7 +110,7 @@ public:
    *
    * @return a protobuf struct.
    */
-  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
+  const Protobuf::Struct toStruct(Util::Replacements& replacements) const override;
 
 private:
   std::string service_name_;
@@ -202,7 +202,7 @@ public:
    *
    * @return a protobuf struct.
    */
-  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
+  const Protobuf::Struct toStruct(Util::Replacements& replacements) const override;
 
 private:
   uint64_t timestamp_{0};
@@ -290,7 +290,7 @@ public:
    * @param replacements Used to hold the required replacements on serialization step.
    * @return a protobuf struct.
    */
-  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
+  const Protobuf::Struct toStruct(Util::Replacements& replacements) const override;
 
 private:
   std::string key_;
@@ -533,7 +533,7 @@ public:
    *
    * @return a protobuf struct.
    */
-  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
+  const Protobuf::Struct toStruct(Util::Replacements& replacements) const override;
 
   /**
    * @return the span's context.
@@ -542,6 +542,8 @@ public:
    * and sampled attributes.
    */
   SpanContext spanContext() const;
+
+  void setUseLocalDecision(bool use_local_decision) { use_local_decision_ = use_local_decision; }
 
   // Tracing::Span
 
@@ -557,6 +559,7 @@ public:
   void setTag(absl::string_view name, absl::string_view value) override;
   void log(SystemTime timestamp, const std::string& event) override;
   void setSampled(bool val) override { sampled_ = val; }
+  bool useLocalDecision() const override { return use_local_decision_; }
   void setOperation(absl::string_view operation) override { setName(std::string(operation)); }
   void injectContext(Tracing::TraceContext& trace_context,
                      const Tracing::UpstreamContext&) override;
@@ -584,6 +587,7 @@ private:
   int64_t monotonic_start_time_{0};
   TimeSource& time_source_;
   TracerInterface& tracer_;
+  bool use_local_decision_{false};
 };
 
 using SpanPtr = std::unique_ptr<Span>;

@@ -95,7 +95,7 @@ bool trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
     if (reflection->HasField(message, any_field)) {
       ASSERT(any_field != nullptr);
       // Unpack to a DynamicMessage.
-      ProtobufWkt::Any any_message;
+      Protobuf::Any any_message;
       any_message.MergeFrom(reflection->GetMessage(message, any_field));
       Protobuf::DynamicMessageFactory dmf;
       const absl::string_view inner_type_name =
