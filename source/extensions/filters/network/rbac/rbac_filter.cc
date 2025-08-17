@@ -4,7 +4,6 @@
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
 #include "envoy/network/connection.h"
 
-
 #include "source/common/network/matching/inputs.h"
 #include "source/common/ssl/matching/inputs.h"
 #include "source/common/stream_info/bool_accessor_impl.h"
@@ -72,29 +71,47 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
       enforcement_type_(proto_config.enforcement_type()),
       delay_deny_ms_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, delay_deny, 0)) {}
 
-void RoleBasedAccessControlFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
+void RoleBasedAccessControlFilter::initializeReadFilterCallbacks(
+    Network::ReadFilterCallbacks& callbacks) {
   callbacks_ = &callbacks;
   callbacks_->connection().addConnectionCallbacks(*this);
 
-  callbacks_->connection()
-        .streamInfo()
-        .filterState()
-        ->setData(Envoy::TcpProxy::ReceiveBeforeConnectKey, std::make_unique<StreamInfo::BoolAccessorImpl>(true),
-                  StreamInfo::FilterState::StateType::ReadOnly,
-                  StreamInfo::FilterState::LifeSpan::Connection);
+  callbacks_->connection().streamInfo().filterState()->setData(
+      Envoy::TcpProxy::ReceiveBeforeConnectKey,
+      std::make_unique<StreamInfo::BoolAccessorImpl>(true),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
 }
 
 Network::FilterStatus RoleBasedAccessControlFilter::onNewConnection() {
-  // We stop iteration so that the tcp_proxy doesn't make a connection upstream until we make a decision in onData
+  // We stop iteration so that the tcp_proxy doesn't make a connection upstream until we have a
+  // chance to make an RBAC decision in onEvent or onData.
   return Network::FilterStatus::StopIteration;
 }
-
 
 Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bool) {
   if (is_delay_denied_) {
     return Network::FilterStatus::StopIteration;
   }
 
+  if (runAuthorization()) {
+    return Network::FilterStatus::Continue;
+  } else {
+    return Network::FilterStatus::StopIteration;
+  }
+}
+
+void RoleBasedAccessControlFilter::onEvent(Network::ConnectionEvent event) {
+  if (event == Network::ConnectionEvent::RemoteClose ||
+      event == Network::ConnectionEvent::LocalClose) {
+    resetTimerState();
+  } else if (event == Network::ConnectionEvent::Connected) {
+    if (runAuthorization()) {
+      callbacks_->continueReading();
+    }
+  }
+}
+
+bool RoleBasedAccessControlFilter::runAuthorization() {
   if (ENVOY_LOG_CHECK_LEVEL(debug)) {
     const auto& connection = callbacks_->connection();
     const auto& stream_info = connection.streamInfo();
@@ -147,7 +164,7 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
   }
 
   if (engine_result_ == Allow) {
-    return Network::FilterStatus::Continue;
+    return true;
   } else if (engine_result_ == Deny) {
     callbacks_->connection().streamInfo().setConnectionTerminationDetails(
         Filters::Common::RBAC::responseDetail(log_policy_id));
@@ -164,11 +181,10 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
     } else {
       closeConnection();
     }
-    return Network::FilterStatus::StopIteration;
+    return false;
   }
-
   ENVOY_LOG(debug, "no engine, allowed by default");
-  return Network::FilterStatus::Continue;
+  return true;
 }
 
 void RoleBasedAccessControlFilter::closeConnection() const {
@@ -179,13 +195,6 @@ void RoleBasedAccessControlFilter::resetTimerState() {
   if (delay_timer_) {
     delay_timer_->disableTimer();
     delay_timer_.reset();
-  }
-}
-
-void RoleBasedAccessControlFilter::onEvent(Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::LocalClose) {
-    resetTimerState();
   }
 }
 

@@ -106,6 +106,7 @@ private:
   EngineResult engine_result_{Unknown};
   EngineResult shadow_engine_result_{Unknown};
 
+  bool runAuthorization();
   Result checkEngine(Filters::Common::RBAC::EnforcementMode mode) const;
   void closeConnection() const;
   void resetTimerState();
