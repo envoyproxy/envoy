@@ -44,9 +44,6 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
   RateLimitQuotaValidationVisitor visitor;
   Matcher::MatchTreeFactory<Http::HttpMatchingData, RateLimitOnMatchActionContext> matcher_factory(
       action_context, context.serverFactoryContext(), visitor);
-  if (!visitor.errors().empty()) {
-    throw EnvoyException(absl::StrJoin(visitor.errors(), "\n"));
-  }
 
   Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher = nullptr;
   if (config->has_bucket_matchers()) {

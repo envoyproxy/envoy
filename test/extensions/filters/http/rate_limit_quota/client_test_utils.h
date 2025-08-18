@@ -58,6 +58,13 @@ public:
         .WillRepeatedly(Invoke(this, &RateLimitTestClient::mockCreateAsyncClient));
   }
 
+  void failClientCreation() {
+    EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
+                getOrCreateRawAsyncClientWithHashKey(_, _, _))
+        .Times(testing::AtLeast(1))
+        .WillRepeatedly([]() { return absl::InternalError("Mock client creation failure"); });
+  }
+
   void expectStreamCreation(int times) {
     if (times == 0) {
       EXPECT_CALL(*async_client_,

@@ -112,6 +112,48 @@ TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithInvalidMatcher) {
                           "Didn't find a registered implementation.*'input_not_found'");
 }
 
+TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithInvalidGrpcClient) {
+  std::string filter_config_yaml = R"EOF(
+  rlqs_server:
+    envoy_grpc:
+      cluster_name: "rate_limit_quota_server"
+  domain: test
+  bucket_matchers:
+    matcher_list:
+      matchers:
+        # Assign requests with header['env'] set to 'staging' to the bucket { name: 'staging' }
+        predicate:
+          single_predicate:
+            input:
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: environment
+            value_match:
+              exact: staging
+        on_match:
+          action:
+            name: rate_limit_quota
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings
+              bucket_id_builder:
+                bucket_id_builder:
+                  "name":
+                      string_value: "prod"
+              reporting_interval: 60s
+  )EOF";
+  envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig filter_config;
+  TestUtility::loadFromYaml(filter_config_yaml, filter_config);
+
+  auto mock_stream_client = std::make_unique<RateLimitTestClient>();
+  mock_stream_client->failClientCreation();
+
+  RateLimitQuotaFilterFactory factory;
+  std::string stats_prefix = "test";
+  EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProtoTyped(filter_config, stats_prefix,
+                                                                    mock_stream_client->context_),
+                          EnvoyException, "Mock client creation failure");
+}
+
 } // namespace
 } // namespace RateLimitQuota
 } // namespace HttpFilters
