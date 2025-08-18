@@ -246,6 +246,9 @@ new_features:
     extract trace information from W3C trace headers when B3 headers are not present (downstream),
     and inject both B3 and W3C trace headers for upstream requests to maximize compatibility.
     The default value ``USE_B3`` maintains backward compatibility with B3-only behavior.
+- area: composite
+  change: |
+    Allow composite filter to be configured to insert a filter into filter chain outside of the decode headers lifecycle phase.
 - area: rbac
   change: |
     Switch the IP matcher to use LC-Trie for performance improvements.
