@@ -133,11 +133,11 @@ double Filter::getHitAddend() {
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  request_headers_ = &headers;
   if (!config_->enabled()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  request_headers_ = &headers;
   initiateCall(headers);
   return (state_ == State::Calling || state_ == State::Responded)
              ? Http::FilterHeadersStatus::StopIteration
@@ -191,6 +191,7 @@ void Filter::onDestroy() {
     state_ = State::Complete;
     client_->cancel();
   } else if (client_ != nullptr) {
+    ASSERT(request_headers_ != nullptr);
     std::vector<Envoy::RateLimit::Descriptor> descriptors;
     populateRateLimitDescriptors(descriptors, *request_headers_, true);
     if (!descriptors.empty()) {
