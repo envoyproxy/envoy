@@ -254,6 +254,12 @@ new_features:
     Added ``route()`` to the Stream handle API, allowing Lua scripts to retrieve route information. So far, the only method
     implemented is ``metadata()``, allowing Lua scripts to access route metadata scoped to the specific filter name. See
     :ref:`Route object API <config_http_filters_lua_route_wrapper>` for more details.
+- area: cel
+  change: |
+    Add a new %TYPED_CEL% formatter command that, unlike %CEL%, can output non-string values (number, boolean, null, etc)
+    when used in formatting contexts that accept non-string values, such as
+    :ref:`json_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.json_format>`. The new command is introduced
+    so as to not break compatibility with the existing command's behavior.
 - area: dynamic_modules
   change: |
     Added a new Logging ABI that allows modules to emit logs in the standard Envoy logging stream under "dynamic_modules" ID.
