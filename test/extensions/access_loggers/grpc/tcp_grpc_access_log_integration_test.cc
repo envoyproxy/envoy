@@ -440,20 +440,8 @@ typed_config:
   initialize();
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
-  FakeRawConnectionPtr fake_upstream_connection;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection));
-
-  ASSERT_TRUE(fake_upstream_connection->write("hello"));
-  tcp_client->waitForData("hello");
   ASSERT_TRUE(tcp_client->write("bar", false));
-
-  ASSERT_TRUE(fake_upstream_connection->write("", true));
-  tcp_client->waitForHalfClose();
-  ASSERT_TRUE(tcp_client->write("", true));
-
-  // Connection blocked. Do not wait for data, but directly wait for disconnect.
-  ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
-
+  tcp_client->waitForDisconnect();
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());
   ASSERT_TRUE(
@@ -475,27 +463,12 @@ tcp_logs:
       downstream_local_address:
         socket_address:
           address: {}
-      upstream_remote_address:
-        socket_address:
-          address: {}
-      upstream_local_address:
-        socket_address:
-          address: {}
-      upstream_cluster: cluster_0
-      upstream_request_attempt_count: 1
-      downstream_wire_bytes_sent: 5
-      upstream_wire_bytes_received: 5
       connection_termination_details: rbac_access_denied_matched_policy[none]
       downstream_direct_remote_address:
         socket_address:
           address: {}
       access_log_type: NotSet
-    connection_properties:
-      received_bytes: 3
-      sent_bytes: 5
 )EOF",
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
                                           Network::Test::getLoopbackAddressString(ipVersion()),
                                           Network::Test::getLoopbackAddressString(ipVersion()),
                                           Network::Test::getLoopbackAddressString(ipVersion()))));
