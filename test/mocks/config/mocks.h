@@ -137,8 +137,8 @@ public:
   MOCK_METHOD(EdsResourcesCacheOptRef, edsResourcesCache, ());
 
   MOCK_METHOD(absl::Status, updateMuxSource,
-              (Grpc::RawAsyncClientPtr && primary_async_client,
-               Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope& scope,
+              (Grpc::RawAsyncClientSharedPtr && primary_async_client,
+               Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
                BackOffStrategyPtr&& backoff_strategy,
                const envoy::config::core::v3::ApiConfigSource& ads_config_source));
 };

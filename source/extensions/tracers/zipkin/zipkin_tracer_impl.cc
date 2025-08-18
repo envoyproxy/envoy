@@ -2,15 +2,11 @@
 
 #include "envoy/config/trace/v3/zipkin.pb.h"
 
-#include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
-#include "source/common/common/fmt.h"
-#include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
-#include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/tracers/zipkin/span_context_extractor.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 
@@ -30,7 +26,7 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
     : cm_(cluster_manager),
       tracer_stats_{ZIPKIN_TRACER_STATS(POOL_COUNTER_PREFIX(scope, "tracing.zipkin."))},
       tls_(tls.allocateSlot()), runtime_(runtime), local_info_(local_info),
-      time_source_(time_source) {
+      time_source_(time_source), trace_context_option_(zipkin_config.trace_context_option()) {
   THROW_IF_NOT_OK_REF(Config::Utility::checkCluster("envoy.tracers.zipkin",
                                                     zipkin_config.collector_cluster(), cm_,
                                                     /* allow_added_via_api */ true)
@@ -59,6 +55,7 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
     TracerPtr tracer = std::make_unique<Tracer>(
         local_info_.clusterName(), local_info_.address(), random_generator, trace_id_128bit,
         shared_span_context, time_source_, split_spans_for_request);
+    tracer->setTraceContextOption(trace_context_option_);
     tracer->setReporter(
         ReporterImpl::newInstance(std::ref(*this), std::ref(dispatcher), collector));
     return std::make_shared<TlsTracer>(std::move(tracer), *this);
@@ -71,7 +68,9 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
                                    Tracing::Decision tracing_decision) {
   Tracer& tracer = *tls_->getTyped<TlsTracer>().tracer_;
   SpanPtr new_zipkin_span;
-  SpanContextExtractor extractor(trace_context);
+
+  // W3C fallback extraction is only enabled when USE_B3_WITH_W3C_PROPAGATION is configured
+  SpanContextExtractor extractor(trace_context, w3cFallbackEnabled());
   const absl::optional<bool> sampled = extractor.extractSampled();
   bool use_local_decision = !sampled.has_value();
   TRY_NEEDS_AUDIT {
