@@ -27,7 +27,8 @@ CELFormatter::CELFormatter(const ::Envoy::LocalInfo::LocalInfo& local_info,
               absl::StrCat("failed to create an expression: ", compiled_expr.status().message()));
         }
         return std::move(compiled_expr.value());
-      }()), typed_(typed) {}
+      }()),
+      typed_(typed) {}
 
 absl::optional<std::string>
 CELFormatter::formatWithContext(const Envoy::Formatter::HttpFormatterContext& context,
@@ -54,7 +55,7 @@ CELFormatter::formatValueWithContext(const Envoy::Formatter::HttpFormatterContex
     Protobuf::Arena arena;
     auto eval_status =
         compiled_expr_.evaluate(arena, &local_info_, stream_info, &context.requestHeaders(),
-                       &context.responseHeaders(), &context.responseTrailers());
+                                &context.responseHeaders(), &context.responseTrailers());
     if (!eval_status.has_value() || eval_status.value().IsError()) {
       return ValueUtil::nullValue();
     }
@@ -88,10 +89,9 @@ CELFormatterCommandParser::parse(absl::string_view command, absl::string_view su
     }
     Server::Configuration::ServerFactoryContext& context =
         Server::Configuration::ServerFactoryContextInstance::get();
-    return std::make_unique<CELFormatter>(context.localInfo(),
-                                          Extensions::Filters::Common::Expr::getBuilder(context),
-                                          parse_status.value().expr(), max_length,
-                                          command == "TYPED_CEL");
+    return std::make_unique<CELFormatter>(
+        context.localInfo(), Extensions::Filters::Common::Expr::getBuilder(context),
+        parse_status.value().expr(), max_length, command == "TYPED_CEL");
   }
 
   return nullptr;
