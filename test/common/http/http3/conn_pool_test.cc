@@ -87,7 +87,7 @@ public:
   Upstream::ClusterConnectivityState state_;
   NiceMock<Server::MockOverloadManager> overload_manager_;
   Network::Address::InstanceConstSharedPtr test_address_ =
-      *Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
+      *Network::Utility::resolveUrl("tcp://[::]:3000");
   std::shared_ptr<Upstream::HostDescription::AddressVector> address_list_{
       new Upstream::HostDescription::AddressVector{
           *Network::Utility::resolveUrl("tcp://127.0.0.1:3000"),
@@ -279,6 +279,17 @@ TEST_F(Http3ConnPoolImplTest, NewAndDrainClientBeforeConnect) {
   // Triggering the async connect callback after the client starts draining shouldn't cause crash.
   async_connect_callback->invokeCallback();
   cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
+}
+
+TEST_F(Http3ConnPoolImplTest, MigrationEnabledNoDrain) {
+  quic_info_.migration_config_.migrate_session_on_network_change = true;
+  createNewStream();
+  EXPECT_FALSE(pool_->isIdle());
+  // Draining non-migratable connections should not drain the connection which might be able to
+  // migrate.
+  pool_->drainConnections(
+      Envoy::ConnectionPool::DrainBehavior::DrainExistingNonMigratableConnections);
+  EXPECT_FALSE(pool_->isIdle());
 }
 
 } // namespace Http3
