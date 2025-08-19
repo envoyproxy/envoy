@@ -192,7 +192,7 @@ static_resources:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
         sni: www.envoyproxy.io
-  
+
   # OpenTelemetry Collector cluster
   - name: opentelemetry_collector
     type: STRICT_DNS
@@ -227,7 +227,7 @@ tools/vscode/generate_debug_config.py //source/exe:envoy-static --args "-c envoy
 
 There are two types of debuggers envoy community recommends to use, GDB (GNU Debugger) , a widely used and powerful debugger for various languages, including C++ and  LLDB,  the LLVM project's debugger, often used with Clang-compiled code (Clang is one of the many compilers for C++).
 
-Now click F5 to start debugging, this should have generated the `launch.json` as shown below. The generated `launch.json` will use GDB by default. 
+Now click F5 to start debugging, this should have generated the `launch.json` as shown below. The generated `launch.json` will use GDB by default.
 
 ![GDB Launch JSON](./images/GDB-launch-json.png)
 
@@ -316,3 +316,4 @@ Try accessing different admin endpoints from your local machine.
   ![Cluster Endpoints](./images/cluster-endpoints.png)
   ![Config Dump](./images/config-dump.png)
   ![Stats Endpoints](./images/stats-endpoints.png)
+
