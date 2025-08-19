@@ -147,8 +147,8 @@ bool PerSocketTapperImpl::shouldSubmitStreamedDataPerConfiguredSizeByAgedDuratio
     return false;
   }
 
-  const ProtobufWkt::Timestamp& first_event_ts = repeated_streamed_events[0].timestamp();
-  const ProtobufWkt::Timestamp& last_event_ts =
+  const Protobuf::Timestamp& first_event_ts = repeated_streamed_events[0].timestamp();
+  const Protobuf::Timestamp& last_event_ts =
       repeated_streamed_events[repeated_streamed_events.size() - 1].timestamp();
   return (last_event_ts.seconds() - first_event_ts.seconds()) >=
          static_cast<int64_t>(getStreamedBufferAgedDuration());
@@ -165,15 +165,9 @@ void PerSocketTapperImpl::handleSendingStreamTappedMsgPerConfigSize(const Buffer
   }
   setStreamedDataPerConfiguredSize(data, copy_start_offset, total_bytes, is_read, is_end_stream);
 
-  // Try to submit.
-  if (streamed_trace_ != nullptr &&
-      current_streamed_rx_tx_bytes_ >= config_->minStreamedSentBytes()) {
-    submitStreamedDataPerConfiguredSize();
-    pegSubmitCounter(true);
-  }
-
-  // Submit the data when the streamed buffer age exceeds the duration threshold.
-  if (shouldSubmitStreamedDataPerConfiguredSizeByAgedDuration()) {
+  // Submit the data.
+  if (current_streamed_rx_tx_bytes_ >= config_->minStreamedSentBytes() ||
+      shouldSubmitStreamedDataPerConfiguredSizeByAgedDuration()) {
     submitStreamedDataPerConfiguredSize();
     pegSubmitCounter(true);
   }
