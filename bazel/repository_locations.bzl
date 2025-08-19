@@ -612,6 +612,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.tracers.opentelemetry.samplers.cel",
             "envoy.tracers.opentelemetry.samplers.parent_based",
             "envoy.tracers.opentelemetry.samplers.trace_id_ratio_based",
+            "envoy.tracers.zipkin",
         ],
         release_date = "2025-07-11",
         cpe = "N/A",
