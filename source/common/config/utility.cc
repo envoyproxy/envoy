@@ -7,12 +7,14 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/grpc/async_client_manager.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/utility.h"
 
 #include "absl/status/status.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Config {
@@ -240,10 +242,10 @@ bool isApiTypeNonAggregated(const envoy::config::core::v3::ApiConfigSource::ApiT
 }
 } // namespace
 
-absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSource(
-    Grpc::AsyncClientManager& async_client_manager,
-    const envoy::config::core::v3::ApiConfigSource& api_config_source, Stats::Scope& scope,
-    bool skip_cluster_check, int grpc_service_idx, bool xdstp_config_source) {
+absl::StatusOr<Envoy::OptRef<const envoy::config::core::v3::GrpcService>>
+Utility::getGrpcConfigFromApiConfigSource(
+    const envoy::config::core::v3::ApiConfigSource& api_config_source, int grpc_service_idx,
+    bool xdstp_config_source) {
   RETURN_IF_NOT_OK(checkApiConfigSourceNames(
       api_config_source,
       Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support") ? 2 : 1));
@@ -264,13 +266,26 @@ absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSour
 
   if (grpc_service_idx >= api_config_source.grpc_services_size()) {
     // No returned factory in case there's no entry.
-    return nullptr;
+    return absl::nullopt;
   }
 
-  envoy::config::core::v3::GrpcService grpc_service;
-  grpc_service.MergeFrom(api_config_source.grpc_services(grpc_service_idx));
+  return Envoy::makeOptRef(api_config_source.grpc_services(grpc_service_idx));
+}
 
-  return async_client_manager.factoryForGrpcService(grpc_service, scope, skip_cluster_check);
+absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSource(
+    Grpc::AsyncClientManager& async_client_manager,
+    const envoy::config::core::v3::ApiConfigSource& api_config_source, Stats::Scope& scope,
+    bool skip_cluster_check, int grpc_service_idx, bool xdstp_config_source) {
+
+  absl::StatusOr<Envoy::OptRef<const envoy::config::core::v3::GrpcService>> maybe_grpc_service =
+      getGrpcConfigFromApiConfigSource(api_config_source, grpc_service_idx, xdstp_config_source);
+  RETURN_IF_NOT_OK(maybe_grpc_service.status());
+
+  if (!maybe_grpc_service.value().has_value()) {
+    return nullptr;
+  }
+  return async_client_manager.factoryForGrpcService(*maybe_grpc_service.value(), scope,
+                                                    skip_cluster_check);
 }
 
 absl::Status Utility::translateOpaqueConfig(const Protobuf::Any& typed_config,

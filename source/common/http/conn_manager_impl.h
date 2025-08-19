@@ -672,6 +672,9 @@ private:
   // request was incomplete at response completion, the stream is reset.
 
   const bool allow_upstream_half_close_{};
+
+  // Whether the connection manager is drained due to premature resets.
+  bool drained_due_to_premature_resets_{false};
 };
 
 } // namespace Http
