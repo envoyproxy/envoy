@@ -220,6 +220,26 @@ envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
               server_->serverFactoryContext(),
               server_->serverFactoryContext().messageValidationVisitor());
           connectivity_manager_ = Network::ConnectivityManagerFactory{generic_context}.get();
+          Network::DefaultNetworkChangeCallback cb =
+              [this](envoy_netconf_t current_configuration_key) {
+                dispatcher_->post([this, current_configuration_key]() {
+                  if (connectivity_manager_->getConfigurationKey() != current_configuration_key) {
+                    // The default network has changed to a different one.
+                    return;
+                  }
+                  ENVOY_LOG_MISC(
+                      trace,
+                      "Default network state has been changed. Current net configuration key {}",
+                      current_configuration_key);
+                  resetHttpPropertiesAndDrainHosts(probeAndGetLocalAddr(AF_INET6) != nullptr);
+                  if (!disable_dns_refresh_on_network_change_) {
+                    // This call will possibly drain all connections asynchronously.
+                    connectivity_manager_->doRefreshDns(current_configuration_key,
+                                                        /*drain_connections=*/true);
+                  }
+                });
+              };
+          connectivity_manager_->setDefaultNetworkChangeCallback(std::move(cb));
           if (Runtime::runtimeFeatureEnabled(
                   "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
             if (probeAndGetLocalAddr(AF_INET6) == nullptr) {
@@ -375,23 +395,21 @@ void InternalEngine::onDefaultNetworkChanged(int network) {
   });
 }
 
-void InternalEngine::onDefaultNetworkChangedAndroid(ConnectionType /*connection_type*/,
-                                                    int64_t /*net_id*/) {
-  ENVOY_LOG_MISC(trace, "Calling the default network changed callback on Android");
+void InternalEngine::onDefaultNetworkChangedAndroid(ConnectionType connection_type,
+                                                    int64_t net_id) {
+  connectivity_manager_->onDefaultNetworkChangedAndroid(connection_type, net_id);
 }
 
-void InternalEngine::onNetworkDisconnectAndroid(int64_t /*net_id*/) {
-  ENVOY_LOG_MISC(trace, "Calling network disconnect callback on Android");
+void InternalEngine::onNetworkDisconnectAndroid(int64_t net_id) {
+  connectivity_manager_->onNetworkDisconnectAndroid(net_id);
 }
 
-void InternalEngine::onNetworkConnectAndroid(ConnectionType /*connection_type*/,
-                                             int64_t /*net_id*/) {
-  ENVOY_LOG_MISC(trace, "Calling network connect callback on Android");
+void InternalEngine::onNetworkConnectAndroid(ConnectionType connection_type, int64_t net_id) {
+  connectivity_manager_->onNetworkConnectAndroid(connection_type, net_id);
 }
 
-void InternalEngine::purgeActiveNetworkListAndroid(
-    const std::vector<int64_t>& /*active_network_ids*/) {
-  ENVOY_LOG_MISC(trace, "Calling network purge callback on Android");
+void InternalEngine::purgeActiveNetworkListAndroid(const std::vector<int64_t>& active_network_ids) {
+  connectivity_manager_->purgeActiveNetworkListAndroid(active_network_ids);
 }
 
 void InternalEngine::onDefaultNetworkUnavailable() {
@@ -400,8 +418,17 @@ void InternalEngine::onDefaultNetworkUnavailable() {
 }
 
 void InternalEngine::handleNetworkChange(const int network_type, const bool has_ipv6_connectivity) {
-  envoy_netconf_t configuration =
-      Network::ConnectivityManagerImpl::setPreferredNetwork(network_type);
+  envoy_netconf_t configuration = connectivity_manager_->setPreferredNetwork(network_type);
+
+  resetHttpPropertiesAndDrainHosts(has_ipv6_connectivity);
+  if (!disable_dns_refresh_on_network_change_) {
+    // Refresh DNS upon network changes.
+    // This call will possibly drain all connections asynchronously.
+    connectivity_manager_->refreshDns(configuration, /*drain_connections=*/true);
+  }
+}
+
+void InternalEngine::resetHttpPropertiesAndDrainHosts(bool has_ipv6_connectivity) {
   if (Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.dns_cache_set_ip_version_to_remove") ||
       Runtime::runtimeFeatureEnabled(
@@ -435,11 +462,7 @@ void InternalEngine::handleNetworkChange(const int network_type, const bool has_
       ENVOY_LOG_EVENT(debug, "netconf_immediate_drain", "DrainAllHosts");
       getClusterManager().drainConnections([](const Upstream::Host&) { return true; });
     }
-    return;
   }
-  // Refresh DNS upon network changes.
-  // This call will possibly drain all connections asynchronously.
-  connectivity_manager_->refreshDns(configuration, /*drain_connections=*/true);
 }
 
 envoy_status_t InternalEngine::recordCounterInc(absl::string_view elements, envoy_stats_tags tags,
