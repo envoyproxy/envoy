@@ -1,0 +1,75 @@
+name: CI report
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      current:
+        description: Current time slice (takes precedence over previous)
+        type: choice
+        options:
+        -
+        - hour
+        - day
+        - week
+      output:
+        description: Report output
+        type: choice
+        default: console
+        options:
+        - console
+        - artifact
+        - envoy-ci
+      previous:
+        description: Previous time slice (ignored if current set)
+        type: choice
+        default: hour
+        options:
+        -
+        - hour
+        - day
+        - week
+      status:
+        description: CI status
+        default: failure
+        type: choice
+        options:
+        -
+        - failure
+
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  report:
+    secrets:
+      ENVOY_CI_APP_ID: ${{ secrets.ENVOY_CI_APP_ID }}
+      ENVOY_CI_APP_KEY: ${{ secrets.ENVOY_CI_APP_KEY }}
+    permissions:
+      contents: read
+    name: Generate CI report
+    uses: ./.github/workflows/_ci_report.yml
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    with:
+      current: ${{ inputs.current }}
+      output: ${{ inputs.output }}
+      previous: ${{ inputs.previous }}
+      status: ${{ inputs.status }}
+
+  report-scheduled:
+    secrets:
+      ENVOY_CI_APP_ID: ${{ secrets.ENVOY_CI_APP_ID }}
+      ENVOY_CI_APP_KEY: ${{ secrets.ENVOY_CI_APP_KEY }}
+    permissions:
+      contents: read
+    name: Generate CI report
+    uses: ./.github/workflows/_ci_report.yml
+    if: ${{ github.event_name == 'schedule' }}
+    with:
+      output: envoy-ci
+      previous: hour
+      status: failure
