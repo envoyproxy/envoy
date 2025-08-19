@@ -198,8 +198,10 @@ public class AndroidNetworkMonitor {
 
     connectivityManager =
         (ConnectivityManager)context.getSystemService(Context.CONNECTIVITY_SERVICE);
-    connectivityManager.registerDefaultNetworkCallback(
-        new DefaultNetworkCallback(envoyEngine, connectivityManager, useNetworkChangeEvent));
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+      connectivityManager.registerDefaultNetworkCallback(
+          new DefaultNetworkCallback(envoyEngine, connectivityManager, useNetworkChangeEvent));
+    }
   }
 
   /** @returns The singleton instance of {@link AndroidNetworkMonitor}. */
