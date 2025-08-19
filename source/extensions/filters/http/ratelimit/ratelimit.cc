@@ -190,8 +190,10 @@ void Filter::onDestroy() {
   if (state_ == State::Calling) {
     state_ = State::Complete;
     client_->cancel();
-  } else if (client_ != nullptr) {
-    ASSERT(request_headers_ != nullptr);
+  } else if (client_ != nullptr &&
+             request_headers_ != nullptr) // If decodeHeaders is not called because of a local
+                                          // reply, we do not set request_headers_.
+  {
     std::vector<Envoy::RateLimit::Descriptor> descriptors;
     populateRateLimitDescriptors(descriptors, *request_headers_, true);
     if (!descriptors.empty()) {
