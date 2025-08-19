@@ -859,7 +859,7 @@ void BaseIntegrationTest::checkForMissingTagExtractionRules() {
     return true;
   };
   find_stat_prefix("", *json);
-  ENVOY_LOG_MISC(debug, "discovered stat_prefixes {}", stat_prefixes);
+  ENVOY_LOG_MISC(debug, "discovered stat_prefixes {}", absl::StrJoin(stat_prefixes, ","));
 
   auto check_metric = [&](auto& metric) {
     // Validate that the `stat_prefix` string doesn't appear in the tag-extracted name, indicating

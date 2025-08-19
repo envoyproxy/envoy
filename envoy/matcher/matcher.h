@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <format>
 #include <memory>
 #include <string>
 
@@ -400,3 +401,20 @@ namespace fmt {
 // Allow fmtlib to use operator << defined in DataInputGetResult
 template <> struct formatter<::Envoy::Matcher::DataInputGetResult> : ostream_formatter {};
 } // namespace fmt
+
+namespace std {
+template <> struct formatter<::Envoy::Matcher::DataInputGetResult, char> {
+  template <class ParseContext> constexpr ParseContext::iterator parse(ParseContext& ctx) {
+    return ctx.begin();
+  }
+
+  template <class FmtContext>
+  FmtContext::iterator format(const ::Envoy::Matcher::DataInputGetResult& s,
+                              FmtContext& ctx) const {
+    std::ostringstream out;
+    out << s;
+    return std::ranges::copy(std::move(out).str(), ctx.out()).out;
+  }
+};
+
+} // namespace std

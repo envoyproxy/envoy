@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <concepts>
 #include <cstdint>
 #include <cstring>
 #include <iosfwd>
@@ -827,3 +828,34 @@ struct formatter<
     std::enable_if_t<std::is_base_of<::Envoy::Http::HeaderMap, HeaderMapType>::value, char>>
     : ostream_formatter {};
 } // namespace fmt
+
+namespace std {
+// Allow std::format to use operator << defined in HeaderMap and LowerCaseString
+template <> struct formatter<::Envoy::Http::LowerCaseString, char> {
+  template <class ParseContext> constexpr ParseContext::iterator parse(ParseContext& ctx) {
+    return ctx.begin();
+  }
+
+  template <class FmtContext>
+  FmtContext::iterator format(const ::Envoy::Http::LowerCaseString& s, FmtContext& ctx) const {
+    std::ostringstream out;
+    out << s;
+    return std::ranges::copy(std::move(out).str(), ctx.out()).out;
+  }
+};
+
+template <std::derived_from<::Envoy::Http::HeaderMap> HeaderMapType>
+struct formatter<HeaderMapType, char> {
+  template <class ParseContext> constexpr ParseContext::iterator parse(ParseContext& ctx) {
+    return ctx.begin();
+  }
+
+  template <class FmtContext>
+  FmtContext::iterator format(const HeaderMapType& header_map, FmtContext& ctx) const {
+    std::ostringstream out;
+    out << header_map;
+    return std::ranges::copy(std::move(out).str(), ctx.out()).out;
+  }
+};
+
+} // namespace std

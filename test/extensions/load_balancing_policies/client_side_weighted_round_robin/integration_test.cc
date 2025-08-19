@@ -146,7 +146,7 @@ public:
     std::vector<uint64_t> initial_usage;
     sendRequestsAndTrackUpstreamUsage(50, initial_usage);
 
-    ENVOY_LOG(trace, "initial_usage {}", initial_usage);
+    ENVOY_LOG(trace, "initial_usage {}", absl::StrJoin(initial_usage, ","));
 
     // Wait longer than blackout period to ensure that client side weights are
     // applied.
@@ -156,7 +156,7 @@ public:
     // used proportionally to their weights.
     std::vector<uint64_t> weighted_usage;
     sendRequestsAndTrackUpstreamUsage(100, weighted_usage);
-    ENVOY_LOG(trace, "weighted_usage {}", weighted_usage);
+    ENVOY_LOG(trace, "weighted_usage {}", absl::StrJoin(weighted_usage, ","));
     EXPECT_LT(weighted_usage[0], weighted_usage[1]);
     EXPECT_LT(weighted_usage[1], weighted_usage[2]);
   }
