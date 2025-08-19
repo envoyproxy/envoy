@@ -1,4 +1,7 @@
 **Summary of changes**:
 
-* Wasm:
-  - Update v8 to resolve CVEs.
+* Release images:
+  - Update Ubuntu and distroless base images.
+
+* Bug fixes
+  - Assorted bug fixes for TLS inspector, and HTTP listeners.
