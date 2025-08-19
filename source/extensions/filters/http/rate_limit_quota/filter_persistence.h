@@ -23,7 +23,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
-// GlobalTlsStores holds a singleton hashmap of rate_limit_quota TLS stores,
+// GlobalTlsStores holds a singleton hash map of rate_limit_quota TLS stores,
 // indexed by their combined RLQS server targets & domains.
 //
 // This follows the data sharing model of FactoryRegistry, and similarly does
@@ -102,8 +102,7 @@ private:
                   Server::Configuration::FactoryContext& context, TlsStoreIndex& index,
                   bool* new_store_out);
 
-  // Clear a specified index when it is no longer captured by any filter factory
-  // cbs.
+  // Clear a specified index when it is no longer captured by any filter factories.
   static void clearTlsStore(const TlsStoreIndex& index) { stores().erase(index); }
 };
 

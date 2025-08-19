@@ -429,7 +429,7 @@ bucket_action:
 
   // With an entirely fresh quota cache state & RLQS stream again, the next
   // request should be allowed & trigger an initial usage report.
-  // Cleanup of the previouis RLQS stream is needed as the same FakeUpstream can
+  // Cleanup of the previous RLQS stream is needed as the same FakeUpstream can
   // only handle 1 active stream at a time.
   cleanupRlqsStream(0);
   ASSERT_EQ(sendRequest(&headers), "200");
