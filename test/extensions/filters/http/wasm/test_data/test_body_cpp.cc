@@ -124,7 +124,6 @@ FilterDataStatus BodyContext::onBody(WasmBufferType type, size_t buffer_length,
       return FilterDataStatus::Continue;
     }
     return FilterDataStatus::StopIterationAndBuffer;
-
   } else if (body_op_ == "SetEndOfBodies") {
     logBody(type);
     if (end_of_stream) {
@@ -133,7 +132,8 @@ FilterDataStatus BodyContext::onBody(WasmBufferType type, size_t buffer_length,
       return FilterDataStatus::Continue;
     }
     return FilterDataStatus::StopIterationAndBuffer;
-
+  } else if (body_op_ == "SetBodyDuringHeaders") {
+    // Action already performed in headers callback.
   } else {
     // This is a test and the test was configured incorrectly.
     logError("Invalid body test op " + body_op_);
@@ -143,12 +143,20 @@ FilterDataStatus BodyContext::onBody(WasmBufferType type, size_t buffer_length,
 
 FilterHeadersStatus BodyContext::onRequestHeaders(uint32_t, bool) {
   body_op_ = getRequestHeader("x-test-operation")->toString();
+  if (body_op_ == "SetBodyDuringHeaders") {
+    setBuffer(WasmBufferType::HttpRequestBody, 0, 0, "set.during.headers");
+    logBody(WasmBufferType::HttpRequestBody);
+  }
   return FilterHeadersStatus::Continue;
 }
 
 FilterHeadersStatus BodyContext::onResponseHeaders(uint32_t, bool) {
   body_op_ = getResponseHeader("x-test-operation")->toString();
   CHECK_RESULT(replaceResponseHeader("x-test-operation", body_op_));
+  if (body_op_ == "SetBodyDuringHeaders") {
+    setBuffer(WasmBufferType::HttpResponseBody, 0, 0, "set.during.headers");
+    logBody(WasmBufferType::HttpResponseBody);
+  }
   return FilterHeadersStatus::Continue;
 }
 

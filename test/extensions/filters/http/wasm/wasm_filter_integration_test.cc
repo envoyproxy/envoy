@@ -290,6 +290,44 @@ TEST_P(WasmFilterIntegrationTest, LargeRequestHitBufferLimit) {
   }
 }
 
+TEST_P(WasmFilterIntegrationTest, BodyRequestSetBodyDuringHeaders) {
+  setupWasmFilter("", "body");
+  HttpIntegrationTest::initialize();
+
+  Http::TestRequestHeaderMapImpl request_headers{{":scheme", "http"},
+                                                 {":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":authority", "host"},
+                                                 {"x-test-operation", "SetBodyDuringHeaders"}};
+  Http::TestRequestHeaderMapImpl expected_request_headers{{":path", "/"}};
+  Http::TestResponseHeaderMapImpl upstream_response_headers{{":status", "200"}};
+  Http::TestResponseHeaderMapImpl expected_response_headers{{":status", "200"}};
+  auto request_body = std::vector<std::string>();  // headers-only request
+  auto upstream_response_body = std::vector<std::string>{{"upstream_"}, {"body"}};
+  runTest(request_headers, request_body, expected_request_headers, "set.during.headers",
+          upstream_response_headers, upstream_response_body, expected_response_headers,
+          "upstream_body");
+}
+
+TEST_P(WasmFilterIntegrationTest, BodyResponseSetBodyDuringHeaders) {
+  setupWasmFilter("", "body");
+  HttpIntegrationTest::initialize();
+
+  Http::TestRequestHeaderMapImpl request_headers{{":scheme", "http"},
+                                                 {":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":authority", "host"}};
+  Http::TestRequestHeaderMapImpl expected_request_headers{{":path", "/"}};
+  Http::TestResponseHeaderMapImpl upstream_response_headers{{":status", "200"},
+                                                            {"x-test-operation", "SetBodyDuringHeaders"}};
+  Http::TestResponseHeaderMapImpl expected_response_headers{{":status", "200"}};
+  auto request_body = std::vector<std::string>{{"request_"}, {"body"}};
+  auto upstream_response_body = std::vector<std::string>();  // headers-only response
+  runTest(request_headers, request_body, expected_request_headers, "request_body",
+          upstream_response_headers, upstream_response_body, expected_response_headers,
+          "set.during.headers");
+}
+
 } // namespace
 } // namespace Wasm
 } // namespace Extensions

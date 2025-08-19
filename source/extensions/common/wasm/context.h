@@ -414,6 +414,8 @@ protected:
   Http::ResponseHeaderMap* response_headers_{};
   ::Envoy::Buffer::Instance* request_body_buffer_{};
   ::Envoy::Buffer::Instance* response_body_buffer_{};
+  ::Envoy::Buffer::InstancePtr added_request_body_buffer_{};
+  ::Envoy::Buffer::InstancePtr added_response_body_buffer_{};
   Http::RequestTrailerMap* request_trailers_{};
   Http::ResponseTrailerMap* response_trailers_{};
   Http::MetadataMap* request_metadata_{};
