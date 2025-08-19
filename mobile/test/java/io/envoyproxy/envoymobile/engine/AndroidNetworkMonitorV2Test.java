@@ -261,16 +261,15 @@ public class AndroidNetworkMonitorV2Test {
   @Test
   @Config(sdk = Build.VERSION_CODES.M)
   public void testBroadcastReceiver() {
-    Network activeNetwork =
-        triggerDefaultNetworkChange(
-            NetworkCapabilities.TRANSPORT_WIFI, ConnectivityManager.TYPE_WIFI, 0);
+    Network activeNetwork = triggerDefaultNetworkChange(NetworkCapabilities.TRANSPORT_WIFI,
+                                                        ConnectivityManager.TYPE_WIFI, 0);
     Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
     Intent intent = new Intent(ConnectivityManager.CONNECTIVITY_ACTION);
     context.sendBroadcast(intent);
     // Robolectric doesn't seem to run the receiver in the main looper, so we need to idle it.
     shadowOf(Looper.getMainLooper()).idle();
     verify(mockEnvoyEngine)
-        .onDefaultNetworkChangedV2(
-            EnvoyConnectionType.CONNECTION_WIFI, activeNetwork.getNetworkHandle());
+        .onDefaultNetworkChangedV2(EnvoyConnectionType.CONNECTION_WIFI,
+                                   activeNetwork.getNetworkHandle());
   }
 }

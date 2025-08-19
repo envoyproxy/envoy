@@ -707,17 +707,16 @@ public class AndroidNetworkMonitorV2 {
   private class ConnectivityBroadcastReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
-      runOnThread(
-          new Runnable() {
-            @Override
-            public void run() {
-              if (mIgnoreNextBroadcast) {
-                mIgnoreNextBroadcast = false;
-                return;
-              }
-              onNetworkStateChangedTo(getDefaultNetworkState(), getDefaultNetId());
-            }
-          });
+      runOnThread(new Runnable() {
+        @Override
+        public void run() {
+          if (mIgnoreNextBroadcast) {
+            mIgnoreNextBroadcast = false;
+            return;
+          }
+          onNetworkStateChangedTo(getDefaultNetworkState(), getDefaultNetId());
+        }
+      });
     }
   }
 
@@ -776,6 +775,7 @@ public class AndroidNetworkMonitorV2 {
 
     if (mDefaultNetworkCallback != null) {
       // This is only reachable for Android O+.
+      // If registration fails, mDefaultNetworkCallback will be reset.
       maybeRegisterDefaultNetworkCallback();
     }
     if (mDefaultNetworkCallback == null) {
@@ -784,15 +784,13 @@ public class AndroidNetworkMonitorV2 {
         // registerReceiver returns non-null, it means the broadcast was previously issued
         // and onReceive() will be immediately called with this previous Intent. Since this
         // initial callback doesn't actually indicate a network change, we can ignore it.
-        mIgnoreNextBroadcast =
-            (mApplicationContext.registerReceiver(
-                    mBroadcastReceiver, mIntentFilter, /*permission*/ null, mHandler, /*flags*/ 0)
-                != null);
+        mIgnoreNextBroadcast = (mApplicationContext.registerReceiver(
+                                    mBroadcastReceiver, mIntentFilter, /*permission*/ null,
+                                    mHandler, /*flags*/ 0) != null);
       } else {
         mIgnoreNextBroadcast =
-            (mApplicationContext.registerReceiver(
-                    mBroadcastReceiver, mIntentFilter, /*permission*/ null, mHandler)
-                != null);
+            (mApplicationContext.registerReceiver(mBroadcastReceiver, mIntentFilter,
+                                                  /*permission*/ null, mHandler) != null);
       }
     }
     mRegistered = true;
@@ -801,8 +799,8 @@ public class AndroidNetworkMonitorV2 {
       mAllNetworksCallback.initializeVpnInPlace();
       try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        mConnectivityManager.registerNetworkCallback(mNetworkRequest, mAllNetworksCallback,
-                                                     mHandler);
+          mConnectivityManager.registerNetworkCallback(mNetworkRequest, mAllNetworksCallback,
+                                                       mHandler);
         } else {
           mConnectivityManager.registerNetworkCallback(mNetworkRequest, mAllNetworksCallback);
         }
