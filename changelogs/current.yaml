@@ -1,13 +1,6 @@
-date: Pending
-
-behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-
-minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
+date: August 19, 2025
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: listeners
   change: |
     Fixed issue where :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` timed out
@@ -15,14 +8,9 @@ bug_fixes:
     than the TLS inspector had requested, causing the TLS inspector to incorrectly calculate its buffer growth strategy.
     The fix ensures that buffer growth is now based on actual bytes available rather than the previously requested amount.
 
-removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
 new_features:
 - area: http
   change: |
     Added :ref:`ignore_http_11_upgrade
     <envoy_v3_api_field_config.core.v3.Http1ProtocolOptions.ignore_http_11_upgrade>`
     to ignore HTTP/1.1 Upgrade values matching any of the supplied matchers.
-
-deprecated:
