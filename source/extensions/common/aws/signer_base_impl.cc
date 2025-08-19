@@ -5,8 +5,6 @@
 #include "source/common/http/utility.h"
 #include "source/extensions/common/aws/utility.h"
 
-#include "absl/strings/str_replace.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -82,36 +80,11 @@ absl::Status SignerBaseImpl::sign(Http::RequestHeaderMap& headers, const std::st
   // Phase 1: Create a canonical request
   const auto credential_scope = createCredentialScope(short_date, override_region);
 
-  /*
-  * Replace '+' with '%20' in query string - #40523
-  * Envoy is able to receive either raw or url encoded query parameters
-  * AWS assumes that a raw plus is a form encoded space. However the canonicalisation algorithm requires this to be specific.
-  * This fix enforces url encoding of plus to a space in the query parameters. This creates a correct canonicalisation and then on the wire
-  * matches how AWS replays this back when validating the signature.
-  * Normally we would not modify the URL in this extension. However without doing this we create a guaranteed signature failure.
-  */
-
-  std::string path_with_query = std::string(headers.getPathValue());
-  size_t query_start = path_with_query.find('?');
-  if (query_start != std::string::npos) {
-    size_t fragment_start = path_with_query.find('#', query_start);
-    size_t query_end =
-        (fragment_start != std::string::npos) ? fragment_start : path_with_query.length();
-
-    std::string query_part = path_with_query.substr(query_start + 1, query_end - query_start - 1);
-    absl::StrReplaceAll({{std::make_pair("+", "%20")}}, &query_part);
-
-    path_with_query =
-        path_with_query.substr(0, query_start + 1) + query_part + path_with_query.substr(query_end);
-    headers.setPath(path_with_query);
-  }
-
+  // Handle query string parameters by appending them all to the path. Case is important for these
+  // query parameters.
   auto query_params =
       Envoy::Http::Utility::QueryParamsMulti::parseQueryString(headers.getPathValue());
-
   if (query_string_) {
-    // Handle query string parameters by appending them all to the path. Case is important for these
-    // query parameters.
     addRegionQueryParam(query_params, override_region);
     createQueryParams(
         query_params,
@@ -220,11 +193,11 @@ void SignerBaseImpl::createQueryParams(Envoy::Http::Utility::QueryParamsMulti& q
   }
   // X-Amz-Credential
   query_params.add(SignatureQueryParameterValues::AmzCredential,
-                   Utility::encodeQueryComponent(credential));
+                   Utility::encodeQueryComponentPreservingPlus(credential));
   // X-Amz-SignedHeaders
-  query_params.add(
-      SignatureQueryParameterValues::AmzSignedHeaders,
-      Utility::encodeQueryComponent(Utility::joinCanonicalHeaderNames(signed_headers)));
+  query_params.add(SignatureQueryParameterValues::AmzSignedHeaders,
+                   Utility::encodeQueryComponentPreservingPlus(
+                       Utility::joinCanonicalHeaderNames(signed_headers)));
 }
 
 } // namespace Aws
