@@ -87,7 +87,7 @@ public:
   Upstream::ClusterConnectivityState state_;
   NiceMock<Server::MockOverloadManager> overload_manager_;
   Network::Address::InstanceConstSharedPtr test_address_ =
-      *Network::Utility::resolveUrl("tcp://[::]:3000");
+      *Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
   std::shared_ptr<Upstream::HostDescription::AddressVector> address_list_{
       new Upstream::HostDescription::AddressVector{
           *Network::Utility::resolveUrl("tcp://127.0.0.1:3000"),
