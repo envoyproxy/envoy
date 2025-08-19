@@ -1,10 +1,5 @@
 date: August 19, 2025
 
-behavior_changes:
-- area: ext_proc
-  change: |
-    Reverted https://github.com/envoyproxy/envoy/pull/39740 to re-enable fail_open+FULL_DUPLEX_STREAMED configuraton combination.
-
 bug_fixes:
 - area: http
   change: |
