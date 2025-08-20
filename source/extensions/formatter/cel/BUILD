@@ -27,6 +27,7 @@ envoy_cc_library(
         {
             "//bazel:windows_x86_64": [],
             "//conditions:default": [
+                "@com_google_cel_cpp//eval/public:value_export_util",
                 "@com_google_cel_cpp//parser",
             ],
         },

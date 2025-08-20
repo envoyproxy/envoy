@@ -747,12 +747,12 @@ TEST_P(RBACIntegrationTest, RouteMetadataMatcherAllow) {
               baz: bat
           )EOF";
 
-        ProtobufWkt::Struct value;
+        Protobuf::Struct value;
         TestUtility::loadFromYaml(yaml, value);
         auto default_route =
             hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
         default_route->mutable_metadata()->mutable_filter_metadata()->insert(
-            Protobuf::MapPair<std::string, ProtobufWkt::Struct>(key, value));
+            Protobuf::MapPair<std::string, Protobuf::Struct>(key, value));
       });
   initialize();
 
@@ -791,12 +791,12 @@ TEST_P(RBACIntegrationTest, RouteMetadataMatcherDeny) {
               foo: baz
           )EOF";
 
-        ProtobufWkt::Struct value;
+        Protobuf::Struct value;
         TestUtility::loadFromYaml(yaml, value);
         auto default_route =
             hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
         default_route->mutable_metadata()->mutable_filter_metadata()->insert(
-            Protobuf::MapPair<std::string, ProtobufWkt::Struct>(key, value));
+            Protobuf::MapPair<std::string, Protobuf::Struct>(key, value));
       });
   initialize();
 
@@ -833,12 +833,12 @@ TEST_P(RBACIntegrationTest, DEPRECATED_FEATURE_TEST(DynamicMetadataMatcherAllow)
               baz: bat
           )EOF";
 
-        ProtobufWkt::Struct value;
+        Protobuf::Struct value;
         TestUtility::loadFromYaml(yaml, value);
         auto default_route =
             hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
         default_route->mutable_metadata()->mutable_filter_metadata()->insert(
-            Protobuf::MapPair<std::string, ProtobufWkt::Struct>(key, value));
+            Protobuf::MapPair<std::string, Protobuf::Struct>(key, value));
       });
   initialize();
 
@@ -877,12 +877,12 @@ TEST_P(RBACIntegrationTest, DynamicMetadataMatcherDeny) {
               foo: baz
           )EOF";
 
-        ProtobufWkt::Struct value;
+        Protobuf::Struct value;
         TestUtility::loadFromYaml(yaml, value);
         auto default_route =
             hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
         default_route->mutable_metadata()->mutable_filter_metadata()->insert(
-            Protobuf::MapPair<std::string, ProtobufWkt::Struct>(key, value));
+            Protobuf::MapPair<std::string, Protobuf::Struct>(key, value));
       });
   initialize();
 

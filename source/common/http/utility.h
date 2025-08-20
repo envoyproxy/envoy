@@ -59,7 +59,7 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 absl::StatusOr<envoy::config::core::v3::Http2ProtocolOptions>
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
                              bool hcm_stream_error_set,
-                             const ProtobufWkt::BoolValue& hcm_stream_error);
+                             const Protobuf::BoolValue& hcm_stream_error);
 } // namespace Utility
 } // namespace Http2
 namespace Http3 {
@@ -68,7 +68,7 @@ namespace Utility {
 envoy::config::core::v3::Http3ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
                              bool hcm_stream_error_set,
-                             const ProtobufWkt::BoolValue& hcm_stream_error);
+                             const Protobuf::BoolValue& hcm_stream_error);
 
 } // namespace Utility
 } // namespace Http3

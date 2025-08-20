@@ -27,8 +27,7 @@ public:
   static std::unique_ptr<ProtoExtractorInterface>
   Create(proto_processing_lib::proto_scrubber::ScrubberContext scrubber_context,
          const google::grpc::transcoding::TypeHelper* type_helper,
-         const ::Envoy::ProtobufWkt::Type* message_type,
-         const FieldPathToExtractType& field_policies);
+         const ::Envoy::Protobuf::Type* message_type, const FieldPathToExtractType& field_policies);
 
   // Input message must be a message data.
   ExtractedMessageMetadata
@@ -38,7 +37,7 @@ private:
   // Initializes an instance of ProtoExtractor using FieldPolicies.
   ProtoExtractor(proto_processing_lib::proto_scrubber::ScrubberContext scrubber_context,
                  const google::grpc::transcoding::TypeHelper* type_helper,
-                 const ::Envoy::ProtobufWkt::Type* message_type,
+                 const ::Envoy::Protobuf::Type* message_type,
                  const FieldPathToExtractType& field_policies);
 
   // Populate the target resource or the target resource callback in the extracted message
@@ -48,14 +47,14 @@ private:
       bool callback, ExtractedMessageMetadata* extracted_message_metadata) const;
 
   // Function to get the value associated with a key
-  const ProtobufWkt::FieldMask& FindWithDefault(ExtractedMessageDirective directive);
+  const Protobuf::FieldMask& FindWithDefault(ExtractedMessageDirective directive);
 
   const google::grpc::transcoding::TypeHelper* type_helper_;
-  const ::Envoy::ProtobufWkt::Type* message_type_;
+  const ::Envoy::Protobuf::Type* message_type_;
   // We use std::map instead of absl::flat_hash_map because of flat_hash_map's
   // rehash behavior.
-  std::map<ExtractedMessageDirective, ProtobufWkt::FieldMask> directives_mapping_;
-  std::function<const ::Envoy::ProtobufWkt::Type*(const std::string&)> type_finder_;
+  std::map<ExtractedMessageDirective, Protobuf::FieldMask> directives_mapping_;
+  std::function<const ::Envoy::Protobuf::Type*(const std::string&)> type_finder_;
   std::unique_ptr<proto_processing_lib::proto_scrubber::FieldMaskPathChecker> field_checker_;
   std::unique_ptr<proto_processing_lib::proto_scrubber::ProtoScrubber> scrubber_;
   // A field path for 'location_selector' associated with the field marked as

@@ -841,7 +841,7 @@ TEST(Context, ConnectionAttributes) {
 
 TEST(Context, FilterStateAttributes) {
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
-  ProtobufWkt::Arena arena;
+  Protobuf::Arena arena;
   FilterStateWrapper wrapper(arena, filter_state);
   auto status_or = wrapper.ListKeys(&arena);
   EXPECT_EQ(status_or.status().message(), "ListKeys() is not implemented");
@@ -874,7 +874,7 @@ TEST(Context, FilterStateAttributes) {
                               "type.googleapis.com/google.protobuf.DoubleValue",
                               StreamInfo::FilterState::LifeSpan::FilterChain);
   auto cel_state = std::make_shared<CelState>(prototype);
-  ProtobufWkt::DoubleValue v;
+  Protobuf::DoubleValue v;
   v.set_value(1.0);
   cel_state->setValue(v.SerializeAsString());
   EXPECT_TRUE(cel_state->serializeAsString().has_value());

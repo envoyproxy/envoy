@@ -225,7 +225,7 @@ public:
 
   void setSentAttributes(bool sent) { attributes_sent_ = sent; }
 
-  virtual ProtobufWkt::Struct
+  virtual Protobuf::Struct
   evaluateAttributes(const ExpressionManager& mgr,
                      const Filters::Common::Expr::Activation& activation) const PURE;
 
@@ -502,7 +502,7 @@ public:
   }
 
   const Http::RequestOrResponseHeaderMap* responseHeaders() const override { return nullptr; }
-  ProtobufWkt::Struct
+  Protobuf::Struct
   evaluateAttributes(const ExpressionManager& mgr,
                      const Filters::Common::Expr::Activation& activation) const override {
     return mgr.evaluateRequestAttributes(activation);
@@ -594,7 +594,7 @@ public:
 
   const Http::RequestOrResponseHeaderMap* responseHeaders() const override { return headers_; }
 
-  ProtobufWkt::Struct
+  Protobuf::Struct
   evaluateAttributes(const ExpressionManager& mgr,
                      const Filters::Common::Expr::Activation& activation) const override {
     return mgr.evaluateResponseAttributes(activation);

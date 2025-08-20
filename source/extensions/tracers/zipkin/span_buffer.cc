@@ -74,7 +74,7 @@ std::string JsonV2Serializer::serialize(const std::vector<Span>& zipkin_spans) {
         absl::StrAppend(
             out, absl::StrJoin(
                      toListOfSpans(zipkin_span, replacements), ",",
-                     [&replacement_values](std::string* element, const ProtobufWkt::Struct& span) {
+                     [&replacement_values](std::string* element, const Protobuf::Struct& span) {
                        absl::StatusOr<std::string> json_or_error =
                            MessageUtil::getJsonStringFromMessage(span, false, true);
                        ENVOY_BUG(json_or_error.ok(), "Failed to parse json");
@@ -108,16 +108,16 @@ std::string JsonV2Serializer::serialize(const std::vector<Span>& zipkin_spans) {
   return absl::StrCat("[", serialized_elements, "]");
 }
 
-const std::vector<ProtobufWkt::Struct>
+const std::vector<Protobuf::Struct>
 JsonV2Serializer::toListOfSpans(const Span& zipkin_span, Util::Replacements& replacements) const {
-  std::vector<ProtobufWkt::Struct> spans;
+  std::vector<Protobuf::Struct> spans;
   spans.reserve(zipkin_span.annotations().size());
 
   // This holds the annotation entries from logs.
-  std::vector<ProtobufWkt::Value> annotation_entries;
+  std::vector<Protobuf::Value> annotation_entries;
 
   for (const auto& annotation : zipkin_span.annotations()) {
-    ProtobufWkt::Struct span;
+    Protobuf::Struct span;
     auto* fields = span.mutable_fields();
     if (annotation.value() == CLIENT_SEND) {
       (*fields)[SPAN_KIND] = ValueUtil::stringValue(KIND_CLIENT);
@@ -127,7 +127,7 @@ JsonV2Serializer::toListOfSpans(const Span& zipkin_span, Util::Replacements& rep
       }
       (*fields)[SPAN_KIND] = ValueUtil::stringValue(KIND_SERVER);
     } else {
-      ProtobufWkt::Struct annotation_entry;
+      Protobuf::Struct annotation_entry;
       auto* annotation_entry_fields = annotation_entry.mutable_fields();
       (*annotation_entry_fields)[ANNOTATION_VALUE] = ValueUtil::stringValue(annotation.value());
       (*annotation_entry_fields)[ANNOTATION_TIMESTAMP] =
@@ -137,7 +137,7 @@ JsonV2Serializer::toListOfSpans(const Span& zipkin_span, Util::Replacements& rep
     }
 
     if (annotation.isSetEndpoint()) {
-      // Usually we store number to a ProtobufWkt::Struct object via ValueUtil::numberValue.
+      // Usually we store number to a Protobuf::Struct object via ValueUtil::numberValue.
       // However, due to the possibility of rendering that to a number with scientific notation, we
       // chose to store it as a string and keeping track the corresponding replacement. For example,
       // we have 1584324295476870 if we stored it as a double value, MessageToJsonString gives
@@ -171,7 +171,7 @@ JsonV2Serializer::toListOfSpans(const Span& zipkin_span, Util::Replacements& rep
 
     const auto& binary_annotations = zipkin_span.binaryAnnotations();
     if (!binary_annotations.empty()) {
-      ProtobufWkt::Struct tags;
+      Protobuf::Struct tags;
       auto* tag_fields = tags.mutable_fields();
       for (const auto& binary_annotation : binary_annotations) {
         (*tag_fields)[binary_annotation.key()] = ValueUtil::stringValue(binary_annotation.value());
@@ -193,8 +193,8 @@ JsonV2Serializer::toListOfSpans(const Span& zipkin_span, Util::Replacements& rep
   return spans;
 }
 
-const ProtobufWkt::Struct JsonV2Serializer::toProtoEndpoint(const Endpoint& zipkin_endpoint) const {
-  ProtobufWkt::Struct endpoint;
+const Protobuf::Struct JsonV2Serializer::toProtoEndpoint(const Endpoint& zipkin_endpoint) const {
+  Protobuf::Struct endpoint;
   auto* fields = endpoint.mutable_fields();
 
   Network::Address::InstanceConstSharedPtr address = zipkin_endpoint.address();

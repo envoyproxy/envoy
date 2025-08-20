@@ -91,10 +91,10 @@ public:
                        lua_State* state) PURE;
 
   /**
-   * @return const ProtobufWkt::Struct& the value of metadata inside the lua filter scope of current
+   * @return const Protobuf::Struct& the value of metadata inside the lua filter scope of current
    * route entry.
    */
-  virtual const ProtobufWkt::Struct& metadata() const PURE;
+  virtual const Protobuf::Struct& metadata() const PURE;
 
   /**
    * @return StreamInfo::StreamInfo& the current stream info handle. This handle is mutable to
@@ -124,11 +124,11 @@ public:
   virtual void clearRouteCache() PURE;
 
   /**
-   * @return const ProtobufWkt::Struct& the filter context from the most specific filter config
+   * @return const Protobuf::Struct& the filter context from the most specific filter config
    * from the route or virtual host. Empty struct will be returned if no route or virtual host is
    * found.
    */
-  virtual const ProtobufWkt::Struct& filterContext() const PURE;
+  virtual const Protobuf::Struct& filterContext() const PURE;
 
   /**
    * @return absl::string_view the value of filter config name.
@@ -485,13 +485,13 @@ public:
   bool disabled() const { return disabled_; }
   absl::string_view name() const { return name_; }
   PerLuaCodeSetup* perLuaCodeSetup() const { return per_lua_code_setup_ptr_.get(); }
-  const ProtobufWkt::Struct& filterContext() const { return filter_context_; }
+  const Protobuf::Struct& filterContext() const { return filter_context_; }
 
 private:
   const bool disabled_;
   const std::string name_;
   PerLuaCodeSetupPtr per_lua_code_setup_ptr_;
-  const ProtobufWkt::Struct filter_context_;
+  const Protobuf::Struct filter_context_;
 };
 
 /**
@@ -571,7 +571,7 @@ private:
     void respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                  lua_State* state) override;
 
-    const ProtobufWkt::Struct& metadata() const override;
+    const Protobuf::Struct& metadata() const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override {
       return callbacks_->connection().ptr();
@@ -585,7 +585,7 @@ private:
         cb->clearRouteCache();
       }
     }
-    const ProtobufWkt::Struct& filterContext() const override { return parent_.filterContext(); }
+    const Protobuf::Struct& filterContext() const override { return parent_.filterContext(); }
     const absl::string_view filterConfigName() const override {
       return callbacks_->filterConfigName();
     }
@@ -607,7 +607,7 @@ private:
     void respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                  lua_State* state) override;
 
-    const ProtobufWkt::Struct& metadata() const override;
+    const Protobuf::Struct& metadata() const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override {
       return callbacks_->connection().ptr();
@@ -617,7 +617,7 @@ private:
       UNREFERENCED_PARAMETER(host_and_strict);
     }
     void clearRouteCache() override {}
-    const ProtobufWkt::Struct& filterContext() const override { return parent_.filterContext(); }
+    const Protobuf::Struct& filterContext() const override { return parent_.filterContext(); }
     const absl::string_view filterConfigName() const override {
       return callbacks_->filterConfigName();
     }
@@ -652,8 +652,8 @@ private:
     return config_->perLuaCodeSetup();
   }
 
-  const ProtobufWkt::Struct& filterContext() const {
-    return per_route_config_ == nullptr ? ProtobufWkt::Struct::default_instance()
+  const Protobuf::Struct& filterContext() const {
+    return per_route_config_ == nullptr ? Protobuf::Struct::default_instance()
                                         : per_route_config_->filterContext();
   }
 

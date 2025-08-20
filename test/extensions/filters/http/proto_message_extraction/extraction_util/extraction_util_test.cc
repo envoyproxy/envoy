@@ -38,9 +38,9 @@ namespace {
 using ::Envoy::Protobuf::Field;
 using ::Envoy::Protobuf::FieldMask;
 using Envoy::Protobuf::FileDescriptorSet;
+using ::Envoy::Protobuf::Struct;
 using ::Envoy::Protobuf::Type;
 using ::Envoy::Protobuf::field_extraction::CordMessageData;
-using ::Envoy::ProtobufWkt::Struct;
 using ::Envoy::StatusHelpers::IsOkAndHolds;
 using ::Envoy::StatusHelpers::StatusIs;
 using ::extraction::TestRequest;
@@ -224,15 +224,15 @@ protected:
 };
 
 TEST_F(ExtractionUtilTest, IsEmptyStruct_EmptyStruct) {
-  ProtobufWkt::Struct message_struct;
-  message_struct.mutable_fields()->insert({kTypeProperty, ProtobufWkt::Value()});
+  Protobuf::Struct message_struct;
+  message_struct.mutable_fields()->insert({kTypeProperty, Protobuf::Value()});
   EXPECT_TRUE(IsEmptyStruct(message_struct));
 }
 
 TEST_F(ExtractionUtilTest, IsEmptyStruct_NonEmptyStruct) {
-  ProtobufWkt::Struct message_struct;
-  message_struct.mutable_fields()->insert({kTypeProperty, ProtobufWkt::Value()});
-  message_struct.mutable_fields()->insert({"another_field", ProtobufWkt::Value()});
+  Protobuf::Struct message_struct;
+  message_struct.mutable_fields()->insert({kTypeProperty, Protobuf::Value()});
+  message_struct.mutable_fields()->insert({"another_field", Protobuf::Value()});
   EXPECT_FALSE(IsEmptyStruct(message_struct));
 }
 

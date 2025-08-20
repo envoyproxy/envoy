@@ -259,7 +259,7 @@ public:
     return socket_factories_;
   }
   void debugLog(const std::string& message);
-  void dumpListenerConfig(ProtobufWkt::Any& dump) const;
+  void dumpListenerConfig(Protobuf::Any& dump) const;
   void initialize();
   DrainManager& localDrainManager() const {
     return listener_factory_context_->listener_factory_context_base_->drainManager();

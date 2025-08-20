@@ -3818,7 +3818,7 @@ virtual_hosts:
            mock_cluster_specifier_plugin_3](
               const Protobuf::Message& config,
               Server::Configuration::CommonFactoryContext&) -> ClusterSpecifierPluginSharedPtr {
-            const auto& typed_config = dynamic_cast<const ProtobufWkt::Struct&>(config);
+            const auto& typed_config = dynamic_cast<const Protobuf::Struct&>(config);
             if (auto iter = typed_config.fields().find("a"); iter == typed_config.fields().end()) {
               return nullptr;
             } else if (iter->second.string_value() == "test1") {
@@ -3896,7 +3896,7 @@ virtual_hosts:
            mock_cluster_specifier_plugin_3](
               const Protobuf::Message& config,
               Server::Configuration::CommonFactoryContext&) -> ClusterSpecifierPluginSharedPtr {
-            const auto& typed_config = dynamic_cast<const ProtobufWkt::Struct&>(config);
+            const auto& typed_config = dynamic_cast<const Protobuf::Struct&>(config);
             if (auto iter = typed_config.fields().find("a"); iter == typed_config.fields().end()) {
               return nullptr;
             } else if (iter->second.string_value() == "test1") {
@@ -4772,7 +4772,7 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     // Using Struct instead of a custom empty config proto. This is only allowed in tests.
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
 
   std::string name() const override { return "test_retry_options_predicate_factory"; }
@@ -6258,7 +6258,7 @@ public:
   std::string name() const override { return "baz"; }
   // Returns nullptr (conversion failure) if d is empty.
   std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
-  parse(const ProtobufWkt::Struct& d) const override {
+  parse(const Protobuf::Struct& d) const override {
     if (d.fields().find("name") != d.fields().end()) {
       return std::make_unique<Baz>(d.fields().at("name").string_value());
     }
@@ -6266,7 +6266,7 @@ public:
   }
 
   std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
-  parse(const ProtobufWkt::Any&) const override {
+  parse(const Protobuf::Any&) const override {
     return nullptr;
   }
 };
@@ -7538,14 +7538,14 @@ request_headers_to_add:
 }
 
 TEST(MetadataMatchCriteriaImpl, Create) {
-  auto v1 = ProtobufWkt::Value();
+  auto v1 = Protobuf::Value();
   v1.set_string_value("v1");
-  auto v2 = ProtobufWkt::Value();
+  auto v2 = Protobuf::Value();
   v2.set_number_value(2.0);
-  auto v3 = ProtobufWkt::Value();
+  auto v3 = Protobuf::Value();
   v3.set_bool_value(true);
 
-  auto metadata_struct = ProtobufWkt::Struct();
+  auto metadata_struct = Protobuf::Struct();
   auto mutable_fields = metadata_struct.mutable_fields();
   mutable_fields->insert({"a", v1});
   mutable_fields->insert({"b", v2});
@@ -7568,14 +7568,14 @@ TEST(MetadataMatchCriteriaImpl, Create) {
 }
 
 TEST(MetadataMatchCriteriaImpl, Merge) {
-  auto pv1 = ProtobufWkt::Value();
+  auto pv1 = Protobuf::Value();
   pv1.set_string_value("v1");
-  auto pv2 = ProtobufWkt::Value();
+  auto pv2 = Protobuf::Value();
   pv2.set_number_value(2.0);
-  auto pv3 = ProtobufWkt::Value();
+  auto pv3 = Protobuf::Value();
   pv3.set_bool_value(true);
 
-  auto parent_struct = ProtobufWkt::Struct();
+  auto parent_struct = Protobuf::Struct();
   auto parent_fields = parent_struct.mutable_fields();
   parent_fields->insert({"a", pv1});
   parent_fields->insert({"b", pv2});
@@ -7583,14 +7583,14 @@ TEST(MetadataMatchCriteriaImpl, Merge) {
 
   auto parent_matches = MetadataMatchCriteriaImpl(parent_struct);
 
-  auto v1 = ProtobufWkt::Value();
+  auto v1 = Protobuf::Value();
   v1.set_string_value("override1");
-  auto v2 = ProtobufWkt::Value();
+  auto v2 = Protobuf::Value();
   v2.set_string_value("v2");
-  auto v3 = ProtobufWkt::Value();
+  auto v3 = Protobuf::Value();
   v3.set_string_value("override3");
 
-  auto metadata_struct = ProtobufWkt::Struct();
+  auto metadata_struct = Protobuf::Struct();
   auto mutable_fields = metadata_struct.mutable_fields();
   mutable_fields->insert({"a", v1});
   mutable_fields->insert({"b++", v2});
@@ -7617,14 +7617,14 @@ TEST(MetadataMatchCriteriaImpl, Merge) {
 }
 
 TEST(MetadataMatchCriteriaImpl, Filter) {
-  auto pv1 = ProtobufWkt::Value();
+  auto pv1 = Protobuf::Value();
   pv1.set_string_value("v1");
-  auto pv2 = ProtobufWkt::Value();
+  auto pv2 = Protobuf::Value();
   pv2.set_number_value(2.0);
-  auto pv3 = ProtobufWkt::Value();
+  auto pv3 = Protobuf::Value();
   pv3.set_bool_value(true);
 
-  auto metadata_matches = ProtobufWkt::Struct();
+  auto metadata_matches = Protobuf::Struct();
   auto parent_fields = metadata_matches.mutable_fields();
   parent_fields->insert({"a", pv1});
   parent_fields->insert({"b", pv2});
@@ -10658,7 +10658,7 @@ public:
       : registered_factory_(factory_), registered_default_factory_(default_factory_) {}
 
   struct DerivedFilterConfig : public RouteSpecificFilterConfig {
-    ProtobufWkt::Timestamp config_;
+    Protobuf::Timestamp config_;
   };
   class TestFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
   public:
@@ -10669,11 +10669,11 @@ public:
       PANIC("not implemented");
     }
     ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
-      return ProtobufTypes::MessagePtr{new ProtobufWkt::Timestamp()};
+      return ProtobufTypes::MessagePtr{new Protobuf::Timestamp()};
     }
     ProtobufTypes::MessagePtr createEmptyConfigProto() override {
       // Override this to guarantee that we have a different factory mapping by-type.
-      return ProtobufTypes::MessagePtr{new ProtobufWkt::Timestamp()};
+      return ProtobufTypes::MessagePtr{new Protobuf::Timestamp()};
     }
     std::set<std::string> configTypes() override { return {"google.protobuf.Timestamp"}; }
     absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
@@ -10694,7 +10694,7 @@ public:
       PANIC("not implemented");
     }
     ProtobufTypes::MessagePtr createEmptyRouteConfigProto() override {
-      return ProtobufTypes::MessagePtr{new ProtobufWkt::Struct()};
+      return ProtobufTypes::MessagePtr{new Protobuf::Struct()};
     }
     std::set<std::string> configTypes() override { return {"google.protobuf.Struct"}; }
   };

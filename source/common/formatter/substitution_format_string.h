@@ -24,7 +24,7 @@ namespace Formatter {
 class SubstitutionFormatStringUtils {
 public:
   using FormattersConfig =
-      ProtobufWkt::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>;
+      Protobuf::RepeatedPtrField<envoy::config::core::v3::TypedExtensionConfig>;
 
   /**
    * Parse list of formatter configurations to commands.
@@ -44,7 +44,7 @@ public:
   /**
    * Generate a Json formatter object from proto::Struct config
    */
-  static FormatterPtr createJsonFormatter(const ProtobufWkt::Struct& struct_format,
+  static FormatterPtr createJsonFormatter(const Protobuf::Struct& struct_format,
                                           bool omit_empty_values,
                                           const std::vector<CommandParserPtr>& commands = {});
 };

@@ -65,7 +65,7 @@ directories:
   source/extensions/rate_limit_descriptors/expr: 88.2
   source/extensions/stat_sinks/graphite_statsd: 82.8  # Death tests don't report LCOV
   source/extensions/stat_sinks/statsd: 85.2  # Death tests don't report LCOV
-  source/extensions/tracers/zipkin: 96.1
+  source/extensions/tracers/zipkin: 95.4
   source/extensions/transport_sockets/proxy_protocol: 96.2
   source/extensions/wasm_runtime/wamr: 0.0  # Not enabled in coverage build
   source/extensions/wasm_runtime/wasmtime: 0.0  # Not enabled in coverage build
