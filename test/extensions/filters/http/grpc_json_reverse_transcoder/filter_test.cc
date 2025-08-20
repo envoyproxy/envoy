@@ -903,6 +903,14 @@ TEST_F(GrpcJsonReverseTranscoderFilterTest, CreateTranscoder) {
   EXPECT_TRUE(transcoder1_or.ok());
 }
 
+// Test request transcoding where ":path" header is empty.
+TEST_F(GrpcJsonReverseTranscoderFilterTest, TranscodeWithEmptyPathHeader) {
+  Http::TestRequestHeaderMapImpl headers{
+      {":method", "POST"}, {":path", ""}, {"content-type", "application/grpc"}};
+  EXPECT_CALL(decoder_callbacks_, sendLocalReply(Http::Code::BadRequest, _, _, _, _));
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_.decodeHeaders(headers, false));
+}
+
 } // namespace
 } // namespace GrpcJsonReverseTranscoder
 } // namespace HttpFilters
