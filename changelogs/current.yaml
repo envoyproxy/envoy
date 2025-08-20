@@ -272,6 +272,11 @@ new_features:
 - area: http
   change: |
     Added ``upstream_rq_per_cx`` histogram to track requests per connection for monitoring connection reuse efficiency.
+- area: geoip
+  change: |
+    Added a new metric ``db_build_epoch`` to track the build timestamp of the Maxmind geolocation database files.
+    This can be used to monitor the freshness of the databases currently in use by the filter.
+    See https://maxmind.github.io/MaxMind-DB/#build_epoch for more details.
 
 
 deprecated:
