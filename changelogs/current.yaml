@@ -44,6 +44,9 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: udp_proxy
+  change: |
+    Fixed a crash in the UDP proxy that occurred during ENVOY_SIGTERM when active tunneling sessions were present.
 - area: geoip
   change: |
     Fixed a bug in the maxmind provider where the found_entry field in the lookup result was not checked before trying to populate
