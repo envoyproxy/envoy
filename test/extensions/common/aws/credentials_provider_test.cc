@@ -4,12 +4,15 @@
 
 #include "test/extensions/common/aws/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
-
+#include "test/mocks/event/mocks.h"
 #include "gtest/gtest.h"
 
 using Envoy::Extensions::Common::Aws::MetadataFetcherPtr;
 using testing::MockFunction;
 using testing::Return;
+using testing::SaveArg;
+using testing::DoAll;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -273,6 +276,43 @@ TEST_F(AsyncCredentialHandlingTest, SubscriptionsCleanedUp) {
   // We now have credentials so sign should complete immediately
   auto result = signer->sign(*message_, false, "");
   ASSERT_TRUE(result.ok());
+}
+
+TEST_F(AsyncCredentialHandlingTest, TimerCallbackSafetyAfterProviderDestruction) {
+  MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
+      MetadataFetcher::MetadataReceiver::RefreshState::Ready;
+  std::chrono::seconds initialization_timer = std::chrono::seconds(2);
+
+  envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider cred_provider = {};
+  cred_provider.mutable_web_identity_token_data_source()->set_inline_string("token");
+  cred_provider.set_role_arn("aws:iam::123456789012:role/arn");
+  cred_provider.set_role_session_name("session");
+
+  mock_manager_ = std::make_shared<MockAwsClusterManager>();
+  EXPECT_CALL(*mock_manager_, getUriFromClusterName(_)).WillRepeatedly(Return("uri"));
+
+  Event::MockTimer* timer_ptr;
+  {
+    provider_ = std::make_shared<WebIdentityCredentialsProvider>(
+        context_, mock_manager_, "cluster",
+        [this](Upstream::ClusterManager&, absl::string_view) {
+          metadata_fetcher_.reset(raw_metadata_fetcher_);
+          return std::move(metadata_fetcher_);
+        },
+        refresh_state, initialization_timer, cred_provider);
+
+    timer_ptr = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
+    timer_ = timer_ptr;
+
+    auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
+    provider_friend.onClusterAddOrUpdate();
+    
+    // Provider goes out of scope here, but timer callback should be safe due to weak_ptr
+    provider_.reset();
+  }
+  
+  // Invoke timer callback after provider destruction - should not crash
+  timer_ptr->invokeCallback();
 }
 
 class ControlledCredentialsProvider : public CredentialsProvider {

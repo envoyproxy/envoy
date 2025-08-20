@@ -239,7 +239,7 @@ public:
 
   void populateMetadata(envoy::config::core::v3::Metadata& metadata, const std::string& ns,
                         const std::string& key, const std::string& value) {
-    ProtobufWkt::Struct struct_obj;
+    Protobuf::Struct struct_obj;
     auto& fields_map = *struct_obj.mutable_fields();
     fields_map[key] = ValueUtil::stringValue(value);
     (*metadata.mutable_filter_metadata())[ns] = struct_obj;

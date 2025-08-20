@@ -30,7 +30,7 @@ TEST_F(MetadataTest, MatchNullValue) {
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "label")
       .set_string_value("test");
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.b", "label")
-      .set_null_value(ProtobufWkt::NullValue::NULL_VALUE);
+      .set_null_value(Protobuf::NullValue::NULL_VALUE);
 
   envoy::type::matcher::v3::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.b");
@@ -223,9 +223,9 @@ listMatchEntry(envoy::type::matcher::v3::MetadataMatcher* matcher) {
 
 TEST_F(MetadataTest, MatchStringListValue) {
   envoy::config::core::v3::Metadata metadata;
-  ProtobufWkt::Value& metadataValue =
+  Protobuf::Value& metadataValue =
       Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "groups");
-  ProtobufWkt::ListValue* values = metadataValue.mutable_list_value();
+  Protobuf::ListValue* values = metadataValue.mutable_list_value();
   values->add_values()->set_string_value("first");
   values->add_values()->set_string_value("second");
   values->add_values()->set_string_value("third");
@@ -251,9 +251,9 @@ TEST_F(MetadataTest, MatchStringListValue) {
 
 TEST_F(MetadataTest, MatchBoolListValue) {
   envoy::config::core::v3::Metadata metadata;
-  ProtobufWkt::Value& metadataValue =
+  Protobuf::Value& metadataValue =
       Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "groups");
-  ProtobufWkt::ListValue* values = metadataValue.mutable_list_value();
+  Protobuf::ListValue* values = metadataValue.mutable_list_value();
   values->add_values()->set_bool_value(false);
   values->add_values()->set_bool_value(false);
 
@@ -274,9 +274,9 @@ TEST_F(MetadataTest, MatchBoolListValue) {
 
 TEST_F(MetadataTest, MatchDoubleListValue) {
   envoy::config::core::v3::Metadata metadata;
-  ProtobufWkt::Value& metadataValue =
+  Protobuf::Value& metadataValue =
       Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "groups");
-  ProtobufWkt::ListValue* values = metadataValue.mutable_list_value();
+  Protobuf::ListValue* values = metadataValue.mutable_list_value();
   values->add_values()->set_number_value(10);
   values->add_values()->set_number_value(23);
 

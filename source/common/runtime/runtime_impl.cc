@@ -234,7 +234,7 @@ SnapshotImpl::SnapshotImpl(Random::RandomGenerator& generator, RuntimeStats& sta
   stats.num_keys_.set(values_.size());
 }
 
-void parseFractionValue(SnapshotImpl::Entry& entry, const ProtobufWkt::Struct& value) {
+void parseFractionValue(SnapshotImpl::Entry& entry, const Protobuf::Struct& value) {
   envoy::type::v3::FractionalPercent percent;
   static_assert(envoy::type::v3::FractionalPercent::MILLION ==
                 envoy::type::v3::FractionalPercent::DenominatorType_MAX);
@@ -286,11 +286,11 @@ bool parseEntryDoubleValue(Envoy::Runtime::Snapshot::Entry& entry) {
 }
 
 void SnapshotImpl::addEntry(Snapshot::EntryMap& values, const std::string& key,
-                            const ProtobufWkt::Value& value, absl::string_view raw_string) {
+                            const Protobuf::Value& value, absl::string_view raw_string) {
   values.emplace(key, SnapshotImpl::createEntry(value, raw_string));
 }
 
-SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
+SnapshotImpl::Entry SnapshotImpl::createEntry(const Protobuf::Value& value,
                                               absl::string_view raw_string) {
   Entry entry;
   entry.raw_string_value_ = value.string_value();
@@ -298,26 +298,26 @@ SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
     entry.raw_string_value_ = raw_string;
   }
   switch (value.kind_case()) {
-  case ProtobufWkt::Value::kNumberValue:
+  case Protobuf::Value::kNumberValue:
     setNumberValue(entry, value.number_value());
     if (entry.raw_string_value_.empty()) {
       entry.raw_string_value_ = absl::StrCat(value.number_value());
     }
     break;
-  case ProtobufWkt::Value::kBoolValue:
+  case Protobuf::Value::kBoolValue:
     entry.bool_value_ = value.bool_value();
     if (entry.raw_string_value_.empty()) {
       // Convert boolean to "true"/"false"
       entry.raw_string_value_ = value.bool_value() ? "true" : "false";
     }
     break;
-  case ProtobufWkt::Value::kStructValue:
+  case Protobuf::Value::kStructValue:
     if (entry.raw_string_value_.empty()) {
       entry.raw_string_value_ = value.struct_value().DebugString();
     }
     parseFractionValue(entry, value.struct_value());
     break;
-  case ProtobufWkt::Value::kStringValue:
+  case Protobuf::Value::kStringValue:
     parseEntryDoubleValue(entry);
     break;
   default:
@@ -422,7 +422,7 @@ absl::Status DiskLayer::walkDirectory(const std::string& path, const std::string
   return absl::OkStatus();
 }
 
-ProtoLayer::ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto,
+ProtoLayer::ProtoLayer(absl::string_view name, const Protobuf::Struct& proto,
                        absl::Status& creation_status)
     : OverrideLayerImpl{name} {
   creation_status = absl::OkStatus();
@@ -434,18 +434,18 @@ ProtoLayer::ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto,
   }
 }
 
-absl::Status ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& prefix) {
+absl::Status ProtoLayer::walkProtoValue(const Protobuf::Value& v, const std::string& prefix) {
   switch (v.kind_case()) {
-  case ProtobufWkt::Value::KIND_NOT_SET:
-  case ProtobufWkt::Value::kListValue:
-  case ProtobufWkt::Value::kNullValue:
+  case Protobuf::Value::KIND_NOT_SET:
+  case Protobuf::Value::kListValue:
+  case Protobuf::Value::kNullValue:
     return absl::InvalidArgumentError(absl::StrCat("Invalid runtime entry value for ", prefix));
     break;
-  case ProtobufWkt::Value::kStringValue:
+  case Protobuf::Value::kStringValue:
     SnapshotImpl::addEntry(values_, prefix, v, "");
     break;
-  case ProtobufWkt::Value::kNumberValue:
-  case ProtobufWkt::Value::kBoolValue:
+  case Protobuf::Value::kNumberValue:
+  case Protobuf::Value::kBoolValue:
     if (hasRuntimePrefix(prefix) && !isRuntimeFeature(prefix) && !isLegacyRuntimeFeature(prefix)) {
       IS_ENVOY_BUG(absl::StrCat(
           "Using a removed guard ", prefix,
@@ -453,8 +453,8 @@ absl::Status ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::
     }
     SnapshotImpl::addEntry(values_, prefix, v, "");
     break;
-  case ProtobufWkt::Value::kStructValue: {
-    const ProtobufWkt::Struct& s = v.struct_value();
+  case Protobuf::Value::kStructValue: {
+    const Protobuf::Struct& s = v.struct_value();
     if (s.fields().empty() || s.fields().find("numerator") != s.fields().end() ||
         s.fields().find("denominator") != s.fields().end()) {
       SnapshotImpl::addEntry(values_, prefix, v, "");

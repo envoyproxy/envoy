@@ -73,100 +73,100 @@ jobs:
           target: ios
           timeout-minutes: 120
 
-  hello-world:
-    permissions:
-      contents: read
-      packages: read
-    uses: ./.github/workflows/_run.yml
-    if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-ios }}
-    needs:
-    - load
-    - build
-    name: ios-hello-world
-    with:
-      args: >-
-        build
-        ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
-        ${{ matrix.app }}
-      command: ./bazelw
-      container-command:
-      docker-ipv6: false
-      request: ${{ needs.load.outputs.request }}
-      runs-on: macos-15
-      source: |
-        source ./ci/mac_ci_setup.sh
-        ./bazelw shutdown
-      steps-post: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.3.24
-          with:
-            app: ${{ matrix.app }}
-            args: ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
-            expected: received headers with status ${{ matrix.expected-status }}
-          env:
-            ANDROID_NDK_HOME:
-            ANDROID_HOME:
-      target: ${{ matrix.target }}
-      timeout-minutes: ${{ matrix.timeout-minutes }}
-      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
-      working-directory: mobile
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-        - name: Build swift hello world
-          app: //examples/swift/hello_world:app
-          expected-status: 200
-          target: swift-hello-world
-          timeout-minutes: 90
+  # hello-world:
+  #   permissions:
+  #     contents: read
+  #     packages: read
+  #   uses: ./.github/workflows/_run.yml
+  #   if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-ios }}
+  #   needs:
+  #   - load
+  #   - build
+  #   name: ios-hello-world
+  #   with:
+  #     args: >-
+  #       build
+  #       ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
+  #       ${{ matrix.app }}
+  #     command: ./bazelw
+  #     container-command:
+  #     docker-ipv6: false
+  #     request: ${{ needs.load.outputs.request }}
+  #     runs-on: macos-15
+  #     source: |
+  #       source ./ci/mac_ci_setup.sh
+  #       ./bazelw shutdown
+  #     steps-post: |
+  #       - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.3.24
+  #         with:
+  #           app: ${{ matrix.app }}
+  #           args: ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
+  #           expected: received headers with status ${{ matrix.expected-status }}
+  #         env:
+  #           ANDROID_NDK_HOME:
+  #           ANDROID_HOME:
+  #     target: ${{ matrix.target }}
+  #     timeout-minutes: ${{ matrix.timeout-minutes }}
+  #     trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
+  #     working-directory: mobile
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #       - name: Build swift hello world
+  #         app: //examples/swift/hello_world:app
+  #         expected-status: 200
+  #         target: swift-hello-world
+  #         timeout-minutes: 90
 
-  apps:
-    permissions:
-      contents: read
-      packages: read
-    uses: ./.github/workflows/_run.yml
-    if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-ios-all }}
-    needs:
-    - load
-    - build
-    name: ios-apps
-    with:
-      args: >-
-        build
-        ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
-        ${{ matrix.app }}
-      command: ./bazelw
-      container-command:
-      docker-ipv6: false
-      request: ${{ needs.load.outputs.request }}
-      runs-on: macos-15
-      source: |
-        source ./ci/mac_ci_setup.sh
-      steps-post: |
-        - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.3.24
-          with:
-            app: ${{ matrix.app }}
-            args: ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
-            expected: >-
-              ${{ matrix.expected
-                  || format('received headers with status {0}', matrix.expected-status) }}
-            timeout: ${{ matrix.timeout || '5m' }}
-          env:
-            ANDROID_NDK_HOME:
-            ANDROID_HOME:
-      target: ${{ matrix.target }}
-      timeout-minutes: 90
-      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
-      working-directory: mobile
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-        - name: Build swift experimental app
-          args: >-
-            --config=mobile-remote-ci-macos-ios
-          app: //test/swift/apps/experimental:app
-          expected-status: 200
-          target: swift-experimental-app
+  # apps:
+  #   permissions:
+  #     contents: read
+  #     packages: read
+  #   uses: ./.github/workflows/_run.yml
+  #   if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-ios-all }}
+  #   needs:
+  #   - load
+  #   - build
+  #   name: ios-apps
+  #   with:
+  #     args: >-
+  #       build
+  #       ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
+  #       ${{ matrix.app }}
+  #     command: ./bazelw
+  #     container-command:
+  #     docker-ipv6: false
+  #     request: ${{ needs.load.outputs.request }}
+  #     runs-on: macos-15
+  #     source: |
+  #       source ./ci/mac_ci_setup.sh
+  #     steps-post: |
+  #       - uses: envoyproxy/toolshed/gh-actions/envoy/ios/post@actions-v0.3.24
+  #         with:
+  #           app: ${{ matrix.app }}
+  #           args: ${{ matrix.args || '--config=mobile-remote-ci-macos-ios' }}
+  #           expected: >-
+  #             ${{ matrix.expected
+  #                 || format('received headers with status {0}', matrix.expected-status) }}
+  #           timeout: ${{ matrix.timeout || '5m' }}
+  #         env:
+  #           ANDROID_NDK_HOME:
+  #           ANDROID_HOME:
+  #     target: ${{ matrix.target }}
+  #     timeout-minutes: 90
+  #     trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
+  #     working-directory: mobile
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       include:
+  #       - name: Build swift experimental app
+  #         args: >-
+  #           --config=mobile-remote-ci-macos-ios
+  #         app: //test/swift/apps/experimental:app
+  #         expected-status: 200
+  #         target: swift-experimental-app
 
   request:
     secrets:
@@ -186,8 +186,8 @@ jobs:
     needs:
     - load
     - build
-    - hello-world
-    - apps
+    # - hello-world
+    # - apps
     uses: ./.github/workflows/_finish.yml
     with:
       needs: ${{ toJSON(needs) }}

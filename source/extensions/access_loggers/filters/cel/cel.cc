@@ -19,7 +19,7 @@ CELAccessLogExtensionFilter::CELAccessLogExtensionFilter(
 
 bool CELAccessLogExtensionFilter::evaluate(const Formatter::HttpFormatterContext& log_context,
                                            const StreamInfo::StreamInfo& stream_info) const {
-  ProtobufWkt::Arena arena;
+  Protobuf::Arena arena;
   const auto result = Extensions::Filters::Common::Expr::evaluate(
       *compiled_expr_.get(), arena, &local_info_, stream_info, &log_context.requestHeaders(),
       &log_context.responseHeaders(), &log_context.responseTrailers());

@@ -25,7 +25,7 @@ extern "C" JNIEXPORT jbyteArray JNICALL
 Java_io_envoyproxy_envoymobile_jni_JniUtilityTest_protoJavaByteArrayConversion(JNIEnv* env, jclass,
                                                                                jbyteArray source) {
   Envoy::JNI::JniHelper jni_helper(env);
-  Envoy::ProtobufWkt::Struct s;
+  Envoy::Protobuf::Struct s;
   Envoy::JNI::javaByteArrayToProto(jni_helper, source, &s);
   return Envoy::JNI::protoToJavaByteArray(jni_helper, s).release();
 }

@@ -73,7 +73,7 @@ TEST(OverrideHostLbonfigTest, NoPrimaryOverideSources) {
   config.set_name("envoy.load_balancers.override_host");
   OverrideHost config_msg;
 
-  ProtobufWkt::Struct invalid_policy;
+  Protobuf::Struct invalid_policy;
   auto* typed_extension_config =
       config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
   typed_extension_config->mutable_typed_config()->PackFrom(invalid_policy);
@@ -100,7 +100,7 @@ TEST(OverrideHostLbonfigTest, FirstValidFallbackPolicyIsUsed) {
   OverrideHost config_msg;
   config_msg.add_override_host_sources()->set_header("x-foo");
 
-  ProtobufWkt::Struct invalid_policy;
+  Protobuf::Struct invalid_policy;
   auto* typed_extension_config =
       config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
   typed_extension_config->mutable_typed_config()->PackFrom(invalid_policy);
@@ -128,7 +128,7 @@ TEST(OverrideHostLbonfigTest, EmptyPrimaryOverrideSource) {
   // Do not set either host or metadata keys
   config_msg.add_override_host_sources();
 
-  ProtobufWkt::Struct invalid_policy;
+  Protobuf::Struct invalid_policy;
   auto* typed_extension_config =
       config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
   typed_extension_config->mutable_typed_config()->PackFrom(invalid_policy);
@@ -161,7 +161,7 @@ TEST(OverrideHostLbonfigTest, HeaderAndMetadataInTheSameOverrideSource) {
   metadata_key->set_key("x-bar");
   metadata_key->add_path()->set_key("a/b/c");
 
-  ProtobufWkt::Struct invalid_policy;
+  Protobuf::Struct invalid_policy;
   auto* typed_extension_config =
       config_msg.mutable_fallback_policy()->add_policies()->mutable_typed_extension_config();
   typed_extension_config->mutable_typed_config()->PackFrom(invalid_policy);

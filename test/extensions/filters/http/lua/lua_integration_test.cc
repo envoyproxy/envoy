@@ -75,7 +75,7 @@ public:
 
           // Metadata variables for the virtual host and route.
           const std::string key = "lua";
-          ProtobufWkt::Struct value;
+          Protobuf::Struct value;
           std::string yaml;
 
           // Sets the virtual host's metadata.
@@ -90,7 +90,7 @@ public:
               ->mutable_virtual_hosts(0)
               ->mutable_metadata()
               ->mutable_filter_metadata()
-              ->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(key, value));
+              ->insert(Protobuf::MapPair<std::string, Protobuf::Struct>(key, value));
 
           // Sets the route's metadata.
           yaml =
@@ -107,7 +107,7 @@ public:
               ->mutable_routes(0)
               ->mutable_metadata()
               ->mutable_filter_metadata()
-              ->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(key, value));
+              ->insert(Protobuf::MapPair<std::string, Protobuf::Struct>(key, value));
         });
 
     // This filter is not compatible with the async load balancer, as httpCall with data will
@@ -1611,7 +1611,7 @@ public:
     (*typed_metadata_map)["ssl_cn"] = "client.example.com";
 
     // Pack metadata into Any
-    ProtobufWkt::Any typed_config;
+    Protobuf::Any typed_config;
     typed_config.PackFrom(metadata);
     typed_filter_metadata.insert({metadata_key, typed_config});
 
@@ -1639,7 +1639,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Any>();
+    return std::make_unique<Protobuf::Any>();
   }
 
   std::string name() const override { return "envoy.test.typed_metadata"; }
@@ -1687,7 +1687,7 @@ public:
     (*typed_metadata_map)["ssl_cipher"] = "ECDHE-RSA-AES128-GCM-SHA256";
 
     // Pack metadata into Any
-    ProtobufWkt::Any typed_config;
+    Protobuf::Any typed_config;
     typed_config.PackFrom(metadata);
     typed_filter_metadata.insert({metadata_key, typed_config});
 
@@ -1715,7 +1715,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Any>();
+    return std::make_unique<Protobuf::Any>();
   }
 
   std::string name() const override { return "envoy.test.ppv2.typed_metadata"; }

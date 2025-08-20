@@ -75,11 +75,11 @@ public:
   virtual ~OpaqueResourceDecoder() = default;
 
   /**
-   * @param resource some opaque resource (ProtobufWkt::Any).
+   * @param resource some opaque resource (Protobuf::Any).
    * @return ProtobufTypes::MessagePtr decoded protobuf message in the opaque resource, e.g. the
    *         RouteConfiguration for an Any containing envoy.config.route.v3.RouteConfiguration.
    */
-  virtual ProtobufTypes::MessagePtr decodeResource(const ProtobufWkt::Any& resource) PURE;
+  virtual ProtobufTypes::MessagePtr decodeResource(const Protobuf::Any& resource) PURE;
 
   /**
    * @param resource some opaque resource (Protobuf::Message).
@@ -166,7 +166,7 @@ public:
    *        is accepted. Accepted configurations have their version_info reflected in subsequent
    *        requests.
    */
-  virtual void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+  virtual void onConfigUpdate(const Protobuf::RepeatedPtrField<Protobuf::Any>& resources,
                               const std::string& version_info) PURE;
 
   /**

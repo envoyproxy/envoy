@@ -1112,7 +1112,7 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::config::route::v3::Route& rou
       return ret;
     }
     for (const auto& it : filter_metadata->second.fields()) {
-      if (it.second.kind_case() == ProtobufWkt::Value::kStringValue) {
+      if (it.second.kind_case() == Protobuf::Value::kStringValue) {
         ret.emplace(it.first, it.second.string_value());
       }
     }

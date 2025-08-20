@@ -113,7 +113,7 @@ public:
 
   std::string name() const override { return "envoy.config.xds.test_xds_tracker"; };
 
-  Config::XdsConfigTrackerPtr createXdsConfigTracker(const ProtobufWkt::Any&,
+  Config::XdsConfigTrackerPtr createXdsConfigTracker(const Protobuf::Any&,
                                                      ProtobufMessage::ValidationVisitor&,
                                                      Api::Api& api, Event::Dispatcher&) override {
     return std::make_unique<TestXdsConfigTracker>(api.rootScope());
@@ -221,7 +221,7 @@ TEST_P(XdsConfigTrackerIntegrationTest, XdsConfigTrackerSuccessCountWithWrapper)
 
   // Add a typed metadata to the Resource wrapper.
   test::envoy::config::xds::TestTrackerMetadata test_metadata;
-  ProtobufWkt::Any packed_value;
+  Protobuf::Any packed_value;
   packed_value.PackFrom(test_metadata);
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TestTypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_, cluster2_}, {}, "1",

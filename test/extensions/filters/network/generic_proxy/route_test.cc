@@ -85,7 +85,7 @@ public:
   std::string name() const override { return "baz"; }
   // Returns nullptr (conversion failure) if d is empty.
   std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
-  parse(const ProtobufWkt::Struct& d) const override {
+  parse(const Protobuf::Struct& d) const override {
     if (d.fields().find("name") != d.fields().end()) {
       return std::make_unique<Baz>(d.fields().at("name").string_value());
     }
@@ -93,7 +93,7 @@ public:
   }
 
   std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
-  parse(const ProtobufWkt::Any&) const override {
+  parse(const Protobuf::Any&) const override {
     return nullptr;
   }
 };
@@ -130,7 +130,7 @@ TEST_F(RouteEntryImplTest, RouteTypedMetadata) {
  */
 TEST_F(RouteEntryImplTest, RoutePerFilterConfig) {
   ON_CALL(filter_config_, createEmptyRouteConfigProto()).WillByDefault(Invoke([]() {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }));
   Registry::InjectFactory<NamedFilterConfigFactory> registration(filter_config_);
 
@@ -175,7 +175,7 @@ TEST_F(RouteEntryImplTest, RouteTimeout) {
  */
 TEST_F(RouteEntryImplTest, RoutePerFilterConfigWithUnknownType) {
   ON_CALL(filter_config_, createEmptyRouteConfigProto()).WillByDefault(Invoke([]() {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }));
   Registry::InjectFactory<NamedFilterConfigFactory> registration(filter_config_);
 
@@ -206,7 +206,7 @@ TEST_F(RouteEntryImplTest, RoutePerFilterConfigWithUnknownTypeButEnableExtension
   scoped_runtime.mergeValues({{"envoy.reloadable_features.no_extension_lookup_by_name", "false"}});
 
   ON_CALL(filter_config_, createEmptyRouteConfigProto()).WillByDefault(Invoke([]() {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }));
   Registry::InjectFactory<NamedFilterConfigFactory> registration(filter_config_);
 
@@ -264,7 +264,7 @@ TEST_F(RouteEntryImplTest, NullRouteEmptyProto) {
 TEST_F(RouteEntryImplTest, NullRouteSpecificConfig) {
   Registry::InjectFactory<NamedFilterConfigFactory> registration(filter_config_);
   ON_CALL(filter_config_, createEmptyRouteConfigProto()).WillByDefault(Invoke([]() {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }));
 
   const std::string yaml_config = R"EOF(
