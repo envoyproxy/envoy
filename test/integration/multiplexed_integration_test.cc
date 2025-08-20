@@ -279,7 +279,7 @@ TEST_P(MultiplexedIntegrationTest, CodecStreamIdleTimeoutOverride) {
           envoy::config::core::v3::Http2ProtocolOptions())
           .value();
   http2_options.mutable_initial_stream_window_size()->set_value(stream_flow_control_window);
-#if 1 // changed through copybara ifdef ENVOY_ENABLE_QUIC
+#ifdef ENVOY_ENABLE_QUIC
   if (downstream_protocol_ == Http::CodecType::HTTP3) {
     dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
         .quic_config_.SetInitialStreamFlowControlWindowToSend(stream_flow_control_window);
