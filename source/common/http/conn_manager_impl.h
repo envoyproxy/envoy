@@ -334,6 +334,7 @@ private:
 
     void refreshDurationTimeout();
     void refreshIdleTimeout();
+    void refreshFlushTimeout();
     void refreshAccessLogFlushTimer();
     void refreshTracing();
 
@@ -473,6 +474,11 @@ private:
     Event::TimerPtr access_log_flush_timer_;
 
     std::chrono::milliseconds idle_timeout_ms_{};
+    // If an explicit global flush timeout is set, never override it with the route entry idle
+    // timeout. If there is no explicit global flush timeout, then override with the route entry
+    // idle timeout if it exists. This is to prevent breaking existing user expectations that the
+    // flush timeout is the same as the idle timeout.
+    const bool has_explicit_global_flush_timeout_{false};
     State state_;
 
     // Snapshot of the route configuration at the time of request is started. This is used to ensure

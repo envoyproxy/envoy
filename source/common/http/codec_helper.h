@@ -117,14 +117,14 @@ public:
 
 protected:
   void setFlushTimeout(std::chrono::milliseconds timeout) override {
-    stream_idle_timeout_ = timeout;
+    stream_flush_timeout_ = timeout;
   }
 
   void createPendingFlushTimer() {
     ASSERT(stream_idle_timer_ == nullptr);
-    if (stream_idle_timeout_.count() > 0) {
+    if (stream_flush_timeout_.count() > 0) {
       stream_idle_timer_ = dispatcher_.createTimer([this] { onPendingFlushTimer(); });
-      stream_idle_timer_->enableTimer(stream_idle_timeout_);
+      stream_idle_timer_->enableTimer(stream_flush_timeout_);
     }
   }
 
@@ -137,7 +137,7 @@ protected:
 private:
   Event::Dispatcher& dispatcher_;
   // See HttpConnectionManager.stream_idle_timeout.
-  std::chrono::milliseconds stream_idle_timeout_{};
+  std::chrono::milliseconds stream_flush_timeout_{};
   Event::TimerPtr stream_idle_timer_;
 };
 

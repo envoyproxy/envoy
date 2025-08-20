@@ -431,7 +431,12 @@ RequestDecoder& ConnectionManagerImpl::newStream(ResponseEncoder& response_encod
   new_stream->response_encoder_ = &response_encoder;
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
   new_stream->response_encoder_->getStream().registerCodecEventCallbacks(new_stream.get());
-  new_stream->response_encoder_->getStream().setFlushTimeout(new_stream->idle_timeout_ms_);
+  if (config_->streamFlushTimeout().has_value()) {
+    new_stream->response_encoder_->getStream().setFlushTimeout(
+        config_->streamFlushTimeout().value());
+  } else {
+    new_stream->response_encoder_->getStream().setFlushTimeout(config_->streamIdleTimeout());
+  }
   new_stream->streamInfo().setDownstreamBytesMeter(response_encoder.getStream().bytesMeter());
   // If the network connection is backed up, the stream should be made aware of it on creation.
   // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacksHelper.
@@ -846,6 +851,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
                       connection_manager_.overload_manager_),
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
+      has_explicit_global_flush_timeout_(
+          connection_manager.config_->streamFlushTimeout().has_value()),
       header_validator_(
           connection_manager.config_->makeHeaderValidator(connection_manager.codec_->protocol())),
       trace_refresh_after_route_refresh_(Runtime::runtimeFeatureEnabled(
@@ -2217,14 +2224,17 @@ void ConnectionManagerImpl::ActiveStream::setVirtualHostRoute(
   refreshTracing();
   refreshDurationTimeout();
   refreshIdleTimeout();
+  refreshFlushTimeout();
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshIdleTimeout() {
   if (hasCachedRoute()) {
     const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
-    if (route_entry != nullptr && route_entry->idleTimeout()) {
+    if (route_entry == nullptr) {
+      return;
+    }
+    if (route_entry->idleTimeout()) {
       idle_timeout_ms_ = route_entry->idleTimeout().value();
-      response_encoder_->getStream().setFlushTimeout(idle_timeout_ms_);
       if (idle_timeout_ms_.count()) {
         // If we have a route-level idle timeout but no global stream idle timeout, create a timer.
         if (stream_idle_timer_ == nullptr) {
@@ -2239,6 +2249,23 @@ void ConnectionManagerImpl::ActiveStream::refreshIdleTimeout() {
         stream_idle_timer_ = nullptr;
       }
     }
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::refreshFlushTimeout() {
+  if (!hasCachedRoute()) {
+    return;
+  }
+  const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
+  if (route_entry == nullptr) {
+    return;
+  }
+  if (route_entry->flushTimeout().has_value()) {
+    response_encoder_->getStream().setFlushTimeout(route_entry->flushTimeout().value());
+    return;
+  }
+  if (!has_explicit_global_flush_timeout_ && route_entry->idleTimeout().has_value()) {
+    response_encoder_->getStream().setFlushTimeout(route_entry->idleTimeout().value());
   }
 }
 
