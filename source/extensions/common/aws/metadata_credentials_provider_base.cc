@@ -34,10 +34,13 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
 void MetadataCredentialsProviderBase::onClusterAddOrUpdate() {
   ENVOY_LOG(debug, "Received callback from aws cluster manager for cluster {}", cluster_name_);
   if (!cache_duration_timer_) {
+    std::weak_ptr<MetadataCredentialsProviderStats> weak_stats = stats_;
     std::weak_ptr<MetadataCredentialsProviderBase> weak_self = shared_from_this();
-    cache_duration_timer_ = context_.mainThreadDispatcher().createTimer([weak_self]() -> void {
+    cache_duration_timer_ = context_.mainThreadDispatcher().createTimer([weak_stats, weak_self]() -> void {
+      if (auto stats = weak_stats.lock()) {
+        stats->credential_refreshes_performed_.inc();
+      }
       if (auto self = weak_self.lock()) {
-        self->stats_->credential_refreshes_performed_.inc();
         self->refresh();
       }
     });
