@@ -381,6 +381,17 @@ FilterHeadersStatus GrpcJsonReverseTranscoderFilter::decodeHeaders(RequestHeader
   InitPerRouteConfig();
 
   absl::string_view path = headers.getPathValue();
+  if (path.empty()) {
+    ENVOY_STREAM_LOG(error, "Request path is empty", *decoder_callbacks_);
+    decoder_callbacks_->sendLocalReply(
+        Code::BadRequest, "Request path is empty", nullptr,
+        Status::WellKnownGrpcStatus::InvalidArgument,
+        absl::StrCat(RcDetails::get().grpc_transcode_failed_early, "{",
+                     StringUtil::replaceAllEmptySpace(
+                         MessageUtil::codeEnumToString(absl::StatusCode::kNotFound)),
+                     "}"));
+    return FilterHeadersStatus::StopIteration;
+  }
   const auto* method_descriptor = per_route_config_->GetMethodDescriptor(path);
   if (method_descriptor == nullptr) {
     ENVOY_STREAM_LOG(error, "Couldn't find a gRPC method matching {}", *decoder_callbacks_, path);
