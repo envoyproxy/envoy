@@ -462,8 +462,7 @@ void InternalEngine::resetHttpPropertiesAndDrainHosts(bool has_ipv6_connectivity
       ENVOY_LOG_EVENT(debug, "netconf_immediate_drain", "DrainAllHosts");
       getClusterManager().drainConnections(
           [](const Upstream::Host&) { return true; },
-          Envoy::ConnectionPool::DrainBehavior::
-              DrainExistingNonMigratableConnections);
+          Envoy::ConnectionPool::DrainBehavior::DrainExistingNonMigratableConnections);
     }
   }
 }
