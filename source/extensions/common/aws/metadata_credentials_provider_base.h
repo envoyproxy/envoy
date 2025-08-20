@@ -29,7 +29,8 @@ using CreateMetadataFetcherCb =
 
 class MetadataCredentialsProviderBase : public CredentialsProvider,
                                         public Logger::Loggable<Logger::Id::aws>,
-                                        public AwsManagedClusterUpdateCallbacks {
+                                        public AwsManagedClusterUpdateCallbacks,
+                                        public std::enable_shared_from_this<MetadataCredentialsProviderBase> {
 public:
   friend class MetadataCredentialsProviderBaseFriend;
   using OnAsyncFetchCb = std::function<void(const std::string&&)>;
