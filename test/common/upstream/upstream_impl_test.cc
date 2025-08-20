@@ -63,6 +63,8 @@ using testing::_;
 using testing::AnyNumber;
 using testing::ContainerEq;
 using testing::Invoke;
+using testing::Mock;
+using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -568,24 +570,19 @@ TEST_P(StrictDnsClusterImplParamTest, DontWaitForDNSOnInit) {
 
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
-  ReadyWatcher initialized;
+  MockFunction<absl::Status()> initialize_cb;
 
   // Initialized without completing DNS resolution.
-  EXPECT_CALL(initialized, ready());
-  cluster->initialize([&]() -> absl::Status {
-    initialized.ready();
-    return absl::OkStatus();
-  });
+  EXPECT_CALL(initialize_cb, Call).WillOnce(Return(absl::OkStatus()));
+  cluster->initialize(initialize_cb.AsStdFunction());
+  Mock::VerifyAndClearExpectations(&initialize_cb);
 
-  ReadyWatcher membership_updated;
-  auto priority_update_cb = cluster->prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) {
-        membership_updated.ready();
-        return absl::OkStatus();
-      });
+  MockFunction<absl::Status(uint32_t, const HostVector&, const HostVector&)> priority_update_cb;
+  auto priority_update_handle =
+      cluster->prioritySet().addPriorityUpdateCb(priority_update_cb.AsStdFunction());
 
   EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  EXPECT_CALL(membership_updated, ready());
+  EXPECT_CALL(priority_update_cb, Call).WillOnce(Return(absl::OkStatus()));
   resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                          TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
 }
