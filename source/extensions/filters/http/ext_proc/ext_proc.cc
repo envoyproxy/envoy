@@ -1631,7 +1631,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       // instance's lifetime to protect us from a malformed server.
       stats_.failure_mode_allowed_.inc();
       closeStream();
-      clearAsyncState();
+      clearAsyncState(processing_status.raw_code());
       processing_complete_ = true;
     } else {
       // Send an immediate response if fail close is configured.
@@ -1656,7 +1656,14 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
 
   if (failure_mode_allow_) {
     // Ignore this and treat as a successful close
-    onGrpcClose();
+    ENVOY_STREAM_LOG(debug, "Received gRPC stream close", *decoder_callbacks_);
+
+    processing_complete_ = true;
+    stats_.streams_closed_.inc();
+    // Successful close. We can ignore the stream for the rest of our request
+    // and response processing.
+    closeStream();
+    clearAsyncState(status);
     stats_.failure_mode_allowed_.inc();
 
   } else {
@@ -1696,7 +1703,7 @@ void Filter::onMessageTimeout() {
     processing_complete_ = true;
     closeStream();
     stats_.failure_mode_allowed_.inc();
-    clearAsyncState();
+    clearAsyncState(Grpc::Status::DeadlineExceeded);
 
   } else {
     // Return an error and stop processing the current stream.
@@ -1714,9 +1721,9 @@ void Filter::onMessageTimeout() {
 
 // Regardless of the current filter state, reset it to "IDLE", continue
 // the current callback, and reset timers. This is used in a few error-handling situations.
-void Filter::clearAsyncState() {
-  decoding_state_.clearAsyncState();
-  encoding_state_.clearAsyncState();
+void Filter::clearAsyncState(Grpc::Status::GrpcStatus call_status) {
+  decoding_state_.clearAsyncState(call_status);
+  encoding_state_.clearAsyncState(call_status);
 }
 
 // Regardless of the current state, ensure that the timers won't fire
