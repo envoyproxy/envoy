@@ -10,6 +10,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
+#include "envoy/extensions/request_id/uuid/v3/uuid.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stream_info/bool_accessor.h"
@@ -26,6 +27,7 @@
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/http/request_id_extension_impl.h"
 #include "source/common/network/application_protocol.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/socket_option_factory.h"
@@ -751,6 +753,10 @@ const std::string& TunnelResponseTrailers::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.propagate_response_trailers");
 }
 
+const std::string& TunnelRequestIdKey() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.tunnel_request_id");
+}
+
 TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
     Stats::Scope& stats_scope,
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config_message,
@@ -788,6 +794,25 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
   hostname_fmt_ = THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
                                             substitution_format_config, context),
                                         Formatter::FormatterPtr);
+
+  // Initialize request ID generation configuration.
+  generate_request_id_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_message.tunneling_config(),
+                                                         generate_request_id, false);
+  if (generate_request_id_) {
+    envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension
+        final_rid_config = config_message.tunneling_config().request_id_extension();
+    if (!final_rid_config.has_typed_config()) {
+      // Default to UUID extension.
+      final_rid_config.mutable_typed_config()->PackFrom(
+          envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig());
+    }
+    auto extension_or_error = Http::RequestIDExtensionFactory::fromProto(final_rid_config, context);
+    if (!extension_or_error.ok()) {
+      throw EnvoyException(absl::StrCat("Failed to create request ID extension: ",
+                                        extension_or_error.status().ToString()));
+    }
+    request_id_extension_ = extension_or_error.value();
+  }
 }
 
 std::string TunnelingConfigHelperImpl::host(const StreamInfo::StreamInfo& stream_info) const {

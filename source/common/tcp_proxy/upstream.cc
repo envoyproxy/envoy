@@ -10,6 +10,7 @@
 #include "source/common/http/null_route_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
@@ -118,6 +119,23 @@ void HttpUpstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool
 
     if (config_.usePost()) {
       headers->addReference(Http::Headers::get().Scheme, scheme);
+    }
+  }
+
+  // Optionally generate a request ID before evaluating configured headers so
+  // it is available to header formatters.
+  if (config_.generateRequestId()) {
+    // Tunneling requests are edge requests, and we don't preserve any external ID by default.
+    config_.requestIDExtension()->set(*headers, /*edge_request=*/true,
+                                      /*keep_external_id=*/false);
+    // Also store the request ID in filter state to allow TCP access logs to format it.
+    const auto rid = headers->getRequestIdValue();
+    if (!rid.empty()) {
+      downstream_info_.filterState()->setData(
+          "envoy.tcp_proxy.tunnel_request_id",
+          std::make_shared<Router::StringAccessorImpl>(std::string(rid)),
+          StreamInfo::FilterState::StateType::ReadOnly,
+          StreamInfo::FilterState::LifeSpan::Connection);
     }
   }
 
@@ -421,6 +439,19 @@ CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
 
   if (config_.usePost()) {
     downstream_headers_->addReference(Http::Headers::get().Path, config_.postPath());
+  }
+
+  if (config_.generateRequestId()) {
+    config_.requestIDExtension()->set(*downstream_headers_, /*edge_request=*/true,
+                                      /*keep_external_id=*/false);
+    const auto rid = downstream_headers_->getRequestIdValue();
+    if (!rid.empty()) {
+      downstream_info_.filterState()->setData(
+          "envoy.tcp_proxy.tunnel_request_id",
+          std::make_shared<Router::StringAccessorImpl>(std::string(rid)),
+          StreamInfo::FilterState::StateType::ReadOnly,
+          StreamInfo::FilterState::LifeSpan::Connection);
+    }
   }
 
   config_.headerEvaluator().evaluateHeaders(

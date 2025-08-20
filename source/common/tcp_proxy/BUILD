@@ -18,6 +18,7 @@ envoy_cc_library(
     ],
     deps = [
         "//envoy/http:header_map_interface",
+        "//envoy/http:request_id_extension_interface",
         "//envoy/router:router_ratelimit_interface",
         "//envoy/tcp:conn_pool_interface",
         "//envoy/tcp:upstream_interface",
@@ -33,6 +34,7 @@ envoy_cc_library(
         "//source/common/router:header_parser_lib",
         "//source/common/router:router_lib",
         "//source/common/router:shadow_writer_lib",
+        "//source/common/router:string_accessor_lib",
     ],
 )
 
@@ -73,6 +75,7 @@ envoy_cc_library(
         "//source/common/config:well_known_names",
         "//source/common/formatter:substitution_format_string_lib",
         "//source/common/http:codec_client_lib",
+        "//source/common/http:request_id_extension_lib",
         "//source/common/network:application_protocol_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:filter_lib",
@@ -90,8 +93,10 @@ envoy_cc_library(
         "//source/common/stream_info:uint64_accessor_lib",
         "//source/common/upstream:load_balancer_context_base_lib",
         "//source/common/upstream:od_cds_api_lib",
+        "//source/extensions/request_id/uuid:config",
         "//source/extensions/upstreams/tcp/generic:config",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/request_id/uuid/v3:pkg_cc_proto",
     ],
 )
