@@ -90,6 +90,10 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.report_load_with_rq_issued`` and legacy code paths.
 
 new_features:
+- area: listener_filters
+  change: |
+    Added :ref:`Postgres Inspector <config_listener_filters_postgres_inspector>` listener filter for detecting
+    PostgreSQL connections, extracting metadata and supporting SNI-based routing for PostgreSQL traffic.
 - area: http
   change: |
     Added ``vhost_header`` to the RouteConfiguration, allowing use of a different header for vhost matching.
