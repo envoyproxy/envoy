@@ -2324,6 +2324,7 @@ TEST_P(DnsImplAresFlagsForNoNameserverRotationTest, NameserverRotationDisabled) 
 
 class DnsImplEdns0Test : public DnsImplTest {
 protected:
+  bool tcpOnly() const override { return false; }
   uint32_t getEdns0MaxPayloadSize() const override { return 4096; }
 };
 
@@ -2332,6 +2333,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplEdns0Test,
                          TestUtility::ipTestParamsToString);
 
 // Test: Verify EDNS0 configuration is applied to c-ares options
+// Note: EDNS0 is only relevant for UDP DNS queries.
+// The DNS tests in this file use TCP-only mode to avoid instability and flakiness from UDP.
+// Therefore, this test only verifies that the EDNS0 configuration flag is set in c-ares,
+// not its functional behavior.
 TEST_P(DnsImplEdns0Test, Edns0ConfigurationApplied) {
   ares_options opts{};
   int optmask = 0;
