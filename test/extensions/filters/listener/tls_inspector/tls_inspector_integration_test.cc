@@ -4,7 +4,6 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
-#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 
 #include "source/common/config/api_version.h"
 #include "source/common/network/raw_buffer_socket.h"
@@ -135,15 +134,6 @@ filter_disabled:
     });
     if (ssl_client) {
       config_helper_.addSslConfig();
-    } else {
-      config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-        auto* filter_chain =
-            bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
-        filter_chain->mutable_transport_socket()->set_name("envoy.transport_sockets.raw_buffer");
-        envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer_config;
-        filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(
-            raw_buffer_config);
-      });
     }
 
     useListenerAccessLog(log_format);
