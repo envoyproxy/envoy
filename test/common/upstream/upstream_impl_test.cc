@@ -36,7 +36,6 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/common/upstream/test_local_address_selector.h"
 #include "test/common/upstream/utility.h"
-#include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
