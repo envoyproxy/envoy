@@ -1967,3 +1967,17 @@ envoy.filters.http.dynamic_modules:
   status_upstream: alpha
   type_urls:
   - envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
+envoy.http.mcp_handler.mcp_to_grpc:
+  categories:
+  - envoy.http.mcp_handler
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.http.mcp_handler.mcp_to_grpc.v3.McpToGrpc
+envoy.filters.http.mcp_proxy:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.mcp_proxy.v3.McpProxy

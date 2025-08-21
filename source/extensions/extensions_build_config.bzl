@@ -168,6 +168,7 @@ EXTENSIONS = {
     "envoy.filters.http.ip_tagging":                    "//source/extensions/filters/http/ip_tagging:config",
     "envoy.filters.http.json_to_metadata":              "//source/extensions/filters/http/json_to_metadata:config",
     "envoy.filters.http.jwt_authn":                     "//source/extensions/filters/http/jwt_authn:config",
+    "envoy.filters.http.mcp_proxy":                     "//source/extensions/filters/http/mcp_proxy:config",
     "envoy.filters.http.rate_limit_quota":              "//source/extensions/filters/http/rate_limit_quota:config",
     # Disabled by default. kill_request is not built into most prebuilt images.
     # For instructions for building with disabled-by-default filters enabled, see
@@ -561,6 +562,11 @@ EXTENSIONS = {
 
     # Dynamic mocules
     "envoy.filters.http.dynamic_modules":                      "//source/extensions/filters/http/dynamic_modules:factory_registration",
+
+    #
+    # MCP Handler
+    #
+    "envoy.http.mcp_handler.mcp_to_grpc":                     "//source/extensions/http/mcp_handler/mcp_to_grpc:config",
 }
 
 # These can be changed to ["//visibility:public"], for  downstream builds which

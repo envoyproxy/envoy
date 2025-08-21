@@ -274,3 +274,18 @@ envoy_cc_library(
         "//source/common/singleton:const_singleton",
     ],
 )
+
+envoy_cc_library(
+    name = "mcp_handler_interface",
+    hdrs = [
+        "mcp_handler.h",
+    ],
+    deps = [
+        "//envoy/http:header_map_interface",
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
+        "//envoy/buffer:buffer_interface",
+        "//envoy/server:factory_context_interface",
+        "@com_google_googleapis//google/api:http_cc_proto",
+    ],
+)

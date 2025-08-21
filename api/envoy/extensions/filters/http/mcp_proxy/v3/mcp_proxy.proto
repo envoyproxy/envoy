@@ -1,0 +1,23 @@
+syntax = "proto3";
+ 
+package envoy.extensions.filters.http.mcp_proxy.v3;
+ 
+import "envoy/config/core/v3/extension.proto";
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+ 
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.mcp_proxy.v3";
+option java_outer_classname = "McpProxyProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/mcp_proxy/v3;mcp_proxyv3";
+ 
+// MCP gRPC-JSON-RPC proxy filter configuration
+message McpProxy {
+  config.core.v3.TypedExtensionConfig mcp_handler = 1;
+ 
+  string server_name = 2;
+  string server_title = 3;
+  string server_version = 4;
+  string server_instructions = 5;
+  bool structured_content = 6;
+}
