@@ -83,22 +83,6 @@ private:
 using ConfigSharedPtr = std::shared_ptr<Config>;
 
 /**
- * TLS inspector filter state
- */
-class FilterState : public Envoy::StreamInfo::FilterState::Object {
-public:
-  enum class ErrorType { ClientHelloTooLarge, ClientHelloNotDetected };
-
-  FilterState(ErrorType error_type) : error_type_(error_type) {}
-  ErrorType errorType() const { return error_type_; }
-
-  static const std::string& key();
-
-private:
-  const ErrorType error_type_;
-};
-
-/**
  * TLS inspector listener filter.
  */
 class Filter : public Network::ListenerFilter, Logger::Loggable<Logger::Id::filter> {
@@ -110,6 +94,8 @@ public:
   Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override;
   size_t maxReadBytes() const override { return requested_read_bytes_; }
 
+  static const std::string& dynamicMetadataKey();
+
 private:
   ParseState parseClientHello(const void* data, size_t len, uint64_t bytes_already_processed);
   ParseState onRead();
@@ -118,7 +104,9 @@ private:
   void createJA3Hash(const SSL_CLIENT_HELLO* ssl_client_hello);
   void createJA4Hash(const SSL_CLIENT_HELLO* ssl_client_hello);
   uint32_t maxConfigReadBytes() const { return config_->maxClientHelloSize(); }
-  void setFilterState(FilterState::ErrorType error_type);
+  void setDynamicMetadata(
+      envoy::extensions::filters::listener::tls_inspector::v3::TlsInspectorMetadata::ErrorType
+          error_type);
 
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_{};

@@ -4,6 +4,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
+#include "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.pb.h"
 
 #include "source/common/config/api_version.h"
 #include "source/common/network/raw_buffer_socket.h"
@@ -134,6 +135,15 @@ filter_disabled:
     });
     if (ssl_client) {
       config_helper_.addSslConfig();
+    } else {
+      config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        auto* filter_chain =
+            bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+        filter_chain->mutable_transport_socket()->set_name("envoy.transport_sockets.raw_buffer");
+        envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer_config;
+        filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(
+            raw_buffer_config);
+      });
     }
 
     useListenerAccessLog(log_format);
@@ -179,7 +189,7 @@ typed_config:
                         const std::string& log_format = "%RESPONSE_CODE_DETAILS%",
                         const Ssl::ClientSslTransportOptions& ssl_options = {},
                         const std::string& curves_list = "", bool enable_ja3_fingerprinting = false,
-                        bool enable_ja4_fingerprinting = false) {
+                        bool enable_ja4_fingerprinting = false, bool write_fake_data = false) {
     initializeWithTlsInspector(ssl_client, log_format, listener_filter_disabled,
                                enable_ja3_fingerprinting, enable_ja4_fingerprinting);
 
@@ -210,6 +220,10 @@ typed_config:
                                             std::move(transport_socket), nullptr, nullptr);
     client_->addConnectionCallbacks(connect_callbacks_);
     client_->connect();
+    if (write_fake_data) {
+      Buffer::OwnedImpl buffer("fake data");
+      client_->write(buffer, false);
+    }
     while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
       dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     }
@@ -259,6 +273,20 @@ TEST_P(TlsInspectorIntegrationTest, ContinueOnListenerTimeout) {
   timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(2000));
   client_->close(Network::ConnectionCloseType::NoFlush);
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::Eq("-"));
+}
+
+TEST_P(TlsInspectorIntegrationTest, TlsInspectorMetadataPopulatedInAccessLog) {
+  setupConnections(
+      /*listener_filter_disabled=*/false, /*expect_connection_open=*/true,
+      /*ssl_client=*/false, /*log_format=*/"%TLS_INSPECTOR_ERROR%",
+      /*ssl_options=*/{}, /*curves_list=*/"",
+      /*enable_ja3_fingerprinting=*/false, /*enable_ja4_fingerprinting=*/false,
+      /*write_fake_data=*/true);
+  // The timeout is set as one seconds, advance 2 seconds to trigger the timeout.
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(2000));
+  client_->close(Network::ConnectionCloseType::FlushWrite);
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
+              testing::Eq("CLIENT_HELLO_NOT_DETECTED"));
 }
 
 // The `JA3` fingerprint is correct in the access log.

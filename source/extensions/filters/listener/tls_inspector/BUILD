@@ -27,6 +27,9 @@ envoy_cc_library(
     srcs = ["tls_inspector.cc"],
     hdrs = ["tls_inspector.h"],
     external_deps = ["ssl"],
+    visibility = [
+        "//visibility:public",
+    ],
     deps = [
         ":ja4_fingerprint_lib",
         "//envoy/event:dispatcher_interface",

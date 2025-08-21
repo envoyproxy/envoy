@@ -29,6 +29,9 @@ using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
 
+using TlsInspectorMetadata =
+    envoy::extensions::filters::listener::tls_inspector::v3::TlsInspectorMetadata;
+
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
@@ -281,15 +284,19 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
   mockSysCallForPeek(client_hello, true);
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
   EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+
+  TlsInspectorMetadata expected_metadata;
+  expected_metadata.set_error_type(TlsInspectorMetadata::CLIENT_HELLO_TOO_LARGE);
+  Protobuf::Any expected_any;
+  expected_any.PackFrom(expected_metadata);
+  EXPECT_CALL(cb_, setDynamicTypedMetadata(Filter::dynamicMetadataKey(), ProtoEq(expected_any)));
+
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, state);
   EXPECT_EQ(1, cfg_->stats().client_hello_too_large_.value());
   const std::vector<uint64_t> bytes_processed =
       store_.histogramValues("tls_inspector.bytes_processed", false);
   ASSERT_EQ(1, bytes_processed.size());
-  EXPECT_THAT(cb_.filterState().getDataReadOnly<FilterState>(FilterState::key()),
-              Pointee(testing::Property(&FilterState::errorType,
-                                        FilterState::ErrorType::ClientHelloTooLarge)));
 }
 
 // Test that the filter sets the `JA3` hash
@@ -412,6 +419,13 @@ TEST_P(TlsInspectorTest, NotSsl) {
   mockSysCallForPeek(data);
   // trigger the event to copy the client hello message into buffer:q
   EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+
+  TlsInspectorMetadata expected_metadata;
+  expected_metadata.set_error_type(TlsInspectorMetadata::CLIENT_HELLO_NOT_DETECTED);
+  Protobuf::Any expected_any;
+  expected_any.PackFrom(expected_metadata);
+  EXPECT_CALL(cb_, setDynamicTypedMetadata(Filter::dynamicMetadataKey(), ProtoEq(expected_any)));
+
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
   EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
@@ -419,9 +433,6 @@ TEST_P(TlsInspectorTest, NotSsl) {
       store_.histogramValues("tls_inspector.bytes_processed", false);
   ASSERT_EQ(1, bytes_processed.size());
   EXPECT_EQ(5, bytes_processed[0]);
-  EXPECT_THAT(cb_.filterState().getDataReadOnly<FilterState>(FilterState::key()),
-              Pointee(testing::Property(&FilterState::errorType,
-                                        FilterState::ErrorType::ClientHelloNotDetected)));
 }
 
 TEST_P(TlsInspectorTest, EarlyTerminationShouldNotRecordBytesProcessed) {
