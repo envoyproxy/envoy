@@ -211,7 +211,8 @@ TEST_P(HttpConnPoolIntegrationTest, PoolDrainAfterDrainApiAllClusters) {
 
   // Drain connection pools via API. Need to post this to the server thread.
   test_server_->server().dispatcher().post(
-      [this] { test_server_->server().clusterManager().drainConnections(nullptr); });
+      [this] { test_server_->server().clusterManager().drainConnections(nullptr,
+      ConnectionPool::DrainBehavior::DrainExistingConnections); });
 
   ASSERT_TRUE(first_connection->waitForDisconnect());
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
