@@ -726,7 +726,7 @@ public:
     cares.set_filter_unroutable_families(filterUnroutableFamilies());
     cares.set_allocated_udp_max_queries(udpMaxQueries());
     cares.set_rotate_nameservers(setRotateNameservers());
-    
+
     // Set EDNS0 configuration if specified
     if (getEdns0MaxPayloadSize() > 0) {
       cares.mutable_edns0_max_payload_size()->set_value(getEdns0MaxPayloadSize());
@@ -2341,11 +2341,11 @@ TEST_P(DnsImplEdns0Test, Edns0ConfigurationApplied) {
   ares_options opts{};
   int optmask = 0;
   EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
-  
+
   // Verify EDNS0 payload size flag is set and value is correct
   EXPECT_TRUE((optmask & ARES_OPT_EDNSPSZ) == ARES_OPT_EDNSPSZ);
   EXPECT_EQ(opts.ednspsz, 4096);
-  
+
   ares_destroy_options(&opts);
 }
 
