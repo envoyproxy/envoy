@@ -127,7 +127,7 @@ protected:
 
   void setSelectedEndpointsMetadata(absl::string_view key,
                                     absl::string_view selected_endpoints_text_proto) {
-    Envoy::ProtobufWkt::Struct selected_endpoints;
+    Envoy::Protobuf::Struct selected_endpoints;
     EXPECT_TRUE(
         Protobuf::TextFormat::ParseFromString(selected_endpoints_text_proto, &selected_endpoints));
     (*metadata_.mutable_filter_metadata())[key] = selected_endpoints;

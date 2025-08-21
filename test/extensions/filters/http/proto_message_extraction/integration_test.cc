@@ -20,7 +20,7 @@ using ::apikeys::CreateApiKeyRequest;
 using ::Envoy::Extensions::HttpFilters::GrpcFieldExtraction::checkSerializedData;
 
 void compareJson(const std::string& actual, const std::string& expected) {
-  ProtobufWkt::Value expected_value, actual_value;
+  Protobuf::Value expected_value, actual_value;
   TestUtility::loadFromJson(expected, expected_value);
   TestUtility::loadFromJson(actual, actual_value);
   EXPECT_TRUE(TestUtility::protoEqual(expected_value, actual_value))

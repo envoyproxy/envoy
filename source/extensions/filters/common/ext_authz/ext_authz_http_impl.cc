@@ -46,7 +46,7 @@ const Response& errorResponse() {
                                             {},
                                             EMPTY_STRING,
                                             Http::Code::Forbidden,
-                                            ProtobufWkt::Struct{}});
+                                            Protobuf::Struct{}});
 }
 
 // SuccessResponse used for creating either DENIED or OK authorization responses.
@@ -366,7 +366,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                                 {},
                                 EMPTY_STRING,
                                 Http::Code::OK,
-                                ProtobufWkt::Struct{}}};
+                                Protobuf::Struct{}}};
     return std::move(ok.response_);
   }
 
@@ -389,7 +389,7 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                                   {},
                                   message->bodyAsString(),
                                   static_cast<Http::Code>(status_code),
-                                  ProtobufWkt::Struct{}}};
+                                  Protobuf::Struct{}}};
   return std::move(denied.response_);
 }
 

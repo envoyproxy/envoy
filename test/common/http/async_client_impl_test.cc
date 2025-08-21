@@ -2284,7 +2284,7 @@ TEST_F(AsyncClientImplTest, MetadataMatchCriteriaWithValidRouteEntry) {
 
   NiceMock<Router::MockRouteEntry> route_entry;
   const auto metadata_criteria =
-      std::make_shared<Router::MetadataMatchCriteriaImpl>(ProtobufWkt::Struct());
+      std::make_shared<Router::MetadataMatchCriteriaImpl>(Protobuf::Struct());
   EXPECT_CALL(*route, routeEntry()).WillRepeatedly(Return(&route_entry));
 
   EXPECT_CALL(route_entry, metadataMatchCriteria()).WillRepeatedly(Return(metadata_criteria.get()));

@@ -90,6 +90,16 @@ To force the Envoy build image to be refreshed by Docker you can set `ENVOY_DOCK
 ENVOY_DOCKER_PULL=true ./ci/run_envoy_docker.sh <build_script_args>
 ```
 
+## Resource Requirements and Troubleshooting
+
+Envoy requires a lot of resources (disk/memory/cpu) to build, especially the first time its built, as bazel does not yet have anything cached.
+
+**Memory Requirements:**
+- Envoy builds can be memory-intensive and require substantial RAM
+- If you have less than 2GB of RAM per CPU core, you may want to limit the number of parallel build jobs
+- To limit build parallelism, add or modify the jobs setting in your `user.bazelrc` file with a line that follows the format "build --jobs=X/2" where X is the number of GB of RAM that your system has e.g.: `"build --jobs=4"` for a system with 8GB of memory in the `user.bazlerc` file that you created
+
+This configuration helps prevent out-of-memory errors that can cause builds to crash.
 
 # Generating compile commands
 

@@ -132,7 +132,7 @@ public:
     return createConfig<PerRouteConfig>(std::move(config_source), timeout_millis);
   }
 
-  static OptRef<Protobuf::Map<std::string, ProtobufWkt::Any>>
+  static OptRef<Protobuf::Map<std::string, Protobuf::Any>>
   findPerRouteConfigMap(ConfigHelper::HttpConnectionManager& hcm, absl::string_view vhost_name,
                         absl::string_view route_name) {
     auto* route_config = hcm.mutable_route_config();
@@ -215,7 +215,7 @@ public:
 
 private:
   envoy::config::listener::v3::Listener listener_;
-  ProtobufWkt::Any* hcm_any_;
+  Protobuf::Any* hcm_any_;
   ConfigHelper::HttpConnectionManager hcm_;
 };
 

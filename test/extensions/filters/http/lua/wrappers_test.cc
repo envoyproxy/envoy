@@ -475,10 +475,10 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicMetadataBinaryData) {
     end
   )EOF"};
 
-  ProtobufWkt::Value metadata_value;
+  Protobuf::Value metadata_value;
   constexpr uint8_t buffer[] = {'h', 'e', 0x00, 'l', 'l', 'o'};
   metadata_value.set_string_value(reinterpret_cast<char const*>(buffer), sizeof(buffer));
-  ProtobufWkt::Struct metadata;
+  Protobuf::Struct metadata;
   metadata.mutable_fields()->insert({"bin_data", metadata_value});
 
   setup(SCRIPT);
@@ -533,18 +533,18 @@ TEST_F(LuaStreamInfoWrapperTest, SetGetComplexDynamicMetadata) {
   start("callMe");
 
   EXPECT_EQ(1, stream_info.dynamicMetadata().filter_metadata_size());
-  const ProtobufWkt::Struct& meta_foo = stream_info.dynamicMetadata()
-                                            .filter_metadata()
-                                            .at("envoy.lb")
-                                            .fields()
-                                            .at("foo")
-                                            .struct_value();
+  const Protobuf::Struct& meta_foo = stream_info.dynamicMetadata()
+                                         .filter_metadata()
+                                         .at("envoy.lb")
+                                         .fields()
+                                         .at("foo")
+                                         .struct_value();
 
   EXPECT_EQ(1234.0, meta_foo.fields().at("x").number_value());
   EXPECT_EQ("baz", meta_foo.fields().at("y").string_value());
   EXPECT_EQ(true, meta_foo.fields().at("z").bool_value());
 
-  const ProtobufWkt::ListValue& meta_so =
+  const Protobuf::ListValue& meta_so =
       stream_info.dynamicMetadata().filter_metadata().at("envoy.lb").fields().at("so").list_value();
 
   EXPECT_EQ(4, meta_so.values_size());
@@ -766,10 +766,10 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicTypedMetadataBasic) {
                                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Create test typed metadata
-  ProtobufWkt::Struct test_struct;
+  Protobuf::Struct test_struct;
   (*test_struct.mutable_fields())["test_field"].set_string_value("test_value");
 
-  ProtobufWkt::Any any_metadata;
+  Protobuf::Any any_metadata;
   any_metadata.set_type_url("type.googleapis.com/google.protobuf.Struct");
   any_metadata.PackFrom(test_struct);
 
@@ -831,10 +831,10 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicTypedMetadataComplexStructure) {
                                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Create complex test metadata
-  ProtobufWkt::Struct complex_struct;
+  Protobuf::Struct complex_struct;
 
   // Add nested structure
-  ProtobufWkt::Struct nested_struct;
+  Protobuf::Struct nested_struct;
   (*nested_struct.mutable_fields())["inner_field"].set_string_value("inner_value");
   (*complex_struct.mutable_fields())["nested"].mutable_struct_value()->CopyFrom(nested_struct);
 
@@ -843,12 +843,12 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicTypedMetadataComplexStructure) {
   (*complex_struct.mutable_fields())["number_field"].set_number_value(42.5);
 
   // Add array
-  ProtobufWkt::ListValue array_value;
+  Protobuf::ListValue array_value;
   array_value.add_values()->set_string_value("first");
   array_value.add_values()->set_string_value("second");
   (*complex_struct.mutable_fields())["array_field"].mutable_list_value()->CopyFrom(array_value);
 
-  ProtobufWkt::Any any_metadata;
+  Protobuf::Any any_metadata;
   any_metadata.set_type_url("type.googleapis.com/google.protobuf.Struct");
   any_metadata.PackFrom(complex_struct);
 
@@ -885,7 +885,7 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicTypedMetadataInvalidTypeUrl) {
                                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Create metadata with invalid/unknown type URL
-  ProtobufWkt::Any any_metadata;
+  Protobuf::Any any_metadata;
   any_metadata.set_type_url("type.googleapis.com/invalid.unknown.Type");
   any_metadata.set_value("invalid_data");
 
@@ -918,7 +918,7 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicTypedMetadataUnpackFailure) {
                                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Create metadata with correct type URL but corrupted data
-  ProtobufWkt::Any any_metadata;
+  Protobuf::Any any_metadata;
   any_metadata.set_type_url("type.googleapis.com/google.protobuf.Struct");
   any_metadata.set_value("corrupted_protobuf_data_that_cannot_be_unpacked");
 
@@ -965,17 +965,17 @@ TEST_F(LuaStreamInfoWrapperTest, IterateDynamicTypedMetadata) {
                                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Create first metadata entry
-  ProtobufWkt::Struct struct1;
+  Protobuf::Struct struct1;
   (*struct1.mutable_fields())["field_one"].set_string_value("value_one");
-  ProtobufWkt::Any any1;
+  Protobuf::Any any1;
   any1.set_type_url("type.googleapis.com/google.protobuf.Struct");
   any1.PackFrom(struct1);
   (*stream_info.metadata_.mutable_typed_filter_metadata())["envoy.metadata.one"] = any1;
 
   // Create second metadata entry
-  ProtobufWkt::Struct struct2;
+  Protobuf::Struct struct2;
   (*struct2.mutable_fields())["field_two"].set_string_value("value_two");
-  ProtobufWkt::Any any2;
+  Protobuf::Any any2;
   any2.set_type_url("type.googleapis.com/google.protobuf.Struct");
   any2.PackFrom(struct2);
   (*stream_info.metadata_.mutable_typed_filter_metadata())["envoy.metadata.two"] = any2;

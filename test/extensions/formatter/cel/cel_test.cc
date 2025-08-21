@@ -42,14 +42,151 @@ TEST_F(CELFormatterTest, TestNodeId) {
   auto formatter = cel_parser->parse("CEL", "xds.node.id", max_length);
   EXPECT_THAT(formatter->formatValueWithContext(formatter_context_, stream_info_),
               ProtoEq(ValueUtil::stringValue("node_name")));
+
+  auto typed_formatter = cel_parser->parse("TYPED_CEL", "xds.node.id", max_length);
+  EXPECT_THAT(typed_formatter->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::stringValue("node_name")));
 }
 
-TEST_F(CELFormatterTest, TestFormatValue) {
+TEST_F(CELFormatterTest, TestFormatWithContext) {
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  absl::optional<size_t> max_length = absl::nullopt;
+  auto formatter = cel_parser->parse("CEL", "xds.node.id", max_length);
+  EXPECT_THAT(formatter->formatWithContext(formatter_context_, stream_info_), "node_name");
+
+  auto typed_formatter = cel_parser->parse("TYPED_CEL", "xds.node.id", max_length);
+  EXPECT_THAT(typed_formatter->formatWithContext(formatter_context_, stream_info_), "node_name");
+}
+
+TEST_F(CELFormatterTest, TestFormatStringValue) {
   auto cel_parser = std::make_unique<CELFormatterCommandParser>();
   absl::optional<size_t> max_length = absl::nullopt;
   auto formatter = cel_parser->parse("CEL", "request.headers[':method']", max_length);
   EXPECT_THAT(formatter->formatValueWithContext(formatter_context_, stream_info_),
               ProtoEq(ValueUtil::stringValue("GET")));
+
+  auto typed_formatter = cel_parser->parse("TYPED_CEL", "request.headers[':method']", max_length);
+  EXPECT_THAT(typed_formatter->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::stringValue("GET")));
+}
+
+TEST_F(CELFormatterTest, TestFormatNumberValue) {
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  absl::optional<size_t> max_length = absl::nullopt;
+  auto formatter = cel_parser->parse("CEL", "request.headers[':method'].size()", max_length);
+  EXPECT_THAT(formatter->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::stringValue("3")));
+
+  auto typed_formatter =
+      cel_parser->parse("TYPED_CEL", "request.headers[':method'].size()", max_length);
+  EXPECT_THAT(typed_formatter->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::numberValue(3)));
+}
+
+TEST_F(CELFormatterTest, TestFormatNullValue) {
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  absl::optional<size_t> max_length = absl::nullopt;
+  auto formatter = cel_parser->parse("CEL", "request.headers.nope", max_length);
+  EXPECT_THAT(formatter->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::nullValue()));
+
+  auto typed_formatter = cel_parser->parse("TYPED_CEL", "request.headers.nope", max_length);
+  EXPECT_THAT(typed_formatter->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::nullValue()));
+}
+
+TEST_F(CELFormatterTest, TestFormatBoolValue) {
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  absl::optional<size_t> max_length = absl::nullopt;
+  auto formatter = cel_parser->parse("CEL", "request.headers[':method'] == 'GET'", max_length);
+  EXPECT_THAT(formatter->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::stringValue("true")));
+
+  auto typed_formatter =
+      cel_parser->parse("TYPED_CEL", "request.headers[':method'] == 'GET'", max_length);
+  EXPECT_THAT(typed_formatter->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::boolValue(true)));
+}
+
+TEST_F(CELFormatterTest, TestFormatDurationValue) {
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  absl::optional<size_t> max_length = absl::nullopt;
+  auto formatter = cel_parser->parse("CEL", "duration(\"1h30m\")", max_length);
+  EXPECT_THAT(formatter->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::stringValue("1h30m")));
+
+  auto typed_formatter = cel_parser->parse("TYPED_CEL", "duration(\"1h30m\")", max_length);
+  EXPECT_THAT(typed_formatter->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::stringValue("5400s")));
+}
+
+TEST_F(CELFormatterTest, TestFormatTimestampValue) {
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  absl::optional<size_t> max_length = absl::nullopt;
+  auto formatter = cel_parser->parse("CEL", "timestamp(\"2023-08-26T12:39:00-07:00\")", max_length);
+  EXPECT_THAT(formatter->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::stringValue("2023-08-26T19:39:00+00:00")));
+
+  auto typed_formatter =
+      cel_parser->parse("TYPED_CEL", "timestamp(\"2023-08-26T12:39:00-07:00\")", max_length);
+  EXPECT_THAT(typed_formatter->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::stringValue("2023-08-26T19:39:00Z")));
+}
+
+TEST_F(CELFormatterTest, TestFormatBytesValue) {
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  absl::optional<size_t> max_length = absl::nullopt;
+  auto formatter = cel_parser->parse("CEL", "bytes(\"hello\")", max_length);
+  EXPECT_THAT(formatter->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::stringValue("hello")));
+
+  auto typed_formatter = cel_parser->parse("TYPED_CEL", "bytes(\"hello\")", max_length);
+  EXPECT_THAT(typed_formatter->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::stringValue("aGVsbG8=")));
+}
+
+TEST_F(CELFormatterTest, TestFormatListValue) {
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  absl::optional<size_t> max_length = absl::nullopt;
+  auto formatter = cel_parser->parse("CEL", "[\"foo\", 42, true]", max_length);
+  EXPECT_THAT(formatter->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::stringValue("CelList value")));
+
+  auto typed_formatter = cel_parser->parse("TYPED_CEL", "[\"foo\", 42, true]", max_length);
+  EXPECT_THAT(
+      typed_formatter->formatValueWithContext(formatter_context_, stream_info_),
+      ProtoEq(ValueUtil::listValue({ValueUtil::stringValue("foo"), ValueUtil::numberValue(42),
+                                    ValueUtil::boolValue(true)})));
+}
+
+TEST_F(CELFormatterTest, TestFormatMapValue) {
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  absl::optional<size_t> max_length = absl::nullopt;
+  auto formatter = cel_parser->parse("CEL", "{\"foo\": \"42\"}", max_length);
+  EXPECT_THAT(formatter->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::stringValue("CelMap value")));
+
+  auto typed_formatter = cel_parser->parse("TYPED_CEL", "{\"foo\": \"42\"}", max_length);
+  EXPECT_THAT(typed_formatter->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::structValue(MessageUtil::keyValueStruct("foo", "42"))));
+
+  // Test something that fails to format. For whatever reason,
+  // ExportAsProtoValue will not tolerate boolean keys.
+  auto invalid_typed_formatter = cel_parser->parse("TYPED_CEL", "{true: \"42\"}", max_length);
+  EXPECT_THAT(invalid_typed_formatter->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::nullValue()));
+}
+
+TEST_F(CELFormatterTest, TestTruncation) {
+  auto cel_parser = std::make_unique<CELFormatterCommandParser>();
+  absl::optional<size_t> max_length = 2;
+  auto formatter = cel_parser->parse("CEL", "request.headers[':method']", max_length);
+  EXPECT_THAT(formatter->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::stringValue("GE")));
+
+  auto typed_formatter = cel_parser->parse("TYPED_CEL", "request.headers[':method']", max_length);
+  EXPECT_THAT(typed_formatter->formatValueWithContext(formatter_context_, stream_info_),
+              ProtoEq(ValueUtil::stringValue("GE")));
 }
 
 TEST_F(CELFormatterTest, TestParseFail) {
@@ -178,7 +315,7 @@ TEST_F(CELFormatterTest, TestComplexCelExpression) {
   EXPECT_EQ("true /original false", formatter->formatWithContext(formatter_context_, stream_info_));
 }
 
-TEST_F(CELFormatterTest, TestInvalidExpression) {
+TEST_F(CELFormatterTest, TestUntypedInvalidExpression) {
   const std::string yaml = R"EOF(
   text_format_source:
     inline_string: "%CEL(+++++)%"
@@ -187,7 +324,19 @@ TEST_F(CELFormatterTest, TestInvalidExpression) {
 
   EXPECT_THROW_WITH_REGEX(
       *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
-      EnvoyException, "Not able to parse filter expression: .*");
+      EnvoyException, "Not able to parse expression: .*");
+}
+
+TEST_F(CELFormatterTest, TestTypedInvalidExpression) {
+  const std::string yaml = R"EOF(
+  text_format_source:
+    inline_string: "%TYPED_CEL(+++++)%"
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  EXPECT_THROW_WITH_REGEX(
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
+      EnvoyException, "Not able to parse expression: .*");
 }
 
 TEST_F(CELFormatterTest, TestRegexExtFunctions) {
@@ -200,6 +349,36 @@ TEST_F(CELFormatterTest, TestRegexExtFunctions) {
   auto formatter =
       *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("true ", formatter->formatWithContext(formatter_context_, stream_info_));
+}
+
+TEST_F(CELFormatterTest, TestUntypedJsonFormat) {
+  const std::string yaml = R"EOF(
+  json_format:
+    methodSize: "%CEL(request.headers[':method'].size())%"
+    shortMethod: "%CEL(request.headers[':method']):2%"
+    missingHeaderUnusedMaxLength: "%CEL(request.headers.missing):2%"
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter =
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  EXPECT_EQ("{\"methodSize\":\"3\",\"missingHeaderUnusedMaxLength\":null,\"shortMethod\":\"GE\"}\n",
+            formatter->formatWithContext(formatter_context_, stream_info_));
+}
+
+TEST_F(CELFormatterTest, TestTypedJsonFormat) {
+  const std::string yaml = R"EOF(
+  json_format:
+    methodSize: "%TYPED_CEL(request.headers[':method'].size())%"
+    shortMethod: "%TYPED_CEL(request.headers[':method']):2%"
+    missingHeaderUnusedMaxLength: "%TYPED_CEL(request.headers.missing):2%"
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  auto formatter =
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  EXPECT_EQ("{\"methodSize\":3,\"missingHeaderUnusedMaxLength\":null,\"shortMethod\":\"GE\"}\n",
+            formatter->formatWithContext(formatter_context_, stream_info_));
 }
 #endif
 

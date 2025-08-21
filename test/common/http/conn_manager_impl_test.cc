@@ -2533,9 +2533,9 @@ TEST_F(HttpConnectionManagerImplTest, TestFilterCanEnrichAccessLogs) {
       }));
 
   EXPECT_CALL(*filter, onStreamComplete()).WillOnce(Invoke([&]() {
-    ProtobufWkt::Value metadata_value;
+    Protobuf::Value metadata_value;
     metadata_value.set_string_value("value");
-    ProtobufWkt::Struct metadata;
+    Protobuf::Struct metadata;
     metadata.mutable_fields()->insert({"field", metadata_value});
     filter->callbacks_->streamInfo().setDynamicMetadata("metadata_key", metadata);
   }));

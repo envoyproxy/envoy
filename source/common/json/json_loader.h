@@ -23,7 +23,7 @@ public:
   /**
    * Constructs a Json Object from a Protobuf struct.
    */
-  static ObjectSharedPtr loadFromProtobufStruct(const ProtobufWkt::Struct& protobuf_struct);
+  static ObjectSharedPtr loadFromProtobufStruct(const Protobuf::Struct& protobuf_struct);
 
   /*
    * Serializes a JSON string to a byte vector using the MessagePack serialization format.

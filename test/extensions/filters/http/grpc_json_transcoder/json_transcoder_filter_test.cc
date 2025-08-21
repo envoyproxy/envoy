@@ -1531,7 +1531,7 @@ bookstore::EchoStructReqResp createDeepStruct(int level) {
   auto* field_map = msg.mutable_content()->mutable_fields();
   for (int i = 0; i < level; ++i) {
     (*field_map)["level"] = ValueUtil::numberValue(i);
-    Envoy::ProtobufWkt::Struct s;
+    Envoy::Protobuf::Struct s;
     (*field_map)["struct"] = ValueUtil::structValue(s);
     field_map = (*field_map)["struct"].mutable_struct_value()->mutable_fields();
   }

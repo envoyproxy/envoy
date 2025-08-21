@@ -47,7 +47,7 @@ public:
 
 class MockVerifierCallbacks : public Verifier::Callbacks {
 public:
-  MOCK_METHOD(void, setExtractedData, (const ProtobufWkt::Struct& payload));
+  MOCK_METHOD(void, setExtractedData, (const Protobuf::Struct& payload));
   MOCK_METHOD(void, clearRouteCache, ());
   MOCK_METHOD(void, onComplete, (const Status& status));
 };
