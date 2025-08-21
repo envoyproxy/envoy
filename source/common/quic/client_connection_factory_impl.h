@@ -35,9 +35,8 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   // Override the maximum packet length of connections for tunneling. Use the default length in
   // QUICHE if this is set to 0.
   quic::QuicByteCount max_packet_length_;
-  // Whether connection migration is enabled for this cluster.
   // TODO(danzh): Add a config knob to configure connection migration.
-  quic::QuicConnectionMigrationConfig migration_config_{.migrate_session_on_network_change = false};
+  quic::QuicConnectionMigrationConfig migration_config_;
 };
 
 std::unique_ptr<PersistentQuicInfoImpl>
