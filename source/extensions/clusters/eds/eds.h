@@ -20,10 +20,36 @@
 #include "source/common/config/subscription_base.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
+
+#include "absl/container/flat_hash_set.h"
 #include "source/extensions/clusters/eds/leds.h"
 
 namespace Envoy {
 namespace Upstream {
+
+/**
+ * Deduplication key for EDS endpoints that considers both address and transport socket match metadata.
+ * This allows the same address to be used with different transport socket configurations.
+ */
+struct EndpointDedupKey {
+  std::string address;
+  std::string transport_socket_match_metadata;
+
+  bool operator==(const EndpointDedupKey& other) const {
+    return address == other.address &&
+           transport_socket_match_metadata == other.transport_socket_match_metadata;
+  }
+
+  static EndpointDedupKey fromLbEndpoint(const std::string& address_string,
+                                        const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint);
+};
+
+struct EndpointDedupKeyHash {
+  std::size_t operator()(const EndpointDedupKey& key) const {
+    return absl::Hash<std::string>{}(key.address) ^
+           (absl::Hash<std::string>{}(key.transport_socket_match_metadata) << 1);
+  }
+};
 
 /**
  * Cluster implementation that reads host information from the Endpoint Discovery Service.
@@ -98,7 +124,7 @@ private:
         const envoy::config::endpoint::v3::LbEndpoint& lb_endpoint,
         const envoy::config::endpoint::v3::LocalityLbEndpoints& locality_lb_endpoint,
         PriorityStateManager& priority_state_manager,
-        absl::flat_hash_set<std::string>& all_new_hosts);
+        absl::flat_hash_set<EndpointDedupKey, EndpointDedupKeyHash>& all_new_hosts);
 
     EdsClusterImpl& parent_;
     const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment_;
