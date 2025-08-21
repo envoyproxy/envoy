@@ -1,4 +1,4 @@
-#include "common/http/codes.h"
+#include "source/common/http/codes.h"
 
 #include <cstdint>
 #include <string>
@@ -6,10 +6,10 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/common/utility.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 
 #include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
@@ -32,7 +32,7 @@ CodeStatsImpl::CodeStatsImpl(Stats::SymbolTable& symbol_table)
       upstream_rq_completed_(stat_name_pool_.add("upstream_rq_completed")),
       upstream_rq_time_(stat_name_pool_.add("upstream_rq_time")),
       vcluster_(stat_name_pool_.add("vcluster")), vhost_(stat_name_pool_.add("vhost")),
-      zone_(stat_name_pool_.add("zone")) {
+      route_(stat_name_pool_.add("route")), zone_(stat_name_pool_.add("zone")) {
 
   // Pre-allocate response codes 200, 404, and 503, as those seem quite likely.
   // We don't pre-allocate all the HTTP codes because the first 127 allocations
@@ -60,23 +60,28 @@ void CodeStatsImpl::recordHistogram(Stats::Scope& scope, const Stats::StatNameVe
 }
 
 void CodeStatsImpl::chargeBasicResponseStat(Stats::Scope& scope, Stats::StatName prefix,
-                                            Code response_code) const {
+                                            Code response_code,
+                                            bool exclude_http_code_stats) const {
   ASSERT(&symbol_table_ == &scope.symbolTable());
 
   // Build a dynamic stat for the response code and increment it.
   incCounter(scope, prefix, upstream_rq_completed_);
-  const Stats::StatName rq_group = upstreamRqGroup(response_code);
-  if (!rq_group.empty()) {
-    incCounter(scope, prefix, rq_group);
+
+  if (!exclude_http_code_stats) {
+    const Stats::StatName rq_group = upstreamRqGroup(response_code);
+    if (!rq_group.empty()) {
+      incCounter(scope, prefix, rq_group);
+    }
+    incCounter(scope, prefix, upstreamRqStatName(response_code));
   }
-  incCounter(scope, prefix, upstreamRqStatName(response_code));
 }
 
-void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
+void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info,
+                                       bool exclude_http_code_stats) const {
   const Code code = static_cast<Code>(info.response_status_code_);
 
   ASSERT(&info.cluster_scope_.symbolTable() == &symbol_table_);
-  chargeBasicResponseStat(info.cluster_scope_, info.prefix_, code);
+  chargeBasicResponseStat(info.cluster_scope_, info.prefix_, code, exclude_http_code_stats);
 
   const Stats::StatName rq_group = upstreamRqGroup(code);
   const Stats::StatName rq_code = upstreamRqStatName(code);
@@ -101,6 +106,16 @@ void CodeStatsImpl::chargeResponseStat(const ResponseStatInfo& info) const {
                                     info.request_vcluster_name_, rq_group});
     incCounter(info.global_scope_,
                {vhost_, info.request_vhost_name_, vcluster_, info.request_vcluster_name_, rq_code});
+  }
+
+  // Handle route level stats.
+  if (!info.request_route_name_.empty()) {
+    incCounter(info.global_scope_, {vhost_, info.request_vhost_name_, route_,
+                                    info.request_route_name_, upstream_rq_completed_});
+    incCounter(info.global_scope_,
+               {vhost_, info.request_vhost_name_, route_, info.request_route_name_, rq_group});
+    incCounter(info.global_scope_,
+               {vhost_, info.request_vhost_name_, route_, info.request_route_name_, rq_code});
   }
 
   // Handle per zone stats.
@@ -144,6 +159,13 @@ void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
                     {vhost_, info.request_vhost_name_, vcluster_, info.request_vcluster_name_,
                      upstream_rq_time_},
                     Stats::Histogram::Unit::Milliseconds, count);
+  }
+
+  if (!info.request_route_name_.empty()) {
+    recordHistogram(
+        info.global_scope_,
+        {vhost_, info.request_vhost_name_, route_, info.request_route_name_, upstream_rq_time_},
+        Stats::Histogram::Unit::Milliseconds, count);
   }
 
   // Handle per zone stats.
@@ -256,6 +278,7 @@ const char* CodeUtility::toString(Code code) {
   case Code::PreconditionRequired:          return "Precondition Required";
   case Code::TooManyRequests:               return "Too Many Requests";
   case Code::RequestHeaderFieldsTooLarge:   return "Request Header Fields Too Large";
+  case Code::TooEarly:                      return "Too Early";
 
   // 5xx
   case Code::InternalServerError:           return "Internal Server Error";

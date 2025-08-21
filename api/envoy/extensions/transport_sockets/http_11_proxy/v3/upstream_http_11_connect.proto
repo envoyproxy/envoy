@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package envoy.extensions.transport_sockets.http_11_proxy.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.http_11_proxy.v3";
+option java_outer_classname = "UpstreamHttp11ConnectProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/http_11_proxy/v3;http_11_proxyv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Upstream HTTP/1.1 Proxy]
+// [#extension: envoy.transport_sockets.http_11_proxy]
+
+// HTTP/1.1 proxy transport socket establishes an upstream connection to a proxy address
+// instead of the target host's address. This behavior is triggered when the transport
+// socket is configured and proxy information is provided.
+//
+// Behavior when proxying:
+// =======================
+// When an upstream connection is established, instead of connecting directly to the endpoint
+// address, the client will connect to the specified proxy address, send an HTTP/1.1 ``CONNECT`` request
+// indicating the endpoint address, and process the response. If the response has HTTP status 200,
+// the connection will be passed down to the underlying transport socket.
+//
+// Configuring proxy information:
+// ==============================
+// Set ``typed_filter_metadata`` in :ref:`LbEndpoint.Metadata <envoy_v3_api_field_config.endpoint.v3.lbendpoint.metadata>` or :ref:`LocalityLbEndpoints.Metadata <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.metadata>`.
+// using the key ``envoy.http11_proxy_transport_socket.proxy_address`` and the
+// proxy address in ``config::core::v3::Address`` format.
+//
+message Http11ProxyUpstreamTransport {
+  // The underlying transport socket being wrapped. Defaults to plaintext (raw_buffer) if unset.
+  config.core.v3.TransportSocket transport_socket = 1;
+}

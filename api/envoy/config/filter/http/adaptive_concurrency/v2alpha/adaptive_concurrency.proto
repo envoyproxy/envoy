@@ -5,7 +5,6 @@ package envoy.config.filter.http.adaptive_concurrency.v2alpha;
 import "envoy/api/v2/core/base.proto";
 import "envoy/type/percent.proto";
 
-import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -16,6 +15,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.filter.http.adaptive_concurrency.v2alpha";
 option java_outer_classname = "AdaptiveConcurrencyProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/filter/http/adaptive_concurrency/v2alpha";
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.http.adaptive_concurrency.v3";
 option (udpa.annotations.file_status).package_version_status = FROZEN;

@@ -1,4 +1,4 @@
-#include "extensions/stat_sinks/dog_statsd/config.h"
+#include "source/extensions/stat_sinks/dog_statsd/config.h"
 
 #include <memory>
 
@@ -6,10 +6,8 @@
 #include "envoy/config/metrics/v3/stats.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/network/resolver_impl.h"
-
-#include "extensions/stat_sinks/common/statsd/statsd.h"
-#include "extensions/stat_sinks/well_known_names.h"
+#include "source/common/network/resolver_impl.h"
+#include "source/extensions/stat_sinks/common/statsd/statsd.h"
 
 #include "absl/types/optional.h"
 
@@ -18,14 +16,15 @@ namespace Extensions {
 namespace StatSinks {
 namespace DogStatsd {
 
-Stats::SinkPtr
+absl::StatusOr<Stats::SinkPtr>
 DogStatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
                                       Server::Configuration::ServerFactoryContext& server) {
   const auto& sink_config =
       MessageUtil::downcastAndValidate<const envoy::config::metrics::v3::DogStatsdSink&>(
           config, server.messageValidationContext().staticValidationVisitor());
-  Network::Address::InstanceConstSharedPtr address =
-      Network::Address::resolveProtoAddress(sink_config.address());
+  auto address_or_error = Network::Address::resolveProtoAddress(sink_config.address());
+  RETURN_IF_NOT_OK_REF(address_or_error.status());
+  Network::Address::InstanceConstSharedPtr address = address_or_error.value();
   ENVOY_LOG(debug, "dog_statsd UDP ip address: {}", address->asString());
   absl::optional<uint64_t> max_bytes;
   if (sink_config.has_max_bytes_per_datagram()) {
@@ -39,12 +38,13 @@ ProtobufTypes::MessagePtr DogStatsdSinkFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::config::metrics::v3::DogStatsdSink>();
 }
 
-std::string DogStatsdSinkFactory::name() const { return StatsSinkNames::get().DogStatsd; }
+std::string DogStatsdSinkFactory::name() const { return DogStatsdName; }
 
 /**
  * Static registration for the this sink factory. @see RegisterFactory.
  */
-REGISTER_FACTORY(DogStatsdSinkFactory, Server::Configuration::StatsSinkFactory){"envoy.dog_statsd"};
+LEGACY_REGISTER_FACTORY(DogStatsdSinkFactory, Server::Configuration::StatsSinkFactory,
+                        "envoy.dog_statsd");
 
 } // namespace DogStatsd
 } // namespace StatSinks

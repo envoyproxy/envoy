@@ -2,8 +2,8 @@
 
 #include "envoy/stats/store.h"
 
-#include "common/protobuf/protobuf.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -96,7 +96,7 @@ private:
   // preserve all stats throughout the hot restart. Then, when the restart completes, dropping
   // the scope will drop exactly those stats whose names have not already been accessed through
   // another store/scope.
-  ScopePtr temp_scope_;
+  ScopeSharedPtr temp_scope_;
 };
 
 } // namespace Stats

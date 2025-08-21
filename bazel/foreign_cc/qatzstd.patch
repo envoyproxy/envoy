@@ -1,0 +1,13 @@
+diff --git a/src/Makefile b/src/Makefile
+index 83d37e5..db67af6 100644
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -56,7 +56,7 @@ ifneq ($(ICP_ROOT), )
+ 			   -lusdm_drv_s
+ else
+ 	QATFLAGS = -DINTREE
+-	LDFLAGS  = -lqat -lusdm
++	LDFLAGS  += -lqat -lusdm
+ endif
+ 
+ ifdef ZSTDLIB

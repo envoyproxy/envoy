@@ -1,14 +1,13 @@
 #pragma once
 
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/network/dubbo_proxy/decoder.h"
-#include "extensions/filters/network/dubbo_proxy/decoder_event_handler.h"
-#include "extensions/filters/network/dubbo_proxy/filters/factory_base.h"
-#include "extensions/filters/network/dubbo_proxy/filters/filter.h"
-#include "extensions/filters/network/dubbo_proxy/protocol.h"
-#include "extensions/filters/network/dubbo_proxy/router/router.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/network/dubbo_proxy/decoder.h"
+#include "source/extensions/filters/network/dubbo_proxy/decoder_event_handler.h"
+#include "source/extensions/filters/network/dubbo_proxy/filters/factory_base.h"
+#include "source/extensions/filters/network/dubbo_proxy/filters/filter.h"
+#include "source/extensions/filters/network/dubbo_proxy/protocol.h"
+#include "source/extensions/filters/network/dubbo_proxy/router/router.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -301,18 +300,18 @@ private:
   const std::string name_;
 };
 
-class MockFilterConfigFactory : public MockFactoryBase<ProtobufWkt::Struct> {
+class MockFilterConfigFactory : public MockFactoryBase<Protobuf::Struct> {
 public:
   MockFilterConfigFactory();
   ~MockFilterConfigFactory() override;
 
   DubboFilters::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const ProtobufWkt::Struct& proto_config,
+  createFilterFactoryFromProtoTyped(const Protobuf::Struct& proto_config,
                                     const std::string& stat_prefix,
                                     Server::Configuration::FactoryContext& context) override;
 
   std::shared_ptr<MockDecoderFilter> mock_filter_;
-  ProtobufWkt::Struct config_struct_;
+  Protobuf::Struct config_struct_;
   std::string config_stat_prefix_;
 };
 

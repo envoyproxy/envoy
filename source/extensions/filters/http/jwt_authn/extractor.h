@@ -6,7 +6,7 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/http/header_map.h"
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,10 +29,10 @@ public:
   virtual const std::string& token() const PURE;
 
   // Check if an issuer has specified the location.
-  virtual bool isIssuerSpecified(const std::string& issuer) const PURE;
+  virtual bool isIssuerAllowed(const std::string& issuer) const PURE;
 
   // Remove the token from the headers
-  virtual void removeJwt(Http::HeaderMap& headers) const PURE;
+  virtual void removeJwt(Http::RequestHeaderMap& headers) const PURE;
 };
 
 using JwtLocationConstPtr = std::unique_ptr<const JwtLocation>;
@@ -67,7 +67,7 @@ public:
   virtual ~Extractor() = default;
 
   /**
-   * Extract all JWT tokens from the headers. If set of header_keys or param_keys
+   * Extract all JWTs from the headers. If set of header_keys or param_keys
    * is not empty only those in the matching locations will be returned.
    *
    * @param headers is the HTTP request headers.
@@ -77,11 +77,11 @@ public:
   extract(const Http::RequestHeaderMap& headers) const PURE;
 
   /**
-   * Remove headers that configured to send JWT payloads.
+   * Remove headers that configured to send JWT payloads and JWT claims.
    *
    * @param headers is the HTTP request headers.
    */
-  virtual void sanitizePayloadHeaders(Http::HeaderMap& headers) const PURE;
+  virtual void sanitizeHeaders(Http::RequestHeaderMap& headers) const PURE;
 
   /**
    * Create an instance of Extractor for a given config.

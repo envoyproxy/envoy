@@ -6,12 +6,11 @@
 #include "envoy/http/filter.h"
 #include "envoy/server/admin.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-#include "common/http/codes.h"
-#include "common/http/header_map_impl.h"
-
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/http/codes.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "absl/strings/string_view.h"
 
@@ -29,7 +28,13 @@ public:
       absl::string_view path_and_query, Http::ResponseHeaderMap& response_headers,
       Buffer::OwnedImpl& response, AdminFilter& filter)>;
 
-  AdminFilter(AdminServerCallbackFunction admin_server_run_callback_func);
+  /**
+   * Instantiates an AdminFilter.
+   *
+   * @param admin the admin context from which to create the filter. This is used
+   *        to create a request object based on the path.
+   */
+  AdminFilter(const Admin& admin);
 
   // Http::StreamFilterBase
   // Handlers relying on the reference should use addOnDestroyCallback()
@@ -52,13 +57,14 @@ public:
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
     return encoder_callbacks_->http1StreamEncoderOptions();
   }
+  Http::Utility::QueryParamsMulti queryParams() const override;
 
 private:
   /**
    * Called when an admin request has been completely received.
    */
   void onComplete();
-  AdminServerCallbackFunction admin_server_callback_func_;
+  const Admin& admin_;
   Http::RequestHeaderMap* request_headers_{};
   std::list<std::function<void()>> on_destroy_callbacks_;
   bool end_stream_on_complete_ = true;

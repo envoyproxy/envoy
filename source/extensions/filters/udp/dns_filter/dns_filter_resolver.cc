@@ -1,6 +1,6 @@
-#include "extensions/filters/udp/dns_filter/dns_filter_resolver.h"
+#include "source/extensions/filters/udp/dns_filter/dns_filter_resolver.h"
 
-#include "common/network/utility.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,9 +14,7 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
   ctx.query_rec = domain_query;
   ctx.query_context = std::move(context);
   ctx.query_context->in_callback_ = false;
-  ctx.expiry = std::chrono::duration_cast<std::chrono::seconds>(
-                   dispatcher_.timeSource().systemTime().time_since_epoch())
-                   .count() +
+  ctx.expiry = DateUtil::nowToSeconds(dispatcher_.timeSource()) +
                std::chrono::duration_cast<std::chrono::seconds>(timeout_).count();
   ctx.resolver_status = DnsFilterResolverStatus::Pending;
 
@@ -32,7 +30,7 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
     // We don't support other lookups other than A and AAAA. Set success here so that we don't
     // retry for something that we are certain will fail.
     ENVOY_LOG(debug, "Unknown query type [{}] for upstream lookup", domain_query->type_);
-    ctx.query_context->resolution_status_ = Network::DnsResolver::ResolutionStatus::Success;
+    ctx.query_context->resolution_status_ = Network::DnsResolver::ResolutionStatus::Completed;
     ctx.resolver_status = DnsFilterResolverStatus::Complete;
     invokeCallback(ctx);
     return;
@@ -61,7 +59,7 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
   // Define the callback that is executed when resolution completes
   // Resolve the address in the query and add to the resolved_hosts vector
   resolver_->resolve(domain_query->name_, lookup_family,
-                     [this, id](Network::DnsResolver::ResolutionStatus status,
+                     [this, id](Network::DnsResolver::ResolutionStatus status, absl::string_view,
                                 std::list<Network::DnsResponse>&& response) -> void {
                        auto ctx_iter = lookups_.find(id);
 
@@ -89,13 +87,15 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
                        ctx.resolver_status = DnsFilterResolverStatus::Complete;
 
                        // C-ares doesn't expose the TTL in the data available here.
-                       if (status == Network::DnsResolver::ResolutionStatus::Success) {
+                       if (status == Network::DnsResolver::ResolutionStatus::Completed) {
                          ctx.resolved_hosts.reserve(response.size());
                          for (const auto& resp : response) {
-                           ASSERT(resp.address_ != nullptr);
+                           const auto& addrinfo = resp.addrInfo();
+                           ASSERT(addrinfo.address_ != nullptr);
                            ENVOY_LOG(trace, "Resolved address: {} for {}",
-                                     resp.address_->ip()->addressAsString(), ctx.query_rec->name_);
-                           ctx.resolved_hosts.emplace_back(std::move(resp.address_));
+                                     addrinfo.address_->ip()->addressAsString(),
+                                     ctx.query_rec->name_);
+                           ctx.resolved_hosts.emplace_back(std::move(addrinfo.address_));
                          }
                        }
                        // Invoke the filter callback notifying it of resolved addresses
@@ -104,9 +104,7 @@ void DnsFilterResolver::resolveExternalQuery(DnsQueryContextPtr context,
 }
 
 void DnsFilterResolver::onResolveTimeout() {
-  const uint64_t now = std::chrono::duration_cast<std::chrono::seconds>(
-                           dispatcher_.timeSource().systemTime().time_since_epoch())
-                           .count();
+  const uint64_t now = DateUtil::nowToSeconds(dispatcher_.timeSource());
   ENVOY_LOG(trace, "Pending queries: {}", lookups_.size());
 
   // Find an outstanding pending query and purge it

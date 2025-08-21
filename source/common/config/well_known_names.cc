@@ -1,7 +1,48 @@
-#include "common/config/well_known_names.h"
+#include "source/common/config/well_known_names.h"
+
+#include "absl/strings/str_replace.h"
 
 namespace Envoy {
 namespace Config {
+
+namespace {
+
+const absl::string_view TAG_VALUE_REGEX = R"([^\.]+)";
+
+// To allow for more readable regular expressions to be declared below, and to
+// reduce duplication, define a few common pattern substitutions for regex
+// segments.
+std::string expandRegex(const std::string& regex) {
+  return absl::StrReplaceAll(
+      regex, {// Regex to look for either IPv4 or IPv6 addresses plus port number after underscore.
+              {"<ADDRESS>", R"((?:(?:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|\[[a-fA-F_\d]+\])_\d+))"},
+              // Cipher names can contain alphanumerics with dashes and
+              // underscores.
+              {"<CIPHER>", R"([\w-]+)"},
+              // TLS version strings are always of the form "TLSv1.3".
+              {"<TLS_VERSION>", R"(TLSv\d\.\d)"},
+              // A generic name can contain any character except dots.
+              {"<TAG_VALUE>", TAG_VALUE_REGEX},
+              // Route names may contain dots and slashes in addition to
+              // alphanumerics, underscores, and dashes.
+              {"<ROUTE_CONFIG_NAME>", R"([\w-\./]+)"},
+              // Scoped Route names are named similarly to route config names.
+              {"<SCOPED_ROUTE_CONFIG_NAME>", R"([\w-\.]+)"},
+              // Match a prefix that is either a listener plus name or cluster plus name
+              {"<LISTENER_OR_CLUSTER_WITH_NAME>", R"((?:listener|cluster)\..*?)"},
+              {"<PROXY_PROTOCOL_VERSION>", R"(\d)"}});
+}
+
+const Regex::CompiledGoogleReMatcher& validTagValueRegex() {
+  CONSTRUCT_ON_FIRST_USE(Regex::CompiledGoogleReMatcherNoSafetyChecks,
+                         absl::StrCat("^", TAG_VALUE_REGEX, "$"));
+}
+
+} // namespace
+
+bool doesTagNameValueMatchInvalidCharRegex(absl::string_view name) {
+  return validTagValueRegex().match(name);
+}
 
 TagNameValues::TagNameValues() {
   // Note: the default regexes are defined below in the order that they will typically be matched
@@ -24,107 +65,195 @@ TagNameValues::TagNameValues() {
   // - Typical * notation will be used to denote an arbitrary set of characters.
 
   // *_rq(_<response_code>)
-  addRegex(RESPONSE_CODE, "_rq(_(\\d{3}))$", "_rq_");
+  addRe2(RESPONSE_CODE, R"(_rq(_(\d{3}))$)", "_rq_");
 
   // *_rq_(<response_code_class>)xx
-  addRegex(RESPONSE_CODE_CLASS, "_rq_(\\d)xx$", "_rq_");
+  addRe2(RESPONSE_CODE_CLASS, R"(_rq_((\d))xx$)", "_rq_");
 
   // http.[<stat_prefix>.]dynamodb.table.[<table_name>.]capacity.[<operation_name>.](__partition_id=<last_seven_characters_from_partition_id>)
-  addRegex(DYNAMO_PARTITION_ID,
-           "^http(?=\\.).*?\\.dynamodb\\.table(?=\\.).*?\\."
-           "capacity(?=\\.).*?(\\.__partition_id=(\\w{7}))$",
-           ".dynamodb.table.");
+  addRe2(
+      DYNAMO_PARTITION_ID,
+      R"(^http\.<TAG_VALUE>\.dynamodb\.table\.<TAG_VALUE>\.capacity\.<TAG_VALUE>(\.__partition_id=(\w{7}))$)",
+      ".dynamodb.table.");
 
-  // http.[<stat_prefix>.]dynamodb.operation.(<operation_name>.)<base_stat> or
+  // http.[<stat_prefix>.]dynamodb.operation.(<operation_name>.)* or
   // http.[<stat_prefix>.]dynamodb.table.[<table_name>.]capacity.(<operation_name>.)[<partition_id>]
-  addRegex(DYNAMO_OPERATION,
-           "^http(?=\\.).*?\\.dynamodb.(?:operation|table(?="
-           "\\.).*?\\.capacity)(\\.(.*?))(?:\\.|$)",
-           ".dynamodb.");
+  addRe2(
+      DYNAMO_OPERATION,
+      R"(^http\.<TAG_VALUE>\.dynamodb.(?:operation|table\.<TAG_VALUE>\.capacity)(\.(<TAG_VALUE>))(?:\.|$))",
+      ".dynamodb.");
 
-  // mongo.[<stat_prefix>.]collection.[<collection>.]callsite.(<callsite>.)query.<base_stat>
-  addRegex(MONGO_CALLSITE,
-           R"(^mongo(?=\.).*?\.collection(?=\.).*?\.callsite\.((.*?)\.).*?query.\w+?$)",
-           ".collection.");
+  // mongo.[<stat_prefix>.]collection.[<collection>.]callsite.(<callsite>.)query.*
+  addTokenized(MONGO_CALLSITE, "mongo.*.collection.*.callsite.$.query.**");
 
-  // http.[<stat_prefix>.]dynamodb.table.(<table_name>.) or
+  // http.[<stat_prefix>.]dynamodb.table.(<table_name>.)* or
   // http.[<stat_prefix>.]dynamodb.error.(<table_name>.)*
-  addRegex(DYNAMO_TABLE, R"(^http(?=\.).*?\.dynamodb.(?:table|error)\.((.*?)\.))", ".dynamodb.");
+  addRe2(DYNAMO_TABLE, R"(^http\.<TAG_VALUE>\.dynamodb.(?:table|error)\.((<TAG_VALUE>)\.))",
+         ".dynamodb.");
 
-  // mongo.[<stat_prefix>.]collection.(<collection>.)query.<base_stat>
-  addRegex(MONGO_COLLECTION, R"(^mongo(?=\.).*?\.collection\.((.*?)\.).*?query.\w+?$)",
-           ".collection.");
+  // mongo.[<stat_prefix>.]collection.(<collection>.)query.*
+  addTokenized(MONGO_COLLECTION, "mongo.*.collection.$.**.query.*");
 
-  // mongo.[<stat_prefix>.]cmd.(<cmd>.)<base_stat>
-  addRegex(MONGO_CMD, R"(^mongo(?=\.).*?\.cmd\.((.*?)\.)\w+?$)", ".cmd.");
+  // mongo.[<stat_prefix>.]cmd.(<cmd>.)*
+  addTokenized(MONGO_CMD, "mongo.*.cmd.$.**");
 
-  // cluster.[<route_target_cluster>.]grpc.[<grpc_service>.](<grpc_method>.)<base_stat>
-  addRegex(GRPC_BRIDGE_METHOD, R"(^cluster(?=\.).*?\.grpc(?=\.).*\.((.*?)\.)\w+?$)", ".grpc.");
+  // cluster.[<route_target_cluster>.]grpc.[<grpc_service>.](<grpc_method>.)*
+  addTokenized(GRPC_BRIDGE_METHOD, "cluster.*.grpc.*.$.**");
 
-  // http.[<stat_prefix>.]user_agent.(<user_agent>.)<base_stat>
-  addRegex(HTTP_USER_AGENT, R"(^http(?=\.).*?\.user_agent\.((.*?)\.)\w+?$)", ".user_agent.");
+  // http.[<stat_prefix>.]user_agent.(<user_agent>.)*
+  addTokenized(HTTP_USER_AGENT, "http.*.user_agent.$.**");
 
-  // vhost.[<virtual host name>.]vcluster.(<virtual_cluster_name>.)<base_stat>
-  addRegex(VIRTUAL_CLUSTER, R"(^vhost(?=\.).*?\.vcluster\.((.*?)\.)\w+?$)", ".vcluster.");
+  // vhost.[<virtual host name>.]vcluster.(<virtual_cluster_name>.)*
+  addTokenized(VIRTUAL_CLUSTER, "vhost.*.vcluster.$.**");
 
-  // http.[<stat_prefix>.]fault.(<downstream_cluster>.)<base_stat>
-  addRegex(FAULT_DOWNSTREAM_CLUSTER, R"(^http(?=\.).*?\.fault\.((.*?)\.)\w+?$)", ".fault.");
+  // http.[<stat_prefix>.]fault.(<downstream_cluster>.)*
+  addTokenized(FAULT_DOWNSTREAM_CLUSTER, "http.*.fault.$.**");
 
-  // listener.[<address>.]ssl.cipher.(<cipher>)
-  addRegex(SSL_CIPHER, R"(^listener(?=\.).*?\.ssl\.cipher(\.(.*?))$)");
+  // listener.[<address>.]ssl.ciphers.(<cipher>)
+  addRe2(SSL_CIPHER, R"(^listener\..*?\.ssl\.ciphers(\.(<CIPHER>))$)", ".ssl.ciphers.");
+
+  // Curves and ciphers have the same pattern so they use the same regex.
+  // listener.[<address>.]ssl.curves.(<curve>)
+  addRe2(SSL_CURVE, R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.curves(\.(<CIPHER>))$)",
+         ".ssl.curves.");
+
+  // Signing algorithms and ciphers have the same pattern so they use the same regex.
+  // listener.[<address>.]ssl.sigalgs.(<algorithm>)
+  addRe2(SSL_SIGALG, R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.sigalgs(\.(<CIPHER>))$)",
+         ".ssl.sigalgs.");
+
+  // listener.[<address>.]ssl.versions.(<version>)
+  addRe2(SSL_VERSION, R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.versions(\.(<TLS_VERSION>))$)",
+         ".ssl.versions.");
 
   // cluster.[<cluster_name>.]ssl.ciphers.(<cipher>)
-  addRegex(SSL_CIPHER_SUITE, R"(^cluster(?=\.).*?\.ssl\.ciphers(\.(.*?))$)", ".ssl.ciphers.");
+  addRe2(SSL_CIPHER_SUITE, R"(^cluster\.<TAG_VALUE>\.ssl\.ciphers(\.(<CIPHER>))$)",
+         ".ssl.ciphers.");
 
   // cluster.[<route_target_cluster>.]grpc.(<grpc_service>.)*
-  addRegex(GRPC_BRIDGE_SERVICE, R"(^cluster(?=\.).*?\.grpc\.((.*?)\.))", ".grpc.");
+  addTokenized(GRPC_BRIDGE_SERVICE, "cluster.*.grpc.$.**");
 
-  // tcp.(<stat_prefix>.)<base_stat>
-  addRegex(TCP_PREFIX, R"(^tcp\.((.*?)\.)\w+?$)");
+  // tcp.(<stat_prefix>.)*
+  addTokenized(TCP_PREFIX, "tcp.$.**");
 
-  // udp.(<stat_prefix>.)<base_stat>
-  addRegex(UDP_PREFIX, R"(^udp\.((.*?)\.)\w+?$)");
+  // udp.(<stat_prefix>.)*
+  addTokenized(UDP_PREFIX, "udp.$.**");
 
-  // auth.clientssl.(<stat_prefix>.)<base_stat>
-  addRegex(CLIENTSSL_PREFIX, R"(^auth\.clientssl\.((.*?)\.)\w+?$)");
+  // auth.clientssl.(<stat_prefix>.)*
+  addTokenized(CLIENTSSL_PREFIX, "auth.clientssl.$.**");
 
-  // ratelimit.(<stat_prefix>.)<base_stat>
-  addRegex(RATELIMIT_PREFIX, R"(^ratelimit\.((.*?)\.)\w+?$)");
+  // ratelimit.(<stat_prefix>.)*
+  addTokenized(RATELIMIT_PREFIX, "ratelimit.$.**");
 
   // cluster.(<cluster_name>.)*
-  addRe2(CLUSTER_NAME, "^cluster\\.(([^\\.]+)\\.).*");
+  addTokenized(CLUSTER_NAME, "cluster.$.**");
 
   // listener.[<address>.]http.(<stat_prefix>.)*
-  addRegex(HTTP_CONN_MANAGER_PREFIX, R"(^listener(?=\.).*?\.http\.((.*?)\.))", ".http.");
+  // The <address> part can be anything here (.*?) for the sake of a simpler
+  // internal state of the regex which performs better.
+  addRe2(HTTP_CONN_MANAGER_PREFIX, R"(^listener\..*?\.http\.((<TAG_VALUE>)\.))", ".http.");
+
+  // Extract ext_authz stat_prefix field
+  // cluster.[<cluster>.]ext_authz.[<ext_authz_prefix>.]*
+  addTokenized(EXT_AUTHZ_PREFIX, "cluster.*.ext_authz.$.**");
+  // http.[<http_conn_mgr_prefix>.]ext_authz.[<ext_authz_prefix>.]*
+  addTokenized(EXT_AUTHZ_PREFIX, "http.*.ext_authz.$.**");
 
   // http.(<stat_prefix>.)*
-  addRegex(HTTP_CONN_MANAGER_PREFIX, "^http\\.((.*?)\\.)");
+  addTokenized(HTTP_CONN_MANAGER_PREFIX, "http.$.**");
 
-  // listener.(<address>.)*
-  addRegex(LISTENER_ADDRESS,
-           R"(^listener\.(((?:[_.[:digit:]]*|[_\[\]aAbBcCdDeEfF[:digit:]]*))\.))");
+  // listener.<address|stat_prefix>.(worker_<id>.)*
+  // listener_manager.(worker_<id>.)*
+  // server.(worker_<id>.)*
+  // thread_local_cluster_manager.(worker_<id>.)*
+  addRe2(
+      WORKER_ID,
+      R"(^(?:listener\.(?:<ADDRESS>|<TAG_VALUE>)|server|listener_manager|thread_local_cluster_manager)\.worker_((\d+)\.))",
+      "");
+
+  // listener.(<address|stat_prefix>.)*, but specifically excluding "admin"
+  addRe2(LISTENER_ADDRESS, R"(^listener\.((<ADDRESS>|<TAG_VALUE>)\.))", "", "admin");
 
   // vhost.(<virtual host name>.)*
-  addRegex(VIRTUAL_HOST, "^vhost\\.((.*?)\\.)");
+  addTokenized(VIRTUAL_HOST, "vhost.$.**");
 
   // mongo.(<stat_prefix>.)*
-  addRegex(MONGO_PREFIX, "^mongo\\.((.*?)\\.)");
+  addTokenized(MONGO_PREFIX, "mongo.$.**");
 
   // http.[<stat_prefix>.]rds.(<route_config_name>.)<base_stat>
-  addRegex(RDS_ROUTE_CONFIG, R"(^http(?=\.).*?\.rds\.((.*?)\.)\w+?$)", ".rds.");
+  // Note: <route_config_name> can contain dots thus we have to maintain full
+  // match.
+  addRe2(RDS_ROUTE_CONFIG, R"(^http\.<TAG_VALUE>\.rds\.((<ROUTE_CONFIG_NAME>)\.)\w+?$)", ".rds.");
 
-  // listener_manager.(worker_<id>.)*
-  addRegex(WORKER_ID, R"(^listener_manager\.((worker_\d+)\.))", "listener_manager.worker_");
-}
+  // http.[<stat_prefix>.]scoped_rds.(<scoped_route_config_name>.)<base_stat>
+  addRe2(SCOPED_RDS_CONFIG,
+         R"(^http\.<TAG_VALUE>\.scoped_rds\.((<SCOPED_ROUTE_CONFIG_NAME>)\.)\w+?$)",
+         ".scoped_rds.");
 
-void TagNameValues::addRegex(const std::string& name, const std::string& regex,
-                             const std::string& substr) {
-  descriptor_vec_.emplace_back(Descriptor{name, regex, substr, Regex::Type::StdRegex});
+  // vhost.[<virtual host name>.]route.(<route_stat_prefix>.)*
+  addTokenized(ROUTE, "vhost.*.route.$.**");
+
+  // thrift.(<stat_prefix>.)*
+  addTokenized(THRIFT_PREFIX, "thrift.$.**");
+
+  // redis.(<stat_prefix>.)*
+  addTokenized(REDIS_PREFIX, "redis.$.**");
+
+  // (<stat_prefix>.).http_local_rate_limit.**
+  addTokenized(LOCAL_HTTP_RATELIMIT_PREFIX, "$.http_local_rate_limit.**");
+
+  // local_rate_limit.(<stat_prefix>.)
+  addTokenized(LOCAL_NETWORK_RATELIMIT_PREFIX, "local_rate_limit.$.**");
+
+  // listener_local_rate_limit.(<stat_prefix>.)
+  addTokenized(LOCAL_LISTENER_RATELIMIT_PREFIX, "listener_local_ratelimit.$.**");
+
+  // dns_filter.(<stat_prefix>.).**
+  addTokenized(DNS_FILTER_PREFIX, "dns_filter.$.**");
+
+  // connection_limit.(<stat_prefix>.)*
+  addTokenized(CONNECTION_LIMIT_PREFIX, "connection_limit.$.**");
+
+  // http.[<stat_prefix>.]rbac.[<optional stat_prefix>]policy.(<policy
+  // name>.).(allowed|shadow_allowed|denied|shadow_denied)
+  addRe2(
+      RBAC_POLICY_NAME,
+      R"(^http\.<TAG_VALUE>\.rbac\.(?:<TAG_VALUE>\.)?policy\.((<TAG_VALUE>)\.)(allowed|shadow_allowed|denied|shadow_denied)$)");
+
+  // (<stat_prefix>.).rbac.**
+  addTokenized(RBAC_PREFIX, "$.rbac.**");
+
+  // http.<stat_prefix>.rbac.(<rules_stat_prefix>.)* but excluding policy
+  addRe2(RBAC_HTTP_PREFIX, R"(^http\.<TAG_VALUE>\.rbac\.((<TAG_VALUE>)\.).*?)", "", "policy");
+
+  // proxy_proto.(<stat_prefix>.)**
+  addRe2(PROXY_PROTOCOL_PREFIX, R"(^proxy_proto\.((<TAG_VALUE>)\.).+$)", "", "versions");
+
+  // proxy_proto.([<optional stat_prefix>.]versions.v(<version_number>).)(found|disallowed|error)
+  //
+  // Strips out:  [<optional stat_prefix>.]versions.v(<version_number>).
+  // Leaving: proxy_proto.(found|disallowed|error)
+  addRe2(PROXY_PROTOCOL_VERSION,
+         R"(^proxy_proto\.((?:<TAG_VALUE>\.)?versions\.v(<PROXY_PROTOCOL_VERSION>)\.)\w+$)");
+
+  // grpc.(<stat_prefix>).**
+  addTokenized(GOOGLE_GRPC_CLIENT_PREFIX, "grpc.$.**");
+
+  // listener.[<address>.]ssl.certificate.(<cert_name>).<metric_name> or
+  // cluster.[<cluster_name>.]ssl.certificate.(<cert_name>).<metric_name>
+  addRe2(TLS_CERTIFICATE,
+         R"(^<LISTENER_OR_CLUSTER_WITH_NAME>\.ssl\.certificate(\.(<TAG_VALUE>)\..*)$)",
+         ".ssl.certificate");
 }
 
 void TagNameValues::addRe2(const std::string& name, const std::string& regex,
-                           const std::string& substr) {
-  descriptor_vec_.emplace_back(Descriptor{name, regex, substr, Regex::Type::Re2});
+                           const std::string& substr, const std::string& negative_matching_value) {
+  descriptor_vec_.emplace_back(
+      Descriptor{name, expandRegex(regex), substr, negative_matching_value, Regex::Type::Re2});
+}
+
+void TagNameValues::addTokenized(const std::string& name, const std::string& tokens) {
+  tokenized_descriptor_vec_.emplace_back(TokenizedDescriptor{name, tokens});
 }
 
 } // namespace Config

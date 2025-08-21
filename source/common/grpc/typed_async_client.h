@@ -5,8 +5,7 @@
 
 #include "envoy/grpc/async_client.h"
 
-#include "common/common/empty_string.h"
-#include "common/config/version_converter.h"
+#include "source/common/common/empty_string.h"
 
 namespace Envoy {
 namespace Grpc {
@@ -36,21 +35,22 @@ template <typename Request> class AsyncStream /* : public RawAsyncStream */ {
 public:
   AsyncStream() = default;
   AsyncStream(RawAsyncStream* stream) : stream_(stream) {}
-  AsyncStream(const AsyncStream& other) = default;
   void sendMessage(const Protobuf::Message& request, bool end_stream) {
-    Internal::sendMessageUntyped(stream_, std::move(request), end_stream);
-  }
-  void sendMessage(const Protobuf::Message& request,
-                   envoy::config::core::v3::ApiVersion transport_api_version, bool end_stream) {
-    Config::VersionConverter::prepareMessageForGrpcWire(const_cast<Protobuf::Message&>(request),
-                                                        transport_api_version);
     Internal::sendMessageUntyped(stream_, std::move(request), end_stream);
   }
   void closeStream() { stream_->closeStream(); }
   void resetStream() { stream_->resetStream(); }
+  void waitForRemoteCloseAndDelete() { stream_->waitForRemoteCloseAndDelete(); }
   bool isAboveWriteBufferHighWatermark() const {
     return stream_->isAboveWriteBufferHighWatermark();
   }
+
+  void setWatermarkCallbacks(Http::SidestreamWatermarkCallbacks& callbacks) {
+    stream_->setWatermarkCallbacks(callbacks);
+  }
+
+  void removeWatermarkCallbacks() { stream_->removeWatermarkCallbacks(); }
+
   AsyncStream* operator->() { return this; }
   AsyncStream<Request> operator=(RawAsyncStream* stream) {
     stream_ = stream;
@@ -58,6 +58,8 @@ public:
   }
   bool operator==(RawAsyncStream* stream) const { return stream_ == stream; }
   bool operator!=(RawAsyncStream* stream) const { return stream_ != stream; }
+  const StreamInfo::StreamInfo& streamInfo() const { return stream_->streamInfo(); }
+  StreamInfo::StreamInfo& streamInfo() { return stream_->streamInfo(); }
 
 private:
   RawAsyncStream* stream_{};
@@ -87,55 +89,6 @@ private:
 };
 
 /**
- * Versioned methods wrapper.
- */
-class VersionedMethods {
-public:
-  VersionedMethods(const std::string& v3, const std::string& v2, const std::string& v2_alpha = "")
-      : v3_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(v3)),
-        v2_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(v2)),
-        v2_alpha_(v2_alpha.empty()
-                      ? nullptr
-                      : Protobuf::DescriptorPool::generated_pool()->FindMethodByName(v2_alpha)) {}
-
-  /**
-   * Given a version, return the method descriptor for a specific version.
-   *
-   * @param api_version target API version.
-   * @param use_alpha if this is an alpha version of an API method.
-   *
-   * @return Protobuf::MethodDescriptor& of a method for a specific version.
-   */
-  const Protobuf::MethodDescriptor&
-  getMethodDescriptorForVersion(envoy::config::core::v3::ApiVersion api_version,
-                                bool use_alpha = false) const {
-    switch (api_version) {
-    case envoy::config::core::v3::ApiVersion::AUTO:
-      FALLTHRU;
-    case envoy::config::core::v3::ApiVersion::V2: {
-      const auto* descriptor = use_alpha ? v2_alpha_ : v2_;
-      ASSERT(descriptor != nullptr);
-      return *descriptor;
-    }
-
-    case envoy::config::core::v3::ApiVersion::V3: {
-      const auto* descriptor = v3_;
-      ASSERT(descriptor != nullptr);
-      return *descriptor;
-    }
-
-    default:
-      NOT_REACHED_GCOVR_EXCL_LINE;
-    }
-  }
-
-private:
-  const Protobuf::MethodDescriptor* v3_{nullptr};
-  const Protobuf::MethodDescriptor* v2_{nullptr};
-  const Protobuf::MethodDescriptor* v2_alpha_{nullptr};
-};
-
-/**
  * Convenience subclasses for AsyncStreamCallbacks.
  */
 template <typename Response> class AsyncStreamCallbacks : public RawAsyncStreamCallbacks {
@@ -160,23 +113,14 @@ template <typename Request, typename Response> class AsyncClient /* : public Raw
 public:
   AsyncClient() = default;
   AsyncClient(RawAsyncClientPtr&& client) : client_(std::move(client)) {}
-  AsyncClient(RawAsyncClientSharedPtr client) : client_(client) {}
+  AsyncClient(const RawAsyncClientSharedPtr& client) : client_(client) {}
+  AsyncClient(RawAsyncClientSharedPtr&& client) : client_(std::move(client)) {}
   virtual ~AsyncClient() = default;
 
   virtual AsyncRequest* send(const Protobuf::MethodDescriptor& service_method,
                              const Protobuf::Message& request,
                              AsyncRequestCallbacks<Response>& callbacks, Tracing::Span& parent_span,
                              const Http::AsyncClient::RequestOptions& options) {
-    return Internal::sendUntyped(client_.get(), service_method, request, callbacks, parent_span,
-                                 options);
-  }
-  virtual AsyncRequest* send(const Protobuf::MethodDescriptor& service_method,
-                             const Protobuf::Message& request,
-                             AsyncRequestCallbacks<Response>& callbacks, Tracing::Span& parent_span,
-                             const Http::AsyncClient::RequestOptions& options,
-                             envoy::config::core::v3::ApiVersion transport_api_version) {
-    Config::VersionConverter::prepareMessageForGrpcWire(const_cast<Protobuf::Message&>(request),
-                                                        transport_api_version);
     return Internal::sendUntyped(client_.get(), service_method, request, callbacks, parent_span,
                                  options);
   }
@@ -187,6 +131,8 @@ public:
     return AsyncStream<Request>(
         Internal::startUntyped(client_.get(), service_method, callbacks, options));
   }
+
+  absl::string_view destination() { return client_->destination(); }
 
   AsyncClient* operator->() { return this; }
   void operator=(RawAsyncClientPtr&& client) { client_ = std::move(client); }

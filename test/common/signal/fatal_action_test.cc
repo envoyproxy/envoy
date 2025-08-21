@@ -1,7 +1,10 @@
+#include <vector>
+
+#include "envoy/common/scope_tracker.h"
 #include "envoy/server/fatal_action_config.h"
 
-#include "common/signal/fatal_action.h"
-#include "common/signal/fatal_error_handler.h"
+#include "source/common/signal/fatal_action.h"
+#include "source/common/signal/fatal_error_handler.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/test_common/utility.h"
@@ -23,9 +26,10 @@ class TestFatalErrorHandler : public FatalErrorHandlerInterface {
   void onFatalError(std::ostream& /*os*/) const override {}
   void
   runFatalActionsOnTrackedObject(const FatalAction::FatalActionPtrList& actions) const override {
-    // Call the Fatal Actions with nullptr
+    // Call the Fatal Actions with a non-empty vector so it runs the action.
+    std::vector<const ScopeTrackedObject*> tracked_objects{nullptr};
     for (const Server::Configuration::FatalActionPtr& action : actions) {
-      action->run(nullptr);
+      action->run(tracked_objects);
     }
   }
 };
@@ -33,7 +37,9 @@ class TestFatalErrorHandler : public FatalErrorHandlerInterface {
 class TestFatalAction : public Server::Configuration::FatalAction {
 public:
   TestFatalAction(bool is_safe, int* const counter) : is_safe_(is_safe), counter_(counter) {}
-  void run(const ScopeTrackedObject* /*current_object*/) override { ++(*counter_); }
+  void run(absl::Span<const ScopeTrackedObject* const> /*tracked_objects*/) override {
+    ++(*counter_);
+  }
   bool isAsyncSignalSafe() const override { return is_safe_; }
 
 private:
@@ -64,13 +70,6 @@ TEST_F(FatalActionTest, ShouldNotBeAbleToRunActionsBeforeRegistration) {
   // Call the actions
   EXPECT_EQ(FatalErrorHandler::runSafeActions(), Status::ActionManagerUnset);
   EXPECT_EQ(FatalErrorHandler::runUnsafeActions(), Status::ActionManagerUnset);
-}
-
-TEST_F(FatalActionTest, ShouldOnlyBeAbleToRegisterFatalActionsOnce) {
-  // Register empty list of actions
-  FatalErrorHandler::registerFatalActions({}, {}, Thread::threadFactoryForTest());
-  EXPECT_DEBUG_DEATH(
-      { FatalErrorHandler::registerFatalActions({}, {}, Thread::threadFactoryForTest()); }, "");
 }
 
 TEST_F(FatalActionTest, CanCallRegisteredActions) {

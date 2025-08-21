@@ -71,7 +71,7 @@ USE_CATEGORIES = [
 USE_CATEGORIES_WITH_CPE_OPTIONAL = ["build", "other", "test_only", "api"]
 
 def _fail_missing_attribute(attr, key):
-    fail("The '%s' attribute must be defined for external dependecy " % attr + key)
+    fail("The '%s' attribute must be defined for external dependency " % attr + key)
 
 # Method for verifying content of the repository location specifications.
 #

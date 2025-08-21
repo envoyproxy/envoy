@@ -10,7 +10,7 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
 namespace Http {
@@ -63,7 +63,8 @@ public:
 
   /**
    * Initialize the user agent from request headers. This is only done once and the user-agent
-   * is assumed to be the same for further requests.
+   * is assumed to be the same for further requests. Downstream request counter is incremented for
+   * for each request.
    * @param headers supplies the request headers.
    * @param prefix supplies the stat prefix for the UA stats.
    * @param scope supplies the backing stat scope.

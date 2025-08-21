@@ -1,4 +1,4 @@
-#include "extensions/common/redis/cluster_refresh_manager_impl.h"
+#include "source/extensions/common/redis/cluster_refresh_manager_impl.h"
 
 #include "envoy/singleton/manager.h"
 

@@ -1,0 +1,23 @@
+base {
+  config {
+    clear_route_cache: true
+    include_peer_certificate: true
+    stat_prefix: "C"
+    filter_enabled_metadata {
+      filter: ";"
+      path {
+        key: "V"
+      }
+      value {
+        string_match {
+          safe_regex {
+            regex: "/envoy.config.route.v3.Route"
+          }
+        }
+      }
+    }
+    bootstrap_metadata_labels_key: "\000\000\000\000\000\000\000\000\000\000\000\000\000"
+  }
+}
+request_data {
+}

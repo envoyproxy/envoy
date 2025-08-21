@@ -7,9 +7,8 @@
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/utility.h"
-
-#include "date_provider.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/date_provider.h"
 
 namespace Envoy {
 namespace Http {
@@ -22,7 +21,6 @@ public:
   explicit DateProviderImplBase(TimeSource& time_source) : time_source_(time_source) {}
 
 protected:
-  static DateFormatter date_formatter_;
   TimeSource& time_source_;
 };
 

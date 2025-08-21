@@ -6,10 +6,9 @@
 #include <csignal>
 #include <list>
 
-#include "common/common/non_copyable.h"
-#include "common/signal/fatal_error_handler.h"
-
-#include "server/backtrace.h"
+#include "source/common/common/non_copyable.h"
+#include "source/common/signal/fatal_error_handler.h"
+#include "source/server/backtrace.h"
 
 namespace Envoy {
 
@@ -53,7 +52,9 @@ class SignalAction : NonCopyable {
 public:
   SignalAction()
       : guard_size_(sysconf(_SC_PAGE_SIZE)),
-        altstack_size_(std::max(guard_size_ * 4, static_cast<size_t>(MINSIGSTKSZ))) {
+        altstack_size_(
+            std::max(guard_size_ * 4, (static_cast<size_t>(MINSIGSTKSZ) + guard_size_ - 1) /
+                                          guard_size_ * guard_size_)) {
     mapAndProtectStackMemory();
     installSigHandlers();
   }
@@ -129,7 +130,11 @@ private:
   void unmapStackMemory();
   char* altstack_{};
   std::array<struct sigaction, sizeof(FATAL_SIGS) / sizeof(int)> previous_handlers_;
+// sigaltstack and backtrace() are incompatible on Apple platforms
+// https://reviews.llvm.org/D28265
+#if !defined(__APPLE__)
   stack_t previous_altstack_;
+#endif
 };
 
 } // namespace Envoy

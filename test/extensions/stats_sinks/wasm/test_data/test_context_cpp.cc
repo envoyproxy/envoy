@@ -7,7 +7,7 @@
 #include "proxy_wasm_intrinsics.h"
 #include "source/extensions/common/wasm/ext/envoy_proxy_wasm_api.h"
 #else
-#include "extensions/common/wasm/ext/envoy_null_plugin.h"
+#include "source/extensions/common/wasm/ext/envoy_null_plugin.h"
 #endif
 
 START_WASM_PLUGIN(CommonWasmTestContextCpp)

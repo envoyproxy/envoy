@@ -2,8 +2,7 @@
 
 #include "envoy/config/core/v3/extension.pb.h"
 
-#include "common/matcher/exact_map_matcher.h"
-#include "common/matcher/matcher.h"
+#include "source/common/matcher/exact_map_matcher.h"
 
 #include "test/common/matcher/test_utility.h"
 
@@ -12,113 +11,167 @@
 namespace Envoy {
 namespace Matcher {
 
-class ExactMapMatcherTest : public ::testing::Test {
-public:
-  void verifyNoMatch(const MatchTree<TestData>::MatchResult& result) {
-    EXPECT_EQ(MatchState::MatchComplete, result.match_state_);
-    EXPECT_FALSE(result.on_match_.has_value());
-  }
+using ::testing::ElementsAre;
 
-  void verifyImmediateMatch(const MatchTree<TestData>::MatchResult& result,
-                            absl::string_view expected_value) {
-    EXPECT_EQ(MatchState::MatchComplete, result.match_state_);
-    EXPECT_TRUE(result.on_match_.has_value());
-
-    EXPECT_EQ(nullptr, result.on_match_->matcher_);
-    EXPECT_NE(result.on_match_->action_cb_, nullptr);
-
-    EXPECT_EQ(*static_cast<StringAction*>(result.on_match_->action_cb_().get()),
-              *stringValue(expected_value));
-  }
-
-  void verifyNotEnoughDataForMatch(const MatchTree<TestData>::MatchResult& result) {
-    EXPECT_EQ(MatchState::UnableToMatch, result.match_state_);
-    EXPECT_FALSE(result.on_match_.has_value());
-  }
-};
-
-TEST_F(ExactMapMatcherTest, NoMatch) {
-  ExactMapMatcher<TestData> matcher(
+TEST(ExactMapMatcherTest, NoMatch) {
+  std::unique_ptr<ExactMapMatcher<TestData>> matcher = *ExactMapMatcher<TestData>::create(
       std::make_unique<TestInput>(
           DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "blah"}),
       absl::nullopt);
 
   TestData data;
-  const auto result = matcher.match(data);
-  verifyNoMatch(result);
+  const auto result = matcher->match(data);
+  EXPECT_THAT(result, HasNoMatch());
 }
 
-TEST_F(ExactMapMatcherTest, NoMatchDueToNoData) {
-  ExactMapMatcher<TestData> matcher(
+TEST(ExactMapMatcherTest, NoMatchDueToNoData) {
+  std::unique_ptr<ExactMapMatcher<TestData>> matcher = *ExactMapMatcher<TestData>::create(
       std::make_unique<TestInput>(DataInputGetResult{
-          DataInputGetResult::DataAvailability::AllDataAvailable, absl::nullopt}),
+          DataInputGetResult::DataAvailability::AllDataAvailable, absl::monostate()}),
       absl::nullopt);
 
   TestData data;
-  const auto result = matcher.match(data);
-  verifyNoMatch(result);
+  const auto result = matcher->match(data);
+  EXPECT_THAT(result, HasNoMatch());
 }
 
-TEST_F(ExactMapMatcherTest, NoMatchWithFallback) {
-  ExactMapMatcher<TestData> matcher(
+TEST(ExactMapMatcherTest, NoMatchWithFallback) {
+  std::unique_ptr<ExactMapMatcher<TestData>> matcher = *ExactMapMatcher<TestData>::create(
       std::make_unique<TestInput>(
           DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "blah"}),
       stringOnMatch<TestData>("no_match"));
 
   TestData data;
-  const auto result = matcher.match(data);
-  verifyImmediateMatch(result, "no_match");
+  const auto result = matcher->match(data);
+  EXPECT_THAT(result, HasStringAction("no_match"));
 }
 
-TEST_F(ExactMapMatcherTest, Match) {
-  ExactMapMatcher<TestData> matcher(
+TEST(ExactMapMatcherTest, Match) {
+  std::unique_ptr<ExactMapMatcher<TestData>> matcher = *ExactMapMatcher<TestData>::create(
       std::make_unique<TestInput>(
           DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "match"}),
       stringOnMatch<TestData>("no_match"));
 
-  matcher.addChild("match", stringOnMatch<TestData>("match"));
+  matcher->addChild("match", stringOnMatch<TestData>("match"));
 
   TestData data;
-  const auto result = matcher.match(data);
-  verifyImmediateMatch(result, "match");
+  const auto result = matcher->match(data);
+  EXPECT_THAT(result, HasStringAction("match"));
 }
 
-TEST_F(ExactMapMatcherTest, DataNotAvailable) {
-  ExactMapMatcher<TestData> matcher(std::make_unique<TestInput>(DataInputGetResult{
-                                        DataInputGetResult::DataAvailability::NotAvailable, {}}),
-                                    stringOnMatch<TestData>("no_match"));
+TEST(ExactMapMatcherTest, DataNotAvailable) {
+  std::unique_ptr<ExactMapMatcher<TestData>> matcher = *ExactMapMatcher<TestData>::create(
+      std::make_unique<TestInput>(
+          DataInputGetResult{DataInputGetResult::DataAvailability::NotAvailable, {}}),
+      stringOnMatch<TestData>("no_match"));
 
-  matcher.addChild("match", stringOnMatch<TestData>("match"));
+  matcher->addChild("match", stringOnMatch<TestData>("match"));
 
   TestData data;
-  const auto result = matcher.match(data);
-  verifyNotEnoughDataForMatch(result);
+  const auto result = matcher->match(data);
+  EXPECT_THAT(result, HasInsufficientData());
 }
 
-TEST_F(ExactMapMatcherTest, MoreDataMightBeAvailableNoMatch) {
-  ExactMapMatcher<TestData> matcher(
+TEST(ExactMapMatcherTest, MoreDataMightBeAvailableNoMatch) {
+  std::unique_ptr<ExactMapMatcher<TestData>> matcher = *ExactMapMatcher<TestData>::create(
       std::make_unique<TestInput>(DataInputGetResult{
           DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, "no match"}),
       stringOnMatch<TestData>("no_match"));
 
-  matcher.addChild("match", stringOnMatch<TestData>("match"));
+  matcher->addChild("match", stringOnMatch<TestData>("match"));
 
   TestData data;
-  const auto result = matcher.match(data);
-  verifyNotEnoughDataForMatch(result);
+  const auto result = matcher->match(data);
+  EXPECT_THAT(result, HasInsufficientData());
 }
 
-TEST_F(ExactMapMatcherTest, MoreDataMightBeAvailableMatch) {
-  ExactMapMatcher<TestData> matcher(
+TEST(ExactMapMatcherTest, MoreDataMightBeAvailableMatch) {
+  std::unique_ptr<ExactMapMatcher<TestData>> matcher = *ExactMapMatcher<TestData>::create(
       std::make_unique<TestInput>(DataInputGetResult{
           DataInputGetResult::DataAvailability::MoreDataMightBeAvailable, "match"}),
       stringOnMatch<TestData>("no_match"));
 
-  matcher.addChild("match", stringOnMatch<TestData>("match"));
+  matcher->addChild("match", stringOnMatch<TestData>("match"));
 
   TestData data;
-  const auto result = matcher.match(data);
-  verifyImmediateMatch(result, "match");
+  const auto result = matcher->match(data);
+  EXPECT_THAT(result, HasStringAction("match"));
 }
+
+TEST(ExactMapMatcherTest, RecursiveMatching) {
+  auto sub_matcher = std::shared_ptr<ExactMapMatcher<TestData>>(*ExactMapMatcher<TestData>::create(
+      std::make_unique<TestInput>(
+          DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "match"}),
+      stringOnMatch<TestData>("no_match")));
+  sub_matcher->addChild("match", stringOnMatch<TestData>("match"));
+
+  std::unique_ptr<ExactMapMatcher<TestData>> matcher = *ExactMapMatcher<TestData>::create(
+      std::make_unique<TestInput>(
+          DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "match"}),
+      stringOnMatch<TestData>("no_match"));
+  matcher->addChild("match", OnMatch<TestData>{/*.action_=*/nullptr, /*.matcher=*/sub_matcher,
+                                               /*.keep_matching=*/false});
+
+  TestData data;
+  const auto result = matcher->match(data);
+  EXPECT_THAT(result, HasStringAction("match"));
+}
+
+TEST(ExactMapMatcherTest, RecursiveMatchingOnNoMatch) {
+  auto sub_matcher = std::shared_ptr<ExactMapMatcher<TestData>>(*ExactMapMatcher<TestData>::create(
+      std::make_unique<TestInput>(
+          DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "match"}),
+      stringOnMatch<TestData>("nested_no_match")));
+  sub_matcher->addChild("match", stringOnMatch<TestData>("nested_match"));
+
+  std::unique_ptr<ExactMapMatcher<TestData>> matcher = *ExactMapMatcher<TestData>::create(
+      std::make_unique<TestInput>(
+          DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "blah"}),
+      OnMatch<TestData>{/*.action_=*/nullptr, /*.matcher=*/sub_matcher,
+                        /*.keep_matching=*/false});
+  matcher->addChild("match", stringOnMatch<TestData>("match"));
+
+  TestData data;
+  const auto result = matcher->match(data);
+  EXPECT_THAT(result, HasStringAction("nested_match"));
+}
+
+TEST(ExactMapMatcherTest, RecursiveMatchingWithKeepMatching) {
+  // Match is skipped by nested keep_matching and on_no_match is skipped by top-level keep_matching.
+  auto sub_matcher_match_keeps_matching =
+      std::shared_ptr<ExactMapMatcher<TestData>>(*ExactMapMatcher<TestData>::create(
+          std::make_unique<TestInput>(
+              DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "match"}),
+          stringOnMatch<TestData>("nested_on_no_match_1")));
+  sub_matcher_match_keeps_matching->addChild(
+      "match", stringOnMatch<TestData>("nested_match_1", /*keep_matching=*/true));
+
+  // Recursive on_no_match should still work.
+  auto top_on_no_match_matcher =
+      std::shared_ptr<ExactMapMatcher<TestData>>(*ExactMapMatcher<TestData>::create(
+          std::make_unique<TestInput>(
+              DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "match"}),
+          stringOnMatch<TestData>("top_level_no_match")));
+
+  std::unique_ptr<ExactMapMatcher<TestData>> matcher = *ExactMapMatcher<TestData>::create(
+      std::make_unique<TestInput>(
+          DataInputGetResult{DataInputGetResult::DataAvailability::AllDataAvailable, "match"}),
+      OnMatch<TestData>{/*.action_=*/nullptr, /*.matcher=*/top_on_no_match_matcher,
+                        /*.keep_matching=*/false});
+  matcher->addChild("match", OnMatch<TestData>{/*.action_=*/nullptr,
+                                               /*.matcher=*/sub_matcher_match_keeps_matching,
+                                               /*.keep_matching=*/true});
+
+  std::vector<ActionConstSharedPtr> skipped_results{};
+  SkippedMatchCb skipped_match_cb = [&skipped_results](const ActionConstSharedPtr& cb) {
+    skipped_results.push_back(cb);
+  };
+  TestData data;
+  const auto result = matcher->match(data, skipped_match_cb);
+  EXPECT_THAT(result, HasStringAction("top_level_no_match"));
+  EXPECT_THAT(skipped_results, ElementsAre(IsStringAction("nested_match_1"),
+                                           IsStringAction("nested_on_no_match_1")));
+}
+
 } // namespace Matcher
 } // namespace Envoy

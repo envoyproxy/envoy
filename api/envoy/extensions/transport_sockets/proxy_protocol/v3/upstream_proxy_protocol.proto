@@ -11,6 +11,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.proxy_protocol.v3";
 option java_outer_classname = "UpstreamProxyProtocolProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/proxy_protocol/v3;proxy_protocolv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Upstream Proxy Protocol]
@@ -23,4 +24,13 @@ message ProxyProtocolUpstreamTransport {
 
   // The underlying transport socket being wrapped.
   config.core.v3.TransportSocket transport_socket = 2 [(validate.rules).message = {required: true}];
+
+  // If this is set to true, the null addresses are allowed in the PROXY protocol header.
+  // The proxy protocol header encodes the null addresses to AF_UNSPEC.
+  // [#not-implemented-hide:]
+  bool allow_unspecified_address = 3;
+
+  // If true, all the TLVs are encoded in the connection pool key.
+  // [#not-implemented-hide:]
+  bool tlv_as_pool_key = 4;
 }

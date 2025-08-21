@@ -7,7 +7,6 @@ node {
   }
 }
 admin {
-  access_log_path: "{{ null_device_path }}"
   address {
     socket_address {
       address: "{{ ntop_ip_loopback_address }}"

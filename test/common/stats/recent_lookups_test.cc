@@ -1,8 +1,8 @@
 #include <algorithm>
 #include <string>
 
-#include "common/common/utility.h"
-#include "common/stats/recent_lookups.h"
+#include "source/common/common/utility.h"
+#include "source/common/stats/recent_lookups.h"
 
 #include "test/test_common/logging.h"
 

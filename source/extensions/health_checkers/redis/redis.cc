@@ -1,10 +1,10 @@
-#include "extensions/health_checkers/redis/redis.h"
+#include "source/extensions/health_checkers/redis/redis.h"
 
 #include "envoy/config/core/v3/health_check.pb.h"
-#include "envoy/config/health_checker/redis/v2/redis.pb.h"
 #include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
+#include "envoy/extensions/health_checkers/redis/v3/redis.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -13,17 +13,27 @@ namespace RedisHealthChecker {
 
 RedisHealthChecker::RedisHealthChecker(
     const Upstream::Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
-    const envoy::config::health_checker::redis::v2::Redis& redis_config,
+    const envoy::extensions::health_checkers::redis::v3::Redis& redis_config,
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
     Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
-    Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory)
+    Extensions::NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
+    const absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam>
+        aws_iam_config,
+    const absl::optional<Extensions::NetworkFilters::Common::Redis::AwsIamAuthenticator::
+                             AwsIamAuthenticatorSharedPtr>
+        aws_iam_authenticator)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, api.randomGenerator(),
                             std::move(event_logger)),
       client_factory_(client_factory), key_(redis_config.key()),
+      redis_stats_(generateRedisStats(cluster.info()->statsScope())),
       auth_username_(
           NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authUsername(cluster.info(), api)),
-      auth_password_(NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authPassword(
-          cluster.info(), api)) {
+      auth_password_(
+          NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::authPassword(cluster.info(), api)),
+      aws_iam_authenticator_(aws_iam_authenticator), aws_iam_config_(aws_iam_config),
+      redis_config_(redis_config)
+
+{
   if (!key_.empty()) {
     type_ = Type::Exists;
   } else {
@@ -42,6 +52,11 @@ RedisHealthChecker::RedisActiveHealthCheckSession::RedisActiveHealthCheckSession
 RedisHealthChecker::RedisActiveHealthCheckSession::~RedisActiveHealthCheckSession() {
   ASSERT(current_request_ == nullptr);
   ASSERT(client_ == nullptr);
+}
+
+RedisHealthCheckerStats RedisHealthChecker::generateRedisStats(Stats::Scope& scope) {
+  std::string prefix("health_check.redis.");
+  return {ALL_REDIS_HEALTH_CHECKER_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
 }
 
 void RedisHealthChecker::RedisActiveHealthCheckSession::onDeferredDelete() {
@@ -67,8 +82,9 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onEvent(Network::Connect
 void RedisHealthChecker::RedisActiveHealthCheckSession::onInterval() {
   if (!client_) {
     client_ = parent_.client_factory_.create(
-        host_, parent_.dispatcher_, *this, redis_command_stats_,
-        parent_.cluster_.info()->statsScope(), parent_.auth_username_, parent_.auth_password_);
+        host_, parent_.dispatcher_, redis_config_, redis_command_stats_,
+        parent_.cluster_.info()->statsScope(), parent_.auth_username_, parent_.auth_password_,
+        false, parent_.aws_iam_config_, parent_.aws_iam_authenticator_);
     client_->addConnectionCallbacks(*this);
   }
 
@@ -81,8 +97,6 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onInterval() {
   case Type::Ping:
     current_request_ = client_->makeRequest(pingHealthCheckRequest(), *this);
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -96,6 +110,7 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onResponse(
         value->asInteger() == 0) {
       handleSuccess();
     } else {
+      parent_.redis_stats_.exists_failure_.inc();
       handleFailure(envoy::data::core::v3::ACTIVE);
     }
     break;
@@ -107,8 +122,6 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onResponse(
       handleFailure(envoy::data::core::v3::ACTIVE);
     }
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
   if (!parent_.reuse_connection_) {
@@ -121,12 +134,11 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onFailure() {
   handleFailure(envoy::data::core::v3::NETWORK);
 }
 
-bool RedisHealthChecker::RedisActiveHealthCheckSession::onRedirection(
+void RedisHealthChecker::RedisActiveHealthCheckSession::onRedirection(
     NetworkFilters::Common::Redis::RespValuePtr&&, const std::string&, bool) {
   // Treat any redirection error response from a Redis server as success.
   current_request_ = nullptr;
   handleSuccess();
-  return true;
 }
 
 void RedisHealthChecker::RedisActiveHealthCheckSession::onTimeout() {

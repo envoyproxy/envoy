@@ -1,7 +1,7 @@
-#include "extensions/filters/network/dubbo_proxy/decoder.h"
-#include "extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
-#include "extensions/filters/network/dubbo_proxy/message_impl.h"
-#include "extensions/filters/network/dubbo_proxy/metadata.h"
+#include "source/extensions/filters/network/dubbo_proxy/decoder.h"
+#include "source/extensions/filters/network/dubbo_proxy/dubbo_hessian2_serializer_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/metadata.h"
 
 #include "test/extensions/filters/network/dubbo_proxy/mocks.h"
 #include "test/extensions/filters/network/dubbo_proxy/utility.h"
@@ -42,7 +42,7 @@ public:
               context->setBodySize(body_size);
               metadata->setMessageType(type);
 
-              return std::pair<ContextSharedPtr, bool>(context, true);
+              return {context, true};
             }));
   }
 
@@ -175,10 +175,8 @@ TEST_F(DubboDecoderStateMachineTest, ProtocolDecodeException) {
 TEST_F(DubboDecoderTest, NeedMoreDataForProtocolHeader) {
   EXPECT_CALL(request_callbacks_, newStream()).Times(0);
   EXPECT_CALL(protocol_, decodeHeader(_, _))
-      .WillOnce(Invoke(
-          [](Buffer::Instance&, MessageMetadataSharedPtr) -> std::pair<ContextSharedPtr, bool> {
-            return std::pair<ContextSharedPtr, bool>(nullptr, false);
-          }));
+      .WillOnce(Invoke([](Buffer::Instance&, MessageMetadataSharedPtr)
+                           -> std::pair<ContextSharedPtr, bool> { return {nullptr, false}; }));
 
   RequestDecoder decoder(protocol_, request_callbacks_);
 
@@ -196,7 +194,7 @@ TEST_F(DubboDecoderTest, NeedMoreDataForProtocolBody) {
         auto context = std::make_shared<ContextImpl>();
         context->setHeaderSize(16);
         context->setBodySize(10);
-        return std::pair<ContextSharedPtr, bool>(context, true);
+        return {context, true};
       }));
   EXPECT_CALL(protocol_, decodeData(_, _, _))
       .WillOnce(Invoke([&](Buffer::Instance&, ContextSharedPtr, MessageMetadataSharedPtr) -> bool {
@@ -230,7 +228,7 @@ TEST_F(DubboDecoderTest, DecodeResponseMessage) {
         auto context = std::make_shared<ContextImpl>();
         context->setHeaderSize(16);
         context->setBodySize(10);
-        return std::pair<ContextSharedPtr, bool>(context, true);
+        return {context, true};
       }));
   EXPECT_CALL(protocol_, decodeData(_, _, _)).WillOnce(Return(true));
   EXPECT_CALL(response_callbacks_, newStream()).WillOnce(ReturnRef(handler_));
@@ -253,7 +251,7 @@ TEST_F(DubboDecoderTest, DecodeResponseMessage) {
         auto context = std::make_shared<ContextImpl>();
         context->setHeaderSize(16);
         context->setBodySize(10);
-        return std::pair<ContextSharedPtr, bool>(context, true);
+        return {context, true};
       }));
   EXPECT_CALL(protocol_, decodeData(_, _, _)).WillOnce(Return(true));
   EXPECT_CALL(response_callbacks_, newStream()).WillOnce(ReturnRef(handler_));

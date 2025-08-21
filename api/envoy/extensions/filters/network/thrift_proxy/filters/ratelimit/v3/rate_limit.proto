@@ -13,11 +13,12 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.thrift_proxy.filters.ratelimit.v3";
 option java_outer_classname = "RateLimitProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3;ratelimitv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Rate limit]
 // Rate limit :ref:`configuration overview <config_thrift_filters_rate_limit>`.
-// [#extension: envoy.filters.thrift.ratelimit]
+// [#extension: envoy.filters.thrift.rate_limit]
 
 // [#next-free-field: 6]
 message RateLimit {
@@ -29,7 +30,7 @@ message RateLimit {
 
   // Specifies the rate limit configuration stage. Each configured rate limit filter performs a
   // rate limit check using descriptors configured in the
-  // :ref:`envoy_api_msg_extensions.filters.network.thrift_proxy.v3.RouteAction` for the request.
+  // :ref:`envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.RouteAction` for the request.
   // Only those entries with a matching stage number are used for a given filter. If not set, the
   // default stage number is 0.
   //

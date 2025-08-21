@@ -1,12 +1,12 @@
-#include "common/config/remote_data_fetcher.h"
+#include "source/common/config/remote_data_fetcher.h"
 
 #include "envoy/config/core/v3/http_uri.pb.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/common/hex.h"
-#include "common/crypto/utility.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/hex.h"
+#include "source/common/crypto/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Config {

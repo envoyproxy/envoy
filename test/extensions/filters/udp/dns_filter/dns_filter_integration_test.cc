@@ -1,6 +1,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
-#include "extensions/filters/udp/dns_filter/dns_filter.h"
+#include "source/extensions/filters/udp/dns_filter/dns_filter.h"
 
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
@@ -13,26 +13,28 @@ namespace UdpFilters {
 namespace DnsFilter {
 namespace {
 
+using ResponseValidator = Utils::DnsResponseValidator;
+
 class DnsFilterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                  public BaseIntegrationTest {
 public:
   DnsFilterIntegrationTest()
       : BaseIntegrationTest(GetParam(), configToUse()), api_(Api::createApiForTest()),
-        counters_(mock_query_buffer_underflow_, mock_record_name_overflow_,
-                  query_parsing_failure_) {
+        counters_(mock_query_buffer_underflow_, mock_record_name_overflow_, query_parsing_failure_,
+                  queries_with_additional_rrs_, queries_with_ans_or_authority_rrs_) {
     setupResponseParser();
   }
 
-  void setupResponseParser() {
-    histogram_.unit_ = Stats::Histogram::Unit::Milliseconds;
-    response_parser_ = std::make_unique<DnsMessageParser>(
-        true /* recursive queries */, api_->timeSource(), 0 /* retries */, random_, histogram_);
-  }
+  void setupResponseParser() { histogram_.unit_ = Stats::Histogram::Unit::Milliseconds; }
 
   static std::string configToUse() {
     return fmt::format(R"EOF(
 admin:
-  access_log_path: {}
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{}"
   address:
     socket_address:
       address: 127.0.0.1
@@ -54,8 +56,8 @@ static_resources:
                        Network::Test::getLoopbackAddressString(GetParam()));
   }
 
-  Network::Address::InstanceConstSharedPtr getListenerBindAddressAndPort() {
-    auto addr = Network::Utility::parseInternetAddressAndPort(
+  Network::Address::InstanceConstSharedPtr getListenerBindAddressAndPortNoThrow() {
+    auto addr = Network::Utility::parseInternetAddressAndPortNoThrow(
         fmt::format("{}:{}", Envoy::Network::Test::getLoopbackAddressUrlString(version_), 0),
         false);
 
@@ -71,7 +73,6 @@ static_resources:
   getListener0(Network::Address::InstanceConstSharedPtr& addr) {
     auto config = fmt::format(R"EOF(
 name: listener_0
-reuse_port: true
 address:
   socket_address:
     address: {}
@@ -80,22 +81,29 @@ address:
 listener_filters:
   name: "envoy.filters.udp.dns_filter"
   typed_config:
-    '@type': 'type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig'
+    '@type': 'type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3.DnsFilterConfig'
     stat_prefix: "my_prefix"
     client_config:
       resolver_timeout: 1s
-      upstream_resolvers:
-      - socket_address:
-          address: {}
-          port_value: {}
+      typed_dns_resolver_config:
+        name: envoy.network.dns_resolver.cares
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
+          resolvers:
+          - socket_address:
+              address: {}
+              port_value: {}
+          dns_resolver_options:
+            use_tcp_for_dns_lookups: false
+            no_default_search_domain: false
       max_pending_lookups: 256
     server_config:
       inline_dns_table:
         external_retry_count: 0
-        known_suffixes:
-        - suffix: "foo1.com"
-        - suffix: "cluster_0"
         virtual_domains:
+        - name: "im_just_here_so_coverage_doesnt_fail.foo1.com"
+          endpoint:
+            cluster_name: "cluster_0"
         - name: "www.foo1.com"
           endpoint:
             address_list:
@@ -126,6 +134,13 @@ listener_filters:
                 - cluster_name: "cluster_0"
                   weight: 20
                   priority: 10
+        - name: "*.foo1.com"
+          endpoint:
+            address_list:
+              address:
+              - 10.10.0.1
+              - 10.10.0.2
+              - 10.10.0.3
 )EOF",
                               addr->ip()->addressAsString(), addr->ip()->addressAsString(),
                               addr->ip()->port());
@@ -144,13 +159,11 @@ address:
 listener_filters:
   name: "envoy.filters.udp.dns_filter"
   typed_config:
-    '@type': 'type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig'
+    '@type': 'type.googleapis.com/envoy.extensions.filters.udp.dns_filter.v3.DnsFilterConfig'
     stat_prefix: "external_resolver"
     server_config:
       inline_dns_table:
         external_retry_count: 0
-        known_suffixes:
-        - suffix: "google.com"
         virtual_domains:
         - name: "www.google.com"
           endpoint:
@@ -164,9 +177,9 @@ listener_filters:
   }
 
   void setup(uint32_t upstream_count) {
-    setUdpFakeUpstream(true);
+    setUdpFakeUpstream(FakeUpstreamConfig::UdpConfig());
     if (upstream_count > 1) {
-      setDeterministic();
+      setDeterministicValue();
       setUpstreamCount(upstream_count);
       config_helper_.addConfigModifier(
           [upstream_count](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -184,7 +197,7 @@ listener_filters:
     }
 
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-      auto addr_port = getListenerBindAddressAndPort();
+      auto addr_port = getListenerBindAddressAndPortNoThrow();
       auto listener_0 = getListener0(addr_port);
       auto listener_1 = getListener1(addr_port);
       bootstrap.mutable_static_resources()->add_listeners()->MergeFrom(listener_0);
@@ -208,9 +221,10 @@ listener_filters:
   NiceMock<Stats::MockCounter> mock_query_buffer_underflow_;
   NiceMock<Stats::MockCounter> mock_record_name_overflow_;
   NiceMock<Stats::MockCounter> query_parsing_failure_;
+  NiceMock<Stats::MockCounter> queries_with_additional_rrs_;
+  NiceMock<Stats::MockCounter> queries_with_ans_or_authority_rrs_;
   DnsParserCounters counters_;
-  std::unique_ptr<DnsMessageParser> response_parser_;
-  DnsQueryContextPtr query_ctx_;
+  DnsQueryContextPtr response_ctx_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, DnsFilterIntegrationTest,
@@ -220,7 +234,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DnsFilterIntegrationTest,
 TEST_P(DnsFilterIntegrationTest, ExternalLookupTest) {
   setup(0);
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   Network::UdpRecvData response;
@@ -228,17 +242,17 @@ TEST_P(DnsFilterIntegrationTest, ExternalLookupTest) {
       Utils::buildQueryForDomain("www.google.com", DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
   requestResponseWithListenerAddress(*listener_address, query, response);
 
-  query_ctx_ = response_parser_->createQueryContext(response, counters_);
-  EXPECT_TRUE(query_ctx_->parse_status_);
+  response_ctx_ = ResponseValidator::createResponseContext(response, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
 
-  EXPECT_EQ(1, query_ctx_->answers_.size());
-  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
+  EXPECT_EQ(1, response_ctx_->answers_.size());
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
 }
 
 TEST_P(DnsFilterIntegrationTest, ExternalLookupTestIPv6) {
   setup(0);
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   Network::UdpRecvData response;
@@ -246,17 +260,17 @@ TEST_P(DnsFilterIntegrationTest, ExternalLookupTestIPv6) {
       Utils::buildQueryForDomain("www.google.com", DNS_RECORD_TYPE_AAAA, DNS_RECORD_CLASS_IN);
   requestResponseWithListenerAddress(*listener_address, query, response);
 
-  query_ctx_ = response_parser_->createQueryContext(response, counters_);
-  EXPECT_TRUE(query_ctx_->parse_status_);
+  response_ctx_ = ResponseValidator::createResponseContext(response, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
 
-  EXPECT_EQ(1, query_ctx_->answers_.size());
-  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
+  EXPECT_EQ(1, response_ctx_->answers_.size());
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
 }
 
 TEST_P(DnsFilterIntegrationTest, LocalLookupTest) {
   setup(0);
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   Network::UdpRecvData response;
@@ -264,17 +278,17 @@ TEST_P(DnsFilterIntegrationTest, LocalLookupTest) {
       Utils::buildQueryForDomain("www.foo1.com", DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
   requestResponseWithListenerAddress(*listener_address, query, response);
 
-  query_ctx_ = response_parser_->createQueryContext(response, counters_);
-  EXPECT_TRUE(query_ctx_->parse_status_);
+  response_ctx_ = ResponseValidator::createResponseContext(response, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
 
-  EXPECT_EQ(4, query_ctx_->answers_.size());
-  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
+  EXPECT_EQ(4, response_ctx_->answers_.size());
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
 }
 
 TEST_P(DnsFilterIntegrationTest, ClusterLookupTest) {
   setup(2);
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   uint16_t record_type;
@@ -288,17 +302,17 @@ TEST_P(DnsFilterIntegrationTest, ClusterLookupTest) {
   std::string query = Utils::buildQueryForDomain("cluster_0", record_type, DNS_RECORD_CLASS_IN);
   requestResponseWithListenerAddress(*listener_address, query, response);
 
-  query_ctx_ = response_parser_->createQueryContext(response, counters_);
-  EXPECT_TRUE(query_ctx_->parse_status_);
+  response_ctx_ = ResponseValidator::createResponseContext(response, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
 
-  EXPECT_EQ(2, query_ctx_->answers_.size());
-  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
+  EXPECT_EQ(2, response_ctx_->answers_.size());
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
 }
 
 TEST_P(DnsFilterIntegrationTest, ClusterEndpointLookupTest) {
   setup(2);
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   uint16_t record_type;
@@ -313,17 +327,17 @@ TEST_P(DnsFilterIntegrationTest, ClusterEndpointLookupTest) {
       Utils::buildQueryForDomain("cluster.foo1.com", record_type, DNS_RECORD_CLASS_IN);
   requestResponseWithListenerAddress(*listener_address, query, response);
 
-  query_ctx_ = response_parser_->createQueryContext(response, counters_);
-  EXPECT_TRUE(query_ctx_->parse_status_);
+  response_ctx_ = ResponseValidator::createResponseContext(response, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
 
-  EXPECT_EQ(2, query_ctx_->answers_.size());
-  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
+  EXPECT_EQ(2, response_ctx_->answers_.size());
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
 }
 
 TEST_P(DnsFilterIntegrationTest, ClusterEndpointWithPortServiceRecordLookupTest) {
   setup(2);
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   const std::string service("_http._tcp.web.foo1.com");
@@ -331,13 +345,13 @@ TEST_P(DnsFilterIntegrationTest, ClusterEndpointWithPortServiceRecordLookupTest)
   std::string query = Utils::buildQueryForDomain(service, DNS_RECORD_TYPE_SRV, DNS_RECORD_CLASS_IN);
   requestResponseWithListenerAddress(*listener_address, query, response);
 
-  query_ctx_ = response_parser_->createQueryContext(response, counters_);
-  EXPECT_TRUE(query_ctx_->parse_status_);
+  response_ctx_ = ResponseValidator::createResponseContext(response, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
 
-  EXPECT_EQ(2, query_ctx_->answers_.size());
-  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
+  EXPECT_EQ(2, response_ctx_->answers_.size());
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
 
-  for (const auto& answer : query_ctx_->answers_) {
+  for (const auto& answer : response_ctx_->answers_) {
     EXPECT_EQ(answer.second->type_, DNS_RECORD_TYPE_SRV);
 
     DnsSrvRecord* srv_rec = dynamic_cast<DnsSrvRecord*>(answer.second.get());
@@ -358,7 +372,7 @@ TEST_P(DnsFilterIntegrationTest, ClusterEndpointWithoutPortServiceRecordLookupTe
   constexpr size_t endpoints = 2;
   setup(endpoints);
   const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = Network::Utility::resolveUrl(
+  const auto listener_address = *Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
   const std::string service("_https._tcp.web.foo1.com");
@@ -366,14 +380,14 @@ TEST_P(DnsFilterIntegrationTest, ClusterEndpointWithoutPortServiceRecordLookupTe
   std::string query = Utils::buildQueryForDomain(service, DNS_RECORD_TYPE_SRV, DNS_RECORD_CLASS_IN);
   requestResponseWithListenerAddress(*listener_address, query, response);
 
-  query_ctx_ = response_parser_->createQueryContext(response, counters_);
-  EXPECT_TRUE(query_ctx_->parse_status_);
+  response_ctx_ = ResponseValidator::createResponseContext(response, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
 
-  EXPECT_EQ(endpoints, query_ctx_->answers_.size());
-  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, query_ctx_->getQueryResponseCode());
+  EXPECT_EQ(endpoints, response_ctx_->answers_.size());
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
 
   std::set<uint16_t> ports;
-  for (const auto& answer : query_ctx_->answers_) {
+  for (const auto& answer : response_ctx_->answers_) {
     EXPECT_EQ(answer.second->type_, DNS_RECORD_TYPE_SRV);
 
     DnsSrvRecord* srv_rec = dynamic_cast<DnsSrvRecord*>(answer.second.get());
@@ -393,6 +407,24 @@ TEST_P(DnsFilterIntegrationTest, ClusterEndpointWithoutPortServiceRecordLookupTe
   }
 
   EXPECT_EQ(endpoints, ports.size());
+}
+
+TEST_P(DnsFilterIntegrationTest, WildcardLookupTest) {
+  setup(0);
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = *Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+
+  Network::UdpRecvData response;
+  std::string query =
+      Utils::buildQueryForDomain("wild.foo1.com", DNS_RECORD_TYPE_A, DNS_RECORD_CLASS_IN);
+  requestResponseWithListenerAddress(*listener_address, query, response);
+
+  response_ctx_ = ResponseValidator::createResponseContext(response, counters_);
+  EXPECT_TRUE(response_ctx_->parse_status_);
+
+  EXPECT_EQ(3, response_ctx_->answers_.size());
+  EXPECT_EQ(DNS_RESPONSE_CODE_NO_ERROR, response_ctx_->getQueryResponseCode());
 }
 } // namespace
 } // namespace DnsFilter

@@ -1,17 +1,16 @@
-#include "extensions/filters/http/decompressor/config.h"
+#include "source/extensions/filters/http/decompressor/config.h"
 
 #include "envoy/compression/decompressor/config.h"
 
-#include "common/config/utility.h"
-
-#include "extensions/filters/http/decompressor/decompressor_filter.h"
+#include "source/common/config/utility.h"
+#include "source/extensions/filters/http/decompressor/decompressor_filter.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Decompressor {
 
-Http::FilterFactoryCb DecompressorFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> DecompressorFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::decompressor::v3::Decompressor& proto_config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   const std::string decompressor_library_type{TypeUtil::typeUrlToDescriptorFullName(
@@ -21,8 +20,8 @@ Http::FilterFactoryCb DecompressorFilterFactory::createFilterFactoryFromProtoTyp
           Compression::Decompressor::NamedDecompressorLibraryConfigFactory>::
           getFactoryByType(decompressor_library_type);
   if (decompressor_library_factory == nullptr) {
-    throw EnvoyException(fmt::format("Didn't find a registered implementation for type: '{}'",
-                                     decompressor_library_type));
+    return absl::InvalidArgumentError(fmt::format(
+        "Didn't find a registered implementation for type: '{}'", decompressor_library_type));
   }
   ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
       proto_config.decompressor_library().typed_config(), context.messageValidationVisitor(),
@@ -30,7 +29,7 @@ Http::FilterFactoryCb DecompressorFilterFactory::createFilterFactoryFromProtoTyp
   Compression::Decompressor::DecompressorFactoryPtr decompressor_factory =
       decompressor_library_factory->createDecompressorFactoryFromProto(*message, context);
   DecompressorFilterConfigSharedPtr filter_config = std::make_shared<DecompressorFilterConfig>(
-      proto_config, stats_prefix, context.scope(), context.runtime(),
+      proto_config, stats_prefix, context.scope(), context.serverFactoryContext().runtime(),
       std::move(decompressor_factory));
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<DecompressorFilter>(filter_config));

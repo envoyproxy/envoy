@@ -1,5 +1,9 @@
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
+#include "envoy/config/overload/v3/overload.pb.h"
+#include "envoy/http/stream_reset_handler.h"
+
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/common/assert.h"
 
 #include "absl/strings/string_view.h"
 #include "benchmark/benchmark.h"
@@ -7,6 +11,11 @@
 namespace Envoy {
 
 static constexpr uint64_t MaxBufferLength = 1024 * 1024;
+
+class FakeStreamResetHandler : public Http::StreamResetHandler {
+public:
+  void resetStream(Http::StreamResetReason reason) override { UNREFERENCED_PARAMETER(reason); }
+};
 
 // The fragment needs to be heap allocated in order to survive past the processing done in the inner
 // loop in the benchmarks below. Do not attempt to release the actual contents of the buffer.
@@ -16,6 +25,7 @@ void deleteFragment(const void*, size_t, const Buffer::BufferFragmentImpl* self)
 static void bufferCreateEmpty(benchmark::State& state) {
   uint64_t length = 0;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     Buffer::OwnedImpl buffer;
     length += buffer.length();
   }
@@ -23,12 +33,89 @@ static void bufferCreateEmpty(benchmark::State& state) {
 }
 BENCHMARK(bufferCreateEmpty);
 
+// Test add performance of OwnedImpl vs WatermarkBuffer
+static void bufferVsWatermarkBuffer(benchmark::State& state) {
+  const uint64_t length = state.range(0);
+  const uint64_t high_watermark = state.range(1);
+  const uint64_t step = state.range(2);
+  const bool use_watermark_buffer = (state.range(3) != 0);
+  const std::string data(step, 'a');
+
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    std::unique_ptr<Buffer::Instance> buffer;
+    if (use_watermark_buffer) {
+      buffer = std::make_unique<Buffer::WatermarkBuffer>([]() {}, []() {}, []() {});
+      buffer->setWatermarks(high_watermark);
+    } else {
+      buffer = std::make_unique<Buffer::OwnedImpl>();
+    }
+
+    for (uint64_t idx = 0; idx < length; idx += step) {
+      buffer->add(data);
+    }
+  }
+}
+BENCHMARK(bufferVsWatermarkBuffer)
+    ->Args({1024, 0, 1, 0})
+    ->Args({1024, 0, 1, 1})
+    ->Args({1024, 1, 1, 1})
+    ->Args({1024, 1024, 1, 1})
+    ->Args({64 * 1024, 0, 1, 0})
+    ->Args({64 * 1024, 0, 1, 1})
+    ->Args({64 * 1024, 1, 1, 1})
+    ->Args({64 * 1024, 64 * 1024, 1, 1})
+    ->Args({64 * 1024, 0, 32, 0})
+    ->Args({64 * 1024, 64 * 1024, 32, 1})
+    ->Args({1024 * 1024, 0, 1, 0})
+    ->Args({1024 * 1024, 0, 1, 1})
+    ->Args({1024 * 1024, 1, 1, 1})
+    ->Args({1024 * 1024, 1024 * 1024, 1, 1})
+    ->Args({1024 * 1024, 0, 32, 0})
+    ->Args({1024 * 1024, 1024 * 1024, 32, 1});
+
+// Measure performance impact of enabling accounts.
+static void bufferAccountUse(benchmark::State& state) {
+  const std::string data(state.range(0), 'a');
+  uint64_t iters = state.range(1);
+  const bool enable_accounts = (state.range(2) != 0);
+
+  auto config = envoy::config::overload::v3::BufferFactoryConfig();
+  config.set_minimum_account_to_track_power_of_two(2);
+  Buffer::WatermarkBufferFactory buffer_factory(config);
+  FakeStreamResetHandler reset_handler;
+  auto account = buffer_factory.createAccount(reset_handler);
+  RELEASE_ASSERT(account != nullptr, "");
+
+  for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
+    Buffer::OwnedImpl buffer;
+    if (enable_accounts) {
+      buffer.bindAccount(account);
+    }
+    for (uint64_t idx = 0; idx < iters; ++idx) {
+      buffer.add(data);
+    }
+  }
+  account->clearDownstream();
+}
+BENCHMARK(bufferAccountUse)
+    ->Args({1, 1024 * 1024, 0})
+    ->Args({1, 1024 * 1024, 1})
+    ->Args({1024, 1024, 0})
+    ->Args({1024, 1024, 1})
+    ->Args({4 * 1024, 1024, 0})
+    ->Args({4 * 1024, 1024, 1})
+    ->Args({16 * 1024, 1024, 0})
+    ->Args({16 * 1024, 1024, 1});
+
 // Test the creation of an OwnedImpl with varying amounts of content.
 static void bufferCreate(benchmark::State& state) {
   const std::string data(state.range(0), 'a');
   const absl::string_view input(data);
   uint64_t length = 0;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     Buffer::OwnedImpl buffer(input);
     length += buffer.length();
   }
@@ -42,6 +129,7 @@ static void bufferAddSmallIncrement(benchmark::State& state) {
   const absl::string_view input(data);
   Buffer::OwnedImpl buffer;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     buffer.add(input);
     if (buffer.length() >= MaxBufferLength) {
       // Keep the test's memory usage from growing too large.
@@ -62,6 +150,7 @@ static void bufferAddString(benchmark::State& state) {
   const absl::string_view input(data);
   Buffer::OwnedImpl buffer(input);
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     buffer.add(data);
     if (buffer.length() >= MaxBufferLength) {
       buffer.drain(buffer.length());
@@ -79,6 +168,7 @@ static void bufferAddBuffer(benchmark::State& state) {
   const Buffer::OwnedImpl to_add(data);
   Buffer::OwnedImpl buffer(input);
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     buffer.add(to_add);
     if (buffer.length() >= MaxBufferLength) {
       buffer.drain(buffer.length());
@@ -94,6 +184,7 @@ static void bufferPrependString(benchmark::State& state) {
   const absl::string_view input(data);
   Buffer::OwnedImpl buffer(input);
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     buffer.prepend(data);
     if (buffer.length() >= MaxBufferLength) {
       buffer.drain(buffer.length());
@@ -109,6 +200,7 @@ static void bufferPrependBuffer(benchmark::State& state) {
   const absl::string_view input(data);
   Buffer::OwnedImpl buffer(input);
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     // The prepend method removes the content from its source buffer. To populate a new source
     // buffer every time without the overhead of a copy, we use an BufferFragment that references
     // (and never deletes) an external string.
@@ -144,6 +236,7 @@ static void bufferDrain(benchmark::State& state) {
 
   size_t drain_cycle = 0;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     buffer.add(to_add);
     buffer.drain(drain_size[drain_cycle]);
     drain_cycle++;
@@ -159,6 +252,7 @@ static void bufferDrainSmallIncrement(benchmark::State& state) {
   const absl::string_view input(data);
   Buffer::OwnedImpl buffer(input);
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     buffer.drain(state.range(0));
     if (buffer.length() == 0) {
       buffer.add(input);
@@ -175,6 +269,7 @@ static void bufferMove(benchmark::State& state) {
   Buffer::OwnedImpl buffer1(input);
   Buffer::OwnedImpl buffer2(input);
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     buffer1.move(buffer2); // now buffer1 has 2 copies of the input, and buffer2 is empty.
     buffer2.move(buffer1, input.size()); // now buffer1 and buffer2 are the same size.
   }
@@ -192,6 +287,7 @@ static void bufferMovePartial(benchmark::State& state) {
   Buffer::OwnedImpl buffer1(input);
   Buffer::OwnedImpl buffer2(input);
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     while (buffer2.length() != 0) {
       buffer1.move(buffer2, 1);
     }
@@ -206,43 +302,46 @@ BENCHMARK(bufferMovePartial)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
 // fully used (and therefore the commit size equals the reservation size).
 static void bufferReserveCommit(benchmark::State& state) {
   Buffer::OwnedImpl buffer;
+  auto size = state.range(0);
   for (auto _ : state) {
-    constexpr uint64_t NumSlices = 2;
-    Buffer::RawSlice slices[NumSlices];
-    uint64_t slices_used = buffer.reserve(state.range(0), slices, NumSlices);
-    uint64_t bytes_to_commit = 0;
-    for (uint64_t i = 0; i < slices_used; i++) {
-      bytes_to_commit += static_cast<uint64_t>(slices[i].len_);
-    }
-    buffer.commit(slices, slices_used);
+    UNREFERENCED_PARAMETER(_);
+    Buffer::Reservation reservation = buffer.reserveForReadWithLengthForTest(size);
+    reservation.commit(reservation.length());
     if (buffer.length() >= MaxBufferLength) {
       buffer.drain(buffer.length());
     }
   }
   benchmark::DoNotOptimize(buffer.length());
 }
-BENCHMARK(bufferReserveCommit)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+BENCHMARK(bufferReserveCommit)
+    ->Arg(1)
+    ->Arg(4 * 1024)
+    ->Arg(16 * 1024)
+    ->Arg(64 * 1024)
+    ->Arg(128 * 1024);
 
 // Test the reserve+commit cycle, for the common case where the reserved space is
 // only partially used (and therefore the commit size is smaller than the reservation size).
 static void bufferReserveCommitPartial(benchmark::State& state) {
   Buffer::OwnedImpl buffer;
+  auto size = state.range(0);
   for (auto _ : state) {
-    constexpr uint64_t NumSlices = 2;
-    Buffer::RawSlice slices[NumSlices];
-    uint64_t slices_used = buffer.reserve(state.range(0), slices, NumSlices);
-    ASSERT(slices_used > 0);
+    UNREFERENCED_PARAMETER(_);
+    Buffer::Reservation reservation = buffer.reserveForReadWithLengthForTest(size);
     // Commit one byte from the first slice and nothing from any subsequent slice.
-    uint64_t bytes_to_commit = 1;
-    slices[0].len_ = bytes_to_commit;
-    buffer.commit(slices, 1);
+    reservation.commit(1);
     if (buffer.length() >= MaxBufferLength) {
       buffer.drain(buffer.length());
     }
   }
   benchmark::DoNotOptimize(buffer.length());
 }
-BENCHMARK(bufferReserveCommitPartial)->Arg(1)->Arg(4096)->Arg(16384)->Arg(65536);
+BENCHMARK(bufferReserveCommitPartial)
+    ->Arg(1)
+    ->Arg(4 * 1024)
+    ->Arg(16 * 1024)
+    ->Arg(64 * 1024)
+    ->Arg(128 * 1024);
 
 // Test the linearization of a buffer in the best case where the data is in one slice.
 static void bufferLinearizeSimple(benchmark::State& state) {
@@ -250,6 +349,7 @@ static void bufferLinearizeSimple(benchmark::State& state) {
   const absl::string_view input(data);
   Buffer::OwnedImpl buffer;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     buffer.drain(buffer.length());
     auto fragment =
         std::make_unique<Buffer::BufferFragmentImpl>(input.data(), input.size(), deleteFragment);
@@ -267,6 +367,7 @@ static void bufferLinearizeGeneral(benchmark::State& state) {
   const absl::string_view input(data);
   Buffer::OwnedImpl buffer;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     buffer.drain(buffer.length());
     do {
       auto fragment =
@@ -291,6 +392,7 @@ static void bufferSearch(benchmark::State& state) {
   Buffer::OwnedImpl buffer(input);
   ssize_t result = 0;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     result += buffer.search(Pattern.c_str(), Pattern.length(), 0, 0);
   }
   benchmark::DoNotOptimize(result);
@@ -314,6 +416,7 @@ static void bufferSearchPartialMatch(benchmark::State& state) {
   Buffer::OwnedImpl buffer(input);
   ssize_t result = 0;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     result += buffer.search(Pattern.c_str(), Pattern.length(), 0, 0);
   }
   benchmark::DoNotOptimize(result);
@@ -333,6 +436,7 @@ static void bufferStartsWith(benchmark::State& state) {
   Buffer::OwnedImpl buffer(input);
   ssize_t result = 0;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     if (!buffer.startsWith({Pattern.c_str(), Pattern.length()})) {
       result++;
     }
@@ -356,6 +460,7 @@ static void bufferStartsWithMatch(benchmark::State& state) {
   Buffer::OwnedImpl buffer(input);
   ssize_t result = 0;
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     if (buffer.startsWith({Prefix.c_str(), Prefix.length()})) {
       result++;
     }
@@ -367,5 +472,90 @@ BENCHMARK(bufferStartsWithMatch)
     ->Args({4096, 16})
     ->Args({16384, 256})
     ->Args({65536, 4096});
+
+static void bufferAddVsAddFragments(benchmark::State& state) {
+  static constexpr size_t OwnedImplBufferType = 0;
+  static constexpr size_t WatermarkBufferType = 1;
+
+  static constexpr size_t ClassicalAddApi = 0;
+  static constexpr size_t AddFragmentsApi = 1;
+
+  static constexpr size_t Write2UnitsPerCall = 2;
+  static constexpr size_t Write5UnitsPerCall = 5;
+
+  static constexpr size_t DataSizeToWrite = 32 * 1024 * 1024;
+
+  size_t buffer_type = state.range(0);
+  size_t api_type = state.range(1);
+  size_t data_unit_size = state.range(2);
+  size_t write_cycle = state.range(3);
+
+  std::string data_unit(data_unit_size, 'c');
+  absl::string_view data_unit_view(data_unit);
+
+  for (auto _ : state) { // NOLINT
+    ASSERT(buffer_type == OwnedImplBufferType || buffer_type == WatermarkBufferType);
+    Buffer::InstancePtr buffer_ptr =
+        buffer_type == OwnedImplBufferType
+            ? std::make_unique<Buffer::OwnedImpl>()
+            : std::make_unique<Buffer::WatermarkBuffer>([]() {}, []() {}, []() {});
+    Buffer::Instance& buffer = *buffer_ptr;
+
+    ASSERT(api_type == ClassicalAddApi || api_type == AddFragmentsApi);
+    ASSERT(write_cycle == Write2UnitsPerCall || write_cycle == Write5UnitsPerCall);
+    if (api_type == ClassicalAddApi) {
+      if (write_cycle == Write2UnitsPerCall) {
+        for (size_t i = 0; i < DataSizeToWrite; i += Write2UnitsPerCall * data_unit_size) {
+          for (size_t c = 0; c < Write2UnitsPerCall; c++) {
+            buffer.add(data_unit_view);
+          }
+        }
+      } else {
+        for (size_t i = 0; i < DataSizeToWrite; i += Write5UnitsPerCall * data_unit_size) {
+          for (size_t c = 0; c < Write5UnitsPerCall; c++) {
+            buffer.add(data_unit_view);
+          }
+        }
+      }
+    } else {
+      if (write_cycle == Write2UnitsPerCall) {
+        for (size_t i = 0; i < DataSizeToWrite; i += Write2UnitsPerCall * data_unit_size) {
+          buffer.addFragments({data_unit_view, data_unit_view});
+        }
+      } else {
+        for (size_t i = 0; i < DataSizeToWrite; i += Write5UnitsPerCall * data_unit_size) {
+          buffer.addFragments(
+              {data_unit_view, data_unit_view, data_unit_view, data_unit_view, data_unit_view});
+        }
+      }
+    }
+  }
+}
+
+BENCHMARK(bufferAddVsAddFragments)
+    ->Args({0, 0, 16, 2})
+    ->Args({0, 0, 64, 2})
+    ->Args({0, 0, 4096, 2})
+    ->Args({0, 0, 16, 5})
+    ->Args({0, 0, 64, 5})
+    ->Args({0, 0, 4096, 5})
+    ->Args({0, 1, 16, 2})
+    ->Args({0, 1, 64, 2})
+    ->Args({0, 1, 4096, 2})
+    ->Args({0, 1, 16, 5})
+    ->Args({0, 1, 64, 5})
+    ->Args({0, 1, 4096, 5})
+    ->Args({1, 0, 16, 2})
+    ->Args({1, 0, 64, 2})
+    ->Args({1, 0, 4096, 2})
+    ->Args({1, 0, 16, 5})
+    ->Args({1, 0, 64, 5})
+    ->Args({1, 0, 4096, 5})
+    ->Args({1, 1, 16, 2})
+    ->Args({1, 1, 64, 2})
+    ->Args({1, 1, 4096, 2})
+    ->Args({1, 1, 16, 5})
+    ->Args({1, 1, 64, 5})
+    ->Args({1, 1, 4096, 5});
 
 } // namespace Envoy

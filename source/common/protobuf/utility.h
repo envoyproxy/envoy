@@ -1,6 +1,7 @@
 #pragma once
 
 #include <numeric>
+#include <string>
 
 #include "envoy/api/api.h"
 #include "envoy/common/exception.h"
@@ -8,21 +9,30 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/common/hash.h"
-#include "common/common/utility.h"
-#include "common/config/version_converter.h"
-#include "common/protobuf/protobuf.h"
-#include "common/singleton/const_singleton.h"
+#include "source/common/common/hash.h"
+#include "source/common/common/stl_helpers.h"
+#include "source/common/common/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/singleton/const_singleton.h"
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
 
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, return
 // the default value.
 #define PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, field_name, default_value)                        \
   ((message).has_##field_name() ? (message).field_name().value() : (default_value))
 
+// Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, return
+// absl::nullopt.
+#define PROTOBUF_GET_OPTIONAL_WRAPPED(message, field_name)                                         \
+  ((message).has_##field_name() ? absl::make_optional((message).field_name().value())              \
+                                : absl::nullopt)
+
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, throw
-// a MissingFieldException.
+// a EnvoyException.
 
 #define PROTOBUF_GET_WRAPPED_REQUIRED(message, field_name)                                         \
   ([](const auto& msg) {                                                                           \
@@ -49,8 +59,8 @@
              DurationUtil::durationToMilliseconds((message).field_name()))                         \
        : absl::nullopt)
 
-// Obtain the milliseconds value of a google.protobuf.Duration field if set. Otherwise, throw a
-// MissingFieldException.
+// Obtain the milliseconds value of a google.protobuf.Duration field if set. Otherwise, throw an
+// EnvoyException.
 #define PROTOBUF_GET_MS_REQUIRED(message, field_name)                                              \
   ([](const auto& msg) {                                                                           \
     if (!msg.has_##field_name()) {                                                                 \
@@ -59,8 +69,14 @@
     return DurationUtil::durationToMilliseconds(msg.field_name());                                 \
   }((message)))
 
-// Obtain the seconds value of a google.protobuf.Duration field if set. Otherwise, throw a
-// MissingFieldException.
+// Obtain the seconds value of a google.protobuf.Duration field if set. Otherwise, return the
+// default value.
+#define PROTOBUF_GET_SECONDS_OR_DEFAULT(message, field_name, default_value)                        \
+  ((message).has_##field_name() ? DurationUtil::durationToSeconds((message).field_name())          \
+                                : (default_value))
+
+// Obtain the seconds value of a google.protobuf.Duration field if set. Otherwise, throw an
+// EnvoyException.
 #define PROTOBUF_GET_SECONDS_REQUIRED(message, field_name)                                         \
   ([](const auto& msg) {                                                                           \
     if (!msg.has_##field_name()) {                                                                 \
@@ -116,7 +132,7 @@ uint64_t fractionalPercentDenominatorToInt(
 // @param default_value supplies the default if the field is not present.
 //
 // TODO(anirudhmurali): Recommended to capture and validate NaN values in PGV
-// Issue: https://github.com/envoyproxy/protoc-gen-validate/issues/85
+// Issue: https://github.com/bufbuild/protoc-gen-validate/issues/85
 #define PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(message, field_name, max_value,             \
                                                        default_value)                              \
   ([](const auto& msg) {                                                                           \
@@ -131,17 +147,11 @@ uint64_t fractionalPercentDenominatorToInt(
 
 namespace Envoy {
 
-/**
- * Exception class for rejecting a deprecated major version.
- */
-class DeprecatedMajorVersionException : public EnvoyException {
+class TypeUtil {
 public:
-  DeprecatedMajorVersionException(const std::string& message) : EnvoyException(message) {}
-};
+  static absl::string_view typeUrlToDescriptorFullName(absl::string_view type_url);
 
-class MissingFieldException : public EnvoyException {
-public:
-  MissingFieldException(const std::string& field_name, const Protobuf::Message& message);
+  static std::string descriptorFullNameToTypeUrl(absl::string_view type);
 };
 
 class RepeatedPtrUtil {
@@ -153,32 +163,32 @@ public:
 
   template <class ProtoType>
   static std::string debugString(const Protobuf::RepeatedPtrField<ProtoType>& source) {
-    if (source.empty()) {
-      return "[]";
-    }
-    return std::accumulate(std::next(source.begin()), source.end(), "[" + source[0].DebugString(),
-                           [](std::string debug_string, const Protobuf::Message& message) {
-                             return debug_string + ", " + message.DebugString();
-                           }) +
-           "]";
+    return accumulateToString<ProtoType>(
+        source, [](const Protobuf::Message& message) { return message.DebugString(); });
   }
 
   // Based on MessageUtil::hash() defined below.
   template <class ProtoType>
   static std::size_t hash(const Protobuf::RepeatedPtrField<ProtoType>& source) {
-    // Use Protobuf::io::CodedOutputStream to force deterministic serialization, so that the same
-    // message doesn't hash to different values.
     std::string text;
+#if defined(ENVOY_ENABLE_FULL_PROTOS)
     {
-      // For memory safety, the StringOutputStream needs to be destroyed before
-      // we read the string.
-      Protobuf::io::StringOutputStream string_stream(&text);
-      Protobuf::io::CodedOutputStream coded_stream(&string_stream);
-      coded_stream.SetSerializationDeterministic(true);
+      Protobuf::TextFormat::Printer printer;
+      printer.SetExpandAny(true);
+      printer.SetUseFieldNumber(true);
+      printer.SetSingleLineMode(true);
+      printer.SetHideUnknownFields(true);
       for (const auto& message : source) {
-        message.SerializeToCodedStream(&coded_stream);
+        std::string text_message;
+        printer.PrintToString(message, &text_message);
+        absl::StrAppend(&text, text_message);
       }
     }
+#else
+    for (const auto& message : source) {
+      absl::StrAppend(&text, message.SerializeAsString());
+    }
+#endif
     return HashUtil::xxHash64(text);
   }
 
@@ -195,17 +205,14 @@ public:
     std::transform(repeated_field.begin(), repeated_field.end(), std::back_inserter(ret_container),
                    [](const ProtoType& proto_message) -> std::unique_ptr<const Protobuf::Message> {
                      Protobuf::Message* clone = proto_message.New();
-                     clone->MergeFrom(proto_message);
+                     clone->CheckTypeAndMergeFrom(proto_message);
                      return std::unique_ptr<const Protobuf::Message>(clone);
                    });
     return ret_container;
   }
 };
 
-class ProtoValidationException : public EnvoyException {
-public:
-  ProtoValidationException(const std::string& validation_error, const Protobuf::Message& message);
-};
+using ProtoValidationException = EnvoyException;
 
 /**
  * utility functions to call when throwing exceptions in header files
@@ -225,7 +232,7 @@ public:
 
   // std::equals_to
   bool operator()(const Protobuf::Message& lhs, const Protobuf::Message& rhs) const {
-    return Protobuf::util::MessageDifferencer::Equivalent(lhs, rhs);
+    return Protobuf::util::MessageDifferencer::Equals(lhs, rhs);
   }
 
   class FileExtensionValues {
@@ -235,6 +242,7 @@ public:
     const std::string ProtoText = ".pb_text";
     const std::string Json = ".json";
     const std::string Yaml = ".yaml";
+    const std::string Yml = ".yml";
   };
 
   using FileExtensions = ConstSingleton<FileExtensionValues>;
@@ -248,58 +256,113 @@ public:
    */
   static std::size_t hash(const Protobuf::Message& message);
 
-  static void loadFromJson(const std::string& json, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor,
-                           bool do_boosting = true);
-  static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message);
+#ifdef ENVOY_ENABLE_YAML
+  static void loadFromJson(absl::string_view json, Protobuf::Message& message,
+                           ProtobufMessage::ValidationVisitor& validation_visitor);
+  /**
+   * Return ok only when strict conversion(don't ignore unknown field) succeeds.
+   * Return error status for strict conversion and set has_unknown_field to true if relaxed
+   * conversion(ignore unknown field) succeeds.
+   * Return error status for relaxed conversion and set has_unknown_field to false if relaxed
+   * conversion(ignore unknown field) fails.
+   */
+  static absl::Status loadFromJsonNoThrow(absl::string_view json, Protobuf::Message& message,
+                                          bool& has_unknown_fileld);
+  static void loadFromJson(absl::string_view json, Protobuf::Struct& message);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor,
-                           bool do_boosting = true);
-  static void loadFromYaml(const std::string& yaml, ProtobufWkt::Struct& message);
-  static void loadFromFile(const std::string& path, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
-                           bool do_boosting = true);
+                           ProtobufMessage::ValidationVisitor& validation_visitor);
+#endif
+
+  // This function attempts to load Envoy configuration from the specified file
+  // based on the file type.
+  // It handles .pb .pb_text .json .yaml and .yml files which are well
+  // structured based on the file type.
+  // It has somewhat inconsistent handling of invalid file contents,
+  // occasionally failing over to try another type of parsing, or silently
+  // failing instead of throwing an exception.
+  static absl::Status loadFromFile(const std::string& path, Protobuf::Message& message,
+                                   ProtobufMessage::ValidationVisitor& validation_visitor,
+                                   Api::Api& api);
 
   /**
    * Checks for use of deprecated fields in message and all sub-messages.
    * @param message message to validate.
-   * @param loader optional a pointer to the runtime loader for live deprecation status.
-   * @throw ProtoValidationException if deprecated fields are used and listed
+   * @param validation_visitor the validation visitor to use.
+   * @param recurse_into_any whether to recurse into Any messages during unexpected checking.
+   * @throw EnvoyException if deprecated fields are used and listed
    *    in disallowed_features in runtime_features.h
    */
-  static void
-  checkForUnexpectedFields(const Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor,
-                           Runtime::Loader* loader = Runtime::LoaderSingleton::getExisting());
+  static void checkForUnexpectedFields(const Protobuf::Message& message,
+                                       ProtobufMessage::ValidationVisitor& validation_visitor,
+                                       bool recurse_into_any = false);
 
   /**
-   * Validate protoc-gen-validate constraints on a given protobuf.
+   * Validates that duration fields in the config are valid.
+   * @param message message to validate.
+   * @param recurse_into_any whether to recurse into Any messages during unexpected checking.
+   * @throw EnvoyException if a duration field is invalid.
+   */
+  static void validateDurationFields(const Protobuf::Message& message,
+                                     bool recurse_into_any = false);
+
+  /**
+   * Perform a PGV check on the entire message tree, recursing into Any messages as needed.
+   */
+  static void recursivePgvCheck(const Protobuf::Message& message);
+
+  /**
+   * Validate protoc-gen-validate constraints on a given protobuf as well as performing
+   * unexpected field validation.
    * Note the corresponding `.pb.validate.h` for the message has to be included in the source file
    * of caller.
    * @param message message to validate.
-   * @throw ProtoValidationException if the message does not satisfy its type constraints.
+   * @param validation_visitor the validation visitor to use.
+   * @param recurse_into_any whether to recurse into Any messages during unexpected checking.
+   * @throw EnvoyException if the message does not satisfy its type constraints.
    */
   template <class MessageType>
   static void validate(const MessageType& message,
-                       ProtobufMessage::ValidationVisitor& validation_visitor) {
+                       ProtobufMessage::ValidationVisitor& validation_visitor,
+                       bool recurse_into_any = false) {
+    // TODO(adisuissa): There are multiple recursive traversals done by the
+    // calls in this function. This can be refactored into a single recursive
+    // traversal that invokes the various validators.
+
     // Log warnings or throw errors if deprecated fields or unknown fields are in use.
     if (!validation_visitor.skipValidation()) {
-      checkForUnexpectedFields(message, validation_visitor);
+      checkForUnexpectedFields(message, validation_visitor, recurse_into_any);
     }
 
+    // Throw an exception if the config has an invalid Duration field. This is needed
+    // because Envoy validates the duration in a strict way that is not supported by PGV.
+    validateDurationFields(message, recurse_into_any);
+
+    // TODO(mattklein123): This will recurse the message twice, once above and once for PGV. When
+    // we move to always recursing, satisfying the TODO below, we should merge into a single
+    // recursion for performance reasons.
+    if (recurse_into_any) {
+      return recursivePgvCheck(message);
+    }
+
+    // TODO(mattklein123): Now that PGV is capable of doing recursive message checks on abstract
+    // types, we can remove bottom up validation from the entire codebase and only validate
+    // at top level ingestion (bootstrap, discovery response). This is a large change and will be
+    // done as a separate PR. This change will also allow removing templating from most/all of
+    // related functions.
     std::string err;
     if (!Validate(message, &err)) {
-      ProtoExceptionUtil::throwProtoValidationException(err, API_RECOVER_ORIGINAL(message));
+      ProtoExceptionUtil::throwProtoValidationException(err, message);
     }
   }
 
+#ifdef ENVOY_ENABLE_YAML
   template <class MessageType>
   static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor,
-                                      bool avoid_boosting = false) {
-    loadFromYaml(yaml, message, validation_visitor, !avoid_boosting);
+                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
+    loadFromYaml(yaml, message, validation_visitor);
     validate(message, validation_visitor);
   }
+#endif
 
   /**
    * Downcast and validate protoc-gen-validate constraints on a given protobuf.
@@ -307,7 +370,7 @@ public:
    * of caller.
    * @param message const Protobuf::Message& to downcast and validate.
    * @return const MessageType& the concrete message type downcasted to on success.
-   * @throw ProtoValidationException if the message does not satisfy its type constraints.
+   * @throw EnvoyException if the message does not satisfy its type constraints.
    */
   template <class MessageType>
   static const MessageType&
@@ -319,15 +382,52 @@ public:
   }
 
   /**
+   * Utility method to swap between protobuf bytes type using absl::Cord instead of std::string.
+   * Noop for now.
+   */
+  static const std::string& bytesToString(const std::string& bytes) { return bytes; }
+
+  /**
+   * Convert from a typed message into a google.protobuf.Any. This should be used
+   * instead of the inbuilt PackTo, as PackTo is not available with lite protos.
+   *
+   * @param any_message destination google.protobuf.Any.
+   * @param message source to pack from.
+   *
+   * @throw EnvoyException if the message does not unpack.
+   */
+  static void packFrom(Protobuf::Any& any_message, const Protobuf::Message& message);
+
+  /**
    * Convert from google.protobuf.Any to a typed message. This should be used
    * instead of the inbuilt UnpackTo as it performs validation of results.
    *
    * @param any_message source google.protobuf.Any message.
    * @param message destination to unpack to.
    *
-   * @throw EnvoyException if the message does not unpack.
+   * @return absl::Status
    */
-  static void unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message);
+  static absl::Status unpackTo(const Protobuf::Any& any_message, Protobuf::Message& message);
+
+  /**
+   * Convert from google.protobuf.Any to bytes as std::string
+   * @param any source google.protobuf.Any message.
+   *
+   * @return std::string consists of bytes in the input message or error status.
+   */
+  static absl::StatusOr<std::string> anyToBytes(const Protobuf::Any& any) {
+    if (any.Is<Protobuf::StringValue>()) {
+      Protobuf::StringValue s;
+      RETURN_IF_NOT_OK(MessageUtil::unpackTo(any, s));
+      return s.value();
+    }
+    if (any.Is<Protobuf::BytesValue>()) {
+      Protobuf::BytesValue b;
+      RETURN_IF_NOT_OK(MessageUtil::unpackTo(any, b));
+      return bytesToString(b.value());
+    }
+    return bytesToString(any.value());
+  };
 
   /**
    * Convert from google.protobuf.Any to a typed message.
@@ -336,12 +436,11 @@ public:
    * @return MessageType the typed message inside the Any.
    */
   template <class MessageType>
-  static inline void anyConvert(const ProtobufWkt::Any& message, MessageType& typed_message) {
-    unpackTo(message, typed_message);
+  static inline void anyConvert(const Protobuf::Any& message, MessageType& typed_message) {
+    THROW_IF_NOT_OK(unpackTo(message, typed_message));
   };
 
-  template <class MessageType>
-  static inline MessageType anyConvert(const ProtobufWkt::Any& message) {
+  template <class MessageType> static inline MessageType anyConvert(const Protobuf::Any& message) {
     MessageType typed_message;
     anyConvert(message, typed_message);
     return typed_message;
@@ -352,11 +451,10 @@ public:
    * @param message source google.protobuf.Any message.
    *
    * @return MessageType the typed message inside the Any.
-   * @throw ProtoValidationException if the message does not satisfy its type constraints.
+   * @throw EnvoyException if the message does not satisfy its type constraints.
    */
   template <class MessageType>
-  static inline void anyConvertAndValidate(const ProtobufWkt::Any& message,
-                                           MessageType& typed_message,
+  static inline void anyConvertAndValidate(const Protobuf::Any& message, MessageType& typed_message,
                                            ProtobufMessage::ValidationVisitor& validation_visitor) {
     anyConvert<MessageType>(message, typed_message);
     validate(typed_message, validation_visitor);
@@ -364,20 +462,12 @@ public:
 
   template <class MessageType>
   static inline MessageType
-  anyConvertAndValidate(const ProtobufWkt::Any& message,
+  anyConvertAndValidate(const Protobuf::Any& message,
                         ProtobufMessage::ValidationVisitor& validation_visitor) {
     MessageType typed_message;
     anyConvertAndValidate<MessageType>(message, typed_message, validation_visitor);
     return typed_message;
   };
-
-  /**
-   * Invoke when a version upgrade (e.g. v2 -> v3) is detected. This may warn or throw
-   * depending on where we are in the major version deprecation cycle.
-   * @param desc description of upgrade to include in warning or exception.
-   * @param reject should a DeprecatedMajorVersionException be thrown on failure?
-   */
-  static void onVersionUpgradeDeprecation(absl::string_view desc, bool reject = true);
 
   /**
    * Obtain a string field from a protobuf message dynamically.
@@ -389,12 +479,14 @@ public:
    */
   static inline std::string getStringField(const Protobuf::Message& message,
                                            const std::string& field_name) {
-    const Protobuf::Descriptor* descriptor = message.GetDescriptor();
+    Protobuf::ReflectableMessage reflectable_message = createReflectableMessage(message);
+    const Protobuf::Descriptor* descriptor = reflectable_message->GetDescriptor();
     const Protobuf::FieldDescriptor* name_field = descriptor->FindFieldByName(field_name);
-    const Protobuf::Reflection* reflection = message.GetReflection();
-    return reflection->GetString(message, name_field);
+    const Protobuf::Reflection* reflection = reflectable_message->GetReflection();
+    return reflection->GetString(*reflectable_message, name_field);
   }
 
+#ifdef ENVOY_ENABLE_YAML
   /**
    * Convert between two protobufs via a JSON round-trip. This is used to translate arbitrary
    * messages to/from google.protobuf.Struct.
@@ -403,11 +495,13 @@ public:
    * @param source message.
    * @param dest message.
    */
-  static void jsonConvert(const Protobuf::Message& source, ProtobufWkt::Struct& dest);
-  static void jsonConvert(const ProtobufWkt::Struct& source,
+  static void jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest);
+  static void jsonConvert(const Protobuf::Message& source, Protobuf::Struct& dest);
+  static void jsonConvert(const Protobuf::Struct& source,
                           ProtobufMessage::ValidationVisitor& validation_visitor,
                           Protobuf::Message& dest);
-  static void jsonConvertValue(const Protobuf::Message& source, ProtobufWkt::Value& dest);
+  // Convert a message to a Protobuf::Value, return false upon failure.
+  static bool jsonConvertValue(const Protobuf::Message& source, Protobuf::Value& dest);
 
   /**
    * Extract YAML as string from a google.protobuf.Message.
@@ -422,16 +516,37 @@ public:
                                               const bool always_print_primitive_fields = false);
 
   /**
-   * Extract JSON as string from a google.protobuf.Message.
+   * Extract JSON as string from a google.protobuf.Message. Returns an error if the message cannot
+   * be represented as JSON, which can occur if it contains an Any proto with an unrecognized type
+   * URL or invalid data, or if memory cannot be allocated.
    * @param message message of type type.googleapis.com/google.protobuf.Message.
    * @param pretty_print whether the returned JSON should be formatted.
    * @param always_print_primitive_fields whether to include primitive fields set to their default
    * values, e.g. an int32 set to 0 or a bool set to false.
-   * @return std::string of formatted JSON object.
+   * @return ProtobufUtil::StatusOr<std::string> of formatted JSON object, or an error status if
+   * conversion fails.
    */
-  static std::string getJsonStringFromMessage(const Protobuf::Message& message,
-                                              bool pretty_print = false,
-                                              bool always_print_primitive_fields = false);
+  static absl::StatusOr<std::string>
+  getJsonStringFromMessage(const Protobuf::Message& message, bool pretty_print = false,
+                           bool always_print_primitive_fields = false);
+
+  /**
+   * Extract JSON as string from a google.protobuf.Message, returning some error string if the
+   * conversion to JSON fails.
+   * @param message message of type type.googleapis.com/google.protobuf.Message.
+   * @param pretty_print whether the returned JSON should be formatted.
+   * @param always_print_primitive_fields whether to include primitive fields set to their default
+   * values, e.g. an int32 set to 0 or a bool set to false.
+   * @return std::string of formatted JSON object, or an error message if conversion fails.
+   */
+  static std::string getJsonStringFromMessageOrError(const Protobuf::Message& message,
+                                                     bool pretty_print = false,
+                                                     bool always_print_primitive_fields = false);
+#endif
+
+  static std::string convertToStringForLogs(const Protobuf::Message& message,
+                                            bool pretty_print = false,
+                                            bool always_print_primitive_fields = false);
 
   /**
    * Utility method to create a Struct containing the passed in key/value strings.
@@ -439,21 +554,21 @@ public:
    * @param key the key to use to set the value
    * @param value the string value to associate with the key
    */
-  static ProtobufWkt::Struct keyValueStruct(const std::string& key, const std::string& value);
+  static Protobuf::Struct keyValueStruct(const std::string& key, const std::string& value);
 
   /**
    * Utility method to create a Struct containing the passed in key/value map.
    *
    * @param fields the key/value pairs to initialize the Struct proto
    */
-  static ProtobufWkt::Struct keyValueStruct(const std::map<std::string, std::string>& fields);
+  static Protobuf::Struct keyValueStruct(const std::map<std::string, std::string>& fields);
 
   /**
    * Utility method to print a human readable string of the code passed in.
    *
    * @param code the protobuf error code
    */
-  static std::string CodeEnumToString(ProtobufUtil::error::Code code);
+  static std::string codeEnumToString(absl::StatusCode code);
 
   /**
    * Modifies a message such that all sensitive data (that is, fields annotated as
@@ -464,10 +579,10 @@ public:
    * traversed recursively to redact their contents.
    *
    * LIMITATION: This works properly for strongly-typed messages, as well as for messages packed in
-   * a `ProtobufWkt::Any` with a `type_url` corresponding to a proto that was compiled into the
-   * Envoy binary. However it does not work for messages encoded as `ProtobufWkt::Struct`, since
+   * a `Protobuf::Any` with a `type_url` corresponding to a proto that was compiled into the
+   * Envoy binary. However it does not work for messages encoded as `Protobuf::Struct`, since
    * structs are missing the "sensitive" annotations that this function expects. Similarly, it fails
-   * for messages encoded as `ProtobufWkt::Any` with a `type_url` that isn't registered with the
+   * for messages encoded as `Protobuf::Any` with a `type_url` that isn't registered with the
    * binary. If you're working with struct-typed messages, including those that might be hiding
    * within strongly-typed messages, please reify them to strongly-typed messages using
    * `MessageUtil::jsonConvert()` before calling `MessageUtil::redact()`.
@@ -475,88 +590,103 @@ public:
    * @param message message to redact.
    */
   static void redact(Protobuf::Message& message);
+
+  /**
+   * Sanitizes a string to contain only valid UTF-8. Invalid UTF-8 characters will be replaced. If
+   * the input string is valid UTF-8, it will be returned unmodified.
+   */
+  static std::string sanitizeUtf8String(absl::string_view str);
+
+  /**
+   * Return text proto representation of the `message`.
+   * @param message proto to print.
+   * @return text representation of the proto `message`.
+   */
+  static std::string toTextProto(const Protobuf::Message& message);
 };
 
 class ValueUtil {
 public:
-  static std::size_t hash(const ProtobufWkt::Value& value) { return MessageUtil::hash(value); }
+  static std::size_t hash(const Protobuf::Value& value) { return MessageUtil::hash(value); }
 
+#ifdef ENVOY_ENABLE_YAML
   /**
-   * Load YAML string into ProtobufWkt::Value.
+   * Load YAML string into Protobuf::Value.
    */
-  static ProtobufWkt::Value loadFromYaml(const std::string& yaml);
+  static Protobuf::Value loadFromYaml(const std::string& yaml);
+#endif
 
   /**
-   * Compare two ProtobufWkt::Values for equality.
+   * Compare two Protobuf::Values for equality.
    * @param v1 message of type type.googleapis.com/google.protobuf.Value
    * @param v2 message of type type.googleapis.com/google.protobuf.Value
    * @return true if v1 and v2 are identical
    */
-  static bool equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2);
+  static bool equal(const Protobuf::Value& v1, const Protobuf::Value& v2);
 
   /**
-   * @return wrapped ProtobufWkt::NULL_VALUE.
+   * @return wrapped Protobuf::NULL_VALUE.
    */
-  static const ProtobufWkt::Value& nullValue();
+  static const Protobuf::Value& nullValue();
 
   /**
-   * Wrap std::string into ProtobufWkt::Value string value.
+   * Wrap absl::string_view into Protobuf::Value string value.
    * @param str string to be wrapped.
    * @return wrapped string.
    */
-  static ProtobufWkt::Value stringValue(const std::string& str);
+  static Protobuf::Value stringValue(absl::string_view str);
 
   /**
-   * Wrap optional std::string into ProtobufWkt::Value string value.
-   * If the argument contains a null optional, return ProtobufWkt::NULL_VALUE.
+   * Wrap optional std::string into Protobuf::Value string value.
+   * If the argument contains a null optional, return Protobuf::NULL_VALUE.
    * @param str string to be wrapped.
    * @return wrapped string.
    */
-  static ProtobufWkt::Value optionalStringValue(const absl::optional<std::string>& str);
+  static Protobuf::Value optionalStringValue(const absl::optional<std::string>& str);
 
   /**
-   * Wrap boolean into ProtobufWkt::Value boolean value.
+   * Wrap boolean into Protobuf::Value boolean value.
    * @param str boolean to be wrapped.
    * @return wrapped boolean.
    */
-  static ProtobufWkt::Value boolValue(bool b);
+  static Protobuf::Value boolValue(bool b);
 
   /**
-   * Wrap ProtobufWkt::Struct into ProtobufWkt::Value struct value.
+   * Wrap Protobuf::Struct into Protobuf::Value struct value.
    * @param obj struct to be wrapped.
    * @return wrapped struct.
    */
-  static ProtobufWkt::Value structValue(const ProtobufWkt::Struct& obj);
+  static Protobuf::Value structValue(const Protobuf::Struct& obj);
 
   /**
-   * Wrap number into ProtobufWkt::Value double value.
+   * Wrap number into Protobuf::Value double value.
    * @param num number to be wrapped.
    * @return wrapped number.
    */
-  template <typename T> static ProtobufWkt::Value numberValue(const T num) {
-    ProtobufWkt::Value val;
+  template <typename T> static Protobuf::Value numberValue(const T num) {
+    Protobuf::Value val;
     val.set_number_value(static_cast<double>(num));
     return val;
   }
 
   /**
-   * Wrap a collection of ProtobufWkt::Values into ProtobufWkt::Value list value.
-   * @param values collection of ProtobufWkt::Values to be wrapped.
+   * Wrap a collection of Protobuf::Values into Protobuf::Value list value.
+   * @param values collection of Protobuf::Values to be wrapped.
    * @return wrapped list value.
    */
-  static ProtobufWkt::Value listValue(const std::vector<ProtobufWkt::Value>& values);
+  static Protobuf::Value listValue(const std::vector<Protobuf::Value>& values);
 };
 
 /**
- * HashedValue is a wrapper around ProtobufWkt::Value that computes
+ * HashedValue is a wrapper around Protobuf::Value that computes
  * and stores a hash code for the Value at construction.
  */
 class HashedValue {
 public:
-  HashedValue(const ProtobufWkt::Value& value) : value_(value), hash_(ValueUtil::hash(value)){};
+  HashedValue(const Protobuf::Value& value) : value_(value), hash_(ValueUtil::hash(value)) {};
   HashedValue(const HashedValue& v) = default;
 
-  const ProtobufWkt::Value& value() const { return value_; }
+  const Protobuf::Value& value() const { return value_; }
   std::size_t hash() const { return hash_; }
 
   bool operator==(const HashedValue& rhs) const {
@@ -566,35 +696,37 @@ public:
   bool operator!=(const HashedValue& rhs) const { return !(*this == rhs); }
 
 private:
-  const ProtobufWkt::Value value_;
+  const Protobuf::Value value_;
   const std::size_t hash_;
 };
 
 class DurationUtil {
 public:
-  class OutOfRangeException : public EnvoyException {
-  public:
-    OutOfRangeException(const std::string& error) : EnvoyException(error) {}
-  };
-
   /**
    * Same as DurationUtil::durationToMilliseconds but with extra validation logic.
    * Same as Protobuf::util::TimeUtil::DurationToSeconds but with extra validation logic.
    * Specifically, we ensure that the duration is positive.
    * @param duration protobuf.
    * @return duration in milliseconds.
-   * @throw OutOfRangeException when duration is out-of-range.
+   * @throw EnvoyException when duration is out-of-range.
    */
-  static uint64_t durationToMilliseconds(const ProtobufWkt::Duration& duration);
+  static uint64_t durationToMilliseconds(const Protobuf::Duration& duration);
+
+  /**
+   * Same as DurationUtil::durationToMilliseconds but does not throw an exception.
+   * @param duration protobuf.
+   * @return duration in milliseconds or an error status.
+   */
+  static absl::StatusOr<uint64_t> durationToMillisecondsNoThrow(const Protobuf::Duration& duration);
 
   /**
    * Same as Protobuf::util::TimeUtil::DurationToSeconds but with extra validation logic.
    * Specifically, we ensure that the duration is positive.
    * @param duration protobuf.
    * @return duration in seconds.
-   * @throw OutOfRangeException when duration is out-of-range.
+   * @throw EnvoyException when duration is out-of-range.
    */
-  static uint64_t durationToSeconds(const ProtobufWkt::Duration& duration);
+  static uint64_t durationToSeconds(const Protobuf::Duration& duration);
 };
 
 class TimestampUtil {
@@ -605,15 +737,31 @@ public:
    * @param timestamp a pointer to the mutable protobuf member to be written into.
    */
   static void systemClockToTimestamp(const SystemTime system_clock_time,
-                                     ProtobufWkt::Timestamp& timestamp);
+                                     Protobuf::Timestamp& timestamp);
+};
+
+class StructUtil {
+public:
+  /**
+   * Recursively updates in-place a protobuf structure with keys from another
+   * object.
+   *
+   * The merging strategy is the following. If a key from \p other does not
+   * exists, it's just copied into \p obj. If the key exists but has a
+   * different type, it is replaced by the new value. Otherwise:
+   * - for scalar values (null, string, number, boolean) are replaced with the new value
+   * - for lists: new values are added to the current list
+   * - for structures: recursively apply this scheme
+   *
+   * @param obj the object to update in-place
+   * @param with the object to update \p obj with
+   */
+  static void update(Protobuf::Struct& obj, const Protobuf::Struct& with);
 };
 
 } // namespace Envoy
 
-namespace std {
-// Inject an implementation of std::hash for Envoy::HashedValue into the std namespace.
-template <> struct hash<Envoy::HashedValue> {
+// Specialize std::hash on Envoy::HashedValue.
+template <> struct std::hash<Envoy::HashedValue> {
   std::size_t operator()(Envoy::HashedValue const& v) const { return v.hash(); }
 };
-
-} // namespace std

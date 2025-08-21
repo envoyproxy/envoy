@@ -8,11 +8,11 @@
 #include "envoy/common/platform.h"
 #include "envoy/network/address.h"
 
-#include "common/common/assert.h"
-#include "common/common/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/cidr_range.h"
-#include "common/network/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/cidr_range.h"
+#include "source/common/network/utility.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/numeric/int128.h"
@@ -137,8 +137,8 @@ public:
     // step 1. But it has a useful new property: now that all the prefixes
     // are at the leaves, they are disjoint: no prefix is nested under another.
 
-    std::vector<IpPrefix<Ipv4>> ipv4_prefixes = ipv4_temp.push_leaves();
-    std::vector<IpPrefix<Ipv6>> ipv6_prefixes = ipv6_temp.push_leaves();
+    std::vector<IpPrefix<Ipv4>> ipv4_prefixes = ipv4_temp.pushLeaves();
+    std::vector<IpPrefix<Ipv6>> ipv6_prefixes = ipv6_temp.pushLeaves();
 
     // Step 3: take the disjoint prefixes from the leaves of each Binary Trie
     // and use them to construct an LC Trie.
@@ -345,7 +345,7 @@ private:
      *     trie can be nested under another leaf)
      * @return the prefixes associated with the leaf nodes.
      */
-    std::vector<IpPrefix<IpType>> push_leaves() {
+    std::vector<IpPrefix<IpType>> pushLeaves() {
       std::vector<IpPrefix<IpType>> prefixes;
       std::function<void(Node*, DataSetSharedPtr, unsigned, IpType)> visit =
           [&](Node* node, DataSetSharedPtr data, unsigned depth, IpType prefix) {

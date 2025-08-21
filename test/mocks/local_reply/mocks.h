@@ -1,4 +1,6 @@
-#include "common/local_reply/local_reply.h"
+#pragma once
+
+#include "source/common/local_reply/local_reply.h"
 
 #include "gmock/gmock.h"
 
@@ -11,7 +13,7 @@ public:
 
   MOCK_METHOD(void, rewrite,
               (const Http::RequestHeaderMap* request_headers,
-               Http::ResponseHeaderMap& response_headers, StreamInfo::StreamInfoImpl& stream_info,
+               Http::ResponseHeaderMap& response_headers, StreamInfo::StreamInfo& stream_info,
                Http::Code& code, std::string& body, absl::string_view& content_type),
               (const));
 };

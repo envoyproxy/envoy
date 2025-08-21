@@ -23,9 +23,9 @@ public:
   virtual void onWorkerListenerRemoved() PURE;
 
   /**
-   * Called when the Runtime::ScopedLoaderSingleton is created by the server.
+   * Called when all workers have started.
    */
-  virtual void onRuntimeCreated() PURE;
+  virtual void onWorkersStarted() PURE;
 };
 
 /**
@@ -36,7 +36,7 @@ public:
   // ListenerHooks
   void onWorkerListenerAdded() override {}
   void onWorkerListenerRemoved() override {}
-  void onRuntimeCreated() override {}
+  void onWorkersStarted() override {}
 };
 
 } // namespace Envoy

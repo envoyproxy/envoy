@@ -1,0 +1,52 @@
+date: February 9, 2024
+
+minor_behavior_changes:
+- area: access_log
+  change: |
+    When emitting grpc logs, only downstream filter state was used. Now, both downstream and upstream filter states will be tried
+    to find the keys configured in filter_state_objects_to_log.
+
+bug_fixes:
+- area: buffer
+  change: |
+    Fixed a bug (https://github.com/envoyproxy/envoy/issues/28760) that the internal listener causes an undefined
+    behavior due to the unintended release of the buffer memory.
+- area: http
+  change: |
+    Fixed recursion when HTTP connection is disconnected due to a high number of premature resets.
+- area: grpc
+  change: |
+    Fixed a bug in gRPC async client cache which intermittently causes CPU spikes due to busy loop in timer expiration.
+- area: tracing
+  change: |
+    Fixed a bug where Datadog spans tagged as errors would not have the appropriate error property set.
+- area: tracing
+  change: |
+    Fixed a bug where child spans produced by the Datadog tracer would have an incorrect operation name.
+- area: tracing
+  change: |
+    Fixed a bug that caused the Datadog tracing extension to drop traces that
+    should be kept on account of an extracted sampling decision.
+- area: proxy protocol
+  change: |
+    fixed a crash when Envoy is configured for PROXY protocol on both a listener and cluster, and the listener receives
+    a PROXY protocol header with address type LOCAL (typically used for health checks).
+- area: proxy_protocol
+  change: |
+    Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
+    received in a proxy protocol header. Connections will instead be dropped/reset.
+- area: proxy_protocol
+  change: |
+    Fixed a bug where TLVs with non utf8 characters were inserted as protobuf values into filter metadata circumventing
+    ext_authz checks when ``failure_mode_allow`` is set to ``true``.
+- area: tls
+  change: |
+    Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
+    received in an mTLS client cert IP SAN. These SANs will be ignored. This applies only when using formatter
+    ``%DOWNSTREAM_PEER_IP_SAN%``.
+- area: http
+  change: |
+    Fixed crash when HTTP request idle and per try timeouts occurs within backoff interval.
+- area: url matching
+  change: |
+    Fixed excessive CPU utilization when using regex URL template matcher.

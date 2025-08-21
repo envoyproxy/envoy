@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package test.integration.filters;
+
+message AddBodyFilterConfig {
+  enum FilterCallback {
+    DEFAULT = 0;
+    DECODE_HEADERS = 1;
+    DECODE_DATA = 2;
+    DECODE_TRAILERS = 3;
+    ENCODE_HEADERS = 4;
+    ENCODE_DATA = 5;
+  }
+
+  FilterCallback where_to_add_body = 1;
+  uint32 body_size = 2;
+  FilterCallback where_to_stop_and_buffer = 3;
+  bool add_trailers_in_encode_decode_header = 4;
+}

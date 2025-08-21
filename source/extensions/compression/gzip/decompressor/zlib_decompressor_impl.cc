@@ -1,4 +1,4 @@
-#include "extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
+#include "source/extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 
 #include <zlib.h>
 
@@ -6,7 +6,8 @@
 
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
 
@@ -16,17 +17,14 @@ namespace Compression {
 namespace Gzip {
 namespace Decompressor {
 
-ZlibDecompressorImpl::ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix)
-    : ZlibDecompressorImpl(scope, stats_prefix, 4096) {}
-
 ZlibDecompressorImpl::ZlibDecompressorImpl(Stats::Scope& scope, const std::string& stats_prefix,
-                                           uint64_t chunk_size)
-    : Zlib::Base(chunk_size,
-                 [](z_stream* z) {
-                   inflateEnd(z);
-                   delete z;
-                 }),
-      stats_(generateStats(stats_prefix, scope)) {
+                                           uint64_t chunk_size, uint64_t max_inflate_ratio)
+    : Common::Base(chunk_size,
+                   [](z_stream* z) {
+                     inflateEnd(z);
+                     delete z;
+                   }),
+      stats_(generateStats(stats_prefix, scope)), max_inflate_ratio_(max_inflate_ratio) {
   zstream_ptr_->zalloc = Z_NULL;
   zstream_ptr_->zfree = Z_NULL;
   zstream_ptr_->opaque = Z_NULL;
@@ -43,12 +41,25 @@ void ZlibDecompressorImpl::init(int64_t window_bits) {
 
 void ZlibDecompressorImpl::decompress(const Buffer::Instance& input_buffer,
                                       Buffer::Instance& output_buffer) {
+  uint64_t limit = max_inflate_ratio_ * input_buffer.length();
+
   for (const Buffer::RawSlice& input_slice : input_buffer.getRawSlices()) {
     zstream_ptr_->avail_in = input_slice.len_;
     zstream_ptr_->next_in = static_cast<Bytef*>(input_slice.mem_);
     while (inflateNext()) {
       if (zstream_ptr_->avail_out == 0) {
         updateOutput(output_buffer);
+      }
+
+      if (Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.enable_compression_bomb_protection") &&
+          (output_buffer.length() > limit)) {
+        stats_.zlib_data_error_.inc();
+        ENVOY_LOG(trace,
+                  "excessive decompression ratio detected: output "
+                  "size {} for input size {}",
+                  output_buffer.length(), input_buffer.length());
+        return;
       }
     }
   }
@@ -76,7 +87,7 @@ bool ZlibDecompressorImpl::inflateNext() {
     ENVOY_LOG(trace,
               "zlib decompression error: {}, msg: {}. Error codes are defined in "
               "https://www.zlib.net/manual.html",
-              result, zstream_ptr_->msg);
+              result, zstream_ptr_->msg ? zstream_ptr_->msg : "nullptr");
     chargeErrorStats(result);
     return false;
   }

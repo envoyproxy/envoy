@@ -5,12 +5,12 @@ package envoy.extensions.compression.gzip.compressor.v3;
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.compression.gzip.compressor.v3";
 option java_outer_classname = "GzipProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/compression/gzip/compressor/v3;compressorv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Gzip Compressor]

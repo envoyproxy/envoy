@@ -2,7 +2,7 @@
 
 #include "envoy/thread/thread.h"
 
-#include "common/common/lock_guard.h"
+#include "source/common/common/lock_guard.h"
 
 #include "test/test_common/thread_factory_for_test.h"
 

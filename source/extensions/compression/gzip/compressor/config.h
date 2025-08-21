@@ -4,17 +4,28 @@
 #include "envoy/extensions/compression/gzip/compressor/v3/gzip.pb.h"
 #include "envoy/extensions/compression/gzip/compressor/v3/gzip.pb.validate.h"
 
-#include "common/http/headers.h"
-
-#include "extensions/compression/common/compressor/factory_base.h"
-#include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/http/headers.h"
+#include "source/extensions/compression/common/compressor/factory_base.h"
+#include "source/extensions/compression/gzip/compressor/zlib_compressor_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Compression {
 namespace Gzip {
 namespace Compressor {
+
+// Default zlib memory level.
+const uint64_t DefaultMemoryLevel = 5;
+
+// Default and maximum compression window size.
+const uint64_t DefaultWindowBits = 12;
+
+// When logical OR'ed to window bits, this sets a gzip header and trailer around the compressed
+// data.
+const uint64_t GzipHeaderValue = 16;
+
+// Default zlib chunk size.
+const uint32_t DefaultChunkSize = 4096;
 
 namespace {
 
@@ -59,7 +70,8 @@ public:
 
 private:
   Envoy::Compression::Compressor::CompressorFactoryPtr createCompressorFactoryFromProtoTyped(
-      const envoy::extensions::compression::gzip::compressor::v3::Gzip& config) override;
+      const envoy::extensions::compression::gzip::compressor::v3::Gzip& config,
+      Server::Configuration::FactoryContext& context) override;
 };
 
 DECLARE_FACTORY(GzipCompressorLibraryFactory);

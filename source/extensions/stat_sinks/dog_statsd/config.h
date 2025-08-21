@@ -2,12 +2,15 @@
 
 #include "envoy/server/instance.h"
 
-#include "server/configuration_impl.h"
+#include "source/server/configuration_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace DogStatsd {
+
+// DogStatsD compatible statsd sink
+constexpr char DogStatsdName[] = "envoy.stat_sinks.dog_statsd";
 
 /**
  * Config registration for the DogStatsD compatible statsd sink. @see StatsSinkFactory.
@@ -15,8 +18,9 @@ namespace DogStatsd {
 class DogStatsdSinkFactory : Logger::Loggable<Logger::Id::config>,
                              public Server::Configuration::StatsSinkFactory {
 public:
-  Stats::SinkPtr createStatsSink(const Protobuf::Message& config,
-                                 Server::Configuration::ServerFactoryContext& server) override;
+  absl::StatusOr<Stats::SinkPtr>
+  createStatsSink(const Protobuf::Message& config,
+                  Server::Configuration::ServerFactoryContext& server) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 

@@ -24,15 +24,19 @@ for some duration of time prior to server shutdown, use :ref:`drain_listeners <o
 before shutting down the server. The listeners will be directly stopped without any graceful draining behaviour,
 and cease accepting new connections immediately.
 
-To add a graceful drain period prior to listeners being closed, use the query parameter
-:ref:`drain_listeners?graceful <operations_admin_interface_drain>`. By default, Envoy
-will discourage requests for some period of time (as determined by :option:`--drain-time-s`). 
-The behaviour of request discouraging is determined by the drain manager.
+To add a graceful drain period prior to listeners being closed, use the query
+parameter :ref:`drain_listeners?graceful <operations_admin_interface_drain>`.
+By default, Envoy will discourage requests for some period of time (as
+determined by :option:`--drain-time-s`) but continue accepting new connections
+until the drain timeout. The behaviour of request discouraging is determined by
+the drain manager.
 
 Note that although draining is a per-listener concept, it must be supported at the network filter
 level. Currently the only filters that support graceful draining are
 :ref:`Redis <config_network_filters_redis_proxy>`,
 :ref:`Mongo <config_network_filters_mongo_proxy>`,
+:ref:`Thrift <config_network_filters_thrift_proxy>`
+(if the ``envoy.reloadable_features.thrift_connection_draining`` runtime feature is enabled),
 and :ref:`HTTP connection manager <config_http_conn_man>`.
 
 By default, the :ref:`HTTP connection manager <config_http_conn_man>` filter will

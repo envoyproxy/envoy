@@ -1,9 +1,8 @@
-#include "extensions/filters/network/common/redis/redis_command_stats.h"
+#include "source/extensions/filters/network/common/redis/redis_command_stats.h"
 
-#include "common/stats/timespan_impl.h"
-#include "common/stats/utility.h"
-
-#include "extensions/filters/network/common/redis/supported_commands.h"
+#include "source/common/stats/timespan_impl.h"
+#include "source/common/stats/utility.h"
+#include "source/extensions/filters/network/common/redis/supported_commands.h"
 
 namespace Envoy {
 namespace Extensions {

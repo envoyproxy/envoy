@@ -1,4 +1,4 @@
-#include "extensions/filters/listener/http_inspector/http_inspector.h"
+#include "source/extensions/filters/listener/http_inspector/http_inspector.h"
 
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.h"
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.pb.validate.h"
@@ -9,7 +9,7 @@ namespace Extensions {
 namespace ListenerFilters {
 namespace HttpInspector {
 
-DEFINE_PROTO_FUZZER(const test::extensions::filters::listener::FilterFuzzTestCase& input) {
+DEFINE_PROTO_FUZZER(const test::extensions::filters::listener::FilterFuzzWithDataTestCase& input) {
   try {
     TestUtility::validate(input);
   } catch (const ProtoValidationException& e) {
@@ -18,11 +18,11 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::listener::FilterFuzzTestCas
   }
 
   Stats::IsolatedStoreImpl store;
-  ConfigSharedPtr cfg = std::make_shared<Config>(store);
+  ConfigSharedPtr cfg = std::make_shared<Config>(*store.rootScope());
   auto filter = std::make_unique<Filter>(cfg);
 
-  ListenerFilterFuzzer fuzzer;
-  fuzzer.fuzz(*filter, input);
+  ListenerFilterWithDataFuzzer fuzzer;
+  fuzzer.fuzz(std::move(filter), input);
 }
 
 } // namespace HttpInspector

@@ -7,7 +7,7 @@
 #include "envoy/network/address.h"
 #include "envoy/server/options.h"
 
-#include "common/json/json_loader.h"
+#include "source/common/json/json_loader.h"
 
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"
@@ -16,6 +16,14 @@
 #include "tools/cpp/runfiles/runfiles.h"
 
 namespace Envoy {
+
+namespace Grpc {
+
+// Support parameterizing over gRPC client type.
+enum class ClientType { EnvoyGrpc, GoogleGrpc };
+
+} // namespace Grpc
+
 class TestEnvironment {
 public:
   using PortMap = absl::node_hash_map<std::string, uint32_t>;
@@ -53,6 +61,20 @@ public:
    * types to test.
    */
   static std::vector<Network::Address::IpVersion> getIpVersionsForTest();
+
+  /**
+   * Return a vector of spdlog loggers as parameters to test. Tests are mainly
+   * for the behavior consistency between default loggers and fine-grained loggers.
+   * @return std::vector<spdlog::logger*>
+   */
+  static std::vector<spdlog::logger*> getSpdLoggersForTest();
+
+  /**
+   * Tests can be run with Envoy Grpc and Google Grpc or Envoy Grpc alone by setting compiler option
+   * `--define google_grpc=disabled`.
+   * @return a vector of Grpc versions to test.
+   */
+  static std::vector<Grpc::ClientType> getsGrpcVersionsForTest();
 
   /**
    * Obtain command-line options reference.
@@ -173,11 +195,14 @@ public:
   jsonLoadFromString(const std::string& json,
                      Network::Address::IpVersion version = Network::Address::IpVersion::v4);
 
+#ifndef TARGET_OS_IOS
   /**
    * Execute a program under ::system. Any failure is fatal.
    * @param args program path and arguments.
    */
+
   static void exec(const std::vector<std::string>& args);
+#endif
 
   /**
    * Dumps the contents of the string into a temporary file from temporaryDirectory() + filename.
@@ -185,24 +210,19 @@ public:
    * @param filename: the name of the file to use
    * @param contents: the data to go in the file.
    * @param fully_qualified_path: if true, will write to filename without prepending the tempdir.
+   * @param unlink: if true will delete any prior file before writing.
    * @return the fully qualified path of the output file.
    */
   static std::string writeStringToFileForTest(const std::string& filename,
                                               const std::string& contents,
-                                              bool fully_qualified_path = false);
+                                              bool fully_qualified_path = false,
+                                              bool unlink = true);
   /**
    * Dumps the contents of the file into the string.
    *
    * @param filename: the fully qualified name of the file to use
-   * @param require_existence if true, RELEASE_ASSERT if the file does not exist.
-   *   If false, an empty string will be returned if the file is not present.
-   * @param read_binary if true, read file verbatim, otherwise convert to POSIX
-   *   carriage control
-   * @return string the contents of the file.
    */
-  static std::string readFileToStringForTest(const std::string& filename,
-                                             bool require_existence = true,
-                                             bool read_binary = true);
+  static std::string readFileToStringForTest(const std::string& filename);
 
   /**
    * Create a path on the filesystem (mkdir -p ... equivalent).
@@ -266,7 +286,7 @@ private:
   const std::string new_link_;
   const std::string target1_;
   const std::string target2_;
-  bool use_target1_;
+  bool use_target1_{true};
 };
 
 } // namespace Envoy

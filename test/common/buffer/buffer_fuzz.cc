@@ -4,11 +4,12 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/memory/stats.h"
-#include "common/network/io_socket_handle_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/memory/stats.h"
+#include "source/common/network/io_socket_handle_impl.h"
 
 #include "test/fuzz/utility.h"
 
@@ -74,6 +75,11 @@ public:
     drain_tracker();
   }
 
+  void bindAccount(Buffer::BufferMemoryAccountSharedPtr) override {
+    // Not implemented.
+    ASSERT(false);
+  }
+
   void add(const void* data, uint64_t size) override {
     FUZZ_ASSERT(start_ + size_ + size <= data_.size());
     ::memcpy(mutableEnd(), data, size);
@@ -105,13 +111,24 @@ public:
     src.size_ = 0;
   }
 
-  void commit(Buffer::RawSlice* iovecs, uint64_t num_iovecs) override {
-    FUZZ_ASSERT(num_iovecs == 1);
-    size_ += iovecs[0].len_;
-  }
-
   void copyOut(size_t start, uint64_t size, void* data) const override {
     ::memcpy(data, this->start() + start, size);
+  }
+
+  uint64_t copyOutToSlices(uint64_t length, Buffer::RawSlice* slices,
+                           uint64_t num_slices) const override {
+    uint64_t size_copied = 0;
+    uint64_t num_slices_copied = 0;
+    while (size_copied < length && num_slices_copied < num_slices) {
+      auto copy_length =
+          std::min((length - size_copied), static_cast<uint64_t>(slices[num_slices_copied].len_));
+      ::memcpy(slices[num_slices_copied].mem_, this->start(), copy_length);
+      size_copied += copy_length;
+      if (copy_length == slices[num_slices_copied].len_) {
+        num_slices_copied++;
+      }
+    }
+    return size_copied;
   }
 
   void drain(uint64_t size) override {
@@ -135,23 +152,47 @@ public:
     return mutableStart();
   }
 
-  Buffer::SliceDataPtr extractMutableFrontSlice() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  Buffer::SliceDataPtr extractMutableFrontSlice() override { PANIC("not implemented"); }
 
   void move(Buffer::Instance& rhs) override { move(rhs, rhs.length()); }
 
-  void move(Buffer::Instance& rhs, uint64_t length) override {
+  void move(Buffer::Instance& rhs, uint64_t length) override { move(rhs, length, false); }
+
+  void move(Buffer::Instance& rhs, uint64_t length, bool) override {
     StringBuffer& src = dynamic_cast<StringBuffer&>(rhs);
     add(src.start(), length);
     src.start_ += length;
     src.size_ -= length;
   }
 
-  uint64_t reserve(uint64_t length, Buffer::RawSlice* iovecs, uint64_t num_iovecs) override {
-    FUZZ_ASSERT(num_iovecs > 0);
+  Buffer::Reservation reserveForRead() override {
+    auto reservation = Buffer::Reservation::bufferImplUseOnlyConstruct(*this);
+    Buffer::RawSlice slice;
+    slice.mem_ = mutableEnd();
+    slice.len_ = data_.size() - (start_ + size_);
+    reservation.bufferImplUseOnlySlices().push_back(slice);
+    reservation.bufferImplUseOnlySetLength(slice.len_);
+
+    return reservation;
+  }
+
+  Buffer::ReservationSingleSlice reserveSingleSlice(uint64_t length, bool separate_slice) override {
+    ASSERT(!separate_slice);
     FUZZ_ASSERT(start_ + size_ + length <= data_.size());
-    iovecs[0].mem_ = mutableEnd();
-    iovecs[0].len_ = length;
-    return 1;
+
+    auto reservation = Buffer::ReservationSingleSlice::bufferImplUseOnlyConstruct(*this);
+    Buffer::RawSlice slice;
+    slice.mem_ = mutableEnd();
+    slice.len_ = length;
+    reservation.bufferImplUseOnlySlice() = slice;
+
+    return reservation;
+  }
+
+  void commit(uint64_t length, absl::Span<Buffer::RawSlice>,
+              Buffer::ReservationSlicesOwnerPtr) override {
+    FUZZ_ASSERT(start_ + size_ + length <= data_.size());
+    size_ += length;
   }
 
   ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override {
@@ -163,14 +204,25 @@ public:
     return absl::StartsWith(asStringView(), data);
   }
 
-  std::string toString() const override { return std::string(data_.data() + start_, size_); }
+  std::string toString() const override { return {data_.data() + start_, size_}; }
 
-  void setWatermarks(uint32_t) override {
+  size_t addFragments(absl::Span<const absl::string_view> fragments) override {
+    size_t total_size_to_write = 0;
+
+    for (const auto& fragment : fragments) {
+      total_size_to_write += fragment.size();
+      add(fragment.data(), fragment.size());
+    }
+    return total_size_to_write;
+  }
+
+  void setWatermarks(uint32_t, uint32_t) override {
     // Not implemented.
     // TODO(antoniovicente) Implement and add fuzz coverage as we merge the Buffer::OwnedImpl and
     // WatermarkBuffer implementations.
     ASSERT(false);
   }
+
   uint32_t highWatermark() const override { return 0; }
   bool highWatermarkTriggered() const override { return false; }
 
@@ -257,31 +309,21 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     if (reserve_length == 0) {
       break;
     }
-    constexpr uint32_t reserve_slices = 16;
-    Buffer::RawSlice slices[reserve_slices];
-    const uint32_t allocated_slices = target_buffer.reserve(reserve_length, slices, reserve_slices);
-    uint32_t allocated_length = 0;
-    for (uint32_t i = 0; i < allocated_slices; ++i) {
-      ::memset(slices[i].mem_, insert_value, slices[i].len_);
-      allocated_length += slices[i].len_;
-    }
-    FUZZ_ASSERT(reserve_length <= allocated_length);
-    const uint32_t target_length =
-        std::min(reserve_length, action.reserve_commit().commit_length());
-    uint32_t shrink_length = allocated_length;
-    int32_t shrink_slice = allocated_slices - 1;
-    while (shrink_length > target_length) {
-      FUZZ_ASSERT(shrink_slice >= 0);
-      const uint32_t available = slices[shrink_slice].len_;
-      const uint32_t remainder = shrink_length - target_length;
-      if (available >= remainder) {
-        slices[shrink_slice].len_ -= remainder;
-        break;
+    if (reserve_length < 16384) {
+      auto reservation = target_buffer.reserveSingleSlice(reserve_length);
+      ::memset(reservation.slice().mem_, insert_value, reservation.slice().len_);
+      reservation.commit(
+          std::min<uint64_t>(action.reserve_commit().commit_length(), reservation.length()));
+    } else {
+      Buffer::Reservation reservation = target_buffer.reserveForRead();
+      for (uint32_t i = 0; i < reservation.numSlices(); ++i) {
+        ::memset(reservation.slices()[i].mem_, insert_value, reservation.slices()[i].len_);
       }
-      shrink_length -= available;
-      slices[shrink_slice--].len_ = 0;
+      const uint32_t target_length = clampSize(
+          std::min<uint32_t>(reservation.length(), action.reserve_commit().commit_length()),
+          reserve_length);
+      reservation.commit(target_length);
     }
-    target_buffer.commit(slices, allocated_slices);
     break;
   }
   case test::common::buffer::Action::kCopyOut: {
@@ -294,6 +336,18 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     target_buffer.copyOut(start, length, copy_buffer);
     const std::string data = target_buffer.toString();
     FUZZ_ASSERT(::memcmp(copy_buffer, data.data() + start, length) == 0);
+    break;
+  }
+  case test::common::buffer::Action::kCopyOutToSlices: {
+    const uint32_t length =
+        std::min(static_cast<uint32_t>(target_buffer.length()), action.copy_out_to_slices());
+    Buffer::OwnedImpl buffer;
+    auto reservation = buffer.reserveForRead();
+    auto rc = target_buffer.copyOutToSlices(length, reservation.slices(), reservation.numSlices());
+    reservation.commit(rc);
+    const std::string data = buffer.toString();
+    const std::string target_data = target_buffer.toString();
+    FUZZ_ASSERT(::memcmp(data.data(), target_data.data(), reservation.length()) == 0);
     break;
   }
   case test::common::buffer::Action::kDrain: {
@@ -340,43 +394,45 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     if (max_length == 0) {
       break;
     }
-    int pipe_fds[2] = {0, 0};
-    FUZZ_ASSERT(::pipe(pipe_fds) == 0);
-    Network::IoSocketHandleImpl io_handle(pipe_fds[0]);
-    FUZZ_ASSERT(::fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK) == 0);
-    FUZZ_ASSERT(::fcntl(pipe_fds[1], F_SETFL, O_NONBLOCK) == 0);
+    int fds[2] = {0, 0};
+    auto& os_sys_calls = Api::OsSysCallsSingleton::get();
+    FUZZ_ASSERT(os_sys_calls.socketpair(AF_UNIX, SOCK_STREAM, 0, fds).return_value_ == 0);
+    Network::IoSocketHandleImpl io_handle(fds[0]);
+    FUZZ_ASSERT(::fcntl(fds[0], F_SETFL, O_NONBLOCK) == 0);
+    FUZZ_ASSERT(::fcntl(fds[1], F_SETFL, O_NONBLOCK) == 0);
     std::string data(max_length, insert_value);
-    const ssize_t rc = ::write(pipe_fds[1], data.data(), max_length);
+    const ssize_t rc = ::write(fds[1], data.data(), max_length);
     FUZZ_ASSERT(rc > 0);
     Api::IoCallUint64Result result = io_handle.read(target_buffer, max_length);
-    FUZZ_ASSERT(result.rc_ == static_cast<uint64_t>(rc));
-    FUZZ_ASSERT(::close(pipe_fds[1]) == 0);
+    FUZZ_ASSERT(result.return_value_ == static_cast<uint64_t>(rc));
+    FUZZ_ASSERT(::close(fds[1]) == 0);
     break;
   }
   case test::common::buffer::Action::kWrite: {
-    int pipe_fds[2] = {0, 0};
-    FUZZ_ASSERT(::pipe(pipe_fds) == 0);
-    Network::IoSocketHandleImpl io_handle(pipe_fds[1]);
-    FUZZ_ASSERT(::fcntl(pipe_fds[0], F_SETFL, O_NONBLOCK) == 0);
-    FUZZ_ASSERT(::fcntl(pipe_fds[1], F_SETFL, O_NONBLOCK) == 0);
-    uint64_t rc;
+    int fds[2] = {0, 0};
+    auto& os_sys_calls = Api::OsSysCallsSingleton::get();
+    FUZZ_ASSERT(os_sys_calls.socketpair(AF_UNIX, SOCK_STREAM, 0, fds).return_value_ == 0);
+    Network::IoSocketHandleImpl io_handle(fds[1]);
+    FUZZ_ASSERT(::fcntl(fds[0], F_SETFL, O_NONBLOCK) == 0);
+    FUZZ_ASSERT(::fcntl(fds[1], F_SETFL, O_NONBLOCK) == 0);
+    uint64_t return_value;
     do {
       const bool empty = target_buffer.length() == 0;
       const std::string previous_data = target_buffer.toString();
       const auto result = io_handle.write(target_buffer);
       FUZZ_ASSERT(result.ok());
-      rc = result.rc_;
-      ENVOY_LOG_MISC(trace, "Write rc: {} errno: {}", rc,
+      return_value = result.return_value_;
+      ENVOY_LOG_MISC(trace, "Write return_value: {} errno: {}", return_value,
                      result.err_ != nullptr ? result.err_->getErrorDetails() : "-");
       if (empty) {
-        FUZZ_ASSERT(rc == 0);
+        FUZZ_ASSERT(return_value == 0);
       } else {
-        auto buf = std::make_unique<char[]>(rc);
-        FUZZ_ASSERT(static_cast<uint64_t>(::read(pipe_fds[0], buf.get(), rc)) == rc);
-        FUZZ_ASSERT(::memcmp(buf.get(), previous_data.data(), rc) == 0);
+        auto buf = std::make_unique<char[]>(return_value);
+        FUZZ_ASSERT(static_cast<uint64_t>(::read(fds[0], buf.get(), return_value)) == return_value);
+        FUZZ_ASSERT(::memcmp(buf.get(), previous_data.data(), return_value) == 0);
       }
-    } while (rc > 0);
-    FUZZ_ASSERT(::close(pipe_fds[0]) == 0);
+    } while (return_value > 0);
+    FUZZ_ASSERT(::close(fds[0]) == 0);
     break;
   }
   case test::common::buffer::Action::kGetRawSlices: {
@@ -451,23 +507,26 @@ void executeActions(const test::common::buffer::BufferFuzzTestCase& input, Buffe
       // return the pointer to its std::string array, we can avoid the
       // toString() copy here.
       const uint64_t linear_buffer_length = linear_buffers[j]->length();
-      if (buffers[j]->toString() !=
-          absl::string_view(
+      // We may have spilled over TotalMaxAllocation at this point. Only compare up to
+      // TotalMaxAllocation.
+      if (absl::string_view(
               static_cast<const char*>(linear_buffers[j]->linearize(linear_buffer_length)),
-              linear_buffer_length)) {
+              linear_buffer_length)
+              .compare(buffers[j]->toString().substr(0, TotalMaxAllocation)) != 0) {
         ENVOY_LOG_MISC(debug, "Mismatched buffers at index {}", j);
         ENVOY_LOG_MISC(debug, "B: {}", buffers[j]->toString());
         ENVOY_LOG_MISC(debug, "L: {}", linear_buffers[j]->toString());
         FUZZ_ASSERT(false);
       }
-      FUZZ_ASSERT(buffers[j]->length() == linear_buffer_length);
+      FUZZ_ASSERT(std::min(TotalMaxAllocation, static_cast<uint32_t>(buffers[j]->length())) ==
+                  linear_buffer_length);
       current_allocated_bytes += linear_buffer_length;
     }
     ENVOY_LOG_MISC(debug, "[{} MB allocated total]", current_allocated_bytes / (1024.0 * 1024));
     // We bail out if buffers get too big, otherwise we will OOM the sanitizer.
     // We can't use Memory::Stats::totalCurrentlyAllocated() here as we don't
     // have tcmalloc in ASAN builds, so just do a simple count.
-    if (current_allocated_bytes > TotalMaxAllocation) {
+    if (current_allocated_bytes >= TotalMaxAllocation) {
       ENVOY_LOG_MISC(debug, "Terminating early with total buffer length {} to avoid OOM",
                      current_allocated_bytes);
       break;

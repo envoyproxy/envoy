@@ -5,8 +5,9 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "extensions/common/aws/signer.h"
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/common/cancel_wrapper.h"
+#include "source/extensions/common/aws/signer.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,9 +18,11 @@ namespace AwsRequestSigningFilter {
  * All stats for the AWS request signing filter. @see stats_macros.h
  */
 // clang-format off
-#define ALL_AWS_REQUEST_SIGNING_FILTER_STATS(COUNTER)                                                           \
-  COUNTER(signing_added)                                                                        \
-  COUNTER(signing_failed)
+#define ALL_AWS_REQUEST_SIGNING_FILTER_STATS(COUNTER)                                              \
+  COUNTER(signing_added)                                                                           \
+  COUNTER(signing_failed)                                                                          \
+  COUNTER(payload_signing_added)                                                                   \
+  COUNTER(payload_signing_failed)
 // clang-format on
 
 /**
@@ -32,9 +35,9 @@ struct FilterStats {
 /**
  * Abstract filter configuration.
  */
-class FilterConfig {
+class FilterConfig : public Router::RouteSpecificFilterConfig {
 public:
-  virtual ~FilterConfig() = default;
+  ~FilterConfig() override = default;
 
   /**
    * @return the config's signer.
@@ -50,6 +53,11 @@ public:
    * @return the host rewrite value.
    */
   virtual const std::string& hostRewrite() const PURE;
+
+  /**
+   * @return whether or not to buffer and sign the payload.
+   */
+  virtual bool useUnsignedPayload() const PURE;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -60,16 +68,18 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 class FilterConfigImpl : public FilterConfig {
 public:
   FilterConfigImpl(Extensions::Common::Aws::SignerPtr&& signer, const std::string& stats_prefix,
-                   Stats::Scope& scope, const std::string& host_rewrite);
+                   Stats::Scope& scope, const std::string& host_rewrite, bool use_unsigned_payload);
 
   Extensions::Common::Aws::Signer& signer() override;
   FilterStats& stats() override;
   const std::string& hostRewrite() const override;
+  bool useUnsignedPayload() const override;
 
 private:
   Extensions::Common::Aws::SignerPtr signer_;
   FilterStats stats_;
   std::string host_rewrite_;
+  const bool use_unsigned_payload_;
 };
 
 /**
@@ -78,14 +88,26 @@ private:
 class Filter : public Http::PassThroughDecoderFilter, Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(const std::shared_ptr<FilterConfig>& config);
+  ~Filter() override { cancel_callback_(); }
 
   static FilterStats generateStats(const std::string& prefix, Stats::Scope& scope);
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override;
 
+  Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
+
 private:
+  FilterConfig& getConfig() const;
+  void continueDecodeHeaders(FilterConfig& config);
+  void continueDecodeData(FilterConfig& config, const std::string hash);
+
+  void addSigningStats(FilterConfig& config, absl::Status status) const;
+  void addSigningPayloadStats(FilterConfig& config, absl::Status status) const;
+
   std::shared_ptr<FilterConfig> config_;
+  Http::RequestHeaderMap* request_headers_{};
+  Envoy::CancelWrapper::CancelFunction cancel_callback_ = []() {};
 };
 
 } // namespace AwsRequestSigningFilter

@@ -1,19 +1,18 @@
-#include "extensions/transport_sockets/proxy_protocol/config.h"
+#include "source/extensions/transport_sockets/proxy_protocol/config.h"
 
 #include "envoy/extensions/transport_sockets/proxy_protocol/v3/upstream_proxy_protocol.pb.h"
 #include "envoy/extensions/transport_sockets/proxy_protocol/v3/upstream_proxy_protocol.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/utility.h"
-
-#include "extensions/transport_sockets/proxy_protocol/proxy_protocol.h"
+#include "source/common/config/utility.h"
+#include "source/extensions/transport_sockets/proxy_protocol/proxy_protocol.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace ProxyProtocol {
 
-Network::TransportSocketFactoryPtr
+absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
 UpstreamProxyProtocolSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& message,
     Server::Configuration::TransportSocketFactoryContext& context) {
@@ -25,10 +24,11 @@ UpstreamProxyProtocolSocketConfigFactory::createTransportSocketFactory(
       Server::Configuration::UpstreamTransportSocketConfigFactory>(outer_config.transport_socket());
   ProtobufTypes::MessagePtr inner_factory_config = Config::Utility::translateToFactoryConfig(
       outer_config.transport_socket(), context.messageValidationVisitor(), inner_config_factory);
-  auto inner_transport_factory =
+  auto factory_or_error =
       inner_config_factory.createTransportSocketFactory(*inner_factory_config, context);
-  return std::make_unique<UpstreamProxyProtocolSocketFactory>(std::move(inner_transport_factory),
-                                                              outer_config.config());
+  RETURN_IF_NOT_OK_REF(factory_or_error.status());
+  return std::make_unique<UpstreamProxyProtocolSocketFactory>(
+      std::move(factory_or_error.value()), outer_config.config(), context.statsScope());
 }
 
 ProtobufTypes::MessagePtr UpstreamProxyProtocolSocketConfigFactory::createEmptyConfigProto() {

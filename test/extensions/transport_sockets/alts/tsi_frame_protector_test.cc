@@ -1,6 +1,5 @@
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/transport_sockets/alts/tsi_frame_protector.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/transport_sockets/alts/tsi_frame_protector.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -31,35 +30,40 @@ protected:
 
 TEST_F(TsiFrameProtectorTest, Protect) {
   {
-    Buffer::OwnedImpl input, encrypted;
-    input.add("foo");
+    Buffer::OwnedImpl encrypted;
 
-    EXPECT_EQ(TSI_OK, frame_protector_.protect(input, encrypted));
+    EXPECT_EQ(TSI_OK, frame_protector_.protect(grpc_slice_from_static_string("foo"), encrypted));
     EXPECT_EQ("\x07\0\0\0foo"s, encrypted.toString());
   }
 
   {
-    Buffer::OwnedImpl input, encrypted;
-    input.add("foo");
+    Buffer::OwnedImpl encrypted;
 
-    EXPECT_EQ(TSI_OK, frame_protector_.protect(input, encrypted));
+    EXPECT_EQ(TSI_OK, frame_protector_.protect(grpc_slice_from_static_string("foo"), encrypted));
     EXPECT_EQ("\x07\0\0\0foo"s, encrypted.toString());
 
-    input.add("bar");
-    EXPECT_EQ(TSI_OK, frame_protector_.protect(input, encrypted));
+    EXPECT_EQ(TSI_OK, frame_protector_.protect(grpc_slice_from_static_string("bar"), encrypted));
     EXPECT_EQ("\x07\0\0\0foo\x07\0\0\0bar"s, encrypted.toString());
   }
 
   {
-    Buffer::OwnedImpl input, encrypted;
-    input.add(std::string(20000, 'a'));
+    Buffer::OwnedImpl encrypted;
 
-    EXPECT_EQ(TSI_OK, frame_protector_.protect(input, encrypted));
+    EXPECT_EQ(TSI_OK,
+              frame_protector_.protect(
+                  grpc_slice_from_static_string(std::string(20000, 'a').c_str()), encrypted));
 
     // fake frame protector will split long buffer to 2 "encrypted" frames with length 16K.
     std::string expected =
         "\0\x40\0\0"s + std::string(16380, 'a') + "\x28\x0e\0\0"s + std::string(3620, 'a');
     EXPECT_EQ(expected, encrypted.toString());
+  }
+
+  {
+    Buffer::OwnedImpl encrypted;
+
+    EXPECT_EQ(frame_protector_.protect(grpc_empty_slice(), encrypted), TSI_OK);
+    EXPECT_EQ(encrypted.length(), 0);
   }
 }
 
@@ -71,10 +75,10 @@ TEST_F(TsiFrameProtectorTest, ProtectError) {
   };
   raw_frame_protector_->vtable = &mock_vtable;
 
-  Buffer::OwnedImpl input, encrypted;
-  input.add("foo");
+  Buffer::OwnedImpl encrypted;
 
-  EXPECT_EQ(TSI_INTERNAL_ERROR, frame_protector_.protect(input, encrypted));
+  EXPECT_EQ(TSI_INTERNAL_ERROR,
+            frame_protector_.protect(grpc_slice_from_static_string("foo"), encrypted));
 
   raw_frame_protector_->vtable = vtable;
 }
@@ -108,12 +112,20 @@ TEST_F(TsiFrameProtectorTest, Unprotect) {
     EXPECT_EQ(TSI_OK, frame_protector_.unprotect(input, decrypted));
     EXPECT_EQ(std::string(20000, 'a'), decrypted.toString());
   }
+
+  {
+    Buffer::OwnedImpl input, decrypted;
+
+    EXPECT_EQ(TSI_OK, frame_protector_.unprotect(input, decrypted));
+    EXPECT_EQ(decrypted.length(), 0);
+  }
 }
+
 TEST_F(TsiFrameProtectorTest, UnprotectError) {
   const tsi_zero_copy_grpc_protector_vtable* vtable = raw_frame_protector_->vtable;
   tsi_zero_copy_grpc_protector_vtable mock_vtable = *raw_frame_protector_->vtable;
-  mock_vtable.unprotect = [](tsi_zero_copy_grpc_protector*, grpc_slice_buffer*,
-                             grpc_slice_buffer*) { return TSI_INTERNAL_ERROR; };
+  mock_vtable.unprotect = [](tsi_zero_copy_grpc_protector*, grpc_slice_buffer*, grpc_slice_buffer*,
+                             int*) { return TSI_INTERNAL_ERROR; };
   raw_frame_protector_->vtable = &mock_vtable;
 
   Buffer::OwnedImpl input, decrypted;

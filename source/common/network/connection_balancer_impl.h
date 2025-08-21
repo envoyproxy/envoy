@@ -1,11 +1,28 @@
 #pragma once
 
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/network/connection_balancer.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
+
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 namespace Network {
+/**
+ * A base factory to create connection balance, which makes it easier to extend.
+ */
+class ConnectionBalanceFactory : public Config::TypedFactory {
+public:
+  ~ConnectionBalanceFactory() override = default;
+  virtual ConnectionBalancerSharedPtr
+  createConnectionBalancerFromProto(const Protobuf::Message& config,
+                                    Server::Configuration::FactoryContext& context) PURE;
+
+  std::string category() const override { return "envoy.network.connection_balance"; }
+};
 
 /**
  * Implementation of connection balancer that does exact balancing. This means that a lock is held

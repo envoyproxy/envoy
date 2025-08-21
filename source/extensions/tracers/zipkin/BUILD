@@ -15,7 +15,6 @@ envoy_cc_library(
     name = "zipkin_lib",
     srcs = [
         "span_buffer.cc",
-        "span_context.cc",
         "span_context_extractor.cc",
         "tracer.cc",
         "util.cc",
@@ -34,17 +33,14 @@ envoy_cc_library(
         "zipkin_json_field_names.h",
         "zipkin_tracer_impl.h",
     ],
-    external_deps = [
-        "abseil_optional",
-    ],
     deps = [
-        "//include/envoy/common:time_interface",
-        "//include/envoy/local_info:local_info_interface",
-        "//include/envoy/network:address_interface",
-        "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/thread_local:thread_local_interface",
-        "//include/envoy/tracing:http_tracer_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/common:time_interface",
+        "//envoy/local_info:local_info_interface",
+        "//envoy/network:address_interface",
+        "//envoy/runtime:runtime_interface",
+        "//envoy/thread_local:thread_local_interface",
+        "//envoy/tracing:tracer_interface",
+        "//envoy/upstream:cluster_manager_interface",
         "//source/common/common:enum_to_int",
         "//source/common/common:hex_lib",
         "//source/common/common:utility_lib",
@@ -58,7 +54,9 @@ envoy_cc_library(
         "//source/common/singleton:const_singleton",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:cluster_update_tracker_lib",
+        "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
         "@com_github_openzipkin_zipkinapi//:zipkin_cc_proto",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
@@ -67,11 +65,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    # Legacy test use. TODO(#9953) clean up.
-    extra_visibility = [
-        "//test/server:__subpackages__",
-    ],
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
         ":zipkin_lib",
         "//source/extensions/tracers/common:factory_base_lib",

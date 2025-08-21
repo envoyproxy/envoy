@@ -1,0 +1,43 @@
+node {
+  id: "\016\000\317@"
+  cluster: "@"
+}
+dynamic_resources {
+  ads_config {
+    api_type: DELTA_GRPC
+    grpc_services {
+      google_grpc {
+        target_uri: "7.0z1"
+        stat_prefix: "Ny"
+      }
+    }
+    rate_limit_settings {
+      max_tokens {
+      }
+      fill_rate {
+        value: nan
+      }
+    }
+  }
+}
+layered_runtime {
+  layers {
+    name: "0"
+    rtds_layer {
+      name: "1="
+      rtds_config {
+        ads {
+        }
+        initial_fetch_timeout {
+          seconds: 9472
+        }
+      }
+    }
+  }
+  layers {
+    name: "q"
+    static_layer {
+    }
+  }
+}
+default_socket_interface: "#"

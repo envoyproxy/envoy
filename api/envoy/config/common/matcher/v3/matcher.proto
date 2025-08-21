@@ -6,14 +6,13 @@ import "envoy/config/core/v3/extension.proto";
 import "envoy/config/route/v3/route_components.proto";
 import "envoy/type/matcher/v3/string.proto";
 
-import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.common.matcher.v3";
 option java_outer_classname = "MatcherProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/common/matcher/v3;matcherv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Unified Matcher API]
@@ -24,8 +23,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // As an on_no_match might result in another matching tree being evaluated, this process
 // might repeat several times until the final OnMatch (or no match) is decided.
 //
-// This API is a work in progress.
-// [#not-implemented-hide:]
+// .. note::
+//   Please use the syntactically equivalent :ref:`matching API <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`
 message Matcher {
   // What to do if a match is successful.
   message OnMatch {
@@ -42,6 +41,17 @@ message Matcher {
       // Protocol-specific action to take.
       core.v3.TypedExtensionConfig action = 2;
     }
+
+    // If true, the action will be taken but the caller will behave as if no
+    // match was found. This applies both to actions directly encoded in the
+    // action field and to actions returned from a nested matcher tree in the
+    // matcher field. A subsequent matcher on_no_match action will be used
+    // instead.
+    //
+    // This field is not supported in all contexts in which the matcher API is
+    // used. If this field is set in a context in which it's not supported,
+    // the resource will be rejected.
+    bool keep_matching = 3;
   }
 
   // A linear list of field matchers.
@@ -53,6 +63,7 @@ message Matcher {
       // Predicate for a single input field.
       message SinglePredicate {
         // Protocol-specific specification of input field to match on.
+        // [#extension-category: envoy.matching.common_inputs]
         core.v3.TypedExtensionConfig input = 1 [(validate.rules).message = {required: true}];
 
         oneof matcher {
@@ -62,6 +73,7 @@ message Matcher {
           type.matcher.v3.StringMatcher value_match = 2;
 
           // Extension for custom matching logic.
+          // [#extension-category: envoy.matching.input_matchers]
           core.v3.TypedExtensionConfig custom_match = 3;
         }
       }
@@ -82,6 +94,9 @@ message Matcher {
 
         // A list of predicates to be AND-ed together.
         PredicateList and_matcher = 3;
+
+        // The inverse of a predicate
+        Predicate not_matcher = 4;
       }
     }
 
@@ -133,8 +148,8 @@ message Matcher {
     MatcherTree matcher_tree = 2;
   }
 
-  // Optional OnMatch to use if the matcher failed.
-  // If specified, the OnMatch is used, and the matcher is considered
+  // Optional ``OnMatch`` to use if the matcher failed.
+  // If specified, the ``OnMatch`` is used, and the matcher is considered
   // to have matched.
   // If not specified, the matcher is considered not to have matched.
   OnMatch on_no_match = 3;
@@ -200,9 +215,9 @@ message HttpHeadersMatch {
 //
 // .. attention::
 //
-//   Searching for patterns in HTTP body is potentially cpu intensive. For each specified pattern, http body is scanned byte by byte to find a match.
+//   Searching for patterns in HTTP body is potentially CPU-intensive. For each specified pattern, HTTP body is scanned byte by byte to find a match.
 //   If multiple patterns are specified, the process is repeated for each pattern. If location of a pattern is known, ``bytes_limit`` should be specified
-//   to scan only part of the http body.
+//   to scan only part of the HTTP body.
 message HttpGenericBodyMatch {
   message GenericTextMatch {
     oneof rule {

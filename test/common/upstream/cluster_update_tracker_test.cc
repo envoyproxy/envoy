@@ -1,4 +1,4 @@
-#include "common/upstream/cluster_update_tracker.h"
+#include "source/common/upstream/cluster_update_tracker.h"
 
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/upstream/thread_local_cluster.h"
@@ -52,14 +52,16 @@ TEST_F(ClusterUpdateTrackerTest, ShouldProperlyHandleUpdateCallbacks) {
 
   {
     // Simulate addition of an irrelevant cluster.
-    cluster_tracker.onClusterAddOrUpdate(irrelevant_);
+    ThreadLocalClusterCommand command = [this]() -> ThreadLocalCluster& { return irrelevant_; };
+    cluster_tracker.onClusterAddOrUpdate("unrelated_cluster", command);
 
     EXPECT_FALSE(cluster_tracker.threadLocalCluster().has_value());
   }
 
   {
     // Simulate addition of the relevant cluster.
-    cluster_tracker.onClusterAddOrUpdate(expected_);
+    ThreadLocalClusterCommand command = [this]() -> ThreadLocalCluster& { return expected_; };
+    cluster_tracker.onClusterAddOrUpdate(cluster_name_, command);
 
     ASSERT_TRUE(cluster_tracker.threadLocalCluster().has_value());
     EXPECT_EQ(cluster_tracker.threadLocalCluster()->get().info(), expected_.cluster_.info_);

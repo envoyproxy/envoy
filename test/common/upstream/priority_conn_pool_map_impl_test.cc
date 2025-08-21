@@ -2,7 +2,7 @@
 
 #include "envoy/http/conn_pool.h"
 
-#include "common/upstream/priority_conn_pool_map_impl.h"
+#include "source/common/upstream/priority_conn_pool_map_impl.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
@@ -33,6 +33,13 @@ public:
       ON_CALL(*pool, hasActiveConnections).WillByDefault(Return(false));
       mock_pools_.push_back(pool.get());
       return pool;
+    };
+  }
+
+  TestMap::PoolFactory getNeverCalledFactory() {
+    return []() {
+      EXPECT_TRUE(false);
+      return nullptr;
     };
   }
 
@@ -101,7 +108,25 @@ TEST_F(PriorityConnPoolMapImplTest, TestClearEmptiesOut) {
   test_map->getPool(ResourcePriority::Default, 2, getBasicFactory());
   test_map->clear();
 
-  EXPECT_EQ(test_map->size(), 0);
+  EXPECT_TRUE(test_map->empty());
+}
+
+TEST_F(PriorityConnPoolMapImplTest, TestErase) {
+  TestMapPtr test_map = makeTestMap();
+
+  auto* pool_ptr = &test_map->getPool(ResourcePriority::High, 1, getBasicFactory()).value().get();
+  EXPECT_EQ(1, test_map->size());
+  EXPECT_EQ(pool_ptr,
+            &test_map->getPool(ResourcePriority::High, 1, getNeverCalledFactory()).value().get());
+  EXPECT_FALSE(test_map->erasePool(ResourcePriority::Default, 1));
+  EXPECT_NE(pool_ptr,
+            &test_map->getPool(ResourcePriority::Default, 1, getBasicFactory()).value().get());
+  EXPECT_EQ(2, test_map->size());
+  EXPECT_TRUE(test_map->erasePool(ResourcePriority::Default, 1));
+  EXPECT_TRUE(test_map->erasePool(ResourcePriority::High, 1));
+  EXPECT_TRUE(test_map->empty());
+  EXPECT_NE(pool_ptr,
+            &test_map->getPool(ResourcePriority::High, 1, getBasicFactory()).value().get());
 }
 
 // Show that the drained callback is invoked once for the high priority pool, and once for
@@ -112,13 +137,13 @@ TEST_F(PriorityConnPoolMapImplTest, TestAddDrainedCbProxiedThrough) {
   test_map->getPool(ResourcePriority::High, 0, getBasicFactory());
   test_map->getPool(ResourcePriority::Default, 0, getBasicFactory());
 
-  Http::ConnectionPool::Instance::DrainedCb cbHigh;
-  EXPECT_CALL(*mock_pools_[0], addDrainedCallback(_)).WillOnce(SaveArg<0>(&cbHigh));
-  Http::ConnectionPool::Instance::DrainedCb cbDefault;
-  EXPECT_CALL(*mock_pools_[1], addDrainedCallback(_)).WillOnce(SaveArg<0>(&cbDefault));
+  Http::ConnectionPool::Instance::IdleCb cbHigh;
+  EXPECT_CALL(*mock_pools_[0], addIdleCallback(_)).WillOnce(SaveArg<0>(&cbHigh));
+  Http::ConnectionPool::Instance::IdleCb cbDefault;
+  EXPECT_CALL(*mock_pools_[1], addIdleCallback(_)).WillOnce(SaveArg<0>(&cbDefault));
 
   ReadyWatcher watcher;
-  test_map->addDrainedCallback([&watcher] { watcher.ready(); });
+  test_map->addIdleCallback([&watcher]() { watcher.ready(); });
 
   EXPECT_CALL(watcher, ready()).Times(2);
   cbHigh();
@@ -131,10 +156,12 @@ TEST_F(PriorityConnPoolMapImplTest, TestDrainConnectionsProxiedThrough) {
   test_map->getPool(ResourcePriority::High, 0, getBasicFactory());
   test_map->getPool(ResourcePriority::Default, 0, getBasicFactory());
 
-  EXPECT_CALL(*mock_pools_[0], drainConnections());
-  EXPECT_CALL(*mock_pools_[1], drainConnections());
+  EXPECT_CALL(*mock_pools_[0],
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
+  EXPECT_CALL(*mock_pools_[1],
+              drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections));
 
-  test_map->drainConnections();
+  test_map->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
 }
 
 } // namespace

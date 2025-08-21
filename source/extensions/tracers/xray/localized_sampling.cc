@@ -1,17 +1,20 @@
-#include "extensions/tracers/xray/localized_sampling.h"
+#include "source/extensions/tracers/xray/localized_sampling.h"
 
-#include "common/http/exception.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/tracers/xray/util.h"
+#include "source/common/http/exception.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/tracers/xray/util.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace XRay {
 
-constexpr double DefaultRate = 0.5;
+// Corresponds to 5% sampling rate when no custom rules are applied.
+constexpr double DefaultRate = 0.05;
+// Determines how many requests to sample per second before default
+// sampling rate kicks in when no custom rules are applied.
 constexpr int DefaultFixedTarget = 1;
+// The required 'version' of sampling manifest file when localized sampling is applied.
 constexpr int SamplingFileVersion = 2;
 constexpr auto VersionJsonKey = "version";
 constexpr auto DefaultRuleJsonKey = "default";
@@ -28,11 +31,11 @@ void fail(absl::string_view msg) {
   ENVOY_LOG_TO_LOGGER(logger, error, "Failed to parse sampling rules - {}", msg);
 }
 
-bool is_valid_rate(double n) { return n >= 0 && n <= 1.0; }
-bool is_valid_fixed_target(double n) { return n >= 0 && static_cast<uint32_t>(n) == n; }
+bool isValidRate(double n) { return n >= 0 && n <= 1.0; }
+bool isValidFixedTarget(double n) { return n >= 0 && static_cast<uint32_t>(n) == n; }
 
-bool validateRule(const ProtobufWkt::Struct& rule) {
-  using ProtobufWkt::Value;
+bool validateRule(const Protobuf::Struct& rule) {
+  using Protobuf::Value;
 
   const auto host_it = rule.fields().find(HostJsonKey);
   if (host_it != rule.fields().end() &&
@@ -58,7 +61,7 @@ bool validateRule(const ProtobufWkt::Struct& rule) {
   const auto fixed_target_it = rule.fields().find(FixedTargetJsonKey);
   if (fixed_target_it == rule.fields().end() ||
       fixed_target_it->second.kind_case() != Value::KindCase::kNumberValue ||
-      !is_valid_fixed_target(fixed_target_it->second.number_value())) {
+      !isValidFixedTarget(fixed_target_it->second.number_value())) {
     fail("fixed target is missing or not a valid positive integer");
     return false;
   }
@@ -66,7 +69,7 @@ bool validateRule(const ProtobufWkt::Struct& rule) {
   const auto rate_it = rule.fields().find(RateJsonKey);
   if (rate_it == rule.fields().end() ||
       rate_it->second.kind_case() != Value::KindCase::kNumberValue ||
-      !is_valid_rate(rate_it->second.number_value())) {
+      !isValidRate(rate_it->second.number_value())) {
     fail("rate is missing or not a valid positive floating number");
     return false;
   }
@@ -75,7 +78,7 @@ bool validateRule(const ProtobufWkt::Struct& rule) {
 } // namespace
 
 LocalizedSamplingRule LocalizedSamplingRule::createDefault() {
-  return LocalizedSamplingRule(DefaultFixedTarget, DefaultRate);
+  return {DefaultFixedTarget, DefaultRate};
 }
 
 bool LocalizedSamplingRule::appliesTo(const SamplingRequest& request) const {
@@ -90,10 +93,9 @@ LocalizedSamplingManifest::LocalizedSamplingManifest(const std::string& rule_jso
     return;
   }
 
-  ProtobufWkt::Struct document;
-  try {
-    MessageUtil::loadFromJson(rule_json, document);
-  } catch (EnvoyException& e) {
+  Protobuf::Struct document;
+  TRY_NEEDS_AUDIT { MessageUtil::loadFromJson(rule_json, document); }
+  END_TRY catch (EnvoyException& e) {
     fail("invalid JSON format");
     return;
   }
@@ -104,7 +106,7 @@ LocalizedSamplingManifest::LocalizedSamplingManifest(const std::string& rule_jso
     return;
   }
 
-  if (version_it->second.kind_case() != ProtobufWkt::Value::KindCase::kNumberValue ||
+  if (version_it->second.kind_case() != Protobuf::Value::KindCase::kNumberValue ||
       version_it->second.number_value() != SamplingFileVersion) {
     fail("wrong version number");
     return;
@@ -112,7 +114,7 @@ LocalizedSamplingManifest::LocalizedSamplingManifest(const std::string& rule_jso
 
   const auto default_rule_it = document.fields().find(DefaultRuleJsonKey);
   if (default_rule_it == document.fields().end() ||
-      default_rule_it->second.kind_case() != ProtobufWkt::Value::KindCase::kStructValue) {
+      default_rule_it->second.kind_case() != Protobuf::Value::KindCase::kStructValue) {
     fail("missing default rule");
     return;
   }
@@ -132,13 +134,13 @@ LocalizedSamplingManifest::LocalizedSamplingManifest(const std::string& rule_jso
     return;
   }
 
-  if (custom_rules_it->second.kind_case() != ProtobufWkt::Value::KindCase::kListValue) {
+  if (custom_rules_it->second.kind_case() != Protobuf::Value::KindCase::kListValue) {
     fail("rules must be JSON array");
     return;
   }
 
   for (auto& el : custom_rules_it->second.list_value().values()) {
-    if (el.kind_case() != ProtobufWkt::Value::KindCase::kStructValue) {
+    if (el.kind_case() != Protobuf::Value::KindCase::kStructValue) {
       fail("rules array must be objects");
       return;
     }
@@ -174,16 +176,16 @@ LocalizedSamplingManifest::LocalizedSamplingManifest(const std::string& rule_jso
 }
 
 bool LocalizedSamplingStrategy::shouldTrace(const SamplingRequest& sampling_request) {
-  if (!custom_manifest_.hasCustomRules()) {
-    return shouldTrace(default_manifest_.defaultRule());
+  if (!manifest_.hasCustomRules()) {
+    return shouldTrace(manifest_.defaultRule());
   }
 
-  for (auto&& rule : custom_manifest_.customRules()) {
+  for (auto&& rule : manifest_.customRules()) {
     if (rule.appliesTo(sampling_request)) {
       return shouldTrace(rule);
     }
   }
-  return shouldTrace(custom_manifest_.defaultRule());
+  return shouldTrace(manifest_.defaultRule());
 }
 
 bool LocalizedSamplingStrategy::shouldTrace(LocalizedSamplingRule& rule) {

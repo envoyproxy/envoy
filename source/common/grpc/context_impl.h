@@ -1,15 +1,16 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
 #include "envoy/grpc/context.h"
 #include "envoy/http/header_map.h"
 
-#include "common/common/hash.h"
-#include "common/grpc/stat_names.h"
-#include "common/stats/symbol_table_impl.h"
-#include "common/stats/utility.h"
+#include "source/common/common/hash.h"
+#include "source/common/grpc/stat_names.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/utility.h"
 
 #include "absl/types/optional.h"
 
@@ -51,6 +52,16 @@ public:
    */
   absl::optional<RequestStatNames>
   resolveDynamicServiceAndMethod(const Http::HeaderEntry* path) override;
+
+  /**
+   * Resolve the gRPC service and method from the HTTP2 :path header. Replace dots in the gRPC
+   * service name if there are any.
+   * @param path supplies the :path header.
+   * @return if both gRPC serve and method have been resolved successfully returns
+   *   a populated RequestStatNames, otherwise returns an empty optional.
+   */
+  absl::optional<RequestStatNames>
+  resolveDynamicServiceAndMethodWithDotReplaced(const Http::HeaderEntry* path) override;
 
   Stats::StatName successStatName(bool success) const { return success ? success_ : failure_; }
   Stats::StatName protocolStatName(Protocol protocol) const {

@@ -4,10 +4,9 @@
 #include "envoy/extensions/compression/gzip/decompressor/v3/gzip.pb.h"
 #include "envoy/extensions/compression/gzip/decompressor/v3/gzip.pb.validate.h"
 
-#include "common/http/headers.h"
-
-#include "extensions/compression/common/decompressor/factory_base.h"
-#include "extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
+#include "source/common/http/headers.h"
+#include "source/extensions/compression/common/decompressor/factory_base.h"
+#include "source/extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -40,10 +39,11 @@ private:
   Stats::Scope& scope_;
   const int32_t window_bits_;
   const uint32_t chunk_size_;
+  const uint64_t max_inflate_ratio_;
 };
 
 class GzipDecompressorLibraryFactory
-    : public Common::Decompressor::DecompressorLibraryFactoryBase<
+    : public Compression::Common::Decompressor::DecompressorLibraryFactoryBase<
           envoy::extensions::compression::gzip::decompressor::v3::Gzip> {
 public:
   GzipDecompressorLibraryFactory() : DecompressorLibraryFactoryBase(gzipExtensionName()) {}

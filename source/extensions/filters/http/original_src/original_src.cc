@@ -1,8 +1,7 @@
-#include "extensions/filters/http/original_src/original_src.h"
+#include "source/extensions/filters/http/original_src/original_src.h"
 
-#include "common/common/assert.h"
-
-#include "extensions/filters/common/original_src/socket_option_factory.h"
+#include "source/common/common/assert.h"
+#include "source/extensions/filters/common/original_src/socket_option_factory.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,7 +13,8 @@ OriginalSrcFilter::OriginalSrcFilter(const Config& config) : config_(config) {}
 void OriginalSrcFilter::onDestroy() {}
 
 Http::FilterHeadersStatus OriginalSrcFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
-  const auto downstream_address = callbacks_->streamInfo().downstreamRemoteAddress();
+  const auto downstream_address =
+      callbacks_->streamInfo().downstreamAddressProvider().remoteAddress();
   ASSERT(downstream_address);
 
   if (downstream_address->type() != Network::Address::Type::Ip) {

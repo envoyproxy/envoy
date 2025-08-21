@@ -12,9 +12,18 @@ envoy_package()
 
 genrule(
     name = "generate_version_number",
-    srcs = ["//:VERSION"],
+    srcs = ["//:VERSION.txt"],
     outs = ["version_number.h"],
     cmd = """echo "#define BUILD_VERSION_NUMBER \\"$$(cat $<)\\"" >$@""",
+    visibility = ["//visibility:private"],
+)
+
+genrule(
+    name = "generate_api_version_number",
+    srcs = ["//:API_VERSION.txt"],
+    outs = ["api_version_number.h"],
+    cmd = """./$(location //tools/api_versioning:generate_api_version_header_bin) $< >$@""",
+    tools = ["//tools/api_versioning:generate_api_version_header_bin"],
     visibility = ["//visibility:private"],
 )
 
@@ -53,11 +62,27 @@ envoy_cc_library(
         ["-DENVOY_SSL_VERSION=\\\"BoringSSL-FIPS\\\""],
         ["-DENVOY_SSL_VERSION=\\\"BoringSSL\\\""],
     ),
+    external_deps = ["ssl"],
+    tags = ["notidy"],
     deps = [
         ":version_includes",
         "//source/common/common:macros",
         "//source/common/protobuf:utility_lib",
     ],
+)
+
+envoy_cc_library(
+    name = "api_version_includes",
+    hdrs = [
+        "api_version_struct.h",
+        ":generate_api_version_number",
+    ],
+)
+
+envoy_cc_library(
+    name = "api_version_lib",
+    hdrs = ["api_version.h"],
+    deps = [":api_version_includes"],
 )
 
 envoy_basic_cc_library(

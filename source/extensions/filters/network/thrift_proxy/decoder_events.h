@@ -1,7 +1,7 @@
 #pragma once
 
-#include "extensions/filters/network/thrift_proxy/metadata.h"
-#include "extensions/filters/network/thrift_proxy/thrift.h"
+#include "source/extensions/filters/network/thrift_proxy/metadata.h"
+#include "source/extensions/filters/network/thrift_proxy/thrift.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,6 +15,32 @@ enum class FilterStatus {
   // Stop iterating over filters in the filter chain. Iteration must be explicitly restarted via
   // continueDecoding().
   StopIteration
+};
+
+enum class DecoderEvent {
+  TransportBegin,
+  TransportEnd,
+  PassthroughData,
+  MessageBegin,
+  MessageEnd,
+  StructBegin,
+  StructEnd,
+  FieldBegin,
+  FieldEnd,
+  BoolValue,
+  ByteValue,
+  DoubleValue,
+  Int16Value,
+  Int32Value,
+  Int64Value,
+  StringValue,
+  ListBegin,
+  ListEnd,
+  SetBegin,
+  SetEnd,
+  MapBegin,
+  MapEnd,
+  ContinueDecode
 };
 
 class DecoderEventHandler {

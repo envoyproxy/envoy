@@ -2,12 +2,11 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/thrift_proxy/filters/filter.h"
-#include "extensions/filters/network/thrift_proxy/protocol.h"
-#include "extensions/filters/network/thrift_proxy/transport.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
+#include "source/extensions/filters/network/thrift_proxy/protocol.h"
+#include "source/extensions/filters/network/thrift_proxy/transport.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,6 +19,7 @@ namespace ThriftProxy {
   FUNCTION(PassthroughData)                                                                        \
   FUNCTION(MessageBegin)                                                                           \
   FUNCTION(MessageEnd)                                                                             \
+  FUNCTION(ReplyPayload)                                                                           \
   FUNCTION(StructBegin)                                                                            \
   FUNCTION(StructEnd)                                                                              \
   FUNCTION(FieldBegin)                                                                             \
@@ -67,8 +67,7 @@ class DecoderStateMachine : public Logger::Loggable<Logger::Id::thrift> {
 public:
   DecoderStateMachine(Protocol& proto, MessageMetadataSharedPtr& metadata,
                       DecoderEventHandler& handler, DecoderCallbacks& callbacks)
-      : proto_(proto), metadata_(metadata), handler_(handler), callbacks_(callbacks),
-        state_(ProtocolState::MessageBegin) {}
+      : proto_(proto), metadata_(metadata), handler_(handler), callbacks_(callbacks) {}
 
   /**
    * Consumes as much data from the configured Buffer as possible and executes the decoding state
@@ -88,7 +87,14 @@ public:
   ProtocolState currentState() const { return state_; }
 
   /**
-   * Set the current state. Used for testing only.
+   * Consumes whole passthrough data without the message start portion.
+   * @param buffer a buffer containing whole passthrough data
+   * @throw Envoy Exception if thrown by the underlying Protocol
+   */
+  void runPassthroughData(Buffer::Instance& buffer);
+
+  /**
+   * Set the current state. Used for testing and decoder internal only.
    */
   void setCurrentState(ProtocolState state) { state_ = state; }
 
@@ -122,9 +128,9 @@ private:
   };
 
   struct DecoderStatus {
-    DecoderStatus(ProtocolState next_state) : next_state_(next_state){};
+    DecoderStatus(ProtocolState next_state) : next_state_(next_state) {};
     DecoderStatus(ProtocolState next_state, FilterStatus filter_status)
-        : next_state_(next_state), filter_status_(filter_status){};
+        : next_state_(next_state), filter_status_(filter_status) {};
 
     ProtocolState next_state_;
     absl::optional<FilterStatus> filter_status_;
@@ -135,6 +141,7 @@ private:
   DecoderStatus passthroughData(Buffer::Instance& buffer);
   DecoderStatus messageBegin(Buffer::Instance& buffer);
   DecoderStatus messageEnd(Buffer::Instance& buffer);
+  DecoderStatus replyPayload(Buffer::Instance& buffer);
   DecoderStatus structBegin(Buffer::Instance& buffer);
   DecoderStatus structEnd(Buffer::Instance& buffer);
   DecoderStatus fieldBegin(Buffer::Instance& buffer);
@@ -150,6 +157,10 @@ private:
   DecoderStatus setBegin(Buffer::Instance& buffer);
   DecoderStatus setValue(Buffer::Instance& buffer);
   DecoderStatus setEnd(Buffer::Instance& buffer);
+
+  // handleMessageBegin calls the handler for messageBegin and then determines whether to
+  // perform payload passthrough or not
+  DecoderStatus handleMessageBegin();
 
   // handleValue represents the generic Value state from the state machine documentation. It
   // returns either ProtocolState::WaitForData if more data is required or the next state. For
@@ -170,8 +181,9 @@ private:
   MessageMetadataSharedPtr metadata_;
   DecoderEventHandler& handler_;
   DecoderCallbacks& callbacks_;
-  ProtocolState state_;
+  ProtocolState state_{ProtocolState::MessageBegin};
   std::vector<Frame> stack_;
+  uint32_t body_start_{};
   uint32_t body_bytes_{};
 };
 
@@ -190,6 +202,18 @@ public:
    * @return True if payload passthrough is enabled and is supported by filter chain.
    */
   virtual bool passthroughEnabled() const PURE;
+
+  /**
+   * @return True if the expected message comes from the client.
+   *
+   * See https://github.com/apache/thrift/blob/master/lib/ts/thrift.d.ts#L68.
+   */
+  virtual bool isRequest() const PURE;
+
+  /**
+   * @return True if payload header keys should be treated as case-sensitive.
+   */
+  virtual bool headerKeysPreserveCase() const PURE;
 };
 
 /**

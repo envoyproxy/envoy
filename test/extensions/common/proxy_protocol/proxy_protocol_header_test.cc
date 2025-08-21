@@ -1,8 +1,9 @@
 #include "envoy/network/address.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/common/proxy_protocol/proxy_protocol_header.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/network/address_impl.h"
+#include "source/extensions/common/proxy_protocol/proxy_protocol_header.h"
 
 #include "test/mocks/network/connection.h"
 #include "test/test_common/utility.h"
@@ -15,6 +16,8 @@ namespace Extensions {
 namespace Common {
 namespace ProxyProtocol {
 namespace {
+
+using namespace std::literals::string_literals;
 
 TEST(ProxyProtocolHeaderTest, GeneratesV1IPv4Header) {
   const auto expectedHeaderStr = "PROXY TCP4 174.2.2.222 172.0.0.1 50000 80\r\n";
@@ -32,8 +35,10 @@ TEST(ProxyProtocolHeaderTest, GeneratesV1IPv4Header) {
 
   // Make sure the wrapper utility generates the same output.
   testing::NiceMock<Network::MockClientConnection> connection;
-  connection.remote_address_ = Network::Utility::resolveUrl("tcp://174.2.2.222:50000");
-  connection.local_address_ = Network::Utility::resolveUrl("tcp://172.0.0.1:80");
+  connection.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      *Network::Utility::resolveUrl("tcp://174.2.2.222:50000"));
+  connection.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      *Network::Utility::resolveUrl("tcp://172.0.0.1:80"));
   Buffer::OwnedImpl util_buf;
   envoy::config::core::v3::ProxyProtocolConfig config;
   config.set_version(envoy::config::core::v3::ProxyProtocolConfig::V1);
@@ -93,8 +98,10 @@ TEST(ProxyProtocolHeaderTest, GeneratesV2IPv6Header) {
 
   // Make sure the wrapper utility generates the same output.
   testing::NiceMock<Network::MockConnection> connection;
-  connection.remote_address_ = Network::Utility::resolveUrl("tcp://[1:2:3::4]:8");
-  connection.local_address_ = Network::Utility::resolveUrl("tcp://[1:100:200:3::]:2");
+  connection.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      *Network::Utility::resolveUrl("tcp://[1:2:3::4]:8"));
+  connection.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      *Network::Utility::resolveUrl("tcp://[1:100:200:3::]:2"));
   Buffer::OwnedImpl util_buf;
   envoy::config::core::v3::ProxyProtocolConfig config;
   config.set_version(envoy::config::core::v3::ProxyProtocolConfig::V2);
@@ -110,6 +117,157 @@ TEST(ProxyProtocolHeaderTest, GeneratesV2LocalHeader) {
 
   generateV2LocalHeader(buff);
 
+  EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
+}
+
+TEST(ProxyProtocolHeaderTest, GeneratesV2IPv4HeaderWithTLVPassAll) {
+  const uint8_t v2_protocol[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,
+                                 0x0a, 0x21, 0x11, 0x00, 0x11, 0x01, 0x02, 0x03, 0x04, 0x00, 0x01,
+                                 0x01, 0x02, 0x03, 0x05, 0x02, 0x01, 0x05, 0x00, 0x02, 0x06, 0x07};
+
+  const Buffer::OwnedImpl expectedBuff(v2_protocol, sizeof(v2_protocol));
+  auto src_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("1.2.3.4", 773));
+  auto dst_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("0.1.1.2", 513));
+  Network::ProxyProtocolTLV tlv{0x5, {0x06, 0x07}};
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {tlv}};
+  Buffer::OwnedImpl buff{};
+  ASSERT_TRUE(generateV2Header(proxy_proto_data, buff, true, {}, {}));
+
+  EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
+}
+
+TEST(ProxyProtocolHeaderTest, GeneratesV2IPv4HeaderWithTLVPassEmpty) {
+  const uint8_t v2_protocol[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
+                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x0c, 0x01, 0x02, 0x03, 0x04,
+                                 0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x02, 0x01};
+
+  const Buffer::OwnedImpl expectedBuff(v2_protocol, sizeof(v2_protocol));
+  auto src_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("1.2.3.4", 773));
+  auto dst_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("0.1.1.2", 513));
+  Network::ProxyProtocolTLV tlv{0x5, {0x06, 0x07}};
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {tlv}};
+  Buffer::OwnedImpl buff{};
+
+  ASSERT_TRUE(generateV2Header(proxy_proto_data, buff, false, {}, {}));
+
+  EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
+}
+
+TEST(ProxyProtocolHeaderTest, GeneratesV2IPv4HeaderWithTLVPassSpecific) {
+  const uint8_t v2_protocol[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,
+                                 0x0a, 0x21, 0x11, 0x00, 0x11, 0x01, 0x02, 0x03, 0x04, 0x00, 0x01,
+                                 0x01, 0x02, 0x03, 0x05, 0x02, 0x01, 0x05, 0x00, 0x02, 0x06, 0x07};
+
+  const Buffer::OwnedImpl expectedBuff(v2_protocol, sizeof(v2_protocol));
+  auto src_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("1.2.3.4", 773));
+  auto dst_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("0.1.1.2", 513));
+  Network::ProxyProtocolTLV tlv{0x5, {0x06, 0x07}};
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {tlv}};
+  Buffer::OwnedImpl buff{};
+
+  ASSERT_TRUE(generateV2Header(proxy_proto_data, buff, false, {0x5}, {}));
+
+  EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
+}
+
+TEST(ProxyProtocolHeaderTest, GeneratesV2IPv6HeaderWithTLV) {
+  const uint8_t v2_protocol[] = {
+      0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, 0x21, 0x21, 0x00,
+      0x29, 0x00, 0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x04, 0x00, 0x01, 0x01, 0x00, 0x02, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x02, 0x05, 0x00, 0x02, 0x06, 0x07};
+  const Buffer::OwnedImpl expectedBuff(v2_protocol, sizeof(v2_protocol));
+  auto src_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv6Instance("1:2:3::4", 8));
+  auto dst_addr = Network::Address::InstanceConstSharedPtr(
+      new Network::Address::Ipv6Instance("1:100:200:3::", 2));
+  Network::ProxyProtocolTLV tlv{0x5, {0x06, 0x07}};
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {tlv}};
+
+  Buffer::OwnedImpl buff{};
+  ASSERT_TRUE(generateV2Header(proxy_proto_data, buff, true, {}, {}));
+
+  EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
+}
+
+TEST(ProxyProtocolHeaderTest, GeneratesV2WithTLVExceedingLengthLimit) {
+  auto src_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("1.2.3.4", 773));
+  auto dst_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("0.1.1.2", 513));
+  const std::string long_tlv(65536, 'a');
+  Network::ProxyProtocolTLV tlv{0x5, std::vector<unsigned char>(long_tlv.begin(), long_tlv.end())};
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {tlv}};
+  Buffer::OwnedImpl buff{};
+
+  EXPECT_LOG_CONTAINS("warn", "Skipping TLV type 5 because adding it would exceed the 65535 limit",
+                      generateV2Header(proxy_proto_data, buff, true, {}, {}));
+}
+
+TEST(ProxyProtocolHeaderTest, GeneratesV2WithCustomTLVs) {
+  const uint8_t v2_protocol[] = {
+      0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54, 0x0a, 0x21,
+      0x11, 0x00, 0x15, 0x01, 0x02, 0x03, 0x04, 0x00, 0x01, 0x01, 0x02, 0x03, 0x05,
+      0x02, 0x01, 0x08, 0x00, 0x01, 0x08, 0xD3, 0x00, 0x02, 0x06, 0x07,
+  };
+
+  const Buffer::OwnedImpl expectedBuff(v2_protocol, sizeof(v2_protocol));
+  auto src_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("1.2.3.4", 773));
+  auto dst_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("0.1.1.2", 513));
+  Network::ProxyProtocolTLV tlv{0xD3, {0x06, 0x07}};
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {tlv}};
+  std::vector<Envoy::Network::ProxyProtocolTLV> custom_tlvs = {
+      {0x8, {0x08}},
+  };
+  Buffer::OwnedImpl buff{};
+
+  ASSERT_TRUE(generateV2Header(proxy_proto_data, buff, false, {0xD3}, custom_tlvs));
+  EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
+}
+
+TEST(ProxyProtocolHeaderTest, GeneratesV2WithCustomTLVExceedingLengthLimit) {
+  auto src_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("1.2.3.4", 773));
+  auto dst_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("0.1.1.2", 513));
+  Network::ProxyProtocolTLV tlv{0x5, {0x06, 0x07}};
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {tlv}};
+  Buffer::OwnedImpl buff{};
+  std::vector<Envoy::Network::ProxyProtocolTLV> custom_tlvs = {
+      {0x8, std::vector<unsigned char>(65536, 'a')},
+  };
+  EXPECT_LOG_CONTAINS("warn", "Skipping TLV type 8 because adding it would exceed the 65535 limit",
+                      generateV2Header(proxy_proto_data, buff, true, {}, custom_tlvs));
+}
+
+TEST(ProxyProtocolHeaderTest, GeneratesV2WithCustomTLVsNoPassthrough) {
+  const uint8_t v2_protocol[] = {
+      0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49, 0x54,
+      0x0a, 0x21, 0x11, 0x00, 0x10, 0x01, 0x02, 0x03, 0x04, 0x00, 0x01,
+      0x01, 0x02, 0x03, 0x05, 0x02, 0x01, 0xD3, 0x00, 0x01, 0x09,
+  };
+
+  const Buffer::OwnedImpl expectedBuff(v2_protocol, sizeof(v2_protocol));
+  auto src_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("1.2.3.4", 773));
+  auto dst_addr =
+      Network::Address::InstanceConstSharedPtr(new Network::Address::Ipv4Instance("0.1.1.2", 513));
+  Network::ProxyProtocolTLV tlv{0xD5, {0x06, 0x07}};
+  Network::ProxyProtocolData proxy_proto_data{src_addr, dst_addr, {tlv}};
+  std::vector<Envoy::Network::ProxyProtocolTLV> custom_tlvs = {
+      {0xD3, {0x09}},
+  };
+  Buffer::OwnedImpl buff{};
+
+  ASSERT_TRUE(generateV2Header(proxy_proto_data, buff, false, {}, custom_tlvs));
   EXPECT_TRUE(TestUtility::buffersEqual(expectedBuff, buff));
 }
 

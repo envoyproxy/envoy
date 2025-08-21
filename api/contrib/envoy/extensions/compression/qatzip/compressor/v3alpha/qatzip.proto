@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package envoy.extensions.compression.qatzip.compressor.v3alpha;
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.compression.qatzip.compressor.v3alpha";
+option java_outer_classname = "QatzipProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/compression/qatzip/compressor/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Qatzip Compressor]
+// Qatzip :ref:`configuration overview <config_qatzip>`.
+// [#extension: envoy.compression.qatzip.compressor]
+
+// [#next-free-field: 6]
+message Qatzip {
+  enum HardwareBufferSize {
+    DEFAULT = 0;
+    SZ_4K = 1;
+    SZ_8K = 2;
+    SZ_32K = 3;
+    SZ_64K = 4;
+    SZ_128K = 5;
+    SZ_512K = 6;
+  }
+
+  // Value from 1 to 9 that controls the main compression speed-density lever.
+  // The higher quality, the slower compression. The default value is 1.
+  google.protobuf.UInt32Value compression_level = 1 [(validate.rules).uint32 = {lte: 9 gte: 1}];
+
+  // A size of qat hardware buffer. This field will be set to "DEFAULT" if not specified.
+  HardwareBufferSize hardware_buffer_size = 2 [(validate.rules).enum = {defined_only: true}];
+
+  // Threshold of compression service’s input size for software failover.
+  // If the size of input request less than the threshold, qatzip will route the request to software
+  // compressor. The default value is 1024. The maximum value is 512*1024.
+  google.protobuf.UInt32Value input_size_threshold = 3
+      [(validate.rules).uint32 = {lte: 524288 gte: 128}];
+
+  // A size of stream buffer. The default value is 128 * 1024. The maximum value is 2*1024*1024 -
+  // 5*1024
+  google.protobuf.UInt32Value stream_buffer_size = 4
+      [(validate.rules).uint32 = {lte: 2092032 gte: 1024}];
+
+  // Value for compressor's next output buffer. If not set, defaults to 4096.
+  google.protobuf.UInt32Value chunk_size = 5 [(validate.rules).uint32 = {lte: 65536 gte: 4096}];
+}

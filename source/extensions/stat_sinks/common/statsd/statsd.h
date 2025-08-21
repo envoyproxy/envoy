@@ -12,9 +12,10 @@
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/macros.h"
-#include "common/network/io_socket_handle_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/macros.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/extensions/stat_sinks/common/statsd/tag_formats.h"
 
 #include "absl/types/optional.h"
 
@@ -42,14 +43,16 @@ public:
 
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, Network::Address::InstanceConstSharedPtr address,
                 const bool use_tag, const std::string& prefix = getDefaultPrefix(),
-                absl::optional<uint64_t> buffer_size = absl::nullopt);
+                absl::optional<uint64_t> buffer_size = absl::nullopt,
+                const Statsd::TagFormat& tag_format = Statsd::getDefaultTagFormat());
   // For testing.
   UdpStatsdSink(ThreadLocal::SlotAllocator& tls, const std::shared_ptr<Writer>& writer,
                 const bool use_tag, const std::string& prefix = getDefaultPrefix(),
-                absl::optional<uint64_t> buffer_size = absl::nullopt)
+                absl::optional<uint64_t> buffer_size = absl::nullopt,
+                const Statsd::TagFormat& tag_format = Statsd::getDefaultTagFormat())
       : tls_(tls.allocateSlot()), use_tag_(use_tag),
         prefix_(prefix.empty() ? getDefaultPrefix() : prefix),
-        buffer_size_(buffer_size.value_or(0)) {
+        buffer_size_(buffer_size.value_or(0)), tag_format_(tag_format) {
     tls_->set(
         [writer](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr { return writer; });
   }
@@ -82,7 +85,10 @@ private:
   void flushBuffer(Buffer::OwnedImpl& buffer, Writer& writer) const;
   void writeBuffer(Buffer::OwnedImpl& buffer, Writer& writer, const std::string& data) const;
 
-  const std::string getName(const Stats::Metric& metric) const;
+  template <class StatType, typename ValueType>
+  const std::string buildMessage(const StatType& metric, ValueType value,
+                                 const std::string& type) const;
+  template <class StatType> const std::string getName(const StatType& metric) const;
   const std::string buildTagStr(const std::vector<Stats::Tag>& tags) const;
 
   const ThreadLocal::SlotPtr tls_;
@@ -91,6 +97,7 @@ private:
   // Prefix for all flushed stats.
   const std::string prefix_;
   const uint64_t buffer_size_;
+  const Statsd::TagFormat tag_format_;
 };
 
 /**
@@ -98,19 +105,25 @@ private:
  */
 class TcpStatsdSink : public Stats::Sink {
 public:
-  TcpStatsdSink(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
-                ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
-                Stats::Scope& scope, const std::string& prefix = getDefaultPrefix());
+  /**
+   * This is a wrapper around the constructor to return StatusOr.
+   */
+  static absl::StatusOr<std::unique_ptr<TcpStatsdSink>>
+  create(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
+         ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
+         Stats::Scope& scope, const std::string& prefix = getDefaultPrefix());
 
   // Stats::Sink
   void flush(Stats::MetricSnapshot& snapshot) override;
-  void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) override {
-    // For statsd histograms are all timers.
-    tls_->getTyped<TlsSink>().onTimespanComplete(histogram.name(),
-                                                 std::chrono::milliseconds(value));
-  }
+  void onHistogramComplete(const Stats::Histogram& histogram, uint64_t value) override;
 
   const std::string& getPrefix() { return prefix_; }
+
+protected:
+  TcpStatsdSink(const LocalInfo::LocalInfo& local_info, const std::string& cluster_name,
+                ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
+                Stats::Scope& scope, absl::Status& creation_status,
+                const std::string& prefix = getDefaultPrefix());
 
 private:
   struct TlsSink : public ThreadLocal::ThreadLocalObject, public Network::ConnectionCallbacks {
@@ -123,6 +136,7 @@ private:
     void flushGauge(const std::string& name, uint64_t value);
     void endFlush(bool do_write);
     void onTimespanComplete(const std::string& name, std::chrono::milliseconds ms);
+    void onPercentHistogramComplete(const std::string& name, float value);
     uint64_t usedBuffer() const;
     void write(Buffer::Instance& buffer);
 
@@ -135,7 +149,7 @@ private:
     Event::Dispatcher& dispatcher_;
     Network::ClientConnectionPtr connection_;
     Buffer::OwnedImpl buffer_;
-    Buffer::RawSlice current_buffer_slice_;
+    absl::optional<Buffer::ReservationSingleSlice> current_buffer_reservation_;
     char* current_slice_mem_{};
   };
 

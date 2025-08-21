@@ -1,5 +1,4 @@
 admin:
-  access_log_path: /tmp/admin_access.log
   address:
     socket_address:
       protocol: TCP
@@ -44,13 +43,34 @@ static_resources:
               dns_cache_config:
                 name: dynamic_forward_proxy_cache_config
                 dns_lookup_family: V4_ONLY
+                # DNS Cache Circuit Breaker Configuration
+                dns_cache_circuit_breaker:
+                  max_pending_requests: 1024
+                typed_dns_resolver_config:
+                  name: envoy.network.dns_resolver.cares
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
+                    resolvers:
+                    - socket_address:
+                        address: "8.8.8.8"
+                        port_value: 53
+                    dns_resolver_options:
+                      use_tcp_for_dns_lookups: true
+                      no_default_search_domain: true
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   clusters:
   - name: dynamic_forward_proxy_cluster
-    connect_timeout: 1s
     lb_policy: CLUSTER_PROVIDED
+    # Standard Cluster Circuit Breaker Configuration
+    circuit_breakers:
+      thresholds:
+      - priority: DEFAULT
+        max_connections: 1024
+        max_pending_requests: 1024
+        max_requests: 1024
+        max_retries: 3
     cluster_type:
       name: envoy.clusters.dynamic_forward_proxy
       typed_config:
@@ -58,6 +78,20 @@ static_resources:
         dns_cache_config:
           name: dynamic_forward_proxy_cache_config
           dns_lookup_family: V4_ONLY
+          # DNS Cache Circuit Breaker Configuration (same as above)
+          dns_cache_circuit_breaker:
+            max_pending_requests: 1024
+          typed_dns_resolver_config:
+            name: envoy.network.dns_resolver.cares
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig
+              resolvers:
+              - socket_address:
+                  address: "8.8.8.8"
+                  port_value: 53
+              dns_resolver_options:
+                use_tcp_for_dns_lookups: true
+                no_default_search_domain: true
     transport_socket:
       name: envoy.transport_sockets.tls
       typed_config:

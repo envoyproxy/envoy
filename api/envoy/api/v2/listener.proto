@@ -10,7 +10,6 @@ import "envoy/api/v2/listener/udp_listener_config.proto";
 import "envoy/config/filter/accesslog/v2/accesslog.proto";
 import "envoy/config/listener/v2/api_listener.proto";
 
-import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -21,6 +20,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.api.v2";
 option java_outer_classname = "ListenerProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/api/v2;apiv2";
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.listener.v3";
 option (udpa.annotations.file_status).package_version_status = FROZEN;
 
@@ -196,6 +196,8 @@ message Listener {
   google.protobuf.UInt32Value tcp_fast_open_queue_length = 12;
 
   // Specifies the intended direction of the traffic relative to the local Envoy.
+  // This property is required on Windows for listeners using the original destination filter,
+  // see :ref:`Original Destination <config_listener_filters_original_dst>`.
   core.TrafficDirection traffic_direction = 16;
 
   // If the protocol in the listener socket address in :ref:`protocol

@@ -1,6 +1,6 @@
-#include "common/http/status.h"
+#include "source/common/http/status.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -25,10 +25,12 @@ absl::string_view statusCodeToString(StatusCode code) {
     return "CodecClientError";
   case StatusCode::InboundFramesWithEmptyPayload:
     return "InboundFramesWithEmptyPayloadError";
-  case StatusCode::StreamAlreadyReset:
-    return "StreamAlreadyReset";
+  case StatusCode::EnvoyOverloadError:
+    return "EnvoyOverloadError";
+  case StatusCode::GoAwayGracefulClose:
+    return "GoAwayGracefulClose";
   }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return "";
 }
 
 struct EnvoyStatusPayload {
@@ -43,7 +45,10 @@ struct PrematureResponsePayload : public EnvoyStatusPayload {
 };
 
 template <typename T> void storePayload(absl::Status& status, const T& payload) {
-  absl::Cord cord(absl::string_view(reinterpret_cast<const char*>(&payload), sizeof(payload)));
+  const T* allocated = new T(payload);
+  const absl::string_view sv =
+      absl::string_view(reinterpret_cast<const char*>(allocated), sizeof(T));
+  absl::Cord cord = absl::MakeCordFromExternal(sv, [allocated]() { delete allocated; });
   cord.Flatten(); // Flatten ahead of time for easier access later.
   status.SetPayload(EnvoyPayloadUrl, std::move(cord));
 }
@@ -115,10 +120,15 @@ Status inboundFramesWithEmptyPayloadError() {
   return status;
 }
 
-Status streamAlreadyReset() {
-  absl::Status status(absl::StatusCode::kInternal,
-                      "Attempted to proxy headers after stream has been reset.");
-  storePayload(status, EnvoyStatusPayload(StatusCode::StreamAlreadyReset));
+Status envoyOverloadError(absl::string_view message) {
+  absl::Status status(absl::StatusCode::kInternal, message);
+  storePayload(status, EnvoyStatusPayload(StatusCode::EnvoyOverloadError));
+  return status;
+}
+
+Status goAwayGracefulCloseError() {
+  absl::Status status(absl::StatusCode::kInternal, {});
+  storePayload(status, EnvoyStatusPayload(StatusCode::GoAwayGracefulClose));
   return status;
 }
 
@@ -152,6 +162,14 @@ bool isCodecClientError(const Status& status) {
 
 bool isInboundFramesWithEmptyPayloadError(const Status& status) {
   return getStatusCode(status) == StatusCode::InboundFramesWithEmptyPayload;
+}
+
+bool isEnvoyOverloadError(const Status& status) {
+  return getStatusCode(status) == StatusCode::EnvoyOverloadError;
+}
+
+bool isGoAwayGracefulCloseError(const Status& status) {
+  return getStatusCode(status) == StatusCode::GoAwayGracefulClose;
 }
 
 } // namespace Http

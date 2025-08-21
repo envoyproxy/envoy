@@ -2,12 +2,10 @@
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/well_known_names.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/stat_sinks/common/statsd/statsd.h"
-#include "extensions/stat_sinks/dog_statsd/config.h"
-#include "extensions/stat_sinks/well_known_names.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/stat_sinks/common/statsd/statsd.h"
+#include "source/extensions/stat_sinks/dog_statsd/config.h"
 
 #include "test/mocks/server/instance.h"
 #include "test/test_common/environment.h"
@@ -31,8 +29,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DogStatsdConfigLoopbackTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
-  const std::string name = StatsSinkNames::get().DogStatsd;
-
   envoy::config::metrics::v3::DogStatsdSink sink_config;
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();
   envoy::config::core::v3::SocketAddress& socket_address = *address.mutable_socket_address();
@@ -43,14 +39,14 @@ TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
   socket_address.set_port_value(8125);
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(DogStatsdName);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   TestUtility::jsonConvert(sink_config, *message);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
-  Stats::SinkPtr sink = factory->createStatsSink(*message, server);
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server).value();
   EXPECT_NE(sink, nullptr);
   auto udp_sink = dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get());
   EXPECT_NE(udp_sink, nullptr);
@@ -61,14 +57,13 @@ TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
 // Negative test for protoc-gen-validate constraints for dog_statsd.
 TEST(DogStatsdConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
-  EXPECT_THROW(
-      DogStatsdSinkFactory().createStatsSink(envoy::config::metrics::v3::DogStatsdSink(), server),
-      ProtoValidationException);
+  EXPECT_THROW(DogStatsdSinkFactory()
+                   .createStatsSink(envoy::config::metrics::v3::DogStatsdSink(), server)
+                   .value(),
+               ProtoValidationException);
 }
 
 TEST_P(DogStatsdConfigLoopbackTest, CustomBufferSize) {
-  const std::string name = StatsSinkNames::get().DogStatsd;
-
   envoy::config::metrics::v3::DogStatsdSink sink_config;
   sink_config.mutable_max_bytes_per_datagram()->set_value(128);
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();
@@ -80,14 +75,14 @@ TEST_P(DogStatsdConfigLoopbackTest, CustomBufferSize) {
   socket_address.set_port_value(8125);
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(DogStatsdName);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   TestUtility::jsonConvert(sink_config, *message);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
-  Stats::SinkPtr sink = factory->createStatsSink(*message, server);
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server).value();
   ASSERT_NE(sink, nullptr);
   auto udp_sink = dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get());
   ASSERT_NE(udp_sink, nullptr);
@@ -95,8 +90,6 @@ TEST_P(DogStatsdConfigLoopbackTest, CustomBufferSize) {
 }
 
 TEST_P(DogStatsdConfigLoopbackTest, DefaultBufferSize) {
-  const std::string name = StatsSinkNames::get().DogStatsd;
-
   envoy::config::metrics::v3::DogStatsdSink sink_config;
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();
   envoy::config::core::v3::SocketAddress& socket_address = *address.mutable_socket_address();
@@ -107,14 +100,14 @@ TEST_P(DogStatsdConfigLoopbackTest, DefaultBufferSize) {
   socket_address.set_port_value(8125);
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(DogStatsdName);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   TestUtility::jsonConvert(sink_config, *message);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
-  Stats::SinkPtr sink = factory->createStatsSink(*message, server);
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server).value();
   ASSERT_NE(sink, nullptr);
   auto udp_sink = dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get());
   ASSERT_NE(udp_sink, nullptr);
@@ -123,8 +116,6 @@ TEST_P(DogStatsdConfigLoopbackTest, DefaultBufferSize) {
 }
 
 TEST_P(DogStatsdConfigLoopbackTest, WithCustomPrefix) {
-  const std::string name = StatsSinkNames::get().DogStatsd;
-
   envoy::config::metrics::v3::DogStatsdSink sink_config;
   envoy::config::core::v3::Address& address = *sink_config.mutable_address();
   envoy::config::core::v3::SocketAddress& socket_address = *address.mutable_socket_address();
@@ -138,26 +129,18 @@ TEST_P(DogStatsdConfigLoopbackTest, WithCustomPrefix) {
   sink_config.set_prefix(customPrefix);
 
   Server::Configuration::StatsSinkFactory* factory =
-      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);
+      Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(DogStatsdName);
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   TestUtility::jsonConvert(sink_config, *message);
 
   NiceMock<Server::Configuration::MockServerFactoryContext> server;
-  Stats::SinkPtr sink = factory->createStatsSink(*message, server);
+  Stats::SinkPtr sink = factory->createStatsSink(*message, server).value();
   ASSERT_NE(sink, nullptr);
   auto udp_sink = dynamic_cast<Common::Statsd::UdpStatsdSink*>(sink.get());
   ASSERT_NE(udp_sink, nullptr);
   EXPECT_EQ(udp_sink->getPrefix(), customPrefix);
-}
-
-// Test that the deprecated extension name still functions.
-TEST(DogStatsdConfigTest, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.dog_statsd";
-
-  ASSERT_NE(nullptr, Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(
-                         deprecated_name));
 }
 
 } // namespace

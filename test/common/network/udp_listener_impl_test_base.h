@@ -1,3 +1,5 @@
+#pragma once
+
 #include <cstddef>
 #include <memory>
 #include <string>
@@ -5,12 +7,12 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/network/address_impl.h"
-#include "common/network/socket_option_factory.h"
-#include "common/network/socket_option_impl.h"
-#include "common/network/udp_listener_impl.h"
-#include "common/network/udp_packet_writer_handler_impl.h"
-#include "common/network/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/network/udp_listener_impl.h"
+#include "source/common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/network/utility.h"
 
 #include "test/common/network/listener_impl_test_base.h"
 #include "test/mocks/api/mocks.h"
@@ -29,20 +31,33 @@ namespace Envoy {
 namespace Network {
 
 class UdpListenerImplTestBase : public ListenerImplTestBase {
-public:
-  UdpListenerImplTestBase()
-      : server_socket_(createServerSocket(true)), send_to_addr_(getServerLoopbackAddress()) {
+protected:
+  MockIoHandle&
+  useHotRestartSocket(OptRef<ParentDrainedCallbackRegistrar> parent_drained_callback_registrar) {
+    auto io_handle = std::make_unique<testing::NiceMock<MockIoHandle>>();
+    MockIoHandle& ret = *io_handle;
+    server_socket_ = createServerSocketFromExistingHandle(std::move(io_handle),
+                                                          parent_drained_callback_registrar);
+    return ret;
+  }
+
+  void setup() {
+    if (server_socket_ == nullptr) {
+      server_socket_ = createServerSocket(true);
+    }
+    send_to_addr_ = Address::InstanceConstSharedPtr(getServerLoopbackAddress());
     time_system_.advanceTimeWait(std::chrono::milliseconds(100));
   }
 
-protected:
   Address::Instance* getServerLoopbackAddress() {
     if (version_ == Address::IpVersion::v4) {
-      return new Address::Ipv4Instance(Network::Test::getLoopbackAddressString(version_),
-                                       server_socket_->localAddress()->ip()->port());
+      return new Address::Ipv4Instance(
+          Network::Test::getLoopbackAddressString(version_),
+          server_socket_->connectionInfoProvider().localAddress()->ip()->port());
     }
-    return new Address::Ipv6Instance(Network::Test::getLoopbackAddressString(version_),
-                                     server_socket_->localAddress()->ip()->port());
+    return new Address::Ipv6Instance(
+        Network::Test::getLoopbackAddressString(version_),
+        server_socket_->connectionInfoProvider().localAddress()->ip()->port());
   }
 
   SocketSharedPtr createServerSocket(bool bind) {
@@ -56,6 +71,14 @@ protected:
                                              bind);
   }
 
+  SocketSharedPtr createServerSocketFromExistingHandle(
+      IoHandlePtr&& io_handle,
+      OptRef<ParentDrainedCallbackRegistrar> parent_drained_callback_registrar) {
+    return std::make_shared<UdpListenSocket>(
+        std::move(io_handle), Network::Test::getCanonicalLoopbackAddress(version_),
+        SocketOptionFactory::buildIpFreebindOptions(), parent_drained_callback_registrar);
+  }
+
   Address::InstanceConstSharedPtr getNonDefaultSourceAddress() {
     // Use a self address that is unlikely to be picked by source address discovery
     // algorithm if not specified in recvmsg/recvmmsg. Port is not taken into
@@ -64,7 +87,7 @@ protected:
     if (version_ == Address::IpVersion::v4) {
       // Linux kernel regards any 127.x.x.x as local address. But Mac OS doesn't.
       send_from_addr = std::make_shared<Address::Ipv4Instance>(
-          "127.0.0.1", server_socket_->localAddress()->ip()->port());
+          "127.0.0.1", server_socket_->connectionInfoProvider().localAddress()->ip()->port());
     } else {
       // Only use non-local v6 address if IP_FREEBIND is supported. Otherwise use
       // ::1 to avoid EINVAL error. Unfortunately this can't verify that sendmsg with
@@ -76,7 +99,7 @@ protected:
 #else
           "::1",
 #endif
-          server_socket_->localAddress()->ip()->port());
+          server_socket_->connectionInfoProvider().localAddress()->ip()->port());
     }
     return send_from_addr;
   }

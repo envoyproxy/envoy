@@ -1,12 +1,15 @@
 #pragma once
 
 #include "envoy/http/codec.h"
+#include "envoy/server/overload/load_shed_point.h"
 
-#include "common/http/http2/codec_impl.h"
-#include "common/http/http2/codec_impl_legacy.h"
-#include "common/http/utility.h"
+#include "source/common/http/http2/codec_impl.h"
+#include "source/common/http/utility.h"
 
 #include "test/mocks/common.h"
+#include "test/mocks/server/overload_manager.h"
+
+#include "quiche/http2/adapter/http2_adapter.h"
 
 namespace Envoy {
 namespace Http {
@@ -35,23 +38,20 @@ public:
     return it->second;
   }
 
-  // protected:
+protected:
   // Stores SETTINGS parameters contained in |settings_frame| to make them available via
   // getRemoteSettingsParameterValue().
-  void onSettingsFrame(const nghttp2_settings& settings_frame) {
-    for (uint32_t i = 0; i < settings_frame.niv; ++i) {
-      auto result = settings_.insert(
-          std::make_pair(settings_frame.iv[i].settings_id, settings_frame.iv[i].value));
+  void onSettingsFrame(absl::Span<const http2::adapter::Http2Setting> settings) {
+    for (const auto& [id, value] : settings) {
+      auto result = settings_.insert(std::make_pair(id, value));
       // It is possible to have duplicate settings parameters, each new parameter replaces any
       // existing value.
       // https://tools.ietf.org/html/rfc7540#section-6.5
       if (!result.second) {
-        ENVOY_LOG_MISC(debug, "Duplicated settings parameter {} with value {}",
-                       settings_frame.iv[i].settings_id, settings_frame.iv[i].value);
+        ENVOY_LOG_MISC(debug, "Duplicated settings parameter {} with value {}", id, value);
         settings_.erase(result.first);
         // Guaranteed success here.
-        settings_.insert(
-            std::make_pair(settings_frame.iv[i].settings_id, settings_frame.iv[i].value));
+        settings_.insert(std::make_pair(id, value));
       }
     }
   }
@@ -60,133 +60,91 @@ private:
   absl::node_hash_map<int32_t, uint32_t> settings_;
 };
 
-struct ServerCodecFacade : public virtual Connection {
-  virtual nghttp2_session* session() PURE;
-  virtual Http::Stream* getStream(int32_t stream_id) PURE;
-  virtual uint32_t getStreamUnconsumedBytes(int32_t stream_id) PURE;
-  virtual void setStreamWriteBufferWatermarks(int32_t stream_id, uint32_t low_watermark,
-                                              uint32_t high_watermark) PURE;
-};
-
-class TestServerConnection : public TestCodecStatsProvider,
-                             public TestCodecSettingsProvider,
-                             public ServerCodecFacade {
+class TestCodecOverloadManagerProvider {
 public:
-  TestServerConnection(Stats::Scope& scope) : TestCodecStatsProvider(scope) {}
+  TestCodecOverloadManagerProvider() {
+    ON_CALL(overload_manager_, getLoadShedPoint(testing::_))
+        .WillByDefault(testing::Invoke([this](absl::string_view name) -> Server::LoadShedPoint* {
+          if (name == Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch) {
+            return &server_go_away_on_dispatch;
+          }
+          if (name == Server::LoadShedPointName::get().H2ServerGoAwayAndCloseOnDispatch) {
+            return &server_go_away_and_close_on_dispatch;
+          }
+          return nullptr;
+        }));
+  }
+
+  testing::NiceMock<Server::MockOverloadManager> overload_manager_;
+  testing::NiceMock<Server::MockLoadShedPoint> server_go_away_on_dispatch;
+  testing::NiceMock<Server::MockLoadShedPoint> server_go_away_and_close_on_dispatch;
 };
 
-template <typename CodecImplType>
-class TestServerConnectionImpl : public TestServerConnection, public CodecImplType {
+class TestServerConnectionImpl : public TestCodecStatsProvider,
+                                 public TestCodecSettingsProvider,
+                                 public TestCodecOverloadManagerProvider,
+                                 public ServerConnectionImpl {
 public:
   TestServerConnectionImpl(
       Network::Connection& connection, ServerConnectionCallbacks& callbacks, Stats::Scope& scope,
       const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-      uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
+      Random::RandomGenerator& random, uint32_t max_request_headers_kb,
+      uint32_t max_request_headers_count,
       envoy::config::core::v3::HttpProtocolOptions::HeadersWithUnderscoresAction
           headers_with_underscores_action)
-      : TestServerConnection(scope),
-        CodecImplType(connection, callbacks, http2CodecStats(), random_, http2_options,
-                      max_request_headers_kb, max_request_headers_count,
-                      headers_with_underscores_action) {}
+      : TestCodecStatsProvider(scope),
+        ServerConnectionImpl(connection, callbacks, http2CodecStats(), random, http2_options,
+                             max_request_headers_kb, max_request_headers_count,
+                             headers_with_underscores_action, overload_manager_) {}
 
-  // ServerCodecFacade
-  nghttp2_session* session() override { return CodecImplType::session_; }
-  Http::Stream* getStream(int32_t stream_id) override {
-    return CodecImplType::getStream(stream_id);
-  }
-  uint32_t getStreamUnconsumedBytes(int32_t stream_id) override {
-    return CodecImplType::getStream(stream_id)->unconsumed_bytes_;
-  }
-  void setStreamWriteBufferWatermarks(int32_t stream_id, uint32_t low_watermark,
-                                      uint32_t high_watermark) override {
-    CodecImplType::getStream(stream_id)->setWriteBufferWatermarks(low_watermark, high_watermark);
-  }
+  http2::adapter::Http2Adapter* adapter() { return adapter_.get(); }
+  using ServerConnectionImpl::getStream;
+  using ServerConnectionImpl::sendPendingFrames;
 
 protected:
-  // Overrides ServerConnectionImpl::onSettingsForTest().
-  void onSettingsForTest(const nghttp2_settings& settings) override { onSettingsFrame(settings); }
+  // Overrides ServerConnectionImpl::onSettings().
+  void onSettings(absl::Span<const http2::adapter::Http2Setting> settings) override {
+    onSettingsFrame(settings);
+  }
 
   testing::NiceMock<Random::MockRandomGenerator> random_;
 };
 
-using TestServerConnectionImplLegacy =
-    TestServerConnectionImpl<Envoy::Http::Legacy::Http2::ServerConnectionImpl>;
-using TestServerConnectionImplNew =
-    TestServerConnectionImpl<Envoy::Http::Http2::ServerConnectionImpl>;
-
-struct ClientCodecFacade : public ClientConnection {
-  virtual nghttp2_session* session() PURE;
-  virtual Http::Stream* getStream(int32_t stream_id) PURE;
-  virtual uint64_t getStreamPendingSendDataLength(int32_t stream_id) PURE;
-  virtual Status sendPendingFrames() PURE;
-  virtual bool submitMetadata(const MetadataMapVector& mm_vector, int32_t stream_id) PURE;
-};
-
-class TestClientConnection : public TestCodecStatsProvider,
-                             public TestCodecSettingsProvider,
-                             public ClientCodecFacade {
-public:
-  TestClientConnection(Stats::Scope& scope) : TestCodecStatsProvider(scope) {}
-
-  testing::NiceMock<Random::MockRandomGenerator> random_generator_;
-};
-
-template <typename CodecImplType>
-class TestClientConnectionImpl : public TestClientConnection, public CodecImplType {
+class TestClientConnectionImpl : public TestCodecStatsProvider,
+                                 public TestCodecSettingsProvider,
+                                 public ClientConnectionImpl {
 public:
   TestClientConnectionImpl(Network::Connection& connection, Http::ConnectionCallbacks& callbacks,
                            Stats::Scope& scope,
                            const envoy::config::core::v3::Http2ProtocolOptions& http2_options,
-                           uint32_t max_request_headers_kb, uint32_t max_request_headers_count,
-                           typename CodecImplType::SessionFactory& http2_session_factory)
-      : TestClientConnection(scope),
-        CodecImplType(connection, callbacks, http2CodecStats(), random_generator_, http2_options,
-                      max_request_headers_kb, max_request_headers_count, http2_session_factory) {}
+                           Random::RandomGenerator& random, uint32_t max_request_headers_kb,
+                           uint32_t max_request_headers_count,
+                           Http2SessionFactory& http2_session_factory)
+      : TestCodecStatsProvider(scope),
+        ClientConnectionImpl(connection, callbacks, http2CodecStats(), random, http2_options,
+                             max_request_headers_kb, max_request_headers_count,
+                             http2_session_factory) {}
 
-  // ClientCodecFacade
-  RequestEncoder& newStream(ResponseDecoder& response_decoder) override {
-    return CodecImplType::newStream(response_decoder);
-  }
-  nghttp2_session* session() override { return CodecImplType::session_; }
-  Http::Stream* getStream(int32_t stream_id) override {
-    return CodecImplType::getStream(stream_id);
-  }
-  uint64_t getStreamPendingSendDataLength(int32_t stream_id) override {
-    return CodecImplType::getStream(stream_id)->pending_send_data_.length();
-  }
-  Status sendPendingFrames() override;
+  http2::adapter::Http2Adapter* adapter() { return adapter_.get(); }
   // Submits an H/2 METADATA frame to the peer.
   // Returns true on success, false otherwise.
-  bool submitMetadata(const MetadataMapVector& mm_vector, int32_t stream_id) override {
+  virtual bool submitMetadata(const MetadataMapVector& mm_vector, int32_t stream_id) {
     UNREFERENCED_PARAMETER(mm_vector);
     UNREFERENCED_PARAMETER(stream_id);
     return false;
   }
 
+  using ClientConnectionImpl::getStream;
+  using ConnectionImpl::sendPendingFrames;
+
+  bool useOghttp2Library() const { return use_oghttp2_library_; }
+
 protected:
-  // Overrides ClientConnectionImpl::onSettingsForTest().
-  void onSettingsForTest(const nghttp2_settings& settings) override { onSettingsFrame(settings); }
+  // Overrides ClientConnectionImpl::onSettings().
+  void onSettings(absl::Span<const http2::adapter::Http2Setting> settings) override {
+    onSettingsFrame(settings);
+  }
 };
-
-template <typename CodecImplType>
-Status TestClientConnectionImpl<CodecImplType>::sendPendingFrames() {
-  return CodecImplType::sendPendingFrames();
-}
-
-template <>
-Status
-TestClientConnectionImpl<Envoy::Http::Legacy::Http2::ClientConnectionImpl>::sendPendingFrames() {
-  Envoy::Http::Legacy::Http2::ClientConnectionImpl::sendPendingFrames();
-  return okStatus();
-}
-
-using TestClientConnectionImplLegacy =
-    TestClientConnectionImpl<Envoy::Http::Legacy::Http2::ClientConnectionImpl>;
-using TestClientConnectionImplNew =
-    TestClientConnectionImpl<Envoy::Http::Http2::ClientConnectionImpl>;
-
-using ProdNghttp2SessionFactoryLegacy = Envoy::Http::Legacy::Http2::ProdNghttp2SessionFactory;
-using ProdNghttp2SessionFactoryNew = Envoy::Http::Http2::ProdNghttp2SessionFactory;
 
 } // namespace Http2
 } // namespace Http

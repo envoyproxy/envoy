@@ -12,6 +12,7 @@ import "udpa/annotations/status.proto";
 option java_package = "io.envoyproxy.envoy.service.auth.v2";
 option java_outer_classname = "AttributeContextProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/auth/v2;authv2";
 option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Attribute Context ]
@@ -26,7 +27,7 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 // of the `AttributeContext`. The `AttributeContext` is a collection of individual attributes
 // supported by Envoy authorization system.
 // [#comment: The following items are left out of this proto
-// Request.Auth field for jwt tokens
+// Request.Auth field for JWTs
 // Request.Api for api management
 // Origin peer that originated the request
 // Caching Protocol
@@ -110,7 +111,9 @@ message AttributeContext {
     // The HTTP request `Host` or 'Authority` header value.
     string host = 5;
 
-    // The HTTP URL scheme, such as `http` and `https`.
+    // The HTTP URL scheme, such as `http` and `https`. This is set for HTTP/2
+    // requests only. For HTTP/1.1, use "x-forwarded-for" header value to lookup
+    // the scheme of the request.
     string scheme = 6;
 
     // This field is always empty, and exists for compatibility reasons. The HTTP URL query is

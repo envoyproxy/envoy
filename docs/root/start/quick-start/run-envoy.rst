@@ -23,7 +23,7 @@ Once you have :ref:`installed Envoy <install>`, you can check the version inform
          $ envoy --version
          ...
 
-   .. tab:: Docker
+   .. tab:: Docker (Linux Image)
 
       .. substitution-code-block:: console
 
@@ -49,7 +49,7 @@ flag:
          $ envoy --help
          ...
 
-   .. tab:: Docker
+   .. tab:: Docker (Linux Image)
 
       .. substitution-code-block:: console
 
@@ -65,6 +65,9 @@ Run Envoy with the demo configuration
 
 The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configuration.
 
+Envoy will parse the config file according to the file extension, please see the
+:option:`config path command line option <-c>` for further information.
+
 .. tabs::
 
    .. tab:: System
@@ -77,7 +80,7 @@ The ``-c`` or ``--config-path`` flag tells Envoy the path to its initial configu
          $ envoy -c envoy-demo.yaml
          ...
 
-   .. tab:: Docker
+   .. tab:: Docker (Linux Image)
 
       You can start the Envoy Docker image without specifying a configuration file, and
       it will use the demo config by default.
@@ -111,14 +114,7 @@ Check Envoy is proxying on http://localhost:10000.
    $ curl -v localhost:10000
    ...
 
-The Envoy admin endpoint should also be available at http://localhost:9901.
-
-.. code-block:: console
-
-   $ curl -v localhost:9901
-   ...
-
-You can exit the server with `Ctrl-c`.
+You can exit the server with ``Ctrl-c``.
 
 See the :ref:`admin quick start guide <start_quick_start_admin>` for more information about the Envoy admin interface.
 
@@ -139,7 +135,12 @@ Save the following snippet to ``envoy-override.yaml``:
    admin:
      address:
        socket_address:
+         address: 127.0.0.1
          port_value: 9902
+
+.. warning::
+
+  If you run Envoy inside a Docker container you may wish to use ``0.0.0.0``. Exposing the admin interface in this way may give unintended control of your Envoy server. Please see the :ref:`admin section <start_quick_start_admin_config>` for more information.
 
 Next, start the Envoy server using the override configuration:
 
@@ -147,12 +148,23 @@ Next, start the Envoy server using the override configuration:
 
    .. tab:: System
 
+      On Linux/Mac: run:
+
       .. code-block:: console
 
          $ envoy -c envoy-demo.yaml --config-yaml "$(cat envoy-override.yaml)"
          ...
 
-   .. tab:: Docker
+      On Windows run:
+
+      .. include:: ../../_include/windows_support_ended.rst
+
+      .. code-block:: powershell
+
+         $ envoy -c envoy-demo.yaml --config-yaml "$(Get-Content -Raw envoy-override.yaml)"
+         ...
+
+   .. tab:: Docker (Linux Image)
 
       .. substitution-code-block:: console
 
@@ -174,12 +186,12 @@ The Envoy admin interface should now be available on http://localhost:9902.
 .. note::
 
    When merging ``yaml`` lists (e.g. :ref:`listeners <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>`
-   or :ref:`clusters <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>`) the merged configurations
+   or :ref:`clusters <envoy_v3_api_file_envoy/config/cluster/v3/cluster.proto>`) the merged configurations
    are appended.
 
    You cannot therefore use an override file to change the configurations of previously specified
    :ref:`listeners <envoy_v3_api_file_envoy/config/listener/v3/listener.proto>` or
-   :ref:`clusters <envoy_v3_api_file_envoy/service/cluster/v3/cds.proto>`
+   :ref:`clusters <envoy_v3_api_file_envoy/config/cluster/v3/cluster.proto>`
 
 Validating your Envoy configuration
 -----------------------------------
@@ -214,7 +226,7 @@ For invalid configuration the process will print the errors and exit with ``1``.
          [2020-11-08 12:36:06.549][11][info][config] [source/server/configuration_impl.cc:121] loading stats sink configuration
          configuration 'my-envoy-config.yaml' OK
 
-   .. tab:: Docker
+   .. tab:: Docker (Linux Image)
 
       .. substitution-code-block:: console
 
@@ -253,7 +265,7 @@ This can be overridden using :option:`--log-path`.
          $ mkdir logs
          $ envoy -c envoy-demo.yaml --log-path logs/custom.log
 
-   .. tab:: Docker
+   .. tab:: Docker (Linux Image)
 
       .. substitution-code-block:: console
 
@@ -279,7 +291,7 @@ to ``/dev/stdout``:
    :linenos:
    :lineno-start: 12
    :lines: 12-22
-   :emphasize-lines: 4-8
+   :emphasize-lines: 4-7
 
 The default configuration in the Envoy Docker container also logs access in this way.
 
@@ -292,11 +304,25 @@ Some Envoy :ref:`filters and extensions <api-v3_config>` may also have additiona
 Envoy can be configured to log to :ref:`different formats <config_access_log>`, and to
 :ref:`different outputs <api-v3_config_accesslog>` in addition to files and ``stdout/err``.
 
-.. note::
+Envoy networking
+----------------
 
-   If you are running Envoy on a Windows system Envoy will output to ``CON`` by default.
+By default Envoy can use both IPv4 and IPv6 networks.
 
-   This can also be used as a logging path when configuring logging.
+If your environment does not support IPv6 you should disable it.
+
+This may be the case when using Docker on a non-linux host (see here for more information regarding
+`IPv6 support in Docker <https://docs.docker.com/config/daemon/ipv6/>`_).
+
+You can disable IPv6 by setting the ``dns_lookup_family`` to ``V4_ONLY`` in your configuration as follows:
+
+.. literalinclude:: _include/envoy-demo.yaml
+   :language: yaml
+   :linenos:
+   :lineno-start: 34
+   :lines: 34-46
+   :emphasize-lines: 5
+   :caption: :download:`envoy-demo.yaml <_include/envoy-demo.yaml>`
 
 Debugging Envoy
 ---------------
@@ -329,7 +355,7 @@ which are set to ``debug`` and ``trace`` respectively.
          $ envoy -c envoy-demo.yaml -l off --component-log-level upstream:debug,connection:trace
          ...
 
-   .. tab:: Docker
+   .. tab:: Docker (Linux Image)
 
       .. substitution-code-block:: console
 

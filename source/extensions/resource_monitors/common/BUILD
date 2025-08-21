@@ -14,7 +14,7 @@ envoy_cc_library(
     # This resource monitoring library is considered core code.
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/server:resource_monitor_config_interface",
+        "//envoy/server:resource_monitor_config_interface",
         "//source/common/protobuf:utility_lib",
     ],
 )

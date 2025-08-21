@@ -14,7 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "reverse_bridge_test",
     srcs = ["reverse_bridge_test.cc"],
-    extension_name = "envoy.filters.http.grpc_http1_reverse_bridge",
+    extension_names = ["envoy.filters.http.grpc_http1_reverse_bridge"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
@@ -26,8 +27,10 @@ envoy_extension_cc_test(
 
 envoy_extension_cc_test(
     name = "reverse_bridge_integration_test",
+    size = "large",
     srcs = ["reverse_bridge_integration_test.cc"],
-    extension_name = "envoy.filters.http.grpc_http1_reverse_bridge",
+    extension_names = ["envoy.filters.http.grpc_http1_reverse_bridge"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/http:header_map_lib",
@@ -43,7 +46,8 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.filters.http.grpc_http1_reverse_bridge",
+    extension_names = ["envoy.filters.http.grpc_http1_reverse_bridge"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/grpc_http1_reverse_bridge:config",
         "//test/mocks/server:factory_context_mocks",

@@ -1,8 +1,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/common/lua/wrappers.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/common/lua/wrappers.h"
 
 #include "test/extensions/filters/common/lua/lua_wrappers.h"
 #include "test/mocks/network/mocks.h"
@@ -83,7 +82,8 @@ TEST_F(LuaBufferWrapperTest, Methods) {
 
   setup(SCRIPT);
   Buffer::OwnedImpl data("hello world");
-  BufferWrapper::create(coroutine_->luaState(), data);
+  Http::TestRequestHeaderMapImpl headers;
+  BufferWrapper::create(coroutine_->luaState(), headers, data);
   EXPECT_CALL(printer_, testPrint("11"));
   EXPECT_CALL(printer_, testPrint("he"));
   EXPECT_CALL(printer_, testPrint("world"));
@@ -102,7 +102,8 @@ TEST_F(LuaBufferWrapperTest, GetBytesInvalidParams) {
 
   setup(SCRIPT);
   Buffer::OwnedImpl data("hello world");
-  BufferWrapper::create(coroutine_->luaState(), data);
+  Http::TestRequestHeaderMapImpl headers;
+  BufferWrapper::create(coroutine_->luaState(), headers, data);
   EXPECT_THROW_WITH_MESSAGE(
       start("callMe"), LuaException,
       "[string \"...\"]:3: index/length must be >= 0 and (index + length) must be <= buffer size");

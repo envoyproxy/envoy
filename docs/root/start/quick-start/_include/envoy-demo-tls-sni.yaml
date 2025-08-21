@@ -14,6 +14,8 @@ static_resources:
           stat_prefix: ingress_http
           http_filters:
           - name: envoy.filters.http.router
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
           route_config:
             name: local_route
             virtual_hosts:
@@ -34,14 +36,13 @@ static_resources:
           "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.DownstreamTlsContext
           common_tls_context:
             tls_certificates:
-              certificate_chain:
+            - certificate_chain:
                 filename: certs/servercert.pem
               private_key:
                 filename: certs/serverkey.pem
 
   clusters:
   - name: service_envoyproxy_io
-    connect_timeout: 30s
     type: LOGICAL_DNS
     # Comment out the following line to test on v6 networks
     dns_lookup_family: V4_ONLY
@@ -59,3 +60,11 @@ static_resources:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
         sni: www.envoyproxy.io
+        common_tls_context:
+          validation_context:
+            trusted_ca:
+              filename: certs/cacert.pem
+            match_typed_subject_alt_names:
+            - san_type: DNS
+              matcher:
+                exact: www.envoyproxy.io

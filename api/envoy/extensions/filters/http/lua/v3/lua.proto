@@ -4,6 +4,10 @@ package envoy.extensions.filters.http.lua.v3;
 
 import "envoy/config/core/v3/base.proto";
 
+import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
+
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -11,12 +15,14 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.lua.v3";
 option java_outer_classname = "LuaProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/lua/v3;luav3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Lua]
 // Lua :ref:`configuration overview <config_http_filters_lua>`.
 // [#extension: envoy.filters.http.lua]
 
+// [#next-free-field: 6]
 message Lua {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.lua.v2.Lua";
@@ -25,7 +31,14 @@ message Lua {
   // further loads code from disk if desired. Note that if JSON configuration is used, the code must
   // be properly escaped. YAML configuration may be easier to read since YAML supports multi-line
   // strings so complex scripts can be easily expressed inline in the configuration.
-  string inline_code = 1 [(validate.rules).string = {min_len: 1}];
+  //
+  // This field is deprecated. Please use
+  // :ref:`default_source_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.default_source_code>`.
+  // Only one of :ref:`inline_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.inline_code>`
+  // or :ref:`default_source_code <envoy_v3_api_field_extensions.filters.http.lua.v3.Lua.default_source_code>`
+  // can be set for the Lua filter.
+  string inline_code = 1
+      [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
   // Map of named Lua source codes that can be referenced in :ref:`LuaPerRoute
   // <envoy_v3_api_msg_extensions.filters.http.lua.v3.LuaPerRoute>`. The Lua source codes can be
@@ -45,12 +58,40 @@ message Lua {
   //       filename: /etc/lua/world.lua
   //
   map<string, config.core.v3.DataSource> source_codes = 2;
+
+  // The default Lua code that Envoy will execute. If no per route config is provided
+  // for the request, this Lua code will be applied.
+  config.core.v3.DataSource default_source_code = 3;
+
+  // Optional additional prefix to use when emitting statistics. By default
+  // metrics are emitted in *.lua.* namespace. If multiple lua filters are
+  // configured in a filter chain, the stats from each filter instance can
+  // be emitted using custom stat prefix to distinguish emitted
+  // statistics. For example:
+  //
+  // .. code-block:: yaml
+  //
+  //   http_filters:
+  //     - name: envoy.filters.http.lua
+  //       typed_config:
+  //         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  //         stat_prefix: foo_script # This emits lua.foo_script.errors etc.
+  //     - name: envoy.filters.http.lua
+  //       typed_config:
+  //         "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  //         stat_prefix: bar_script # This emits lua.bar_script.errors etc.
+  //
+  string stat_prefix = 4;
+
+  // If set to true, the Lua filter will clear the route cache automatically if the request
+  // headers are modified by the Lua script. If set to false, the Lua filter will not clear the
+  // route cache automatically.
+  // Default is true for backward compatibility.
+  google.protobuf.BoolValue clear_route_cache = 5;
 }
 
 message LuaPerRoute {
   oneof override {
-    option (validate.required) = true;
-
     // Disable the Lua filter for this particular vhost or route. If disabled is specified in
     // multiple per-filter-configs, the most specific one will be used.
     bool disabled = 1 [(validate.rules).bool = {const: true}];
@@ -62,4 +103,18 @@ message LuaPerRoute {
     // A configured per-route Lua source code that can be served by RDS or provided inline.
     config.core.v3.DataSource source_code = 3;
   }
+
+  // Optional filter context for Lua script. This could be used to pass configuration
+  // to Lua script. The Lua script can access the filter context using ``handle:filterContext()``.
+  // For example:
+  //
+  // .. code-block:: lua
+  //
+  //   function envoy_on_request(request_handle)
+  //     local filter_context = request_handle:filterContext()
+  //     local filter_context_value = filter_context["key"]
+  //     -- Do something with filter_context_value.
+  //   end
+  //
+  google.protobuf.Struct filter_context = 4;
 }

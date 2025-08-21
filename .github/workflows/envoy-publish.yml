@@ -1,0 +1,173 @@
+# This workflow is triggered by azp currently
+# Once arm/x64 build jobs are shifted to github, this can be triggered
+#  by on: workflow_run
+name: Envoy/Publish & verify
+
+permissions:
+  contents: read
+
+on:
+  workflow_run:
+    workflows:
+    # Workaround issue with PRs not triggering tertiary workflows
+    - Request
+    # - Envoy/Prechecks
+    types:
+    - completed
+
+concurrency:
+  group: >-
+    ${{ ((github.event.workflow_run.head_branch == 'main'
+          || startsWith(github.event.workflow_run.head_branch, 'release/v'))
+          && github.event.repository.full_name == github.repository)
+        && github.run_id
+        || github.event.workflow_run.head_branch }}-${{ github.event.repository.full_name }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  CI_DEBUG: ${{ vars.CI_DEBUG }}
+
+
+jobs:
+  load:
+    secrets:
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+    permissions:
+      actions: read
+      contents: read
+      packages: read
+      pull-requests: read
+    if: |
+      github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.repository.full_name == github.repository
+      && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
+      && (github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI)
+    uses: ./.github/workflows/_load.yml
+    with:
+      check-name: publish
+      # head-sha: ${{ github.sha }}
+
+  build:
+    permissions:
+      contents: read
+      packages: read
+    secrets:
+      gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
+      gpg-key: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_GPG_MAINTAINER_KEY
+            || secrets.ENVOY_GPG_SNAKEOIL_KEY }}
+      gpg-key-password: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_GPG_MAINTAINER_KEY_PASSWORD
+            || secrets.ENVOY_GPG_SNAKEOIL_KEY_PASSWORD }}
+    if: ${{ fromJSON(needs.load.outputs.request).run.release || fromJSON(needs.load.outputs.request).run.verify }}
+    needs:
+    - load
+    uses: ./.github/workflows/_publish_build.yml
+    name: Build
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+        - x64
+        - arm64
+    with:
+      arch: ${{ matrix.arch }}
+      gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
+      request: ${{ needs.load.outputs.request }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
+
+  release:
+    secrets:
+      dockerhub-password: ${{ secrets.DOCKERHUB_PASSWORD }}
+      dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+      ENVOY_CI_SYNC_APP_ID: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_CI_SYNC_APP_ID
+            || '' }}
+      ENVOY_CI_SYNC_APP_KEY: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_CI_SYNC_APP_KEY
+            || '' }}
+      ENVOY_CI_PUBLISH_APP_ID: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_CI_PUBLISH_APP_ID
+            || '' }}
+      ENVOY_CI_PUBLISH_APP_KEY: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_CI_PUBLISH_APP_KEY
+            || '' }}
+      gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
+      gpg-key: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_GPG_MAINTAINER_KEY
+            || secrets.ENVOY_GPG_SNAKEOIL_KEY }}
+      gpg-key-password: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_GPG_MAINTAINER_KEY_PASSWORD
+            || secrets.ENVOY_GPG_SNAKEOIL_KEY_PASSWORD }}
+    permissions:
+      contents: read
+      packages: read
+    if: ${{ fromJSON(needs.load.outputs.request).run.release }}
+    needs:
+    - load
+    - build
+    uses: ./.github/workflows/_publish_release.yml
+    name: Release
+    with:
+      gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
+      request: ${{ needs.load.outputs.request }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
+
+  verify:
+    secrets:
+      gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
+    permissions:
+      contents: read
+      packages: read
+    if: ${{ fromJSON(needs.load.outputs.request).run.verify }}
+    needs:
+    - load
+    - build
+    - release
+    uses: ./.github/workflows/_publish_verify.yml
+    name: Verify
+    with:
+      gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
+      request: ${{ needs.load.outputs.request }}
+      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
+
+  request:
+    secrets:
+      app-id: ${{ secrets.ENVOY_CI_APP_ID }}
+      app-key: ${{ secrets.ENVOY_CI_APP_KEY }}
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    if: |
+      always()
+      && github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.repository.full_name == github.repository
+      && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
+      && (fromJSON(needs.load.outputs.request).run.release
+          || fromJSON(needs.load.outputs.request).run.verify)
+    needs:
+    - load
+    - build
+    - release
+    - verify
+    uses: ./.github/workflows/_finish.yml
+    with:
+      needs: ${{ toJSON(needs) }}

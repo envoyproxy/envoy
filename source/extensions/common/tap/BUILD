@@ -2,6 +2,7 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_extension_package",
+    "envoy_select_admin_functionality",
 )
 
 licenses(["notice"])  # Apache 2
@@ -12,10 +13,11 @@ envoy_cc_library(
     name = "tap_interface",
     hdrs = ["tap.h"],
     deps = [
-        "//include/envoy/http:header_map_interface",
+        "//envoy/http:header_map_interface",
         "//source/extensions/common/matcher:matcher_lib",
         "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/tap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/tap/v3:pkg_cc_proto",
     ],
 )
 
@@ -27,6 +29,7 @@ envoy_cc_library(
         ":tap_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hex_lib",
+        "//source/common/config:utility_lib",
         "//source/extensions/common/matcher:matcher_lib",
         "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
         "@envoy_api//envoy/data/tap/v3:pkg_cc_proto",
@@ -35,12 +38,12 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "admin",
-    srcs = ["admin.cc"],
-    hdrs = ["admin.h"],
+    srcs = envoy_select_admin_functionality(["admin.cc"]),
+    hdrs = envoy_select_admin_functionality(["admin.h"]),
     deps = [
         ":tap_interface",
-        "//include/envoy/server:admin_interface",
-        "//include/envoy/singleton:manager_interface",
+        "//envoy/server:admin_interface",
+        "//envoy/singleton:manager_interface",
         "//source/common/buffer:buffer_lib",
         "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
@@ -50,10 +53,10 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "extension_config_base",
-    srcs = ["extension_config_base.cc"],
-    hdrs = ["extension_config_base.h"],
+    srcs = envoy_select_admin_functionality(["extension_config_base.cc"]),
+    hdrs = envoy_select_admin_functionality(["extension_config_base.h"]),
     deps = [
-        "//include/envoy/thread_local:thread_local_interface",
+        "//envoy/thread_local:thread_local_interface",
         "//source/extensions/common/tap:admin",
         "@envoy_api//envoy/config/tap/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/common/tap/v3:pkg_cc_proto",

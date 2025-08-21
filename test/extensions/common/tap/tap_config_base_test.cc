@@ -4,9 +4,8 @@
 #include "envoy/data/tap/v3/common.pb.h"
 #include "envoy/data/tap/v3/wrapper.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/common/tap/tap_config_base.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/common/tap/tap_config_base.h"
 
 #include "gtest/gtest.h"
 

@@ -1,13 +1,12 @@
-#include "common/network/udp_packet_writer_handler_impl.h"
+#include "source/common/network/udp_packet_writer_handler_impl.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/network/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/utility.h"
 
 namespace Envoy {
 namespace Network {
 
-UdpDefaultWriter::UdpDefaultWriter(Network::IoHandle& io_handle)
-    : write_blocked_(false), io_handle_(io_handle) {}
+UdpDefaultWriter::UdpDefaultWriter(Network::IoHandle& io_handle) : io_handle_(io_handle) {}
 
 UdpDefaultWriter::~UdpDefaultWriter() = default;
 

@@ -1,6 +1,6 @@
-#include "common/http/http2/nghttp2.h"
+#include "source/common/http/http2/nghttp2.h"
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 // nghttp2 fails to convey the POSIX ssize_t declaration
 // that Microsoft declines to implement. Pick up a valid
@@ -14,7 +14,7 @@ namespace Http {
 namespace Http2 {
 
 void initializeNghttp2Logging() {
-  // Event when ENVOY_NGHTTP2_TRACE is not set, we install a debug logger, to prevent nghttp2
+  // When ENVOY_NGHTTP2_TRACE is set, we install a debug logger, to prevent nghttp2
   // logging directly to stdout at -l trace.
   nghttp2_set_debug_vprintf_callback([](const char* format, va_list args) {
     if (std::getenv("ENVOY_NGHTTP2_TRACE") != nullptr) {

@@ -15,29 +15,28 @@ envoy_cc_library(
     name = "http_inspector_lib",
     srcs = ["http_inspector.cc"],
     hdrs = ["http_inspector.h"],
-    external_deps = ["http_parser"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:timer_interface",
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/network:listen_socket_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
+        "//envoy/network:filter_interface",
+        "//envoy/network:listen_socket_interface",
         "//source/common/api:os_sys_calls_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
-        "//source/extensions/transport_sockets:well_known_names",
+        "//source/common/http/http1:balsa_parser_lib",
+        "//source/common/http/http1:legacy_parser_lib",
+        "//source/common/http/http1:parser_interface",
     ],
 )
 
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
-    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":http_inspector_lib",
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/extensions/filters/listener:well_known_names",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
         "@envoy_api//envoy/extensions/filters/listener/http_inspector/v3:pkg_cc_proto",
     ],
 )

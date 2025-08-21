@@ -7,8 +7,8 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
 
 namespace Envoy {
 
@@ -61,7 +61,7 @@ TcpDump::TcpDump(const std::string& path, const std::string& iface,
       break;
     }
     // Give 50ms sleep.
-    ::usleep(50000);
+    ::usleep(50000); // NO_CHECK_FORMAT(real_time)
   }
 #endif
 }

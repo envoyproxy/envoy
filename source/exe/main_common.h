@@ -2,106 +2,102 @@
 
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/platform.h"
 
-#include "common/common/thread.h"
-#include "common/event/real_time_system.h"
-#include "common/grpc/google_grpc_context.h"
-#include "common/stats/symbol_table_impl.h"
-#include "common/stats/thread_local_store.h"
-#include "common/thread_local/thread_local_impl.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/real_time_system.h"
+#include "source/common/grpc/google_grpc_context.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/thread_local_store.h"
+#include "source/common/thread_local/thread_local_impl.h"
 
-#include "exe/platform_impl.h"
-#include "exe/process_wide.h"
-
-#include "server/listener_hooks.h"
-#include "server/options_impl.h"
-#include "server/server.h"
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
+#include "source/exe/admin_response.h"
+#endif
+#include "source/exe/process_wide.h"
+#include "source/exe/stripped_main_base.h"
+#include "source/server/listener_hooks.h"
+#include "source/server/options_impl.h"
+#include "source/server/server.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
-#include "common/signal/signal_action.h"
-#include "exe/terminate_handler.h"
+#include "source/common/signal/signal_action.h"
+#include "source/exe/terminate_handler.h"
 #endif
 
 namespace Envoy {
 
-class ProdComponentFactory : public Server::ComponentFactory {
+class MainCommonBase : public StrippedMainBase {
 public:
-  // Server::DrainManagerFactory
-  Server::DrainManagerPtr createDrainManager(Server::Instance& server) override;
-  Runtime::LoaderPtr createRuntime(Server::Instance& server,
-                                   Server::Configuration::Initial& config) override;
-};
-
-class MainCommonBase {
-public:
-  // Consumer must guarantee that all passed references are alive until this object is
-  // destructed.
-  MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system,
+  MainCommonBase(const Server::Options& options, Event::TimeSystem& time_system,
                  ListenerHooks& listener_hooks, Server::ComponentFactory& component_factory,
+                 std::unique_ptr<Server::Platform> platform_impl,
                  std::unique_ptr<Random::RandomGenerator>&& random_generator,
-                 Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
                  std::unique_ptr<ProcessContext> process_context);
 
   bool run();
 
-  // Will be null if options.mode() == Server::Mode::Validate
-  Server::Instance* server() { return server_.get(); }
-
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
   using AdminRequestFn =
       std::function<void(const Http::ResponseHeaderMap& response_headers, absl::string_view body)>;
 
-  // Makes an admin-console request by path, calling handler() when complete.
-  // The caller can initiate this from any thread, but it posts the request
-  // onto the main thread, so the handler is called asynchronously.
-  //
-  // This is designed to be called from downstream consoles, so they can access
-  // the admin console information stream without opening up a network port.
-  //
-  // This should only be called while run() is active; ensuring this is the
-  // responsibility of the caller.
-  //
-  // TODO(jmarantz): consider std::future for encapsulating this delayed request
-  // semantics, rather than a handler callback.
+  /**
+   * Makes an admin-console request by path, calling handler() when complete.
+   * The caller can initiate this from any thread, but it posts the request
+   * onto the main thread, so the handler is called asynchronously.
+   *
+   * This is designed to be called from downstream consoles, so they can access
+   * the admin console information stream without opening up a network port.
+   *
+   * This should only be called while run() is active; ensuring this is the
+   * responsibility of the caller.
+   *
+   * TODO(jmarantz): consider std::future for encapsulating this delayed request
+   * semantics, rather than a handler callback.
+   *
+   * Consider using the 2-arg version of adminRequest, below, which enables
+   * streaming of large responses one chunk at a time, without holding
+   * potentially huge response text in memory.
+   *
+   * @param path_and_query the URL to send to admin, including any query params.
+   * @param method the HTTP method: "GET" or "POST"
+   * @param handler an async callback that will be sent the serialized headers
+   *        and response.
+   */
   void adminRequest(absl::string_view path_and_query, absl::string_view method,
                     const AdminRequestFn& handler);
 
-protected:
-  ProcessWide process_wide_; // Process-wide state setup/teardown (excluding grpc).
-  // We instantiate this class regardless of ENVOY_GOOGLE_GRPC, to avoid having
-  // an ifdef in a header file exposed in a C++ library. It is too easy to have
-  // the ifdef be inconsistent across build-system boundaries.
-  Grpc::GoogleGrpcContext google_grpc_context_;
-  const Envoy::OptionsImpl& options_;
-  Server::ComponentFactory& component_factory_;
-  Thread::ThreadFactory& thread_factory_;
-  Filesystem::Instance& file_system_;
-  Stats::SymbolTableImpl symbol_table_;
-  Stats::AllocatorImpl stats_allocator_;
-
-  ThreadLocal::InstanceImplPtr tls_;
-  std::unique_ptr<Server::HotRestart> restarter_;
-  Stats::ThreadLocalStoreImplPtr stats_store_;
-  std::unique_ptr<Logger::Context> logging_context_;
-  std::unique_ptr<Init::Manager> init_manager_{std::make_unique<Init::ManagerImpl>("Server")};
-  std::unique_ptr<Server::InstanceImpl> server_;
+  /**
+   * Initiates a streaming response to an admin request. The caller interacts
+   * with the returned AdminResponse object, and can thus control the pace of
+   * handling chunks of response text.
+   *
+   * @param path_and_query the URL to send to admin, including any query params.
+   * @param method the HTTP method: "GET" or "POST"
+   * @return AdminResponseSharedPtr the response object
+   */
+  AdminResponseSharedPtr adminRequest(absl::string_view path_and_query, absl::string_view method);
 
 private:
-  void configureComponentLogLevels();
-  void configureHotRestarter(Random::RandomGenerator& random_generator);
+  AdminResponse::SharedPtrSet shared_response_set_;
+#endif
 };
 
-// TODO(jmarantz): consider removing this class; I think it'd be more useful to
-// go through MainCommonBase directly.
+// This is separate from MainCommonBase for legacy reasons: sufficient
+// downstream tests use one or the other that resolving is deemed problematic.
 class MainCommon {
 public:
   // Hook to run after a server is created.
   using PostServerHook = std::function<void(Server::Instance& server)>;
 
   MainCommon(int argc, const char* const* argv);
+  MainCommon(const std::vector<std::string>& args);
+
   bool run() { return base_.run(); }
   // Only tests have a legitimate need for this today.
   Event::Dispatcher& dispatcherForTest() { return base_.server()->dispatcher(); }
 
+#ifdef ENVOY_ADMIN_FUNCTIONALITY
   // Makes an admin-console request by path, calling handler() when complete.
   // The caller can initiate this from any thread, but it posts the request
   // onto the main thread, so the handler is called asynchronously.
@@ -115,6 +111,10 @@ public:
                     const MainCommonBase::AdminRequestFn& handler) {
     base_.adminRequest(path_and_query, method, handler);
   }
+  AdminResponseSharedPtr adminRequest(absl::string_view path_and_query, absl::string_view method) {
+    return base_.adminRequest(path_and_query, method);
+  }
+#endif
 
   static std::string hotRestartVersion(bool hot_restart_enabled);
 
@@ -139,12 +139,13 @@ public:
   static int main(int argc, char** argv, PostServerHook hook = nullptr);
 
 private:
+  Thread::MainThread main_thread_;
+
 #ifdef ENVOY_HANDLE_SIGNALS
   Envoy::SignalAction handle_sigs_;
   Envoy::TerminateHandler log_on_terminate_;
 #endif
 
-  PlatformImpl platform_impl_;
   Envoy::OptionsImpl options_;
   Event::RealTimeSystem real_time_system_;
   DefaultListenerHooks default_listener_hooks_;

@@ -5,7 +5,7 @@
 #include "envoy/common/pure.h"
 #include "envoy/common/random_generator.h"
 
-#include "common/common/macros.h"
+#include "source/common/common/macros.h"
 
 #include "absl/strings/string_view.h"
 
@@ -15,9 +15,9 @@ namespace Tracers {
 namespace XRay {
 
 struct SamplingRequest {
-  std::string host_;
-  std::string http_method_;
-  std::string http_url_;
+  absl::string_view host_;
+  absl::string_view http_method_;
+  absl::string_view http_url_;
 };
 
 /**

@@ -14,12 +14,11 @@ class MockThreadLocalOverloadState : public ThreadLocalOverloadState {
 public:
   MockThreadLocalOverloadState();
   MOCK_METHOD(const OverloadActionState&, getState, (const std::string&), (override));
-  Event::TimerPtr createScaledTimer(OverloadTimerType timer_type, Event::TimerCb callback) override;
-  Event::TimerPtr createScaledTimer(Event::ScaledTimerMinimum minimum,
-                                    Event::TimerCb callback) override;
-  MOCK_METHOD(Event::Timer*, createScaledTypedTimer_, (OverloadTimerType, Event::TimerCb));
-  MOCK_METHOD(Event::Timer*, createScaledMinimumTimer_,
-              (Event::ScaledTimerMinimum, Event::TimerCb));
+  MOCK_METHOD(bool, tryAllocateResource, (OverloadProactiveResourceName, int64_t));
+  MOCK_METHOD(bool, tryDeallocateResource, (OverloadProactiveResourceName, int64_t));
+  MOCK_METHOD(bool, isResourceMonitorEnabled, (OverloadProactiveResourceName));
+  MOCK_METHOD(ProactiveResourceMonitorOptRef, getProactiveResourceMonitorForTest,
+              (OverloadProactiveResourceName));
 
 private:
   const OverloadActionState disabled_state_;
@@ -35,9 +34,20 @@ public:
   MOCK_METHOD(bool, registerForAction,
               (const std::string& action, Event::Dispatcher& dispatcher,
                OverloadActionCb callback));
+  MOCK_METHOD(Event::ScaledRangeTimerManagerFactory, scaledTimerFactory, (), (override));
   MOCK_METHOD(ThreadLocalOverloadState&, getThreadLocalOverloadState, ());
+  MOCK_METHOD(LoadShedPoint*, getLoadShedPoint, (absl::string_view));
+  MOCK_METHOD(void, stop, ());
 
   testing::NiceMock<MockThreadLocalOverloadState> overload_state_;
+};
+
+class MockLoadShedPoint : public LoadShedPoint {
+public:
+  MockLoadShedPoint() = default;
+
+  // LoadShedPoint
+  MOCK_METHOD(bool, shouldShedLoad, ());
 };
 
 } // namespace Server

@@ -1,12 +1,10 @@
 #include <atomic>
 #include <chrono>
 
-#include "common/common/lock_guard.h"
-#include "common/common/thread.h"
-
-#include "exe/platform_impl.h"
-
-#include "extensions/common/redis/cluster_refresh_manager_impl.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/thread.h"
+#include "source/exe/platform_impl.h"
+#include "source/extensions/common/redis/cluster_refresh_manager_impl.h"
 
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/redis_proxy/mocks.h"
@@ -27,11 +25,11 @@ namespace Common {
 namespace Redis {
 
 // TODO: rewrite the tests to fix the flaky test
-class ClusterRefreshManagerTest : public testing::Test {
+class ClusterRefreshManagerTest : public testing::Test, public Event::TestUsingSimulatedTime {
 public:
   ClusterRefreshManagerTest()
       : cluster_name_("fake_cluster"), refresh_manager_(std::make_shared<ClusterRefreshManagerImpl>(
-                                           dispatcher_, cm_, time_system_)) {
+                                           *dispatcher_, cm_, time_system_)) {
     time_system_.setMonotonicTime(std::chrono::seconds(1));
     cluster_maps_.active_clusters_.emplace("fake_cluster", mock_cluster_);
     ON_CALL(cm_, clusters()).WillByDefault(Return(cluster_maps_));
@@ -102,7 +100,8 @@ public:
   }
 
   const std::string cluster_name_;
-  NiceMock<Event::MockDispatcher> dispatcher_;
+  Api::ApiPtr api_ = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher_ = api_->allocateDispatcher("test_thread");
   NiceMock<Upstream::MockClusterManager> cm_;
   Upstream::ClusterManager::ClusterInfoMaps cluster_maps_;
   Upstream::MockClusterMockPrioritySet mock_cluster_;
@@ -144,6 +143,7 @@ TEST_F(ClusterRefreshManagerTest, Basic) {
   advanceTime(MonotonicTime(std::chrono::seconds(3)), 2);
   thread_1->join();
   thread_2->join();
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   EXPECT_GE(callback_count_, 2);
   EXPECT_EQ(cluster_info->redirects_count_, 0);
@@ -189,6 +189,7 @@ TEST_F(ClusterRefreshManagerTest, BasicFailureEvents) {
   thread_1->join();
   thread_2->join();
 
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_GE(callback_count_, 2);
   EXPECT_EQ(cluster_info->failures_count_, 0);
   EXPECT_EQ(cluster_info->last_callback_time_ms_.load(), 3000);
@@ -199,6 +200,7 @@ TEST_F(ClusterRefreshManagerTest, BasicFailureEvents) {
 
   callback_count_ = 0;
   advanceTime(MonotonicTime(std::chrono::seconds(5)));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_FALSE(refresh_manager_->onFailure("unregistered_cluster_name"));
   EXPECT_EQ(callback_count_, 0);
 
@@ -233,6 +235,7 @@ TEST_F(ClusterRefreshManagerTest, BasicDegradedEvents) {
   thread_1->join();
   thread_2->join();
 
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_GE(callback_count_, 2);
   EXPECT_EQ(cluster_info->host_degraded_count_, 0);
   EXPECT_EQ(cluster_info->last_callback_time_ms_.load(), 3000);
@@ -243,6 +246,7 @@ TEST_F(ClusterRefreshManagerTest, BasicDegradedEvents) {
 
   callback_count_ = 0;
   advanceTime(MonotonicTime(std::chrono::seconds(5)));
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_FALSE(refresh_manager_->onHostDegraded("unregistered_cluster_name"));
   EXPECT_EQ(callback_count_, 0);
 
@@ -292,6 +296,7 @@ TEST_F(ClusterRefreshManagerTest, HighVolume) {
   thread_1->join();
   thread_2->join();
 
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_EQ(callback_count_, thread1_callback_count + thread2_callback_count);
   EXPECT_EQ(callback_count_, 30);
 }
@@ -307,6 +312,7 @@ TEST_F(ClusterRefreshManagerTest, FeatureDisabled) {
   EXPECT_FALSE(refresh_manager_->onFailure(cluster_name_));
   EXPECT_FALSE(refresh_manager_->onHostDegraded(cluster_name_));
 
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
   EXPECT_GE(callback_count_, 0);
   EXPECT_EQ(cluster_info->redirects_count_, 0);
   EXPECT_EQ(cluster_info->failures_count_, 0);

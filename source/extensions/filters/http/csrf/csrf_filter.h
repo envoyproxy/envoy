@@ -6,8 +6,8 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/matchers.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/matchers.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -35,11 +35,11 @@ struct CsrfStats {
 class CsrfPolicy : public Router::RouteSpecificFilterConfig {
 public:
   CsrfPolicy(const envoy::extensions::filters::http::csrf::v3::CsrfPolicy& policy,
-             Runtime::Loader& runtime)
-      : policy_(policy), runtime_(runtime) {
+             Server::Configuration::CommonFactoryContext& context)
+      : policy_(policy), runtime_(context.runtime()) {
     for (const auto& additional_origin : policy.additional_origins()) {
       additional_origins_.emplace_back(
-          std::make_unique<Matchers::StringMatcherImpl>(additional_origin));
+          std::make_unique<Matchers::StringMatcherImpl>(additional_origin, context));
     }
   }
 
@@ -77,7 +77,8 @@ using CsrfPolicyPtr = std::unique_ptr<CsrfPolicy>;
 class CsrfFilterConfig {
 public:
   CsrfFilterConfig(const envoy::extensions::filters::http::csrf::v3::CsrfPolicy& policy,
-                   const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
+                   const std::string& stats_prefix, Stats::Scope& scope,
+                   Server::Configuration::CommonFactoryContext& context);
 
   CsrfStats& stats() { return stats_; }
   const CsrfPolicy* policy() { return policy_.get(); }

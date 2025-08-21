@@ -17,15 +17,17 @@ public:
 
   MOCK_METHOD(uint64_t, baseId, (), (const));
   MOCK_METHOD(bool, useDynamicBaseId, (), (const));
+  MOCK_METHOD(bool, skipHotRestartOnNoParent, (), (const));
+  MOCK_METHOD(bool, skipHotRestartParentStats, (), (const));
   MOCK_METHOD(const std::string&, baseIdPath, (), (const));
   MOCK_METHOD(uint32_t, concurrency, (), (const));
   MOCK_METHOD(const std::string&, configPath, (), (const));
   MOCK_METHOD(const envoy::config::bootstrap::v3::Bootstrap&, configProto, (), (const));
   MOCK_METHOD(const std::string&, configYaml, (), (const));
-  MOCK_METHOD(const absl::optional<uint32_t>&, bootstrapVersion, (), (const));
   MOCK_METHOD(bool, allowUnknownStaticFields, (), (const));
   MOCK_METHOD(bool, rejectUnknownDynamicFields, (), (const));
   MOCK_METHOD(bool, ignoreUnknownDynamicFields, (), (const));
+  MOCK_METHOD(bool, skipDeprecatedLogs, (), (const));
   MOCK_METHOD(const std::string&, adminAddressPath, (), (const));
   MOCK_METHOD(Network::Address::IpVersion, localAddressIpVersion, (), (const));
   MOCK_METHOD(std::chrono::seconds, drainTime, (), (const));
@@ -35,6 +37,7 @@ public:
   MOCK_METHOD((const std::vector<std::pair<std::string, spdlog::level::level_enum>>&),
               componentLogLevels, (), (const));
   MOCK_METHOD(const std::string&, logFormat, (), (const));
+  MOCK_METHOD(bool, logFormatSet, (), (const));
   MOCK_METHOD(bool, logFormatEscaped, (), (const));
   MOCK_METHOD(bool, enableFineGrainLogging, (), (const));
   MOCK_METHOD(const std::string&, logPath, (), (const));
@@ -47,11 +50,13 @@ public:
   MOCK_METHOD(bool, hotRestartDisabled, (), (const));
   MOCK_METHOD(bool, signalHandlingEnabled, (), (const));
   MOCK_METHOD(bool, mutexTracingEnabled, (), (const));
+  MOCK_METHOD(bool, coreDumpEnabled, (), (const));
   MOCK_METHOD(bool, cpusetThreadsEnabled, (), (const));
   MOCK_METHOD(const std::vector<std::string>&, disabledExtensions, (), (const));
   MOCK_METHOD(Server::CommandLineOptionsPtr, toCommandLineOptions, (), (const));
   MOCK_METHOD(const std::string&, socketPath, (), (const));
   MOCK_METHOD(mode_t, socketMode, (), (const));
+  MOCK_METHOD((const Stats::TagVector&), statsTags, (), (const));
 
   std::string config_path_;
   envoy::config::bootstrap::v3::Bootstrap config_proto_;
@@ -71,10 +76,12 @@ public:
   bool hot_restart_disabled_{};
   bool signal_handling_enabled_{true};
   bool mutex_tracing_enabled_{};
+  bool core_dump_enabled_{};
   bool cpuset_threads_enabled_{};
   std::vector<std::string> disabled_extensions_;
   std::string socket_path_;
   mode_t socket_mode_;
+  Stats::TagVector stats_tags_;
 };
 } // namespace Server
 } // namespace Envoy

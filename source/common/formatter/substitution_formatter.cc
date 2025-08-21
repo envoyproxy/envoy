@@ -1,1155 +1,451 @@
-#include "common/formatter/substitution_formatter.h"
-
-#include <climits>
-#include <cstdint>
-#include <regex>
-#include <string>
-#include <vector>
-
-#include "envoy/config/core/v3/base.pb.h"
-
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/config/metadata.h"
-#include "common/grpc/common.h"
-#include "common/grpc/status.h"
-#include "common/http/utility.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/protobuf/utility.h"
-#include "common/stream_info/utility.h"
-
-#include "absl/strings/str_split.h"
-#include "fmt/format.h"
-
-using Envoy::Config::Metadata;
+#include "source/common/formatter/substitution_formatter.h"
 
 namespace Envoy {
 namespace Formatter {
 
-static const std::string DefaultUnspecifiedValueString = "-";
-
-namespace {
-
-const ProtobufWkt::Value& unspecifiedValue() { return ValueUtil::nullValue(); }
-
-void truncate(std::string& str, absl::optional<uint32_t> max_length) {
-  if (!max_length) {
-    return;
-  }
-
-  str = str.substr(0, max_length.value());
+const re2::RE2& commandWithArgsRegex() {
+  // The following regex is used to check validity of the formatter command and to
+  // extract groups.
+  // The formatter command has the following format:
+  //    % COMMAND(SUBCOMMAND):LENGTH%
+  // % signs at the beginning and end are used by parser to find next COMMAND.
+  // COMMAND must always be present and must consist of characters: "A-Z", "0-9" or "_".
+  // SUBCOMMAND presence depends on the COMMAND. Format is flexible but cannot contain ")".:
+  // - for some commands SUBCOMMAND is not allowed (for example %PROTOCOL%)
+  // - for some commands SUBCOMMAND is required (for example %REQ(:AUTHORITY)%, just %REQ% will
+  // cause error)
+  // - for some commands SUBCOMMAND is optional (for example %START_TIME% and
+  // %START_TIME(%f.%1f.%2f.%3f)% are both correct).
+  // LENGTH presence depends on the command. Some
+  // commands allow LENGTH to be specified, so not. Regex is used to validate the syntax and also
+  // to extract values for COMMAND, SUBCOMMAND and LENGTH.
+  //
+  // Below is explanation of capturing and non-capturing groups. Non-capturing groups are used
+  // to specify that certain part of the formatter command is optional and should contain specific
+  // characters. Capturing groups are used to extract the values when regex is matched against
+  // formatter command string.
+  //
+  // clang-format off
+  // Non-capturing group specifying optional :LENGTH ----------------------
+  //                                                                       |
+  // Non-capturing group specifying optional (SUBCOMMAND)---               |
+  //                                                        |              |
+  // Non-capturing group specifying mandatory COMMAND       |              |
+  //  which uses only A-Z, 0-9 and _ characters             |              |
+  //  Group is used only to specify allowed characters.     |              |
+  //                                      |                 |              |
+  //                                      |                 |              |
+  //                              _________________  _____________ _____________
+  //                              |               |  |           | |           |
+  CONSTRUCT_ON_FIRST_USE(re2::RE2,
+                         R"EOF(^%((?:[A-Z]|[0-9]|_)+)(?:\((.*?)\))?(?::([0-9]+))?%)EOF");
+  //                             |__________________|     |___|        |______|
+  //                                       |                |              |
+  // Capturing group specifying COMMAND ---                 |              |
+  // The index of this group is 1.                          |              |
+  //                                                        |              |
+  // Capturing group for SUBCOMMAND. If present, it will ---               |
+  // contain SUBCOMMAND without "(" and ")". The index                     |
+  // of SUBCOMMAND group is 2.                                             |
+  //                                                                       |
+  // Capturing group for LENGTH. If present, it will ----------------------
+  // contain just number without ":". The index of
+  // LENGTH group is 3.
+  // clang-format on
 }
 
-// Matches newline pattern in a StartTimeFormatter format string.
-const std::regex& getStartTimeNewlinePattern() {
-  CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*(E|O)?n");
-}
-const std::regex& getNewlinePattern() { CONSTRUCT_ON_FIRST_USE(std::regex, "\n"); }
+// Helper class to write value to output buffer in JSON style.
+// NOTE: This helper class has duplicated logic with the Json::BufferStreamer class but
+// provides lower level of APIs to operate on the output buffer (like control the
+// delimiters). This is designed for special scenario of substitution formatter and
+// is not intended to be used by other parts of the code.
+class JsonStringSerializer {
+public:
+  using OutputBufferType = Json::StringOutput;
+  explicit JsonStringSerializer(std::string& output_buffer) : output_buffer_(output_buffer) {}
 
-template <class... Ts> struct JsonFormatMapVisitor : Ts... { using Ts::operator()...; };
-template <class... Ts> JsonFormatMapVisitor(Ts...) -> JsonFormatMapVisitor<Ts...>;
+  // Methods that be used to add JSON delimiter to output buffer.
+  void addMapBeginDelimiter() { output_buffer_.add(Json::Constants::MapBegin); }
+  void addMapEndDelimiter() { output_buffer_.add(Json::Constants::MapEnd); }
+  void addArrayBeginDelimiter() { output_buffer_.add(Json::Constants::ArrayBegin); }
+  void addArrayEndDelimiter() { output_buffer_.add(Json::Constants::ArrayEnd); }
+  void addElementsDelimiter() { output_buffer_.add(Json::Constants::Comma); }
+  void addKeyValueDelimiter() { output_buffer_.add(Json::Constants::Colon); }
 
-} // namespace
-
-const std::string SubstitutionFormatUtils::DEFAULT_FORMAT =
-    "[%START_TIME%] \"%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL%\" "
-    "%RESPONSE_CODE% %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %DURATION% "
-    "%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)% "
-    "\"%REQ(X-FORWARDED-FOR)%\" \"%REQ(USER-AGENT)%\" \"%REQ(X-REQUEST-ID)%\" "
-    "\"%REQ(:AUTHORITY)%\" \"%UPSTREAM_HOST%\"\n";
-
-FormatterPtr SubstitutionFormatUtils::defaultSubstitutionFormatter() {
-  return FormatterPtr{new FormatterImpl(DEFAULT_FORMAT, false)};
-}
-
-const absl::optional<std::reference_wrapper<const std::string>>
-SubstitutionFormatUtils::protocolToString(const absl::optional<Http::Protocol>& protocol) {
-  if (protocol) {
-    return Http::Utility::getProtocolString(protocol.value());
-  }
-  return absl::nullopt;
-}
-
-const std::string&
-SubstitutionFormatUtils::protocolToStringOrDefault(const absl::optional<Http::Protocol>& protocol) {
-  if (protocol) {
-    return Http::Utility::getProtocolString(protocol.value());
-  }
-  return DefaultUnspecifiedValueString;
-}
-
-const absl::optional<std::string> SubstitutionFormatUtils::getHostname() {
-#ifdef HOST_NAME_MAX
-  const size_t len = HOST_NAME_MAX;
-#else
-  // This is notably the case in OSX.
-  const size_t len = 255;
-#endif
-  char name[len];
-  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
-  const Api::SysCallIntResult result = os_sys_calls.gethostname(name, len);
-
-  absl::optional<std::string> hostname;
-  if (result.rc_ == 0) {
-    hostname = name;
-  }
-
-  return hostname;
-}
-
-const std::string SubstitutionFormatUtils::getHostnameOrDefault() {
-  absl::optional<std::string> hostname = getHostname();
-  if (hostname.has_value()) {
-    return hostname.value();
-  }
-  return DefaultUnspecifiedValueString;
-}
-
-FormatterImpl::FormatterImpl(const std::string& format, bool omit_empty_values)
-    : empty_value_string_(omit_empty_values ? EMPTY_STRING : DefaultUnspecifiedValueString) {
-  providers_ = SubstitutionFormatParser::parse(format);
-}
-
-std::string FormatterImpl::format(const Http::RequestHeaderMap& request_headers,
-                                  const Http::ResponseHeaderMap& response_headers,
-                                  const Http::ResponseTrailerMap& response_trailers,
-                                  const StreamInfo::StreamInfo& stream_info,
-                                  absl::string_view local_reply_body) const {
-  std::string log_line;
-  log_line.reserve(256);
-
-  for (const FormatterProviderPtr& provider : providers_) {
-    const auto bit = provider->format(request_headers, response_headers, response_trailers,
-                                      stream_info, local_reply_body);
-    log_line += bit.value_or(empty_value_string_);
-  }
-
-  return log_line;
-}
-
-std::string JsonFormatterImpl::format(const Http::RequestHeaderMap& request_headers,
-                                      const Http::ResponseHeaderMap& response_headers,
-                                      const Http::ResponseTrailerMap& response_trailers,
-                                      const StreamInfo::StreamInfo& stream_info,
-                                      absl::string_view local_reply_body) const {
-  const auto output_struct =
-      toStruct(request_headers, response_headers, response_trailers, stream_info, local_reply_body);
-
-  const std::string log_line = MessageUtil::getJsonStringFromMessage(output_struct, false, true);
-  return absl::StrCat(log_line, "\n");
-}
-
-JsonFormatterImpl::JsonFormatMapWrapper
-JsonFormatterImpl::toFormatMap(const ProtobufWkt::Struct& json_format) const {
-  auto output = std::make_unique<JsonFormatMap>();
-  for (const auto& pair : json_format.fields()) {
-    switch (pair.second.kind_case()) {
-    case ProtobufWkt::Value::kStringValue:
-      output->emplace(pair.first, SubstitutionFormatParser::parse(pair.second.string_value()));
-      break;
-    case ProtobufWkt::Value::kStructValue:
-      output->emplace(pair.first, toFormatMap(pair.second.struct_value()));
-      break;
-    default:
-      throw EnvoyException(
-          "Only string values or nested structs are supported in the JSON access log format.");
+  // Methods that be used to add JSON key or value to output buffer.
+  void addString(absl::string_view value) { addSanitized(R"(")", value, R"(")"); }
+  /**
+   * Serializes a number.
+   */
+  void addNumber(double d) {
+    if (std::isnan(d)) {
+      output_buffer_.add(Json::Constants::Null);
+    } else {
+      Buffer::Util::serializeDouble(d, output_buffer_);
     }
   }
-  return {std::move(output)};
+  /**
+   * Serializes a integer number.
+   * NOTE: All numbers in JSON is float. When loading output of this serializer, the parser's
+   * implementation decides if the full precision of big integer could be preserved or not.
+   * See discussion here https://stackoverflow.com/questions/13502398/json-integers-limit-on-size
+   * and spec https://www.rfc-editor.org/rfc/rfc7159#section-6 for more details.
+   */
+  void addNumber(uint64_t i) { output_buffer_.add(absl::StrCat(i)); }
+  void addNumber(int64_t i) { output_buffer_.add(absl::StrCat(i)); }
+  void addBool(bool b) { output_buffer_.add(b ? Json::Constants::True : Json::Constants::False); }
+  void addNull() { output_buffer_.add(Json::Constants::Null); }
+
+  // Low-level methods that be used to provide a low-level control to buffer.
+  void addSanitized(absl::string_view prefix, absl::string_view value, absl::string_view suffix) {
+    output_buffer_.add(prefix, Json::sanitize(sanitize_buffer_, value), suffix);
+  }
+  void addRawString(absl::string_view value) { output_buffer_.add(value); }
+
+protected:
+  std::string sanitize_buffer_;
+  OutputBufferType output_buffer_;
 };
 
-ProtobufWkt::Struct JsonFormatterImpl::toStruct(const Http::RequestHeaderMap& request_headers,
-                                                const Http::ResponseHeaderMap& response_headers,
-                                                const Http::ResponseTrailerMap& response_trailers,
-                                                const StreamInfo::StreamInfo& stream_info,
-                                                absl::string_view local_reply_body) const {
-  const std::string& empty_value =
-      omit_empty_values_ ? EMPTY_STRING : DefaultUnspecifiedValueString;
-  const std::function<ProtobufWkt::Value(const std::vector<FormatterProviderPtr>&)>
-      providers_callback = [&](const std::vector<FormatterProviderPtr>& providers) {
-        ASSERT(!providers.empty());
-        if (providers.size() == 1) {
-          const auto& provider = providers.front();
-          if (preserve_types_) {
-            return provider->formatValue(request_headers, response_headers, response_trailers,
-                                         stream_info, local_reply_body);
-          }
+// Helper class to parse the Json format configuration. The class will be used to parse
+// the JSON format configuration and convert it to a list of raw JSON pieces and
+// substitution format template strings. See comments below for more details.
+class JsonFormatBuilder {
+public:
+  struct FormatElement {
+    // Pre-sanitized JSON piece or a format template string that contains
+    // substitution commands.
+    std::string value_;
+    // Whether the value is a template string.
+    // If true, the value is a format template string that contains substitution commands.
+    // If false, the value is a pre-sanitized JSON piece.
+    bool is_template_;
+  };
+  using FormatElements = std::vector<FormatElement>;
 
-          if (omit_empty_values_) {
-            return ValueUtil::optionalStringValue(
-                provider->format(request_headers, response_headers, response_trailers, stream_info,
-                                 local_reply_body));
-          }
+  /**
+   * Constructor of JsonFormatBuilder.
+   */
+  JsonFormatBuilder() = default;
 
-          const auto str = provider->format(request_headers, response_headers, response_trailers,
-                                            stream_info, local_reply_body);
-          return ValueUtil::stringValue(str.value_or(DefaultUnspecifiedValueString));
-        }
-        // Multiple providers forces string output.
-        std::string str;
-        for (const auto& provider : providers) {
-          const auto bit = provider->format(request_headers, response_headers, response_trailers,
-                                            stream_info, local_reply_body);
-          str += bit.value_or(empty_value);
-        }
-        return ValueUtil::stringValue(str);
-      };
-  const std::function<ProtobufWkt::Value(const JsonFormatterImpl::JsonFormatMapWrapper&)>
-      json_format_map_callback = [&](const JsonFormatterImpl::JsonFormatMapWrapper& format) {
-        ProtobufWkt::Struct output;
-        auto* fields = output.mutable_fields();
-        JsonFormatMapVisitor visitor{json_format_map_callback, providers_callback};
-        for (const auto& pair : *format.value_) {
-          ProtobufWkt::Value value = absl::visit(visitor, pair.second);
-          if (omit_empty_values_ && value.kind_case() == ProtobufWkt::Value::kNullValue) {
-            continue;
-          }
-          (*fields)[pair.first] = value;
-        }
-        return ValueUtil::structValue(output);
-      };
-  return json_format_map_callback(json_output_format_).struct_value();
+  /**
+   * Convert a proto struct format configuration to an array of raw JSON pieces and
+   * substitution format template strings.
+   *
+   * The keys, raw values, delimiters will be serialized as JSON string pieces (raw
+   * JSON strings) directly when loading the configuration.
+   * The substitution format template strings will be kept as template string pieces and
+   * will be parsed to formatter providers by the JsonFormatter.
+   *
+   * NOTE: This class is used to parse the configuration of the proto struct format
+   * and should only be used in the context of parsing the configuration.
+   *
+   * For example given the following proto struct format configuration:
+   *
+   *   json_format:
+   *     name: "value"
+   *     template: "%START_TIME%"
+   *     number: 2
+   *     bool: true
+   *     list:
+   *       - "list_raw_value"
+   *       - false
+   *       - "%EMIT_TIME%"
+   *     nested:
+   *       nested_name: "nested_value"
+   *
+   * It will be parsed to the following pieces:
+   *
+   *   - '{"name":"value","template":'                                      # Raw JSON piece.
+   *   - '%START_TIME%'                                                     # Format template piece.
+   *   - ',"number":2,"bool":true,"list":["list_raw_value",false,'          # Raw JSON piece.
+   *   - '%EMIT_TIME%'                                                      # Format template piece.
+   *   - '],"nested":{"nested_name":"nested_value"}}'                       # Raw JSON piece.
+   *
+   * Finally, join the raw JSON pieces and output of substitution formatters in order
+   * to construct the final JSON output.
+   *
+   * @param struct_format the proto struct format configuration.
+   */
+  FormatElements fromStruct(const Protobuf::Struct& struct_format);
+
+private:
+  using ProtoDict = Protobuf::Map<std::string, Protobuf::Value>;
+  using ProtoList = Protobuf::RepeatedPtrField<Protobuf::Value>;
+
+  void formatValueToFormatElements(const ProtoDict& dict_value);
+  void formatValueToFormatElements(const Protobuf::Value& value);
+  void formatValueToFormatElements(const ProtoList& list_value);
+
+  std::string buffer_;                       // JSON writer buffer.
+  JsonStringSerializer serializer_{buffer_}; // JSON serializer.
+  FormatElements elements_;                  // Parsed elements.
+};
+
+JsonFormatBuilder::FormatElements
+JsonFormatBuilder::fromStruct(const Protobuf::Struct& struct_format) {
+  elements_.clear();
+
+  // This call will iterate through the map tree and serialize the key/values as JSON.
+  // If a string value that contains a substitution commands is found, the current
+  // JSON piece and the substitution command will be pushed into the output list.
+  // After that, the iteration will continue until the whole tree is traversed.
+  formatValueToFormatElements(struct_format.fields());
+  elements_.push_back(FormatElement{std::move(buffer_), false});
+  buffer_.clear();
+
+  return std::move(elements_);
+};
+
+void JsonFormatBuilder::formatValueToFormatElements(const Protobuf::Value& value) {
+  switch (value.kind_case()) {
+  case Protobuf::Value::KIND_NOT_SET:
+  case Protobuf::Value::kNullValue:
+    serializer_.addNull();
+    break;
+  case Protobuf::Value::kNumberValue:
+    serializer_.addNumber(value.number_value());
+    break;
+  case Protobuf::Value::kStringValue: {
+    absl::string_view string_format = value.string_value();
+    if (!absl::StrContains(string_format, '%')) {
+      serializer_.addString(string_format);
+      break;
+    }
+
+    // The string contains a formatter, we need to push the current exist JSON piece
+    // into the output list first.
+    elements_.push_back(FormatElement{std::move(buffer_), false});
+    buffer_.clear();
+
+    // Now a formatter is coming, we need to push the current raw string into
+    // the output list.
+    elements_.push_back(FormatElement{std::string(string_format), true});
+    break;
+  }
+  case Protobuf::Value::kBoolValue:
+    serializer_.addBool(value.bool_value());
+    break;
+  case Protobuf::Value::kStructValue: {
+    formatValueToFormatElements(value.struct_value().fields());
+    break;
+  case Protobuf::Value::kListValue:
+    formatValueToFormatElements(value.list_value().values());
+    break;
+  }
+  }
 }
 
-void SubstitutionFormatParser::parseCommandHeader(const std::string& token, const size_t start,
-                                                  std::string& main_header,
-                                                  std::string& alternative_header,
-                                                  absl::optional<size_t>& max_length) {
-  std::vector<std::string> subs;
-  parseCommand(token, start, "?", main_header, subs, max_length);
-  if (subs.size() > 1) {
-    throw EnvoyException(
-        // Header format rules support only one alternative header.
-        // docs/root/configuration/access_log.rst#format-rules
-        absl::StrCat("More than 1 alternative header specified in token: ", token));
+void JsonFormatBuilder::formatValueToFormatElements(const ProtoList& list_value) {
+  serializer_.addArrayBeginDelimiter(); // Delimiter to start list.
+  for (int i = 0; i < list_value.size(); ++i) {
+    if (i > 0) {
+      serializer_.addElementsDelimiter(); // Delimiter to separate list elements.
+    }
+    formatValueToFormatElements(list_value[i]);
   }
-  if (subs.size() == 1) {
-    alternative_header = subs.front();
-  } else {
-    alternative_header = "";
-  }
-  // The main and alternative header should not contain invalid characters {NUL, LR, CF}.
-  if (std::regex_search(main_header, getNewlinePattern()) ||
-      std::regex_search(alternative_header, getNewlinePattern())) {
-    throw EnvoyException("Invalid header configuration. Format string contains newline.");
-  }
+  serializer_.addArrayEndDelimiter(); // Delimiter to end list.
 }
 
-void SubstitutionFormatParser::parseCommand(const std::string& token, const size_t start,
-                                            const std::string& separator, std::string& main,
-                                            std::vector<std::string>& sub_items,
-                                            absl::optional<size_t>& max_length) {
-  // TODO(dnoe): Convert this to use string_view throughout.
-  const size_t end_request = token.find(')', start);
-  sub_items.clear();
-  if (end_request != token.length() - 1) {
-    // Closing bracket is not found.
-    if (end_request == std::string::npos) {
-      throw EnvoyException(absl::StrCat("Closing bracket is missing in token: ", token));
-    }
+void JsonFormatBuilder::formatValueToFormatElements(const ProtoDict& dict_value) {
+  std::vector<std::pair<absl::string_view, ProtoDict::const_iterator>> sorted_fields;
+  sorted_fields.reserve(dict_value.size());
 
-    // Closing bracket should be either last one or followed by ':' to denote limitation.
-    if (token[end_request + 1] != ':') {
-      throw EnvoyException(absl::StrCat("Incorrect position of ')' in token: ", token));
-    }
-
-    const auto length_str = absl::string_view(token).substr(end_request + 2);
-    uint64_t length_value;
-
-    if (!absl::SimpleAtoi(length_str, &length_value)) {
-      throw EnvoyException(absl::StrCat("Length must be an integer, given: ", length_str));
-    }
-
-    max_length = length_value;
+  for (auto it = dict_value.begin(); it != dict_value.end(); ++it) {
+    sorted_fields.push_back({it->first, it});
   }
 
-  const std::string name_data = token.substr(start, end_request - start);
-  if (!separator.empty()) {
-    const std::vector<std::string> keys = absl::StrSplit(name_data, separator);
-    if (!keys.empty()) {
-      // The main value is the first key
-      main = keys.at(0);
-      if (keys.size() > 1) {
-        // Sub items contain additional keys
-        sub_items.insert(sub_items.end(), keys.begin() + 1, keys.end());
-      }
+  // Sort the keys to make the output deterministic.
+  std::sort(sorted_fields.begin(), sorted_fields.end(),
+            [](const auto& a, const auto& b) { return a.first < b.first; });
+
+  serializer_.addMapBeginDelimiter(); // Delimiter to start map.
+  for (size_t i = 0; i < sorted_fields.size(); ++i) {
+    if (i > 0) {
+      serializer_.addElementsDelimiter(); // Delimiter to separate map elements.
     }
-  } else {
-    main = name_data;
+    // Add the key.
+    serializer_.addString(sorted_fields[i].first);
+    serializer_.addKeyValueDelimiter(); // Delimiter to separate key and value.
+    formatValueToFormatElements(sorted_fields[i].second->second);
   }
+  serializer_.addMapEndDelimiter(); // Delimiter to end map.
 }
 
-// TODO(derekargueta): #2967 - Rewrite SubstitutionFormatter with parser library & formal grammar
-std::vector<FormatterProviderPtr> SubstitutionFormatParser::parse(const std::string& format) {
+absl::StatusOr<std::vector<FormatterProviderPtr>>
+SubstitutionFormatParser::parse(absl::string_view format,
+                                const std::vector<CommandParserPtr>& command_parsers) {
   std::string current_token;
+  current_token.reserve(32);
   std::vector<FormatterProviderPtr> formatters;
-  static constexpr absl::string_view DYNAMIC_META_TOKEN{"DYNAMIC_METADATA("};
-  static constexpr absl::string_view FILTER_STATE_TOKEN{"FILTER_STATE("};
-  const std::regex command_w_args_regex(R"EOF(^%([A-Z]|_)+(\([^\)]*\))?(:[0-9]+)?(%))EOF");
 
-  static constexpr absl::string_view PLAIN_SERIALIZATION{"PLAIN"};
-  static constexpr absl::string_view TYPED_SERIALIZATION{"TYPED"};
-
-  for (size_t pos = 0; pos < format.length(); ++pos) {
-    if (format[pos] == '%') {
-      if (!current_token.empty()) {
-        formatters.emplace_back(FormatterProviderPtr{new PlainStringFormatter(current_token)});
-        current_token = "";
-      }
-
-      std::smatch m;
-      const std::string search_space = format.substr(pos);
-      if (!std::regex_search(search_space, m, command_w_args_regex)) {
-        throw EnvoyException(
-            fmt::format("Incorrect configuration: {}. Couldn't find valid command at position {}",
-                        format, pos));
-      }
-
-      const std::string match = m.str(0);
-      const std::string token = match.substr(1, match.length() - 2);
-      pos += 1;
-      const int command_end_position = pos + token.length();
-
-      if (absl::StartsWith(token, "REQ(")) {
-        std::string main_header, alternative_header;
-        absl::optional<size_t> max_length;
-
-        parseCommandHeader(token, ReqParamStart, main_header, alternative_header, max_length);
-
-        formatters.emplace_back(FormatterProviderPtr{
-            new RequestHeaderFormatter(main_header, alternative_header, max_length)});
-      } else if (absl::StartsWith(token, "RESP(")) {
-        std::string main_header, alternative_header;
-        absl::optional<size_t> max_length;
-
-        parseCommandHeader(token, RespParamStart, main_header, alternative_header, max_length);
-
-        formatters.emplace_back(FormatterProviderPtr{
-            new ResponseHeaderFormatter(main_header, alternative_header, max_length)});
-      } else if (absl::StartsWith(token, "TRAILER(")) {
-        std::string main_header, alternative_header;
-        absl::optional<size_t> max_length;
-
-        parseCommandHeader(token, TrailParamStart, main_header, alternative_header, max_length);
-
-        formatters.emplace_back(FormatterProviderPtr{
-            new ResponseTrailerFormatter(main_header, alternative_header, max_length)});
-      } else if (absl::StartsWith(token, "LOCAL_REPLY_BODY")) {
-        formatters.emplace_back(std::make_unique<LocalReplyBodyFormatter>());
-      } else if (absl::StartsWith(token, DYNAMIC_META_TOKEN)) {
-        std::string filter_namespace;
-        absl::optional<size_t> max_length;
-        std::vector<std::string> path;
-        const size_t start = DYNAMIC_META_TOKEN.size();
-
-        parseCommand(token, start, ":", filter_namespace, path, max_length);
-        formatters.emplace_back(
-            FormatterProviderPtr{new DynamicMetadataFormatter(filter_namespace, path, max_length)});
-      } else if (absl::StartsWith(token, FILTER_STATE_TOKEN)) {
-        std::string key;
-        absl::optional<size_t> max_length;
-        std::vector<std::string> path;
-        const size_t start = FILTER_STATE_TOKEN.size();
-
-        parseCommand(token, start, ":", key, path, max_length);
-        if (key.empty()) {
-          throw EnvoyException("Invalid filter state configuration, key cannot be empty.");
-        }
-
-        const absl::string_view serialize_type =
-            !path.empty() ? path[path.size() - 1] : TYPED_SERIALIZATION;
-
-        if (serialize_type != PLAIN_SERIALIZATION && serialize_type != TYPED_SERIALIZATION) {
-          throw EnvoyException("Invalid filter state serialize type, only support PLAIN/TYPED.");
-        }
-        const bool serialize_as_string = serialize_type == PLAIN_SERIALIZATION;
-
-        formatters.push_back(
-            std::make_unique<FilterStateFormatter>(key, max_length, serialize_as_string));
-      } else if (absl::StartsWith(token, "START_TIME")) {
-        const size_t parameters_length = pos + StartTimeParamStart + 1;
-        const size_t parameters_end = command_end_position - parameters_length;
-
-        const std::string args = token[StartTimeParamStart - 1] == '('
-                                     ? token.substr(StartTimeParamStart, parameters_end)
-                                     : "";
-        // Validate the input specifier here. The formatted string may be destined for a header, and
-        // should not contain invalid characters {NUL, LR, CF}.
-        if (std::regex_search(args, getStartTimeNewlinePattern())) {
-          throw EnvoyException("Invalid header configuration. Format string contains newline.");
-        }
-        formatters.emplace_back(FormatterProviderPtr{new StartTimeFormatter(args)});
-      } else if (absl::StartsWith(token, "GRPC_STATUS")) {
-        formatters.emplace_back(FormatterProviderPtr{
-            new GrpcStatusFormatter("grpc-status", "", absl::optional<size_t>())});
-      } else {
-        formatters.emplace_back(FormatterProviderPtr{new StreamInfoFormatter(token)});
-      }
-      pos = command_end_position;
-    } else {
-      current_token += format[pos];
+  for (size_t pos = 0; pos < format.size();) {
+    if (format[pos] != '%') {
+      current_token.push_back(format[pos]);
+      pos++;
+      continue;
     }
+
+    // escape '%%'
+    if (format.size() > pos + 1) {
+      if (format[pos + 1] == '%') {
+        current_token.push_back('%');
+        pos += 2;
+        continue;
+      }
+    }
+
+    if (!current_token.empty()) {
+      formatters.emplace_back(FormatterProviderPtr{new PlainStringFormatter(current_token)});
+      current_token.clear();
+    }
+
+    absl::string_view sub_format = format.substr(pos);
+    const size_t sub_format_size = sub_format.size();
+
+    absl::string_view command, command_arg;
+    absl::optional<size_t> max_len;
+
+    if (!re2::RE2::Consume(&sub_format, commandWithArgsRegex(), &command, &command_arg, &max_len)) {
+      return absl::InvalidArgumentError(fmt::format(
+          "Incorrect configuration: {}. Couldn't find valid command at position {}", format, pos));
+    }
+
+    bool added = false;
+
+    // First try the command parsers provided by the user. This allows the user to override
+    // built-in command parsers.
+    for (const auto& cmd : command_parsers) {
+      auto formatter = cmd->parse(command, command_arg, max_len);
+      if (formatter) {
+        formatters.push_back(std::move(formatter));
+        added = true;
+        break;
+      }
+    }
+
+    // Next, try the built-in command parsers.
+    if (!added) {
+      for (const auto& cmd : BuiltInCommandParserFactoryHelper::commandParsers()) {
+        auto formatter = cmd->parse(command, command_arg, max_len);
+        if (formatter) {
+          formatters.push_back(std::move(formatter));
+          added = true;
+          break;
+        }
+      }
+    }
+
+    if (!added) {
+      return absl::InvalidArgumentError(
+          fmt::format("Not supported field in StreamInfo: {}", command));
+    }
+
+    pos += (sub_format_size - sub_format.size());
   }
 
-  if (!current_token.empty()) {
+  if (!current_token.empty() || format.empty()) {
+    // Create a PlainStringFormatter with the final string literal. If the format string
+    // was empty, this creates a PlainStringFormatter with an empty string.
     formatters.emplace_back(FormatterProviderPtr{new PlainStringFormatter(current_token)});
   }
 
   return formatters;
 }
 
-// StreamInfo std::string field extractor.
-class StreamInfoStringFieldExtractor : public StreamInfoFormatter::FieldExtractor {
-public:
-  using FieldExtractor = std::function<absl::optional<std::string>(const StreamInfo::StreamInfo&)>;
+absl::StatusOr<std::unique_ptr<FormatterImpl>>
+FormatterImpl::create(absl::string_view format, bool omit_empty_values,
+                      const CommandParsers& command_parsers) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = std::unique_ptr<FormatterImpl>(
+      new FormatterImpl(creation_status, format, omit_empty_values, command_parsers));
+  RETURN_IF_NOT_OK_REF(creation_status);
+  return ret;
+}
 
-  StreamInfoStringFieldExtractor(FieldExtractor f) : field_extractor_(f) {}
+std::string FormatterImpl::formatWithContext(const Context& context,
+                                             const StreamInfo::StreamInfo& stream_info) const {
+  std::string log_line;
+  log_line.reserve(256);
 
-  // StreamInfoFormatter::FieldExtractor
-  absl::optional<std::string> extract(const StreamInfo::StreamInfo& stream_info) const override {
-    return field_extractor_(stream_info);
-  }
-  ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo& stream_info) const override {
-    return ValueUtil::optionalStringValue(field_extractor_(stream_info));
-  }
-
-private:
-  FieldExtractor field_extractor_;
-};
-
-// StreamInfo std::chrono_nanoseconds field extractor.
-class StreamInfoDurationFieldExtractor : public StreamInfoFormatter::FieldExtractor {
-public:
-  using FieldExtractor =
-      std::function<absl::optional<std::chrono::nanoseconds>(const StreamInfo::StreamInfo&)>;
-
-  StreamInfoDurationFieldExtractor(FieldExtractor f) : field_extractor_(f) {}
-
-  // StreamInfoFormatter::FieldExtractor
-  absl::optional<std::string> extract(const StreamInfo::StreamInfo& stream_info) const override {
-    const auto millis = extractMillis(stream_info);
-    if (!millis) {
-      return absl::nullopt;
-    }
-
-    return fmt::format_int(millis.value()).str();
-  }
-  ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo& stream_info) const override {
-    const auto millis = extractMillis(stream_info);
-    if (!millis) {
-      return unspecifiedValue();
-    }
-
-    return ValueUtil::numberValue(millis.value());
-  }
-
-private:
-  absl::optional<int64_t> extractMillis(const StreamInfo::StreamInfo& stream_info) const {
-    const auto time = field_extractor_(stream_info);
-    if (time) {
-      return std::chrono::duration_cast<std::chrono::milliseconds>(time.value()).count();
-    }
-    return absl::nullopt;
-  }
-
-  FieldExtractor field_extractor_;
-};
-
-// StreamInfo uint64_t field extractor.
-class StreamInfoUInt64FieldExtractor : public StreamInfoFormatter::FieldExtractor {
-public:
-  using FieldExtractor = std::function<uint64_t(const StreamInfo::StreamInfo&)>;
-
-  StreamInfoUInt64FieldExtractor(FieldExtractor f) : field_extractor_(f) {}
-
-  // StreamInfoFormatter::FieldExtractor
-  absl::optional<std::string> extract(const StreamInfo::StreamInfo& stream_info) const override {
-    return fmt::format_int(field_extractor_(stream_info)).str();
-  }
-  ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo& stream_info) const override {
-    return ValueUtil::numberValue(field_extractor_(stream_info));
-  }
-
-private:
-  FieldExtractor field_extractor_;
-};
-
-// StreamInfo Envoy::Network::Address::InstanceConstSharedPtr field extractor.
-class StreamInfoAddressFieldExtractor : public StreamInfoFormatter::FieldExtractor {
-public:
-  using FieldExtractor =
-      std::function<Network::Address::InstanceConstSharedPtr(const StreamInfo::StreamInfo&)>;
-
-  static std::unique_ptr<StreamInfoAddressFieldExtractor> withPort(FieldExtractor f) {
-    return std::make_unique<StreamInfoAddressFieldExtractor>(
-        f, StreamInfoFormatter::StreamInfoAddressFieldExtractionType::WithPort);
-  }
-
-  static std::unique_ptr<StreamInfoAddressFieldExtractor> withoutPort(FieldExtractor f) {
-    return std::make_unique<StreamInfoAddressFieldExtractor>(
-        f, StreamInfoFormatter::StreamInfoAddressFieldExtractionType::WithoutPort);
-  }
-
-  static std::unique_ptr<StreamInfoAddressFieldExtractor> justPort(FieldExtractor f) {
-    return std::make_unique<StreamInfoAddressFieldExtractor>(
-        f, StreamInfoFormatter::StreamInfoAddressFieldExtractionType::JustPort);
-  }
-
-  StreamInfoAddressFieldExtractor(
-      FieldExtractor f, StreamInfoFormatter::StreamInfoAddressFieldExtractionType extraction_type)
-      : field_extractor_(f), extraction_type_(extraction_type) {}
-
-  // StreamInfoFormatter::FieldExtractor
-  absl::optional<std::string> extract(const StreamInfo::StreamInfo& stream_info) const override {
-    Network::Address::InstanceConstSharedPtr address = field_extractor_(stream_info);
-    if (!address) {
-      return absl::nullopt;
-    }
-
-    return toString(*address);
-  }
-  ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo& stream_info) const override {
-    Network::Address::InstanceConstSharedPtr address = field_extractor_(stream_info);
-    if (!address) {
-      return unspecifiedValue();
-    }
-
-    return ValueUtil::stringValue(toString(*address));
-  }
-
-private:
-  std::string toString(const Network::Address::Instance& address) const {
-    switch (extraction_type_) {
-    case StreamInfoFormatter::StreamInfoAddressFieldExtractionType::WithoutPort:
-      return StreamInfo::Utility::formatDownstreamAddressNoPort(address);
-    case StreamInfoFormatter::StreamInfoAddressFieldExtractionType::JustPort:
-      return StreamInfo::Utility::formatDownstreamAddressJustPort(address);
-    case StreamInfoFormatter::StreamInfoAddressFieldExtractionType::WithPort:
-    default:
-      return address.asString();
+  for (const auto& provider : providers_) {
+    const absl::optional<std::string> bit = provider->formatWithContext(context, stream_info);
+    // Add the formatted value if there is one. Otherwise add a default value
+    // of "-" if omit_empty_values_ is not set.
+    if (bit.has_value()) {
+      log_line += bit.value();
+    } else if (!omit_empty_values_) {
+      log_line += DefaultUnspecifiedValueStringView;
     }
   }
 
-  FieldExtractor field_extractor_;
-  const StreamInfoFormatter::StreamInfoAddressFieldExtractionType extraction_type_;
-};
+  return log_line;
+}
 
-// Ssl::ConnectionInfo std::string field extractor.
-class StreamInfoSslConnectionInfoFieldExtractor : public StreamInfoFormatter::FieldExtractor {
-public:
-  using FieldExtractor =
-      std::function<absl::optional<std::string>(const Ssl::ConnectionInfo& connection_info)>;
+void stringValueToLogLine(const JsonFormatterImpl::Formatters& formatters, const Context& context,
+                          const StreamInfo::StreamInfo& info, std::string& log_line,
+                          std::string& sanitize, bool omit_empty_values) {
+  log_line.push_back('"'); // Start the JSON string.
+  for (const JsonFormatterImpl::Formatter& formatter : formatters) {
+    const absl::optional<std::string> value = formatter->formatWithContext(context, info);
+    if (!value.has_value()) {
+      // Add the empty value. This needn't be sanitized.
+      log_line.append(omit_empty_values ? EMPTY_STRING : DefaultUnspecifiedValueStringView);
+      continue;
+    }
+    // Sanitize the string value and add it to the buffer. The string value will not be quoted
+    // since we handle the quoting by ourselves at the outer level.
+    log_line.append(Json::sanitize(sanitize, value.value()));
+  }
+  log_line.push_back('"'); // End the JSON string.
+}
 
-  StreamInfoSslConnectionInfoFieldExtractor(FieldExtractor f) : field_extractor_(f) {}
+JsonFormatterImpl::JsonFormatterImpl(const Protobuf::Struct& struct_format, bool omit_empty_values,
+                                     const CommandParsers& commands)
+    : omit_empty_values_(omit_empty_values) {
+  for (JsonFormatBuilder::FormatElement& element : JsonFormatBuilder().fromStruct(struct_format)) {
+    if (element.is_template_) {
+      parsed_elements_.emplace_back(
+          THROW_OR_RETURN_VALUE(SubstitutionFormatParser::parse(element.value_, commands),
+                                std::vector<FormatterProviderPtr>));
+    } else {
+      parsed_elements_.emplace_back(std::move(element.value_));
+    }
+  }
+}
 
-  absl::optional<std::string> extract(const StreamInfo::StreamInfo& stream_info) const override {
-    if (stream_info.downstreamSslConnection() == nullptr) {
-      return absl::nullopt;
+std::string JsonFormatterImpl::formatWithContext(const Context& context,
+                                                 const StreamInfo::StreamInfo& info) const {
+  std::string log_line;
+  log_line.reserve(2048);
+  std::string sanitize; // Helper to serialize the value to log line.
+
+  for (const ParsedFormatElement& element : parsed_elements_) {
+    // 1. Handle the raw string element.
+    if (absl::holds_alternative<std::string>(element)) {
+      // The raw string element will be added to the buffer directly.
+      // It is sanitized when loading the configuration.
+      log_line.append(absl::get<std::string>(element));
+      continue;
     }
 
-    const auto value = field_extractor_(*stream_info.downstreamSslConnection());
-    if (value && value->empty()) {
-      return absl::nullopt;
+    ASSERT(absl::holds_alternative<Formatters>(element));
+    const Formatters& formatters = absl::get<Formatters>(element);
+    ASSERT(!formatters.empty());
+
+    if (formatters.size() != 1) {
+      // 2. Handle the formatter element with multiple or zero providers.
+      stringValueToLogLine(formatters, context, info, log_line, sanitize, omit_empty_values_);
+    } else {
+      // 3. Handle the formatter element with a single provider and value
+      //    type needs to be kept.
+      const auto value = formatters[0]->formatValueWithContext(context, info);
+      Json::Utility::appendValueToString(value, log_line);
     }
-
-    return value;
   }
 
-  ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo& stream_info) const override {
-    if (stream_info.downstreamSslConnection() == nullptr) {
-      return unspecifiedValue();
-    }
-
-    const auto value = field_extractor_(*stream_info.downstreamSslConnection());
-    if (value && value->empty()) {
-      return unspecifiedValue();
-    }
-
-    return ValueUtil::optionalStringValue(value);
-  }
-
-private:
-  FieldExtractor field_extractor_;
-};
-
-StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
-  if (field_name == "REQUEST_DURATION") {
-    field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.lastDownstreamRxByteReceived();
-        });
-  } else if (field_name == "RESPONSE_DURATION") {
-    field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.firstUpstreamRxByteReceived();
-        });
-  } else if (field_name == "RESPONSE_TX_DURATION") {
-    field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          auto downstream = stream_info.lastDownstreamTxByteSent();
-          auto upstream = stream_info.firstUpstreamRxByteReceived();
-
-          absl::optional<std::chrono::nanoseconds> result;
-          if (downstream && upstream) {
-            result = downstream.value() - upstream.value();
-          }
-
-          return result;
-        });
-  } else if (field_name == "BYTES_RECEIVED") {
-    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) { return stream_info.bytesReceived(); });
-  } else if (field_name == "PROTOCOL") {
-    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return SubstitutionFormatUtils::protocolToString(stream_info.protocol());
-        });
-  } else if (field_name == "RESPONSE_CODE") {
-    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.responseCode().value_or(0);
-        });
-  } else if (field_name == "RESPONSE_CODE_DETAILS") {
-    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.responseCodeDetails();
-        });
-  } else if (field_name == "CONNECTION_TERMINATION_DETAILS") {
-    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.connectionTerminationDetails();
-        });
-  } else if (field_name == "BYTES_SENT") {
-    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) { return stream_info.bytesSent(); });
-  } else if (field_name == "DURATION") {
-    field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) { return stream_info.requestComplete(); });
-  } else if (field_name == "RESPONSE_FLAGS") {
-    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return StreamInfo::ResponseFlagUtils::toShortString(stream_info);
-        });
-  } else if (field_name == "UPSTREAM_HOST") {
-    field_extractor_ =
-        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.upstreamHost() ? stream_info.upstreamHost()->address() : nullptr;
-        });
-  } else if (field_name == "UPSTREAM_CLUSTER") {
-    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          std::string upstream_cluster_name;
-          if (nullptr != stream_info.upstreamHost()) {
-            upstream_cluster_name = stream_info.upstreamHost()->cluster().name();
-          }
-
-          return upstream_cluster_name.empty()
-                     ? absl::nullopt
-                     : absl::make_optional<std::string>(upstream_cluster_name);
-        });
-  } else if (field_name == "UPSTREAM_LOCAL_ADDRESS") {
-    field_extractor_ =
-        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.upstreamLocalAddress();
-        });
-  } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS") {
-    field_extractor_ =
-        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamLocalAddress();
-        });
-  } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT") {
-    field_extractor_ = StreamInfoAddressFieldExtractor::withoutPort(
-        [](const Envoy::StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamLocalAddress();
-        });
-  } else if (field_name == "DOWNSTREAM_LOCAL_PORT") {
-    field_extractor_ = StreamInfoAddressFieldExtractor::justPort(
-        [](const Envoy::StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamLocalAddress();
-        });
-  } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
-    field_extractor_ =
-        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamRemoteAddress();
-        });
-  } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT") {
-    field_extractor_ =
-        StreamInfoAddressFieldExtractor::withoutPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamRemoteAddress();
-        });
-  } else if (field_name == "DOWNSTREAM_DIRECT_REMOTE_ADDRESS") {
-    field_extractor_ =
-        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamDirectRemoteAddress();
-        });
-  } else if (field_name == "DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT") {
-    field_extractor_ =
-        StreamInfoAddressFieldExtractor::withoutPort([](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.downstreamDirectRemoteAddress();
-        });
-  } else if (field_name == "CONNECTION_ID") {
-    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          return stream_info.connectionID().value_or(0);
-        });
-  } else if (field_name == "REQUESTED_SERVER_NAME") {
-    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          absl::optional<std::string> result;
-          if (!stream_info.requestedServerName().empty()) {
-            result = stream_info.requestedServerName();
-          }
-          return result;
-        });
-  } else if (field_name == "ROUTE_NAME") {
-    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          absl::optional<std::string> result;
-          std::string route_name = stream_info.getRouteName();
-          if (!route_name.empty()) {
-            result = route_name;
-          }
-          return result;
-        });
-  } else if (field_name == "DOWNSTREAM_PEER_URI_SAN") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          return absl::StrJoin(connection_info.uriSanPeerCertificate(), ",");
-        });
-  } else if (field_name == "DOWNSTREAM_LOCAL_URI_SAN") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          return absl::StrJoin(connection_info.uriSanLocalCertificate(), ",");
-        });
-  } else if (field_name == "DOWNSTREAM_PEER_SUBJECT") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.subjectPeerCertificate();
-        });
-  } else if (field_name == "DOWNSTREAM_LOCAL_SUBJECT") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.subjectLocalCertificate();
-        });
-  } else if (field_name == "DOWNSTREAM_TLS_SESSION_ID") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) { return connection_info.sessionId(); });
-  } else if (field_name == "DOWNSTREAM_TLS_CIPHER") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.ciphersuiteString();
-        });
-  } else if (field_name == "DOWNSTREAM_TLS_VERSION") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) { return connection_info.tlsVersion(); });
-  } else if (field_name == "DOWNSTREAM_PEER_FINGERPRINT_256") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.sha256PeerCertificateDigest();
-        });
-  } else if (field_name == "DOWNSTREAM_PEER_FINGERPRINT_1") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.sha1PeerCertificateDigest();
-        });
-  } else if (field_name == "DOWNSTREAM_PEER_SERIAL") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.serialNumberPeerCertificate();
-        });
-  } else if (field_name == "DOWNSTREAM_PEER_ISSUER") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.issuerPeerCertificate();
-        });
-  } else if (field_name == "DOWNSTREAM_PEER_CERT") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.urlEncodedPemEncodedPeerCertificate();
-        });
-  } else if (field_name == "DOWNSTREAM_PEER_CERT_V_START") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          absl::optional<SystemTime> time = connection_info.validFromPeerCertificate();
-          absl::optional<std::string> result;
-          if (time.has_value()) {
-            result = AccessLogDateTimeFormatter::fromTime(time.value());
-          }
-          return result;
-        });
-  } else if (field_name == "DOWNSTREAM_PEER_CERT_V_END") {
-    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
-        [](const Ssl::ConnectionInfo& connection_info) {
-          absl::optional<SystemTime> time = connection_info.expirationPeerCertificate();
-          absl::optional<std::string> result;
-          if (time.has_value()) {
-            result = AccessLogDateTimeFormatter::fromTime(time.value());
-          }
-          return result;
-        });
-  } else if (field_name == "UPSTREAM_TRANSPORT_FAILURE_REASON") {
-    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [](const StreamInfo::StreamInfo& stream_info) {
-          absl::optional<std::string> result;
-          if (!stream_info.upstreamTransportFailureReason().empty()) {
-            result = stream_info.upstreamTransportFailureReason();
-          }
-          return result;
-        });
-  } else if (field_name == "HOSTNAME") {
-    absl::optional<std::string> hostname = SubstitutionFormatUtils::getHostname();
-    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
-        [hostname](const StreamInfo::StreamInfo&) { return hostname; });
-  } else {
-    throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", field_name));
-  }
-}
-
-absl::optional<std::string> StreamInfoFormatter::format(const Http::RequestHeaderMap&,
-                                                        const Http::ResponseHeaderMap&,
-                                                        const Http::ResponseTrailerMap&,
-                                                        const StreamInfo::StreamInfo& stream_info,
-                                                        absl::string_view) const {
-  return field_extractor_->extract(stream_info);
-}
-
-ProtobufWkt::Value StreamInfoFormatter::formatValue(const Http::RequestHeaderMap&,
-                                                    const Http::ResponseHeaderMap&,
-                                                    const Http::ResponseTrailerMap&,
-                                                    const StreamInfo::StreamInfo& stream_info,
-                                                    absl::string_view) const {
-  return field_extractor_->extractValue(stream_info);
-}
-
-PlainStringFormatter::PlainStringFormatter(const std::string& str) { str_.set_string_value(str); }
-
-absl::optional<std::string> PlainStringFormatter::format(const Http::RequestHeaderMap&,
-                                                         const Http::ResponseHeaderMap&,
-                                                         const Http::ResponseTrailerMap&,
-                                                         const StreamInfo::StreamInfo&,
-                                                         absl::string_view) const {
-  return str_.string_value();
-}
-
-ProtobufWkt::Value PlainStringFormatter::formatValue(const Http::RequestHeaderMap&,
-                                                     const Http::ResponseHeaderMap&,
-                                                     const Http::ResponseTrailerMap&,
-                                                     const StreamInfo::StreamInfo&,
-                                                     absl::string_view) const {
-  return str_;
-}
-
-absl::optional<std::string>
-LocalReplyBodyFormatter::format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&,
-                                absl::string_view local_reply_body) const {
-  return std::string(local_reply_body);
-}
-
-ProtobufWkt::Value LocalReplyBodyFormatter::formatValue(const Http::RequestHeaderMap&,
-                                                        const Http::ResponseHeaderMap&,
-                                                        const Http::ResponseTrailerMap&,
-                                                        const StreamInfo::StreamInfo&,
-                                                        absl::string_view local_reply_body) const {
-  return ValueUtil::stringValue(std::string(local_reply_body));
-}
-
-HeaderFormatter::HeaderFormatter(const std::string& main_header,
-                                 const std::string& alternative_header,
-                                 absl::optional<size_t> max_length)
-    : main_header_(main_header), alternative_header_(alternative_header), max_length_(max_length) {}
-
-const Http::HeaderEntry* HeaderFormatter::findHeader(const Http::HeaderMap& headers) const {
-  const auto header = headers.get(main_header_);
-
-  if (header.empty() && !alternative_header_.get().empty()) {
-    const auto alternate_header = headers.get(alternative_header_);
-    // TODO(https://github.com/envoyproxy/envoy/issues/13454): Potentially log all header values.
-    return alternate_header.empty() ? nullptr : alternate_header[0];
-  }
-
-  return header.empty() ? nullptr : header[0];
-}
-
-absl::optional<std::string> HeaderFormatter::format(const Http::HeaderMap& headers) const {
-  const Http::HeaderEntry* header = findHeader(headers);
-  if (!header) {
-    return absl::nullopt;
-  }
-
-  std::string val = std::string(header->value().getStringView());
-  truncate(val, max_length_);
-  return val;
-}
-
-ProtobufWkt::Value HeaderFormatter::formatValue(const Http::HeaderMap& headers) const {
-  const Http::HeaderEntry* header = findHeader(headers);
-  if (!header) {
-    return unspecifiedValue();
-  }
-
-  std::string val = std::string(header->value().getStringView());
-  truncate(val, max_length_);
-  return ValueUtil::stringValue(val);
-}
-
-ResponseHeaderFormatter::ResponseHeaderFormatter(const std::string& main_header,
-                                                 const std::string& alternative_header,
-                                                 absl::optional<size_t> max_length)
-    : HeaderFormatter(main_header, alternative_header, max_length) {}
-
-absl::optional<std::string> ResponseHeaderFormatter::format(
-    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
-    const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view) const {
-  return HeaderFormatter::format(response_headers);
-}
-
-ProtobufWkt::Value ResponseHeaderFormatter::formatValue(
-    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap& response_headers,
-    const Http::ResponseTrailerMap&, const StreamInfo::StreamInfo&, absl::string_view) const {
-  return HeaderFormatter::formatValue(response_headers);
-}
-
-RequestHeaderFormatter::RequestHeaderFormatter(const std::string& main_header,
-                                               const std::string& alternative_header,
-                                               absl::optional<size_t> max_length)
-    : HeaderFormatter(main_header, alternative_header, max_length) {}
-
-absl::optional<std::string>
-RequestHeaderFormatter::format(const Http::RequestHeaderMap& request_headers,
-                               const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
-                               const StreamInfo::StreamInfo&, absl::string_view) const {
-  return HeaderFormatter::format(request_headers);
-}
-
-ProtobufWkt::Value
-RequestHeaderFormatter::formatValue(const Http::RequestHeaderMap& request_headers,
-                                    const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
-                                    const StreamInfo::StreamInfo&, absl::string_view) const {
-  return HeaderFormatter::formatValue(request_headers);
-}
-
-ResponseTrailerFormatter::ResponseTrailerFormatter(const std::string& main_header,
-                                                   const std::string& alternative_header,
-                                                   absl::optional<size_t> max_length)
-    : HeaderFormatter(main_header, alternative_header, max_length) {}
-
-absl::optional<std::string>
-ResponseTrailerFormatter::format(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                 const Http::ResponseTrailerMap& response_trailers,
-                                 const StreamInfo::StreamInfo&, absl::string_view) const {
-  return HeaderFormatter::format(response_trailers);
-}
-
-ProtobufWkt::Value
-ResponseTrailerFormatter::formatValue(const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&,
-                                      const Http::ResponseTrailerMap& response_trailers,
-                                      const StreamInfo::StreamInfo&, absl::string_view) const {
-  return HeaderFormatter::formatValue(response_trailers);
-}
-
-GrpcStatusFormatter::GrpcStatusFormatter(const std::string& main_header,
-                                         const std::string& alternative_header,
-                                         absl::optional<size_t> max_length)
-    : HeaderFormatter(main_header, alternative_header, max_length) {}
-
-absl::optional<std::string>
-GrpcStatusFormatter::format(const Http::RequestHeaderMap&,
-                            const Http::ResponseHeaderMap& response_headers,
-                            const Http::ResponseTrailerMap& response_trailers,
-                            const StreamInfo::StreamInfo& info, absl::string_view) const {
-  const auto grpc_status =
-      Grpc::Common::getGrpcStatus(response_trailers, response_headers, info, true);
-  if (!grpc_status.has_value()) {
-    return absl::nullopt;
-  }
-  const auto grpc_status_message = Grpc::Utility::grpcStatusToString(grpc_status.value());
-  if (grpc_status_message == EMPTY_STRING || grpc_status_message == "InvalidCode") {
-    return std::to_string(grpc_status.value());
-  }
-  return grpc_status_message;
-}
-
-ProtobufWkt::Value
-GrpcStatusFormatter::formatValue(const Http::RequestHeaderMap&,
-                                 const Http::ResponseHeaderMap& response_headers,
-                                 const Http::ResponseTrailerMap& response_trailers,
-                                 const StreamInfo::StreamInfo& info, absl::string_view) const {
-  const auto grpc_status =
-      Grpc::Common::getGrpcStatus(response_trailers, response_headers, info, true);
-  if (!grpc_status.has_value()) {
-    return unspecifiedValue();
-  }
-  const auto grpc_status_message = Grpc::Utility::grpcStatusToString(grpc_status.value());
-  if (grpc_status_message == EMPTY_STRING || grpc_status_message == "InvalidCode") {
-    return ValueUtil::stringValue(std::to_string(grpc_status.value()));
-  }
-  return ValueUtil::stringValue(grpc_status_message);
-}
-
-MetadataFormatter::MetadataFormatter(const std::string& filter_namespace,
-                                     const std::vector<std::string>& path,
-                                     absl::optional<size_t> max_length)
-    : filter_namespace_(filter_namespace), path_(path), max_length_(max_length) {}
-
-absl::optional<std::string>
-MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metadata) const {
-  ProtobufWkt::Value value = formatMetadataValue(metadata);
-  if (value.kind_case() == ProtobufWkt::Value::kNullValue) {
-    return absl::nullopt;
-  }
-
-  std::string json = MessageUtil::getJsonStringFromMessage(value, false, true);
-  truncate(json, max_length_);
-  return json;
-}
-
-ProtobufWkt::Value
-MetadataFormatter::formatMetadataValue(const envoy::config::core::v3::Metadata& metadata) const {
-  if (path_.empty()) {
-    const auto filter_it = metadata.filter_metadata().find(filter_namespace_);
-    if (filter_it == metadata.filter_metadata().end()) {
-      return unspecifiedValue();
-    }
-    ProtobufWkt::Value output;
-    output.mutable_struct_value()->CopyFrom(filter_it->second);
-    return output;
-  }
-
-  const ProtobufWkt::Value& val = Metadata::metadataValue(&metadata, filter_namespace_, path_);
-  if (val.kind_case() == ProtobufWkt::Value::KindCase::KIND_NOT_SET) {
-    return unspecifiedValue();
-  }
-
-  return val;
-}
-
-// TODO(glicht): Consider adding support for route/listener/cluster metadata as suggested by @htuch.
-// See: https://github.com/envoyproxy/envoy/issues/3006
-DynamicMetadataFormatter::DynamicMetadataFormatter(const std::string& filter_namespace,
-                                                   const std::vector<std::string>& path,
-                                                   absl::optional<size_t> max_length)
-    : MetadataFormatter(filter_namespace, path, max_length) {}
-
-absl::optional<std::string> DynamicMetadataFormatter::format(
-    const Http::RequestHeaderMap&, const Http::ResponseHeaderMap&, const Http::ResponseTrailerMap&,
-    const StreamInfo::StreamInfo& stream_info, absl::string_view) const {
-  return MetadataFormatter::formatMetadata(stream_info.dynamicMetadata());
-}
-
-ProtobufWkt::Value DynamicMetadataFormatter::formatValue(const Http::RequestHeaderMap&,
-                                                         const Http::ResponseHeaderMap&,
-                                                         const Http::ResponseTrailerMap&,
-                                                         const StreamInfo::StreamInfo& stream_info,
-                                                         absl::string_view) const {
-  return MetadataFormatter::formatMetadataValue(stream_info.dynamicMetadata());
-}
-
-FilterStateFormatter::FilterStateFormatter(const std::string& key,
-                                           absl::optional<size_t> max_length,
-                                           bool serialize_as_string)
-    : key_(key), max_length_(max_length), serialize_as_string_(serialize_as_string) {}
-
-const Envoy::StreamInfo::FilterState::Object*
-FilterStateFormatter::filterState(const StreamInfo::StreamInfo& stream_info) const {
-  const StreamInfo::FilterState& filter_state = stream_info.filterState();
-  if (!filter_state.hasDataWithName(key_)) {
-    return nullptr;
-  }
-  return &filter_state.getDataReadOnly<StreamInfo::FilterState::Object>(key_);
-}
-
-absl::optional<std::string> FilterStateFormatter::format(const Http::RequestHeaderMap&,
-                                                         const Http::ResponseHeaderMap&,
-                                                         const Http::ResponseTrailerMap&,
-                                                         const StreamInfo::StreamInfo& stream_info,
-                                                         absl::string_view) const {
-  const Envoy::StreamInfo::FilterState::Object* state = filterState(stream_info);
-  if (!state) {
-    return absl::nullopt;
-  }
-
-  if (serialize_as_string_) {
-    absl::optional<std::string> plain_value = state->serializeAsString();
-    if (plain_value.has_value()) {
-      truncate(plain_value.value(), max_length_);
-      return plain_value.value();
-    }
-    return absl::nullopt;
-  }
-
-  ProtobufTypes::MessagePtr proto = state->serializeAsProto();
-  if (proto == nullptr) {
-    return absl::nullopt;
-  }
-
-  std::string value;
-  const auto status = Protobuf::util::MessageToJsonString(*proto, &value);
-  if (!status.ok()) {
-    // If the message contains an unknown Any (from WASM or Lua), MessageToJsonString will fail.
-    // TODO(lizan): add support of unknown Any.
-    return absl::nullopt;
-  }
-
-  truncate(value, max_length_);
-  return value;
-}
-
-ProtobufWkt::Value FilterStateFormatter::formatValue(const Http::RequestHeaderMap&,
-                                                     const Http::ResponseHeaderMap&,
-                                                     const Http::ResponseTrailerMap&,
-                                                     const StreamInfo::StreamInfo& stream_info,
-                                                     absl::string_view) const {
-  const Envoy::StreamInfo::FilterState::Object* state = filterState(stream_info);
-  if (!state) {
-    return unspecifiedValue();
-  }
-
-  if (serialize_as_string_) {
-    absl::optional<std::string> plain_value = state->serializeAsString();
-    if (plain_value.has_value()) {
-      truncate(plain_value.value(), max_length_);
-      return ValueUtil::stringValue(plain_value.value());
-    }
-    return unspecifiedValue();
-  }
-
-  ProtobufTypes::MessagePtr proto = state->serializeAsProto();
-  if (!proto) {
-    return unspecifiedValue();
-  }
-
-  ProtobufWkt::Value val;
-  try {
-    MessageUtil::jsonConvertValue(*proto, val);
-  } catch (EnvoyException& ex) {
-    return unspecifiedValue();
-  }
-  return val;
-}
-
-StartTimeFormatter::StartTimeFormatter(const std::string& format) : date_formatter_(format) {}
-
-absl::optional<std::string> StartTimeFormatter::format(const Http::RequestHeaderMap&,
-                                                       const Http::ResponseHeaderMap&,
-                                                       const Http::ResponseTrailerMap&,
-                                                       const StreamInfo::StreamInfo& stream_info,
-                                                       absl::string_view) const {
-  if (date_formatter_.formatString().empty()) {
-    return AccessLogDateTimeFormatter::fromTime(stream_info.startTime());
-  }
-  return date_formatter_.fromTime(stream_info.startTime());
-}
-
-ProtobufWkt::Value StartTimeFormatter::formatValue(
-    const Http::RequestHeaderMap& request_headers, const Http::ResponseHeaderMap& response_headers,
-    const Http::ResponseTrailerMap& response_trailers, const StreamInfo::StreamInfo& stream_info,
-    absl::string_view local_reply_body) const {
-  return ValueUtil::optionalStringValue(
-      format(request_headers, response_headers, response_trailers, stream_info, local_reply_body));
+  log_line.push_back('\n');
+  return log_line;
 }
 
 } // namespace Formatter

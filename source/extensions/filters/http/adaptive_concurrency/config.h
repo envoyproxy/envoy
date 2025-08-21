@@ -3,8 +3,7 @@
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
 #include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.validate.h"
 
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,7 +17,7 @@ class AdaptiveConcurrencyFilterFactory
     : public Common::FactoryBase<
           envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency> {
 public:
-  AdaptiveConcurrencyFilterFactory() : FactoryBase(HttpFilterNames::get().AdaptiveConcurrency) {}
+  AdaptiveConcurrencyFilterFactory() : FactoryBase("envoy.filters.http.adaptive_concurrency") {}
 
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::adaptive_concurrency::v3::AdaptiveConcurrency&

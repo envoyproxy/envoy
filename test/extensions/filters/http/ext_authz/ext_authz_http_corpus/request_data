@@ -1,0 +1,35 @@
+base {
+  config {
+    grpc_service {
+      envoy_grpc {
+        cluster_name: "ext_authz_server"
+      }
+    }
+    with_request_body {
+      max_request_bytes: 10
+    }
+  }
+  request_data {
+    headers {
+      headers {
+        key: ":host"
+        value: "example.com"
+      }
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: ":path"
+        value: "/users"
+      }
+      headers {
+        key: ":scheme"
+        value: "https"
+      }
+    }
+    http_body {
+      data: "foobarbaz"
+    }
+  }
+}

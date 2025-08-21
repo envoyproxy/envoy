@@ -15,6 +15,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.health_check.v3";
 option java_outer_classname = "HealthCheckProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/health_check/v3;health_checkv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Health check]
@@ -37,7 +38,8 @@ message HealthCheck {
 
   // If operating in non-pass-through mode, specifies a set of upstream cluster
   // names and the minimum percentage of servers in each of those clusters that
-  // must be healthy or degraded in order for the filter to return a 200.
+  // must be healthy or degraded in order for the filter to return a 200. If any of
+  // the clusters configured here does not exist, the filter will not return a 200.
   //
   // .. note::
   //

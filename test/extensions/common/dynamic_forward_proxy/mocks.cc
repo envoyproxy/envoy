@@ -16,7 +16,7 @@ MockDnsCacheResourceManager::MockDnsCacheResourceManager() {
 MockDnsCacheResourceManager::~MockDnsCacheResourceManager() = default;
 
 MockDnsCache::MockDnsCache() {
-  ON_CALL(*this, canCreateDnsRequest_(_)).WillByDefault(Return(nullptr));
+  ON_CALL(*this, canCreateDnsRequest_()).WillByDefault(Return(nullptr));
 }
 MockDnsCache::~MockDnsCache() = default;
 
@@ -30,6 +30,7 @@ MockDnsCacheManager::~MockDnsCacheManager() = default;
 
 MockDnsHostInfo::MockDnsHostInfo() {
   ON_CALL(*this, address()).WillByDefault(ReturnPointee(&address_));
+  ON_CALL(*this, addressList(_)).WillByDefault(ReturnPointee(&address_list_));
   ON_CALL(*this, resolvedHost()).WillByDefault(ReturnRef(resolved_host_));
 }
 MockDnsHostInfo::~MockDnsHostInfo() = default;

@@ -1,0 +1,26 @@
+﻿staticResources:
+  clusters:
+  - name: ser
+    connectTimeout: 0.000000813s
+    healthChecks:
+    - timeout: 0.926363914s
+      interval: 165537s
+      unhealthyThreshold: 16
+      healthyThreshold: 0
+      httpHealthCheck:
+        host: h
+        path: '&'
+    loadAssignment:
+      clusterName: .
+      endpoints:
+      - lbEndpoints:
+        - endpoint:
+            address:
+              pipe:
+                path: .
+          healthStatus: DRAINING
+hdsConfig:
+  apiType: GRPC
+  requestTimeout: 0.014024704s
+
+enableDispatcherStats: true

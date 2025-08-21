@@ -1,7 +1,7 @@
-#include "common/memory/utils.h"
+#include "source/common/memory/utils.h"
 
-#include "common/common/assert.h"
-#include "common/memory/stats.h"
+#include "source/common/common/assert.h"
+#include "source/common/memory/stats.h"
 
 #if defined(TCMALLOC)
 #include "tcmalloc/malloc_extension.h"
@@ -38,9 +38,8 @@ void Utils::tryShrinkHeap() {
   auto total_physical_bytes = Stats::totalPhysicalBytes();
   auto allocated_size_by_app = Stats::totalCurrentlyAllocated();
 
-  ASSERT(total_physical_bytes >= allocated_size_by_app);
-
-  if ((total_physical_bytes - allocated_size_by_app) >= MAX_UNFREED_MEMORY_BYTE) {
+  if (total_physical_bytes >= allocated_size_by_app &&
+      (total_physical_bytes - allocated_size_by_app) >= MAX_UNFREED_MEMORY_BYTE) {
     Utils::releaseFreeMemory();
   }
 #endif

@@ -1,0 +1,9 @@
+date: December 7, 2020
+
+bug_fixes:
+- area: http
+  change: |
+    fixed URL parsing for HTTP/1.1 fully qualified URLs and connect requests containing IPv6 addresses.
+- area: vrp
+  change: |
+    allow supervisord to open its log file.

@@ -1,11 +1,11 @@
-#include "extensions/tracers/zipkin/util.h"
+#include "source/extensions/tracers/zipkin/util.h"
 
 #include <chrono>
 #include <random>
 #include <regex>
 
-#include "common/common/hex.h"
-#include "common/common/utility.h"
+#include "source/common/common/hex.h"
+#include "source/common/common/utility.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
@@ -23,8 +23,8 @@ uint64_t Util::generateRandom64(TimeSource& time_source) {
   return rand_64();
 }
 
-ProtobufWkt::Value Util::uint64Value(uint64_t value, absl::string_view name,
-                                     Replacements& replacements) {
+Protobuf::Value Util::uint64Value(uint64_t value, absl::string_view name,
+                                  Replacements& replacements) {
   const std::string string_value = std::to_string(value);
   replacements.push_back({absl::StrCat("\"", name, "\":\"", string_value, "\""),
                           absl::StrCat("\"", name, "\":", string_value)});

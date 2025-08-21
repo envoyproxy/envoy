@@ -1,7 +1,6 @@
-#include "common/event/dispatcher_impl.h"
-#include "common/stats/isolated_store_impl.h"
-
-#include "extensions/common/wasm/wasm.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/common/wasm/wasm.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/server/mocks.h"
@@ -27,12 +26,12 @@ public:
       : Extensions::Common::Wasm::Context(wasm, plugin) {}
   ~TestContext() override = default;
   using Extensions::Common::Wasm::Context::log;
-  proxy_wasm::WasmResult log(uint32_t level, absl::string_view message) override {
-    std::cerr << std::string(message) << "\n";
-    log_(static_cast<spdlog::level::level_enum>(level), message);
+  proxy_wasm::WasmResult log(uint32_t level, std::string_view message) override {
+    std::cerr << message << "\n";
+    log_(static_cast<spdlog::level::level_enum>(level), toAbslStringView(message));
     return proxy_wasm::WasmResult::Ok;
   }
-  MOCK_METHOD2(log_, void(spdlog::level::level_enum level, absl::string_view message));
+  MOCK_METHOD(void, log_, (spdlog::level::level_enum level, absl::string_view message));
 };
 
 class WasmTestBase {
@@ -43,12 +42,22 @@ public:
         base_scope_(stats_store_.createScope("")), scope_(base_scope_->createScope("")) {}
 
   void createWasm(absl::string_view runtime) {
+    envoy::extensions::wasm::v3::PluginConfig plugin_config;
+    *plugin_config.mutable_name() = name_;
+    *plugin_config.mutable_root_id() = root_id_;
+    *plugin_config.mutable_vm_config()->mutable_runtime() =
+        absl::StrCat("envoy.wasm.runtime.", runtime);
+    *plugin_config.mutable_vm_config()->mutable_vm_id() = vm_id_;
+    plugin_config.mutable_vm_config()->mutable_configuration()->set_value(vm_configuration_);
+    plugin_config.mutable_configuration()->set_value(plugin_configuration_);
     plugin_ = std::make_shared<Extensions::Common::Wasm::Plugin>(
-        name_, root_id_, vm_id_, runtime, plugin_configuration_, false,
-        envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info_, nullptr);
-    wasm_ = std::make_shared<Extensions::Common::Wasm::Wasm>(
-        absl::StrCat("envoy.wasm.runtime.", runtime), vm_id_, vm_configuration_, vm_key_, scope_,
-        cluster_manager, *dispatcher_);
+        plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info_,
+        nullptr);
+    auto config = plugin_->wasmConfig();
+    config.allowedCapabilities() = allowed_capabilities_;
+    config.environmentVariables() = envs_;
+    wasm_ = std::make_shared<Extensions::Common::Wasm::Wasm>(config, vm_key_, scope_, *api_,
+                                                             cluster_manager, *dispatcher_);
     EXPECT_NE(wasm_, nullptr);
     wasm_->setCreateContextForTesting(
         nullptr,
@@ -69,35 +78,42 @@ public:
   std::string vm_id_;
   std::string vm_configuration_;
   std::string vm_key_;
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities_;
+  Extensions::Common::Wasm::EnvironmentVariableMap envs_{};
   std::string plugin_configuration_;
   std::shared_ptr<Extensions::Common::Wasm::Plugin> plugin_;
   std::shared_ptr<Extensions::Common::Wasm::Wasm> wasm_;
 };
 
-class WasmTest : public WasmTestBase, public testing::TestWithParam<std::string> {
+class WasmTest : public WasmTestBase,
+                 public testing::TestWithParam<std::tuple<std::string, std::string>> {
 public:
-  void createWasm() { WasmTestBase::createWasm(GetParam()); }
+  void createWasm() { WasmTestBase::createWasm(std::get<0>(GetParam())); }
 };
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmTest,
-                         Envoy::Extensions::Common::Wasm::sandbox_runtime_values);
+                         Envoy::Extensions::Common::Wasm::sandbox_runtime_and_cpp_values,
+                         Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmTest);
 
-class WasmNullTest : public WasmTestBase, public testing::TestWithParam<std::string> {
+class WasmNullTest : public WasmTestBase,
+                     public testing::TestWithParam<std::tuple<std::string, std::string>> {
 public:
   void createWasm() {
-    WasmTestBase::createWasm(GetParam());
+    WasmTestBase::createWasm(std::get<0>(GetParam()));
     const auto code =
-        GetParam() != "null"
+        std::get<0>(GetParam()) != "null"
             ? TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
                   "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/stats_cpp.wasm"))
             : "WasmStatsCpp";
     EXPECT_FALSE(code.empty());
-    EXPECT_TRUE(wasm_->initialize(code, false));
+    EXPECT_TRUE(wasm_->load(code, false));
+    EXPECT_TRUE(wasm_->initialize());
   }
 };
 
-INSTANTIATE_TEST_SUITE_P(Runtimes, WasmNullTest, Envoy::Extensions::Common::Wasm::runtime_values);
+INSTANTIATE_TEST_SUITE_P(Runtimes, WasmNullTest,
+                         Envoy::Extensions::Common::Wasm::runtime_and_cpp_values);
 
 class WasmTestMatrix : public WasmTestBase,
                        public testing::TestWithParam<std::tuple<std::string, std::string>> {
@@ -118,21 +134,20 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(RuntimesAndLanguages, WasmTestMatrix,
-                         testing::Combine(Envoy::Extensions::Common::Wasm::sandbox_runtime_values,
-                                          testing::Values("cpp", "rust")));
+                         Envoy::Extensions::Common::Wasm::sandbox_runtime_and_language_values);
 GTEST_ALLOW_UNINSTANTIATED_PARAMETERIZED_TEST(WasmTestMatrix);
 
-TEST_P(WasmTestMatrix, Logging) {
+TEST_P(WasmTestMatrix, LoggingWithEnvVars) {
   plugin_configuration_ = "configure-test";
+  envs_ = {{"ON_TICK", "TICK_VALUE"}, {"ON_CONFIGURE", "CONFIGURE_VALUE"}};
   createWasm();
   setWasmCode("logging");
-
   auto wasm_weak = std::weak_ptr<Extensions::Common::Wasm::Wasm>(wasm_);
   auto wasm_handler = std::make_unique<Extensions::Common::Wasm::WasmHandle>(std::move(wasm_));
 
-  EXPECT_TRUE(wasm_weak.lock()->initialize(code_, false));
+  EXPECT_TRUE(wasm_weak.lock()->load(code_, false));
+  EXPECT_TRUE(wasm_weak.lock()->initialize());
   auto context = static_cast<TestContext*>(wasm_weak.lock()->start(plugin_));
-
   if (std::get<1>(GetParam()) == "cpp") {
     EXPECT_CALL(*context, log_(spdlog::level::info, Eq("printf stdout test")));
     EXPECT_CALL(*context, log_(spdlog::level::err, Eq("printf stderr test")));
@@ -145,6 +160,8 @@ TEST_P(WasmTestMatrix, Logging) {
       .Times(testing::AtLeast(1));
   EXPECT_CALL(*context, log_(spdlog::level::info, Eq("onDone logging")));
   EXPECT_CALL(*context, log_(spdlog::level::info, Eq("onDelete logging")));
+  EXPECT_CALL(*context, log_(spdlog::level::trace, Eq("ON_CONFIGURE: CONFIGURE_VALUE")));
+  EXPECT_CALL(*context, log_(spdlog::level::trace, Eq("ON_TICK: TICK_VALUE")));
 
   EXPECT_TRUE(wasm_weak.lock()->configure(context, plugin_));
   wasm_handler.reset();
@@ -160,7 +177,8 @@ TEST_P(WasmTest, BadSignature) {
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/bad_signature_cpp.wasm"));
   EXPECT_FALSE(code.empty());
-  EXPECT_FALSE(wasm_->initialize(code, false));
+  EXPECT_TRUE(wasm_->load(code, false));
+  EXPECT_FALSE(wasm_->initialize());
   EXPECT_TRUE(wasm_->isFailed());
 }
 
@@ -169,7 +187,8 @@ TEST_P(WasmTest, Segv) {
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/segv_cpp.wasm"));
   EXPECT_FALSE(code.empty());
-  EXPECT_TRUE(wasm_->initialize(code, false));
+  EXPECT_TRUE(wasm_->load(code, false));
+  EXPECT_TRUE(wasm_->initialize());
   auto context = static_cast<TestContext*>(wasm_->start(plugin_));
   EXPECT_CALL(*context, log_(spdlog::level::err, Eq("before badptr")));
   EXPECT_FALSE(wasm_->configure(context, plugin_));
@@ -181,7 +200,8 @@ TEST_P(WasmTest, DivByZero) {
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/segv_cpp.wasm"));
   EXPECT_FALSE(code.empty());
-  EXPECT_TRUE(wasm_->initialize(code, false));
+  EXPECT_TRUE(wasm_->load(code, false));
+  EXPECT_TRUE(wasm_->initialize());
   auto context = static_cast<TestContext*>(wasm_->start(plugin_));
   EXPECT_CALL(*context, log_(spdlog::level::err, Eq("before div by zero")));
   context->onLog();
@@ -193,7 +213,8 @@ TEST_P(WasmTest, IntrinsicGlobals) {
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/emscripten_cpp.wasm"));
   EXPECT_FALSE(code.empty());
-  EXPECT_TRUE(wasm_->initialize(code, false));
+  EXPECT_TRUE(wasm_->load(code, false));
+  EXPECT_TRUE(wasm_->initialize());
   auto context = static_cast<TestContext*>(wasm_->start(plugin_));
   EXPECT_CALL(*context, log_(spdlog::level::info, Eq("NaN nan")));
   EXPECT_CALL(*context, log_(spdlog::level::warn, Eq("inf inf"))).Times(3);
@@ -211,7 +232,8 @@ TEST_P(WasmTest, Asm2Wasm) {
   const auto code = TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/asm2wasm_cpp.wasm"));
   EXPECT_FALSE(code.empty());
-  EXPECT_TRUE(wasm_->initialize(code, false));
+  EXPECT_TRUE(wasm_->load(code, false));
+  EXPECT_TRUE(wasm_->initialize());
   auto context = static_cast<TestContext*>(wasm_->start(plugin_));
   EXPECT_CALL(*context, log_(spdlog::level::info, Eq("out 0 0 0")));
   EXPECT_TRUE(wasm_->configure(context, plugin_));
@@ -230,8 +252,10 @@ TEST_P(WasmNullTest, Stats) {
   EXPECT_CALL(*context, log_(spdlog::level::err, Eq("get histogram = Unsupported")));
 
   EXPECT_TRUE(wasm_->configure(context, plugin_));
-  EXPECT_EQ(scope_->counterFromString("test_counter").value(), 5);
-  EXPECT_EQ(scope_->gaugeFromString("test_gauge", Stats::Gauge::ImportMode::Accumulate).value(), 2);
+  EXPECT_EQ(scope_->counterFromString("wasmcustom.test_counter").value(), 5);
+  EXPECT_EQ(scope_->gaugeFromString("wasmcustom.test_gauge", Stats::Gauge::ImportMode::Accumulate)
+                .value(),
+            2);
 }
 
 TEST_P(WasmNullTest, StatsHigherLevel) {
@@ -251,11 +275,12 @@ TEST_P(WasmNullTest, StatsHigherLevel) {
 
   wasm_->setTimerPeriod(1, std::chrono::milliseconds(10));
   wasm_->tickHandler(1);
-  EXPECT_EQ(scope_->counterFromString("counter_tag.test_tag.test_counter").value(), 5);
-  EXPECT_EQ(
-      scope_->gaugeFromString("gauge_int_tag.9.test_gauge", Stats::Gauge::ImportMode::Accumulate)
-          .value(),
-      2);
+  EXPECT_EQ(scope_->counterFromString("wasmcustom.counter_tag.test_tag.test_counter").value(), 5);
+  EXPECT_EQ(scope_
+                ->gaugeFromString("wasmcustom.gauge_int_tag.9.test_gauge",
+                                  Stats::Gauge::ImportMode::Accumulate)
+                .value(),
+            2);
 }
 
 TEST_P(WasmNullTest, StatsHighLevel) {
@@ -279,13 +304,16 @@ TEST_P(WasmNullTest, StatsHighLevel) {
   // EXPECT_CALL(*context, log_(spdlog::level::err, Eq("stack_h = 3")));
   context->onLog();
   EXPECT_EQ(
-      scope_->counterFromString("string_tag.test_tag.int_tag.7.bool_tag.true.test_counter").value(),
+      scope_
+          ->counterFromString("wasmcustom.string_tag.test_tag.int_tag.7.bool_tag.true.test_counter")
+          .value(),
       5);
-  EXPECT_EQ(scope_
-                ->gaugeFromString("string_tag1.test_tag1.string_tag2.test_tag2.test_gauge",
-                                  Stats::Gauge::ImportMode::Accumulate)
-                .value(),
-            2);
+  EXPECT_EQ(
+      scope_
+          ->gaugeFromString("wasmcustom.string_tag1.test_tag1.string_tag2.test_tag2.test_gauge",
+                            Stats::Gauge::ImportMode::Accumulate)
+          .value(),
+      2);
 }
 
 } // namespace Wasm

@@ -4,7 +4,8 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
+#include "source/common/network/transport_socket_options_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -22,18 +23,26 @@ public:
   IoResult doWrite(Buffer::Instance& buffer, bool end_stream) override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override { return nullptr; }
   bool startSecureTransport() override { return false; }
+  void configureInitialCongestionWindow(uint64_t, std::chrono::microseconds) override {}
+
+protected:
+  TransportSocketCallbacks* transportSocketCallbacks() const { return callbacks_; };
 
 private:
-  TransportSocketCallbacks* callbacks_{};
   bool shutdown_{};
+  TransportSocketCallbacks* callbacks_{};
 };
 
-class RawBufferSocketFactory : public TransportSocketFactory {
+class RawBufferSocketFactory : public DownstreamTransportSocketFactory,
+                               public CommonUpstreamTransportSocketFactory {
 public:
-  // Network::TransportSocketFactory
-  TransportSocketPtr createTransportSocket(TransportSocketOptionsSharedPtr options) const override;
+  // Network::UpstreamTransportSocketFactory
+  TransportSocketPtr createTransportSocket(TransportSocketOptionsConstSharedPtr,
+                                           Upstream::HostDescriptionConstSharedPtr) const override;
   bool implementsSecureTransport() const override;
-  bool usesProxyProtocolOptions() const override { return false; }
+  absl::string_view defaultServerNameIndication() const override { return ""; }
+  // Network::DownstreamTransportSocketFactory
+  TransportSocketPtr createDownstreamTransportSocket() const override;
 };
 
 } // namespace Network

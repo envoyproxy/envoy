@@ -2,7 +2,7 @@
 #define ENVOY_PERF_ANNOTATION
 #endif
 
-#include "common/common/perf_annotation.h"
+#include "source/common/common/perf_annotation.h"
 
 #include <chrono>
 #include <iostream>
@@ -10,8 +10,8 @@
 
 #include "envoy/common/platform.h"
 
-#include "common/common/lock_guard.h"
-#include "common/common/utility.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/utility.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -131,7 +131,8 @@ std::string PerfAnnotationContext::toString() {
   for (size_t row = 0; row < columns[0].size(); ++row) {
     for (size_t i = 0; i < num_columns; ++i) {
       const std::string& str = columns[i][row];
-      absl::StrAppend(&out, fmt::format(formats[i], str), (i != (num_columns - 1) ? "  " : "\n"));
+      absl::StrAppend(&out, fmt::format(fmt::runtime(formats[i]), str),
+                      (i != (num_columns - 1) ? "  " : "\n"));
     }
   }
   return out;

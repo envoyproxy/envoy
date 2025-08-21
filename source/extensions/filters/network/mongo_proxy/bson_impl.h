@@ -7,10 +7,9 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 
-#include "common/common/logger.h"
-#include "common/common/utility.h"
-
-#include "extensions/filters/network/mongo_proxy/bson.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
+#include "source/extensions/filters/network/mongo_proxy/bson.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -152,11 +151,7 @@ public:
   Type type() const override { return type_; }
 
 private:
-  void checkType(Type type) const {
-    if (type_ != type) {
-      ExceptionUtil::throwEnvoyException("invalid BSON field type cast");
-    }
-  }
+  void checkType(Type type) const;
 
   /**
    * All of the possible variadic values that a field can be.

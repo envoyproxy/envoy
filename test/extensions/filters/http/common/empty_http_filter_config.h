@@ -4,7 +4,7 @@
 
 #include "envoy/server/filter_config.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,10 +19,10 @@ namespace Common {
  */
 class EmptyHttpFilterConfig : public Server::Configuration::NamedHttpFilterConfigFactory {
 public:
-  virtual Http::FilterFactoryCb createFilter(const std::string& stat_prefix,
-                                             Server::Configuration::FactoryContext& context) PURE;
+  virtual absl::StatusOr<Http::FilterFactoryCb>
+  createFilter(const std::string& stat_prefix, Server::Configuration::FactoryContext& context) PURE;
 
-  Http::FilterFactoryCb
+  absl::StatusOr<Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string& stat_prefix,
                                Server::Configuration::FactoryContext& context) override {
     return createFilter(stat_prefix, context);
@@ -30,13 +30,10 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     // Using Struct instead of a custom filter config proto. This is only allowed in tests.
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
 
-  std::string configType() override {
-    // Prevent registration of filters by type. This is only allowed in tests.
-    return "";
-  }
+  std::set<std::string> configTypes() override { return {}; }
 
   std::string name() const override { return name_; }
 
@@ -45,6 +42,30 @@ protected:
 
 private:
   const std::string name_;
+};
+
+class UpstreamFilterConfig : public Server::Configuration::UpstreamHttpFilterConfigFactory {
+public:
+  virtual absl::StatusOr<Http::FilterFactoryCb>
+  createDualFilter(const std::string& stat_prefix,
+                   Server::Configuration::ServerFactoryContext& context) PURE;
+
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message&, const std::string& stat_prefix,
+                               Server::Configuration::UpstreamFactoryContext& context) override {
+    return createDualFilter(stat_prefix, context.serverFactoryContext());
+  }
+};
+
+class EmptyHttpDualFilterConfig : public EmptyHttpFilterConfig, public UpstreamFilterConfig {
+public:
+  EmptyHttpDualFilterConfig(const std::string& name) : EmptyHttpFilterConfig(name) {}
+
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilter(const std::string& stat_prefix,
+               Server::Configuration::FactoryContext& context) override {
+    return createDualFilter(stat_prefix, context.serverFactoryContext());
+  }
 };
 
 } // namespace Common

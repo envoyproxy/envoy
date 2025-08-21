@@ -5,9 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/common/redis/codec.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/common/redis/codec.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -38,7 +37,15 @@ private:
     CR,
     LF,
     SimpleString,
-    ValueComplete
+    ValueComplete,
+    InlineStart,
+    InlineDelimiter,
+    InlineString,
+    InlineStringQuoted,
+    InlineStringQuotedEscape,
+    InlineStringQuotedEscapeHex,
+    InlineStringSingleQuoted,
+    InlineStringSingleQuotedEscape
   };
 
   struct PendingInteger {

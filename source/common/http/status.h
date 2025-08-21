@@ -76,9 +76,14 @@ enum class StatusCode : int {
   InboundFramesWithEmptyPayload = 5,
 
   /**
-   * Indicates that we attempted to proxy upstream headers to a stream that has already been reset.
+   * Indicates that Envoy is overloaded and may shed load.
    */
-  StreamAlreadyReset = 6,
+  EnvoyOverloadError = 6,
+
+  /**
+   * Indicates the connection was gracefully closed due to GOAWAY.
+   */
+  GoAwayGracefulClose = 7,
 };
 
 using Status = absl::Status;
@@ -99,7 +104,8 @@ Status bufferFloodError(absl::string_view message);
 Status prematureResponseError(absl::string_view message, Http::Code http_code);
 Status codecClientError(absl::string_view message);
 Status inboundFramesWithEmptyPayloadError();
-Status streamAlreadyReset();
+Status envoyOverloadError(absl::string_view message);
+Status goAwayGracefulCloseError();
 
 /**
  * Returns Envoy::StatusCode of the given status object.
@@ -115,7 +121,8 @@ ABSL_MUST_USE_RESULT bool isBufferFloodError(const Status& status);
 ABSL_MUST_USE_RESULT bool isPrematureResponseError(const Status& status);
 ABSL_MUST_USE_RESULT bool isCodecClientError(const Status& status);
 ABSL_MUST_USE_RESULT bool isInboundFramesWithEmptyPayloadError(const Status& status);
-ABSL_MUST_USE_RESULT bool isStreamAlreadyReset(const Status& status);
+ABSL_MUST_USE_RESULT bool isEnvoyOverloadError(const Status& status);
+ABSL_MUST_USE_RESULT bool isGoAwayGracefulCloseError(const Status& status);
 
 /**
  * Returns Http::Code value of the PrematureResponseError status.

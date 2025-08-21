@@ -1,10 +1,10 @@
-#include "common/init/target_impl.h"
+#include "source/common/init/target_impl.h"
 
 namespace Envoy {
 namespace Init {
 
 TargetHandleImpl::TargetHandleImpl(absl::string_view handle_name, absl::string_view name,
-                                   std::weak_ptr<InternalInitalizeFn> fn)
+                                   std::weak_ptr<InternalInitializeFn> fn)
     : handle_name_(handle_name), name_(name), fn_(std::move(fn)) {}
 
 bool TargetHandleImpl::initialize(const Watcher& watcher) const {
@@ -26,7 +26,7 @@ absl::string_view TargetHandleImpl::name() const { return name_; }
 
 TargetImpl::TargetImpl(absl::string_view name, InitializeFn fn)
     : name_(fmt::format("target {}", name)),
-      fn_(std::make_shared<InternalInitalizeFn>([this, fn](WatcherHandlePtr watcher_handle) {
+      fn_(std::make_shared<InternalInitializeFn>([this, fn](WatcherHandlePtr watcher_handle) {
         watcher_handle_ = std::move(watcher_handle);
         fn();
       })) {}
@@ -38,23 +38,30 @@ absl::string_view TargetImpl::name() const { return name_; }
 TargetHandlePtr TargetImpl::createHandle(absl::string_view handle_name) const {
   // Note: can't use std::make_unique here because TargetHandleImpl ctor is private.
   return TargetHandlePtr(
-      new TargetHandleImpl(handle_name, name_, std::weak_ptr<InternalInitalizeFn>(fn_)));
+      new TargetHandleImpl(handle_name, name_, std::weak_ptr<InternalInitializeFn>(fn_)));
 }
 
 bool TargetImpl::ready() {
   if (watcher_handle_) {
     // If we have a handle for the ManagerImpl's watcher, signal it and then reset so it can't be
     // accidentally signaled again.
-    const bool result = watcher_handle_->ready();
-    watcher_handle_.reset();
-    return result;
+    // NOTE: We must move watcher_handle_ to a local to avoid the scenario in which as a result of
+    // calling ready() this target is destroyed. This is possible in practice, for example when
+    // a listener is deleted as a result of a failure in the context of the ready() call.
+    auto local_watcher_handle = std::move(watcher_handle_);
+    return local_watcher_handle->ready();
   }
+
+  // If the watcher handle is not initialized, it means that the manager did not initialize its
+  // targets yet. Disposing the callback here so when the manager initializes it will not hang
+  // waiting for this target since it is already marked as ready.
+  fn_.reset();
   return false;
 }
 
 SharedTargetImpl::SharedTargetImpl(absl::string_view name, InitializeFn fn)
     : name_(fmt::format("shared target {}", name)),
-      fn_(std::make_shared<InternalInitalizeFn>([this, fn](WatcherHandlePtr watcher_handle) {
+      fn_(std::make_shared<InternalInitializeFn>([this, fn](WatcherHandlePtr watcher_handle) {
         if (initialized_) {
           watcher_handle->ready();
         } else {
@@ -70,17 +77,19 @@ absl::string_view SharedTargetImpl::name() const { return name_; }
 TargetHandlePtr SharedTargetImpl::createHandle(absl::string_view handle_name) const {
   // Note: can't use std::make_unique here because TargetHandleImpl ctor is private.
   return TargetHandlePtr(
-      new TargetHandleImpl(handle_name, name_, std::weak_ptr<InternalInitalizeFn>(fn_)));
+      new TargetHandleImpl(handle_name, name_, std::weak_ptr<InternalInitializeFn>(fn_)));
 }
 
 bool SharedTargetImpl::ready() {
   initialized_ = true;
-  bool all_notified = !watcher_handles_.empty();
-  for (auto& watcher_handle : watcher_handles_) {
+  // NOTE: We must move watcher_handles_ to a local to avoid the scenario in which as a result of
+  // calling ready() this target is destroyed. This is possible in practice, for example when
+  // a listener is deleted as a result of a failure in the context of the ready() call.
+  auto local_watcher_handles = std::move(watcher_handles_);
+  bool all_notified = !local_watcher_handles.empty();
+  for (auto& watcher_handle : local_watcher_handles) {
     all_notified = watcher_handle->ready() && all_notified;
   }
-  // save heap and avoid repeatedly invoke
-  watcher_handles_.clear();
   return all_notified;
 }
 

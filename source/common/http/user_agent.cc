@@ -1,4 +1,4 @@
-#include "common/http/user_agent.h"
+#include "source/common/http/user_agent.h"
 
 #include <cstdint>
 #include <memory>
@@ -8,9 +8,9 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/http/headers.h"
-#include "common/stats/symbol_table_impl.h"
-#include "common/stats/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/utility.h"
 
 namespace Envoy {
 namespace Http {
@@ -41,7 +41,6 @@ UserAgentStats::UserAgentStats(Stats::StatName prefix, Stats::StatName device, S
           scope, {prefix, device, context.downstream_cx_length_ms_},
           Stats::Histogram::Unit::Milliseconds)) {
   downstream_cx_total_.inc();
-  downstream_rq_total_.inc();
 }
 
 void UserAgent::initializeFromHeaders(const RequestHeaderMap& headers, Stats::StatName prefix,
@@ -58,6 +57,9 @@ void UserAgent::initializeFromHeaders(const RequestHeaderMap& headers, Stats::St
         stats_ = std::make_unique<UserAgentStats>(prefix, context_.android_, scope, context_);
       }
     }
+  }
+  if (stats_ != nullptr) {
+    stats_->downstream_rq_total_.inc();
   }
 }
 

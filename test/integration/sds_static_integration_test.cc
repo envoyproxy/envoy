@@ -5,12 +5,12 @@
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/event/dispatcher_impl.h"
-#include "common/network/connection_impl.h"
-#include "common/network/utility.h"
-
-#include "extensions/transport_sockets/tls/context_config_impl.h"
-#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/network/connection_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/tls/context_config_impl.h"
+#include "source/common/tls/context_manager_impl.h"
 
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/integration/http_integration.h"
@@ -34,8 +34,7 @@ class SdsStaticDownstreamIntegrationTest
     : public testing::TestWithParam<Network::Address::IpVersion>,
       public HttpIntegrationTest {
 public:
-  SdsStaticDownstreamIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  SdsStaticDownstreamIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -68,7 +67,7 @@ public:
       tls_certificate->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
     });
-
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
     HttpIntegrationTest::initialize();
 
     registerTestServerPorts({"http"});
@@ -84,15 +83,15 @@ public:
 
   Network::ClientConnectionPtr makeSslClientConnection() {
     Network::Address::InstanceConstSharedPtr address = getSslAddress(version_, lookupPort("http"));
-    return dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
-                                               client_ssl_ctx_->createTransportSocket(nullptr),
-                                               nullptr);
+    return dispatcher_->createClientConnection(
+        address, Network::Address::InstanceConstSharedPtr(),
+        client_ssl_ctx_->createTransportSocket(nullptr, nullptr), nullptr, nullptr);
   }
 
 private:
-  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{server_factory_context_};
 
-  Network::TransportSocketFactoryPtr client_ssl_ctx_;
+  Network::UpstreamTransportSocketFactoryPtr client_ssl_ctx_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SdsStaticDownstreamIntegrationTest,
@@ -109,8 +108,7 @@ TEST_P(SdsStaticDownstreamIntegrationTest, RouterRequestAndResponseWithGiantBody
 class SdsStaticUpstreamIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                          public HttpIntegrationTest {
 public:
-  SdsStaticUpstreamIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  SdsStaticUpstreamIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -145,12 +143,12 @@ public:
   }
 
   void createUpstreams() override {
-    addFakeUpstream(createUpstreamSslContext(context_manager_, *api_),
-                    FakeHttpConnection::Type::HTTP1);
+    addFakeUpstream(createUpstreamSslContext(context_manager_, *api_), Http::CodecType::HTTP1,
+                    /*autonomous_upstream=*/false);
   }
 
 private:
-  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{timeSystem()};
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{server_factory_context_};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, SdsStaticUpstreamIntegrationTest,

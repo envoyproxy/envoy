@@ -1,6 +1,6 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
-def envoy_http_archive(name, locations, **kwargs):
+def envoy_http_archive(name, locations, location_name = None, **kwargs):
     # `existing_rule_keys` contains the names of repositories that have already
     # been defined in the Bazel workspace. By skipping repos with existing keys,
     # users can override dependency versions by using standard Bazel repository
@@ -10,7 +10,7 @@ def envoy_http_archive(name, locations, **kwargs):
         # This repository has already been defined, probably because the user
         # wants to override the version. Do nothing.
         return
-    location = locations[name]
+    location = locations[location_name or name]
 
     # HTTP tarball at a given URL. Add a BUILD file if requested.
     http_archive(

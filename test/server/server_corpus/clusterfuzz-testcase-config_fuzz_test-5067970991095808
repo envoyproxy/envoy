@@ -20,8 +20,13 @@ static_resources {
         path: "t"
       }
     }
-    max_requests_per_connection {
-      value: 67108864
+    typed_extension_protocol_options {
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions {
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        max_requests_per_connection {
+          value: 67108864
+        }
+      }
     }
     dns_lookup_family: V4_ONLY
     outlier_detection {

@@ -9,9 +9,9 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/store.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-#include "common/common/thread.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -37,14 +37,15 @@ public:
                        Event::Dispatcher& dispatcher, Thread::BasicLockable& lock,
                        Stats::Store& stats_store)
       : file_flush_interval_msec_(file_flush_interval_msec), api_(api), dispatcher_(dispatcher),
-        lock_(lock), file_stats_{
-                         ACCESS_LOG_FILE_STATS(POOL_COUNTER_PREFIX(stats_store, "filesystem."),
-                                               POOL_GAUGE_PREFIX(stats_store, "filesystem."))} {}
+        lock_(lock),
+        file_stats_{ACCESS_LOG_FILE_STATS(POOL_COUNTER_PREFIX(stats_store, "filesystem."),
+                                          POOL_GAUGE_PREFIX(stats_store, "filesystem."))} {}
   ~AccessLogManagerImpl() override;
 
   // AccessLog::AccessLogManager
   void reopen() override;
-  AccessLogFileSharedPtr createAccessLog(const std::string& file_name) override;
+  absl::StatusOr<AccessLogFileSharedPtr>
+  createAccessLog(const Filesystem::FilePathAndType& file_info) override;
 
 private:
   const std::chrono::milliseconds file_flush_interval_msec_;
@@ -84,11 +85,7 @@ public:
 private:
   void doWrite(Buffer::Instance& buffer);
   void flushThreadFunc();
-  void open();
   void createFlushStructures();
-
-  // return default flags set which used by open
-  static Filesystem::FlagSet defaultFlags();
 
   // Minimum size before the flush thread will be told to flush.
   static const uint64_t MIN_FLUSH_SIZE = 1024 * 64;
@@ -114,8 +111,8 @@ private:
                    // high performance. It is always local to the process.
   Thread::ThreadPtr flush_thread_;
   Thread::CondVar flush_event_;
-  std::atomic<bool> flush_thread_exit_{};
-  std::atomic<bool> reopen_file_{};
+  bool flush_thread_exit_ ABSL_GUARDED_BY(write_lock_){false};
+  bool reopen_file_ ABSL_GUARDED_BY(write_lock_){false};
   Buffer::OwnedImpl
       flush_buffer_ ABSL_GUARDED_BY(write_lock_); // This buffer is used by multiple threads. It
                                                   // gets filled and then flushed either when max

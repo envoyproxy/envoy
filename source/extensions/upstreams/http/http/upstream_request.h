@@ -5,11 +5,12 @@
 
 #include "envoy/http/codes.h"
 #include "envoy/http/conn_pool.h"
+#include "envoy/upstream/thread_local_cluster.h"
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
-#include "common/config/well_known_names.h"
-#include "common/router/upstream_request.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/config/well_known_names.h"
+#include "source/common/router/upstream_request.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,40 +20,35 @@ namespace Http {
 
 class HttpConnPool : public Router::GenericConnPool, public Envoy::Http::ConnectionPool::Callbacks {
 public:
-  // GenericConnPool
-  HttpConnPool(Upstream::ClusterManager& cm, bool is_connect, const Router::RouteEntry& route_entry,
+  HttpConnPool(Upstream::HostConstSharedPtr host,
+               Upstream::ThreadLocalCluster& thread_local_cluster,
+               Upstream::ResourcePriority priority,
                absl::optional<Envoy::Http::Protocol> downstream_protocol,
                Upstream::LoadBalancerContext* ctx) {
-    ASSERT(!is_connect);
-    // TODO(mattklein123): Pass thread local cluster into this function, removing an additional
-    // map lookup and moving the error handling closer to the source (where it is likely already
-    // done).
-    const auto thread_local_cluster = cm.getThreadLocalCluster(route_entry.clusterName());
-    if (thread_local_cluster != nullptr) {
-      conn_pool_ =
-          thread_local_cluster->httpConnPool(route_entry.priority(), downstream_protocol, ctx);
-    }
+    pool_data_ = thread_local_cluster.httpConnPool(host, priority, downstream_protocol, ctx);
   }
   ~HttpConnPool() override {
     ASSERT(conn_pool_stream_handle_ == nullptr, "conn_pool_stream_handle not null");
   }
+  // GenericConnPool
   void newStream(Router::GenericConnectionPoolCallbacks* callbacks) override;
   bool cancelAnyPendingStream() override;
+  bool valid() const override { return pool_data_.has_value(); }
+  Upstream::HostDescriptionConstSharedPtr host() const override {
+    return pool_data_.value().host();
+  }
 
   // Http::ConnectionPool::Callbacks
   void onPoolFailure(ConnectionPool::PoolFailureReason reason,
                      absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override;
   void onPoolReady(Envoy::Http::RequestEncoder& callbacks_encoder,
-                   Upstream::HostDescriptionConstSharedPtr host, const StreamInfo::StreamInfo& info,
+                   Upstream::HostDescriptionConstSharedPtr host, StreamInfo::StreamInfo& info,
                    absl::optional<Envoy::Http::Protocol> protocol) override;
-  Upstream::HostDescriptionConstSharedPtr host() const override { return conn_pool_->host(); }
-
-  bool valid() { return conn_pool_ != nullptr; }
 
 protected:
   // Points to the actual connection pool to create streams from.
-  Envoy::Http::ConnectionPool::Instance* conn_pool_{};
+  absl::optional<Envoy::Upstream::HttpPoolData> pool_data_{};
   Envoy::Http::ConnectionPool::Cancellable* conn_pool_stream_handle_{};
   Router::GenericConnectionPoolCallbacks* callbacks_{};
 };
@@ -78,12 +74,18 @@ public:
   void encodeTrailers(const Envoy::Http::RequestTrailerMap& trailers) override {
     request_encoder_->encodeTrailers(trailers);
   }
+  void enableTcpTunneling() override { request_encoder_->enableTcpTunneling(); }
 
   void readDisable(bool disable) override { request_encoder_->getStream().readDisable(disable); }
 
   void resetStream() override {
-    request_encoder_->getStream().removeCallbacks(*this);
-    request_encoder_->getStream().resetStream(Envoy::Http::StreamResetReason::LocalReset);
+    auto& stream = request_encoder_->getStream();
+    stream.removeCallbacks(*this);
+    stream.resetStream(Envoy::Http::StreamResetReason::LocalReset);
+  }
+
+  void setAccount(Buffer::BufferMemoryAccountSharedPtr account) override {
+    request_encoder_->getStream().setAccount(std::move(account));
   }
 
   // Http::StreamCallbacks
@@ -98,6 +100,10 @@ public:
 
   void onBelowWriteBufferLowWatermark() override {
     upstream_request_.onBelowWriteBufferLowWatermark();
+  }
+
+  const StreamInfo::BytesMeterSharedPtr& bytesMeter() override {
+    return request_encoder_->getStream().bytesMeter();
   }
 
 private:

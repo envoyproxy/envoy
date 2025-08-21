@@ -22,6 +22,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.api.v2.route";
 option java_outer_classname = "RouteComponentsProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/api/v2/route";
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.route.v3";
 option (udpa.annotations.file_status).package_version_status = FROZEN;
 
@@ -300,7 +301,7 @@ message WeightedCluster {
     // An integer between 0 and :ref:`total_weight
     // <envoy_api_field_route.WeightedCluster.total_weight>`. When a request matches the route,
     // the choice of an upstream cluster is determined by its weight. The sum of weights across all
-    // entries in the clusters array must add up to the total_weight, which defaults to 100.
+    // entries in the clusters array must add up to the total_weight, if total_weight is greater than 0.
     google.protobuf.UInt32Value weight = 2;
 
     // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
@@ -675,8 +676,8 @@ message RouteAction {
 
     message FilterState {
       // The name of the Object in the per-request filterState, which is an
-      // Envoy::Http::Hashable object. If there is no data associated with the key,
-      // or the stored object is not Envoy::Http::Hashable, no hash will be produced.
+      // Envoy::Hashable object. If there is no data associated with the key,
+      // or the stored object is not Envoy::Hashable, no hash will be produced.
       string key = 1 [(validate.rules).string = {min_bytes: 1}];
     }
 
@@ -858,8 +859,9 @@ message RouteAction {
     // Indicates that during forwarding, the host header will be swapped with
     // the hostname of the upstream host chosen by the cluster manager. This
     // option is applicable only when the destination cluster for a route is of
-    // type *strict_dns* or *logical_dns*. Setting this to true with other cluster
-    // types has no effect.
+    // type ``STRICT_DNS``,  ``LOGICAL_DNS`` or ``STATIC``. For ``STATIC`` clusters, the
+    // hostname attribute of the endpoint must be configured. Setting this to true
+    // with other cluster types has no effect.
     google.protobuf.BoolValue auto_host_rewrite = 7;
 
     // Indicates that during forwarding, the host header will be swapped with the content of given
@@ -1263,7 +1265,7 @@ message Tracing {
   // Target percentage of requests managed by this HTTP connection manager that will be force
   // traced if the :ref:`x-client-trace-id <config_http_conn_man_headers_x-client-trace-id>`
   // header is set. This field is a direct analog for the runtime variable
-  // 'tracing.client_sampling' in the :ref:`HTTP Connection Manager
+  // 'tracing.client_enabled' in the :ref:`HTTP Connection Manager
   // <config_http_conn_man_runtime>`.
   // Default: 100%
   type.FractionalPercent client_sampling = 1;

@@ -1,0 +1,111 @@
+syntax = "proto3";
+
+package extraction;
+
+message TestBucket {
+  string name = 1;
+  float ratio = 2;
+  repeated bytes objects = 3;
+}
+
+enum TestEnum {
+  TEST_ENUM_UNSPECIFIED = 0;
+  ALPHA = 1;
+  BETA = 2;
+  GAMMA = 3;
+}
+
+enum TestProto2Enum {
+  PROTO2_ALPHA = 0;
+  PROTO2_BETA = 1;
+  PROTO2_GAMMA = 2;
+}
+
+message TestProto2Message {
+  repeated string repeated_strings = 3;
+
+  repeated TestProto2Enum repeated_enum = 17 [packed = true];
+
+  repeated double repeated_double = 4;
+
+  repeated float repeated_float = 5 [packed = true];
+
+  repeated int64 repeated_int64 = 6;
+
+  repeated uint64 repeated_uint64 = 7 [packed = true];
+
+  repeated int32 repeated_int32 = 8;
+
+  repeated fixed64 repeated_fixed64 = 9 [packed = true];
+
+  repeated fixed32 repeated_fixed32 = 10;
+
+  repeated bool repeated_bool = 11 [packed = true];
+
+  repeated uint32 repeated_uint32 = 12;
+
+  repeated sfixed64 repeated_sfixed64 = 13 [packed = true];
+
+  repeated sfixed32 repeated_sfixed32 = 14;
+
+  repeated sint32 repeated_sint32 = 15 [packed = true];
+
+  repeated sint64 repeated_sint64 = 16;
+}
+
+message TestRequest {
+  int64 id = 1;
+
+  TestBucket bucket = 2;
+
+  TestProto2Message proto2_message = 18;
+
+  repeated string repeated_strings = 3;
+
+  repeated TestEnum repeated_enum = 17;
+
+  repeated double repeated_double = 4;
+
+  repeated float repeated_float = 5;
+
+  repeated int64 repeated_int64 = 6;
+
+  repeated uint64 repeated_uint64 = 7;
+
+  repeated int32 repeated_int32 = 8;
+
+  repeated fixed64 repeated_fixed64 = 9;
+
+  repeated fixed32 repeated_fixed32 = 10;
+
+  repeated bool repeated_bool = 11;
+
+  repeated uint32 repeated_uint32 = 12;
+
+  repeated sfixed64 repeated_sfixed64 = 13;
+
+  repeated sfixed32 repeated_sfixed32 = 14;
+
+  repeated sint32 repeated_sint32 = 15;
+
+  repeated sint64 repeated_sint64 = 16;
+}
+
+message TestResponse {
+  repeated TestBucket buckets = 1;
+
+  map<string, TestBucket> sub_buckets = 3;
+
+  TestBucket bucket_present = 4;
+  TestBucket bucket_absent = 5;
+  message SubMessage {
+    TestBucket bucket_present = 1;
+    TestBucket bucket_absent = 2;
+  }
+  SubMessage sub_message = 6;
+}
+
+service ExtractionUtilTestService {
+  // ExtractTest Method.
+  rpc ExtractTest(TestRequest) returns (TestResponse);
+}

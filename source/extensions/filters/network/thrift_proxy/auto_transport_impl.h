@@ -4,9 +4,8 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/common/fmt.h"
-
-#include "extensions/filters/network/thrift_proxy/transport.h"
+#include "source/common/common/fmt.h"
+#include "source/extensions/filters/network/thrift_proxy/transport.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -20,7 +19,7 @@ namespace ThriftProxy {
  */
 class AutoTransportImpl : public Transport {
 public:
-  AutoTransportImpl() : name_(TransportNames::get().AUTO){};
+  AutoTransportImpl() : name_(TransportNames::get().AUTO) {};
 
   // Transport
   const std::string& name() const override { return name_; }

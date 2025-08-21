@@ -3,16 +3,15 @@ use proxy_wasm::traits::{Context, HttpContext};
 use proxy_wasm::types::*;
 use std::time::Duration;
 
-#[no_mangle]
-pub fn _start() {
+proxy_wasm::main! {{
     proxy_wasm::set_log_level(LogLevel::Trace);
     proxy_wasm::set_http_context(|_, _| -> Box<dyn HttpContext> { Box::new(TestStream) });
-}
+}}
 
 struct TestStream;
 
 impl HttpContext for TestStream {
-    fn on_http_request_headers(&mut self, _: usize) -> Action {
+    fn on_http_request_headers(&mut self, _: usize, _: bool) -> Action {
         self.dispatch_http_call(
             "cluster",
             vec![(":method", "POST"), (":path", "/"), (":authority", "foo")],

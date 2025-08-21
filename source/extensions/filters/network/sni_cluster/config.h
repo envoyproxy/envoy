@@ -2,7 +2,7 @@
 
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,7 +15,7 @@ namespace SniCluster {
 class SniClusterNetworkFilterConfigFactory
     : public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
-  Network::FilterFactoryCb
+  absl::StatusOr<Network::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;

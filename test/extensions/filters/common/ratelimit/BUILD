@@ -13,6 +13,7 @@ envoy_package()
 envoy_cc_test(
     name = "ratelimit_impl_test",
     srcs = ["ratelimit_impl_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/http:header_map_lib",
         "//source/common/http:headers_lib",
@@ -29,7 +30,7 @@ envoy_cc_mock(
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
     deps = [
-        "//include/envoy/ratelimit:ratelimit_interface",
+        "//envoy/ratelimit:ratelimit_interface",
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
     ],
 )

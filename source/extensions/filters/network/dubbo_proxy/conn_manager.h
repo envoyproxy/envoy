@@ -9,15 +9,14 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/filters/network/dubbo_proxy/active_message.h"
-#include "extensions/filters/network/dubbo_proxy/decoder.h"
-#include "extensions/filters/network/dubbo_proxy/decoder_event_handler.h"
-#include "extensions/filters/network/dubbo_proxy/filters/filter.h"
-#include "extensions/filters/network/dubbo_proxy/protocol.h"
-#include "extensions/filters/network/dubbo_proxy/serializer.h"
-#include "extensions/filters/network/dubbo_proxy/stats.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/network/dubbo_proxy/active_message.h"
+#include "source/extensions/filters/network/dubbo_proxy/decoder.h"
+#include "source/extensions/filters/network/dubbo_proxy/decoder_event_handler.h"
+#include "source/extensions/filters/network/dubbo_proxy/filters/filter.h"
+#include "source/extensions/filters/network/dubbo_proxy/protocol.h"
+#include "source/extensions/filters/network/dubbo_proxy/serializer.h"
+#include "source/extensions/filters/network/dubbo_proxy/stats.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -37,6 +36,8 @@ public:
   virtual Router::Config& routerConfig() PURE;
 };
 
+using ConfigSharedPtr = std::shared_ptr<Config>;
+
 // class ActiveMessagePtr;
 class ConnectionManager : public Network::ReadFilter,
                           public Network::ConnectionCallbacks,
@@ -47,7 +48,7 @@ public:
   using ConfigSerializationType =
       envoy::extensions::filters::network::dubbo_proxy::v3::SerializationType;
 
-  ConnectionManager(Config& config, Random::RandomGenerator& random_generator,
+  ConnectionManager(ConfigSharedPtr config, Random::RandomGenerator& random_generator,
                     TimeSource& time_system);
   ~ConnectionManager() override = default;
 
@@ -69,11 +70,10 @@ public:
   Network::Connection& connection() const { return read_callbacks_->connection(); }
   TimeSource& timeSystem() const { return time_system_; }
   Random::RandomGenerator& randomGenerator() const { return random_generator_; }
-  Config& config() const { return config_; }
+  Config& config() const { return *config_; }
   SerializationType downstreamSerializationType() const { return protocol_->serializer()->type(); }
   ProtocolType downstreamProtocolType() const { return protocol_->type(); }
 
-  void continueDecoding();
   void deferredMessage(ActiveMessage& message);
   void sendLocalReply(MessageMetadata& metadata, const DubboFilters::DirectResponse& response,
                       bool end_stream);
@@ -88,10 +88,7 @@ private:
   Buffer::OwnedImpl request_buffer_;
   std::list<ActiveMessagePtr> active_message_list_;
 
-  bool stopped_{false};
-  bool half_closed_{false};
-
-  Config& config_;
+  ConfigSharedPtr config_;
   TimeSource& time_system_;
   DubboFilterStats& stats_;
   Random::RandomGenerator& random_generator_;

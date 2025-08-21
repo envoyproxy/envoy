@@ -1,8 +1,9 @@
 #include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "common/stats/stats_matcher_impl.h"
+#include "source/common/stats/stats_matcher_impl.h"
 
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -12,6 +13,8 @@ namespace Stats {
 
 class StatsMatcherTest : public testing::Test {
 protected:
+  StatsMatcherTest() : pool_(symbol_table_) {}
+
   envoy::type::matcher::v3::StringMatcher* inclusionList() {
     return stats_config_.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns();
   }
@@ -21,18 +24,24 @@ protected:
   void rejectAll(const bool should_reject) {
     stats_config_.mutable_stats_matcher()->set_reject_all(should_reject);
   }
-  void initMatcher() { stats_matcher_impl_ = std::make_unique<StatsMatcherImpl>(stats_config_); }
-  void expectAccepted(std::vector<std::string> expected_to_pass) {
+  void initMatcher() {
+    stats_matcher_impl_ =
+        std::make_unique<StatsMatcherImpl>(stats_config_, symbol_table_, context_);
+  }
+  void expectAccepted(const std::vector<std::string>& expected_to_pass) {
     for (const auto& stat_name : expected_to_pass) {
-      EXPECT_FALSE(stats_matcher_impl_->rejects(stat_name)) << "Accepted: " << stat_name;
+      EXPECT_FALSE(stats_matcher_impl_->rejects(pool_.add(stat_name))) << "Accepted: " << stat_name;
     }
   }
-  void expectDenied(std::vector<std::string> expected_to_fail) {
+  void expectDenied(const std::vector<std::string>& expected_to_fail) {
     for (const auto& stat_name : expected_to_fail) {
-      EXPECT_TRUE(stats_matcher_impl_->rejects(stat_name)) << "Rejected: " << stat_name;
+      EXPECT_TRUE(stats_matcher_impl_->rejects(pool_.add(stat_name))) << "Rejected: " << stat_name;
     }
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  SymbolTableImpl symbol_table_;
+  StatNamePool pool_;
   std::unique_ptr<StatsMatcherImpl> stats_matcher_impl_;
 
 private:
@@ -56,6 +65,7 @@ TEST_F(StatsMatcherTest, CheckRejectAll) {
   expectDenied({"foo", "bar", "foo.bar", "foo.bar.baz", "foobarbaz"});
   EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
   EXPECT_TRUE(stats_matcher_impl_->rejectsAll());
+  EXPECT_EQ(StatsMatcher::FastResult::Rejects, stats_matcher_impl_->fastRejects(StatName()));
 }
 
 TEST_F(StatsMatcherTest, CheckNotRejectAll) {
@@ -65,10 +75,11 @@ TEST_F(StatsMatcherTest, CheckNotRejectAll) {
   expectAccepted({"foo", "bar", "foo.bar", "foo.bar.baz", "foobarbaz"});
   EXPECT_TRUE(stats_matcher_impl_->acceptsAll());
   EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
+  EXPECT_EQ(StatsMatcher::FastResult::NoMatch, stats_matcher_impl_->fastRejects(StatName()));
 }
 
 TEST_F(StatsMatcherTest, CheckIncludeAll) {
-  inclusionList()->set_hidden_envoy_deprecated_regex(".*");
+  inclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*"));
   initMatcher();
   expectAccepted({"foo", "bar", "foo.bar", "foo.bar.baz"});
   // It really does accept all, but the impl doesn't know it.
@@ -77,7 +88,7 @@ TEST_F(StatsMatcherTest, CheckIncludeAll) {
 }
 
 TEST_F(StatsMatcherTest, CheckExcludeAll) {
-  exclusionList()->set_hidden_envoy_deprecated_regex(".*");
+  exclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*"));
   initMatcher();
   expectDenied({"foo", "bar", "foo.bar", "foo.bar.baz"});
   EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
@@ -90,8 +101,7 @@ TEST_F(StatsMatcherTest, CheckIncludeExact) {
   inclusionList()->set_exact("abc");
   initMatcher();
   expectAccepted({"abc"});
-  expectDenied({"abcd", "abc.d", "d.abc", "dabc", "ab", "ac", "abcc", "Abc", "aBc", "abC", "abc.",
-                ".abc", "ABC"});
+  expectDenied({"abcd", "abc.d", "d.abc", "dabc", "ab", "ac", "abcc", "Abc", "aBc", "abC", "ABC"});
   EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
   EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
 }
@@ -99,8 +109,8 @@ TEST_F(StatsMatcherTest, CheckIncludeExact) {
 TEST_F(StatsMatcherTest, CheckExcludeExact) {
   exclusionList()->set_exact("abc");
   initMatcher();
-  expectAccepted({"abcd", "abc.d", "d.abc", "dabc", "ab", "ac", "abcc", "Abc", "aBc", "abC", "abc.",
-                  ".abc", "ABC"});
+  expectAccepted(
+      {"abcd", "abc.d", "d.abc", "dabc", "ab", "ac", "abcc", "Abc", "aBc", "abC", "ABC"});
   expectDenied({"abc"});
   EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
   EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
@@ -115,6 +125,18 @@ TEST_F(StatsMatcherTest, CheckIncludePrefix) {
   expectDenied({"ABC", "ABC.foo", "ABCfoo", "foo", "abb", "a.b.c", "_abc", "foo.abc", "fooabc"});
   EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
   EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
+}
+
+TEST_F(StatsMatcherTest, CheckIncludePrefixDot) {
+  inclusionList()->set_prefix("abc.");
+  initMatcher();
+  expectAccepted({"abc", "abc.foo"});
+  expectDenied(
+      {"abcfoo", "ABC", "ABC.foo", "ABCfoo", "foo", "abb", "a.b.c", "_abc", "foo.abc", "fooabc"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
+  EXPECT_EQ(StatsMatcher::FastResult::Matches,
+            stats_matcher_impl_->fastRejects(pool_.add("abc.foo")));
 }
 
 TEST_F(StatsMatcherTest, CheckExcludePrefix) {
@@ -149,7 +171,7 @@ TEST_F(StatsMatcherTest, CheckExcludeSuffix) {
 // Single regex matchers.
 
 TEST_F(StatsMatcherTest, CheckIncludeRegex) {
-  inclusionList()->set_hidden_envoy_deprecated_regex(".*envoy.*");
+  inclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*envoy.*"));
   initMatcher();
   expectAccepted({"envoy.matchers.requests", "stats.envoy.2xx", "regex.envoy.matchers"});
   expectDenied({"foo", "Envoy", "EnvoyProxy"});
@@ -158,7 +180,7 @@ TEST_F(StatsMatcherTest, CheckIncludeRegex) {
 }
 
 TEST_F(StatsMatcherTest, CheckExcludeRegex) {
-  exclusionList()->set_hidden_envoy_deprecated_regex(".*envoy.*");
+  exclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*envoy.*"));
   initMatcher();
   expectAccepted({"foo", "Envoy", "EnvoyProxy"});
   expectDenied({"envoy.matchers.requests", "stats.envoy.2xx", "regex.envoy.matchers"});
@@ -237,8 +259,8 @@ TEST_F(StatsMatcherTest, CheckMultipleExcludeSuffix) {
 // Multiple regex matchers.
 
 TEST_F(StatsMatcherTest, CheckMultipleIncludeRegex) {
-  inclusionList()->set_hidden_envoy_deprecated_regex(".*envoy.*");
-  inclusionList()->set_hidden_envoy_deprecated_regex(".*absl.*");
+  inclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*envoy.*"));
+  inclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*absl.*"));
   initMatcher();
   expectAccepted({"envoy.matchers.requests", "stats.absl.2xx", "absl.envoy.matchers"});
   expectDenied({"Abseil", "EnvoyProxy"});
@@ -247,8 +269,8 @@ TEST_F(StatsMatcherTest, CheckMultipleIncludeRegex) {
 }
 
 TEST_F(StatsMatcherTest, CheckMultipleExcludeRegex) {
-  exclusionList()->set_hidden_envoy_deprecated_regex(".*envoy.*");
-  exclusionList()->set_hidden_envoy_deprecated_regex(".*absl.*");
+  exclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*envoy.*"));
+  exclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*absl.*"));
   initMatcher();
   expectAccepted({"Abseil", "EnvoyProxy"});
   expectDenied({"envoy.matchers.requests", "stats.absl.2xx", "absl.envoy.matchers"});
@@ -262,7 +284,7 @@ TEST_F(StatsMatcherTest, CheckMultipleExcludeRegex) {
 // whichever the case may be.
 
 TEST_F(StatsMatcherTest, CheckMultipleAssortedInclusionMatchers) {
-  inclusionList()->set_hidden_envoy_deprecated_regex(".*envoy.*");
+  inclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*envoy.*"));
   inclusionList()->set_suffix("requests");
   inclusionList()->set_exact("regex");
   initMatcher();
@@ -273,7 +295,7 @@ TEST_F(StatsMatcherTest, CheckMultipleAssortedInclusionMatchers) {
 }
 
 TEST_F(StatsMatcherTest, CheckMultipleAssortedExclusionMatchers) {
-  exclusionList()->set_hidden_envoy_deprecated_regex(".*envoy.*");
+  exclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*envoy.*"));
   exclusionList()->set_suffix("requests");
   exclusionList()->set_exact("regex");
   initMatcher();
@@ -281,6 +303,58 @@ TEST_F(StatsMatcherTest, CheckMultipleAssortedExclusionMatchers) {
   expectDenied({"envoy.matchers.requests", "requests.for.envoy", "envoyrequests", "regex"});
   EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
   EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
+}
+
+TEST_F(StatsMatcherTest, CheckMultipleAssortedInclusionMatchersWithPrefix) {
+  inclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*envoy.*"));
+  inclusionList()->set_suffix("requests");
+  inclusionList()->set_exact("regex");
+  inclusionList()->set_prefix("prefix.");
+  initMatcher();
+  expectAccepted({"envoy.matchers.requests", "requests.for.envoy", "envoyrequests", "regex",
+                  "prefix", "prefix.foo"});
+  expectAccepted({"prefix.envoy.matchers.requests", "prefix.requests.for.envoy",
+                  "prefix.envoyrequests", "prefix.regex"});
+  expectDenied({"requestsEnvoy", "EnvoyProxy", "foo", "regex_etc"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
+}
+
+TEST_F(StatsMatcherTest, CheckMultipleAssortedExclusionMatchersWithPrefix) {
+  exclusionList()->MergeFrom(TestUtility::createRegexMatcher(".*envoy.*"));
+  exclusionList()->set_suffix("requests");
+  exclusionList()->set_exact("regex");
+  exclusionList()->set_prefix("prefix.");
+  initMatcher();
+  expectAccepted({"requestsEnvoy", "EnvoyProxy", "foo", "regex_etc", "prefixfoo"});
+  expectDenied({"envoy.matchers.requests", "requests.for.envoy", "envoyrequests", "regex", "prefix",
+                "prefix.foo", "prefix.requests.for.envoy"});
+  EXPECT_FALSE(stats_matcher_impl_->acceptsAll());
+  EXPECT_FALSE(stats_matcher_impl_->rejectsAll());
+}
+
+TEST_F(StatsMatcherTest, SkipSlowRejectsOnFastReject) {
+  inclusionList()->set_suffix("xyz");
+  initMatcher();
+  StatName stat_name = pool_.add("wxyz");
+  // Verify that we skip the slow check if fast_result is not NoMatch.
+  EXPECT_TRUE(stats_matcher_impl_->slowRejects(StatsMatcher::FastResult::Rejects, stat_name));
+
+  // Verify we don't skip the slow check if fast_result is NoMatch.
+  EXPECT_FALSE(
+      stats_matcher_impl_->slowRejects(stats_matcher_impl_->fastRejects(stat_name), stat_name));
+}
+
+TEST_F(StatsMatcherTest, SkipSlowRejectsOnFastMatches) {
+  exclusionList()->set_suffix("xyz");
+  initMatcher();
+  StatName stat_name = pool_.add("wxyz");
+  // Verify that we skip the slow check if fast_result is not NoMatch.
+  EXPECT_FALSE(stats_matcher_impl_->slowRejects(StatsMatcher::FastResult::Matches, stat_name));
+
+  // Verify we don't skip the slow check if fast_result is NoMatch.
+  EXPECT_TRUE(
+      stats_matcher_impl_->slowRejects(stats_matcher_impl_->fastRejects(stat_name), stat_name));
 }
 
 } // namespace Stats

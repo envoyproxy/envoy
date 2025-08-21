@@ -1,8 +1,8 @@
 #include <algorithm>
 
-#include "common/common/assert.h"
-#include "common/common/base64.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/base64.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/fuzz/fuzz_runner.h"

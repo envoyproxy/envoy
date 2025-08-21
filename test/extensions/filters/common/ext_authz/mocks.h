@@ -5,7 +5,7 @@
 
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
-#include "extensions/filters/common/ext_authz/ext_authz.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz.h"
 
 #include "gmock/gmock.h"
 
@@ -25,6 +25,7 @@ public:
   MOCK_METHOD(void, check,
               (RequestCallbacks & callbacks, const envoy::service::auth::v3::CheckRequest& request,
                Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info));
+  MOCK_METHOD(StreamInfo::StreamInfo const*, streamInfo, (), (const));
 };
 
 class MockRequestCallbacks : public RequestCallbacks {

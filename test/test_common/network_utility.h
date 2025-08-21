@@ -8,9 +8,22 @@
 #include "envoy/network/io_handle.h"
 #include "envoy/network/transport_socket.h"
 
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/network/win32_socket_handle_impl.h"
+
+#include "gtest/gtest.h"
+
 namespace Envoy {
 namespace Network {
 namespace Test {
+
+#if defined(WIN32) || defined(FORCE_LEVEL_EVENTS)
+using IoSocketHandlePlatformImpl = Win32SocketHandleImpl;
+#else
+using IoSocketHandlePlatformImpl = IoSocketHandleImpl;
+#endif
 
 /**
  * Determines if the passed in address and port is available for binding. If the port is zero,
@@ -125,10 +138,38 @@ TransportSocketPtr createRawBufferSocket();
 
 /**
  * Create a transport socket factory for testing purposes.
- * @return TransportSocketFactoryPtr the transport socket factory to use with a cluster or a
- * listener.
+ * @return TransportSocketFactoryPtr the transport socket factory to use with a cluster
  */
-TransportSocketFactoryPtr createRawBufferSocketFactory();
+UpstreamTransportSocketFactoryPtr createRawBufferSocketFactory();
+
+/**
+ * Create a transport socket factory for testing purposes.
+ * @return TransportSocketFactoryPtr the transport socket factory to use with a listener.
+ */
+DownstreamTransportSocketFactoryPtr createRawBufferDownstreamSocketFactory();
+
+/**
+ * Creates a sockaddr_storage instance containing an IPv6 socket.
+ * @param ip The IP address as a string.
+ * @param port The port.
+ * @return sockaddr_storage
+ */
+sockaddr_storage getV6SockAddr(const std::string& ip, uint32_t port);
+
+/**
+ * Creates a sockaddr_storage instance containing an IPv4 socket.
+ * @param ip The IP address as a string.
+ * @param port The port.
+ * @return sockaddr_storage
+ */
+sockaddr_storage getV4SockAddr(const std::string& ip, uint32_t port);
+
+/**
+ * Gets the length of the sockaddr_storage instance.
+ * @param ss The sockaddr_storage instance (can be a v4 or v6 instance).
+ * @return socklen_t The size of the sockaddr_storage object.
+ */
+socklen_t getSockAddrLen(const sockaddr_storage& ss);
 
 /**
  * Implementation of Network::FilterChain with empty filter chain, but pluggable transport socket
@@ -136,11 +177,11 @@ TransportSocketFactoryPtr createRawBufferSocketFactory();
  */
 class EmptyFilterChain : public FilterChain {
 public:
-  EmptyFilterChain(TransportSocketFactoryPtr&& transport_socket_factory)
+  EmptyFilterChain(DownstreamTransportSocketFactoryPtr&& transport_socket_factory)
       : transport_socket_factory_(std::move(transport_socket_factory)) {}
 
   // Network::FilterChain
-  const TransportSocketFactory& transportSocketFactory() const override {
+  const DownstreamTransportSocketFactory& transportSocketFactory() const override {
     return *transport_socket_factory_;
   }
 
@@ -148,13 +189,17 @@ public:
     return std::chrono::milliseconds::zero();
   }
 
-  const std::vector<FilterFactoryCb>& networkFilterFactories() const override {
+  const NetworkFilterFactoriesList& networkFilterFactories() const override {
     return empty_network_filter_factory_;
   }
 
+  absl::string_view name() const override { return "EmptyFilterChain"; }
+
+  bool addedViaApi() const override { return false; }
+
 private:
-  const TransportSocketFactoryPtr transport_socket_factory_;
-  const std::vector<FilterFactoryCb> empty_network_filter_factory_{};
+  const DownstreamTransportSocketFactoryPtr transport_socket_factory_;
+  const NetworkFilterFactoriesList empty_network_filter_factory_{};
 };
 
 /**
@@ -163,7 +208,7 @@ private:
  * @return const FilterChainSharedPtr filter chain.
  */
 const FilterChainSharedPtr
-createEmptyFilterChain(TransportSocketFactoryPtr&& transport_socket_factory);
+createEmptyFilterChain(DownstreamTransportSocketFactoryPtr&& transport_socket_factory);
 
 /**
  * Create an empty filter chain creating raw buffer sockets for testing purposes.
@@ -176,15 +221,17 @@ const FilterChainSharedPtr createEmptyFilterChainWithRawBufferSockets();
  * UdpRecvData without worrying about the packet processor interface. The function will
  * instantiate the buffer returned in data.
  */
-Api::IoCallUint64Result readFromSocket(IoHandle& handle, const Address::Instance& local_address,
-                                       UdpRecvData& data);
+Api::IoCallUint64Result
+readFromSocket(IoHandle& handle, const Address::Instance& local_address, UdpRecvData& data,
+               uint64_t max_rx_datagram_size = Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
 
 /**
  * A synchronous UDP peer that can be used for testing.
  */
 class UdpSyncPeer {
 public:
-  UdpSyncPeer(Network::Address::IpVersion version);
+  UdpSyncPeer(Network::Address::IpVersion version,
+              uint64_t max_rx_datagram_size = Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
 
   // Writer a datagram to a remote peer.
   void write(const std::string& buffer, const Network::Address::Instance& peer);
@@ -193,11 +240,26 @@ public:
   void recv(Network::UdpRecvData& datagram);
 
   // Return the local peer's socket address.
-  const Network::Address::InstanceConstSharedPtr& localAddress() { return socket_->localAddress(); }
+  const Network::Address::InstanceConstSharedPtr& localAddress() {
+    return socket_->connectionInfoProvider().localAddress();
+  }
 
 private:
   const Network::SocketPtr socket_;
+  const uint64_t max_rx_datagram_size_;
   std::list<Network::UdpRecvData> received_datagrams_;
+};
+
+/**
+ * A test version of TcpListenSocket that immediately listens which is a common pattern in tests.
+ */
+class TcpListenSocketImmediateListen : public Network::TcpListenSocket {
+public:
+  TcpListenSocketImmediateListen(const Address::InstanceConstSharedPtr& address,
+                                 const Network::Socket::OptionsSharedPtr& options = nullptr)
+      : TcpListenSocket(address, options, true) {
+    EXPECT_EQ(0, io_handle_->listen(ENVOY_TCP_BACKLOG_SIZE).return_value_);
+  }
 };
 
 } // namespace Test

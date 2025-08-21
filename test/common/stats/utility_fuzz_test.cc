@@ -1,8 +1,8 @@
 #include <string>
 #include <vector>
 
-#include "common/stats/isolated_store_impl.h"
-#include "common/stats/utility.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/common/stats/utility.h"
 
 #include "test/fuzz/fuzz_runner.h"
 
@@ -44,7 +44,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   std::unique_ptr<Stats::IsolatedStoreImpl> store =
       std::make_unique<Stats::IsolatedStoreImpl>(symbol_table);
   Stats::StatNamePool pool(symbol_table);
-  Stats::ScopePtr scope = store->createScope(provider.ConsumeRandomLengthString(max_len));
+  Stats::ScopeSharedPtr scope = store->createScope(provider.ConsumeRandomLengthString(max_len));
   Stats::ElementVec ele_vec;
   Stats::StatNameVec sn_vec;
   Stats::StatNameTagVector tags;

@@ -20,7 +20,6 @@ health_check_config {
   unhealthy_interval {
     seconds: 4227858432
   }
-  event_log_path: "?("
   tls_options {
   }
 }

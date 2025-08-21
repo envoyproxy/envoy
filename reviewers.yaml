@@ -1,0 +1,99 @@
+adisuissa:
+  maintainer: true
+  opsgenie: Adi
+  slack: UT17EMMTP
+agrawroh:
+  maintainer: true
+  slack: U025KC9D7T5
+antoniovleonti:
+  first-pass: true
+  slack: U06DHAS4FDF
+botengyao:
+  maintainer: true
+  opsgenie: Boteng
+  slack: U037YUAK147
+daixiang0:
+  first-pass: true
+  slack: U020CJG6UU8
+danzh2010:
+  maintainer: true
+  slack: UDR2MA31P
+ggreenway:
+  maintainer: true
+  opsgenie: Greg
+  slack: U78MBV869
+jmarantz:
+  slack: U80HPLBPG
+KBaichoo:
+  maintainer: true
+  opsgenie: Kevin
+  slack: U016ZPU8KBK
+keith:
+  maintainer: true
+  opsgenie: Keith
+  slack: UGS5P90CF
+krinkinmu:
+  maintainer: true
+  opsgenie: Mike
+  slack: U07KZ4B0H5J
+kyessenov:
+  opsgenie: kuat
+  slack: U7KTRAA8M
+  maintainer: true
+markdroth:
+  api: true
+  slack: UMN8K55A6
+mattklein123:
+  maintainer: true
+  opsgenie: Matt
+  slack: U5CALEVSL
+mathetake:
+  maintainer: true
+  opsgenie: mathetake
+  slack: UG9TD2FSB
+nezdolik:
+  maintainer: true
+  opsgenie: Kateryna
+  slack: UDYUWRL13
+paul-r-gall:
+  opsgenie: Paul
+  maintainer: true
+  slack: U0246MUEE9F
+phlax:
+  maintainer: true
+  opsgenie: phlax
+  slack: U017PLM0GNQ
+ravenblackx:
+  maintainer: true
+  opsgenie: Raven
+  slack: U02MJHFEX35
+RyanTheOptimist:
+  maintainer: true
+  opsgenie: Ryan
+  slack: U01SW3JC8GP
+silverstar194:
+  first-pass: true
+  slack: U03LNPC8JN9
+tonya11en:
+  maintainer: true
+  opsgenie: tony
+  slack: U989BG2CW
+tyxia:
+  maintainer: true
+  opsgenie: Tianyu
+  slack: U023U1ZN9SP
+wbpcode:
+  maintainer: true
+  opsgenie: Baiping
+  slack: U017KF5C0Q6
+yanavlasov:
+  maintainer: true
+  opsgenie: Yan
+  slack: UJHLR5KFS
+yanjunxiang-google:
+  first-pass: true
+  slack: U0210Q3SUKX
+zuercher:
+  maintainer: true
+  opsgenie: Stephan
+  slack: U78J72Q82

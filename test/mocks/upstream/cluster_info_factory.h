@@ -2,7 +2,7 @@
 
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

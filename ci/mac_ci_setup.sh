@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Installs the dependencies required for a macOS build via homebrew.
 # Tools are not upgraded to new versions.
@@ -6,13 +6,20 @@
 # https://github.com/actions/virtual-environments/blob/master/images/macos/macos-10.15-Readme.md for
 # a list of pre-installed tools in the macOS image.
 
-# https://github.com/actions/virtual-environments/issues/1811
-brew uninstall openssl@1.0.2t
+# https://github.com/actions/virtual-environments/issues/2322
+if command -v 2to3 > /dev/null; then
+    rm -f "$(command -v 2to3)"
+fi
 
 export HOMEBREW_NO_AUTO_UPDATE=1
 HOMEBREW_RETRY_ATTEMPTS=10
 HOMEBREW_RETRY_INTERVAL=3
 
+XCODE_DEFAULT_VERSION=16.1
+XCODE_VERSION="${XCODE_VERSION:-${XCODE_DEFAULT_VERSION}}"
+if [[ -n "$XCODE_VERSION" ]]; then
+    sudo xcode-select --switch "/Applications/Xcode_${XCODE_VERSION}.app"
+fi
 
 function is_installed {
     brew ls --versions "$1" >/dev/null
@@ -27,39 +34,31 @@ function install {
 }
 
 function retry () {
-    local returns=1 i=1
-    while ((i<=HOMEBREW_RETRY_ATTEMPTS)); do
-	if "$@"; then
-	    returns=0
-	    break
-	else
-	    sleep "$HOMEBREW_RETRY_INTERVAL";
-	    ((i++))
-	fi
+    local returns=1 i=1 attempts
+    attempts="${1}"
+    interval="${2}"
+    shift 2
+    while ((i<=attempts)); do
+        if "$@"; then
+            returns=0
+            break
+        else
+            sleep "$interval";
+            ((i++))
+        fi
     done
     return "$returns"
 }
 
-if ! retry brew update; then
+if ! retry "$HOMEBREW_RETRY_ATTEMPTS" "$HOMEBREW_RETRY_INTERVAL" brew update; then
   # Do not exit early if update fails.
   echo "Failed to update homebrew"
 fi
 
-DEPS="automake cmake coreutils go libtool wget ninja"
+DEPS="automake coreutils libtool wget"
 for DEP in ${DEPS}
 do
     is_installed "${DEP}" || install "${DEP}"
 done
 
-# Required as bazel and a foreign bazelisk are installed in the latest macos vm image, we have
-# to unlink/overwrite them to install bazelisk
-echo "Installing bazelisk"
-brew reinstall --force bazelisk
-if ! brew link --overwrite bazelisk; then
-    echo "Failed to install and link bazelisk"
-    exit 1
-fi
-
-bazel version
-
-pip3 install virtualenv
+retry 5 2 bazel version

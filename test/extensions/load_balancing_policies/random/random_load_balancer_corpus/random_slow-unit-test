@@ -1,0 +1,58 @@
+load_balancer_test_case {
+  common_lb_config {
+    update_merge_window {
+      nanos: 512
+    }
+  }
+  actions {
+    update_health_flags {
+      num_healthy_hosts: 2
+      random_bytestring: 1
+      random_bytestring: 2
+      random_bytestring: 1
+      random_bytestring: 2
+    }
+  }
+  actions {
+    preconnect {
+    }
+  }
+  actions {
+    preconnect {
+    }
+  }
+  actions {
+    choose_host {
+    }
+  }
+  actions {
+    update_health_flags {
+      num_healthy_hosts: 2
+      random_bytestring: 1
+      random_bytestring: 2
+      random_bytestring: 1
+      random_bytestring: 2
+    }
+  }
+  setup_priority_levels {
+    num_hosts_in_priority_level: 500
+    num_hosts_locality_one: 50
+    num_hosts_locality_two: 50
+    num_hosts_locality_three: 50
+    random_bytestring: 1
+    random_bytestring: 2
+    random_bytestring: 1
+    random_bytestring: 2
+  }
+  setup_priority_levels {
+    num_hosts_in_priority_level: 500
+    num_hosts_locality_one: 50
+    num_hosts_locality_two: 50
+    num_hosts_locality_three: 50
+    random_bytestring: 1
+    random_bytestring: 2
+    random_bytestring: 1
+    random_bytestring: 2
+  }
+  seed_for_prng: 88
+}

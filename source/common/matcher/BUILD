@@ -9,10 +9,28 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "map_matcher_lib",
+    hdrs = ["map_matcher.h"],
+    deps = [
+        "//envoy/matcher:matcher_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "exact_map_matcher_lib",
     hdrs = ["exact_map_matcher.h"],
     deps = [
-        "//include/envoy/matcher:matcher_interface",
+        ":map_matcher_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "prefix_map_matcher_lib",
+    hdrs = ["prefix_map_matcher.h"],
+    deps = [
+        ":map_matcher_lib",
+        "//source/common/common:radix_tree_lib",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )
 
@@ -20,8 +38,16 @@ envoy_cc_library(
     name = "value_input_matcher_lib",
     hdrs = ["value_input_matcher.h"],
     deps = [
-        "//include/envoy/matcher:matcher_interface",
+        "//envoy/matcher:matcher_interface",
         "//source/common/common:matchers_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "validation_visitor_lib",
+    hdrs = ["validation_visitor.h"],
+    deps = [
+        "//envoy/matcher:matcher_interface",
     ],
 )
 
@@ -30,7 +56,7 @@ envoy_cc_library(
     hdrs = ["list_matcher.h"],
     deps = [
         ":field_matcher_lib",
-        "//include/envoy/matcher:matcher_interface",
+        "//envoy/matcher:matcher_interface",
     ],
 )
 
@@ -38,7 +64,7 @@ envoy_cc_library(
     name = "field_matcher_lib",
     hdrs = ["field_matcher.h"],
     deps = [
-        "//include/envoy/matcher:matcher_interface",
+        "//envoy/matcher:matcher_interface",
     ],
 )
 
@@ -50,9 +76,11 @@ envoy_cc_library(
         ":exact_map_matcher_lib",
         ":field_matcher_lib",
         ":list_matcher_lib",
+        ":prefix_map_matcher_lib",
+        ":validation_visitor_lib",
         ":value_input_matcher_lib",
-        "//include/envoy/config:typed_config_interface",
-        "//include/envoy/matcher:matcher_interface",
+        "//envoy/config:typed_config_interface",
+        "//envoy/matcher:matcher_interface",
         "//source/common/config:utility_lib",
         "@envoy_api//envoy/config/common/matcher/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",

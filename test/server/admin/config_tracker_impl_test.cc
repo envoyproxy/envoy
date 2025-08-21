@@ -1,4 +1,5 @@
-#include "server/admin/config_tracker_impl.h"
+#include "source/common/common/matchers.h"
+#include "source/server/admin/config_tracker_impl.h"
 
 #include "test/mocks/common.h"
 
@@ -11,13 +12,13 @@ class ConfigTrackerImplTest : public testing::Test {
 public:
   ConfigTrackerImplTest() : cbs_map(tracker.getCallbacksMap()) {
     EXPECT_TRUE(cbs_map.empty());
-    test_cb = [this] {
+    test_cb = [this](const Matchers::StringMatcher&) {
       called = true;
-      return test_msg();
+      return testMsg();
     };
   }
 
-  ProtobufTypes::MessagePtr test_msg() { return std::make_unique<ProtobufWkt::Any>(); }
+  ProtobufTypes::MessagePtr testMsg() { return std::make_unique<Protobuf::Any>(); }
 
   ~ConfigTrackerImplTest() override = default;
 
@@ -33,7 +34,7 @@ TEST_F(ConfigTrackerImplTest, Basic) {
   auto entry_owner = tracker.add("test_key", test_cb);
   EXPECT_EQ(1, cbs_map.size());
   EXPECT_NE(nullptr, entry_owner);
-  EXPECT_NE(nullptr, cbs_map.begin()->second());
+  EXPECT_NE(nullptr, cbs_map.begin()->second(Matchers::UniversalStringMatcher()));
   EXPECT_TRUE(called);
 }
 
@@ -61,19 +62,19 @@ TEST_F(ConfigTrackerImplTest, AddDuplicate) {
 
 TEST_F(ConfigTrackerImplTest, OperationsWithinCallback) {
   ConfigTracker::EntryOwnerPtr owner1, owner2;
-  owner1 = tracker.add("test_key", [&] {
-    owner2 = tracker.add("test_key2", [&] {
+  owner1 = tracker.add("test_key", [&](const Matchers::StringMatcher&) {
+    owner2 = tracker.add("test_key2", [&](const Matchers::StringMatcher&) {
       owner1.reset();
-      return test_msg();
+      return testMsg();
     });
-    return test_msg();
+    return testMsg();
   });
   EXPECT_EQ(1, cbs_map.size());
   EXPECT_NE(nullptr, owner1);
-  EXPECT_NE(nullptr, cbs_map.at("test_key")());
+  EXPECT_NE(nullptr, cbs_map.at("test_key")(Matchers::UniversalStringMatcher()));
   EXPECT_EQ(2, cbs_map.size());
   EXPECT_NE(nullptr, owner2);
-  EXPECT_NE(nullptr, cbs_map.at("test_key2")());
+  EXPECT_NE(nullptr, cbs_map.at("test_key2")(Matchers::UniversalStringMatcher()));
   EXPECT_EQ(1, cbs_map.size());
   EXPECT_EQ(0, cbs_map.count("test_key"));
 }

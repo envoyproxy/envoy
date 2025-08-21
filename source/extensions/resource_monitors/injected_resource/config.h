@@ -1,11 +1,10 @@
 #pragma once
 
-#include "envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.pb.h"
-#include "envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.pb.validate.h"
+#include "envoy/extensions/resource_monitors/injected_resource/v3/injected_resource.pb.h"
+#include "envoy/extensions/resource_monitors/injected_resource/v3/injected_resource.pb.validate.h"
 #include "envoy/server/resource_monitor_config.h"
 
-#include "extensions/resource_monitors/common/factory_base.h"
-#include "extensions/resource_monitors/well_known_names.h"
+#include "source/extensions/resource_monitors/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,13 +13,13 @@ namespace InjectedResourceMonitor {
 
 class InjectedResourceMonitorFactory
     : public Common::FactoryBase<
-          envoy::config::resource_monitor::injected_resource::v2alpha::InjectedResourceConfig> {
+          envoy::extensions::resource_monitors::injected_resource::v3::InjectedResourceConfig> {
 public:
-  InjectedResourceMonitorFactory() : FactoryBase(ResourceMonitorNames::get().InjectedResource) {}
+  InjectedResourceMonitorFactory() : FactoryBase("envoy.resource_monitors.injected_resource") {}
 
 private:
   Server::ResourceMonitorPtr createResourceMonitorFromProtoTyped(
-      const envoy::config::resource_monitor::injected_resource::v2alpha::InjectedResourceConfig&
+      const envoy::extensions::resource_monitors::injected_resource::v3::InjectedResourceConfig&
           config,
       Server::Configuration::ResourceMonitorFactoryContext& context) override;
 };

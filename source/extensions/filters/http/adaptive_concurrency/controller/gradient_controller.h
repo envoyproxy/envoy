@@ -10,7 +10,8 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "extensions/filters/http/adaptive_concurrency/controller/controller.h"
+#include "source/common/common/thread_synchronizer.h"
+#include "source/extensions/filters/http/adaptive_concurrency/controller/controller.h"
 
 #include "absl/base/thread_annotations.h"
 #include "absl/strings/numbers.h"
@@ -89,6 +90,8 @@ public:
     return runtime_.snapshot().getInteger(RuntimeKeys::get().MinConcurrencyKey, min_concurrency_);
   }
 
+  std::chrono::milliseconds fixedValue() const { return fixed_value_; }
+
   // The percentage is normalized to the range [0.0, 1.0].
   double minRTTBufferPercent() const {
     const double val = runtime_.snapshot().getDouble(RuntimeKeys::get().MinRTTBufferPercentKey,
@@ -140,6 +143,9 @@ private:
 
   // The concurrency limit set while measuring the minRTT.
   const uint32_t min_concurrency_;
+
+  // The fixed value of minRTT, if present.
+  const std::chrono::milliseconds fixed_value_;
 
   // The amount added to the measured minRTT as a hedge against natural variability in latency.
   const double min_rtt_buffer_pct_;
@@ -214,6 +220,17 @@ public:
                      Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope,
                      Random::RandomGenerator& random, TimeSource& time_source);
 
+  // Used in unit tests to validate worker thread interactions.
+  Thread::ThreadSynchronizer& synchronizer() { return synchronizer_; }
+
+  // True if there is a minRTT sampling window active.
+  bool inMinRTTSamplingWindow() const { return deferred_limit_value_.load() > 0; }
+
+  // True if minRTT is sampled.
+  bool isMinRTTSamplingEnabled() const {
+    return config_.fixedValue() <= std::chrono::milliseconds::zero();
+  }
+
   // ConcurrencyController.
   RequestForwardingAction forwardingDecision() override;
   void recordLatencySample(MonotonicTime rq_send_time) override;
@@ -223,12 +240,11 @@ public:
 private:
   static GradientControllerStats generateStats(Stats::Scope& scope,
                                                const std::string& stats_prefix);
-  void updateMinRTT();
+  void updateMinRTT() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   std::chrono::microseconds processLatencySamplesAndClear()
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   uint32_t calculateNewLimit() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   void enterMinRTTSamplingWindow();
-  bool inMinRTTSamplingWindow() const { return deferred_limit_value_.load() > 0; }
   void resetSampleWindow() ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
   void updateConcurrencyLimit(const uint32_t new_limit)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(sample_mutation_mtx_);
@@ -283,6 +299,9 @@ private:
 
   Event::TimerPtr min_rtt_calc_timer_;
   Event::TimerPtr sample_reset_timer_;
+
+  // Used for testing only.
+  Thread::ThreadSynchronizer synchronizer_;
 };
 using GradientControllerSharedPtr = std::shared_ptr<GradientController>;
 

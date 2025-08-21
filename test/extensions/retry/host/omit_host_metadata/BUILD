@@ -14,7 +14,8 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.retry_host_predicates.omit_host_metadata",
+    extension_names = ["envoy.retry_host_predicates.omit_host_metadata"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/retry/host/omit_host_metadata:config",
         "//test/mocks/upstream:host_mocks",

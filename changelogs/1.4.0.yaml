@@ -1,0 +1,132 @@
+date: August 24, 2017
+
+changes:
+- area: mac
+  change: |
+    macOS is :repo:`now supported <v1.5:/bazel#quick-start-bazel-build-for-developers>`. (A few features are missing such as
+    hot restart and original destination routing).
+- area: config
+  change: |
+    YAML is now directly supported for config files.
+- area: admin
+  change: |
+    Added /routes admin endpoint.
+- area: flow_control
+  change: |
+    End-to-end flow control is now supported for TCP proxy, HTTP/1, and HTTP/2. HTTP flow control that includes filter
+    buffering is incomplete and will be implemented in 1.5.0.
+- area: logging
+  change: |
+    Log verbosity :repo:`compile time flag <v1.5:/bazel#log-verbosity>` added.
+- area: hot_restart
+  change: |
+    Hot restart :repo:`compile time flag <v1.5:/bazel#hot-restart>` added.
+- area: load_balancing
+  change: |
+    Original destination :ref:`cluster <v1.5:arch_overview_service_discovery_types_original_destination>` and :ref:`load
+    balancer <v1.5:arch_overview_load_balancing_types_original_destination>` added.
+- area: websockets
+  change: |
+    :ref:`WebSocket <v1.5:arch_overview_websocket>` is now supported.
+- area: clusters
+  change: |
+    Virtual cluster priorities have been hard removed without deprecation as we are reasonably sure no one is using this
+    feature.
+- area: clusters
+  change: |
+    Route ``validate_clusters`` option added.
+- area: headers
+  change: |
+    :ref:`x-envoy-downstream-service-node <v1.5:config_http_conn_man_headers_downstream-service-node>` header added.
+- area: headers
+  change: |
+    :ref:`x-forwarded-client-cert <v1.5:config_http_conn_man_headers_x-forwarded-client-cert>` header added.
+- area: http1
+  change: |
+    Initial HTTP/1 forward proxy support for absolute URLs has been added.
+- area: http2
+  change: |
+    HTTP/2 codec settings are now configurable.
+- area: grpc
+  change: |
+    gRPC/JSON transcoder :ref:`filter <v1.5:config_http_filters_grpc_json_transcoder>` added.
+- area: grpc
+  change: |
+    gRPC web :ref:`filter <v1.5:config_http_filters_grpc_web>` added.
+- area: rate_limting
+  change: |
+    Configurable timeout for the rate limit service call in the :ref:`network <v1.5:config_network_filters_rate_limit>` and
+    :ref:`HTTP <v1.5:config_http_filters_rate_limit>` rate limit filters.
+- area: headers
+  change: |
+    :ref:`x-envoy-retry-grpc-on <v1.5:config_http_filters_router_x-envoy-retry-grpc-on>` header added.
+- area: lds
+  change: |
+    :ref:`LDS API <v1.5:arch_overview_dynamic_config_lds>` added.
+- area: tls
+  change: |
+    TLS :``require_client_certificate`` option added.
+- area: configs
+  change: |
+    :ref:`Configuration check tool <v1.5:install_tools_config_load_check_tool>` added.
+- area: schema
+  change: |
+    :ref:`JSON schema check tool <v1.5:install_tools_schema_validator_check_tool>` added.
+- area: options
+  change: |
+    Config validation mode added via the :option:`--mode` option.
+- area: options
+  change: |
+    :option:`--local-address-ip-version` option added.
+- area: networking
+  change: |
+    IPv6 support is now complete.
+- area: dns
+  change: |
+    UDP ``statsd_ip_address`` option added.
+- area: dns
+  change: |
+    Per-cluster DNS resolvers added.
+- area: fault_injection
+  change: |
+    :ref:`Fault filter <v1.5:config_http_filters_fault_injection>` enhancements and fixes.
+- area: deprecation
+  change: |
+    Several features are `deprecated as of the 1.4.0 release
+    <https://github.com/envoyproxy/envoy/blob/v1.4.0/DEPRECATED.md>`_. They will be removed at the beginning of the 1.5.0
+    release cycle. We explicitly call out that the ``HttpFilterConfigFactory`` filter API has been deprecated in favor of
+    ``NamedHttpFilterConfigFactory``.
+- area: envoy
+  change: |
+    Many small bug fixes and performance improvements not listed.
+
+deprecated:
+- area: options
+  change: |
+    Config option ``statsd_local_udp_port`` has been deprecated and has been replaced with ``statsd_udp_ip_address``.
+- area: http_filters
+  change: |
+    ``HttpFilterConfigFactory`` filter API has been deprecated in favor of ``NamedHttpFilterConfigFactory``.
+- area: config
+  change: |
+    Config option ``http_codec_options`` has been deprecated and has been replaced with ``http2_settings``.
+- area: logging
+  change: |
+    The following log macros have been deprecated: ``log_trace``, ``log_debug``, ``conn_log``, ``conn_log_info``,
+    ``conn_log_debug``, ``conn_log_trace``, ``stream_log``, ``stream_log_info``, ``stream_log_debug``, ``stream_log_trace``.
+    For replacements, please see `logger.h <https://github.com/envoyproxy/envoy/blob/main/source/common/common/logger.h>`_.
+- area: streaming
+  change: |
+    The connectionId() and ssl() callbacks of StreamFilterCallbacks have been deprecated and replaced with a more general
+    connection() callback, which, when not returning a nullptr, can be used to get the connection id and SSL connection from
+    the returned Connection object pointer.
+- area: grpc
+  change: |
+    The protobuf stub gRPC support via ``Grpc::RpcChannelImpl`` is now replaced with ``Grpc::AsyncClientImpl``. This no
+    longer uses ``protoc`` generated stubs but instead utilizes C++ template generation of the RPC stubs.
+    ``Grpc::AsyncClientImpl`` supports streaming, in addition to the previous unary, RPCs.
+- area: filters
+  change: |
+    The direction of network and HTTP filters in the configuration will be ignored from 1.4.0 and later removed from the
+    configuration in the v2 APIs. Filter direction is now implied at the C++ type level. The ``type()`` methods on the
+    ``NamedNetworkFilterConfigFactory`` and ``NamedHttpFilterConfigFactory`` interfaces have been removed to reflect this.

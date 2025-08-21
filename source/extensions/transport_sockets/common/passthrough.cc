@@ -1,9 +1,9 @@
-#include "extensions/transport_sockets/common/passthrough.h"
+#include "source/extensions/transport_sockets/common/passthrough.h"
 
 #include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,6 +24,10 @@ absl::string_view PassthroughSocket::failureReason() const {
 
 bool PassthroughSocket::canFlushClose() { return transport_socket_->canFlushClose(); }
 
+Api::SysCallIntResult PassthroughSocket::connect(Network::ConnectionSocket& socket) {
+  return transport_socket_->connect(socket);
+}
+
 void PassthroughSocket::closeSocket(Network::ConnectionEvent event) {
   transport_socket_->closeSocket(event);
 }
@@ -40,6 +44,11 @@ void PassthroughSocket::onConnected() { transport_socket_->onConnected(); }
 
 Ssl::ConnectionInfoConstSharedPtr PassthroughSocket::ssl() const {
   return transport_socket_->ssl();
+}
+
+void PassthroughSocket::configureInitialCongestionWindow(uint64_t bandwidth_bits_per_sec,
+                                                         std::chrono::microseconds rtt) {
+  return transport_socket_->configureInitialCongestionWindow(bandwidth_bits_per_sec, rtt);
 }
 
 } // namespace TransportSockets

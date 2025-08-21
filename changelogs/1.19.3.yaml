@@ -1,0 +1,28 @@
+date: February 22, 2022
+
+behavior_changes:
+- area: dns_filter
+  change: |
+    :ref:`dns_filter <envoy_v3_api_msg_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig>` protobuf fields have been
+    renumbered to restore compatibility with Envoy 1.18, breaking compatibility with Envoy 1.19.0 and 1.19.1. The new field
+    numbering allows control planes supporting Envoy 1.18 to gracefully upgrade to :ref:`dns_resolution_config
+    <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3alpha.DnsFilterConfig.ClientContextConfig.dns_resolution_config>`,
+    provided they skip over Envoy 1.19.0 and 1.19.1. Control planes upgrading from Envoy 1.19.0 and 1.19.1 will need to
+    vendor the corresponding protobuf definitions to ensure that the renumbered fields have the types expected by those
+    releases.
+
+bug_fixes:
+- area: data plane
+  change: |
+    fix crash when internal redirect selects a route configured with direct response or redirect actions.
+- area: jwt_authn
+  change: |
+    fixed the crash when a CONNECT request is sent to JWT filter configured with regex match on the Host header.
+- area: listener
+  change: |
+    fixed an issue on Windows where connections are not handled by all worker threads.
+- area: tcp_proxy
+  change: |
+    fix a crash that occurs when configured for :ref:`upstream tunneling
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.tunneling_config>` and the downstream connection
+    disconnects while the the upstream connection or http/2 stream is still being established.

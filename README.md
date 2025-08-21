@@ -1,4 +1,4 @@
-![Envoy Logo](https://github.com/envoyproxy/artwork/blob/master/PNG/Envoy_Logo_Final_PANTONE.png)
+![Envoy Logo](https://github.com/envoyproxy/artwork/blob/main/PNG/Envoy_Logo_Final_PANTONE.png)
 
 [Cloud-native high-performance edge/middle/service proxy](https://www.envoyproxy.io/)
 
@@ -9,18 +9,18 @@ involved and how Envoy plays a role, read the CNCF
 [announcement](https://www.cncf.io/blog/2017/09/13/cncf-hosts-envoy/).
 
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/1266/badge)](https://bestpractices.coreinfrastructure.org/projects/1266)
-[![Azure Pipelines](https://dev.azure.com/cncf/envoy/_apis/build/status/11?branchName=master)](https://dev.azure.com/cncf/envoy/_build/latest?definitionId=11&branchName=master)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/envoyproxy/envoy/badge)](https://securityscorecards.dev/viewer/?uri=github.com/envoyproxy/envoy)
+[![CLOMonitor](https://img.shields.io/endpoint?url=https://clomonitor.io/api/projects/cncf/envoy/badge)](https://clomonitor.io/projects/cncf/envoy)
+[![Azure Pipelines](https://dev.azure.com/cncf/envoy/_apis/build/status/11?branchName=main)](https://dev.azure.com/cncf/envoy/_build/latest?definitionId=11&branchName=main)
 [![Fuzzing Status](https://oss-fuzz-build-logs.storage.googleapis.com/badges/envoy.svg)](https://bugs.chromium.org/p/oss-fuzz/issues/list?sort=-opened&can=1&q=proj:envoy)
 [![Jenkins](https://powerci.osuosl.org/buildStatus/icon?job=build-envoy-static-master&subject=ppc64le%20build)](https://powerci.osuosl.org/job/build-envoy-static-master/)
+[![Jenkins](https://ibmz-ci.osuosl.org/buildStatus/icon?job=Envoy_IBMZ_CI&subject=s390x%20build)](https://ibmz-ci.osuosl.org/job/Envoy_IBMZ_CI/)
 
 ## Documentation
 
 * [Official documentation](https://www.envoyproxy.io/)
 * [FAQ](https://www.envoyproxy.io/docs/envoy/latest/faq/overview)
-* [Unofficial Chinese documentation](https://www.servicemesher.com/envoy/)
-* Watch [a video overview of Envoy](https://www.youtube.com/watch?v=RVZX4CwKhGE)
-([transcript](https://www.microservices.com/talks/lyfts-envoy-monolith-service-mesh-matt-klein/))
-to find out more about the origin story and design philosophy of Envoy
+* [Example documentation](https://github.com/envoyproxy/examples/)
 * [Blog](https://medium.com/@mattklein123/envoy-threading-model-a8d44b922310) about the threading model
 * [Blog](https://medium.com/@mattklein123/envoy-hot-restart-1d16b14555b5) about hot restart
 * [Blog](https://medium.com/@mattklein123/envoy-stats-b65c7f363342) about stats architecture
@@ -47,9 +47,7 @@ to find out more about the origin story and design philosophy of Envoy
 * [envoy-maintainers](https://groups.google.com/forum/#!forum/envoy-maintainers): Use this list
   to reach all core Envoy maintainers.
 * [Twitter](https://twitter.com/EnvoyProxy/): Follow along on Twitter!
-* [Slack](https://envoyproxy.slack.com/): Slack, to get invited go [here](https://envoyslack.cncf.io).
-  We have the IRC/XMPP gateways enabled if you prefer either of those. Once an account is created,
-  connection instructions for IRC/XMPP can be found [here](https://envoyproxy.slack.com/account/gateways).
+* [Slack](https://envoyproxy.slack.com/): Slack, to get invited go [here](https://communityinviter.com/apps/envoyproxy/envoy).
   * NOTE: Response to user questions is best effort on Slack. For a "guaranteed" response please email
     envoy-users@ per the guidance in the following linked thread.
 
@@ -65,22 +63,26 @@ have prior experience. To get started:
 * [Beginner issues](https://github.com/envoyproxy/envoy/issues?q=is%3Aopen+is%3Aissue+label%3Abeginner)
 * [Build/test quick start using docker](ci#building-and-running-tests-as-a-developer)
 * [Developer guide](DEVELOPER.md)
-* Consider installing the Envoy [development support toolchain](https://github.com/envoyproxy/envoy/blob/master/support/README.md), which helps automate parts of the development process, particularly those involving code review.
+* Consider installing the Envoy [development support toolchain](https://github.com/envoyproxy/envoy/blob/main/support/README.md), which helps automate parts of the development process, particularly those involving code review.
 * Please make sure that you let us know if you are working on an issue so we don't duplicate work!
 
 ## Community Meeting
 
-The Envoy team meets twice per month on Tuesday, alternating between 9am PT and 5PM PT. The public
-Google calendar is here: https://goo.gl/PkDijT
-
-* Meeting minutes are [here](https://goo.gl/5Cergb)
-* Recorded videos are posted [here](https://www.youtube.com/channel/UCvqbFHwN-nwalWPjPUKpvTA/videos?view=0&sort=dd&shelf_id=1)
+The Envoy team has a scheduled meeting time twice per month on Tuesday at 9am PT. The public
+Google calendar is [here](https://goo.gl/PkDijT).  The meeting will only be held
+if there are agenda items listed in the [meeting
+minutes](https://goo.gl/5Cergb).  Any member of the community should be able to
+propose agenda items by adding to the minutes.  The maintainers will either confirm
+the additions to the agenda, or will cancel the meeting within 24 hours of the scheduled
+date if there is no confirmed agenda.
 
 ## Security
 
 ### Security Audit
 
-A third party security audit was performed by Cure53, you can see the full report [here](docs/SECURITY_AUDIT.pdf).
+There has been several third party engagements focused on Envoy security:
+* In 2018 Cure53 performed a security audit, [full report](docs/security/audit_cure53_2018.pdf).
+* In 2021 Ada Logics performed an audit on our fuzzing infrastructure with recommendations for improvements, [full report](docs/security/audit_fuzzer_adalogics_2021.pdf).
 
 ### Reporting security vulnerabilities
 
@@ -90,3 +92,11 @@ email to acknowledge your report, and we'll send an additional email when we've 
 positively or negatively.
 
 For further details please see our complete [security release process](SECURITY.md).
+
+### ppc64le builds
+
+Builds for the ppc64le architecture or using aws-lc are not covered by the envoy security policy. The ppc64le architecture is currently best-effort and not maintained by the Envoy maintainers.
+
+## Releases
+
+For further details please see our [release process](https://github.com/envoyproxy/envoy/blob/main/RELEASES.md).

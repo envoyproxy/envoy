@@ -1,0 +1,24 @@
+config {
+  virtual_hosts {
+    name: "2"
+    domains: "*"
+    matcher {
+      on_no_match {
+        action {
+          name: "type.googleapis.com/envoy.config.route.v3.Route"
+          typed_config {
+            type_url: "type.googleapis.com/envoy.config.route.v3.Route"
+            value: "\n\002\n\000r\001Q\212\001\000"
+          }
+        }
+      }
+    }
+  }
+}
+headers {
+  headers {
+    key: "x-forwarded-proto"
+    value: "4"
+  }
+}
+random_value: 262144

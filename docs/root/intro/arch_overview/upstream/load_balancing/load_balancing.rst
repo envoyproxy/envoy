@@ -11,6 +11,9 @@ Load Balancing
   locality_weight
   overprovisioning
   panic_threshold
+  excluded
   original_dst
   zone_aware
   subsets
+  slow_start
+  override_host

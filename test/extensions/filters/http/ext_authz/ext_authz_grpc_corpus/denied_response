@@ -1,0 +1,49 @@
+base {
+  config {
+    grpc_service {
+      envoy_grpc {
+        cluster_name: "ext_authz_server"
+      }
+    }
+    stat_prefix: "with_stat_prefix"
+  }
+  request_data {
+    headers {
+      headers {
+        key: ":host"
+        value: "example.com"
+      }
+      headers {
+        key: ":method"
+        value: "GET"
+      }
+      headers {
+        key: ":path"
+        value: "/users"
+      }
+      headers {
+        key: ":scheme"
+        value: "https"
+      }
+    }
+  }
+}
+response {
+  status {
+    code: 7
+    message: "PERMISSION DENIED"
+  }
+  denied_response {
+    status {
+      code: Forbidden
+    }
+    headers {
+      header {
+        key: "added-upstream-request-header"
+        value: "this should be added by ext_authz to the upstream request!"
+      }
+      append_action: APPEND_IF_EXISTS_OR_ADD
+    }
+    body: "this is the response body"
+  }
+}

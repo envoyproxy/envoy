@@ -27,6 +27,11 @@ message Action {
   }
 }
 
+// Helper to mutate actions in FilterFuzzTestCase, because mutate() does not apply to repeated members.
+message FuzzHelperForActions {
+  repeated Action actions = 1;
+}
+
 message FilterFuzzTestCase {
   // This is actually a protobuf type for the config of network filters.
   envoy.config.listener.v3.Filter config = 1;

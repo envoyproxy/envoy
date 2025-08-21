@@ -1,6 +1,6 @@
 #include "test/mocks/http/stream_encoder.h"
 
-#include "common/http/header_utility.h"
+#include "source/common/http/header_utility.h"
 
 using testing::_;
 using testing::Invoke;
@@ -17,7 +17,7 @@ MockRequestEncoder::MockRequestEncoder() {
       .WillByDefault(Invoke([](const RequestHeaderMap& headers, bool) -> Status {
         // Check to see that method is not-null. Path can be null for CONNECT and authority can be
         // null at the codec level.
-        ASSERT(HeaderUtility::checkRequiredHeaders(headers).ok());
+        ASSERT(HeaderUtility::checkRequiredRequestHeaders(headers).ok());
         return okStatus();
       }));
 }
@@ -31,7 +31,14 @@ MockResponseEncoder::MockResponseEncoder() {
         ASSERT_NE(nullptr, headers.Status());
       }));
 }
-MockResponseEncoder::~MockResponseEncoder() = default;
+
+MockResponseEncoder::~MockResponseEncoder() {
+  // We notify the adapter here to avoid NiceMock dtor from
+  // no longer suppressing uninteresting calls.
+  if (stream_.codec_callbacks_) {
+    stream_.codec_callbacks_->onCodecLowLevelReset();
+  }
+}
 
 } // namespace Http
 } // namespace Envoy

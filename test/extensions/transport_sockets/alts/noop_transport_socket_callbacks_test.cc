@@ -1,8 +1,7 @@
 #include "envoy/network/transport_socket.h"
 
-#include "common/network/io_socket_handle_impl.h"
-
-#include "extensions/transport_sockets/alts/noop_transport_socket_callbacks.h"
+#include "source/common/network/io_socket_handle_impl.h"
+#include "source/extensions/transport_sockets/alts/noop_transport_socket_callbacks.h"
 
 #include "test/mocks/network/mocks.h"
 

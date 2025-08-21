@@ -1,8 +1,7 @@
 #include "envoy/common/exception.h"
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/thrift_proxy/auto_transport_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/auto_transport_impl.h"
 
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
@@ -30,7 +29,7 @@ TEST(TransportNames, FromType) {
 TEST(AutoTransportTest, NotEnoughData) {
   Buffer::OwnedImpl buffer;
   AutoTransportImpl transport;
-  MessageMetadata metadata;
+  MessageMetadata metadata(false);
 
   EXPECT_FALSE(transport.decodeFrameStart(buffer, metadata));
   EXPECT_THAT(metadata, IsEmptyMetadata());
@@ -50,7 +49,7 @@ TEST(AutoTransportTest, UnknownTransport) {
     buffer.writeBEInt<int32_t>(0);
     buffer.writeBEInt<int32_t>(0);
 
-    MessageMetadata metadata;
+    MessageMetadata metadata(false);
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
                               "unknown thrift auto transport frame start 00 00 00 00 00 00 00 00");
     EXPECT_THAT(metadata, IsEmptyMetadata());
@@ -62,7 +61,7 @@ TEST(AutoTransportTest, UnknownTransport) {
     buffer.writeBEInt<int32_t>(0xFF);
     buffer.writeBEInt<int32_t>(0);
 
-    MessageMetadata metadata;
+    MessageMetadata metadata(false);
     EXPECT_THROW_WITH_MESSAGE(transport.decodeFrameStart(buffer, metadata), EnvoyException,
                               "unknown thrift auto transport frame start 00 00 00 ff 00 00 00 00");
     EXPECT_THAT(metadata, IsEmptyMetadata());
@@ -78,7 +77,7 @@ TEST(AutoTransportTest, DecodeFrameStart) {
     buffer.writeBEInt<int16_t>(0x8001);
     buffer.writeBEInt<int16_t>(0);
 
-    MessageMetadata metadata;
+    MessageMetadata metadata(false);
     EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
     EXPECT_THAT(metadata, HasOnlyFrameSize(255U));
     EXPECT_EQ(transport.name(), "framed(auto)");
@@ -94,7 +93,7 @@ TEST(AutoTransportTest, DecodeFrameStart) {
     buffer.writeBEInt<int16_t>(0x8201);
     buffer.writeBEInt<int16_t>(0);
 
-    MessageMetadata metadata;
+    MessageMetadata metadata(false);
     EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
     EXPECT_THAT(metadata, HasOnlyFrameSize(4095U));
     EXPECT_EQ(transport.name(), "framed(auto)");
@@ -109,7 +108,7 @@ TEST(AutoTransportTest, DecodeFrameStart) {
     buffer.writeBEInt<int16_t>(0x8001);
     addRepeated(buffer, 6, 0);
 
-    MessageMetadata metadata;
+    MessageMetadata metadata(false);
     EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
     EXPECT_THAT(metadata, IsEmptyMetadata());
     EXPECT_EQ(transport.name(), "unframed(auto)");
@@ -124,7 +123,7 @@ TEST(AutoTransportTest, DecodeFrameStart) {
     buffer.writeBEInt<int16_t>(0x8201);
     addRepeated(buffer, 6, 0);
 
-    MessageMetadata metadata;
+    MessageMetadata metadata(false);
     EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
     EXPECT_THAT(metadata, IsEmptyMetadata());
     EXPECT_EQ(transport.name(), "unframed(auto)");
@@ -144,7 +143,7 @@ TEST(AutoTransportTest, DecodeFrameStart) {
     buffer.writeBEInt<int32_t>(0); // protocol (binary), 0 transforms + padding
     buffer.writeBEInt<int16_t>(0x8001);
 
-    MessageMetadata metadata;
+    MessageMetadata metadata(false);
     EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
     EXPECT_THAT(metadata, HasFrameSize(241U));
     EXPECT_THAT(metadata, HasProtocol(ProtocolType::Binary));
@@ -166,7 +165,7 @@ TEST(AutoTransportTest, DecodeFrameStart) {
     buffer.writeBEInt<int32_t>(0x02000000); // protocol (binary), 0 transforms + padding
     buffer.writeBEInt<int16_t>(0x8201);
 
-    MessageMetadata metadata;
+    MessageMetadata metadata(false);
     EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
     EXPECT_THAT(metadata, HasFrameSize(241U));
     EXPECT_THAT(metadata, HasProtocol(ProtocolType::Compact));
@@ -184,7 +183,7 @@ TEST(AutoTransportTest, DecodeFrameEnd) {
   buffer.writeBEInt<int16_t>(0x8001);
   buffer.writeBEInt<int16_t>(0);
 
-  MessageMetadata metadata;
+  MessageMetadata metadata(false);
   EXPECT_TRUE(transport.decodeFrameStart(buffer, metadata));
 
   EXPECT_EQ(buffer.length(), 4);
@@ -198,7 +197,7 @@ TEST(AutoTransportTest, EncodeFrame) {
   AutoTransportImpl transport;
   transport.setTransport(TransportPtr{mock_transport});
 
-  MessageMetadata metadata;
+  MessageMetadata metadata(false);
   Buffer::OwnedImpl buffer;
   Buffer::OwnedImpl message;
 

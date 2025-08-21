@@ -5,7 +5,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/server/filter_config.h"
 
-#include "common/stream_info/stream_info_impl.h"
+#include "source/common/stream_info/stream_info_impl.h"
 
 namespace Envoy {
 namespace LocalReply {
@@ -24,7 +24,7 @@ public:
    */
   virtual void rewrite(const Http::RequestHeaderMap* request_headers,
                        Http::ResponseHeaderMap& response_headers,
-                       StreamInfo::StreamInfoImpl& stream_info, Http::Code& code, std::string& body,
+                       StreamInfo::StreamInfo& stream_info, Http::Code& code, std::string& body,
                        absl::string_view& content_type) const PURE;
 };
 
@@ -38,7 +38,7 @@ public:
   /**
    * Create a LocalReply object from ProtoConfig
    */
-  static LocalReplyPtr
+  static absl::StatusOr<LocalReplyPtr>
   create(const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
              config,
          Server::Configuration::FactoryContext& context);

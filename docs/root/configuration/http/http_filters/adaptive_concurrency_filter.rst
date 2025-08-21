@@ -3,13 +3,8 @@
 Adaptive Concurrency
 ====================
 
-.. attention::
-
-  The adaptive concurrency filter is experimental and is currently under active development.
-
-This filter should be configured with the name `envoy.filters.http.adaptive_concurrency`.
-
-See the :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency>` for details on each configuration parameter.
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency``.
+* :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.adaptive_concurrency.v3.AdaptiveConcurrency>` for details on each configuration parameter.
 
 Overview
 --------
@@ -156,8 +151,8 @@ The adaptive concurrency filter supports the following runtime settings:
 
 adaptive_concurrency.enabled
     Overrides whether the adaptive concurrency filter will use the concurrency controller for
-    forwarding decisions. If set to `false`, the filter will be a no-op. Defaults to what is
-    specified for `enabled` in the filter configuration.
+    forwarding decisions. If set to ``false``, the filter will be a no-op. Defaults to what is
+    specified for ``enabled`` in the filter configuration.
 
 adaptive_concurrency.gradient_controller.min_rtt_calc_interval_ms
     Overrides the interval in which the ideal round-trip time (minRTT) will be recalculated.
@@ -166,7 +161,7 @@ adaptive_concurrency.gradient_controller.min_rtt_aggregate_request_count
     Overrides the number of requests sampled for calculation of the minRTT.
 
 adaptive_concurrency.gradient_controller.jitter
-    Overrides the random delay introduced to the minRTT calculation start time. A value of `10`
+    Overrides the random delay introduced to the minRTT calculation start time. A value of ``10``
     indicates a random delay of 10% of the configured interval. The runtime value specified is
     clamped to the range [0,100].
 
@@ -181,7 +176,7 @@ adaptive_concurrency.gradient_controller.min_rtt_buffer
 
 adaptive_concurrency.gradient_controller.sample_aggregate_percentile
     Overrides the percentile value used to represent the collection of latency samples in
-    calculations. A value of `95` indicates the 95th percentile. The runtime value specified is
+    calculations. A value of ``95`` indicates the 95th percentile. The runtime value specified is
     clamped to the range [0,100].
 
 adaptive_concurrency.gradient_controller.min_concurrency
@@ -207,7 +202,7 @@ The gradient controller uses the namespace
   rq_blocked, Counter, Total requests that were blocked by the filter.
   min_rtt_calculation_active, Gauge, Set to 1 if the controller is in the process of a minRTT calculation. 0 otherwise.
   concurrency_limit, Gauge, The current concurrency limit.
-  gradient, Gauge, The current gradient value.
+  gradient, Gauge, The current gradient value multiplied by 1000 (values will range between 500 and 2000).
   burst_queue_size, Gauge, The current headroom value in the concurrency limit calculation.
   min_rtt_msecs, Gauge, The current measured minRTT value.
   sample_rtt_msecs, Gauge, The current measured sampleRTT aggregate.

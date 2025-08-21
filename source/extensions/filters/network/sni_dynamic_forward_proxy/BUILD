@@ -14,13 +14,18 @@ envoy_cc_library(
     srcs = ["proxy_filter.cc"],
     hdrs = ["proxy_filter.h"],
     deps = [
-        "//include/envoy/network:connection_interface",
-        "//include/envoy/network:filter_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/network:filter_interface",
+        "//envoy/router:string_accessor_interface",
+        "//envoy/stream_info:uint32_accessor_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/stream_info:uint32_accessor_lib",
+        "//source/common/stream_info:upstream_address_lib",
         "//source/common/tcp_proxy",
+        "//source/common/upstream:upstream_includes",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_interface",
-        "@envoy_api//envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -28,13 +33,11 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    security_posture = "unknown",
-    status = "alpha",
     deps = [
         ":proxy_filter_lib",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
-        "@envoy_api//envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )

@@ -1,10 +1,7 @@
 #pragma once
 
-#include <regex>
-
-#include "extensions/tracers/zipkin/util.h"
-#include "extensions/tracers/zipkin/zipkin_core_constants.h"
-#include "extensions/tracers/zipkin/zipkin_core_types.h"
+#include <cstdint>
+#include <string>
 
 namespace Envoy {
 namespace Extensions {
@@ -29,20 +26,14 @@ public:
    * @param trace_id_high The high 64 bits of the trace id.
    * @param trace_id The low 64 bits of the trace id.
    * @param id The span id.
-   * @param parent_id The parent id.
+   * @param parent_id The parent span id.
    * @param sampled The sampled flag.
+   * @param inner_context If this context is created base on the inner span.
    */
   SpanContext(const uint64_t trace_id_high, const uint64_t trace_id, const uint64_t id,
-              const uint64_t parent_id, bool sampled)
+              const uint64_t parent_id, bool sampled, bool inner_context = false)
       : trace_id_high_(trace_id_high), trace_id_(trace_id), id_(id), parent_id_(parent_id),
-        sampled_(sampled) {}
-
-  /**
-   * Constructor that creates a context object from the given Zipkin span object.
-   *
-   * @param span The Zipkin span used to initialize a SpanContext object.
-   */
-  SpanContext(const Span& span);
+        sampled_(sampled), inner_context_(inner_context) {}
 
   /**
    * @return the span id as an integer
@@ -74,12 +65,19 @@ public:
    */
   bool sampled() const { return sampled_; }
 
+  /**
+   * @return the inner context flag. True if this context is created base on the inner span.
+   */
+  bool innerContext() const { return inner_context_; }
+  void setInnerContextForTest(bool inner_context) { inner_context_ = inner_context; }
+
 private:
   const uint64_t trace_id_high_{0};
   const uint64_t trace_id_{0};
   const uint64_t id_{0};
   const uint64_t parent_id_{0};
   const bool sampled_{false};
+  bool inner_context_{false};
 };
 
 } // namespace Zipkin

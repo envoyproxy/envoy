@@ -6,7 +6,7 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 
-#include "server/admin/handler_ctx.h"
+#include "source/server/admin/handler_ctx.h"
 
 #include "absl/strings/string_view.h"
 
@@ -18,16 +18,13 @@ class ServerCmdHandler : public HandlerContextBase {
 public:
   ServerCmdHandler(Server::Instance& server);
 
-  Http::Code handlerQuitQuitQuit(absl::string_view path_and_query,
-                                 Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerQuitQuitQuit(Http::ResponseHeaderMap& response_headers,
                                  Buffer::Instance& response, AdminStream&);
 
-  Http::Code handlerHealthcheckFail(absl::string_view path_and_query,
-                                    Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerHealthcheckFail(Http::ResponseHeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&);
 
-  Http::Code handlerHealthcheckOk(absl::string_view path_and_query,
-                                  Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerHealthcheckOk(Http::ResponseHeaderMap& response_headers,
                                   Buffer::Instance& response, AdminStream&);
 };
 

@@ -1,13 +1,26 @@
-load("@io_bazel_rules_rust//rust:rust.bzl", "rust_binary")
-load("@proxy_wasm_cpp_sdk//bazel/wasm:wasm.bzl", "wasm_cc_binary")
+load("@proxy_wasm_cpp_sdk//bazel:defs.bzl", "proxy_wasm_cc_binary")
+load("@rules_rust//rust:defs.bzl", "rust_binary")
 
 def _wasm_rust_transition_impl(settings, attr):
     return {
-        "//command_line_option:platforms": "@io_bazel_rules_rust//rust/platform:wasm",
+        "//command_line_option:platforms": "@rules_rust//rust/platform:wasm",
+    }
+
+def _wasi_rust_transition_impl(settings, attr):
+    return {
+        "//command_line_option:platforms": "@rules_rust//rust/platform:wasi",
     }
 
 wasm_rust_transition = transition(
     implementation = _wasm_rust_transition_impl,
+    inputs = [],
+    outputs = [
+        "//command_line_option:platforms",
+    ],
+)
+
+wasi_rust_transition = transition(
+    implementation = _wasi_rust_transition_impl,
     inputs = [],
     outputs = [
         "//command_line_option:platforms",
@@ -39,7 +52,7 @@ def _wasm_attrs(transition):
         "precompile": attr.bool(default = False),
         # This is deliberately in target configuration to avoid compiling v8 twice.
         "_compile_tool": attr.label(default = "@envoy//test/tools/wee8_compile:wee8_compile_tool", executable = True, cfg = "target"),
-        "_whitelist_function_transition": attr.label(default = "@bazel_tools//tools/whitelists/function_transition_whitelist"),
+        "_allowlist_function_transition": attr.label(default = "@bazel_tools//tools/allowlists/function_transition_allowlist"),
     }
 
 wasm_rust_binary_rule = rule(
@@ -47,15 +60,25 @@ wasm_rust_binary_rule = rule(
     attrs = _wasm_attrs(wasm_rust_transition),
 )
 
-def envoy_wasm_cc_binary(name, deps = [], tags = [], **kwargs):
-    wasm_cc_binary(
+wasi_rust_binary_rule = rule(
+    implementation = _wasm_binary_impl,
+    attrs = _wasm_attrs(wasi_rust_transition),
+)
+
+def envoy_wasm_cc_binary(name, additional_linker_inputs = [], linkopts = [], tags = [], **kwargs):
+    proxy_wasm_cc_binary(
         name = name,
-        deps = deps + ["@proxy_wasm_cpp_sdk//:proxy_wasm_intrinsics"],
+        additional_linker_inputs = additional_linker_inputs + [
+            "@envoy//source/extensions/common/wasm/ext:envoy_proxy_wasm_api_js",
+        ],
+        linkopts = linkopts + [
+            "--js-library=$(location @envoy//source/extensions/common/wasm/ext:envoy_proxy_wasm_api_js)",
+        ],
         tags = tags + ["manual"],
         **kwargs
     )
 
-def wasm_rust_binary(name, tags = [], **kwargs):
+def wasm_rust_binary(name, tags = [], wasi = False, precompile = False, **kwargs):
     wasm_name = "_wasm_" + name.replace(".", "_")
     kwargs.setdefault("visibility", ["//visibility:public"])
 
@@ -68,12 +91,13 @@ def wasm_rust_binary(name, tags = [], **kwargs):
         **kwargs
     )
 
-    wasm_rust_binary_rule(
+    bin_rule = wasm_rust_binary_rule
+    if wasi:
+        bin_rule = wasi_rust_binary_rule
+
+    bin_rule(
         name = name,
-        precompile = select({
-            "@envoy//bazel:linux_x86_64": True,
-            "//conditions:default": False,
-        }),
+        precompile = precompile,
         binary = ":" + wasm_name,
         tags = tags + ["manual"],
     )

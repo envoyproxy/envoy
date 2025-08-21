@@ -1,0 +1,88 @@
+# No compilation for unused binaries and libs.
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 7757916..6241f45 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -477,8 +477,8 @@ else()
+     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+ endif()
+ 
+-add_subdirectory(util)
+-add_subdirectory(doc/dev-reference)
++# add_subdirectory(util)
++# add_subdirectory(doc/dev-reference)
+ 
+ if (NOT WIN32)
+ # PCRE check, we have a fixed requirement for PCRE to use Chimera
+@@ -496,9 +496,9 @@ if (CORRECT_PCRE_VERSION AND PCRE_BUILD_SOURCE AND BUILD_STATIC_LIBS)
+     set(BUILD_CHIMERA TRUE)
+ endif()
+ 
+-add_subdirectory(unit)
++# add_subdirectory(unit)
+ if (EXISTS ${CMAKE_SOURCE_DIR}/tools/CMakeLists.txt)
+-    add_subdirectory(tools)
++    # add_subdirectory(tools)
+ endif()
+ if (EXISTS ${CMAKE_SOURCE_DIR}/chimera/CMakeLists.txt AND BUILD_CHIMERA)
+     add_subdirectory(chimera)
+@@ -548,9 +548,9 @@ if (CORRECT_PCRE_VERSION AND PCRE_BUILD_SOURCE AND BUILD_STATIC_LIBS)
+     set(BUILD_CHIMERA TRUE)
+ endif()
+ 
+-add_subdirectory(unit)
++# add_subdirectory(unit)
+ if (EXISTS ${CMAKE_SOURCE_DIR}/tools/CMakeLists.txt)
+-    add_subdirectory(tools)
++    # add_subdirectory(tools)
+ endif()
+ if (EXISTS ${CMAKE_SOURCE_DIR}/chimera/CMakeLists.txt AND BUILD_CHIMERA)
+     add_subdirectory(chimera)
+@@ -1194,8 +1194,8 @@ if (NOT FAT_RUNTIME)
+     if (BUILD_STATIC_LIBS)
+         add_library(hs_exec OBJECT ${hs_exec_SRCS})
+ 
+-        add_library(hs_runtime STATIC src/hs_version.c src/hs_valid_platform.c $<TARGET_OBJECTS:hs_exec>)
+-        set_target_properties(hs_runtime PROPERTIES LINKER_LANGUAGE C)
++        # add_library(hs_runtime STATIC src/hs_version.c src/hs_valid_platform.c $<TARGET_OBJECTS:hs_exec>)
++        # set_target_properties(hs_runtime PROPERTIES LINKER_LANGUAGE C)
+ 
+         add_library(hs_compile OBJECT ${hs_compile_SRCS})
+ 
+@@ -1271,10 +1271,10 @@ else (FAT_RUNTIME)
+        # hs_version.c is added explicitly to avoid some build systems that refuse to
+        # create a lib without any src (I'm looking at you Xcode)
+ 
+-       add_library(hs_runtime STATIC src/hs_version.c
+-           $<TARGET_OBJECTS:hs_exec_common>
+-           ${RUNTIME_LIBS})
+-       set_target_properties(hs_runtime PROPERTIES LINKER_LANGUAGE C)
++       # add_library(hs_runtime STATIC src/hs_version.c
++       #     $<TARGET_OBJECTS:hs_exec_common>
++       #     ${RUNTIME_LIBS})
++       # set_target_properties(hs_runtime PROPERTIES LINKER_LANGUAGE C)
+         add_library(hs_compile OBJECT ${hs_compile_SRCS})
+ 
+        # we want the static lib for testing
+@@ -1342,7 +1342,7 @@ else (FAT_RUNTIME)
+ endif (NOT FAT_RUNTIME)
+ 
+ if (NOT BUILD_SHARED_LIBS)
+-    install(TARGETS hs_runtime DESTINATION ${CMAKE_INSTALL_LIBDIR})
++    # install(TARGETS hs_runtime DESTINATION ${CMAKE_INSTALL_LIBDIR})
+ endif()
+ 
+ if (BUILD_STATIC_AND_SHARED OR BUILD_SHARED_LIBS)
+# Workaround for uninitialized use.
+diff --git a/src/fdr/teddy_runtime_common.h b/src/fdr/teddy_runtime_common.h
+index b76800e..6e587c2 100644
+--- a/src/fdr/teddy_runtime_common.h
++++ b/src/fdr/teddy_runtime_common.h
+@@ -362,6 +362,7 @@ m512 vectoredLoad512(m512 *p_mask, const u8 *ptr, const size_t start_offset,
+             *p_mask = set_mask_m512(~k);
+             return loadu512(ptr);
+         }
++        val = zeroes512();
+         assert(start_offset - start <= avail);
+         u64a k = ones_u64a << (64 - avail + start_offset - start)
+                            >> (64 - avail);

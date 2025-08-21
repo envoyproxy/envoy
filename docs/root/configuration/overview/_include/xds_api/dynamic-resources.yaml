@@ -1,0 +1,41 @@
+node:
+  cluster: envoy_cluster
+  id: envoy_node
+
+dynamic_resources:
+  ads_config:
+    api_type: GRPC
+    grpc_services:
+    - envoy_grpc:
+        cluster_name: xds_cluster
+  cds_config:
+    api_config_source:
+      api_type: GRPC
+      grpc_services:
+      - envoy_grpc:
+          cluster_name: xds_cluster
+  lds_config:
+    api_config_source:
+      api_type: GRPC
+      grpc_services:
+      - envoy_grpc:
+          cluster_name: xds_cluster
+
+static_resources:
+  clusters:
+  - type: STRICT_DNS
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+    name: xds_cluster
+    load_assignment:
+      cluster_name: xds_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: my-control-plane
+                port_value: 18000

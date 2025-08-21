@@ -6,7 +6,8 @@ Compression Libraries
 Underlying implementation
 -------------------------
 
-Currently Envoy uses `zlib <http://zlib.net>`_ as a compression library.
+Currently Envoy uses `zlib <http://zlib.net>`_, `brotli <https://brotli.org>`_ and
+`zstd <https://facebook.github.io/zstd>`_ as compression libraries.
 
 .. note::
 

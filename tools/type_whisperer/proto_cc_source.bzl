@@ -1,13 +1,12 @@
 def _proto_cc_source(ctx):
-    pb_text_set = depset()
-    for src in ctx.attr.deps:
-        pb_text_set = depset(transitive = [pb_text_set, src.files])
-    args = [ctx.attr.constant, ctx.outputs.cc.path]
-    for pb_text in pb_text_set.to_list():
-        args.append(pb_text.path)
+    pb_text_set = depset(transitive = [src.files for src in ctx.attr.deps])
+    args = ctx.actions.args()
+    args.add(ctx.attr.constant)
+    args.add(ctx.outputs.cc)
+    args.add_all(pb_text_set)
     ctx.actions.run(
         executable = ctx.executable._proto_cc_source_gen,
-        arguments = args,
+        arguments = [args],
         inputs = pb_text_set,
         outputs = [ctx.outputs.cc],
         mnemonic = "ProtoCcSourceGen",
@@ -24,7 +23,7 @@ proto_cc_source = rule(
             doc = "List of all text protos to be included.",
         ),
         "proto_repositories": attr.string_list(
-            default = ["envoy_api_canonical"],
+            default = ["envoy_api"],
             allow_empty = False,
         ),
         "_proto_cc_source_gen": attr.label(

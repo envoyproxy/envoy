@@ -1,0 +1,125 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.json_to_metadata.v3;
+
+import "envoy/type/matcher/v3/regex.proto";
+
+import "google/protobuf/struct.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.json_to_metadata.v3";
+option java_outer_classname = "JsonToMetadataProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/json_to_metadata/v3;json_to_metadatav3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Json-To-Metadata Filter]
+//
+// The configuration for transforming json body into metadata. This is useful
+// for matching load balancer subsets, logging, etc.
+//
+// Json to Metadata :ref:`configuration overview <config_http_filters_json_to_metadata>`.
+// [#extension: envoy.filters.http.json_to_metadata]
+
+message JsonToMetadata {
+  enum ValueType {
+    // The value is a serialized `protobuf.Value
+    // <https://github.com/protocolbuffers/protobuf/blob/master/src/google/protobuf/struct.proto#L62>`_.
+    PROTOBUF_VALUE = 0;
+
+    STRING = 1;
+
+    NUMBER = 2;
+  }
+
+  // [#next-free-field: 6]
+  message KeyValuePair {
+    // The namespace — if this is empty, the filter's namespace will be used.
+    string metadata_namespace = 1;
+
+    // The key to use within the namespace.
+    string key = 2 [(validate.rules).string = {min_len: 1}];
+
+    oneof value_type {
+      // The value to pair with the given key.
+      //
+      // When used for on_present case, if value is non-empty it'll be used instead
+      // of the the value of the JSON key. If both are empty, the the value of the
+      // JSON key is used as-is.
+      //
+      // When used for on_missing/on_error case, a non-empty value
+      // must be provided.
+      //
+      // It ignores ValueType, i.e., not type casting.
+      google.protobuf.Value value = 3;
+    }
+
+    // The value's type — defaults to protobuf.Value.
+    ValueType type = 4 [(validate.rules).enum = {defined_only: true}];
+
+    // False if we want to overwrite the existing metadata value. Default to false.
+    bool preserve_existing_metadata_value = 5;
+  }
+
+  message Selector {
+    oneof selector {
+      // key to match
+      string key = 1 [(validate.rules).string = {min_len: 1}];
+    }
+  }
+
+  // A Rule defines what metadata to apply when a key-value is present, missing in the json
+  // or fail to parse the payload.
+  message Rule {
+    // Specifies that a match will be performed on the value of a property.
+    // Here's an example to match on 1 in {"foo": {"bar": 1}, "bar": 2}
+    //
+    // selectors:
+    // - key: foo
+    // - key: bar
+    repeated Selector selectors = 1 [(validate.rules).repeated = {min_items: 1}];
+
+    // If the attribute is present, apply this metadata KeyValuePair.
+    KeyValuePair on_present = 2;
+
+    // If the attribute is missing, apply this metadata KeyValuePair.
+    //
+    // The value in the KeyValuePair must be set.
+    KeyValuePair on_missing = 3;
+
+    // If the body is too large or fail to parse or content-type is mismatched, apply this metadata KeyValuePair.
+    //
+    // The value in the KeyValuePair must be set.
+    KeyValuePair on_error = 4;
+  }
+
+  message MatchRules {
+    // The list of rules to apply.
+    repeated Rule rules = 1 [(validate.rules).repeated = {min_items: 1}];
+
+    // Allowed content-type for json to metadata transformation.
+    // Default to ``{"application/json"}``.
+    //
+    // Set ``allow_empty_content_type`` if empty/missing content-type header
+    // is allowed.
+    repeated string allow_content_types = 2
+        [(validate.rules).repeated = {items {string {min_len: 1}}}];
+
+    // Allowed empty content-type for json to metadata transformation.
+    // Default to false.
+    bool allow_empty_content_type = 3;
+
+    // Allowed content-type by regex match for json to metadata transformation.
+    // This can be used in parallel with ``allow_content_types``.
+    type.matcher.v3.RegexMatcher allow_content_types_regex = 4;
+  }
+
+  // At least one of request_rules and response_rules must be provided.
+  // Rules to match json body of requests.
+  MatchRules request_rules = 1;
+
+  // Rules to match json body of responses.
+  MatchRules response_rules = 2;
+}

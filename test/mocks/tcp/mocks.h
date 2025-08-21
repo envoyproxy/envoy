@@ -15,6 +15,14 @@ namespace Envoy {
 namespace Tcp {
 namespace ConnectionPool {
 
+class MockCallbacks : public Callbacks {
+  MOCK_METHOD(void, onPoolFailure,
+              (PoolFailureReason reason, absl::string_view details,
+               Upstream::HostDescriptionConstSharedPtr host));
+  MOCK_METHOD(void, onPoolReady,
+              (ConnectionDataPtr && conn, Upstream::HostDescriptionConstSharedPtr host));
+};
+
 class MockUpstreamCallbacks : public UpstreamCallbacks {
 public:
   MockUpstreamCallbacks();
@@ -51,11 +59,12 @@ public:
   ~MockInstance() override;
 
   // Tcp::ConnectionPool::Instance
-  MOCK_METHOD(void, addDrainedCallback, (DrainedCb cb));
-  MOCK_METHOD(void, drainConnections, ());
+  MOCK_METHOD(void, addIdleCallback, (IdleCb cb));
+  MOCK_METHOD(bool, isIdle, (), (const));
+  MOCK_METHOD(void, drainConnections, (Envoy::ConnectionPool::DrainBehavior drain_behavior));
   MOCK_METHOD(void, closeConnections, ());
   MOCK_METHOD(Cancellable*, newConnection, (Tcp::ConnectionPool::Callbacks & callbacks));
-  MOCK_METHOD(bool, maybePrefetch, (float), ());
+  MOCK_METHOD(bool, maybePreconnect, (float), ());
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
 
   Envoy::ConnectionPool::MockCancellable* newConnectionImpl(Callbacks& cb);
@@ -67,6 +76,7 @@ public:
 
   std::list<NiceMock<Envoy::ConnectionPool::MockCancellable>> handles_;
   std::list<Callbacks*> callbacks_;
+  IdleCb idle_cb_;
 
   std::shared_ptr<NiceMock<Upstream::MockHostDescription>> host_{
       new NiceMock<Upstream::MockHostDescription>()};
@@ -75,5 +85,36 @@ public:
 };
 
 } // namespace ConnectionPool
+
+namespace AsyncClient {
+
+class MockAsyncTcpClientCallbacks : public AsyncTcpClientCallbacks {
+public:
+  MockAsyncTcpClientCallbacks() = default;
+  ~MockAsyncTcpClientCallbacks() override = default;
+
+  MOCK_METHOD(void, onData, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, onEvent, (Network::ConnectionEvent event));
+  MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
+  MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
+};
+
+class MockAsyncTcpClient : public AsyncTcpClient {
+public:
+  MockAsyncTcpClient() = default;
+  ~MockAsyncTcpClient() override = default;
+
+  MOCK_METHOD(bool, connect, ());
+  MOCK_METHOD(void, close, (Network::ConnectionCloseType type));
+  MOCK_METHOD(Network::DetectedCloseType, detectedCloseType, (), (const));
+  MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, readDisable, (bool disable));
+  MOCK_METHOD(void, setAsyncTcpClientCallbacks, (AsyncTcpClientCallbacks & callbacks));
+  MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
+  MOCK_METHOD(bool, connected, ());
+  MOCK_METHOD(OptRef<StreamInfo::StreamInfo>, getStreamInfo, ());
+};
+
+} // namespace AsyncClient
 } // namespace Tcp
 } // namespace Envoy

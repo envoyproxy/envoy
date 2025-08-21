@@ -1,0 +1,19 @@
+date: April 15, 2020
+
+changes:
+- area: http
+  change: |
+    fixed a crash upon receiving empty HTTP/2 metadata frames. Received empty metadata frames are now counted in the HTTP/2
+    codec stat :ref:`metadata_empty_frames <config_http_conn_man_stats_per_codec>`.
+- area: http
+  change: |
+    fixed a remotely exploitable integer overflow via a very large grpc-timeout value causes undefined behavior.
+- area: http
+  change: |
+    fixed bugs in datadog and squash filter's handling of responses with no bodies.
+- area: http
+  change: |
+    fixed URL parsing for HTTP/1.1 fully qualified URLs and connect requests containing IPv6 addresses.
+- area: tls
+  change: |
+    fix detection of the upstream connection close event.

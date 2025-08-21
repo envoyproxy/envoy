@@ -1,4 +1,4 @@
-#include "common/http/path_utility.h"
+#include "source/common/http/path_utility.h"
 
 #include "test/common/http/path_utility_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
@@ -14,6 +14,10 @@ DEFINE_PROTO_FUZZER(const test::common::http::PathUtilityTestCase& input) {
     ENVOY_LOG_MISC(debug, "ProtoValidationException: {}", e.what());
     return;
   }
+
+  // The following log is needed to pass the `check_build` tests of
+  // Cluster-Fuzz for empty inputs.
+  ENVOY_LOG_MISC(trace, "Input: {}", input.DebugString());
 
   switch (input.path_utility_selector_case()) {
   case test::common::http::PathUtilityTestCase::kCanonicalPath: {
@@ -33,7 +37,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::PathUtilityTestCase& input) {
   case test::common::http::PathUtilityTestCase::kRemoveQueryAndFragment: {
     auto path = input.remove_query_and_fragment().path();
     auto sanitized_path = Http::PathUtil::removeQueryAndFragment(path);
-    ASSERT(path.find(sanitized_path) != std::string::npos);
+    ASSERT(path.find(std::string(sanitized_path)) != std::string::npos);
     break;
   }
   default:

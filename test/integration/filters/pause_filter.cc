@@ -2,9 +2,8 @@
 
 #include "envoy/registry/registry.h"
 
-#include "common/network/connection_impl.h"
-
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/common/network/connection_impl.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 
@@ -53,8 +52,9 @@ public:
     // As long as we're doing horrible things let's do *all* the horrible things.
     // Assert the connection we have is a ConnectionImpl and const cast it so we
     // can force watermark changes.
-    auto conn_impl = dynamic_cast<const Network::ConnectionImpl*>(decoder_callbacks_->connection());
-    return const_cast<Network::ConnectionImpl*>(conn_impl);
+    const Network::Connection& connection = *decoder_callbacks_->connection();
+    return const_cast<Network::ConnectionImpl*>(
+        dynamic_cast<const Network::ConnectionImpl*>(&connection));
   }
 
   absl::Mutex& encode_lock_;
@@ -66,8 +66,8 @@ class TestPauseFilterConfig : public Extensions::HttpFilters::Common::EmptyHttpF
 public:
   TestPauseFilterConfig() : EmptyHttpFilterConfig("pause-filter") {}
 
-  Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext&) override {
+  absl::StatusOr<Http::FilterFactoryCb>
+  createFilter(const std::string&, Server::Configuration::FactoryContext&) override {
     return [&](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       // ABSL_GUARDED_BY insists the lock be held when the guarded variables are passed by
       // reference.

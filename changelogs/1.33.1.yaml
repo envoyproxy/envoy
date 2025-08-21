@@ -1,0 +1,19 @@
+date: March 21, 2025
+
+bug_fixes:
+- area: connection pool
+  change: |
+    Fixed a bug in :ref:`preconnecting <envoy_v3_api_msg_config.cluster.v3.Cluster.PreconnectPolicy>` where established connection
+    unused capacity was not considered in the logic to establish new connections, resulting in new connections anytime there was not
+    a connection currently in the process of being established. This resulted in far too many connections being established, with the only
+    bounds being cluster circuit breaker limits or upstream service limits.
+- area: ext_proc
+  change: |
+    Fixes a bug where local replies were incorrectly sent to the ext_proc server for external processing.
+    This change can be temporarily reverted by setting runtime guard ``envoy_reloadable_features_skip_ext_proc_on_local_reply``
+    to ``false``.
+- area: router
+  change: |
+    Fixes an Envoy crash issue when a local reply is sent.
+    This change can be temporarily reverted by setting runtime guard
+    ``envoy_reloadable_features_router_filter_resetall_on_local_reply`` to ``false``.

@@ -2,8 +2,8 @@
 
 #include "envoy/upstream/upstream.h"
 
-#include "common/common/callback_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/common/callback_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -17,10 +17,11 @@ public:
   ~MockHostSet() override;
 
   void runCallbacks(const HostVector added, const HostVector removed) {
-    member_update_cb_helper_.runCallbacks(priority(), added, removed);
+    THROW_IF_NOT_OK(member_update_cb_helper_.runCallbacks(priority(), added, removed));
   }
 
-  Common::CallbackHandle* addMemberUpdateCb(PrioritySet::PriorityUpdateCb callback) {
+  ABSL_MUST_USE_RESULT Common::CallbackHandlePtr
+  addMemberUpdateCb(PrioritySet::PriorityUpdateCb callback) {
     return member_update_cb_helper_.add(callback);
   }
 
@@ -49,6 +50,7 @@ public:
   void setOverprovisioningFactor(const uint32_t overprovisioning_factor) {
     overprovisioning_factor_ = overprovisioning_factor;
   }
+  bool weightedPriorityHealth() const override { return weighted_priority_health_; }
 
   HostVector hosts_;
   HostVector healthy_hosts_;
@@ -62,6 +64,7 @@ public:
   Common::CallbackManager<uint32_t, const HostVector&, const HostVector&> member_update_cb_helper_;
   uint32_t priority_{};
   uint32_t overprovisioning_factor_{};
+  bool weighted_priority_health_{false};
   bool run_in_panic_mode_ = false;
 };
 } // namespace Upstream

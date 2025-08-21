@@ -9,3 +9,4 @@ HTTP
   http_routing
   upgrades
   http_proxy
+  http3

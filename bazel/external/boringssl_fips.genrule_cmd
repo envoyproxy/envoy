@@ -1,96 +1,116 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-set -e
+set -eo pipefail
 
-# BoringSSL build as described in the Security Policy for BoringCrypto module (2020-07-02):
-# https://csrc.nist.gov/CSRC/media/projects/cryptographic-module-validation-program/documents/security-policies/140sp3678.pdf
+# BoringSSL build as described in the Security Policy for BoringCrypto module "update stream":
+# https://boringssl.googlesource.com/boringssl/+/refs/heads/main/crypto/fipsmodule/FIPS.md#update-stream
 
-# This works only on Linux-x86_64.
-if [[ `uname` != "Linux" || `uname -m` != "x86_64" ]]; then
-  echo "ERROR: BoringSSL FIPS is currently supported only on Linux-x86_64."
-  exit 1
+OS=$(uname)
+ARCH=$(uname -m)
+# This works only on Linux-x86_64 and Linux-aarch64.
+if [[ "$OS" != "Linux" || ("$ARCH" != "x86_64" && "$ARCH" != "aarch64") ]]; then
+    echo "ERROR: BoringSSL FIPS is currently supported only on Linux-x86_64 and Linux-aarch64." >&2
+    echo "  found: $OS-$ARCH" >&2
+    exit 1
 fi
 
-# Bazel magic.
-ROOT=$$(dirname $(rootpath boringssl/BUILDING.md))/..
-pushd $$ROOT
-
-# Build tools requirements:
-# - Clang compiler version 7.0.1 (https://releases.llvm.org/download.html)
-# - Go programming language version 1.12.7 (https://golang.org/dl/)
-# - Ninja build system version 1.9.0 (https://github.com/ninja-build/ninja/releases)
-
-# Override $$PATH for build tools, to avoid picking up anything else.
-export PATH="$$(dirname `which cmake`):/usr/bin:/bin"
-
-# Clang 7.0.1
-VERSION=7.0.1
-SHA256=02ad925add5b2b934d64c3dd5cbd1b2002258059f7d962993ba7f16524c3089c
-PLATFORM="x86_64-linux-gnu-ubuntu-16.04"
-
-curl -sLO https://releases.llvm.org/"$$VERSION"/clang+llvm-"$$VERSION"-"$$PLATFORM".tar.xz \
-  && echo "$$SHA256" clang+llvm-"$$VERSION"-"$$PLATFORM".tar.xz | sha256sum --check
-tar xf clang+llvm-"$$VERSION"-"$$PLATFORM".tar.xz
-
-export HOME="$$PWD"
-printf "set(CMAKE_C_COMPILER \"clang\")\nset(CMAKE_CXX_COMPILER \"clang++\")\n" > $${HOME}/toolchain
-export PATH="$$PWD/clang+llvm-$$VERSION-$$PLATFORM/bin:$$PATH"
-
-if [[ `clang --version | head -1 | awk '{print $$3}'` != "$$VERSION" ]]; then
-  echo "ERROR: Clang version doesn't match."
-  exit 1
+if [[ -z "$CRYPTO_OUT" ]]; then
+    echo "ERROR: CRYPTO_OUT not set for crypto lib path." >&2
+    exit
 fi
 
-# Go 1.12.7
-VERSION=1.12.7
-SHA256=66d83bfb5a9ede000e33c6579a91a29e6b101829ad41fffb5c5bb6c900e109d9
-PLATFORM="linux-amd64"
-
-curl -sLO https://dl.google.com/go/go"$$VERSION"."$$PLATFORM".tar.gz \
-  && echo "$$SHA256" go"$$VERSION"."$$PLATFORM".tar.gz | sha256sum --check
-tar xf go"$$VERSION"."$$PLATFORM".tar.gz
-
-export GOPATH="$$PWD/gopath"
-export GOROOT="$$PWD/go"
-export PATH="$$GOPATH/bin:$$GOROOT/bin:$$PATH"
-
-if [[ `go version | awk '{print $$3}'` != "go$$VERSION" ]]; then
-  echo "ERROR: Go version doesn't match."
-  exit 1
+if [[ -z "$SSL_OUT" ]]; then
+    echo "ERROR: SSL_OUT not set for ssl lib path." >&2
+    exit
 fi
 
-# Ninja 1.9.0
-VERSION=1.9.0
-SHA256=1b1235f2b0b4df55ac6d80bbe681ea3639c9d2c505c7ff2159a3daf63d196305
-PLATFORM="linux"
+validate_go() {
+    GO_VERSION=$(go version | awk '{print $3}')
+    if [[ "$GO_VERSION" != "$EXPECTED_GO_VERSION" ]]; then
+        echo "ERROR: Go version doesn't match." >&2
+        echo "  expected: $EXPECTED_GO_VERSION" >&2
+        echo "  found: $GO_VERSION" >&2
+        return 1
+    fi
+}
 
-curl -sLO https://github.com/ninja-build/ninja/releases/download/v"$$VERSION"/ninja-"$$PLATFORM".zip \
-  && echo "$$SHA256" ninja-"$$PLATFORM".zip | sha256sum --check
-unzip -o ninja-"$$PLATFORM".zip
+validate_ninja() {
+    NINJA_VERSION=$(ninja --version)
+    if [[ "$NINJA_VERSION" != "$EXPECTED_NINJA_VERSION" ]]; then
+        echo "ERROR: Ninja version doesn't match." >&2
+        echo "  expected: $EXPECTED_NINJA_VERSION" >&2
+        echo "  found: $NINJA_VERSION" >&2
+        return 1
+    fi
+}
 
-export PATH="$$PWD:$$PATH"
+validate_cmake() {
+    CMAKE_VERSION=$(cmake --version | head -n1)
+    if [[ "$CMAKE_VERSION" != "$EXPECTED_CMAKE_VERSION" ]]; then
+        echo "ERROR: CMake version doesn't match." >&2
+        echo "  expected: $EXPECTED_CMAKE_VERSION" >&2
+        echo "  found: $CMAKE_VERSION" >&2
+        return 1
+    fi
+}
 
-if [[ `ninja --version` != "$$VERSION" ]]; then
-  echo "ERROR: Ninja version doesn't match."
-  exit 1
-fi
+build_boringssl_fips() {
+    cd "$BSSL_SRC" || exit 1
+    export HOME="${BSSL_SRC}"
 
-# Clean after previous build.
-rm -rf boringssl/build
+    # The security policy recommends using the recent compiler versions:
+    # "The latest stable versions of Clang, Go, Ninja, and CMake should be used".
+    # This build makes use of the same LLVM toolchain as the rest of Envoy.
+    printf "set(CMAKE_C_COMPILER \"${CC}\")\nset(CMAKE_CXX_COMPILER \"${CC}\")\n" > "${BSSL_SRC}/toolchain"
 
-# Build BoringSSL.
-cd boringssl
-mkdir build && cd build && cmake -GNinja -DCMAKE_TOOLCHAIN_FILE=$${HOME}/toolchain -DFIPS=1 -DCMAKE_BUILD_TYPE=Release ..
-ninja
-ninja run_tests
+    # Go tests use go:embed directives which fail to compile in a Bazel sandbox because Go refuses to embed symlinks.
+    # (see issue https://github.com/golang/go/issues/59924). As a workaround, replace symlinks with the file copies.
+    for pem in $(ls ssl/test/runner/*.pem); do
+        cp --dereference "${pem}" tmp.pem; mv tmp.pem "${pem}";
+    done
+    for testdata in $(ls ssl/test/runner/hpke/testdata/*.json); do
+        cp --dereference "${testdata}" tmp.json; mv tmp.json "${testdata}";
+    done
 
-# Verify correctness of the FIPS build.
-if [[ `tool/bssl isfips` != "1" ]]; then
-  echo "ERROR: BoringSSL tool didn't report FIPS build."
-  exit 1
-fi
+    # Build BoringSSL.
+    # Setting -fPIC only affects the compilation of the non-module code in libcrypto.a,
+    # because the FIPS module itself is already built with -fPIC.
+    mkdir build
+    cd build
+    cmake -GNinja \
+          -DCMAKE_TOOLCHAIN_FILE="${BSSL_SRC}/toolchain" \
+          -DFIPS=1 \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_FLAGS="-fPIC" \
+          -DCMAKE_CXX_FLAGS="${CXXFLAGS} -fPIC" \
+          -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS" \
+          -DCMAKE_SHARED_LINKER_FLAGS="$${LDFLAGS}" \
+          ..
+    ninja -j "${NINJA_CORES:-1}"
+}
 
-# Move compiled libraries to the expected destinations.
-popd
-mv $$ROOT/boringssl/build/crypto/libcrypto.a $(execpath crypto/libcrypto.a)
-mv $$ROOT/boringssl/build/ssl/libssl.a $(execpath ssl/libssl.a)
+validate_fips() {
+    cd "$BSSL_SRC/build" || exit 1
+    ninja run_tests
+    # Verify correctness of the FIPS build.
+    IS_FIPS="$(./bssl isfips)"
+    if [[ "${IS_FIPS}" != "1" ]]; then
+        echo "ERROR: BoringSSL tool didn't report FIPS build." >&2
+        echo "  expected: 1" >&2
+        echo "  found: ${IS_FIPS}" >&2
+        return 1
+    fi
+}
+
+output_libs() {
+    # Move compiled libraries to the expected destinations.
+    mv "${BSSL_SRC}/build/libcrypto.a" "$CRYPTO_OUT"
+    mv "${BSSL_SRC}/build/libssl.a" "$SSL_OUT"
+}
+
+validate_go
+validate_ninja
+validate_cmake
+build_boringssl_fips
+validate_fips
+output_libs

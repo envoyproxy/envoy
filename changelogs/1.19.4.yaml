@@ -1,0 +1,12 @@
+date: April 25, 2022
+
+minor_behavior_changes:
+- area: perf
+  change: |
+    ssl contexts are now tracked without scan based garbage collection and greatly improved the performance on secret
+    update.
+
+bug_fixes:
+- area: docker
+  change: |
+    update Docker images to resolve CVE issues in container packages (#20760).

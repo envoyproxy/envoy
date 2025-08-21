@@ -8,13 +8,13 @@
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "common/common/thread.h"
-#include "common/common/utility.h"
-#include "common/config/utility.h"
-#include "common/init/manager_impl.h"
-#include "common/init/target_impl.h"
-#include "common/init/watcher_impl.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/common/thread.h"
+#include "source/common/common/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/init/manager_impl.h"
+#include "source/common/init/target_impl.h"
+#include "source/common/init/watcher_impl.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Config {
@@ -35,7 +35,7 @@ namespace Config {
 // and/or stream/request (if required by the configuration being processed).
 //
 // Dynamic configuration is distributed via xDS APIs (see
-// https://github.com/envoyproxy/data-plane-api/blob/master/xds_protocol.rst). The framework exposed
+// https://github.com/envoyproxy/data-plane-api/blob/main/xds_protocol.rst). The framework exposed
 // by these classes simplifies creation of client xDS implementations following a shared ownership
 // model, where according to the config source specification, a config subscription, config protos
 // received over the subscription and the subsequent config "implementation" (i.e., data structures
@@ -172,9 +172,10 @@ public:
    * Must be called by derived classes when the onConfigUpdate() callback associated with the
    * underlying subscription is issued.
    */
-  void onConfigUpdate() {
+  absl::Status onConfigUpdate() {
     setLastUpdated();
     local_init_target_.ready();
+    return absl::OkStatus();
   }
 
   /**
@@ -210,7 +211,7 @@ protected:
         manager_identifier_(manager_identifier), config_provider_manager_(config_provider_manager),
         time_source_(factory_context.timeSource()),
         last_updated_(factory_context.timeSource().systemTime()) {
-    Envoy::Config::Utility::checkLocalInfo(name, factory_context.localInfo());
+    THROW_IF_NOT_OK(Envoy::Config::Utility::checkLocalInfo(name, factory_context.localInfo()));
     local_init_manager_.add(local_init_target_);
   }
 
@@ -376,14 +377,15 @@ private:
  * This class can not be instantiated directly; instead, it provides the foundation for
  * dynamic config provider implementations which derive from it.
  */
-class ConfigProviderManagerImplBase : public ConfigProviderManager, public Singleton::Instance {
+class ConfigProviderManagerImplBase : public ConfigProviderManager {
 public:
   /**
    * This is invoked by the /config_dump admin handler.
    * @return ProtobufTypes::MessagePtr the config dump proto corresponding to the associated
    *                                   config providers.
    */
-  virtual ProtobufTypes::MessagePtr dumpConfigs() const PURE;
+  virtual ProtobufTypes::MessagePtr
+  dumpConfigs(const Matchers::StringMatcher& name_matcher) const PURE;
 
 protected:
   // Ordered set for deterministic config dump output.
@@ -393,7 +395,7 @@ protected:
   using ConfigSubscriptionMap =
       absl::node_hash_map<uint64_t, std::weak_ptr<ConfigSubscriptionCommonBase>>;
 
-  ConfigProviderManagerImplBase(Server::Admin& admin, const std::string& config_name);
+  ConfigProviderManagerImplBase(OptRef<Server::Admin> admin, const std::string& config_name);
 
   const ConfigSubscriptionMap& configSubscriptions() const { return config_subscriptions_; }
 

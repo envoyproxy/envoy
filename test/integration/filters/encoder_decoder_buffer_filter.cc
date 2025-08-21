@@ -4,7 +4,7 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/extensions/filters/http/common/empty_http_filter_config.h"
 
@@ -34,13 +34,13 @@ public:
   }
 };
 
-class EncoderDecoderBuffferFilterConfig
-    : public Extensions::HttpFilters::Common::EmptyHttpFilterConfig {
+class EncoderDecoderBufferFilterConfig
+    : public Extensions::HttpFilters::Common::EmptyHttpDualFilterConfig {
 public:
-  EncoderDecoderBuffferFilterConfig() : EmptyHttpFilterConfig("encoder-decoder-buffer-filter") {}
+  EncoderDecoderBufferFilterConfig() : EmptyHttpDualFilterConfig("encoder-decoder-buffer-filter") {}
 
-  Http::FilterFactoryCb createFilter(const std::string&,
-                                     Server::Configuration::FactoryContext&) override {
+  absl::StatusOr<Http::FilterFactoryCb>
+  createDualFilter(const std::string&, Server::Configuration::ServerFactoryContext&) override {
     return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
       callbacks.addStreamFilter(std::make_shared<::Envoy::EncoderDecoderBufferStreamFilter>());
     };
@@ -48,8 +48,11 @@ public:
 };
 
 // perform static registration
-static Registry::RegisterFactory<EncoderDecoderBuffferFilterConfig,
+static Registry::RegisterFactory<EncoderDecoderBufferFilterConfig,
                                  Server::Configuration::NamedHttpFilterConfigFactory>
     register_;
+static Registry::RegisterFactory<EncoderDecoderBufferFilterConfig,
+                                 Server::Configuration::UpstreamHttpFilterConfigFactory>
+    register_upstream_;
 
 } // namespace Envoy

@@ -6,7 +6,7 @@
 
 #include <cerrno>
 
-#include "common/api/os_sys_calls_impl_linux.h"
+#include "source/common/api/os_sys_calls_impl_linux.h"
 
 namespace Envoy {
 namespace Api {
@@ -14,6 +14,11 @@ namespace Api {
 SysCallIntResult LinuxOsSysCallsImpl::sched_getaffinity(pid_t pid, size_t cpusetsize,
                                                         cpu_set_t* mask) {
   const int rc = ::sched_getaffinity(pid, cpusetsize, mask);
+  return {rc, errno};
+}
+
+SysCallIntResult LinuxOsSysCallsImpl::setns(int fd, int nstype) const {
+  const int rc = ::setns(fd, nstype);
   return {rc, errno};
 }
 

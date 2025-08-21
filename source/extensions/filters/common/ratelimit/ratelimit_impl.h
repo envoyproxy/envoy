@@ -12,14 +12,13 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/service/ratelimit/v3/rls.pb.h"
 #include "envoy/stats/scope.h"
-#include "envoy/tracing/http_tracer.h"
+#include "envoy/tracing/tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/common/logger.h"
-#include "common/grpc/typed_async_client.h"
-#include "common/singleton/const_singleton.h"
-
-#include "extensions/filters/common/ratelimit/ratelimit.h"
+#include "source/common/common/logger.h"
+#include "source/common/grpc/typed_async_client.h"
+#include "source/common/singleton/const_singleton.h"
+#include "source/extensions/filters/common/ratelimit/ratelimit.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -45,20 +44,21 @@ class GrpcClientImpl : public Client,
                        public RateLimitAsyncCallbacks,
                        public Logger::Loggable<Logger::Id::config> {
 public:
-  GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
-                 const absl::optional<std::chrono::milliseconds>& timeout,
-                 envoy::config::core::v3::ApiVersion transport_api_version);
+  GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
+                 const absl::optional<std::chrono::milliseconds>& timeout);
   ~GrpcClientImpl() override;
 
   static void createRequest(envoy::service::ratelimit::v3::RateLimitRequest& request,
                             const std::string& domain,
-                            const std::vector<Envoy::RateLimit::Descriptor>& descriptors);
+                            const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
+                            uint32_t hits_addend);
 
   // Filters::Common::RateLimit::Client
   void cancel() override;
   void limit(RequestCallbacks& callbacks, const std::string& domain,
              const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-             Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) override;
+             Tracing::Span& parent_span, OptRef<const StreamInfo::StreamInfo> stream_info,
+             uint32_t hits_addend = 0) override;
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
@@ -75,16 +75,14 @@ private:
   absl::optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};
   const Protobuf::MethodDescriptor& service_method_;
-  const envoy::config::core::v3::ApiVersion transport_api_version_;
 };
 
 /**
  * Builds the rate limit client.
  */
 ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
-                          const envoy::config::core::v3::GrpcService& grpc_service,
-                          const std::chrono::milliseconds timeout,
-                          envoy::config::core::v3::ApiVersion transport_api_version);
+                          const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+                          const std::chrono::milliseconds timeout);
 
 } // namespace RateLimit
 } // namespace Common

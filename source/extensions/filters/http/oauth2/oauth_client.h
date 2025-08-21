@@ -8,16 +8,18 @@
 #include "envoy/http/message.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-
-#include "extensions/filters/http/oauth2/oauth.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/extensions/filters/http/oauth2/oauth.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Oauth2 {
+
+using RouteRetryPolicy = envoy::config::route::v3::RetryPolicy;
+using HttpUri = envoy::config::core::v3::HttpUri;
 
 /**
  * An OAuth client abstracts away everything regarding how to communicate with
@@ -27,7 +29,14 @@ namespace Oauth2 {
 class OAuth2Client : public Http::AsyncClient::Callbacks {
 public:
   virtual void asyncGetAccessToken(const std::string& auth_code, const std::string& client_id,
-                                   const std::string& secret, const std::string& cb_url) PURE;
+                                   const std::string& secret, const std::string& cb_url,
+                                   const std::string& code_verifier,
+                                   AuthType auth_type = AuthType::UrlEncodedBody) PURE;
+
+  virtual void asyncRefreshAccessToken(const std::string& refresh_token,
+                                       const std::string& client_id, const std::string& secret,
+                                       AuthType auth_type = AuthType::UrlEncodedBody) PURE;
+
   virtual void setCallbacks(FilterCallbacks& callbacks) PURE;
 
   // Http::AsyncClient::Callbacks
@@ -36,10 +45,12 @@ public:
                  Http::AsyncClient::FailureReason f) override PURE;
 };
 
-class OAuth2ClientImpl : public OAuth2Client, Logger::Loggable<Logger::Id::upstream> {
+class OAuth2ClientImpl : public OAuth2Client, Logger::Loggable<Logger::Id::oauth2> {
 public:
-  OAuth2ClientImpl(Upstream::ClusterManager& cm, const envoy::config::core::v3::HttpUri& uri)
-      : cm_(cm), uri_(uri) {}
+  OAuth2ClientImpl(Upstream::ClusterManager& cm, const HttpUri& uri,
+                   const OptRef<const RouteRetryPolicy> retry_policy,
+                   const std::chrono::seconds default_expires_in)
+      : cm_(cm), uri_(uri), retry_policy_(retry_policy), default_expires_in_(default_expires_in) {}
 
   ~OAuth2ClientImpl() override {
     if (in_flight_request_ != nullptr) {
@@ -52,13 +63,18 @@ public:
    * Request the access token from the OAuth server. Calls the `onSuccess` on `onFailure` callbacks.
    */
   void asyncGetAccessToken(const std::string& auth_code, const std::string& client_id,
-                           const std::string& secret, const std::string& cb_url) override;
+                           const std::string& secret, const std::string& cb_url,
+                           const std::string& code_verifier, AuthType auth_type) override;
+
+  void asyncRefreshAccessToken(const std::string& refresh_token, const std::string& client_id,
+                               const std::string& secret, AuthType auth_type) override;
 
   void setCallbacks(FilterCallbacks& callbacks) override { parent_ = &callbacks; }
 
   // AsyncClient::Callbacks
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& m) override;
   void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason f) override;
+
   void onBeforeFinalizeUpstreamSpan(Envoy::Tracing::Span&,
                                     const Http::ResponseHeaderMap*) override {}
 
@@ -68,13 +84,15 @@ private:
   FilterCallbacks* parent_{nullptr};
 
   Upstream::ClusterManager& cm_;
-  const envoy::config::core::v3::HttpUri uri_;
+  const HttpUri uri_;
+  const OptRef<const RouteRetryPolicy> retry_policy_;
+  const std::chrono::seconds default_expires_in_;
 
   // Tracks any outstanding in-flight requests, allowing us to cancel the request
   // if the filter ends before the request completes.
   Http::AsyncClient::Request* in_flight_request_{nullptr};
 
-  enum class OAuthState { Idle, PendingAccessToken };
+  enum class OAuthState { Idle, PendingAccessToken, PendingAccessTokenByRefreshToken };
 
   // Due to the asynchronous nature of this functionality, it is helpful to have managed state which
   // is tracked here.
@@ -90,7 +108,13 @@ private:
   Http::RequestMessagePtr createPostRequest() {
     auto request = Http::Utility::prepareHeaders(uri_);
     request->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
-    request->headers().setContentType(Http::Headers::get().ContentTypeValues.FormUrlEncoded);
+    request->headers().setReferenceContentType(
+        Http::Headers::get().ContentTypeValues.FormUrlEncoded);
+    // Use the Accept header to ensure the Access Token Response is returned as JSON.
+    // Some authorization servers return other encodings (e.g. FormUrlEncoded) in the absence of the
+    // Accept header. RFC 6749 Section 5.1 defines the media type to be JSON, so this is safe.
+    request->headers().setReference(Http::CustomHeaders::get().Accept,
+                                    Http::Headers::get().ContentTypeValues.Json);
     return request;
   }
 };

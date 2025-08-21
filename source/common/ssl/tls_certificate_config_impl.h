@@ -12,14 +12,20 @@ namespace Ssl {
 
 class TlsCertificateConfigImpl : public TlsCertificateConfig {
 public:
-  TlsCertificateConfigImpl(
-      const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& config,
-      Server::Configuration::TransportSocketFactoryContext* factory_context, Api::Api& api);
+  static absl::StatusOr<TlsCertificateConfigImpl>
+  create(const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& config,
+         Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api,
+         const std::string& certificate_name);
+
+  TlsCertificateConfigImpl(TlsCertificateConfigImpl&& other) = default;
 
   const std::string& certificateChain() const override { return certificate_chain_; }
   const std::string& certificateChainPath() const override { return certificate_chain_path_; }
+  const std::string& certificateName() const override { return certificate_name_; }
   const std::string& privateKey() const override { return private_key_; }
   const std::string& privateKeyPath() const override { return private_key_path_; }
+  const std::string& pkcs12() const override { return pkcs12_; }
+  const std::string& pkcs12Path() const override { return pkcs12_path_; }
   const std::string& password() const override { return password_; }
   const std::string& passwordPath() const override { return password_path_; }
   const std::vector<uint8_t>& ocspStaple() const override { return ocsp_staple_; }
@@ -29,10 +35,18 @@ public:
   }
 
 private:
+  TlsCertificateConfigImpl(
+      const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& config,
+      Server::Configuration::TransportSocketFactoryContext& factory_context, Api::Api& api,
+      absl::Status& creation_status, const std::string& certificate_name);
+
   const std::string certificate_chain_;
   const std::string certificate_chain_path_;
+  const std::string certificate_name_;
   const std::string private_key_;
   const std::string private_key_path_;
+  const std::string pkcs12_;
+  const std::string pkcs12_path_;
   const std::string password_;
   const std::string password_path_;
   const std::vector<uint8_t> ocsp_staple_;

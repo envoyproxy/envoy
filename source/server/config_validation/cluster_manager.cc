@@ -1,25 +1,29 @@
-#include "server/config_validation/cluster_manager.h"
+#include "source/server/config_validation/cluster_manager.h"
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 
-#include "common/common/utility.h"
+#include "source/common/common/utility.h"
 
 namespace Envoy {
 namespace Upstream {
 
-ClusterManagerPtr ValidationClusterManagerFactory::clusterManagerFromProto(
+absl::StatusOr<ClusterManagerPtr> ValidationClusterManagerFactory::clusterManagerFromProto(
     const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-  return std::make_unique<ValidationClusterManager>(
-      bootstrap, *this, stats_, tls_, runtime_, local_info_, log_manager_, main_thread_dispatcher_,
-      admin_, validation_context_, api_, http_context_, grpc_context_, router_context_);
+  absl::Status creation_status = absl::OkStatus();
+  auto cluster_manager = std::unique_ptr<ValidationClusterManager>{
+      new ValidationClusterManager(bootstrap, *this, context_, creation_status)};
+  RETURN_IF_NOT_OK(creation_status);
+  return cluster_manager;
 }
 
-CdsApiPtr
-ValidationClusterManagerFactory::createCds(const envoy::config::core::v3::ConfigSource& cds_config,
-                                           ClusterManager& cm) {
+absl::StatusOr<CdsApiPtr> ValidationClusterManagerFactory::createCds(
+    const envoy::config::core::v3::ConfigSource& cds_config,
+    const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm) {
   // Create the CdsApiImpl...
-  ProdClusterManagerFactory::createCds(cds_config, cm);
+  auto cluster_or_error =
+      ProdClusterManagerFactory::createCds(cds_config, cds_resources_locator, cm);
+  RETURN_IF_NOT_OK_REF(cluster_or_error.status());
   // ... and then throw it away, so that we don't actually connect to it.
   return nullptr;
 }

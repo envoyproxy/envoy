@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/config/utility.h"
+#include "source/common/config/utility.h"
 
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/simulated_time_system.h"
@@ -11,6 +11,7 @@
 namespace Envoy {
 namespace Config {
 
+enum class LegacyOrUnified { Legacy, Unified };
 const uint64_t TEST_TIME_MILLIS = 42000;
 
 /**
@@ -21,8 +22,8 @@ const uint64_t TEST_TIME_MILLIS = 42000;
 class SubscriptionTestHarness : public Event::TestUsingSimulatedTime {
 public:
   SubscriptionTestHarness()
-      : stats_(Utility::generateStats(stats_store_)),
-        control_plane_stats_(Utility::generateControlPlaneStats(stats_store_)) {
+      : stats_(Utility::generateStats(*stats_store_.rootScope())),
+        control_plane_stats_(Utility::generateControlPlaneStats(*stats_store_.rootScope())) {
     simTime().setSystemTime(SystemTime(std::chrono::milliseconds(TEST_TIME_MILLIS)));
   }
   virtual ~SubscriptionTestHarness() = default;
@@ -109,6 +110,14 @@ public:
 
   virtual void doSubscriptionTearDown() {}
 
+  // Helper util to convert to absl::flat_hash_set when calling Subscription interface methods.
+  absl::flat_hash_set<std::string> flattenResources(const std::set<std::string>& resources) {
+    absl::flat_hash_set<std::string> flat_resources;
+    std::copy(resources.begin(), resources.end(),
+              std::inserter(flat_resources, flat_resources.begin()));
+    return flat_resources;
+  }
+
   Stats::TestUtil::TestStore stats_store_;
   SubscriptionStats stats_;
   ControlPlaneStats control_plane_stats_;
@@ -118,6 +127,7 @@ ACTION_P(ThrowOnRejectedConfig, accept) {
   if (!accept) {
     throw EnvoyException("bad config");
   }
+  return absl::OkStatus();
 }
 
 } // namespace Config

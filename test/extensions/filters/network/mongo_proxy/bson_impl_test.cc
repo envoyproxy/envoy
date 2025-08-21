@@ -1,8 +1,7 @@
 #include <string>
 
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/mongo_proxy/bson_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/mongo_proxy/bson_impl.h"
 
 #include "test/test_common/printers.h"
 
@@ -52,6 +51,12 @@ TEST(BsonImplTest, InvalodDocumentTermination) {
   EXPECT_THROW(DocumentImpl::create(buffer), EnvoyException);
 }
 
+TEST(BsonImplTest, DocumentSizeUnderflow) {
+  Buffer::OwnedImpl buffer;
+  BufferHelper::writeInt32(buffer, 2);
+  EXPECT_THROW(DocumentImpl::create(buffer), EnvoyException);
+}
+
 TEST(BufferHelperTest, InvalidSize) {
   {
     Buffer::OwnedImpl buffer;
@@ -77,6 +82,23 @@ TEST(BufferHelperTest, InvalidSize) {
     buffer.add(&dummy, sizeof(dummy));
     EXPECT_THROW(BufferHelper::removeBinary(buffer), EnvoyException);
   }
+}
+
+TEST(BsonImplTest, StringContainsNullBytes) {
+  std::string s("hello\0world", 11);
+  Buffer::OwnedImpl buffer;
+  BufferHelper::writeString(buffer, s);
+  EXPECT_TRUE(BufferHelper::removeString(buffer) == s);
+}
+
+TEST(BsonImplTest, StringSizeObserved) {
+  char s[] = "helloworld";
+  Buffer::OwnedImpl buffer;
+
+  std::string hello("hello");
+  BufferHelper::writeInt32(buffer, hello.size() + 1);
+  buffer.add(s, sizeof(s));
+  EXPECT_TRUE(BufferHelper::removeString(buffer) == hello);
 }
 
 } // namespace Bson

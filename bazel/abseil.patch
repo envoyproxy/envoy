@@ -1,0 +1,50 @@
+From 3392fd87f3d91aeb404034bb872b7e95fa19dc25 Mon Sep 17 00:00:00 2001
+From: Rohit Agrawal <rohit.agrawal@databricks.com>
+Date: Fri, 18 Apr 2025 17:59:15 -0700
+Subject: [PATCH] Patches
+
+---
+ absl/debugging/internal/stacktrace_config.h | 2 +-
+ absl/debugging/symbolize.cc                 | 2 +-
+ absl/flags/commandlineflag.h                | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/absl/debugging/internal/stacktrace_config.h b/absl/debugging/internal/stacktrace_config.h
+index 88949fe9740..a4d47a7ee65 100644
+--- a/absl/debugging/internal/stacktrace_config.h
++++ b/absl/debugging/internal/stacktrace_config.h
+@@ -40,7 +40,7 @@
+ // Emscripten stacktraces rely on JS. Do not use them in standalone mode.
+ #elif defined(__EMSCRIPTEN__) && !defined(STANDALONE_WASM)
+ #define ABSL_STACKTRACE_INL_HEADER \
+-  "absl/debugging/internal/stacktrace_emscripten-inl.inc"
++  "absl/debugging/internal/stacktrace_unimplemented-inl.inc"
+ 
+ #elif defined(__ANDROID__) && __ANDROID_API__ >= 33
+ 
+diff --git a/absl/debugging/symbolize.cc b/absl/debugging/symbolize.cc
+index 344436f9d10..6f8088d1d08 100644
+--- a/absl/debugging/symbolize.cc
++++ b/absl/debugging/symbolize.cc
+@@ -34,7 +34,7 @@
+ #elif defined(ABSL_INTERNAL_HAVE_SYMBOLIZE_WIN32)
+ // The Windows Symbolizer only works if PDB files containing the debug info
+ // are available to the program at runtime.
+-#include "absl/debugging/symbolize_win32.inc"
++#include "absl/debugging/symbolize_unimplemented.inc"
+ #elif defined(__APPLE__)
+ #include "absl/debugging/symbolize_darwin.inc"
+ #elif defined(ABSL_INTERNAL_HAVE_SYMBOLIZE_WASM)
+diff --git a/absl/flags/commandlineflag.h b/absl/flags/commandlineflag.h
+index a9ffd020844..b5ce0f7658f 100644
+--- a/absl/flags/commandlineflag.h
++++ b/absl/flags/commandlineflag.h
+@@ -161,7 +161,7 @@ class CommandLineFlag {
+   bool ParseFrom(absl::string_view value, std::string* error);
+ 
+  protected:
+-  ~CommandLineFlag() = default;
++  virtual ~CommandLineFlag() = default;
+ 
+  private:
+   friend class flags_internal::PrivateHandleAccessor;

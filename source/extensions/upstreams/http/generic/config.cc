@@ -1,7 +1,8 @@
-#include "extensions/upstreams/http/generic/config.h"
+#include "source/extensions/upstreams/http/generic/config.h"
 
-#include "extensions/upstreams/http/http/upstream_request.h"
-#include "extensions/upstreams/http/tcp/upstream_request.h"
+#include "source/extensions/upstreams/http/http/upstream_request.h"
+#include "source/extensions/upstreams/http/tcp/upstream_request.h"
+#include "source/extensions/upstreams/http/udp/upstream_request.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -9,18 +10,29 @@ namespace Upstreams {
 namespace Http {
 namespace Generic {
 
+using UpstreamProtocol = Envoy::Router::GenericConnPoolFactory::UpstreamProtocol;
+
 Router::GenericConnPoolPtr GenericGenericConnPoolFactory::createGenericConnPool(
-    Upstream::ClusterManager& cm, bool is_connect, const Router::RouteEntry& route_entry,
-    absl::optional<Envoy::Http::Protocol> downstream_protocol,
-    Upstream::LoadBalancerContext* ctx) const {
-  if (is_connect) {
-    auto ret = std::make_unique<Upstreams::Http::Tcp::TcpConnPool>(cm, is_connect, route_entry,
-                                                                   downstream_protocol, ctx);
-    return (ret->valid() ? std::move(ret) : nullptr);
+    Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& thread_local_cluster,
+    UpstreamProtocol upstream_protocol, Upstream::ResourcePriority priority,
+    absl::optional<Envoy::Http::Protocol> downstream_protocol, Upstream::LoadBalancerContext* ctx,
+    const Protobuf::Message&) const {
+  Router::GenericConnPoolPtr conn_pool;
+  switch (upstream_protocol) {
+  case UpstreamProtocol::HTTP:
+    conn_pool = std::make_unique<Upstreams::Http::Http::HttpConnPool>(
+        host, thread_local_cluster, priority, downstream_protocol, ctx);
+    return (conn_pool->valid() ? std::move(conn_pool) : nullptr);
+  case UpstreamProtocol::TCP:
+    conn_pool = std::make_unique<Upstreams::Http::Tcp::TcpConnPool>(host, thread_local_cluster,
+                                                                    priority, ctx);
+    return (conn_pool->valid() ? std::move(conn_pool) : nullptr);
+  case UpstreamProtocol::UDP:
+    conn_pool = std::make_unique<Upstreams::Http::Udp::UdpConnPool>(host);
+    return (conn_pool->valid() ? std::move(conn_pool) : nullptr);
   }
-  auto ret = std::make_unique<Upstreams::Http::Http::HttpConnPool>(cm, is_connect, route_entry,
-                                                                   downstream_protocol, ctx);
-  return (ret->valid() ? std::move(ret) : nullptr);
+
+  return nullptr;
 }
 
 REGISTER_FACTORY(GenericGenericConnPoolFactory, Router::GenericConnPoolFactory);

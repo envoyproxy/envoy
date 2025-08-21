@@ -12,10 +12,10 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.service.accesslog.v3";
 option java_outer_classname = "AlsProto";
 option java_multiple_files = true;
-option java_generic_services = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v3;accesslogv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: gRPC Access Log Service (ALS)]
+// [#protodoc-title: gRPC access log service (ALS)]
 
 // Service for streaming access logs from Envoy to an access log server.
 service AccessLogService {
@@ -49,7 +49,7 @@ message StreamAccessLogsMessage {
     config.core.v3.Node node = 1 [(validate.rules).message = {required: true}];
 
     // The friendly name of the log configured in :ref:`CommonGrpcAccessLogConfig
-    // <envoy_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig>`.
+    // <envoy_v3_api_msg_extensions.access_loggers.grpc.v3.CommonGrpcAccessLogConfig>`.
     string log_name = 2 [(validate.rules).string = {min_len: 1}];
   }
 

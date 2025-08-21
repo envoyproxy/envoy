@@ -4,9 +4,9 @@
 #include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 #include "envoy/network/transport_socket.h"
 
-#include "extensions/common/tap/extension_config_base.h"
-#include "extensions/transport_sockets/common/passthrough.h"
-#include "extensions/transport_sockets/tap/tap_config.h"
+#include "source/extensions/common/tap/extension_config_base.h"
+#include "source/extensions/transport_sockets/common/passthrough.h"
+#include "source/extensions/transport_sockets/tap/tap_config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -15,7 +15,9 @@ namespace Tap {
 
 class TapSocket : public TransportSockets::PassthroughSocket {
 public:
-  TapSocket(SocketTapConfigSharedPtr config, Network::TransportSocketPtr&& transport_socket);
+  TapSocket(SocketTapConfigSharedPtr config,
+            const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig& socket_tap_config,
+            Stats::Scope& stats_scope, Network::TransportSocketPtr&& transport_socket);
 
   // Network::TransportSocket
   void setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) override;
@@ -26,25 +28,45 @@ public:
 private:
   SocketTapConfigSharedPtr config_;
   PerSocketTapperPtr tapper_;
+  const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig socket_tap_config_;
+  TransportTapStats stats_;
+  static TransportTapStats generateStats(Stats::Scope& stats_scope, const std::string& prefix);
 };
 
-class TapSocketFactory : public Network::TransportSocketFactory,
-                         public Common::Tap::ExtensionConfigBase {
+class TapSocketFactory : public Common::Tap::ExtensionConfigBase, public PassthroughFactory {
 public:
   TapSocketFactory(const envoy::extensions::transport_sockets::tap::v3::Tap& proto_config,
-                   Common::Tap::TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
+                   Common::Tap::TapConfigFactoryPtr&& config_factory, OptRef<Server::Admin> admin,
                    Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
-                   Event::Dispatcher& main_thread_dispatcher,
-                   Network::TransportSocketFactoryPtr&& transport_socket_factory);
+                   Event::Dispatcher& main_thread_dispatcher, Stats::Scope& scope,
+                   Network::UpstreamTransportSocketFactoryPtr&& transport_socket_factory);
 
-  // Network::TransportSocketFactory
+  // Network::UpstreamTransportSocketFactory
   Network::TransportSocketPtr
-  createTransportSocket(Network::TransportSocketOptionsSharedPtr options) const override;
-  bool implementsSecureTransport() const override;
-  bool usesProxyProtocolOptions() const override;
+  createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
+                        Upstream::HostDescriptionConstSharedPtr host) const override;
 
 private:
-  Network::TransportSocketFactoryPtr transport_socket_factory_;
+  const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig ts_tap_config_;
+  Stats::Scope& stats_scope_;
+};
+
+class DownstreamTapSocketFactory : public Common::Tap::ExtensionConfigBase,
+                                   public DownstreamPassthroughFactory {
+public:
+  DownstreamTapSocketFactory(
+      const envoy::extensions::transport_sockets::tap::v3::Tap& proto_config,
+      Common::Tap::TapConfigFactoryPtr&& config_factory, OptRef<Server::Admin> admin,
+      Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
+      Event::Dispatcher& main_thread_dispatcher, Stats::Scope& scope,
+      Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory);
+
+  // Network::UpstreamTransportSocketFactory
+  Network::TransportSocketPtr createDownstreamTransportSocket() const override;
+
+private:
+  const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig ds_ts_tap_config_;
+  Stats::Scope& stats_scope_;
 };
 
 } // namespace Tap

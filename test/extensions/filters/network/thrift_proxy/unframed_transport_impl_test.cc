@@ -1,6 +1,5 @@
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/unframed_transport_impl.h"
 
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
 #include "test/test_common/printers.h"

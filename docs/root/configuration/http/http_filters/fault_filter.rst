@@ -24,8 +24,8 @@ Configuration
   The fault injection filter must be inserted before any other filter,
   including the router filter.
 
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.fault.v3.HTTPFault``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.fault.v3.HTTPFault>`
-* This filter should be configured with the name *envoy.filters.http.fault*.
 
 .. _config_http_filters_fault_injection_http_header:
 
@@ -47,7 +47,7 @@ x-envoy-fault-abort-grpc-request
   the gRPC status code to return in response to a request. Its value range is [0, UInt32.Max] instead of [0, 16]
   to allow testing even not well-defined gRPC status codes. When this header is set, the HTTP response status code
   will be set to 200. In order for the header to work, :ref:`header_abort
-  <envoy_api_field_config.filter.http.fault.v2.FaultAbort.header_abort>` needs to be set. If both
+  <envoy_v3_api_field_extensions.filters.http.fault.v3.FaultAbort.header_abort>` needs to be set. If both
   *x-envoy-fault-abort-request* and *x-envoy-fault-abort-grpc-request* headers are set then
   *x-envoy-fault-abort-grpc-request* header will be **ignored** and fault response http status code will be
   set to *x-envoy-fault-abort-request* header value.
@@ -163,7 +163,7 @@ fault.http.abort.grpc_status
   aborted if the headers match. Defaults to the gRPC status code specified in the config.
   If this field is missing from both the runtime and the config, gRPC status code in the response
   will be derived from *fault.http.abort.http_status* field. This runtime key is only available when
-  the filter is :ref:`configured for abort <envoy_api_field_config.filter.http.fault.v2.HTTPFault.abort>`.
+  the filter is :ref:`configured for abort <envoy_v3_api_field_extensions.filters.http.fault.v3.HTTPFault.abort>`.
 
 fault.http.delay.fixed_delay_percent
   % of requests that will be delayed if the headers match. Defaults to the
@@ -210,7 +210,7 @@ which defaults to the config settings.
 Statistics
 ----------
 
-The fault filter outputs statistics in the *http.<stat_prefix>.fault.* namespace. The :ref:`stat prefix
+The fault filter outputs statistics in the ``http.<stat_prefix>.fault.`` namespace. The :ref:`stat prefix
 <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>` comes from the
 owning HTTP connection manager.
 

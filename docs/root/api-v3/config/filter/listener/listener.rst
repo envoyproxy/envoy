@@ -5,5 +5,4 @@ Listener filters
   :glob:
   :maxdepth: 2
 
-  */empty/*
   ../../../extensions/filters/listener/*/v3/*

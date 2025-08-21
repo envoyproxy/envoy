@@ -5,7 +5,7 @@
 
 #include "envoy/buffer/buffer.h"
 
-#include "common/protobuf/protobuf.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 

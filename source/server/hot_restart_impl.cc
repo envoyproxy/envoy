@@ -1,4 +1,4 @@
-#include "server/hot_restart_impl.h"
+#include "source/server/hot_restart_impl.h"
 
 #include <sys/prctl.h>
 #include <sys/types.h>
@@ -13,10 +13,10 @@
 #include "envoy/event/file_event.h"
 #include "envoy/server/instance.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/api/os_sys_calls_impl_hot_restart.h"
-#include "common/common/fmt.h"
-#include "common/common/lock_guard.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/api/os_sys_calls_impl_hot_restart.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/lock_guard.h"
 
 #include "absl/strings/string_view.h"
 
@@ -39,20 +39,20 @@ SharedMemory* attachSharedMemory(uint32_t base_id, uint32_t restart_epoch) {
 
   const Api::SysCallIntResult result =
       hot_restart_os_sys_calls.shmOpen(shmem_name.c_str(), flags, S_IRUSR | S_IWUSR);
-  if (result.rc_ == -1) {
+  if (result.return_value_ == -1) {
     PANIC(fmt::format("cannot open shared memory region {} check user permissions. Error: {}",
                       shmem_name, errorDetails(result.errno_)));
   }
 
   if (restart_epoch == 0) {
     const Api::SysCallIntResult truncateRes =
-        os_sys_calls.ftruncate(result.rc_, sizeof(SharedMemory));
-    RELEASE_ASSERT(truncateRes.rc_ != -1, "");
+        os_sys_calls.ftruncate(result.return_value_, sizeof(SharedMemory));
+    RELEASE_ASSERT(truncateRes.return_value_ != -1, "");
   }
 
   const Api::SysCallPtrResult mmapRes = os_sys_calls.mmap(
-      nullptr, sizeof(SharedMemory), PROT_READ | PROT_WRITE, MAP_SHARED, result.rc_, 0);
-  SharedMemory* shmem = reinterpret_cast<SharedMemory*>(mmapRes.rc_);
+      nullptr, sizeof(SharedMemory), PROT_READ | PROT_WRITE, MAP_SHARED, result.return_value_, 0);
+  SharedMemory* shmem = reinterpret_cast<SharedMemory*>(mmapRes.return_value_);
   RELEASE_ASSERT(shmem != MAP_FAILED, "");
   RELEASE_ASSERT((reinterpret_cast<uintptr_t>(shmem) % alignof(decltype(shmem))) == 0, "");
 
@@ -96,9 +96,11 @@ void initializeMutex(pthread_mutex_t& mutex) {
 // TODO(zuercher): ideally, the base_id would be separated from the restart_epoch in
 // the socket names to entirely prevent collisions between consecutive base ids.
 HotRestartImpl::HotRestartImpl(uint32_t base_id, uint32_t restart_epoch,
-                               const std::string& socket_path, mode_t socket_mode)
+                               const std::string& socket_path, mode_t socket_mode,
+                               bool skip_hot_restart_on_no_parent, bool skip_parent_stats)
     : base_id_(base_id), scaled_base_id_(base_id * 10),
-      as_child_(HotRestartingChild(scaled_base_id_, restart_epoch, socket_path, socket_mode)),
+      as_child_(HotRestartingChild(scaled_base_id_, restart_epoch, socket_path, socket_mode,
+                                   skip_hot_restart_on_no_parent, skip_parent_stats)),
       as_parent_(HotRestartingParent(scaled_base_id_, restart_epoch, socket_path, socket_mode)),
       shmem_(attachSharedMemory(scaled_base_id_, restart_epoch)), log_lock_(shmem_->log_lock_),
       access_log_lock_(shmem_->access_log_lock_) {
@@ -114,16 +116,27 @@ void HotRestartImpl::drainParentListeners() {
   shmem_->flags_ &= ~SHMEM_FLAGS_INITIALIZING;
 }
 
-int HotRestartImpl::duplicateParentListenSocket(const std::string& address) {
-  return as_child_.duplicateParentListenSocket(address);
+int HotRestartImpl::duplicateParentListenSocket(const std::string& address, uint32_t worker_index) {
+  return as_child_.duplicateParentListenSocket(address, worker_index);
+}
+
+void HotRestartImpl::registerUdpForwardingListener(
+    Network::Address::InstanceConstSharedPtr address,
+    std::shared_ptr<Network::UdpListenerConfig> listener_config) {
+  as_child_.registerUdpForwardingListener(address, listener_config);
+}
+
+OptRef<Network::ParentDrainedCallbackRegistrar> HotRestartImpl::parentDrainedCallbackRegistrar() {
+  return as_child_;
 }
 
 void HotRestartImpl::initialize(Event::Dispatcher& dispatcher, Server::Instance& server) {
   as_parent_.initialize(dispatcher, server);
+  as_child_.initialize(dispatcher);
 }
 
-void HotRestartImpl::sendParentAdminShutdownRequest(time_t& original_start_time) {
-  as_child_.sendParentAdminShutdownRequest(original_start_time);
+absl::optional<HotRestart::AdminShutdownResponse> HotRestartImpl::sendParentAdminShutdownRequest() {
+  return as_child_.sendParentAdminShutdownRequest();
 }
 
 void HotRestartImpl::sendParentTerminateRequest() { as_child_.sendParentTerminateRequest(); }
@@ -141,7 +154,10 @@ HotRestartImpl::mergeParentStatsIfAny(Stats::StoreRoot& stats_store) {
   return response;
 }
 
-void HotRestartImpl::shutdown() { as_parent_.shutdown(); }
+void HotRestartImpl::shutdown() {
+  as_parent_.shutdown();
+  as_child_.shutdown();
+}
 
 uint32_t HotRestartImpl::baseId() { return base_id_; }
 std::string HotRestartImpl::version() { return hotRestartVersion(); }

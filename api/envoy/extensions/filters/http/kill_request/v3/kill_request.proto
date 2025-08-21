@@ -5,11 +5,12 @@ package envoy.extensions.filters.http.kill_request.v3;
 import "envoy/type/v3/percent.proto";
 
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.kill_request.v3";
 option java_outer_classname = "KillRequestProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/kill_request/v3;kill_requestv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Kill Request]
@@ -18,9 +19,19 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for KillRequest filter.
 message KillRequest {
+  // On which direction should the filter check for the ``kill_request_header``.
+  // Default to ``REQUEST`` if unspecified.
+  enum Direction {
+    REQUEST = 0;
+    RESPONSE = 1;
+  }
+
   // The probability that a Kill request will be triggered.
   type.v3.FractionalPercent probability = 1;
 
   // The name of the kill request header. If this field is not empty, it will override the :ref:`default header <config_http_filters_kill_request_http_header>` name. Otherwise the default header name will be used.
-  string kill_request_header = 2;
+  string kill_request_header = 2
+      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+
+  Direction direction = 3 [(validate.rules).enum = {defined_only: true}];
 }

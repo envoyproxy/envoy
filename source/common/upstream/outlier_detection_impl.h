@@ -9,17 +9,19 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/common/callback.h"
 #include "envoy/common/time.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/cluster/v3/outlier_detection.pb.h"
-#include "envoy/data/cluster/v2alpha/outlier_detection_event.pb.h"
+#include "envoy/data/cluster/v3/outlier_detection_event.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codes.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/outlier_detection.h"
-#include "envoy/upstream/upstream.h"
+
+#include "source/common/upstream/upstream_impl.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -28,32 +30,14 @@ namespace Upstream {
 namespace Outlier {
 
 /**
- * Null host monitor implementation.
- */
-class DetectorHostMonitorNullImpl : public DetectorHostMonitor {
-public:
-  // Upstream::Outlier::DetectorHostMonitor
-  uint32_t numEjections() override { return 0; }
-  void putHttpResponseCode(uint64_t) override {}
-  void putResult(Result, absl::optional<uint64_t>) override {}
-  void putResponseTime(std::chrono::milliseconds) override {}
-  const absl::optional<MonotonicTime>& lastEjectionTime() override { return time_; }
-  const absl::optional<MonotonicTime>& lastUnejectionTime() override { return time_; }
-  double successRate(SuccessRateMonitorType) const override { return -1; }
-
-private:
-  const absl::optional<MonotonicTime> time_{};
-};
-
-/**
  * Factory for creating a detector from a proto configuration.
  */
 class DetectorImplFactory {
 public:
-  static DetectorSharedPtr
+  static absl::StatusOr<DetectorSharedPtr>
   createForCluster(Cluster& cluster, const envoy::config::cluster::v3::Cluster& cluster_config,
                    Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                   EventLoggerSharedPtr event_logger);
+                   EventLoggerSharedPtr event_logger, Random::RandomGenerator& random);
 };
 
 /**
@@ -105,8 +89,8 @@ private:
 
 class SuccessRateMonitor {
 public:
-  SuccessRateMonitor(envoy::data::cluster::v2alpha::OutlierEjectionType ejection_type)
-      : ejection_type_(ejection_type), success_rate_(-1) {
+  SuccessRateMonitor(envoy::data::cluster::v3::OutlierEjectionType ejection_type)
+      : ejection_type_(ejection_type) {
     // Point the success_rate_accumulator_bucket_ pointer to a bucket.
     updateCurrentSuccessRateBucket();
   }
@@ -121,15 +105,13 @@ public:
     success_rate_accumulator_bucket_.load()->success_request_counter_++;
   }
 
-  envoy::data::cluster::v2alpha::OutlierEjectionType getEjectionType() const {
-    return ejection_type_;
-  }
+  envoy::data::cluster::v3::OutlierEjectionType getEjectionType() const { return ejection_type_; }
 
 private:
   SuccessRateAccumulator success_rate_accumulator_;
   std::atomic<SuccessRateAccumulatorBucket*> success_rate_accumulator_bucket_;
-  envoy::data::cluster::v2alpha::OutlierEjectionType ejection_type_;
-  double success_rate_;
+  envoy::data::cluster::v3::OutlierEjectionType ejection_type_;
+  double success_rate_{-1};
 };
 
 class DetectorImpl;
@@ -144,6 +126,8 @@ public:
   void eject(MonotonicTime ejection_time);
   void uneject(MonotonicTime ejection_time);
 
+  uint32_t& ejectTimeBackoff() { return eject_time_backoff_; }
+
   void resetConsecutive5xx() { consecutive_5xx_ = 0; }
   void resetConsecutiveGatewayFailure() { consecutive_gateway_failure_ = 0; }
   void resetConsecutiveLocalOriginFailure() { consecutive_local_origin_failure_ = 0; }
@@ -151,13 +135,14 @@ public:
 
   // Upstream::Outlier::DetectorHostMonitor
   uint32_t numEjections() override { return num_ejections_; }
-  void putHttpResponseCode(uint64_t response_code) override;
   void putResult(Result result, absl::optional<uint64_t> code) override;
   void putResponseTime(std::chrono::milliseconds) override {}
   const absl::optional<MonotonicTime>& lastEjectionTime() override { return last_ejection_time_; }
   const absl::optional<MonotonicTime>& lastUnejectionTime() override {
     return last_unejection_time_;
   }
+
+  void putHttpResponseCode(uint64_t response_code);
 
   const SuccessRateMonitor& getSRMonitor(SuccessRateMonitorType type) const {
     return (SuccessRateMonitorType::ExternalOrigin == type) ? external_origin_sr_monitor_
@@ -182,12 +167,22 @@ public:
   void localOriginFailure();
   void localOriginNoFailure();
 
+  // handlers for setting and getting jitter, used to add a random value
+  // to outlier eject time in order to prevent a connection storm when
+  // hosts are unejected
+  void setJitter(const std::chrono::milliseconds jitter) { jitter_ = jitter; }
+  std::chrono::milliseconds getJitter() const { return jitter_; }
+
 private:
   std::weak_ptr<DetectorImpl> detector_;
   std::weak_ptr<Host> host_;
   absl::optional<MonotonicTime> last_ejection_time_;
   absl::optional<MonotonicTime> last_unejection_time_;
   uint32_t num_ejections_{};
+  // Determines ejection time. Each time a node is ejected,
+  // the eject_time_backoff is incremented. The value is decremented
+  // each time the node was healthy and not ejected.
+  uint32_t eject_time_backoff_{};
 
   // counters for externally generated failures
   std::atomic<uint32_t> consecutive_5xx_{0};
@@ -195,6 +190,9 @@ private:
 
   // counters for local origin failures
   std::atomic<uint32_t> consecutive_local_origin_failure_{0};
+
+  // jitter for outlier ejection time
+  std::chrono::milliseconds jitter_;
 
   // success rate monitors:
   // - external_origin: for all events when external/local are not split
@@ -242,6 +240,45 @@ struct DetectionStats {
   ALL_OUTLIER_DETECTION_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
+// Names used in runtime configuration.
+constexpr absl::string_view MaxEjectionPercentRuntime = "outlier_detection.max_ejection_percent";
+constexpr absl::string_view ConsecutiveGatewayFailureRuntime =
+    "outlier_detection.consecutive_gateway_failure";
+constexpr absl::string_view Consecutive5xxRuntime = "outlier_detection.consecutive_5xx";
+constexpr absl::string_view ConsecutiveLocalOriginFailureRuntime =
+    "outlier_detection.consecutive_local_origin_failure";
+constexpr absl::string_view IntervalMsRuntime = "outlier_detection.interval_ms";
+constexpr absl::string_view BaseEjectionTimeMsRuntime = "outlier_detection.base_ejection_time_ms";
+constexpr absl::string_view MaxEjectionTimeMsRuntime = "outlier_detection.max_ejection_time_ms";
+constexpr absl::string_view EnforcingConsecutive5xxRuntime =
+    "outlier_detection.enforcing_consecutive_5xx";
+constexpr absl::string_view EnforcingConsecutiveGatewayFailureRuntime =
+    "outlier_detection.enforcing_consecutive_gateway_failure";
+constexpr absl::string_view EnforcingSuccessRateRuntime =
+    "outlier_detection.enforcing_success_rate";
+constexpr absl::string_view EnforcingConsecutiveLocalOriginFailureRuntime =
+    "outlier_detection.enforcing_consecutive_local_origin_failure";
+constexpr absl::string_view EnforcingLocalOriginSuccessRateRuntime =
+    "outlier_detection.enforcing_local_origin_success_rate";
+constexpr absl::string_view EnforcingFailurePercentageRuntime =
+    "outlier_detection.enforcing_failure_percentage";
+constexpr absl::string_view EnforcingFailurePercentageLocalOriginRuntime =
+    "outlier_detection.enforcing_failure_percentage_local_origin";
+constexpr absl::string_view SuccessRateMinimumHostsRuntime =
+    "outlier_detection.success_rate_minimum_hosts";
+constexpr absl::string_view SuccessRateRequestVolumeRuntime =
+    "outlier_detection.success_rate_request_volume";
+constexpr absl::string_view FailurePercentageMinimumHostsRuntime =
+    "outlier_detection.failure_percentage_minimum_hosts";
+constexpr absl::string_view FailurePercentageRequestVolumeRuntime =
+    "outlier_detection.failure_percentage_request_volume";
+constexpr absl::string_view SuccessRateStdevFactorRuntime =
+    "outlier_detection.success_rate_stdev_factor";
+constexpr absl::string_view FailurePercentageThresholdRuntime =
+    "outlier_detection.failure_percentage_threshold";
+constexpr absl::string_view MaxEjectionTimeJitterMsRuntime =
+    "outlier_detection.max_ejection_time_jitter_ms";
+
 /**
  * Configuration for the outlier detection.
  */
@@ -254,6 +291,7 @@ public:
   uint64_t consecutive5xx() const { return consecutive_5xx_; }
   uint64_t consecutiveGatewayFailure() const { return consecutive_gateway_failure_; }
   uint64_t maxEjectionPercent() const { return max_ejection_percent_; }
+  bool alwaysEjectOneHost() const { return always_eject_one_host_; }
   uint64_t successRateMinimumHosts() const { return success_rate_minimum_hosts_; }
   uint64_t successRateRequestVolume() const { return success_rate_request_volume_; }
   uint64_t successRateStdevFactor() const { return success_rate_stdev_factor_; }
@@ -275,6 +313,11 @@ public:
     return enforcing_consecutive_local_origin_failure_;
   }
   uint64_t enforcingLocalOriginSuccessRate() const { return enforcing_local_origin_success_rate_; }
+  uint64_t maxEjectionTimeMs() const { return max_ejection_time_ms_; }
+  uint64_t maxEjectionTimeJitterMs() const { return max_ejection_time_jitter_ms_; }
+  bool successfulActiveHealthCheckUnejectHost() const {
+    return successful_active_health_check_uneject_host_;
+  }
 
 private:
   const uint64_t interval_ms_;
@@ -282,6 +325,7 @@ private:
   const uint64_t consecutive_5xx_;
   const uint64_t consecutive_gateway_failure_;
   const uint64_t max_ejection_percent_;
+  const bool always_eject_one_host_;
   const uint64_t success_rate_minimum_hosts_;
   const uint64_t success_rate_request_volume_;
   const uint64_t success_rate_stdev_factor_;
@@ -297,26 +341,31 @@ private:
   const uint64_t consecutive_local_origin_failure_;
   const uint64_t enforcing_consecutive_local_origin_failure_;
   const uint64_t enforcing_local_origin_success_rate_;
+  const uint64_t max_ejection_time_ms_;
+  const uint64_t max_ejection_time_jitter_ms_;
+  const bool successful_active_health_check_uneject_host_;
 
-  static const uint64_t DEFAULT_INTERVAL_MS = 10000;
-  static const uint64_t DEFAULT_BASE_EJECTION_TIME_MS = 30000;
-  static const uint64_t DEFAULT_CONSECUTIVE_5XX = 5;
-  static const uint64_t DEFAULT_CONSECUTIVE_GATEWAY_FAILURE = 5;
-  static const uint64_t DEFAULT_MAX_EJECTION_PERCENT = 10;
-  static const uint64_t DEFAULT_SUCCESS_RATE_MINIMUM_HOSTS = 5;
-  static const uint64_t DEFAULT_SUCCESS_RATE_REQUEST_VOLUME = 100;
-  static const uint64_t DEFAULT_SUCCESS_RATE_STDEV_FACTOR = 1900;
-  static const uint64_t DEFAULT_FAILURE_PERCENTAGE_THRESHOLD = 85;
-  static const uint64_t DEFAULT_FAILURE_PERCENTAGE_MINIMUM_HOSTS = 5;
-  static const uint64_t DEFAULT_FAILURE_PERCENTAGE_REQUEST_VOLUME = 50;
-  static const uint64_t DEFAULT_ENFORCING_CONSECUTIVE_5XX = 100;
-  static const uint64_t DEFAULT_ENFORCING_CONSECUTIVE_GATEWAY_FAILURE = 0;
-  static const uint64_t DEFAULT_ENFORCING_SUCCESS_RATE = 100;
-  static const uint64_t DEFAULT_ENFORCING_FAILURE_PERCENTAGE = 0;
-  static const uint64_t DEFAULT_ENFORCING_FAILURE_PERCENTAGE_LOCAL_ORIGIN = 0;
-  static const uint64_t DEFAULT_CONSECUTIVE_LOCAL_ORIGIN_FAILURE = 5;
-  static const uint64_t DEFAULT_ENFORCING_CONSECUTIVE_LOCAL_ORIGIN_FAILURE = 100;
-  static const uint64_t DEFAULT_ENFORCING_LOCAL_ORIGIN_SUCCESS_RATE = 100;
+  static constexpr uint64_t DEFAULT_INTERVAL_MS = 10000;
+  static constexpr uint64_t DEFAULT_BASE_EJECTION_TIME_MS = 30000;
+  static constexpr uint64_t DEFAULT_CONSECUTIVE_5XX = 5;
+  static constexpr uint64_t DEFAULT_CONSECUTIVE_GATEWAY_FAILURE = 5;
+  static constexpr uint64_t DEFAULT_MAX_EJECTION_PERCENT = 10;
+  static constexpr uint64_t DEFAULT_SUCCESS_RATE_MINIMUM_HOSTS = 5;
+  static constexpr uint64_t DEFAULT_SUCCESS_RATE_REQUEST_VOLUME = 100;
+  static constexpr uint64_t DEFAULT_SUCCESS_RATE_STDEV_FACTOR = 1900;
+  static constexpr uint64_t DEFAULT_FAILURE_PERCENTAGE_THRESHOLD = 85;
+  static constexpr uint64_t DEFAULT_FAILURE_PERCENTAGE_MINIMUM_HOSTS = 5;
+  static constexpr uint64_t DEFAULT_FAILURE_PERCENTAGE_REQUEST_VOLUME = 50;
+  static constexpr uint64_t DEFAULT_ENFORCING_CONSECUTIVE_5XX = 100;
+  static constexpr uint64_t DEFAULT_ENFORCING_CONSECUTIVE_GATEWAY_FAILURE = 0;
+  static constexpr uint64_t DEFAULT_ENFORCING_SUCCESS_RATE = 100;
+  static constexpr uint64_t DEFAULT_ENFORCING_FAILURE_PERCENTAGE = 0;
+  static constexpr uint64_t DEFAULT_ENFORCING_FAILURE_PERCENTAGE_LOCAL_ORIGIN = 0;
+  static constexpr uint64_t DEFAULT_CONSECUTIVE_LOCAL_ORIGIN_FAILURE = 5;
+  static constexpr uint64_t DEFAULT_ENFORCING_CONSECUTIVE_LOCAL_ORIGIN_FAILURE = 100;
+  static constexpr uint64_t DEFAULT_ENFORCING_LOCAL_ORIGIN_SUCCESS_RATE = 100;
+  static constexpr uint64_t DEFAULT_MAX_EJECTION_TIME_MS = 10 * DEFAULT_BASE_EJECTION_TIME_MS;
+  static constexpr uint64_t DEFAULT_MAX_EJECTION_TIME_JITTER_MS = 0;
 };
 
 /**
@@ -326,10 +375,10 @@ private:
  */
 class DetectorImpl : public Detector, public std::enable_shared_from_this<DetectorImpl> {
 public:
-  static std::shared_ptr<DetectorImpl>
-  create(const Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
+  static absl::StatusOr<std::shared_ptr<DetectorImpl>>
+  create(Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
          Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
-         EventLoggerSharedPtr event_logger);
+         EventLoggerSharedPtr event_logger, Random::RandomGenerator& random);
   ~DetectorImpl() override;
 
   void onConsecutive5xx(HostSharedPtr host);
@@ -337,6 +386,7 @@ public:
   void onConsecutiveLocalOriginFailure(HostSharedPtr host);
   Runtime::Loader& runtime() { return runtime_; }
   DetectorConfig& config() { return config_; }
+  void unejectHost(HostSharedPtr host);
 
   // Upstream::Outlier::Detector
   void addChangedStateCb(ChangeStateCb cb) override { callbacks_.push_back(cb); }
@@ -367,26 +417,30 @@ public:
                                const std::vector<HostSuccessRatePair>& valid_success_rate_hosts,
                                double success_rate_stdev_factor);
 
+  const absl::node_hash_map<HostSharedPtr, DetectorHostMonitorImpl*>& getHostMonitors() {
+    return host_monitors_;
+  }
+
 private:
   DetectorImpl(const Cluster& cluster, const envoy::config::cluster::v3::OutlierDetection& config,
                Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
-               EventLoggerSharedPtr event_logger);
+               EventLoggerSharedPtr event_logger, Random::RandomGenerator& random);
 
   void addHostMonitor(HostSharedPtr host);
   void armIntervalTimer();
   void checkHostForUneject(HostSharedPtr host, DetectorHostMonitorImpl* monitor, MonotonicTime now);
-  void ejectHost(HostSharedPtr host, envoy::data::cluster::v2alpha::OutlierEjectionType type);
+  void ejectHost(HostSharedPtr host, envoy::data::cluster::v3::OutlierEjectionType type);
   static DetectionStats generateStats(Stats::Scope& scope);
-  void initialize(const Cluster& cluster);
+  void initialize(Cluster& cluster);
   void onConsecutiveErrorWorker(HostSharedPtr host,
-                                envoy::data::cluster::v2alpha::OutlierEjectionType type);
+                                envoy::data::cluster::v3::OutlierEjectionType type);
   void notifyMainThreadConsecutiveError(HostSharedPtr host,
-                                        envoy::data::cluster::v2alpha::OutlierEjectionType type);
+                                        envoy::data::cluster::v3::OutlierEjectionType type);
   void onIntervalTimer();
   void runCallbacks(HostSharedPtr host);
-  bool enforceEjection(envoy::data::cluster::v2alpha::OutlierEjectionType type);
-  void updateEnforcedEjectionStats(envoy::data::cluster::v2alpha::OutlierEjectionType type);
-  void updateDetectedEjectionStats(envoy::data::cluster::v2alpha::OutlierEjectionType type);
+  bool enforceEjection(envoy::data::cluster::v3::OutlierEjectionType type);
+  void updateEnforcedEjectionStats(envoy::data::cluster::v3::OutlierEjectionType type);
+  void updateDetectedEjectionStats(envoy::data::cluster::v3::OutlierEjectionType type);
   void processSuccessRateEjections(DetectorHostMonitor::SuccessRateMonitorType monitor_type);
 
   // The helper to double write value and gauge. The gauge could be null value since because any
@@ -416,6 +470,8 @@ private:
   std::list<ChangeStateCb> callbacks_;
   absl::node_hash_map<HostSharedPtr, DetectorHostMonitorImpl*> host_monitors_;
   EventLoggerSharedPtr event_logger_;
+  Common::CallbackHandlePtr member_update_cb_;
+  Random::RandomGenerator& random_generator_;
 
   // EjectionPair for external and local origin events.
   // When external/local origin events are not split, external_origin_sr_num_ are used for
@@ -438,18 +494,27 @@ private:
 
 class EventLoggerImpl : public EventLogger {
 public:
-  EventLoggerImpl(AccessLog::AccessLogManager& log_manager, const std::string& file_name,
-                  TimeSource& time_source)
-      : file_(log_manager.createAccessLog(file_name)), time_source_(time_source) {}
-
+  static absl::StatusOr<std::unique_ptr<EventLoggerImpl>>
+  create(AccessLog::AccessLogManager& log_manager, const std::string& file_name,
+         TimeSource& time_source) {
+    auto file_or_error = log_manager.createAccessLog(
+        Filesystem::FilePathAndType{Filesystem::DestinationType::File, file_name});
+    RETURN_IF_NOT_OK_REF(file_or_error.status());
+    return std::unique_ptr<EventLoggerImpl>(
+        new EventLoggerImpl(std::move(*file_or_error), time_source));
+  }
   // Upstream::Outlier::EventLogger
   void logEject(const HostDescriptionConstSharedPtr& host, Detector& detector,
-                envoy::data::cluster::v2alpha::OutlierEjectionType type, bool enforced) override;
+                envoy::data::cluster::v3::OutlierEjectionType type, bool enforced) override;
 
   void logUneject(const HostDescriptionConstSharedPtr& host) override;
 
+protected:
+  EventLoggerImpl(AccessLog::AccessLogFileSharedPtr&& file, TimeSource& time_source)
+      : file_(std::move(file)), time_source_(time_source) {}
+
 private:
-  void setCommonEventParams(envoy::data::cluster::v2alpha::OutlierDetectionEvent& event,
+  void setCommonEventParams(envoy::data::cluster::v3::OutlierDetectionEvent& event,
                             const HostDescriptionConstSharedPtr& host,
                             absl::optional<MonotonicTime> time);
 

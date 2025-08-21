@@ -1,0 +1,6 @@
+date: November 8, 2019
+
+changes:
+- area: listener
+  change: |
+    fixed CVE-2019-18836 by clearing accept filters before connection creation.

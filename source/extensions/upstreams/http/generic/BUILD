@@ -16,11 +16,11 @@ envoy_cc_extension(
     hdrs = [
         "config.h",
     ],
-    security_posture = "robust_to_untrusted_downstream",
     visibility = ["//visibility:public"],
     deps = [
         "//source/extensions/upstreams/http/http:upstream_request_lib",
         "//source/extensions/upstreams/http/tcp:upstream_request_lib",
+        "//source/extensions/upstreams/http/udp:upstream_request_lib",
         "@envoy_api//envoy/extensions/upstreams/http/generic/v3:pkg_cc_proto",
     ],
 )

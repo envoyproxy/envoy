@@ -8,43 +8,51 @@ load(
 licenses(["notice"])  # Apache 2
 
 # TLS inspector filter for examining various TLS parameters before routing to a FilterChain.
-# Public docs: docs/root/configuration/listener_filters/tls_inspector.rst
+# Public docs: https://envoyproxy.io/docs/envoy/latest/configuration/listeners/listener_filters/tls_inspector
 
 envoy_extension_package()
+
+envoy_cc_library(
+    name = "ja4_fingerprint_lib",
+    srcs = ["ja4_fingerprint.cc"],
+    hdrs = ["ja4_fingerprint.h"],
+    external_deps = ["ssl"],
+    deps = [
+        "//source/common/common:hex_lib",
+    ],
+)
 
 envoy_cc_library(
     name = "tls_inspector_lib",
     srcs = ["tls_inspector.cc"],
     hdrs = ["tls_inspector.h"],
     external_deps = ["ssl"],
-    # TODO(#9953) clean up.
-    visibility = [
-        "//visibility:public",
-    ],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/event:timer_interface",
-        "//include/envoy/network:filter_interface",
-        "//include/envoy/network:listen_socket_interface",
+        ":ja4_fingerprint_lib",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/event:timer_interface",
+        "//envoy/network:filter_interface",
+        "//envoy/network:listen_socket_interface",
         "//source/common/api:os_sys_calls_lib",
+        "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
+        "//source/common/common:hex_lib",
         "//source/common/common:minimal_logger_lib",
-        "//source/extensions/transport_sockets:well_known_names",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/tls:utility_lib",
+        "@envoy_api//envoy/extensions/filters/listener/tls_inspector/v3:pkg_cc_proto",
     ],
 )
 
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
-    # TODO(#9953) clean up.
     extra_visibility = [
-        "//test/integration:__subpackages__",
+        "//test/common/listener_manager:__subpackages__",
     ],
-    security_posture = "robust_to_untrusted_downstream",
     deps = [
-        "//include/envoy/registry",
-        "//include/envoy/server:filter_config_interface",
-        "//source/extensions/filters/listener:well_known_names",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
         "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
         "@envoy_api//envoy/extensions/filters/listener/tls_inspector/v3:pkg_cc_proto",
     ],

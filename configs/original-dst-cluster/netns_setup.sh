@@ -9,7 +9,7 @@
 set -e
 
 # name of the network namespace
-NETNS=$1 
+NETNS=$1
 
 # IP address or prefix that will be redirected
 TARGET_IP=$2

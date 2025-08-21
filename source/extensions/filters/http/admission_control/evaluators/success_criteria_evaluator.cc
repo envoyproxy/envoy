@@ -1,25 +1,36 @@
-#include "extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"
+#include "source/extensions/filters/http/admission_control/evaluators/success_criteria_evaluator.h"
 
 #include <algorithm>
 
 #include "envoy/common/exception.h"
 #include "envoy/grpc/status.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/common/fmt.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace AdmissionControl {
 
-SuccessCriteriaEvaluator::SuccessCriteriaEvaluator(const SuccessCriteria& success_criteria) {
+absl::StatusOr<std::unique_ptr<SuccessCriteriaEvaluator>>
+SuccessCriteriaEvaluator::create(const SuccessCriteria& success_criteria) {
+  absl::Status status = absl::OkStatus();
+  auto evaluator = std::unique_ptr<SuccessCriteriaEvaluator>(
+      new SuccessCriteriaEvaluator(success_criteria, status));
+  RETURN_IF_NOT_OK_REF(status);
+  return evaluator;
+}
+
+SuccessCriteriaEvaluator::SuccessCriteriaEvaluator(const SuccessCriteria& success_criteria,
+                                                   absl::Status& creation_status) {
   // HTTP status.
   if (success_criteria.has_http_criteria()) {
     for (const auto& range : success_criteria.http_criteria().http_success_status()) {
       if (!validHttpRange(range.start(), range.end())) {
-        throw EnvoyException(
+        creation_status = absl::InvalidArgumentError(
             fmt::format("invalid HTTP range: [{}, {})", range.start(), range.end()));
+        return;
       }
 
       const auto start = static_cast<uint64_t>(range.start());
@@ -36,7 +47,8 @@ SuccessCriteriaEvaluator::SuccessCriteriaEvaluator(const SuccessCriteria& succes
   if (success_criteria.has_grpc_criteria()) {
     for (const auto& status : success_criteria.grpc_criteria().grpc_success_status()) {
       if (status > 16) {
-        throw EnvoyException(fmt::format("invalid gRPC code {}", status));
+        creation_status = absl::InvalidArgumentError(fmt::format("invalid gRPC code {}", status));
+        return;
       }
 
       grpc_success_codes_.emplace_back(status);

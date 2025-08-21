@@ -1,25 +1,29 @@
 #include <memory>
 
-#include "common/buffer/buffer_impl.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/http/codec_client.h"
-#include "common/http/exception.h"
-#include "common/network/listen_socket_impl.h"
-#include "common/network/utility.h"
-#include "common/stream_info/stream_info_impl.h"
-#include "common/upstream/upstream_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/http/codec_client.h"
+#include "source/common/http/exception.h"
+#include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/tcp_listener_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/http/common.h"
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
+#include "test/mocks/http/header_validator.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/status_utility.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -27,6 +31,7 @@
 
 using testing::_;
 using testing::AtMost;
+using testing::ByMove; // NOLINT(misc-unused-using-decls)
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
@@ -34,7 +39,6 @@ using testing::Pointee;
 using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
-using testing::Throw;
 
 namespace Envoy {
 namespace Http {
@@ -42,9 +46,10 @@ namespace {
 
 class CodecClientTest : public Event::TestUsingSimulatedTime, public testing::Test {
 public:
-  CodecClientTest() {
+  void initialize() {
     connection_ = new NiceMock<Network::MockClientConnection>();
 
+    EXPECT_CALL(*connection_, connecting()).WillOnce(Return(true));
     EXPECT_CALL(*connection_, detectEarlyCloseWhenReadDisabled(false));
     EXPECT_CALL(*connection_, addConnectionCallbacks(_)).WillOnce(SaveArgAddress(&connection_cb_));
     EXPECT_CALL(*connection_, connect());
@@ -53,16 +58,31 @@ public:
             Invoke([this](Network::ReadFilterSharedPtr filter) -> void { filter_ = filter; }));
 
     codec_ = new Http::MockClientConnection();
+    EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http11));
 
     Network::ClientConnectionPtr connection{connection_};
     EXPECT_CALL(dispatcher_, createTimer_(_));
-    client_ = std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP1, std::move(connection),
-                                                   codec_, nullptr, host_, dispatcher_);
+    client_ = std::make_unique<CodecClientForTest>(CodecType::HTTP1, std::move(connection), codec_,
+                                                   nullptr, host_, dispatcher_);
     ON_CALL(*connection_, streamInfo()).WillByDefault(ReturnRef(stream_info_));
+#ifdef ENVOY_ENABLE_UHV
+    ON_CALL(*header_validator_, validateRequestHeaders(_))
+        .WillByDefault(Return(HeaderValidator::ValidationResult::success()));
+    ON_CALL(*header_validator_, transformRequestHeaders(_))
+        .WillByDefault(
+            Return(ByMove(ClientHeaderValidator::RequestHeadersTransformationResult::success())));
+    ON_CALL(*header_validator_, validateResponseHeaders(_))
+        .WillByDefault(Return(HeaderValidator::ValidationResult::success()));
+    ON_CALL(*header_validator_, transformResponseHeaders(_))
+        .WillByDefault(Return(HeaderValidator::TransformationResult::success()));
+    ON_CALL(*cluster_, makeHeaderValidator(_))
+        .WillByDefault(Return(ByMove(std::unique_ptr<ClientHeaderValidator>(header_validator_))));
+#endif
   }
 
   ~CodecClientTest() override { EXPECT_EQ(0U, client_->numActiveRequests()); }
 
+  NiceMock<Runtime::MockLoader> runtime_;
   Event::MockDispatcher dispatcher_;
   Network::MockClientConnection* connection_;
   Http::MockClientConnection* codec_;
@@ -72,13 +92,17 @@ public:
   std::shared_ptr<Upstream::MockIdleTimeEnabledClusterInfo> cluster_{
       new NiceMock<Upstream::MockIdleTimeEnabledClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_{
-      Upstream::makeTestHostDescription(cluster_, "tcp://127.0.0.1:80", simTime())};
+      Upstream::makeTestHostDescription(cluster_, "tcp://127.0.0.1:80")};
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+#ifdef ENVOY_ENABLE_UHV
+  NiceMock<MockClientHeaderValidator>* header_validator_{new NiceMock<MockClientHeaderValidator>};
+#endif
 };
 
 TEST_F(CodecClientTest, NotCallDetectEarlyCloseWhenReadDiabledUsingHttp3) {
   auto connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
 
+  EXPECT_CALL(*connection, connecting()).WillOnce(Return(true));
   EXPECT_CALL(*connection, detectEarlyCloseWhenReadDisabled(false)).Times(0);
   EXPECT_CALL(*connection, addConnectionCallbacks(_)).WillOnce(SaveArgAddress(&connection_cb_));
   EXPECT_CALL(*connection, connect());
@@ -86,11 +110,13 @@ TEST_F(CodecClientTest, NotCallDetectEarlyCloseWhenReadDiabledUsingHttp3) {
   auto codec = new Http::MockClientConnection();
 
   EXPECT_CALL(dispatcher_, createTimer_(_));
-  auto client = std::make_unique<CodecClientForTest>(
-      CodecClient::Type::HTTP3, std::move(connection), codec, nullptr, host_, dispatcher_);
+  client_ = std::make_unique<CodecClientForTest>(CodecType::HTTP3, std::move(connection), codec,
+                                                 nullptr, host_, dispatcher_);
 }
 
 TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {
+  initialize();
+
   ResponseDecoder* inner_decoder;
   NiceMock<MockRequestEncoder> inner_encoder;
   EXPECT_CALL(*codec_, newStream(_))
@@ -100,14 +126,18 @@ TEST_F(CodecClientTest, BasicHeaderOnlyResponse) {
       }));
 
   Http::MockResponseDecoder outer_decoder;
-  client_->newStream(outer_decoder);
+  Http::RequestEncoder& request_encoder = client_->newStream(outer_decoder);
 
+  TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+  EXPECT_OK(request_encoder.encodeHeaders(request_headers, true));
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), true));
   inner_decoder->decodeHeaders(std::move(response_headers), true);
 }
 
 TEST_F(CodecClientTest, BasicResponseWithBody) {
+  initialize();
   ResponseDecoder* inner_decoder;
   NiceMock<MockRequestEncoder> inner_encoder;
   EXPECT_CALL(*codec_, newStream(_))
@@ -117,8 +147,11 @@ TEST_F(CodecClientTest, BasicResponseWithBody) {
       }));
 
   Http::MockResponseDecoder outer_decoder;
-  client_->newStream(outer_decoder);
+  Http::RequestEncoder& request_encoder = client_->newStream(outer_decoder);
 
+  TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+  EXPECT_OK(request_encoder.encodeHeaders(request_headers, true));
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), false));
   inner_decoder->decodeHeaders(std::move(response_headers), false);
@@ -129,6 +162,7 @@ TEST_F(CodecClientTest, BasicResponseWithBody) {
 }
 
 TEST_F(CodecClientTest, DisconnectBeforeHeaders) {
+  initialize();
   ResponseDecoder* inner_decoder;
   NiceMock<MockRequestEncoder> inner_encoder;
   EXPECT_CALL(*codec_, newStream(_))
@@ -151,6 +185,7 @@ TEST_F(CodecClientTest, DisconnectBeforeHeaders) {
 }
 
 TEST_F(CodecClientTest, IdleTimerWithNoActiveRequests) {
+  initialize();
   ResponseDecoder* inner_decoder;
   NiceMock<MockRequestEncoder> inner_encoder;
   EXPECT_CALL(*codec_, newStream(_))
@@ -160,11 +195,14 @@ TEST_F(CodecClientTest, IdleTimerWithNoActiveRequests) {
       }));
 
   Http::MockResponseDecoder outer_decoder;
-  Http::StreamEncoder& request_encoder = client_->newStream(outer_decoder);
+  Http::RequestEncoder& request_encoder = client_->newStream(outer_decoder);
   Http::MockStreamCallbacks callbacks;
   request_encoder.getStream().addCallbacks(callbacks);
   connection_cb_->onEvent(Network::ConnectionEvent::Connected);
 
+  TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+  EXPECT_OK(request_encoder.encodeHeaders(request_headers, true));
   ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
   EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), false));
   inner_decoder->decodeHeaders(std::move(response_headers), false);
@@ -183,6 +221,7 @@ TEST_F(CodecClientTest, IdleTimerWithNoActiveRequests) {
 }
 
 TEST_F(CodecClientTest, IdleTimerClientRemoteCloseWithActiveRequests) {
+  initialize();
   ResponseDecoder* inner_decoder;
   NiceMock<MockRequestEncoder> inner_encoder;
   EXPECT_CALL(*codec_, newStream(_))
@@ -207,6 +246,7 @@ TEST_F(CodecClientTest, IdleTimerClientRemoteCloseWithActiveRequests) {
 }
 
 TEST_F(CodecClientTest, IdleTimerClientLocalCloseWithActiveRequests) {
+  initialize();
   ResponseDecoder* inner_decoder;
   NiceMock<MockRequestEncoder> inner_encoder;
   EXPECT_CALL(*codec_, newStream(_))
@@ -230,16 +270,18 @@ TEST_F(CodecClientTest, IdleTimerClientLocalCloseWithActiveRequests) {
 }
 
 TEST_F(CodecClientTest, ProtocolError) {
+  initialize();
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Return(codecProtocolError("protocol error")));
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
 
   Buffer::OwnedImpl data;
   filter_->onData(data, false);
 
-  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_protocol_error_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_protocol_error_.value());
 }
 
 TEST_F(CodecClientTest, 408Response) {
+  initialize();
   EXPECT_CALL(*codec_, dispatch(_))
       .WillOnce(Return(prematureResponseError("", Code::RequestTimeout)));
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
@@ -247,20 +289,22 @@ TEST_F(CodecClientTest, 408Response) {
   Buffer::OwnedImpl data;
   filter_->onData(data, false);
 
-  EXPECT_EQ(0U, cluster_->stats_.upstream_cx_protocol_error_.value());
+  EXPECT_EQ(0U, cluster_->traffic_stats_->upstream_cx_protocol_error_.value());
 }
 
 TEST_F(CodecClientTest, PrematureResponse) {
+  initialize();
   EXPECT_CALL(*codec_, dispatch(_)).WillOnce(Return(prematureResponseError("", Code::OK)));
   EXPECT_CALL(*connection_, close(Network::ConnectionCloseType::NoFlush));
 
   Buffer::OwnedImpl data;
   filter_->onData(data, false);
 
-  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_protocol_error_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_protocol_error_.value());
 }
 
 TEST_F(CodecClientTest, WatermarkPassthrough) {
+  initialize();
   EXPECT_CALL(*codec_, onUnderlyingConnectionAboveWriteBufferHighWatermark());
   connection_cb_->onAboveWriteBufferHighWatermark();
 
@@ -268,35 +312,206 @@ TEST_F(CodecClientTest, WatermarkPassthrough) {
   connection_cb_->onBelowWriteBufferLowWatermark();
 }
 
-TEST_F(CodecClientTest, SSLConnectionInfo) {
-  std::string session_id = "D62A523A65695219D46FE1FFE285A4C371425ACE421B110B5B8D11D3EB4D5F0B";
-  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
-  ON_CALL(*connection_info, sessionId()).WillByDefault(ReturnRef(session_id));
-  EXPECT_CALL(*connection_, ssl()).WillRepeatedly(Return(connection_info));
-  connection_cb_->onEvent(Network::ConnectionEvent::Connected);
-  EXPECT_NE(nullptr, stream_info_.downstreamSslConnection());
-  EXPECT_EQ(session_id, stream_info_.downstreamSslConnection()->sessionId());
+#ifdef ENVOY_ENABLE_UHV
+TEST_F(CodecClientTest, RequestHeaderValidationFails) {
+  initialize();
+  EXPECT_CALL(*header_validator_, validateRequestHeaders(_))
+      .WillOnce(Return(HeaderValidator::ValidationResult{
+          HeaderValidator::ValidationResult::Action::Reject, "some error"}));
+
+  ResponseDecoder* inner_decoder;
+  NiceMock<MockRequestEncoder> inner_encoder;
+  EXPECT_CALL(*codec_, newStream(_))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder) -> RequestEncoder& {
+        inner_decoder = &decoder;
+        return inner_encoder;
+      }));
+
+  Http::MockResponseDecoder outer_decoder;
+  Http::RequestEncoder& request_encoder = client_->newStream(outer_decoder);
+
+  TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+  auto status = request_encoder.encodeHeaders(request_headers, true);
+  EXPECT_THAT(status, StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument,
+                                               testing::HasSubstr("some error")));
+  // Router will reset upstream request when encodeHeaders returns failure status
+  inner_encoder.stream_.callbacks_.front()->onResetStream(StreamResetReason::LocalReset,
+                                                          "some error");
 }
+
+TEST_F(CodecClientTest, RequestHeaderTransformationFails) {
+  initialize();
+  EXPECT_CALL(*header_validator_, transformRequestHeaders(_))
+      .WillOnce(Return(ByMove(ClientHeaderValidator::RequestHeadersTransformationResult{
+          {HeaderValidator::RejectResult::Action::Reject, "some error"}, nullptr})));
+
+  ResponseDecoder* inner_decoder;
+  NiceMock<MockRequestEncoder> inner_encoder;
+  EXPECT_CALL(*codec_, newStream(_))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder) -> RequestEncoder& {
+        inner_decoder = &decoder;
+        return inner_encoder;
+      }));
+
+  Http::MockResponseDecoder outer_decoder;
+  Http::RequestEncoder& request_encoder = client_->newStream(outer_decoder);
+
+  TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+  auto status = request_encoder.encodeHeaders(request_headers, true);
+  EXPECT_THAT(status, StatusHelpers::HasStatus(absl::StatusCode::kInvalidArgument,
+                                               testing::HasSubstr("some error")));
+  // Router will reset upstream request when encodeHeaders returns failure status
+  inner_encoder.stream_.callbacks_.front()->onResetStream(StreamResetReason::LocalReset,
+                                                          "some error");
+}
+
+TEST_F(CodecClientTest, RequestHeaderTransformationUpdatesHeaders) {
+  initialize();
+  TestRequestHeaderMapImpl expected_new_headers{
+      {":authority", "new_hosthost"}, {":path", "/new_path"}, {":method", "PUT"}};
+  auto new_headers = std::make_unique<TestRequestHeaderMapImpl>(expected_new_headers);
+  EXPECT_CALL(*header_validator_, transformRequestHeaders(_))
+      .WillOnce(Return(ByMove(ClientHeaderValidator::RequestHeadersTransformationResult{
+          HeaderValidator::RejectResult::success(), std::move(new_headers)})));
+
+  ResponseDecoder* inner_decoder;
+  NiceMock<MockRequestEncoder> inner_encoder;
+  EXPECT_CALL(*codec_, newStream(_))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder) -> RequestEncoder& {
+        inner_decoder = &decoder;
+        return inner_encoder;
+      }));
+
+  Http::MockResponseDecoder outer_decoder;
+  Http::RequestEncoder& request_encoder = client_->newStream(outer_decoder);
+
+  TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+  // Codec's encodeHeaders should observe header map modified by the transformRequestHeaders()
+  // method
+  EXPECT_CALL(inner_encoder, encodeHeaders(HeaderMapEqualRef(&expected_new_headers), _));
+
+  EXPECT_OK(request_encoder.encodeHeaders(request_headers, true));
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  EXPECT_CALL(outer_decoder, decodeHeaders_(Pointee(Ref(*response_headers)), true));
+  inner_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(CodecClientTest, ResponseHeaderValidationFails) {
+  initialize();
+
+  ResponseDecoder* inner_decoder;
+  NiceMock<MockRequestEncoder> inner_encoder;
+  EXPECT_CALL(*codec_, newStream(_))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder) -> RequestEncoder& {
+        inner_decoder = &decoder;
+        return inner_encoder;
+      }));
+
+  Http::MockResponseDecoder outer_decoder;
+  Http::RequestEncoder& request_encoder = client_->newStream(outer_decoder);
+
+  TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+
+  EXPECT_OK(request_encoder.encodeHeaders(request_headers, true));
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  EXPECT_CALL(*header_validator_, validateResponseHeaders(_))
+      .WillOnce(Return(HeaderValidator::ValidationResult{
+          HeaderValidator::ValidationResult::Action::Reject, "some error"}));
+  // Invalid response should cause stream reset
+  EXPECT_CALL(inner_encoder.stream_, resetStream(StreamResetReason::ProtocolError));
+  inner_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(CodecClientTest, ResponseHeaderTransformationFails) {
+  initialize();
+
+  ResponseDecoder* inner_decoder;
+  NiceMock<MockRequestEncoder> inner_encoder;
+  EXPECT_CALL(*codec_, newStream(_))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder) -> RequestEncoder& {
+        inner_decoder = &decoder;
+        return inner_encoder;
+      }));
+
+  Http::MockResponseDecoder outer_decoder;
+  Http::RequestEncoder& request_encoder = client_->newStream(outer_decoder);
+
+  TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+
+  EXPECT_OK(request_encoder.encodeHeaders(request_headers, true));
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  EXPECT_CALL(*header_validator_, transformResponseHeaders(_))
+      .WillOnce(Return(ClientHeaderValidator::TransformationResult{
+          ClientHeaderValidator::TransformationResult::Action::Reject, "some error"}));
+  // Invalid transformation should cause stream reset
+  EXPECT_CALL(inner_encoder.stream_, resetStream(StreamResetReason::ProtocolError));
+  inner_decoder->decodeHeaders(std::move(response_headers), true);
+}
+
+TEST_F(CodecClientTest, ResponseHeaderValidationFailsWithConnectionClosure) {
+  initialize();
+  EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http2));
+
+  ResponseDecoder* inner_decoder;
+  NiceMock<MockRequestEncoder> inner_encoder;
+  EXPECT_CALL(*codec_, newStream(_))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder) -> RequestEncoder& {
+        inner_decoder = &decoder;
+        return inner_encoder;
+      }));
+
+  Http::MockResponseDecoder outer_decoder;
+  Http::RequestEncoder& request_encoder = client_->newStream(outer_decoder);
+
+  TestRequestHeaderMapImpl request_headers{
+      {":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+
+  EXPECT_OK(request_encoder.encodeHeaders(request_headers, true));
+  ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+  EXPECT_CALL(*header_validator_, validateResponseHeaders(_))
+      .WillOnce(Return(HeaderValidator::ValidationResult{
+          HeaderValidator::ValidationResult::Action::Reject, "some error"}));
+  // By default H/2 and H/3 connections are disconnected on protocol errors
+  EXPECT_CALL(*connection_, close(_));
+  inner_decoder->decodeHeaders(std::move(response_headers), true);
+  // Connection closure will cause stream to be reset
+  inner_encoder.stream_.callbacks_.front()->onResetStream(StreamResetReason::LocalReset,
+                                                          "some error");
+}
+#endif // ENVOY_ENABLE_UHV
 
 // Test the codec getting input from a real TCP connection.
 class CodecNetworkTest : public Event::TestUsingSimulatedTime,
                          public testing::TestWithParam<Network::Address::IpVersion> {
 public:
-  CodecNetworkTest() : api_(Api::createApiForTest()), stream_info_(api_->timeSource()) {
+  CodecNetworkTest()
+      : api_(Api::createApiForTest()),
+        stream_info_(api_->timeSource(), nullptr, StreamInfo::FilterState::LifeSpan::Connection) {
     dispatcher_ = api_->allocateDispatcher("test_thread");
-    auto socket = std::make_shared<Network::TcpListenSocket>(
-        Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true);
+    auto socket = std::make_shared<Network::Test::TcpListenSocketImmediateListen>(
+        Network::Test::getCanonicalLoopbackAddress(GetParam()));
     Network::ClientConnectionPtr client_connection = dispatcher_->createClientConnection(
-        socket->localAddress(), source_address_, Network::Test::createRawBufferSocket(), nullptr);
-    upstream_listener_ = dispatcher_->createListener(std::move(socket), listener_callbacks_, true,
-                                                     ENVOY_TCP_BACKLOG_SIZE);
+        socket->connectionInfoProvider().localAddress(), source_address_,
+        Network::Test::createRawBufferSocket(), nullptr, nullptr);
+    NiceMock<Network::MockListenerConfig> listener_config;
+    Server::ThreadLocalOverloadStateOptRef overload_state;
+    upstream_listener_ = std::make_unique<Network::TcpListenerImpl>(
+        *dispatcher_, api_->randomGenerator(), runtime_, std::move(socket), listener_callbacks_,
+        listener_config.bindToPort(), listener_config.ignoreGlobalConnLimit(),
+        listener_config.shouldBypassOverloadManager(),
+        listener_config.maxConnectionsToAcceptPerSocketEvent(), overload_state);
     client_connection_ = client_connection.get();
     client_connection_->addConnectionCallbacks(client_callbacks_);
 
     codec_ = new Http::MockClientConnection();
-    client_ =
-        std::make_unique<CodecClientForTest>(CodecClient::Type::HTTP1, std::move(client_connection),
-                                             codec_, nullptr, host_, *dispatcher_);
+    EXPECT_CALL(*codec_, protocol()).WillRepeatedly(Return(Protocol::Http11));
+    client_ = std::make_unique<CodecClientForTest>(CodecType::HTTP1, std::move(client_connection),
+                                                   codec_, nullptr, host_, *dispatcher_);
 
     int expected_callbacks = 2;
     EXPECT_CALL(listener_callbacks_, onAccept_(_))
@@ -310,6 +525,7 @@ public:
             dispatcher_->exit();
           }
         }));
+    EXPECT_CALL(listener_callbacks_, recordConnectionsAcceptedOnSocketEvent(_));
 
     EXPECT_CALL(client_callbacks_, onEvent(Network::ConnectionEvent::Connected))
         .WillOnce(InvokeWithoutArgs([&]() -> void {
@@ -347,16 +563,16 @@ public:
 
 protected:
   Api::ApiPtr api_;
+  NiceMock<Runtime::MockLoader> runtime_;
   Event::DispatcherPtr dispatcher_;
   Network::ListenerPtr upstream_listener_;
   Network::MockTcpListenerCallbacks listener_callbacks_;
-  Network::MockConnectionHandler connection_handler_;
   Network::Address::InstanceConstSharedPtr source_address_;
   Http::MockClientConnection* codec_;
   std::unique_ptr<CodecClientForTest> client_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_{
-      Upstream::makeTestHostDescription(cluster_, "tcp://127.0.0.1:80", simTime())};
+      Upstream::makeTestHostDescription(cluster_, "tcp://127.0.0.1:80")};
   Network::ConnectionPtr upstream_connection_;
   NiceMock<Network::MockConnectionCallbacks> upstream_callbacks_;
   Network::ClientConnection* client_connection_{};

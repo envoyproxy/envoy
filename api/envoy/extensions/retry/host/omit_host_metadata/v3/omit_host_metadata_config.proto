@@ -10,6 +10,7 @@ import "udpa/annotations/versioning.proto";
 option java_package = "io.envoyproxy.envoy.extensions.retry.host.omit_host_metadata.v3";
 option java_outer_classname = "OmitHostMetadataConfigProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/retry/host/omit_host_metadata/v3;omit_host_metadatav3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Omit host metadata retry predicate]
@@ -24,6 +25,6 @@ message OmitHostMetadataConfig {
   // Retry host predicate metadata match criteria. The hosts in
   // the upstream cluster with matching metadata will be omitted while
   // attempting a retry of a failed request. The metadata should be specified
-  // under the *envoy.lb* key.
+  // under the ``envoy.lb`` key.
   config.core.v3.Metadata metadata_match = 1;
 }

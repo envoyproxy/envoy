@@ -4,9 +4,8 @@
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/type/v3/http_status.pb.h"
 
-#include "common/http/headers.h"
-
-#include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
+#include "source/common/http/headers.h"
+#include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/test_common/utility.h"
@@ -16,6 +15,12 @@ namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace ExtAuthz {
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+void PrintTo(const ResponsePtr& ptr, std::ostream* os);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+void PrintTo(const Response& response, std::ostream* os);
 
 struct KeyValueOption {
   std::string key;
@@ -32,25 +37,31 @@ public:
   static Http::ResponseMessagePtr makeMessageResponse(const HeaderValueOptionVector& headers,
                                                       const std::string& body = std::string{});
 
-  static CheckResponsePtr makeCheckResponse(
-      Grpc::Status::GrpcStatus response_status = Grpc::Status::WellKnownGrpcStatus::Ok,
-      envoy::type::v3::StatusCode http_status_code = envoy::type::v3::OK,
-      const std::string& body = std::string{},
-      const HeaderValueOptionVector& headers = HeaderValueOptionVector{});
+  static CheckResponsePtr makeCheckResponse(Grpc::Status::GrpcStatus response_status,
+                                            envoy::type::v3::StatusCode http_status_code,
+                                            const std::string& body,
+                                            const HeaderValueOptionVector& headers,
+                                            const HeaderValueOptionVector& downstream_headers);
 
   static Response
   makeAuthzResponse(CheckStatus status, Http::Code status_code = Http::Code::OK,
                     const std::string& body = std::string{},
-                    const HeaderValueOptionVector& headers = HeaderValueOptionVector{});
+                    const HeaderValueOptionVector& headers = HeaderValueOptionVector{},
+                    const HeaderValueOptionVector& downstream_headers = HeaderValueOptionVector{},
+                    const absl::optional<Grpc::Status::GrpcStatus>& grpc_status = absl::nullopt);
 
   static HeaderValueOptionVector makeHeaderValueOption(KeyValueOptionVector&& headers);
 
-  static bool compareHeaderVector(const Http::HeaderVector& lhs, const Http::HeaderVector& rhs);
-  static bool compareVectorOfHeaderName(const std::vector<Http::LowerCaseString>& lhs,
-                                        const std::vector<Http::LowerCaseString>& rhs);
+  static bool compareHeaderVector(const UnsafeHeaderVector& lhs, const UnsafeHeaderVector& rhs);
+  static bool compareQueryParamsVector(const Http::Utility::QueryParamsVector& lhs,
+                                       const Http::Utility::QueryParamsVector& rhs);
+  static bool compareVectorOfHeaderName(const std::vector<std::string>& lhs,
+                                        const std::vector<std::string>& rhs);
+  static bool compareVectorOfUnorderedStrings(const std::vector<std::string>& lhs,
+                                              const std::vector<std::string>& rhs);
 };
 
-MATCHER_P(AuthzErrorResponse, status, "") {
+MATCHER_P(AuthzErrorResponse, response, "") {
   // These fields should be always empty when the status is an error.
   if (!arg->headers_to_add.empty() || !arg->headers_to_append.empty() || !arg->body.empty()) {
     return false;
@@ -59,10 +70,11 @@ MATCHER_P(AuthzErrorResponse, status, "") {
   if (arg->status_code != Http::Code::Forbidden) {
     return false;
   }
-  return arg->status == status;
+  return arg->status == response.status;
 }
 
 MATCHER_P(AuthzResponseNoAttributes, response, "") {
+  const bool equal_grpc_status = arg->grpc_status == response.grpc_status;
   const bool equal_status = arg->status == response.status;
   const bool equal_metadata =
       TestUtility::protoEqual(arg->dynamic_metadata, response.dynamic_metadata);
@@ -74,10 +86,13 @@ MATCHER_P(AuthzResponseNoAttributes, response, "") {
                      << arg->dynamic_metadata.DebugString()
                      << "=======================================================================\n";
   }
-  return equal_status && equal_metadata;
+  return equal_grpc_status && equal_status && equal_metadata;
 }
 
 MATCHER_P(AuthzDeniedResponse, response, "") {
+  if (arg->grpc_status != response.grpc_status) {
+    return false;
+  }
   if (arg->status != response.status) {
     return false;
   }
@@ -95,17 +110,48 @@ MATCHER_P(AuthzOkResponse, response, "") {
   if (arg->status != response.status) {
     return false;
   }
-  // Compare headers_to_append.
+
+  if (arg->grpc_status != response.grpc_status) {
+    return false;
+  }
+
   if (!TestCommon::compareHeaderVector(response.headers_to_append, arg->headers_to_append)) {
     return false;
   }
 
-  // Compare headers_to_add.
   if (!TestCommon::compareHeaderVector(response.headers_to_add, arg->headers_to_add)) {
     return false;
   }
 
-  return TestCommon::compareVectorOfHeaderName(response.headers_to_remove, arg->headers_to_remove);
+  if (!TestCommon::compareHeaderVector(response.response_headers_to_add,
+                                       arg->response_headers_to_add)) {
+    return false;
+  }
+
+  if (!TestCommon::compareHeaderVector(response.response_headers_to_set,
+                                       arg->response_headers_to_set)) {
+    return false;
+  }
+
+  if (!TestCommon::compareQueryParamsVector(response.query_parameters_to_set,
+                                            arg->query_parameters_to_set)) {
+    return false;
+  }
+
+  if (!TestCommon::compareVectorOfUnorderedStrings(response.query_parameters_to_remove,
+                                                   arg->query_parameters_to_remove)) {
+    return false;
+  }
+
+  if (!TestCommon::compareVectorOfHeaderName(response.headers_to_remove, arg->headers_to_remove)) {
+    return false;
+  }
+
+  if (!TestUtility::protoEqual(arg->dynamic_metadata, response.dynamic_metadata)) {
+    return false;
+  }
+
+  return true;
 }
 
 MATCHER_P(ContainsPairAsHeader, pair, "") {

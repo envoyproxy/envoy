@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package test.common.network;
+
+message Action {
+  oneof action_selector {
+    uint64 readable = 1;
+    uint64 drain = 2;
+    uint64 resetCapacity = 3;
+  }
+}
+
+message ListenerFilterBufferFuzzTestCase {
+  uint64 max_bytes_read = 1;
+  repeated Action actions = 2;
+}

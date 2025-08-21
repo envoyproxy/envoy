@@ -13,12 +13,12 @@
 #include "envoy/filesystem/watcher.h"
 #include "envoy/network/io_handle.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/buffer/buffer_impl.h"
-#include "common/common/fmt.h"
-#include "common/common/logger.h"
-#include "common/common/thread_impl.h"
-#include "common/network/io_socket_handle_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread_impl.h"
+#include "source/common/network/io_socket_handle_impl.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -27,11 +27,11 @@ namespace Filesystem {
 
 class WatcherImpl : public Watcher, Logger::Loggable<Logger::Id::file> {
 public:
-  WatcherImpl(Event::Dispatcher& dispatcher, Api::Api& api);
+  WatcherImpl(Event::Dispatcher& dispatcher, Filesystem::Instance& file_system);
   ~WatcherImpl();
 
   // Filesystem::Watcher
-  void addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) override;
+  absl::Status addWatch(absl::string_view path, uint32_t events, OnChangedCb cb) override;
 
 private:
   static void issueFirstRead(ULONG_PTR param);
@@ -59,7 +59,7 @@ private:
 
   typedef std::unique_ptr<DirectoryWatch> DirectoryWatchPtr;
 
-  Api::Api& api_;
+  Filesystem::Instance& file_system_;
   absl::node_hash_map<std::string, DirectoryWatchPtr> callback_map_;
   Network::IoHandlePtr read_handle_;
   Network::IoHandlePtr write_handle_;

@@ -17,7 +17,6 @@ envoy_cc_extension(
     hdrs = [
         "config.h",
     ],
-    security_posture = "robust_to_untrusted_downstream",
     visibility = ["//visibility:public"],
     deps = [
         ":upstream_request_lib",
@@ -35,9 +34,9 @@ envoy_cc_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//include/envoy/http:codes_interface",
-        "//include/envoy/http:filter_interface",
-        "//include/envoy/upstream:upstream_interface",
+        "//envoy/http:codes_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/upstream:upstream_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:utility_lib",
@@ -48,7 +47,7 @@ envoy_cc_library(
         "//source/common/network:application_protocol_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/router:router_lib",
-        "//source/common/upstream:load_balancer_lib",
+        "//source/common/upstream:load_balancer_context_base_lib",
         "//source/extensions/common/proxy_protocol:proxy_protocol_header_lib",
     ],
 )

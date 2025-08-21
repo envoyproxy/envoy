@@ -1,6 +1,5 @@
 config {
   name: "envoy.filters.http.grpc_stats"
-  typed_config: {}
 }
 data {
   headers {

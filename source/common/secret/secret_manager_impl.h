@@ -8,8 +8,8 @@
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
-#include "common/common/logger.h"
-#include "common/secret/sds_api.h"
+#include "source/common/common/logger.h"
+#include "source/common/secret/sds_api.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -18,8 +18,8 @@ namespace Secret {
 
 class SecretManagerImpl : public SecretManager {
 public:
-  SecretManagerImpl(Server::ConfigTracker& config_tracker);
-  void
+  SecretManagerImpl(OptRef<Server::ConfigTracker> config_tracker);
+  absl::Status
   addStaticSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override;
 
   TlsCertificateConfigProviderSharedPtr
@@ -50,25 +50,31 @@ public:
   GenericSecretConfigProviderSharedPtr createInlineGenericSecretProvider(
       const envoy::extensions::transport_sockets::tls::v3::GenericSecret& generic_secret) override;
 
-  TlsCertificateConfigProviderSharedPtr findOrCreateTlsCertificateProvider(
-      const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
+  TlsCertificateConfigProviderSharedPtr
+  findOrCreateTlsCertificateProvider(const envoy::config::core::v3::ConfigSource& config_source,
+                                     const std::string& config_name,
+                                     Server::Configuration::ServerFactoryContext& server_context,
+                                     Init::Manager& init_manager) override;
 
   CertificateValidationContextConfigProviderSharedPtr
   findOrCreateCertificateValidationContextProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
+      Server::Configuration::ServerFactoryContext& server_context,
+      Init::Manager& init_manager) override;
 
   TlsSessionTicketKeysConfigProviderSharedPtr findOrCreateTlsSessionTicketKeysContextProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
+      Server::Configuration::ServerFactoryContext& server_context,
+      Init::Manager& init_manager) override;
 
-  GenericSecretConfigProviderSharedPtr findOrCreateGenericSecretProvider(
-      const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
+  GenericSecretConfigProviderSharedPtr
+  findOrCreateGenericSecretProvider(const envoy::config::core::v3::ConfigSource& config_source,
+                                    const std::string& config_name,
+                                    Server::Configuration::ServerFactoryContext& server_context,
+                                    Init::Manager& init_manager) override;
 
 private:
-  ProtobufTypes::MessagePtr dumpSecretConfigs();
+  ProtobufTypes::MessagePtr dumpSecretConfigs(const Matchers::StringMatcher& name_matcher);
 
   template <class SecretType>
   class DynamicSecretProviders : public Logger::Loggable<Logger::Id::secret> {
@@ -77,7 +83,8 @@ private:
     std::shared_ptr<SecretType>
     findOrCreate(const envoy::config::core::v3::ConfigSource& sds_config_source,
                  const std::string& config_name,
-                 Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
+                 Server::Configuration::ServerFactoryContext& server_context,
+                 Init::Manager& init_manager) {
       const std::string map_key =
           absl::StrCat(MessageUtil::hash(sds_config_source), ".", config_name);
 
@@ -88,10 +95,23 @@ private:
         std::function<void()> unregister_secret_provider = [map_key, this]() {
           removeDynamicSecretProvider(map_key);
         };
-        secret_provider = SecretType::create(secret_provider_context, sds_config_source,
-                                             config_name, unregister_secret_provider);
+        secret_provider = SecretType::create(server_context, sds_config_source, config_name,
+                                             unregister_secret_provider);
         dynamic_secret_providers_[map_key] = secret_provider;
       }
+      // It is important to add the init target to the manager regardless the secret provider is new
+      // or existing. Different clusters / listeners can share same secret so they have to be marked
+      // warming correctly.
+
+      // Note that we are not using server_context's init manager because in some cases,
+      // for example oauth2 filter with sds config, it could be server's init manager. In oauth2
+      // filter example, if the filter config is dynamic, it could be received from xds server when
+      // the server's init manager is already in the initialized state. In that situation, adding
+      // init target to the initialized init manager will lead to assertion failure.
+      //
+      // It is expected that correct init manager will be passed to this method by the caller
+      // separately.
+      init_manager.add(*secret_provider->initTarget());
       return secret_provider;
     }
 

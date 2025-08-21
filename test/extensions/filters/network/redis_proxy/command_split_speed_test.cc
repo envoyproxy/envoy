@@ -5,13 +5,12 @@
 #include <string>
 #include <vector>
 
-#include "common/common/fmt.h"
-#include "common/stats/isolated_store_impl.h"
-
-#include "extensions/filters/network/common/redis/client_impl.h"
-#include "extensions/filters/network/common/redis/supported_commands.h"
-#include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
-#include "extensions/filters/network/redis_proxy/router_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/filters/network/common/redis/client_impl.h"
+#include "source/extensions/filters/network/common/redis/supported_commands.h"
+#include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
+#include "source/extensions/filters/network/redis_proxy/router_impl.h"
 
 #include "test/test_common/simulated_time_system.h"
 
@@ -89,44 +88,48 @@ public:
 } // namespace Extensions
 } // namespace Envoy
 
-static void BM_Split_CompositeArray(benchmark::State& state) {
+static void bmSplitCompositeArray(benchmark::State& state) {
   Envoy::Extensions::NetworkFilters::RedisProxy::CommandSplitSpeedTest context;
   Envoy::Extensions::NetworkFilters::Common::Redis::RespValueSharedPtr request =
       context.makeSharedBulkStringArray(state.range(0), 36, state.range(1));
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     context.createLocalCompositeArray(request);
   }
 }
-BENCHMARK(BM_Split_CompositeArray)->Ranges({{1, 100}, {64, 8 << 14}});
+BENCHMARK(bmSplitCompositeArray)->Ranges({{1, 100}, {64, 8 << 14}});
 
-static void BM_Split_Copy(benchmark::State& state) {
+static void bmSplitCopy(benchmark::State& state) {
   Envoy::Extensions::NetworkFilters::RedisProxy::CommandSplitSpeedTest context;
   Envoy::Extensions::NetworkFilters::Common::Redis::RespValueSharedPtr request =
       context.makeSharedBulkStringArray(state.range(0), 36, state.range(1));
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     context.copy(request);
   }
 }
-BENCHMARK(BM_Split_Copy)->Ranges({{1, 100}, {64, 8 << 14}});
+BENCHMARK(bmSplitCopy)->Ranges({{1, 100}, {64, 8 << 14}});
 
-static void BM_Split_CreateShared(benchmark::State& state) {
+static void bmSplitCreateShared(benchmark::State& state) {
   Envoy::Extensions::NetworkFilters::RedisProxy::CommandSplitSpeedTest context;
   Envoy::Extensions::NetworkFilters::Common::Redis::RespValueSharedPtr request =
       context.makeSharedBulkStringArray(state.range(0), 36, state.range(1));
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     context.createShared(request);
   }
   state.counters["use_count"] = request.use_count();
 }
-BENCHMARK(BM_Split_CreateShared)->Ranges({{1, 100}, {64, 8 << 14}});
+BENCHMARK(bmSplitCreateShared)->Ranges({{1, 100}, {64, 8 << 14}});
 
-static void BM_Split_CreateVariant(benchmark::State& state) {
+static void bmSplitCreateVariant(benchmark::State& state) {
   Envoy::Extensions::NetworkFilters::RedisProxy::CommandSplitSpeedTest context;
   Envoy::Extensions::NetworkFilters::Common::Redis::RespValueSharedPtr request =
       context.makeSharedBulkStringArray(state.range(0), 36, state.range(1));
   for (auto _ : state) {
+    UNREFERENCED_PARAMETER(_);
     context.createVariant(request);
   }
   state.counters["use_count"] = request.use_count();
 }
-BENCHMARK(BM_Split_CreateVariant)->Ranges({{1, 100}, {64, 8 << 14}});
+BENCHMARK(bmSplitCreateVariant)->Ranges({{1, 100}, {64, 8 << 14}});

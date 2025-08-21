@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/common/thread.h"
+#include "source/common/common/thread.h"
 
 namespace Envoy {
 namespace Grpc {

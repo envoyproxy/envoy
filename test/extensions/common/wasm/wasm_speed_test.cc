@@ -1,7 +1,6 @@
-#include "common/common/thread.h"
-#include "common/common/thread_synchronizer.h"
-
-#include "extensions/common/wasm/wasm.h"
+#include "source/common/common/thread.h"
+#include "source/common/common/thread_synchronizer.h"
+#include "source/extensions/common/wasm/wasm.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -30,8 +29,13 @@ void bmWasmSpeedTest(benchmark::State& state) {
   Envoy::Upstream::MockClusterManager cluster_manager;
   Envoy::Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
   auto scope = Envoy::Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
-  auto wasm = std::make_unique<Envoy::Extensions::Common::Wasm::Wasm>(
-      "envoy.wasm.runtime.null", "", "", "", scope, cluster_manager, *dispatcher);
+  proxy_wasm::AllowedCapabilitiesMap allowed_capabilities;
+
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  *plugin_config.mutable_vm_config()->mutable_runtime() = "envoy.wasm.runtime.null";
+  auto config = Envoy::Extensions::Common::Wasm::WasmConfig(plugin_config);
+  auto wasm = std::make_unique<Envoy::Extensions::Common::Wasm::Wasm>(config, "", scope, *api,
+                                                                      cluster_manager, *dispatcher);
 
   auto context = std::make_shared<Envoy::Extensions::Common::Wasm::Context>(wasm.get());
   Envoy::Thread::ThreadFactory& thread_factory{Envoy::Thread::threadFactoryForTest()};

@@ -13,7 +13,7 @@ envoy_cc_library(
     srcs = ["watcher_impl.cc"],
     hdrs = ["watcher_impl.h"],
     deps = [
-        "//include/envoy/init:watcher_interface",
+        "//envoy/init:watcher_interface",
         "//source/common/common:logger_lib",
     ],
 )
@@ -23,7 +23,7 @@ envoy_cc_library(
     srcs = ["target_impl.cc"],
     hdrs = ["target_impl.h"],
     deps = [
-        "//include/envoy/init:target_interface",
+        "//envoy/init:target_interface",
         "//source/common/common:logger_lib",
     ],
 )
@@ -34,7 +34,7 @@ envoy_cc_library(
     hdrs = ["manager_impl.h"],
     deps = [
         ":watcher_lib",
-        "//include/envoy/init:manager_interface",
+        "//envoy/init:manager_interface",
         "//source/common/common:logger_lib",
     ],
 )

@@ -4,8 +4,8 @@
 
 #include "envoy/init/manager.h"
 
-#include "common/common/logger.h"
-#include "common/init/watcher_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/init/watcher_impl.h"
 
 #include "absl/container/flat_hash_map.h"
 
@@ -14,7 +14,7 @@ namespace Init {
 
 /**
  * Init::ManagerImpl coordinates initialization of one or more "targets." See comments in
- * include/envoy/init/manager.h for an overview.
+ * envoy/init/manager.h for an overview.
  *
  * When the logging level is set to "debug" or "trace," the log will contain entries for all
  * significant events in the initialization flow:
@@ -36,7 +36,7 @@ public:
   State state() const override;
   void add(const Target& target) override;
   void initialize(const Watcher& watcher) override;
-  const absl::flat_hash_map<std::string, uint32_t>& unreadyTargets() const override;
+  void updateWatcher(const Watcher& watcher) override;
   void dumpUnreadyTargets(envoy::admin::v3::UnreadyTargetsDumps& dumps) override;
 
 private:
@@ -50,10 +50,10 @@ private:
   const std::string name_;
 
   // Current state.
-  State state_;
+  State state_{State::Uninitialized};
 
   // Current number of registered targets that have not yet initialized.
-  uint32_t count_;
+  uint32_t count_{0};
 
   // Handle to the watcher passed in `initialize`, to be called when initialization completes.
   WatcherHandlePtr watcher_handle_;

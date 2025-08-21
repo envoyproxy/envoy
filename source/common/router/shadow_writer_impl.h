@@ -23,6 +23,10 @@ public:
   void shadow(const std::string& cluster, Http::RequestMessagePtr&& request,
               const Http::AsyncClient::RequestOptions& options) override;
 
+  Http::AsyncClient::OngoingRequest*
+  streamingShadow(const std::string& cluster, Http::RequestHeaderMapPtr&& headers,
+                  const Http::AsyncClient::RequestOptions& options) override;
+
   // Http::AsyncClient::Callbacks
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&&) override {}
   void onFailure(const Http::AsyncClient::Request&, Http::AsyncClient::FailureReason) override {}
@@ -30,6 +34,10 @@ public:
                                     const Http::ResponseHeaderMap*) override {}
 
 private:
+  Upstream::ThreadLocalCluster*
+  getClusterAndPreprocessHeadersAndOptions(absl::string_view cluster,
+                                           Http::RequestHeaderMap& headers,
+                                           const Http::AsyncClient::RequestOptions& options);
   Upstream::ClusterManager& cm_;
 };
 

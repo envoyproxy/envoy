@@ -1,0 +1,7 @@
+frames {
+  qframe {
+    handshake_done {
+      control_frame_id: 0,
+    }
+  }
+}

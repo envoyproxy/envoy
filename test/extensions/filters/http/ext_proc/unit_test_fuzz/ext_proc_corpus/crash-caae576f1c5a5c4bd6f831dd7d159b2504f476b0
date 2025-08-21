@@ -1,0 +1,36 @@
+config {
+  grpc_service {
+    envoy_grpc {
+      cluster_name: "#"
+      retry_policy {
+        retry_back_off {
+          base_interval {
+            seconds: 137438953472
+          }
+        }
+      }
+    }
+    timeout {
+      seconds: 137438953472
+      nanos: 655360
+    }
+  }
+  request_attributes: "#"
+  message_timeout {
+    seconds: 137438953472
+  }
+  max_message_timeout {
+    seconds: 137438953472
+  }
+  disable_clear_route_cache: true
+}
+request {
+}
+response {
+  request_headers {
+  }
+  override_message_timeout {
+    seconds: 137438953472
+    nanos: 655360
+  }
+}

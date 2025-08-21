@@ -1,9 +1,9 @@
-#include "extensions/transport_sockets/alts/tsi_frame_protector.h"
+#include "source/extensions/transport_sockets/alts/tsi_frame_protector.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/assert.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
 
-#include "grpc/slice_buffer.h"
+#include "src/core/lib/iomgr/exec_ctx.h"
 #include "src/core/tsi/transport_security_grpc.h"
 #include "src/core/tsi/transport_security_interface.h"
 
@@ -15,16 +15,14 @@ namespace Alts {
 TsiFrameProtector::TsiFrameProtector(CFrameProtectorPtr&& frame_protector)
     : frame_protector_(std::move(frame_protector)) {}
 
-tsi_result TsiFrameProtector::protect(Buffer::Instance& input, Buffer::Instance& output) {
+tsi_result TsiFrameProtector::protect(const grpc_slice& input_slice, Buffer::Instance& output) {
   ASSERT(frame_protector_);
 
-  if (input.length() == 0) {
+  if (GRPC_SLICE_LENGTH(input_slice) == 0) {
     return TSI_OK;
   }
 
   grpc_core::ExecCtx exec_ctx;
-  grpc_slice input_slice = grpc_slice_from_copied_buffer(
-      reinterpret_cast<char*>(input.linearize(input.length())), input.length());
 
   grpc_slice_buffer message_buffer;
   grpc_slice_buffer_init(&message_buffer);
@@ -58,7 +56,6 @@ tsi_result TsiFrameProtector::protect(Buffer::Instance& input, Buffer::Instance&
       });
 
   output.addBufferFragment(*fragment);
-  input.drain(input.length());
 
   grpc_slice_buffer_destroy(&message_buffer);
   grpc_slice_buffer_destroy(&protected_buffer);
@@ -85,7 +82,7 @@ tsi_result TsiFrameProtector::unprotect(Buffer::Instance& input, Buffer::Instanc
   grpc_slice_buffer_init(&unprotected_buffer);
 
   tsi_result result = tsi_zero_copy_grpc_protector_unprotect(
-      frame_protector_.get(), &protected_buffer, &unprotected_buffer);
+      frame_protector_.get(), &protected_buffer, &unprotected_buffer, nullptr);
 
   if (result != TSI_OK) {
     ASSERT(result != TSI_INVALID_ARGUMENT && result != TSI_UNIMPLEMENTED);

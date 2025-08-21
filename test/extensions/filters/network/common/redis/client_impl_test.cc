@@ -2,12 +2,11 @@
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/network/utility.h"
-#include "common/upstream/upstream_impl.h"
-
-#include "extensions/filters/network/common/redis/client_impl.h"
-#include "extensions/filters/network/common/redis/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/utility.h"
+#include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/filters/network/common/redis/client_impl.h"
+#include "source/extensions/filters/network/common/redis/utility.h"
 
 #include "test/extensions/filters/network/common/redis/mocks.h"
 #include "test/extensions/filters/network/common/redis/test_utils.h"
@@ -52,12 +51,12 @@ public:
   }
 
   void setup() {
-    config_ = std::make_unique<ConfigImpl>(createConnPoolSettings());
+    config_ = std::make_shared<ConfigImpl>(createConnPoolSettings());
     finishSetup();
   }
 
-  void setup(std::unique_ptr<Config>&& config) {
-    config_ = std::move(config);
+  void setup(std::shared_ptr<Config> config) {
+    config_ = config;
     finishSetup();
   }
 
@@ -81,8 +80,9 @@ public:
         Common::Redis::RedisCommandStats::createRedisCommandStats(stats_.symbolTable());
 
     client_ = ClientImpl::create(host_, dispatcher_, Common::Redis::EncoderPtr{encoder_}, *this,
-                                 *config_, redis_command_stats_, stats_);
-    EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_total_.value());
+                                 config_, redis_command_stats_, *stats_.rootScope(), false, "pass",
+                                 absl::nullopt, absl::nullopt);
+    EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_total_.value());
     EXPECT_EQ(1UL, host_->stats_.cx_total_.value());
     EXPECT_EQ(false, client_->active());
 
@@ -118,8 +118,8 @@ public:
     EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
     client_->initialize(auth_username_, auth_password_);
 
-    EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_total_.value());
-    EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_active_.value());
+    EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
+    EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
     EXPECT_EQ(1UL, host_->stats_.rq_total_.value());
     EXPECT_EQ(1UL, host_->stats_.rq_active_.value());
 
@@ -138,10 +138,10 @@ public:
   Common::Redis::DecoderCallbacks* callbacks_{};
   NiceMock<Network::MockClientConnection>* upstream_connection_{};
   Network::ReadFilterSharedPtr upstream_read_filter_;
-  std::unique_ptr<Config> config_;
+  std::shared_ptr<Config> config_;
   ClientPtr client_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_;
-  Stats::ScopePtr stats_scope_;
+  Stats::ScopeSharedPtr stats_scope_;
   Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
   std::string auth_username_;
   std::string auth_password_;
@@ -191,6 +191,8 @@ class ConfigBufferSizeGTSingleRequest : public Config {
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
   bool enableCommandStats() const override { return false; }
   ReadPolicy readPolicy() const override { return ReadPolicy::Primary; }
+  bool connectionRateLimitEnabled() const override { return false; }
+  uint32_t connectionRateLimitPerSec() const override { return 0; }
 };
 
 TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
@@ -199,7 +201,7 @@ TEST_F(RedisClientImplTest, BatchWithTimerFiring) {
   // have to wait for the flush timer to fire.
   InSequence s;
 
-  setup(std::make_unique<ConfigBufferSizeGTSingleRequest>());
+  setup(std::make_shared<ConfigBufferSizeGTSingleRequest>());
 
   // Make the dummy request
   Common::Redis::RespValue request1;
@@ -241,7 +243,7 @@ TEST_F(RedisClientImplTest, BatchWithTimerCancelledByBufferFlush) {
   // that it is never invoked.
   InSequence s;
 
-  setup(std::make_unique<ConfigBufferSizeGTSingleRequest>());
+  setup(std::make_shared<ConfigBufferSizeGTSingleRequest>());
 
   // Make the dummy request (doesn't fill buffer, starts timer)
   Common::Redis::RespValue request1;
@@ -309,8 +311,8 @@ TEST_F(RedisClientImplTest, Basic) {
   PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
   EXPECT_NE(nullptr, handle2);
 
-  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_total_.value());
-  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_active_.value());
+  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
+  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_total_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
@@ -350,6 +352,8 @@ class ConfigEnableCommandStats : public Config {
   ReadPolicy readPolicy() const override { return ReadPolicy::Primary; }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
   bool enableCommandStats() const override { return true; }
+  bool connectionRateLimitEnabled() const override { return false; }
+  uint32_t connectionRateLimitPerSec() const override { return 0; }
 };
 
 void initializeRedisSimpleCommand(Common::Redis::RespValue* request, std::string command_name,
@@ -386,8 +390,8 @@ TEST_F(RedisClientImplTest, CommandStatsDisabledSingleRequest) {
   onConnected();
 
   // Regular Envoy stats function as normal
-  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_total_.value());
-  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_active_.value());
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
   EXPECT_EQ(1UL, host_->stats_.rq_total_.value());
   EXPECT_EQ(1UL, host_->stats_.rq_active_.value());
 
@@ -425,7 +429,7 @@ TEST_F(RedisClientImplTest, CommandStatsEnabledTwoRequests) {
   // Make two GET requests (one success, one failure) and verify command stats are recorded
   InSequence s;
 
-  setup(std::make_unique<ConfigEnableCommandStats>());
+  setup(std::make_shared<ConfigEnableCommandStats>());
 
   client_->initialize(auth_username_, auth_password_);
 
@@ -450,8 +454,8 @@ TEST_F(RedisClientImplTest, CommandStatsEnabledTwoRequests) {
   EXPECT_NE(nullptr, handle2);
 
   // Regular Envoy stats function as normal
-  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_total_.value());
-  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_active_.value());
+  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
+  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_total_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
@@ -514,8 +518,8 @@ TEST_F(RedisClientImplTest, InitializedWithAuthPassword) {
   EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
   client_->initialize(auth_username_, auth_password_);
 
-  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_total_.value());
-  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_active_.value());
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
   EXPECT_EQ(1UL, host_->stats_.rq_total_.value());
   EXPECT_EQ(1UL, host_->stats_.rq_active_.value());
 
@@ -536,8 +540,8 @@ TEST_F(RedisClientImplTest, InitializedWithAuthAcl) {
   EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
   client_->initialize(auth_username_, auth_password_);
 
-  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_total_.value());
-  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_active_.value());
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
   EXPECT_EQ(1UL, host_->stats_.rq_total_.value());
   EXPECT_EQ(1UL, host_->stats_.rq_active_.value());
 
@@ -613,7 +617,7 @@ TEST_F(RedisClientImplTest, Cancel) {
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   client_->close();
 
-  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_cancelled_.value());
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_cancelled_.value());
 }
 
 TEST_F(RedisClientImplTest, FailAll) {
@@ -640,8 +644,9 @@ TEST_F(RedisClientImplTest, FailAll) {
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::RemoteClose));
   upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
-  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_destroy_with_active_rq_.value());
-  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_destroy_remote_with_active_rq_.value());
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_destroy_with_active_rq_.value());
+  EXPECT_EQ(1UL,
+            host_->cluster_.traffic_stats_->upstream_cx_destroy_remote_with_active_rq_.value());
 }
 
 TEST_F(RedisClientImplTest, FailAllWithCancel) {
@@ -667,9 +672,9 @@ TEST_F(RedisClientImplTest, FailAllWithCancel) {
   EXPECT_CALL(connection_callbacks, onEvent(Network::ConnectionEvent::LocalClose));
   upstream_connection_->raiseEvent(Network::ConnectionEvent::LocalClose);
 
-  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_destroy_with_active_rq_.value());
-  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_destroy_local_with_active_rq_.value());
-  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_cancelled_.value());
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_destroy_with_active_rq_.value());
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_destroy_local_with_active_rq_.value());
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_cancelled_.value());
 }
 
 TEST_F(RedisClientImplTest, ProtocolError) {
@@ -697,7 +702,7 @@ TEST_F(RedisClientImplTest, ProtocolError) {
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   upstream_read_filter_->onData(fake_data, false);
 
-  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_protocol_error_.value());
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_protocol_error_.value());
   EXPECT_EQ(1UL, host_->stats_.rq_error_.value());
 }
 
@@ -719,7 +724,7 @@ TEST_F(RedisClientImplTest, ConnectFail) {
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
-  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_connect_fail_.value());
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_connect_fail_.value());
   EXPECT_EQ(1UL, host_->stats_.cx_connect_fail_.value());
 }
 
@@ -735,12 +740,14 @@ class ConfigOutlierDisabled : public Config {
   ReadPolicy readPolicy() const override { return ReadPolicy::Primary; }
   uint32_t maxUpstreamUnknownConnections() const override { return 0; }
   bool enableCommandStats() const override { return false; }
+  bool connectionRateLimitEnabled() const override { return false; }
+  uint32_t connectionRateLimitPerSec() const override { return 0; }
 };
 
 TEST_F(RedisClientImplTest, OutlierDisabled) {
   InSequence s;
 
-  setup(std::make_unique<ConfigOutlierDisabled>());
+  setup(std::make_shared<ConfigOutlierDisabled>());
 
   Common::Redis::RespValue request1;
   MockClientCallbacks callbacks1;
@@ -754,7 +761,7 @@ TEST_F(RedisClientImplTest, OutlierDisabled) {
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   upstream_connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
 
-  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_connect_fail_.value());
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_connect_fail_.value());
   EXPECT_EQ(1UL, host_->stats_.cx_connect_fail_.value());
 }
 
@@ -777,7 +784,7 @@ TEST_F(RedisClientImplTest, ConnectTimeout) {
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   connect_or_op_timer_->invokeCallback();
 
-  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_cx_connect_timeout_.value());
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_cx_connect_timeout_.value());
   EXPECT_EQ(1UL, host_->stats_.cx_connect_fail_.value());
 }
 
@@ -795,8 +802,8 @@ TEST_F(RedisClientImplTest, OpTimeout) {
 
   onConnected();
 
-  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_total_.value());
-  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_active_.value());
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
 
   EXPECT_CALL(callbacks1, onResponse_(_));
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
@@ -804,8 +811,8 @@ TEST_F(RedisClientImplTest, OpTimeout) {
               putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
   respond();
 
-  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_total_.value());
-  EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_rq_active_.value());
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
+  EXPECT_EQ(0UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
 
   EXPECT_CALL(*encoder_, encode(Ref(request1), _));
   EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
@@ -820,10 +827,10 @@ TEST_F(RedisClientImplTest, OpTimeout) {
   EXPECT_CALL(*connect_or_op_timer_, disableTimer());
   connect_or_op_timer_->invokeCallback();
 
-  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_timeout_.value());
+  EXPECT_EQ(1UL, host_->cluster_.traffic_stats_->upstream_rq_timeout_.value());
   EXPECT_EQ(1UL, host_->stats_.rq_timeout_.value());
-  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_total_.value());
-  EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_rq_active_.value());
+  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
+  EXPECT_EQ(0UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
 }
 
 TEST_F(RedisClientImplTest, AskRedirection) {
@@ -847,8 +854,8 @@ TEST_F(RedisClientImplTest, AskRedirection) {
   PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
   EXPECT_NE(nullptr, handle2);
 
-  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_total_.value());
-  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_active_.value());
+  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
+  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_total_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
@@ -860,27 +867,21 @@ TEST_F(RedisClientImplTest, AskRedirection) {
     // The exact values of the hash slot and IP info are not important.
     response1->asString() = "ASK 1111 10.1.2.3:4321";
     // Simulate redirection failure.
-    EXPECT_CALL(callbacks1, onRedirection_(Ref(response1), "10.1.2.3:4321", true))
-        .WillOnce(Return(false));
+    EXPECT_CALL(callbacks1, onRedirection_(Ref(response1), "10.1.2.3:4321", true));
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
     EXPECT_CALL(host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response1));
 
-    EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_internal_redirect_failed_total_.value());
-
     Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
     response2->type(Common::Redis::RespType::Error);
     // The exact values of the hash slot and IP info are not important.
     response2->asString() = "ASK 2222 10.1.2.4:4321";
-    EXPECT_CALL(callbacks2, onRedirection_(Ref(response2), "10.1.2.4:4321", true))
-        .WillOnce(Return(true));
+    EXPECT_CALL(callbacks2, onRedirection_(Ref(response2), "10.1.2.4:4321", true));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
     EXPECT_CALL(host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
-
-    EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_internal_redirect_succeeded_total_.value());
   }));
   upstream_read_filter_->onData(fake_data, false);
 
@@ -910,8 +911,8 @@ TEST_F(RedisClientImplTest, MovedRedirection) {
   PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
   EXPECT_NE(nullptr, handle2);
 
-  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_total_.value());
-  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_active_.value());
+  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
+  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_total_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
@@ -923,27 +924,21 @@ TEST_F(RedisClientImplTest, MovedRedirection) {
     // The exact values of the hash slot and IP info are not important.
     response1->asString() = "MOVED 1111 10.1.2.3:4321";
     // Simulate redirection failure.
-    EXPECT_CALL(callbacks1, onRedirection_(Ref(response1), "10.1.2.3:4321", false))
-        .WillOnce(Return(false));
+    EXPECT_CALL(callbacks1, onRedirection_(Ref(response1), "10.1.2.3:4321", false));
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
     EXPECT_CALL(host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response1));
 
-    EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_internal_redirect_failed_total_.value());
-
     Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
     response2->type(Common::Redis::RespType::Error);
     // The exact values of the hash slot and IP info are not important.
     response2->asString() = "MOVED 2222 10.1.2.4:4321";
-    EXPECT_CALL(callbacks2, onRedirection_(Ref(response2), "10.1.2.4:4321", false))
-        .WillOnce(Return(true));
+    EXPECT_CALL(callbacks2, onRedirection_(Ref(response2), "10.1.2.4:4321", false));
     EXPECT_CALL(*connect_or_op_timer_, disableTimer());
     EXPECT_CALL(host_->outlier_detector_,
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
-
-    EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_internal_redirect_succeeded_total_.value());
   }));
   upstream_read_filter_->onData(fake_data, false);
 
@@ -973,8 +968,8 @@ TEST_F(RedisClientImplTest, RedirectionFailure) {
   PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
   EXPECT_NE(nullptr, handle2);
 
-  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_total_.value());
-  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_active_.value());
+  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
+  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_total_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
@@ -994,8 +989,10 @@ TEST_F(RedisClientImplTest, RedirectionFailure) {
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response1));
 
-    EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_succeeded_total_.value());
-    EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_failed_total_.value());
+    EXPECT_EQ(0UL,
+              host_->cluster_.traffic_stats_->upstream_internal_redirect_succeeded_total_.value());
+    EXPECT_EQ(0UL,
+              host_->cluster_.traffic_stats_->upstream_internal_redirect_failed_total_.value());
 
     // Test a truncated MOVED error response that cannot be parsed properly.
     Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
@@ -1007,8 +1004,10 @@ TEST_F(RedisClientImplTest, RedirectionFailure) {
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
 
-    EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_succeeded_total_.value());
-    EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_failed_total_.value());
+    EXPECT_EQ(0UL,
+              host_->cluster_.traffic_stats_->upstream_internal_redirect_succeeded_total_.value());
+    EXPECT_EQ(0UL,
+              host_->cluster_.traffic_stats_->upstream_internal_redirect_failed_total_.value());
   }));
   upstream_read_filter_->onData(fake_data, false);
 
@@ -1020,7 +1019,7 @@ TEST_F(RedisClientImplTest, RedirectionFailure) {
 TEST_F(RedisClientImplTest, AskRedirectionNotEnabled) {
   InSequence s;
 
-  setup(std::make_unique<ConfigImpl>(createConnPoolSettings(20, true, false)));
+  setup(std::make_shared<ConfigImpl>(createConnPoolSettings(20, true, false)));
 
   Common::Redis::RespValue request1;
   MockClientCallbacks callbacks1;
@@ -1038,8 +1037,8 @@ TEST_F(RedisClientImplTest, AskRedirectionNotEnabled) {
   PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
   EXPECT_NE(nullptr, handle2);
 
-  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_total_.value());
-  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_active_.value());
+  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
+  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_total_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
@@ -1057,8 +1056,10 @@ TEST_F(RedisClientImplTest, AskRedirectionNotEnabled) {
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response1));
 
-    EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_failed_total_.value());
-    EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_succeeded_total_.value());
+    EXPECT_EQ(0UL,
+              host_->cluster_.traffic_stats_->upstream_internal_redirect_failed_total_.value());
+    EXPECT_EQ(0UL,
+              host_->cluster_.traffic_stats_->upstream_internal_redirect_succeeded_total_.value());
 
     Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
     response2->type(Common::Redis::RespType::Error);
@@ -1070,8 +1071,10 @@ TEST_F(RedisClientImplTest, AskRedirectionNotEnabled) {
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
 
-    EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_failed_total_.value());
-    EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_succeeded_total_.value());
+    EXPECT_EQ(0UL,
+              host_->cluster_.traffic_stats_->upstream_internal_redirect_failed_total_.value());
+    EXPECT_EQ(0UL,
+              host_->cluster_.traffic_stats_->upstream_internal_redirect_succeeded_total_.value());
   }));
   upstream_read_filter_->onData(fake_data, false);
 
@@ -1083,7 +1086,7 @@ TEST_F(RedisClientImplTest, AskRedirectionNotEnabled) {
 TEST_F(RedisClientImplTest, MovedRedirectionNotEnabled) {
   InSequence s;
 
-  setup(std::make_unique<ConfigImpl>(createConnPoolSettings(20, true, false)));
+  setup(std::make_shared<ConfigImpl>(createConnPoolSettings(20, true, false)));
 
   Common::Redis::RespValue request1;
   MockClientCallbacks callbacks1;
@@ -1101,8 +1104,8 @@ TEST_F(RedisClientImplTest, MovedRedirectionNotEnabled) {
   PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
   EXPECT_NE(nullptr, handle2);
 
-  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_total_.value());
-  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_active_.value());
+  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_total_.value());
+  EXPECT_EQ(2UL, host_->cluster_.traffic_stats_->upstream_rq_active_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_total_.value());
   EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
 
@@ -1119,8 +1122,10 @@ TEST_F(RedisClientImplTest, MovedRedirectionNotEnabled) {
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response1));
 
-    EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_succeeded_total_.value());
-    EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_failed_total_.value());
+    EXPECT_EQ(0UL,
+              host_->cluster_.traffic_stats_->upstream_internal_redirect_succeeded_total_.value());
+    EXPECT_EQ(0UL,
+              host_->cluster_.traffic_stats_->upstream_internal_redirect_failed_total_.value());
 
     Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
     response2->type(Common::Redis::RespType::Error);
@@ -1132,8 +1137,10 @@ TEST_F(RedisClientImplTest, MovedRedirectionNotEnabled) {
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
 
-    EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_succeeded_total_.value());
-    EXPECT_EQ(0UL, host_->cluster_.stats_.upstream_internal_redirect_failed_total_.value());
+    EXPECT_EQ(0UL,
+              host_->cluster_.traffic_stats_->upstream_internal_redirect_succeeded_total_.value());
+    EXPECT_EQ(0UL,
+              host_->cluster_.traffic_stats_->upstream_internal_redirect_failed_total_.value());
   }));
   upstream_read_filter_->onData(fake_data, false);
 
@@ -1207,14 +1214,15 @@ TEST(RedisClientFactoryImplTest, Basic) {
   std::shared_ptr<Upstream::MockHost> host(new NiceMock<Upstream::MockHost>());
   EXPECT_CALL(*host, createConnection_(_, _)).WillOnce(Return(conn_info));
   NiceMock<Event::MockDispatcher> dispatcher;
-  ConfigImpl config(createConnPoolSettings());
+  auto config = std::make_shared<ConfigImpl>(createConnPoolSettings());
   Stats::IsolatedStoreImpl stats_;
   auto redis_command_stats =
       Common::Redis::RedisCommandStats::createRedisCommandStats(stats_.symbolTable());
   const std::string auth_username;
   const std::string auth_password;
-  ClientPtr client = factory.create(host, dispatcher, config, redis_command_stats, stats_,
-                                    auth_username, auth_password);
+  ClientPtr client =
+      factory.create(host, dispatcher, config, redis_command_stats, *stats_.rootScope(),
+                     auth_username, auth_password, false, absl::nullopt, absl::nullopt);
   client->close();
 }
 } // namespace Client

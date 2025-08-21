@@ -6,7 +6,7 @@
 #include "envoy/event/schedulable_cb.h"
 #include "envoy/event/timer.h"
 
-#include "common/event/libevent.h"
+#include "source/common/event/libevent.h"
 
 #include "event2/event.h"
 #include "event2/watch.h"
@@ -43,8 +43,6 @@ namespace Event {
 // The same mechanism implements both of these operations, so they are invoked as a group.
 // - Event::SchedulableCallback::scheduleCallbackCurrentIteration(). Each of these callbacks is
 // scheduled and invoked independently.
-// - Event::Timer::enableTimer(0) if "envoy.reloadable_features.activate_timers_next_event_loop"
-// runtime feature is disabled.
 //
 // Event::FileEvent::activate and Event::SchedulableCallback::scheduleCallbackNextIteration are
 // implemented as libevent timers with a deadline of 0. Both of these actions are moved to the work
@@ -59,6 +57,8 @@ namespace Event {
 class LibeventScheduler : public Scheduler, public CallbackScheduler {
 public:
   using OnPrepareCallback = std::function<void()>;
+  using OnCheckCallback = std::function<void()>;
+
   LibeventScheduler();
 
   // Scheduler
@@ -96,6 +96,14 @@ public:
   void registerOnPrepareCallback(OnPrepareCallback&& callback);
 
   /**
+   * Register callback to be called in the event loop after polling for
+   * events and prior to handling those events. Must not be called more than once. |callback| must
+   * not be null. |callback| cannot be unregistered, therefore it has to be valid throughout the
+   * lifetime of |this|.
+   */
+  void registerOnCheckCallback(OnCheckCallback&& callback);
+
+  /**
    * Start writing stats once thread-local storage is ready to receive them (see
    * ThreadLocalStoreImpl::initializeThreading).
    */
@@ -103,6 +111,7 @@ public:
 
 private:
   static void onPrepareForCallback(evwatch*, const evwatch_prepare_cb_info* info, void* arg);
+  static void onCheckForCallback(evwatch*, const evwatch_check_cb_info* info, void* arg);
   static void onPrepareForStats(evwatch*, const evwatch_prepare_cb_info* info, void* arg);
   static void onCheckForStats(evwatch*, const evwatch_check_cb_info*, void* arg);
 
@@ -122,7 +131,8 @@ private:
   timeval timeout_{};        // the poll timeout for the current event loop iteration, if available
   timeval prepare_time_{};   // timestamp immediately before polling
   timeval check_time_{};     // timestamp immediately after polling
-  OnPrepareCallback callback_; // callback to be called from onPrepareForCallback()
+  OnPrepareCallback prepare_callback_; // callback to be called from onPrepareForCallback()
+  OnCheckCallback check_callback_;     // callback to be called from onCheckForCallback()
 };
 
 } // namespace Event

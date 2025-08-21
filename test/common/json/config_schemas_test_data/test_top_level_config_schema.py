@@ -20,7 +20,7 @@ TOP_LEVEL_CONFIG_BLOB = {
     "tracing": {
         "http": {
             "driver": {
-                "type": "lightstep",
+                "type": "known",
                 "config": {
                     "access_token_file": "/etc/envoy/envoy.cfg",
                     "collector_cluster": "foo"
@@ -32,18 +32,18 @@ TOP_LEVEL_CONFIG_BLOB = {
 
 
 def test(writer):
-  writer.write_test_file(
-      'Valid',
-      schema='TOP_LEVEL_CONFIG_SCHEMA',
-      data=get_blob(TOP_LEVEL_CONFIG_BLOB),
-      throws=False,
-  )
+    writer.write_test_file(
+        'Valid',
+        schema='TOP_LEVEL_CONFIG_SCHEMA',
+        data=get_blob(TOP_LEVEL_CONFIG_BLOB),
+        throws=False,
+    )
 
-  blob = get_blob(TOP_LEVEL_CONFIG_BLOB)
-  blob['tracing']['http']['driver']['type'] = 'unknown'
-  writer.write_test_file(
-      'UnsupportedTracingDriver',
-      schema='TOP_LEVEL_CONFIG_SCHEMA',
-      data=blob,
-      throws=True,
-  )
+    blob = get_blob(TOP_LEVEL_CONFIG_BLOB)
+    blob['tracing']['http']['driver']['type'] = 'unknown'
+    writer.write_test_file(
+        'UnsupportedTracingDriver',
+        schema='TOP_LEVEL_CONFIG_SCHEMA',
+        data=blob,
+        throws=True,
+    )

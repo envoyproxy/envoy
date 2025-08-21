@@ -1,60 +1,49 @@
 #pragma once
 
-#include <iostream>
 #include <memory>
 
-#include "envoy/common/pure.h"
+#include "envoy/tracing/trace_driver.h"
 
-#include "common/tracing/http_tracer_impl.h"
+#include "source/common/tracing/common_values.h"
+#include "source/common/tracing/null_span_impl.h"
+#include "source/common/tracing/trace_context_impl.h"
+#include "source/extensions/tracers/skywalking/trace_segment_reporter.h"
 
-#include "extensions/tracers/skywalking/skywalking_types.h"
-#include "extensions/tracers/skywalking/trace_segment_reporter.h"
+#include "cpp2sky/tracing_context.h"
+#include "cpp2sky/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace SkyWalking {
 
-class Span;
+using cpp2sky::TracingContextSharedPtr;
+using cpp2sky::TracingSpanSharedPtr;
+
+const Tracing::TraceContextHandler& skywalkingPropagationHeaderKey();
 
 class Tracer {
 public:
-  explicit Tracer(TimeSource& time_source) : time_source_(time_source) {}
-  virtual ~Tracer() { reporter_->closeStream(); }
-
-  /*
-   * Set a trace segment reporter to the current Tracer. Whenever a SkyWalking segment ends, the
-   * reporter will be used to report segment data.
-   *
-   * @param reporter The unique ptr of trace segment reporter.
-   */
-  void setReporter(TraceSegmentReporterPtr&& reporter) { reporter_ = std::move(reporter); }
+  Tracer(TraceSegmentReporterPtr reporter);
 
   /*
    * Report trace segment data to backend tracing service.
    *
    * @param segment_context The segment context.
    */
-  void report(const SegmentContext& segment_context) { return reporter_->report(segment_context); }
+  void sendSegment(TracingContextSharedPtr tracing_context);
 
   /*
    * Create a new span based on the segment context and parent span.
    *
-   * @param config The tracing config.
-   * @param start_time Start time of span.
-   * @param operation Operation name of span.
-   * @param segment_context The SkyWalking segment context. The newly created span belongs to this
-   * segment.
-   * @param parent The parent span pointer. If parent is null, then the newly created span is first
-   * span of this segment.
+   * @param name Operation name of span.
+   * @param tracing_context The SkyWalking tracing context. The newly created span belongs to this
+   * context.
    *
    * @return The unique ptr to the newly created span.
    */
-  Tracing::SpanPtr startSpan(const Tracing::Config& config, SystemTime start_time,
-                             const std::string& operation, SegmentContextSharedPtr segment_context,
-                             Span* parent);
-
-  TimeSource& time_source_;
+  Tracing::SpanPtr startSpan(absl::string_view name, absl::string_view protocol,
+                             TracingContextSharedPtr tracing_context);
 
 private:
   TraceSegmentReporterPtr reporter_;
@@ -64,51 +53,55 @@ using TracerPtr = std::unique_ptr<Tracer>;
 
 class Span : public Tracing::Span {
 public:
-  /*
-   * Constructor of span.
-   *
-   * @param segment_context The SkyWalking segment context.
-   * @param span_store Pointer to a SpanStore object. Whenever a new span is created, a new
-   * SpanStore object is created and stored in the segment context. This parameter can never be
-   * null.
-   * @param tracer Reference to tracer.
-   */
-  Span(SegmentContextSharedPtr segment_context, SpanStore* span_store, Tracer& tracer)
-      : segment_context_(std::move(segment_context)), span_store_(span_store), tracer_(tracer) {}
+  Span(absl::string_view name, absl::string_view protocol, TracingContextSharedPtr tracing_context,
+       Tracer& parent_tracer)
+      : parent_tracer_(parent_tracer), tracing_context_(tracing_context),
+        span_entity_(tracing_context_->createEntrySpan()) {
+    span_entity_->startSpan({name.data(), name.size()});
+    skywalking::v3::SpanLayer layer;
+    if (absl::StrContains(protocol, "HTTP")) {
+      // TraceContext.protocol of http is parsed from http message, which value could be HTTP/1.1,
+      // etc.
+      layer = skywalking::v3::SpanLayer::Http;
+    } else if (!skywalking::v3::SpanLayer_Parse(std::string(protocol), &layer)) {
+      layer = skywalking::v3::SpanLayer::Unknown;
+    }
+    span_entity_->setSpanLayer(layer);
+  }
+  Span(absl::string_view name, skywalking::v3::SpanLayer span_layer, Span& parent_span,
+       TracingContextSharedPtr tracing_context, Tracer& parent_tracer)
+      : parent_tracer_(parent_tracer), tracing_context_(tracing_context),
+        span_entity_(tracing_context_->createExitSpan(parent_span.spanEntity())) {
+    span_entity_->startSpan({name.data(), name.size()});
+    span_entity_->setSpanLayer(span_layer);
+  }
 
   // Tracing::Span
-  void setOperation(absl::string_view operation) override;
+  void setOperation(absl::string_view) override {}
   void setTag(absl::string_view name, absl::string_view value) override;
   void log(SystemTime timestamp, const std::string& event) override;
   void finishSpan() override;
-  void injectContext(Http::RequestHeaderMap& request_headers) override;
+  void injectContext(Tracing::TraceContext& trace_context,
+                     const Tracing::UpstreamContext& upstream) override;
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
-  void setSampled(bool sampled) override;
-  std::string getBaggage(absl::string_view key) override;
-  void setBaggage(absl::string_view key, absl::string_view value) override;
+  void setSampled(bool do_sample) override;
+  // TODO(wbpcode): The SkyWalking tracer may create NullSpanImpl if the tracing decision is not to
+  // trace. That make it is impossible to update the sampling decision. So, the useLocalDecision()
+  // always return false now. This should be resolved in the future.
+  bool useLocalDecision() const override { return false; }
+  std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
+  void setBaggage(absl::string_view, absl::string_view) override {}
+  std::string getTraceId() const override { return tracing_context_->traceId(); }
+  std::string getSpanId() const override { return EMPTY_STRING; }
 
-  /*
-   * Get pointer to corresponding SpanStore object. This method is mainly used in testing. Used to
-   * check the internal data of the span.
-   */
-  SpanStore* spanStore() const { return span_store_; }
-  SegmentContext* segmentContext() const { return segment_context_.get(); }
+  const TracingContextSharedPtr tracingContext() { return tracing_context_; }
+  const TracingSpanSharedPtr spanEntity() { return span_entity_; }
 
 private:
-  void tryToReportSpan() {
-    // If the current span is the root span of the entire segment and its sampling flag is not
-    // false, the data for the entire segment is reported. Please ensure that the root span is the
-    // last span to end in the entire segment.
-    if (span_store_->sampled() && span_store_->spanId() == 0) {
-      tracer_.report(*segment_context_);
-    }
-  }
-
-  SegmentContextSharedPtr segment_context_;
-  SpanStore* span_store_;
-
-  Tracer& tracer_;
+  Tracer& parent_tracer_;
+  TracingContextSharedPtr tracing_context_;
+  TracingSpanSharedPtr span_entity_;
 };
 
 } // namespace SkyWalking

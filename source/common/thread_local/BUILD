@@ -13,10 +13,11 @@ envoy_cc_library(
     srcs = ["thread_local_impl.cc"],
     hdrs = ["thread_local_impl.h"],
     deps = [
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/thread_local:thread_local_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:stl_helpers",
+        "//source/common/runtime:runtime_features_lib",
     ],
 )

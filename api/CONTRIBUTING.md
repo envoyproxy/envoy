@@ -9,7 +9,7 @@ changes. They may be as part of a larger implementation PR. Please follow the st
 process for validating build/test sanity of `api/` before submitting a PR.
 
 *Note: New .proto files should be added to
-[BUILD](https://github.com/envoyproxy/envoy/blob/master/api/versioning/BUILD) in order to get the RSTs generated.*
+[BUILD](https://github.com/envoyproxy/envoy/blob/main/api/versioning/BUILD) in order to get the RSTs generated.*
 
 ## Documentation changes
 
@@ -23,19 +23,19 @@ documentation.
 The documentation can be built locally in the root of https://github.com/envoyproxy/envoy via:
 
 ```
-docs/build.sh
+ci/do_ci.sh docs
 ```
 
 To skip configuration examples validation:
 
 ```
-SPHINX_SKIP_CONFIG_VALIDATION=true docs/build.sh
+SPHINX_SKIP_CONFIG_VALIDATION=true ci/do_ci.sh docs
 ```
 
 Or to use a hermetic Docker container:
 
 ```
-./ci/run_envoy_docker.sh './ci/do_ci.sh docs'
+./ci/run_envoy_docker.sh 'ci/do_ci.sh docs'
 ```
 
 This process builds RST documentation directly from the proto files, merges it with the static RST
@@ -72,7 +72,6 @@ The following are some general guidelines around documentation.
   // [#comment:TODO(mattklein123): Do something cooler]
   string foo_field = 3;
   ```
-
-* Prefer *italics* for emphasis as `backtick` emphasis is somewhat jarring in our Sphinx theme.
+* Please use *italics* (enclosed in asterisks `*emphasized word*`) for emphasis and `inline literals` for code quotation (enclosed in *double* backticks ` ``code`` `).
 * All documentation is expected to use proper English grammar with proper punctuation. If you are
   not a fluent English speaker please let us know and we will help out.

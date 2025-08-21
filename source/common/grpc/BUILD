@@ -1,4 +1,8 @@
 load(
+    "@envoy_build_config//:extensions_build_config.bzl",
+    "LEGACY_ALWAYSLINK",
+)
+load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_google_grpc_external_deps",
@@ -17,7 +21,8 @@ envoy_cc_library(
     deps = [
         ":codec_lib",
         ":context_lib",
-        "//include/envoy/grpc:async_client_interface",
+        "//envoy/grpc:async_client_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/http:async_client_lib",
     ],
@@ -31,11 +36,12 @@ envoy_cc_library(
         ":codec_lib",
         ":context_lib",
         ":typed_async_client_lib",
-        "//include/envoy/grpc:async_client_interface",
+        "//envoy/grpc:async_client_interface",
+        "//envoy/stream_info:stream_info_interface",
         "//source/common/buffer:zero_copy_input_stream_lib",
-        "//source/common/config:version_converter_lib",
         "//source/common/http:async_client_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
 
@@ -46,10 +52,11 @@ envoy_cc_library(
     deps = [
         ":async_client_lib",
         ":context_lib",
-        "//include/envoy/grpc:async_client_manager_interface",
-        "//include/envoy/singleton:manager_interface",
-        "//include/envoy/thread_local:thread_local_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
+        "//envoy/grpc:async_client_manager_interface",
+        "//envoy/singleton:manager_interface",
+        "//envoy/thread_local:thread_local_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ] + envoy_select_google_grpc([":google_async_client_lib"]),
 )
 
@@ -58,7 +65,7 @@ envoy_cc_library(
     srcs = ["codec.cc"],
     hdrs = ["codec.h"],
     deps = [
-        "//include/envoy/buffer:buffer_interface",
+        "//envoy/buffer:buffer_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:minimal_logger_lib",
     ],
@@ -68,9 +75,9 @@ envoy_cc_library(
     name = "status_lib",
     srcs = ["status.cc"],
     hdrs = ["status.h"],
-    external_deps = ["abseil_optional"],
     deps = [
-        "//include/envoy/grpc:status",
+        "//envoy/grpc:status",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -78,13 +85,12 @@ envoy_cc_library(
     name = "common_lib",
     srcs = ["common.cc"],
     hdrs = ["common.h"],
-    external_deps = ["abseil_optional"],
     deps = [
-        "//include/envoy/http:header_map_interface",
-        "//include/envoy/http:message_interface",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/upstream:cluster_manager_interface",
-        "//include/envoy/upstream:upstream_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/http:message_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/upstream:cluster_manager_interface",
+        "//envoy/upstream:upstream_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/common:assert_lib",
@@ -93,13 +99,16 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:hash_lib",
         "//source/common/common:macros",
+        "//source/common/common:safe_memcpy_lib",
         "//source/common/common:utility_lib",
+        "//source/common/grpc:codec_lib",
         "//source/common/grpc:status_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -107,16 +116,16 @@ envoy_cc_library(
     name = "context_lib",
     srcs = ["context_impl.cc"],
     hdrs = ["context_impl.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         ":common_lib",
         ":stat_names_lib",
-        "//include/envoy/grpc:context_interface",
-        "//include/envoy/http:header_map_interface",
-        "//include/envoy/stats:stats_interface",
+        "//envoy/grpc:context_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/stats:stats_interface",
         "//source/common/common:hash_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:utility_lib",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -124,14 +133,11 @@ envoy_cc_library(
     name = "google_grpc_utils_lib",
     srcs = ["google_grpc_utils.cc"],
     hdrs = ["google_grpc_utils.h"],
-    external_deps = [
-        "abseil_optional",
-        "grpc",
-    ],
+    external_deps = ["grpc"],
     deps = [
         ":google_grpc_creds_lib",
-        "//include/envoy/api:api_interface",
-        "//include/envoy/registry",
+        "//envoy/api:api_interface",
+        "//envoy/registry",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
@@ -139,6 +145,7 @@ envoy_cc_library(
         "//source/common/common:macros",
         "//source/common/common:utility_lib",
         "//source/common/grpc:status_lib",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -148,7 +155,7 @@ envoy_cc_library(
     srcs = ["stat_names.cc"],
     hdrs = ["stat_names.h"],
     deps = [
-        "//include/envoy/grpc:status",
+        "//envoy/grpc:status",
         "//source/common/stats:symbol_table_lib",
     ],
 )
@@ -157,10 +164,7 @@ envoy_cc_library(
     name = "google_async_client_lib",
     srcs = ["google_async_client_impl.cc"],
     hdrs = ["google_async_client_impl.h"],
-    external_deps = [
-        "abseil_synchronization",
-        "grpc",
-    ],
+    external_deps = ["grpc"],
     deps = [
         ":context_lib",
         ":google_grpc_context_lib",
@@ -168,15 +172,17 @@ envoy_cc_library(
         ":google_grpc_utils_lib",
         ":stat_names_lib",
         ":typed_async_client_lib",
-        "//include/envoy/api:api_interface",
-        "//include/envoy/grpc:google_grpc_creds_interface",
-        "//include/envoy/thread:thread_interface",
-        "//include/envoy/thread_local:thread_local_object",
+        "//envoy/api:api_interface",
+        "//envoy/grpc:google_grpc_creds_interface",
+        "//envoy/stream_info:stream_info_interface",
+        "//envoy/thread:thread_interface",
+        "//envoy/thread_local:thread_local_object",
         "//source/common/common:base64_lib",
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
         "//source/common/common:thread_annotations",
         "//source/common/tracing:http_tracer_lib",
+        "@com_google_absl//absl/synchronization",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
@@ -199,25 +205,31 @@ envoy_cc_library(
     hdrs = ["google_grpc_creds_impl.h"],
     external_deps = ["grpc"],
     deps = [
-        "//include/envoy/api:api_interface",
-        "//include/envoy/grpc:google_grpc_creds_interface",
-        "//include/envoy/registry",
+        "//envoy/api:api_interface",
+        "//envoy/grpc:google_grpc_creds_interface",
+        "//envoy/registry",
         "//source/common/config:datasource_lib",
+        "//source/common/runtime:runtime_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+    alwayslink = LEGACY_ALWAYSLINK,
+)
+
+envoy_cc_library(
+    name = "buffered_async_client_lib",
+    hdrs = ["buffered_async_client.h"],
+    deps = [
+        ":buffered_message_ttl_manager_lib",
+        ":typed_async_client_lib",
+        "//source/common/protobuf:utility_lib",
+        "@com_google_absl//absl/container:btree",
     ],
 )
 
 envoy_cc_library(
-    name = "google_async_client_cache",
-    srcs = ["google_async_client_cache.cc"],
-    hdrs = ["google_async_client_cache.h"],
-    external_deps = [
-        "grpc",
-    ],
+    name = "buffered_message_ttl_manager_lib",
+    hdrs = ["buffered_message_ttl_manager.h"],
     deps = [
-        "//include/envoy/grpc:async_client_manager_interface",
-        "//include/envoy/server:factory_context_interface",
-        "//include/envoy/singleton:instance_interface",
-        "//include/envoy/thread_local:thread_local_interface",
+        "//envoy/event:dispatcher_interface",
     ],
 )

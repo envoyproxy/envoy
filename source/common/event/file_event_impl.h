@@ -4,8 +4,8 @@
 
 #include "envoy/event/file_event.h"
 
-#include "common/event/dispatcher_impl.h"
-#include "common/event/event_impl_base.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/event/event_impl_base.h"
 
 namespace Envoy {
 namespace Event {
@@ -30,6 +30,7 @@ private:
   void mergeInjectedEventsAndRunCb(uint32_t events);
   void updateEvents(uint32_t events);
 
+  Dispatcher& dispatcher_;
   FileReadyCb cb_;
   os_fd_t fd_;
   FileTriggerType trigger_;

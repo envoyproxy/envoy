@@ -1,5 +1,5 @@
-#include "common/common/statusor.h"
-#include "common/http/status.h"
+#include "source/common/common/statusor.h"
+#include "source/common/http/status.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

@@ -2,8 +2,6 @@
 
 #include "envoy/server/transport_socket_config.h"
 
-#include "extensions/transport_sockets/well_known_names.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
@@ -14,14 +12,14 @@ class AltsTransportSocketConfigFactory
     : public virtual Server::Configuration::TransportSocketConfigFactory {
 public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-  std::string name() const override { return TransportSocketNames::get().Alts; }
+  std::string name() const override { return "envoy.transport_sockets.alts"; }
 };
 
 class UpstreamAltsTransportSocketConfigFactory
     : public AltsTransportSocketConfigFactory,
       public Server::Configuration::UpstreamTransportSocketConfigFactory {
 public:
-  Network::TransportSocketFactoryPtr
+  absl::StatusOr<Network::UpstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message&,
                                Server::Configuration::TransportSocketFactoryContext&) override;
 };
@@ -30,7 +28,7 @@ class DownstreamAltsTransportSocketConfigFactory
     : public AltsTransportSocketConfigFactory,
       public Server::Configuration::DownstreamTransportSocketConfigFactory {
 public:
-  Network::TransportSocketFactoryPtr
+  absl::StatusOr<Network::DownstreamTransportSocketFactoryPtr>
   createTransportSocketFactory(const Protobuf::Message&,
                                Server::Configuration::TransportSocketFactoryContext&,
                                const std::vector<std::string>&) override;

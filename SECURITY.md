@@ -48,7 +48,8 @@ necessary and is unlikely to make a public disclosure less damaging.
 
 For each vulnerability a member of the PST will volunteer to lead coordination with the "Fix Team"
 and is responsible for sending disclosure emails to the rest of the community. This lead will be
-referred to as the "Fix Lead."
+referred to as the "Fix Lead." The detailed list of responsibilities is outlined on the
+[Fix Lead Checklist](https://docs.google.com/document/d/1cuU0m9hTQ73Te3i06-8LjQkFVn83IL22FbCoc_4IFEY/edit#heading=h.c6thx0zc0gtz)
 
 The role of Fix Lead should rotate round-robin across the PST.
 
@@ -63,35 +64,38 @@ score >= 4; see below). If the fix relies on another upstream project's disclosu
 will adjust the process as well. We will work with the upstream project to fit their timeline and
 best protect our users.
 
-### Released versions and master branch
+### Released versions and main branch
 
 If the vulnerability affects the last point release version, e.g. 1.10, then the full security
 release process described in this document will be activated. A security point release will be
-created for 1.10, e.g. 1.10.1, together with a fix to master if necessary. Older point releases,
-e.g. 1.9, are not supported by the Envoy project and will not have any security release created.
+created for each currently supported Envoy version, as described in [stable releases](RELEASES.md#stable-releases),
+together with a fix to main if necessary. Older point releases,
+e.g. 1.5, are not supported by the Envoy project and will not have any security release created.
 
-If a security vulnerability affects only these older versions but not master or the last supported
+If a security vulnerability affects only these older versions but not main or the last supported
 point release, the Envoy security team will share this information with the private distributor
 list, following the standard embargo process, but not create a security release. After the embargo
 expires, the vulnerability will be described as a GitHub issue. A CVE will be filed if warranted by
 severity.
 
-If a vulnerability does not affect any point release but only master, additional caveats apply:
+If a vulnerability does not affect any point release but only main, additional caveats apply:
 
 * If the issue is detected and a fix is available within 7 days of the introduction of the
   vulnerability, or the issue is deemed a low severity vulnerability by the Envoy maintainer and
-  security teams, the fix will be publicly reviewed and landed on master. If the severity is at least
+  security teams, the fix will be publicly reviewed and landed on main. If the severity is at least
   medium or at maintainer discretion a courtesy e-mail will be sent to envoy-users@googlegroups.com,
   envoy-dev@googlegroups.com, envoy-security-announce@googlegroups.com and
   cncf-envoy-distributors-announce@lists.cncf.io.
 * If the vulnerability has been in existence for more than 7 days and is medium or higher, we will
   activate the security release process.
 
-We advise distributors and operators working from the master branch to allow at least 5 days soak
+We advise distributors and operators working from the main branch to allow at least 5 days soak
 time after cutting a binary release before distribution or rollout, to allow time for our fuzzers to
 detect issues during their execution on ClusterFuzz. A soak period of 7 days provides an even stronger
 guarantee, since we will invoke the security release process for medium or higher severity issues
 for these older bugs.
+
+**NOTE:** Contrib extensions are not eligible for Envoy security team coverage.
 
 ### Threat model
 
@@ -153,9 +157,14 @@ holiday periods or end-of-quarter (e.g. impacting downstream Istio releases), wh
 * Three weeks notice will be provided to private distributors from patch
   availability until the embargo deadline.
 
-* Public zero days will be fixed ASAP, but there is no SLO for this, since this
-  will depend on the severity and impact to the organizations backing the Envoy
-  security team.
+* Public zero days which affect the optimized binary will be fixed ASAP, but there is
+  no SLO for this, since this will depend on the severity and impact to the
+  organizations backing the Envoy security team. After a zero day bug fix is in, the
+  PST will kick off point releases unless the bug is deemed unlikely to be encountered
+  in production (e.g. only triggered by trace logs) at which point there will instead be an email
+  to envoy-announce and users can request point releases if they believe they will be affected.
+  Publicly announced bugs which only affect debug binaries will neither trigger point
+  releases nor announce emails.
 
 ### Fix Disclosure Process
 
@@ -181,7 +190,7 @@ patches, understand exact mitigation steps, etc.
   should be reserved for remotely exploitable or privilege escalation issues. Otherwise, this
   process can be skipped.
 - The Fix Lead will email the patches to cncf-envoy-distributors-announce@lists.cncf.io so
-  distributors can prepare builds to be available to users on the day of the issue's announcement. Any 
+  distributors can prepare builds to be available to users on the day of the issue's announcement. Any
   patches against main will be updated and resent weekly.
   Distributors should read about the [Private Distributors List](#private-distributors-list) to find
   out the requirements for being added to this list.
@@ -193,7 +202,7 @@ patches, understand exact mitigation steps, etc.
 - The maintainers will create a new patch release branch from the latest patch release tag + the fix
   from the security branch. As a practical example if v1.5.3 is the latest patch release in Envoy.git
   a new branch will be created called v1.5.4 which includes only patches required to fix the issue.
-- The Fix Lead will cherry-pick the patches onto the master branch and all relevant release branches.
+- The Fix Lead will cherry-pick the patches onto the main branch and all relevant release branches.
   The Fix Team will LGTM and merge. Maintainers will merge these PRs as quickly as possible. Changes
   shouldn't be made to the commits even for a typo in the CHANGELOG as this will change the git sha
   of the commits leading to confusion and potentially conflicts as the fix is cherry-picked around
@@ -205,6 +214,13 @@ patches, understand exact mitigation steps, etc.
   and user action. As much as possible this email should be actionable and include links on how to apply
   the fix to user's environments; this can include links to external distributor documentation.
 - The Fix Lead will remove the Fix Team from the private security repo.
+
+The reporter of a vulnerability will be granted early access to fix patches upon
+request, prior to the general disclosure of patches to the Private Distributors
+List for the purpose of testing and internal vulnerability mitigation. They must
+accept the embargo policy below in order for this to occur. If the vulnerability
+reporter is also responsible for developing fix patches, they may make use of
+the patches internally in their organization at any point in the fix cycle.
 
 ### Retrospective
 
@@ -325,6 +341,11 @@ use of Envoy should:
           **10** slots. Periodic review (see below) may allow new slots to open, so please continue
           to apply if it seems your organization would otherwise qualify. The security team also
           reserves the right to change this limit in the future.
+       5. Note that in this context "end user" is defined as an organization that *directly*
+          operates Envoy in order to serve traffic for 1st party use cases. The 1st party use case
+          can be either internal or external facing. Critically, vendors of cloud native software
+          and solutions can *also* be end users. Being a vendor does not preclude an organization
+          from being an end user as long as it satisfies the 1st party usage criteria.
 2. Have a user or customer base not limited to your own organization (except for option 3 above).
    We will use the size of the user or customer base as part of the criteria to determine
    eligibility.
@@ -442,20 +463,22 @@ and security team to ensure they still qualify for inclusion on the list.
 
 ### Members
 
-| E-mail                                                | Organization  | End User | Last Review |
-|-------------------------------------------------------|:-------------:|:--------:|:-----------:|
-| envoy-security-team@aspenmesh.io                      | Aspen Mesh    | No       | 12/19       |
-| aws-app-mesh-security@amazon.com                      | AWS           | No       | 12/19       |
-| security@cilium.io                                    | Cilium        | No       | 12/19       |
-| vulnerabilityreports@cloudfoundry.org                 | Cloud Foundry | No       | 12/19       |
-| secalert@datawire.io                                  | Datawire      | No       | 12/19       |
-| google-internal-envoy-security@google.com             | Google        | No       | 12/19       |
-| argoprod@us.ibm.com                                   | IBM           | No       | 12/19       |
-| istio-security-vulnerability-reports@googlegroups.com | Istio         | No       | 12/19       |
-| secalert@redhat.com                                   | Red Hat       | No       | 12/19       |
-| envoy-security@solo.io                                | solo.io       | No       | 12/19       |
-| envoy-security@tetrate.io                             | Tetrate       | No       | 12/19       |
-| security@vmware.com                                   | VMware        | No       | 12/19       |
-| envoy-security@pinterest.com                          | Pinterest     | Yes      | 12/19       |
-| envoy-security@dropbox.com                            | Dropbox       | Yes      | 01/20       |
-| envoy-security-predisclosure@stripe.com               | Stripe        | Yes      | 01/20       |
+| Organization  | End User | Last Review |
+|:-------------:|:--------:|:-----------:|
+| AWS           | No       | 07/24       |
+| Cilium        | No       | 07/24       |
+| Cloud Foundry | No       | 07/24       |
+| F5            | No       | 07/24       |
+| Google        | No       | 07/24       |
+| Istio         | No       | 07/24       |
+| Microsoft     | No       | 07/24       |
+| Red Hat       | No       | 07/24       |
+| VMware        | No       | 07/24       |
+| Tetrate       | No       | 07/24       |
+| solo.io       | No       | 07/24       |
+| Pinterest     | Yes      | 07/24       |
+| Dropbox       | Yes      | 07/24       |
+| Apple         | Yes      | 07/24       |
+| Spotify       | Yes      | 02/21       |
+| Netflix       | Yes      | 07/24       |
+| Slack         | Yes      | 07/24       |

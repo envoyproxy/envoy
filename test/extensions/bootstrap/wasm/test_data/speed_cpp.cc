@@ -17,12 +17,9 @@ START_WASM_PLUGIN(WasmSpeedCpp)
 
 int xDoNotRemove = 0;
 
-google::protobuf::Arena arena;
+google::protobuf::Struct test_proto;
 
-google::protobuf::Struct args;
-google::protobuf::Struct* args_arena =
-    google::protobuf::Arena::CreateMessage<google::protobuf::Struct>(&arena);
-std::string configuration = R"EOF(
+const std::string test_json = R"EOF(
   {
     "NAME":"test_pod",
     "NAMESPACE":"test_namespace",
@@ -42,9 +39,6 @@ std::string configuration = R"EOF(
     "MESH_ID":"test-mesh"
   }
   )EOF";
-
-// google::protobuf::Struct a;
-// google::protobuf::util::JsonStringToMessage(configuration+'hfdjfhkjhdskhjk', a);
 
 const static char encodeLookup[] =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -85,14 +79,17 @@ std::string base64Encode(const uint8_t* start, const uint8_t* end) {
 }
 
 bool base64Decode(const std::basic_string<char>& input, std::vector<uint8_t>* output) {
-  if (input.length() % 4)
+  if (input.length() % 4) {
     return false;
+  }
   size_t padding = 0;
   if (input.length()) {
-    if (input[input.length() - 1] == padCharacter)
+    if (input[input.length() - 1] == padCharacter) {
       padding++;
-    if (input[input.length() - 2] == padCharacter)
+    }
+    if (input[input.length() - 2] == padCharacter) {
       padding++;
+    }
   }
   // Setup a vector to hold the result
   std::vector<unsigned char> decodedBytes;
@@ -102,17 +99,17 @@ bool base64Decode(const std::basic_string<char>& input, std::vector<uint8_t>* ou
   while (cursor < input.end()) {
     for (size_t quantumPosition = 0; quantumPosition < 4; quantumPosition++) {
       temp <<= 6;
-      if (*cursor >= 0x41 && *cursor <= 0x5A) // This area will need tweaking if
-        temp |= *cursor - 0x41;               // you are using an alternate alphabet
-      else if (*cursor >= 0x61 && *cursor <= 0x7A)
+      if (*cursor >= 0x41 && *cursor <= 0x5A) { // This area will need tweaking if
+        temp |= *cursor - 0x41;                 // you are using an alternate alphabet
+      } else if (*cursor >= 0x61 && *cursor <= 0x7A) {
         temp |= *cursor - 0x47;
-      else if (*cursor >= 0x30 && *cursor <= 0x39)
+      } else if (*cursor >= 0x30 && *cursor <= 0x39) {
         temp |= *cursor + 0x04;
-      else if (*cursor == 0x2B)
+      } else if (*cursor == 0x2B) {
         temp |= 0x3E; // change to 0x2D for URL alphabet
-      else if (*cursor == 0x2F)
+      }  else if (*cursor == 0x2F) {
         temp |= 0x3F;                     // change to 0x5F for URL alphabet
-      else if (*cursor == padCharacter) { // pad
+      } else if (*cursor == padCharacter) { // pad
         switch (input.end() - cursor) {
         case 1: // One pad character
           decodedBytes.push_back((temp >> 16) & 0x000000FF);
@@ -124,8 +121,9 @@ bool base64Decode(const std::basic_string<char>& input, std::vector<uint8_t>* ou
         default:
           return false;
         }
-      } else
+      } else {
         return false;
+      }
       cursor++;
     }
     decodedBytes.push_back((temp >> 16) & 0x000000FF);
@@ -140,28 +138,28 @@ std::string check_compiler;
 
 void (*test_fn)() = nullptr;
 
-void empty_test() {}
+void emptyTest() {}
 
-void get_current_time_test() {
+void getCurrentTimeTest() {
   uint64_t t;
   if (WasmResult::Ok != proxy_get_current_time_nanoseconds(&t)) {
     logError("bad result from getCurrentTimeNanoseconds");
   }
 }
 
-void small_string_check_compiler_test() {
+void smallStringCheckCompilerTest() {
   check_compiler = "foo";
   check_compiler += "bar";
   check_compiler = "";
 }
 
-void small_string_test() {
+void smallStringTest() {
   std::string s = "foo";
   s += "bar";
   xDoNotRemove = s.size();
 }
 
-void small_string_check_compiler1000_test() {
+void smallStringCheckCompiler1000Test() {
   for (int x = 0; x < 1000; x++) {
     check_compiler = "foo";
     check_compiler += "bar";
@@ -169,7 +167,7 @@ void small_string_check_compiler1000_test() {
   check_compiler = "";
 }
 
-void small_string1000_test() {
+void smallString1000Test() {
   for (int x = 0; x < 1000; x++) {
     std::string s = "foo";
     s += "bar";
@@ -177,14 +175,14 @@ void small_string1000_test() {
   }
 }
 
-void large_string_test() {
+void largeStringTest() {
   std::string s(1024, 'f');
   std::string d(1024, 'o');
   s += d;
   xDoNotRemove += s.size();
 }
 
-void large_string1000_test() {
+void largeString1000Test() {
   for (int x = 0; x < 1000; x++) {
     std::string s(1024, 'f');
     std::string d(1024, 'o');
@@ -193,7 +191,7 @@ void large_string1000_test() {
   }
 }
 
-void get_property_test() {
+void getPropertyTest() {
   std::string property = "plugin_root_id";
   const char* value_ptr = nullptr;
   size_t value_size = 0;
@@ -204,7 +202,7 @@ void get_property_test() {
   ::free(reinterpret_cast<void*>(const_cast<char*>(value_ptr)));
 }
 
-void grpc_service_test() {
+void grpcServiceTest() {
   std::string value = "foo";
   GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name(value);
@@ -212,7 +210,7 @@ void grpc_service_test() {
   grpc_service.SerializeToString(&grpc_service_string);
 }
 
-void grpc_service1000_test() {
+void grpcService1000Test() {
   std::string value = "foo";
   for (int x = 0; x < 1000; x++) {
     GrpcService grpc_service;
@@ -222,7 +220,7 @@ void grpc_service1000_test() {
   }
 }
 
-void modify_metadata_test() {
+void modifyMetadataTest() {
   auto path = getRequestHeader(":path");
   addRequestHeader("newheader", "newheadervalue");
   auto server = getRequestHeader("server");
@@ -231,7 +229,7 @@ void modify_metadata_test() {
   removeRequestHeader("newheader");
 }
 
-void modify_metadata1000_test() {
+void modifyMetadata1000Test() {
   for (int x = 0; x < 1000; x++) {
     auto path = getRequestHeader(":path");
     addRequestHeader("newheader", "newheadervalue");
@@ -242,47 +240,34 @@ void modify_metadata1000_test() {
   }
 }
 
-void json_serialize_test() { google::protobuf::util::JsonStringToMessage(configuration, &args); }
-
-void json_serialize_arena_test() {
-  google::protobuf::util::JsonStringToMessage(configuration, args_arena);
+void jsonSerializeTest() {
+  google::protobuf::Struct proto;
+  google::protobuf::util::JsonStringToMessage(test_json, &proto).IgnoreError();
 }
 
-void json_deserialize_test() {
+void jsonDeserializeTest() {
   std::string json;
-  google::protobuf::util::MessageToJsonString(args, &json);
+  google::protobuf::util::MessageToJsonString(test_proto, &json).IgnoreError();
   xDoNotRemove += json.size();
 }
 
-void json_deserialize_arena_test() {
-  std::string json;
-  google::protobuf::util::MessageToJsonString(*args_arena, &json);
-}
-
-void json_deserialize_empty_test() {
+void jsonDeserializeEmptyTest() {
   std::string json;
   google::protobuf::Struct empty;
-  google::protobuf::util::MessageToJsonString(empty, &json);
+  google::protobuf::util::MessageToJsonString(empty, &json).IgnoreError();
   xDoNotRemove = json.size();
 }
 
-void json_serialize_deserialize_test() {
-  std::string json;
-  google::protobuf::Struct proto;
-  google::protobuf::util::JsonStringToMessage(configuration, &proto);
-  google::protobuf::util::MessageToJsonString(proto, &json);
-  xDoNotRemove = json.size();
-}
-
-void convert_to_filter_state_test() {
-  auto start = reinterpret_cast<uint8_t*>(&*configuration.begin());
-  auto end = start + configuration.size();
-  std::string encoded_config = base64Encode(start, end);
+void convertToFilterStateTest() {
+  auto start = reinterpret_cast<const uint8_t*>(&*test_json.begin());
+  auto end = start + test_json.size();
+  std::string encoded_json = base64Encode(start, end);
   std::vector<uint8_t> decoded;
-  base64Decode(encoded_config, &decoded);
-  std::string decoded_config(decoded.begin(), decoded.end());
-  google::protobuf::util::JsonStringToMessage(decoded_config, &args);
-  auto bytes = args.SerializeAsString();
+  base64Decode(encoded_json, &decoded);
+  std::string decoded_json(decoded.begin(), decoded.end());
+  google::protobuf::Struct proto;
+  google::protobuf::util::JsonStringToMessage(decoded_json, &proto).IgnoreError();
+  auto bytes = proto.SerializeAsString();
   setFilterStateStringValue("wasm_request_set_key", bytes);
 }
 
@@ -293,45 +278,40 @@ WASM_EXPORT(uint32_t, proxy_on_vm_start, (uint32_t, uint32_t configuration_size)
                          &size);
   std::string configuration(configuration_ptr, size);
   if (configuration == "empty") {
-    test_fn = &empty_test;
+    test_fn = &emptyTest;
   } else if (configuration == "get_current_time") {
-    test_fn = &get_current_time_test;
+    test_fn = &getCurrentTimeTest;
   } else if (configuration == "small_string") {
-    test_fn = &small_string_test;
+    test_fn = &smallStringTest;
   } else if (configuration == "small_string1000") {
-    test_fn = &small_string1000_test;
+    test_fn = &smallString1000Test;
   } else if (configuration == "small_string_check_compiler") {
-    test_fn = &small_string_check_compiler_test;
+    test_fn = &smallStringCheckCompilerTest;
   } else if (configuration == "small_string_check_compiler1000") {
-    test_fn = &small_string_check_compiler1000_test;
+    test_fn = &smallStringCheckCompiler1000Test;
   } else if (configuration == "large_string") {
-    test_fn = &large_string_test;
+    test_fn = &largeStringTest;
   } else if (configuration == "large_string1000") {
-    test_fn = &large_string1000_test;
+    test_fn = &largeString1000Test;
   } else if (configuration == "get_property") {
-    test_fn = &get_property_test;
+    test_fn = &getPropertyTest;
   } else if (configuration == "grpc_service") {
-    test_fn = &grpc_service_test;
+    test_fn = &grpcServiceTest;
   } else if (configuration == "grpc_service1000") {
-    test_fn = &grpc_service1000_test;
+    test_fn = &grpcService1000Test;
   } else if (configuration == "modify_metadata") {
-    test_fn = &modify_metadata_test;
+    test_fn = &modifyMetadataTest;
   } else if (configuration == "modify_metadata1000") {
-    test_fn = &modify_metadata1000_test;
+    test_fn = &modifyMetadata1000Test;
   } else if (configuration == "json_serialize") {
-    test_fn = &json_serialize_test;
-  } else if (configuration == "json_serialize_arena") {
-    test_fn = &json_serialize_arena_test;
+    test_fn = &jsonSerializeTest;
   } else if (configuration == "json_deserialize") {
-    test_fn = &json_deserialize_test;
+    google::protobuf::util::JsonStringToMessage(test_json, &test_proto).IgnoreError();
+    test_fn = &jsonDeserializeTest;
   } else if (configuration == "json_deserialize_empty") {
-    test_fn = &json_deserialize_empty_test;
-  } else if (configuration == "json_deserialize_arena") {
-    test_fn = &json_deserialize_arena_test;
-  } else if (configuration == "json_serialize_deserialize") {
-    test_fn = &json_serialize_deserialize_test;
+    test_fn = &jsonDeserializeEmptyTest;
   } else if (configuration == "convert_to_filter_state") {
-    test_fn = &convert_to_filter_state_test;
+    test_fn = &convertToFilterStateTest;
   } else {
     std::string message = "on_start " + configuration;
     proxy_log(LogLevel::info, message.c_str(), message.size());

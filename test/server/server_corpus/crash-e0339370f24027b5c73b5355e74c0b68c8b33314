@@ -18,7 +18,6 @@ static_resources {
   }
 }
 admin {
-  access_log_path: "/tmp/admin_access,lOg"
   address {
     pipe {
       path: "\026runt"

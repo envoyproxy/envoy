@@ -1,11 +1,11 @@
-#include "extensions/tracers/xray/xray_tracer_impl.h"
+#include "source/extensions/tracers/xray/xray_tracer_impl.h"
 
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-
-#include "extensions/tracers/xray/localized_sampling.h"
-#include "extensions/tracers/xray/tracer.h"
-#include "extensions/tracers/xray/xray_configuration.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/headers.h"
+#include "source/extensions/tracers/xray/localized_sampling.h"
+#include "source/extensions/tracers/xray/tracer.h"
+#include "source/extensions/tracers/xray/xray_configuration.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -62,9 +62,10 @@ Driver::Driver(const XRayConfiguration& config,
 }
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
-                                   Http::RequestHeaderMap& request_headers,
-                                   const std::string& operation_name, Envoy::SystemTime start_time,
-                                   const Tracing::Decision tracing_decision) {
+                                   Tracing::TraceContext& trace_context,
+                                   const StreamInfo::StreamInfo& stream_info,
+                                   const std::string& operation_name,
+                                   Tracing::Decision tracing_decision) {
   // First thing is to determine whether this request will be sampled or not.
   // if there's a X-Ray header and it has a sampling decision already determined (i.e. Sample=1)
   // then we can move on; otherwise, we ask the sampling strategy whether this request should be
@@ -74,15 +75,14 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   // If we have a XRay TraceID in the headers, then we create a SpanContext to pass that trace-id
   // around if no TraceID (which means no x-ray header) then this is a brand new span.
 
-  UNREFERENCED_PARAMETER(config);
-  // TODO(marcomagdy) - how do we factor this into the logic above
+  // TODO(suniltheta) - how do we factor this into the logic above
   UNREFERENCED_PARAMETER(tracing_decision);
-  const auto header = request_headers.get(Http::LowerCaseString(XRayTraceHeader));
+  const auto header = xRayTraceHeader().get(trace_context);
   absl::optional<bool> should_trace;
   XRayHeader xray_header;
-  if (!header.empty()) {
+  if (header.has_value()) {
     // This is an implicitly untrusted header, so only the first value is used.
-    Http::LowerCaseString lowered_header_value{std::string(header[0]->value().getStringView())};
+    Http::LowerCaseString lowered_header_value{header.value()};
     xray_header = parseXRayHeader(lowered_header_value);
     // if the sample_decision in the x-ray header is unknown then we try to make a decision based
     // on the sampling strategy
@@ -98,25 +98,26 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
   }
 
   if (!should_trace.has_value()) {
-    const SamplingRequest request{std::string{request_headers.getHostValue()},
-                                  std::string{request_headers.getMethodValue()},
-                                  std::string{request_headers.getPathValue()}};
+    const SamplingRequest request{trace_context.host(), trace_context.method(),
+                                  trace_context.path()};
 
     should_trace = sampling_strategy_->shouldTrace(request);
   }
 
   auto* tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer_.get();
   if (should_trace.value()) {
-    return tracer->startSpan(operation_name, start_time,
-                             !header.empty() ? absl::optional<XRayHeader>(xray_header)
-                                             : absl::nullopt);
+    return tracer->startSpan(config, operation_name, stream_info.startTime(),
+                             header.has_value() ? absl::optional<XRayHeader>(xray_header)
+                                                : absl::nullopt,
+                             xForwardedForHeader().get(trace_context));
   }
 
-  // instead of returning nullptr, we return a Span that is marked as not-sampled.
+  // Instead of returning nullptr, we return a Span that is marked as not-sampled.
   // This is important to communicate that information to upstream services (see injectContext()).
   // Otherwise, the upstream service can decide to sample the request regardless and we end up with
   // more samples than we asked for.
-  return tracer->createNonSampledSpan();
+  return tracer->createNonSampledSpan(header.has_value() ? absl::optional<XRayHeader>(xray_header)
+                                                         : absl::nullopt);
 }
 
 } // namespace XRay

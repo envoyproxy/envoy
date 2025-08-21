@@ -1,0 +1,57 @@
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 33481ba1..681d0c5c 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -66,7 +66,6 @@ set(
+     tinycthread.c
+     tinycthread_extra.c
+     rdxxhash.c
+-    cJSON.c
+ )
+ 
+ if(WITH_SSL)
+diff --git a/src/Makefile b/src/Makefile
+index 26df5723..69bdb427 100644
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -43,7 +43,7 @@ SRCS=		rdkafka.c rdkafka_broker.c rdkafka_msg.c rdkafka_topic.c \
+ 		rdkafka_assignor.c rdkafka_range_assignor.c \
+ 		rdkafka_roundrobin_assignor.c rdkafka_sticky_assignor.c \
+ 		rdkafka_feature.c \
+-		rdcrc32.c crc32c.c rdmurmur2.c rdfnv1a.c cJSON.c \
++		rdcrc32.c crc32c.c rdmurmur2.c rdfnv1a.c \
+ 		rdaddr.c rdrand.c rdlist.c \
+ 		tinycthread.c tinycthread_extra.c \
+ 		rdlog.c rdstring.c rdkafka_event.c rdkafka_metadata.c \
+diff --git a/src/rdkafka.c b/src/rdkafka.c
+index 33147ccd..5ed33b29 100644
+--- a/src/rdkafka.c
++++ b/src/rdkafka.c
+@@ -71,9 +71,6 @@
+ #include <sys/timeb.h>
+ #endif
+ 
+-#define CJSON_HIDE_SYMBOLS
+-#include "cJSON.h"
+-
+ #if WITH_CURL
+ #include "rdhttp.h"
+ #endif
+@@ -139,8 +136,6 @@ void rd_kafka_set_thread_sysname(const char *fmt, ...) {
+ }
+ 
+ static void rd_kafka_global_init0(void) {
+-        cJSON_Hooks json_hooks = {.malloc_fn = rd_malloc, .free_fn = rd_free};
+-
+         mtx_init(&rd_kafka_global_lock, mtx_plain);
+ #if ENABLE_DEVEL
+         rd_atomic32_init(&rd_kafka_op_cnt, 0);
+@@ -153,8 +148,6 @@ static void rd_kafka_global_init0(void) {
+         rd_kafka_ssl_init();
+ #endif
+ 
+-        cJSON_InitHooks(&json_hooks);
+-
+ #if WITH_CURL
+         rd_http_global_init();
+ #endif

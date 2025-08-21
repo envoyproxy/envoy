@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.geoip.v3;
+
+import "envoy/config/core/v3/extension.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.geoip.v3";
+option java_outer_classname = "GeoipProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/geoip/v3;geoipv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Geoip]
+// Geoip :ref:`configuration overview <config_http_filters_geoip>`.
+// [#extension: envoy.filters.http.geoip]
+
+message Geoip {
+  message XffConfig {
+    // The number of additional ingress proxy hops from the right side of the
+    // :ref:`config_http_conn_man_headers_x-forwarded-for` HTTP header to trust when
+    // determining the origin client's IP address. The default is zero if this option
+    // is not specified. See the documentation for
+    // :ref:`config_http_conn_man_headers_x-forwarded-for` for more information.
+    uint32 xff_num_trusted_hops = 1;
+  }
+
+  // If set, the :ref:`xff_num_trusted_hops <envoy_v3_api_field_extensions.filters.http.geoip.v3.Geoip.XffConfig.xff_num_trusted_hops>` field will be used to determine
+  // trusted client address from ``x-forwarded-for`` header.
+  // Otherwise, the immediate downstream connection source address will be used.
+  // [#next-free-field: 2]
+  XffConfig xff_config = 1;
+
+  // Geoip driver specific configuration which depends on the driver being instantiated.
+  // See the geoip drivers for examples:
+  //
+  // - :ref:`MaxMindConfig <envoy_v3_api_msg_extensions.geoip_providers.maxmind.v3.MaxMindConfig>`
+  // [#extension-category: envoy.geoip_providers]
+  config.core.v3.TypedExtensionConfig provider = 3 [(validate.rules).message = {required: true}];
+}

@@ -4,7 +4,7 @@
 
 #include "envoy/http/conn_pool.h"
 
-#include "common/http/codec_client.h"
+#include "source/common/http/codec_client.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
@@ -17,11 +17,12 @@ namespace Envoy {
 class CodecClientForTest : public Http::CodecClient {
 public:
   using DestroyCb = std::function<void(CodecClient*)>;
-  CodecClientForTest(CodecClient::Type type, Network::ClientConnectionPtr&& connection,
+  CodecClientForTest(Http::CodecType type, Network::ClientConnectionPtr&& connection,
                      Http::ClientConnection* codec, DestroyCb destroy_cb,
                      Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher)
       : CodecClient(type, std::move(connection), host, dispatcher), destroy_cb_(destroy_cb) {
     codec_.reset(codec);
+    connect();
   }
   ~CodecClientForTest() override {
     if (destroy_cb_) {
@@ -30,6 +31,7 @@ public:
   }
   void raiseGoAway(Http::GoAwayErrorCode error_code) { onGoAway(error_code); }
   Event::Timer* idleTimer() { return idle_timer_.get(); }
+  using Http::CodecClient::onSettings;
 
   DestroyCb destroy_cb_;
 };
@@ -39,22 +41,25 @@ public:
  */
 struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
   void onPoolReady(Http::RequestEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
-                   const StreamInfo::StreamInfo&, absl::optional<Http::Protocol>) override {
+                   StreamInfo::StreamInfo&, absl::optional<Http::Protocol>) override {
     outer_encoder_ = &encoder;
     host_ = host;
     pool_ready_.ready();
   }
 
-  void onPoolFailure(ConnectionPool::PoolFailureReason reason, absl::string_view,
+  void onPoolFailure(ConnectionPool::PoolFailureReason reason,
+                     absl::string_view transport_failure_reason,
                      Upstream::HostDescriptionConstSharedPtr host) override {
     host_ = host;
     reason_ = reason;
+    transport_failure_reason_ = transport_failure_reason;
     pool_failure_.ready();
   }
 
   ConnectionPool::PoolFailureReason reason_;
-  ReadyWatcher pool_failure_;
-  ReadyWatcher pool_ready_;
+  std::string transport_failure_reason_;
+  testing::NiceMock<ReadyWatcher> pool_failure_;
+  testing::NiceMock<ReadyWatcher> pool_ready_;
   Http::RequestEncoder* outer_encoder_{};
   Upstream::HostDescriptionConstSharedPtr host_;
 };
@@ -64,7 +69,6 @@ struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
  */
 class HttpTestUtility {
 public:
-  static void addDefaultHeaders(Http::RequestHeaderMap& headers,
-                                const std::string default_method = "GET");
+  static void addDefaultHeaders(Http::RequestHeaderMap& headers, bool overwrite = true);
 };
 } // namespace Envoy

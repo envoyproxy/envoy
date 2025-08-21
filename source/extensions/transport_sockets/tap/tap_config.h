@@ -1,13 +1,30 @@
 #pragma once
 
+#include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 #include "envoy/network/connection.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 
-#include "extensions/common/tap/tap.h"
+#include "source/extensions/common/tap/tap.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Tap {
+
+/**
+ * All stats for the tap filter. @see stats_macros.h
+ */
+#define ALL_TRANSPORT_TAP_STATS(COUNTER)                                                           \
+  COUNTER(streamed_submit)                                                                         \
+  COUNTER(buffered_submit)
+
+/**
+ * Wrapper struct for tap filter stats. @see stats_macros.h
+ */
+struct TransportTapStats {
+  ALL_TRANSPORT_TAP_STATS(GENERATE_COUNTER_STRUCT)
+};
 
 /**
  * Per-socket tap implementation. Abstractly handles all socket lifecycle events in order to tap
@@ -51,7 +68,9 @@ public:
    * @return a new per-socket tapper which is used to handle tapping of a discrete socket.
    * @param connection supplies the underlying network connection.
    */
-  virtual PerSocketTapperPtr createPerSocketTapper(const Network::Connection& connection) PURE;
+  virtual PerSocketTapperPtr createPerSocketTapper(
+      const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig& tap_config,
+      const TransportTapStats& stats, const Network::Connection& connection) PURE;
 
   /**
    * @return time source to use for stamping events.

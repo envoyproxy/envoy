@@ -1,0 +1,6 @@
+date: September 29, 2020
+
+changes:
+- area: docs
+  change: |
+    fix docs for v1.15.1.

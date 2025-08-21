@@ -7,11 +7,10 @@
 
 #include "envoy/config/route/v3/route_components.pb.h"
 
-#include "common/http/header_utility.h"
-
-#include "extensions/filters/network/thrift_proxy/metadata.h"
-#include "extensions/filters/network/thrift_proxy/router/router.h"
-#include "extensions/filters/network/thrift_proxy/router/router_ratelimit.h"
+#include "source/common/http/header_utility.h"
+#include "source/extensions/filters/network/thrift_proxy/metadata.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router_ratelimit.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -95,7 +94,8 @@ private:
 class HeaderValueMatchAction : public RateLimitAction {
 public:
   HeaderValueMatchAction(
-      const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action);
+      const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action,
+      Server::Configuration::CommonFactoryContext& context);
 
   // Router::RateLimitAction
   bool populateDescriptor(const Router::RouteEntry& route, RateLimit::Descriptor& descriptor,
@@ -113,7 +113,8 @@ private:
  */
 class RateLimitPolicyEntryImpl : public RateLimitPolicyEntry {
 public:
-  RateLimitPolicyEntryImpl(const envoy::config::route::v3::RateLimit& config);
+  RateLimitPolicyEntryImpl(const envoy::config::route::v3::RateLimit& config,
+                           Server::Configuration::CommonFactoryContext& context);
 
   // Router::RateLimitPolicyEntry
   uint32_t stage() const override { return stage_; }
@@ -136,7 +137,8 @@ private:
 class RateLimitPolicyImpl : public RateLimitPolicy {
 public:
   RateLimitPolicyImpl(
-      const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits);
+      const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
+      Server::Configuration::CommonFactoryContext& context);
 
   // Router::RateLimitPolicy
   const std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>&

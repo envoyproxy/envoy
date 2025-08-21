@@ -1,11 +1,9 @@
-#include "extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
+#include "source/extensions/filters/network/dubbo_proxy/dubbo_protocol_impl.h"
 
 #include "envoy/registry/registry.h"
 
-#include "common/common/assert.h"
-
-#include "extensions/filters/network/dubbo_proxy/message_impl.h"
-#include "extensions/filters/network/dubbo_proxy/serializer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/extensions/filters/network/dubbo_proxy/message_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -46,13 +44,12 @@ bool isValidResponseStatus(ResponseStatus status) {
   case ResponseStatus::BadResponse:
   case ResponseStatus::ServiceNotFound:
   case ResponseStatus::ServiceError:
+  case ResponseStatus::ServerError:
   case ResponseStatus::ClientError:
   case ResponseStatus::ServerThreadpoolExhaustedError:
-    break;
-  default:
-    return false;
+    return true;
   }
-  return true;
+  return false;
 }
 
 void parseRequestInfoFromBuffer(Buffer::Instance& data, MessageMetadataSharedPtr metadata) {
@@ -92,7 +89,7 @@ DubboProtocolImpl::decodeHeader(Buffer::Instance& buffer, MessageMetadataSharedP
   }
 
   if (buffer.length() < DubboProtocolImpl::MessageSize) {
-    return std::pair<ContextSharedPtr, bool>(nullptr, false);
+    return {nullptr, false};
   }
 
   uint16_t magic_number = buffer.peekBEInt<uint16_t>();
@@ -133,14 +130,14 @@ DubboProtocolImpl::decodeHeader(Buffer::Instance& buffer, MessageMetadataSharedP
   context->setBodySize(body_size);
   context->setHeartbeat(is_event);
 
-  return std::pair<ContextSharedPtr, bool>(context, true);
+  return {context, true};
 }
 
 bool DubboProtocolImpl::decodeData(Buffer::Instance& buffer, ContextSharedPtr context,
                                    MessageMetadataSharedPtr metadata) {
   ASSERT(serializer_);
 
-  if ((buffer.length()) < static_cast<uint64_t>(context->bodySize())) {
+  if ((buffer.length()) < context->bodySize()) {
     return false;
   }
 
@@ -155,6 +152,11 @@ bool DubboProtocolImpl::decodeData(Buffer::Instance& buffer, ContextSharedPtr co
     break;
   }
   case MessageType::Response: {
+    // Non `Ok` response body has no response type info and skip deserialization.
+    if (metadata->responseStatus() != ResponseStatus::Ok) {
+      metadata->setMessageType(MessageType::Exception);
+      break;
+    }
     auto ret = serializer_->deserializeRpcResult(buffer, context);
     if (!ret.second) {
       return false;
@@ -165,7 +167,7 @@ bool DubboProtocolImpl::decodeData(Buffer::Instance& buffer, ContextSharedPtr co
     break;
   }
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not handled");
   }
 
   return true;
@@ -185,7 +187,11 @@ bool DubboProtocolImpl::encode(Buffer::Instance& buffer, const MessageMetadata& 
     buffer.writeByte(flag);
     buffer.writeByte(static_cast<uint8_t>(metadata.responseStatus()));
     buffer.writeBEInt<uint64_t>(metadata.requestId());
-    buffer.writeBEInt<uint32_t>(0);
+    // Body of heart beat response is null.
+    // TODO(wbpcode): Currently we only support the Hessian2 serialization scheme, so here we
+    // directly use the 'N' for null object in Hessian2. This coupling should be unnecessary.
+    buffer.writeBEInt<uint32_t>(1u);
+    buffer.writeByte('N');
     return true;
   }
   case MessageType::Response: {
@@ -206,9 +212,9 @@ bool DubboProtocolImpl::encode(Buffer::Instance& buffer, const MessageMetadata& 
   case MessageType::Request:
   case MessageType::Oneway:
   case MessageType::Exception:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not implemented");
   }
 }
 

@@ -1,10 +1,9 @@
-#include "extensions/filters/network/thrift_proxy/filters/ratelimit/ratelimit.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/ratelimit/ratelimit.h"
 
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
-#include "extensions/filters/network/thrift_proxy/router/router.h"
-#include "extensions/filters/network/thrift_proxy/router/router_ratelimit.h"
+#include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router.h"
+#include "source/extensions/filters/network/thrift_proxy/router/router_ratelimit.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -47,7 +46,7 @@ void Filter::initiateCall(const ThriftProxy::MessageMetadata& metadata) {
     state_ = State::Calling;
     initiating_call_ = true;
     client_->limit(*this, config_->domain(), descriptors, Tracing::NullSpan::instance(),
-                   decoder_callbacks_->streamInfo());
+                   decoder_callbacks_->streamInfo(), 0);
     initiating_call_ = false;
   }
 }
@@ -62,13 +61,19 @@ void Filter::onDestroy() {
 void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                       Filters::Common::RateLimit::DescriptorStatusListPtr&& descriptor_statuses,
                       Http::ResponseHeaderMapPtr&& response_headers_to_add,
-                      Http::RequestHeaderMapPtr&& request_headers_to_add) {
+                      Http::RequestHeaderMapPtr&& request_headers_to_add, const std::string&,
+                      Filters::Common::RateLimit::DynamicMetadataPtr&& dynamic_metadata) {
   // TODO(zuercher): Store headers to append to a response. Adding them to a local reply (over
   // limit or error) is a matter of modifying the callbacks to allow it. Adding them to an upstream
   // response requires either response (aka encoder) filters or some other mechanism.
   UNREFERENCED_PARAMETER(descriptor_statuses);
   UNREFERENCED_PARAMETER(response_headers_to_add);
   UNREFERENCED_PARAMETER(request_headers_to_add);
+
+  if (dynamic_metadata != nullptr && !dynamic_metadata->fields().empty()) {
+    decoder_callbacks_->streamInfo().setDynamicMetadata("envoy.filters.thrift.rate_limit",
+                                                        *dynamic_metadata);
+  }
 
   state_ = State::Complete;
   Filters::Common::RateLimit::StatNames& stat_names = config_->statNames();
@@ -85,7 +90,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
           ThriftProxy::AppException(ThriftProxy::AppExceptionType::InternalError, "limiter error"),
           false);
       decoder_callbacks_->streamInfo().setResponseFlag(
-          StreamInfo::ResponseFlag::RateLimitServiceError);
+          StreamInfo::CoreResponseFlag::RateLimitServiceError);
       return;
     }
     cluster_->statsScope().counterFromStatName(stat_names.failure_mode_allowed_).inc();
@@ -97,7 +102,7 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
       decoder_callbacks_->sendLocalReply(
           ThriftProxy::AppException(ThriftProxy::AppExceptionType::InternalError, "over limit"),
           false);
-      decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::ResponseFlag::RateLimited);
+      decoder_callbacks_->streamInfo().setResponseFlag(StreamInfo::CoreResponseFlag::RateLimited);
       return;
     }
     break;
@@ -121,9 +126,9 @@ void Filter::populateRateLimitDescriptors(
             fmt::format("ratelimit.{}.thrift_filter_enabled", disable_key), 100)) {
       continue;
     }
-    rate_limit.populateDescriptors(*route_entry, descriptors, config_->localInfo().clusterName(),
-                                   metadata,
-                                   *decoder_callbacks_->streamInfo().downstreamRemoteAddress());
+    rate_limit.populateDescriptors(
+        *route_entry, descriptors, config_->localInfo().clusterName(), metadata,
+        *decoder_callbacks_->streamInfo().downstreamAddressProvider().remoteAddress());
   }
 }
 

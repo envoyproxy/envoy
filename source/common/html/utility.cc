@@ -1,4 +1,4 @@
-#include "common/html/utility.h"
+#include "source/common/html/utility.h"
 
 #include <string>
 
@@ -7,7 +7,7 @@
 namespace Envoy {
 namespace Html {
 
-std::string Utility::sanitize(const std::string& text) {
+std::string Utility::sanitize(absl::string_view text) {
   return absl::StrReplaceAll(
       text, {{"&", "&amp;"}, {"<", "&lt;"}, {">", "&gt;"}, {"\"", "&quot;"}, {"'", "&#39;"}});
 }

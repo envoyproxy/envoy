@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Used in a genrule to wrap sh_test script for execution in
 # //test/coverage:coverage_tests single binary.

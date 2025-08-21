@@ -3,9 +3,8 @@
 #include "envoy/network/address.h"
 #include "envoy/network/filter.h"
 
-#include "common/common/logger.h"
-
-#include "extensions/filters/listener/original_src/config.h"
+#include "source/common/common/logger.h"
+#include "source/extensions/filters/listener/original_src/config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -23,6 +22,12 @@ public:
 
   // Network::ListenerFilter
   Network::FilterStatus onAccept(Network::ListenerFilterCallbacks& cb) override;
+
+  size_t maxReadBytes() const override { return 0; }
+
+  Network::FilterStatus onData(Network::ListenerFilterBuffer&) override {
+    return Network::FilterStatus::Continue;
+  };
 
 private:
   Config config_;

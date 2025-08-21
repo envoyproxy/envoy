@@ -1,0 +1,4 @@
+typed_dns_resolver_config:
+  name: envoy.network.dns_resolver.apple
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.apple.v3.AppleDnsResolverConfig

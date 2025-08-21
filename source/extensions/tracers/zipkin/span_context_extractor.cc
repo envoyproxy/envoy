@@ -1,10 +1,11 @@
-#include "extensions/tracers/zipkin/span_context_extractor.h"
+#include "source/extensions/tracers/zipkin/span_context_extractor.h"
 
-#include "common/common/assert.h"
-#include "common/common/utility.h"
+#include <charconv>
 
-#include "extensions/tracers/zipkin/span_context.h"
-#include "extensions/tracers/zipkin/zipkin_core_constants.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/utility.h"
+#include "source/extensions/tracers/zipkin/span_context.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -12,6 +13,7 @@ namespace Tracers {
 namespace Zipkin {
 namespace {
 constexpr int FormatMaxLength = 32 + 1 + 16 + 3 + 16; // traceid128-spanid-1-parentid
+
 bool validSamplingFlags(char c) {
   if (c == '1' || c == '0' || c == 'd') {
     return true;
@@ -19,27 +21,37 @@ bool validSamplingFlags(char c) {
   return false;
 }
 
-bool getSamplingFlags(char c, const Tracing::Decision tracing_decision) {
+absl::optional<bool> getSamplingFlags(char c) {
   if (validSamplingFlags(c)) {
     return c == '0' ? false : true;
   } else {
-    return tracing_decision.traced;
+    return absl::nullopt;
   }
+}
+
+// Helper function to parse hex string_view to uint64_t using std::from_chars
+bool parseHexStringView(absl::string_view hex_str, uint64_t& result) {
+  const char* begin = hex_str.data();
+  const char* end = begin + hex_str.size();
+  auto [ptr, ec] = std::from_chars(begin, end, result, 16);
+  return ec == std::errc{} && ptr == end;
 }
 
 } // namespace
 
-SpanContextExtractor::SpanContextExtractor(Http::RequestHeaderMap& request_headers)
-    : request_headers_(request_headers) {}
+SpanContextExtractor::SpanContextExtractor(Tracing::TraceContext& trace_context,
+                                           bool w3c_fallback_enabled)
+    : trace_context_(trace_context), w3c_fallback_enabled_(w3c_fallback_enabled) {}
 
 SpanContextExtractor::~SpanContextExtractor() = default;
 
-bool SpanContextExtractor::extractSampled(const Tracing::Decision tracing_decision) {
+absl::optional<bool> SpanContextExtractor::extractSampled() {
   bool sampled(false);
-  auto b3_header_entry = request_headers_.get(ZipkinCoreConstants::get().B3);
-  if (!b3_header_entry.empty()) {
+  // Try B3 single format first.
+  auto b3_header_entry = ZipkinCoreConstants::get().B3.get(trace_context_);
+  if (b3_header_entry.has_value()) {
     // This is an implicitly untrusted header, so only the first value is used.
-    absl::string_view b3 = b3_header_entry[0]->value().getStringView();
+    absl::string_view b3 = b3_header_entry.value();
     int sampled_pos = 0;
     switch (b3.length()) {
     case 1:
@@ -57,40 +69,58 @@ bool SpanContextExtractor::extractSampled(const Tracing::Decision tracing_decisi
       sampled_pos = 50;
       break;
     default:
-      return tracing_decision.traced;
+      return absl::nullopt; // invalid length
     }
-    return getSamplingFlags(b3[sampled_pos], tracing_decision);
+    return getSamplingFlags(b3[sampled_pos]);
   }
 
-  auto x_b3_sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED);
-  if (x_b3_sampled_entry.empty()) {
-    return tracing_decision.traced;
+  // Try individual B3 sampled header.
+  auto x_b3_sampled_entry = ZipkinCoreConstants::get().X_B3_SAMPLED.get(trace_context_);
+
+  if (x_b3_sampled_entry.has_value()) {
+    // Checking if sampled flag has been specified. Also checking for 'true' value, as some old
+    // zipkin tracers may still use that value, although should be 0 or 1.
+    // This is an implicitly untrusted header, so only the first value is used.
+    absl::string_view xb3_sampled = x_b3_sampled_entry.value();
+    sampled = xb3_sampled == SAMPLED || xb3_sampled == "true";
+    return sampled;
   }
-  // Checking if sampled flag has been specified. Also checking for 'true' value, as some old
-  // zipkin tracers may still use that value, although should be 0 or 1.
-  // This is an implicitly untrusted header, so only the first value is used.
-  absl::string_view xb3_sampled = x_b3_sampled_entry[0]->value().getStringView();
-  sampled = xb3_sampled == SAMPLED || xb3_sampled == "true";
-  return sampled;
+
+  // Try W3C Trace Context format as fallback only if enabled.
+  if (w3c_fallback_enabled_) {
+    Extensions::Tracers::OpenTelemetry::SpanContextExtractor w3c_extractor(
+        const_cast<Tracing::TraceContext&>(trace_context_));
+    if (w3c_extractor.propagationHeaderPresent()) {
+      auto w3c_span_context = w3c_extractor.extractSpanContext();
+      if (w3c_span_context.ok()) {
+        return w3c_span_context.value().sampled();
+      }
+    }
+  }
+
+  return absl::nullopt;
 }
 
 std::pair<SpanContext, bool> SpanContextExtractor::extractSpanContext(bool is_sampled) {
-  if (!request_headers_.get(ZipkinCoreConstants::get().B3).empty()) {
+  // Try B3 single format first.
+  if (ZipkinCoreConstants::get().B3.get(trace_context_).has_value()) {
     return extractSpanContextFromB3SingleFormat(is_sampled);
   }
-  uint64_t trace_id(0);
-  uint64_t trace_id_high(0);
-  uint64_t span_id(0);
-  uint64_t parent_id(0);
 
-  auto b3_trace_id_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID);
-  auto b3_span_id_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SPAN_ID);
-  if (!b3_span_id_entry.empty() && !b3_trace_id_entry.empty()) {
+  // Try individual B3 headers.
+  auto b3_trace_id_entry = ZipkinCoreConstants::get().X_B3_TRACE_ID.get(trace_context_);
+  auto b3_span_id_entry = ZipkinCoreConstants::get().X_B3_SPAN_ID.get(trace_context_);
+  if (b3_span_id_entry.has_value() && b3_trace_id_entry.has_value()) {
+    uint64_t trace_id(0);
+    uint64_t trace_id_high(0);
+    uint64_t span_id(0);
+    uint64_t parent_id(0);
+
     // Extract trace id - which can either be 128 or 64 bit. For 128 bit,
     // it needs to be divided into two 64 bit numbers (high and low).
     // This is an implicitly untrusted header, so only the first value is used.
-    const std::string tid(b3_trace_id_entry[0]->value().getStringView());
-    if (b3_trace_id_entry[0]->value().size() == 32) {
+    const std::string tid(b3_trace_id_entry.value());
+    if (b3_trace_id_entry.value().size() == 32) {
       const std::string high_tid = tid.substr(0, 16);
       const std::string low_tid = tid.substr(16, 16);
       if (!StringUtil::atoull(high_tid.c_str(), trace_id_high, 16) ||
@@ -103,39 +133,51 @@ std::pair<SpanContext, bool> SpanContextExtractor::extractSpanContext(bool is_sa
     }
 
     // This is an implicitly untrusted header, so only the first value is used.
-    const std::string spid(b3_span_id_entry[0]->value().getStringView());
+    const std::string spid(b3_span_id_entry.value());
     if (!StringUtil::atoull(spid.c_str(), span_id, 16)) {
       throw ExtractorException(absl::StrCat("Invalid span id ", spid.c_str()));
     }
 
-    auto b3_parent_id_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID);
-    if (!b3_parent_id_entry.empty() && !b3_parent_id_entry[0]->value().empty()) {
+    auto b3_parent_id_entry = ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID.get(trace_context_);
+    if (b3_parent_id_entry.has_value() && !b3_parent_id_entry.value().empty()) {
       // This is an implicitly untrusted header, so only the first value is used.
-      const std::string pspid(b3_parent_id_entry[0]->value().getStringView());
+      const std::string pspid(b3_parent_id_entry.value());
       if (!StringUtil::atoull(pspid.c_str(), parent_id, 16)) {
         throw ExtractorException(absl::StrCat("Invalid parent span id ", pspid.c_str()));
       }
     }
-  } else {
-    return {SpanContext(), false};
+
+    return {SpanContext(trace_id_high, trace_id, span_id, parent_id, is_sampled), true};
   }
 
-  return {SpanContext(trace_id_high, trace_id, span_id, parent_id, is_sampled), true};
+  // Try W3C Trace Context format as fallback only if enabled.
+  if (w3c_fallback_enabled_) {
+    Extensions::Tracers::OpenTelemetry::SpanContextExtractor w3c_extractor(
+        const_cast<Tracing::TraceContext&>(trace_context_));
+    if (w3c_extractor.propagationHeaderPresent()) {
+      auto w3c_span_context = w3c_extractor.extractSpanContext();
+      if (w3c_span_context.ok()) {
+        return convertW3CToZipkin(w3c_span_context.value(), is_sampled);
+      }
+    }
+  }
+
+  return {SpanContext(), false};
 }
 
 std::pair<SpanContext, bool>
 SpanContextExtractor::extractSpanContextFromB3SingleFormat(bool is_sampled) {
-  auto b3_head_entry = request_headers_.get(ZipkinCoreConstants::get().B3);
-  ASSERT(!b3_head_entry.empty());
+  auto b3_head_entry = ZipkinCoreConstants::get().B3.get(trace_context_);
+  ASSERT(b3_head_entry.has_value());
   // This is an implicitly untrusted header, so only the first value is used.
-  const std::string b3(b3_head_entry[0]->value().getStringView());
+  const std::string b3(b3_head_entry.value());
   if (!b3.length()) {
     throw ExtractorException("Invalid input: empty");
   }
 
   if (b3.length() == 1) { // possibly sampling flags
     if (validSamplingFlags(b3[0])) {
-      return std::pair<SpanContext, bool>(SpanContext(), false);
+      return {SpanContext(), false};
     }
     throw ExtractorException(fmt::format("Invalid input: invalid sampling flag {}", b3[0]));
   }
@@ -208,7 +250,7 @@ SpanContextExtractor::extractSpanContextFromB3SingleFormat(bool is_sampled) {
     }
 
     if (b3.length() > pos) {
-      // If we are at this point, we should have a parent ID, encoded as "-[0-9a-f]{16}"
+      // If we are at this point, we should have a parent ID, encoded as "-[0-9a-f]{16}".
       if (b3.length() != pos + 17) {
         throw ExtractorException("Invalid input: truncated");
       }
@@ -225,6 +267,47 @@ SpanContextExtractor::extractSpanContextFromB3SingleFormat(bool is_sampled) {
   }
 
   return {SpanContext(trace_id_high, trace_id, span_id, parent_id, is_sampled), true};
+}
+
+std::pair<SpanContext, bool> SpanContextExtractor::convertW3CToZipkin(
+    const Extensions::Tracers::OpenTelemetry::SpanContext& w3c_context, bool fallback_sampled) {
+  // Convert W3C 128-bit trace ID (32 hex chars) to Zipkin format.
+  const absl::string_view trace_id_str = w3c_context.traceId();
+
+  if (trace_id_str.length() != 32) {
+    throw ExtractorException(fmt::format("Invalid W3C trace ID length: {}", trace_id_str.length()));
+  }
+
+  // Split 128-bit trace ID into high and low 64-bit parts for Zipkin.
+  const absl::string_view trace_id_high_str = absl::string_view(trace_id_str).substr(0, 16);
+  const absl::string_view trace_id_low_str = absl::string_view(trace_id_str).substr(16, 16);
+
+  uint64_t trace_id_high(0);
+  uint64_t trace_id(0);
+  if (!parseHexStringView(trace_id_high_str, trace_id_high) ||
+      !parseHexStringView(trace_id_low_str, trace_id)) {
+    throw ExtractorException(fmt::format("Invalid W3C trace ID: {}", trace_id_str));
+  }
+
+  // Convert W3C span ID (16 hex chars) to Zipkin span ID.
+  const absl::string_view span_id_str = w3c_context.spanId();
+  if (span_id_str.length() != 16) {
+    throw ExtractorException(fmt::format("Invalid W3C span ID length: {}", span_id_str.length()));
+  }
+
+  uint64_t span_id(0);
+  if (!parseHexStringView(span_id_str, span_id)) {
+    throw ExtractorException(fmt::format("Invalid W3C span ID: {}", span_id_str));
+  }
+
+  // W3C doesn't have a direct parent span concept like B3
+  // The W3C span-id becomes our span-id, and we don't set a parent.
+  uint64_t parent_id(0);
+
+  // Use W3C sampling decision, or fallback if not specified.
+  bool sampled = w3c_context.sampled() || fallback_sampled;
+
+  return {SpanContext(trace_id_high, trace_id, span_id, parent_id, sampled), true};
 }
 
 } // namespace Zipkin

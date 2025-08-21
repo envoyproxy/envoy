@@ -22,13 +22,13 @@ to be eligible for the program:
    :ref:`execution environment <arch_overview_google_vrp_ee>` and be consistent with the
    program's :ref:`threat model <arch_overview_google_vrp_threat_model>`.
 
-2. Vulnerabilities must be reported to envoy-security@googlegroups.com and be kept under embargo
-   while triage and potential security releases occur. Please follow the :repo:`disclosure guidance
-   <SECURITY.md#disclosures>` when submitting reports. Disclosure SLOs are documented :repo:`here
-   <SECURITY.md#fix-and-disclosure-slos>`. In general, security disclosures are subject to the
-   `Linux Foundation's privacy policy <https://www.linuxfoundation.org/privacy/>`_ with the added
-   proviso that VRP reports (including reporter e-mail address and name) may be freely shared with
-   Google for VRP purposes.
+2. Vulnerabilities must be reported to **both** envoy-security@googlegroups.com and via https://bughunters.google.com/report.
+   Vulenrabilities must be kept under embargo while triage and potential security releases occur.
+   Please follow the :repo:`disclosure guidance <SECURITY.md#disclosures>` when submitting reports.
+   Disclosure SLOs are documented :repo:`here <SECURITY.md#fix-and-disclosure-slos>`. In general,
+   security disclosures are subject to the `Linux Foundation's privacy policy
+   <https://www.linuxfoundation.org/privacy/>`_ with the added proviso that VRP reports (including
+   reporter e-mail address and name) may be freely shared with Google for VRP purposes.
 
 3. Vulnerabilities must not be previously known in a public forum, e.g. GitHub issues trackers,
    CVE databases (when previously associated with Envoy), etc. Existing CVEs that have not been
@@ -42,6 +42,8 @@ the above criteria. If multiple instances of the same vulnerability are reported
 independent researchers or the vulnerability is already tracked under embargo by the OSS Envoy
 security team, we will aim to fairly divide the reward amongst reporters.
 
+Rewards should be claimed from Google VRP following the corresponding Envoy security release.
+
 .. _arch_overview_google_vrp_threat_model:
 
 Threat model
@@ -53,9 +55,13 @@ attack surface for the initial stages of this program. We exclude any threat fro
 
 * Untrusted control planes.
 * Runtime services such as access logging, external authorization, etc.
-* Untrusted upstreams.
 * DoS attacks except as stipulated below.
-* Any filters apart from the HTTP connection manager network filter and HTTP router filter.
+* Any extensions in the ``contrib`` directory.
+* Any extensions that do not have ``stable`` status.
+* Any extensions that do not have security_posture ``robust_to_untrusted_downstream`` or ``robust_to_untrusted_downstream_and_upstream``
+  in the most recent `manifest <https://github.com/envoyproxy/envoy/blob/HEAD/source/extensions/extensions_metadata.yaml>`_.
+* Extensions with the ``robust_to_untrusted_downstream`` security posture do not qualify for vulnerabilties that require
+  untrusted upstream.
 * Admin console; this is disabled in the execution environment.
 
 We also explicitly exclude any local attacks (e.g. via local processes, shells, etc.) against
@@ -78,40 +84,40 @@ We supply Docker images that act as the reference environment for this program:
   1.15.0 Envoy release.
 
 * `envoyproxy/envoy-google-vrp-dev <https://hub.docker.com/r/envoyproxy/envoy-google-vrp-dev/tags/>`_
-  images are based on Envoy master builds. Only builds within the last 5 days at the time of
+  images are based on Envoy main builds. Only builds within the last 5 days at the time of
   vulnerability submission are eligible for the program. They must not be subject to any
   publicly disclosed vulnerability at that point in time.
 
-Two Envoy processes are available when these images are launched via `docker run`:
+Two Envoy processes are available when these images are launched via ``docker run``:
 
 * The *edge* Envoy is listening on ports 10000 (HTTPS). It has a :repo:`static configuration
   </configs/google-vrp/envoy-edge.yaml>` that is configured according to Envoy's :ref:`edge hardening
   principles <faq_edge>`. It has sinkhole, direct response and request forwarding routing rules (in
   order):
 
-  1. `/content/*`: route to the origin Envoy server.
-  2. `/*`: return 403 (denied).
+  1. ``/content/*``: route to the origin Envoy server.
+  2. ``/*``: return 403 (denied).
 
 
 * The *origin* Envoy is an upstream of the edge Envoy. It has a :repo:`static configuration
   </configs/google-vrp/envoy-origin.yaml>` that features only direct responses, effectively acting
   as an HTTP origin server. There are two route rules (in order):
 
-  1. `/blockedz`: return 200 `hidden treasure`. It should never be possible to have
+  1. ``/blockedz``: return 200 ``hidden treasure``. It should never be possible to have
      traffic on the Envoy edge server's 10000 port receive this response unless a
      qualifying vulnerability is present.
-  2. `/*`: return 200 `normal`.
+  2. ``/*``: return 200 ``normal``.
 
 When running the Docker images, the following command line options should be supplied:
 
-* `-m 3g` to ensure that memory is bounded to 3GB. At least this much memory should be available
+* ``-m 3g`` to ensure that memory is bounded to 3GB. At least this much memory should be available
   to the execution environment. Each Envoy process has an overload manager configured to limit
   at 1GB.
 
-* `-e ENVOY_EDGE_EXTRA_ARGS="<...>"` supplies additional CLI args for the edge Envoy. This
+* ``-e ENVOY_EDGE_EXTRA_ARGS="<...>"`` supplies additional CLI args for the edge Envoy. This
   needs to be set but can be empty.
 
-* `-e ENVOY_ORIGIN_EXTRA_ARGS="<...>"` supplies additional CLI args for the origin Envoy. This
+* ``-e ENVOY_ORIGIN_EXTRA_ARGS="<...>"`` supplies additional CLI args for the origin Envoy. This
   needs to be set but can be empty.
 
 .. _arch_overview_google_vrp_objectives:
@@ -127,9 +133,9 @@ that falls into one of these categories:
 * OOM: requests that cause the edge Envoy process to OOM. There should be no more than
   100 connections and streams in total involved to cause this to happen (i.e. brute force
   connection/stream DoS is excluded).
-* Routing rule bypass: requests that are able to access `hidden treasure`.
+* Routing rule bypass: requests that are able to access ``hidden treasure``.
 * TLS certificate exfiltration: requests that are able to obtain the edge Envoy's
-  `serverkey.pem`.
+  ``serverkey.pem``.
 * Remote code exploits: any root shell obtained via the network data plane.
 * At the discretion of the OSS Envoy security team, sufficiently interesting vulnerabilities that
   don't fit the above categories but are likely to fall into the category of high or critical
@@ -149,7 +155,7 @@ port 10000 looks like:
      envoyproxy/envoy-google-vrp-dev:latest
 
 When debugging, additional args may prove useful, e.g. in order to obtain trace logs, make
-use of `wireshark` and `gdb`:
+use of ``wireshark`` and ``gdb``:
 
 .. code-block:: bash
 
@@ -165,7 +171,7 @@ You can obtain a shell in the Docker container with:
 
   docker exec -it envoy-google-vrp /bin/bash
 
-The Docker images include `gdb`, `strace`, `tshark` (feel free to contribute other
+The Docker images include ``gdb``, ``strace``, ``tshark`` (feel free to contribute other
 suggestions via PRs updating the :repo:`Docker build file </ci/Dockerfile-envoy-google-vrp>`).
 
 Rebuilding the Docker image

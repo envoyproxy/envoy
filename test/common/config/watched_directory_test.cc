@@ -1,12 +1,13 @@
 #include "envoy/filesystem/watcher.h"
 
-#include "common/config/watched_directory.h"
+#include "source/common/config/watched_directory.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"
 
 #include "gtest/gtest.h"
 
+using testing::DoAll;
 using testing::Return;
 using testing::SaveArg;
 
@@ -21,11 +22,14 @@ TEST(WatchedDirectory, All) {
   EXPECT_CALL(dispatcher, createFilesystemWatcher_()).WillOnce(Return(watcher));
   Filesystem::Watcher::OnChangedCb cb;
   EXPECT_CALL(*watcher, addWatch("foo/bar/", Filesystem::Watcher::Events::MovedTo, _))
-      .WillOnce(SaveArg<2>(&cb));
-  WatchedDirectory wd(config, dispatcher);
+      .WillOnce(DoAll(SaveArg<2>(&cb), Return(absl::OkStatus())));
+  auto wd = *WatchedDirectory::create(config, dispatcher);
   bool called = false;
-  wd.setCallback([&called] { called = true; });
-  cb(Filesystem::Watcher::Events::MovedTo);
+  wd->setCallback([&called] {
+    called = true;
+    return absl::OkStatus();
+  });
+  EXPECT_TRUE(cb(Filesystem::Watcher::Events::MovedTo).ok());
   EXPECT_TRUE(called);
 }
 

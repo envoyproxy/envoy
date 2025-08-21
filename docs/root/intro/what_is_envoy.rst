@@ -46,13 +46,16 @@ clients and target servers can be bridged. The recommended service to service co
 HTTP/2 between all Envoys to create a mesh of persistent connections that requests and responses can
 be multiplexed over.
 
+**HTTP/3 support (currently in alpha):** As of 1.19.0, Envoy now supports HTTP/3 upstream and downstream,
+and translating between any combination of HTTP/1.1, HTTP/2 and HTTP/3 in either direction.
+
 **HTTP L7 routing:** When operating in HTTP mode, Envoy supports a
 :ref:`routing <arch_overview_http_routing>` subsystem that is capable of routing and redirecting
 requests based on path, authority, content type, :ref:`runtime <arch_overview_runtime>` values, etc.
 This functionality is most useful when using Envoy as a front/edge proxy but is also leveraged when
 building a service to service mesh.
 
-**gRPC support:** `gRPC <https://www.grpc.io/>`_ is an RPC framework from Google that uses HTTP/2
+**gRPC support:** `gRPC <https://www.grpc.io/>`_ is an RPC framework from Google that uses HTTP/2 or above
 as the underlying multiplexed transport. Envoy :ref:`supports <arch_overview_grpc>` all of the
 HTTP/2 features required to be used as the routing and load balancing substrate for gRPC requests
 and responses. The two systems are very complementary.
@@ -88,7 +91,7 @@ racing.
 **Front/edge proxy support:** There is substantial benefit in using the same software at the edge
 (observability, management, identical service discovery and load balancing algorithms, etc.). Envoy
 has a feature set that makes it well suited as an edge proxy for most modern web application use
-cases. This includes :ref:`TLS <arch_overview_ssl>` termination, HTTP/1.1 and HTTP/2 :ref:`support
+cases. This includes :ref:`TLS <arch_overview_ssl>` termination, HTTP/1.1 HTTP/2 and HTTP/3 :ref:`support
 <arch_overview_http_protocols>`, as well as HTTP L7 :ref:`routing <arch_overview_http_routing>`.
 
 **Best in class observability:** As stated above, the primary goal of Envoy is to make the network

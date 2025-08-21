@@ -1,69 +1,19 @@
-#include "extensions/tracers/zipkin/zipkin_tracer_impl.h"
+#include "source/extensions/tracers/zipkin/zipkin_tracer_impl.h"
 
 #include "envoy/config/trace/v3/zipkin.pb.h"
 
-#include "common/common/enum_to_int.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-#include "common/config/utility.h"
-#include "common/http/headers.h"
-#include "common/http/message_impl.h"
-#include "common/http/utility.h"
-#include "common/tracing/http_tracer_impl.h"
-
-#include "extensions/tracers/zipkin/span_context_extractor.h"
-#include "extensions/tracers/zipkin/zipkin_core_constants.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/config/utility.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/message_impl.h"
+#include "source/common/http/utility.h"
+#include "source/extensions/tracers/zipkin/span_context_extractor.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
-
-ZipkinSpan::ZipkinSpan(Zipkin::Span& span, Zipkin::Tracer& tracer) : span_(span), tracer_(tracer) {}
-
-void ZipkinSpan::finishSpan() { span_.finish(); }
-
-void ZipkinSpan::setOperation(absl::string_view operation) {
-  span_.setName(std::string(operation));
-}
-
-void ZipkinSpan::setTag(absl::string_view name, absl::string_view value) {
-  span_.setTag(name, value);
-}
-
-void ZipkinSpan::log(SystemTime timestamp, const std::string& event) {
-  span_.log(timestamp, event);
-}
-
-// TODO(#11622): Implement baggage storage for zipkin spans
-void ZipkinSpan::setBaggage(absl::string_view, absl::string_view) {}
-std::string ZipkinSpan::getBaggage(absl::string_view) { return std::string(); }
-
-void ZipkinSpan::injectContext(Http::RequestHeaderMap& request_headers) {
-  // Set the trace-id and span-id headers properly, based on the newly-created span structure.
-  request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID,
-                                  span_.traceIdAsHexString());
-  request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID, span_.idAsHexString());
-
-  // Set the parent-span header properly, based on the newly-created span structure.
-  if (span_.isSetParentId()) {
-    request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID,
-                                    span_.parentIdAsHexString());
-  }
-
-  // Set the sampled header.
-  request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED,
-                                  span_.sampled() ? SAMPLED : NOT_SAMPLED);
-}
-
-void ZipkinSpan::setSampled(bool sampled) { span_.setSampled(sampled); }
-
-Tracing::SpanPtr ZipkinSpan::spawnChild(const Tracing::Config& config, const std::string& name,
-                                        SystemTime start_time) {
-  SpanContext previous_context(span_);
-  return std::make_unique<ZipkinSpan>(
-      *tracer_.startSpan(config, name, start_time, previous_context), tracer_);
-}
 
 Driver::TlsTracer::TlsTracer(TracerPtr&& tracer, Driver& driver)
     : tracer_(std::move(tracer)), driver_(driver) {}
@@ -73,12 +23,14 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
                ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
                const LocalInfo::LocalInfo& local_info, Random::RandomGenerator& random_generator,
                TimeSource& time_source)
-    : cm_(cluster_manager), tracer_stats_{ZIPKIN_TRACER_STATS(
-                                POOL_COUNTER_PREFIX(scope, "tracing.zipkin."))},
+    : cm_(cluster_manager),
+      tracer_stats_{ZIPKIN_TRACER_STATS(POOL_COUNTER_PREFIX(scope, "tracing.zipkin."))},
       tls_(tls.allocateSlot()), runtime_(runtime), local_info_(local_info),
-      time_source_(time_source) {
-  Config::Utility::checkCluster("envoy.tracers.zipkin", zipkin_config.collector_cluster(), cm_,
-                                /* allow_added_via_api */ true);
+      time_source_(time_source), trace_context_option_(zipkin_config.trace_context_option()) {
+  THROW_IF_NOT_OK_REF(Config::Utility::checkCluster("envoy.tracers.zipkin",
+                                                    zipkin_config.collector_cluster(), cm_,
+                                                    /* allow_added_via_api */ true)
+                          .status());
   cluster_ = zipkin_config.collector_cluster();
   hostname_ = !zipkin_config.collector_hostname().empty() ? zipkin_config.collector_hostname()
                                                           : zipkin_config.collector_cluster();
@@ -87,7 +39,7 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
   if (!zipkin_config.collector_endpoint().empty()) {
     collector.endpoint_ = zipkin_config.collector_endpoint();
   }
-  // The current default version of collector_endpoint_version is HTTP_JSON_V1.
+  // The current default version of collector_endpoint_version is HTTP_JSON.
   collector.version_ = zipkin_config.collector_endpoint_version();
   const bool trace_id_128bit = zipkin_config.trace_id_128bit();
 
@@ -95,50 +47,57 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
       zipkin_config, shared_span_context, DEFAULT_SHARED_SPAN_CONTEXT);
   collector.shared_span_context_ = shared_span_context;
 
-  tls_->set([this, collector, &random_generator, trace_id_128bit, shared_span_context](
+  const bool split_spans_for_request = zipkin_config.split_spans_for_request();
+
+  tls_->set([this, collector, &random_generator, trace_id_128bit, shared_span_context,
+             split_spans_for_request](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    TracerPtr tracer =
-        std::make_unique<Tracer>(local_info_.clusterName(), local_info_.address(), random_generator,
-                                 trace_id_128bit, shared_span_context, time_source_);
+    TracerPtr tracer = std::make_unique<Tracer>(
+        local_info_.clusterName(), local_info_.address(), random_generator, trace_id_128bit,
+        shared_span_context, time_source_, split_spans_for_request);
+    tracer->setTraceContextOption(trace_context_option_);
     tracer->setReporter(
-        ReporterImpl::NewInstance(std::ref(*this), std::ref(dispatcher), collector));
+        ReporterImpl::newInstance(std::ref(*this), std::ref(dispatcher), collector));
     return std::make_shared<TlsTracer>(std::move(tracer), *this);
   });
 }
 
 Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
-                                   Http::RequestHeaderMap& request_headers, const std::string&,
-                                   SystemTime start_time,
-                                   const Tracing::Decision tracing_decision) {
+                                   Tracing::TraceContext& trace_context,
+                                   const StreamInfo::StreamInfo& stream_info, const std::string&,
+                                   Tracing::Decision tracing_decision) {
   Tracer& tracer = *tls_->getTyped<TlsTracer>().tracer_;
   SpanPtr new_zipkin_span;
-  SpanContextExtractor extractor(request_headers);
-  bool sampled{extractor.extractSampled(tracing_decision)};
-  try {
-    auto ret_span_context = extractor.extractSpanContext(sampled);
+
+  // W3C fallback extraction is only enabled when USE_B3_WITH_W3C_PROPAGATION is configured
+  SpanContextExtractor extractor(trace_context, w3cFallbackEnabled());
+  const absl::optional<bool> sampled = extractor.extractSampled();
+  bool use_local_decision = !sampled.has_value();
+  TRY_NEEDS_AUDIT {
+    auto ret_span_context = extractor.extractSpanContext(sampled.value_or(tracing_decision.traced));
     if (!ret_span_context.second) {
       // Create a root Zipkin span. No context was found in the headers.
       new_zipkin_span =
-          tracer.startSpan(config, std::string(request_headers.getHostValue()), start_time);
-      new_zipkin_span->setSampled(sampled);
+          tracer.startSpan(config, std::string(trace_context.host()), stream_info.startTime());
+      new_zipkin_span->setSampled(sampled.value_or(tracing_decision.traced));
     } else {
-      new_zipkin_span = tracer.startSpan(config, std::string(request_headers.getHostValue()),
-                                         start_time, ret_span_context.first);
+      use_local_decision = false;
+      new_zipkin_span = tracer.startSpan(config, std::string(trace_context.host()),
+                                         stream_info.startTime(), ret_span_context.first);
     }
-
-  } catch (const ExtractorException& e) {
-    return std::make_unique<Tracing::NullSpan>();
   }
+  END_TRY catch (const ExtractorException& e) { return std::make_unique<Tracing::NullSpan>(); }
 
+  new_zipkin_span->setUseLocalDecision(use_local_decision);
   // Return the active Zipkin span.
-  return std::make_unique<ZipkinSpan>(*new_zipkin_span, tracer);
+  return new_zipkin_span;
 }
 
 ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
                            const CollectorInfo& collector)
-    : driver_(driver),
-      collector_(collector), span_buffer_{std::make_unique<SpanBuffer>(
-                                 collector.version_, collector.shared_span_context_)},
+    : driver_(driver), collector_(collector),
+      span_buffer_{
+          std::make_unique<SpanBuffer>(collector.version_, collector.shared_span_context_)},
       collector_cluster_(driver_.clusterManager(), driver_.cluster()) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     driver_.tracerStats().timer_flushed_.inc();
@@ -153,7 +112,7 @@ ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
   enableTimer();
 }
 
-ReporterPtr ReporterImpl::NewInstance(Driver& driver, Event::Dispatcher& dispatcher,
+ReporterPtr ReporterImpl::newInstance(Driver& driver, Event::Dispatcher& dispatcher,
                                       const CollectorInfo& collector) {
   return std::make_unique<ReporterImpl>(driver, dispatcher, collector);
 }

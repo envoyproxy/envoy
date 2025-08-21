@@ -25,11 +25,11 @@ You need to write implementations of four small interfaces:
 
 ## LookupContext
  * Example Implementation: `SimpleLookupContext`
- * `LookupContext` represents a single lookup operation; this is a good place to store whatever per-lookup state you may need during the lookup process. 
+ * `LookupContext` represents a single lookup operation; this is a good place to store whatever per-lookup state you may need during the lookup process.
 
 ## InsertContext
  * Example Implementation: `SimpleInsertContext`
- * `LookupContext` represents a single insert operation; this is a good place to store whatever per-insert state you may need during the lookup process. 
+ * `LookupContext` represents a single insert operation; this is a good place to store whatever per-insert state you may need during the lookup process.
 
 ### Flow
 

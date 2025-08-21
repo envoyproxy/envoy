@@ -15,6 +15,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.metrics.v2";
 option java_outer_classname = "StatsProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/metrics/v2;metricsv2";
 option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Stats]
@@ -87,8 +88,8 @@ message StatsMatcher {
   // limited by either an exclusion or an inclusion list of :ref:`StringMatcher
   // <envoy_api_msg_type.matcher.StringMatcher>` protos:
   //
-  // * If `reject_all` is set to `true`, no stats will be instantiated. If `reject_all` is set to
-  //   `false`, all stats will be instantiated.
+  // * If ``reject_all`` is set to ``true``, no stats will be instantiated. If ``reject_all`` is set to
+  //   ``false``, all stats will be instantiated.
   //
   // * If an exclusion list is supplied, any stat name matching *any* of the StringMatchers in the
   //   list will not instantiate.

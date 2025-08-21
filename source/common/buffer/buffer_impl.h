@@ -3,14 +3,18 @@
 #include <algorithm>
 #include <cstdint>
 #include <deque>
+#include <memory>
 #include <string>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/http/stream_reset_handler.h"
 
-#include "common/common/assert.h"
-#include "common/common/non_copyable.h"
-#include "common/common/utility.h"
-#include "common/event/libevent.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/non_copyable.h"
+#include "source/common/common/utility.h"
+#include "source/common/event/libevent.h"
+
+#include "absl/functional/any_invocable.h"
 
 namespace Envoy {
 namespace Buffer {
@@ -28,11 +32,17 @@ namespace Buffer {
  * +-----------------+----------------+----------------------+
  * ^                 ^                ^                      ^
  * |                 |                |                      |
- * base_             data()           base_ + reservable_    base_ + capacity_
+ * base_             base_ + data_    base_ + reservable_    base_ + capacity_
  */
 class Slice {
 public:
   using Reservation = RawSlice;
+  using StoragePtr = std::unique_ptr<uint8_t[]>;
+
+  struct SizedStorage {
+    StoragePtr mem_{};
+    size_t len_{};
+  };
 
   /**
    * Create an empty Slice with 0 capacity.
@@ -40,13 +50,39 @@ public:
   Slice() = default;
 
   /**
-   * Create an empty mutable Slice that owns its storage.
+   * Create an empty mutable Slice that owns its storage, which it charges to the provided account,
+   * if any.
    * @param min_capacity number of bytes of space the slice should have. Actual capacity is rounded
    * up to the next multiple of 4kb.
+   * @param account the account to charge.
    */
-  Slice(uint64_t min_capacity)
-      : capacity_(sliceSize(min_capacity)), storage_(new uint8_t[capacity_]), base_(storage_.get()),
-        data_(0), reservable_(0) {}
+  Slice(uint64_t min_capacity, const BufferMemoryAccountSharedPtr& account)
+      : capacity_(sliceSize(min_capacity)), storage_(new uint8_t[capacity_]),
+        base_(storage_.get()) {
+    if (account) {
+      account->charge(capacity_);
+      account_ = account;
+    }
+  }
+
+  /**
+   * Create an empty mutable Slice that owns its storage, which it charges to the provided account,
+   * if any.
+   * @param storage backend storage for the slice.
+   * @param used_size the size already used in storage.
+   * @param account the account to charge.
+   */
+  Slice(SizedStorage storage, uint64_t used_size, const BufferMemoryAccountSharedPtr& account)
+      : capacity_(storage.len_), storage_(std::move(storage.mem_)), base_(storage_.get()),
+        reservable_(used_size) {
+    ASSERT(sliceSize(capacity_) == capacity_);
+    ASSERT(reservable_ <= capacity_);
+
+    if (account) {
+      account->charge(capacity_);
+      account_ = account;
+    }
+  }
 
   /**
    * Create an immutable Slice that refers to an external buffer fragment.
@@ -54,46 +90,59 @@ public:
    */
   Slice(BufferFragment& fragment)
       : capacity_(fragment.size()), storage_(nullptr),
-        base_(static_cast<uint8_t*>(const_cast<void*>(fragment.data()))), data_(0),
+        base_(static_cast<uint8_t*>(const_cast<void*>(fragment.data()))),
         reservable_(fragment.size()) {
-    addDrainTracker([&fragment]() { fragment.done(); });
+    releasor_ = [&fragment]() { fragment.done(); };
   }
 
   Slice(Slice&& rhs) noexcept {
+    capacity_ = rhs.capacity_;
     storage_ = std::move(rhs.storage_);
-    drain_trackers_ = std::move(rhs.drain_trackers_);
     base_ = rhs.base_;
     data_ = rhs.data_;
     reservable_ = rhs.reservable_;
-    capacity_ = rhs.capacity_;
+    drain_trackers_ = std::move(rhs.drain_trackers_);
+    account_ = std::move(rhs.account_);
+    releasor_.swap(rhs.releasor_);
 
+    rhs.capacity_ = 0;
     rhs.base_ = nullptr;
     rhs.data_ = 0;
     rhs.reservable_ = 0;
-    rhs.capacity_ = 0;
   }
 
   Slice& operator=(Slice&& rhs) noexcept {
     if (this != &rhs) {
-      callAndClearDrainTrackers();
+      callAndClearDrainTrackersAndCharges();
 
+      capacity_ = rhs.capacity_;
       storage_ = std::move(rhs.storage_);
-      drain_trackers_ = std::move(rhs.drain_trackers_);
       base_ = rhs.base_;
       data_ = rhs.data_;
       reservable_ = rhs.reservable_;
-      capacity_ = rhs.capacity_;
+      drain_trackers_ = std::move(rhs.drain_trackers_);
+      account_ = std::move(rhs.account_);
+      if (releasor_) {
+        releasor_();
+      }
+      releasor_ = rhs.releasor_;
+      rhs.releasor_ = nullptr;
 
+      rhs.capacity_ = 0;
       rhs.base_ = nullptr;
       rhs.data_ = 0;
       rhs.reservable_ = 0;
-      rhs.capacity_ = 0;
     }
 
     return *this;
   }
 
-  ~Slice() { callAndClearDrainTrackers(); }
+  ~Slice() {
+    callAndClearDrainTrackersAndCharges();
+    if (releasor_) {
+      releasor_();
+    }
+  }
 
   /**
    * @return true if the data in the slice is mutable
@@ -136,7 +185,7 @@ public:
   }
 
   /**
-   * @return the number of bytes available to be reserve()d.
+   * @return the number of bytes available to be reserved.
    * @note Read-only implementations of Slice should return zero from this method.
    */
   uint64_t reservableSize() const {
@@ -186,12 +235,18 @@ public:
    *        and the read only returns two bytes, the caller should set
    *        reservation.len_ = 2 and then call `commit(reservation)`.
    * @return whether the Reservation was successfully committed to the Slice.
+   * @note template parameter `SafeCommit` can be used to disable memory range check.
    */
-  bool commit(const Reservation& reservation) {
-    if (static_cast<const uint8_t*>(reservation.mem_) != base_ + reservable_ ||
-        reservable_ + reservation.len_ > capacity_ || reservable_ >= capacity_) {
-      // The reservation is not from this Slice.
-      return false;
+  template <bool SafeCommit = true> bool commit(const Reservation& reservation) {
+    if constexpr (SafeCommit) {
+      if (static_cast<const uint8_t*>(reservation.mem_) != base_ + reservable_ ||
+          reservable_ + reservation.len_ > capacity_ || reservable_ >= capacity_) {
+        // The reservation is not from this Slice.
+        return false;
+      }
+    } else {
+      ASSERT(static_cast<const uint8_t*>(reservation.mem_) == base_ + reservable_ &&
+             reservable_ + reservation.len_ <= capacity_);
     }
     reservable_ += reservation.len_;
     return true;
@@ -211,7 +266,7 @@ public:
     uint8_t* dest = base_ + reservable_;
     reservable_ += copy_size;
     // NOLINTNEXTLINE(clang-analyzer-core.NullDereference)
-    memcpy(dest, data, copy_size);
+    memcpy(dest, data, copy_size); // NOLINT(safe-memcpy)
     return copy_size;
   }
 
@@ -223,27 +278,7 @@ public:
    * @param size number of bytes to copy.
    * @return number of bytes copied (may be a smaller than size, may even be zero).
    */
-  uint64_t prepend(const void* data, uint64_t size) {
-    const uint8_t* src = static_cast<const uint8_t*>(data);
-    uint64_t copy_size;
-    if (dataSize() == 0) {
-      // There is nothing in the slice, so put the data at the very end in case the caller
-      // later tries to prepend anything else in front of it.
-      copy_size = std::min(size, reservableSize());
-      reservable_ = capacity_;
-      data_ = capacity_ - copy_size;
-    } else {
-      if (data_ == 0) {
-        // There is content in the slice, and no space in front of it to write anything.
-        return 0;
-      }
-      // Write into the space in front of the slice's current content.
-      copy_size = std::min(size, data_);
-      data_ -= copy_size;
-    }
-    memcpy(base_ + data_, src + size - copy_size, copy_size);
-    return copy_size;
-  }
+  uint64_t prepend(const void* data, uint64_t size);
 
   /**
    * Describe the in-memory representation of the slice. For use
@@ -260,11 +295,14 @@ public:
   }
 
   /**
-   * Move all drain trackers from the current slice to the destination slice.
+   * Move all drain trackers and charges from the current slice to the destination slice.
    */
   void transferDrainTrackersTo(Slice& destination) {
     destination.drain_trackers_.splice(destination.drain_trackers_.end(), drain_trackers_);
     ASSERT(drain_trackers_.empty());
+    // The releasor needn't to be transferred, and actually if there is releasor, this
+    // slice can't coalesce. Then there won't be a chance to calling this method.
+    ASSERT(releasor_ == nullptr);
   }
 
   /**
@@ -278,14 +316,35 @@ public:
    * Call all drain trackers associated with the slice, then clear
    * the drain tracker list.
    */
-  void callAndClearDrainTrackers() {
+  void callAndClearDrainTrackersAndCharges() {
     for (const auto& drain_tracker : drain_trackers_) {
       drain_tracker();
     }
     drain_trackers_.clear();
+
+    if (account_) {
+      account_->credit(capacity_);
+      account_.reset();
+    }
   }
 
-protected:
+  /**
+   * Charges the provided account for the resources if these conditions hold:
+   * - we're not already charging for this slice
+   * - the given account is non-null
+   * - the slice owns backing memory
+   */
+  void maybeChargeAccount(const BufferMemoryAccountSharedPtr& account) {
+    if (account_ != nullptr || storage_ == nullptr || account == nullptr) {
+      return;
+    }
+    account->charge(capacity_);
+    account_ = account;
+  }
+
+  static constexpr uint32_t default_slice_size_ = 16384;
+
+public:
   /**
    * Compute a slice size big enough to hold a specified amount of data.
    * @param data_size the minimum amount of data the slice must be able to store, in bytes.
@@ -297,27 +356,49 @@ protected:
     return num_pages * PageSize;
   }
 
+  /**
+   * Create new backend storage with min capacity. This method will create a recommended capacity
+   * which will bigger or equal to the min capacity and create new backend storage based on the
+   * recommended capacity.
+   * @param min_capacity the min capacity of new created backend storage.
+   * @return a backend storage for slice.
+   */
+  static inline SizedStorage newStorage(uint64_t min_capacity) {
+    const uint64_t slice_size = sliceSize(min_capacity);
+    return {StoragePtr{new uint8_t[slice_size]}, static_cast<size_t>(slice_size)};
+  }
+
+protected:
   /** Length of the byte array that base_ points to. This is also the offset in bytes from the start
    * of the slice to the end of the Reservable section. */
-  uint64_t capacity_;
+  uint64_t capacity_ = 0;
 
   /** Backing storage for mutable slices which own their own storage. This storage should never be
    * accessed directly; access base_ instead. */
-  std::unique_ptr<uint8_t[]> storage_;
+  StoragePtr storage_;
 
   /** Start of the slice. Points to storage_ iff the slice owns its own storage. */
   uint8_t* base_{nullptr};
 
   /** Offset in bytes from the start of the slice to the start of the Data section. */
-  uint64_t data_;
+  uint64_t data_ = 0;
 
   /** Offset in bytes from the start of the slice to the start of the Reservable section which is
    * also the end of the Data section. */
-  uint64_t reservable_;
+  uint64_t reservable_ = 0;
 
   /** Hooks to execute when the slice is destroyed. */
   std::list<std::function<void()>> drain_trackers_;
+
+  /** Account associated with this slice. This may be null. When
+   * coalescing with another slice, we do not transfer over their account. */
+  BufferMemoryAccountSharedPtr account_;
+
+  /** The releasor for the BufferFragment */
+  std::function<void()> releasor_;
 };
+
+class OwnedImpl;
 
 class SliceDataImpl : public SliceData {
 public:
@@ -326,10 +407,11 @@ public:
   // SliceData
   absl::Span<uint8_t> getMutableData() override {
     RELEASE_ASSERT(slice_.isMutable(), "Not allowed to call getMutableData if slice is immutable");
-    return {slice_.data(), slice_.dataSize()};
+    return {slice_.data(), static_cast<absl::Span<uint8_t>::size_type>(slice_.dataSize())};
   }
 
 private:
+  friend OwnedImpl;
   Slice slice_;
 };
 
@@ -504,8 +586,8 @@ public:
    */
   BufferFragmentImpl(
       const void* data, size_t size,
-      const std::function<void(const void*, size_t, const BufferFragmentImpl*)>& releasor)
-      : data_(data), size_(size), releasor_(releasor) {}
+      absl::AnyInvocable<void(const void*, size_t, const BufferFragmentImpl*)> releasor)
+      : data_(data), size_(size), releasor_(std::move(releasor)) {}
 
   // Buffer::BufferFragment
   const void* data() const override { return data_; }
@@ -519,7 +601,7 @@ public:
 private:
   const void* const data_;
   const size_t size_;
-  const std::function<void(const void*, size_t, const BufferFragmentImpl*)> releasor_;
+  absl::AnyInvocable<void(const void*, size_t, const BufferFragmentImpl*)> releasor_;
 };
 
 class LibEventInstance : public Instance {
@@ -564,17 +646,20 @@ public:
   OwnedImpl(absl::string_view data);
   OwnedImpl(const Instance& data);
   OwnedImpl(const void* data, uint64_t size);
+  OwnedImpl(BufferMemoryAccountSharedPtr account);
 
   // Buffer::Instance
   void addDrainTracker(std::function<void()> drain_tracker) override;
+  void bindAccount(BufferMemoryAccountSharedPtr account) override;
   void add(const void* data, uint64_t size) override;
   void addBufferFragment(BufferFragment& fragment) override;
   void add(absl::string_view data) override;
   void add(const Instance& data) override;
   void prepend(absl::string_view data) override;
   void prepend(Instance& data) override;
-  void commit(RawSlice* iovecs, uint64_t num_iovecs) override;
   void copyOut(size_t start, uint64_t size, void* data) const override;
+  uint64_t copyOutToSlices(uint64_t size, Buffer::RawSlice* slices,
+                           uint64_t num_slice) const override;
   void drain(uint64_t size) override;
   RawSliceVector getRawSlices(absl::optional<uint64_t> max_slices = absl::nullopt) const override;
   RawSlice frontSlice() const override;
@@ -583,7 +668,9 @@ public:
   void* linearize(uint32_t size) override;
   void move(Instance& rhs) override;
   void move(Instance& rhs, uint64_t length) override;
-  uint64_t reserve(uint64_t length, RawSlice* iovecs, uint64_t num_iovecs) override;
+  void move(Instance& rhs, uint64_t length, bool reset_drain_trackers_and_accounting) override;
+  Reservation reserveForRead() override;
+  ReservationSingleSlice reserveSingleSlice(uint64_t length, bool separate_slice = false) override;
   ssize_t search(const void* data, uint64_t size, size_t start, size_t length) const override;
   bool startsWith(absl::string_view data) const override;
   std::string toString() const override;
@@ -604,10 +691,15 @@ public:
    */
   virtual void appendSliceForTest(absl::string_view data);
 
+  /**
+   * @return the BufferMemoryAccount bound to this buffer, if any.
+   */
+  BufferMemoryAccountSharedPtr getAccountForTest();
+
   // Does not implement watermarking.
   // TODO(antoniovicente) Implement watermarks by merging the OwnedImpl and WatermarkBuffer
   // implementations. Also, make high-watermark config a constructor argument.
-  void setWatermarks(uint32_t) override { ASSERT(false, "watermarks not implemented."); }
+  void setWatermarks(uint32_t, uint32_t) override { ASSERT(false, "watermarks not implemented."); }
   uint32_t highWatermark() const override { return 0; }
   bool highWatermarkTriggered() const override { return false; }
 
@@ -617,6 +709,27 @@ public:
    * bytes in the buffer.
    */
   std::vector<Slice::SliceRepresentation> describeSlicesForTest() const;
+
+  /**
+   * Create a reservation for reading with a non-default length. Used in benchmark tests.
+   */
+  Reservation reserveForReadWithLengthForTest(uint64_t length) {
+    return reserveWithMaxLength(length);
+  }
+
+  size_t addFragments(absl::Span<const absl::string_view> fragments) override;
+
+protected:
+  static constexpr uint64_t default_read_reservation_size_ =
+      Reservation::MAX_SLICES_ * Slice::default_slice_size_;
+
+  /**
+   * Create a reservation with a maximum length.
+   */
+  Reservation reserveWithMaxLength(uint64_t max_length);
+
+  void commit(uint64_t length, absl::Span<RawSlice> slices,
+              ReservationSlicesOwnerPtr slices_owner) override;
 
 private:
   /**
@@ -641,6 +754,67 @@ private:
 
   /** Sum of the dataSize of all slices. */
   OverflowDetectingUInt64 length_;
+
+  BufferMemoryAccountSharedPtr account_;
+
+  struct OwnedImplReservationSlicesOwner : public ReservationSlicesOwner {
+    virtual absl::Span<Slice::SizedStorage> ownedStorages() PURE;
+  };
+
+  struct OwnedImplReservationSlicesOwnerMultiple : public OwnedImplReservationSlicesOwner {
+  public:
+    static constexpr uint32_t free_list_max_ = Buffer::Reservation::MAX_SLICES_;
+
+    OwnedImplReservationSlicesOwnerMultiple() : free_list_ref_(free_list_) {}
+    ~OwnedImplReservationSlicesOwnerMultiple() override {
+      for (auto r = owned_storages_.rbegin(); r != owned_storages_.rend(); r++) {
+        if (r->mem_ != nullptr) {
+          ASSERT(r->len_ == Slice::default_slice_size_);
+          if (free_list_ref_.size() < free_list_max_) {
+            free_list_ref_.push_back(std::move(r->mem_));
+          }
+        }
+      }
+    }
+
+    Slice::SizedStorage newStorage() {
+      ASSERT(Slice::sliceSize(Slice::default_slice_size_) == Slice::default_slice_size_);
+
+      Slice::SizedStorage storage{nullptr, Slice::default_slice_size_};
+      if (!free_list_ref_.empty()) {
+        storage.mem_ = std::move(free_list_ref_.back());
+        free_list_ref_.pop_back();
+      } else {
+        storage.mem_.reset(new uint8_t[Slice::default_slice_size_]);
+      }
+
+      return storage;
+    }
+
+    absl::Span<Slice::SizedStorage> ownedStorages() override {
+      return absl::MakeSpan(owned_storages_);
+    }
+
+    absl::InlinedVector<Slice::SizedStorage, Buffer::Reservation::MAX_SLICES_> owned_storages_;
+
+  private:
+    // Thread local resolving introduces additional overhead. Initialize this reference once when
+    // constructing the owner to reduce thread local resolving to improve performance.
+    absl::InlinedVector<Slice::StoragePtr, free_list_max_>& free_list_ref_;
+
+    // Simple thread local cache to reduce unnecessary memory allocation and release. This cache
+    // is currently only used for multiple slices reservation because of the additional overhead
+    // that thread local resolving would introduce.
+    static thread_local absl::InlinedVector<Slice::StoragePtr, free_list_max_> free_list_;
+  };
+
+  struct OwnedImplReservationSlicesOwnerSingle : public OwnedImplReservationSlicesOwner {
+    absl::Span<Slice::SizedStorage> ownedStorages() override {
+      return absl::MakeSpan(&owned_storage_, 1);
+    }
+
+    Slice::SizedStorage owned_storage_;
+  };
 };
 
 using BufferFragmentPtr = std::unique_ptr<BufferFragment>;
@@ -674,7 +848,7 @@ private:
   OwnedBufferFragmentImpl(absl::string_view data, const Releasor& releasor)
       : releasor_(releasor), size_(data.size()) {
     ASSERT(releasor != nullptr);
-    memcpy(data_, data.data(), data.size());
+    memcpy(data_, data.data(), data.size()); // NOLINT(safe-memcpy)
   }
 
   const Releasor releasor_;

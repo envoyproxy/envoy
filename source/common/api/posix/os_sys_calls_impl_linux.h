@@ -6,7 +6,7 @@
 
 #include "envoy/api/os_sys_calls_linux.h"
 
-#include "common/singleton/threadsafe_singleton.h"
+#include "source/common/singleton/threadsafe_singleton.h"
 
 namespace Envoy {
 namespace Api {
@@ -15,6 +15,7 @@ class LinuxOsSysCallsImpl : public LinuxOsSysCalls {
 public:
   // Api::LinuxOsSysCalls
   SysCallIntResult sched_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t* mask) override;
+  SysCallIntResult setns(int fd, int nstype) const override;
 };
 
 using LinuxOsSysCallsSingleton = ThreadSafeSingleton<LinuxOsSysCallsImpl>;

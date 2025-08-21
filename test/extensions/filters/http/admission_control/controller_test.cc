@@ -1,9 +1,9 @@
 #include <chrono>
 
-#include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
-#include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.validate.h"
+#include "envoy/extensions/filters/http/admission_control/v3/admission_control.pb.h"
+#include "envoy/extensions/filters/http/admission_control/v3/admission_control.pb.validate.h"
 
-#include "extensions/filters/http/admission_control/thread_local_controller.h"
+#include "source/extensions/filters/http/admission_control/thread_local_controller.h"
 
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -98,6 +98,35 @@ TEST_F(ThreadLocalControllerTest, VerifyMemoryUsage) {
   time_system_.advanceTimeWait(std::chrono::seconds(3));
   tlc_.recordSuccess();
   EXPECT_EQ(RequestData(3, 3), tlc_.requestCounts());
+}
+
+// Verify the average RPS is calculated properly.
+TEST_F(ThreadLocalControllerTest, AverageRps) {
+  // Sample window is 5s by default in these tests.
+  constexpr auto test_window = std::chrono::seconds(5);
+  EXPECT_EQ(test_window, tlc_.samplingWindow());
+
+  // We expect the RPS to be 0 after instantiation.
+  EXPECT_EQ(0, tlc_.averageRps());
+
+  // Validate the average RPS value is calculated over the entire sample window.
+  tlc_.recordSuccess();
+  tlc_.recordFailure();
+  // We had 2 requests, so this would be 0.4 RPS over the full window.
+  EXPECT_EQ(2, tlc_.requestCounts().requests);
+  EXPECT_EQ(0, tlc_.averageRps());
+  // At 5 requests, this should be 1 RPS even if 0s have elapsed.
+  tlc_.recordSuccess();
+  tlc_.recordFailure();
+  tlc_.recordSuccess();
+  EXPECT_EQ(5, tlc_.requestCounts().requests);
+  EXPECT_EQ(1, tlc_.averageRps());
+
+  // After enough time, the requests that are outside the window should not count towards the
+  // average RPS calculation.
+  time_system_.advanceTimeWait(test_window);
+  EXPECT_EQ(0, tlc_.requestCounts().requests);
+  EXPECT_EQ(0, tlc_.averageRps());
 }
 
 } // namespace

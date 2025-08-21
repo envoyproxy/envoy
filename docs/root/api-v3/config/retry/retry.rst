@@ -1,4 +1,4 @@
-Retry Predicates
+Retry predicates
 ================
 
 .. toctree::

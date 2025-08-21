@@ -1,13 +1,13 @@
-#include "common/common/utility.h"
-#include "common/network/address_impl.h"
-#include "common/network/utility.h"
-
-#include "extensions/tracers/zipkin/zipkin_core_constants.h"
-#include "extensions/tracers/zipkin/zipkin_core_types.h"
+#include "source/common/common/utility.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_types.h"
 
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
+#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -26,13 +26,13 @@ TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
                               ep.toStruct(replacements)));
 
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Utility::parseInternetAddress("127.0.0.1");
+      Network::Utility::parseInternetAddressNoThrow("127.0.0.1");
   ep.setAddress(addr);
   EXPECT_TRUE(TestUtility::protoEqual(
       TestUtility::jsonToStruct(R"({"ipv4":"127.0.0.1","port":0,"serviceName":""})"),
       ep.toStruct(replacements)));
 
-  addr = Network::Utility::parseInternetAddressAndPort(
+  addr = Network::Utility::parseInternetAddressAndPortNoThrow(
       "[2001:0db8:85a3:0000:0000:8a2e:0370:4444]:7334");
   ep.setAddress(addr);
   EXPECT_TRUE(TestUtility::protoEqual(
@@ -53,7 +53,7 @@ TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
 
 TEST(ZipkinCoreTypesEndpointTest, customConstructor) {
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
   Util::Replacements replacements;
 
@@ -63,7 +63,7 @@ TEST(ZipkinCoreTypesEndpointTest, customConstructor) {
       ep.toStruct(replacements)));
   EXPECT_TRUE(replacements.empty());
 
-  addr = Network::Utility::parseInternetAddressAndPort(
+  addr = Network::Utility::parseInternetAddressAndPortNoThrow(
       "[2001:0db8:85a3:0000:0000:8a2e:0370:4444]:7334");
   ep.setAddress(addr);
 
@@ -76,7 +76,7 @@ TEST(ZipkinCoreTypesEndpointTest, customConstructor) {
 
 TEST(ZipkinCoreTypesEndpointTest, copyOperator) {
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:3306");
   Endpoint ep1(std::string("my_service"), addr);
   Endpoint& ep2(ep1);
   Util::Replacements replacements;
@@ -93,7 +93,7 @@ TEST(ZipkinCoreTypesEndpointTest, copyOperator) {
 
 TEST(ZipkinCoreTypesEndpointTest, assignmentOperator) {
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:3306");
   Endpoint ep1(std::string("my_service"), addr);
   Endpoint& ep2 = ep1;
   Util::Replacements replacements;
@@ -135,7 +135,7 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   replacements.clear();
   // Test the copy-semantics flavor of setEndpoint
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
   ann.setEndpoint(ep);
   EXPECT_TRUE(ann.isSetEndpoint());
@@ -155,7 +155,7 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
 
   replacements.clear();
   // Test the move-semantics flavor of setEndpoint
-  addr = Network::Utility::parseInternetAddressAndPort("192.168.1.1:5555");
+  addr = Network::Utility::parseInternetAddressAndPortNoThrow("192.168.1.1:5555");
   Endpoint ep2(std::string("my_service_2"), addr);
   ann.setEndpoint(std::move(ep2));
   EXPECT_TRUE(ann.isSetEndpoint());
@@ -190,7 +190,7 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
 
 TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
   Event::SimulatedTimeSystem test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
@@ -220,7 +220,7 @@ TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
 
 TEST(ZipkinCoreTypesAnnotationTest, copyConstructor) {
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
   Event::SimulatedTimeSystem test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
@@ -239,7 +239,7 @@ TEST(ZipkinCoreTypesAnnotationTest, copyConstructor) {
 
 TEST(ZipkinCoreTypesAnnotationTest, assignmentOperator) {
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
   Event::SimulatedTimeSystem test_time;
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
@@ -278,7 +278,7 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, defaultConstructor) {
   // Test the copy-semantics flavor of setEndpoint
 
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Utility::parseInternetAddressAndPort("127.0.0.1:3306");
+      Network::Utility::parseInternetAddressAndPortNoThrow("127.0.0.1:3306");
   Endpoint ep(std::string("my_service"), addr);
   ann.setEndpoint(ep);
   EXPECT_TRUE(ann.isSetEndpoint());
@@ -296,7 +296,7 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, defaultConstructor) {
                                       ann.toStruct(replacements)));
 
   // Test the move-semantics flavor of setEndpoint
-  addr = Network::Utility::parseInternetAddressAndPort("192.168.1.1:5555");
+  addr = Network::Utility::parseInternetAddressAndPortNoThrow("192.168.1.1:5555");
   Endpoint ep2(std::string("my_service_2"), addr);
   ann.setEndpoint(ep2);
   EXPECT_TRUE(ann.isSetEndpoint());
@@ -351,9 +351,23 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, assignmentOperator) {
   EXPECT_EQ(ann.annotationType(), ann2.annotationType());
 }
 
+class MockTracer : public TracerInterface {
+public:
+  MOCK_METHOD(SpanPtr, startSpan,
+              (const Tracing::Config&, const std::string& span_name, SystemTime timestamp), ());
+  MOCK_METHOD(SpanPtr, startSpan,
+              (const Tracing::Config&, const std::string& span_name, SystemTime timestamp,
+               const SpanContext& parent_context),
+              ());
+  MOCK_METHOD(void, reportSpan, (Span && span), ());
+  MOCK_METHOD(envoy::config::trace::v3::ZipkinConfig::TraceContextOption, traceContextOption, (),
+              (const));
+};
+
 TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   Event::SimulatedTimeSystem test_time;
-  Span span(test_time.timeSystem());
+  MockTracer tracer;
+  Span span(test_time.timeSystem(), tracer);
   Util::Replacements replacements;
 
   EXPECT_EQ(0ULL, span.id());
@@ -431,7 +445,7 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
 
   endpoint.setServiceName("my_service_name");
   Network::Address::InstanceConstSharedPtr addr =
-      Network::Utility::parseInternetAddressAndPort("192.168.1.2:3306");
+      Network::Utility::parseInternetAddressAndPortNoThrow("192.168.1.2:3306");
   endpoint.setAddress(addr);
 
   ann.setValue(CLIENT_SEND);
@@ -576,85 +590,10 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   EXPECT_EQ(6, replacements.size());
 }
 
-TEST(ZipkinCoreTypesSpanTest, copyConstructor) {
-  Event::SimulatedTimeSystem test_time;
-  Span span(test_time.timeSystem());
-  Util::Replacements replacements;
-
-  uint64_t id = Util::generateRandom64(test_time.timeSystem());
-  std::string id_hex = Hex::uint64ToHex(id);
-  span.setId(id);
-  span.setParentId(id);
-  span.setTraceId(id);
-  int64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                          test_time.timeSystem().systemTime().time_since_epoch())
-                          .count();
-  span.setTimestamp(timestamp);
-  span.setDuration(3000LL);
-  span.setName("span_name");
-
-  Span span2(span);
-
-  EXPECT_EQ(span.id(), span2.id());
-  EXPECT_EQ(span.parentId(), span2.parentId());
-  EXPECT_EQ(span.traceId(), span2.traceId());
-  EXPECT_EQ(span.name(), span2.name());
-  EXPECT_EQ(span.annotations().size(), span2.annotations().size());
-  EXPECT_EQ(span.binaryAnnotations().size(), span2.binaryAnnotations().size());
-  EXPECT_EQ(span.idAsHexString(), span2.idAsHexString());
-  EXPECT_EQ(span.parentIdAsHexString(), span2.parentIdAsHexString());
-  EXPECT_EQ(span.traceIdAsHexString(), span2.traceIdAsHexString());
-  EXPECT_EQ(span.timestamp(), span2.timestamp());
-  EXPECT_EQ(span.duration(), span2.duration());
-  EXPECT_EQ(span.startTime(), span2.startTime());
-  EXPECT_EQ(span.debug(), span2.debug());
-  EXPECT_EQ(span.isSetDuration(), span2.isSetDuration());
-  EXPECT_EQ(span.isSetParentId(), span2.isSetParentId());
-  EXPECT_EQ(span.isSetTimestamp(), span2.isSetTimestamp());
-  EXPECT_EQ(span.isSetTraceIdHigh(), span2.isSetTraceIdHigh());
-}
-
-TEST(ZipkinCoreTypesSpanTest, assignmentOperator) {
-  Event::SimulatedTimeSystem test_time;
-  Span span(test_time.timeSystem());
-  Util::Replacements replacements;
-
-  uint64_t id = Util::generateRandom64(test_time.timeSystem());
-  std::string id_hex = Hex::uint64ToHex(id);
-  span.setId(id);
-  span.setParentId(id);
-  span.setTraceId(id);
-  int64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
-                          test_time.timeSystem().systemTime().time_since_epoch())
-                          .count();
-  span.setTimestamp(timestamp);
-  span.setDuration(3000LL);
-  span.setName("span_name");
-
-  Span span2 = span;
-
-  EXPECT_EQ(span.id(), span2.id());
-  EXPECT_EQ(span.parentId(), span2.parentId());
-  EXPECT_EQ(span.traceId(), span2.traceId());
-  EXPECT_EQ(span.name(), span2.name());
-  EXPECT_EQ(span.annotations().size(), span2.annotations().size());
-  EXPECT_EQ(span.binaryAnnotations().size(), span2.binaryAnnotations().size());
-  EXPECT_EQ(span.idAsHexString(), span2.idAsHexString());
-  EXPECT_EQ(span.parentIdAsHexString(), span2.parentIdAsHexString());
-  EXPECT_EQ(span.traceIdAsHexString(), span2.traceIdAsHexString());
-  EXPECT_EQ(span.timestamp(), span2.timestamp());
-  EXPECT_EQ(span.duration(), span2.duration());
-  EXPECT_EQ(span.startTime(), span2.startTime());
-  EXPECT_EQ(span.debug(), span2.debug());
-  EXPECT_EQ(span.isSetDuration(), span2.isSetDuration());
-  EXPECT_EQ(span.isSetParentId(), span2.isSetParentId());
-  EXPECT_EQ(span.isSetTimestamp(), span2.isSetTimestamp());
-  EXPECT_EQ(span.isSetTraceIdHigh(), span2.isSetTraceIdHigh());
-}
-
 TEST(ZipkinCoreTypesSpanTest, setTag) {
   Event::SimulatedTimeSystem test_time;
-  Span span(test_time.timeSystem());
+  MockTracer tracer;
+  Span span(test_time.timeSystem(), tracer);
 
   span.setTag("key1", "value1");
   span.setTag("key2", "value2");

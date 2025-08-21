@@ -1,0 +1,7 @@
+config {
+  name: "envoy.filters.http.basic_auth"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.basic_auth.v3.BasicAuth"
+    value: "\n\003\022\001#"
+  }
+}

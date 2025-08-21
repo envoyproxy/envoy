@@ -3,9 +3,8 @@
 #include "envoy/extensions/filters/http/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/extensions/filters/http/ratelimit/v3/rate_limit.pb.validate.h"
 
-#include "extensions/filters/common/ratelimit/ratelimit.h"
-#include "extensions/filters/http/common/factory_base.h"
-#include "extensions/filters/http/well_known_names.h"
+#include "source/extensions/filters/common/ratelimit/ratelimit.h"
+#include "source/extensions/filters/http/common/factory_base.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -16,18 +15,19 @@ namespace RateLimitFilter {
  * Config registration for the rate limit filter. @see NamedHttpFilterConfigFactory.
  */
 class RateLimitFilterConfig
-    : public Common::FactoryBase<
+    : public Common::ExceptionFreeFactoryBase<
           envoy::extensions::filters::http::ratelimit::v3::RateLimit,
           envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute> {
 public:
-  RateLimitFilterConfig() : FactoryBase(HttpFilterNames::get().RateLimit) {}
+  RateLimitFilterConfig() : ExceptionFreeFactoryBase("envoy.filters.http.ratelimit") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::ratelimit::v3::RateLimit& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 
-  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute& proto_config,
       Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor& validator) override;

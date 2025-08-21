@@ -1,4 +1,4 @@
-#include "common/network/connection_balancer_impl.h"
+#include "source/common/network/connection_balancer_impl.h"
 
 namespace Envoy {
 namespace Network {
@@ -28,7 +28,7 @@ ExactConnectionBalancerImpl::pickTargetHandler(BalancedConnectionHandler&) {
       }
     }
 
-    min_connection_handler->incNumConnections();
+    min_connection_handler->incNumConnections(); // NOLINT(clang-analyzer-core.CallAndMessage)
   }
 
   return *min_connection_handler;

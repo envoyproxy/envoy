@@ -1,8 +1,8 @@
 #pragma once
 
-#include "extensions/filters/network/thrift_proxy/decoder.h"
-#include "extensions/filters/network/thrift_proxy/filters/filter.h"
-#include "extensions/filters/network/thrift_proxy/thrift_object.h"
+#include "source/extensions/filters/network/thrift_proxy/decoder.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/filter.h"
+#include "source/extensions/filters/network/thrift_proxy/thrift_object.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -248,6 +248,8 @@ public:
     return FilterStatus::Continue;
   }
   bool passthroughEnabled() const override { return false; }
+  bool isRequest() const override { return false; }
+  bool headerKeysPreserveCase() const override { return false; }
 
   // ThriftObject
   bool onData(Buffer::Instance& buffer) override;

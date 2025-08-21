@@ -8,3 +8,9 @@ message CustomRequestIDExtension {
 
 message UnknownRequestIDExtension {
 }
+
+message FilterDependencyTestFilter {
+}
+
+message CustomHeaderValidator {
+}

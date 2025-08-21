@@ -6,12 +6,11 @@
 #include "envoy/common/time.h"
 #include "envoy/network/address.h"
 
-#include "common/common/assert.h"
-#include "common/common/hex.h"
-#include "common/protobuf/utility.h"
-
-#include "extensions/tracers/zipkin/tracer_interface.h"
-#include "extensions/tracers/zipkin/util.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/hex.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/tracers/zipkin/tracer_interface.h"
+#include "source/extensions/tracers/zipkin/util.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_replace.h"
@@ -36,11 +35,11 @@ public:
 
   /**
    * All classes defining Zipkin abstractions need to implement this method to convert
-   * the corresponding abstraction to a ProtobufWkt::Struct.
+   * the corresponding abstraction to a Protobuf::Struct.
    * @param replacements A container that is used to hold the required replacements when this object
    * is serialized.
    */
-  virtual const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const PURE;
+  virtual const Protobuf::Struct toStruct(Util::Replacements& replacements) const PURE;
 
   /**
    * Serializes the a type as a Zipkin-compliant JSON representation as a string.
@@ -49,10 +48,10 @@ public:
    */
   const std::string toJson() const {
     Util::Replacements replacements;
-    return absl::StrReplaceAll(
-        MessageUtil::getJsonStringFromMessage(toStruct(replacements), /* pretty_print */ false,
-                                              /* always_print_primitive_fields */ true),
-        replacements);
+    return absl::StrReplaceAll(MessageUtil::getJsonStringFromMessageOrError(
+                                   toStruct(replacements), /* pretty_print */ false,
+                                   /* always_print_primitive_fields */ true),
+                               replacements);
   };
 };
 
@@ -111,7 +110,7 @@ public:
    *
    * @return a protobuf struct.
    */
-  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
+  const Protobuf::Struct toStruct(Util::Replacements& replacements) const override;
 
 private:
   std::string service_name_;
@@ -203,7 +202,7 @@ public:
    *
    * @return a protobuf struct.
    */
-  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
+  const Protobuf::Struct toStruct(Util::Replacements& replacements) const override;
 
 private:
   uint64_t timestamp_{0};
@@ -253,11 +252,6 @@ public:
   AnnotationType annotationType() const { return annotation_type_; }
 
   /**
-   * Sets the binary's annotation type.
-   */
-  void setAnnotationType(AnnotationType annotation_type) { annotation_type_ = annotation_type; }
-
-  /**
    * @return the annotation's endpoint attribute.
    */
   const Endpoint& endpoint() const { return endpoint_.value(); }
@@ -266,11 +260,6 @@ public:
    * Sets the annotation's endpoint attribute (copy semantics).
    */
   void setEndpoint(const Endpoint& endpoint) { endpoint_ = endpoint; }
-
-  /**
-   * Sets the annotation's endpoint attribute (move semantics).
-   */
-  void setEndpoint(const Endpoint&& endpoint) { endpoint_ = endpoint; }
 
   /**
    * @return true if the endpoint attribute is set, or false otherwise.
@@ -301,7 +290,7 @@ public:
    * @param replacements Used to hold the required replacements on serialization step.
    * @return a protobuf struct.
    */
-  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
+  const Protobuf::Struct toStruct(Util::Replacements& replacements) const override;
 
 private:
   std::string key_;
@@ -310,24 +299,16 @@ private:
   AnnotationType annotation_type_{};
 };
 
-using SpanPtr = std::unique_ptr<Span>;
-
 /**
  * Represents a Zipkin span. This class is based on Zipkin's Thrift definition of a span.
  */
-class Span : public ZipkinBase {
+class Span : public ZipkinBase, public Tracing::Span {
 public:
-  /**
-   * Copy constructor.
-   */
-  Span(const Span&);
-
   /**
    * Default constructor. Creates an empty span.
    */
-  explicit Span(TimeSource& time_source)
-      : trace_id_(0), id_(0), debug_(false), sampled_(false), monotonic_start_time_(0),
-        tracer_(nullptr), time_source_(time_source) {}
+  explicit Span(TimeSource& time_source, TracerInterface& tracer)
+      : time_source_(time_source), tracer_(tracer) {}
 
   /**
    * Sets the span's trace id attribute.
@@ -337,7 +318,7 @@ public:
   /**
    * Sets the span's name attribute.
    */
-  void setName(const std::string& val) { name_ = val; }
+  void setName(absl::string_view val) { name_ = std::string(val); }
 
   /**
    * Sets the span's id.
@@ -353,11 +334,6 @@ public:
    * @return Whether or not the parent_id attribute is set.
    */
   bool isSetParentId() const { return parent_id_.has_value(); }
-
-  /**
-   * Set the span's sampled flag.
-   */
-  void setSampled(bool val) { sampled_ = val; }
 
   /**
    * @return a vector with all annotations added to the span.
@@ -557,21 +533,19 @@ public:
    *
    * @return a protobuf struct.
    */
-  const ProtobufWkt::Struct toStruct(Util::Replacements& replacements) const override;
+  const Protobuf::Struct toStruct(Util::Replacements& replacements) const override;
 
   /**
-   * Associates a Tracer object with the span. The tracer's reportSpan() method is invoked
-   * by the span's finish() method so that the tracer can decide what to do with the span
-   * when it is finished.
+   * @return the span's context.
    *
-   * @param tracer Represents the Tracer object to be associated with the span.
+   * This method returns a SpanContext object that contains the span's trace id, span id, parent id,
+   * and sampled attributes.
    */
-  void setTracer(TracerInterface* tracer) { tracer_ = tracer; }
+  SpanContext spanContext() const;
 
-  /**
-   * @return the Tracer object associated with the span.
-   */
-  TracerInterface* tracer() const { return tracer_; }
+  void setUseLocalDecision(bool use_local_decision) { use_local_decision_ = use_local_decision; }
+
+  // Tracing::Span
 
   /**
    * Marks a successful end of the span. This method will:
@@ -581,41 +555,47 @@ public:
    * (2) compute and set the span's duration; and
    * (3) invoke the tracer's reportSpan() method if a tracer has been associated with the span.
    */
-  void finish();
+  void finishSpan() override;
+  void setTag(absl::string_view name, absl::string_view value) override;
+  void log(SystemTime timestamp, const std::string& event) override;
+  void setSampled(bool val) override { sampled_ = val; }
+  bool useLocalDecision() const override { return use_local_decision_; }
+  void setOperation(absl::string_view operation) override { setName(std::string(operation)); }
+  void injectContext(Tracing::TraceContext& trace_context,
+                     const Tracing::UpstreamContext&) override;
+  Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& name,
+                              SystemTime start_time) override;
 
-  /**
-   * Adds a binary annotation to the span.
-   *
-   * @param name The binary annotation's key.
-   * @param value The binary annotation's value.
-   */
-  void setTag(absl::string_view name, absl::string_view value);
-
-  /**
-   * Adds an annotation to the span
-   *
-   * @param timestamp The annotation's timestamp.
-   * @param event The annotation's value.
-   */
-  void log(SystemTime timestamp, const std::string& event);
+  void setBaggage(absl::string_view, absl::string_view) override {}
+  std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
+  std::string getSpanId() const override { return EMPTY_STRING; };
+  std::string getTraceId() const override { return traceIdAsHexString(); };
 
 private:
+  /**
+   * Injects W3C trace context headers based on this span's context.
+   * @param trace_context The trace context to inject headers into.
+   */
+  void injectW3CContext(Tracing::TraceContext& trace_context);
   static const std::string EMPTY_HEX_STRING_;
-  uint64_t trace_id_;
+  uint64_t trace_id_{0};
   std::string name_;
-  uint64_t id_;
+  uint64_t id_{0};
   absl::optional<uint64_t> parent_id_;
-  bool debug_;
-  bool sampled_;
+  bool debug_{false};
+  bool sampled_{false};
   std::vector<Annotation> annotations_;
   std::vector<BinaryAnnotation> binary_annotations_;
   absl::optional<int64_t> timestamp_;
   absl::optional<int64_t> duration_;
   absl::optional<uint64_t> trace_id_high_;
-  int64_t monotonic_start_time_;
-  TracerInterface* tracer_;
+  int64_t monotonic_start_time_{0};
   TimeSource& time_source_;
+  TracerInterface& tracer_;
+  bool use_local_decision_{false};
 };
+
+using SpanPtr = std::unique_ptr<Span>;
 
 } // namespace Zipkin
 } // namespace Tracers

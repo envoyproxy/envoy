@@ -1,6 +1,6 @@
-#include "extensions/filters/network/common/redis/utility.h"
+#include "source/extensions/filters/network/common/redis/utility.h"
 
-#include "common/common/utility.h"
+#include "source/common/common/utility.h"
 
 namespace Envoy {
 namespace Extensions {

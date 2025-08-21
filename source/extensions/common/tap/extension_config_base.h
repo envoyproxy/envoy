@@ -4,8 +4,8 @@
 #include "envoy/extensions/common/tap/v3/common.pb.h"
 #include "envoy/thread_local/thread_local.h"
 
-#include "extensions/common/tap/admin.h"
-#include "extensions/common/tap/tap.h"
+#include "source/extensions/common/tap/admin.h"
+#include "source/extensions/common/tap/tap.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -25,7 +25,7 @@ public:
 
 protected:
   ExtensionConfigBase(const envoy::extensions::common::tap::v3::CommonExtensionConfig proto_config,
-                      TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
+                      TapConfigFactoryPtr&& config_factory, OptRef<Server::Admin> admin,
                       Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
                       Event::Dispatcher& main_thread_dispatcher);
   ~ExtensionConfigBase() override;

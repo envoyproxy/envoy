@@ -1,0 +1,89 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.proto_api_scrubber.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "xds/annotations/v3/status.proto";
+import "xds/type/matcher/v3/matcher.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.proto_api_scrubber.v3";
+option java_outer_classname = "ConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/proto_api_scrubber/v3;proto_api_scrubberv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Proto API Scrubber]
+// [#not-implemented-hide:] Implementation in progress.
+// [#extension: envoy.filters.http.proto_api_scrubber]
+
+// ProtoApiScrubber filter supports filtering of the request and
+// response payloads based on the configured field restrictions and actions.
+// The field restrictions and actions can be defined using unified matcher API.
+// The filter evaluates the configured restriction for each field
+// to produce the filtered output using the configured actions.
+// This filter currently supports only field level restrictions.
+// Restriction support for other proto elements (eg, message
+// level restriction, method level restriction, etc.) are planned to be
+// implemented in future. The design doc for this filter is available
+// `here <https://docs.google.com/document/d/1jgRe5mhucFRgmKYf-Ukk20jW8kusIo53U5bcF74GkK8>`_
+
+message ProtoApiScrubberConfig {
+  // An enum enlisting all the filtering modes supported by this filter.
+  enum FilteringMode {
+    // Override the original request/response body with the filtered
+    // request/response body.
+    OVERRIDE = 0;
+  }
+
+  // The proto descriptor set for the proto services.
+  DescriptorSet descriptor_set = 1;
+
+  // Contains the restrictions for the supported proto elements.
+  Restrictions restrictions = 2;
+
+  // Specifies the filtering mode of this filter.
+  FilteringMode filtering_mode = 3;
+}
+
+// Specifies the descriptor set for proto services.
+message DescriptorSet {
+  // It could be passed by a local file through ``Datasource.filename`` or
+  // embedded in the ``Datasource.inline_bytes``.
+  config.core.v3.DataSource data_source = 1;
+}
+
+// Contains the restrictions for the methods.
+message Restrictions {
+  // Specifies the method restrictions.
+  // Key - Fully qualified method name e.g., ``endpoints.examples.bookstore.BookStore/GetShelf``.
+  // Value - Method restrictions.
+  map<string, MethodRestrictions> method_restrictions = 1;
+}
+
+// Contains the method restrictions which include the field level restrictions
+// for the request and response fields.
+message MethodRestrictions {
+  // Restrictions that apply to request fields of the method.
+  // Key - field mask like path of the field eg, foo.bar.baz
+  // Value - Restrictions map containing the mapping from restriction name to
+  // the restriction values.
+  map<string, RestrictionConfig> request_field_restrictions = 1;
+
+  // Restrictions that apply to response fields of the method.
+  // Key - field mask like path of the field eg, foo.bar.baz
+  // Value - Restrictions map containing the mapping from restriction name to
+  // the restriction values.
+  map<string, RestrictionConfig> response_field_restrictions = 2;
+}
+
+// The restriction configuration.
+message RestrictionConfig {
+  // Matcher tree for matching requests and responses with the configured restrictions.
+  // NOTE: Currently, only CEL expressions are supported for matching. Support for more
+  // matchers will be added incrementally overtime.
+  xds.type.matcher.v3.Matcher matcher = 1;
+}

@@ -18,22 +18,22 @@ initialize();
 codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
 
 // Create some request headers.
-Http::TestHeaderMapImpl request_headers{{":method", "GET"},
-                                        {":path", "/test/long/url"},
-                                        {":scheme", "http"},
-                                        {":authority", "host"}};
+Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                               {":path", "/test/long/url"},
+                                               {":scheme", "http"},
+                                               {":authority", "host"}};
 
 // Send the request headers from the client, wait until they are received upstream. When they
 // are received, send the default response headers from upstream and wait until they are
 // received at by client
-sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+auto response = sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
 
 // Verify the proxied request was received upstream, as expected.
 EXPECT_TRUE(upstream_request_->complete());
 EXPECT_EQ(0U, upstream_request_->bodyLength());
 // Verify the proxied response was received downstream, as expected.
-EXPECT_TRUE(response_->complete());
-EXPECT_STREQ("200", response_->headers().Status()->value().c_str());
+EXPECT_TRUE(response->complete());
+EXPECT_STREQ("200", response->headers().Status()->value().c_str());
 EXPECT_EQ(0U, response_->body().size());
 ```
 
@@ -50,14 +50,14 @@ The [`ConfigHelper`](../config/utility.h) has utilities for common alterations s
 
 ```c++
 // Set the default protocol to HTTP2
-setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
+setDownstreamProtocol(Http::CodecType::HTTP2);
 ```
 
 or
 
 ```c++
 // Add a buffering filter on the request path
-config_helper_.addFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
+config_helper_.prependFilter(ConfigHelper::DEFAULT_BUFFER_FILTER);
 ```
 
 For other edits which are less likely reusable, one can add config modifiers. Config modifiers
@@ -78,7 +78,7 @@ An example of modifying `HttpConnectionManager` to change Envoy’s HTTP/1.1 pro
 
 ```c++
 config_helper_.addConfigModifier([&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm) -> void {
-  envoy::api::v2::core::Http1ProtocolOptions options;
+  nvoy::config::core::v3::Http1ProtocolOptions options;
   options.mutable_allow_absolute_url()->set_value(true);
   hcm.mutable_http_protocol_options()->CopyFrom(options);
 };);
@@ -88,7 +88,7 @@ An example of modifying `HttpConnectionManager` to add an additional upstream
 cluster:
 
 ```c++
-   config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       bootstrap.mutable_rate_limit_service()->set_cluster_name("ratelimit");
       auto* ratelimit_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ratelimit_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -165,6 +165,17 @@ bazel test //test/integration:http2_upstream_integration_test \
 --test_arg=--gtest_filter="IpVersions/Http2UpstreamIntegrationTest.RouterRequestAndResponseWithBodyNoBuffer/IPv6" \
 --jobs 60 --local_test_jobs=60 --runs_per_test=1000 --test_arg="-l trace"
 ```
+
+For hard to reproduce flakes, a sometimes useful tool is `stress`, available via
+`apt install stress`. Running stress alongsize `bazel test` (in another window,
+starting it after the build completes) can be a great help in reproducing issues,
+especially where tests are blocked on different things. For example, if a test
+spends some time blocked on network traffic and has a cpu race, running many
+instances of the test doesn't much help repro because the other instances aren't
+using cpu at the critical moment. For this case, `stress -c [number of cores]`
+can frequently make a 1/1000 flake into a 1/2 flake. Less commonly, for example,
+unusually slow disk access can flake a test, in which case `stress --hdd 8`
+helps boost the failure rate.
 
 ## Debugging test flakes
 

@@ -2,9 +2,9 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/network/utility.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/network/utility.h"
 
 #include "test/test_common/network_utility.h"
 
@@ -42,6 +42,14 @@ TEST_P(UdsUpstreamIntegrationTest, RouterDownstreamDisconnectBeforeRequestComple
 
 TEST_P(UdsUpstreamIntegrationTest, RouterDownstreamDisconnectBeforeResponseComplete) {
   testRouterDownstreamDisconnectBeforeResponseComplete();
+}
+
+TEST_P(UdsUpstreamIntegrationTest, TestTls) {
+  upstream_tls_ = true;
+  setUpstreamProtocol(Http::CodecType::HTTP1);
+  config_helper_.configureUpstreamTls(false, upstreamProtocol() == Http::CodecType::HTTP3);
+
+  testRouterHeaderOnlyRequestAndResponse();
 }
 
 #if defined(__linux__)
@@ -84,8 +92,8 @@ void UdsListenerIntegrationTest::initialize() {
 HttpIntegrationTest::ConnectionCreationFunction UdsListenerIntegrationTest::createConnectionFn() {
   return [&]() -> Network::ClientConnectionPtr {
     Network::ClientConnectionPtr conn(dispatcher_->createClientConnection(
-        Network::Utility::resolveUrl(fmt::format("unix://{}", getListenerSocketName())),
-        Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(),
+        *Network::Utility::resolveUrl(fmt::format("unix://{}", getListenerSocketName())),
+        Network::Address::InstanceConstSharedPtr(), Network::Test::createRawBufferSocket(), nullptr,
         nullptr));
     conn->enableHalfClose(enableHalfClose());
     return conn;
@@ -105,7 +113,7 @@ TEST_P(UdsListenerIntegrationTest, TestSocketMode) {
 
   Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
   struct stat listener_stat;
-  EXPECT_EQ(os_sys_calls.stat(getListenerSocketName().c_str(), &listener_stat).rc_, 0);
+  EXPECT_EQ(os_sys_calls.stat(getListenerSocketName().c_str(), &listener_stat).return_value_, 0);
   if (mode_ == 0) {
     EXPECT_NE(listener_stat.st_mode & 0777, 0);
   } else {
@@ -136,7 +144,7 @@ TEST_P(UdsListenerIntegrationTest, TestPeerCredentials) {
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
-  response->waitForEndStream();
+  ASSERT_TRUE(response->waitForEndStream());
 }
 
 TEST_P(UdsListenerIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {

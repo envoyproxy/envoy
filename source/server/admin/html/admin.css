@@ -1,0 +1,164 @@
+.home-table {
+  font-family: sans-serif;
+  font-size: medium;
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+.home-data {
+  text-align: left;
+  padding: 4px;
+}
+
+.home-form {
+  margin-bottom: 0;
+}
+
+.button-as-link {
+  background: none!important;
+  border: none;
+  padding: 0!important;
+  font-family: sans-serif;
+  font-size: medium;
+  color: #069;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.gray {
+  background-color: #dddddd;
+}
+
+.vert-space {
+  height: 4px;
+}
+
+.option {
+  padding-bottom: 4px;
+  padding-top: 4px;
+  padding-right: 4px;
+  padding-left: 20px;
+  text-align: right;
+}
+
+.error-status-line {
+  font-family: sans-serif;
+  font-size: medium;
+  color: #c00;
+}
+
+.histogram-graphics {
+  height: 40px;
+  position: relative;
+  margin-top: 15px;
+  /*
+   * TODO(jmarantz): enable resizing; to finish this we need to add a ResizeObserver
+   * to keep a map of the resized histograms for use when refreshing them.
+   *
+   *   resize: vertical;
+   *   overflow: auto;
+   */
+}
+
+.histogram-annotations {
+  height: 40px;
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.histogram-labels {
+  background-color: #ddd;
+  position: relative;
+  height: 15px;
+}
+
+.histogram-name {
+  font-family: sans-serif;
+  font-size: 14px;
+  font-weight: bold;
+  margin-top: 10px;
+  margin-bottom: 8px;
+}
+
+.histogram-no-data {
+  font-family: sans-serif;
+  font-size: 14px;
+  font-style: italic;
+  margin-top: 10px;
+  margin-bottom: 8px;
+  margin-left: 10px;
+}
+
+.histogram-bucket {
+  bottom: 0;
+  background-color: #e6d7ff;
+  position: absolute;
+  border-color: purple;
+  border-width: 1px;
+  border-style: solid;
+  width: 2%;
+  z-index: 1;
+}
+
+.histogram-popup {
+  position: absolute;
+  background-color: yellow;
+  border-width: 1px;
+  border-style: solid;
+  border-color: black;
+  visibility: hidden;
+  z-index: 3;
+  top: 70px;
+  padding: 3px;
+  /*Imargin-left: -1%;*/
+}
+
+.histogram-popup div {
+  font-family: sans-serif;
+  font-size: 14px;
+  overflow: hidden;
+  text-align: center;
+}
+
+.histogram-percentile {
+  width: 5px;
+  background-color: #306844;
+  height: 30%;
+  width: 4px;
+  top: 0;
+  position: absolute;
+}
+
+.histogram-interval {
+  width: 5px;
+  background-color: #e06844;
+  height: 30%;
+  width: 4px;
+  margin-left: 0.5%;
+  top: 0;
+  position: absolute;
+}
+
+.bucket-label {
+  position: absolute;
+  bottom: 1%;
+  font-family: sans-serif;
+  font-size: 12px;
+  margin-bottom: 1px;
+  text-align: center;
+}
+
+.percentile-label {
+  position: absolute;
+  font-family: sans-serif;
+  font-size: 12px;
+  z-index: 2;
+}
+
+.histogram-labels span {
+  position: absolute;
+  bottom: 0;
+  font-family: sans-serif;
+  font-size: 12px;
+  overflow-x: visible;
+}

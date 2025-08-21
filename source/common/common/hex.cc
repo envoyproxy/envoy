@@ -1,14 +1,12 @@
-#include "common/common/hex.h"
+#include "source/common/common/hex.h"
 
 #include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
 
-#include "envoy/common/exception.h"
-
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
 
 namespace Envoy {
 std::string Hex::encode(const uint8_t* data, size_t length) {

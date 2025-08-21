@@ -4,8 +4,8 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 
-#include "common/singleton/const_singleton.h"
-#include "common/version/version_number.h"
+#include "source/common/singleton/const_singleton.h"
+#include "source/common/version/version_number.h"
 
 namespace Envoy {
 
@@ -22,6 +22,8 @@ public:
   static const std::string& revisionStatus();
   // Repository information and build type.
   static const std::string& version();
+  // FIPS Compliance of envoy build
+  static bool sslFipsCompliant();
 
   static const envoy::config::core::v3::BuildVersion& buildVersion();
 

@@ -11,11 +11,12 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.type.matcher";
 option java_outer_classname = "ValueProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/type/matcher";
 option (udpa.annotations.file_status).package_version_status = FROZEN;
 
 // [#protodoc-title: Value matcher]
 
-// Specifies the way to match a ProtobufWkt::Value. Primitive values and ListValue are supported.
+// Specifies the way to match a Protobuf::Value. Primitive values and ListValue are supported.
 // StructValue is not supported and is always not matched.
 // [#next-free-field: 7]
 message ValueMatcher {

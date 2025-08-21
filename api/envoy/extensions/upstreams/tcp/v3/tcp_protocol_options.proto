@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package envoy.extensions.upstreams.tcp.v3;
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.upstreams.tcp.v3";
+option java_outer_classname = "TcpProtocolOptionsProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/upstreams/tcp/v3;tcpv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: TCP Protocol Options]
+// [#extension: envoy.upstreams.tcp.tcp_protocol_options]
+
+// TCProtocolOptions specifies TCP upstream protocol options. This object
+// is used in
+// :ref:`typed_extension_protocol_options<envoy_v3_api_field_config.cluster.v3.Cluster.typed_extension_protocol_options>`,
+// keyed by the name ``envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions``.
+//
+// .. code::
+//
+//   clusters:
+//     - name: some_service
+//       connect_timeout: 5s
+//       typed_extension_protocol_options:
+//         envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions:
+//           "@type": type.googleapis.com/envoy.extensions.upstreams.tcp.v3.TcpProtocolOptions
+//           idle_timeout: 10m
+//        .... [further cluster config]
+
+message TcpProtocolOptions {
+  // The idle timeout for the connection. The idle timeout is defined as the period in which
+  // the connection is not associated with a downstream connection. When the idle timeout is
+  // reached, the connection will be closed.
+  //
+  // If not set, the default idle timeout is 10 minutes. To disable idle timeouts, explicitly set this to 0.
+  //
+  // .. warning::
+  //   Disabling this timeout has a highly likelihood of yielding connection leaks due to lost TCP
+  //   FIN packets, etc.
+  google.protobuf.Duration idle_timeout = 1;
+}

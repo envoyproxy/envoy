@@ -1,7 +1,7 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
-#include "extensions/filters/http/jwt_authn/filter_config.h"
-#include "extensions/filters/http/jwt_authn/verifier.h"
+#include "source/extensions/filters/http/jwt_authn/filter_config.h"
+#include "source/extensions/filters/http/jwt_authn/verifier.h"
 
 #include "test/extensions/filters/http/jwt_authn/mock.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
@@ -73,19 +73,19 @@ public:
   }
 
   void createVerifier() {
-    filter_config_ = FilterConfigImpl::create(proto_config_, "", mock_factory_ctx_);
-    verifier_ = Verifier::create(proto_config_.rules(0).requires(), proto_config_.providers(),
+    filter_config_ = std::make_shared<FilterConfigImpl>(proto_config_, "", mock_factory_ctx_);
+    verifier_ = Verifier::create(proto_config_.rules(0).requires_(), proto_config_.providers(),
                                  *filter_config_);
   }
 
   void modifyRequirement(const std::string& yaml) {
-    TestUtility::loadFromYaml(yaml, *proto_config_.mutable_rules(0)->mutable_requires());
+    TestUtility::loadFromYaml(yaml, *proto_config_.mutable_rules(0)->mutable_requires_());
   }
 
   JwtAuthentication proto_config_;
+  NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
   std::shared_ptr<FilterConfigImpl> filter_config_;
   VerifierConstPtr verifier_;
-  NiceMock<Server::Configuration::MockFactoryContext> mock_factory_ctx_;
   ContextSharedPtr context_;
   MockVerifierCallbacks mock_cb_;
   NiceMock<Tracing::MockSpan> parent_span_;
@@ -110,7 +110,7 @@ class AllowFailedInSingleRequirementTest : public AllVerifierTest {
 protected:
   void SetUp() override {
     AllVerifierTest::SetUp();
-    proto_config_.mutable_rules(0)->mutable_requires()->mutable_allow_missing_or_failed();
+    proto_config_.mutable_rules(0)->mutable_requires_()->mutable_allow_missing_or_failed();
     createVerifier();
   }
 };
@@ -197,7 +197,7 @@ TEST_F(SingleAllowMissingInOrListTest, BadJwt) {
 }
 
 TEST_F(SingleAllowMissingInOrListTest, MissingIssToken) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtUnknownIssuer));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, ES256WithoutIssToken}};
   context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
   verifier_->verify(context_);
@@ -471,6 +471,15 @@ TEST_F(AllowMissingInOrListTest, OtherGoodJwt) {
   EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kOtherHeader));
 }
 
+TEST_F(AllowMissingInOrListTest, WrongIssuer) {
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtUnknownIssuer));
+  auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, OtherGoodToken}};
+  context_ = Verifier::createContext(headers, parent_span_, &mock_cb_);
+  verifier_->verify(context_);
+  // x-other JWT should be ignored.
+  EXPECT_THAT(headers, JwtOutputFailedOrIgnore(kOtherHeader));
+}
+
 TEST_F(AllowMissingInOrListTest, BadAndGoodJwts) {
   EXPECT_CALL(mock_cb_, onComplete(Status::JwtVerificationFail));
   auto headers = Http::TestRequestHeaderMapImpl{{kExampleHeader, NonExistKidToken},
@@ -589,7 +598,7 @@ TEST_F(AllowMissingInAndOfOrListTest, TwoGoodJwts) {
 }
 
 TEST_F(AllowMissingInAndOfOrListTest, GoodAndBadJwts) {
-  EXPECT_CALL(mock_cb_, onComplete(Status::Ok));
+  EXPECT_CALL(mock_cb_, onComplete(Status::JwtUnknownIssuer));
   // Use the token with example.com issuer for x-other.
   auto headers =
       Http::TestRequestHeaderMapImpl{{kExampleHeader, GoodToken}, {kOtherHeader, GoodToken}};

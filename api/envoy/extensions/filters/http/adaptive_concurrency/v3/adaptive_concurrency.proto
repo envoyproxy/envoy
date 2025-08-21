@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.http.adaptive_concurrency.v3;
 
 import "envoy/config/core/v3/base.proto";
+import "envoy/type/v3/http_status.proto";
 import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/duration.proto";
@@ -15,6 +16,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.adaptive_concurrency.v3";
 option java_outer_classname = "AdaptiveConcurrencyProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/adaptive_concurrency/v3;adaptive_concurrencyv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Adaptive Concurrency]
@@ -45,18 +47,19 @@ message GradientControllerConfig {
   }
 
   // Parameters controlling the periodic minRTT recalculation.
-  // [#next-free-field: 6]
+  // [#next-free-field: 7]
   message MinimumRTTCalculationParams {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.http.adaptive_concurrency.v2alpha.GradientControllerConfig."
         "MinimumRTTCalculationParams";
 
     // The time interval between recalculating the minimum request round-trip time. Has to be
-    // positive.
-    google.protobuf.Duration interval = 1 [(validate.rules).duration = {
-      required: true
-      gte {nanos: 1000000}
-    }];
+    // positive. If set to zero, dynamic sampling of the minRTT is disabled.
+    google.protobuf.Duration interval = 1 [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+    // The fixed value for the minRTT. This value is used when minRTT is not sampled dynamically.
+    // If dynamic sampling of the minRTT is disabled, this field must be set.
+    google.protobuf.Duration fixed_value = 6 [(validate.rules).duration = {gt {}}];
 
     // The number of requests to aggregate/sample during the minRTT recalculation window before
     // updating. Defaults to 50.
@@ -104,4 +107,12 @@ message AdaptiveConcurrency {
   // If set to false, the adaptive concurrency filter will operate as a pass-through filter. If the
   // message is unspecified, the filter will be enabled.
   config.core.v3.RuntimeFeatureFlag enabled = 2;
+
+  // This field allows for a custom HTTP response status code to the downstream client when
+  // the concurrency limit has been exceeded.
+  // Defaults to 503 (Service Unavailable).
+  //
+  // .. note::
+  //   If this is set to < 400, 503 will be used instead.
+  type.v3.HttpStatus concurrency_limit_exceeded_status = 3;
 }

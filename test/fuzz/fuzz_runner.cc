@@ -1,14 +1,16 @@
 #include "test/fuzz/fuzz_runner.h"
 
-#include "common/common/thread.h"
-#include "common/common/utility.h"
-#include "common/event/libevent.h"
-#include "common/http/http2/codec_impl.h"
+#include <cstdlib>
 
-#include "exe/process_wide.h"
+#include "source/common/common/thread.h"
+#include "source/common/common/utility.h"
+#include "source/common/event/libevent.h"
+#include "source/common/http/http2/codec_impl.h"
+#include "source/exe/process_wide.h"
 
 #include "test/test_common/environment.h"
 
+#include "absl/log/globals.h"
 #include "gmock/gmock.h"
 
 namespace Envoy {
@@ -51,9 +53,29 @@ void Runner::setupEnvironment(int argc, char** argv, spdlog::level::level_enum d
   // Suppress all libprotobuf non-fatal logging as long as this object exists.
   // For fuzzing, this prevents logging when parsing text-format protos fails,
   // deprecated fields are used, etc.
-  // https://github.com/protocolbuffers/protobuf/blob/204f99488ce1ef74565239cf3963111ae4c774b7/src/google/protobuf/stubs/logging.h#L223
   if (log_level_ > spdlog::level::debug) {
-    ABSL_ATTRIBUTE_UNUSED static auto* log_silencer = new Protobuf::LogSilencer();
+    absl::SetMinLogLevel(absl::LogSeverityAtLeast::kInfinity);
+  }
+}
+
+using Hooks = std::vector<std::function<void()>>;
+static Hooks* cleanup_hooks = nullptr;
+
+void addCleanupHook(std::function<void()> cleanup) {
+  if (cleanup_hooks == nullptr) {
+    cleanup_hooks = new Hooks;
+  }
+  cleanup_hooks->push_back(cleanup);
+}
+
+void runCleanupHooks() {
+  if (cleanup_hooks != nullptr) {
+    // Run hooks in reverse order from how they were added.
+    for (auto iter = cleanup_hooks->rbegin(), end = cleanup_hooks->rend(); iter != end; ++iter) {
+      (*iter)();
+    }
+    delete cleanup_hooks;
+    cleanup_hooks = nullptr;
   }
 }
 
@@ -65,8 +87,9 @@ void Runner::setupEnvironment(int argc, char** argv, spdlog::level::level_enum d
 extern "C" int LLVMFuzzerInitialize(int* argc, char*** argv) {
   // Before parsing gmock flags, set the default value of flag --gmock_verbose to "error".
   // This suppresses logs from NiceMock objects, which can be noisy and provide little value.
-  testing::GMOCK_FLAG(verbose) = "error";
+  GMOCK_FLAG_SET(verbose, "error");
   testing::InitGoogleMock(argc, *argv);
   Envoy::Fuzz::Runner::setupEnvironment(1, *argv, spdlog::level::critical);
+  atexit(Envoy::Fuzz::runCleanupHooks);
   return 0;
 }

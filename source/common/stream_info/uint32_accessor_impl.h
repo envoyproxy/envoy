@@ -14,10 +14,11 @@ public:
 
   // From FilterState::Object
   ProtobufTypes::MessagePtr serializeAsProto() const override {
-    auto message = std::make_unique<ProtobufWkt::UInt32Value>();
+    auto message = std::make_unique<Protobuf::UInt32Value>();
     message->set_value(value_);
     return message;
   }
+  absl::optional<std::string> serializeAsString() const override { return absl::StrCat(value_); }
 
   // From UInt32Accessor.
   void increment() override { value_++; }

@@ -2,12 +2,15 @@
 
 #include "envoy/server/instance.h"
 
-#include "server/configuration_impl.h"
+#include "source/server/configuration_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace Statsd {
+
+// Statsd sink
+constexpr char StatsdName[] = "envoy.stat_sinks.statsd";
 
 /**
  * Config registration for the tcp statsd sink. @see StatsSinkFactory.
@@ -16,8 +19,9 @@ class StatsdSinkFactory : Logger::Loggable<Logger::Id::config>,
                           public Server::Configuration::StatsSinkFactory {
 public:
   // StatsSinkFactory
-  Stats::SinkPtr createStatsSink(const Protobuf::Message& config,
-                                 Server::Configuration::ServerFactoryContext& server) override;
+  absl::StatusOr<Stats::SinkPtr>
+  createStatsSink(const Protobuf::Message& config,
+                  Server::Configuration::ServerFactoryContext& server) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 

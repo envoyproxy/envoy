@@ -1,0 +1,28 @@
+config {
+  grpc_service {
+    envoy_grpc {
+      cluster_name: ":"
+    }
+  }
+  processing_mode {
+    response_header_mode: SKIP
+    request_trailer_mode: SKIP
+    response_trailer_mode: SKIP
+  }
+  max_message_timeout {
+    nanos: 89
+  }
+}
+request {
+  http_body {
+    data: "\177\177\177\177"
+  }
+}
+response {
+  request_headers {
+  }
+  mode_override {
+    request_header_mode: SKIP
+    request_body_mode: BUFFERED
+  }
+}

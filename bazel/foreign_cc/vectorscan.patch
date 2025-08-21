@@ -1,0 +1,33 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 1db128b..ee3b4a9 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -27,7 +27,7 @@ include (${CMAKE_MODULE_PATH}/platform.cmake)
+ include (${CMAKE_MODULE_PATH}/boost.cmake)
+ include (${CMAKE_MODULE_PATH}/ragel.cmake)
+ 
+-find_package(PkgConfig REQUIRED)
++find_package(PkgConfig QUIET)
+ 
+ find_program(RAGEL ragel)
+ 
+diff --git a/cmake/sqlite3.cmake b/cmake/sqlite3.cmake
+index 92b18ce..5291726 100644
+--- a/cmake/sqlite3.cmake
++++ b/cmake/sqlite3.cmake
+@@ -2,6 +2,8 @@
+ # a lot of noise to find sqlite
+ #
+ 
++if(NOT SQLITE_SKIP_CHECK)
++
+ option(SQLITE_PREFER_STATIC "Build sqlite3 statically instead of using an installed lib" OFF)
+ 
+ if(NOT SQLITE_PREFER_STATIC)
+@@ -33,4 +35,6 @@ else()
+     endif()
+ endif()
+ 
++endif()
++
+ # that's enough about sqlite

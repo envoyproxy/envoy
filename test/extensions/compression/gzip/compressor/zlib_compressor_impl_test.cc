@@ -1,8 +1,7 @@
-#include "common/buffer/buffer_impl.h"
-#include "common/common/hex.h"
-
-#include "extensions/compression/gzip/compressor/config.h"
-#include "extensions/compression/gzip/compressor/zlib_compressor_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/hex.h"
+#include "source/extensions/compression/gzip/compressor/config.h"
+#include "source/extensions/compression/gzip/compressor/zlib_compressor_impl.h"
 
 #include "test/test_common/utility.h"
 
@@ -185,6 +184,10 @@ TEST_F(ZlibCompressorImplTest, CallingChecksum) {
   TestUtility::feedBufferWithRandomCharacters(buffer, 4096);
   compressor.compressThenFlush(buffer);
   expectValidFlushedBuffer(buffer);
+
+  // Add an empty buffer finish call to finalize the checksum
+  Buffer::OwnedImpl empty_buffer;
+  compressor.finish(empty_buffer);
 
   drainBuffer(buffer);
   EXPECT_TRUE(compressor.checksum() > 0);

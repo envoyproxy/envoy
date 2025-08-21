@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package test.integration.filters;
+
+message SetIsTerminalFilterConfig {
+  bool is_terminal_filter = 1;
+}

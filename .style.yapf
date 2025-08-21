@@ -1,0 +1,15 @@
+# The Google Python styles can be found here: https://github.com/google/styleguide/blob/gh-pages/pyguide.md
+# TODO: Look into enforcing single vs double quote.
+[style]
+based_on_style=Google
+indent_width=4
+column_limit=100
+split_before_first_argument=True
+coalesce_brackets=True
+split_before_logical_operator=True
+split_complex_comprehension=True
+split_before_expression_after_opening_paren=True
+split_before_dict_set_generator=True
+split_before_arithmetic_operator=True
+split_before_bitwise_operator=True
+# blank_line_before_nested_def_

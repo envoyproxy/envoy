@@ -1,4 +1,4 @@
-#include "common/router/config_utility.h"
+#include "source/common/router/config_utility.h"
 
 #include <string>
 #include <vector>
@@ -7,78 +7,84 @@
 #include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "common/common/assert.h"
-#include "common/common/regex.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/regex.h"
+#include "source/common/config/datasource.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Router {
 namespace {
 
 absl::optional<Matchers::StringMatcherImpl>
-maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& config) {
+maybeCreateStringMatcher(const envoy::config::route::v3::QueryParameterMatcher& config,
+                         Server::Configuration::CommonFactoryContext& context) {
   switch (config.query_parameter_match_specifier_case()) {
   case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
-      kStringMatch: {
-    return Matchers::StringMatcherImpl(config.string_match());
-  }
+      kStringMatch:
+    return Matchers::StringMatcherImpl(config.string_match(), context);
   case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
-      kPresentMatch: {
+      kPresentMatch:
+    return absl::nullopt;
+  case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
+      QUERY_PARAMETER_MATCH_SPECIFIER_NOT_SET:
     return absl::nullopt;
   }
-  case envoy::config::route::v3::QueryParameterMatcher::QueryParameterMatchSpecifierCase::
-      QUERY_PARAMETER_MATCH_SPECIFIER_NOT_SET: {
-    if (config.hidden_envoy_deprecated_value().empty()) {
-      // Present match.
-      return absl::nullopt;
-    }
 
-    envoy::type::matcher::v3::StringMatcher matcher_config;
-    if (config.has_hidden_envoy_deprecated_regex() ? config.hidden_envoy_deprecated_regex().value()
-                                                   : false) {
-      matcher_config.set_hidden_envoy_deprecated_regex(config.hidden_envoy_deprecated_value());
-    } else {
-      matcher_config.set_exact(config.hidden_envoy_deprecated_value());
-    }
-    return Matchers::StringMatcherImpl(matcher_config);
-  }
-  }
-
-  NOT_REACHED_GCOVR_EXCL_LINE; // Needed for gcc
+  return absl::nullopt;
 }
 
 } // namespace
 
 ConfigUtility::QueryParameterMatcher::QueryParameterMatcher(
-    const envoy::config::route::v3::QueryParameterMatcher& config)
-    : name_(config.name()), matcher_(maybeCreateStringMatcher(config)) {}
+    const envoy::config::route::v3::QueryParameterMatcher& config,
+    Server::Configuration::CommonFactoryContext& context)
+    : name_(config.name()),
+      present_match_(config.has_present_match() ? absl::make_optional(config.present_match())
+                                                : absl::nullopt),
+      matcher_(maybeCreateStringMatcher(config, context)) {}
 
 bool ConfigUtility::QueryParameterMatcher::matches(
-    const Http::Utility::QueryParams& request_query_params) const {
-  auto query_param = request_query_params.find(name_);
-  if (query_param == request_query_params.end()) {
-    return false;
-  } else if (!matcher_.has_value()) {
-    // Present match.
-    return true;
-  } else {
-    return matcher_.value().match(query_param->second);
+    const Http::Utility::QueryParamsMulti& request_query_params) const {
+  // This preserves the legacy behavior of ignoring all but the first value for a given key
+  auto data = request_query_params.getFirstValue(name_);
+
+  // If we're doing a present_match, return whether the parameter exists and matches the expected
+  // presence
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.enable_new_query_param_present_match_behavior") &&
+      present_match_.has_value()) {
+    return data.has_value() == present_match_.value();
   }
+
+  // If the parameter doesn't exist, no match
+  if (!data.has_value()) {
+    return false;
+  }
+
+  // If there's no matcher, treat it as a present check
+  if (!matcher_.has_value()) {
+    return true;
+  }
+
+  // Match the value against the string matcher
+  return matcher_.value().match(data.value());
 }
 
 Upstream::ResourcePriority
 ConfigUtility::parsePriority(const envoy::config::core::v3::RoutingPriority& priority) {
   switch (priority) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::core::v3::DEFAULT:
     return Upstream::ResourcePriority::Default;
   case envoy::config::core::v3::HIGH:
     return Upstream::ResourcePriority::High;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 bool ConfigUtility::matchQueryParams(
-    const Http::Utility::QueryParams& query_params,
+    const Http::Utility::QueryParamsMulti& query_params,
     const std::vector<QueryParameterMatcherPtr>& config_query_params) {
   for (const auto& config_query_param : config_query_params) {
     if (!config_query_param->matches(query_params)) {
@@ -92,6 +98,7 @@ bool ConfigUtility::matchQueryParams(
 Http::Code ConfigUtility::parseRedirectResponseCode(
     const envoy::config::route::v3::RedirectAction::RedirectResponseCode& code) {
   switch (code) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::route::v3::RedirectAction::MOVED_PERMANENTLY:
     return Http::Code::MovedPermanently;
   case envoy::config::route::v3::RedirectAction::FOUND:
@@ -102,9 +109,8 @@ Http::Code ConfigUtility::parseRedirectResponseCode(
     return Http::Code::TemporaryRedirect;
   case envoy::config::route::v3::RedirectAction::PERMANENT_REDIRECT:
     return Http::Code::PermanentRedirect;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 absl::optional<Http::Code>
@@ -117,47 +123,32 @@ ConfigUtility::parseDirectResponseCode(const envoy::config::route::v3::Route& ro
   return {};
 }
 
-std::string ConfigUtility::parseDirectResponseBody(const envoy::config::route::v3::Route& route,
-                                                   Api::Api& api) {
-  static const ssize_t MaxBodySize = 4096;
-  if (!route.has_direct_response() || !route.direct_response().has_body()) {
-    return EMPTY_STRING;
-  }
-  const auto& body = route.direct_response().body();
-  const std::string& filename = body.filename();
-  if (!filename.empty()) {
-    if (!api.fileSystem().fileExists(filename)) {
-      throw EnvoyException(fmt::format("response body file {} does not exist", filename));
-    }
-    const ssize_t size = api.fileSystem().fileSize(filename);
-    if (size < 0) {
-      throw EnvoyException(absl::StrCat("cannot determine size of response body file ", filename));
-    }
-    if (size > MaxBodySize) {
-      throw EnvoyException(fmt::format("response body file {} size is {} bytes; maximum is {}",
-                                       filename, size, MaxBodySize));
-    }
-    return api.fileSystem().fileReadToEnd(filename);
-  }
-  const std::string inline_body(body.inline_bytes().empty() ? body.inline_string()
-                                                            : body.inline_bytes());
-  if (inline_body.length() > MaxBodySize) {
-    throw EnvoyException(fmt::format("response body size is {} bytes; maximum is {}",
-                                     inline_body.length(), MaxBodySize));
-  }
-  return inline_body;
-}
-
 Http::Code ConfigUtility::parseClusterNotFoundResponseCode(
     const envoy::config::route::v3::RouteAction::ClusterNotFoundResponseCode& code) {
   switch (code) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::config::route::v3::RouteAction::SERVICE_UNAVAILABLE:
     return Http::Code::ServiceUnavailable;
   case envoy::config::route::v3::RouteAction::NOT_FOUND:
     return Http::Code::NotFound;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::config::route::v3::RouteAction::INTERNAL_SERVER_ERROR:
+    return Http::Code::InternalServerError;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+
+void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms& src) {
+  dest.headers_to_append_or_add.insert(dest.headers_to_append_or_add.end(),
+                                       src.headers_to_append_or_add.begin(),
+                                       src.headers_to_append_or_add.end());
+  dest.headers_to_overwrite_or_add.insert(dest.headers_to_overwrite_or_add.end(),
+                                          src.headers_to_overwrite_or_add.begin(),
+                                          src.headers_to_overwrite_or_add.end());
+  dest.headers_to_add_if_absent.insert(dest.headers_to_add_if_absent.end(),
+                                       src.headers_to_add_if_absent.begin(),
+                                       src.headers_to_add_if_absent.end());
+  dest.headers_to_remove.insert(dest.headers_to_remove.end(), src.headers_to_remove.begin(),
+                                src.headers_to_remove.end());
 }
 
 } // namespace Router

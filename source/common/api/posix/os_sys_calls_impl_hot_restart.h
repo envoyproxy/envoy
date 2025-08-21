@@ -2,7 +2,7 @@
 
 #include "envoy/api/os_sys_calls_hot_restart.h"
 
-#include "common/singleton/threadsafe_singleton.h"
+#include "source/common/singleton/threadsafe_singleton.h"
 
 namespace Envoy {
 namespace Api {

@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package envoy.extensions.quic.connection_id_generator.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.quic.connection_id_generator.v3";
+option java_outer_classname = "EnvoyDeterministicConnectionIdGeneratorProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/quic/connection_id_generator/v3;connection_id_generatorv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: QUIC connection ID generator config]
+// [#extension: envoy.quic.deterministic_connection_id_generator]
+
+// Configuration for a connection ID generator implementation which issues predictable CIDs with stable first 4 bytes.
+message DeterministicConnectionIdGeneratorConfig {
+}

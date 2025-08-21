@@ -9,30 +9,26 @@ static_resources:
         - endpoint:
             address:
               socket_address:
-                address: {{ ntop_ip_loopback_address }}
+                address: "{{ ntop_ip_loopback_address }}"
                 port_value: 0
   - name: rtds_cluster
     connect_timeout: 1s
     type: EDS
     eds_cluster_config:
       eds_config:
-        resource_api_version: V3
         api_config_source:
           api_type: GRPC
-          transport_api_version: V3
           grpc_services:
             envoy_grpc:
               cluster_name: "dummy_cluster"
 layered_runtime:
   layers:
-    - name: foobar
-      rtds_layer:
-        name: foobar
-        rtds_config:
-          resource_api_version: V3
-          api_config_source:
-            api_type: GRPC
-            transport_api_version: V3
-            grpc_services:
-              envoy_grpc:
-                cluster_name: rtds_cluster
+  - name: foobar
+    rtds_layer:
+      name: foobar
+      rtds_config:
+        api_config_source:
+          api_type: GRPC
+          grpc_services:
+            envoy_grpc:
+              cluster_name: rtds_cluster

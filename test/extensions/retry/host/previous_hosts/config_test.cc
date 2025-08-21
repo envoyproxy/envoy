@@ -1,9 +1,8 @@
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/retry.h"
 
-#include "common/network/address_impl.h"
-
-#include "extensions/retry/host/previous_hosts/config.h"
+#include "source/common/network/address_impl.h"
+#include "source/extensions/retry/host/previous_hosts/config.h"
 
 #include "test/mocks/upstream/host.h"
 
@@ -24,7 +23,7 @@ TEST(PreviousHostsRetryPredicateConfigTest, PredicateTest) {
 
   ASSERT_NE(nullptr, factory);
 
-  ProtobufWkt::Struct config;
+  Protobuf::Struct config;
   auto predicate = factory->createHostPredicate(config, 3);
 
   auto host1 = std::make_shared<NiceMock<Upstream::MockHost>>();
@@ -56,8 +55,9 @@ TEST(PreviousHostsRetryPredicateConfigTest, EmptyConfig) {
   ASSERT_NE(nullptr, factory);
 
   ProtobufTypes::MessagePtr config = factory->createEmptyConfigProto();
-  EXPECT_TRUE(dynamic_cast<envoy::config::retry::previous_hosts::v2::PreviousHostsPredicate*>(
-      config.get()));
+  EXPECT_TRUE(
+      dynamic_cast<envoy::extensions::retry::host::previous_hosts::v3::PreviousHostsPredicate*>(
+          config.get()));
 }
 
 } // namespace

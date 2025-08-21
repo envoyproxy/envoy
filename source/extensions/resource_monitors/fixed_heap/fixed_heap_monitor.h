@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.pb.h"
+#include "envoy/extensions/resource_monitors/fixed_heap/v3/fixed_heap.pb.h"
 #include "envoy/server/resource_monitor.h"
 
 namespace Envoy {
@@ -20,6 +20,8 @@ public:
   virtual uint64_t reservedHeapBytes();
   // Memory in free, unmapped pages in the page heap.
   virtual uint64_t unmappedHeapBytes();
+  // Memory in free, mapped pages in the page heap.
+  virtual uint64_t freeMappedHeapBytes();
 };
 
 /**
@@ -28,10 +30,10 @@ public:
 class FixedHeapMonitor : public Server::ResourceMonitor {
 public:
   FixedHeapMonitor(
-      const envoy::config::resource_monitor::fixed_heap::v2alpha::FixedHeapConfig& config,
+      const envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig& config,
       std::unique_ptr<MemoryStatsReader> stats = std::make_unique<MemoryStatsReader>());
 
-  void updateResourceUsage(Server::ResourceMonitor::Callbacks& callbacks) override;
+  void updateResourceUsage(Server::ResourceUpdateCallbacks& callbacks) override;
 
 private:
   const uint64_t max_heap_;

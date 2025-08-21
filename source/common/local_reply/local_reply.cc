@@ -1,42 +1,56 @@
-#include "common/local_reply/local_reply.h"
+#include "source/common/local_reply/local_reply.h"
 
 #include <string>
 #include <vector>
 
-#include "common/access_log/access_log_impl.h"
-#include "common/common/enum_to_int.h"
-#include "common/config/datasource.h"
-#include "common/formatter/substitution_format_string.h"
-#include "common/formatter/substitution_formatter.h"
-#include "common/http/header_map_impl.h"
-#include "common/router/header_parser.h"
+#include "envoy/api/api.h"
+
+#include "source/common/access_log/access_log_impl.h"
+#include "source/common/common/enum_to_int.h"
+#include "source/common/config/datasource.h"
+#include "source/common/formatter/substitution_format_string.h"
+#include "source/common/formatter/substitution_formatter.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/router/header_parser.h"
 
 namespace Envoy {
 namespace LocalReply {
 
 class BodyFormatter {
 public:
-  BodyFormatter()
-      : formatter_(std::make_unique<Envoy::Formatter::FormatterImpl>("%LOCAL_REPLY_BODY%")),
-        content_type_(Http::Headers::get().ContentTypeValues.Text) {}
+  BodyFormatter() : content_type_(Http::Headers::get().ContentTypeValues.Text) {}
 
-  BodyFormatter(const envoy::config::core::v3::SubstitutionFormatString& config)
-      : formatter_(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config)),
+  static absl::StatusOr<std::unique_ptr<BodyFormatter>>
+  create(const envoy::config::core::v3::SubstitutionFormatString& config,
+         Server::Configuration::GenericFactoryContext& context) {
+    auto formatter_or_error =
+        Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config, context);
+    RETURN_IF_NOT_OK_REF(formatter_or_error.status());
+    return std::make_unique<BodyFormatter>(config, std::move(*formatter_or_error));
+  }
+
+  BodyFormatter(const envoy::config::core::v3::SubstitutionFormatString& config,
+                Formatter::FormatterPtr&& formatter)
+      : formatter_(std::move(formatter)),
         content_type_(
-            !config.content_type().empty()
-                ? config.content_type()
-                : config.format_case() ==
-                          envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat
-                      ? Http::Headers::get().ContentTypeValues.Json
-                      : Http::Headers::get().ContentTypeValues.Text) {}
+            !config.content_type().empty() ? config.content_type()
+            : config.format_case() ==
+                    envoy::config::core::v3::SubstitutionFormatString::FormatCase::kJsonFormat
+                ? Http::Headers::get().ContentTypeValues.Json
+                : Http::Headers::get().ContentTypeValues.Text) {}
 
   void format(const Http::RequestHeaderMap& request_headers,
               const Http::ResponseHeaderMap& response_headers,
               const Http::ResponseTrailerMap& response_trailers,
               const StreamInfo::StreamInfo& stream_info, std::string& body,
               absl::string_view& content_type) const {
-    body =
-        formatter_->format(request_headers, response_headers, response_trailers, stream_info, body);
+    // No specific formatter is provided and the default formatter %LOCAL_REPLY_BODY% will
+    // be used. That means the body will be the same as the original body and we don't need
+    // to format it.
+    if (formatter_ != nullptr) {
+      body = formatter_->formatWithContext(
+          {&request_headers, &response_headers, &response_trailers, body}, stream_info);
+    }
     content_type = content_type_;
   }
 
@@ -50,34 +64,51 @@ using HeaderParserPtr = std::unique_ptr<Envoy::Router::HeaderParser>;
 
 class ResponseMapper {
 public:
+  static absl::StatusOr<std::unique_ptr<ResponseMapper>>
+  create(const envoy::extensions::filters::network::http_connection_manager::v3::ResponseMapper&
+             config,
+         Server::Configuration::FactoryContext& context) {
+    absl::Status creation_status = absl::OkStatus();
+    auto ret = std::make_unique<ResponseMapper>(config, context, creation_status);
+    RETURN_IF_NOT_OK(creation_status);
+    return ret;
+  }
+
   ResponseMapper(
       const envoy::extensions::filters::network::http_connection_manager::v3::ResponseMapper&
           config,
-      Server::Configuration::FactoryContext& context)
-      : filter_(AccessLog::FilterFactory::fromProto(config.filter(), context.runtime(),
-                                                    context.api().randomGenerator(),
-                                                    context.messageValidationVisitor())) {
+      Server::Configuration::FactoryContext& context, absl::Status& creation_status)
+      : filter_(AccessLog::FilterFactory::fromProto(config.filter(), context)) {
     if (config.has_status_code()) {
       status_code_ = static_cast<Http::Code>(config.status_code().value());
     }
     if (config.has_body()) {
-      body_ = Config::DataSource::read(config.body(), true, context.api());
+      auto body_or_error =
+          Config::DataSource::read(config.body(), true, context.serverFactoryContext().api());
+      SET_AND_RETURN_IF_NOT_OK(body_or_error.status(), creation_status);
+      body_ = *body_or_error;
     }
 
     if (config.has_body_format_override()) {
-      body_formatter_ = std::make_unique<BodyFormatter>(config.body_format_override());
+      auto formatter_or_error = BodyFormatter::create(config.body_format_override(), context);
+      SET_AND_RETURN_IF_NOT_OK(formatter_or_error.status(), creation_status);
+      body_formatter_ = std::move(*formatter_or_error);
     }
 
-    header_parser_ = Envoy::Router::HeaderParser::configure(config.headers_to_add());
+    auto parser_or_error = Envoy::Router::HeaderParser::configure(config.headers_to_add());
+    SET_AND_RETURN_IF_NOT_OK(parser_or_error.status(), creation_status);
+    header_parser_ = std::move(*parser_or_error);
   }
 
   bool matchAndRewrite(const Http::RequestHeaderMap& request_headers,
                        Http::ResponseHeaderMap& response_headers,
                        const Http::ResponseTrailerMap& response_trailers,
-                       StreamInfo::StreamInfoImpl& stream_info, Http::Code& code, std::string& body,
+                       StreamInfo::StreamInfo& stream_info, Http::Code& code, std::string& body,
                        BodyFormatter*& final_formatter) const {
     // If not matched, just bail out.
-    if (!filter_->evaluate(stream_info, request_headers, response_headers, response_trailers)) {
+    if (filter_ == nullptr ||
+        !filter_->evaluate({&request_headers, &response_headers, &response_trailers},
+                           stream_info)) {
       return false;
     }
 
@@ -85,12 +116,13 @@ public:
       body = body_.value();
     }
 
-    header_parser_->evaluateHeaders(response_headers, stream_info);
+    header_parser_->evaluateHeaders(response_headers, {&request_headers, &response_headers},
+                                    stream_info);
 
     if (status_code_.has_value() && code != status_code_.value()) {
       code = status_code_.value();
       response_headers.setStatus(std::to_string(enumToInt(code)));
-      stream_info.response_code_ = static_cast<uint32_t>(code);
+      stream_info.setResponseCode(static_cast<uint32_t>(code));
     }
 
     if (body_formatter_) {
@@ -113,27 +145,44 @@ class LocalReplyImpl : public LocalReply {
 public:
   LocalReplyImpl() : body_formatter_(std::make_unique<BodyFormatter>()) {}
 
+  static absl::StatusOr<std::unique_ptr<LocalReplyImpl>>
+  create(const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
+             config,
+         Server::Configuration::FactoryContext& context) {
+    absl::Status creation_status = absl::OkStatus();
+    auto ret = std::make_unique<LocalReplyImpl>(config, context, creation_status);
+    RETURN_IF_NOT_OK(creation_status);
+    return ret;
+  }
+
   LocalReplyImpl(
       const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
           config,
-      Server::Configuration::FactoryContext& context)
-      : body_formatter_(config.has_body_format()
-                            ? std::make_unique<BodyFormatter>(config.body_format())
-                            : std::make_unique<BodyFormatter>()) {
+      Server::Configuration::FactoryContext& context, absl::Status& creation_status) {
+    if (!config.has_body_format()) {
+      body_formatter_ = std::make_unique<BodyFormatter>();
+    } else {
+      auto formatter_or_error = BodyFormatter::create(config.body_format(), context);
+      SET_AND_RETURN_IF_NOT_OK(formatter_or_error.status(), creation_status);
+      body_formatter_ = std::move(*formatter_or_error);
+    }
+
     for (const auto& mapper : config.mappers()) {
-      mappers_.emplace_back(std::make_unique<ResponseMapper>(mapper, context));
+      auto mapper_or_error = ResponseMapper::create(mapper, context);
+      SET_AND_RETURN_IF_NOT_OK(mapper_or_error.status(), creation_status);
+      mappers_.emplace_back(std::move(*mapper_or_error));
     }
   }
 
   void rewrite(const Http::RequestHeaderMap* request_headers,
-               Http::ResponseHeaderMap& response_headers, StreamInfo::StreamInfoImpl& stream_info,
+               Http::ResponseHeaderMap& response_headers, StreamInfo::StreamInfo& stream_info,
                Http::Code& code, std::string& body,
                absl::string_view& content_type) const override {
     // Set response code to stream_info and response_headers due to:
     // 1) StatusCode filter is using response_code from stream_info,
     // 2) %RESP(:status)% is from Status() in response_headers.
     response_headers.setStatus(std::to_string(enumToInt(code)));
-    stream_info.response_code_ = static_cast<uint32_t>(code);
+    stream_info.setResponseCode(static_cast<uint32_t>(code));
 
     if (request_headers == nullptr) {
       request_headers = Http::StaticEmptyHeaders::get().request_headers.get();
@@ -158,16 +207,16 @@ public:
 
 private:
   std::list<ResponseMapperPtr> mappers_;
-  const BodyFormatterPtr body_formatter_;
+  BodyFormatterPtr body_formatter_;
 };
 
 LocalReplyPtr Factory::createDefault() { return std::make_unique<LocalReplyImpl>(); }
 
-LocalReplyPtr Factory::create(
+absl::StatusOr<LocalReplyPtr> Factory::create(
     const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
         config,
     Server::Configuration::FactoryContext& context) {
-  return std::make_unique<LocalReplyImpl>(config, context);
+  return LocalReplyImpl::create(config, context);
 }
 
 } // namespace LocalReply

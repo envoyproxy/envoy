@@ -1,0 +1,10 @@
+date: December 7, 2020
+
+changes:
+- area: tls
+  change: |
+    fix read resumption after triggering buffer high-watermark and all remaining request/response bytes are stored in the
+    SSL connection's internal buffers.
+- area: udp
+  change: |
+    fixed issue in which receiving truncated UDP datagrams would cause Envoy to crash.

@@ -1,12 +1,11 @@
 #ifdef ENVOY_GOOGLE_GRPC
 #include "envoy/config/core/v3/grpc_service.pb.h"
 
-#include "common/grpc/google_async_client_impl.h"
-
-#include "extensions/grpc_credentials/well_known_names.h"
+#include "source/common/grpc/google_async_client_impl.h"
 
 #endif
 
+#include "test/test_common/test_runtime.h"
 #include "test/common/grpc/grpc_client_integration_test_harness.h"
 
 using testing::Eq;
@@ -14,6 +13,71 @@ using testing::Eq;
 namespace Envoy {
 namespace Grpc {
 namespace {
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, EnvoyGrpcFlowControlTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         EnvoyGrpcClientIntegrationParamTest::protocolTestParamsToString);
+
+TEST_P(EnvoyGrpcFlowControlTest, BasicStreamWithFlowControl) {
+  // Configure the connection buffer limit to 1KB
+  connection_buffer_limits_ = 1024;
+  // Create large request string that will trigger watermark given buffer limit above.
+  std::string large_request = std::string(64 * 1024, 'a');
+
+  initialize();
+  auto stream = createStream(empty_metadata_);
+
+  testing::NiceMock<Http::MockSidestreamWatermarkCallbacks> watermark_callbacks;
+
+  // Registering the new watermark callback.
+  stream->grpc_stream_->setWatermarkCallbacks(watermark_callbacks);
+  // Expect that flow control kicks in and watermark calls are triggered.
+  EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark());
+
+  // Create send request with large request string.
+  helloworld::HelloRequest request_msg;
+  request_msg.set_name(large_request);
+
+  RequestArgs request_args;
+  request_args.request = &request_msg;
+  stream->sendRequest(request_args);
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+}
+
+TEST_P(EnvoyGrpcFlowControlTest, BasicStreamFlowControlWithStreamOption) {
+  // Configure the connection buffer limit to 1KB
+  connection_buffer_limits_ = 1024;
+  // Create large request string that will trigger watermark given buffer limit above.
+  std::string large_request = std::string(64 * 1024, 'a');
+
+  // Set watermark_callbacks_ so that sidestream watermark callback will be registered with stream
+  // options.
+  testing::NiceMock<Http::MockSidestreamWatermarkCallbacks> watermark_callbacks;
+  watermark_callbacks_ = &watermark_callbacks;
+
+  initialize();
+  auto stream = createStream(empty_metadata_);
+
+  // Expect that flow control kicks in and watermark calls are triggered.
+  EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
+  EXPECT_CALL(watermark_callbacks, onSidestreamBelowLowWatermark());
+
+  // Create send request with large request string.
+  helloworld::HelloRequest request_msg;
+  request_msg.set_name(large_request);
+
+  RequestArgs request_args;
+  request_args.request = &request_msg;
+  stream->sendRequest(request_args);
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+}
 
 // Parameterize the loopback test server socket address and gRPC client type.
 INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, GrpcClientIntegrationTest,
@@ -24,11 +88,193 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, GrpcClientIntegrationTest,
 TEST_P(GrpcClientIntegrationTest, BasicStream) {
   initialize();
   auto stream = createStream(empty_metadata_);
+  // Send request without END_STREAM set to true.
+  // gRPC protocol allows server to send trailers before the client half-closed, however
+  // it indicates that the server is no longer interested in the client data (this is relevant when
+  // the client is streaming). gRPC server sends RST_STREAM after trailers if client had not yet
+  // half-closed. It is ok for the client to reset the stream in this case as well.
+  stream->sendRequest();
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  // Skip encoding RST_STREAM to document the behavior of the Envoy and gRPC clients
+  dispatcher_helper_.runDispatcher();
+
+  // The client resets the stream in this case.
+  if (clientType() == ClientType::EnvoyGrpc) {
+    // Envoy gRPC based AsyncGrpcClient also increments a counter.
+    EXPECT_EQ(
+        cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_tx_reset_.value(), 1);
+  }
+  stream->waitForReset();
+}
+
+TEST_P(GrpcClientIntegrationTest, BasicStreamWithGracefulClose) {
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  stream->sendRequest();
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->closeStream();
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+  EXPECT_EQ(cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_tx_reset_.value(),
+            0);
+}
+
+TEST_P(GrpcClientIntegrationTest, BasicStreamDeleteOnRemoteClose) {
+  setOnDeleteCallback();
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  stream->sendRequest();
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->runDispatcherUntilResponseReceived();
+
+  stream->closeStream();
+  stream->waitForRemoteCloseAndDelete();
+  stream->encodeServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  runDispatcherUntilStreamDeletion();
+  EXPECT_EQ(cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_tx_reset_.value(),
+            0);
+}
+
+TEST_P(GrpcClientIntegrationTest, BasicStreamDeleteOnTimeout) {
+  // Make remote close timeout small, so that the test does not timeout.
+  remote_close_timeout_ = std::chrono::milliseconds(100);
+  setOnDeleteCallback();
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  stream->sendRequest();
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->runDispatcherUntilResponseReceived();
+
+  stream->closeStream();
+  stream->waitForRemoteCloseAndDelete();
+  runDispatcherUntilStreamDeletion();
+  // Stream is reset if remote close timer expires.
+  if (clientType() == ClientType::EnvoyGrpc) {
+    // Envoy gRPC based AsyncGrpcClient also increments a counter.
+    EXPECT_EQ(
+        cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_tx_reset_.value(), 1);
+  }
+}
+
+// Validate that a simple request-reply stream works.
+TEST_P(GrpcClientIntegrationTest, BasicStreamGracefulClose) {
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  // Send request with end_stream set to true, causing gRPC client to half close
+  // the stream.
+  RequestArgs request_args{nullptr, true};
+  stream->sendRequest(request_args);
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+
+  // AsyncGrpcClient should not cause local reset, completing the stream gracefully.
+  EXPECT_EQ(cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_tx_reset_.value(),
+            0);
+  stream->waitForEndStream();
+}
+
+TEST_P(GrpcClientIntegrationTest, BasicStreamWithServerReset) {
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  // Send request without END_STREAM set to true.
+  // gRPC protocol allows server to send trailers before the client half-closed, however
+  // it indicates that the server is no longer interested in the client data (this is relevant when
+  // the client is streaming). gRPC server sends RST_STREAM after trailers if client had not yet
+  // half-closed. It is ok for the client to reset the stream in this case as well.
+  stream->sendRequest();
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  // Compliant gRPC server will reset the stream if it half-closes before the client.
+  stream->sendServerReset();
+  dispatcher_helper_.runDispatcher();
+
+  // The client resets the stream in this case.
+  if (clientType() == ClientType::EnvoyGrpc) {
+    // Envoy gRPC based AsyncGrpcClient also increments a counter.
+    EXPECT_EQ(
+        cm_.thread_local_cluster_.cluster_.info_->trafficStats()->upstream_rq_tx_reset_.value(), 1);
+  }
+  stream->waitForReset();
+}
+
+// A simple request-reply stream, "x-envoy-internal" and `x-forward-for` headers
+// are removed due to grpc service configuration.
+TEST_P(GrpcClientIntegrationTest, BasicStreamRemoveInternalHeaders) {
+  // "x-envoy-internal" and `x-forward-for` headers are only available on Envoy gRPC path.
+  SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
+  skip_envoy_headers_ = true;
+  initialize();
+  auto stream = createStream(empty_metadata_);
   stream->sendRequest();
   stream->sendServerInitialMetadata(empty_metadata_);
   stream->sendReply();
   stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
   dispatcher_helper_.runDispatcher();
+}
+
+// A simple request-reply stream, "x-envoy-internal" and `x-forward-for` headers
+// are removed due to per stream options which overrides the gRPC service configuration.
+TEST_P(GrpcClientIntegrationTest, BasicStreamRemoveInternalHeadersWithStreamOption) {
+  // "x-envoy-internal" and `x-forward-for` headers are only available on Envoy gRPC path.
+  SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
+  send_internal_header_stream_option_ = false;
+  send_xff_header_stream_option_ = false;
+  initialize();
+  auto stream = createStream(empty_metadata_);
+  stream->sendRequest();
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->sendReply();
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+}
+
+// Validate that a simple request-reply stream works with bytes metering in Envoy gRPC.
+TEST_P(GrpcClientIntegrationTest, BasicStreamWithBytesMeter) {
+  // Currently, only Envoy gRPC's bytes metering is based on the bytes meter in Envoy.
+  // Therefore, skip the test for google gRPC.
+  SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
+  // The check in this test is based on HTTP2 codec logic (i.e., including H2_FRAME_HEADER_SIZE).
+  // Skip this test if default protocol of this integration test is no longer HTTP2.
+  if (fake_upstream_config_.upstream_protocol_ != Http::CodecType::HTTP2) {
+    return;
+  }
+  initialize();
+  auto stream = createStream(empty_metadata_);
+
+  // Create the send request.
+  helloworld::HelloRequest request_msg;
+  request_msg.set_name(HELLO_REQUEST);
+
+  RequestArgs request_args;
+  request_args.request = &request_msg;
+  stream->sendRequest(request_args);
+  stream->sendServerInitialMetadata(empty_metadata_);
+
+  auto send_buf = Common::serializeMessage(request_msg);
+  Common::prependGrpcFrameHeader(*send_buf);
+
+  auto upstream_meter = stream->grpc_stream_->streamInfo().getUpstreamBytesMeter();
+  uint64_t total_bytes_sent = upstream_meter->wireBytesSent();
+  uint64_t header_bytes_sent = upstream_meter->headerBytesSent();
+  uint64_t decompressed_header_bytes_sent = upstream_meter->decompressedHeaderBytesSent();
+  // Verify the number of sent bytes that is tracked in stream info equals to the length of
+  // request buffer.
+  // Note, in HTTP2 codec, H2_FRAME_HEADER_SIZE is always included in bytes meter so we need to
+  // account for it in the check here as well.
+  EXPECT_EQ(total_bytes_sent - header_bytes_sent,
+            send_buf->length() + Http::Http2::H2_FRAME_HEADER_SIZE);
+  EXPECT_GE(decompressed_header_bytes_sent, header_bytes_sent);
+
+  stream->sendReply(/*check_response_size=*/true);
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
 }
 
 // Validate that a client destruction with open streams cleans up appropriately.
@@ -54,8 +300,67 @@ TEST_P(GrpcClientIntegrationTest, MultiStream) {
   auto stream_1 = createStream(empty_metadata_);
   stream_0->sendRequest();
   stream_1->sendRequest();
+  // Access stream info to make sure it is present.
+  if (std::get<1>(GetParam()) == ClientType::EnvoyGrpc) {
+    envoy::config::core::v3::Metadata m;
+    (*m.mutable_filter_metadata())["com.foo.bar"] = {};
+    EXPECT_THAT(stream_0->grpc_stream_.streamInfo().dynamicMetadata(), ProtoEq(m));
+    EXPECT_THAT(stream_1->grpc_stream_.streamInfo().dynamicMetadata(), ProtoEq(m));
+  }
   stream_0->sendServerInitialMetadata(empty_metadata_);
   stream_0->sendReply();
+  stream_1->sendServerTrailers(Status::WellKnownGrpcStatus::Unavailable, "", empty_metadata_, true);
+  stream_0->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
+  dispatcher_helper_.runDispatcher();
+}
+
+// Validate that multiple streams work with bytes metering in Envoy gRPC.
+TEST_P(GrpcClientIntegrationTest, MultiStreamWithBytesMeter) {
+  SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
+  // The check in this test is based on HTTP2 codec logic (i.e., including H2_FRAME_HEADER_SIZE).
+  // Skip this test if default protocol of this integration test is no longer HTTP2.
+  if (fake_upstream_config_.upstream_protocol_ != Http::CodecType::HTTP2) {
+    return;
+  }
+  initialize();
+  auto stream_0 = createStream(empty_metadata_);
+  auto stream_1 = createStream(empty_metadata_);
+  // Create the send request.
+  helloworld::HelloRequest request_msg;
+  request_msg.set_name(HELLO_REQUEST);
+
+  RequestArgs request_args;
+  request_args.request = &request_msg;
+  stream_0->sendRequest(request_args);
+  stream_1->sendRequest(request_args);
+
+  auto send_buf = Common::serializeMessage(request_msg);
+  Common::prependGrpcFrameHeader(*send_buf);
+
+  // Access stream info to make sure it is present.
+  envoy::config::core::v3::Metadata m;
+  (*m.mutable_filter_metadata())["com.foo.bar"] = {};
+  EXPECT_THAT(stream_0->grpc_stream_.streamInfo().dynamicMetadata(), ProtoEq(m));
+  EXPECT_THAT(stream_1->grpc_stream_.streamInfo().dynamicMetadata(), ProtoEq(m));
+
+  auto upstream_meter_0 = stream_0->grpc_stream_->streamInfo().getUpstreamBytesMeter();
+  uint64_t total_bytes_sent = upstream_meter_0->wireBytesSent();
+  uint64_t header_bytes_sent = upstream_meter_0->headerBytesSent();
+  uint64_t decompressed_header_bytes_sent = upstream_meter_0->decompressedHeaderBytesSent();
+  EXPECT_EQ(total_bytes_sent - header_bytes_sent,
+            send_buf->length() + Http::Http2::H2_FRAME_HEADER_SIZE);
+  EXPECT_GE(decompressed_header_bytes_sent, header_bytes_sent);
+
+  auto upstream_meter_1 = stream_1->grpc_stream_->streamInfo().getUpstreamBytesMeter();
+  uint64_t total_bytes_sent_1 = upstream_meter_1->wireBytesSent();
+  uint64_t header_bytes_sent_1 = upstream_meter_1->headerBytesSent();
+  uint64_t decompressed_header_bytes_sent_1 = upstream_meter_1->decompressedHeaderBytesSent();
+  EXPECT_EQ(total_bytes_sent_1 - header_bytes_sent_1,
+            send_buf->length() + Http::Http2::H2_FRAME_HEADER_SIZE);
+  EXPECT_GE(decompressed_header_bytes_sent_1, header_bytes_sent_1);
+
+  stream_0->sendServerInitialMetadata(empty_metadata_);
+  stream_0->sendReply(true);
   stream_1->sendServerTrailers(Status::WellKnownGrpcStatus::Unavailable, "", empty_metadata_, true);
   stream_0->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
   dispatcher_helper_.runDispatcher();
@@ -80,11 +385,9 @@ TEST_P(GrpcClientIntegrationTest, HttpNon200Status) {
         {":status", std::to_string(http_response_status)}};
     stream->expectInitialMetadata(empty_metadata_);
     stream->expectTrailingMetadata(empty_metadata_);
-    // Technically this should be
-    // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
-    // as given by Grpc::Utility::httpToGrpcStatus(), but the Google gRPC client treats
-    // this as WellKnownGrpcStatus::Canceled.
-    stream->expectGrpcStatus(Status::WellKnownGrpcStatus::Canceled);
+    // Translate status per
+    // // https://github.com/grpc/grpc/blob/master/doc/http-grpc-status-mapping.md
+    stream->expectGrpcStatus(Utility::httpToGrpcStatus(http_response_status));
     stream->fake_stream_->encodeHeaders(reply_headers, true);
     dispatcher_helper_.runDispatcher();
   }
@@ -131,6 +434,28 @@ TEST_P(GrpcClientIntegrationTest, BadReplyGrpcFraming) {
   stream->expectGrpcStatus(Status::WellKnownGrpcStatus::Internal);
   Buffer::OwnedImpl reply_buffer("\xde\xad\xbe\xef\x00", 5);
   stream->fake_stream_->encodeData(reply_buffer, true);
+  dispatcher_helper_.runDispatcher();
+}
+
+// Validate that a reply that exceeds gRPC maximum frame size is handled as an RESOURCE_EXHAUSTED
+// gRPC error.
+TEST_P(GrpcClientIntegrationTest, BadReplyOverGrpcFrameLimit) {
+  // Only testing behavior of Envoy client, since `max_receive_message_length` configuration is
+  // added to Envoy-gRPC only.
+  SKIP_IF_GRPC_CLIENT(ClientType::GoogleGrpc);
+
+  helloworld::HelloReply reply;
+  reply.set_message("HelloWorld");
+
+  initialize(/*envoy_grpc_max_recv_msg_length=*/2);
+
+  auto stream = createStream(empty_metadata_);
+  stream->sendRequest();
+  stream->sendServerInitialMetadata(empty_metadata_);
+  stream->expectTrailingMetadata(empty_metadata_);
+  stream->expectGrpcStatus(Status::WellKnownGrpcStatus::ResourceExhausted);
+  auto serialized_response = Grpc::Common::serializeToGrpcFrame(reply);
+  stream->fake_stream_->encodeData(*serialized_response, true);
   dispatcher_helper_.runDispatcher();
 }
 
@@ -233,8 +558,17 @@ TEST_P(GrpcClientIntegrationTest, StreamClientInitialMetadata) {
   const TestMetadata initial_metadata = {
       {Http::LowerCaseString("foo"), "bar"},
       {Http::LowerCaseString("baz"), "blah"},
+      {Http::LowerCaseString("hello-world-in-japanese-bin"), "こんにちは 世界"},
   };
-  auto stream = createStream(initial_metadata);
+  auto stream = createStream(
+      initial_metadata,
+      TestMetadata{{Http::LowerCaseString("foo"), "bar"},
+                   {Http::LowerCaseString("baz"), "blah"},
+                   {Http::LowerCaseString("hello-world-in-japanese-bin"),
+                    // Google base64 encoding doesn't do padding.
+                    clientType() == ClientType::EnvoyGrpc ? "44GT44KT44Gr44Gh44GvIOS4lueVjA=="
+                                                          : "44GT44KT44Gr44Gh44GvIOS4lueVjA"}});
+
   stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_, true);
   dispatcher_helper_.runDispatcher();
 }
@@ -262,6 +596,7 @@ TEST_P(GrpcClientIntegrationTest, RequestServiceWideInitialMetadata) {
 }
 
 // Validate that receiving server initial metadata works.
+// And -bin headers stay encoded.
 TEST_P(GrpcClientIntegrationTest, ServerInitialMetadata) {
   initialize();
   auto stream = createStream(empty_metadata_);
@@ -269,7 +604,8 @@ TEST_P(GrpcClientIntegrationTest, ServerInitialMetadata) {
   const TestMetadata initial_metadata = {
       {Http::LowerCaseString("foo"), "bar"},
       {Http::LowerCaseString("baz"), "blah"},
-      {Http::LowerCaseString("binary-bin"), "help"},
+      {Http::LowerCaseString("hello-world-in-japanese-bin"),
+       "44GT44KT44Gr44Gh44GvIOS4lueVjA==" /*"こんにちは 世界"*/},
   };
   stream->sendServerInitialMetadata(initial_metadata);
   stream->sendReply();
@@ -277,7 +613,7 @@ TEST_P(GrpcClientIntegrationTest, ServerInitialMetadata) {
   dispatcher_helper_.runDispatcher();
 }
 
-// Validate that receiving server trailing metadata works.
+// Validates that receiving server trailing metadata works.
 TEST_P(GrpcClientIntegrationTest, ServerTrailingMetadata) {
   initialize();
   auto stream = createStream(empty_metadata_);
@@ -286,9 +622,11 @@ TEST_P(GrpcClientIntegrationTest, ServerTrailingMetadata) {
   stream->sendReply();
   const TestMetadata trailing_metadata = {
       {Http::LowerCaseString("foo"), "bar"},
+      {Http::LowerCaseString("hello-world-in-japanese-bin"), "44GT44KT44Gr44Gh44GvIOS4lueVjA=="},
       {Http::LowerCaseString("baz"), "blah"},
   };
-  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", trailing_metadata);
+  stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", trailing_metadata,
+                             /*trailers_only=*/false);
   dispatcher_helper_.runDispatcher();
 }
 
@@ -354,7 +692,10 @@ TEST_P(GrpcClientIntegrationTest, MaximumKnownPlusOne) {
 TEST_P(GrpcClientIntegrationTest, ReceiveAfterLocalClose) {
   initialize();
   auto stream = createStream(empty_metadata_);
-  stream->sendRequest(true);
+
+  RequestArgs request_args;
+  request_args.end_stream = true;
+  stream->sendRequest(request_args);
   stream->sendServerInitialMetadata(empty_metadata_);
   stream->sendReply();
   stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
@@ -406,6 +747,29 @@ TEST_P(GrpcSslClientIntegrationTest, BasicSslRequestWithClientCert) {
   dispatcher_helper_.runDispatcher();
 }
 
+// Validate TLS version mismatch between the client and the server.
+TEST_P(GrpcSslClientIntegrationTest, BasicSslRequestHandshakeFailure) {
+  SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.google_grpc_disable_tls_13", "true"}});
+  use_server_tls_13_ = true;
+  initialize();
+  auto request = createRequest(empty_metadata_, false);
+  EXPECT_CALL(*request->child_span_, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("13")));
+  EXPECT_CALL(*request->child_span_,
+              setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
+  EXPECT_CALL(*request, onFailure(Status::Internal, "", _)).WillOnce(InvokeWithoutArgs([this]() {
+    dispatcher_helper_.dispatcher_.exit();
+  }));
+  EXPECT_CALL(*request->child_span_, finishSpan());
+  FakeRawConnectionPtr fake_connection;
+  ASSERT_TRUE(fake_upstream_->waitForRawConnection(fake_connection));
+  if (fake_connection->connected()) {
+    ASSERT_TRUE(fake_connection->waitForDisconnect());
+  }
+  dispatcher_helper_.dispatcher_.run(Event::Dispatcher::RunType::Block);
+}
+
 #ifdef ENVOY_GOOGLE_GRPC
 // AccessToken credential validation tests.
 class GrpcAccessTokenClientIntegrationTest : public GrpcSslClientIntegrationTest {
@@ -454,8 +818,7 @@ INSTANTIATE_TEST_SUITE_P(SslIpVersionsClientType, GrpcAccessTokenClientIntegrati
 TEST_P(GrpcAccessTokenClientIntegrationTest, AccessTokenAuthRequest) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   access_token_value_ = "accesstokenvalue";
-  credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().AccessTokenExample;
+  credentials_factory_name_ = "envoy.grpc_credentials.access_token_example";
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
@@ -466,8 +829,7 @@ TEST_P(GrpcAccessTokenClientIntegrationTest, AccessTokenAuthRequest) {
 TEST_P(GrpcAccessTokenClientIntegrationTest, AccessTokenAuthStream) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   access_token_value_ = "accesstokenvalue";
-  credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().AccessTokenExample;
+  credentials_factory_name_ = "envoy.grpc_credentials.access_token_example";
   initialize();
   auto stream = createStream(empty_metadata_);
   stream->sendServerInitialMetadata(empty_metadata_);
@@ -482,8 +844,7 @@ TEST_P(GrpcAccessTokenClientIntegrationTest, MultipleAccessTokens) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   access_token_value_ = "accesstokenvalue";
   access_token_value_2_ = "accesstokenvalue2";
-  credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().AccessTokenExample;
+  credentials_factory_name_ = "envoy.grpc_credentials.access_token_example";
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
@@ -495,8 +856,7 @@ TEST_P(GrpcAccessTokenClientIntegrationTest, ExtraCredentialParams) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
   access_token_value_ = "accesstokenvalue";
   refresh_token_value_ = "refreshtokenvalue";
-  credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().AccessTokenExample;
+  credentials_factory_name_ = "envoy.grpc_credentials.access_token_example";
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();
@@ -506,8 +866,7 @@ TEST_P(GrpcAccessTokenClientIntegrationTest, ExtraCredentialParams) {
 // Validate that no access token still works
 TEST_P(GrpcAccessTokenClientIntegrationTest, NoAccessTokens) {
   SKIP_IF_GRPC_CLIENT(ClientType::EnvoyGrpc);
-  credentials_factory_name_ =
-      Extensions::GrpcCredentials::GrpcCredentialsNames::get().AccessTokenExample;
+  credentials_factory_name_ = "envoy.grpc_credentials.access_token_example";
   initialize();
   auto request = createRequest(empty_metadata_);
   request->sendReply();

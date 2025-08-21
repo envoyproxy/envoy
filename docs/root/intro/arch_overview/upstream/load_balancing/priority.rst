@@ -98,7 +98,7 @@ To sum this up in pseudo algorithms:
 
   health(P_X) = min(100, 1.4 * 100 * healthy_P_X_backends / total_P_X_backends)
   normalized_total_health = min(100, Σ(health(P_0)...health(P_X)))
-  priority_load(P_0) = min(100, health(P_0) * 100 / normalized_total_health)
+  priority_load(P_0) = health(P_0) * 100 / normalized_total_health
   priority_load(P_X) = min(100 - Σ(priority_load(P_0)..priority_load(P_X-1)),
                            health(P_X) * 100 / normalized_total_health)
 

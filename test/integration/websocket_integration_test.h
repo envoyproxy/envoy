@@ -10,8 +10,8 @@ namespace Envoy {
 
 struct WebsocketProtocolTestParams {
   Network::Address::IpVersion version;
-  Http::CodecClient::Type downstream_protocol;
-  FakeHttpConnection::Type upstream_protocol;
+  Http::CodecType downstream_protocol;
+  Http::CodecType upstream_protocol;
 };
 
 class WebsocketIntegrationTest : public HttpProtocolIntegrationTest {
@@ -20,7 +20,8 @@ public:
 
 protected:
   void performUpgrade(const Http::TestRequestHeaderMapImpl& upgrade_request_headers,
-                      const Http::TestResponseHeaderMapImpl& upgrade_response_headers);
+                      const Http::TestResponseHeaderMapImpl& upgrade_response_headers,
+                      bool upgrade_should_fail = false);
   void sendBidirectionalData();
 
   void validateUpgradeRequestHeaders(const Http::RequestHeaderMap& proxied_request_headers,
@@ -30,7 +31,7 @@ protected:
 
   ABSL_MUST_USE_RESULT
   testing::AssertionResult waitForUpstreamDisconnectOrReset() {
-    if (upstreamProtocol() != FakeHttpConnection::Type::HTTP1) {
+    if (upstreamProtocol() != Http::CodecType::HTTP1) {
       return upstream_request_->waitForReset();
     } else {
       return fake_upstream_connection_->waitForDisconnect();
@@ -39,8 +40,8 @@ protected:
 
   void waitForClientDisconnectOrReset(
       Http::StreamResetReason reason = Http::StreamResetReason::RemoteReset) {
-    if (downstreamProtocol() != Http::CodecClient::Type::HTTP1) {
-      response_->waitForReset();
+    if (downstreamProtocol() != Http::CodecType::HTTP1) {
+      ASSERT_TRUE(response_->waitForReset());
       ASSERT_EQ(reason, response_->resetReason());
     } else {
       ASSERT_TRUE(codec_client_->waitForDisconnect());

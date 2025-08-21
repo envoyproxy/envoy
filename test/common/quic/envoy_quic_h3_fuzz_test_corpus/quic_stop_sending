@@ -1,0 +1,9 @@
+frames {
+  qframe {
+    stop_sending {
+      control_frame_id: 0,
+      stream_id: 0,
+      error_code: 0,
+    }
+  }
+}

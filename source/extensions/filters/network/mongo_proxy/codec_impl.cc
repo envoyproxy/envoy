@@ -1,4 +1,4 @@
-#include "extensions/filters/network/mongo_proxy/codec_impl.h"
+#include "source/extensions/filters/network/mongo_proxy/codec_impl.h"
 
 #include <cstdint>
 #include <list>
@@ -9,10 +9,9 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-
-#include "extensions/filters/network/mongo_proxy/bson_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/extensions/filters/network/mongo_proxy/bson_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -356,6 +355,11 @@ bool DecoderImpl::decode(Buffer::Instance& data) {
   }
 
   data.drain(sizeof(int32_t));
+  if (message_length < Message::MessageHeaderSize) {
+    ENVOY_LOG(debug, "message size {} less than min. message size {}", message_length,
+              Message::MessageHeaderSize);
+    return false;
+  }
   int32_t request_id = Bson::BufferHelper::removeInt32(data);
   int32_t response_to = Bson::BufferHelper::removeInt32(data);
   Message::OpCode op_code = static_cast<Message::OpCode>(Bson::BufferHelper::removeInt32(data));

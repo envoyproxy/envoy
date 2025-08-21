@@ -1,5 +1,5 @@
-#include "common/common/lock_guard.h"
-#include "common/common/thread.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/thread.h"
 
 #include "gtest/gtest.h"
 
@@ -37,7 +37,7 @@ TEST_F(LockGuardTest, TestTryLockGuard) {
   if (lock.tryLock()) {
     // This test doesn't work, because a_mutex_ is guarded, and thread
     // annotations don't work with TryLockGuard. The macro is defined in
-    // include/envoy/thread/thread.h.
+    // envoy/thread/thread.h.
     DISABLE_TRYLOCKGUARD_ANNOTATION(EXPECT_EQ(1, ++a_));
 
     // TryLockGuard does functionally work with unguarded variables.

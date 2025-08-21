@@ -1,4 +1,3 @@
-
 #pragma once
 
 #include "envoy/admin/v3/init_dump.pb.h"
@@ -7,7 +6,7 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 
-#include "server/admin/handler_ctx.h"
+#include "source/server/admin/handler_ctx.h"
 
 #include "absl/strings/string_view.h"
 
@@ -19,8 +18,7 @@ class InitDumpHandler : public HandlerContextBase {
 public:
   InitDumpHandler(Server::Instance& server);
 
-  Http::Code handlerInitDump(absl::string_view path_and_query,
-                             Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+  Http::Code handlerInitDump(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                              AdminStream&) const;
 
 private:

@@ -1,6 +1,5 @@
-#include "common/network/utility.h"
-
-#include "extensions/filters/common/expr/evaluator.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/common/expr/evaluator.h"
 
 #include "test/common/stream_info/test_util.h"
 #include "test/extensions/filters/common/expr/evaluator_fuzz.pb.validate.h"
@@ -9,6 +8,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/utility.h"
 
+#include "cel/expr/syntax.pb.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -21,13 +21,14 @@ namespace {
 DEFINE_PROTO_FUZZER(const test::extensions::filters::common::expr::EvaluatorTestCase& input) {
   // Create builder without constant folding.
   static Expr::BuilderPtr builder = Expr::createBuilder(nullptr);
+  MockTimeSystem time_source;
   std::unique_ptr<TestStreamInfo> stream_info;
 
   try {
     // Validate that the input has an expression.
     TestUtility::validate(input);
     // Create stream_info to test against, this may catch exceptions from invalid addresses.
-    stream_info = Fuzz::fromStreamInfo(input.stream_info());
+    stream_info = Fuzz::fromStreamInfo(input.stream_info(), time_source);
   } catch (const EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
     return;
@@ -39,12 +40,22 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::common::expr::EvaluatorTest
   auto response_trailers = Fuzz::fromHeaders<Http::TestResponseTrailerMapImpl>(input.trailers());
 
   try {
-    // Create the CEL expression.
-    Expr::ExpressionPtr expr = Expr::createExpression(*builder, input.expression());
+    // Create the CEL expression with boundary conversion.
+    std::string serialized;
+    if (!input.expression().SerializeToString(&serialized)) {
+      ENVOY_LOG_MISC(debug, "Failed to serialize expression");
+      return;
+    }
+    cel::expr::Expr new_expr;
+    if (!new_expr.ParseFromString(serialized)) {
+      ENVOY_LOG_MISC(debug, "Failed to convert expression to new format");
+      return;
+    }
+    Expr::ExpressionPtr expr = Expr::createExpression(*builder, new_expr);
 
     // Evaluate the CEL expression.
     Protobuf::Arena arena;
-    Expr::evaluate(*expr, arena, *stream_info, &request_headers, &response_headers,
+    Expr::evaluate(*expr, arena, nullptr, *stream_info, &request_headers, &response_headers,
                    &response_trailers);
   } catch (const CelException& e) {
     ENVOY_LOG_MISC(debug, "CelException: {}", e.what());

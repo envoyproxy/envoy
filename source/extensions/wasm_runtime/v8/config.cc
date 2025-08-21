@@ -1,6 +1,6 @@
 #include "envoy/registry/registry.h"
 
-#include "extensions/common/wasm/wasm_runtime_factory.h"
+#include "source/extensions/common/wasm/wasm_runtime_factory.h"
 
 #include "include/proxy-wasm/v8.h"
 
@@ -13,11 +13,10 @@ class V8RuntimeFactory : public WasmRuntimeFactory {
 public:
   WasmVmPtr createWasmVm() override { return proxy_wasm::createV8Vm(); }
 
-  absl::string_view name() override { return "envoy.wasm.runtime.v8"; }
-  absl::string_view shortName() override { return "v8"; }
+  std::string name() const override { return "envoy.wasm.runtime.v8"; }
 };
 
-#if defined(ENVOY_WASM_V8)
+#if defined(PROXY_WASM_HAS_RUNTIME_V8)
 REGISTER_FACTORY(V8RuntimeFactory, WasmRuntimeFactory);
 #endif
 

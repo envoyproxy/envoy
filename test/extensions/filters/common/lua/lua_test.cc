@@ -1,8 +1,7 @@
 #include <memory>
 
-#include "common/thread_local/thread_local_impl.h"
-
-#include "extensions/filters/common/lua/lua.h"
+#include "source/common/thread_local/thread_local_impl.h"
+#include "source/extensions/filters/common/lua/lua.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -51,6 +50,7 @@ public:
   ThreadLocalStatePtr state_;
   std::function<void()> yield_callback_;
   ReadyWatcher on_yield_;
+  InitializerList initializers_;
 };
 
 // Basic ref counting between coroutines.
@@ -62,8 +62,8 @@ TEST_F(LuaTest, CoroutineRefCounting) {
 
   InSequence s;
   setup(SCRIPT);
-  EXPECT_EQ(LUA_REFNIL, state_->getGlobalRef(state_->registerGlobal("not here")));
-  EXPECT_NE(LUA_REFNIL, state_->getGlobalRef(state_->registerGlobal("callMe")));
+  EXPECT_EQ(LUA_REFNIL, state_->getGlobalRef(state_->registerGlobal("not here", initializers_)));
+  EXPECT_NE(LUA_REFNIL, state_->getGlobalRef(state_->registerGlobal("callMe", initializers_)));
 
   // Start a coroutine but do not hold a reference to the object we pass.
   CoroutinePtr cr1(state_->createCoroutine());
@@ -86,6 +86,24 @@ TEST_F(LuaTest, CoroutineRefCounting) {
   lua_gc(cr2->luaState(), LUA_GCCOLLECT, 0);
 }
 
+// Test that we don't crash when empty errors are used (see PR #15471)
+TEST_F(LuaTest, EmptyError) {
+  const std::string SCRIPT{R"EOF(
+    function callMe()
+      error()
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  const int callMeRef = state_->getGlobalRef(state_->registerGlobal("callMe", initializers_));
+  EXPECT_NE(LUA_REFNIL, callMeRef);
+  CoroutinePtr cr1(state_->createCoroutine());
+  EXPECT_THROW_WITH_REGEX(cr1->start(callMeRef, 0, yield_callback_), EnvoyException,
+                          "unspecified lua error");
+}
+
 // Basic yield/resume functionality.
 TEST_F(LuaTest, YieldAndResume) {
   const std::string SCRIPT{R"EOF(
@@ -97,7 +115,7 @@ TEST_F(LuaTest, YieldAndResume) {
 
   InSequence s;
   setup(SCRIPT);
-  EXPECT_NE(LUA_REFNIL, state_->getGlobalRef(state_->registerGlobal("callMe")));
+  EXPECT_NE(LUA_REFNIL, state_->getGlobalRef(state_->registerGlobal("callMe", initializers_)));
 
   CoroutinePtr cr(state_->createCoroutine());
   LuaRef<TestObject> ref(TestObject::create(cr->luaState()), true);
@@ -132,8 +150,9 @@ TEST_F(LuaTest, MarkDead) {
 
   InSequence s;
   setup(SCRIPT);
-  EXPECT_NE(LUA_REFNIL, state_->getGlobalRef(state_->registerGlobal("callMeFirst")));
-  EXPECT_NE(LUA_REFNIL, state_->getGlobalRef(state_->registerGlobal("callMeSecond")));
+  EXPECT_NE(LUA_REFNIL, state_->getGlobalRef(state_->registerGlobal("callMeFirst", initializers_)));
+  EXPECT_NE(LUA_REFNIL,
+            state_->getGlobalRef(state_->registerGlobal("callMeSecond", initializers_)));
 
   CoroutinePtr cr1(state_->createCoroutine());
   LuaDeathRef<TestObject> ref(TestObject::create(cr1->luaState()), true);

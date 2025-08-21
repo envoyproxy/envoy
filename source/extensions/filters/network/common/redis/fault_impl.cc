@@ -1,4 +1,4 @@
-#include "extensions/filters/network/common/redis/fault_impl.h"
+#include "source/extensions/filters/network/common/redis/fault_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,14 +18,12 @@ FaultManagerImpl::FaultImpl::FaultImpl(
   delay_ms_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(base_fault, delay, 0));
 
   switch (base_fault.fault_type()) {
+    PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::RedisFault::DELAY:
     fault_type_ = FaultType::Delay;
     break;
   case envoy::extensions::filters::network::redis_proxy::v3::RedisProxy::RedisFault::ERROR:
     fault_type_ = FaultType::Error;
-    break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
     break;
   }
 

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+         xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>io.envoyproxy.envoymobile</groupId>
+    <artifactId>{pom_artifact_id}</artifactId>
+    <version>{pom_version}</version>
+    <packaging>aar</packaging>
+    <dependencies>
+        {generated_bzl_deps}
+        {pom_extra_dependencies}
+    </dependencies>
+
+    <name>Envoy Mobile</name>
+    <description>Client networking libraries based on the Envoy project.</description>
+    <url>https://envoymobile.io</url>
+
+    <licenses>
+        <license>
+            <name>The Apache Software License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+    <developers>
+        <developer>
+            <id>alyssawilk</id>
+            <name>Alyssa Wilk</name>
+            <email>alyssar@google.com</email>
+        </developer>
+        <developer>
+            <id>ryantheoptimist</id>
+            <name>Ryan Hamilton</name>
+            <email>rch@google.com</email>
+        </developer>
+        <developer>
+            <id>abeyad</id>
+            <name>Ali Beyad</name>
+            <email>abeyad@google.com</email>
+        </developer>
+    </developers>
+    <scm>
+        <url>https://github.com/envoyproxy/envoy</url>
+        <connection>scm:git:git@github.com:envoyproxy/envoy.git</connection>
+        <developerConnection>scm:git:git@github.com:envoyproxy/envoy.git</developerConnection>
+        <tag>HEAD</tag>
+    </scm>
+
+</project>

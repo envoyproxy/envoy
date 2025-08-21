@@ -1,4 +1,4 @@
-#include "extensions/stat_sinks/wasm/config.h"
+#include "source/extensions/stat_sinks/wasm/config.h"
 
 #include <memory>
 
@@ -6,59 +6,36 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/factory_context.h"
 
-#include "extensions/common/wasm/wasm.h"
-#include "extensions/stat_sinks/wasm/wasm_stat_sink_impl.h"
-#include "extensions/stat_sinks/well_known_names.h"
+#include "source/extensions/common/wasm/wasm.h"
+#include "source/extensions/stat_sinks/wasm/wasm_stat_sink_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace Wasm {
 
-Stats::SinkPtr
+absl::StatusOr<Stats::SinkPtr>
 WasmSinkFactory::createStatsSink(const Protobuf::Message& proto_config,
                                  Server::Configuration::ServerFactoryContext& context) {
   const auto& config =
       MessageUtil::downcastAndValidate<const envoy::extensions::stat_sinks::wasm::v3::Wasm&>(
           proto_config, context.messageValidationContext().staticValidationVisitor());
 
-  auto plugin = std::make_shared<Common::Wasm::Plugin>(
-      config.config().name(), config.config().root_id(), config.config().vm_config().vm_id(),
-      config.config().vm_config().runtime(),
-      Common::Wasm::anyToBytes(config.config().configuration()), config.config().fail_open(),
-      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, context.localInfo(), nullptr);
+  auto plugin_config = std::make_unique<Common::Wasm::PluginConfig>(
+      config.config(), context, context.scope(), context.initManager(),
+      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, nullptr, true);
 
-  auto wasm_sink = std::make_unique<WasmStatSink>(plugin, nullptr);
+  context.api().customStatNamespaces().registerStatNamespace(
+      Extensions::Common::Wasm::CustomStatNamespace);
 
-  auto callback = [&wasm_sink, &context, plugin](Common::Wasm::WasmHandleSharedPtr base_wasm) {
-    if (!base_wasm) {
-      if (plugin->fail_open_) {
-        ENVOY_LOG(error, "Unable to create Wasm Stat Sink {}", plugin->name_);
-      } else {
-        ENVOY_LOG(critical, "Unable to create Wasm Stat Sink {}", plugin->name_);
-      }
-      return;
-    }
-    wasm_sink->setSingleton(
-        Common::Wasm::getOrCreateThreadLocalPlugin(base_wasm, plugin, context.dispatcher()));
-  };
-
-  if (!Common::Wasm::createWasm(
-          config.config().vm_config(), plugin, context.scope().createScope(""),
-          context.clusterManager(), context.initManager(), context.dispatcher(), context.api(),
-          context.lifecycleNotifier(), remote_data_provider_, std::move(callback))) {
-    throw Common::Wasm::WasmException(
-        fmt::format("Unable to create Wasm Stat Sink {}", plugin->name_));
-  }
-
-  return wasm_sink;
+  return std::make_unique<WasmStatSink>(std::move(plugin_config));
 }
 
 ProtobufTypes::MessagePtr WasmSinkFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::extensions::stat_sinks::wasm::v3::Wasm>();
 }
 
-std::string WasmSinkFactory::name() const { return StatsSinkNames::get().Wasm; }
+std::string WasmSinkFactory::name() const { return WasmName; }
 
 /**
  * Static registration for the wasm access log. @see RegisterFactory.

@@ -12,12 +12,13 @@ envoy_cc_library(
     name = "dns_cache_interface",
     hdrs = ["dns_cache.h"],
     deps = [
-        "//include/envoy/common:backoff_strategy_interface",
-        "//include/envoy/common:random_generator_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//include/envoy/singleton:manager_interface",
-        "//include/envoy/thread_local:thread_local_interface",
-        "//include/envoy/upstream:resource_manager_interface",
+        "//envoy/common:backoff_strategy_interface",
+        "//envoy/common:random_generator_interface",
+        "//envoy/event:dispatcher_interface",
+        "//envoy/singleton:manager_interface",
+        "//envoy/thread_local:thread_local_interface",
+        "//envoy/upstream:resource_manager_interface",
+        "//source/common/http:header_utility_lib",
         "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )
@@ -40,12 +41,15 @@ envoy_cc_library(
     deps = [
         ":dns_cache_interface",
         ":dns_cache_resource_manager",
-        "//include/envoy/network:dns_interface",
-        "//include/envoy/thread_local:thread_local_interface",
+        "//envoy/network:dns_interface",
+        "//envoy/thread_local:thread_local_interface",
         "//source/common/common:cleanup_lib",
+        "//source/common/common:dns_utils_lib",
+        "//source/common/common:key_value_store_lib",
         "//source/common/config:utility_lib",
         "//source/common/network:utility_lib",
-        "//source/common/upstream:upstream_lib",
+        "//source/common/network/dns_resolver:dns_factory_util_lib",
+        "//source/server:generic_factory_context_lib",
         "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )
@@ -56,12 +60,23 @@ envoy_cc_library(
     hdrs = ["dns_cache_resource_manager.h"],
     deps = [
         ":dns_cache_interface",
-        "//include/envoy/common:resource_interface",
-        "//include/envoy/stats:stats_interface",
+        "//envoy/common:resource_interface",
+        "//envoy/stats:stats_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:basic_resource_lib",
         "//source/common/runtime:runtime_lib",
         "//source/common/upstream:resource_manager_lib",
         "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "cluster_store",
+    srcs = ["cluster_store.cc"],
+    hdrs = ["cluster_store.h"],
+    deps = [
+        "//envoy/server:factory_context_interface",
+        "//envoy/upstream:upstream_interface",
+        "@com_google_absl//absl/container:flat_hash_set",
     ],
 )

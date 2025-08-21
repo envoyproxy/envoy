@@ -1,0 +1,8 @@
+frames {
+  qframe {
+    crypto {
+      offset: 0,
+      data: "\000"
+    }
+  }
+}

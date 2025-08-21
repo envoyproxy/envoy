@@ -14,24 +14,27 @@ envoy_package()
 envoy_extension_cc_test(
     name = "fixed_heap_monitor_test",
     srcs = ["fixed_heap_monitor_test.cc"],
-    extension_name = "envoy.resource_monitors.fixed_heap",
-    external_deps = ["abseil_optional"],
+    extension_names = ["envoy.resource_monitors.fixed_heap"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/resource_monitors/fixed_heap:fixed_heap_monitor",
-        "@envoy_api//envoy/config/resource_monitor/fixed_heap/v2alpha:pkg_cc_proto",
+        "@com_google_absl//absl/types:optional",
+        "@envoy_api//envoy/extensions/resource_monitors/fixed_heap/v3:pkg_cc_proto",
     ],
 )
 
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.resource_monitors.fixed_heap",
+    extension_names = ["envoy.resource_monitors.fixed_heap"],
+    rbe_pool = "6gig",
     deps = [
-        "//include/envoy/registry",
+        "//envoy/registry",
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/resource_monitors/fixed_heap:config",
         "//source/server:resource_monitor_config_lib",
         "//test/mocks/event:event_mocks",
-        "@envoy_api//envoy/config/resource_monitor/fixed_heap/v2alpha:pkg_cc_proto",
+        "//test/mocks/server:options_mocks",
+        "@envoy_api//envoy/extensions/resource_monitors/fixed_heap/v3:pkg_cc_proto",
     ],
 )

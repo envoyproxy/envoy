@@ -5,7 +5,15 @@
 #include "envoy/config/trace/v3/datadog.pb.h"
 #include "envoy/config/trace/v3/datadog.pb.validate.h"
 
-#include "extensions/tracers/common/factory_base.h"
+#include "source/extensions/tracers/common/factory_base.h"
+
+namespace datadog {
+namespace tracing {
+
+struct TracerConfig;
+
+} // namespace tracing
+} // namespace datadog
 
 namespace Envoy {
 namespace Extensions {
@@ -19,11 +27,17 @@ class DatadogTracerFactory : public Common::FactoryBase<envoy::config::trace::v3
 public:
   DatadogTracerFactory();
 
+  static datadog::tracing::TracerConfig
+  makeConfig(const envoy::config::trace::v3::DatadogConfig& proto_config);
+  static std::string
+  makeCollectorReferenceHost(const envoy::config::trace::v3::DatadogConfig& proto_config);
+
 private:
-  // FactoryBase
-  Tracing::HttpTracerSharedPtr
-  createHttpTracerTyped(const envoy::config::trace::v3::DatadogConfig& proto_config,
-                        Server::Configuration::TracerFactoryContext& context) override;
+  // Common::FactoryBase
+
+  Tracing::DriverSharedPtr
+  createTracerDriverTyped(const envoy::config::trace::v3::DatadogConfig& proto_config,
+                          Server::Configuration::TracerFactoryContext& context) override;
 };
 
 } // namespace Datadog

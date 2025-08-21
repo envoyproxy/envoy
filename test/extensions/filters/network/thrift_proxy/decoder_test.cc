@@ -1,7 +1,6 @@
-#include "common/buffer/buffer_impl.h"
-
-#include "extensions/filters/network/thrift_proxy/app_exception_impl.h"
-#include "extensions/filters/network/thrift_proxy/decoder.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/app_exception_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/decoder.h"
 
 #include "test/extensions/filters/network/thrift_proxy/mocks.h"
 #include "test/extensions/filters/network/thrift_proxy/utility.h"
@@ -81,7 +80,7 @@ ExpectationSet expectValue(MockProtocol& proto, MockDecoderEventHandler& handler
     }
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
   return s;
 }
@@ -140,7 +139,7 @@ ExpectationSet expectContainerStart(MockProtocol& proto, MockDecoderEventHandler
              }));
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
   return s;
 }
@@ -170,7 +169,7 @@ ExpectationSet expectContainerEnd(MockProtocol& proto, MockDecoderEventHandler& 
     s += EXPECT_CALL(handler, setEnd()).WillOnce(Return(FilterStatus::Continue));
     break;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("reached unexpected code");
   }
   return s;
 }

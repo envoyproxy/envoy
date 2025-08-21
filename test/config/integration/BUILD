@@ -9,6 +9,7 @@ envoy_package()
 
 exports_files([
     "server.yaml",
+    "server_multiple_addresses.yaml",
     "server_unix_listener.yaml",
 ])
 
@@ -16,7 +17,7 @@ filegroup(
     name = "server_xds_files",
     srcs = [
         "server_xds.bootstrap.udpa.yaml",
-        "server_xds.bootstrap.yaml",
+        "server_xds.bootstrap.yml",
         "server_xds.cds.with_unknown_field.yaml",
         "server_xds.cds.yaml",
         "server_xds.eds.ads_cluster.yaml",
@@ -35,7 +36,9 @@ filegroup(
 filegroup(
     name = "server_config_files",
     srcs = [
+        "empty.yaml",
         "server.yaml",
+        "server_multiple_addresses.yaml",
         "server_unix_listener.yaml",
     ],
 )

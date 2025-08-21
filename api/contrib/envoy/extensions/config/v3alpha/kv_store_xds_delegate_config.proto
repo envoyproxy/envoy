@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package envoy.extensions.config.v3alpha;
+
+import "envoy/config/common/key_value/v3/config.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.config.v3alpha";
+option java_outer_classname = "KvStoreXdsDelegateConfigProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/config/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#extension: envoy.xds_delegates.kv_store]
+//
+// Configuration for a KeyValueStore-based XdsResourcesDelegate implementation. This implementation
+// updates the underlying KV store with xDS resources received from the configured management
+// servers, enabling configuration to be persisted locally and used on startup in case connectivity
+// with the xDS management servers could not be established.
+//
+// The KV Store based delegate's handling of wildcard resources (empty resource list or "*") is
+// designed for use with O(100) resources or fewer, so it's not currently advised to use this
+// feature for large configurations with heavy use of wildcard resources.
+message KeyValueStoreXdsDelegateConfig {
+  // Configuration for the KeyValueStore that holds the xDS resources.
+  // [#allow-fully-qualified-name:]
+  .envoy.config.common.key_value.v3.KeyValueStoreConfig key_value_store_config = 1;
+}

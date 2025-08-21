@@ -6,14 +6,30 @@
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/network/connection.h"
 
-#include "common/http/http2/codec_stats.h"
-#include "common/http/status.h"
+#include "source/common/http/http2/codec_stats.h"
+#include "source/common/http/status.h"
 
+#ifdef ENVOY_NGHTTP2
 #include "nghttp2/nghttp2.h"
+#endif
 
 namespace Envoy {
 namespace Http {
 namespace Http2 {
+
+// Frame types as inherited from nghttp2 and preserved for oghttp2
+enum FrameType {
+  OGHTTP2_DATA_FRAME_TYPE,
+  OGHTTP2_HEADERS_FRAME_TYPE,
+  OGHTTP2_PRIORITY_FRAME_TYPE,
+  OGHTTP2_RST_STREAM_FRAME_TYPE,
+  OGHTTP2_SETTINGS_FRAME_TYPE,
+  OGHTTP2_PUSH_PROMISE_FRAME_TYPE,
+  OGHTTP2_PING_FRAME_TYPE,
+  OGHTTP2_GOAWAY_FRAME_TYPE,
+  OGHTTP2_WINDOW_UPDATE_FRAME_TYPE,
+  OGHTTP2_CONTINUATION_FRAME_TYPE,
+};
 
 //  Class for detecting abusive peers and validating additional constraints imposed by Envoy.
 //  This class does not check protocol compliance with the H/2 standard, as this is checked by
@@ -22,7 +38,7 @@ namespace Http2 {
 //  2. detection of outbound DATA or HEADER frame floods.
 //  4. zero length, PRIORITY and WINDOW_UPDATE floods.
 
-class ProtocolConstraints {
+class ProtocolConstraints : public ScopeTrackedObject {
 public:
   using ReleasorProc = std::function<void()>;
 
@@ -47,11 +63,15 @@ public:
 
   // Track received frames of various types.
   // Return an error status if inbound frame constraints were violated.
-  Status trackInboundFrames(const nghttp2_frame_hd* hd, uint32_t padding_length);
+  Status trackInboundFrame(uint8_t type, bool end_stream, bool is_empty);
   // Increment the number of DATA frames sent to the peer.
   void incrementOutboundDataFrameCount() { ++outbound_data_frames_; }
+  void incrementOpenedStreamCount() { ++opened_streams_; }
 
   Status checkOutboundFrameLimits();
+
+  // ScopeTrackedObject
+  void dumpState(std::ostream& os, int indent_level) const override;
 
 private:
   void releaseOutboundFrame();
@@ -87,8 +107,12 @@ private:
   // a payload. Initialized from corresponding http2_protocol_options. Default value is 1.
   const uint32_t max_consecutive_inbound_frames_with_empty_payload_;
 
-  // This counter keeps track of the number of inbound streams.
-  uint32_t inbound_streams_ = 0;
+  // This counter keeps track of the number of opened streams.
+  // For downstream connection this is incremented when the first HEADERS frame with the new
+  // stream ID is received from the client.
+  // For upstream connections this is incremented when the first HEADERS frame with the new
+  // stream ID is sent to the upstream server.
+  uint32_t opened_streams_ = 0;
   // This counter keeps track of the number of inbound PRIORITY frames. If this counter exceeds
   // the value calculated using this formula:
   //

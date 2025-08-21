@@ -3,8 +3,8 @@
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.validate.h"
 
-#include "extensions/filters/network/common/factory_base.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/common/factory_base.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {

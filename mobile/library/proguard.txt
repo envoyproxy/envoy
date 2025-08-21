@@ -1,0 +1,68 @@
+-dontwarn android.support.**
+-dontwarn kotlin.**
+-dontwarn org.jetbrains.annotations.NotNull
+-dontwarn org.jetbrains.annotations.Nullable
+
+-dontnote android.support.**
+-dontnote kotlin.**
+-dontnote com.google.devtools.build.android.**
+
+-keepclasseswithmembernames,includedescriptorclasses class * {
+    native <methods>;
+}
+
+-keep, includedescriptorclasses class io.envoyproxy.envoymobile.utilities.AndroidNetworkLibrary {
+   <methods>;
+}
+
+-keep, includedescriptorclasses class io.envoyproxy.envoymobile.utilities.AndroidCertVerifyResult {
+   <methods>;
+}
+
+-keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.types.EnvoyEventTracker {
+   <methods>;
+}
+
+-keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning {
+   <methods>;
+}
+
+-keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.EnvoyHTTPFilterCallbacksImpl {
+   <methods>;
+}
+
+-keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.JvmBridgeUtility {
+   <methods>;
+}
+
+-keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.JvmFilterContext {
+   <methods>;
+}
+
+-keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.JvmFilterFactoryContext {
+   <methods>;
+}
+
+-keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.JvmKeyValueStoreContext {
+   <methods>;
+}
+
+-keep, includedescriptorclasses class io.envoyproxy.envoymobile.engine.JvmStringAccessorContext {
+   <methods>;
+}
+
+-keep class io.envoyproxy.envoymobile.engine.types.EnvoyLogger {
+   <methods>;
+}
+
+-keep class io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks {
+   <methods>;
+}
+
+-keep class io.envoyproxy.envoymobile.engine.types.EnvoyStreamIntel {
+   <methods>;
+}
+
+-keep class io.envoyproxy.envoymobile.engine.types.EnvoyFinalStreamIntel {
+   <methods>;
+}

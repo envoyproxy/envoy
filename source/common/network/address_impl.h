@@ -10,11 +10,20 @@
 #include "envoy/network/address.h"
 #include "envoy/network/socket.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/statusor.h"
 
 namespace Envoy {
 namespace Network {
 namespace Address {
+
+/**
+ * Check whether we are a) on Android or an Apple platform and b) configured via runtime to always
+ * use v6 sockets.
+ * This appears to be what Android OS does for all platform sockets.
+ */
+bool forceV6();
 
 /**
  * Convert an address in the form of the socket address struct defined by Posix, Linux, etc. into
@@ -25,8 +34,21 @@ namespace Address {
  * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
  * @return InstanceConstSharedPtr the address.
  */
-InstanceConstSharedPtr addressFromSockAddr(const sockaddr_storage& ss, socklen_t len,
-                                           bool v6only = true);
+StatusOr<InstanceConstSharedPtr> addressFromSockAddr(const sockaddr_storage& ss, socklen_t len,
+                                                     bool v6only = true);
+
+/**
+ * Convert an address in the form of the socket address struct defined by Posix, Linux, etc. into
+ * a Network::Address::Instance and return a pointer to it. Die on failure.
+ * @param ss a valid address with family AF_INET, AF_INET6 or AF_UNIX.
+ * @param len length of the address (e.g. from accept, getsockname or getpeername). If len > 0,
+ *        it is used to validate the structure contents; else if len == 0, it is ignored.
+ * @param fd the file descriptor for the created address instance.
+ * @param v6only disable IPv4-IPv6 mapping for IPv6 addresses?
+ * @return InstanceConstSharedPtr the address.
+ */
+InstanceConstSharedPtr addressFromSockAddrOrDie(const sockaddr_storage& ss, socklen_t ss_len,
+                                                os_fd_t fd, bool v6only = true);
 
 /**
  * Base class for all address types.
@@ -41,16 +63,35 @@ public:
   Type type() const override { return type_; }
 
   const SocketInterface& socketInterface() const override { return socket_interface_; }
+  absl::optional<std::string> networkNamespace() const override { return network_namespace_; }
 
 protected:
-  InstanceBase(Type type, const SocketInterface* sock_interface)
-      : socket_interface_(*sock_interface), type_(type) {}
+  InstanceBase(Type type, const SocketInterface* sock_interface,
+               absl::optional<std::string> network_namespace)
+      : socket_interface_(*sock_interface), network_namespace_(network_namespace), type_(type) {}
 
   std::string friendly_name_;
   const SocketInterface& socket_interface_;
+  absl::optional<std::string> network_namespace_;
 
 private:
   const Type type_;
+};
+
+// Create an address instance. Upon failure, return an error status without throwing.
+class InstanceFactory {
+public:
+  template <typename InstanceType, typename... Args>
+  static StatusOr<InstanceConstSharedPtr> createInstancePtr(Args&&... args) {
+    absl::Status status = absl::OkStatus();
+    // Use new instead of make_shared here because the instance constructors are private and must
+    // be called directly here.
+    std::shared_ptr<InstanceType> instance(new InstanceType(status, std::forward<Args>(args)...));
+    if (!status.ok()) {
+      return status;
+    }
+    return instance;
+  }
 };
 
 /**
@@ -61,26 +102,28 @@ public:
   /**
    * Construct from an existing unix IPv4 socket address (IP v4 address and port).
    */
-  explicit Ipv4Instance(const sockaddr_in* address,
-                        const SocketInterface* sock_interface = nullptr);
+  explicit Ipv4Instance(const sockaddr_in* address, const SocketInterface* sock_interface = nullptr,
+                        absl::optional<std::string> network_namespace = absl::nullopt);
 
   /**
    * Construct from a string IPv4 address such as "1.2.3.4". Port will be unset/0.
    */
-  explicit Ipv4Instance(const std::string& address,
-                        const SocketInterface* sock_interface = nullptr);
+  explicit Ipv4Instance(const std::string& address, const SocketInterface* sock_interface = nullptr,
+                        absl::optional<std::string> network_namespace = absl::nullopt);
 
   /**
    * Construct from a string IPv4 address such as "1.2.3.4" as well as a port.
    */
   Ipv4Instance(const std::string& address, uint32_t port,
-               const SocketInterface* sock_interface = nullptr);
+               const SocketInterface* sock_interface = nullptr,
+               absl::optional<std::string> network_namespace = absl::nullopt);
 
   /**
    * Construct from a port. The IPv4 address will be set to "any" and is suitable for binding
    * a port to any available address.
    */
-  explicit Ipv4Instance(uint32_t port, const SocketInterface* sock_interface = nullptr);
+  explicit Ipv4Instance(uint32_t port, const SocketInterface* sock_interface = nullptr,
+                        absl::optional<std::string> network_namespace = absl::nullopt);
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
@@ -91,6 +134,7 @@ public:
     return reinterpret_cast<const sockaddr*>(&ip_.ipv4_.address_);
   }
   socklen_t sockAddrLen() const override { return sizeof(sockaddr_in); }
+  absl::string_view addressType() const override { return "default"; }
 
   /**
    * Convenience function to convert an IPv4 address to canonical string format.
@@ -100,7 +144,27 @@ public:
    */
   static std::string sockaddrToString(const sockaddr_in& addr);
 
+  // Validate that IPv4 is supported on this platform, raise an exception for the
+  // given address if not.
+  static absl::Status validateProtocolSupported();
+
+  /**
+   * For use in tests only.
+   * Force validateProtocolSupported() to return false for IPv4.
+   */
+  static Envoy::Cleanup forceProtocolUnsupportedForTest(bool new_val);
+
 private:
+  /**
+   * Construct from an existing unix IPv4 socket address (IP v4 address and port).
+   * Store the status code in passed in parameter instead of throwing.
+   * It is called by the factory method and the partially constructed instance will be discarded
+   * upon error.
+   */
+  explicit Ipv4Instance(absl::Status& error, const sockaddr_in* address,
+                        const SocketInterface* sock_interface = nullptr,
+                        absl::optional<std::string> network_namespace = absl::nullopt);
+
   struct Ipv4Helper : public Ipv4 {
     uint32_t address() const override { return address_.sin_addr.s_addr; }
 
@@ -115,6 +179,22 @@ private:
              // inlined IN_MULTICAST() to avoid byte swapping
              !((ipv4_.address_.sin_addr.s_addr & htonl(0xf0000000)) == htonl(0xe0000000));
     }
+    bool isLinkLocalAddress() const override {
+      // Check if the address is in the link-local range: 169.254.0.0/16.
+      return (ipv4_.address_.sin_addr.s_addr & htonl(0xffff0000)) == htonl(0xa9fe0000);
+    }
+    bool isUniqueLocalAddress() const override {
+      // Unique Local Addresses (ULA) are not applicable to IPv4.
+      return false;
+    }
+    bool isSiteLocalAddress() const override {
+      // Site-Local Addresses are not applicable to IPv4.
+      return false;
+    }
+    bool isTeredoAddress() const override {
+      // Teredo addresses are not applicable to IPv4.
+      return false;
+    }
     const Ipv4* ipv4() const override { return &ipv4_; }
     const Ipv6* ipv6() const override { return nullptr; }
     uint32_t port() const override { return ntohs(ipv4_.address_.sin_port); }
@@ -124,7 +204,10 @@ private:
     std::string friendly_address_;
   };
 
+  void initHelper(const sockaddr_in* address);
+
   IpHelper ip_;
+  friend class InstanceFactory;
 };
 
 /**
@@ -136,25 +219,28 @@ public:
    * Construct from an existing unix IPv6 socket address (IP v6 address and port).
    */
   Ipv6Instance(const sockaddr_in6& address, bool v6only = true,
-               const SocketInterface* sock_interface = nullptr);
+               const SocketInterface* sock_interface = nullptr,
+               absl::optional<std::string> network_namespace = absl::nullopt);
 
   /**
    * Construct from a string IPv6 address such as "12:34::5". Port will be unset/0.
    */
-  explicit Ipv6Instance(const std::string& address,
-                        const SocketInterface* sock_interface = nullptr);
+  explicit Ipv6Instance(const std::string& address, const SocketInterface* sock_interface = nullptr,
+                        absl::optional<std::string> network_namespace = absl::nullopt);
 
   /**
    * Construct from a string IPv6 address such as "12:34::5" as well as a port.
    */
   Ipv6Instance(const std::string& address, uint32_t port,
-               const SocketInterface* sock_interface = nullptr);
+               const SocketInterface* sock_interface = nullptr, bool v6only = true,
+               absl::optional<std::string> network_namespace = absl::nullopt);
 
   /**
    * Construct from a port. The IPv6 address will be set to "any" and is suitable for binding
    * a port to any available address.
    */
-  explicit Ipv6Instance(uint32_t port, const SocketInterface* sock_interface = nullptr);
+  explicit Ipv6Instance(uint32_t port, const SocketInterface* sock_interface = nullptr,
+                        absl::optional<std::string> network_namespace = absl::nullopt);
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
@@ -165,15 +251,46 @@ public:
     return reinterpret_cast<const sockaddr*>(&ip_.ipv6_.address_);
   }
   socklen_t sockAddrLen() const override { return sizeof(sockaddr_in6); }
+  absl::string_view addressType() const override { return "default"; }
+
+  /**
+   * Convenience function to convert an IPv6 address to canonical string format.
+   * @param addr address to format.
+   * @return the address in dotted-decimal string format.
+   */
+  static std::string sockaddrToString(const sockaddr_in6& addr);
+
+  // Validate that IPv6 is supported on this platform
+  static absl::Status validateProtocolSupported();
+
+  /**
+   * For use in tests only.
+   * Force validateProtocolSupported() to return false for IPv6.
+   */
+  static Envoy::Cleanup forceProtocolUnsupportedForTest(bool new_val);
 
 private:
+  /**
+   * Construct from an existing unix IPv6 socket address (IP v6 address and port).
+   * Store the status code in passed in parameter instead of throwing.
+   * It is called by the factory method and the partially constructed instance will be discarded
+   * upon error.
+   */
+  Ipv6Instance(absl::Status& error, const sockaddr_in6& address, bool v6only = true,
+               const SocketInterface* sock_interface = nullptr,
+               absl::optional<std::string> network_namespace = absl::nullopt);
+
   struct Ipv6Helper : public Ipv6 {
     Ipv6Helper() { memset(&address_, 0, sizeof(address_)); }
     absl::uint128 address() const override;
     bool v6only() const override;
+    uint32_t scopeId() const override;
     uint32_t port() const;
+    InstanceConstSharedPtr v4CompatibleAddress() const override;
+    InstanceConstSharedPtr addressWithoutScopeId() const override;
 
     std::string makeFriendlyAddress() const;
+    static std::string makeFriendlyAddress(const sockaddr_in6& address);
 
     sockaddr_in6 address_;
     // Is IPv4 compatibility (https://tools.ietf.org/html/rfc3493#page-11) disabled?
@@ -190,6 +307,29 @@ private:
     bool isUnicastAddress() const override {
       return !isAnyAddress() && !IN6_IS_ADDR_MULTICAST(&ipv6_.address_.sin6_addr);
     }
+    bool isLinkLocalAddress() const override {
+      // Check if the address is in the link-local range: fe80::/10 or in the v4 mapped link-local
+      // range: [::ffff:169.254.0.0].
+      return IN6_IS_ADDR_LINKLOCAL(&ipv6_.address_.sin6_addr) ||
+             (IN6_IS_ADDR_V4MAPPED(&ipv6_.address_.sin6_addr) &&
+              (ipv6_.address_.sin6_addr.s6_addr[12] == 0xa9 &&
+               ipv6_.address_.sin6_addr.s6_addr[13] == 0xfe));
+    }
+    bool isUniqueLocalAddress() const override {
+      // Unique Local Addresses (ULA) are in the range fc00::/7.
+      return (ipv6_.address_.sin6_addr.s6_addr[0] & 0xfe) == 0xfc;
+    }
+    bool isSiteLocalAddress() const override {
+      // Site-Local Addresses are in the range fec0::/10.
+      return IN6_IS_ADDR_SITELOCAL(&ipv6_.address_.sin6_addr);
+    }
+    bool isTeredoAddress() const override {
+      // Teredo addresses have the prefix 2001:0000::/32.
+      return ipv6_.address_.sin6_addr.s6_addr[0] == 0x20 &&
+             ipv6_.address_.sin6_addr.s6_addr[1] == 0x01 &&
+             ipv6_.address_.sin6_addr.s6_addr[2] == 0x00 &&
+             ipv6_.address_.sin6_addr.s6_addr[3] == 0x00;
+    }
     const Ipv4* ipv4() const override { return nullptr; }
     const Ipv6* ipv6() const override { return &ipv6_; }
     uint32_t port() const override { return ipv6_.port(); }
@@ -199,7 +339,10 @@ private:
     std::string friendly_address_;
   };
 
+  void initHelper(const sockaddr_in6& address, bool v6only);
+
   IpHelper ip_;
+  friend class InstanceFactory;
 };
 
 /**
@@ -210,14 +353,18 @@ public:
   /**
    * Construct from an existing unix address.
    */
-  explicit PipeInstance(const sockaddr_un* address, socklen_t ss_len, mode_t mode = 0,
-                        const SocketInterface* sock_interface = nullptr);
+  static absl::StatusOr<std::unique_ptr<PipeInstance>>
+  create(const sockaddr_un* address, socklen_t ss_len, mode_t mode = 0,
+         const SocketInterface* sock_interface = nullptr);
 
   /**
    * Construct from a string pipe path.
    */
-  explicit PipeInstance(const std::string& pipe_path, mode_t mode = 0,
-                        const SocketInterface* sock_interface = nullptr);
+  static absl::StatusOr<std::unique_ptr<PipeInstance>>
+  create(const std::string& pipe_path, mode_t mode = 0,
+         const SocketInterface* sock_interface = nullptr);
+
+  static absl::Status validateProtocolSupported() { return absl::OkStatus(); }
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
@@ -227,14 +374,27 @@ public:
   const sockaddr* sockAddr() const override {
     return reinterpret_cast<const sockaddr*>(&pipe_.address_);
   }
+  const sockaddr_un& getSockAddr() const { return pipe_.address_; }
   socklen_t sockAddrLen() const override {
     if (pipe_.abstract_namespace_) {
       return offsetof(struct sockaddr_un, sun_path) + pipe_.address_length_;
     }
     return sizeof(pipe_.address_);
   }
+  absl::string_view addressType() const override { return "default"; }
 
 private:
+  explicit PipeInstance(const std::string& pipe_path, mode_t mode,
+                        const SocketInterface* sock_interface, absl::Status& creation_status);
+  /**
+   * Construct from an existing unix address.
+   * Store the error status code in passed in parameter instead of throwing.
+   * It is called by the factory method and the partially constructed instance will be discarded
+   * upon error.
+   */
+  PipeInstance(absl::Status& error, const sockaddr_un* address, socklen_t ss_len, mode_t mode = 0,
+               const SocketInterface* sock_interface = nullptr);
+
   struct PipeHelper : public Pipe {
 
     bool abstractNamespace() const override { return abstract_namespace_; }
@@ -247,7 +407,10 @@ private:
     mode_t mode_{0};
   };
 
+  absl::Status initHelper(const sockaddr_un* address, mode_t mode);
+
   PipeHelper pipe_;
+  friend class InstanceFactory;
 };
 
 class EnvoyInternalInstance : public InstanceBase {
@@ -255,7 +418,7 @@ public:
   /**
    * Construct from a string name.
    */
-  explicit EnvoyInternalInstance(const std::string& address_id,
+  explicit EnvoyInternalInstance(const std::string& address_id, const std::string& endpoint_id = "",
                                  const SocketInterface* sock_interface = nullptr);
 
   // Network::Address::Instance
@@ -266,13 +429,17 @@ public:
   // TODO(lambdai): Verify all callers accepts nullptr.
   const sockaddr* sockAddr() const override { return nullptr; }
   socklen_t sockAddrLen() const override { return 0; }
+  absl::string_view addressType() const override { return "envoy_internal"; }
 
 private:
   struct EnvoyInternalAddressImpl : public EnvoyInternalAddress {
-    explicit EnvoyInternalAddressImpl(const std::string& address_id) : address_id_(address_id) {}
+    explicit EnvoyInternalAddressImpl(const std::string& address_id, const std::string& endpoint_id)
+        : address_id_(address_id), endpoint_id_(endpoint_id) {}
     ~EnvoyInternalAddressImpl() override = default;
     const std::string& addressId() const override { return address_id_; }
+    const std::string& endpointId() const override { return endpoint_id_; }
     const std::string address_id_;
+    const std::string endpoint_id_;
   };
   EnvoyInternalAddressImpl internal_address_;
 };

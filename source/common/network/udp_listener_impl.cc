@@ -1,4 +1,4 @@
-#include "common/network/udp_listener_impl.h"
+#include "source/common/network/udp_listener_impl.h"
 
 #include <cerrno>
 #include <csetjmp>
@@ -9,14 +9,16 @@
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/exception.h"
+#include "envoy/network/parent_drained_callback_registrar.h"
 
-#include "common/api/os_sys_calls_impl.h"
-#include "common/common/assert.h"
-#include "common/common/empty_string.h"
-#include "common/common/fmt.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/network/address_impl.h"
-#include "common/network/io_socket_error_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/common/fmt.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/io_socket_error_impl.h"
 
 #include "absl/container/fixed_array.h"
 #include "event2/listener.h"
@@ -28,17 +30,43 @@
 namespace Envoy {
 namespace Network {
 
-UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
-                                 UdpListenerCallbacks& cb, TimeSource& time_source)
-    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), time_source_(time_source) {
+UdpListenerImpl::UdpListenerImpl(Event::Dispatcher& dispatcher, SocketSharedPtr socket,
+                                 UdpListenerCallbacks& cb, TimeSource& time_source,
+                                 const envoy::config::core::v3::UdpSocketConfig& config)
+    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), time_source_(time_source),
+      // Default prefer_gro to false for downstream server traffic.
+      config_(config, false) {
+  parent_drained_callback_registrar_ = socket_->parentDrainedCallbackRegistrar();
   socket_->ioHandle().initializeFileEvent(
-      dispatcher, [this](uint32_t events) -> void { onSocketEvent(events); },
-      Event::PlatformDefaultTriggerType, Event::FileReadyType::Read | Event::FileReadyType::Write);
+      dispatcher,
+      [this](uint32_t events) {
+        onSocketEvent(events);
+        return absl::OkStatus();
+      },
+      Event::PlatformDefaultTriggerType, paused() ? 0 : events_when_unpaused_);
+  if (paused()) {
+    parent_drained_callback_registrar_->registerParentDrainedCallback(
+        socket_->connectionInfoProvider().localAddress(),
+        [this, &dispatcher, alive = std::weak_ptr<void>(destruction_checker_)]() {
+          dispatcher.post([this, alive = std::move(alive)]() {
+            auto still_alive = alive.lock();
+            if (still_alive != nullptr) {
+              unpause();
+            }
+          });
+        });
+  }
+}
 
-  if (!Network::Socket::applyOptions(socket_->options(), *socket_,
-                                     envoy::config::core::v3::SocketOption::STATE_BOUND)) {
-    throw CreateListenerException(fmt::format("cannot set post-bound socket option on socket: {}",
-                                              socket_->localAddress()->asString()));
+void UdpListenerImpl::unpause() {
+  // Remove the paused state so enable will actually start listening to events.
+  parent_drained_callback_registrar_ = absl::nullopt;
+  if (events_when_unpaused_ != 0) {
+    // Start listening to events.
+    enable();
+    // There may have already been events while this instance was ignoring them,
+    // so try reading immediately.
+    activateRead();
   }
 }
 
@@ -47,10 +75,18 @@ UdpListenerImpl::~UdpListenerImpl() { socket_->ioHandle().resetFileEvents(); }
 void UdpListenerImpl::disable() { disableEvent(); }
 
 void UdpListenerImpl::enable() {
-  socket_->ioHandle().enableFileEvents(Event::FileReadyType::Read | Event::FileReadyType::Write);
+  events_when_unpaused_ = Event::FileReadyType::Read | Event::FileReadyType::Write;
+  if (!paused()) {
+    socket_->ioHandle().enableFileEvents(events_when_unpaused_);
+  }
 }
 
-void UdpListenerImpl::disableEvent() { socket_->ioHandle().enableFileEvents(0); }
+void UdpListenerImpl::disableEvent() {
+  events_when_unpaused_ = 0;
+  if (!paused()) {
+    socket_->ioHandle().enableFileEvents(0);
+  }
+}
 
 void UdpListenerImpl::onSocketEvent(short flags) {
   ASSERT((flags & (Event::FileReadyType::Read | Event::FileReadyType::Write)));
@@ -69,8 +105,14 @@ void UdpListenerImpl::handleReadCallback() {
   ENVOY_UDP_LOG(trace, "handleReadCallback");
   cb_.onReadReady();
   const Api::IoErrorPtr result = Utility::readPacketsFromSocket(
-      socket_->ioHandle(), *socket_->localAddress(), *this, time_source_, packets_dropped_);
-  // TODO(mattklein123): Handle no error when we limit the number of packets read.
+      socket_->ioHandle(), *socket_->connectionInfoProvider().localAddress(), *this, time_source_,
+      config_.prefer_gro_, /*allow_mmsg=*/true, packets_dropped_);
+  if (result == nullptr) {
+    // No error. The number of reads was limited by read rate. There are more packets to read.
+    // Register to read more in the next event loop.
+    socket_->ioHandle().activateFileEvents(Event::FileReadyType::Read);
+    return;
+  }
   if (result->getErrorCode() != Api::IoError::IoErrorCode::Again) {
     // TODO(mattklein123): When rate limited logging is implemented log this at error level
     // on a periodic basis.
@@ -82,12 +124,16 @@ void UdpListenerImpl::handleReadCallback() {
 
 void UdpListenerImpl::processPacket(Address::InstanceConstSharedPtr local_address,
                                     Address::InstanceConstSharedPtr peer_address,
-                                    Buffer::InstancePtr buffer, MonotonicTime receive_time) {
+                                    Buffer::InstancePtr buffer, MonotonicTime receive_time,
+                                    uint8_t tos, Buffer::OwnedImpl saved_cmsg) {
   // UDP listeners are always configured with the socket option that allows pulling the local
   // address. This should never be null.
   ASSERT(local_address != nullptr);
-  UdpRecvData recvData{
-      {std::move(local_address), std::move(peer_address)}, std::move(buffer), receive_time};
+  UdpRecvData recvData{{std::move(local_address), std::move(peer_address)},
+                       std::move(buffer),
+                       receive_time,
+                       tos,
+                       std::move(saved_cmsg)};
   cb_.onData(std::move(recvData));
 }
 
@@ -99,7 +145,7 @@ void UdpListenerImpl::handleWriteCallback() {
 Event::Dispatcher& UdpListenerImpl::dispatcher() { return dispatcher_; }
 
 const Address::InstanceConstSharedPtr& UdpListenerImpl::localAddress() const {
-  return socket_->localAddress();
+  return socket_->connectionInfoProvider().localAddress();
 }
 
 Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
@@ -109,9 +155,9 @@ Api::IoCallUint64Result UdpListenerImpl::send(const UdpSendData& send_data) {
   Api::IoCallUint64Result send_result =
       cb_.udpPacketWriter().writePacket(buffer, send_data.local_ip_, send_data.peer_address_);
 
-  // The send_result normalizes the rc_ value to 0 in error conditions.
+  // The send_result normalizes the return_value_ value to 0 in error conditions.
   // The drain call is hence 'safe' in success and failure cases.
-  buffer.drain(send_result.rc_);
+  buffer.drain(send_result.return_value_);
   return send_result;
 }
 

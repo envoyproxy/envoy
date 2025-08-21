@@ -23,7 +23,7 @@ namespace Envoy {
 class XdsFuzzTest : public HttpIntegrationTest {
 public:
   XdsFuzzTest(const test::server::config_validation::XdsTestCase& input,
-              envoy::config::core::v3::ApiVersion api_version);
+              bool use_unified_mux = false);
 
   envoy::config::cluster::v3::Cluster buildCluster(const std::string& name);
 
@@ -76,8 +76,7 @@ private:
   std::vector<envoy::config::route::v3::RouteConfiguration> routes_;
   std::vector<envoy::config::listener::v3::Listener> listeners_;
 
-  uint64_t version_;
-  envoy::config::core::v3::ApiVersion api_version_;
+  uint64_t version_{1};
 
   Network::Address::IpVersion ip_version_;
 

@@ -2,6 +2,7 @@
 
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/http/header_map.h"
+#include "envoy/server/factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -34,7 +35,8 @@ public:
    * @return the matcher instance.
    */
   static MatcherConstPtr
-  create(const envoy::extensions::filters::http::jwt_authn::v3::RequirementRule& rule);
+  create(const envoy::extensions::filters::http::jwt_authn::v3::RequirementRule& rule,
+         Server::Configuration::CommonFactoryContext& context);
 };
 
 } // namespace JwtAuthn

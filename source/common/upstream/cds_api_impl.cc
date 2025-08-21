@@ -1,43 +1,51 @@
-#include "common/upstream/cds_api_impl.h"
+#include "source/common/upstream/cds_api_impl.h"
 
-#include <string>
+#include "source/common/common/assert.h"
+#include "source/common/grpc/common.h"
 
-#include "envoy/api/v2/cluster.pb.h"
-#include "envoy/config/core/v3/config_source.pb.h"
-#include "envoy/service/discovery/v3/discovery.pb.h"
-#include "envoy/stats/scope.h"
-
-#include "common/common/assert.h"
-#include "common/common/cleanup.h"
-#include "common/common/utility.h"
-#include "common/config/api_version.h"
-#include "common/config/utility.h"
-#include "common/protobuf/utility.h"
-
-#include "absl/container/node_hash_set.h"
 #include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Upstream {
 
-CdsApiPtr CdsApiImpl::create(const envoy::config::core::v3::ConfigSource& cds_config,
-                             ClusterManager& cm, Stats::Scope& scope,
-                             ProtobufMessage::ValidationVisitor& validation_visitor) {
-  return CdsApiPtr{new CdsApiImpl(cds_config, cm, scope, validation_visitor)};
+absl::StatusOr<CdsApiPtr>
+CdsApiImpl::create(const envoy::config::core::v3::ConfigSource& cds_config,
+                   const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm,
+                   Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
+                   Server::Configuration::ServerFactoryContext& factory_context) {
+  absl::Status creation_status = absl::OkStatus();
+  auto ret = CdsApiPtr{new CdsApiImpl(cds_config, cds_resources_locator, cm, scope,
+                                      validation_visitor, factory_context, creation_status)};
+  RETURN_IF_NOT_OK(creation_status);
+  return ret;
 }
 
-CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config, ClusterManager& cm,
-                       Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(
-          cds_config.resource_api_version(), validation_visitor, "name"),
-      cm_(cm), scope_(scope.createScope("cluster_manager.cds.")) {
+CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config,
+                       const xds::core::v3::ResourceLocator* cds_resources_locator,
+                       ClusterManager& cm, Stats::Scope& scope,
+                       ProtobufMessage::ValidationVisitor& validation_visitor,
+                       Server::Configuration::ServerFactoryContext& factory_context,
+                       absl::Status& creation_status)
+    : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(validation_visitor,
+                                                                           "name"),
+      helper_(cm, factory_context.xdsManager(), "cds"), cm_(cm),
+      scope_(scope.createScope("cluster_manager.cds.")), factory_context_(factory_context),
+      stats_({ALL_CDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}) {
   const auto resource_name = getResourceName();
-  subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
-      cds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_);
+  absl::StatusOr<Config::SubscriptionPtr> subscription_or_error;
+  if (cds_resources_locator == nullptr) {
+    subscription_or_error = cm_.subscriptionFactory().subscriptionFromConfigSource(
+        cds_config, Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, {});
+  } else {
+    subscription_or_error = cm.subscriptionFactory().collectionSubscriptionFromUrl(
+        *cds_resources_locator, cds_config, resource_name, *scope_, *this, resource_decoder_);
+  }
+  SET_AND_RETURN_IF_NOT_OK(subscription_or_error.status(), creation_status);
+  subscription_ = std::move(*subscription_or_error);
 }
 
-void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
-                                const std::string& version_info) {
+absl::Status CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                                        const std::string& version_info) {
   auto all_existing_clusters = cm_.clusters();
   // Exclude the clusters which CDS wants to add.
   for (const auto& resource : resources) {
@@ -46,66 +54,35 @@ void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& r
   }
   Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
   for (const auto& [cluster_name, _] : all_existing_clusters.active_clusters_) {
+    UNREFERENCED_PARAMETER(_);
     *to_remove_repeated.Add() = cluster_name;
   }
   for (const auto& [cluster_name, _] : all_existing_clusters.warming_clusters_) {
+    UNREFERENCED_PARAMETER(_);
     // Do not add the cluster twice when the cluster is both active and warming.
-    if (all_existing_clusters.active_clusters_.count(cluster_name) == 0) {
+    if (!all_existing_clusters.active_clusters_.contains(cluster_name)) {
       *to_remove_repeated.Add() = cluster_name;
     }
   }
-  onConfigUpdate(resources, to_remove_repeated, version_info);
+  return onConfigUpdate(resources, to_remove_repeated, version_info);
 }
 
-void CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
-                                const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                                const std::string& system_version_info) {
-  Config::ScopedResume maybe_resume_eds;
-  if (cm_.adsMux()) {
-    const auto type_urls =
-        Config::getAllVersionTypeUrls<envoy::config::endpoint::v3::ClusterLoadAssignment>();
-    maybe_resume_eds = cm_.adsMux()->pause(type_urls);
-  }
-
-  ENVOY_LOG(info, "cds: add {} cluster(s), remove {} cluster(s)", added_resources.size(),
-            removed_resources.size());
-
-  std::vector<std::string> exception_msgs;
-  absl::flat_hash_set<std::string> cluster_names(added_resources.size());
-  bool any_applied = false;
-  for (const auto& resource : added_resources) {
-    envoy::config::cluster::v3::Cluster cluster;
-    try {
-      cluster = dynamic_cast<const envoy::config::cluster::v3::Cluster&>(resource.get().resource());
-      if (!cluster_names.insert(cluster.name()).second) {
-        // NOTE: at this point, the first of these duplicates has already been successfully applied.
-        throw EnvoyException(fmt::format("duplicate cluster {} found", cluster.name()));
-      }
-      if (cm_.addOrUpdateCluster(cluster, resource.get().version())) {
-        any_applied = true;
-        ENVOY_LOG(info, "cds: add/update cluster '{}'", cluster.name());
-      } else {
-        ENVOY_LOG(debug, "cds: add/update cluster '{}' skipped", cluster.name());
-      }
-    } catch (const EnvoyException& e) {
-      exception_msgs.push_back(fmt::format("{}: {}", cluster.name(), e.what()));
-    }
-  }
-  for (const auto& resource_name : removed_resources) {
-    if (cm_.removeCluster(resource_name)) {
-      any_applied = true;
-      ENVOY_LOG(info, "cds: remove cluster '{}'", resource_name);
-    }
-  }
-
-  if (any_applied) {
-    system_version_info_ = system_version_info;
-  }
+absl::Status
+CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                           const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                           const std::string& system_version_info) {
+  auto [added_or_updated, exception_msgs] =
+      helper_.onConfigUpdate(added_resources, removed_resources, system_version_info);
   runInitializeCallbackIfAny();
   if (!exception_msgs.empty()) {
-    throw EnvoyException(
+    return absl::InvalidArgumentError(
         fmt::format("Error adding/updating cluster(s) {}", absl::StrJoin(exception_msgs, ", ")));
   }
+  if (added_or_updated > 0) {
+    stats_.config_reload_.inc();
+    stats_.config_reload_time_ms_.set(DateUtil::nowToMilliseconds(factory_context_.timeSource()));
+  }
+  return absl::OkStatus();
 }
 
 void CdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,

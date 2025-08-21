@@ -1,4 +1,4 @@
-#include "extensions/filters/network/thrift_proxy/thrift_object_impl.h"
+#include "source/extensions/filters/network/thrift_proxy/thrift_object_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -9,20 +9,15 @@ namespace {
 std::unique_ptr<ThriftValueBase> makeValue(ThriftBase* parent, FieldType type) {
   switch (type) {
   case FieldType::Stop:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-
+    PANIC("unexpected");
   case FieldType::List:
     return std::make_unique<ThriftListValueImpl>(parent);
-
   case FieldType::Set:
     return std::make_unique<ThriftSetValueImpl>(parent);
-
   case FieldType::Map:
     return std::make_unique<ThriftMapValueImpl>(parent);
-
   case FieldType::Struct:
     return std::make_unique<ThriftStructValueImpl>(parent);
-
   default:
     return std::make_unique<ThriftValueImpl>(parent, type);
   }
@@ -335,7 +330,7 @@ const void* ThriftValueImpl::getValue() const {
   case FieldType::String:
     return &string_value_;
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("not handled");
   }
 }
 

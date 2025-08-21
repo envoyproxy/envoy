@@ -11,19 +11,15 @@ Build
 
   build/binaries
   build/boringssl
+  build/speed
 
 API
 ---
 .. toctree::
   :maxdepth: 2
 
-  api/transition
-  api/envoy_v2_support
   api/envoy_v3
-  api/envoy_upgrade_v3
   api/extensions
-  api/control_plane_version_support
-  api/control_plane
   api/package_naming
   api/why_versioning
   api/incremental
@@ -40,6 +36,8 @@ Debugging
   debugging/why_is_envoy_404ing_connect_requests
   debugging/why_is_envoy_sending_413s
   debugging/why_is_my_route_not_found
+  debugging/xfp_vs_scheme
+  debugging/how_to_dump_heap_profile_of_envoy
 
 Performance
 -----------
@@ -60,7 +58,7 @@ Configuration
   configuration/level_two
   configuration/sni
   configuration/zone_aware_routing
-  configuration/zipkin_tracing
+  configuration/tracing
   configuration/flow_control
   configuration/timeouts
   configuration/deprecation
@@ -85,3 +83,18 @@ Extensions
   :maxdepth: 2
 
   extensions/contract
+
+Windows
+-------
+
+.. include:: ../_include/windows_support_ended.rst
+
+.. toctree::
+  :maxdepth: 2
+
+  windows/win_requirements
+  windows/win_not_supported_features
+  windows/win_fips_support
+  windows/win_performance
+  windows/win_security
+  windows/win_run_as_service

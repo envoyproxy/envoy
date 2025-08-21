@@ -16,4 +16,5 @@ v3 API reference
   data/data
   service/service
   common_messages/common_messages
+  common_messages/common_messages_xds
   types/types

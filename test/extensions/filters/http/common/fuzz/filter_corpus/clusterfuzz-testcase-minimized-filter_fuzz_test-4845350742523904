@@ -1,0 +1,14 @@
+config {
+  name: "envoy.filters.http.aws_request_signing"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning"
+    value: "\nZtype.googleapis.com/envoy.extensions.filters.http.aws_request_signing.v3.AwsRequestSigning\022\013&&&&&&&&&&&"
+  }
+}
+data {
+  http_body {
+    data: "\000\000\000\023"
+  }
+}
+upstream_data {
+}

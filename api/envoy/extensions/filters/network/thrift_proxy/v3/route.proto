@@ -14,6 +14,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.thrift_proxy.v3";
 option java_outer_classname = "RouteProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/thrift_proxy/v3;thrift_proxyv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Thrift Proxy Route Configuration]
@@ -23,12 +24,31 @@ message RouteConfiguration {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.thrift_proxy.v2alpha1.RouteConfiguration";
 
-  // The name of the route configuration. Reserved for future use in asynchronous route discovery.
+  // The name of the route configuration. This name is used in asynchronous route discovery.
+  // For example, it might match
+  // :ref:`route_config_name
+  // <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.Trds.route_config_name>` in
+  // :ref:`envoy_v3_api_msg_extensions.filters.network.thrift_proxy.v3.Trds`.
   string name = 1;
 
   // The list of routes that will be matched, in order, against incoming requests. The first route
   // that matches will be used.
   repeated Route routes = 2;
+
+  // An optional boolean that specifies whether the clusters that the route
+  // table refers to will be validated by the cluster manager. If set to true
+  // and a route refers to a non-existent cluster, the route table will not
+  // load. If set to false and a route refers to a non-existent cluster, the
+  // route table will load and the router filter will return a INTERNAL_ERROR
+  // if the route is selected at runtime. This setting defaults to true if the route table
+  // is statically defined via the :ref:`route_config
+  // <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.route_config>`
+  // option. This setting default to false if the route table is loaded dynamically via the
+  // :ref:`trds
+  // <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.ThriftProxy.trds>`
+  // option. Users may wish to override the default behavior in certain cases (for example when
+  // using CDS with a static route table).
+  google.protobuf.BoolValue validate_clusters = 3;
 }
 
 message Route {
@@ -60,17 +80,17 @@ message RouteMatch {
   }
 
   // Inverts whatever matching is done in the :ref:`method_name
-  // <envoy_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.method_name>` or
+  // <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.method_name>` or
   // :ref:`service_name
-  // <envoy_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.service_name>` fields.
+  // <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.service_name>` fields.
   // Cannot be combined with wildcard matching as that would result in routes never being matched.
   //
   // .. note::
   //
   //   This does not invert matching done as part of the :ref:`headers field
-  //   <envoy_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.headers>` field. To
+  //   <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteMatch.headers>` field. To
   //   invert header matching, see :ref:`invert_match
-  //   <envoy_api_field_config.route.v3.HeaderMatcher.invert_match>`.
+  //   <envoy_v3_api_field_config.route.v3.HeaderMatcher.invert_match>`.
   bool invert = 3;
 
   // Specifies a set of headers that the route should match on. The router will check the request’s
@@ -81,10 +101,32 @@ message RouteMatch {
   repeated config.route.v3.HeaderMatcher headers = 4;
 }
 
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.thrift_proxy.v2alpha1.RouteAction";
+
+  // The router is capable of shadowing traffic from one cluster to another. The current
+  // implementation is "fire and forget," meaning Envoy will not wait for the shadow cluster to
+  // respond before returning the response from the primary cluster. All normal statistics are
+  // collected for the shadow cluster making this feature useful for testing.
+  //
+  // .. note::
+  //
+  //   Shadowing will not be triggered if the primary cluster does not exist.
+  message RequestMirrorPolicy {
+    // Specifies the cluster that requests will be mirrored to. The cluster must
+    // exist in the cluster manager configuration when the route configuration is loaded.
+    // If it disappears at runtime, the shadow request will silently be ignored.
+    string cluster = 1 [(validate.rules).string = {min_len: 1}];
+
+    // If not specified, all requests to the target cluster will be mirrored.
+    //
+    // For some fraction N/D, a random number in the range [0,D) is selected. If the
+    // number is <= the value of the numerator N, or if the key is not present, the default
+    // value, the request will be mirrored.
+    config.core.v3.RuntimeFractionalPercent runtime_fraction = 2;
+  }
 
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -110,7 +152,7 @@ message RouteAction {
   // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
   // the upstream cluster with metadata matching what is set in this field will be considered.
   // Note that this will be merged with what's provided in :ref:`WeightedCluster.metadata_match
-  // <envoy_api_field_extensions.filters.network.thrift_proxy.v3.WeightedCluster.ClusterWeight.metadata_match>`,
+  // <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.WeightedCluster.ClusterWeight.metadata_match>`,
   // with values there taking precedence. Keys and values should be provided under the "envoy.lb"
   // metadata key.
   config.core.v3.Metadata metadata_match = 3;
@@ -123,6 +165,9 @@ message RouteAction {
   // Strip the service prefix from the method name, if there's a prefix. For
   // example, the method call Service:method would end up being just method.
   bool strip_service_name = 5;
+
+  // Indicates that the route has request mirroring policies.
+  repeated RequestMirrorPolicy request_mirror_policies = 7;
 }
 
 // Allows for specification of multiple upstream clusters along with weights that indicate the
@@ -147,7 +192,7 @@ message WeightedCluster {
     // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
     // the upstream cluster with metadata matching what is set in this field, combined with what's
     // provided in :ref:`RouteAction's metadata_match
-    // <envoy_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.metadata_match>`,
+    // <envoy_v3_api_field_extensions.filters.network.thrift_proxy.v3.RouteAction.metadata_match>`,
     // will be considered. Values here will take precedence. Keys and values should be provided
     // under the "envoy.lb" metadata key.
     config.core.v3.Metadata metadata_match = 3;

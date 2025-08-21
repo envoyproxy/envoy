@@ -18,9 +18,9 @@ ROUTE_CONFIGURATION_BLOB = {
 
 def test(writer):
 
-  writer.write_test_file(
-      'Valid',
-      schema='ROUTE_CONFIGURATION_SCHEMA',
-      data=get_blob(ROUTE_CONFIGURATION_BLOB),
-      throws=False,
-  )
+    writer.write_test_file(
+        'Valid',
+        schema='ROUTE_CONFIGURATION_SCHEMA',
+        data=get_blob(ROUTE_CONFIGURATION_BLOB),
+        throws=False,
+    )

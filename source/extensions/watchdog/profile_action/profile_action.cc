@@ -1,12 +1,12 @@
-#include "extensions/watchdog/profile_action/profile_action.h"
+#include "source/extensions/watchdog/profile_action/profile_action.h"
 
 #include <chrono>
 
 #include "envoy/thread/thread.h"
 
-#include "common/profiler/profiler.h"
-#include "common/protobuf/utility.h"
-#include "common/stats/symbol_table_impl.h"
+#include "source/common/profiler/profiler.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/stats/symbol_table.h"
 
 #include "absl/strings/str_format.h"
 
@@ -17,8 +17,8 @@ namespace ProfileAction {
 namespace {
 static constexpr uint64_t DefaultMaxProfiles = 10;
 
-std::string generateProfileFilePath(const std::string& directory, const SystemTime& now) {
-  auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(now.time_since_epoch()).count();
+std::string generateProfileFilePath(const std::string& directory, TimeSource& time_source) {
+  const uint64_t timestamp = DateUtil::nowToSeconds(time_source);
   if (absl::EndsWith(directory, "/")) {
     return absl::StrFormat("%s%s.%d", directory, "ProfileAction", timestamp);
   }
@@ -27,7 +27,7 @@ std::string generateProfileFilePath(const std::string& directory, const SystemTi
 } // namespace
 
 ProfileAction::ProfileAction(
-    envoy::extensions::watchdog::profile_action::v3alpha::ProfileActionConfig& config,
+    envoy::extensions::watchdog::profile_action::v3::ProfileActionConfig& config,
     Server::Configuration::GuardDogActionFactoryContext& context)
     : path_(config.profile_path()),
       duration_(
@@ -89,7 +89,7 @@ void ProfileAction::run(
   }
 
   // Generate file path for output and try to profile
-  profile_filename_ = generateProfileFilePath(path_, context_.api_.timeSource().systemTime());
+  profile_filename_ = generateProfileFilePath(path_, context_.api_.timeSource());
 
   if (!Profiler::Cpu::profilerEnabled()) {
     if (Profiler::Cpu::startProfiler(profile_filename_)) {

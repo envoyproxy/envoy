@@ -1,12 +1,13 @@
-#include "common/http/path_utility.h"
+#include "source/common/http/path_utility.h"
 
-#include "common/chromium_url/url_canon.h"
-#include "common/chromium_url/url_canon_stdstring.h"
-#include "common/common/logger.h"
+#include "source/common/common/logger.h"
 
 #include "absl/strings/str_join.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 #include "absl/types/optional.h"
+#include "url/url_canon.h"
+#include "url/url_canon_stdstring.h"
 
 namespace Envoy {
 namespace Http {
@@ -14,16 +15,14 @@ namespace Http {
 namespace {
 absl::optional<std::string> canonicalizePath(absl::string_view original_path) {
   std::string canonical_path;
-  chromium_url::Component in_component(0, original_path.size());
-  chromium_url::Component out_component;
-  chromium_url::StdStringCanonOutput output(&canonical_path);
-  if (!chromium_url::CanonicalizePath(original_path.data(), in_component, &output,
-                                      &out_component)) {
+  url::Component in_component(0, original_path.size());
+  url::Component out_component;
+  url::StdStringCanonOutput output(&canonical_path);
+  if (!url::CanonicalizePath(original_path.data(), in_component, &output, &out_component)) {
     return absl::nullopt;
-  } else {
-    output.Complete();
-    return absl::make_optional(std::move(canonical_path));
   }
+  output.Complete();
+  return absl::make_optional(std::move(canonical_path));
 }
 } // namespace
 
@@ -69,6 +68,32 @@ void PathUtil::mergeSlashes(RequestHeaderMap& headers) {
   headers.setPath(absl::StrCat(path_prefix,
                                absl::StrJoin(absl::StrSplit(path, '/', absl::SkipEmpty()), "/"),
                                path_suffix, query));
+}
+
+PathUtil::UnescapeSlashesResult PathUtil::unescapeSlashes(RequestHeaderMap& headers) {
+  ASSERT(headers.Path());
+  const auto original_path = headers.getPathValue();
+  const auto original_length = original_path.length();
+  // Only operate on path component in URL.
+  const absl::string_view::size_type query_start = original_path.find('?');
+  const absl::string_view path = original_path.substr(0, query_start);
+  if (path.find('%') == absl::string_view::npos) {
+    return UnescapeSlashesResult::NotFound;
+  }
+  const absl::string_view query = absl::ClippedSubstr(original_path, query_start);
+
+  static const std::vector<std::pair<absl::string_view, absl::string_view>> replacements{
+      {"%2F", "/"},
+      {"%2f", "/"},
+      {"%5C", "\\"},
+      {"%5c", "\\"},
+  };
+  headers.setPath(absl::StrCat(absl::StrReplaceAll(path, replacements), query));
+
+  // Path length will not match if there were unescaped %2f or %5c
+  return headers.getPathValue().length() != original_length
+             ? UnescapeSlashesResult::FoundAndUnescaped
+             : UnescapeSlashesResult::NotFound;
 }
 
 absl::string_view PathUtil::removeQueryAndFragment(const absl::string_view path) {

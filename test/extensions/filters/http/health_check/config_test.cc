@@ -4,7 +4,7 @@
 #include "envoy/extensions/filters/http/health_check/v3/health_check.pb.h"
 #include "envoy/extensions/filters/http/health_check/v3/health_check.pb.validate.h"
 
-#include "extensions/filters/http/health_check/config.h"
+#include "source/extensions/filters/http/health_check/config.h"
 
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/utility.h"
@@ -26,14 +26,16 @@ TEST(HealthCheckFilterConfig, HealthCheckFilter) {
   pass_through_mode: true
   headers:
     - name: ":path"
-      exact_match: "/hc"
+      string_match:
+        exact: "/hc"
   )EOF";
 
   envoy::extensions::filters::http::health_check::v3::HealthCheck proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   HealthCheckFilterConfig factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(proto_config, "stats", context).value();
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
@@ -44,13 +46,13 @@ TEST(HealthCheckFilterConfig, BadHealthCheckFilterConfig) {
   pass_through_mode: true
   headers:
     - name: ":path"
-      exact_match: "/hc"
+      string_match:
+        exact: "/hc"
   status: 500
   )EOF";
 
   envoy::extensions::filters::http::health_check::v3::HealthCheck proto_config;
-  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, proto_config), EnvoyException,
-                          "status: Cannot find field");
+  EXPECT_THROW(TestUtility::loadFromYaml(yaml_string, proto_config), EnvoyException);
 }
 
 TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetYaml) {
@@ -59,7 +61,8 @@ TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetYaml) {
   cache_time: 0.234s
   headers:
     - name: ":path"
-      exact_match: "/foo"
+      string_match:
+        exact: "/foo"
   )EOF";
 
   envoy::extensions::filters::http::health_check::v3::HealthCheck proto_config;
@@ -68,7 +71,9 @@ TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetYaml) {
   HealthCheckFilterConfig factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context),
+  EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context)
+                   .status()
+                   .IgnoreError(),
                EnvoyException);
 }
 
@@ -78,7 +83,8 @@ TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetYaml) 
   cache_time: 0.234s
   headers:
     - name: ":path"
-      exact_match: "/foo"
+      string_match:
+        exact: "/foo"
   )EOF";
 
   envoy::extensions::filters::http::health_check::v3::HealthCheck proto_config;
@@ -87,8 +93,9 @@ TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetYaml) 
   HealthCheckFilterConfig factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_NO_THROW(
-      factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context));
+  EXPECT_TRUE(factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context)
+                  .status()
+                  .ok());
 }
 
 TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetProto) {
@@ -100,10 +107,12 @@ TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetProto) {
   config.mutable_cache_time()->set_seconds(10);
   envoy::config::route::v3::HeaderMatcher& header = *config.add_headers();
   header.set_name(":path");
-  header.set_exact_match("foo");
+  header.mutable_string_match()->set_exact("foo");
 
   EXPECT_THROW(
-      healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context),
+      healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context)
+          .status()
+          .IgnoreError(),
       EnvoyException);
 }
 
@@ -115,8 +124,11 @@ TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetProto)
   config.mutable_pass_through_mode()->set_value(false);
   envoy::config::route::v3::HeaderMatcher& header = *config.add_headers();
   header.set_name(":path");
-  header.set_exact_match("foo");
-  healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context);
+  header.mutable_string_match()->set_exact("foo");
+  EXPECT_TRUE(
+      healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context)
+          .status()
+          .ok());
 }
 
 TEST(HealthCheckFilterConfig, HealthCheckFilterWithEmptyProto) {
@@ -129,8 +141,11 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterWithEmptyProto) {
   config.mutable_pass_through_mode()->set_value(false);
   envoy::config::route::v3::HeaderMatcher& header = *config.add_headers();
   header.set_name(":path");
-  header.set_exact_match("foo");
-  healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context);
+  header.mutable_string_match()->set_exact("foo");
+  EXPECT_TRUE(
+      healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context)
+          .status()
+          .ok());
 }
 
 void testHealthCheckHeaderMatch(
@@ -146,7 +161,8 @@ void testHealthCheckHeaderMatch(
   *config = input_config;
 
   Http::FilterFactoryCb cb =
-      healthCheckFilterConfig.createFilterFactoryFromProto(*config, "dummy_stats_prefix", context);
+      healthCheckFilterConfig.createFilterFactoryFromProto(*config, "dummy_stats_prefix", context)
+          .value();
 
   Http::MockFilterChainFactoryCallbacks filter_callbacks;
   Http::StreamFilterSharedPtr health_check_filter;
@@ -184,7 +200,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatch) {
 
   envoy::config::route::v3::HeaderMatcher& yheader = *config.add_headers();
   yheader.set_name("y-healthcheck");
-  yheader.set_exact_match("foo");
+  yheader.mutable_string_match()->set_exact("foo");
 
   Http::TestRequestHeaderMapImpl headers{{"x-healthcheck", "arbitrary_value"},
                                          {"y-healthcheck", "foo"}};
@@ -203,7 +219,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatchWrongValue) {
 
   envoy::config::route::v3::HeaderMatcher& yheader = *config.add_headers();
   yheader.set_name("y-healthcheck");
-  yheader.set_exact_match("foo");
+  yheader.mutable_string_match()->set_exact("foo");
 
   Http::TestRequestHeaderMapImpl headers{{"x-healthcheck", "arbitrary_value"},
                                          {"y-healthcheck", "bar"}};
@@ -222,7 +238,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatchMissingHeader) {
 
   envoy::config::route::v3::HeaderMatcher& yheader = *config.add_headers();
   yheader.set_name("y-healthcheck");
-  yheader.set_exact_match("foo");
+  yheader.mutable_string_match()->set_exact("foo");
 
   Http::TestRequestHeaderMapImpl headers{{"y-healthcheck", "foo"}};
 
@@ -237,7 +253,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateMatch) {
 
   envoy::config::route::v3::HeaderMatcher& header = *config.add_headers();
   header.set_name("x-healthcheck");
-  header.set_exact_match("foo");
+  header.mutable_string_match()->set_exact("foo");
 
   envoy::config::route::v3::HeaderMatcher& dup_header = *config.add_headers();
   dup_header.set_name("x-healthcheck");
@@ -255,25 +271,15 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateNoMatch) {
 
   envoy::config::route::v3::HeaderMatcher& header = *config.add_headers();
   header.set_name("x-healthcheck");
-  header.set_exact_match("foo");
+  header.mutable_string_match()->set_exact("foo");
 
   envoy::config::route::v3::HeaderMatcher& dup_header = *config.add_headers();
   dup_header.set_name("x-healthcheck");
-  dup_header.set_exact_match("bar");
+  dup_header.mutable_string_match()->set_exact("bar");
 
   Http::TestRequestHeaderMapImpl headers{{"x-healthcheck", "foo"}};
 
   testHealthCheckHeaderMatch(config, headers, false);
-}
-
-// Test that the deprecated extension name still functions.
-TEST(HealthCheckFilterConfig, DEPRECATED_FEATURE_TEST(DeprecatedExtensionFilterName)) {
-  const std::string deprecated_name = "envoy.health_check";
-
-  ASSERT_NE(
-      nullptr,
-      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::getFactory(
-          deprecated_name));
 }
 
 } // namespace

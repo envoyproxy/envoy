@@ -1,0 +1,35 @@
+static_resources:
+  listeners:
+  - address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: {{ data['kafka_envoy_port'] }}
+    filter_chains:
+    - filters:
+      - name: requesttypes
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.kafka_broker.v3.KafkaBroker
+          stat_prefix: testfilter
+          force_response_rewrite: true
+      - name: mesh
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.kafka_mesh.v3alpha.KafkaMesh
+          advertised_host: "127.0.0.1"
+          advertised_port: {{ data['kafka_envoy_port'] }}
+          upstream_clusters:
+          - cluster_name: kafka_c1
+            bootstrap_servers: 127.0.0.1:{{ data['kafka_real_port1'] }}
+            partition_count: 1
+          - cluster_name: kafka_c2
+            bootstrap_servers: 127.0.0.1:{{ data['kafka_real_port2'] }}
+            partition_count: 1
+          forwarding_rules:
+          - target_cluster: kafka_c1
+            topic_prefix: a
+          - target_cluster: kafka_c2
+            topic_prefix: b
+admin:
+  access_log_path: /dev/null
+  profile_path: /dev/null
+  address:
+    socket_address: { address: 127.0.0.1, port_value: {{ data['envoy_monitoring_port'] }} }

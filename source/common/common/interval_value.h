@@ -22,6 +22,25 @@ public:
 
   T value() const { return value_; }
 
+  // Returns a value that is as far from max as the original value is from min.
+  // This guarantees that max().invert() == min() and min().invert() == max().
+  ClosedIntervalValue invert() const {
+    return ClosedIntervalValue(value_ == Interval::max_value ? Interval::min_value
+                               : value_ == Interval::min_value
+                                   ? Interval::max_value
+                                   : Interval::max_value - (value_ - Interval::min_value));
+  }
+
+  // Comparisons are performed using the same operators on the underlying value
+  // type, with the same exactness guarantees.
+
+  bool operator==(ClosedIntervalValue<T, Interval> other) const { return value_ == other.value(); }
+  bool operator!=(ClosedIntervalValue<T, Interval> other) const { return value_ != other.value(); }
+  bool operator<(ClosedIntervalValue<T, Interval> other) const { return value_ < other.value(); }
+  bool operator<=(ClosedIntervalValue<T, Interval> other) const { return value_ <= other.value(); }
+  bool operator>=(ClosedIntervalValue<T, Interval> other) const { return value_ >= other.value(); }
+  bool operator>(ClosedIntervalValue<T, Interval> other) const { return value_ > other.value(); }
+
 private:
   T value_;
 };

@@ -10,27 +10,33 @@ Wasm
   The Wasm filter is experimental and is currently under active development. Capabilities will
   be expanded over time and the configuration structures are likely to change.
 
-The HTTP Wasm filter is used implement an HTTP filter with a Wasm plugin.
+The HTTP Wasm filter is used to implement an HTTP filter with a Wasm plugin.
+
+.. note::
+
+ This filter is not supported on Windows.
 
 Example configuration
 ---------------------
 
 Example filter configuration:
 
-.. code-block:: yaml
+.. literalinclude:: ../../../start/sandboxes/_include/wasm-cc/envoy.yaml
+    :language: yaml
+    :lines: 24-49
+    :emphasize-lines: 5-21
+    :linenos:
+    :lineno-start: 24
+    :caption: :download:`wasm envoy.yaml <../../../start/sandboxes/_include/wasm-cc/envoy.yaml>`
 
-  name: envoy.filters.http.wasm
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm
-    config:
-      config:
-        name: "my_plugin"
-        vm_config:
-          runtime: "envoy.wasm.runtime.v8"
-          code:
-            local:
-              filename: "/etc/envoy_filter_http_wasm_example.wasm"
-          allow_precompiled: true
- 
+Example upstream filter configuration:
 
-The preceding snippet configures a filter from a Wasm binary on local disk.
+.. literalinclude:: ../../../start/sandboxes/_include/wasm-cc/envoy.yaml
+    :language: yaml
+    :lines: 89-128
+    :emphasize-lines: 21-37
+    :linenos:
+    :lineno-start: 89
+    :caption: :download:`wasm envoy.yaml <../../../start/sandboxes/_include/wasm-cc/envoy.yaml>`
+
+The preceding snippets configures a filter from a Wasm binary on local disk.

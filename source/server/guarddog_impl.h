@@ -13,12 +13,11 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
-#include "common/common/lock_guard.h"
-#include "common/common/logger.h"
-#include "common/common/thread.h"
-#include "common/event/libevent.h"
-
-#include "server/watchdog_impl.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/libevent.h"
+#include "source/server/watchdog_impl.h"
 
 #include "absl/types/optional.h"
 
@@ -87,7 +86,7 @@ public:
    */
   void forceCheckForTest() {
     Thread::LockGuard guard(mutex_);
-    loop_timer_->enableTimer(std::chrono::milliseconds(0));
+    dispatcher_->post([this]() { loop_timer_->enableTimer(std::chrono::milliseconds(0)); });
     test_interlock_hook_->waitFromTest(mutex_);
   }
 

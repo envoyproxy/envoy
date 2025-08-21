@@ -1,16 +1,17 @@
-#include "common/version/version.h"
+#include "source/common/version/version.h"
 
 #include <map>
 #include <regex>
 #include <string>
 
-#include "common/common/fmt.h"
-#include "common/common/macros.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/macros.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
+#include "openssl/crypto.h"
 
 extern const char build_scm_revision[];
 extern const char build_scm_status[];
@@ -35,6 +36,8 @@ const envoy::config::core::v3::BuildVersion& VersionInfo::buildVersion() {
       new envoy::config::core::v3::BuildVersion(makeBuildVersion(BUILD_VERSION_NUMBER));
   return *result;
 }
+
+bool VersionInfo::sslFipsCompliant() { return FIPS_mode() == 1; }
 
 const std::string& VersionInfo::buildType() {
 #ifdef NDEBUG

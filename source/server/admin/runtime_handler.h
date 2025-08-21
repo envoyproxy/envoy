@@ -6,7 +6,7 @@
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 
-#include "server/admin/handler_ctx.h"
+#include "source/server/admin/handler_ctx.h"
 
 #include "absl/strings/string_view.h"
 
@@ -18,11 +18,9 @@ class RuntimeHandler : public HandlerContextBase {
 public:
   RuntimeHandler(Server::Instance& server);
 
-  Http::Code handlerRuntime(absl::string_view path_and_query,
-                            Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
+  Http::Code handlerRuntime(Http::ResponseHeaderMap& response_headers, Buffer::Instance& response,
                             AdminStream&);
-  Http::Code handlerRuntimeModify(absl::string_view path_and_query,
-                                  Http::ResponseHeaderMap& response_headers,
+  Http::Code handlerRuntimeModify(Http::ResponseHeaderMap& response_headers,
                                   Buffer::Instance& response, AdminStream&);
 };
 

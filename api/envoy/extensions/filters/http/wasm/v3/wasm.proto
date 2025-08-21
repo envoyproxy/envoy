@@ -5,12 +5,11 @@ package envoy.extensions.filters.http.wasm.v3;
 import "envoy/extensions/wasm/v3/wasm.proto";
 
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.wasm.v3";
 option java_outer_classname = "WasmProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/wasm/v3;wasmv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Wasm]

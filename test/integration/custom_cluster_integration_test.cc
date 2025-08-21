@@ -1,8 +1,8 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 
-#include "common/network/address_impl.h"
-#include "common/upstream/load_balancer_impl.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/upstream/load_balancer_context_base.h"
 
 #include "test/config/utility.h"
 #include "test/integration/clusters/cluster_factory_config.pb.h"
@@ -18,8 +18,7 @@ const int UpstreamIndex = 0;
 class CustomClusterIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                      public HttpIntegrationTest {
 public:
-  CustomClusterIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+  CustomClusterIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void initialize() override {
     setUpstreamCount(1);
@@ -34,11 +33,19 @@ public:
       envoy::config::cluster::v3::Cluster::CustomClusterType cluster_type;
       cluster_type.set_name(cluster_provided_lb_ ? "envoy.clusters.custom_static_with_lb"
                                                  : "envoy.clusters.custom_static");
-      test::integration::clusters::CustomStaticConfig config;
-      config.set_priority(10);
-      config.set_address(Network::Test::getLoopbackAddressString(ipVersion()));
-      config.set_port_value(fake_upstreams_[UpstreamIndex]->localAddress()->ip()->port());
-      cluster_type.mutable_typed_config()->PackFrom(config);
+      if (!cluster_provided_lb_) {
+        test::integration::clusters::CustomStaticConfig1 config;
+        config.set_priority(10);
+        config.set_address(Network::Test::getLoopbackAddressString(ipVersion()));
+        config.set_port_value(fake_upstreams_[UpstreamIndex]->localAddress()->ip()->port());
+        cluster_type.mutable_typed_config()->PackFrom(config);
+      } else {
+        test::integration::clusters::CustomStaticConfig2 config;
+        config.set_priority(10);
+        config.set_address(Network::Test::getLoopbackAddressString(ipVersion()));
+        config.set_port_value(fake_upstreams_[UpstreamIndex]->localAddress()->ip()->port());
+        cluster_type.mutable_typed_config()->PackFrom(config);
+      }
 
       cluster_0->mutable_cluster_type()->CopyFrom(cluster_type);
     });

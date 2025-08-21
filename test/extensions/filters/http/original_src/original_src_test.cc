@@ -1,22 +1,21 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/original_src/v3/original_src.pb.h"
 
-#include "common/network/socket_option_impl.h"
-#include "common/network/utility.h"
-
-#include "extensions/filters/http/original_src/original_src.h"
+#include "source/common/network/socket_option_impl.h"
+#include "source/common/network/utility.h"
+#include "source/extensions/filters/http/original_src/original_src.h"
 
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::SaveArg;
 using testing::StrictMock;
 
@@ -51,7 +50,8 @@ public:
   }
 
   void setAddressToReturn(const std::string& address) {
-    callbacks_.stream_info_.downstream_remote_address_ = Network::Utility::resolveUrl(address);
+    callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+        *Network::Utility::resolveUrl(address));
   }
 
 protected:
@@ -92,11 +92,11 @@ TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressAddsOption) {
   EXPECT_EQ(filter->decodeHeaders(headers_, false), Http::FilterHeadersStatus::Continue);
 
   NiceMock<Network::MockConnectionSocket> socket;
-  EXPECT_CALL(socket,
-              setLocalAddress(PointeesEq(callbacks_.stream_info_.downstream_remote_address_)));
   for (const auto& option : *options) {
     option->setOption(socket, envoy::config::core::v3::SocketOption::STATE_PREBIND);
   }
+  EXPECT_EQ(*socket.connectionInfoProvider().localAddress(),
+            *callbacks_.stream_info_.downstream_connection_info_provider_->remoteAddress());
 }
 
 TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressUsesCorrectAddress) {
@@ -111,9 +111,17 @@ TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressUsesCorrectAddress) {
     option->hashKey(key);
   }
 
-  std::vector<uint8_t> expected_key = {1, 2, 3, 4};
-
-  EXPECT_EQ(key, expected_key);
+  // The first part of the hash is the address. Then come the other options. On Windows there are
+  // is only the single option. On other platforms there are more that get hashed.
+  EXPECT_EQ(key[0], 1);
+  EXPECT_EQ(key[1], 2);
+  EXPECT_EQ(key[2], 3);
+  EXPECT_EQ(key[3], 4);
+#ifndef WIN32
+  EXPECT_GT(key.size(), 4);
+#else
+  EXPECT_EQ(key.size(), 4);
+#endif
 }
 
 TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressBleachesPort) {
@@ -125,12 +133,12 @@ TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressBleachesPort) {
   filter->decodeHeaders(headers_, false);
 
   NiceMock<Network::MockConnectionSocket> socket;
-  const auto expected_address = Network::Utility::parseInternetAddress("1.2.3.4");
+  const auto expected_address = Network::Utility::parseInternetAddressNoThrow("1.2.3.4");
 
-  EXPECT_CALL(socket, setLocalAddress(PointeesEq(expected_address)));
   for (const auto& option : *options) {
     option->setOption(socket, envoy::config::core::v3::SocketOption::STATE_PREBIND);
   }
+  EXPECT_EQ(*socket.connectionInfoProvider().localAddress(), *expected_address);
 }
 
 TEST_F(OriginalSrcHttpTest, FilterAddsTransparentOption) {
@@ -201,8 +209,8 @@ TEST_F(OriginalSrcHttpTest, TrailersAndDataEndStreamDoNothing) {
   // This will be invoked in decodeHeaders.
   EXPECT_CALL(callbacks, addUpstreamSocketOptions(_));
   EXPECT_CALL(callbacks, streamInfo());
-  callbacks.stream_info_.downstream_remote_address_ =
-      Network::Utility::parseInternetAddress("1.2.3.4");
+  callbacks.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4"));
   filter->decodeHeaders(headers_, true);
 
   // No new expectations => no side effects from calling these.
@@ -218,14 +226,58 @@ TEST_F(OriginalSrcHttpTest, TrailersAndDataNotEndStreamDoNothing) {
   // This will be invoked in decodeHeaders.
   EXPECT_CALL(callbacks, addUpstreamSocketOptions(_));
   EXPECT_CALL(callbacks, streamInfo());
-  callbacks.stream_info_.downstream_remote_address_ =
-      Network::Utility::parseInternetAddress("1.2.3.4");
+  callbacks.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      Network::Utility::parseInternetAddressNoThrow("1.2.3.4"));
   filter->decodeHeaders(headers_, false);
 
   // No new expectations => no side effects from calling these.
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter->decodeData(buffer_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter->decodeTrailers(trailers_));
 }
+
+TEST_F(OriginalSrcHttpTest, FilterAddsBindAddressNoPortOptionEnabledAndDisabled) {
+  if (!ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT.hasValue()) {
+    // The option isn't supported on this platform. Just skip the test.
+    return;
+  }
+
+  {
+    // Runtime option is enabled by default.
+    auto filter = makeDefaultFilter();
+    Network::Socket::OptionsSharedPtr options;
+    setAddressToReturn("tcp://1.2.3.4:80");
+    EXPECT_CALL(callbacks_, addUpstreamSocketOptions(_)).WillOnce(SaveArg<0>(&options));
+
+    filter->decodeHeaders(headers_, false);
+
+    const auto addr_bind_option =
+        findOptionDetails(*options, ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT,
+                          envoy::config::core::v3::SocketOption::STATE_PREBIND);
+
+    EXPECT_TRUE(addr_bind_option.has_value());
+  }
+
+  {
+    // Runtime option is disabled.
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.original_src_fix_port_exhaustion", "false"}});
+
+    auto filter = makeDefaultFilter();
+    Network::Socket::OptionsSharedPtr options;
+    setAddressToReturn("tcp://1.2.3.4:80");
+    EXPECT_CALL(callbacks_, addUpstreamSocketOptions(_)).WillOnce(SaveArg<0>(&options));
+
+    filter->decodeHeaders(headers_, false);
+
+    const auto addr_bind_option =
+        findOptionDetails(*options, ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT,
+                          envoy::config::core::v3::SocketOption::STATE_PREBIND);
+
+    EXPECT_FALSE(addr_bind_option.has_value());
+  }
+}
+
 } // namespace
 } // namespace OriginalSrc
 } // namespace HttpFilters

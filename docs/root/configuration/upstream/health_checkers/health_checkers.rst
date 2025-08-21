@@ -7,3 +7,4 @@ Health checkers
   :maxdepth: 2
 
   redis
+  thrift

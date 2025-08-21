@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "common/protobuf/protobuf.h"
-#include "common/protobuf/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -107,7 +107,7 @@ MockFilterConfigFactory::MockFilterConfigFactory()
 MockFilterConfigFactory::~MockFilterConfigFactory() = default;
 
 FilterFactoryCb
-MockFilterConfigFactory::createFilterFactoryFromProtoTyped(const ProtobufWkt::Struct& proto_config,
+MockFilterConfigFactory::createFilterFactoryFromProtoTyped(const Protobuf::Struct& proto_config,
                                                            const std::string& stat_prefix,
                                                            Server::Configuration::FactoryContext&) {
   config_struct_ = proto_config;

@@ -1,16 +1,26 @@
 #pragma once
 
-#include "common/common/base64.h"
-#include "common/common/hex.h"
-
-#include "extensions/tracers/skywalking/skywalking_types.h"
+#include "source/common/common/base64.h"
+#include "source/common/common/hex.h"
+#include "source/tracing_context_impl.h"
 
 #include "test/test_common/utility.h"
+
+#include "cpp2sky/config.pb.h"
+#include "cpp2sky/propagation.h"
+#include "cpp2sky/tracing_context.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace SkyWalking {
+
+using cpp2sky::createSpanContext;
+using cpp2sky::SpanContextSharedPtr;
+using cpp2sky::TracerConfig;
+using cpp2sky::TracingContextFactory;
+using cpp2sky::TracingContextSharedPtr;
+using cpp2sky::TracingSpanSharedPtr;
 
 /*
  * A simple helper class for auxiliary testing. Contains some simple static functions, such as
@@ -26,47 +36,74 @@ public:
     return Base64::encode(input.data(), input.length());
   }
 
-  static SegmentContextSharedPtr createSegmentContext(bool sampled, std::string seed,
-                                                      std::string prev_seed,
-                                                      Random::RandomGenerator& random) {
-    SpanContextPtr previous_span_context;
-    if (!prev_seed.empty()) {
-      std::string header_value =
-          fmt::format("{}-{}-{}-{}-{}-{}-{}-{}", sampled ? 1 : 0, base64Encode(generateId(random)),
-                      base64Encode(generateId(random)), random.random(),
-                      base64Encode(prev_seed + "#SERVICE"), base64Encode(prev_seed + "#INSTANCE"),
-                      base64Encode(prev_seed + "#ENDPOINT"), base64Encode(prev_seed + "#ADDRESS"));
+  static std::string createPropagatedSW8HeaderValue(bool do_sample, std::string seed) {
+    TracerConfig config;
+    config.set_service_name(seed + "#SERVICE");
+    config.set_instance_name(seed + "#INSTANCE");
 
-      Http::TestRequestHeaderMapImpl request_headers{{"sw8", header_value}};
-      previous_span_context = SpanContext::spanContextFromRequest(request_headers);
-      ASSERT(previous_span_context);
+    auto tracing_context_factory = std::make_unique<TracingContextFactory>(config);
+    auto tracing_context = tracing_context_factory->create();
+
+    auto entry_span = tracing_context->createEntrySpan();
+    auto span = tracing_context->createExitSpan(entry_span);
+    span->startSpan(seed + "#OPERATION");
+    span->setPeer(seed + "#ADDRESS");
+
+    if (!do_sample) {
+      span->setSkipAnalysis();
     }
-    Tracing::Decision decision;
-    decision.traced = sampled;
-    decision.reason = Tracing::Reason::Sampling;
 
-    auto segment_context =
-        std::make_shared<SegmentContext>(std::move(previous_span_context), decision, random);
+    span->endSpan();
+    entry_span->endSpan();
 
-    segment_context->setService(seed + "#SERVICE");
-    segment_context->setServiceInstance(seed + "#INSTANCE");
-
-    return segment_context;
+    return tracing_context->createSW8HeaderValue(seed + "#ENDPOINT").value();
   }
 
-  static SpanStore* createSpanStore(SegmentContext* segment_context, SpanStore* parent_span_store,
-                                    std::string seed) {
-    SpanStore* span_store = segment_context->createSpanStore(parent_span_store);
+  static TracingContextSharedPtr createSegmentContext(bool sampled, std::string seed,
+                                                      std::string prev_seed) {
+    TracerConfig config;
+    config.set_service_name(seed + "#SERVICE");
+    config.set_instance_name(seed + "#INSTANCE");
+    auto tracing_context_factory = std::make_unique<TracingContextFactory>(config);
 
-    span_store->setAsError(false);
-    span_store->setOperation(seed + "#OPERATION");
-    span_store->setPeerAddress("0.0.0.0");
-    span_store->setStartTime(22222222);
-    span_store->setEndTime(33333333);
+    SpanContextSharedPtr previous_span_context;
+    if (!prev_seed.empty()) {
+      std::string header_value = createPropagatedSW8HeaderValue(sampled, prev_seed);
+      previous_span_context = createSpanContext(header_value);
+      ASSERT(previous_span_context);
+    }
 
+    TracingContextSharedPtr tracing_context;
+    if (previous_span_context) {
+      tracing_context = tracing_context_factory->create(previous_span_context);
+    } else {
+      tracing_context = tracing_context_factory->create();
+      if (!sampled) {
+        tracing_context->setSkipAnalysis();
+      }
+    }
+
+    return tracing_context;
+  }
+
+  static TracingSpanSharedPtr createSpanStore(TracingContextSharedPtr tracing_context,
+                                              TracingSpanSharedPtr parent_span_store,
+                                              std::string seed, bool sample = true) {
+    auto span_store = parent_span_store ? tracing_context->createExitSpan(parent_span_store)
+                                        : tracing_context->createEntrySpan();
+
+    span_store->startSpan(seed + "#OPERATION");
+    span_store->setPeer("0.0.0.0");
     span_store->addTag(seed + "#TAG_KEY_A", seed + "#TAG_VALUE_A");
     span_store->addTag(seed + "#TAG_KEY_B", seed + "#TAG_VALUE_B");
     span_store->addTag(seed + "#TAG_KEY_C", seed + "#TAG_VALUE_C");
+
+    if (!sample) {
+      span_store->setSkipAnalysis();
+    }
+
+    span_store->endSpan();
+
     return span_store;
   }
 };

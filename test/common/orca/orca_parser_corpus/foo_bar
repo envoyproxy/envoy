@@ -1,0 +1,6 @@
+response_headers {
+  headers {
+    key: "foo"
+    value: "bar"
+  }
+}

@@ -4,19 +4,23 @@
 
 #include "envoy/server/instance.h"
 
-#include "server/configuration_impl.h"
+#include "source/server/configuration_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace Hystrix {
 
+// Hystrix sink
+constexpr char HystrixName[] = "envoy.stat_sinks.hystrix";
+
 class HystrixSinkFactory : Logger::Loggable<Logger::Id::config>,
                            public Server::Configuration::StatsSinkFactory {
 public:
   // StatsSinkFactory
-  Stats::SinkPtr createStatsSink(const Protobuf::Message& config,
-                                 Server::Configuration::ServerFactoryContext& server) override;
+  absl::StatusOr<Stats::SinkPtr>
+  createStatsSink(const Protobuf::Message& config,
+                  Server::Configuration::ServerFactoryContext& server) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 

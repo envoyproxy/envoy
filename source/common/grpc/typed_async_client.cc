@@ -1,11 +1,11 @@
-#include "common/grpc/typed_async_client.h"
+#include "source/common/grpc/typed_async_client.h"
 
-#include "common/buffer/zero_copy_input_stream_impl.h"
-#include "common/common/assert.h"
-#include "common/common/macros.h"
-#include "common/common/utility.h"
-#include "common/grpc/common.h"
-#include "common/http/utility.h"
+#include "source/common/buffer/zero_copy_input_stream_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/macros.h"
+#include "source/common/common/utility.h"
+#include "source/common/grpc/common.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Grpc {

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "envoy/stats/stats_macros.h"
 
 namespace Envoy {
@@ -14,6 +16,8 @@ namespace SkyWalking {
 struct SkyWalkingTracerStats {
   SKYWALKING_TRACER_STATS(GENERATE_COUNTER_STRUCT)
 };
+
+using SkyWalkingTracerStatsSharedPtr = std::shared_ptr<SkyWalkingTracerStats>;
 
 } // namespace SkyWalking
 } // namespace Tracers

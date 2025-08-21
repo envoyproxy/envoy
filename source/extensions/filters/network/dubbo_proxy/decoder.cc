@@ -1,6 +1,6 @@
-#include "extensions/filters/network/dubbo_proxy/decoder.h"
+#include "source/extensions/filters/network/dubbo_proxy/decoder.h"
 
-#include "common/common/macros.h"
+#include "source/common/common/macros.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -34,7 +34,7 @@ DecoderStateMachine::onDecodeStreamHeader(Buffer::Instance& buffer) {
 
   active_stream_ = delegate_.newStream(metadata, context);
   ASSERT(active_stream_);
-  context->messageOriginData().move(buffer, context->headerSize());
+  context->originMessage().move(buffer, context->headerSize());
 
   return {ProtocolState::OnDecodeStreamData};
 }
@@ -49,7 +49,7 @@ DecoderStateMachine::onDecodeStreamData(Buffer::Instance& buffer) {
     return {ProtocolState::WaitForData};
   }
 
-  active_stream_->context_->messageOriginData().move(buffer, active_stream_->context_->bodySize());
+  active_stream_->context_->originMessage().move(buffer, active_stream_->context_->bodySize());
   active_stream_->onStreamDecoded();
   active_stream_ = nullptr;
 
@@ -64,7 +64,7 @@ DecoderStateMachine::DecoderStatus DecoderStateMachine::handleState(Buffer::Inst
   case ProtocolState::OnDecodeStreamData:
     return onDecodeStreamData(buffer);
   default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+    PANIC("unexpected");
   }
 }
 

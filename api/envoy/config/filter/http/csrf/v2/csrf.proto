@@ -12,6 +12,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.filter.http.csrf.v2";
 option java_outer_classname = "CsrfProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/config/filter/http/csrf/v2;csrfv2";
 option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.filters.http.csrf.v3";
 option (udpa.annotations.file_status).package_version_status = FROZEN;
 

@@ -40,7 +40,6 @@ static_resources {
   }
 }
 admin {
-  access_log_path: "127.1"
   profile_path: "\'"
   address {
     pipe {

@@ -4,10 +4,9 @@
  * Run with:
  * `bazel run --config=libc++ -c opt //test/extensions/bootstrap/wasm:wasm_speed_test`
  */
-#include "common/event/dispatcher_impl.h"
-#include "common/stats/isolated_store_impl.h"
-
-#include "extensions/common/wasm/wasm.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/common/wasm/wasm.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
@@ -33,11 +32,11 @@ public:
       : Envoy::Extensions::Common::Wasm::Context(wasm, plugin) {}
 
   using Envoy::Extensions::Common::Wasm::Context::log;
-  proxy_wasm::WasmResult log(uint32_t level, absl::string_view message) override {
-    log_(static_cast<spdlog::level::level_enum>(level), message);
+  proxy_wasm::WasmResult log(uint32_t level, std::string_view message) override {
+    log_(static_cast<spdlog::level::level_enum>(level), toAbslStringView(message));
     return proxy_wasm::WasmResult::Ok;
   }
-  MOCK_METHOD2(log_, void(spdlog::level::level_enum level, absl::string_view message));
+  MOCK_METHOD(void, log_, (spdlog::level::level_enum level, absl::string_view message));
 };
 
 static void bmWasmSimpleCallSpeedTest(benchmark::State& state, std::string test,
@@ -49,18 +48,15 @@ static void bmWasmSimpleCallSpeedTest(benchmark::State& state, std::string test,
   Event::DispatcherPtr dispatcher(api->allocateDispatcher("wasm_test"));
   auto scope = Stats::ScopeSharedPtr(stats_store.createScope("wasm."));
   NiceMock<LocalInfo::MockLocalInfo> local_info;
-  auto name = "";
-  auto root_id = "some_long_root_id";
-  auto vm_id = "";
-  auto vm_configuration = test;
-  auto vm_key = "";
-  auto plugin_configuration = "";
+
+  envoy::extensions::wasm::v3::PluginConfig plugin_config;
+  *plugin_config.mutable_root_id() = "some_long_root_id";
+  plugin_config.mutable_vm_config()->mutable_configuration()->set_value(test);
+  plugin_config.mutable_vm_config()->set_runtime(absl::StrCat("envoy.wasm.runtime.", runtime));
   auto plugin = std::make_shared<Extensions::Common::Wasm::Plugin>(
-      name, root_id, vm_id, runtime, plugin_configuration, false,
-      envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
+      plugin_config, envoy::config::core::v3::TrafficDirection::UNSPECIFIED, local_info, nullptr);
   auto wasm = std::make_unique<Extensions::Common::Wasm::Wasm>(
-      absl::StrCat("envoy.wasm.runtime.", runtime), vm_id, vm_configuration, vm_key, scope,
-      cluster_manager, *dispatcher);
+      plugin->wasmConfig(), "vm_key", scope, *api, cluster_manager, *dispatcher);
   std::string code;
   if (runtime == "null") {
     code = "WasmSpeedCpp";
@@ -69,7 +65,8 @@ static void bmWasmSimpleCallSpeedTest(benchmark::State& state, std::string test,
         TestEnvironment::runfilesPath("test/extensions/bootstrap/wasm/test_data/speed_cpp.wasm"));
   }
   EXPECT_FALSE(code.empty());
-  EXPECT_TRUE(wasm->initialize(code, false));
+  EXPECT_TRUE(wasm->load(code, false));
+  EXPECT_TRUE(wasm->initialize());
   wasm->setCreateContextForTesting(
       nullptr,
       [](Extensions::Common::Wasm::Wasm* wasm,
@@ -82,18 +79,26 @@ static void bmWasmSimpleCallSpeedTest(benchmark::State& state, std::string test,
   }
 }
 
-#if defined(ENVOY_WASM_WAVM)
+#if defined(PROXY_WASM_HAS_RUNTIME_V8)
 #define B(_t)                                                                                      \
-  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, V8SpeedTest_##_t, std::string(#_t),                 \
-                    std::string("v8"));                                                            \
   BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, NullSpeedTest_##_t, std::string(#_t),               \
                     std::string("null"));                                                          \
-  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, WavmSpeedTest_##_t, std::string(#_t),               \
-                    std::string("wavm"));
+  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, WasmSpeedTest_##_t, std::string(#_t),               \
+                    std::string("v8"));
+#elif defined(PROXY_WASM_HAS_RUNTIME_WAMR)
+#define B(_t)                                                                                      \
+  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, NullSpeedTest_##_t, std::string(#_t),               \
+                    std::string("null"));                                                          \
+  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, WasmSpeedTest_##_t, std::string(#_t),               \
+                    std::string("wamr"));
+#elif defined(PROXY_WASM_HAS_RUNTIME_WASMTIME)
+#define B(_t)                                                                                      \
+  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, NullSpeedTest_##_t, std::string(#_t),               \
+                    std::string("null"));                                                          \
+  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, WasmSpeedTest_##_t, std::string(#_t),               \
+                    std::string("wasmtime"));
 #else
 #define B(_t)                                                                                      \
-  BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, V8SpeedTest_##_t, std::string(#_t),                 \
-                    std::string("v8"));                                                            \
   BENCHMARK_CAPTURE(bmWasmSimpleCallSpeedTest, NullSpeedTest_##_t, std::string(#_t),               \
                     std::string("null"));
 #endif
@@ -112,11 +117,8 @@ B(grpc_service1000)
 B(modify_metadata)
 B(modify_metadata1000)
 B(json_serialize)
-B(json_serialize_arena)
 B(json_deserialize)
-B(json_deserialize_arena)
 B(json_deserialize_empty)
-B(json_serialize_deserialize)
 B(convert_to_filter_state)
 
 } // namespace Wasm

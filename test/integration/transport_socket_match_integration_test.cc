@@ -13,8 +13,7 @@ namespace Envoy {
 class TransportSockeMatchIntegrationTest : public testing::Test, public HttpIntegrationTest {
 public:
   TransportSockeMatchIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
-                            TestEnvironment::getIpVersionsForTest().front(),
+      : HttpIntegrationTest(Http::CodecType::HTTP1, TestEnvironment::getIpVersionsForTest().front(),
                             ConfigHelper::httpProxyConfig()) {
     autonomous_upstream_ = true;
     setUpstreamCount(num_hosts_);
@@ -102,7 +101,7 @@ transport_socket:
     // Match the x-type header against the given host_type (a/b).
     auto* match_header = match->add_headers();
     match_header->set_name(type_header_);
-    match_header->set_exact_match(host_type);
+    match_header->mutable_string_match()->set_exact(host_type);
 
     // Route to cluster_0, selecting metadata type=a or type=b.
     auto* action = route->mutable_route();
@@ -119,19 +118,19 @@ transport_socket:
       auto endpoint = upstream_address_fn_(i);
       if (isTLSUpstream(i)) {
         fake_upstreams_.emplace_back(new AutonomousUpstream(
-            HttpIntegrationTest::createUpstreamTlsContext(), endpoint->ip()->port(),
+            HttpIntegrationTest::createUpstreamTlsContext(upstreamConfig()), endpoint->ip()->port(),
             endpoint->ip()->version(), upstreamConfig(), false));
       } else {
         fake_upstreams_.emplace_back(new AutonomousUpstream(
-            Network::Test::createRawBufferSocketFactory(), endpoint->ip()->port(),
+            Network::Test::createRawBufferDownstreamSocketFactory(), endpoint->ip()->port(),
             endpoint->ip()->version(), upstreamConfig(), false));
       }
     }
   }
 
   void SetUp() override {
-    setDownstreamProtocol(Http::CodecClient::Type::HTTP1);
-    setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
+    setDownstreamProtocol(Http::CodecType::HTTP1);
+    setUpstreamProtocol(Http::CodecType::HTTP1);
   }
 
   const uint32_t num_hosts_{2};
@@ -158,10 +157,10 @@ TEST_F(TransportSockeMatchIntegrationTest, TlsAndPlaintextSucceed) {
   for (int i = 0; i < 3; i++) {
     IntegrationStreamDecoderPtr response =
         codec_client_->makeHeaderOnlyRequest(type_a_request_headers_);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ("200", response->headers().getStatusValue());
     response = codec_client_->makeHeaderOnlyRequest(type_b_request_headers_);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
 }
@@ -173,10 +172,10 @@ TEST_F(TransportSockeMatchIntegrationTest, TlsAndPlaintextFailsWithoutSocketMatc
   for (int i = 0; i < 3; i++) {
     IntegrationStreamDecoderPtr response =
         codec_client_->makeHeaderOnlyRequest(type_a_request_headers_);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ("503", response->headers().getStatusValue());
     response = codec_client_->makeHeaderOnlyRequest(type_b_request_headers_);
-    response->waitForEndStream();
+    ASSERT_TRUE(response->waitForEndStream());
     EXPECT_EQ("200", response->headers().getStatusValue());
   }
 }

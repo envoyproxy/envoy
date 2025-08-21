@@ -1,14 +1,15 @@
-#include "extensions/access_loggers/grpc/grpc_access_log_impl.h"
+#include "source/extensions/access_loggers/grpc/grpc_access_log_impl.h"
 
 #include "envoy/data/accesslog/v3/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
-#include "envoy/upstream/upstream.h"
+#include "envoy/grpc/async_client_manager.h"
+#include "envoy/local_info/local_info.h"
 
-#include "common/common/assert.h"
-#include "common/grpc/typed_async_client.h"
-#include "common/network/utility.h"
-#include "common/runtime/runtime_features.h"
-#include "common/stream_info/utility.h"
+#include "source/common/config/utility.h"
+#include "source/common/grpc/typed_async_client.h"
+#include "source/extensions/access_loggers/common/grpc_access_logger_clients.h"
+
+const char GRPC_LOG_STATS_PREFIX[] = "access_logs.grpc_access_log.";
 
 namespace Envoy {
 namespace Extensions {
@@ -16,81 +17,57 @@ namespace AccessLoggers {
 namespace GrpcCommon {
 
 GrpcAccessLoggerImpl::GrpcAccessLoggerImpl(
-    Grpc::RawAsyncClientPtr&& client, std::string log_name,
-    std::chrono::milliseconds buffer_flush_interval_msec, uint64_t max_buffer_size_bytes,
-    Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
-    envoy::config::core::v3::ApiVersion transport_api_version)
-    : GrpcAccessLogger(
-          std::move(client),
-          Grpc::VersionedMethods("envoy.service.accesslog.v3.AccessLogService.StreamAccessLogs",
-                                 "envoy.service.accesslog.v2.AccessLogService.StreamAccessLogs")
-              .getMethodDescriptorForVersion(transport_api_version),
-          transport_api_version),
-      stats_({ALL_GRPC_ACCESS_LOGGER_STATS(
-          POOL_COUNTER_PREFIX(scope, "access_logs.grpc_access_log."))}),
-      log_name_(log_name), buffer_flush_interval_msec_(buffer_flush_interval_msec),
-      flush_timer_(dispatcher.createTimer([this]() {
-        flush();
-        flush_timer_->enableTimer(buffer_flush_interval_msec_);
-      })),
-      max_buffer_size_bytes_(max_buffer_size_bytes), local_info_(local_info) {
-  flush_timer_->enableTimer(buffer_flush_interval_msec_);
-}
+    const Grpc::RawAsyncClientSharedPtr& client,
+    const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
+    Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info, Stats::Scope& scope)
+    : GrpcAccessLogger(config, dispatcher, scope, GRPC_LOG_STATS_PREFIX,
+                       std::make_unique<Common::StreamingGrpcAccessLogClient<
+                           envoy::service::accesslog::v3::StreamAccessLogsMessage,
+                           envoy::service::accesslog::v3::StreamAccessLogsResponse>>(
+                           client,
+                           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                               "envoy.service.accesslog.v3.AccessLogService.StreamAccessLogs"),
+                           GrpcCommon::optionalRetryPolicy(config))),
+      log_name_(config.log_name()), local_info_(local_info) {}
 
-bool GrpcAccessLoggerImpl::canLogMore() {
-  if (max_buffer_size_bytes_ == 0 || approximate_message_size_bytes_ < max_buffer_size_bytes_) {
-    stats_.logs_written_.inc();
-    return true;
-  }
-  flush();
-  if (approximate_message_size_bytes_ < max_buffer_size_bytes_) {
-    stats_.logs_written_.inc();
-    return true;
-  }
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.disallow_unbounded_access_logs")) {
-    stats_.logs_dropped_.inc();
-    return false;
-  }
-  stats_.logs_written_.inc();
-  return true;
-}
-
-void GrpcAccessLoggerImpl::log(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
-  if (!canLogMore()) {
-    return;
-  }
-  approximate_message_size_bytes_ += entry.ByteSizeLong();
+void GrpcAccessLoggerImpl::addEntry(envoy::data::accesslog::v3::HTTPAccessLogEntry&& entry) {
   message_.mutable_http_logs()->mutable_log_entry()->Add(std::move(entry));
-  if (approximate_message_size_bytes_ >= max_buffer_size_bytes_) {
-    flush();
-  }
 }
 
-void GrpcAccessLoggerImpl::log(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) {
-  approximate_message_size_bytes_ += entry.ByteSizeLong();
+void GrpcAccessLoggerImpl::addEntry(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) {
   message_.mutable_tcp_logs()->mutable_log_entry()->Add(std::move(entry));
-  if (approximate_message_size_bytes_ >= max_buffer_size_bytes_) {
-    flush();
-  }
 }
 
-void GrpcAccessLoggerImpl::flush() {
-  if (!message_.has_http_logs() && !message_.has_tcp_logs()) {
-    // Nothing to flush.
-    return;
-  }
+bool GrpcAccessLoggerImpl::isEmpty() {
+  return !message_.has_http_logs() && !message_.has_tcp_logs();
+}
 
-  if (!client_.isStreamStarted()) {
-    auto* identifier = message_.mutable_identifier();
-    *identifier->mutable_node() = local_info_.node();
-    identifier->set_log_name(log_name_);
-  }
+void GrpcAccessLoggerImpl::initMessage() {
+  auto* identifier = message_.mutable_identifier();
+  *identifier->mutable_node() = local_info_.node();
+  identifier->set_log_name(log_name_);
+}
 
-  if (client_.log(message_)) {
-    // Clear the message regardless of the success.
-    approximate_message_size_bytes_ = 0;
-    message_.Clear();
-  }
+GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& async_client_manager,
+                                                     Stats::Scope& scope,
+                                                     ThreadLocal::SlotAllocator& tls,
+                                                     const LocalInfo::LocalInfo& local_info)
+    : GrpcAccessLoggerCache(async_client_manager, scope, tls), local_info_(local_info) {}
+
+GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
+    const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config,
+    Event::Dispatcher& dispatcher) {
+  // We pass skip_cluster_check=true to factoryForGrpcService in order to avoid throwing
+  // exceptions in worker threads. Call sites of this getOrCreateLogger must check the cluster
+  // availability via ClusterManager::checkActiveStaticCluster beforehand, and throw exceptions in
+  // the main thread if necessary.
+  auto factory_or_error =
+      async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, true);
+  THROW_IF_NOT_OK_REF(factory_or_error.status());
+  return std::make_shared<GrpcAccessLoggerImpl>(
+      THROW_OR_RETURN_VALUE(factory_or_error.value()->createUncachedRawAsyncClient(),
+                            Grpc::RawAsyncClientPtr),
+      config, dispatcher, local_info_, scope_);
 }
 
 } // namespace GrpcCommon

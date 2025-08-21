@@ -1,5 +1,5 @@
-#include "common/buffer/buffer_impl.h"
-#include "common/crypto/utility.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/crypto/utility.h"
 
 #include "test/fuzz/fuzz_runner.h"
 

@@ -1,0 +1,7 @@
+config {
+  name: "envoy.filters.http.decompressor"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor"
+    value: "\nU\n\001t\022P\nNtype.googleapis.com/envoy.extensions.filters.http.decompressor.v3.Decompressor"
+  }
+}

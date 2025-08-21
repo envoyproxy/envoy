@@ -10,8 +10,8 @@ class HystrixIntegrationTest : public HttpProtocolIntegrationTest {};
 
 INSTANTIATE_TEST_SUITE_P(Protocols, HystrixIntegrationTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
-                             {FakeHttpConnection::Type::HTTP1})),
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
+                             {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(HystrixIntegrationTest, NoChunkEncoding) {
@@ -23,7 +23,7 @@ TEST_P(HystrixIntegrationTest, NoChunkEncoding) {
   });
   initialize();
 
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+  if (downstreamProtocol() == Http::CodecType::HTTP1) {
     // For HTTP/1.1 we use a raw client to make absolutely sure there is no chunk encoding.
     std::string response;
     auto connection = createConnectionDriver(
@@ -34,7 +34,7 @@ TEST_P(HystrixIntegrationTest, NoChunkEncoding) {
             conn.close(Network::ConnectionCloseType::NoFlush);
           }
         });
-    connection->run();
+    ASSERT_TRUE(connection->run());
     EXPECT_THAT(response, StartsWith("HTTP/1.1 200 OK\r\n"));
     // Make sure that the response is not actually chunk encoded, but it does have the hystrix flush
     // trailer.

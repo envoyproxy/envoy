@@ -1,14 +1,12 @@
-#include "extensions/filters/http/csrf/csrf_filter.h"
+#include "source/extensions/filters/http/csrf/csrf_filter.h"
 
 #include "envoy/extensions/filters/http/csrf/v3/csrf.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/empty_string.h"
-#include "common/http/header_map_impl.h"
-#include "common/http/headers.h"
-#include "common/http/utility.h"
-
-#include "extensions/filters/http/well_known_names.h"
+#include "source/common/common/empty_string.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -26,6 +24,8 @@ struct RcDetailsValues {
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
 namespace {
+constexpr absl::string_view NullOrigin{"null"};
+
 bool isModifyMethod(const Http::RequestHeaderMap& headers) {
   const absl::string_view method_type = headers.getMethodValue();
   if (method_type.empty()) {
@@ -51,7 +51,11 @@ std::string hostAndPort(const absl::string_view absolute_url) {
 //       the Origin header must include the scheme (and hostAndPort expects
 //       an absolute URL).
 std::string sourceOriginValue(const Http::RequestHeaderMap& headers) {
-  const auto origin = hostAndPort(headers.getInlineValue(origin_handle.handle()));
+  const auto origin_value = headers.getInlineValue(origin_handle.handle());
+  if (origin_value == NullOrigin) {
+    return Envoy::EMPTY_STRING;
+  }
+  const auto origin = hostAndPort(origin_value);
   if (!origin.empty()) {
     return origin;
   }
@@ -61,7 +65,7 @@ std::string sourceOriginValue(const Http::RequestHeaderMap& headers) {
 std::string targetOriginValue(const Http::RequestHeaderMap& headers) {
   const auto host_value = headers.getHostValue();
 
-  // Don't even bother if there's not Host header.
+  // Don't even bother if there's no Host header.
   if (host_value.empty()) {
     return EMPTY_STRING;
   }
@@ -78,15 +82,16 @@ static CsrfStats generateStats(const std::string& prefix, Stats::Scope& scope) {
 
 static CsrfPolicyPtr
 generatePolicy(const envoy::extensions::filters::http::csrf::v3::CsrfPolicy& policy,
-               Runtime::Loader& runtime) {
-  return std::make_unique<CsrfPolicy>(policy, runtime);
+               Server::Configuration::CommonFactoryContext& context) {
+  return std::make_unique<CsrfPolicy>(policy, context);
 }
 } // namespace
 
 CsrfFilterConfig::CsrfFilterConfig(
     const envoy::extensions::filters::http::csrf::v3::CsrfPolicy& policy,
-    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
-    : stats_(generateStats(stats_prefix, scope)), policy_(generatePolicy(policy, runtime)) {}
+    const std::string& stats_prefix, Stats::Scope& scope,
+    Server::Configuration::CommonFactoryContext& context)
+    : stats_(generateStats(stats_prefix, scope)), policy_(generatePolicy(policy, context)) {}
 
 CsrfFilter::CsrfFilter(const CsrfFilterConfigSharedPtr config) : config_(config) {}
 
@@ -101,19 +106,12 @@ Http::FilterHeadersStatus CsrfFilter::decodeHeaders(Http::RequestHeaderMap& head
     return Http::FilterHeadersStatus::Continue;
   }
 
-  bool is_valid = true;
   const auto source_origin = sourceOriginValue(headers);
   if (source_origin.empty()) {
-    is_valid = false;
     config_->stats().missing_source_origin_.inc();
-  }
-
-  if (!isValid(source_origin, headers)) {
-    is_valid = false;
+  } else if (!isValid(source_origin, headers)) {
     config_->stats().request_invalid_.inc();
-  }
-
-  if (is_valid == true) {
+  } else {
     config_->stats().request_valid_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
@@ -128,9 +126,8 @@ Http::FilterHeadersStatus CsrfFilter::decodeHeaders(Http::RequestHeaderMap& head
 }
 
 void CsrfFilter::determinePolicy() {
-  const std::string& name = Extensions::HttpFilters::HttpFilterNames::get().Csrf;
   const CsrfPolicy* policy =
-      Http::Utility::resolveMostSpecificPerFilterConfig<CsrfPolicy>(name, callbacks_->route());
+      Http::Utility::resolveMostSpecificPerFilterConfig<CsrfPolicy>(callbacks_);
   if (policy != nullptr) {
     policy_ = policy;
   } else {

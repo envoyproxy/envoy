@@ -3,16 +3,18 @@
 
 #include "envoy/config/metrics/v3/stats.pb.h"
 
-#include "common/common/logger.h"
-#include "common/common/thread.h"
-#include "common/event/dispatcher_impl.h"
-#include "common/stats/allocator_impl.h"
-#include "common/stats/symbol_table_impl.h"
-#include "common/stats/tag_producer_impl.h"
-#include "common/stats/thread_local_store.h"
-#include "common/thread_local/thread_local_impl.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/thread.h"
+#include "source/common/event/dispatcher_impl.h"
+#include "source/common/stats/allocator_impl.h"
+#include "source/common/stats/stats_matcher_impl.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/common/stats/tag_producer_impl.h"
+#include "source/common/stats/thread_local_store.h"
+#include "source/common/thread_local/thread_local_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
@@ -26,20 +28,20 @@ public:
   ThreadLocalStorePerf()
       : heap_alloc_(symbol_table_), store_(heap_alloc_),
         api_(Api::createApiForTest(store_, time_system_)) {
-    store_.setTagProducer(std::make_unique<Stats::TagProducerImpl>(stats_config_));
+    const Stats::TagVector tags;
+    store_.setTagProducer(Stats::TagProducerImpl::createTagProducer(stats_config_, tags).value());
 
-    Stats::TestUtil::forEachSampleStat(1000, [this](absl::string_view name) {
-      stat_names_.push_back(std::make_unique<Stats::StatNameStorage>(name, symbol_table_));
+    Stats::TestUtil::forEachSampleStat(1000, true, [this](absl::string_view name) {
+      stat_names_.push_back(std::make_unique<Stats::StatNameManagedStorage>(name, symbol_table_));
     });
   }
 
   ~ThreadLocalStorePerf() {
-    for (auto& stat_name_storage : stat_names_) {
-      stat_name_storage->free(symbol_table_);
+    if (tls_) {
+      tls_->shutdownGlobalThreading();
     }
     store_.shutdownThreading();
     if (tls_) {
-      tls_->shutdownGlobalThreading();
       tls_->shutdownThread();
     }
     if (dispatcher_) {
@@ -48,8 +50,9 @@ public:
   }
 
   void accessCounters() {
+    Stats::Scope& scope = *store_.rootScope();
     for (auto& stat_name_storage : stat_names_) {
-      store_.counterFromStatName(stat_name_storage->statName());
+      scope.counterFromStatName(stat_name_storage->statName());
     }
   }
 
@@ -63,7 +66,15 @@ public:
     store_.initializeThreading(*dispatcher_, *tls_);
   }
 
+  void initPrefixRejections(const std::string& prefix) {
+    stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_prefix(
+        prefix);
+    store_.setStatsMatcher(
+        std::make_unique<Stats::StatsMatcherImpl>(stats_config_, symbol_table_, context_));
+  }
+
 private:
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   Stats::SymbolTableImpl symbol_table_;
   Event::SimulatedTimeSystem time_system_;
   Stats::AllocatorImpl heap_alloc_;
@@ -72,7 +83,7 @@ private:
   Stats::ThreadLocalStoreImpl store_;
   Api::ApiPtr api_;
   envoy::config::metrics::v3::StatsConfig stats_config_;
-  std::vector<std::unique_ptr<Stats::StatNameStorage>> stat_names_;
+  std::vector<std::unique_ptr<Stats::StatNameManagedStorage>> stat_names_;
 };
 
 } // namespace Envoy
@@ -83,7 +94,7 @@ private:
 static void BM_StatsNoTls(benchmark::State& state) {
   Envoy::ThreadLocalStorePerf context;
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     context.accessCounters();
   }
 }
@@ -97,11 +108,35 @@ static void BM_StatsWithTls(benchmark::State& state) {
   Envoy::ThreadLocalStorePerf context;
   context.initThreading();
 
-  for (auto _ : state) {
+  for (auto _ : state) { // NOLINT
     context.accessCounters();
   }
 }
 BENCHMARK(BM_StatsWithTls);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_StatsWithTlsAndRejectionsWithDot(benchmark::State& state) {
+  Envoy::ThreadLocalStorePerf context;
+  context.initThreading();
+  context.initPrefixRejections("cluster.");
+
+  for (auto _ : state) { // NOLINT
+    context.accessCounters();
+  }
+}
+BENCHMARK(BM_StatsWithTlsAndRejectionsWithDot);
+
+// NOLINTNEXTLINE(readability-identifier-naming)
+static void BM_StatsWithTlsAndRejectionsWithoutDot(benchmark::State& state) {
+  Envoy::ThreadLocalStorePerf context;
+  context.initThreading();
+  context.initPrefixRejections("cluster");
+
+  for (auto _ : state) { // NOLINT
+    context.accessCounters();
+  }
+}
+BENCHMARK(BM_StatsWithTlsAndRejectionsWithoutDot);
 
 // TODO(jmarantz): add multi-threaded variant of this test, that aggressively
 // looks up stats in multiple threads to try to trigger contention issues.

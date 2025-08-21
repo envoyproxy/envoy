@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
@@ -13,12 +14,13 @@
 #include "envoy/stats/stats_macros.h"
 #include "envoy/type/v3/percent.pb.h"
 
-#include "common/buffer/watermark_buffer.h"
-#include "common/common/token_bucket_impl.h"
-#include "common/http/header_utility.h"
-#include "common/stats/symbol_table_impl.h"
-
-#include "extensions/filters/common/fault/fault_config.h"
+#include "source/common/buffer/watermark_buffer.h"
+#include "source/common/common/token_bucket_impl.h"
+#include "source/common/http/header_utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/stats/symbol_table.h"
+#include "source/extensions/filters/common/fault/fault_config.h"
+#include "source/extensions/filters/http/common/stream_rate_limiter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -47,7 +49,8 @@ struct FaultFilterStats {
  */
 class FaultSettings : public Router::RouteSpecificFilterConfig {
 public:
-  FaultSettings(const envoy::extensions::filters::http::fault::v3::HTTPFault& fault);
+  FaultSettings(const envoy::extensions::filters::http::fault::v3::HTTPFault& fault,
+                Server::Configuration::CommonFactoryContext& context);
 
   const std::vector<Http::HeaderUtility::HeaderDataPtr>& filterHeaders() const {
     return fault_filter_headers_;
@@ -73,6 +76,8 @@ public:
   const std::string& responseRateLimitPercentRuntime() const {
     return response_rate_limit_percent_runtime_;
   }
+  bool disableDownstreamClusterStats() const { return disable_downstream_cluster_stats_; }
+  const Envoy::Protobuf::Struct& filterMetadata() const { return filter_metadata_; }
 
 private:
   class RuntimeKeyValues {
@@ -95,6 +100,7 @@ private:
   const std::vector<Http::HeaderUtility::HeaderDataPtr> fault_filter_headers_;
   absl::flat_hash_set<std::string> downstream_nodes_{}; // Inject failures for specific downstream
   absl::optional<uint64_t> max_active_faults_;
+
   Filters::Common::Fault::FaultRateLimitConfigPtr response_rate_limit_;
   const std::string delay_percent_runtime_;
   const std::string abort_percent_runtime_;
@@ -103,6 +109,9 @@ private:
   const std::string abort_grpc_status_runtime_;
   const std::string max_active_faults_runtime_;
   const std::string response_rate_limit_percent_runtime_;
+  const bool disable_downstream_cluster_stats_;
+
+  const Envoy::Protobuf::Struct filter_metadata_;
 };
 
 /**
@@ -111,8 +120,8 @@ private:
 class FaultFilterConfig {
 public:
   FaultFilterConfig(const envoy::extensions::filters::http::fault::v3::HTTPFault& fault,
-                    Runtime::Loader& runtime, const std::string& stats_prefix, Stats::Scope& scope,
-                    TimeSource& time_source);
+                    const std::string& stats_prefix, Stats::Scope& scope,
+                    Server::Configuration::CommonFactoryContext& context);
 
   Runtime::Loader& runtime() { return runtime_; }
   FaultFilterStats& stats() { return stats_; }
@@ -145,67 +154,6 @@ private:
 
 using FaultFilterConfigSharedPtr = std::shared_ptr<FaultFilterConfig>;
 
-/**
- * An HTTP stream rate limiter. Split out for ease of testing and potential code reuse elsewhere.
- */
-class StreamRateLimiter : Logger::Loggable<Logger::Id::filter> {
-public:
-  /**
-   * @param max_kbps maximum rate in KiB/s.
-   * @param max_buffered_data maximum data to buffer before invoking the pause callback.
-   * @param pause_data_cb callback invoked when the limiter has buffered too much data.
-   * @param resume_data_cb callback invoked when the limiter has gone under the buffer limit.
-   * @param write_data_cb callback invoked to write data to the stream.
-   * @param continue_cb callback invoked to continue the stream. This is only used to continue
-   *                    trailers that have been paused during body flush.
-   * @param time_source the time source to run the token bucket with.
-   * @param dispatcher the stream's dispatcher to use for creating timers.
-   * @param scope the stream's scope
-   */
-  StreamRateLimiter(uint64_t max_kbps, uint64_t max_buffered_data,
-                    std::function<void()> pause_data_cb, std::function<void()> resume_data_cb,
-                    std::function<void(Buffer::Instance&, bool)> write_data_cb,
-                    std::function<void()> continue_cb, TimeSource& time_source,
-                    Event::Dispatcher& dispatcher, const ScopeTrackedObject& scope);
-
-  /**
-   * Called by the stream to write data. All data writes happen asynchronously, the stream should
-   * be stopped after this call (all data will be drained from incoming_buffer).
-   */
-  void writeData(Buffer::Instance& incoming_buffer, bool end_stream);
-
-  /**
-   * Called if the stream receives trailers.
-   */
-  Http::FilterTrailersStatus onTrailers();
-
-  /**
-   * Like the owning filter, we must handle inline destruction, so we have a destroy() method which
-   * kills any callbacks.
-   */
-  void destroy() { token_timer_.reset(); }
-  bool destroyed() { return token_timer_ == nullptr; }
-
-private:
-  void onTokenTimer();
-
-  // We currently divide each second into 16 segments for the token bucket. Thus, the rate limit is
-  // KiB per second, divided into 16 segments, ~63ms apart. 16 is used because it divides into 1024
-  // evenly.
-  static constexpr uint64_t SecondDivisor = 16;
-
-  const uint64_t bytes_per_time_slice_;
-  const std::function<void(Buffer::Instance&, bool)> write_data_cb_;
-  const std::function<void()> continue_cb_;
-  const ScopeTrackedObject& scope_;
-  TokenBucketImpl token_bucket_;
-  Event::TimerPtr token_timer_;
-  bool saw_data_{};
-  bool saw_end_stream_{};
-  bool saw_trailers_{};
-  Buffer::WatermarkBuffer buffer_;
-};
-
 using AbortHttpAndGrpcStatus =
     std::pair<absl::optional<Http::Code>, absl::optional<Grpc::Status::GrpcStatus>>;
 /**
@@ -229,8 +177,8 @@ public:
   }
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encode100ContinueHeaders(Http::ResponseHeaderMap&) override {
-    return Http::FilterHeadersStatus::Continue;
+  Http::Filter1xxHeadersStatus encode1xxHeaders(Http::ResponseHeaderMap&) override {
+    return Http::Filter1xxHeadersStatus::Continue;
   }
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
     return Http::FilterHeadersStatus::Continue;
@@ -257,6 +205,7 @@ private:
   bool isAbortEnabled(const Http::RequestHeaderMap& request_headers);
   bool isDelayEnabled(const Http::RequestHeaderMap& request_headers);
   bool isResponseRateLimitEnabled(const Http::RequestHeaderMap& request_headers);
+  bool isResponseRateLimitConfigured();
   absl::optional<std::chrono::milliseconds>
   delayDuration(const Http::RequestHeaderMap& request_headers);
   AbortHttpAndGrpcStatus abortStatus(const Http::RequestHeaderMap& request_headers);
@@ -278,7 +227,7 @@ private:
   std::unique_ptr<Stats::StatNameDynamicStorage> downstream_cluster_storage_;
   const FaultSettings* fault_settings_;
   bool fault_active_{};
-  std::unique_ptr<StreamRateLimiter> response_limiter_;
+  std::unique_ptr<Envoy::Extensions::HttpFilters::Common::StreamRateLimiter> response_limiter_;
   std::string downstream_cluster_delay_percent_key_{};
   std::string downstream_cluster_abort_percent_key_{};
   std::string downstream_cluster_delay_duration_key_{};

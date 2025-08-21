@@ -2,9 +2,8 @@
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/stats/isolated_store_impl.h"
-
-#include "extensions/bootstrap/wasm/config.h"
+#include "source/common/stats/isolated_store_impl.h"
+#include "source/extensions/bootstrap/wasm/config.h"
 
 #include "test/extensions/common/wasm/wasm_runtime.h"
 #include "test/mocks/event/mocks.h"
@@ -20,14 +19,12 @@ namespace Envoy {
 namespace Extensions {
 namespace Wasm {
 
-using Extensions::Bootstrap::Wasm::WasmServicePtr;
-
-class WasmFactoryTest : public testing::TestWithParam<std::string> {
+class WasmFactoryTest : public testing::TestWithParam<std::tuple<std::string, std::string>> {
 protected:
   WasmFactoryTest() {
     config_.mutable_config()->mutable_vm_config()->set_runtime(
-        absl::StrCat("envoy.wasm.runtime.", GetParam()));
-    if (GetParam() != "null") {
+        absl::StrCat("envoy.wasm.runtime.", std::get<0>(GetParam())));
+    if (std::get<0>(GetParam()) != "null") {
       config_.mutable_config()->mutable_vm_config()->mutable_code()->mutable_local()->set_filename(
           TestEnvironment::substitute(
               "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/start_cpp.wasm"));
@@ -53,6 +50,7 @@ protected:
     EXPECT_CALL(context_, lifecycleNotifier())
         .WillRepeatedly(testing::ReturnRef(lifecycle_notifier_));
     extension_ = factory->createBootstrapExtension(config, context_);
+    extension_->onServerInitialized();
     static_cast<Bootstrap::Wasm::WasmServiceExtension*>(extension_.get())->wasmService();
     EXPECT_CALL(init_watcher_, ready());
     init_manager_.initialize(init_watcher_);
@@ -69,7 +67,8 @@ protected:
 };
 
 INSTANTIATE_TEST_SUITE_P(Runtimes, WasmFactoryTest,
-                         Envoy::Extensions::Common::Wasm::runtime_values);
+                         Envoy::Extensions::Common::Wasm::runtime_and_cpp_values,
+                         Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
 
 TEST_P(WasmFactoryTest, CreateWasmFromWasm) {
   auto factory = std::make_unique<Bootstrap::Wasm::WasmFactory>();
@@ -78,6 +77,9 @@ TEST_P(WasmFactoryTest, CreateWasmFromWasm) {
   initializeWithConfig(config_);
 
   EXPECT_NE(extension_, nullptr);
+
+  // Check if the custom stat namespace is registered during the initialization.
+  EXPECT_TRUE(api_->customStatNamespaces().registered("wasmcustom"));
 }
 
 TEST_P(WasmFactoryTest, CreateWasmFromWasmPerThread) {
@@ -90,59 +92,49 @@ TEST_P(WasmFactoryTest, CreateWasmFromWasmPerThread) {
 }
 
 TEST_P(WasmFactoryTest, MissingImport) {
-  if (GetParam() == "null") {
+  if (std::get<0>(GetParam()) == "null") {
     return;
   }
   config_.mutable_config()->mutable_vm_config()->mutable_code()->mutable_local()->set_filename(
       TestEnvironment::substitute(
           "{{ test_rundir }}/test/extensions/bootstrap/wasm/test_data/missing_cpp.wasm"));
   EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config_), Extensions::Common::Wasm::WasmException,
-                            "Unable to create Wasm service test");
+                            "Unable to create Wasm plugin test");
 }
 
 TEST_P(WasmFactoryTest, UnspecifiedRuntime) {
+  if (std::get<0>(GetParam()) == "null") {
+    return;
+  }
   config_.mutable_config()->mutable_vm_config()->set_runtime("");
 
-  EXPECT_THROW_WITH_REGEX(
-      initializeWithConfig(config_), EnvoyException,
-      "Proto constraint validation failed \\(WasmServiceValidationError\\.Config");
+  EXPECT_NO_THROW(initializeWithConfig(config_));
 }
 
 TEST_P(WasmFactoryTest, UnknownRuntime) {
   config_.mutable_config()->mutable_vm_config()->set_runtime("envoy.wasm.runtime.invalid");
 
   EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config_), Extensions::Common::Wasm::WasmException,
-                            "Unable to create Wasm service test");
+                            "Unable to create Wasm plugin test");
 }
 
 TEST_P(WasmFactoryTest, StartFailed) {
-  ProtobufWkt::StringValue plugin_configuration;
+  Protobuf::StringValue plugin_configuration;
   plugin_configuration.set_value("bad");
   config_.mutable_config()->mutable_vm_config()->mutable_configuration()->PackFrom(
       plugin_configuration);
 
   EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config_), Extensions::Common::Wasm::WasmException,
-                            "Unable to create Wasm service test");
-}
-
-TEST_P(WasmFactoryTest, StartFailedOpen) {
-  ProtobufWkt::StringValue plugin_configuration;
-  plugin_configuration.set_value("bad");
-  config_.mutable_config()->mutable_vm_config()->mutable_configuration()->PackFrom(
-      plugin_configuration);
-  config_.mutable_config()->set_fail_open(true);
-
-  EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config_), Extensions::Common::Wasm::WasmException,
-                            "Unable to create Wasm service test");
+                            "Unable to create Wasm plugin test");
 }
 
 TEST_P(WasmFactoryTest, ConfigureFailed) {
-  ProtobufWkt::StringValue plugin_configuration;
+  Protobuf::StringValue plugin_configuration;
   plugin_configuration.set_value("bad");
   config_.mutable_config()->mutable_configuration()->PackFrom(plugin_configuration);
 
   EXPECT_THROW_WITH_MESSAGE(initializeWithConfig(config_), Extensions::Common::Wasm::WasmException,
-                            "Unable to create Wasm service test");
+                            "Unable to create Wasm plugin test");
 }
 
 } // namespace Wasm

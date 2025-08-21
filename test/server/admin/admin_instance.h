@@ -1,6 +1,6 @@
 #pragma once
 
-#include "server/admin/admin.h"
+#include "source/server/admin/admin.h"
 
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
@@ -29,7 +29,6 @@ public:
   Http::Code postCallback(absl::string_view path_and_query,
                           Http::ResponseHeaderMap& response_headers, Buffer::Instance& response);
 
-  std::string address_out_path_;
   std::string cpu_profile_path_;
   NiceMock<MockInstance> server_;
   Stats::IsolatedStoreImpl listener_scope_;

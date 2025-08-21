@@ -1,8 +1,8 @@
-#include "common/network/filter_matcher.h"
+#include "source/common/network/filter_matcher.h"
 
 #include "envoy/network/filter.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 #include "absl/strings/str_format.h"
 
@@ -23,9 +23,10 @@ ListenerFilterMatcherPtr ListenerFilterMatcherBuilder::buildListenerFilterMatche
   case envoy::config::listener::v3::ListenerFilterChainMatchPredicate::RuleCase::
       kDestinationPortRange:
     return std::make_unique<ListenerFilterDstPortMatcher>(match_config.destination_port_range());
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
+  case envoy::config::listener::v3::ListenerFilterChainMatchPredicate::RuleCase::RULE_NOT_SET:
+    PANIC_DUE_TO_PROTO_UNSET;
   }
+  PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
 ListenerFilterSetLogicMatcher::ListenerFilterSetLogicMatcher(

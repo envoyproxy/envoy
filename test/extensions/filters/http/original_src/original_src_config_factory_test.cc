@@ -1,9 +1,9 @@
 #include "envoy/extensions/filters/http/original_src/v3/original_src.pb.h"
 #include "envoy/extensions/filters/http/original_src/v3/original_src.pb.validate.h"
 
-#include "extensions/filters/http/original_src/config.h"
-#include "extensions/filters/http/original_src/original_src.h"
-#include "extensions/filters/http/original_src/original_src_config_factory.h"
+#include "source/extensions/filters/http/original_src/config.h"
+#include "source/extensions/filters/http/original_src/original_src.h"
+#include "source/extensions/filters/http/original_src/original_src_config_factory.h"
 
 #include "test/mocks/server/factory_context.h"
 
@@ -30,7 +30,8 @@ TEST(OriginalSrcHttpConfigFactoryTest, TestCreateFactory) {
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "", context);
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(*proto_config, "", context).value();
 
   Http::MockFilterChainFactoryCallbacks filter_callback;
   Http::StreamDecoderFilterSharedPtr added_filter;

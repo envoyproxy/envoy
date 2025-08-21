@@ -1,8 +1,8 @@
-#include "common/common/logger.h"
-
+#include "source/common/common/logger.h"
 #include "source/extensions/common/wasm/ext/declare_property.pb.h"
-
-#include "extensions/common/wasm/wasm.h"
+#include "source/extensions/common/wasm/ext/set_envoy_filter_state.pb.h"
+#include "source/extensions/common/wasm/ext/verify_signature.pb.h"
+#include "source/extensions/common/wasm/wasm.h"
 
 #if defined(WASM_USE_CEL_PARSER)
 #include "eval/public/builtin_func_registrar.h"
@@ -10,6 +10,10 @@
 #include "parser/parser.h"
 #endif
 #include "zlib.h"
+#include "source/common/crypto/crypto_impl.h"
+#include "source/common/crypto/utility.h"
+
+#include "source/common/common/logger.h"
 
 using proxy_wasm::RegisterForeignFunction;
 using proxy_wasm::WasmForeignFunction;
@@ -19,14 +23,62 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 
+using CelStateType = Filters::Common::Expr::CelStateType;
+
 template <typename T> WasmForeignFunction createFromClass() {
   auto c = std::make_shared<T>();
   return c->create(c);
 }
 
+inline StreamInfo::FilterState::LifeSpan
+toFilterStateLifeSpan(envoy::source::extensions::common::wasm::LifeSpan span) {
+  switch (span) {
+  case envoy::source::extensions::common::wasm::LifeSpan::FilterChain:
+    return StreamInfo::FilterState::LifeSpan::FilterChain;
+  case envoy::source::extensions::common::wasm::LifeSpan::DownstreamRequest:
+    return StreamInfo::FilterState::LifeSpan::Request;
+  case envoy::source::extensions::common::wasm::LifeSpan::DownstreamConnection:
+    return StreamInfo::FilterState::LifeSpan::Connection;
+  default:
+    return StreamInfo::FilterState::LifeSpan::FilterChain;
+  }
+}
+
+RegisterForeignFunction registerVerifySignatureForeignFunction(
+    "verify_signature",
+    [](WasmBase&, std::string_view arguments,
+       const std::function<void*(size_t size)>& alloc_result) -> WasmResult {
+      envoy::source::extensions::common::wasm::VerifySignatureArguments args;
+      if (args.ParseFromArray(arguments.data(), arguments.size())) {
+        const auto& hash = args.hash_function();
+        auto key_str = args.public_key();
+        auto signature_str = args.signature();
+        auto text_str = args.text();
+
+        std::vector<uint8_t> key(key_str.begin(), key_str.end());
+        std::vector<uint8_t> signature(signature_str.begin(), signature_str.end());
+        std::vector<uint8_t> text(text_str.begin(), text_str.end());
+
+        auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+        Envoy::Common::Crypto::CryptoObjectPtr crypto_ptr = crypto_util.importPublicKey(key);
+
+        auto output = crypto_util.verifySignature(hash, *crypto_ptr, signature, text);
+
+        envoy::source::extensions::common::wasm::VerifySignatureResult verification_result;
+        verification_result.set_result(output.result_);
+        verification_result.set_error(output.error_message_);
+
+        auto size = verification_result.ByteSizeLong();
+        auto result = alloc_result(size);
+        verification_result.SerializeToArray(result, static_cast<int>(size));
+        return WasmResult::Ok;
+      }
+      return WasmResult::BadArgument;
+    });
+
 RegisterForeignFunction registerCompressForeignFunction(
     "compress",
-    [](WasmBase&, absl::string_view arguments,
+    [](WasmBase&, std::string_view arguments,
        const std::function<void*(size_t size)>& alloc_result) -> WasmResult {
       unsigned long dest_len = compressBound(arguments.size());
       std::unique_ptr<unsigned char[]> b(new unsigned char[dest_len]);
@@ -35,13 +87,13 @@ RegisterForeignFunction registerCompressForeignFunction(
         return WasmResult::SerializationFailure;
       }
       auto result = alloc_result(dest_len);
-      memcpy(result, b.get(), dest_len);
+      memcpy(result, b.get(), dest_len); // NOLINT(safe-memcpy)
       return WasmResult::Ok;
     });
 
 RegisterForeignFunction registerUncompressForeignFunction(
     "uncompress",
-    [](WasmBase&, absl::string_view arguments,
+    [](WasmBase&, std::string_view arguments,
        const std::function<void*(size_t size)>& alloc_result) -> WasmResult {
       unsigned long dest_len = arguments.size() * 2 + 2; // output estimate.
       while (true) {
@@ -51,7 +103,7 @@ RegisterForeignFunction registerUncompressForeignFunction(
                        arguments.size());
         if (r == Z_OK) {
           auto result = alloc_result(dest_len);
-          memcpy(result, b.get(), dest_len);
+          memcpy(result, b.get(), dest_len); // NOLINT(safe-memcpy)
           return WasmResult::Ok;
         }
         if (r != Z_BUF_ERROR) {
@@ -61,11 +113,32 @@ RegisterForeignFunction registerUncompressForeignFunction(
       }
     });
 
+RegisterForeignFunction registerSetEnvoyFilterStateForeignFunction(
+    "set_envoy_filter_state",
+    [](WasmBase&, std::string_view arguments,
+       const std::function<void*(size_t size)>&) -> WasmResult {
+      envoy::source::extensions::common::wasm::SetEnvoyFilterStateArguments args;
+      if (args.ParseFromArray(arguments.data(), arguments.size())) {
+        auto context = static_cast<Context*>(proxy_wasm::current_context_);
+        return context->setEnvoyFilterState(args.path(), args.value(),
+                                            toFilterStateLifeSpan(args.span()));
+      }
+      return WasmResult::BadArgument;
+    });
+
+RegisterForeignFunction registerClearRouteCacheForeignFunction(
+    "clear_route_cache",
+    [](WasmBase&, std::string_view, const std::function<void*(size_t size)>&) -> WasmResult {
+      auto context = static_cast<Context*>(proxy_wasm::current_context_);
+      context->clearRouteCache();
+      return WasmResult::Ok;
+    });
+
 #if defined(WASM_USE_CEL_PARSER)
 class ExpressionFactory : public Logger::Loggable<Logger::Id::wasm> {
 protected:
   struct ExpressionData {
-    google::api::expr::v1alpha1::ParsedExpr parsed_expr_;
+    cel::expr::ParsedExpr parsed_expr_;
     Filters::Common::Expr::ExpressionPtr compiled_expr_;
   };
 
@@ -118,7 +191,7 @@ class CreateExpressionFactory : public ExpressionFactory {
 public:
   WasmForeignFunction create(std::shared_ptr<CreateExpressionFactory> self) const {
     WasmForeignFunction f =
-        [self](WasmBase&, absl::string_view expr,
+        [self](WasmBase&, std::string_view expr,
                const std::function<void*(size_t size)>& alloc_result) -> WasmResult {
       auto parse_status = google::api::expr::parser::Parse(std::string(expr));
       if (!parse_status.ok()) {
@@ -130,9 +203,13 @@ public:
       auto token = expr_context.createToken();
       auto& handler = expr_context.getExpression(token);
 
-      handler.parsed_expr_ = parse_status.value();
+      const auto& parsed_expr = parse_status.value();
+      handler.parsed_expr_ = parsed_expr;
+
+      std::vector<absl::Status> warnings;
       auto cel_expression_status = expr_context.builder()->CreateExpression(
-          &handler.parsed_expr_.expr(), &handler.parsed_expr_.source_info());
+          &handler.parsed_expr_.expr(), &handler.parsed_expr_.source_info(), &warnings);
+
       if (!cel_expression_status.ok()) {
         ENVOY_LOG(info, "expr_create compile error: {}", cel_expression_status.status().message());
         expr_context.deleteExpression(token);
@@ -140,6 +217,7 @@ public:
       }
 
       handler.compiled_expr_ = std::move(cel_expression_status.value());
+
       auto result = reinterpret_cast<uint32_t*>(alloc_result(sizeof(uint32_t)));
       *result = token;
       return WasmResult::Ok;
@@ -155,7 +233,7 @@ class EvaluateExpressionFactory : public ExpressionFactory {
 public:
   WasmForeignFunction create(std::shared_ptr<EvaluateExpressionFactory> self) const {
     WasmForeignFunction f =
-        [self](WasmBase&, absl::string_view argument,
+        [self](WasmBase&, std::string_view argument,
                const std::function<void*(size_t size)>& alloc_result) -> WasmResult {
       auto& expr_context = getOrCreateContext(proxy_wasm::current_context_->root_context());
       if (argument.size() != sizeof(uint32_t)) {
@@ -184,7 +262,7 @@ public:
         return serialize_status;
       }
       auto output = alloc_result(result.size());
-      memcpy(output, result.data(), result.size());
+      memcpy(output, result.data(), result.size()); // NOLINT(safe-memcpy)
       return WasmResult::Ok;
     };
     return f;
@@ -197,7 +275,7 @@ RegisterForeignFunction
 class DeleteExpressionFactory : public ExpressionFactory {
 public:
   WasmForeignFunction create(std::shared_ptr<DeleteExpressionFactory> self) const {
-    WasmForeignFunction f = [self](WasmBase&, absl::string_view argument,
+    WasmForeignFunction f = [self](WasmBase&, std::string_view argument,
                                    const std::function<void*(size_t size)>&) -> WasmResult {
       auto& expr_context = getOrCreateContext(proxy_wasm::current_context_->root_context());
       if (argument.size() != sizeof(uint32_t)) {
@@ -220,47 +298,33 @@ RegisterForeignFunction
 class DeclarePropertyFactory {
 public:
   WasmForeignFunction create(std::shared_ptr<DeclarePropertyFactory> self) const {
-    WasmForeignFunction f = [self](WasmBase&, absl::string_view arguments,
+    WasmForeignFunction f = [self](WasmBase&, std::string_view arguments,
                                    const std::function<void*(size_t size)>&) -> WasmResult {
       envoy::source::extensions::common::wasm::DeclarePropertyArguments args;
       if (args.ParseFromArray(arguments.data(), arguments.size())) {
-        WasmType type = WasmType::Bytes;
+        CelStateType type = CelStateType::Bytes;
         switch (args.type()) {
         case envoy::source::extensions::common::wasm::WasmType::Bytes:
-          type = WasmType::Bytes;
+          type = CelStateType::Bytes;
           break;
         case envoy::source::extensions::common::wasm::WasmType::Protobuf:
-          type = WasmType::Protobuf;
+          type = CelStateType::Protobuf;
           break;
         case envoy::source::extensions::common::wasm::WasmType::String:
-          type = WasmType::String;
+          type = CelStateType::String;
           break;
         case envoy::source::extensions::common::wasm::WasmType::FlatBuffers:
-          type = WasmType::FlatBuffers;
+          type = CelStateType::FlatBuffers;
           break;
         default:
           // do nothing
           break;
         }
-        StreamInfo::FilterState::LifeSpan span = StreamInfo::FilterState::LifeSpan::FilterChain;
-        switch (args.span()) {
-        case envoy::source::extensions::common::wasm::LifeSpan::FilterChain:
-          span = StreamInfo::FilterState::LifeSpan::FilterChain;
-          break;
-        case envoy::source::extensions::common::wasm::LifeSpan::DownstreamRequest:
-          span = StreamInfo::FilterState::LifeSpan::Request;
-          break;
-        case envoy::source::extensions::common::wasm::LifeSpan::DownstreamConnection:
-          span = StreamInfo::FilterState::LifeSpan::Connection;
-          break;
-        default:
-          // do nothing
-          break;
-        }
+        StreamInfo::FilterState::LifeSpan span = toFilterStateLifeSpan(args.span());
         auto context = static_cast<Context*>(proxy_wasm::current_context_);
         return context->declareProperty(
-            args.name(),
-            std::make_unique<const WasmStatePrototype>(args.readonly(), type, args.schema(), span));
+            args.name(), std::make_unique<const Filters::Common::Expr::CelStatePrototype>(
+                             args.readonly(), type, args.schema(), span));
       }
       return WasmResult::BadArgument;
     };

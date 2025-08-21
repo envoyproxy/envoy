@@ -2,7 +2,7 @@
 
 #include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
-#include "common/secret/secret_provider_impl.h"
+#include "source/common/secret/secret_provider_impl.h"
 
 using testing::_;
 using testing::Invoke;
@@ -30,6 +30,9 @@ MockSecretManager::~MockSecretManager() = default;
 MockSecretCallbacks::MockSecretCallbacks() = default;
 
 MockSecretCallbacks::~MockSecretCallbacks() = default;
+
+MockGenericSecretConfigProvider::MockGenericSecretConfigProvider() = default;
+MockGenericSecretConfigProvider::~MockGenericSecretConfigProvider() = default;
 
 } // namespace Secret
 } // namespace Envoy

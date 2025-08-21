@@ -4,6 +4,7 @@
 
 #endif
 #include <cerrno>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -75,6 +76,7 @@ WASM_EXPORT(uint32_t, proxy_on_vm_start, (uint32_t context_id, uint32_t configur
     std::string message = "before badptr";
     proxy_log(LogLevel::error, message.c_str(), message.size());
     ::free(const_cast<void*>(reinterpret_cast<const void*>(configuration_ptr)));
+    configuration_ptr = nullptr;
     *badptr = 1;
     message = "after badptr";
     proxy_log(LogLevel::error, message.c_str(), message.size());
@@ -82,6 +84,7 @@ WASM_EXPORT(uint32_t, proxy_on_vm_start, (uint32_t context_id, uint32_t configur
     std::string message = "before div by zero";
     proxy_log(LogLevel::error, message.c_str(), message.size());
     ::free(const_cast<void*>(reinterpret_cast<const void*>(configuration_ptr)));
+    configuration_ptr = nullptr;
     int zero = context_id & 0x100000;
     message = "divide by zero: " + std::to_string(100 / zero);
     proxy_log(LogLevel::error, message.c_str(), message.size());
@@ -194,6 +197,8 @@ WASM_EXPORT(uint32_t, proxy_on_vm_start, (uint32_t context_id, uint32_t configur
   } else if (configuration == "WASI") {
     // These checks depend on Emscripten's support for `WASI` and will only
     // work if invoked on a "real" Wasm VM.
+    // Call to clock_time_get on monotonic clock should be available.
+    const std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
     int err = fprintf(stdout, "WASI write to stdout\n");
     if (err < 0) {
       FAIL_NOW("stdout write should succeed");
@@ -212,6 +217,11 @@ WASM_EXPORT(uint32_t, proxy_on_vm_start, (uint32_t context_id, uint32_t configur
     char* pathenv = getenv("PATH");
     if (pathenv != nullptr) {
       FAIL_NOW("PATH environment variable should not be available");
+    }
+    // Check if the monotonic clock actually increases monotonically.
+    const std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
+    if ((t2-t1).count() <= 0) {
+      FAIL_NOW("monotonic clock should be available");
     }
 #ifndef WIN32
     // Exercise the `WASI` `fd_fdstat_get` a little bit

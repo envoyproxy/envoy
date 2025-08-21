@@ -1,0 +1,14 @@
+envoy:
+  title: Envoy proxy server
+  maintained_by: The Envoy community
+  # TODO(phlax): shift/use icon to/from website
+  logo: https://github.com/envoyproxy/envoy/raw/main/distribution/dockerhub/envoy-icon.png
+  # logo: https://github.com/envoyproxy/envoy/raw/1e2bf2096f9952398caef687f14e3ea86de6cfd4/distribution/dockerhub/envoy-icon.png
+  project_url: https://github.com/envoyproxy/envoy
+  issues_url: https://github.com/envoyproxy/envoy/issues
+  docs_url: https://www.envoyproxy.io/docs
+  slack_url: https://envoyproxy.slack.com/
+
+architectures:
+- amd64
+- arm64

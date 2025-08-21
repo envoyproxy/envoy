@@ -2,10 +2,9 @@
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
-#include "common/common/thread.h"
-#include "common/network/address_impl.h"
-
-#include "server/config_validation/server.h"
+#include "source/common/common/thread.h"
+#include "source/common/network/address_impl.h"
+#include "source/server/config_validation/server.h"
 
 #include "test/fuzz/fuzz_runner.h"
 #include "test/integration/server.h"
@@ -20,9 +19,17 @@ namespace {
 // mode (quits upon validation of the given config)
 DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
   envoy::config::bootstrap::v3::Bootstrap sanitizedInput(input);
-  // TODO(asraa): QUIC is not enabled in production code yet, so remove references for HTTP3.
-  // Tracked at https://github.com/envoyproxy/envoy/issues/9513.
-  for (auto& cluster : *sanitizedInput.mutable_static_resources()->mutable_clusters()) {
+  for (::envoy::config::cluster::v3::Cluster& cluster :
+       *sanitizedInput.mutable_static_resources()->mutable_clusters()) {
+    if (cluster.load_assignment().endpoints_size() > 10) {
+      ENVOY_LOG_MISC(debug,
+                     "Rejecting input with more the 10 endpoints to keep runtime acceptable. "
+                     "Current #endpoints: {}",
+                     cluster.load_assignment().endpoints_size());
+      return;
+    }
+    // TODO(asraa): QUIC is not enabled in production code yet, so remove references for HTTP3.
+    // Tracked at https://github.com/envoyproxy/envoy/issues/9513.
     for (auto& health_check : *cluster.mutable_health_checks()) {
       if (health_check.http_health_check().codec_client_type() ==
           envoy::type::v3::CodecClientType::HTTP3) {
@@ -32,17 +39,17 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
   }
   testing::NiceMock<MockOptions> options;
   TestComponentFactory component_factory;
-  Fuzz::PerTestEnvironment test_env;
+  ABSL_ATTRIBUTE_UNUSED Filesystem::ScopedUseMemfiles use_memfiles{true};
 
-  const std::string bootstrap_path = test_env.temporaryPath("bootstrap.pb_text");
-  std::ofstream bootstrap_file(bootstrap_path);
-  bootstrap_file << sanitizedInput.DebugString();
+  const std::string bootstrap_path =
+      TestEnvironment::writeStringToFileForTest("bootstrap.pb_text", sanitizedInput.DebugString());
   options.config_path_ = bootstrap_path;
   options.log_level_ = Fuzz::Runner::logLevel();
 
   try {
-    validateConfig(options, Network::Address::InstanceConstSharedPtr(), component_factory,
-                   Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
+    validateConfig(options, std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1"),
+                   component_factory, Thread::threadFactoryForTest(),
+                   Filesystem::fileSystemForTest());
   } catch (const EnvoyException& ex) {
     ENVOY_LOG_MISC(debug, "Controlled EnvoyException exit: {}", ex.what());
   }

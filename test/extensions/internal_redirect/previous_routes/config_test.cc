@@ -2,10 +2,8 @@
 #include "envoy/registry/registry.h"
 #include "envoy/router/internal_redirect.h"
 
-#include "common/stream_info/filter_state_impl.h"
-
-#include "extensions/internal_redirect/previous_routes/config.h"
-#include "extensions/internal_redirect/well_known_names.h"
+#include "source/common/stream_info/filter_state_impl.h"
+#include "source/extensions/internal_redirect/previous_routes/config.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -21,7 +19,7 @@ class PreviousRoutesTest : public testing::Test {
 protected:
   PreviousRoutesTest() : filter_state_(StreamInfo::FilterState::LifeSpan::FilterChain) {
     factory_ = Registry::FactoryRegistry<Router::InternalRedirectPredicateFactory>::getFactory(
-        InternalRedirectPredicateValues::get().PreviousRoutesPredicate);
+        "envoy.internal_redirect_predicates.previous_routes");
     config_ = factory_->createEmptyConfigProto();
   }
 

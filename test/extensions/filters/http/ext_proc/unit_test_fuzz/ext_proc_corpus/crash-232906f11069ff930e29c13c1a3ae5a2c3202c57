@@ -1,0 +1,70 @@
+config {
+  grpc_service {
+    google_grpc {
+      target_uri: "test_uri"
+      channel_credentials {
+        ssl_credentials {
+          private_key {
+            inline_string: "/"
+          }
+        }
+      }
+      stat_prefix: "test_uri"
+      credentials_factory_name: "test_uri"
+      config {
+      }
+    }
+    initial_metadata {
+      key: "test_uri"
+    }
+  }
+  failure_mode_allow: true
+  processing_mode {
+    response_header_mode: SKIP
+  }
+  request_attributes: "("
+  response_attributes: "test_uri"
+  response_attributes: "9\000\000\000\000\000\000\000"
+  stat_prefix: "\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000."
+}
+request {
+  headers {
+    headers {
+      key: "("
+    }
+    headers {
+      key: "test_uri"
+    }
+  }
+  http_body {
+    data: "\360\270\270\270\360\270\270\270\360\270\270\270\360\270\270\270\360\270\270\270\360\270\270\270\360\270\270\270\360\270\270\270\360\270\270\270\360\270\270\270\360\270\270\270\360\270\270\270\350\270\270"
+  }
+}
+response {
+  request_headers {
+    response {
+      header_mutation {
+        remove_headers: "f"
+        remove_headers: "f"
+      }
+    }
+  }
+  dynamic_metadata {
+    fields {
+      key: ""
+      value {
+      }
+    }
+    fields {
+      key: ""
+      value {
+      }
+    }
+  }
+  mode_override {
+    request_header_mode: SKIP
+    request_body_mode: BUFFERED
+    response_body_mode: BUFFERED
+    request_trailer_mode: SEND
+  }
+}

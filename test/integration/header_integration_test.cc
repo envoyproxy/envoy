@@ -1,17 +1,19 @@
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/endpoint.pb.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/router/v3/router.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
-#include "common/config/api_version.h"
-#include "common/config/metadata.h"
-#include "common/http/exception.h"
-#include "common/protobuf/protobuf.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/metadata.h"
+#include "source/common/http/exception.h"
+#include "source/common/protobuf/protobuf.h"
 
+#include "test/config/v2_link_hacks.h"
 #include "test/integration/http_integration.h"
+#include "test/integration/http_protocol_integration.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/resources.h"
 #include "test/test_common/utility.h"
@@ -22,18 +24,19 @@ namespace Envoy {
 namespace {
 
 std::string ipSuppressEnvoyHeadersTestParamsToString(
-    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
+    const ::testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool, bool>>& params) {
   return fmt::format(
-      "{}_{}",
+      "{}_{}_{}",
       TestUtility::ipTestParamsToString(
           ::testing::TestParamInfo<Network::Address::IpVersion>(std::get<0>(params.param), 0)),
-      std::get<1>(params.param) ? "with_x_envoy_from_router" : "without_x_envoy_from_router");
+      std::get<1>(params.param) ? "with_x_envoy_from_router" : "without_x_envoy_from_router",
+      std::get<2>(params.param) ? "with_UHV" : "without_UHV");
 }
 
 void disableHeaderValueOptionAppend(
     Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValueOption>& header_value_options) {
   for (auto& i : header_value_options) {
-    i.mutable_append()->set_value(false);
+    i.set_append_action(envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
   }
 }
 
@@ -118,6 +121,9 @@ route_config:
             - header:
                 key: "x-route-response"
                 value: "route"
+            - header:
+                key: "details"
+                value: "%RESPONSE_CODE_DETAILS%"
           response_headers_to_remove: ["x-route-response-remove"]
           route:
             cluster: cluster_0
@@ -173,11 +179,10 @@ route_config:
 } // namespace
 
 class HeaderIntegrationTest
-    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool, bool>>,
       public HttpIntegrationTest {
 public:
-  HeaderIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())) {}
+  HeaderIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
 
   bool routerSuppressEnvoyHeaders() const { return std::get<1>(GetParam()); }
 
@@ -202,7 +207,9 @@ public:
     auto* mutable_header = header_value_option->mutable_header();
     mutable_header->set_key(key);
     mutable_header->set_value(value);
-    header_value_option->mutable_append()->set_value(append);
+    header_value_option->set_append_action(
+        append ? envoy::config::core::v3::HeaderValueOption::APPEND_IF_EXISTS_OR_ADD
+               : envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
   }
 
   void prepareEDS() {
@@ -217,10 +224,8 @@ public:
                   type: EDS
                   eds_cluster_config:
                     eds_config:
-                      resource_api_version: V3
                       api_config_source:
                         api_type: GRPC
-                        transport_api_version: V3
                         grpc_services:
                           envoy_grpc:
                             cluster_name: "eds-cluster"
@@ -329,6 +334,7 @@ public:
           }
 
           hcm.mutable_normalize_path()->set_value(normalize_path_);
+          hcm.set_path_with_escaped_slashes_action(path_with_escaped_slashes_action_);
 
           if (append) {
             // The config specifies append by default: no modifications needed.
@@ -365,7 +371,7 @@ public:
     HttpIntegrationTest::createUpstreams();
 
     if (use_eds_) {
-      addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+      addFakeUpstream(Http::CodecType::HTTP2);
     }
   }
 
@@ -379,13 +385,13 @@ public:
         RELEASE_ASSERT(result, result.message());
         eds_stream_->startGrpcStream();
 
-        API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
+        envoy::service::discovery::v3::DiscoveryRequest discovery_request;
         result = eds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
         RELEASE_ASSERT(result, result.message());
 
-        API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
+        envoy::service::discovery::v3::DiscoveryResponse discovery_response;
         discovery_response.set_version_info("1");
-        discovery_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+        discovery_response.set_type_url(Config::TestTypeUrl::get().ClusterLoadAssignment);
 
         auto cluster_load_assignment =
             TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(fmt::format(
@@ -415,6 +421,9 @@ public:
       };
     }
 
+    config_helper_.addRuntimeOverride("envoy.reloadable_features.enable_universal_header_validator",
+                                      std::get<2>(GetParam()) ? "true" : "false");
+
     HttpIntegrationTest::initialize();
   }
 
@@ -433,7 +442,7 @@ protected:
   }
 
   template <class Headers, class ExpectedHeaders>
-  void compareHeaders(Headers&& headers, ExpectedHeaders& expected_headers) {
+  void compareHeaders(Headers&& headers, const ExpectedHeaders& expected_headers) {
     headers.remove(Envoy::Http::LowerCaseString{"content-length"});
     headers.remove(Envoy::Http::LowerCaseString{"date"});
     if (!routerSuppressEnvoyHeaders()) {
@@ -444,20 +453,103 @@ protected:
     headers.remove(Envoy::Http::LowerCaseString{"x-request-id"});
     headers.remove(Envoy::Http::LowerCaseString{"x-envoy-internal"});
 
-    EXPECT_EQ(expected_headers, headers);
+    EXPECT_THAT(&headers, HeaderMapEqualIgnoreOrder(&expected_headers));
   }
 
   bool use_eds_{false};
   bool normalize_path_{false};
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      PathWithEscapedSlashesAction path_with_escaped_slashes_action_{
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+              KEEP_UNCHANGED};
   FakeHttpConnectionPtr eds_connection_;
   FakeStreamPtr eds_stream_;
 };
 
+#ifdef ENVOY_ENABLE_UHV
 INSTANTIATE_TEST_SUITE_P(
     IpVersionsSuppressEnvoyHeaders, HeaderIntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool(),
+                     testing::Values(true)),
     ipSuppressEnvoyHeadersTestParamsToString);
+#else
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsSuppressEnvoyHeaders, HeaderIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool(),
+                     testing::Values(false)),
+    ipSuppressEnvoyHeadersTestParamsToString);
+#endif
 
+TEST_P(HeaderIntegrationTest, WeightedClusterWithClusterHeader) {
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) {
+        // Overwrite default config with our own.
+        TestUtility::loadFromYaml(R"EOF(
+http_filters:
+  - name: envoy.filters.http.router
+codec_type: HTTP1
+use_remote_address: false
+xff_num_trusted_hops: 1
+stat_prefix: header_test
+route_config:
+  name: route-config-1
+  virtual_hosts:
+    - name: vhost-headers
+      domains: ["vhost-headers.com"]
+      routes:
+        - match: { prefix: "/vhost-route-and-weighted-clusters" }
+          name: route-0
+          route:
+            weighted_clusters:
+              clusters:
+                - cluster_header: x-route-to-this-cluster
+                  weight: 100
+                  request_headers_to_add:
+                    - header:
+                        key: "x-weighted-cluster-request"
+                        value: "weighted-cluster-1"
+                  request_headers_to_remove: ["x-weighted-cluster-request-remove"]
+                  response_headers_to_add:
+                    - header:
+                        key: "x-weighted-cluster-response"
+                        value: "weighted-cluster-1"
+                  response_headers_to_remove: ["x-weighted-cluster-response-remove"]
+)EOF",
+                                  hcm);
+        envoy::extensions::filters::http::router::v3::Router router_config;
+        router_config.set_suppress_envoy_headers(routerSuppressEnvoyHeaders());
+        hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config);
+      });
+  initialize();
+  performRequest(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/vhost-route-and-weighted-clusters"},
+          {":scheme", "http"},
+          {":authority", "vhost-headers.com"},
+          {"x-weighted-cluster-request-remove", "to-remove"},
+          {"x-route-to-this-cluster", "cluster_0"},
+      },
+      Http::TestRequestHeaderMapImpl{
+          {":authority", "vhost-headers.com"},
+          {"x-route-to-this-cluster", "cluster_0"},
+          {":path", "/vhost-route-and-weighted-clusters"},
+          {":method", "GET"},
+          {"x-weighted-cluster-request", "weighted-cluster-1"},
+      },
+      Http::TestResponseHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-weighted-cluster-response-remove", "to-remove"},
+      },
+      Http::TestResponseHeaderMapImpl{
+          {"server", "envoy"},
+          {":status", "200"},
+          {"x-weighted-cluster-response", "weighted-cluster-1"},
+      });
+}
 // Validate that downstream request headers are passed upstream and upstream response headers are
 // passed downstream.
 TEST_P(HeaderIntegrationTest, TestRequestAndResponseHeaderPassThrough) {
@@ -588,6 +680,7 @@ TEST_P(HeaderIntegrationTest, TestRouteAppendHeaderManipulation) {
           {"server", "envoy"},
           {"x-route-response", "upstream"},
           {"x-route-response", "route"},
+          {"details", "via_upstream"},
           {":status", "200"},
       });
 }
@@ -624,6 +717,7 @@ TEST_P(HeaderIntegrationTest, TestRouteReplaceHeaderManipulation) {
           {"server", "envoy"},
           {"x-unmodified", "upstream"},
           {"x-route-response", "route"},
+          {"details", "via_upstream"},
           {":status", "200"},
       });
 }
@@ -1085,73 +1179,212 @@ TEST_P(HeaderIntegrationTest, TestPathAndRouteOnNormalizedPath) {
       });
 }
 
-// Validates TE header is forwarded if it contains a supported value
-TEST_P(HeaderIntegrationTest, TestTeHeaderPassthrough) {
+// Validates that Envoy by default does not modify escaped slashes.
+TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesByDefaultUnchanghed) {
+  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
+      v3::HttpConnectionManager::IMPLEMENTATION_SPECIFIC_DEFAULT;
+  normalize_path_ = true;
   initializeFilter(HeaderMode::Append, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
-          {":path", "/"},
+          {":path", "/private/..%2Fpublic%5C"},
           {":scheme", "http"},
-          {":authority", "no-headers.com"},
-          {"x-request-foo", "downstram"},
-          {"connection", "te, close"},
-          {"te", "trailers"},
+          {":authority", "path-sanitization.com"},
       },
-      Http::TestRequestHeaderMapImpl{
-          {":authority", "no-headers.com"},
-          {":path", "/"},
-          {":method", "GET"},
-          {"x-request-foo", "downstram"},
-          {"te", "trailers"},
-      },
+      Http::TestRequestHeaderMapImpl{{":authority", "path-sanitization.com"},
+                                     {":path", "/private/..%2Fpublic%5C"},
+                                     {":method", "GET"},
+                                     {"x-site", "private"}},
       Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},
-          {"x-return-foo", "upstream"},
+          {"x-unmodified", "response"},
       },
       Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
-          {"x-return-foo", "upstream"},
+          {"x-unmodified", "response"},
           {":status", "200"},
-          {"connection", "close"},
       });
 }
 
-// Validates TE header is stripped if it contains an unsupported value
-TEST_P(HeaderIntegrationTest, TestTeHeaderSanitized) {
+// Validates that default action can be overridden through runtime.
+TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesDefaultOverriden) {
+  // Override the default action to REJECT
+  config_helper_.addRuntimeOverride("http_connection_manager.path_with_escaped_slashes_action",
+                                    "2");
+  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
+      v3::HttpConnectionManager::IMPLEMENTATION_SPECIFIC_DEFAULT;
+  initializeFilter(HeaderMode::Append, false);
+  registerTestServerPorts({"http"});
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/private%2f../public"},
+          {":scheme", "http"},
+          {":authority", "path-sanitization.com"},
+      });
+  EXPECT_TRUE(response->waitForEndStream());
+  Http::TestResponseHeaderMapImpl response_headers{response->headers()};
+  compareHeaders(response_headers, Http::TestResponseHeaderMapImpl{
+                                       {"server", "envoy"},
+                                       {"connection", "close"},
+                                       {":status", "400"},
+                                   });
+}
+
+TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesRejected) {
+  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
+      v3::HttpConnectionManager::REJECT_REQUEST;
+  initializeFilter(HeaderMode::Append, false);
+  registerTestServerPorts({"http"});
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/private%2f../public"},
+          {":scheme", "http"},
+          {":authority", "path-sanitization.com"},
+      });
+  EXPECT_TRUE(response->waitForEndStream());
+  Http::TestResponseHeaderMapImpl response_headers{response->headers()};
+  compareHeaders(response_headers, Http::TestResponseHeaderMapImpl{
+                                       {"server", "envoy"},
+                                       {"connection", "close"},
+                                       {":status", "400"},
+                                   });
+}
+
+// Validates that Envoy does not modify escaped slashes when configured.
+TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesUnmodified) {
+  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
+      v3::HttpConnectionManager::KEEP_UNCHANGED;
+  normalize_path_ = true;
   initializeFilter(HeaderMode::Append, false);
   performRequest(
       Http::TestRequestHeaderMapImpl{
           {":method", "GET"},
-          {":path", "/"},
+          {":path", "/private/..%2Fpublic%5C"},
           {":scheme", "http"},
-          {":authority", "no-headers.com"},
-          {"x-request-foo", "downstram"},
-          {"connection", "te, mike, sam, will, close"},
-          {"te", "gzip"},
-          {"mike", "foo"},
-          {"sam", "bar"},
-          {"will", "baz"},
+          {":authority", "path-sanitization.com"},
       },
-      Http::TestRequestHeaderMapImpl{
-          {":authority", "no-headers.com"},
-          {":path", "/"},
-          {":method", "GET"},
-          {"x-request-foo", "downstram"},
-      },
+      Http::TestRequestHeaderMapImpl{{":authority", "path-sanitization.com"},
+                                     {":path", "/private/..%2Fpublic%5C"},
+                                     {":method", "GET"},
+                                     {"x-site", "private"}},
       Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
           {"content-length", "0"},
           {":status", "200"},
-          {"x-return-foo", "upstream"},
+          {"x-unmodified", "response"},
       },
       Http::TestResponseHeaderMapImpl{
           {"server", "envoy"},
-          {"x-return-foo", "upstream"},
+          {"x-unmodified", "response"},
           {":status", "200"},
-          {"connection", "close"},
       });
+}
+
+// Validates that Envoy forwards unescaped slashes when configured.
+TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesAndNormalizationForwarded) {
+  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
+      v3::HttpConnectionManager::UNESCAPE_AND_FORWARD;
+  normalize_path_ = true;
+  initializeFilter(HeaderMode::Append, false);
+  performRequest(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/private/..%2Fpublic%5c%2e%2Fabc"},
+          {":scheme", "http"},
+          {":authority", "path-sanitization.com"},
+      },
+      Http::TestRequestHeaderMapImpl{{":authority", "path-sanitization.com"},
+                                     {":path", "/public/abc"},
+                                     {":method", "GET"},
+                                     {"x-site", "public"}},
+      Http::TestResponseHeaderMapImpl{
+          {"server", "envoy"},
+          {"content-length", "0"},
+          {":status", "200"},
+          {"x-unmodified", "response"},
+      },
+      Http::TestResponseHeaderMapImpl{
+          {"server", "envoy"},
+          {"x-unmodified", "response"},
+          {":status", "200"},
+      });
+}
+
+TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesRedirected) {
+  path_with_escaped_slashes_action_ = envoy::extensions::filters::network::http_connection_manager::
+      v3::HttpConnectionManager::UNESCAPE_AND_REDIRECT;
+  initializeFilter(HeaderMode::Append, false);
+  registerTestServerPorts({"http"});
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/private%2f../%2e%5Cpublic"},
+          {":scheme", "http"},
+          {":authority", "path-sanitization.com"},
+      });
+  EXPECT_TRUE(response->waitForEndStream());
+  Http::TestResponseHeaderMapImpl response_headers{response->headers()};
+  compareHeaders(response_headers, Http::TestResponseHeaderMapImpl{
+                                       {"server", "envoy"},
+                                       {"location", "/private/../%2e\\public"},
+                                       {":status", "307"},
+                                   });
+}
+
+using EmptyHeaderIntegrationTest = HttpProtocolIntegrationTest;
+using HeaderValueOption = envoy::config::core::v3::HeaderValueOption;
+
+INSTANTIATE_TEST_SUITE_P(Protocols, EmptyHeaderIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
+
+TEST_P(EmptyHeaderIntegrationTest, AllProtocolsPassEmptyHeaders) {
+  auto vhost = config_helper_.createVirtualHost("sni.lyft.com");
+  *vhost.add_request_headers_to_add() = TestUtility::parseYaml<HeaderValueOption>(R"EOF(
+    header:
+      key: "x-ds-add-empty"
+      value: "%PER_REQUEST_STATE(does.not.exist)%"
+    keep_empty_value: true
+  )EOF");
+  *vhost.add_request_headers_to_add() = TestUtility::parseYaml<HeaderValueOption>(R"EOF(
+    header:
+      key: "x-ds-no-add-empty"
+      value: "%PER_REQUEST_STATE(does.not.exist)%"
+  )EOF");
+  *vhost.add_response_headers_to_add() = TestUtility::parseYaml<HeaderValueOption>(R"EOF(
+    header:
+      key: "x-us-add-empty"
+      value: "%PER_REQUEST_STATE(does.not.exist)%"
+    keep_empty_value: true
+  )EOF");
+  *vhost.add_response_headers_to_add() = TestUtility::parseYaml<HeaderValueOption>(R"EOF(
+    header:
+      key: "x-us-no-add-empty"
+      value: "%PER_REQUEST_STATE(does.not.exist)%"
+  )EOF");
+
+  config_helper_.addVirtualHost(vhost);
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = sendRequestAndWaitForResponse(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "sni.lyft.com"}},
+      0,
+      Http::TestResponseHeaderMapImpl{
+          {"server", "envoy"}, {"content-length", "0"}, {":status", "200"}},
+      0);
+  EXPECT_EQ(upstream_request_->headers().get(Http::LowerCaseString("x-ds-add-empty")).size(), 1);
+  EXPECT_TRUE(upstream_request_->headers().get(Http::LowerCaseString("x-ds-no-add-empty")).empty());
+  EXPECT_EQ(response->headers().get(Http::LowerCaseString("x-us-add-empty")).size(), 1);
+  EXPECT_TRUE(response->headers().get(Http::LowerCaseString("x-us-no-add-empty")).empty());
 }
 } // namespace Envoy

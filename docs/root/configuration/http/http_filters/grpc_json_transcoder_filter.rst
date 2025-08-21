@@ -4,8 +4,8 @@ gRPC-JSON transcoder
 ====================
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
+* This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder>`
-* This filter should be configured with the name *envoy.filters.http.grpc_json_transcoder*.
 
 This is a filter which allows a RESTful JSON API client to send requests to Envoy over HTTP
 and get proxied to a gRPC service. The HTTP mapping for the gRPC service has to be defined by
@@ -39,7 +39,7 @@ Then run protoc to generate the descriptor set. For example using the test
 
 .. code-block:: console
 
-  $ protoc -I$(GOOGLEAPIS_DIR) -I. --include_imports --include_source_info \
+  $ protoc -I${GOOGLEAPIS_DIR} -I. --include_imports --include_source_info \
       --descriptor_set_out=proto.pb test/proto/bookstore.proto
 
 If you have more than one proto source files, you can pass all of them in one command.
@@ -48,14 +48,14 @@ Route configs for transcoded requests
 -------------------------------------
 
 The route configs to be used with the gRPC-JSON transcoder should be identical to the gRPC route.
-The requests processed by the transcoder filter will have `/<package>.<service>/<method>` path and
-`POST` method. The route configs for those requests should match on `/<package>.<service>/<method>`,
+The requests processed by the transcoder filter will have ``/<package>.<service>/<method>`` path and
+``POST`` method. The route configs for those requests should match on ``/<package>.<service>/<method>``,
 not the incoming request path. This allows the routes to be used for both gRPC requests and
 gRPC-JSON transcoded requests.
 
-For example, with the following proto example, the router will process `/helloworld.Greeter/SayHello`
-as the path, so the route config prefix `/say` won't match requests to `SayHello`. If you want to
-match the incoming request path, set `match_incoming_request_route` to true.
+For example, with the following proto example, the router will process ``/helloworld.Greeter/SayHello``
+as the path, so the route config prefix ``/say`` won't match requests to ``SayHello``. If you want to
+match the incoming request path, set ``match_incoming_request_route`` to true.
 
 .. literalinclude:: _include/helloworld.proto
     :language: proto
@@ -73,17 +73,17 @@ Sending arbitrary content
 -------------------------
 
 By default, when transcoding occurs, gRPC-JSON encodes the message output of a gRPC service method into
-JSON and sets the HTTP response `Content-Type` header to `application/json`. To send arbitrary content,
+JSON and sets the HTTP response ``Content-Type`` header to ``application/json``. To send arbitrary content,
 a gRPC service method can use
 `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_
 as its output message type. The implementation needs to set
 `content_type <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto#L68>`_
-(which sets the value of the HTTP response `Content-Type` header) and
+(which sets the value of the HTTP response ``Content-Type`` header) and
 `data <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto#L71>`_
 (which sets the HTTP response body) accordingly.
 Multiple `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_
 can be send by the gRPC server in the server streaming case.
-In this case, HTTP response header `Content-Type` will use the `content-type` from the first
+In this case, HTTP response header ``Content-Type`` will use the ``content-type`` from the first
 `google.api.HttpBody <https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto>`_.
 
 Headers
@@ -91,8 +91,8 @@ Headers
 
 gRPC-JSON forwards the following headers to the gRPC server:
 
-* `x-envoy-original-path`, containing the value of the original path of HTTP request
-* `x-envoy-original-method`, containing the value of the original method of HTTP request
+* ``x-envoy-original-path``, containing the value of the original path of HTTP request
+* ``x-envoy-original-method``, containing the value of the original method of HTTP request
 
 
 Sample Envoy configuration
@@ -104,3 +104,5 @@ gRPC or RESTful JSON requests to localhost:51051.
 
 .. literalinclude:: _include/grpc-transcoder-filter.yaml
     :language: yaml
+    :linenos:
+    :caption: :download:`grpc-transcoder-filter.yaml <_include/grpc-transcoder-filter.yaml>`

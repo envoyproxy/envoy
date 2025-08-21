@@ -6,8 +6,12 @@ Configuration: Dynamic from control plane
 These instructions are slightly more complex as you must also set up a control plane to provide Envoy with its
 configuration.
 
-There are a number of control planes compatible with Envoy's API such as `Gloo <https://docs.solo.io/gloo/latest/>`_
-or `Istio <https://istio.io>`_.
+There are a number of control planes compatible with Envoy's API, for example:
+
+- Within the Envoy project you can leverage `Envoy Gateway <https://gateway.envoyproxy.io/docs/>`_
+- `Istio <https://istio.io>`_ provides a popular control plane for service meshes.
+
+You can find more control plane implementations, both CNCF Open Source control planes, and vendor provided control planes on the `Community page <https://www.envoyproxy.io/community>`_.
 
 You may also wish to explore implementing your own control plane, in which case the
 `Go Control Plane <https://github.com/envoyproxy/go-control-plane>`_ provides a reference implementation
@@ -37,6 +41,7 @@ The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should s
     :linenos:
     :lines: 1-5
     :emphasize-lines: 1-3
+    :caption: :download:`envoy-dynamic-control-plane-demo.yaml <_include/envoy-dynamic-control-plane-demo.yaml>`
 
 .. _start_quick_start_dynamic_dynamic_resources:
 
@@ -45,7 +50,7 @@ The :ref:`node <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.node>` should s
 
 The :ref:`dynamic_resources <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.dynamic_resources>` specify
 the configuration to load dynamically, and the :ref:`cluster <start_quick_start_dynamic_static_resources>`
-to connect to for dynamic configuration updates.
+to connect for dynamic configuration updates.
 
 In this example, the configuration is provided by the ``xds_cluster`` configured below.
 
@@ -55,6 +60,7 @@ In this example, the configuration is provided by the ``xds_cluster`` configured
     :lines: 3-19
     :lineno-start: 3
     :emphasize-lines: 3-15
+    :caption: :download:`envoy-dynamic-control-plane-demo.yaml <_include/envoy-dynamic-control-plane-demo.yaml>`
 
 .. _start_quick_start_dynamic_static_resources:
 
@@ -69,6 +75,7 @@ The ``xds_cluster`` is configured to query a control plane at http://my-control-
 .. literalinclude:: _include/envoy-dynamic-control-plane-demo.yaml
     :language: yaml
     :linenos:
-    :lines: 17-35
+    :lines: 17-38
     :lineno-start: 17
-    :emphasize-lines: 3-17
+    :emphasize-lines: 3-20
+    :caption: :download:`envoy-dynamic-control-plane-demo.yaml <_include/envoy-dynamic-control-plane-demo.yaml>`

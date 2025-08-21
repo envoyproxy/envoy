@@ -1,8 +1,8 @@
 #include <chrono>
 #include <thread>
 
-#include "common/common/lock_guard.h"
-#include "common/common/mutex_tracer_impl.h"
+#include "source/common/common/lock_guard.h"
+#include "source/common/common/mutex_tracer_impl.h"
 
 #include "test/test_common/contention.h"
 #include "test/test_common/utility.h"

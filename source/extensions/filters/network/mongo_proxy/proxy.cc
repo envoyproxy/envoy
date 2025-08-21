@@ -1,4 +1,4 @@
-#include "extensions/filters/network/mongo_proxy/proxy.h"
+#include "source/extensions/filters/network/mongo_proxy/proxy.h"
 
 #include <chrono>
 #include <cstdint>
@@ -10,12 +10,11 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/utility.h"
-
-#include "extensions/filters/network/mongo_proxy/codec_impl.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/utility.h"
+#include "source/extensions/filters/network/mongo_proxy/codec_impl.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 #include "absl/strings/str_split.h"
 
@@ -38,12 +37,15 @@ using DynamicMetadataKeysSingleton = ConstSingleton<DynamicMetadataKeys>;
 AccessLog::AccessLog(const std::string& file_name, Envoy::AccessLog::AccessLogManager& log_manager,
                      TimeSource& time_source)
     : time_source_(time_source) {
-  file_ = log_manager.createAccessLog(file_name);
+  auto file_or_error = log_manager.createAccessLog(
+      Filesystem::FilePathAndType{Filesystem::DestinationType::File, file_name});
+  THROW_IF_NOT_OK_REF(file_or_error.status());
+  file_ = file_or_error.value();
 }
 
 void AccessLog::logMessage(const Message& message, bool full,
                            const Upstream::HostDescription* upstream_host) {
-  static const std::string log_format =
+  static constexpr absl::string_view log_format =
       "{{\"time\": \"{}\", \"message\": {}, \"upstream_host\": \"{}\"}}\n";
 
   SystemTime now = time_source_.systemTime();
@@ -73,7 +75,7 @@ ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
 ProxyFilter::~ProxyFilter() { ASSERT(!delay_timer_); }
 
 void ProxyFilter::setDynamicMetadata(std::string operation, std::string resource) {
-  ProtobufWkt::Struct metadata(
+  Protobuf::Struct metadata(
       (*read_callbacks_->connection()
             .streamInfo()
             .dynamicMetadata()
@@ -249,7 +251,7 @@ void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
     break;
   }
 
-  if (active_query_list_.empty() && drain_decision_.drainClose() &&
+  if (active_query_list_.empty() && drain_decision_.drainClose(Network::DrainDirection::All) &&
       runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().DrainCloseEnabled, 100)) {
     ENVOY_LOG(debug, "drain closing mongo connection");
     stats_.cx_drain_close_.inc();
@@ -335,9 +337,8 @@ void ProxyFilter::doDecode(Buffer::Instance& buffer) {
     decoder_ = createDecoder(*this);
   }
 
-  try {
-    decoder_->onData(buffer);
-  } catch (EnvoyException& e) {
+  TRY_NEEDS_AUDIT { decoder_->onData(buffer); }
+  END_TRY catch (EnvoyException& e) {
     ENVOY_LOG(info, "mongo decoding error: {}", e.what());
     stats_.decoding_error_.inc();
     sniffing_ = false;

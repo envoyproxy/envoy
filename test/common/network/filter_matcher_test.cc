@@ -1,5 +1,5 @@
-#include "common/network/address_impl.h"
-#include "common/network/filter_matcher.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/filter_matcher.h"
 
 #include "test/mocks/network/mocks.h"
 
@@ -14,17 +14,16 @@ namespace {
 struct CallbackHandle {
   std::unique_ptr<Network::MockListenerFilterCallbacks> callback_;
   std::unique_ptr<Network::MockConnectionSocket> socket_;
-  Address::InstanceConstSharedPtr address_;
 };
 } // namespace
 class ListenerFilterMatcherTest : public testing::Test {
 public:
   std::unique_ptr<CallbackHandle> createCallbackOnPort(int port) {
     auto handle = std::make_unique<CallbackHandle>();
-    handle->address_ = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", port);
     handle->socket_ = std::make_unique<MockConnectionSocket>();
     handle->callback_ = std::make_unique<MockListenerFilterCallbacks>();
-    EXPECT_CALL(*(handle->socket_), localAddress()).WillRepeatedly(ReturnRef(handle->address_));
+    handle->socket_->connection_info_provider_->setLocalAddress(
+        std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", port));
     EXPECT_CALL(*(handle->callback_), socket()).WillRepeatedly(ReturnRef(*(handle->socket_)));
     return handle;
   }

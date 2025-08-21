@@ -2,8 +2,8 @@
 
 #include <functional>
 
-#include "common/common/assert.h"
-#include "common/common/logger.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/environment.h"
@@ -12,10 +12,10 @@ namespace Envoy {
 
 void H1FuzzIntegrationTest::replay(const test::integration::CaptureFuzzTestCase& input,
                                    bool ignore_response) {
-  PERSISTENT_FUZZ_VAR bool initialized = [this]() -> bool {
-    initialize();
-    return true;
-  }();
+  struct Init {
+    Init(H1FuzzIntegrationTest* test) { test->initialize(); }
+  };
+  PERSISTENT_FUZZ_VAR(Init, initialized, (this));
   UNREFERENCED_PARAMETER(initialized);
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("http"));
   FakeRawConnectionPtr fake_upstream_connection;

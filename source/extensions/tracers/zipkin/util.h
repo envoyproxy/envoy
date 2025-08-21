@@ -5,8 +5,8 @@
 
 #include "envoy/common/time.h"
 
-#include "common/common/byte_order.h"
-#include "common/protobuf/utility.h"
+#include "source/common/common/byte_order.h"
+#include "source/common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -30,7 +30,7 @@ public:
    * @return std::string byte string representation of a number.
    */
   template <typename Type> static std::string toByteString(Type value) {
-    return std::string(reinterpret_cast<const char*>(&value), sizeof(Type));
+    return {reinterpret_cast<const char*>(&value), sizeof(Type)};
   }
 
   /**
@@ -42,7 +42,7 @@ public:
    */
   template <typename Type> static std::string toBigEndianByteString(Type value) {
     auto bytes = toEndianness<ByteOrder::BigEndian>(value);
-    return std::string(reinterpret_cast<const char*>(&bytes), sizeof(Type));
+    return {reinterpret_cast<const char*>(&bytes), sizeof(Type)};
   }
 
   using Replacements = std::vector<std::pair<const std::string, const std::string>>;
@@ -55,10 +55,10 @@ public:
    * @param value unt64_t number that will be represented in string.
    * @param name std::string that is the key for the value being replaced.
    * @param replacements a container to hold the required replacements when serializing this value.
-   * @return ProtobufWkt::Value wrapped uint64_t as a string.
+   * @return Protobuf::Value wrapped uint64_t as a string.
    */
-  static ProtobufWkt::Value uint64Value(uint64_t value, absl::string_view name,
-                                        Replacements& replacements);
+  static Protobuf::Value uint64Value(uint64_t value, absl::string_view name,
+                                     Replacements& replacements);
 };
 
 } // namespace Zipkin

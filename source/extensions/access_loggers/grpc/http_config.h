@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/server/access_log_config.h"
+#include "envoy/access_log/access_log_config.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -12,11 +12,12 @@ namespace HttpGrpc {
 /**
  * Config registration for the HTTP gRPC access log. @see AccessLogInstanceFactory.
  */
-class HttpGrpcAccessLogFactory : public Server::Configuration::AccessLogInstanceFactory {
+class HttpGrpcAccessLogFactory : public AccessLog::AccessLogInstanceFactory {
 public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-                          Server::Configuration::FactoryContext& context) override;
+                          Server::Configuration::FactoryContext& context,
+                          std::vector<Formatter::CommandParserPtr>&& = {}) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 

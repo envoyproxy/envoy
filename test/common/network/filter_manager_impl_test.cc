@@ -1,15 +1,12 @@
 #include <string>
 #include <vector>
 
-#include "envoy/extensions/filters/network/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/network/filter_manager_impl.h"
-#include "common/tcp_proxy/tcp_proxy.h"
-#include "common/upstream/upstream_impl.h"
-
-#include "extensions/filters/network/ratelimit/ratelimit.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/network/filter_manager_impl.h"
+#include "source/common/tcp_proxy/tcp_proxy.h"
+#include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/extensions/filters/common/ratelimit/mocks.h"
@@ -32,7 +29,6 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
-using testing::WithArgs;
 
 namespace Envoy {
 namespace Network {
@@ -50,11 +46,18 @@ public:
   }
 
   NiceMock<MockFilterManagerConnection> connection_;
+  NiceMock<MockConnectionSocket> socket_;
 
   Buffer::OwnedImpl read_buffer_;
   Buffer::OwnedImpl write_buffer_;
   bool read_end_stream_{};
   bool write_end_stream_{};
+  ConnectionCloseAction remote_close_action_ =
+      ConnectionCloseAction{ConnectionEvent::RemoteClose, true};
+  ConnectionCloseAction local_close_action_ =
+      ConnectionCloseAction{ConnectionEvent::LocalClose, false, ConnectionCloseType::FlushWrite};
+  ConnectionCloseAction local_close_socket_action_ =
+      ConnectionCloseAction{ConnectionEvent::LocalClose, true};
 };
 
 class LocalMockFilter : public MockFilter {
@@ -73,13 +76,15 @@ TEST_F(NetworkFilterManagerTest, All) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
 
   read_filter->callbacks_->upstreamHost(Upstream::HostDescriptionConstSharedPtr{host_description});
   EXPECT_EQ(read_filter->callbacks_->upstreamHost(), filter->callbacks_->upstreamHost());
+  EXPECT_EQ(&read_filter->callbacks_->socket(), &socket_);
+  EXPECT_EQ(&write_filter->write_callbacks_->socket(), &socket_);
 
   EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::StopIteration));
   EXPECT_EQ(manager.initializeReadFilters(), true);
@@ -119,7 +124,7 @@ TEST_F(NetworkFilterManagerTest, ConnectionClosedBeforeRunningFilter) {
   MockReadFilter* read_filter(new MockReadFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addFilter(FilterSharedPtr{filter});
 
@@ -146,7 +151,7 @@ TEST_F(NetworkFilterManagerTest, FilterReturnStopAndNoCallback) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -174,7 +179,7 @@ TEST_F(NetworkFilterManagerTest, ReadFilterCloseConnectionAndReturnContinue) {
   MockReadFilter* read_filter(new MockReadFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addFilter(FilterSharedPtr{filter});
 
@@ -206,7 +211,7 @@ TEST_F(NetworkFilterManagerTest, WriteFilterCloseConnectionAndReturnContinue) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -245,7 +250,7 @@ TEST_F(NetworkFilterManagerTest, ReadCloseConnectionReturnStopAndCallback) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -279,7 +284,7 @@ TEST_F(NetworkFilterManagerTest, WriteCloseConnectionReturnStopAndCallback) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -320,7 +325,7 @@ TEST_F(NetworkFilterManagerTest, EndStream) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new LocalMockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -357,77 +362,6 @@ TEST_F(NetworkFilterManagerTest, EndStream) {
   manager.onWrite();
 }
 
-// This is a very important flow so make sure it works correctly in aggregate.
-TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
-  InSequence s;
-  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
-  NiceMock<MockClientConnection> upstream_connection;
-  NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool;
-  FilterManagerImpl manager(connection_);
-
-  std::string rl_yaml = R"EOF(
-domain: foo
-descriptors:
-- entries:
-  - key: hello
-    value: world
-stat_prefix: name
-    )EOF";
-
-  ON_CALL(factory_context.runtime_loader_.snapshot_,
-          featureEnabled("ratelimit.tcp_filter_enabled", 100))
-      .WillByDefault(Return(true));
-  ON_CALL(factory_context.runtime_loader_.snapshot_,
-          featureEnabled("ratelimit.tcp_filter_enforcing", 100))
-      .WillByDefault(Return(true));
-
-  envoy::extensions::filters::network::ratelimit::v3::RateLimit proto_config{};
-  TestUtility::loadFromYaml(rl_yaml, proto_config);
-
-  Extensions::NetworkFilters::RateLimitFilter::ConfigSharedPtr rl_config(
-      new Extensions::NetworkFilters::RateLimitFilter::Config(proto_config, factory_context.scope_,
-                                                              factory_context.runtime_loader_));
-  Extensions::Filters::Common::RateLimit::MockClient* rl_client =
-      new Extensions::Filters::Common::RateLimit::MockClient();
-  manager.addReadFilter(std::make_shared<Extensions::NetworkFilters::RateLimitFilter::Filter>(
-      rl_config, Extensions::Filters::Common::RateLimit::ClientPtr{rl_client}));
-
-  factory_context.cluster_manager_.initializeThreadLocalClusters({"fake_cluster"});
-  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy tcp_proxy;
-  tcp_proxy.set_stat_prefix("name");
-  tcp_proxy.set_cluster("fake_cluster");
-  TcpProxy::ConfigSharedPtr tcp_proxy_config(new TcpProxy::Config(tcp_proxy, factory_context));
-  manager.addReadFilter(
-      std::make_shared<TcpProxy::Filter>(tcp_proxy_config, factory_context.cluster_manager_));
-
-  Extensions::Filters::Common::RateLimit::RequestCallbacks* request_callbacks{};
-  EXPECT_CALL(*rl_client, limit(_, "foo",
-                                testing::ContainerEq(
-                                    std::vector<RateLimit::Descriptor>{{{{"hello", "world"}}}}),
-                                testing::A<Tracing::Span&>(), _))
-      .WillOnce(WithArgs<0>(
-          Invoke([&](Extensions::Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
-            request_callbacks = &callbacks;
-          })));
-
-  EXPECT_EQ(manager.initializeReadFilters(), true);
-
-  EXPECT_CALL(factory_context.cluster_manager_.thread_local_cluster_, tcpConnPool(_, _))
-      .WillOnce(Return(&conn_pool));
-
-  request_callbacks->complete(Extensions::Filters::Common::RateLimit::LimitStatus::OK, nullptr,
-                              nullptr, nullptr);
-
-  conn_pool.poolReady(upstream_connection);
-
-  Buffer::OwnedImpl buffer("hello");
-  EXPECT_CALL(upstream_connection, write(BufferEqual(&buffer), _));
-  read_buffer_.add("hello");
-  manager.onRead();
-
-  connection_.raiseEvent(ConnectionEvent::RemoteClose);
-}
-
 TEST_F(NetworkFilterManagerTest, InjectReadDataToFilterChain) {
   InSequence s;
 
@@ -435,7 +369,7 @@ TEST_F(NetworkFilterManagerTest, InjectReadDataToFilterChain) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new MockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -467,7 +401,7 @@ TEST_F(NetworkFilterManagerTest, InjectWriteDataToFilterChain) {
   MockWriteFilter* write_filter(new MockWriteFilter());
   MockFilter* filter(new MockFilter());
 
-  FilterManagerImpl manager(connection_);
+  FilterManagerImpl manager(connection_, socket_);
   manager.addReadFilter(ReadFilterSharedPtr{read_filter});
   manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
   manager.addFilter(FilterSharedPtr{filter});
@@ -483,6 +417,514 @@ TEST_F(NetworkFilterManagerTest, InjectWriteDataToFilterChain) {
       .WillOnce(Return(FilterStatus::Continue));
   EXPECT_CALL(connection_, rawWrite(BufferStringEqual(" everyone!"), true));
   filter->write_callbacks_->injectWriteDataToFilterChain(injected_buffer, true);
+}
+
+TEST_F(NetworkFilterManagerTest, StartUpstreamSecureTransport) {
+  InSequence s;
+
+  MockReadFilter* read_filter_1(new MockReadFilter());
+  MockReadFilter* read_filter_2(new MockReadFilter());
+  MockFilter* filter(new MockFilter());
+
+  FilterManagerImpl manager(connection_, socket_);
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter_1});
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter_2});
+  manager.addFilter(FilterSharedPtr{filter});
+
+  // Verify that filter manager calls each filter's 'startUpstreamsecureTransport' method.
+  // when one filter calls startUpstreamSecureTransport.
+  EXPECT_CALL(*read_filter_1, startUpstreamSecureTransport);
+  EXPECT_CALL(*read_filter_2, startUpstreamSecureTransport);
+  filter->callbacks_->startUpstreamSecureTransport();
+}
+
+TEST_F(NetworkFilterManagerTest, MultipleStopIterationAndDontCloseRead) {
+  InSequence s;
+
+  // Create multiple read filters to test multiple pending close behaviors
+  MockReadFilter* read_filter_1(new MockReadFilter());
+  MockReadFilter* read_filter_2(new MockReadFilter());
+  MockReadFilter* read_filter_3(new MockReadFilter());
+
+  FilterManagerImpl manager(connection_, socket_);
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter_1});
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter_2});
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter_3});
+
+  // Initialize filters.
+  EXPECT_CALL(*read_filter_1, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*read_filter_2, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*read_filter_3, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_EQ(manager.initializeReadFilters(), true);
+
+  // Set up read data.
+  read_buffer_.add("hello world");
+
+  // First filter disableClose() and StopIteration.
+  EXPECT_CALL(*read_filter_1, onData(BufferStringEqual("hello world"), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+        read_filter_1->callbacks_->disableClose(true);
+        return FilterStatus::StopIteration;
+      }));
+  EXPECT_CALL(*read_filter_2, onData(_, _)).Times(0);
+  EXPECT_CALL(*read_filter_3, onData(_, _)).Times(0);
+  manager.onRead();
+
+  // Try to close the connection.
+  EXPECT_CALL(connection_, closeConnection(_)).Times(0);
+  manager.onConnectionClose(remote_close_action_);
+
+  // Continue from first filter.
+  EXPECT_CALL(*read_filter_2, onData(BufferStringEqual("hello world"), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+        read_filter_2->callbacks_->disableClose(true);
+        return FilterStatus::StopIteration;
+      }));
+  read_filter_1->callbacks_->continueReading();
+
+  // One filter is still pending, so we shouldn't close yet.
+  EXPECT_CALL(connection_, closeConnection(_)).Times(0);
+  read_filter_1->callbacks_->disableClose(false);
+
+  // After all filters continue closing, we should see the connection close.
+  EXPECT_CALL(connection_, closeConnection(_));
+  read_filter_2->callbacks_->disableClose(false);
+}
+
+TEST_F(NetworkFilterManagerTest, BothReadAndWriteFiltersHoldClose) {
+  InSequence s;
+
+  MockReadFilter* read_filter(new MockReadFilter());
+  MockWriteFilter* write_filter(new MockWriteFilter());
+  MockFilter* filter(new MockFilter());
+
+  FilterManagerImpl manager(connection_, socket_);
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter});
+  manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
+  manager.addFilter(FilterSharedPtr{filter});
+
+  // Initialize filters
+  EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_EQ(manager.initializeReadFilters(), true);
+
+  // Make both read and write filters hold a pending close.
+  read_buffer_.add("read_data");
+  EXPECT_CALL(*read_filter, onData(BufferStringEqual("read_data"), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+        read_filter->callbacks_->disableClose(true);
+        return FilterStatus::StopIteration;
+      }));
+  manager.onRead();
+
+  write_buffer_.add("write_data");
+  EXPECT_CALL(*filter, onWrite(BufferStringEqual("write_data"), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+        filter->write_callbacks_->disableClose(true);
+        return FilterStatus::StopIteration;
+      }));
+  manager.onWrite();
+
+  // Try to close the connection.
+  EXPECT_CALL(connection_, closeConnection(_)).Times(0);
+  manager.onConnectionClose(remote_close_action_);
+
+  // After only read filter continues closing, we still shouldn't close.
+  EXPECT_CALL(connection_, closeConnection(_)).Times(0);
+  read_filter->callbacks_->disableClose(false);
+
+  // After both filters continue closing, we should close.
+  EXPECT_CALL(connection_, closeConnection(remote_close_action_));
+  filter->write_callbacks_->disableClose(false);
+}
+
+TEST_F(NetworkFilterManagerTest, StopIterationAndDontCloseWithLocalClose) {
+  InSequence s;
+
+  MockReadFilter* read_filter(new MockReadFilter());
+  MockWriteFilter* write_filter(new MockWriteFilter());
+
+  FilterManagerImpl manager(connection_, socket_);
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter});
+  manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
+
+  // Initialize filters.
+  EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_EQ(manager.initializeReadFilters(), true);
+
+  // Set up read data.
+  read_buffer_.add("test data");
+  EXPECT_CALL(*read_filter, onData(BufferStringEqual("test data"), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+        read_filter->callbacks_->disableClose(true);
+        return FilterStatus::StopIteration;
+      }));
+  manager.onRead();
+
+  // Local close should be pending until filter allows it.
+  EXPECT_CALL(connection_, closeConnection(_)).Times(0);
+  manager.onConnectionClose(local_close_action_);
+
+  // After the filter continues closing, we should see the connection close.
+  EXPECT_CALL(connection_, closeConnection(local_close_action_));
+  read_filter->callbacks_->disableClose(false);
+}
+
+TEST_F(NetworkFilterManagerTest, FinalizeCloseAfterFiltersComplete) {
+  InSequence s;
+
+  MockReadFilter* read_filter(new MockReadFilter());
+  MockWriteFilter* write_filter(new MockWriteFilter());
+
+  FilterManagerImpl manager(connection_, socket_);
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter});
+  manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
+
+  // Initialize filters.
+  EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_EQ(manager.initializeReadFilters(), true);
+
+  // Set up read data with disableClose and StopIteration.
+  read_buffer_.add("data");
+  EXPECT_CALL(*read_filter, onData(BufferStringEqual("data"), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+        read_filter->callbacks_->disableClose(true);
+        return FilterStatus::StopIteration;
+      }));
+  manager.onRead();
+
+  // Try remote close.
+  manager.onConnectionClose(remote_close_action_);
+
+  // Verify that close happens with proper event type after filter completes.
+  EXPECT_CALL(connection_, closeConnection(remote_close_action_));
+  read_filter->callbacks_->disableClose(false);
+}
+
+TEST_F(NetworkFilterManagerTest, LocalAndRemoteCloseRaceCondition) {
+  InSequence s;
+
+  MockReadFilter* read_filter(new MockReadFilter());
+  MockWriteFilter* write_filter(new MockWriteFilter());
+
+  FilterManagerImpl manager(connection_, socket_);
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter});
+  manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
+
+  // Initialize filters with disableClose(true).
+  EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_EQ(manager.initializeReadFilters(), true);
+
+  read_buffer_.add("data");
+  EXPECT_CALL(*read_filter, onData(BufferStringEqual("data"), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+        read_filter->callbacks_->disableClose(true);
+        return FilterStatus::StopIteration;
+      }));
+  manager.onRead();
+
+  // Simulate both local and remote close happening.
+  EXPECT_CALL(connection_, closeConnection(_)).Times(0);
+  manager.onConnectionClose(local_close_action_);
+  manager.onConnectionClose(remote_close_action_);
+
+  // When filter continues, we should see connection closed with
+  // the latest event type (RemoteClose).
+  EXPECT_CALL(connection_, closeConnection(remote_close_action_));
+  read_filter->callbacks_->disableClose(false);
+}
+
+TEST_F(NetworkFilterManagerTest, LocalCloseSocketAndRemoteCloseRace) {
+  InSequence s;
+
+  MockReadFilter* read_filter(new MockReadFilter());
+  MockWriteFilter* write_filter(new MockWriteFilter());
+
+  FilterManagerImpl manager(connection_, socket_);
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter});
+  manager.addWriteFilter(WriteFilterSharedPtr{write_filter});
+
+  // Initialize filters with disableClose(true).
+  EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_EQ(manager.initializeReadFilters(), true);
+
+  read_buffer_.add("data");
+  EXPECT_CALL(*read_filter, onData(BufferStringEqual("data"), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+        read_filter->callbacks_->disableClose(true);
+        return FilterStatus::StopIteration;
+      }));
+  manager.onRead();
+
+  // Simulate both local and remote close happening.
+  EXPECT_CALL(connection_, closeConnection(_)).Times(0);
+  manager.onConnectionClose(local_close_socket_action_);
+  manager.onConnectionClose(remote_close_action_);
+
+  // When filter continues, we should see it is still local close.
+  EXPECT_CALL(connection_, closeConnection(local_close_socket_action_));
+  read_filter->callbacks_->disableClose(false);
+}
+
+TEST_F(NetworkFilterManagerTest, MultipleFiltersWithDifferentStatusResponses) {
+  InSequence s;
+
+  // Create filters that will return different status codes.
+  MockReadFilter* continue_filter(new MockReadFilter());
+  MockReadFilter* stop_filter(new MockReadFilter());
+  MockReadFilter* stop_dont_close_filter(new MockReadFilter());
+
+  FilterManagerImpl manager(connection_, socket_);
+  manager.addReadFilter(ReadFilterSharedPtr{continue_filter});
+  manager.addReadFilter(ReadFilterSharedPtr{stop_filter});
+  manager.addReadFilter(ReadFilterSharedPtr{stop_dont_close_filter});
+
+  // Initialize filters
+  EXPECT_CALL(*continue_filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*stop_filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*stop_dont_close_filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_EQ(manager.initializeReadFilters(), true);
+
+  // Setup data and filter responses.
+  read_buffer_.add("test");
+  EXPECT_CALL(*continue_filter, onData(BufferStringEqual("test"), _))
+      .WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*stop_filter, onData(BufferStringEqual("test"), _))
+      .WillOnce(Return(FilterStatus::StopIteration));
+  EXPECT_CALL(*stop_dont_close_filter, onData(_, _)).Times(0);
+  manager.onRead();
+
+  // Continue from stop_filter.
+  read_buffer_.add("more");
+  EXPECT_CALL(*stop_dont_close_filter, onData(BufferStringEqual("testmore"), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+        stop_dont_close_filter->callbacks_->disableClose(true);
+        return FilterStatus::StopIteration;
+      }));
+  stop_filter->callbacks_->continueReading();
+
+  // Now try to close again, should be held.
+  EXPECT_CALL(connection_, closeConnection(_)).Times(0);
+  manager.onConnectionClose(local_close_action_);
+
+  // The socket close has a higher priority than the local_close_action_.
+  EXPECT_CALL(connection_, closeConnection(local_close_action_));
+  stop_dont_close_filter->callbacks_->disableClose(false);
+}
+
+TEST_F(NetworkFilterManagerTest, InjectReadDataWithStopIterationAndDontClose) {
+  InSequence s;
+
+  MockReadFilter* read_filter_1(new MockReadFilter());
+  MockReadFilter* read_filter_2(new MockReadFilter());
+  MockFilter* filter(new MockFilter());
+
+  FilterManagerImpl manager(connection_, socket_);
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter_1});
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter_2});
+  manager.addFilter(FilterSharedPtr{filter});
+
+  // Initialize filters.
+  EXPECT_CALL(*read_filter_1, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*read_filter_2, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_EQ(manager.initializeReadFilters(), true);
+
+  // First read filter disableClose(true).
+  read_buffer_.add("original");
+  EXPECT_CALL(*read_filter_1, onData(BufferStringEqual("original"), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+        read_filter_1->callbacks_->disableClose(true);
+        return FilterStatus::StopIteration;
+      }));
+  EXPECT_CALL(*read_filter_2, onData(_, _)).Times(0);
+  EXPECT_CALL(*filter, onData(_, _)).Times(0);
+  manager.onRead();
+
+  // Inject data through the stopped filter - should reach remaining filters.
+  Buffer::OwnedImpl injected_data("injected");
+  EXPECT_CALL(*read_filter_2, onData(BufferStringEqual("injected"), false))
+      .WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*filter, onData(BufferStringEqual("injected"), false))
+      .WillOnce(Return(FilterStatus::Continue));
+  read_filter_1->callbacks_->injectReadDataToFilterChain(injected_data, false);
+
+  // Inject more data.
+  Buffer::OwnedImpl more_data("more");
+  EXPECT_CALL(*read_filter_2, onData(BufferStringEqual("more"), true))
+      .WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*filter, onData(BufferStringEqual("more"), true))
+      .WillOnce(Return(FilterStatus::Continue));
+  read_filter_1->callbacks_->injectReadDataToFilterChain(more_data, true);
+
+  // Try to close the connection - should be held by filter.
+  EXPECT_CALL(connection_, closeConnection(_)).Times(0);
+  manager.onConnectionClose(remote_close_action_);
+
+  // Continue reading should not affect the close status.
+  EXPECT_CALL(*read_filter_2, onData(BufferStringEqual("original"), _))
+      .WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*filter, onData(BufferStringEqual("original"), _))
+      .WillOnce(Return(FilterStatus::Continue));
+  read_filter_1->callbacks_->continueReading();
+
+  // Connection should close after filter continues closing.
+  EXPECT_CALL(connection_, closeConnection(remote_close_action_));
+  read_filter_1->callbacks_->disableClose(false);
+}
+
+TEST_F(NetworkFilterManagerTest, InjectWriteDataWithStopIterationAndDontClose) {
+  InSequence s;
+
+  MockReadFilter* read_filter(new MockReadFilter());
+  MockWriteFilter* write_filter_1(new MockWriteFilter());
+  MockWriteFilter* write_filter_2(new MockWriteFilter());
+
+  FilterManagerImpl manager(connection_, socket_);
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter});
+  manager.addWriteFilter(WriteFilterSharedPtr{write_filter_1});
+  manager.addWriteFilter(WriteFilterSharedPtr{write_filter_2});
+
+  // Initialize read filters.
+  EXPECT_CALL(*read_filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_EQ(manager.initializeReadFilters(), true);
+
+  // Write filter disableClose(true).
+  write_buffer_.add("original");
+  EXPECT_CALL(*write_filter_2, onWrite(BufferStringEqual("original"), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+        write_filter_2->write_callbacks_->disableClose(true);
+        return FilterStatus::StopIteration;
+      }));
+  EXPECT_CALL(*write_filter_1, onWrite(_, _)).Times(0);
+  manager.onWrite();
+
+  // Try to close the connection - should be held by filter.
+  EXPECT_CALL(connection_, closeConnection(_)).Times(0);
+  manager.onConnectionClose(local_close_action_);
+
+  // Inject write data should bypass stopped filter and reach connection.
+  Buffer::OwnedImpl injected_data("injected");
+  EXPECT_CALL(*write_filter_1, onWrite(BufferStringEqual("injected"), false))
+      .WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(connection_, rawWrite(BufferStringEqual("injected"), false));
+  write_filter_2->write_callbacks_->injectWriteDataToFilterChain(injected_data, false);
+
+  // Inject more data with end_stream.
+  Buffer::OwnedImpl more_data("more");
+  EXPECT_CALL(*write_filter_1, onWrite(BufferStringEqual("more"), true))
+      .WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(connection_, rawWrite(BufferStringEqual("more"), true));
+  write_filter_2->write_callbacks_->injectWriteDataToFilterChain(more_data, true);
+
+  // Connection should close after filter continues closing.
+  EXPECT_CALL(connection_, closeConnection(local_close_action_));
+  write_filter_2->write_callbacks_->disableClose(false);
+}
+
+TEST_F(NetworkFilterManagerTest, ChainedInjectsWithMixedFilterStatus) {
+  InSequence s;
+
+  MockReadFilter* read_filter_1(new MockReadFilter());
+  MockReadFilter* read_filter_2(new MockReadFilter());
+  MockFilter* filter(new MockFilter());
+
+  FilterManagerImpl manager(connection_, socket_);
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter_1});
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter_2});
+  manager.addFilter(FilterSharedPtr{filter});
+
+  // Initialize filters.
+  EXPECT_CALL(*read_filter_1, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*read_filter_2, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_EQ(manager.initializeReadFilters(), true);
+
+  // First read filter stops the chain with disableClose(true).
+  read_buffer_.add("start");
+  EXPECT_CALL(*read_filter_1, onData(BufferStringEqual("start"), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+        read_filter_1->callbacks_->disableClose(true);
+        return FilterStatus::StopIteration;
+      }));
+  manager.onRead();
+
+  // Inject data and continue the chain - second filter returns StopIteration.
+  Buffer::OwnedImpl data1("inject1");
+  EXPECT_CALL(*read_filter_2, onData(BufferStringEqual("inject1"), false))
+      .WillOnce(Return(FilterStatus::StopIteration));
+  read_filter_1->callbacks_->injectReadDataToFilterChain(data1, false);
+
+  // Continue reading from second filter - filter returns Continue.
+  Buffer::OwnedImpl data2("inject2");
+  EXPECT_CALL(*filter, onData(BufferStringEqual("inject2"), true))
+      .WillOnce(Return(FilterStatus::Continue));
+  read_filter_2->callbacks_->injectReadDataToFilterChain(data2, true);
+
+  // Try to close - should be held by the first filter only.
+  EXPECT_CALL(connection_, closeConnection(_)).Times(0);
+  manager.onConnectionClose(local_close_action_);
+
+  // After filter continues, connection should close.
+  EXPECT_CALL(connection_, closeConnection(local_close_action_));
+  read_filter_1->callbacks_->disableClose(false);
+}
+
+TEST_F(NetworkFilterManagerTest, MultipleInjectDataCallsFromDifferentFilters) {
+  InSequence s;
+
+  MockReadFilter* read_filter_1(new MockReadFilter());
+  MockReadFilter* read_filter_2(new MockReadFilter());
+  MockFilter* filter(new MockFilter());
+
+  FilterManagerImpl manager(connection_, socket_);
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter_1});
+  manager.addReadFilter(ReadFilterSharedPtr{read_filter_2});
+  manager.addFilter(FilterSharedPtr{filter});
+
+  // Initialize filters.
+  EXPECT_CALL(*read_filter_1, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*read_filter_2, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_CALL(*filter, onNewConnection()).WillOnce(Return(FilterStatus::Continue));
+  EXPECT_EQ(manager.initializeReadFilters(), true);
+
+  // First read filter StopIteration in sequence.
+  read_buffer_.add("original");
+  EXPECT_CALL(*read_filter_1, onData(BufferStringEqual("original"), _))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+        read_filter_1->callbacks_->disableClose(true);
+        return FilterStatus::StopIteration;
+      }));
+  EXPECT_CALL(*read_filter_2, onData(_, _)).Times(0);
+  manager.onRead();
+
+  // Inject data from first filter.
+  Buffer::OwnedImpl data1("data1");
+  EXPECT_CALL(*read_filter_2, onData(BufferStringEqual("data1"), false))
+      .WillOnce(Invoke([&](Buffer::Instance&, bool) -> FilterStatus {
+        read_filter_2->callbacks_->disableClose(true);
+        return FilterStatus::StopIteration;
+      }));
+  EXPECT_CALL(*filter, onData(_, _)).Times(0);
+  read_filter_1->callbacks_->injectReadDataToFilterChain(data1, false);
+
+  // Inject data from second filter.
+  Buffer::OwnedImpl data2("data2");
+  EXPECT_CALL(*filter, onData(BufferStringEqual("data2"), false))
+      .WillOnce(Return(FilterStatus::Continue));
+  read_filter_2->callbacks_->injectReadDataToFilterChain(data2, false);
+
+  // Try to close the connection - should be held by both filters.
+  EXPECT_CALL(connection_, closeConnection(_)).Times(0);
+  manager.onConnectionClose(remote_close_action_);
+
+  // First filter continues closing.
+  EXPECT_CALL(connection_, closeConnection(_)).Times(0);
+  read_filter_1->callbacks_->disableClose(false);
+
+  // Second filter continues closing - now connection should close.
+  EXPECT_CALL(connection_, closeConnection(remote_close_action_));
+  read_filter_2->callbacks_->disableClose(false);
 }
 
 } // namespace

@@ -20,6 +20,14 @@ called the *downstream remote address*, for many reasons. Some examples include:
 Envoy supports multiple methods for providing the downstream remote address to the upstream host.
 These techniques vary in complexity and applicability.
 
+Envoy also supports
+:ref:`extensions <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.original_ip_detection_extensions>`
+for detecting the original IP address. This might be useful if none of the techniques below is
+applicable to your setup. Two available extensions are the :ref:`custom header
+<envoy_v3_api_msg_extensions.http.original_ip_detection.custom_header.v3.CustomHeaderConfig>`
+extension and the :ref:`xff <envoy_v3_api_msg_extensions.http.original_ip_detection.xff.v3.XffConfig>`
+extension.
+
 HTTP Headers
 ------------
 
@@ -47,6 +55,7 @@ the downstream remote address for propagation into an
 conjunction with the
 :ref:`Original Src Listener Filter <arch_overview_ip_transparency_original_src_listener>`. Finally,
 Envoy supports generating this header using the :ref:`Proxy Protocol Transport Socket <extension_envoy.transport_sockets.upstream_proxy_protocol>`.
+
 Here is an example config for setting up the socket:
 
 .. code-block:: yaml
@@ -64,9 +73,19 @@ Here is an example config for setting up the socket:
             version: V1
           transport_socket:
             name: envoy.transport_sockets.raw_buffer
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer
       ...
 
-Note: If you are wrapping a TLS socket, the header will be sent before the TLS handshake occurs.
+There are several things to consider if you plan to use this socket in conjunction with the
+:ref:`HTTP connection manager <config_http_conn_man>`. There will be a performance hit as there will be no upstream connection
+re-use among downstream clients. Every client that connects to Envoy will get a new connection to the upstream server.
+This is due to the nature of proxy protocol being a connection based protocol. Downstream client info is only forwarded to the
+upstream at the start of a connection before any other data has been sent (Note: this includes before a TLS handshake occurs).
+If possible, using the :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` header should be preferred as Envoy
+will be able to re-use upstream connections with this method. Due to the disconnect between Envoy's handling of downstream and upstream
+connections, it is a good idea to enforce short :ref:`idle timeouts <faq_configuration_timeouts>` on upstream connections as
+Envoy will not inherently close a corresponding upstream connection when a downstream connection is closed.
 
 Some drawbacks to Proxy Protocol:
 
@@ -91,6 +110,7 @@ Some drawbacks to the Original Source filter:
 * It requires that Envoy have access to the downstream remote address.
 * Its configuration is relatively complex.
 * It may introduce a slight performance hit due to restrictions on connection pooling.
+* Not supported on Windows.
 
 .. _arch_overview_ip_transparency_original_src_http:
 
@@ -115,3 +135,7 @@ Some drawbacks to the Original Source filter:
   :ref:`x-forwarded-for <config_http_conn_man_headers_x-forwarded-for>` header.
 * Its configuration is relatively complex.
 * It may introduce a slight performance hit due to restrictions on connection pooling.
+
+.. note::
+
+ This feature is not supported on Windows.

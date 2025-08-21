@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package test.integration.filters;
+
+message StopAndContinueConfig {
+  // Whether the filter should add tracked object itself to the dispatcher when
+  // created.
+  bool install_scope_tracked_object = 1;
+  // whether the filter should return StopIterationAndBuffer instead of StopIterationNoBuffer
+  bool stop_and_buffer = 2;
+}

@@ -11,6 +11,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.type.tracing.v3";
 option java_outer_classname = "CustomTagProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/type/tracing/v3;tracingv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Custom Tag]
@@ -59,8 +60,8 @@ message CustomTag {
   }
 
   // Metadata type custom tag using
-  // :ref:`MetadataKey <envoy_api_msg_type.metadata.v3.MetadataKey>` to retrieve the protobuf value
-  // from :ref:`Metadata <envoy_api_msg_config.core.v3.Metadata>`, and populate the tag value with
+  // :ref:`MetadataKey <envoy_v3_api_msg_type.metadata.v3.MetadataKey>` to retrieve the protobuf value
+  // from :ref:`Metadata <envoy_v3_api_msg_config.core.v3.Metadata>`, and populate the tag value with
   // `the canonical JSON <https://developers.google.com/protocol-buffers/docs/proto3#json>`_
   // representation of it.
   message Metadata {

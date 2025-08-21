@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "extensions/filters/network/mongo_proxy/codec.h"
+#include "source/extensions/filters/network/mongo_proxy/codec.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -65,7 +65,7 @@ private:
   int32_t request_id_;
   std::string collection_;
   std::string callsite_;
-  int32_t max_time_;
+  int32_t max_time_{0};
   QueryType type_{QueryType::ScatterGet};
   std::string command_;
 };

@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package test.common.upstream;
+
+import "validate/validate.proto";
+import "test/extensions/load_balancing_policies/common/load_balancer_fuzz.proto";
+
+message ZoneAwareLoadBalancerTestCase {
+  test.common.upstream.LoadBalancerTestCase load_balancer_test_case = 1
+      [(validate.rules).message.required = true];
+  // This determines whether ZoneAwareLoadBalancerFuzzBase will generate a local priority set to
+  // pass into Zone Aware constructor
+  bool need_local_priority_set = 2;
+  // This is used to determine the weights of each host - will wrap around if runs out of space
+  bytes random_bytestring_for_weights = 3 [(validate.rules).bytes = {min_len: 1, max_len: 2048}];
+}

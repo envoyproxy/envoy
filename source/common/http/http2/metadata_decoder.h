@@ -5,10 +5,8 @@
 
 #include "envoy/http/codec.h"
 
-#include "common/buffer/buffer_impl.h"
-#include "common/common/logger.h"
-
-#include "nghttp2/nghttp2.h"
+#include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/logger.h"
 
 namespace Envoy {
 namespace Http {
@@ -24,7 +22,8 @@ public:
    * @param cb is the decoder's callback function. The callback function is called when the decoder
    * finishes decoding metadata.
    */
-  MetadataDecoder(MetadataCallback cb);
+  MetadataDecoder(MetadataCallback cb, uint64_t max_payload_size_bound);
+  ~MetadataDecoder();
 
   /**
    * Calls this function when METADATA frame payload is received. The payload doesn't need to be
@@ -44,15 +43,28 @@ public:
    */
   bool onMetadataFrameComplete(bool end_metadata);
 
+  /**
+   * Returns the total size of METADATA frame payloads received.
+   */
+  uint64_t totalPayloadSize() const { return total_payload_size_; }
+
 private:
   friend class MetadataEncoderDecoderTest_VerifyEncoderDecoderOnMultipleMetadataMaps_Test;
   friend class MetadataEncoderDecoderTest_VerifyEncoderDecoderMultipleMetadataReachSizeLimit_Test;
+  friend class MetadataEncoderTest_VerifyEncoderDecoderOnMultipleMetadataMaps_Test;
+  friend class MetadataEncoderTest_VerifyEncoderDecoderMultipleMetadataReachSizeLimit_Test;
+  friend class MetadataEncoderTest_VerifyAdjustingMetadataSizeLimit_Test;
+
+  struct HpackDecoderContext;
+
   /**
-   * Decodes METADATA payload using nghttp2.
+   * Decodes METADATA payload using QUICHE.
    * @param end_metadata indicates is END_METADATA is true.
    * @return if decoding succeeds.
    */
-  bool decodeMetadataPayloadUsingNghttp2(bool end_metadata);
+  bool decodeMetadataPayload(bool end_metadata);
+
+  void resetDecoderContext();
 
   // Metadata that is currently being decoded.
   MetadataMapPtr metadata_map_;
@@ -64,14 +76,11 @@ private:
   Buffer::OwnedImpl payload_;
 
   // Payload size limit. If the total payload received exceeds the limit, fails the connection.
-  const uint64_t max_payload_size_bound_ = 1024 * 1024;
+  const uint64_t max_payload_size_bound_;
 
   uint64_t total_payload_size_ = 0;
 
-  // TODO(soya3129): consider sharing the inflater with all streams in a connection. Caveat:
-  // inflater failure on one stream can impact other streams.
-  using Inflater = CSmartPtr<nghttp2_hd_inflater, nghttp2_hd_inflate_del>;
-  Inflater inflater_;
+  std::unique_ptr<HpackDecoderContext> decoder_context_;
 };
 
 } // namespace Http2

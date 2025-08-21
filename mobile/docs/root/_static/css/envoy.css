@@ -1,0 +1,11 @@
+@import "theme.css";
+
+/* Splits a long line descriptions in tables in to multiple lines */
+.wy-table-responsive table td, .wy-table-responsive table th {
+  white-space: normal !important;
+}
+
+/* align multi line csv table columns */
+table.docutils div.line-block {
+    margin-left: 0;
+}

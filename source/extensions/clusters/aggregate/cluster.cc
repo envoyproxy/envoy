@@ -1,11 +1,11 @@
-#include "extensions/clusters/aggregate/cluster.h"
+#include "source/extensions/clusters/aggregate/cluster.h"
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.validate.h"
 
-#include "common/common/assert.h"
+#include "source/common/common/assert.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,24 +14,47 @@ namespace Aggregate {
 
 Cluster::Cluster(const envoy::config::cluster::v3::Cluster& cluster,
                  const envoy::extensions::clusters::aggregate::v3::ClusterConfig& config,
-                 Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
-                 Random::RandomGenerator& random,
-                 Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-                 Stats::ScopePtr&& stats_scope, ThreadLocal::SlotAllocator& tls, bool added_via_api)
-    : Upstream::ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope),
-                                added_via_api, factory_context.dispatcher().timeSource()),
-      cluster_manager_(cluster_manager), runtime_(runtime), random_(random), tls_(tls),
-      clusters_(config.clusters().begin(), config.clusters().end()) {
-  tls_.set([info = info(), &runtime, &random](Event::Dispatcher&) {
-    auto per_thread_load_balancer = std::make_unique<PerThreadLoadBalancer>();
-    per_thread_load_balancer->lb_ = std::make_unique<AggregateClusterLoadBalancer>(
-        info->stats(), runtime, random, info->lbConfig());
-    return per_thread_load_balancer;
-  });
+                 Upstream::ClusterFactoryContext& context, absl::Status& creation_status)
+    : Upstream::ClusterImplBase(cluster, context, creation_status),
+      cluster_manager_(context.serverFactoryContext().clusterManager()),
+      clusters_(std::make_shared<ClusterSet>(config.clusters().begin(), config.clusters().end())) {}
+
+AggregateClusterLoadBalancer::AggregateClusterLoadBalancer(
+    const Upstream::ClusterInfoConstSharedPtr& parent_info,
+    Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
+    Random::RandomGenerator& random, const ClusterSetConstSharedPtr& clusters)
+    : parent_info_(parent_info), cluster_manager_(cluster_manager), runtime_(runtime),
+      random_(random), clusters_(clusters) {
+  for (const auto& cluster : *clusters_) {
+    auto tlc = cluster_manager_.getThreadLocalCluster(cluster);
+    // It is possible when initializing the cluster, the included cluster doesn't exist. e.g., the
+    // cluster could be added dynamically by xDS.
+    if (tlc == nullptr) {
+      continue;
+    }
+
+    // Add callback for clusters initialized before aggregate cluster.
+    addMemberUpdateCallbackForCluster(*tlc);
+  }
+  refresh();
+  handle_ = cluster_manager_.addThreadLocalClusterUpdateCallbacks(*this);
+}
+
+void AggregateClusterLoadBalancer::addMemberUpdateCallbackForCluster(
+    Upstream::ThreadLocalCluster& thread_local_cluster) {
+  member_update_cbs_[thread_local_cluster.info()->name()] =
+      thread_local_cluster.prioritySet().addMemberUpdateCb(
+          [this, target_cluster_info = thread_local_cluster.info()](const Upstream::HostVector&,
+                                                                    const Upstream::HostVector&) {
+            ENVOY_LOG(debug, "member update for cluster '{}' in aggregate cluster '{}'",
+                      target_cluster_info->name(), parent_info_->name());
+            refresh();
+            return absl::OkStatus();
+          });
 }
 
 PriorityContextPtr
-Cluster::linearizePrioritySet(const std::function<bool(const std::string&)>& skip_predicate) {
+AggregateClusterLoadBalancer::linearizePrioritySet(OptRef<const std::string> excluded_cluster) {
   PriorityContextPtr priority_context = std::make_unique<PriorityContext>();
   uint32_t next_priority_after_linearizing = 0;
 
@@ -42,15 +65,20 @@ Cluster::linearizePrioritySet(const std::function<bool(const std::string&)>& ski
   // The linearization result is:
   //    [C_0.P_0, C_0.P_1, C_0.P_2, C_1.P_0, C_1.P_1, C_2.P_0, C_2.P_1, C_2.P_2, C_2.P_3]
   // and the traffic will be distributed among these priorities.
-  for (const auto& cluster : clusters_) {
-    if (skip_predicate(cluster)) {
+  for (const auto& cluster : *clusters_) {
+    if (excluded_cluster.has_value() && excluded_cluster.value().get() == cluster) {
       continue;
     }
     auto tlc = cluster_manager_.getThreadLocalCluster(cluster);
     // It is possible that the cluster doesn't exist, e.g., the cluster could be deleted or the
     // cluster hasn't been added by xDS.
     if (tlc == nullptr) {
+      ENVOY_LOG(debug, "refresh: cluster '{}' absent in aggregate cluster '{}'", cluster,
+                parent_info_->name());
       continue;
+    } else {
+      ENVOY_LOG(debug, "refresh: cluster '{}' found in aggregate cluster '{}'", cluster,
+                parent_info_->name());
     }
 
     uint32_t priority_in_current_cluster = 0;
@@ -58,7 +86,8 @@ Cluster::linearizePrioritySet(const std::function<bool(const std::string&)>& ski
       if (!host_set->hosts().empty()) {
         priority_context->priority_set_.updateHosts(
             next_priority_after_linearizing, Upstream::HostSetImpl::updateHostsParams(*host_set),
-            host_set->localityWeights(), host_set->hosts(), {}, host_set->overprovisioningFactor());
+            host_set->localityWeights(), host_set->hosts(), {}, random_.random(),
+            host_set->weightedPriorityHealth(), host_set->overprovisioningFactor());
         priority_context->priority_to_cluster_.emplace_back(
             std::make_pair(priority_in_current_cluster, tlc));
 
@@ -73,57 +102,36 @@ Cluster::linearizePrioritySet(const std::function<bool(const std::string&)>& ski
   return priority_context;
 }
 
-void Cluster::startPreInit() {
-  for (const auto& cluster : clusters_) {
-    auto tlc = cluster_manager_.getThreadLocalCluster(cluster);
-    // It is possible when initializing the cluster, the included cluster doesn't exist. e.g., the
-    // cluster could be added dynamically by xDS.
-    if (tlc == nullptr) {
-      continue;
-    }
-
-    // Add callback for clusters initialized before aggregate cluster.
-    tlc->prioritySet().addMemberUpdateCb(
-        [this, cluster](const Upstream::HostVector&, const Upstream::HostVector&) {
-          ENVOY_LOG(debug, "member update for cluster '{}' in aggregate cluster '{}'", cluster,
-                    this->info()->name());
-          refresh();
-        });
+void AggregateClusterLoadBalancer::refresh(OptRef<const std::string> excluded_cluster) {
+  PriorityContextPtr priority_context = linearizePrioritySet(excluded_cluster);
+  if (!priority_context->priority_set_.hostSetsPerPriority().empty()) {
+    load_balancer_ = std::make_unique<LoadBalancerImpl>(
+        *priority_context, parent_info_->lbStats(), runtime_, random_, parent_info_->lbConfig());
+  } else {
+    load_balancer_ = nullptr;
   }
-  refresh();
-  handle_ = cluster_manager_.addThreadLocalClusterUpdateCallbacks(*this);
-
-  onPreInitComplete();
+  priority_context_ = std::move(priority_context);
 }
 
-void Cluster::refresh(const std::function<bool(const std::string&)>& skip_predicate) {
-  // Post the priority set to worker threads.
-  // TODO(mattklein123): Remove "this" capture.
-  tls_.runOnAllThreads([this, skip_predicate, cluster_name = this->info()->name()](
-                           OptRef<PerThreadLoadBalancer> per_thread_load_balancer) {
-    PriorityContextPtr priority_context = linearizePrioritySet(skip_predicate);
-    per_thread_load_balancer->get().refresh(std::move(priority_context));
-  });
-}
-
-void Cluster::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster) {
-  if (std::find(clusters_.begin(), clusters_.end(), cluster.info()->name()) != clusters_.end()) {
-    ENVOY_LOG(debug, "adding or updating cluster '{}' for aggregate cluster '{}'",
-              cluster.info()->name(), info()->name());
+void AggregateClusterLoadBalancer::onClusterAddOrUpdate(
+    absl::string_view cluster_name, Upstream::ThreadLocalClusterCommand& get_cluster) {
+  if (std::find(clusters_->begin(), clusters_->end(), cluster_name) != clusters_->end()) {
+    ENVOY_LOG(debug, "adding or updating cluster '{}' for aggregate cluster '{}'", cluster_name,
+              parent_info_->name());
+    auto& cluster = get_cluster();
     refresh();
-    cluster.prioritySet().addMemberUpdateCb(
-        [this](const Upstream::HostVector&, const Upstream::HostVector&) { refresh(); });
+    addMemberUpdateCallbackForCluster(cluster);
   }
 }
 
-void Cluster::onClusterRemoval(const std::string& cluster_name) {
+void AggregateClusterLoadBalancer::onClusterRemoval(const std::string& cluster_name) {
   //  The onClusterRemoval callback is called before the thread local cluster is removed. There
   //  will be a dangling pointer to the thread local cluster if the deleted cluster is not skipped
   //  when we refresh the load balancer.
-  if (std::find(clusters_.begin(), clusters_.end(), cluster_name) != clusters_.end()) {
-    ENVOY_LOG(debug, "removing cluster '{}' from aggreagte cluster '{}'", cluster_name,
-              info()->name());
-    refresh([cluster_name](const std::string& c) { return cluster_name == c; });
+  if (std::find(clusters_->begin(), clusters_->end(), cluster_name) != clusters_->end()) {
+    ENVOY_LOG(debug, "removing cluster '{}' from aggregate cluster '{}'", cluster_name,
+              parent_info_->name());
+    refresh(cluster_name);
   }
 }
 
@@ -140,7 +148,7 @@ absl::optional<uint32_t> AggregateClusterLoadBalancer::LoadBalancerImpl::hostToL
   }
 }
 
-Upstream::HostConstSharedPtr
+Upstream::HostSelectionResponse
 AggregateClusterLoadBalancer::LoadBalancerImpl::chooseHost(Upstream::LoadBalancerContext* context) {
   const Upstream::HealthyAndDegradedLoad* priority_loads = nullptr;
   if (context != nullptr) {
@@ -164,25 +172,49 @@ AggregateClusterLoadBalancer::LoadBalancerImpl::chooseHost(Upstream::LoadBalance
   return cluster->loadBalancer().chooseHost(&aggregate_context);
 }
 
-Upstream::HostConstSharedPtr
+Upstream::HostSelectionResponse
 AggregateClusterLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   if (load_balancer_) {
     return load_balancer_->chooseHost(context);
   }
+  return {nullptr};
+}
+
+Upstream::HostConstSharedPtr
+AggregateClusterLoadBalancer::peekAnotherHost(Upstream::LoadBalancerContext* context) {
+  if (load_balancer_) {
+    return load_balancer_->peekAnotherHost(context);
+  }
   return nullptr;
 }
 
-std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
+absl::optional<Upstream::SelectedPoolAndConnection>
+AggregateClusterLoadBalancer::selectExistingConnection(Upstream::LoadBalancerContext* context,
+                                                       const Upstream::Host& host,
+                                                       std::vector<uint8_t>& hash_key) {
+  if (load_balancer_) {
+    return load_balancer_->selectExistingConnection(context, host, hash_key);
+  }
+  return absl::nullopt;
+}
+
+OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks>
+AggregateClusterLoadBalancer::lifetimeCallbacks() {
+  if (load_balancer_) {
+    return load_balancer_->lifetimeCallbacks();
+  }
+  return {};
+}
+
+absl::StatusOr<std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
 ClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,
     const envoy::extensions::clusters::aggregate::v3::ClusterConfig& proto_config,
-    Upstream::ClusterFactoryContext& context,
-    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-    Stats::ScopePtr&& stats_scope) {
+    Upstream::ClusterFactoryContext& context) {
+  absl::Status creation_status = absl::OkStatus();
   auto new_cluster =
-      std::make_shared<Cluster>(cluster, proto_config, context.clusterManager(), context.runtime(),
-                                context.api().randomGenerator(), socket_factory_context,
-                                std::move(stats_scope), context.tls(), context.addedViaApi());
+      std::shared_ptr<Cluster>(new Cluster(cluster, proto_config, context, creation_status));
+  RETURN_IF_NOT_OK(creation_status);
   auto lb = std::make_unique<AggregateThreadAwareLoadBalancer>(*new_cluster);
   return std::make_pair(new_cluster, std::move(lb));
 }

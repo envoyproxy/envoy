@@ -2,7 +2,7 @@
 
 #include "envoy/config/core/v3/grpc_service.pb.h"
 
-#include "common/grpc/google_grpc_creds_impl.h"
+#include "source/common/grpc/google_grpc_creds_impl.h"
 
 #include "test/common/grpc/utility.h"
 #include "test/mocks/stats/mocks.h"

@@ -1,0 +1,14 @@
+config {
+  name: "envoy.filters.http.kill_request"
+  typed_config {
+    type_url: "type.googleapis.com/envoy.extensions.filters.http.kill_request.v3.KillRequest"
+    value: "\022Xenv: \"envoy.filters.http.health_check\"\n  typed_config {\n    type_oy.type.v3.Fractio\
+nalPe"
+  }
+}
+
+
+
+
+
+

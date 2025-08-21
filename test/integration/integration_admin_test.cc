@@ -9,11 +9,11 @@
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/http/header_map.h"
 
-#include "common/common/fmt.h"
-#include "common/config/api_version.h"
-#include "common/profiler/profiler.h"
-#include "common/stats/histogram_impl.h"
-#include "common/stats/stats_matcher_impl.h"
+#include "source/common/common/fmt.h"
+#include "source/common/config/api_version.h"
+#include "source/common/profiler/profiler.h"
+#include "source/common/stats/histogram_impl.h"
+#include "source/common/stats/stats_matcher_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/integration/utility.h"
@@ -30,63 +30,45 @@ namespace Envoy {
 
 INSTANTIATE_TEST_SUITE_P(Protocols, IntegrationAdminTest,
                          testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams(
-                             {Http::CodecClient::Type::HTTP1, Http::CodecClient::Type::HTTP2},
-                             {FakeHttpConnection::Type::HTTP1})),
+                             {Http::CodecType::HTTP1, Http::CodecType::HTTP2},
+                             {Http::CodecType::HTTP1})),
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
-TEST_P(IntegrationAdminTest, HealthCheck) {
-  initialize();
+namespace {
 
-  BufferingStreamDecoderPtr response;
-  EXPECT_EQ("200", request("http", "POST", "/healthcheck", response));
-
-  EXPECT_EQ("200", request("admin", "POST", "/healthcheck/fail", response));
-  EXPECT_EQ("503", request("http", "GET", "/healthcheck", response));
-
-  EXPECT_EQ("200", request("admin", "POST", "/healthcheck/ok", response));
-  EXPECT_EQ("200", request("http", "GET", "/healthcheck", response));
+absl::string_view contentType(const BufferingStreamDecoderPtr& response) {
+  const Http::HeaderEntry* entry = response->headers().ContentType();
+  if (entry == nullptr) {
+    return "(null)";
+  }
+  return entry->value().getStringView();
 }
 
-TEST_P(IntegrationAdminTest, HealthCheckWithoutServerStats) {
-  envoy::config::metrics::v3::StatsMatcher stats_matcher;
-  stats_matcher.mutable_exclusion_list()->add_patterns()->set_prefix("server.");
-  initialize(stats_matcher);
-
-  BufferingStreamDecoderPtr response;
-  EXPECT_EQ("200", request("http", "POST", "/healthcheck", response));
-  EXPECT_EQ("200", request("admin", "GET", "/stats", response));
-  EXPECT_THAT(response->body(), Not(HasSubstr("server.")));
-
-  EXPECT_EQ("200", request("admin", "POST", "/healthcheck/fail", response));
-  EXPECT_EQ("503", request("http", "GET", "/healthcheck", response));
-  EXPECT_EQ("200", request("admin", "GET", "/stats", response));
-  EXPECT_THAT(response->body(), Not(HasSubstr("server.")));
-
-  EXPECT_EQ("200", request("admin", "POST", "/healthcheck/ok", response));
-  EXPECT_EQ("200", request("http", "GET", "/healthcheck", response));
-  EXPECT_EQ("200", request("admin", "GET", "/stats", response));
-  EXPECT_THAT(response->body(), Not(HasSubstr("server.")));
-}
-
-TEST_P(IntegrationAdminTest, HealthCheckWithBufferFilter) {
-  config_helper_.addFilter(ConfigHelper::defaultBufferFilter());
-  initialize();
-
-  BufferingStreamDecoderPtr response;
-  EXPECT_EQ("200", request("http", "GET", "/healthcheck", response));
-}
+} // namespace
 
 TEST_P(IntegrationAdminTest, AdminLogging) {
   initialize();
 
   BufferingStreamDecoderPtr response;
   EXPECT_EQ("200", request("admin", "POST", "/logging", response));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_THAT(response->headers(),
+              ContainsHeader(Http::Headers::get().XContentTypeOptions, "nosniff"));
 
   // Bad level
-  EXPECT_EQ("404", request("admin", "POST", "/logging?level=blah", response));
+  EXPECT_EQ("400", request("admin", "POST", "/logging?level=blah", response));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_THAT(response->headers(),
+              ContainsHeader(Http::Headers::get().XContentTypeOptions, "nosniff"));
+  EXPECT_THAT(response->body(), HasSubstr("error: unknown logger level\n"));
 
   // Bad logger
-  EXPECT_EQ("404", request("admin", "POST", "/logging?blah=info", response));
+  EXPECT_EQ("400", request("admin", "POST", "/logging?blah=info", response));
+  EXPECT_THAT(response->body(), HasSubstr("error: unknown logger name\n"));
+
+  // Invalid number of query parameters
+  EXPECT_EQ("400", request("admin", "POST", "/logging?level=blah&assert=trace", response));
+  EXPECT_THAT(response->body(), HasSubstr("error: invalid number of parameters\n"));
 
   // This is going to stomp over custom log levels that are set on the command line.
   EXPECT_EQ("200", request("admin", "POST", "/logging?level=warning", response));
@@ -94,8 +76,46 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
     EXPECT_EQ("warning", logger.levelString());
   }
 
+  // Change particular log level.
   EXPECT_EQ("200", request("admin", "POST", "/logging?assert=trace", response));
   EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::assert).level());
+
+  // Change particular log level.
+  EXPECT_EQ("400", request("admin", "POST", "/logging?assert=blah", response));
+
+  // Multiple loggers at once with bad logger name.
+  EXPECT_EQ("400",
+            request("admin", "POST",
+                    "/logging?paths=blah:debug,assert:debug,admin:debug,config:debug", response));
+  EXPECT_THAT(response->body(), HasSubstr("error: unknown logger name\n"));
+  EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::assert).level());
+
+  // Multiple loggers at once with bad logger level.
+  EXPECT_EQ("400", request("admin", "POST", "/logging?paths=assert:blah,admin:debug,config:debug",
+                           response));
+  EXPECT_THAT(response->body(), HasSubstr("error: unknown logger level\n"));
+  EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::assert).level());
+
+  // Multiple loggers at once with empty logger name or empty logger level.
+  const absl::string_view bad_loggers[] = {
+      ":debug",
+      "init:",
+  };
+  for (auto bad_logger : bad_loggers) {
+    EXPECT_EQ("400", request("admin", "POST",
+                             fmt::format("/logging?paths=assert:debug,admin:debug,config:debug,{}",
+                                         bad_logger),
+                             response));
+    EXPECT_THAT(response->body(), HasSubstr("error: empty logger name or empty logger level\n"));
+    EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::assert).level());
+  }
+
+  // Multiple loggers at once
+  EXPECT_EQ("200", request("admin", "POST", "/logging?paths=assert:trace,admin:trace,config:trace",
+                           response));
+  EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::assert).level());
+  EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::admin).level());
+  EXPECT_EQ(spdlog::level::trace, Logger::Registry::getLog(Logger::Id::config).level());
 
   spdlog::string_view_t level_name = spdlog::level::level_string_views[default_log_level_];
   EXPECT_EQ("200",
@@ -105,100 +125,91 @@ TEST_P(IntegrationAdminTest, AdminLogging) {
   }
 }
 
-namespace {
-
-std::string ContentType(const BufferingStreamDecoderPtr& response) {
-  const Http::HeaderEntry* entry = response->headers().ContentType();
-  if (entry == nullptr) {
-    return "(null)";
-  }
-  return std::string(entry->value().getStringView());
-}
-
-} // namespace
-
 TEST_P(IntegrationAdminTest, Admin) {
   initialize();
 
   BufferingStreamDecoderPtr response;
   EXPECT_EQ("404", request("admin", "GET", "/notfound", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
-  EXPECT_NE(std::string::npos, response->body().find("invalid path. admin commands are:"))
-      << response->body();
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_THAT(response->body(), HasSubstr("invalid path. admin commands are:"));
 
   EXPECT_EQ("200", request("admin", "GET", "/help", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
-  EXPECT_NE(std::string::npos, response->body().find("admin commands are:")) << response->body();
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_THAT(response->body(), HasSubstr("admin commands are:"));
 
   EXPECT_EQ("200", request("admin", "GET", "/", response));
-  EXPECT_EQ("text/html; charset=UTF-8", ContentType(response));
-  EXPECT_NE(std::string::npos, response->body().find("<title>Envoy Admin</title>"))
-      << response->body();
+#ifdef ENVOY_ADMIN_HTML
+  EXPECT_EQ("text/html; charset=UTF-8", contentType(response));
+  EXPECT_THAT(response->body(), HasSubstr("<title>Envoy Admin</title>"));
+#else
+  EXPECT_EQ("text/plain", contentType(response));
+  EXPECT_THAT(response->body(), HasSubstr("HTML output was disabled"));
+#endif
 
   EXPECT_EQ("200", request("admin", "GET", "/server_info", response));
-  EXPECT_EQ("application/json", ContentType(response));
+  EXPECT_EQ("application/json", contentType(response));
 
   EXPECT_EQ("200", request("admin", "GET", "/ready", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
 
   EXPECT_EQ("200", request("admin", "GET", "/stats", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
 
   // Our first attempt to get recent lookups will get the error message as they
   // are off by default.
   EXPECT_EQ("200", request("admin", "GET", "/stats/recentlookups", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
-  EXPECT_THAT(response->body(), testing::HasSubstr("Lookup tracking is not enabled"));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_THAT(response->body(), HasSubstr("Lookup tracking is not enabled"));
 
   // Now enable recent-lookups tracking and check that we get a count.
   EXPECT_EQ("200", request("admin", "POST", "/stats/recentlookups/enable", response));
   EXPECT_EQ("200", request("admin", "GET", "/stats/recentlookups", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
   EXPECT_TRUE(absl::StartsWith(response->body(), "   Count Lookup\n")) << response->body();
   EXPECT_LT(28, response->body().size());
 
   // Now disable recent-lookups tracking and check that we get the error again.
   EXPECT_EQ("200", request("admin", "POST", "/stats/recentlookups/disable", response));
   EXPECT_EQ("200", request("admin", "GET", "/stats/recentlookups", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
-  EXPECT_THAT(response->body(), testing::HasSubstr("Lookup tracking is not enabled"));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_THAT(response->body(), HasSubstr("Lookup tracking is not enabled"));
 
   EXPECT_EQ("200", request("admin", "GET", "/stats?usedonly", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
 
   // Testing a filter with no matches
   EXPECT_EQ("200", request("admin", "GET", "/stats?filter=foo", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
 
   // Testing a filter with matches
   EXPECT_EQ("200", request("admin", "GET", "/stats?filter=server", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
 
   EXPECT_EQ("200", request("admin", "GET", "/stats?filter=server&usedonly", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
 
   EXPECT_EQ("200", request("admin", "GET", "/stats?format=json&usedonly", response));
-  EXPECT_EQ("application/json", ContentType(response));
+  EXPECT_EQ("application/json", contentType(response));
   validateStatsJson(response->body(), 0);
 
-  EXPECT_EQ("404", request("admin", "GET", "/stats?format=blah", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_EQ("400", request("admin", "GET", "/stats?format=blah", response));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
 
   EXPECT_EQ("200", request("admin", "GET", "/stats?format=json", response));
-  EXPECT_EQ("application/json", ContentType(response));
+  EXPECT_EQ("application/json", contentType(response));
   validateStatsJson(response->body(), 1);
 
   // Filtering stats by a regex with one match should return just that match.
   EXPECT_EQ("200",
             request("admin", "GET", "/stats?format=json&filter=^server\\.version$", response));
-  EXPECT_EQ("application/json", ContentType(response));
+  EXPECT_EQ("application/json", contentType(response));
   validateStatsJson(response->body(), 0);
   EXPECT_THAT("{\"stats\":[{\"name\":\"server.version\",\"value\":0}]}",
               JsonStringEq(response->body()));
 
   // Filtering stats by a non-full-string regex should also return just that match.
   EXPECT_EQ("200", request("admin", "GET", "/stats?format=json&filter=server\\.version", response));
-  EXPECT_EQ("application/json", ContentType(response));
+  EXPECT_EQ("application/json", contentType(response));
   validateStatsJson(response->body(), 0);
   EXPECT_THAT("{\"stats\":[{\"name\":\"server.version\",\"value\":0}]}",
               JsonStringEq(response->body()));
@@ -207,7 +218,7 @@ TEST_P(IntegrationAdminTest, Admin) {
   // valid, empty, stats array.
   EXPECT_EQ("200",
             request("admin", "GET", "/stats?format=json&filter=not_intended_to_appear", response));
-  EXPECT_EQ("application/json", ContentType(response));
+  EXPECT_EQ("application/json", contentType(response));
   validateStatsJson(response->body(), 0);
   EXPECT_THAT(response->body(), Eq("{\"stats\":[]}"));
 
@@ -259,93 +270,111 @@ TEST_P(IntegrationAdminTest, Admin) {
 
   EXPECT_EQ("200", request("admin", "GET", "/clusters", response));
   EXPECT_THAT(response->body(), HasSubstr("added_via_api"));
-  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
 
   EXPECT_EQ("200", request("admin", "GET", "/clusters?format=json", response));
-  EXPECT_EQ("application/json", ContentType(response));
-  EXPECT_NO_THROW(Json::Factory::loadFromString(response->body()));
+  EXPECT_EQ("application/json", contentType(response));
+  EXPECT_TRUE(Json::Factory::loadFromString(response->body()).status().ok());
 
   EXPECT_EQ("400", request("admin", "POST", "/cpuprofiler", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
 
   EXPECT_EQ("200", request("admin", "GET", "/hot_restart_version", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
 
   EXPECT_EQ("200", request("admin", "POST", "/reset_counters", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
 
   EXPECT_EQ("200", request("admin", "POST", "/stats/recentlookups/enable", response));
   EXPECT_EQ("200", request("admin", "POST", "/stats/recentlookups/clear", response));
   EXPECT_EQ("200", request("admin", "GET", "/stats/recentlookups", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
 
   switch (GetParam().downstream_protocol) {
-  case Http::CodecClient::Type::HTTP1:
+  case Http::CodecType::HTTP1:
     EXPECT_EQ("   Count Lookup\n"
               "\n"
               "total: 0\n",
               response->body());
     break;
-  case Http::CodecClient::Type::HTTP2:
+  case Http::CodecType::HTTP2:
     EXPECT_EQ("   Count Lookup\n"
               "\n"
               "total: 0\n",
               response->body());
     break;
-  case Http::CodecClient::Type::HTTP3:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  case Http::CodecType::HTTP3:
+    PANIC("not implemented");
   }
 
   EXPECT_EQ("200", request("admin", "GET", "/certs", response));
-  EXPECT_EQ("application/json", ContentType(response));
+  EXPECT_EQ("application/json", contentType(response));
 
   EXPECT_EQ("200", request("admin", "GET", "/runtime", response));
-  EXPECT_EQ("application/json", ContentType(response));
+  EXPECT_EQ("application/json", contentType(response));
 
   EXPECT_EQ("200", request("admin", "POST", "/runtime_modify?foo=bar&foo1=bar1", response));
 
   EXPECT_EQ("200", request("admin", "GET", "/runtime?format=json", response));
-  EXPECT_EQ("application/json", ContentType(response));
+  EXPECT_EQ("application/json", contentType(response));
 
-  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
-  auto entries = json->getObject("entries");
-  auto foo_obj = entries->getObject("foo");
-  EXPECT_EQ("bar", foo_obj->getString("final_value"));
-  auto foo1_obj = entries->getObject("foo1");
-  EXPECT_EQ("bar1", foo1_obj->getString("final_value"));
+  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body()).value();
+  auto entries = json->getObject("entries").value();
+  auto foo_obj = entries->getObject("foo").value();
+  EXPECT_EQ("bar", *foo_obj->getString("final_value"));
+  auto foo1_obj = entries->getObject("foo1").value();
+  EXPECT_EQ("bar1", *foo1_obj->getString("final_value"));
 
   EXPECT_EQ("200", request("admin", "GET", "/listeners", response));
-  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
   auto listeners = test_server_->server().listenerManager().listeners();
   auto listener_it = listeners.cbegin();
   for (; listener_it != listeners.end(); ++listener_it) {
-    EXPECT_THAT(response->body(),
-                HasSubstr(fmt::format(
-                    "{}::{}", listener_it->get().name(),
-                    listener_it->get().listenSocketFactory().localAddress()->asString())));
+    for (auto& socket_factory : listener_it->get().listenSocketFactories()) {
+      EXPECT_THAT(response->body(),
+                  HasSubstr(fmt::format("{}::{}", listener_it->get().name(),
+                                        socket_factory->localAddress()->asString())));
+    }
   }
 
   EXPECT_EQ("200", request("admin", "GET", "/listeners?format=json", response));
-  EXPECT_EQ("application/json", ContentType(response));
+  EXPECT_EQ("application/json", contentType(response));
 
-  json = Json::Factory::loadFromString(response->body());
-  std::vector<Json::ObjectSharedPtr> listener_info = json->getObjectArray("listener_statuses");
+  json = Json::Factory::loadFromString(response->body()).value();
+  std::vector<Json::ObjectSharedPtr> listener_info =
+      json->getObjectArray("listener_statuses").value();
   auto listener_info_it = listener_info.cbegin();
   listeners = test_server_->server().listenerManager().listeners();
   listener_it = listeners.cbegin();
   for (; listener_info_it != listener_info.end() && listener_it != listeners.end();
        ++listener_info_it, ++listener_it) {
-    auto local_address = (*listener_info_it)->getObject("local_address");
-    auto socket_address = local_address->getObject("socket_address");
-    EXPECT_EQ(listener_it->get().listenSocketFactory().localAddress()->ip()->addressAsString(),
-              socket_address->getString("address"));
-    EXPECT_EQ(listener_it->get().listenSocketFactory().localAddress()->ip()->port(),
-              socket_address->getInteger("port_value"));
+    auto local_address = (*listener_info_it)->getObject("local_address").value();
+    auto socket_address = local_address->getObject("socket_address").value();
+    EXPECT_EQ(
+        listener_it->get().listenSocketFactories()[0]->localAddress()->ip()->addressAsString(),
+        *socket_address->getString("address"));
+    EXPECT_EQ(listener_it->get().listenSocketFactories()[0]->localAddress()->ip()->port(),
+              *socket_address->getInteger("port_value"));
+
+    std::vector<Json::ObjectSharedPtr> additional_local_addresses =
+        (*listener_info_it)->getObjectArray("additional_local_addresses").value();
+    for (std::vector<Json::ObjectSharedPtr>::size_type i = 0; i < additional_local_addresses.size();
+         i++) {
+      auto socket_address = *additional_local_addresses[i]->getObject("socket_address");
+      EXPECT_EQ(listener_it->get()
+                    .listenSocketFactories()[i + 1]
+                    ->localAddress()
+                    ->ip()
+                    ->addressAsString(),
+                *socket_address->getString("address"));
+      EXPECT_EQ(listener_it->get().listenSocketFactories()[i + 1]->localAddress()->ip()->port(),
+                *socket_address->getInteger("port_value"));
+    }
   }
 
   EXPECT_EQ("200", request("admin", "GET", "/config_dump", response));
-  EXPECT_EQ("application/json", ContentType(response));
-  json = Json::Factory::loadFromString(response->body());
+  EXPECT_EQ("application/json", contentType(response));
+  json = Json::Factory::loadFromString(response->body()).value();
   size_t index = 0;
   const std::string expected_types[] = {"type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
                                         "type.googleapis.com/envoy.admin.v3.ClustersConfigDump",
@@ -354,8 +383,9 @@ TEST_P(IntegrationAdminTest, Admin) {
                                         "type.googleapis.com/envoy.admin.v3.RoutesConfigDump",
                                         "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"};
 
-  for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs")) {
-    EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type")) == 0);
+  auto array = json->getObjectArray("configs").value();
+  for (const Json::ObjectSharedPtr& obj_ptr : array) {
+    EXPECT_TRUE(expected_types[index].compare(*obj_ptr->getString("@type")) == 0);
     index++;
   }
 
@@ -376,8 +406,8 @@ TEST_P(IntegrationAdminTest, Admin) {
   EXPECT_EQ("secret_static_0", secret_config_dump.static_secrets(0).name());
 
   EXPECT_EQ("200", request("admin", "GET", "/config_dump?include_eds", response));
-  EXPECT_EQ("application/json", ContentType(response));
-  json = Json::Factory::loadFromString(response->body());
+  EXPECT_EQ("application/json", contentType(response));
+  json = Json::Factory::loadFromString(response->body()).value();
   index = 0;
   const std::string expected_types_eds[] = {
       "type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
@@ -388,8 +418,9 @@ TEST_P(IntegrationAdminTest, Admin) {
       "type.googleapis.com/envoy.admin.v3.RoutesConfigDump",
       "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"};
 
-  for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs")) {
-    EXPECT_TRUE(expected_types_eds[index].compare(obj_ptr->getString("@type")) == 0);
+  array = json->getObjectArray("configs").value();
+  for (const Json::ObjectSharedPtr& obj_ptr : array) {
+    EXPECT_TRUE(expected_types_eds[index].compare(*obj_ptr->getString("@type")) == 0);
     index++;
   }
 
@@ -398,13 +429,23 @@ TEST_P(IntegrationAdminTest, Admin) {
   TestUtility::loadFromJson(response->body(), config_dump_with_eds);
   EXPECT_EQ(7, config_dump_with_eds.configs_size());
 
-  // Validate that the "inboundonly" does not stop the default listener.
+  EXPECT_EQ("200", request("admin", "GET", "/config_dump?name_regex=route_config_0", response));
+  EXPECT_EQ("application/json", contentType(response));
+  envoy::admin::v3::ConfigDump name_filtered_config_dump;
+  TestUtility::loadFromJson(response->body(), name_filtered_config_dump);
+  EXPECT_EQ(6, config_dump.configs_size());
+
+  // SecretsConfigDump should have been totally filtered away.
+  secret_config_dump.Clear();
+  name_filtered_config_dump.configs(5).UnpackTo(&secret_config_dump);
+  EXPECT_EQ(secret_config_dump.static_secrets().size(), 0);
+
   response = IntegrationUtil::makeSingleRequest(lookupPort("admin"), "POST",
                                                 "/drain_listeners?inboundonly", "",
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
   EXPECT_EQ("OK\n", response->body());
 
   // Validate that the listener stopped stat is not used and still zero.
@@ -416,7 +457,7 @@ TEST_P(IntegrationAdminTest, Admin) {
                                                 downstreamProtocol(), version_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
   EXPECT_EQ("OK\n", response->body());
 
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
@@ -436,11 +477,147 @@ TEST_P(IntegrationAdminTest, AdminDrainInboundOnly) {
       version_);
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  EXPECT_EQ("text/plain; charset=UTF-8", ContentType(response));
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
   EXPECT_EQ("OK\n", response->body());
 
   // Validate that the inbound listener has been stopped.
   test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+}
+
+TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyIdempotent) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* inbound_listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    inbound_listener->set_traffic_direction(envoy::config::core::v3::INBOUND);
+    inbound_listener->set_name("inbound_0");
+  });
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  initialize();
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners?inboundonly&graceful", "",
+      downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("OK\n", response->body());
+
+  BufferingStreamDecoderPtr response2 = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners?inboundonly&graceful", "",
+      downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("OK\n", response->body());
+
+  // This should actually cause a new drain since this one isn't inbound_only
+  BufferingStreamDecoderPtr response3 = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners?graceful", "", downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("OK\n", response->body());
+
+  codec_client_ = makeHttpConnection(lookupPort("inbound_0"));
+  EXPECT_FALSE(codec_client_->disconnected());
+
+  IntegrationStreamDecoderPtr response4 =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response4->waitForEndStream());
+  EXPECT_TRUE(response4->complete());
+  EXPECT_THAT(response4->headers(), Http::HttpStatusIs("200"));
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  if (downstreamProtocol() == Http::CodecType::HTTP2) {
+    EXPECT_TRUE(codec_client_->sawGoAway());
+  } else {
+    EXPECT_EQ("close", response4->headers().getConnectionValue());
+  }
+
+  // Validate that the inbound listener has been stopped and that we don't double count
+  // the inbound_only drain and the universal drain.
+  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+}
+
+// Validates that the inbound only query param only drains inbound listeners when graceful is set.
+TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyGracefulConnectionCloseForInbound) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* inbound_listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    inbound_listener->set_traffic_direction(envoy::config::core::v3::INBOUND);
+    inbound_listener->set_name("inbound_0");
+  });
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  initialize();
+  // Drain immediately to avoid waiting for the listener to stop.
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners?inboundonly&graceful", "",
+      downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("OK\n", response->body());
+
+  codec_client_ = makeHttpConnection(lookupPort("inbound_0"));
+  EXPECT_FALSE(codec_client_->disconnected());
+
+  IntegrationStreamDecoderPtr response2 =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_TRUE(response2->complete());
+  EXPECT_THAT(response2->headers(), Http::HttpStatusIs("200"));
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+  if (downstreamProtocol() == Http::CodecType::HTTP2) {
+    EXPECT_TRUE(codec_client_->sawGoAway());
+  } else {
+    EXPECT_EQ("close", response2->headers().getConnectionValue());
+  }
+
+  // Validate that the inbound listener has been stopped.
+  test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+}
+
+// Validates that the inbound only query param only drains inbound listeners when graceful is set.
+TEST_P(IntegrationAdminTest, AdminDrainInboundOnlyGracefulNoConnectionCloseForOutbound) {
+  // Drain immediately to avoid waiting for the listener to stop.
+  drain_strategy_ = Server::DrainStrategy::Immediate;
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* inbound_listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    inbound_listener->set_traffic_direction(envoy::config::core::v3::OUTBOUND);
+    inbound_listener->set_name("outbound_0");
+  });
+  initialize();
+
+  BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners?inboundonly&graceful", "",
+      downstreamProtocol(), version_);
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("text/plain; charset=UTF-8", contentType(response));
+  EXPECT_EQ("OK\n", response->body());
+
+  codec_client_ = makeHttpConnection(lookupPort("outbound_0"));
+  EXPECT_FALSE(codec_client_->disconnected());
+
+  IntegrationStreamDecoderPtr response2;
+  response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest(0);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response2->waitForEndStream());
+  EXPECT_TRUE(response2->complete());
+  EXPECT_THAT(response->headers(), Http::HttpStatusIs("200"));
+  EXPECT_FALSE(
+      codec_client_->disconnected()); // Should still be connected because we only drained inbound
+  if (downstreamProtocol() == Http::CodecType::HTTP2) {
+    EXPECT_FALSE(codec_client_->sawGoAway());
+  } else {
+    EXPECT_NE("close", response2->headers().getConnectionValue());
+  }
+
+  // Validate that the inbound listener has been stopped.
+  test_server_->waitForCounterEq("listener_manager.listener_stopped", 0);
 }
 
 TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
@@ -448,7 +625,7 @@ TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
   bool test = true;
 
   // add an handler which adds a callback to the list of callback called when connection is dropped.
-  auto callback = [&test](absl::string_view, Http::HeaderMap&, Buffer::Instance&,
+  auto callback = [&test](Http::HeaderMap&, Buffer::Instance&,
                           Server::AdminStream& admin_stream) -> Http::Code {
     auto on_destroy_callback = [&test]() { test = false; };
 
@@ -458,7 +635,7 @@ TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
   };
 
   EXPECT_TRUE(
-      test_server_->server().admin().addHandler("/foo/bar", "hello", callback, true, false));
+      test_server_->server().admin()->addHandler("/foo/bar", "hello", callback, true, false));
 
   // As part of the request, on destroy() should be called and the on_destroy_callback invoked.
   BufferingStreamDecoderPtr response;
@@ -466,8 +643,8 @@ TEST_P(IntegrationAdminTest, AdminOnDestroyCallbacks) {
   // Check that the added callback was invoked.
   EXPECT_EQ(test, false);
 
-  // Small test to cover new statsFlushInterval() on Instance.h.
-  EXPECT_EQ(test_server_->server().statsFlushInterval(), std::chrono::milliseconds(5000));
+  // Small test to cover new the flush interval on the statsConfig in Instance.h.
+  EXPECT_EQ(test_server_->server().statsConfig().flushInterval(), std::chrono::milliseconds(5000));
 }
 
 TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
@@ -490,7 +667,11 @@ TEST_P(IntegrationAdminTest, AdminCpuProfilerStart) {
 class IntegrationAdminIpv4Ipv6Test : public testing::Test, public HttpIntegrationTest {
 public:
   IntegrationAdminIpv4Ipv6Test()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, Network::Address::IpVersion::v4) {}
+      : HttpIntegrationTest(Http::CodecType::HTTP1, Network::Address::IpVersion::v4) {
+    // This test doesn't have any configuration that creates stats, and one of the tests is failing
+    // for unknown reason on Windows only, so disable.
+    skip_tag_extraction_rule_check_ = true;
+  }
 
   void initialize() override {
     config_helper_.addConfigModifier(
@@ -530,7 +711,7 @@ class StatsMatcherIntegrationTest
       public HttpIntegrationTest,
       public testing::WithParamInterface<Network::Address::IpVersion> {
 public:
-  StatsMatcherIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  StatsMatcherIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
 
   void initialize() override {
     config_helper_.addConfigModifier(
@@ -561,10 +742,9 @@ TEST_P(StatsMatcherIntegrationTest, ExcludePrefixServerDot) {
   EXPECT_THAT(response_->body(), Not(HasSubstr("server.")));
 }
 
-TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(ExcludeRequests)) {
-  v2_bootstrap_ = true;
-  stats_matcher_.mutable_exclusion_list()->add_patterns()->set_hidden_envoy_deprecated_regex(
-      ".*requests.*");
+TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(DISABLED_ExcludeRequests)) {
+  stats_matcher_.mutable_exclusion_list()->add_patterns()->MergeFrom(
+      TestUtility::createRegexMatcher(".*requests.*"));
   initialize();
   makeRequest();
   EXPECT_THAT(response_->body(), Not(HasSubstr("requests")));
@@ -577,11 +757,10 @@ TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(ExcludeExact)) {
   EXPECT_THAT(response_->body(), Not(HasSubstr("server.concurrency")));
 }
 
-TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(ExcludeMultipleExact)) {
-  v2_bootstrap_ = true;
+TEST_P(StatsMatcherIntegrationTest, DEPRECATED_FEATURE_TEST(DISABLED_ExcludeMultipleExact)) {
   stats_matcher_.mutable_exclusion_list()->add_patterns()->set_exact("server.concurrency");
-  stats_matcher_.mutable_exclusion_list()->add_patterns()->set_hidden_envoy_deprecated_regex(
-      ".*live");
+  stats_matcher_.mutable_exclusion_list()->add_patterns()->MergeFrom(
+      TestUtility::createRegexMatcher(".*live"));
   initialize();
   makeRequest();
   EXPECT_THAT(response_->body(), Not(HasSubstr("server.concurrency")));

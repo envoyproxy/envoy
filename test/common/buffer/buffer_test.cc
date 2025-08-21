@@ -1,8 +1,9 @@
+#include <cstddef>
 #include <limits>
 
 #include "envoy/common/exception.h"
 
-#include "common/buffer/buffer_impl.h"
+#include "source/common/buffer/buffer_impl.h"
 
 #include "test/common/buffer/utility.h"
 #include "test/test_common/printers.h"
@@ -25,7 +26,7 @@ public:
       auto slice = std::make_unique<Slice>(*fragment);
       return slice;
     } else {
-      auto slice = std::make_unique<Slice>(data.size());
+      auto slice = std::make_unique<Slice>(data.size(), nullptr);
       slice->append(data.data(), data.size());
       return slice;
     }
@@ -160,7 +161,7 @@ TEST_F(OwnedSliceTest, Create) {
   static constexpr std::pair<uint64_t, uint64_t> Sizes[] = {
       {0, 0}, {1, 4096}, {64, 4096}, {4095, 4096}, {4096, 4096}, {4097, 8192}, {65535, 65536}};
   for (const auto& [size, expected_size] : Sizes) {
-    Slice slice{size};
+    Slice slice{size, nullptr};
     EXPECT_NE(nullptr, slice.data());
     EXPECT_EQ(0, slice.dataSize());
     EXPECT_LE(size, slice.reservableSize());
@@ -169,7 +170,7 @@ TEST_F(OwnedSliceTest, Create) {
 }
 
 TEST_F(OwnedSliceTest, ReserveCommit) {
-  Slice slice{100};
+  Slice slice{100, nullptr};
   const uint64_t initial_capacity = slice.reservableSize();
   EXPECT_LE(100, initial_capacity);
 
@@ -231,7 +232,7 @@ TEST_F(OwnedSliceTest, ReserveCommit) {
     // Try to commit a reservation from the wrong slice, and verify that the slice rejects it.
     Slice::Reservation reservation = slice.reserve(10);
     expectReservationSuccess(reservation, slice, 10);
-    Slice other_slice{100};
+    Slice other_slice{100, nullptr};
     Slice::Reservation other_reservation = other_slice.reserve(10);
     expectReservationSuccess(other_reservation, other_slice, 10);
     EXPECT_FALSE(slice.commit(other_reservation));
@@ -265,7 +266,7 @@ TEST_F(OwnedSliceTest, ReserveCommit) {
 
 TEST_F(OwnedSliceTest, Drain) {
   // Create a slice and commit all the available space.
-  Slice slice{100};
+  Slice slice{100, nullptr};
   Slice::Reservation reservation = slice.reserve(slice.reservableSize());
   bool committed = slice.commit(reservation);
   EXPECT_TRUE(committed);
@@ -1075,7 +1076,33 @@ TEST(BufferHelperTest, WriteBEI64) {
     EXPECT_EQ("\x7F\xFF\xFF\xFF\xFF\xFF\xFF\xFF", buffer.toString());
   }
 }
+TEST(BufferHelperTest, AddFragments) {
+  {
+    // Add some string fragments.
+    Buffer::OwnedImpl buffer;
+    buffer.addFragments({"aaaaa", "bbbbb"});
+    EXPECT_EQ("aaaaabbbbb", buffer.toString());
+  }
 
+  {
+    // Add string fragments cyclically.
+    Buffer::OwnedImpl buffer;
+    std::string str;
+    for (size_t i = 0; i < 1024; i++) {
+      buffer.addFragments({"aaaaa", "bbbbb", "ccccc", "ddddd"});
+      str += "aaaaabbbbbcccccddddd";
+    }
+    EXPECT_EQ(20 * 1024, buffer.length());
+    EXPECT_EQ(str, buffer.toString());
+
+    auto slice_vec = buffer.getRawSlices();
+
+    EXPECT_EQ(5, slice_vec.size());
+    for (size_t i = 0; i < 5; i++) {
+      EXPECT_EQ(4096, slice_vec[i].len_);
+    }
+  }
+}
 } // namespace
 } // namespace Buffer
 } // namespace Envoy

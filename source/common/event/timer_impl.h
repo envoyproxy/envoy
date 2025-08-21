@@ -4,10 +4,10 @@
 
 #include "envoy/event/timer.h"
 
-#include "common/common/scope_tracker.h"
-#include "common/common/utility.h"
-#include "common/event/event_impl_base.h"
-#include "common/event/libevent.h"
+#include "source/common/common/scope_tracker.h"
+#include "source/common/common/utility.h"
+#include "source/common/event/event_impl_base.h"
+#include "source/common/event/libevent.h"
 
 namespace Envoy {
 namespace Event {
@@ -23,15 +23,17 @@ public:
    * before doing any conversions. When the passed in duration exceeds INT32_MAX max seconds, the
    * output will be clipped to yield INT32_MAX seconds and 0 microseconds for the
    * output argument. We clip to INT32_MAX to guard against overflowing the timeval structure.
-   * Throws an EnvoyException on negative duration input.
+   * ENVOY_BUGs if the duration is negative.
    * @tparam Duration std::chrono duration type, e.g. seconds, milliseconds, ...
    * @param d duration value
    * @param tv output parameter that will be updated
    */
   template <typename Duration> static void durationToTimeval(const Duration& d, timeval& tv) {
     if (d.count() < 0) {
-      ExceptionUtil::throwEnvoyException(
-          fmt::format("Negative duration passed to durationToTimeval(): {}", d.count()));
+      IS_ENVOY_BUG(fmt::format("Negative duration passed to durationToTimeval(): {}", d.count()));
+      tv.tv_sec = 0;
+      tv.tv_usec = 500000;
+      return;
     };
     constexpr int64_t clip_to = INT32_MAX; // 136.102208 years
     auto secs = std::chrono::duration_cast<std::chrono::seconds>(d);
@@ -70,11 +72,6 @@ private:
   // example if the DispatcherImpl::post is called by two threads, they race to
   // both set this to null.
   std::atomic<const ScopeTrackedObject*> object_{};
-
-  // Latched "envoy.reloadable_features.activate_timers_next_event_loop" runtime feature. If true,
-  // timers scheduled with a 0 time delta are evaluated in the next iteration of the event loop
-  // after polling and activating new fd events.
-  const bool activate_timers_next_event_loop_;
 };
 
 } // namespace Event

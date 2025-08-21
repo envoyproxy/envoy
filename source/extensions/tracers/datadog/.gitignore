@@ -1,0 +1,2 @@
+# Prevent the exclusion of the diagram used in the readme.
+!diagram.svg

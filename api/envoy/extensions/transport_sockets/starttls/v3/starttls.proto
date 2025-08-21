@@ -5,34 +5,48 @@ package envoy.extensions.transport_sockets.starttls.v3;
 import "envoy/extensions/transport_sockets/raw_buffer/v3/raw_buffer.proto";
 import "envoy/extensions/transport_sockets/tls/v3/tls.proto";
 
-import "google/protobuf/wrappers.proto";
-
 import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.starttls.v3";
 option java_outer_classname = "StarttlsProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/starttls/v3;starttlsv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: StartTls]
 // [#extension: envoy.transport_sockets.starttls]
 
 // StartTls transport socket addresses situations when a protocol starts in clear-text and
-// negotiates an in-band switch to TLS. StartTls transport socket is protocol agnostic and requires
-// a network filter which understands protocol exchange and a state machine to signal to the StartTls
-// transport socket when a switch to TLS is required.
+// negotiates an in-band switch to TLS. StartTls transport socket is protocol agnostic. In the
+// case of downstream StartTls a network filter is required which understands protocol exchange
+// and a state machine to signal to the StartTls transport socket when a switch to TLS is
+// required. Similarly, upstream StartTls requires the owner of an upstream transport socket to
+// manage the state machine necessary to properly coordinate negotiation with the upstream and
+// signal to the transport socket when a switch to secure transport is required.
 
-// Configuration for StartTls transport socket.
+// Configuration for a downstream StartTls transport socket.
 // StartTls transport socket wraps two sockets:
-// - raw_buffer socket which is used at the beginning of the session
-// - TLS socket used when a protocol negotiates a switch to encrypted traffic.
+// * raw_buffer socket which is used at the beginning of the session
+// * TLS socket used when a protocol negotiates a switch to encrypted traffic.
 message StartTlsConfig {
   // (optional) Configuration for clear-text socket used at the beginning of the session.
   raw_buffer.v3.RawBuffer cleartext_socket_config = 1;
 
-  // Configuration for TLS socket.
+  // Configuration for a downstream TLS socket.
   transport_sockets.tls.v3.DownstreamTlsContext tls_socket_config = 2
+      [(validate.rules).message = {required: true}];
+}
+
+// Configuration for an upstream StartTls transport socket.
+// StartTls transport socket wraps two sockets:
+// * raw_buffer socket which is used at the beginning of the session
+// * TLS socket used when a protocol negotiates a switch to encrypted traffic.
+message UpstreamStartTlsConfig {
+  // (optional) Configuration for clear-text socket used at the beginning of the session.
+  raw_buffer.v3.RawBuffer cleartext_socket_config = 1;
+
+  // Configuration for an upstream TLS socket.
+  transport_sockets.tls.v3.UpstreamTlsContext tls_socket_config = 2
       [(validate.rules).message = {required: true}];
 }

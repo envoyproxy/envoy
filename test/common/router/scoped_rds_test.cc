@@ -1,8 +1,7 @@
 #include <string>
 
-#include "envoy/admin/v3/config_dump.pb.h"
-#include "envoy/admin/v3/config_dump.pb.validate.h"
-#include "envoy/api/v2/route.pb.h"
+#include "envoy/admin/v3/config_dump_shared.pb.h"
+#include "envoy/admin/v3/config_dump_shared.pb.validate.h"
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/scoped_route.pb.h"
@@ -13,16 +12,21 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
-#include "common/config/api_version.h"
-#include "common/config/grpc_mux_impl.h"
-#include "common/protobuf/message_validator_impl.h"
-#include "common/router/scoped_rds.h"
+#include "source/common/config/api_version.h"
+#include "source/common/config/config_provider_impl.h"
+#include "source/common/config/null_grpc_mux_impl.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/common/router/route_provider_manager.h"
+#include "source/common/router/scoped_rds.h"
+#include "source/common/router/static_route_provider_impl.h"
 
 #include "test/mocks/config/mocks.h"
+#include "test/mocks/matcher/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/test_common/simulated_time_system.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "absl/strings/string_view.h"
@@ -30,6 +34,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+using testing::_;
 using testing::AnyNumber;
 using testing::Eq;
 using testing::InSequence;
@@ -43,12 +48,15 @@ namespace Envoy {
 namespace Router {
 namespace {
 
+using ::Envoy::Matchers::MockStringMatcher;
+using ::Envoy::Matchers::UniversalStringMatcher;
+
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 
 envoy::config::route::v3::ScopedRouteConfiguration
 parseScopedRouteConfigurationFromYaml(const std::string& yaml) {
   envoy::config::route::v3::ScopedRouteConfiguration scoped_route_config;
-  TestUtility::loadFromYaml(yaml, scoped_route_config, true);
+  TestUtility::loadFromYaml(yaml, scoped_route_config);
   return scoped_route_config;
 }
 
@@ -56,7 +64,7 @@ envoy::extensions::filters::network::http_connection_manager::v3::HttpConnection
 parseHttpConnectionManagerFromYaml(const std::string& config_yaml) {
   envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       http_connection_manager;
-  TestUtility::loadFromYaml(config_yaml, http_connection_manager, true);
+  TestUtility::loadFromYaml(config_yaml, http_connection_manager);
   return http_connection_manager;
 }
 
@@ -81,8 +89,7 @@ protected:
 
   // The delta style API helper.
   Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>
-  anyToResource(Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                const std::string& version) {
+  anyToResource(Protobuf::RepeatedPtrField<Protobuf::Any>& resources, const std::string& version) {
     Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> added_resources;
     for (const auto& resource_any : resources) {
       auto config =
@@ -109,6 +116,220 @@ protected:
   NiceMock<Event::MockDispatcher> event_dispatcher_;
 };
 
+using InlineScopedRoutesTest = ScopedRoutesTestBase;
+
+constexpr char hcm_config_base[] = R"EOF(
+codec_type: auto
+stat_prefix: foo
+http_filters:
+  - name: http_dynamo_filter
+    typed_config:
+)EOF";
+
+TEST_F(InlineScopedRoutesTest, RouteConfigurationNameNotSupported) {
+  const std::string hcm_config = absl::StrCat(hcm_config_base, R"EOF(
+scoped_routes:
+  name: foo-scoped-routes
+  scope_key_builder:
+    fragments:
+      - header_value_extractor:
+          name: addr
+          element_separator: ","
+          index: 0
+  scoped_route_configurations_list:
+    scoped_route_configurations:
+      - name: foo-scope
+        route_configuration_name: foo-route
+        key:
+          fragments: { string_key: foo-key }
+      - name: foo2-scope
+        route_configuration:
+          name: foo2
+          virtual_hosts:
+            - name: bar
+              domains: ["*"]
+              routes:
+                - match: { prefix: "/" }
+                  route: { cluster: baz }
+        key:
+          fragments: { string_key: foo-key-2 }
+)EOF");
+
+  EXPECT_THROW_WITH_REGEX(
+      ScopedRoutesConfigProviderUtil::create(parseHttpConnectionManagerFromYaml(hcm_config),
+                                             server_factory_context_, context_init_manager_, "foo.",
+                                             *config_provider_manager_),
+      EnvoyException, "Fetching routes via RDS \\(route_configuration_name\\) is not supported");
+}
+
+TEST_F(InlineScopedRoutesTest, RouteConfigurationRequired) {
+  const std::string hcm_config = absl::StrCat(hcm_config_base, R"EOF(
+scoped_routes:
+  name: foo-scoped-routes
+  scope_key_builder:
+    fragments:
+      - header_value_extractor:
+          name: addr
+          element_separator: ","
+          index: 0
+  scoped_route_configurations_list:
+    scoped_route_configurations:
+      - name: foo-scope
+        key:
+          fragments: { string_key: foo-key }
+)EOF");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      Envoy::Config::ConfigProviderPtr provider = ScopedRoutesConfigProviderUtil::create(
+          parseHttpConnectionManagerFromYaml(hcm_config), server_factory_context_,
+          context_init_manager_, "foo.", *config_provider_manager_),
+      EnvoyException, "You must specify a route_configuration with inline scoped routes.");
+}
+
+TEST_F(InlineScopedRoutesTest, InlineRouteConfigurations) {
+  server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  const std::string hcm_config = absl::StrCat(hcm_config_base, R"EOF(
+scoped_routes:
+  name: $0
+  scope_key_builder:
+    fragments:
+      - header_value_extractor:
+          name: addr
+          element_separator: ","
+          index: 0
+  scoped_route_configurations_list:
+    scoped_route_configurations:
+      - name: foo-scope
+        route_configuration:
+          name: foo
+          virtual_hosts:
+            - name: bar
+              domains: ["*"]
+              routes:
+                - match: { prefix: "/" }
+                  route: { cluster: baz }
+        key:
+          fragments: { string_key: foo-key }
+      - name: foo2-scope
+        route_configuration:
+          name: foo2
+          virtual_hosts:
+            - name: bar
+              domains: ["*"]
+              routes:
+                - match: { prefix: "/" }
+                  route: { cluster: baz }
+        key:
+          fragments: { string_key: foo-key-2 }
+)EOF");
+  const auto config =
+      parseHttpConnectionManagerFromYaml(absl::Substitute(hcm_config, "foo-scoped-routes"));
+  Envoy::Config::ConfigProviderPtr provider = ScopedRoutesConfigProviderUtil::create(
+      config, server_factory_context_, context_init_manager_, "foo.", *config_provider_manager_);
+  Envoy::Router::ScopeKeyBuilderPtr scope_key_builder =
+      ScopedRoutesConfigProviderUtil::createScopeKeyBuilder(config);
+  ASSERT_THAT(provider->config<ScopedConfigImpl>(), Not(IsNull()));
+  EXPECT_EQ(provider->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"addr", "foo-key"}}))
+                ->name(),
+            "foo");
+  EXPECT_EQ(provider->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"addr", "foo-key-2"}}))
+                ->name(),
+            "foo2");
+  EXPECT_EQ(provider->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"addr", "foo-key,foo-key-2"}}))
+                ->name(),
+            "foo");
+}
+
+TEST_F(InlineScopedRoutesTest, ConfigLoadAndDump) {
+  server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  timeSystem().setSystemTime(std::chrono::milliseconds(1234567891234));
+  const std::string hcm_config = absl::StrCat(hcm_config_base, R"EOF(
+scoped_routes:
+  name: $0
+  scope_key_builder:
+    fragments:
+      - header_value_extractor:
+          name: Addr
+          index: 0
+  scoped_route_configurations_list:
+    scoped_route_configurations:
+      - name: foo
+        route_configuration:
+          name: foo
+          virtual_hosts:
+            - name: bar
+              domains: ["*"]
+              routes:
+                - match: { prefix: "/" }
+                  route: { cluster: baz }
+        key:
+          fragments: { string_key: "172.10.10.10" }
+      - name: foo2
+        route_configuration:
+          name: foo2
+          virtual_hosts:
+            - name: bar2
+              domains: ["*"]
+              routes:
+                - match: { prefix: "/" }
+                  route: { cluster: baz }
+        key:
+          fragments: { string_key: "172.10.10.20" }
+)EOF");
+  Envoy::Config::ConfigProviderPtr inline_config_provider = ScopedRoutesConfigProviderUtil::create(
+      parseHttpConnectionManagerFromYaml(absl::Substitute(hcm_config, "foo-scoped-routes")),
+      server_factory_context_, context_init_manager_, "foo.", *config_provider_manager_);
+  UniversalStringMatcher universal_matcher;
+  ProtobufTypes::MessagePtr message =
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          universal_matcher);
+  const auto& scoped_routes_config_dump =
+      TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(*message);
+
+  envoy::admin::v3::ScopedRoutesConfigDump expected_config_dump;
+  TestUtility::loadFromYaml(R"EOF(
+inline_scoped_route_configs:
+  - name: foo-scoped-routes
+    scoped_route_configs:
+     - name: foo
+       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
+       route_configuration:
+         name: foo
+         virtual_hosts:
+           - name: bar
+             domains: ["*"]
+             routes:
+               - match: { prefix: "/" }
+                 route: { cluster: baz }
+       key:
+         fragments: { string_key: "172.10.10.10" }
+     - name: foo2
+       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
+       route_configuration:
+         name: foo2
+         virtual_hosts:
+           - name: bar2
+             domains: ["*"]
+             routes:
+               - match: { prefix: "/" }
+                 route: { cluster: baz }
+       key:
+         fragments: { string_key: "172.10.10.20" }
+    last_updated:
+      seconds: 1234567891
+      nanos: 234000000
+dynamic_scoped_route_configs:
+)EOF",
+                            expected_config_dump);
+  EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump));
+}
+
 class ScopedRdsTest : public ScopedRoutesTestBase {
 protected:
   void setup() {
@@ -123,7 +344,7 @@ protected:
 
     // srds subscription
     EXPECT_CALL(server_factory_context_.cluster_manager_.subscription_factory_,
-                subscriptionFromConfigSource(_, _, _, _, _))
+                subscriptionFromConfigSource(_, _, _, _, _, _))
         .Times(AnyNumber());
     // rds subscription
     EXPECT_CALL(
@@ -131,18 +352,19 @@ protected:
         subscriptionFromConfigSource(
             _,
             Eq(Grpc::Common::typeUrl(
-                API_NO_BOOST(envoy::api::v2::RouteConfiguration)().GetDescriptor()->full_name())),
-            _, _, _))
+                envoy::config::route::v3::RouteConfiguration().GetDescriptor()->full_name())),
+            _, _, _, _))
         .Times(AnyNumber())
         .WillRepeatedly(
             Invoke([this](const envoy::config::core::v3::ConfigSource&, absl::string_view,
                           Stats::Scope&, Envoy::Config::SubscriptionCallbacks& callbacks,
-                          Envoy::Config::OpaqueResourceDecoder&) {
+                          Envoy::Config::OpaqueResourceDecoderSharedPtr,
+                          const Envoy::Config::SubscriptionOptions&) {
               auto ret = std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
               rds_subscription_by_config_subscription_[ret.get()] = &callbacks;
-              EXPECT_CALL(*ret, start(_, _))
+              EXPECT_CALL(*ret, start(_))
                   .WillOnce(Invoke([this, config_sub_addr = ret.get()](
-                                       const std::set<std::string>& resource_names, const bool) {
+                                       const absl::flat_hash_set<std::string>& resource_names) {
                     EXPECT_EQ(resource_names.size(), 1);
                     auto iter = rds_subscription_by_config_subscription_.find(config_sub_addr);
                     EXPECT_NE(iter, rds_subscription_by_config_subscription_.end());
@@ -174,11 +396,12 @@ scope_key_builder:
     envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes
         scoped_routes_config;
     TestUtility::loadFromYaml(config_yaml, scoped_routes_config);
+    auto scope_key_builder_config = scoped_routes_config.scope_key_builder();
+    scope_key_builder_ = std::make_unique<ScopeKeyBuilderImpl>(std::move(scope_key_builder_config));
     provider_ = config_provider_manager_->createXdsConfigProvider(
         scoped_routes_config.scoped_rds(), server_factory_context_, context_init_manager_, "foo.",
         ScopedRoutesConfigProviderManagerOptArg(scoped_routes_config.name(),
-                                                scoped_routes_config.rds_config_source(),
-                                                scoped_routes_config.scope_key_builder()));
+                                                scoped_routes_config.rds_config_source()));
     srds_subscription_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
   }
 
@@ -190,14 +413,14 @@ scope_key_builder:
       resources.push_back(parseScopedRouteConfigurationFromYaml(config_yaml));
     }
     const auto decoded_resources = TestUtility::decodeResources(resources);
-    EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, version));
+    EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, version).ok());
   }
 
   // Helper function which pushes an update to given RDS subscription, the start(_) of the
   // subscription must have been called.
-  void pushRdsConfig(const std::vector<std::string>& route_config_names,
-                     const std::string& version) {
-    const std::string route_config_tmpl = R"EOF(
+  void pushRdsConfig(const std::vector<std::string>& route_config_names, const std::string& version,
+                     const fmt::format_string<const std::string&>& override_config_tmpl = "") {
+    constexpr absl::string_view default_route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
       - name: test
@@ -206,6 +429,10 @@ scope_key_builder:
         - match: {{ prefix: "/" }}
           route: {{ cluster: bluh }}
 )EOF";
+
+    fmt::format_string<const std::string&> route_config_tmpl =
+        fmt::basic_string_view<char>(override_config_tmpl).size() != 0 ? override_config_tmpl
+                                                                       : default_route_config_tmpl;
     for (const std::string& name : route_config_names) {
       const auto route_config =
           TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
@@ -214,7 +441,8 @@ scope_key_builder:
       if (rds_subscription_by_name_.find(name) == rds_subscription_by_name_.end()) {
         continue;
       }
-      rds_subscription_by_name_[name]->onConfigUpdate(decoded_resources.refvec_, version);
+      EXPECT_TRUE(
+          rds_subscription_by_name_[name]->onConfigUpdate(decoded_resources.refvec_, version).ok());
     }
   }
 
@@ -227,6 +455,7 @@ scope_key_builder:
   }
 
   Envoy::Config::SubscriptionCallbacks* srds_subscription_{};
+  Envoy::Router::ScopeKeyBuilderPtr scope_key_builder_;
   Envoy::Config::ConfigProviderPtr provider_;
   std::list<Init::TargetHandlePtr> target_handles_;
   Init::ExpectableWatcherImpl init_watcher_;
@@ -236,13 +465,110 @@ scope_key_builder:
       rds_subscription_by_config_subscription_;
   absl::flat_hash_map<std::string, Envoy::Config::SubscriptionCallbacks*> rds_subscription_by_name_;
 
-  Envoy::Stats::Gauge& all_scopes_{server_factory_context_.scope_.gauge(
+  Envoy::Stats::Gauge& all_scopes_{server_factory_context_.store_.gauge(
       "foo.scoped_rds.foo_scoped_routes.all_scopes", Stats::Gauge::ImportMode::Accumulate)};
-  Envoy::Stats::Gauge& active_scopes_{server_factory_context_.scope_.gauge(
+  Envoy::Stats::Gauge& active_scopes_{server_factory_context_.store_.gauge(
       "foo.scoped_rds.foo_scoped_routes.active_scopes", Stats::Gauge::ImportMode::Accumulate)};
-  Envoy::Stats::Gauge& on_demand_scopes_{server_factory_context_.scope_.gauge(
+  Envoy::Stats::Gauge& on_demand_scopes_{server_factory_context_.store_.gauge(
       "foo.scoped_rds.foo_scoped_routes.on_demand_scopes", Stats::Gauge::ImportMode::Accumulate)};
 };
+
+TEST_F(ScopedRdsTest, EmptyRouteConfigurationNameFailsConfigUpdate) {
+  setup();
+  init_watcher_.expectReady().Times(0);
+  const std::string config_yaml = R"EOF(
+name: foo_scope
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  const envoy::config::route::v3::ScopedRouteConfiguration resource =
+      parseScopedRouteConfigurationFromYaml(config_yaml);
+  const Envoy::Config::DecodedResourcesWrapper decoded_resources =
+      TestUtility::decodeResources({resource});
+  context_init_manager_.initialize(init_watcher_);
+
+  EXPECT_EQ(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1").message(),
+            "route_configuration_name is empty.");
+}
+
+// Test an exception will be throw when unknown factory in the per-virtualhost typed config.
+TEST_F(ScopedRdsTest, UnknownFactoryForPerVirtualHostTypedConfig) {
+  setup();
+  init_watcher_.expectReady().Times(0); // The onConfigUpdate will simply throw an exception.
+  const std::string config_yaml = R"EOF(
+name: foo_scope
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+
+  const auto resource = parseScopedRouteConfigurationFromYaml(config_yaml);
+  const auto decoded_resources = TestUtility::decodeResources({resource});
+
+  context_init_manager_.initialize(init_watcher_);
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1").ok());
+
+  constexpr absl::string_view route_config_tmpl = R"EOF(
+      name: {}
+      virtual_hosts:
+      - name: test
+        domains: ["*"]
+        routes:
+        - match: {{ prefix: "/" }}
+          route: {{ cluster: bluh }}
+        typed_per_filter_config:
+          filter.unknown:
+            "@type": type.googleapis.com/google.protobuf.Struct
+)EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(pushRdsConfig({"foo_routes"}, "111", route_config_tmpl), EnvoyException,
+                            "Didn't find a registered implementation for 'filter.unknown' with "
+                            "type URL: 'google.protobuf.Struct'");
+}
+
+// Test that scopes with same config as existing scopes will be skipped in a config push.
+TEST_F(ScopedRdsTest, UnchangedScopesAreSkipped) {
+  setup();
+  init_watcher_.expectReady();
+  const std::string config_yaml = R"EOF(
+name: foo_scope
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  const auto resource = parseScopedRouteConfigurationFromYaml(config_yaml);
+  const std::string config_yaml2 = R"EOF(
+name: foo_scope2
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF";
+  const auto resource_2 = parseScopedRouteConfigurationFromYaml(config_yaml2);
+
+  // Delta API.
+  const auto decoded_resources = TestUtility::decodeResources({resource, resource_2});
+  context_init_manager_.initialize(init_watcher_);
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "v1").ok());
+  EXPECT_EQ(1UL,
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+                .value());
+  EXPECT_EQ(2UL, all_scopes_.value());
+  pushRdsConfig({"foo_routes"}, "111");
+  Envoy::Router::ScopedRdsConfigSubscription* srds_delta_subscription =
+      static_cast<Envoy::Router::ScopedRdsConfigSubscription*>(srds_subscription_);
+  ASSERT_NE(srds_delta_subscription, nullptr);
+  ASSERT_EQ("v1", srds_delta_subscription->configInfo()->last_config_version_);
+  // Push again the same set of config with different version number, the config will be skipped.
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "123").ok());
+  ASSERT_EQ("v1", srds_delta_subscription->configInfo()->last_config_version_);
+  EXPECT_EQ(2UL,
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+                .value());
+}
 
 // Tests that multiple uniquely named non-conflict resources are allowed in config updates.
 TEST_F(ScopedRdsTest, MultipleResourcesSotw) {
@@ -267,9 +593,9 @@ key:
   init_watcher_.expectReady(); // Only the SRDS parent_init_target_.
   context_init_manager_.initialize(init_watcher_);
   const auto decoded_resources = TestUtility::decodeResources({resource, resource_2});
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1"));
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1").ok());
   EXPECT_EQ(1UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   EXPECT_EQ(2UL, all_scopes_.value());
   EXPECT_EQ(2UL, active_scopes_.value());
@@ -280,42 +606,51 @@ key:
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
                 ->name(),
             "");
   // RDS updates foo_routes.
   pushRdsConfig({"foo_routes"}, "111");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
                 ->name(),
             "foo_routes");
 
   // Delete foo_scope2.
   const auto decoded_resources_2 = TestUtility::decodeResources({resource});
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources_2.refvec_, "3"));
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources_2.refvec_, "3").ok());
   EXPECT_EQ(1UL, all_scopes_.value());
   EXPECT_EQ(getScopedRouteMap().count("foo_scope"), 1);
   EXPECT_EQ(2UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
+  EXPECT_TRUE(server_factory_context_.store_.findGaugeByString(
+      "foo.scoped_rds.foo_scoped_routes.config_reload_time_ms"));
+
   // now scope key "x-bar-key" points to nowhere.
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})),
               IsNull());
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
 }
@@ -344,9 +679,9 @@ key:
   // Delta API.
   const auto decoded_resources = TestUtility::decodeResources({resource, resource_2});
   context_init_manager_.initialize(init_watcher_);
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1").ok());
   EXPECT_EQ(1UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   EXPECT_EQ(2UL, all_scopes_.value());
 
@@ -356,24 +691,28 @@ key:
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
                 ->name(),
             "");
   // RDS updates foo_routes.
   pushRdsConfig({"foo_routes"}, "111");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
                 ->name(),
             "foo_routes");
 
@@ -381,21 +720,66 @@ key:
   Protobuf::RepeatedPtrField<std::string> deletes;
   *deletes.Add() = "foo_scope2";
   const auto decoded_resources_2 = TestUtility::decodeResources({resource});
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources_2.refvec_, deletes, "2"));
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources_2.refvec_, deletes, "2").ok());
   EXPECT_EQ(1UL, all_scopes_.value());
   EXPECT_EQ(getScopedRouteMap().count("foo_scope"), 1);
   EXPECT_EQ(2UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   // now scope key "x-bar-key" points to nowhere.
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})),
               IsNull());
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
+}
+
+TEST_F(ScopedRdsTest, ScopedRdsSupportsInlineRds) {
+  server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  setup();
+
+  const std::string config_yaml = R"EOF(
+name: foo_scope
+route_configuration:
+  name: route_config
+  virtual_hosts:
+    - name: virtual_host
+      domains: ["*"]
+      routes:
+        - match: { prefix: "/" }
+          route: { cluster: baz }
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  const auto resource = parseScopedRouteConfigurationFromYaml(config_yaml);
+
+  init_watcher_.expectReady(); // Only the SRDS parent_init_target_.
+  context_init_manager_.initialize(init_watcher_);
+  const auto decoded_resources = TestUtility::decodeResources({resource});
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1").ok());
+  EXPECT_EQ(1UL,
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+                .value());
+  EXPECT_EQ(1UL, all_scopes_.value());
+  // Inline RDS doesn't count as an active scope.
+  EXPECT_EQ(0UL, active_scopes_.value());
+
+  // Verify the config is a ScopedConfigImpl instance, scope points to route_config already as there
+  // is no need to wait for RDS.
+  ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
+  ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
+                ->name(),
+            "route_config");
 }
 
 // Tests that conflict resources in the same push are detected.
@@ -421,20 +805,22 @@ key:
   init_watcher_.expectReady().Times(0); // The onConfigUpdate will simply throw an exception.
   context_init_manager_.initialize(init_watcher_);
   const auto decoded_resources = TestUtility::decodeResources({resource, resource_2});
-  EXPECT_THROW_WITH_REGEX(
-      srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1"), EnvoyException,
-      ".*scope key conflict found, first scope is 'foo_scope', second scope is 'foo_scope2'");
+  EXPECT_THAT(
+      srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1").message(),
+      testing::MatchesRegex(
+          ".*scope key conflict found, first scope is 'foo_scope', second scope is 'foo_scope2'"));
   EXPECT_EQ(
       // Fully rejected.
-      0UL, server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+      0UL, server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                .value());
   // Scope key "x-foo-key" points to nowhere.
   ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})),
               IsNull());
-  EXPECT_EQ(server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value(),
+  EXPECT_EQ(server_factory_context_.store_.counter("foo.rds.foo_routes.config_reload").value(),
             0UL);
 }
 
@@ -462,20 +848,22 @@ key:
   context_init_manager_.initialize(init_watcher_);
 
   const auto decoded_resources = TestUtility::decodeResources({resource, resource_2});
-  EXPECT_THROW_WITH_REGEX(
-      srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1"), EnvoyException,
-      ".*scope key conflict found, first scope is 'foo_scope', second scope is 'foo_scope2'");
+  EXPECT_THAT(
+      srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1").message(),
+      testing::MatchesRegex(
+          ".*scope key conflict found, first scope is 'foo_scope', second scope is 'foo_scope2'"));
   EXPECT_EQ(
       // Fully rejected.
-      0UL, server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+      0UL, server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                .value());
   // Scope key "x-foo-key" points to nowhere.
   ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})),
               IsNull());
-  EXPECT_EQ(server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value(),
+  EXPECT_EQ(server_factory_context_.store_.counter("foo.rds.foo_routes.config_reload").value(),
             0UL);
 }
 
@@ -502,9 +890,9 @@ key:
   const auto decoded_resources = TestUtility::decodeResources({resource, resource_2});
   init_watcher_.expectReady();
   context_init_manager_.initialize(init_watcher_);
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1"));
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1").ok());
   EXPECT_EQ(1UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   // Scope key "x-foo-key" points to nowhere.
   ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
@@ -512,17 +900,19 @@ key:
   // No RDS "foo_routes" config push happened yet, Router::NullConfig is returned.
   EXPECT_THAT(getScopedRdsProvider()
                   ->config<ScopedConfigImpl>()
-                  ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                  ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                   ->name(),
               "");
   pushRdsConfig({"foo_routes", "bar_routes"}, "111");
-  EXPECT_EQ(server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value(),
+  EXPECT_EQ(server_factory_context_.store_.counter("foo.rds.foo_routes.config_reload").value(),
             1UL);
-  EXPECT_EQ(server_factory_context_.scope_.counter("foo.rds.bar_routes.config_reload").value(),
+  EXPECT_EQ(server_factory_context_.store_.counter("foo.rds.bar_routes.config_reload").value(),
             1UL);
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
 
@@ -537,9 +927,9 @@ key:
   // Remove foo_scope1 and add a new scope3 reuses the same scope_key.
   const auto resource_3 = parseScopedRouteConfigurationFromYaml(config_yaml3);
   const auto decoded_resources_2 = TestUtility::decodeResources({resource_2, resource_3});
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources_2.refvec_, "2"));
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources_2.refvec_, "2").ok());
   EXPECT_EQ(2UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   // foo_scope is deleted, and foo_scope2 is added.
   EXPECT_EQ(all_scopes_.value(), 2UL);
@@ -549,7 +939,8 @@ key:
   // The same scope-key now points to the same route table.
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
 
@@ -565,23 +956,25 @@ key:
   const auto resource_4 = parseScopedRouteConfigurationFromYaml(config_yaml4);
   const auto decoded_resources_3 =
       TestUtility::decodeResources({resource_2, resource_3, resource_4});
-  EXPECT_THROW_WITH_REGEX(
-      srds_subscription_->onConfigUpdate(decoded_resources_3.refvec_, "3"), EnvoyException,
-      "scope key conflict found, first scope is 'foo_scope2', second scope is 'foo_scope4'");
+  EXPECT_THAT(
+      srds_subscription_->onConfigUpdate(decoded_resources_3.refvec_, "3").message(),
+      testing::MatchesRegex(
+          ".*scope key conflict found, first scope is 'foo_scope2', second scope is 'foo_scope4'"));
   EXPECT_EQ(2UL, all_scopes_.value());
   EXPECT_EQ(getScopedRouteMap().count("foo_scope1"), 0);
   EXPECT_EQ(getScopedRouteMap().count("foo_scope2"), 1);
   EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
                 ->name(),
             "bar_routes");
 
   // Delete foo_scope2, and push a new foo_scope4 with the same scope key but different route-table.
   const auto decoded_resources_4 = TestUtility::decodeResources({resource_3, resource_4});
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources_4.refvec_, "4"));
-  EXPECT_EQ(server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources_4.refvec_, "4").ok());
+  EXPECT_EQ(server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value(),
             3UL);
   EXPECT_EQ(2UL, all_scopes_.value());
@@ -589,14 +982,262 @@ key:
   EXPECT_EQ(getScopedRouteMap().count("foo_scope4"), 1);
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
                 ->name(),
             "foo_routes");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
+
+  // Modify foo_scope4 to use a different scope key.
+  const std::string config_yaml4_modified = R"EOF(
+name: foo_scope4
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-baz-key
+)EOF";
+  const auto resource_4_modified = parseScopedRouteConfigurationFromYaml(config_yaml4_modified);
+  const auto decoded_resources_5 = TestUtility::decodeResources({resource_3, resource_4_modified});
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources_5.refvec_, "5").ok());
+  EXPECT_EQ(server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+                .value(),
+            4UL);
+  EXPECT_EQ(2UL, all_scopes_.value());
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope4"), 1);
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-baz-key"}}))
+                ->name(),
+            "foo_routes");
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})),
+              IsNull());
+
+  // Remove foo_scope4.
+  const auto decoded_resources_6 = TestUtility::decodeResources({resource_3});
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources_6.refvec_, "6").ok());
+  EXPECT_EQ(server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+                .value(),
+            5UL);
+  EXPECT_EQ(1UL, all_scopes_.value());
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope4"), 0);
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-baz-key"}})),
+              IsNull());
+
+  // Re-add foo_scope2 which was conflicting with the previous version of foo_scope4.
+  const auto decoded_resources_7 = TestUtility::decodeResources({resource_2, resource_3});
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources_7.refvec_, "7").ok());
+  pushRdsConfig({"bar_routes"}, "111");
+  EXPECT_EQ(server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+                .value(),
+            6UL);
+  EXPECT_EQ(2UL, all_scopes_.value());
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope2"), 1);
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
+                ->name(),
+            "bar_routes");
+}
+
+TEST_F(ScopedRdsTest, ScopeKeyReuseInDifferentPushesDelta) {
+  setup();
+
+  const std::string config_yaml1 = R"EOF(
+name: foo_scope1
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  const std::string config_yaml2 = R"EOF(
+name: foo_scope2
+route_configuration_name: bar_routes
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF";
+  const auto resource = parseScopedRouteConfigurationFromYaml(config_yaml1);
+  const auto resource_2 = parseScopedRouteConfigurationFromYaml(config_yaml2);
+  const auto decoded_resources = TestUtility::decodeResources({resource, resource_2});
+  init_watcher_.expectReady();
+  context_init_manager_.initialize(init_watcher_);
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1").ok());
+  EXPECT_EQ(1UL,
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+                .value());
+  // Scope key "x-foo-key" points to nowhere.
+  ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
+  ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
+  // No RDS "foo_routes" config push happened yet, Router::NullConfig is returned.
+  EXPECT_THAT(getScopedRdsProvider()
+                  ->config<ScopedConfigImpl>()
+                  ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
+                  ->name(),
+              "");
+  pushRdsConfig({"foo_routes", "bar_routes"}, "111");
+  EXPECT_EQ(server_factory_context_.store_.counter("foo.rds.foo_routes.config_reload").value(),
+            1UL);
+  EXPECT_EQ(server_factory_context_.store_.counter("foo.rds.bar_routes.config_reload").value(),
+            1UL);
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
+                ->name(),
+            "foo_routes");
+
+  const std::string config_yaml3 = R"EOF(
+name: foo_scope3
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+
+  // Remove foo_scope1 and add a new scope3 reuses the same scope_key.
+  const auto resource_3 = parseScopedRouteConfigurationFromYaml(config_yaml3);
+  const auto decoded_resources_2 = TestUtility::decodeResources({resource_3});
+  Protobuf::RepeatedPtrField<std::string> deletes;
+  *deletes.Add() = "foo_scope1";
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources_2.refvec_, deletes, "2").ok());
+  EXPECT_EQ(2UL,
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+                .value());
+  // foo_scope is deleted, and foo_scope2 is added.
+  EXPECT_EQ(all_scopes_.value(), 2UL);
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope1"), 0);
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope2"), 1);
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
+  // The same scope-key now points to the same route table.
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
+                ->name(),
+            "foo_routes");
+
+  // Push a new scope foo_scope4 with the same key as foo_scope2 but a different route-table, this
+  // ends in an exception.
+  const std::string config_yaml4 = R"EOF(
+name: foo_scope4
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF";
+  const auto resource_4 = parseScopedRouteConfigurationFromYaml(config_yaml4);
+  const auto decoded_resources_3 = TestUtility::decodeResources({resource_4});
+  EXPECT_THAT(
+      srds_subscription_->onConfigUpdate(decoded_resources_3.refvec_, {}, "3").message(),
+      testing::MatchesRegex(
+          ".*scope key conflict found, first scope is 'foo_scope2', second scope is 'foo_scope4'"));
+  EXPECT_EQ(2UL, all_scopes_.value());
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope1"), 0);
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope2"), 1);
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
+                ->name(),
+            "bar_routes");
+
+  // Delete foo_scope2, and push a new foo_scope4 with the same scope key but different route-table.
+  const auto decoded_resources_4 = TestUtility::decodeResources({resource_4});
+  deletes.Clear();
+  *deletes.Add() = "foo_scope2";
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources_4.refvec_, deletes, "4").ok());
+  EXPECT_EQ(server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+                .value(),
+            3UL);
+  EXPECT_EQ(2UL, all_scopes_.value());
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope4"), 1);
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
+                ->name(),
+            "foo_routes");
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
+                ->name(),
+            "foo_routes");
+
+  // Modify foo_scope4 to use a different scope key.
+  const std::string config_yaml4_modified = R"EOF(
+name: foo_scope4
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-baz-key
+)EOF";
+  const auto resource_4_modified = parseScopedRouteConfigurationFromYaml(config_yaml4_modified);
+  const auto decoded_resources_5 = TestUtility::decodeResources({resource_4_modified});
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources_5.refvec_, {}, "5").ok());
+  EXPECT_EQ(server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+                .value(),
+            4UL);
+  EXPECT_EQ(2UL, all_scopes_.value());
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope4"), 1);
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-baz-key"}}))
+                ->name(),
+            "foo_routes");
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})),
+              IsNull());
+
+  // Remove foo_scope4.
+  deletes.Clear();
+  *deletes.Add() = "foo_scope4";
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate({}, deletes, "6").ok());
+  EXPECT_EQ(server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+                .value(),
+            5UL);
+  EXPECT_EQ(1UL, all_scopes_.value());
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope4"), 0);
+  EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-baz-key"}})),
+              IsNull());
+
+  // Re-add foo_scope2 which was conflicting with the previous version of foo_scope4.
+  const auto decoded_resources_7 = TestUtility::decodeResources({resource_2});
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources_7.refvec_, {}, "7").ok());
+  pushRdsConfig({"bar_routes"}, "111");
+  EXPECT_EQ(server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+                .value(),
+            6UL);
+  EXPECT_EQ(2UL, all_scopes_.value());
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope2"), 1);
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
+                ->name(),
+            "bar_routes");
 }
 
 // Tests that only one resource is provided during a config update.
@@ -615,10 +1256,9 @@ key:
 )EOF";
   const auto resource = parseScopedRouteConfigurationFromYaml(config_yaml);
   const auto decoded_resources = TestUtility::decodeResources({resource, resource});
-  EXPECT_THROW_WITH_MESSAGE(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1"),
-                            EnvoyException,
-                            "Error adding/updating scoped route(s): duplicate scoped route "
-                            "configuration 'foo_scope' found");
+  EXPECT_EQ(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1").message(),
+            "Error adding/updating scoped route(s): duplicate scoped route "
+            "configuration 'foo_scope' found");
 }
 
 // Tests duplicate resources in the same update, should be fully rejected.
@@ -636,21 +1276,22 @@ key:
 )EOF";
   const auto resource = parseScopedRouteConfigurationFromYaml(config_yaml);
   const auto decoded_resources = TestUtility::decodeResources({resource, resource});
-  EXPECT_THROW_WITH_MESSAGE(
-      srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1"), EnvoyException,
+  EXPECT_EQ(
+      srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1").message(),
       "Error adding/updating scoped route(s): duplicate scoped route configuration 'foo_scope' "
       "found");
   EXPECT_EQ(
       // Fully rejected.
-      0UL, server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+      0UL, server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                .value());
   // Scope key "x-foo-key" points to nowhere.
   ASSERT_THAT(getScopedRdsProvider(), Not(IsNull()));
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})),
               IsNull());
-  EXPECT_EQ(server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value(),
+  EXPECT_EQ(server_factory_context_.store_.counter("foo.rds.foo_routes.config_reload").value(),
             0UL);
 }
 
@@ -675,8 +1316,10 @@ TEST_F(ScopedRdsTest, ConfigDump) {
   setup();
   init_watcher_.expectReady();
   context_init_manager_.initialize(init_watcher_);
+  UniversalStringMatcher universal_matcher;
   auto message_ptr =
-      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          universal_matcher);
   const auto& scoped_routes_config_dump =
       TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(
           *message_ptr);
@@ -707,85 +1350,24 @@ scoped_routes:
           index: 0
 $1
 )EOF";
-  const std::string inline_scoped_route_configs_yaml = R"EOF(
-  scoped_route_configurations_list:
-    scoped_route_configurations:
-      - name: foo
-        route_configuration_name: foo-route-config
-        key:
-          fragments: { string_key: "172.10.10.10" }
-      - name: foo2
-        route_configuration_name: foo-route-config2
-        key:
-          fragments: { string_key: "172.10.10.20" }
-)EOF";
-  // Only load the inline scopes.
-  Envoy::Config::ConfigProviderPtr inline_config = ScopedRoutesConfigProviderUtil::create(
-      parseHttpConnectionManagerFromYaml(absl::Substitute(hcm_base_config_yaml, "foo-scoped-routes",
-                                                          inline_scoped_route_configs_yaml)),
-      server_factory_context_, context_init_manager_, "foo.", *config_provider_manager_);
-  message_ptr =
-      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
-  const auto& scoped_routes_config_dump2 =
-      TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(
-          *message_ptr);
-  TestUtility::loadFromYaml(R"EOF(
-inline_scoped_route_configs:
-  - name: foo-scoped-routes
-    scoped_route_configs:
-     - name: foo
-       "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
-       route_configuration_name: foo-route-config
-       key:
-         fragments: { string_key: "172.10.10.10" }
-     - name: foo2
-       "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
-       route_configuration_name: foo-route-config2
-       key:
-         fragments: { string_key: "172.10.10.20" }
-    last_updated:
-      seconds: 1234567891
-      nanos: 234000000
-dynamic_scoped_route_configs:
-)EOF",
-                            expected_config_dump);
-  EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump2));
 
-  // Now SRDS kicks off.
-  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   const auto resource = parseScopedRouteConfigurationFromYaml(R"EOF(
 name: dynamic-foo
 route_configuration_name: dynamic-foo-route-config
 key:
   fragments: { string_key: "172.30.30.10" }
 )EOF");
-
   timeSystem().setSystemTime(std::chrono::milliseconds(1234567891567));
   const auto decoded_resources = TestUtility::decodeResources({resource});
-  srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1");
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1").ok());
 
   TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
-  - name: foo-scoped-routes
-    scoped_route_configs:
-     - name: foo
-       "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
-       route_configuration_name: foo-route-config
-       key:
-         fragments: { string_key: "172.10.10.10" }
-     - name: foo2
-       "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
-       route_configuration_name: foo-route-config2
-       key:
-         fragments: { string_key: "172.10.10.20" }
-    last_updated:
-      seconds: 1234567891
-      nanos: 234000000
 dynamic_scoped_route_configs:
   - name: foo_scoped_routes
     scoped_route_configs:
       - name: dynamic-foo
-        "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
+        "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
         route_configuration_name: dynamic-foo-route-config
         key:
           fragments: { string_key: "172.30.30.10" }
@@ -796,30 +1378,61 @@ dynamic_scoped_route_configs:
 )EOF",
                             expected_config_dump);
   message_ptr =
-      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          universal_matcher);
   const auto& scoped_routes_config_dump3 =
       TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(
           *message_ptr);
   EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump3));
 
-  srds_subscription_->onConfigUpdate({}, "2");
+  NiceMock<MockStringMatcher> mock_matcher;
+  EXPECT_CALL(mock_matcher, match("dynamic-foo")).WillOnce(Return(false));
   TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
-  - name: foo-scoped-routes
-    scoped_route_configs:
-     - name: foo
-       "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
-       route_configuration_name: foo-route-config
-       key:
-         fragments: { string_key: "172.10.10.10" }
-     - name: foo2
-       "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
-       route_configuration_name: foo-route-config2
-       key:
-         fragments: { string_key: "172.10.10.20" }
+dynamic_scoped_route_configs:
+  - name: foo_scoped_routes
     last_updated:
       seconds: 1234567891
-      nanos: 234000000
+      nanos: 567000000
+    version_info: "1"
+)EOF",
+                            expected_config_dump);
+  message_ptr =
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          mock_matcher);
+  const auto& scoped_routes_config_dump4 =
+      TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(
+          *message_ptr);
+  EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump4));
+
+  EXPECT_CALL(mock_matcher, match("dynamic-foo")).WillOnce(Return(true));
+  TestUtility::loadFromYaml(R"EOF(
+inline_scoped_route_configs:
+dynamic_scoped_route_configs:
+  - name: foo_scoped_routes
+    scoped_route_configs:
+      - name: dynamic-foo
+        "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
+        route_configuration_name: dynamic-foo-route-config
+        key:
+          fragments: { string_key: "172.30.30.10" }
+    last_updated:
+      seconds: 1234567891
+      nanos: 567000000
+    version_info: "1"
+)EOF",
+                            expected_config_dump);
+  message_ptr =
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          mock_matcher);
+  const auto& scoped_routes_config_dump5 =
+      TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(
+          *message_ptr);
+  EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump5));
+
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate({}, "2").ok());
+  TestUtility::loadFromYaml(R"EOF(
+inline_scoped_route_configs:
 dynamic_scoped_route_configs:
   - name: foo_scoped_routes
     last_updated:
@@ -829,27 +1442,67 @@ dynamic_scoped_route_configs:
 )EOF",
                             expected_config_dump);
   message_ptr =
-      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
-  const auto& scoped_routes_config_dump4 =
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          universal_matcher);
+  const auto& scoped_routes_config_dump6 =
       TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(
           *message_ptr);
-  EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump4));
-}
+  EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump6));
 
-// Tests that SRDS only allows creation of delta static config providers.
-TEST_F(ScopedRdsTest, DeltaStaticConfigProviderOnly) {
-  // Use match all regex due to lack of distinctive matchable output for
-  // coverage test.
-  EXPECT_DEATH(config_provider_manager_->createStaticConfigProvider(
-                   parseScopedRouteConfigurationFromYaml(R"EOF(
-name: dynamic-foo
-route_configuration_name: static-foo-route-config
-key:
-  fragments: { string_key: "172.30.30.10" }
-)EOF"),
-                   server_factory_context_,
-                   Envoy::Config::ConfigProviderManager::NullOptionalArg()),
-               ".*");
+  const std::string inline_scoped_route_configs_yaml = R"EOF(
+  scoped_route_configurations_list:
+    scoped_route_configurations:
+      - name: foo
+        route_configuration:
+          name: foo
+          virtual_hosts:
+            - name: bar
+              domains: ["*"]
+              routes:
+                - match: { prefix: "/" }
+                  route: { cluster: baz }
+        key:
+          fragments: { string_key: "172.10.10.10" }
+)EOF";
+  server_factory_context_.cluster_manager_.initializeClusters({"baz"}, {});
+  Envoy::Config::ConfigProviderPtr inline_config = ScopedRoutesConfigProviderUtil::create(
+      parseHttpConnectionManagerFromYaml(absl::Substitute(hcm_base_config_yaml, "foo-scoped-routes",
+                                                          inline_scoped_route_configs_yaml)),
+      server_factory_context_, context_init_manager_, "foo.", *config_provider_manager_);
+  message_ptr =
+      server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"](
+          universal_matcher);
+  const auto& scoped_routes_config_dump7 =
+      TestUtility::downcastAndValidate<const envoy::admin::v3::ScopedRoutesConfigDump&>(
+          *message_ptr);
+  TestUtility::loadFromYaml(R"EOF(
+inline_scoped_route_configs:
+  - name: foo-scoped-routes
+    scoped_route_configs:
+     - name: foo
+       "@type": type.googleapis.com/envoy.config.route.v3.ScopedRouteConfiguration
+       route_configuration:
+         name: foo
+         virtual_hosts:
+           - name: bar
+             domains: ["*"]
+             routes:
+               - match: { prefix: "/" }
+                 route: { cluster: baz }
+       key:
+         fragments: { string_key: "172.10.10.10" }
+    last_updated:
+      seconds: 1234567891
+      nanos: 567000000
+dynamic_scoped_route_configs:
+  - name: foo_scoped_routes
+    last_updated:
+      seconds: 1234567891
+      nanos: 567000000
+    version_info: "2"
+)EOF",
+                            expected_config_dump);
+  EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump7));
 }
 
 // Tests whether scope key conflict with updated scopes is ignored.
@@ -875,9 +1528,9 @@ key:
   // Delta API.
   const auto decoded_resources = TestUtility::decodeResources({resource, resource_2});
   context_init_manager_.initialize(init_watcher_);
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1"));
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, {}, "1").ok());
   EXPECT_EQ(1UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   EXPECT_EQ(2UL, all_scopes_.value());
 
@@ -898,9 +1551,9 @@ key:
 )EOF";
   const auto resource_4 = parseScopedRouteConfigurationFromYaml(config_yaml2);
   const auto decoded_resources_2 = TestUtility::decodeResources({resource_3, resource_4});
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources_2.refvec_, {}, "2"));
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources_2.refvec_, {}, "2").ok());
   EXPECT_EQ(2UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   EXPECT_EQ(2UL, all_scopes_.value());
 }
@@ -928,9 +1581,9 @@ key:
   // Delta API.
   const auto decoded_resources = TestUtility::decodeResources({resource, resource_2});
   context_init_manager_.initialize(init_watcher_);
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1"));
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1").ok());
   EXPECT_EQ(1UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   EXPECT_EQ(2UL, all_scopes_.value());
 
@@ -951,9 +1604,9 @@ key:
 )EOF";
   const auto resource_4 = parseScopedRouteConfigurationFromYaml(config_yaml2);
   const auto decoded_resources_2 = TestUtility::decodeResources({resource_3, resource_4});
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(decoded_resources_2.refvec_, "2"));
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources_2.refvec_, "2").ok());
   EXPECT_EQ(2UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   EXPECT_EQ(2UL, all_scopes_.value());
 }
@@ -985,7 +1638,7 @@ key:
 
   srdsUpdateWithYaml({lazy_resource, eager_resource}, "1");
   EXPECT_EQ(1UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   EXPECT_EQ(2UL, all_scopes_.value());
 
@@ -996,21 +1649,25 @@ key:
   // Route config for foo key is NullConfigImpl and route config for bar key is nullptr
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "");
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})),
               IsNull());
   pushRdsConfig({"foo_routes"}, "111");
   // Scope foo now have route config but route config for scope bar is still nullptr.
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})),
               IsNull());
   EXPECT_EQ(2UL, all_scopes_.value());
   EXPECT_EQ(1UL, active_scopes_.value());
@@ -1043,7 +1700,7 @@ key:
 
   srdsUpdateWithYaml({eager_resource, lazy_resource}, "1");
   EXPECT_EQ(1UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   EXPECT_EQ(2UL, all_scopes_.value());
 
@@ -1053,15 +1710,17 @@ key:
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "");
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})),
               IsNull());
   EXPECT_EQ(1UL, active_scopes_.value());
 
-  ScopeKeyPtr scope_key = getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
+  ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
       TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
   EXPECT_CALL(event_dispatcher_, post(_));
   std::function<void(bool)> route_config_updated_cb = [](bool) {};
@@ -1071,12 +1730,14 @@ key:
   pushRdsConfig({"foo_routes"}, "111");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
                 ->name(),
             "foo_routes");
   // Now we have 1 active on demand scope and 1 eager loading scope.
@@ -1110,7 +1771,7 @@ key:
 
   srdsUpdateWithYaml({eager_resource, lazy_resource}, "1");
   EXPECT_EQ(1UL,
-            server_factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
+            server_factory_context_.store_.counter("foo.scoped_rds.foo_scoped_routes.config_reload")
                 .value());
   EXPECT_EQ(2UL, all_scopes_.value());
 
@@ -1120,20 +1781,23 @@ key:
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "");
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}),
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})),
               IsNull());
   // Push rds update before on demand srds request.
   pushRdsConfig({"foo_routes"}, "111");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
-  ScopeKeyPtr scope_key = getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
+  ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
       TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}});
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_));
   EXPECT_CALL(event_dispatcher_, post(_));
@@ -1142,7 +1806,8 @@ key:
                                             std::move(route_config_updated_cb));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}}))
                 ->name(),
             "foo_routes");
 }
@@ -1167,7 +1832,8 @@ key:
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
 
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})),
               IsNull());
   EXPECT_EQ(0UL, active_scopes_.value());
   EXPECT_EQ(1UL, on_demand_scopes_.value());
@@ -1183,13 +1849,15 @@ key:
   EXPECT_EQ(1UL, all_scopes_.value());
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "");
   pushRdsConfig({"foo_routes"}, "111");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
   // Now we have 1 eager scope.
@@ -1221,7 +1889,8 @@ key:
   ASSERT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>(), Not(IsNull()));
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
   // Update the scope to on demand, rds provider and the route config will be deleted.
@@ -1235,7 +1904,8 @@ key:
   )EOF";
   srdsUpdateWithYaml({lazy_resource}, "2");
   EXPECT_THAT(getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
-                  TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}),
+                  scope_key_builder_->computeScopeKey(
+                      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})),
               IsNull());
   // The new scope will be on demand and inactive after srds update.
   EXPECT_EQ(0UL, active_scopes_.value());
@@ -1263,7 +1933,7 @@ key:
   EXPECT_EQ(1UL, on_demand_scopes_.value());
   // All the on demand updated callbacks will be executed when the route table comes.
   for (int i = 0; i < 5; i++) {
-    ScopeKeyPtr scope_key = getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
+    ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
         TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
     std::function<void(bool)> route_config_updated_cb = [](bool) {};
     getScopedRdsProvider()->onDemandRdsUpdate(std::move(scope_key), event_dispatcher_,
@@ -1275,7 +1945,7 @@ key:
   // Route table have been fetched, callbacks will be executed immediately.
   for (int i = 0; i < 5; i++) {
     EXPECT_CALL(event_dispatcher_, post(_));
-    ScopeKeyPtr scope_key = getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
+    ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
         TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
     std::function<void(bool)> route_config_updated_cb = [](bool) {};
     getScopedRdsProvider()->onDemandRdsUpdate(std::move(scope_key), event_dispatcher_,
@@ -1284,7 +1954,8 @@ key:
   // Activating the same on_demand scope multiple times, active_scopes is still 1.
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
-                ->getRouteConfig(TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->getRouteConfig(scope_key_builder_->computeScopeKey(
+                    TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}}))
                 ->name(),
             "foo_routes");
   EXPECT_EQ(1UL, active_scopes_.value());
@@ -1296,16 +1967,15 @@ TEST_F(ScopedRdsTest, DanglingSubscriptionOnDemandUpdate) {
   std::function<void(bool)> route_config_updated_cb = [](bool) {};
   Event::PostCb temp_post_cb;
   EXPECT_CALL(server_factory_context_.dispatcher_, post(_))
-      .WillOnce(testing::SaveArg<0>(&temp_post_cb));
-  std::shared_ptr<ScopeKey> scope_key =
-      getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
-          TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
+      .WillOnce([&temp_post_cb](Event::PostCb cb) { temp_post_cb = std::move(cb); });
+  std::shared_ptr<ScopeKey> scope_key = scope_key_builder_->computeScopeKey(
+      TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
   getScopedRdsProvider()->onDemandRdsUpdate(scope_key, event_dispatcher_,
                                             std::move(route_config_updated_cb));
   // Destroy the scoped_rds subscription by destroying its only config provider.
   provider_.reset();
   EXPECT_CALL(event_dispatcher_, post(_));
-  EXPECT_NO_THROW(temp_post_cb());
+  temp_post_cb();
 }
 
 // Delete the on demand scope before on demand update in main thread.
@@ -1328,7 +1998,7 @@ key:
   EXPECT_EQ(1UL, on_demand_scopes_.value());
   // All the on demand updated callbacks will be executed when the route table comes.
   {
-    ScopeKeyPtr scope_key = getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
+    ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
         TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
     std::function<void(bool)> route_config_updated_cb = [](bool scope_exist) {
       EXPECT_TRUE(scope_exist);
@@ -1340,10 +2010,10 @@ key:
   EXPECT_CALL(event_dispatcher_, post(_));
   pushRdsConfig({"foo_routes"}, "111");
 
-  ScopeKeyPtr scope_key = getScopedRdsProvider()->config<ScopedConfigImpl>()->computeScopeKey(
+  ScopeKeyPtr scope_key = scope_key_builder_->computeScopeKey(
       TestRequestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}});
   // Delete the scope route.
-  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate({}, "2"));
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate({}, "2").ok());
   EXPECT_EQ(0UL, all_scopes_.value());
   EXPECT_CALL(event_dispatcher_, post(_));
   // Scope no longer exists after srds update.
@@ -1352,6 +2022,53 @@ key:
   };
   getScopedRdsProvider()->onDemandRdsUpdate(std::move(scope_key), event_dispatcher_,
                                             std::move(route_config_updated_cb));
+}
+
+TEST_F(ScopedRdsTest, OnScopeKeyBuilderUpdate) {
+  setup();
+
+  // update scope_key_builder separator to ,
+  const std::string hcm_config = R"EOF(
+name: foo_scoped_routes
+scope_key_builder:
+  fragments:
+    - header_value_extractor:
+        name: Addr
+        element:
+          key: x-foo-key
+          separator: ","
+)EOF";
+  envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes
+      scoped_routes_config;
+  TestUtility::loadFromYaml(hcm_config, scoped_routes_config);
+  auto scope_key_builder_config = scoped_routes_config.scope_key_builder();
+  scope_key_builder_ = std::make_unique<ScopeKeyBuilderImpl>(std::move(scope_key_builder_config));
+  provider_ = config_provider_manager_->createXdsConfigProvider(
+      scoped_routes_config.scoped_rds(), server_factory_context_, context_init_manager_, "foo.",
+      ScopedRoutesConfigProviderManagerOptArg(scoped_routes_config.name(),
+                                              scoped_routes_config.rds_config_source()));
+  srds_subscription_ = server_factory_context_.cluster_manager_.subscription_factory_.callbacks_;
+
+  const std::string config_yaml = R"EOF(
+name: foo_scope
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF";
+  const auto resource = parseScopedRouteConfigurationFromYaml(config_yaml);
+  init_watcher_.expectReady(); // Only the SRDS parent_init_target_.
+  context_init_manager_.initialize(init_watcher_);
+  const auto decoded_resources = TestUtility::decodeResources({resource});
+  EXPECT_TRUE(srds_subscription_->onConfigUpdate(decoded_resources.refvec_, "1").ok());
+
+  pushRdsConfig({"foo_routes"}, "111");
+
+  auto config = getScopedRdsProvider()->config<ScopedConfigImpl>()->getRouteConfig(
+      scope_key_builder_->computeScopeKey(
+          TestRequestHeaderMapImpl{{"Addr", "x-foo-key,x-bar-key"}}));
+  ASSERT_THAT(config, Not(IsNull()));
+  EXPECT_EQ(config->name(), "foo_routes");
 }
 
 } // namespace

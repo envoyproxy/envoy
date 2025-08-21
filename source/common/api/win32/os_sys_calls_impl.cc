@@ -6,7 +6,7 @@
 #include <cstdint>
 #include <string>
 
-#include "common/api/os_sys_calls_impl.h"
+#include "source/common/api/os_sys_calls_impl.h"
 
 #define DWORD_MAX UINT32_MAX
 
@@ -104,14 +104,24 @@ SysCallIntResult OsSysCallsImpl::chmod(const std::string& path, mode_t mode) {
   return {rc, rc != -1 ? 0 : errno};
 }
 
-SysCallIntResult OsSysCallsImpl::ioctl(os_fd_t sockfd, unsigned long int request, void* argp) {
-  const int rc = ::ioctlsocket(sockfd, request, static_cast<u_long*>(argp));
+SysCallIntResult OsSysCallsImpl::ioctl(os_fd_t sockfd, unsigned long control_code, void* in_buffer,
+                                       unsigned long in_buffer_len, void* out_buffer,
+                                       unsigned long out_buffer_len,
+                                       unsigned long* bytes_returned) {
+  const int rc = ::WSAIoctl(sockfd, control_code, in_buffer, in_buffer_len, out_buffer,
+                            out_buffer_len, bytes_returned, nullptr, nullptr);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
 SysCallIntResult OsSysCallsImpl::close(os_fd_t fd) {
-  const int rc = ::closesocket(fd);
-  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+  int rc = ::closesocket(fd);
+  const int socket_err = ::WSAGetLastError();
+  if (rc == -1) {
+    // If `closesocket` failed, maybe the descriptor was a file.
+    rc = ::close(fd);
+  }
+  // Assume the descriptor was a socket, and return the error from that one, if both failed.
+  return {rc, rc != -1 ? 0 : socket_err};
 }
 
 SysCallSizeResult OsSysCallsImpl::writev(os_fd_t fd, const iovec* iov, int num_iov) {
@@ -136,6 +146,21 @@ SysCallSizeResult OsSysCallsImpl::readv(os_fd_t fd, const iovec* iov, int num_io
     return {-1, ::WSAGetLastError()};
   }
   return {bytes_received, 0};
+}
+
+SysCallSizeResult OsSysCallsImpl::pwrite(os_fd_t fd, const void* buffer, size_t length,
+                                         off_t offset) const {
+  PANIC("not implemented");
+}
+
+SysCallSizeResult OsSysCallsImpl::pread(os_fd_t fd, void* buffer, size_t length,
+                                        off_t offset) const {
+  PANIC("not implemented");
+}
+
+SysCallSizeResult OsSysCallsImpl::send(os_fd_t socket, void* buffer, size_t length, int flags) {
+  const ssize_t rc = ::send(socket, static_cast<char*>(buffer), length, flags);
+  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
 SysCallSizeResult OsSysCallsImpl::recv(os_fd_t socket, void* buffer, size_t length, int flags) {
@@ -169,7 +194,7 @@ SysCallSizeResult OsSysCallsImpl::recvmsg(os_fd_t sockfd, msghdr* msg, int flags
 
 SysCallIntResult OsSysCallsImpl::recvmmsg(os_fd_t sockfd, struct mmsghdr* msgvec, unsigned int vlen,
                                           int flags, struct timespec* timeout) {
-  NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  PANIC("not implemented");
 }
 
 bool OsSysCallsImpl::supportsMmsg() const {
@@ -187,7 +212,12 @@ bool OsSysCallsImpl::supportsUdpGso() const {
   return false;
 }
 
-bool OsSysCallsImpl::supportsIpTransparent() const {
+bool OsSysCallsImpl::supportsIpTransparent(Network::Address::IpVersion) const {
+  // Windows doesn't support it.
+  return false;
+}
+
+bool OsSysCallsImpl::supportsMptcp() const {
   // Windows doesn't support it.
   return false;
 }
@@ -207,14 +237,27 @@ SysCallIntResult OsSysCallsImpl::stat(const char* pathname, struct stat* buf) {
   return {rc, rc != -1 ? 0 : errno};
 }
 
+SysCallIntResult OsSysCallsImpl::fstat(os_fd_t fd, struct stat* buf) {
+  const int rc = ::fstat(fd, buf);
+  return {rc, rc != -1 ? 0 : errno};
+}
+
 SysCallIntResult OsSysCallsImpl::setsockopt(os_fd_t sockfd, int level, int optname,
                                             const void* optval, socklen_t optlen) {
+  if (optname == IP_RECVTOS || optname == IPV6_RECVTCLASS) {
+    const int rc = ::WSASetRecvIPEcn(sockfd, *(int*)optval == 1);
+    return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+  }
   const int rc = ::setsockopt(sockfd, level, optname, static_cast<const char*>(optval), optlen);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
 SysCallIntResult OsSysCallsImpl::getsockopt(os_fd_t sockfd, int level, int optname, void* optval,
                                             socklen_t* optlen) {
+  if (optname == IP_RECVTOS || optname == IPV6_RECVTCLASS) {
+    const int rc = ::WSAGetRecvIPEcn(sockfd, (DWORD*)optval);
+    return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+  }
   const int rc = ::getsockopt(sockfd, level, optname, static_cast<char*>(optval), optlen);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
@@ -262,6 +305,30 @@ SysCallIntResult OsSysCallsImpl::connect(os_fd_t sockfd, const sockaddr* addr, s
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
 }
 
+SysCallIntResult OsSysCallsImpl::open(const char* pathname, int flags) const {
+  const int rc = ::open(pathname, flags);
+  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+}
+
+SysCallIntResult OsSysCallsImpl::open(const char* pathname, int flags, mode_t mode) const {
+  const int rc = ::open(pathname, flags, mode);
+  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+}
+
+SysCallIntResult OsSysCallsImpl::unlink(const char* pathname) const {
+  const int rc = ::unlink(pathname);
+  return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
+}
+
+SysCallIntResult OsSysCallsImpl::linkat(os_fd_t olddirfd, const char* oldpath, os_fd_t newdirfd,
+                                        const char* newpath, int flags) const {
+  PANIC("not implemented");
+}
+
+SysCallIntResult OsSysCallsImpl::mkstemp(char* tmplate) const { PANIC("not implemented"); }
+
+bool OsSysCallsImpl::supportsAllPosixFileOperations() const { return false; }
+
 SysCallIntResult OsSysCallsImpl::shutdown(os_fd_t sockfd, int how) {
   const int rc = ::shutdown(sockfd, how);
   return {rc, rc != -1 ? 0 : ::WSAGetLastError()};
@@ -275,11 +342,11 @@ SysCallIntResult OsSysCallsImpl::socketpair(int domain, int type, int protocol, 
   sv[0] = sv[1] = INVALID_SOCKET;
 
   SysCallSocketResult socket_result = socket(domain, type, protocol);
-  if (SOCKET_INVALID(socket_result.rc_)) {
+  if (SOCKET_INVALID(socket_result.return_value_)) {
     return {SOCKET_ERROR, socket_result.errno_};
   }
 
-  os_fd_t listener = socket_result.rc_;
+  os_fd_t listener = socket_result.return_value_;
 
   typedef union {
     struct sockaddr_storage sa;
@@ -309,44 +376,44 @@ SysCallIntResult OsSysCallsImpl::socketpair(int domain, int type, int protocol, 
   };
 
   SysCallIntResult int_result = bind(listener, reinterpret_cast<sockaddr*>(&a), sa_size);
-  if (int_result.rc_ == SOCKET_ERROR) {
+  if (int_result.return_value_ == SOCKET_ERROR) {
     onErr();
     return int_result;
   }
 
   int_result = listen(listener, 1);
-  if (int_result.rc_ == SOCKET_ERROR) {
+  if (int_result.return_value_ == SOCKET_ERROR) {
     onErr();
     return int_result;
   }
 
   socket_result = socket(domain, type, protocol);
-  if (SOCKET_INVALID(socket_result.rc_)) {
+  if (SOCKET_INVALID(socket_result.return_value_)) {
     onErr();
     return {SOCKET_ERROR, socket_result.errno_};
   }
-  sv[0] = socket_result.rc_;
+  sv[0] = socket_result.return_value_;
 
   a = {};
   int_result = getsockname(listener, reinterpret_cast<sockaddr*>(&a), &sa_size);
-  if (int_result.rc_ == SOCKET_ERROR) {
+  if (int_result.return_value_ == SOCKET_ERROR) {
     onErr();
     return int_result;
   }
 
   int_result = connect(sv[0], reinterpret_cast<sockaddr*>(&a), sa_size);
-  if (int_result.rc_ == SOCKET_ERROR) {
+  if (int_result.return_value_ == SOCKET_ERROR) {
     onErr();
     return int_result;
   }
 
-  socket_result.rc_ = ::accept(listener, nullptr, nullptr);
-  if (SOCKET_INVALID(socket_result.rc_)) {
+  socket_result.return_value_ = ::accept(listener, nullptr, nullptr);
+  if (SOCKET_INVALID(socket_result.return_value_)) {
     socket_result.errno_ = ::WSAGetLastError();
     onErr();
     return {SOCKET_ERROR, socket_result.errno_};
   }
-  sv[1] = socket_result.rc_;
+  sv[1] = socket_result.return_value_;
 
   ::closesocket(listener);
   return {0, 0};
@@ -394,10 +461,34 @@ SysCallBoolResult OsSysCallsImpl::socketTcpInfo([[maybe_unused]] os_fd_t sockfd,
 
   if (!SOCKET_FAILURE(rc)) {
     tcp_info->tcpi_rtt = std::chrono::microseconds(win_tcpinfo.RttUs);
+    tcp_info->tcpi_snd_cwnd = win_tcpinfo.Cwnd;
   }
   return {!SOCKET_FAILURE(rc), !SOCKET_FAILURE(rc) ? 0 : ::WSAGetLastError()};
 #endif
   return {false, WSAEOPNOTSUPP};
+}
+
+bool OsSysCallsImpl::supportsGetifaddrs() const { return false; }
+
+SysCallIntResult OsSysCallsImpl::getifaddrs([[maybe_unused]] InterfaceAddressVector& interfaces) {
+  PANIC("not implemented");
+}
+
+SysCallIntResult OsSysCallsImpl::getaddrinfo(const char* node, const char* service,
+                                             const addrinfo* hints, addrinfo** res) {
+  const int rc = ::getaddrinfo(node, service, hints, res);
+  return {rc, errno};
+}
+
+void OsSysCallsImpl::freeaddrinfo(addrinfo* res) { ::freeaddrinfo(res); }
+
+SysCallIntResult OsSysCallsImpl::getrlimit(int resource, struct rlimit* rlim) {
+  // Windows does not support all resource limits.
+  return {0, 0};
+}
+
+SysCallIntResult OsSysCallsImpl::setrlimit(int resource, const struct rlimit* rlim) {
+  PANIC("not implemented");
 }
 
 } // namespace Api

@@ -1,0 +1,60 @@
+# This config is copied from https://github.com/bitdriftlabs/shared-core/blob/4114708cafb80103092b7e585987ef275a136f87/rustfmt.toml
+
+# Rust Autoformatter Config
+# =========================
+#
+# Note that most of rustfmt's configurable settings are nightly-only,
+# so we tend to run that. Typically we don't rely on unstable features,
+# but in this case there's honestly not a lot to configure that _isn't_
+# behind the `unstable_features` gate, unfortunately.
+
+edition           = "2021"
+unstable_features = true
+
+# Try to use inline annotations before using this -- disabling autoformatting
+# for a file makes it harder for everyone to share their work in that file and
+# invites bikeshedding about how code in there should look.
+ignore = []
+
+# Features are broken up into Stable and Unstable features, listed in order of
+# appearance in the Configuring Rustfmt document:
+# https://github.com/rust-lang-nursery/rustfmt/blob/master/Configurations.md
+
+## Stable Features
+
+force_explicit_abi       = true      # Default
+hard_tabs                = false     # Default
+max_width                = 100
+merge_derives            = true      # Default
+newline_style            = "Auto"    # Default
+remove_nested_parens     = true      # Default
+reorder_imports          = true      # Default
+reorder_modules          = true      # Default
+tab_spaces               = 2
+use_field_init_shorthand = false     # Default
+use_small_heuristics     = "Default" # Default
+use_try_shorthand        = true
+
+## Features that were "unstable" when we configured them
+blank_lines_lower_bound      = 0
+blank_lines_upper_bound      = 3
+combine_control_expr         = false
+comment_width                = 100
+condense_wildcard_suffixes   = true
+enum_discrim_align_threshold = 20
+error_on_line_overflow       = true
+error_on_unformatted         = false
+format_code_in_doc_comments  = true
+format_macro_bodies          = true
+format_macro_matchers        = true
+format_strings               = true
+group_imports                = "One"
+imports_granularity          = "Module"
+imports_layout               = "HorizontalVertical"
+match_block_trailing_comma   = true
+normalize_comments           = false
+normalize_doc_attributes     = true
+skip_children                = false
+spaces_around_ranges         = true
+struct_field_align_threshold = 0
+wrap_comments                = true

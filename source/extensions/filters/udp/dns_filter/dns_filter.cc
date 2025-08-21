@@ -1,13 +1,13 @@
-#include "extensions/filters/udp/dns_filter/dns_filter.h"
+#include "source/extensions/filters/udp/dns_filter/dns_filter.h"
 
 #include "envoy/network/listener.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
-#include "common/config/datasource.h"
-#include "common/network/address_impl.h"
-#include "common/protobuf/message_validator_impl.h"
-
-#include "extensions/filters/udp/dns_filter/dns_filter_utils.h"
+#include "source/common/config/datasource.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/dns_resolver/dns_factory_util.h"
+#include "source/common/protobuf/message_validator_impl.h"
+#include "source/extensions/filters/udp/dns_filter/dns_filter_utils.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -19,11 +19,14 @@ static constexpr std::chrono::seconds DEFAULT_RESOLVER_TTL{300};
 
 DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     Server::Configuration::ListenerFactoryContext& context,
-    const envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig& config)
-    : root_scope_(context.scope()), cluster_manager_(context.clusterManager()), api_(context.api()),
+    const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig& config)
+    : root_scope_(context.scope()),
+      cluster_manager_(context.serverFactoryContext().clusterManager()),
+      api_(context.serverFactoryContext().api()),
       stats_(generateStats(config.stat_prefix(), root_scope_)),
-      resolver_timeout_(DEFAULT_RESOLVER_TIMEOUT), random_(context.api().randomGenerator()) {
-  using envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig;
+      resolver_timeout_(DEFAULT_RESOLVER_TIMEOUT),
+      random_(context.serverFactoryContext().api().randomGenerator()) {
+  using envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig;
 
   const auto& server_config = config.server_config();
 
@@ -33,12 +36,14 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
 
   retry_count_ = dns_table.external_retry_count();
 
-  virtual_domains_.reserve(dns_table.virtual_domains().size());
   for (const auto& virtual_domain : dns_table.virtual_domains()) {
     AddressConstPtrVec addrs{};
 
-    const absl::string_view domain_name = virtual_domain.name();
-    ENVOY_LOG(trace, "Loading configuration for domain: {}", domain_name);
+    const absl::string_view virtual_domain_name =
+        Utils::getVirtualDomainName(virtual_domain.name());
+    const absl::string_view suffix = Utils::getDomainSuffix(virtual_domain_name);
+    ENVOY_LOG(trace, "Loading configuration for domain: {}. Suffix: {}", virtual_domain_name,
+              suffix);
 
     if (virtual_domain.endpoint().has_address_list()) {
       const auto& address_list = virtual_domain.endpoint().address_list().address();
@@ -52,20 +57,35 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
       // Creating the IP address will throw an exception if the address string is malformed
       for (auto index = 0; index < address_list.size(); index++) {
         const auto address_iter = std::next(address_list.begin(), (i++ % address_list.size()));
-        auto ipaddr = Network::Utility::parseInternetAddress(*address_iter, 0 /* port */);
+        auto ipaddr = Network::Utility::parseInternetAddressNoThrow(*address_iter, 0 /* port */);
+        if (!ipaddr) {
+          throw EnvoyException(absl::StrCat("malformed IP address: ", *address_iter));
+        }
         addrs.push_back(std::move(ipaddr));
       }
 
-      // If the domain already exists with a different endpoint config, update the address_list
-      // with the data from the config
-      if (virtual_domains_.contains(domain_name)) {
-        auto& addr_vec = virtual_domains_[domain_name].address_list.value();
-        addr_vec.reserve(addr_vec.size() + addrs.size());
-        std::move(addrs.begin(), addrs.end(), std::inserter(addr_vec, addr_vec.end()));
+      DnsEndpointConfig endpoint_config{};
+
+      // Check whether the trie contains an entry for this domain
+      auto virtual_domains = dns_lookup_trie_.find(suffix);
+      if (virtual_domains != nullptr) {
+        // The suffix already has a node in the trie
+
+        auto existing_endpoint_config = virtual_domains->find(virtual_domain_name);
+        if (existing_endpoint_config != virtual_domains->end()) {
+          // Update the existing endpoint config with the new addresses
+
+          auto& addr_vec = existing_endpoint_config->second.address_list.value();
+          addr_vec.reserve(addr_vec.size() + addrs.size());
+          std::move(addrs.begin(), addrs.end(), std::inserter(addr_vec, addr_vec.end()));
+        } else {
+          // Add a new endpoint config for the new domain
+          endpoint_config.address_list = absl::make_optional<AddressConstPtrVec>(std::move(addrs));
+          virtual_domains->emplace(std::string(virtual_domain_name), std::move(endpoint_config));
+        }
       } else {
-        DnsEndpointConfig endpoint_config{};
         endpoint_config.address_list = absl::make_optional<AddressConstPtrVec>(std::move(addrs));
-        virtual_domains_.emplace(std::string(domain_name), std::move(endpoint_config));
+        addEndpointToSuffix(suffix, virtual_domain_name, endpoint_config);
       }
     }
 
@@ -112,7 +132,11 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
         DnsEndpointConfig endpoint_config{};
         endpoint_config.service_list =
             absl::make_optional<DnsSrvRecordPtr>(std::move(service_record_ptr));
-        virtual_domains_.emplace(full_service_name, std::move(endpoint_config));
+
+        auto virtual_domains = dns_lookup_trie_.find(suffix);
+        if (virtual_domains != nullptr) {
+          virtual_domains->emplace(full_service_name, std::move(endpoint_config));
+        }
       }
     }
 
@@ -121,41 +145,56 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
     if (!cluster_name.empty()) {
       DnsEndpointConfig endpoint_config{};
       endpoint_config.cluster_name = absl::make_optional<std::string>(cluster_name);
-      virtual_domains_.emplace(domain_name, std::move(endpoint_config));
+
+      // See if there's a suffix already configured
+      auto virtual_domains = dns_lookup_trie_.find(suffix);
+      if (virtual_domains == nullptr) {
+        addEndpointToSuffix(suffix, virtual_domain_name, endpoint_config);
+      } else {
+        // A domain can be redirected to one cluster. If it appears multiple times, the first
+        // entry is the only one used
+        if (virtual_domains->find(virtual_domain_name) == virtual_domains->end()) {
+          virtual_domains->emplace(virtual_domain_name, std::move(endpoint_config));
+        }
+      }
     }
 
     std::chrono::seconds ttl = virtual_domain.has_answer_ttl()
                                    ? std::chrono::seconds(virtual_domain.answer_ttl().seconds())
                                    : DEFAULT_RESOLVER_TTL;
-    domain_ttl_.emplace(virtual_domain.name(), ttl);
-  }
-
-  // Add known domain suffixes
-  known_suffixes_.reserve(dns_table.known_suffixes().size());
-  for (const auto& suffix : dns_table.known_suffixes()) {
-    auto matcher_ptr = std::make_unique<Matchers::StringMatcherImpl>(suffix);
-    known_suffixes_.push_back(std::move(matcher_ptr));
+    domain_ttl_.emplace(virtual_domain_name, ttl);
   }
 
   forward_queries_ = config.has_client_config();
   if (forward_queries_) {
     const auto& client_config = config.client_config();
-    const auto& upstream_resolvers = client_config.upstream_resolvers();
-    resolvers_.reserve(upstream_resolvers.size());
-    for (const auto& resolver : upstream_resolvers) {
-      auto ipaddr = Network::Utility::protobufAddressToAddress(resolver);
-      resolvers_.emplace_back(std::move(ipaddr));
-    }
+    dns_resolver_factory_ =
+        &Network::createDnsResolverFactoryFromProto(client_config, typed_dns_resolver_config_);
+    // Set additional resolving options from configuration
     resolver_timeout_ = std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(
         client_config, resolver_timeout, DEFAULT_RESOLVER_TIMEOUT.count()));
-
     max_pending_lookups_ = client_config.max_pending_lookups();
+  } else {
+    // In case client_config doesn't exist, create default DNS resolver factory and save it.
+    dns_resolver_factory_ = &Network::createDefaultDnsResolverFactory(typed_dns_resolver_config_);
+    max_pending_lookups_ = 0;
   }
 }
 
+void DnsFilterEnvoyConfig::addEndpointToSuffix(const absl::string_view suffix,
+                                               const absl::string_view domain_name,
+                                               DnsEndpointConfig& endpoint_config) {
+
+  DnsVirtualDomainConfigSharedPtr virtual_domains = std::make_shared<DnsVirtualDomainConfig>();
+  virtual_domains->emplace(std::string(domain_name), std::move(endpoint_config));
+
+  auto success = dns_lookup_trie_.add(suffix, std::move(virtual_domains), false);
+  ASSERT(success, "Unable to overwrite existing suffix in dns_filter trie");
+}
+
 bool DnsFilterEnvoyConfig::loadServerConfig(
-    const envoy::extensions::filters::udp::dns_filter::v3alpha::DnsFilterConfig::
-        ServerContextConfig& config,
+    const envoy::extensions::filters::udp::dns_filter::v3::DnsFilterConfig::ServerContextConfig&
+        config,
     envoy::data::dns::v3::DnsTable& table) {
   using envoy::data::dns::v3::DnsTable;
 
@@ -166,17 +205,15 @@ bool DnsFilterEnvoyConfig::loadServerConfig(
 
   const auto& datasource = config.external_dns_table();
   bool data_source_loaded = false;
-  try {
+  TRY_NEEDS_AUDIT {
     // Data structure is deduced from the file extension. If the data is not read an exception
     // is thrown. If no table can be read, the filter will refer all queries to an external
     // DNS server, if configured, otherwise all queries will be responded to with Name Error.
-    MessageUtil::loadFromFile(datasource.filename(), table,
-                              ProtobufMessage::getNullValidationVisitor(), api_,
-                              false /* do_boosting */);
+    THROW_IF_NOT_OK(MessageUtil::loadFromFile(datasource.filename(), table,
+                                              ProtobufMessage::getNullValidationVisitor(), api_));
     data_source_loaded = true;
-  } catch (const ProtobufMessage::UnknownProtoFieldException& e) {
-    ENVOY_LOG(warn, "Invalid field in DNS Filter datasource configuration: {}", e.what());
-  } catch (const EnvoyException& e) {
+  }
+  END_TRY catch (const EnvoyException& e) {
     ENVOY_LOG(warn, "Filesystem DNS Filter config update failure: {}", e.what());
   }
   return data_source_loaded;
@@ -197,7 +234,7 @@ DnsFilter::DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
     // We cannot retry the resolution if ares returns without a response. The ares context
     // is still dirty and will result in a segfault when it is freed during a subsequent resolve
     // call from here. We will retry resolutions for pending lookups only
-    if (context->resolution_status_ != Network::DnsResolver::ResolutionStatus::Success &&
+    if (context->resolution_status_ != Network::DnsResolver::ResolutionStatus::Completed &&
         !context->in_callback_ && context->retry_ > 0) {
       --context->retry_;
       ENVOY_LOG(debug, "resolving name [{}] via external resolvers [retry {}]", query->name_,
@@ -215,24 +252,26 @@ DnsFilter::DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
     for (const auto& ip : iplist) {
       incrementExternalQueryTypeAnswerCount(query->type_);
       const std::chrono::seconds ttl = getDomainTTL(query->name_);
-      message_parser_.storeDnsAnswerRecord(context, *query, ttl, std::move(ip));
+      message_parser_.storeDnsAnswerRecord(context, *query, ttl, ip);
     }
     sendDnsResponse(std::move(context));
   };
 
-  resolver_ = std::make_unique<DnsFilterResolver>(resolver_callback_, config->resolvers(),
-                                                  config->resolverTimeout(), listener_.dispatcher(),
-                                                  config->maxPendingLookups());
+  resolver_ = std::make_unique<DnsFilterResolver>(
+      resolver_callback_, config->resolverTimeout(), listener_.dispatcher(),
+      config->maxPendingLookups(), config->typedDnsResolverConfig(), config->dnsResolverFactory(),
+      config->api());
 }
 
-void DnsFilter::onData(Network::UdpRecvData& client_request) {
+Network::FilterStatus DnsFilter::onData(Network::UdpRecvData& client_request) {
   config_->stats().downstream_rx_bytes_.recordValue(client_request.buffer_->length());
   config_->stats().downstream_rx_queries_.inc();
 
   // Setup counters for the parser
-  DnsParserCounters parser_counters(config_->stats().query_buffer_underflow_,
-                                    config_->stats().record_name_overflow_,
-                                    config_->stats().query_parsing_failure_);
+  DnsParserCounters parser_counters(
+      config_->stats().query_buffer_underflow_, config_->stats().record_name_overflow_,
+      config_->stats().query_parsing_failure_, config_->stats().queries_with_additional_rrs_,
+      config_->stats().queries_with_ans_or_authority_rrs_);
 
   // Parse the query, if it fails return an response to the client
   DnsQueryContextPtr query_context =
@@ -241,17 +280,19 @@ void DnsFilter::onData(Network::UdpRecvData& client_request) {
   if (!query_context->parse_status_) {
     config_->stats().downstream_rx_invalid_queries_.inc();
     sendDnsResponse(std::move(query_context));
-    return;
+    return Network::FilterStatus::StopIteration;
   }
 
   // Resolve the requested name and respond to the client. If the return code is
   // External, we will respond to the client when the upstream resolver returns
   if (getResponseForQuery(query_context) == DnsLookupResponseCode::External) {
-    return;
+    return Network::FilterStatus::StopIteration;
   }
 
   // We have an answer, it might be "No Answer". Send it to the client
   sendDnsResponse(std::move(query_context));
+
+  return Network::FilterStatus::StopIteration;
 }
 
 void DnsFilter::sendDnsResponse(DnsQueryContextPtr query_context) {
@@ -280,7 +321,8 @@ DnsLookupResponseCode DnsFilter::getResponseForQuery(DnsQueryContextPtr& context
   for (const auto& query : context->queries_) {
     // Try to resolve the query locally. If forwarding the query externally is disabled we will
     // always attempt to resolve with the configured domains
-    if (isKnownDomain(query->name_) || !config_->forwardQueries()) {
+    const bool forward_queries = config_->forwardQueries();
+    if (isKnownDomain(query->name_) || !forward_queries) {
       // Determine whether the name is a cluster. Move on to the next query if successful
       if (resolveViaClusters(context, *query)) {
         continue;
@@ -292,10 +334,14 @@ DnsLookupResponseCode DnsFilter::getResponseForQuery(DnsQueryContextPtr& context
       }
     }
 
-    ENVOY_LOG(debug, "resolving name [{}] via external resolvers", query->name_);
-    resolver_->resolveExternalQuery(std::move(context), query.get());
+    // Forwarding queries is enabled if the configuration contains a client configuration
+    // for the dns_filter.
+    if (forward_queries) {
+      ENVOY_LOG(debug, "resolving name [{}] via external resolvers", query->name_);
+      resolver_->resolveExternalQuery(std::move(context), query.get());
 
-    return DnsLookupResponseCode::External;
+      return DnsLookupResponseCode::External;
+    }
   }
 
   if (context->answers_.empty()) {
@@ -329,28 +375,40 @@ std::chrono::seconds DnsFilter::getDomainTTL(const absl::string_view domain) {
 }
 
 bool DnsFilter::isKnownDomain(const absl::string_view domain_name) {
-  const auto& known_suffixes = config_->knownSuffixes();
-  // If we don't have a list of allowlisted domain suffixes, we will resolve the name with an
-  // external DNS server
+  const absl::string_view suffix = Utils::getDomainSuffix(domain_name);
+  auto config = config_->getDnsTrie().find(suffix);
 
-  // TODO(abaptiste): Use a trie to find a match instead of iterating through the list
-  for (auto& suffix : known_suffixes) {
-    if (suffix->match(domain_name)) {
-      config_->stats().known_domain_queries_.inc();
-      return true;
-    }
+  if (config != nullptr) {
+    config_->stats().known_domain_queries_.inc();
+    return true;
   }
+
   return false;
 }
 
 const DnsEndpointConfig* DnsFilter::getEndpointConfigForDomain(const absl::string_view domain) {
-  const auto& domains = config_->domains();
-  const auto iter = domains.find(domain);
-  if (iter == domains.end()) {
-    ENVOY_LOG(debug, "No endpoint configuration exists for [{}]", domain);
+  const absl::string_view suffix = Utils::getDomainSuffix(domain);
+  const auto virtual_domains = config_->getDnsTrie().find(suffix);
+
+  if (virtual_domains == nullptr) {
+    ENVOY_LOG(debug, "No domain configuration exists for [{}]", domain);
     return nullptr;
   }
-  return &(iter->second);
+
+  // Try to find exact match at first and then look for possible wildcard match
+  // moving to the next label on each iteration.
+  size_t pos = 0;
+  while (pos != domain.npos) {
+    const auto iter = virtual_domains->find(domain.substr(pos));
+    if (iter != virtual_domains->end()) {
+      return &(iter->second);
+    }
+
+    pos = domain.find('.', pos + 1);
+  }
+
+  ENVOY_LOG(debug, "No endpoint configuration exists for [{}]", domain);
+  return nullptr;
 }
 
 const DnsSrvRecord* DnsFilter::getServiceConfigForDomain(const absl::string_view domain) {
@@ -454,7 +512,7 @@ bool DnsFilter::resolveClusterHost(DnsQueryContextPtr& context, const DnsQueryRe
   size_t cluster_endpoints = 0;
   Upstream::ThreadLocalCluster* cluster = cluster_manager_.getThreadLocalCluster(lookup_name);
   if (cluster != nullptr) {
-    // TODO(abaptiste): consider using host weights when returning answer addresses
+    // TODO(suniltheta): consider using host weights when returning answer addresses
     const std::chrono::seconds ttl = getDomainTTL(lookup_name);
 
     for (const auto& hostsets : cluster->prioritySet().hostSetsPerPriority()) {
@@ -550,9 +608,11 @@ bool DnsFilter::resolveConfiguredService(DnsQueryContextPtr& context, const DnsQ
   return (targets_discovered != 0);
 }
 
-void DnsFilter::onReceiveError(Api::IoError::IoErrorCode error_code) {
+Network::FilterStatus DnsFilter::onReceiveError(Api::IoError::IoErrorCode error_code) {
   config_->stats().downstream_rx_errors_.inc();
   UNREFERENCED_PARAMETER(error_code);
+
+  return Network::FilterStatus::StopIteration;
 }
 
 } // namespace DnsFilter

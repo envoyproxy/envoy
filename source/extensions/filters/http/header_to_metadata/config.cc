@@ -1,4 +1,4 @@
-#include "extensions/filters/http/header_to_metadata/config.h"
+#include "source/extensions/filters/http/header_to_metadata/config.h"
 
 #include <string>
 
@@ -6,31 +6,36 @@
 #include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/protobuf/utility.h"
-
-#include "extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
+#include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace HeaderToMetadataFilter {
 
-Http::FilterFactoryCb HeaderToMetadataConfig::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> HeaderToMetadataConfig::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::header_to_metadata::v3::Config& proto_config,
-    const std::string&, Server::Configuration::FactoryContext&) {
-  ConfigSharedPtr filter_config(std::make_shared<Config>(proto_config));
+    const std::string&, Server::Configuration::FactoryContext& context) {
+  absl::StatusOr<ConfigSharedPtr> filter_config_or = Config::create(
+      proto_config, context.serverFactoryContext().regexEngine(), context.scope(), false);
+  RETURN_IF_ERROR(filter_config_or.status());
 
-  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+  return [filter_config = std::move(filter_config_or.value())](
+             Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(
         Http::StreamFilterSharedPtr{new HeaderToMetadataFilter(filter_config)});
   };
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 HeaderToMetadataConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::header_to_metadata::v3::Config& config,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<const Config>(config, true);
+    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+  absl::StatusOr<ConfigSharedPtr> config_or =
+      Config::create(config, context.regexEngine(), context.scope(), true);
+  RETURN_IF_ERROR(config_or.status());
+  return std::move(config_or.value());
 }
 
 /**

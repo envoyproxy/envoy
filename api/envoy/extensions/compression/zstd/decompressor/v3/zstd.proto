@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package envoy.extensions.compression.zstd.decompressor.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.compression.zstd.decompressor.v3";
+option java_outer_classname = "ZstdProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/compression/zstd/decompressor/v3;decompressorv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Zstd Decompressor]
+// [#extension: envoy.compression.zstd.decompressor]
+
+message Zstd {
+  // Dictionaries for decompression. Zstd offers dictionary compression, which greatly improves
+  // efficiency on small files and messages. It is necessary to ensure that the dictionary used for
+  // decompression is the same as the compression dictionary. Multiple dictionaries can be set, and the
+  // dictionary will be automatically selected for decompression according to the dictionary ID in the
+  // source content.
+  // Please refer to `zstd manual <https://github.com/facebook/zstd/blob/dev/programs/zstd.1.md#dictionary-builder>`_
+  // to train specific dictionaries for decompression.
+  repeated config.core.v3.DataSource dictionaries = 1;
+
+  // Value for decompressor's next output buffer. If not set, defaults to 4096.
+  google.protobuf.UInt32Value chunk_size = 2 [(validate.rules).uint32 = {lte: 65536 gte: 4096}];
+}

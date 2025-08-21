@@ -1,0 +1,35 @@
+date: February 9, 2024
+
+bug_fixes:
+- area: tracing
+  change: |
+    Added support for configuring resource detectors on the OpenTelemetry tracer.
+- area: proxy protocol
+  change: |
+    Fixed a crash when Envoy is configured for PROXY protocol on both a listener and cluster, and the listener receives
+    a PROXY protocol header with address type LOCAL (typically used for health checks).
+- area: url matching
+  change: |
+    Fixed excessive CPU utilization when using regex URL template matcher.
+- area: http
+  change: |
+    Fixed crash when HTTP request idle and per try timeouts occurs within backoff interval.
+- area: proxy_protocol
+  change: |
+    Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
+    received in a proxy protocol header. Connections will instead be dropped/reset.
+- area: proxy_protocol
+  change: |
+    Fixed a bug where TLVs with non utf8 characters were inserted as protobuf values into filter metadata circumventing
+    ext_authz checks when ``failure_mode_allow`` is set to ``true``.
+- area: tls
+  change: |
+    Fix crash due to uncaught exception when the operating system does not support an address type (such as IPv6) that is
+    received in an mTLS client cert IP SAN. These SANs will be ignored. This applies only when using formatter
+    ``%DOWNSTREAM_PEER_IP_SAN%``.
+
+removed_config_or_runtime:
+- area: postgres proxy
+  change: |
+    Fix a race condition that may result from upstream servers refusing to switch to TLS/SSL.
+    This fix first appeared in ``v1.29.0`` release.

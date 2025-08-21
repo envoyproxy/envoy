@@ -12,6 +12,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.api.v2.core";
 option java_outer_classname = "ProtocolProto";
 option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/api/v2/core";
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3";
 option (udpa.annotations.file_status).package_version_status = FROZEN;
 
@@ -201,7 +202,7 @@ message Http2ProtocolOptions {
   // Still under implementation. DO NOT USE.
   //
   // Allows metadata. See [metadata
-  // docs](https://github.com/envoyproxy/envoy/blob/master/source/docs/h2_metadata.md) for more
+  // docs](https://github.com/envoyproxy/envoy/blob/main/source/docs/h2_metadata.md) for more
   // information.
   bool allow_metadata = 6;
 

@@ -1,15 +1,22 @@
-#include "common/access_log/access_log_manager_impl.h"
+#include "source/common/access_log/access_log_manager_impl.h"
 
 #include <string>
 
-#include "common/common/assert.h"
-#include "common/common/fmt.h"
-#include "common/common/lock_guard.h"
+#include "envoy/common/exception.h"
+
+#include "source/common/common/assert.h"
+#include "source/common/common/fmt.h"
+#include "source/common/common/lock_guard.h"
 
 #include "absl/container/fixed_array.h"
 
 namespace Envoy {
 namespace AccessLog {
+namespace {
+static constexpr Filesystem::FlagSet default_flags{1 << Filesystem::File::Operation::Write |
+                                                   1 << Filesystem::File::Operation::Create |
+                                                   1 << Filesystem::File::Operation::Append};
+} // namespace
 
 AccessLogManagerImpl::~AccessLogManagerImpl() {
   for (auto& [log_key, log_file_ptr] : access_logs_) {
@@ -25,14 +32,23 @@ void AccessLogManagerImpl::reopen() {
   }
 }
 
-AccessLogFileSharedPtr AccessLogManagerImpl::createAccessLog(const std::string& file_name) {
+absl::StatusOr<AccessLogFileSharedPtr>
+AccessLogManagerImpl::createAccessLog(const Filesystem::FilePathAndType& file_info) {
+  auto file = api_.fileSystem().createFile(file_info);
+  std::string file_name = file->path();
   if (access_logs_.count(file_name)) {
     return access_logs_[file_name];
   }
 
-  access_logs_[file_name] = std::make_shared<AccessLogFileImpl>(
-      api_.fileSystem().createFile(file_name), dispatcher_, lock_, file_stats_,
-      file_flush_interval_msec_, api_.threadFactory());
+  Api::IoCallBoolResult open_result = file->open(default_flags);
+  if (!open_result.ok()) {
+    return absl::InvalidArgumentError(fmt::format("unable to open file '{}': {}", file_name,
+                                                  open_result.err_->getErrorDetails()));
+  }
+
+  access_logs_[file_name] =
+      std::make_shared<AccessLogFileImpl>(std::move(file), dispatcher_, lock_, file_stats_,
+                                          file_flush_interval_msec_, api_.threadFactory());
   return access_logs_[file_name];
 }
 
@@ -47,26 +63,14 @@ AccessLogFileImpl::AccessLogFileImpl(Filesystem::FilePtr&& file, Event::Dispatch
         flush_timer_->enableTimer(flush_interval_msec_);
       })),
       thread_factory_(thread_factory), flush_interval_msec_(flush_interval_msec), stats_(stats) {
-  open();
+  flush_timer_->enableTimer(flush_interval_msec_);
 }
 
-Filesystem::FlagSet AccessLogFileImpl::defaultFlags() {
-  static constexpr Filesystem::FlagSet default_flags{1 << Filesystem::File::Operation::Write |
-                                                     1 << Filesystem::File::Operation::Create |
-                                                     1 << Filesystem::File::Operation::Append};
-
-  return default_flags;
+void AccessLogFileImpl::reopen() {
+  Thread::LockGuard lock(write_lock_);
+  reopen_file_ = true;
+  flush_event_.notifyOne();
 }
-
-void AccessLogFileImpl::open() {
-  const Api::IoCallBoolResult result = file_->open(defaultFlags());
-  if (!result.rc_) {
-    throw EnvoyException(
-        fmt::format("unable to open file '{}': {}", file_->path(), result.err_->getErrorDetails()));
-  }
-}
-
-void AccessLogFileImpl::reopen() { reopen_file_ = true; }
 
 AccessLogFileImpl::~AccessLogFileImpl() {
   {
@@ -84,10 +88,9 @@ AccessLogFileImpl::~AccessLogFileImpl() {
     if (flush_buffer_.length() > 0) {
       doWrite(flush_buffer_);
     }
-
     const Api::IoCallBoolResult result = file_->close();
-    ASSERT(result.rc_, fmt::format("unable to close file '{}': {}", file_->path(),
-                                   result.err_->getErrorDetails()));
+    ASSERT(result.return_value_, fmt::format("unable to close file '{}': {}", file_->path(),
+                                             result.err_->getErrorDetails()));
   }
 }
 
@@ -107,7 +110,7 @@ void AccessLogFileImpl::doWrite(Buffer::Instance& buffer) {
     for (const Buffer::RawSlice& slice : slices) {
       absl::string_view data(static_cast<char*>(slice.mem_), slice.len_);
       const Api::IoCallSizeResult result = file_->write(data);
-      if (result.ok() && result.rc_ == static_cast<ssize_t>(slice.len_)) {
+      if (result.ok() && result.return_value_ == static_cast<ssize_t>(slice.len_)) {
         stats_.write_completed_.inc();
       } else {
         // Probably disk full.
@@ -122,6 +125,11 @@ void AccessLogFileImpl::doWrite(Buffer::Instance& buffer) {
 
 void AccessLogFileImpl::flushThreadFunc() {
 
+  // Transfer the action from `reopen_file_` to this variable so that `reopen_file_` is only
+  // accessed while holding the mutex while the actual operation is performed while not holding the
+  // mutex.
+  bool do_reopen = false;
+
   while (true) {
     std::unique_lock<Thread::BasicLockable> flush_lock;
 
@@ -130,6 +138,10 @@ void AccessLogFileImpl::flushThreadFunc() {
 
       // flush_event_ can be woken up either by large enough flush_buffer or by timer.
       // In case it was timer, flush_buffer_ can be empty.
+      //
+      // Note: do not stop waiting when only `do_reopen` is true. In this case, we tried to
+      // reopen and failed. We don't want to retry this in a tight loop, so wait for the next
+      // event (timer or flush).
       while (flush_buffer_.length() == 0 && !flush_thread_exit_ && !reopen_file_) {
         // CondVar::wait() does not throw, so it's safe to pass the mutex rather than the guard.
         flush_event_.wait(write_lock_);
@@ -142,24 +154,28 @@ void AccessLogFileImpl::flushThreadFunc() {
       flush_lock = std::unique_lock<Thread::BasicLockable>(flush_lock_);
       about_to_write_buffer_.move(flush_buffer_);
       ASSERT(flush_buffer_.length() == 0);
-    }
 
-    // if we failed to open file before, then simply ignore
-    if (file_->isOpen()) {
-      try {
-        if (reopen_file_) {
-          reopen_file_ = false;
-          const Api::IoCallBoolResult result = file_->close();
-          ASSERT(result.rc_, fmt::format("unable to close file '{}': {}", file_->path(),
-                                         result.err_->getErrorDetails()));
-          open();
-        }
-
-        doWrite(about_to_write_buffer_);
-      } catch (const EnvoyException&) {
-        stats_.reopen_failed_.inc();
+      if (reopen_file_) {
+        do_reopen = true;
+        reopen_file_ = false;
       }
     }
+
+    if (do_reopen) {
+      if (file_->isOpen()) {
+        const Api::IoCallBoolResult result = file_->close();
+        ASSERT(result.return_value_, fmt::format("unable to close file '{}': {}", file_->path(),
+                                                 result.err_->getErrorDetails()));
+      }
+      const Api::IoCallBoolResult open_result = file_->open(default_flags);
+      if (!open_result.return_value_) {
+        stats_.reopen_failed_.inc();
+      } else {
+        do_reopen = false;
+      }
+    }
+    // doWrite no matter file isOpen, if not, we can drain buffer
+    doWrite(about_to_write_buffer_);
   }
 }
 
@@ -205,7 +221,6 @@ void AccessLogFileImpl::write(absl::string_view data) {
 void AccessLogFileImpl::createFlushStructures() {
   flush_thread_ = thread_factory_.createThread([this]() -> void { flushThreadFunc(); },
                                                Thread::Options{"AccessLogFlush"});
-  flush_timer_->enableTimer(flush_interval_msec_);
 }
 
 } // namespace AccessLog

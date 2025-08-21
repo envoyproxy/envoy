@@ -16,7 +16,8 @@ envoy_extension_cc_test(
     srcs = [
         "filter_test.cc",
     ],
-    extension_name = "envoy.filters.network.zookeeper_proxy",
+    extension_names = ["envoy.filters.network.zookeeper_proxy"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/network/zookeeper_proxy:config",
         "//test/mocks/network:network_mocks",
@@ -29,7 +30,8 @@ envoy_extension_cc_test(
     srcs = [
         "config_test.cc",
     ],
-    extension_name = "envoy.filters.network.zookeeper_proxy",
+    extension_names = ["envoy.filters.network.zookeeper_proxy"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/network/zookeeper_proxy:config",
         "//test/mocks/server:factory_context_mocks",

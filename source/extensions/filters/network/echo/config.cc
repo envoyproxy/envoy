@@ -3,9 +3,9 @@
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/network/common/factory_base.h"
-#include "extensions/filters/network/echo/echo.h"
-#include "extensions/filters/network/well_known_names.h"
+#include "source/extensions/filters/network/common/factory_base.h"
+#include "source/extensions/filters/network/echo/echo.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,14 +29,17 @@ private:
     };
   }
 
-  bool isTerminalFilter() override { return true; }
+  bool isTerminalFilterByProtoTyped(const envoy::extensions::filters::network::echo::v3::Echo&,
+                                    Server::Configuration::ServerFactoryContext&) override {
+    return true;
+  }
 };
 
 /**
  * Static registration for the echo filter. @see RegisterFactory.
  */
-REGISTER_FACTORY(EchoConfigFactory,
-                 Server::Configuration::NamedNetworkFilterConfigFactory){"envoy.echo"};
+LEGACY_REGISTER_FACTORY(EchoConfigFactory, Server::Configuration::NamedNetworkFilterConfigFactory,
+                        "envoy.echo");
 
 } // namespace Echo
 } // namespace NetworkFilters
