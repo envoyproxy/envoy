@@ -39,8 +39,8 @@ CommonCredentialsProviderChain::customCredentialsProviderChain(
         "Custom credential provider chain must have at least one credential provider");
   }
 
-  auto chain = std::make_shared<CommonCredentialsProviderChain>(context, region,
-                                                                credential_provider_config);
+  auto chain =
+      std::make_shared<CommonCredentialsProviderChain>(context, region, credential_provider_config);
   chain->setupSubscriptions();
   return chain;
 }

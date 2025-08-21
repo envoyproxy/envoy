@@ -173,10 +173,12 @@ using CredentialSubscriberCallbacksSharedPtr = std::shared_ptr<CredentialSubscri
 // successfully updated all threads with new credentials, via the setCredentialsToAllThreads method
 // it will notify all subscribers that credentials have been retrieved.
 // Uses weak_ptr to safely handle subscriber lifetime without dangling pointers.
-class CredentialSubscriberCallbacksHandle : public RaiiListElement<std::weak_ptr<CredentialSubscriberCallbacks>> {
+class CredentialSubscriberCallbacksHandle
+    : public RaiiListElement<std::weak_ptr<CredentialSubscriberCallbacks>> {
 public:
-  CredentialSubscriberCallbacksHandle(CredentialSubscriberCallbacksSharedPtr cb,
-                                      std::list<std::weak_ptr<CredentialSubscriberCallbacks>>& parent)
+  CredentialSubscriberCallbacksHandle(
+      CredentialSubscriberCallbacksSharedPtr cb,
+      std::list<std::weak_ptr<CredentialSubscriberCallbacks>>& parent)
       : RaiiListElement<std::weak_ptr<CredentialSubscriberCallbacks>>(parent, cb) {}
 };
 

@@ -36,14 +36,15 @@ void MetadataCredentialsProviderBase::onClusterAddOrUpdate() {
   if (!cache_duration_timer_) {
     std::weak_ptr<MetadataCredentialsProviderStats> weak_stats = stats_;
     std::weak_ptr<MetadataCredentialsProviderBase> weak_self = shared_from_this();
-    cache_duration_timer_ = context_.mainThreadDispatcher().createTimer([weak_stats, weak_self]() -> void {
-      if (auto stats = weak_stats.lock()) {
-        stats->credential_refreshes_performed_.inc();
-      }
-      if (auto self = weak_self.lock()) {
-        self->refresh();
-      }
-    });
+    cache_duration_timer_ =
+        context_.mainThreadDispatcher().createTimer([weak_stats, weak_self]() -> void {
+          if (auto stats = weak_stats.lock()) {
+            stats->credential_refreshes_performed_.inc();
+          }
+          if (auto self = weak_self.lock()) {
+            self->refresh();
+          }
+        });
   }
   if (!cache_duration_timer_->enabled()) {
     cache_duration_timer_->enableTimer(std::chrono::milliseconds(1));
@@ -138,7 +139,8 @@ void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
 }
 
 CredentialSubscriberCallbacksHandlePtr
-MetadataCredentialsProviderBase::subscribeToCredentialUpdates(CredentialSubscriberCallbacksSharedPtr cs) {
+MetadataCredentialsProviderBase::subscribeToCredentialUpdates(
+    CredentialSubscriberCallbacksSharedPtr cs) {
   Thread::LockGuard guard(mu_);
   return std::make_unique<CredentialSubscriberCallbacksHandle>(cs, credentials_subscribers_);
 }

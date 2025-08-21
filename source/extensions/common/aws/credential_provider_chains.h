@@ -118,7 +118,8 @@ public:
   defaultCredentialsProviderChain(Server::Configuration::ServerFactoryContext& context,
                                   absl::string_view region);
 
-  // Where credential providers use async functionality, subscribe to credential notifications for these providers 
+  // Where credential providers use async functionality, subscribe to credential notifications for
+  // these providers
   void setupSubscriptions();
 
 private:

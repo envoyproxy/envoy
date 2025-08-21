@@ -27,10 +27,11 @@ struct MetadataCredentialsProviderStats {
 using CreateMetadataFetcherCb =
     std::function<MetadataFetcherPtr(Upstream::ClusterManager&, absl::string_view)>;
 
-class MetadataCredentialsProviderBase : public CredentialsProvider,
-                                        public Logger::Loggable<Logger::Id::aws>,
-                                        public AwsManagedClusterUpdateCallbacks,
-                                        public std::enable_shared_from_this<MetadataCredentialsProviderBase> {
+class MetadataCredentialsProviderBase
+    : public CredentialsProvider,
+      public Logger::Loggable<Logger::Id::aws>,
+      public AwsManagedClusterUpdateCallbacks,
+      public std::enable_shared_from_this<MetadataCredentialsProviderBase> {
 public:
   friend class MetadataCredentialsProviderBaseFriend;
   using OnAsyncFetchCb = std::function<void(const std::string&&)>;
@@ -121,7 +122,8 @@ protected:
   // Are credentials pending?
   std::atomic<bool> credentials_pending_ = true;
   Thread::MutexBasicLockable mu_;
-  std::list<std::weak_ptr<CredentialSubscriberCallbacks>> credentials_subscribers_ ABSL_GUARDED_BY(mu_);
+  std::list<std::weak_ptr<CredentialSubscriberCallbacks>>
+      credentials_subscribers_ ABSL_GUARDED_BY(mu_);
 };
 
 } // namespace Aws
