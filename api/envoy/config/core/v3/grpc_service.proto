@@ -252,7 +252,8 @@ message GrpcService {
     // is set.
     repeated CallCredentials call_credentials = 3;
 
-    // A list of call credentials plugins. All specified plugins will be used.
+    // A list of call credentials plugins. All supported plugins will be used.
+    // Unsupported plugin types will be ignored.
     // [#not-implemented-hide:]
     repeated google.protobuf.Any call_credentials_plugin = 10;
 
