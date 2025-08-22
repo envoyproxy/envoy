@@ -210,8 +210,8 @@ protected:
   Filesystem::MockInstance filesystem_;
 };
 
-// parameters for these tests are std::tuple<bool, bool> where the first bool is whether we use
-// watched_directory and the second is whether an OCSP staple is provided (and tested)
+// Parameters for these tests are std::tuple<bool, bool> where the first bool is whether we use
+// watched_directory and the second is whether an OCSP staple is provided (and tested).
 class TlsCertificateSdsRotationApiTest : public testing::TestWithParam<std::tuple<bool, bool>>,
                                          public SdsRotationApiTest {
 protected:
