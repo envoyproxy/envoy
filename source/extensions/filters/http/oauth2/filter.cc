@@ -469,7 +469,8 @@ FilterConfig::FilterConfig(
               ? CookieSettings(proto_config.cookie_configs().code_verifier_cookie_config())
               : CookieSettings()) {
   if (!context.clusterManager().clusters().hasCluster(oauth_token_endpoint_.cluster())) {
-    // This is not necessarily a configuration error — sometimes cluster is sent later than the listener in the xDS stream.
+    // This is not necessarily a configuration error — sometimes cluster is sent later than the
+    // listener in the xDS stream.
     ENVOY_LOG(warn, "OAuth2 filter: unknown cluster '{}' in config. ",
               oauth_token_endpoint_.cluster());
   }
