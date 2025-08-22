@@ -1,0 +1,51 @@
+module(
+    name = "envoy_api",
+    version = "0.0.0-dev",
+)
+
+bazel_dep(name = "bazel_skylib", version = "1.8.1")
+bazel_dep(name = "cel-spec", version = "0.24.0", repo_name = "dev_cel")
+bazel_dep(name = "envoy_toolshed", version = "0.3.3")
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "f536601588f6a523346091adb3420d39b4692d3a",
+    remote = "https://github.com/envoyproxy/toolshed.git",
+    strip_prefix = "bazel/",
+)
+
+bazel_dep(name = "googleapis", version = "0.0.0-20241220-5e258e33.bcr.1", repo_name = "com_google_googleapis")
+bazel_dep(name = "grpc", version = "1.72.0", repo_name = "com_github_grpc_grpc")
+bazel_dep(name = "opentelemetry-proto", version = "1.7.0", repo_name = "opentelemetry_proto")
+bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "protobuf", version = "29.3", repo_name = "com_google_protobuf")
+bazel_dep(name = "protoc-gen-validate", version = "1.2.1.bcr.1", repo_name = "com_envoyproxy_protoc_gen_validate")
+bazel_dep(name = "re2", version = "2024-07-02.bcr.1", repo_name = "com_googlesource_code_re2")
+bazel_dep(name = "rules_buf", version = "0.5.1")
+bazel_dep(name = "rules_cc", version = "0.2.8")
+bazel_dep(name = "rules_go", version = "0.57.0", repo_name = "io_bazel_rules_go")
+bazel_dep(name = "rules_proto", version = "7.1.0")
+bazel_dep(name = "rules_python", version = "1.4.1")
+bazel_dep(name = "zipkin-api", version = "1.0.0", repo_name = "com_github_openzipkin_zipkinapi")
+
+switched_rules = use_extension("@com_google_googleapis//:extensions.bzl", "switched_rules")
+switched_rules.use_languages(
+    cc = True,
+    go = True,
+    grpc = True,
+    python = True,
+)
+use_repo(switched_rules, "com_google_googleapis_imports")
+
+# API dependencies extension - using local module
+envoy_api_deps = use_extension("//bazel/extensions:api_dependencies.bzl", "envoy_api_deps")
+
+# Handles API-specific dependencies and external archives
+use_repo(
+    envoy_api_deps,
+    "com_github_cncf_xds",
+    "prometheus_metrics_model",
+)
+
+proto_bazel_features = use_repo_rule("@com_google_protobuf//bazel/private:proto_bazel_features.bzl", "proto_bazel_features")
+
+proto_bazel_features(name = "proto_bazel_features")

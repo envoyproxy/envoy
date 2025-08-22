@@ -60,7 +60,7 @@ configure_make(
         "//bazel:apple": ["AR=/usr/bin/ar"],
         "//conditions:default": [],
     }),
-    lib_source = "@com_github_gperftools_gperftools//:all",
+    lib_source = "@com_github_gperftools_gperftools//:tcmalloc",
     linkopts = ["-lpthread"],
     out_static_libs = select({
         "//bazel:debug_tcmalloc": ["libtcmalloc_debug.a"],
@@ -552,7 +552,7 @@ envoy_cmake(
         "//bazel:engflow_rbe_aarch64": ["-j"],
         "//conditions:default": ["-j1"],
     }),
-    build_data = ["@com_github_facebook_zstd//:all"],
+    build_data = ["@com_github_facebook_zstd//:zstd"],
     cache_entries = {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_INSTALL_LIBDIR": "lib",
@@ -572,7 +572,7 @@ envoy_cmake(
         "-G",
         "Ninja",
     ],
-    lib_source = "@com_github_facebook_zstd//:all",
+    lib_source = "@com_github_facebook_zstd//:zstd",
     out_static_libs = select({
         "//bazel:windows_x86_64": ["zstd_static.lib"],
         "//conditions:default": ["libzstd.a"],

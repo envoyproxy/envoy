@@ -25,6 +25,7 @@
 !\.zuul.yaml
 
 /bazel-*
+MODULE.bazel.lock
 /mobile/bazel-*
 BROWSE
 /build

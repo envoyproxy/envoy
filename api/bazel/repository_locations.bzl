@@ -1,4 +1,7 @@
 # This should match the schema defined in external_deps.bzl.
+
+PROTOBUF_VERSION = "29.3"
+
 REPOSITORY_LOCATIONS_SPEC = dict(
     bazel_skylib = dict(
         project_name = "bazel-skylib",
@@ -60,6 +63,24 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["api"],
         license = "Apache-2.0",
         license_url = "https://github.com/cncf/xds/blob/{version}/LICENSE",
+    ),
+    com_google_protobuf = dict(
+        project_name = "Protocol Buffers",
+        project_desc = "Language-neutral, platform-neutral extensible mechanism for serializing structured data",
+        project_url = "https://developers.google.com/protocol-buffers",
+        version = PROTOBUF_VERSION,
+        # When upgrading the protobuf library, please re-run
+        # test/common/json:gen_excluded_unicodes to recompute the ranges
+        # excluded from differential fuzzing that are populated in
+        # test/common/json/json_sanitizer_test_util.cc.
+        sha256 = "008a11cc56f9b96679b4c285fd05f46d317d685be3ab524b2a310be0fbad987e",
+        strip_prefix = "protobuf-{version}",
+        urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-{version}.tar.gz"],
+        use_category = ["dataplane_core", "controlplane"],
+        release_date = "2025-01-08",
+        cpe = "cpe:2.3:a:google:protobuf:*",
+        license = "Protocol Buffers",
+        license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
     ),
     com_github_openzipkin_zipkinapi = dict(
         project_name = "Zipkin API",
@@ -165,5 +186,24 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         release_date = "2025-05-09",
         license = "Apache-2.0",
         license_url = "https://github.com/google/cel-spec/blob/v{version}/LICENSE",
+    ),
+    
+    envoy_toolshed = dict(
+        project_name = "envoy_toolshed",
+        project_desc = "Tooling, libraries, runners and checkers for Envoy proxy's CI",
+        project_url = "https://github.com/envoyproxy/toolshed",
+        version = "0.3.3",
+        sha256 = "1ac69d5b1cbc138f779fc3858f06a6777455136260e1144010f0b51880f69814",
+        strip_prefix = "toolshed-bazel-v{version}/bazel",
+        urls = ["https://github.com/envoyproxy/toolshed/archive/bazel-v{version}.tar.gz"],
+        use_category = ["build", "controlplane", "dataplane_core"],
+        implied_untracked_deps = [
+            "tsan_libs",
+            "msan_libs",
+        ],
+        release_date = "2025-06-02",
+        cpe = "N/A",
+        license = "Apache-2.0",
+        license_url = "https://github.com/envoyproxy/toolshed/blob/bazel-v{version}/LICENSE",
     ),
 )
