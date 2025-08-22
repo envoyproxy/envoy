@@ -230,6 +230,11 @@ public:
               stat_prefix_);
     stat_prefix_ =
         PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "upstream_reverse_connection");
+    // Ensure the socket interface has a reference to this extension early, so stats can be
+    // recorded even before onServerInitialized().
+    if (socket_interface_ != nullptr) {
+      socket_interface_->extension_ = this;
+    }
   }
 
   /**
