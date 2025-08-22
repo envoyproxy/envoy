@@ -11,6 +11,7 @@ import static org.mockito.AdditionalMatchers.aryEq;
 import static org.robolectric.Shadows.shadowOf;
 
 import android.content.Context;
+import android.content.Intent;
 import android.Manifest;
 import android.net.ConnectivityManager;
 import android.net.NetworkCapabilities;
@@ -22,6 +23,7 @@ import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.rule.GrantPermissionRule;
 import static androidx.test.core.app.ApplicationProvider.getApplicationContext;
 import android.os.Build;
+import android.os.Looper;
 
 import org.junit.After;
 import org.junit.Before;
@@ -44,6 +46,8 @@ import android.os.Handler;
  * Tests functionality of AndroidNetworkMonitorV2
  */
 @RunWith(RobolectricTestRunner.class)
+// Individual tests may override this to test different Android SDK versions.
+@Config(sdk = Build.VERSION_CODES.O)
 public class AndroidNetworkMonitorV2Test {
   @Rule
   public GrantPermissionRule mRuntimePermissionRule =
@@ -62,7 +66,12 @@ public class AndroidNetworkMonitorV2Test {
     connectivityManager = androidNetworkMonitor.getConnectivityManager();
     networkCapabilities =
         connectivityManager.getNetworkCapabilities(connectivityManager.getActiveNetwork());
-    assertThat(shadowOf(connectivityManager).getNetworkCallbacks()).hasSize(2);
+    int expectedNetworkCallbackSize = 2;
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+      expectedNetworkCallbackSize = 1;
+    }
+    assertThat(shadowOf(connectivityManager).getNetworkCallbacks())
+        .hasSize(expectedNetworkCallbackSize);
   }
 
   @After
@@ -243,6 +252,23 @@ public class AndroidNetworkMonitorV2Test {
     verify(mockEnvoyEngine, times(3))
         .onNetworkConnect(EnvoyConnectionType.CONNECTION_WIFI, activeNetwork.getNetworkHandle());
     verify(mockEnvoyEngine, times(2))
+        .onDefaultNetworkChangedV2(EnvoyConnectionType.CONNECTION_WIFI,
+                                   activeNetwork.getNetworkHandle());
+  }
+
+  // Tests that the broadcast receiver is triggered when the default network changes from cell to
+  // WIFI on Android M.
+  @Test
+  @Config(sdk = Build.VERSION_CODES.M)
+  public void testBroadcastReceiver() {
+    Network activeNetwork = triggerDefaultNetworkChange(NetworkCapabilities.TRANSPORT_WIFI,
+                                                        ConnectivityManager.TYPE_WIFI, 0);
+    Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+    Intent intent = new Intent(ConnectivityManager.CONNECTIVITY_ACTION);
+    context.sendBroadcast(intent);
+    // Robolectric doesn't seem to run the receiver in the main looper, so we need to idle it.
+    shadowOf(Looper.getMainLooper()).idle();
+    verify(mockEnvoyEngine)
         .onDefaultNetworkChangedV2(EnvoyConnectionType.CONNECTION_WIFI,
                                    activeNetwork.getNetworkHandle());
   }

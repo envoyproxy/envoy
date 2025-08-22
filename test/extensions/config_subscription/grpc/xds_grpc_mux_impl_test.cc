@@ -373,7 +373,7 @@ TEST_P(GrpcMuxImplTest, ResourceTTL) {
   OpaqueResourceDecoderSharedPtr resource_decoder(
       std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
           envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
   InSequence s;
   auto* ttl_timer = new Event::MockTimer(&dispatcher_);
   auto eds_sub = makeWatch(type_url, {"x"}, callbacks_, resource_decoder);
@@ -538,7 +538,7 @@ TEST_P(GrpcMuxImplTest, LogsControlPlaneIndentifier) {
 TEST_P(GrpcMuxImplTest, WildcardWatch) {
   setup();
 
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
   auto foo_sub = makeWatch(type_url, {}, callbacks_, resource_decoder_);
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {}, "", true);
@@ -571,7 +571,7 @@ TEST_P(GrpcMuxImplTest, WatchDemux) {
   setup();
   // We will not require InSequence here: an update that causes multiple onConfigUpdates
   // causes them in an indeterminate order, based on the whims of the hash map.
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
 
   NiceMock<MockSubscriptionCallbacks> foo_callbacks;
   auto foo_sub = makeWatch(type_url, {"x", "y"}, foo_callbacks, resource_decoder_);
@@ -660,7 +660,7 @@ TEST_P(GrpcMuxImplTest, WatchDemux) {
 TEST_P(GrpcMuxImplTest, MultipleWatcherWithEmptyUpdates) {
   setup();
   InSequence s;
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
   NiceMock<MockSubscriptionCallbacks> foo_callbacks;
   auto foo_sub = makeWatch(type_url, {"x", "y"}, foo_callbacks, resource_decoder_);
 
@@ -682,7 +682,7 @@ TEST_P(GrpcMuxImplTest, MultipleWatcherWithEmptyUpdates) {
 // Validate behavior when we have Single Watcher that sends Empty updates.
 TEST_P(GrpcMuxImplTest, SingleWatcherWithEmptyUpdates) {
   setup();
-  const std::string& type_url = Config::TypeUrl::get().Cluster;
+  const std::string& type_url = Config::TestTypeUrl::get().Cluster;
   NiceMock<MockSubscriptionCallbacks> foo_callbacks;
   auto foo_sub = makeWatch(type_url, {}, foo_callbacks, resource_decoder_);
 
@@ -867,7 +867,7 @@ TEST_P(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
 
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
 
   grpc_mux_->start();
   {
@@ -905,7 +905,7 @@ TEST_P(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
 TEST_P(GrpcMuxImplTest, UnwatchedTypeAcceptsResources) {
   setup();
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
   grpc_mux_->start();
 
   // subscribe and unsubscribe so that the type is known to envoy
@@ -980,7 +980,7 @@ TEST_P(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
 // Validate that a valid resource decoder is used after removing a subscription.
 TEST_P(GrpcMuxImplTest, ValidResourceDecoderAfterRemoval) {
   setup();
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
 
   {
     // Subscribe to resource "x" with some callbacks and resource decoder.
@@ -1127,7 +1127,7 @@ TEST_P(GrpcMuxImplTest, CacheEdsResource) {
   OpaqueResourceDecoderSharedPtr resource_decoder(
       std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
           envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
   InSequence s;
   auto eds_sub = makeWatch(type_url, {"x"});
 
@@ -1169,7 +1169,7 @@ TEST_P(GrpcMuxImplTest, UpdateCacheEdsResource) {
   OpaqueResourceDecoderSharedPtr resource_decoder(
       std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
           envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
   InSequence s;
   auto eds_sub = makeWatch(type_url, {"x"});
 
@@ -1216,7 +1216,7 @@ TEST_P(GrpcMuxImplTest, AddRemoveSubscriptions) {
   OpaqueResourceDecoderSharedPtr resource_decoder(
       std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
           envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
   InSequence s;
 
   {
@@ -1329,7 +1329,7 @@ TEST_P(GrpcMuxImplTest, MuxDynamicReplacementFetchingResources) {
   setup();
   InSequence s;
 
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
   auto foo_sub = makeWatch(type_url, {"x", "y"});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {"x", "y"}, "", true);
@@ -1410,7 +1410,7 @@ TEST_P(GrpcMuxImplTest, RejectMuxDynamicReplacementRateLimitSettingsError) {
   setup();
   InSequence s;
 
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
   auto foo_sub = makeWatch(type_url, {"x", "y"});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage(type_url, {"x", "y"}, "", true);

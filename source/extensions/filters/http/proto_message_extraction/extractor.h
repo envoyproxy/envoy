@@ -24,7 +24,7 @@ namespace ProtoMessageExtraction {
 
 using ::Envoy::Protobuf::Type;
 
-using TypeFinder = std::function<const Envoy::ProtobufWkt::Type*(const std::string&)>;
+using TypeFinder = std::function<const Envoy::Protobuf::Type*(const std::string&)>;
 
 struct ExtractedMessageResult {
   const TypeFinder* type_finder;
@@ -35,8 +35,8 @@ struct ExtractedMessageResult {
       response_data;
 
   // Extracted struct with a "@type" field.
-  ProtobufWkt::Struct request_type_struct;
-  ProtobufWkt::Struct response_type_struct;
+  Protobuf::Struct request_type_struct;
+  Protobuf::Struct response_type_struct;
 };
 
 class Extractor {

@@ -32,7 +32,7 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
 }
 
 struct FilterChainNameAction
-    : public Matcher::ActionBase<ProtobufWkt::StringValue, Configuration::FilterChainBaseAction> {
+    : public Matcher::ActionBase<Protobuf::StringValue, Configuration::FilterChainBaseAction> {
   explicit FilterChainNameAction(const std::string& name) : name_(name) {}
   const Network::FilterChain* get(const FilterChainsByName& filter_chains_by_name,
                                   const StreamInfo::StreamInfo&) const override {
@@ -53,10 +53,10 @@ public:
                                              FilterChainActionFactoryContext&,
                                              ProtobufMessage::ValidationVisitor&) override {
     return std::make_shared<FilterChainNameAction>(
-        dynamic_cast<const ProtobufWkt::StringValue&>(config).value());
+        dynamic_cast<const Protobuf::StringValue&>(config).value());
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
 };
 
@@ -149,6 +149,15 @@ absl::Status FilterChainManagerImpl::addFilterChains(
   RETURN_IF_NOT_OK(copyOrRebuildDefaultFilterChain(default_filter_chain,
                                                    filter_chain_factory_builder, context_creator));
   maybeConstructMatcher(filter_chain_matcher, filter_chains_by_name, parent_context_);
+
+  const auto* origin = getOriginFilterChainManager();
+  if (origin != nullptr) {
+    for (const auto& message_and_filter_chain : origin->fc_contexts_) {
+      if (fc_contexts_.find(message_and_filter_chain.first) == fc_contexts_.end()) {
+        origin->draining_filter_chains_.push_back(message_and_filter_chain.second);
+      }
+    }
+  }
 
   ENVOY_LOG(debug, "new fc_contexts has {} filter chains, including {} newly built",
             fc_contexts_.size(), new_filter_chain_size);

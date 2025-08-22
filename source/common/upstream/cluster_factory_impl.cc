@@ -27,7 +27,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
   // try to look up by typed_config
   if (cluster.has_cluster_type() && cluster.cluster_type().has_typed_config() &&
       (TypeUtil::typeUrlToDescriptorFullName(cluster.cluster_type().typed_config().type_url()) !=
-       ProtobufWkt::Struct::GetDescriptor()->full_name())) {
+       Protobuf::Struct::GetDescriptor()->full_name())) {
     cluster_config_type_name =
         TypeUtil::typeUrlToDescriptorFullName(cluster.cluster_type().typed_config().type_url());
     factory = Registry::FactoryRegistry<ClusterFactory>::getFactoryByType(cluster_config_type_name);
@@ -102,6 +102,19 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3::Clus
                                                   server_context.api(), typed_dns_resolver_config);
   }
 
+  return context.dnsResolver();
+}
+
+absl::StatusOr<Network::DnsResolverSharedPtr> ClusterFactoryImplBase::selectDnsResolver(
+    const envoy::config::core::v3::TypedExtensionConfig& typed_dns_resolver_config,
+    ClusterFactoryContext& context) {
+  if (typed_dns_resolver_config.has_typed_config()) {
+    Network::DnsResolverFactory& dns_resolver_factory =
+        Network::createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config);
+    auto& server_context = context.serverFactoryContext();
+    return dns_resolver_factory.createDnsResolver(server_context.mainThreadDispatcher(),
+                                                  server_context.api(), typed_dns_resolver_config);
+  }
   return context.dnsResolver();
 }
 

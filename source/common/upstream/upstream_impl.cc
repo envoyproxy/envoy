@@ -94,7 +94,7 @@ parseTcpKeepaliveConfig(const envoy::config::cluster::v3::Cluster& config) {
 }
 
 absl::StatusOr<ProtocolOptionsConfigConstSharedPtr>
-createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typed_config,
+createProtocolOptionsConfig(const std::string& name, const Protobuf::Any& typed_config,
                             Server::Configuration::ProtocolOptionsFactoryContext& factory_context) {
   Server::Configuration::ProtocolOptionsFactory* factory =
       Registry::FactoryRegistry<Server::Configuration::NamedNetworkFilterConfigFactory>::getFactory(
@@ -360,6 +360,28 @@ createUpstreamLocalAddressSelector(
           !(cluster_name.has_value()) ? "Bootstrap"
                                       : fmt::format("Cluster {}", cluster_name.value())));
     }
+
+#if !defined(__linux__)
+    auto fail_status = absl::InvalidArgumentError(fmt::format(
+        "{}'s upstream binding config contains addresses with network namespace filepaths, but the "
+        "OS is not Linux. Network namespaces can only be used on Linux.",
+        !(cluster_name.has_value()) ? "Bootstrap"
+                                    : fmt::format("Cluster {}", cluster_name.value())));
+    if (bind_config->has_source_address() &&
+        !bind_config->source_address().network_namespace_filepath().empty()) {
+      return fail_status;
+    };
+    for (const auto& addr : bind_config->extra_source_addresses()) {
+      if (addr.has_address() && !addr.address().network_namespace_filepath().empty()) {
+        return fail_status;
+      }
+    }
+    for (const auto& addr : bind_config->additional_source_addresses()) {
+      if (!addr.network_namespace_filepath().empty()) {
+        return fail_status;
+      }
+    }
+#endif
   }
   UpstreamLocalAddressSelectorFactory* local_address_selector_factory;
   const envoy::config::core::v3::TypedExtensionConfig* const local_address_selector_config =
@@ -473,6 +495,9 @@ HostDescriptionImplBase::HostDescriptionImplBase(
     // for a pipe address is a misconfiguration.
     creation_status = absl::InvalidArgumentError(
         fmt::format("Invalid host configuration: non-zero port for non-IP address"));
+  } else if (dest_address && dest_address->networkNamespace().has_value()) {
+    creation_status = absl::InvalidArgumentError(
+        "Invalid host configuration: hosts cannot specify network namespaces with their address");
   }
 }
 
@@ -616,17 +641,13 @@ Host::CreateConnectionData HostImplBase::createConnection(
         socket_factory.createTransportSocket(transport_socket_options, host),
         upstream_local_address.socket_options_, transport_socket_options);
   } else if (address_list_or_null != nullptr && address_list_or_null->size() > 1) {
-    // TODO(adisuissa): convert from OptRef to reference once the runtime flag
-    // envoy.reloadable_features.use_config_in_happy_eyeballs is deprecated.
+    ENVOY_LOG(debug, "Upstream using happy eyeballs config.");
     OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
         happy_eyeballs_config;
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_config_in_happy_eyeballs")) {
-      ENVOY_LOG(debug, "Upstream using happy eyeballs config.");
-      if (cluster.happyEyeballsConfig().has_value()) {
-        happy_eyeballs_config = cluster.happyEyeballsConfig();
-      } else {
-        happy_eyeballs_config = defaultHappyEyeballsConfig();
-      }
+    if (cluster.happyEyeballsConfig().has_value()) {
+      happy_eyeballs_config = cluster.happyEyeballsConfig();
+    } else {
+      happy_eyeballs_config = defaultHappyEyeballsConfig();
     }
     connection = std::make_unique<Network::HappyEyeballsConnectionImpl>(
         dispatcher, *address_list_or_null, source_address_selector, socket_factory,

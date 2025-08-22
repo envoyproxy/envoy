@@ -23,7 +23,7 @@ namespace HttpFilters {
 namespace ThriftToMetadata {
 
 MATCHER_P(MapEq, rhs, "") {
-  const ProtobufWkt::Struct& obj = arg;
+  const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
     EXPECT_EQ(obj.fields().at(entry.first).string_value(), entry.second);
@@ -32,7 +32,7 @@ MATCHER_P(MapEq, rhs, "") {
 }
 
 MATCHER_P(MapNumEq, rhs, "") {
-  const ProtobufWkt::Struct& obj = arg;
+  const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
     EXPECT_EQ(obj.fields().at(entry.first).number_value(), entry.second);

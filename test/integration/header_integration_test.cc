@@ -391,7 +391,7 @@ public:
 
         envoy::service::discovery::v3::DiscoveryResponse discovery_response;
         discovery_response.set_version_info("1");
-        discovery_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+        discovery_response.set_type_url(Config::TestTypeUrl::get().ClusterLoadAssignment);
 
         auto cluster_load_assignment =
             TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(fmt::format(

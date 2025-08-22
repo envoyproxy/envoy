@@ -2,8 +2,8 @@
 
 namespace Envoy {
 
-#if __cplusplus < 201402L
-#error "Your compiler does not support C++14. GCC 5+, Clang, or MSVC 2017+ is required."
+#if __cplusplus < 202002L
+#error "Your compiler does not support C++20. GCC 12+, Clang, or MSVC 2019+ is required."
 #endif
 
 // See:

@@ -88,8 +88,13 @@ private:
 
   std::map<std::string, std::unique_ptr<PolicyMatcher>> policies_;
 
-  Protobuf::Arena constant_arena_;
-  Expr::BuilderPtr builder_;
+  // Encapsulated the CEL expression builder with the arena, that will only be
+  // allocated if CEL is configured.
+  struct ExprBuilderWithArena {
+    Protobuf::Arena constant_arena_;
+    Expr::BuilderPtr builder_;
+  };
+  std::unique_ptr<ExprBuilderWithArena> builder_with_arena_;
 };
 
 class RoleBasedAccessControlMatcherEngineImpl : public RoleBasedAccessControlEngine, NonCopyable {

@@ -229,12 +229,12 @@ void ZooKeeperFilter::setDynamicMetadata(
     const std::vector<std::pair<const std::string, const std::string>>& data) {
   envoy::config::core::v3::Metadata& dynamic_metadata =
       read_callbacks_->connection().streamInfo().dynamicMetadata();
-  ProtobufWkt::Struct metadata(
+  Protobuf::Struct metadata(
       (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().ZooKeeperProxy]);
   auto& fields = *metadata.mutable_fields();
 
   for (const auto& pair : data) {
-    auto val = ProtobufWkt::Value();
+    auto val = Protobuf::Value();
     val.set_string_value(pair.second);
     fields.insert({pair.first, val});
   }

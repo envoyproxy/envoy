@@ -188,7 +188,7 @@ HostSelectionResponse SubsetLoadBalancer::chooseHost(LoadBalancerContext* contex
           Cluster_LbSubsetConfig_LbSubsetMetadataFallbackPolicy_FALLBACK_LIST) {
     return chooseHostIteration(context);
   }
-  const ProtobufWkt::Value* metadata_fallbacks = getMetadataFallbackList(context);
+  const Protobuf::Value* metadata_fallbacks = getMetadataFallbackList(context);
   if (metadata_fallbacks == nullptr) {
     return chooseHostIteration(context);
   }
@@ -231,7 +231,7 @@ SubsetLoadBalancer::removeMetadataFallbackList(LoadBalancerContext* context) {
   return {context, to_preserve};
 }
 
-const ProtobufWkt::Value*
+const Protobuf::Value*
 SubsetLoadBalancer::getMetadataFallbackList(LoadBalancerContext* context) const {
   if (context == nullptr) {
     return nullptr;
@@ -557,7 +557,7 @@ SubsetLoadBalancer::extractSubsetMetadata(const std::set<std::string>& subset_ke
       break;
     }
 
-    if (list_as_any_ && it->second.kind_case() == ProtobufWkt::Value::kListValue) {
+    if (list_as_any_ && it->second.kind_case() == Protobuf::Value::kListValue) {
       // If the list of kvs is empty, we initialize one kvs for each value in the list.
       // Otherwise, we branch the list of kvs by generating one new kvs per old kvs per
       // new value.
@@ -611,7 +611,7 @@ std::string SubsetLoadBalancer::describeMetadata(const SubsetLoadBalancer::Subse
       first = false;
     }
 
-    const ProtobufWkt::Value& value = it.second;
+    const Protobuf::Value& value = it.second;
     buf << it.first << "=" << MessageUtil::getJsonStringFromMessageOrError(value);
   }
   return buf.str();
@@ -625,7 +625,7 @@ SubsetLoadBalancer::findOrCreateLbSubsetEntry(LbSubsetMap& subsets, const Subset
   ASSERT(idx < kvs.size());
 
   const std::string& name = kvs[idx].first;
-  const ProtobufWkt::Value& pb_value = kvs[idx].second;
+  const Protobuf::Value& pb_value = kvs[idx].second;
   const HashedValue value(pb_value);
 
   LbSubsetEntryPtr entry;
@@ -908,7 +908,7 @@ SubsetLoadBalancer::LoadBalancerContextWrapper::LoadBalancerContextWrapper(
 }
 
 SubsetLoadBalancer::LoadBalancerContextWrapper::LoadBalancerContextWrapper(
-    LoadBalancerContext* wrapped, const ProtobufWkt::Struct& metadata_match_criteria_override)
+    LoadBalancerContext* wrapped, const Protobuf::Struct& metadata_match_criteria_override)
     : wrapped_(wrapped) {
   ASSERT(wrapped->metadataMatchCriteria());
   metadata_match_ =

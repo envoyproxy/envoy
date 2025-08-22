@@ -16,7 +16,7 @@ using testing::Return;
 using testing::ReturnRef;
 
 MATCHER_P(MapEq, rhs, "") {
-  const Envoy::ProtobufWkt::Struct& obj = arg;
+  const Envoy::Protobuf::Struct& obj = arg;
   EXPECT_TRUE(rhs.size() > 0);
   for (auto const& entry : rhs) {
     EXPECT_EQ(obj.fields().at(entry.first).string_value(), entry.second);
@@ -1075,7 +1075,7 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
                        const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
               EXPECT_EQ(service_full_name, "service");
               EXPECT_EQ(method_name, "method");
-              ProtobufWkt::Value value;
+              Protobuf::Value value;
               EXPECT_TRUE(
                   value.ParseFromArray(message->linearize(message->length()), message->length()));
               EXPECT_EQ(value.string_value(), "request");
@@ -1102,7 +1102,7 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter().decodeHeaders(request_headers, false));
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("response");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1198,7 +1198,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallFailure) {
                        const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
               EXPECT_EQ(service_full_name, "service");
               EXPECT_EQ(method_name, "method");
-              ProtobufWkt::Value value;
+              Protobuf::Value value;
               EXPECT_TRUE(
                   value.ParseFromArray(message->linearize(message->length()), message->length()));
               EXPECT_EQ(value.string_value(), "request");
@@ -1240,7 +1240,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallFailure) {
     EXPECT_EQ(filter().grpcCancel(0xFF02), proxy_wasm::WasmResult::NotFound);
     EXPECT_EQ(filter().grpcClose(0xFF02), proxy_wasm::WasmResult::NotFound);
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("response");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1289,7 +1289,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallCancel) {
                        const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
               EXPECT_EQ(service_full_name, "service");
               EXPECT_EQ(method_name, "method");
-              ProtobufWkt::Value value;
+              Protobuf::Value value;
               EXPECT_TRUE(
                   value.ParseFromArray(message->linearize(message->length()), message->length()));
               EXPECT_EQ(value.string_value(), "request");
@@ -1349,7 +1349,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallClose) {
                        const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
               EXPECT_EQ(service_full_name, "service");
               EXPECT_EQ(method_name, "method");
-              ProtobufWkt::Value value;
+              Protobuf::Value value;
               EXPECT_TRUE(
                   value.ParseFromArray(message->linearize(message->length()), message->length()));
               EXPECT_EQ(value.string_value(), "request");
@@ -1409,7 +1409,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallAfterDestroyed) {
                        const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
               EXPECT_EQ(service_full_name, "service");
               EXPECT_EQ(method_name, "method");
-              ProtobufWkt::Value value;
+              Protobuf::Value value;
               EXPECT_TRUE(
                   value.ParseFromArray(message->linearize(message->length()), message->length()));
               EXPECT_EQ(value.string_value(), "request");
@@ -1448,7 +1448,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallAfterDestroyed) {
       wasm_.reset();
     }
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("response");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1538,7 +1538,7 @@ TEST_P(WasmHttpFilterTest, GrpcStream) {
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter().decodeHeaders(request_headers, false));
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("response");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1599,7 +1599,7 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCloseLocal) {
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter().decodeHeaders(request_headers, false));
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("close");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1659,7 +1659,7 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCloseRemote) {
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter().decodeHeaders(request_headers, false));
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("response");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1709,7 +1709,7 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCancel) {
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter().decodeHeaders(request_headers, false));
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("response");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1766,7 +1766,7 @@ TEST_P(WasmHttpFilterTest, GrpcStreamOpenAtShutdown) {
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter().decodeHeaders(request_headers, false));
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("response");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1800,7 +1800,7 @@ TEST_P(WasmHttpFilterTest, Metadata) {
   setupTest("", "metadata");
   setupFilter();
   envoy::config::core::v3::Node node_data;
-  ProtobufWkt::Value node_val;
+  Protobuf::Value node_val;
   node_val.set_string_value("wasm_node_get_value");
   (*node_data.mutable_metadata()->mutable_fields())["wasm_node_get_key"] = node_val;
   (*node_data.mutable_metadata()->mutable_fields())["wasm_node_list_key"] =
@@ -1821,7 +1821,7 @@ TEST_P(WasmHttpFilterTest, Metadata) {
   }
 
   request_stream_info_.metadata_.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
+      Protobuf::MapPair<std::string, Protobuf::Struct>(
           "envoy.filters.http.wasm",
           MessageUtil::keyValueStruct("wasm_request_get_key", "wasm_request_get_value")));
 
@@ -1857,14 +1857,14 @@ TEST_P(WasmHttpFilterTest, Property) {
     return;
   }
   envoy::config::core::v3::Node node_data;
-  ProtobufWkt::Value node_val;
+  Protobuf::Value node_val;
   node_val.set_string_value("sample_data");
   (*node_data.mutable_metadata()->mutable_fields())["istio.io/metadata"] = node_val;
   EXPECT_CALL(local_info_, node()).WillRepeatedly(ReturnRef(node_data));
   setupTest("", "property");
   setupFilter();
   request_stream_info_.metadata_.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
+      Protobuf::MapPair<std::string, Protobuf::Struct>(
           "envoy.filters.http.wasm",
           MessageUtil::keyValueStruct("wasm_request_get_key", "wasm_request_get_value")));
   EXPECT_CALL(request_stream_info_, responseCode()).WillRepeatedly(Return(403));

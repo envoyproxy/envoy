@@ -510,9 +510,6 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       handleCodecError(status.message());
       return Network::FilterStatus::StopIteration;
     } else if (isEnvoyOverloadError(status)) {
-      // The other codecs aren't wired to send this status.
-      ASSERT(codec_->protocol() < Protocol::Http2,
-             "Expected only HTTP1.1 and below to send overload error.");
       stats_.named_.downstream_rq_overload_close_.inc();
       handleCodecOverloadError(status.message());
       return Network::FilterStatus::StopIteration;
@@ -684,6 +681,23 @@ bool ConnectionManagerImpl::isPrematureRstStream(const ActiveStream& stream) con
 // Sends a GOAWAY if too many streams have been reset prematurely on this
 // connection.
 void ConnectionManagerImpl::maybeDrainDueToPrematureResets() {
+  // If the connection has been drained due to premature resets, do not check this again.
+  // Without this flag, recursion may occur, as shown in the following stack trace:
+  //
+  //   maybeDrainDueToPrematureResets()
+  //   doConnectionClose()
+  //   resetAllStreams()
+  //   onResetStream()
+  //   doDeferredStreamDestroy()
+  //   maybeDrainDueToPrematureResets()
+  //   ...
+  //
+  // The recursion will continue until all streams are destroyed. If there are many streams
+  // that may result in a stack overflow. This flag is used to avoid above recursion.
+  if (drained_due_to_premature_resets_) {
+    return;
+  }
+
   if (closed_non_internally_destroyed_requests_ == 0) {
     return;
   }
@@ -706,6 +720,10 @@ void ConnectionManagerImpl::maybeDrainDueToPrematureResets() {
 
   if (read_callbacks_->connection().state() == Network::Connection::State::Open) {
     stats_.named_.downstream_rq_too_many_premature_resets_.inc();
+
+    // Mark the the connection has been drained due to too many premature resets.
+    drained_due_to_premature_resets_ = true;
+
     doConnectionClose(Network::ConnectionCloseType::Abort, absl::nullopt,
                       "too_many_premature_resets");
   }
@@ -829,7 +847,9 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
       header_validator_(
-          connection_manager.config_->makeHeaderValidator(connection_manager.codec_->protocol())) {
+          connection_manager.config_->makeHeaderValidator(connection_manager.codec_->protocol())),
+      trace_refresh_after_route_refresh_(Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.trace_refresh_after_route_refresh")) {
   ASSERT(!connection_manager.config_->isRoutable() ||
              ((connection_manager.config_->routeConfigProvider() == nullptr &&
                connection_manager.config_->scopedRouteConfigProvider() != nullptr &&
@@ -1003,6 +1023,13 @@ void ConnectionManagerImpl::ActiveStream::onStreamMaxDurationReached() {
 }
 
 void ConnectionManagerImpl::ActiveStream::chargeStats(const ResponseHeaderMap& headers) {
+  if (trace_refresh_after_route_refresh_ && connection_manager_tracing_config_.has_value()) {
+    const Tracing::Decision tracing_decision =
+        Tracing::TracerUtility::shouldTraceRequest(filter_manager_.streamInfo());
+    ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
+                                              connection_manager_.config_->tracingStats());
+  }
+
   uint64_t response_code = Utility::getResponseStatus(headers);
   filter_manager_.streamInfo().setResponseCode(response_code);
 
@@ -1060,6 +1087,78 @@ bool streamErrorOnlyErrors(absl::string_view error_details) {
          error_details == UhvResponseCodeDetail::get().Percent00InPath;
 }
 } // namespace
+
+void ConnectionManagerImpl::ActiveStream::setRequestDecorator(RequestHeaderMap& headers) {
+  ASSERT(active_span_ != nullptr);
+
+  const Router::Decorator* decorater =
+      hasCachedRoute() ? cached_route_.value()->decorator() : nullptr;
+
+  // If a decorator has been defined, apply it to the active span.
+  absl::string_view decorated_operation;
+  if (decorater != nullptr) {
+    decorated_operation = decorater->getOperation();
+
+    decorater->apply(*active_span_);
+    state_.decorated_propagate_ = decorater->propagate();
+  }
+
+  if (connection_manager_tracing_config_->operation_name_ == Tracing::OperationName::Egress) {
+    // For egress (outbound) requests, pass the decorator's operation name (if defined and
+    // propagation enabled) as a request header to enable the receiving service to use it in its
+    // server span.
+    if (!decorated_operation.empty() && state_.decorated_propagate_) {
+      headers.setEnvoyDecoratorOperation(decorated_operation);
+    }
+  } else {
+    absl::string_view req_operation_override = headers.getEnvoyDecoratorOperationValue();
+
+    // For ingress (inbound) requests, if a decorator operation name has been provided, it
+    // should be used to override the active span's operation.
+    if (!req_operation_override.empty()) {
+      active_span_->setOperation(req_operation_override);
+
+      // Set the decorator operation as overridden to avoid propagating the route decorator
+      // operation to the client when the setResponseDecorator() is called.
+      state_.decorator_overriden_ = true;
+    }
+    // Remove header so not propagated to service
+    headers.removeEnvoyDecoratorOperation();
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::setResponseDecorator(ResponseHeaderMap& headers) {
+  ASSERT(active_span_ != nullptr);
+
+  if (connection_manager_tracing_config_->operation_name_ == Tracing::OperationName::Ingress) {
+    // For ingress (inbound) responses, if the request headers do not include a
+    // decorator operation (override), and the decorated operation should be
+    // propagated, then pass the decorator's operation name (if defined)
+    // as a response header to enable the client service to use it in its client span.
+    if (state_.decorated_propagate_ && !state_.decorator_overriden_) {
+      const Router::Decorator* decorater =
+          hasCachedRoute() ? cached_route_.value()->decorator() : nullptr;
+      absl::string_view decorated_operation =
+          decorater != nullptr ? decorater->getOperation() : absl::string_view();
+
+      if (!decorated_operation.empty()) {
+        // If the decorator operation is defined, set it as the response header.
+        headers.setEnvoyDecoratorOperation(decorated_operation);
+      }
+    }
+  } else if (connection_manager_tracing_config_->operation_name_ ==
+             Tracing::OperationName::Egress) {
+    const absl::string_view resp_operation_override = headers.getEnvoyDecoratorOperationValue();
+
+    // For Egress (outbound) response, if a decorator operation name has been provided, it
+    // should be used to override the active span's operation.
+    if (!resp_operation_override.empty()) {
+      active_span_->setOperation(resp_operation_override);
+    }
+    // Remove header so not propagated to service.
+    headers.removeEnvoyDecoratorOperation();
+  }
+}
 
 bool ConnectionManagerImpl::ActiveStream::validateHeaders() {
   if (header_validator_) {
@@ -1438,8 +1537,11 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapSharedPt
 void ConnectionManagerImpl::ActiveStream::traceRequest() {
   const Tracing::Decision tracing_decision =
       Tracing::TracerUtility::shouldTraceRequest(filter_manager_.streamInfo());
-  ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
-                                            connection_manager_.config_->tracingStats());
+
+  if (!trace_refresh_after_route_refresh_) {
+    ConnectionManagerImpl::chargeTracingStats(tracing_decision.reason,
+                                              connection_manager_.config_->tracingStats());
+  }
 
   Tracing::HttpTraceContext trace_context(*request_headers_);
   active_span_ = connection_manager_.tracer().startSpan(
@@ -1449,47 +1551,7 @@ void ConnectionManagerImpl::ActiveStream::traceRequest() {
     return;
   }
 
-  // TODO: Need to investigate the following code based on the cached route, as may
-  // be broken in the case a filter changes the route.
-
-  // If a decorator has been defined, apply it to the active span.
-  if (hasCachedRoute() && cached_route_.value()->decorator()) {
-    const Router::Decorator* decorator = cached_route_.value()->decorator();
-
-    decorator->apply(*active_span_);
-
-    state_.decorated_propagate_ = decorator->propagate();
-
-    // Cache decorated operation.
-    if (!decorator->getOperation().empty()) {
-      decorated_operation_ = &decorator->getOperation();
-    }
-  }
-
-  if (connection_manager_tracing_config_->operation_name_ == Tracing::OperationName::Egress) {
-    // For egress (outbound) requests, pass the decorator's operation name (if defined and
-    // propagation enabled) as a request header to enable the receiving service to use it in its
-    // server span.
-    if (decorated_operation_ && state_.decorated_propagate_) {
-      request_headers_->setEnvoyDecoratorOperation(*decorated_operation_);
-    }
-  } else {
-    const HeaderEntry* req_operation_override = request_headers_->EnvoyDecoratorOperation();
-
-    // For ingress (inbound) requests, if a decorator operation name has been provided, it
-    // should be used to override the active span's operation.
-    if (req_operation_override) {
-      if (!req_operation_override->value().empty()) {
-        active_span_->setOperation(req_operation_override->value().getStringView());
-
-        // Clear the decorated operation so won't be used in the response header, as
-        // it has been overridden by the inbound decorator operation request header.
-        decorated_operation_ = nullptr;
-      }
-      // Remove header so not propagated to service
-      request_headers_->removeEnvoyDecoratorOperation();
-    }
-  }
+  setRequestDecorator(*request_headers_);
 }
 
 void ConnectionManagerImpl::ActiveStream::decodeData(Buffer::Instance& data, bool end_stream) {
@@ -1647,7 +1709,7 @@ void ConnectionManagerImpl::ActiveStream::refreshDurationTimeout() {
 
   // See how long this stream has been alive, and adjust the timeout
   // accordingly.
-  std::chrono::duration time_used = std::chrono::duration_cast<std::chrono::milliseconds>(
+  std::chrono::milliseconds time_used = std::chrono::duration_cast<std::chrono::milliseconds>(
       connection_manager_.timeSource().monotonicTime() -
       filter_manager_.streamInfo().startTimeMonotonic());
   if (timeout > time_used) {
@@ -1688,27 +1750,32 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute(const Router::Route
   setVirtualHostRoute(std::move(route_result));
 }
 
-void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
-  if (!connection_manager_tracing_config_.has_value()) {
+void ConnectionManagerImpl::ActiveStream::refreshTracing() {
+  if (!trace_refresh_after_route_refresh_) {
     return;
   }
-  const Tracing::CustomTagMap& conn_manager_tags = connection_manager_tracing_config_->custom_tags_;
-  const Tracing::CustomTagMap* route_tags = nullptr;
-  if (hasCachedRoute() && cached_route_.value()->tracingConfig()) {
-    route_tags = &cached_route_.value()->tracingConfig()->getCustomTags();
-  }
-  const bool configured_in_conn = !conn_manager_tags.empty();
-  const bool configured_in_route = route_tags && !route_tags->empty();
-  if (!configured_in_conn && !configured_in_route) {
+
+  if (!connection_manager_tracing_config_.has_value() || active_span_ == nullptr ||
+      request_headers_ == nullptr) {
     return;
   }
-  Tracing::CustomTagMap& custom_tag_map = getOrMakeTracingCustomTagMap();
-  if (configured_in_route) {
-    custom_tag_map.insert(route_tags->begin(), route_tags->end());
+
+  ASSERT(cached_route_.has_value());
+
+  // NOTE: if the trace reason have been encoded into the request id then the trace reason may
+  // not be updated. That means we may cannot to force a traced request to be untraced by the
+  // refreshing.
+  const auto trace_reason = ConnectionManagerUtility::mutateTracingRequestHeader(
+      *request_headers_, connection_manager_.runtime_, *connection_manager_.config_,
+      cached_route_.value().get());
+  filter_manager_.streamInfo().setTraceReason(trace_reason);
+  const Tracing::Decision tracing_decision =
+      Tracing::TracerUtility::shouldTraceRequest(filter_manager_.streamInfo());
+  if (active_span_->useLocalDecision()) {
+    active_span_->setSampled(tracing_decision.traced);
   }
-  if (configured_in_conn) {
-    custom_tag_map.insert(conn_manager_tags.begin(), conn_manager_tags.end());
-  }
+
+  setRequestDecorator(*request_headers_);
 }
 
 // TODO(chaoqin-li1123): Make on demand vhds and on demand srds works at the same time.
@@ -1860,29 +1927,8 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ResponseHeaderMap& heade
     }
   }
 
-  if (connection_manager_tracing_config_.has_value()) {
-    if (connection_manager_tracing_config_->operation_name_ == Tracing::OperationName::Ingress) {
-      // For ingress (inbound) responses, if the request headers do not include a
-      // decorator operation (override), and the decorated operation should be
-      // propagated, then pass the decorator's operation name (if defined)
-      // as a response header to enable the client service to use it in its client span.
-      if (decorated_operation_ && state_.decorated_propagate_) {
-        headers.setEnvoyDecoratorOperation(*decorated_operation_);
-      }
-    } else if (connection_manager_tracing_config_->operation_name_ ==
-               Tracing::OperationName::Egress) {
-      const HeaderEntry* resp_operation_override = headers.EnvoyDecoratorOperation();
-
-      // For Egress (outbound) response, if a decorator operation name has been provided, it
-      // should be used to override the active span's operation.
-      if (resp_operation_override) {
-        if (!resp_operation_override->value().empty() && active_span_) {
-          active_span_->setOperation(resp_operation_override->value().getStringView());
-        }
-        // Remove header so not propagated to service.
-        headers.removeEnvoyDecoratorOperation();
-      }
-    }
+  if (connection_manager_tracing_config_.has_value() && active_span_ != nullptr) {
+    setResponseDecorator(headers);
   }
 
   chargeStats(headers);
@@ -2039,8 +2085,29 @@ Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() cons
   return connection_manager_tracing_config_->operation_name_;
 }
 
-const Tracing::CustomTagMap* ConnectionManagerImpl::ActiveStream::customTags() const {
-  return tracing_custom_tags_.get();
+void ConnectionManagerImpl::ActiveStream::modifySpan(Tracing::Span& span) const {
+  ASSERT(connection_manager_tracing_config_.has_value());
+
+  const Tracing::HttpTraceContext trace_context(*request_headers_);
+  const Tracing::CustomTagContext ctx{trace_context, filter_manager_.streamInfo()};
+
+  // Cache the optional custom tags from the route first.
+  OptRef<const Tracing::CustomTagMap> route_custom_tags;
+
+  if (hasCachedRoute() && cached_route_.value()->tracingConfig() != nullptr) {
+    route_custom_tags.emplace(cached_route_.value()->tracingConfig()->getCustomTags());
+    for (const auto& tag : *route_custom_tags) {
+      tag.second->applySpan(span, ctx);
+    }
+  }
+
+  for (const auto& tag : connection_manager_tracing_config_->custom_tags_) {
+    if (!route_custom_tags.has_value() || !route_custom_tags->contains(tag.first)) {
+      // If the tag is defined in both the connection manager and the route,
+      // use the route's tag.
+      tag.second->applySpan(span, ctx);
+    }
+  }
 }
 
 bool ConnectionManagerImpl::ActiveStream::verbose() const {
@@ -2147,7 +2214,7 @@ void ConnectionManagerImpl::ActiveStream::setVirtualHostRoute(
   filter_manager_.streamInfo().vhost_ = std::move(vhost_route.vhost);
   filter_manager_.streamInfo().setUpstreamClusterInfo(cached_cluster_info_.value());
 
-  refreshCachedTracingCustomTags();
+  refreshTracing();
   refreshDurationTimeout();
   refreshIdleTimeout();
 }
@@ -2190,11 +2257,7 @@ void ConnectionManagerImpl::ActiveStream::clearRouteCache() {
   }
 
   setCachedRoute({});
-
   cached_cluster_info_ = absl::optional<Upstream::ClusterInfoConstSharedPtr>();
-  if (tracing_custom_tags_) {
-    tracing_custom_tags_->clear();
-  }
 }
 
 void ConnectionManagerImpl::ActiveStream::refreshRouteCluster() {

@@ -28,6 +28,10 @@ public:
       absl::string_view resource_name, OptRef<const envoy::config::core::v3::ConfigSource> config,
       absl::string_view type_url, Stats::Scope& scope, SubscriptionCallbacks& callbacks,
       OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) override;
+  ScopedResume pause(const std::string& type_url) override {
+    return pause(std::vector<std::string>{type_url});
+  }
+  ScopedResume pause(const std::vector<std::string>& type_urls) override;
   void shutdown() override { ads_mux_.reset(); }
   absl::Status
   setAdsConfigSource(const envoy::config::core::v3::ApiConfigSource& config_source) override;

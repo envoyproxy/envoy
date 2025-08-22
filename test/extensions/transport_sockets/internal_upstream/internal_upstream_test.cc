@@ -83,8 +83,8 @@ TEST_F(InternalSocketTest, PassthroughStateInjected) {
   filter_state_objects_.push_back(
       {filter_state_object, StreamInfo::FilterState::StateType::ReadOnly,
        StreamInfo::StreamSharingMayImpactPooling::SharedWithUpstreamConnection, "test.object"});
-  ProtobufWkt::Struct& map = (*metadata_->mutable_filter_metadata())["envoy.test"];
-  ProtobufWkt::Value val;
+  Protobuf::Struct& map = (*metadata_->mutable_filter_metadata())["envoy.test"];
+  Protobuf::Value val;
   val.set_string_value("val");
   (*map.mutable_fields())["key"] = val;
 

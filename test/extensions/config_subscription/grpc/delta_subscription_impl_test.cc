@@ -82,7 +82,7 @@ TEST_P(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     resource->set_version("version1A");
     const std::string nonce = std::to_string(HashUtil::xxHash64("version1A"));
     message->set_nonce(nonce);
-    message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+    message->set_type_url(Config::TestTypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
     onDiscoveryResponse(std::move(message));
   }
@@ -95,7 +95,7 @@ TEST_P(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     resource->set_version("version2A");
     const std::string nonce = std::to_string(HashUtil::xxHash64("version2A"));
     message->set_nonce(nonce);
-    message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+    message->set_type_url(Config::TestTypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
     onDiscoveryResponse(std::move(message));
   }
@@ -108,7 +108,7 @@ TEST_P(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     resource->set_version("version1B");
     const std::string nonce = std::to_string(HashUtil::xxHash64("version1B"));
     message->set_nonce(nonce);
-    message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+    message->set_type_url(Config::TestTypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
     onDiscoveryResponse(std::move(message));
   }
@@ -175,8 +175,9 @@ TEST_P(DeltaSubscriptionNoGrpcStreamTest, NoGrpcStream) {
   }
 
   GrpcSubscriptionImplPtr subscription = std::make_unique<GrpcSubscriptionImpl>(
-      xds_context, callbacks, resource_decoder, stats, Config::TypeUrl::get().ClusterLoadAssignment,
-      dispatcher, std::chrono::milliseconds(12345), false, SubscriptionOptions());
+      xds_context, callbacks, resource_decoder, stats,
+      Config::TestTypeUrl::get().ClusterLoadAssignment, dispatcher,
+      std::chrono::milliseconds(12345), false, SubscriptionOptions());
 
   EXPECT_CALL(*async_client, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
 

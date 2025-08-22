@@ -172,7 +172,7 @@ public:
     };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
   std::string name() const override { return "test.tcp_listener.set_dns_filter_state"; }
 };
@@ -200,7 +200,7 @@ public:
   std::string name() const override { return "envoy.string_matcher.test_custom_san_matcher"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
 };
 

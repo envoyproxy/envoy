@@ -154,6 +154,21 @@ http_filters:
                             "chain.");
 }
 
+TEST_F(HttpConnectionManagerConfigTest, NonXdsTpRouteWithoutConfigSource) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: router
+rds:
+  route_config_name: route1
+http_filters:
+- name: foo
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "An RDS config must have either a 'config_source' or an xDS-TP based 'route_config_name'");
+}
+
 TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
@@ -725,28 +740,6 @@ TEST_F(HttpConnectionManagerConfigTest, DefaultInternalAddress) {
   // Envoy no longer considers RFC1918 IP addresses to be internal if runtime guard is enabled.
   Network::Address::Ipv4Instance default_ip_address{"10.48.179.130", 0, nullptr};
   EXPECT_FALSE(config.internalAddressConfig().isInternalAddress(default_ip_address));
-}
-
-TEST_F(HttpConnectionManagerConfigTest, LegacyDefaultInternalAddress) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.explicit_internal_address_config", "false"}});
-  const std::string yaml_string = R"EOF(
-  stat_prefix: ingress_http
-  route_config:
-    name: local_route
-  http_filters:
-  - name: envoy.filters.http.router
-  )EOF";
-
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
-                                     date_provider_, route_config_provider_manager_,
-                                     &scoped_routes_config_provider_manager_, tracer_manager_,
-                                     filter_config_provider_manager_, creation_status_);
-  ASSERT_TRUE(creation_status_.ok());
-  // Previously, Envoy considered RFC1918 IP addresses to be internal, by default.
-  Network::Address::Ipv4Instance default_ip_address{"10.48.179.130", 0, nullptr};
-  EXPECT_TRUE(config.internalAddressConfig().isInternalAddress(default_ip_address));
 }
 
 TEST_F(HttpConnectionManagerConfigTest, CidrRangeBasedInternalAddress) {
@@ -2615,7 +2608,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::UInt32Value>();
+    return std::make_unique<Protobuf::UInt32Value>();
   }
 
   std::string name() const override {
@@ -2631,7 +2624,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::UInt32Value>();
+    return std::make_unique<Protobuf::UInt32Value>();
   }
 
   std::string name() const override {
@@ -3241,7 +3234,7 @@ public:
   createFromProto(const Protobuf::Message& message,
                   Server::Configuration::ServerFactoryContext& server_context) override {
     auto mptr = ::Envoy::Config::Utility::translateAnyToFactoryConfig(
-        dynamic_cast<const ProtobufWkt::Any&>(message), server_context.messageValidationVisitor(),
+        dynamic_cast<const Protobuf::Any&>(message), server_context.messageValidationVisitor(),
         *this);
     const auto& proto_config =
         MessageUtil::downcastAndValidate<const ::envoy::extensions::http::header_validators::

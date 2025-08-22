@@ -436,8 +436,8 @@ public:
   MOCK_METHOD(ConnectionSocket&, socket, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(void, continueFilterChain, (bool));
-  MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const ProtobufWkt::Struct&));
-  MOCK_METHOD(void, setDynamicTypedMetadata, (const std::string&, const ProtobufWkt::Any& value));
+  MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const Protobuf::Struct&));
+  MOCK_METHOD(void, setDynamicTypedMetadata, (const std::string&, const Protobuf::Any& value));
   MOCK_METHOD(envoy::config::core::v3::Metadata&, dynamicMetadata, ());
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, dynamicMetadata, (), (const));
   MOCK_METHOD(StreamInfo::FilterState&, filterState, (), ());
@@ -588,6 +588,10 @@ public:
   MOCK_METHOD(const std::string&, addressAsString, (), (const));
   MOCK_METHOD(bool, isAnyAddress, (), (const));
   MOCK_METHOD(bool, isUnicastAddress, (), (const));
+  MOCK_METHOD(bool, isLinkLocalAddress, (), (const));
+  MOCK_METHOD(bool, isUniqueLocalAddress, (), (const));
+  MOCK_METHOD(bool, isSiteLocalAddress, (), (const));
+  MOCK_METHOD(bool, isTeredoAddress, (), (const));
   MOCK_METHOD(const Address::Ipv4*, ipv4, (), (const));
   MOCK_METHOD(const Address::Ipv6*, ipv6, (), (const));
   MOCK_METHOD(uint32_t, port, (), (const));

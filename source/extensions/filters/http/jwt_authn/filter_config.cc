@@ -28,16 +28,14 @@ FilterConfigImpl::FilterConfigImpl(
   // Validate provider URIs.
   // Note that the PGV well-known regex for URI is not implemented in C++, otherwise we could add a
   // PGV rule instead of doing this check manually.
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.jwt_authn_validate_uri")) {
-    for (const auto& provider_pair : proto_config_.providers()) {
-      const auto provider_value = std::get<1>(provider_pair);
-      if (provider_value.has_remote_jwks()) {
-        absl::string_view provider_uri = provider_value.remote_jwks().http_uri().uri();
-        Http::Utility::Url url;
-        if (!url.initialize(provider_uri, /*is_connect=*/false)) {
-          throw EnvoyException(fmt::format("Provider '{}' has an invalid URI: '{}'",
-                                           std::get<0>(provider_pair), provider_uri));
-        }
+  for (const auto& provider_pair : proto_config_.providers()) {
+    const auto provider_value = std::get<1>(provider_pair);
+    if (provider_value.has_remote_jwks()) {
+      absl::string_view provider_uri = provider_value.remote_jwks().http_uri().uri();
+      Http::Utility::Url url;
+      if (!url.initialize(provider_uri, /*is_connect=*/false)) {
+        throw EnvoyException(fmt::format("Provider '{}' has an invalid URI: '{}'",
+                                         std::get<0>(provider_pair), provider_uri));
       }
     }
   }

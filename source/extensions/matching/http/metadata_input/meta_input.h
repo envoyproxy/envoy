@@ -15,8 +15,8 @@ namespace MetadataInput {
 
 class MetadataMatchData : public ::Envoy::Matcher::CustomMatchData {
 public:
-  explicit MetadataMatchData(const ProtobufWkt::Value& value) : value_(value) {}
-  const ProtobufWkt::Value& value_;
+  explicit MetadataMatchData(const Protobuf::Value& value) : value_(value) {}
+  const Protobuf::Value& value_;
 };
 
 template <class MatchingDataType>

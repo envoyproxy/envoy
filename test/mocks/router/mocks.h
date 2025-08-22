@@ -326,7 +326,7 @@ public:
   MOCK_METHOD(bool, includeIsTimeoutRetryHeader, (), (const));
   MOCK_METHOD(Upstream::RetryPrioritySharedPtr, retryPriority, ());
   MOCK_METHOD(Upstream::RetryHostPredicateSharedPtr, retryHostPredicate, ());
-  MOCK_METHOD(uint32_t, retryShadowBufferLimit, (), (const));
+  MOCK_METHOD(uint64_t, requestBodyBufferLimit, (), (const));
   MOCK_METHOD(RouteSpecificFilterConfigs, perFilterConfigs, (absl::string_view), (const));
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
   MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
@@ -368,7 +368,7 @@ public:
   // Router::MetadataMatchCriteria
   MOCK_METHOD(const std::vector<MetadataMatchCriterionConstSharedPtr>&, metadataMatchCriteria, (),
               (const));
-  MOCK_METHOD(MetadataMatchCriteriaConstPtr, mergeMatchCriteria, (const ProtobufWkt::Struct&),
+  MOCK_METHOD(MetadataMatchCriteriaConstPtr, mergeMatchCriteria, (const Protobuf::Struct&),
               (const));
   MOCK_METHOD(MetadataMatchCriteriaConstPtr, filterMatchCriteria, (const std::set<std::string>&),
               (const));
@@ -432,7 +432,7 @@ public:
   MOCK_METHOD(const InternalRedirectPolicy&, internalRedirectPolicy, (), (const));
   MOCK_METHOD(const PathMatcherSharedPtr&, pathMatcher, (), (const));
   MOCK_METHOD(const PathRewriterSharedPtr&, pathRewriter, (), (const));
-  MOCK_METHOD(uint32_t, retryShadowBufferLimit, (), (const));
+  MOCK_METHOD(uint64_t, requestBodyBufferLimit, (), (const));
   MOCK_METHOD(const std::vector<ShadowPolicyPtr>&, shadowPolicies, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, timeout, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
@@ -501,6 +501,11 @@ public:
   MOCK_METHOD(const envoy::type::v3::FractionalPercent&, getRandomSampling, (), (const));
   MOCK_METHOD(const envoy::type::v3::FractionalPercent&, getOverallSampling, (), (const));
   MOCK_METHOD(const Tracing::CustomTagMap&, getCustomTags, (), (const));
+
+  envoy::type::v3::FractionalPercent client_sampling_;
+  envoy::type::v3::FractionalPercent random_sampling_;
+  envoy::type::v3::FractionalPercent overall_sampling_;
+  Tracing::CustomTagMap custom_tags_;
 };
 
 class MockRoute : public RouteEntryAndRoute {
@@ -547,7 +552,7 @@ public:
   MOCK_METHOD(const InternalRedirectPolicy&, internalRedirectPolicy, (), (const));
   MOCK_METHOD(const PathMatcherSharedPtr&, pathMatcher, (), (const));
   MOCK_METHOD(const PathRewriterSharedPtr&, pathRewriter, (), (const));
-  MOCK_METHOD(uint32_t, retryShadowBufferLimit, (), (const));
+  MOCK_METHOD(uint64_t, requestBodyBufferLimit, (), (const));
   MOCK_METHOD(const std::vector<ShadowPolicyPtr>&, shadowPolicies, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, timeout, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, idleTimeout, (), (const));
@@ -754,7 +759,7 @@ public:
                Server::Configuration::ServerFactoryContext& context));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
 
   std::string name() const override { return "envoy.router.cluster_specifier_plugin.mock"; }

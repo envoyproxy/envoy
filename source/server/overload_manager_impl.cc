@@ -147,7 +147,7 @@ absl::StatusOr<Event::ScaledTimerType> parseTimerType(
 }
 
 absl::StatusOr<Event::ScaledTimerTypeMap>
-parseTimerMinimums(const ProtobufWkt::Any& typed_config,
+parseTimerMinimums(const Protobuf::Any& typed_config,
                    ProtobufMessage::ValidationVisitor& validation_visitor) {
   using Config = envoy::config::overload::v3::ScaleTimersOverloadActionConfig;
   const Config action_config =

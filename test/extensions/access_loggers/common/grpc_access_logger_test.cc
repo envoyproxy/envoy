@@ -44,9 +44,9 @@ const Protobuf::MethodDescriptor& mockMethodDescriptor() {
 // need to use a proto type because the ByteSizeLong() is used to determine the log size, so we use
 // standard Struct and Empty protos.
 class MockGrpcAccessLoggerImpl
-    : public Common::GrpcAccessLogger<ProtobufWkt::Struct, ProtobufWkt::Empty, ProtobufWkt::Struct,
-                                      ProtobufWkt::Struct>,
-      public Grpc::AsyncRequestCallbacks<ProtobufWkt::Struct> {
+    : public Common::GrpcAccessLogger<Protobuf::Struct, Protobuf::Empty, Protobuf::Struct,
+                                      Protobuf::Struct>,
+      public Grpc::AsyncRequestCallbacks<Protobuf::Struct> {
 public:
   MockGrpcAccessLoggerImpl(
       const Grpc::RawAsyncClientSharedPtr& client,
@@ -56,18 +56,17 @@ public:
       : GrpcAccessLogger(config, dispatcher, scope, access_log_prefix,
                          createGrpcAccessLoggClient(stream, client, service_method, config)) {}
 
-  std::unique_ptr<Common::GrpcAccessLogClient<ProtobufWkt::Struct, ProtobufWkt::Struct>>
+  std::unique_ptr<Common::GrpcAccessLogClient<Protobuf::Struct, Protobuf::Struct>>
   createGrpcAccessLoggClient(
       bool stream, const Grpc::RawAsyncClientSharedPtr& client,
       const Protobuf::MethodDescriptor& service_method,
       const envoy::extensions::access_loggers::grpc::v3::CommonGrpcAccessLogConfig& config) {
     if (stream) {
       return std::make_unique<
-          Common::StreamingGrpcAccessLogClient<ProtobufWkt::Struct, ProtobufWkt::Struct>>(
+          Common::StreamingGrpcAccessLogClient<Protobuf::Struct, Protobuf::Struct>>(
           client, service_method, GrpcCommon::optionalRetryPolicy(config));
     }
-    return std::make_unique<
-        Common::UnaryGrpcAccessLogClient<ProtobufWkt::Struct, ProtobufWkt::Struct>>(
+    return std::make_unique<Common::UnaryGrpcAccessLogClient<Protobuf::Struct, Protobuf::Struct>>(
         client, service_method, GrpcCommon::optionalRetryPolicy(config),
         [this]() -> MockGrpcAccessLoggerImpl& { return *this; });
   }
@@ -76,7 +75,7 @@ public:
 
   int numClears() const { return num_clears_; }
 
-  void onSuccess(Grpc::ResponsePtr<ProtobufWkt::Struct>&&, Tracing::Span&) override {}
+  void onSuccess(Grpc::ResponsePtr<Protobuf::Struct>&&, Tracing::Span&) override {}
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
 
   void onFailure(Grpc::Status::GrpcStatus, const std::string&, Tracing::Span&) override {}
@@ -84,7 +83,7 @@ public:
 private:
   void mockAddEntry(const std::string& key) {
     if (!message_.fields().contains(key)) {
-      ProtobufWkt::Value default_value;
+      Protobuf::Value default_value;
       default_value.set_number_value(0);
       message_.mutable_fields()->insert({key, default_value});
     }
@@ -97,12 +96,12 @@ private:
   // it's up to each logger implementation. We test whether they were called in the regular flow of
   // logging or not. For example, we count how many entries were added, but don't add the log entry
   // itself to the message.
-  void addEntry(ProtobufWkt::Struct&& entry) override {
+  void addEntry(Protobuf::Struct&& entry) override {
     (void)entry;
     mockAddEntry(MOCK_HTTP_LOG_FIELD_NAME);
   }
 
-  void addEntry(ProtobufWkt::Empty&& entry) override {
+  void addEntry(Protobuf::Empty&& entry) override {
     (void)entry;
     mockAddEntry(MOCK_TCP_LOG_FIELD_NAME);
   }
@@ -123,13 +122,13 @@ private:
 class StreamingGrpcAccessLogTest : public testing::Test {
 public:
   using MockAccessLogStream = Grpc::MockAsyncStream;
-  using AccessLogCallbacks = Grpc::AsyncStreamCallbacks<ProtobufWkt::Struct>;
+  using AccessLogCallbacks = Grpc::AsyncStreamCallbacks<Protobuf::Struct>;
 
   // We log a non empty entry (even though not used) so that we can trigger buffering mechanisms,
   // which are based on the entry size.
-  ProtobufWkt::Struct mockHttpEntry() {
-    ProtobufWkt::Struct entry;
-    entry.mutable_fields()->insert({"test-key", ProtobufWkt::Value()});
+  Protobuf::Struct mockHttpEntry() {
+    Protobuf::Struct entry;
+    entry.mutable_fields()->insert({"test-key", Protobuf::Value()});
     return entry;
   }
 
@@ -160,7 +159,7 @@ public:
     EXPECT_CALL(stream, isAboveWriteBufferHighWatermark()).WillOnce(Return(false));
     EXPECT_CALL(stream, sendMessageRaw_(_, false))
         .WillOnce(Invoke([key, count](Buffer::InstancePtr& request, bool) {
-          ProtobufWkt::Struct message;
+          Protobuf::Struct message;
           Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
           EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
           EXPECT_TRUE(message.fields().contains(key));
@@ -195,14 +194,14 @@ TEST_F(StreamingGrpcAccessLogTest, BasicFlow) {
 
   // Log a TCP entry.
   expectFlushedLogEntriesCount(stream, MOCK_TCP_LOG_FIELD_NAME, 1);
-  logger_->log(ProtobufWkt::Empty());
+  logger_->log(Protobuf::Empty());
   EXPECT_EQ(2, logger_->numClears());
   // TCP logging doesn't change the logs_written counter.
   EXPECT_EQ(1,
             TestUtility::findCounter(stats_store_, "mock_access_log_prefix.logs_written")->value());
 
   // Verify that sending an empty response message doesn't do anything bad.
-  callbacks->onReceiveMessage(std::make_unique<ProtobufWkt::Struct>());
+  callbacks->onReceiveMessage(std::make_unique<Protobuf::Struct>());
 
   // Close the stream and make sure we make a new one.
   callbacks->onRemoteClose(Grpc::Status::Internal, "bad");
@@ -323,9 +322,9 @@ TEST_F(StreamingGrpcAccessLogTest, Batching) {
 
   // Logging an entry that's bigger than the buffer size should trigger another flush.
   expectFlushedLogEntriesCount(stream, MOCK_HTTP_LOG_FIELD_NAME, 1);
-  ProtobufWkt::Struct big_entry = mockHttpEntry();
+  Protobuf::Struct big_entry = mockHttpEntry();
   const std::string big_key(max_buffer_size, 'a');
-  big_entry.mutable_fields()->insert({big_key, ProtobufWkt::Value()});
+  big_entry.mutable_fields()->insert({big_key, Protobuf::Value()});
   logger_->log(std::move(big_entry));
   EXPECT_EQ(2, logger_->numClears());
 }
@@ -357,13 +356,13 @@ TEST_F(StreamingGrpcAccessLogTest, Flushing) {
 class UnaryGrpcAccessLogTest : public testing::Test {
 public:
   using MockAccessLogStream = Grpc::MockAsyncStream;
-  using AccessLogCallbacks = Grpc::AsyncRequestCallbacks<ProtobufWkt::Struct>;
+  using AccessLogCallbacks = Grpc::AsyncRequestCallbacks<Protobuf::Struct>;
 
   // We log a non empty entry (even though not used) so that we can trigger buffering mechanisms,
   // which are based on the entry size.
-  ProtobufWkt::Struct mockHttpEntry() {
-    ProtobufWkt::Struct entry;
-    entry.mutable_fields()->insert({"test-key", ProtobufWkt::Value()});
+  Protobuf::Struct mockHttpEntry() {
+    Protobuf::Struct entry;
+    entry.mutable_fields()->insert({"test-key", Protobuf::Value()});
     return entry;
   }
 
@@ -385,7 +384,7 @@ public:
             Invoke([key, count](absl::string_view, absl::string_view, Buffer::InstancePtr&& request,
                                 Grpc::RawAsyncRequestCallbacks&, Tracing::Span&,
                                 const Http::AsyncClient::RequestOptions&) {
-              ProtobufWkt::Struct message;
+              Protobuf::Struct message;
               Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
               EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
               EXPECT_TRUE(message.fields().contains(key));
@@ -416,7 +415,7 @@ TEST_F(UnaryGrpcAccessLogTest, BasicFlow) {
 
   // Log a TCP entry.
   expectFlushedLogEntriesCount(MOCK_TCP_LOG_FIELD_NAME, 1);
-  logger_->log(ProtobufWkt::Empty());
+  logger_->log(Protobuf::Empty());
   // Message should be initialized and cleared every time a request is sent.
   EXPECT_EQ(2, logger_->numInits());
   EXPECT_EQ(2, logger_->numClears());
@@ -463,9 +462,9 @@ TEST_F(UnaryGrpcAccessLogTest, Batching) {
 
   // Logging an entry that's bigger than the buffer size should trigger another flush.
   expectFlushedLogEntriesCount(MOCK_HTTP_LOG_FIELD_NAME, 1);
-  ProtobufWkt::Struct big_entry = mockHttpEntry();
+  Protobuf::Struct big_entry = mockHttpEntry();
   const std::string big_key(max_buffer_size, 'a');
-  big_entry.mutable_fields()->insert({big_key, ProtobufWkt::Value()});
+  big_entry.mutable_fields()->insert({big_key, Protobuf::Value()});
   logger_->log(std::move(big_entry));
   EXPECT_EQ(2, logger_->numClears());
 }

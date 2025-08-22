@@ -33,13 +33,13 @@ public:
   const std::string& libraryID() const { return library_id_; }
   const std::string& libraryPath() const { return library_path_; }
   const std::string& pluginName() const { return plugin_name_; }
-  const ProtobufWkt::Any& pluginConfig() const { return plugin_config_; }
+  const Protobuf::Any& pluginConfig() const { return plugin_config_; }
 
 private:
   const std::string library_id_;
   const std::string library_path_;
   const std::string plugin_name_;
-  const ProtobufWkt::Any plugin_config_;
+  const Protobuf::Any plugin_config_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

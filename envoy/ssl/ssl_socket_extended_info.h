@@ -7,6 +7,7 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/ssl/handshaker.h"
 
 namespace Envoy {
 namespace Ssl {

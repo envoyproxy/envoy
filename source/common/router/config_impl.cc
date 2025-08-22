@@ -449,15 +449,8 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config, absl::Stat
   // If trace sampling is not explicitly configured in shadow_policy, we pass null optional to
   // inherit the parent's sampling decision. This prevents oversampling when runtime sampling is
   // disabled.
-  if (config.has_trace_sampled()) {
-    trace_sampled_ = config.trace_sampled().value();
-  } else {
-    // If the shadow policy does not specify trace_sampled, we will inherit the parent's sampling
-    // decision.
-    const bool user_parent_sampling_decision = Runtime::runtimeFeatureEnabled(
-        "envoy.reloadable_features.shadow_policy_inherit_trace_sampling");
-    trace_sampled_ = user_parent_sampling_decision ? absl::nullopt : absl::make_optional(true);
-  }
+  trace_sampled_ = config.has_trace_sampled() ? absl::optional<bool>(config.trace_sampled().value())
+                                              : absl::nullopt;
 }
 
 DecoratorImpl::DecoratorImpl(const envoy::config::route::v3::Decorator& decorator)
@@ -571,8 +564,10 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
       route_tracing_(parseRouteTracing(route)), route_name_(route.name()),
       time_source_(factory_context.mainThreadDispatcher().timeSource()),
-      retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          route, per_request_buffer_limit_bytes, vhost->retryShadowBufferLimit())),
+      per_request_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          route, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
+      request_body_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route, request_body_buffer_limit,
+                                                                 vhost->requestBodyBufferLimit())),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),
@@ -582,6 +577,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       using_new_timeouts_(route.route().has_max_stream_duration()),
       match_grpc_(route.match().has_grpc()),
       case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)) {
+
   auto config_or_error =
       PerFilterConfigs::create(route.typed_per_filter_config(), factory_context, validator);
   SET_AND_RETURN_IF_NOT_OK(config_or_error.status(), creation_status);
@@ -1116,7 +1112,7 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::config::route::v3::Route& rou
       return ret;
     }
     for (const auto& it : filter_metadata->second.fields()) {
-      if (it.second.kind_case() == ProtobufWkt::Value::kStringValue) {
+      if (it.second.kind_case() == Protobuf::Value::kStringValue) {
         ret.emplace(it.first, it.second.string_value());
       }
     }
@@ -1563,11 +1559,14 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
           THROW_OR_RETURN_VALUE(PerFilterConfigs::create(virtual_host.typed_per_filter_config(),
                                                          factory_context, validator),
                                 std::unique_ptr<PerFilterConfigs>)),
-      retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      per_request_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
+      request_body_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          virtual_host, request_body_buffer_limit, std::numeric_limits<uint64_t>::max())),
       include_attempt_count_in_request_(virtual_host.include_request_attempt_count()),
       include_attempt_count_in_response_(virtual_host.include_attempt_count_in_response()),
       include_is_timeout_retry_header_(virtual_host.include_is_timeout_retry_header()) {
+
   if (!virtual_host.request_headers_to_add().empty() ||
       !virtual_host.request_headers_to_remove().empty()) {
     request_headers_parser_ =

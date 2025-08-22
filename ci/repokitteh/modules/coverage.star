@@ -3,9 +3,13 @@ COVERAGE_LINK_MESSAGE = """
 
 Coverage for this Pull Request will be rendered here:
 
-https://storage.googleapis.com/envoy-pr/%s/coverage/index.html
+https://storage.googleapis.com/envoy-cncf-pr/%s/coverage/index.html
 
-The coverage results are (re-)rendered each time the CI `envoy-presubmit (check linux_x64 coverage)` job completes.
+For comparison, current coverage on `main` branch is here:
+
+https://storage.googleapis.com/envoy-cncf-postsubmit/main/coverage/index.html
+
+The coverage results are (re-)rendered each time the CI `Envoy/Checks (coverage)` job completes.
 
 """
 

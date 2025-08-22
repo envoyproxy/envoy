@@ -40,7 +40,7 @@ public:
   MockOpaqueResourceDecoder();
   ~MockOpaqueResourceDecoder() override;
 
-  MOCK_METHOD(ProtobufTypes::MessagePtr, decodeResource, (const ProtobufWkt::Any& resource));
+  MOCK_METHOD(ProtobufTypes::MessagePtr, decodeResource, (const Protobuf::Any& resource));
   MOCK_METHOD(std::string, resourceName, (const Protobuf::Message& resource));
 };
 
@@ -50,7 +50,7 @@ public:
   ~MockUntypedConfigUpdateCallbacks() override;
 
   MOCK_METHOD(void, onConfigUpdate,
-              (const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+              (const Protobuf::RepeatedPtrField<Protobuf::Any>& resources,
                const std::string& version_info));
 
   MOCK_METHOD(void, onConfigUpdate,
@@ -137,8 +137,8 @@ public:
   MOCK_METHOD(EdsResourcesCacheOptRef, edsResourcesCache, ());
 
   MOCK_METHOD(absl::Status, updateMuxSource,
-              (Grpc::RawAsyncClientPtr && primary_async_client,
-               Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope& scope,
+              (Grpc::RawAsyncClientSharedPtr && primary_async_client,
+               Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
                BackOffStrategyPtr&& backoff_strategy,
                const envoy::config::core::v3::ApiConfigSource& ads_config_source));
 };

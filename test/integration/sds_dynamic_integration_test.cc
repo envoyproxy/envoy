@@ -189,7 +189,7 @@ protected:
   void sendSdsResponse(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) {
     envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info("1");
-    discovery_response.set_type_url(Config::TypeUrl::get().Secret);
+    discovery_response.set_type_url(Config::TestTypeUrl::get().Secret);
     discovery_response.add_resources()->PackFrom(secret);
 
     xds_stream_->sendGrpcMessage(discovery_response);
@@ -1063,16 +1063,16 @@ public:
   std::unique_ptr<FakeUpstream>& sdsUpstream() override { return fake_upstreams_[1]; }
 
   void sendCdsResponse() {
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
     sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-        Config::TypeUrl::get().Cluster, {dynamic_cluster_}, {dynamic_cluster_}, {}, "55");
+        Config::TestTypeUrl::get().Cluster, {dynamic_cluster_}, {dynamic_cluster_}, {}, "55");
   }
 
   void sendSdsResponse2(const envoy::extensions::transport_sockets::tls::v3::Secret& secret,
                         FakeStream& sds_stream) {
     envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info("1");
-    discovery_response.set_type_url(Config::TypeUrl::get().Secret);
+    discovery_response.set_type_url(Config::TestTypeUrl::get().Secret);
     discovery_response.add_resources()->PackFrom(secret);
     sds_stream.sendGrpcMessage(discovery_response);
   }
@@ -1114,8 +1114,8 @@ TEST_P(SdsCdsIntegrationTest, BasicSuccess) {
   // The 4 clusters are CDS,SDS,static and dynamic cluster.
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
 
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
-                                                             {}, "42");
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster, {},
+                                                             {}, {}, "42");
   // Successfully removed the dynamic cluster.
   test_server_->waitForGaugeEq("cluster_manager.active_clusters", 3);
 }
@@ -1233,14 +1233,14 @@ public:
   std::unique_ptr<FakeUpstream>& cdsUpstream() { return fake_upstreams_[0]; }
 
   void sendCdsResponse(bool do_not_send_sds_cluster = false) {
-    EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+    EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
     if (!do_not_send_sds_cluster) {
       sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-          Config::TypeUrl::get().Cluster, {sds_cluster_, dynamic_cluster_},
+          Config::TestTypeUrl::get().Cluster, {sds_cluster_, dynamic_cluster_},
           {sds_cluster_, dynamic_cluster_}, {}, "55");
     } else {
       sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-          Config::TypeUrl::get().Cluster, {dynamic_cluster_}, {dynamic_cluster_}, {}, "55");
+          Config::TestTypeUrl::get().Cluster, {dynamic_cluster_}, {dynamic_cluster_}, {}, "55");
     }
   }
 
@@ -1248,7 +1248,7 @@ public:
                         FakeStream& sds_stream) {
     envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info("1");
-    discovery_response.set_type_url(Config::TypeUrl::get().Secret);
+    discovery_response.set_type_url(Config::TestTypeUrl::get().Secret);
     discovery_response.add_resources()->PackFrom(secret);
     sds_stream.sendGrpcMessage(discovery_response);
   }
@@ -1303,8 +1303,8 @@ TEST_P(SdsDynamicClusterIntegrationTest, BasicSuccess) {
   // The 4 clusters are CDS,SDS,static and dynamic cluster.
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
 
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
-                                                             {}, "42");
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster, {},
+                                                             {}, {}, "42");
   // Successfully removed the dynamic cluster.
   test_server_->waitForGaugeEq("cluster_manager.active_clusters", 2);
 }
@@ -1347,8 +1347,8 @@ TEST_P(SdsDynamicClusterIntegrationTest, EdsBootStrapCluster) {
   // The 4 clusters are CDS,SDS,static and dynamic cluster.
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
 
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
-                                                             {}, "42");
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster, {},
+                                                             {}, {}, "42");
   // Successfully removed the dynamic cluster.
   test_server_->waitForGaugeEq("cluster_manager.active_clusters", 3);
 }
@@ -1410,8 +1410,8 @@ TEST_P(SdsDynamicClusterIntegrationTest, ClusterRefersNonExistentSdsCluster) {
   // The 3 clusters are CDS, static and dynamic cluster.
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
 
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
-                                                             {}, "42");
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster, {},
+                                                             {}, {}, "42");
   // Successfully removed the dynamic cluster.
   test_server_->waitForGaugeEq("cluster_manager.active_clusters", 2);
 }
@@ -1442,8 +1442,8 @@ TEST_P(SdsDynamicClusterIntegrationTest, CdsSdsCyclicDependency) {
   // The 3 clusters are CDS, static and dynamic cluster.
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
 
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
-                                                             {}, "42");
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster, {},
+                                                             {}, {}, "42");
   // Successfully removed the dynamic cluster.
   test_server_->waitForGaugeEq("cluster_manager.active_clusters", 2);
 }
@@ -1580,8 +1580,8 @@ TEST_P(SdsCdsPrivateKeyIntegrationTest, BasicSdsCdsPrivateKeyProvider) {
   // The 4 clusters are CDS,SDS,static and dynamic cluster.
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
 
-  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
-                                                             {}, "42");
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster, {},
+                                                             {}, {}, "42");
   // Successfully removed the dynamic cluster.
   test_server_->waitForGaugeEq("cluster_manager.active_clusters", 3);
 }

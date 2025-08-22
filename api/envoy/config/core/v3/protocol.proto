@@ -77,7 +77,7 @@ message QuicProtocolOptions {
       [(validate.rules).uint32 = {lte: 16777216 gte: 1}];
 
   // Similar to ``initial_stream_window_size``, but for connection-level
-  // flow-control. Valid values rage from 1 to 25165824 (24MB, maximum supported by QUICHE) and defaults
+  // flow-control. Valid values range from 1 to 25165824 (24MB, maximum supported by QUICHE) and defaults
   // to 25165824 (24 * 1024 * 1024).
   //
   // .. note::
@@ -111,10 +111,9 @@ message QuicProtocolOptions {
   // default 600s will be applied.
   // For internal corporate network, a long timeout is often fine.
   // But for client facing network, 30s is usually a good choice.
-  google.protobuf.Duration idle_network_timeout = 8 [(validate.rules).duration = {
-    lte {seconds: 600}
-    gte {seconds: 1}
-  }];
+  // Do not add an upper bound here. A long idle timeout is useful for maintaining warm connections at non-front-line proxy for low QPS services."
+  google.protobuf.Duration idle_network_timeout = 8
+      [(validate.rules).duration = {gte {seconds: 1}}];
 
   // Maximum packet length for QUIC connections. It refers to the largest size of a QUIC packet that can be transmitted over the connection.
   // If not specified, one of the `default values in QUICHE <https://github.com/google/quiche/blob/main/quiche/quic/core/quic_constants.h>`_ is used.

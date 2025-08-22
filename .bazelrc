@@ -539,6 +539,7 @@ common:common-envoy-engflow --google_default_credentials=false
 common:common-envoy-engflow --credential_helper=*.engflow.com=%workspace%/bazel/engflow-bazel-credential-helper.sh
 common:common-envoy-engflow --grpc_keepalive_time=60s
 common:common-envoy-engflow --grpc_keepalive_timeout=30s
+common:common-envoy-engflow --remote_cache_compression
 
 common:cache-envoy-engflow --remote_cache=grpcs://mordenite.cluster.engflow.com
 common:cache-envoy-engflow --remote_timeout=3600s

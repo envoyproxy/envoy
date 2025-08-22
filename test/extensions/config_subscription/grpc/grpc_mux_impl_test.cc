@@ -308,7 +308,7 @@ TEST_P(GrpcMuxImplTest, ReconnectionResetsNonceAndAcks) {
       .WillRepeatedly(Return(ttl_mgr_timer));
   setup();
   InSequence s;
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
   auto foo_sub = grpc_mux_->addWatch(type_url, {"x", "y"}, callbacks_, resource_decoder, {});
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   // Send on connection.
@@ -481,7 +481,7 @@ TEST_P(GrpcMuxImplTest, ResourceTTL) {
   OpaqueResourceDecoderSharedPtr resource_decoder(
       std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
           envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
   InSequence s;
   auto* ttl_timer = new Event::MockTimer(&dispatcher_);
   auto eds_sub = grpc_mux_->addWatch(type_url, {"x"}, callbacks_, resource_decoder, {});
@@ -642,7 +642,7 @@ TEST_P(GrpcMuxImplTest, WildcardWatch) {
   setup();
 
   InSequence s;
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
   OpaqueResourceDecoderSharedPtr resource_decoder(
       std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
           envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));
@@ -680,7 +680,7 @@ TEST_P(GrpcMuxImplTest, WatchDemux) {
   OpaqueResourceDecoderSharedPtr resource_decoder(
       std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
           envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
   NiceMock<MockSubscriptionCallbacks> foo_callbacks;
   auto foo_sub = grpc_mux_->addWatch(type_url, {"x", "y"}, foo_callbacks, resource_decoder, {});
   NiceMock<MockSubscriptionCallbacks> bar_callbacks;
@@ -765,7 +765,7 @@ TEST_P(GrpcMuxImplTest, WatchDemux) {
 TEST_P(GrpcMuxImplTest, MultipleWatcherWithEmptyUpdates) {
   setup();
   InSequence s;
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
   NiceMock<MockSubscriptionCallbacks> foo_callbacks;
   auto foo_sub = grpc_mux_->addWatch(type_url, {"x", "y"}, foo_callbacks, resource_decoder_, {});
 
@@ -787,7 +787,7 @@ TEST_P(GrpcMuxImplTest, MultipleWatcherWithEmptyUpdates) {
 // Validate behavior when we have Single Watcher that sends Empty updates.
 TEST_P(GrpcMuxImplTest, SingleWatcherWithEmptyUpdates) {
   setup();
-  const std::string& type_url = Config::TypeUrl::get().Cluster;
+  const std::string& type_url = Config::TestTypeUrl::get().Cluster;
   NiceMock<MockSubscriptionCallbacks> foo_callbacks;
   auto foo_sub = grpc_mux_->addWatch(type_url, {}, foo_callbacks, resource_decoder_, {});
 
@@ -972,7 +972,7 @@ TEST_P(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
 
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
 
   grpc_mux_->start();
   {
@@ -1008,7 +1008,7 @@ TEST_P(GrpcMuxImplTest, UnwatchedTypeRejectsResources) {
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
 
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
 
   grpc_mux_->start();
   // subscribe and unsubscribe (by not keeping the return watch) so that the type is known to envoy
@@ -1107,7 +1107,7 @@ TEST_P(GrpcMuxImplTest, CacheEdsResource) {
   OpaqueResourceDecoderSharedPtr resource_decoder(
       std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
           envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
   InSequence s;
   auto eds_sub = grpc_mux_->addWatch(type_url, {"x"}, callbacks_, resource_decoder, {});
 
@@ -1149,7 +1149,7 @@ TEST_P(GrpcMuxImplTest, UpdateCacheEdsResource) {
   OpaqueResourceDecoderSharedPtr resource_decoder(
       std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
           envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
   InSequence s;
   auto eds_sub = grpc_mux_->addWatch(type_url, {"x"}, callbacks_, resource_decoder, {});
 
@@ -1197,7 +1197,7 @@ TEST_P(GrpcMuxImplTest, AddRemoveSubscriptions) {
   OpaqueResourceDecoderSharedPtr resource_decoder(
       std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
           envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
   InSequence s;
 
   {
@@ -1275,7 +1275,7 @@ TEST_P(GrpcMuxImplTest, RemoveCachedResourceOnLastSubscription) {
   OpaqueResourceDecoderSharedPtr resource_decoder(
       std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
           envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
   InSequence s;
 
   NiceMock<MockSubscriptionCallbacks> eds_sub1_callbacks;
@@ -1397,7 +1397,7 @@ TEST_P(GrpcMuxImplTest, MuxDynamicReplacementFetchingResources) {
   setup();
   InSequence s;
 
-  const std::string& type_url = Config::TypeUrl::get().ClusterLoadAssignment;
+  const std::string& type_url = Config::TestTypeUrl::get().ClusterLoadAssignment;
   OpaqueResourceDecoderSharedPtr resource_decoder(
       std::make_shared<TestUtility::TestOpaqueResourceDecoderImpl<
           envoy::config::endpoint::v3::ClusterLoadAssignment>>("cluster_name"));

@@ -132,15 +132,14 @@ public:
   void addDynamicMetadata(const std::string& namespace_key, const std::string& key,
                           const std::string& value) {
     auto& metadata = *stream_info_.metadata_.mutable_filter_metadata();
-    ProtobufWkt::Struct struct_obj;
+    Protobuf::Struct struct_obj;
     auto& fields = *struct_obj.mutable_fields();
     fields[key].set_string_value(value);
     metadata[namespace_key] = struct_obj;
   }
 
   // Add typed dynamic metadata to the stream info
-  void addTypedDynamicMetadata(const std::string& namespace_key,
-                               const ProtobufWkt::Any& typed_value) {
+  void addTypedDynamicMetadata(const std::string& namespace_key, const Protobuf::Any& typed_value) {
     stream_info_.metadata_.mutable_typed_filter_metadata()->insert({namespace_key, typed_value});
   }
 
@@ -719,7 +718,7 @@ TEST_F(NetworkExtProcFilterTest, TypedMetadataForwarding) {
   recreateFilterWithMetadataOptions({}, {"typed-namespace"});
 
   // Create a typed metadata value
-  ProtobufWkt::Any typed_value;
+  Protobuf::Any typed_value;
   typed_value.set_type_url("type.googleapis.com/envoy.test.TestMessage");
   typed_value.set_value("test-value");
 
@@ -727,7 +726,7 @@ TEST_F(NetworkExtProcFilterTest, TypedMetadataForwarding) {
   addTypedDynamicMetadata("typed-namespace", typed_value);
 
   // Create another typed value that shouldn't be forwarded
-  ProtobufWkt::Any other_typed_value;
+  Protobuf::Any other_typed_value;
   other_typed_value.set_type_url("type.googleapis.com/envoy.test.OtherMessage");
   other_typed_value.set_value("other-value");
   addTypedDynamicMetadata("other-namespace", other_typed_value);
@@ -776,7 +775,7 @@ TEST_F(NetworkExtProcFilterTest, BothTypedAndUntypedMetadataForwarding) {
   addDynamicMetadata("untyped-ns", "key1", "value1");
 
   // Add typed metadata
-  ProtobufWkt::Any typed_value;
+  Protobuf::Any typed_value;
   typed_value.set_type_url("type.googleapis.com/envoy.test.TestMessage");
   typed_value.set_value("test-value");
   addTypedDynamicMetadata("typed-ns", typed_value);
