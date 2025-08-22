@@ -1,6 +1,6 @@
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/network/connection_impl.h"
-#include "source/extensions/bootstrap/reverse_connection_socket_interface/reverse_connection_utility.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/test_runtime.h"

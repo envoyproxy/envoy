@@ -61,7 +61,7 @@ EXTENSIONS = {
     # Reverse Connection
     #
 
-    "envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface": "//source/extensions/bootstrap/reverse_connection_socket_interface:upstream_reverse_connection_socket_interface_lib",
+    "envoy.bootstrap.reverse_tunnel.upstream_socket_interface": "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
 
     #
     # Health checkers
