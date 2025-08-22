@@ -265,7 +265,7 @@ new_features:
     Switch the IP matcher to use LC-Trie for performance improvements.
 - area: tls_inspector
   change: |
-    Added filter state when failing to parse the ``ClientHello``.
+    Added dynamic metadata when failing to parse the ``ClientHello``.
 - area: lua
   change: |
     Added ``route()`` to the Stream handle API, allowing Lua scripts to retrieve route information. So far, the only method

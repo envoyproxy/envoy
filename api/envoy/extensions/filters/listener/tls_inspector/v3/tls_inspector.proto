@@ -40,8 +40,7 @@ message TlsInspector {
 }
 
 // [#protodoc-title: TLS Inspector Filter Metadata]
-// Message to be exported as dyanmic metadata from the TLS inspector filter.
-// [#extension: envoy.filters.listener.tls_inspector]
+// Message to be exported as dynamic metadata from the TLS inspector filter.
 message TlsInspectorMetadata {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.listener.tls_inspector.v2.TlsInspectorMetadata";

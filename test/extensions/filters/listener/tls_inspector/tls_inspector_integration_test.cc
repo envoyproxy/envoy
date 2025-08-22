@@ -269,8 +269,7 @@ TEST_P(TlsInspectorIntegrationTest, TlsInspectorMetadataPopulatedInAccessLog) {
   setupConnections(
       /*listener_filter_disabled=*/false, /*expect_connection_open=*/true,
       /*ssl_client=*/false, /*log_format=*/"%TLS_INSPECTOR_ERROR%",
-      /*ssl_options=*/{}, /*curves_list=*/"",
-      /*enable_ja3_fingerprinting=*/false, /*enable_ja4_fingerprinting=*/false,
+      /*ssl_options=*/{}, /*curves_list=*/"", false, false,
       /*write_fake_data=*/true);
   // The timeout is set as one seconds, advance 2 seconds to trigger the timeout.
   timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(2000));
