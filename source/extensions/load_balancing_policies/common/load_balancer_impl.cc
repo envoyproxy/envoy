@@ -640,42 +640,56 @@ absl::FixedArray<ZoneAwareLoadBalancerBase::LocalityPercentages>
 ZoneAwareLoadBalancerBase::calculateLocalityPercentages(
     const HostsPerLocality& local_hosts_per_locality,
     const HostsPerLocality& upstream_hosts_per_locality) {
-  std::map<envoy::config::core::v3::Locality, uint64_t, LocalityLess> local_weights;
-  std::map<envoy::config::core::v3::Locality, uint64_t, LocalityLess> upstream_weights;
+  absl::flat_hash_map<envoy::config::core::v3::Locality, uint64_t, LocalityHash, LocalityEqualTo>
+      local_weights;
+  absl::flat_hash_map<envoy::config::core::v3::Locality, uint64_t, LocalityHash, LocalityEqualTo>
+      upstream_weights;
   uint64_t total_local_weight = 0;
   for (const auto& locality_hosts : local_hosts_per_locality.get()) {
     uint64_t locality_weight = 0;
-    // If locality_basis_ is set to HOST_WEIGHT, we use the host's weight to calculate the locality
-    // percentage. Otherwise, we count the number of hosts in the locality.
-    if (locality_basis_ == LocalityLbConfig::ZoneAwareLbConfig::HOST_WEIGHT) {
+    switch (locality_basis_) {
+    // If locality_basis_ is set to HEALTHY_HOSTS_WEIGHT, it uses the host's weight to calculate the
+    // locality percentage.
+    case LocalityLbConfig::ZoneAwareLbConfig::HEALTHY_HOSTS_WEIGHT:
       for (const auto& host : locality_hosts) {
         locality_weight += host->weight();
       }
-    } else {
+      break;
+    // By default it uses the number of healthy hosts in the locality.
+    case LocalityLbConfig::ZoneAwareLbConfig::NUM_HEALTHY_HOSTS:
       locality_weight = locality_hosts.size();
+      break;
+    default:
+      PANIC_DUE_TO_CORRUPT_ENUM;
     }
     total_local_weight += locality_weight;
     // If there is no entry in the map for a given locality, it is assumed to have 0 hosts.
     if (!locality_hosts.empty()) {
-      local_weights.insert(std::make_pair(locality_hosts[0]->locality(), locality_weight));
+      local_weights.emplace(locality_hosts[0]->locality(), locality_weight);
     }
   }
   uint64_t total_upstream_weight = 0;
   for (const auto& locality_hosts : upstream_hosts_per_locality.get()) {
     uint64_t locality_weight = 0;
-    // If locality_basis_ is set to HOST_WEIGHT, we use the host's weight to calculate the locality
-    // percentage. Otherwise, we count the number of hosts in the locality.
-    if (locality_basis_ == LocalityLbConfig::ZoneAwareLbConfig::HOST_WEIGHT) {
+    switch (locality_basis_) {
+    // If locality_basis_ is set to HEALTHY_HOSTS_WEIGHT, it uses the host's weight to calculate the
+    // locality percentage.
+    case LocalityLbConfig::ZoneAwareLbConfig::HEALTHY_HOSTS_WEIGHT:
       for (const auto& host : locality_hosts) {
         locality_weight += host->weight();
       }
-    } else {
+      break;
+    // By default it uses the number of healthy hosts in the locality.
+    case LocalityLbConfig::ZoneAwareLbConfig::NUM_HEALTHY_HOSTS:
       locality_weight = locality_hosts.size();
+      break;
+    default:
+      PANIC_DUE_TO_CORRUPT_ENUM;
     }
     total_upstream_weight += locality_weight;
     // If there is no entry in the map for a given locality, it is assumed to have 0 hosts.
     if (!locality_hosts.empty()) {
-      upstream_weights.insert(std::make_pair(locality_hosts[0]->locality(), locality_weight));
+      upstream_weights.emplace(locality_hosts[0]->locality(), locality_weight);
     }
   }
 
