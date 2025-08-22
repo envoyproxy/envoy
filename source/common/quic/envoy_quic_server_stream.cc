@@ -60,7 +60,10 @@ void EnvoyQuicServerStream::encode1xxHeaders(const Http::ResponseHeaderMap& head
 void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "encodeHeaders (end_stream={}) {}.", *this, end_stream, headers);
   if (write_side_closed()) {
-    IS_ENVOY_BUG("encodeHeaders is called on write-closed stream.");
+    IS_ENVOY_BUG(fmt::format(
+        "encodeHeaders is called on write-closed stream. rst_received "
+        "{}, rst_sent {}, fin_received {}, fin_sent {}, fin_buffered {}, fin_outstanding {}.",
+        rst_received(), rst_sent(), fin_received(), fin_sent(), fin_buffered(), fin_outstanding()));
     return;
   }
 

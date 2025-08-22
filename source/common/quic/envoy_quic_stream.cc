@@ -17,7 +17,11 @@ void EnvoyQuicStream::encodeData(Buffer::Instance& data, bool end_stream) {
     return;
   }
   if (quic_stream_.write_side_closed()) {
-    IS_ENVOY_BUG("encodeData is called on write-closed stream.");
+    IS_ENVOY_BUG(fmt::format(
+        "encodeData is called on write-closed stream. rst_received "
+        "{}, rst_sent {}, fin_received {}, fin_sent {}, fin_buffered {}, fin_outstanding {}.",
+        quic_stream_.rst_received(), quic_stream_.rst_sent(), quic_stream_.fin_received(),
+        quic_stream_.fin_sent(), quic_stream_.fin_buffered(), quic_stream_.fin_outstanding()));
     return;
   }
   ASSERT(!local_end_stream_);
