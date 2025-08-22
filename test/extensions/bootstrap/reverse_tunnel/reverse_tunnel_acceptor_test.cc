@@ -7,7 +7,7 @@
 #include "source/common/network/socket_interface.h"
 #include "source/common/network/utility.h"
 #include "source/common/thread_local/thread_local_impl.h"
-#include "source/extensions/bootstrap/reverse_tunnel/reverse_tunnel_acceptor.h"
+#include "source/extensions/bootstrap/reverse_connection_socket_interface/reverse_tunnel_acceptor.h"
 
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/factory_context.h"
