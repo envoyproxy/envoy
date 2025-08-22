@@ -2223,36 +2223,10 @@ void ConnectionManagerImpl::ActiveStream::setVirtualHostRoute(
 
   refreshTracing();
   refreshDurationTimeout();
-  refreshIdleTimeout();
-  refreshFlushTimeout();
+  refreshIdleAndFlushTimeouts();
 }
 
-void ConnectionManagerImpl::ActiveStream::refreshIdleTimeout() {
-  if (hasCachedRoute()) {
-    const Router::RouteEntry* route_entry = cached_route_.value()->routeEntry();
-    if (route_entry == nullptr) {
-      return;
-    }
-    if (route_entry->idleTimeout()) {
-      idle_timeout_ms_ = route_entry->idleTimeout().value();
-      if (idle_timeout_ms_.count()) {
-        // If we have a route-level idle timeout but no global stream idle timeout, create a timer.
-        if (stream_idle_timer_ == nullptr) {
-          stream_idle_timer_ = connection_manager_.dispatcher_->createScaledTimer(
-              Event::ScaledTimerType::HttpDownstreamIdleStreamTimeout,
-              [this]() -> void { onIdleTimeout(); });
-        }
-      } else if (stream_idle_timer_ != nullptr) {
-        // If we had a global stream idle timeout but the route-level idle timeout is set to zero
-        // (to override), we disable the idle timer.
-        stream_idle_timer_->disableTimer();
-        stream_idle_timer_ = nullptr;
-      }
-    }
-  }
-}
-
-void ConnectionManagerImpl::ActiveStream::refreshFlushTimeout() {
+void ConnectionManagerImpl::ActiveStream::refreshIdleAndFlushTimeouts() {
   if (!hasCachedRoute()) {
     return;
   }
@@ -2260,12 +2234,31 @@ void ConnectionManagerImpl::ActiveStream::refreshFlushTimeout() {
   if (route_entry == nullptr) {
     return;
   }
+
+  if (route_entry->idleTimeout().has_value()) {
+    idle_timeout_ms_ = route_entry->idleTimeout().value();
+    if (idle_timeout_ms_.count()) {
+      // If we have a route-level idle timeout but no global stream idle timeout, create a timer.
+      if (stream_idle_timer_ == nullptr) {
+        stream_idle_timer_ = connection_manager_.dispatcher_->createScaledTimer(
+            Event::ScaledTimerType::HttpDownstreamIdleStreamTimeout,
+            [this]() -> void { onIdleTimeout(); });
+      }
+    } else if (stream_idle_timer_ != nullptr) {
+      // If we had a global stream idle timeout but the route-level idle timeout is set to zero
+      // (to override), we disable the idle timer.
+      stream_idle_timer_->disableTimer();
+      stream_idle_timer_ = nullptr;
+    }
+  }
+
   if (route_entry->flushTimeout().has_value()) {
     response_encoder_->getStream().setFlushTimeout(route_entry->flushTimeout().value());
-    return;
-  }
-  if (!has_explicit_global_flush_timeout_ && route_entry->idleTimeout().has_value()) {
-    response_encoder_->getStream().setFlushTimeout(route_entry->idleTimeout().value());
+  } else if (!has_explicit_global_flush_timeout_ && route_entry->idleTimeout().has_value()) {
+    // If there is no route-level flush timeout, and the global flush timeout was also inherited
+    // from the idle timeout, also inherit the route-level idle timeout. This is for backwards
+    // compatibility.
+    response_encoder_->getStream().setFlushTimeout(idle_timeout_ms_);
   }
 }
 

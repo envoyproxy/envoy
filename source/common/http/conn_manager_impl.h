@@ -333,8 +333,7 @@ private:
     void refreshCachedRoute(const Router::RouteCallback& cb);
 
     void refreshDurationTimeout();
-    void refreshIdleTimeout();
-    void refreshFlushTimeout();
+    void refreshIdleAndFlushTimeouts();
     void refreshAccessLogFlushTimer();
     void refreshTracing();
 
