@@ -71,7 +71,7 @@ message ExtAuthz {
 
   // Moves the check request from on data to on new connection.
   //
-  // When this field is true, the `envoy.tcp_proxy.receive_before_connect` filter state is set to true, so that a
+  // When this field is true, the ``envoy.tcp_proxy.receive_before_connect`` filter state is set to true, so that a
   // :ref:`TCP proxy <config_network_filters_tcp_proxy>` filter does not disable reads when initializing the filters.
   bool check_on_new_connection = 9;
 }
