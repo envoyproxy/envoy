@@ -250,9 +250,8 @@ TEST_P(TlsInspectorIntegrationTest, DisabledTlsInspectorFailsFilterChainFind) {
 TEST_P(TlsInspectorIntegrationTest, ContinueOnListenerTimeout) {
   setupConnections(/*listener_filter_disabled=*/false, /*expect_connection_open=*/true,
                    /*ssl_client=*/false);
-  // The length of tls hello message is defined as `TLS_MAX_CLIENT_HELLO = 64 * 1024`
-  // if tls inspect filter doesn't read the max length of hello message data, it
-  // will continue wait. Then the listener filter timeout timer will be triggered.
+  // The listener filter will not process the following data but will only wait for 1 second
+  // to timeout and then fall over to another listener filter chain.
   Buffer::OwnedImpl buffer("fake data");
   client_->write(buffer, false);
   // The timeout is set as one seconds, advance 2 seconds to trigger the timeout.
