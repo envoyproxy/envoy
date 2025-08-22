@@ -36,7 +36,7 @@ envoy_cc_test(
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/common/network:connection_lib",
-        "//source/extensions/bootstrap/reverse_tunnel:reverse_connection_utility_lib",
+        "//source/extensions/bootstrap/reverse_connection_socket_interface:reverse_connection_utility_lib",
         "//test/mocks/network:network_mocks",
         "//test/test_common:test_runtime_lib",
     ],

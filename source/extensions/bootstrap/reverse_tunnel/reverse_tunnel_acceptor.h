@@ -142,10 +142,9 @@ public:
    * @param options socket creation options.
    * @return nullptr since reverse connections require specific addresses.
    */
-  Envoy::Network::IoHandlePtr
-  socket(Envoy::Network::Socket::Type socket_type, Envoy::Network::Address::Type addr_type,
-         Envoy::Network::Address::IpVersion version, bool socket_v6only,
-         const Envoy::Network::SocketCreationOptions& options) const override;
+  Envoy::Network::IoHandlePtr socket(Envoy::Network::Socket::Type, Envoy::Network::Address::Type,
+                                     Envoy::Network::Address::IpVersion, bool,
+                                     const Envoy::Network::SocketCreationOptions&) const override;
 
   /**
    * Create a socket with a specific address.

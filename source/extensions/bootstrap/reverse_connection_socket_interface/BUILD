@@ -9,11 +9,29 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_extension(
-    name = "reverse_tunnel_acceptor_lib",
-    srcs = ["reverse_tunnel_acceptor.cc"],
-    hdrs = ["reverse_tunnel_acceptor.h"],
+    name = "reverse_connection_utility_lib",
+    srcs = ["reverse_connection_utility.cc"],
+    hdrs = ["reverse_connection_utility.h"],
     visibility = ["//visibility:public"],
     deps = [
+        "//envoy/buffer:buffer_interface",
+        "//envoy/network:connection_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/common:logger_lib",
+    ],
+)
+
+envoy_cc_extension(
+    name = "upstream_reverse_connection_socket_interface_lib",
+    srcs = [
+        "reverse_tunnel_acceptor.cc",
+    ],
+    hdrs = [
+        "reverse_tunnel_acceptor.h",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":reverse_connection_utility_lib",
         "//envoy/common:random_generator_interface",
         "//envoy/network:address_interface",
         "//envoy/network:io_handle_interface",
@@ -29,8 +47,6 @@ envoy_cc_extension(
         "//source/common/network:address_lib",
         "//source/common/network:default_socket_interface_lib",
         "//source/common/protobuf",
-        "//source/extensions/bootstrap/reverse_connection_socket_interface:reverse_connection_utility_lib",
-        "@envoy_api//envoy/extensions/bootstrap/reverse_connection_socket_interface/v3:pkg_cc_proto",
     ],
     alwayslink = 1,
 )

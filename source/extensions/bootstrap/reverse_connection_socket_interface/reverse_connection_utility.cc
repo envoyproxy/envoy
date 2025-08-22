@@ -1,4 +1,4 @@
-#include "source/extensions/bootstrap/reverse_tunnel/reverse_connection_utility.h"
+#include "source/extensions/bootstrap/reverse_connection_socket_interface/reverse_connection_utility.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
@@ -13,8 +13,6 @@ bool ReverseConnectionUtility::isPingMessage(absl::string_view data) {
   if (data.empty()) {
     return false;
   }
-
-  // Check for exact RPING match.
   return (data.length() == PING_MESSAGE.length() &&
           !memcmp(data.data(), PING_MESSAGE.data(), PING_MESSAGE.length()));
 }
@@ -26,7 +24,6 @@ Buffer::InstancePtr ReverseConnectionUtility::createPingResponse() {
 bool ReverseConnectionUtility::sendPingResponse(Network::Connection& connection) {
   auto ping_buffer = createPingResponse();
   connection.write(*ping_buffer, false);
-
   ENVOY_LOG(debug, "Reverse connection utility: sent RPING response on connection {}",
             connection.id());
   return true;
@@ -35,7 +32,6 @@ bool ReverseConnectionUtility::sendPingResponse(Network::Connection& connection)
 Api::IoCallUint64Result ReverseConnectionUtility::sendPingResponse(Network::IoHandle& io_handle) {
   auto ping_buffer = createPingResponse();
   Api::IoCallUint64Result result = io_handle.write(*ping_buffer);
-
   if (result.ok()) {
     ENVOY_LOG(trace, "Reverse connection utility: sent RPING response, bytes: {}",
               result.return_value_);
@@ -43,7 +39,6 @@ Api::IoCallUint64Result ReverseConnectionUtility::sendPingResponse(Network::IoHa
     ENVOY_LOG(trace, "Reverse connection utility: failed to send RPING response, error: {}",
               result.err_->getErrorDetails());
   }
-
   return result;
 }
 
@@ -52,15 +47,12 @@ bool ReverseConnectionUtility::handlePingMessage(absl::string_view data,
   if (!isPingMessage(data)) {
     return false;
   }
-
   ENVOY_LOG(debug, "Reverse connection utility: received RPING on connection {}, echoing back",
             connection.id());
-
   return sendPingResponse(connection);
 }
 
 bool ReverseConnectionUtility::extractPingFromHttpData(absl::string_view http_data) {
-  // Look for RPING in HTTP response body.
   if (http_data.find(PING_MESSAGE) != absl::string_view::npos) {
     ENVOY_LOG(debug, "Reverse connection utility: found RPING in HTTP data");
     return true;
@@ -69,7 +61,6 @@ bool ReverseConnectionUtility::extractPingFromHttpData(absl::string_view http_da
 }
 
 std::shared_ptr<PingMessageHandler> ReverseConnectionMessageHandlerFactory::createPingHandler() {
-  // Use make_shared following Envoy patterns for shared components.
   return std::make_shared<PingMessageHandler>();
 }
 
