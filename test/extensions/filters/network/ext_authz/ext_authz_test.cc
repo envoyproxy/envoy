@@ -169,16 +169,16 @@ public:
     (*fields)["ext_authz_duration"] = ValueUtil::numberValue(10);
 
     EXPECT_CALL(filter_callbacks_.connection_.stream_info_, setDynamicMetadata(_, _))
-        .WillOnce(Invoke([&response](const std::string& ns,
-                                     const Protobuf::Struct& returned_dynamic_metadata) {
-          EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
-          EXPECT_TRUE(
-              returned_dynamic_metadata.fields().at("ext_authz_duration").has_number_value());
-          EXPECT_TRUE(
-              TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
-          EXPECT_EQ(response.dynamic_metadata.fields().at("ext_authz_duration").number_value(),
-                    returned_dynamic_metadata.fields().at("ext_authz_duration").number_value());
-        }));
+        .WillOnce(Invoke(
+            [&response](const std::string& ns, const Protobuf::Struct& returned_dynamic_metadata) {
+              EXPECT_EQ(ns, NetworkFilterNames::get().ExtAuthorization);
+              EXPECT_TRUE(
+                  returned_dynamic_metadata.fields().at("ext_authz_duration").has_number_value());
+              EXPECT_TRUE(
+                  TestUtility::protoEqual(returned_dynamic_metadata, response.dynamic_metadata));
+              EXPECT_EQ(response.dynamic_metadata.fields().at("ext_authz_duration").number_value(),
+                        returned_dynamic_metadata.fields().at("ext_authz_duration").number_value());
+            }));
 
     EXPECT_CALL(filter_callbacks_, continueReading());
     request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
