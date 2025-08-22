@@ -16,7 +16,7 @@ envoy_extension_cc_test(
     name = "reverse_tunnel_initiator_test",
     size = "large",
     srcs = ["reverse_tunnel_initiator_test.cc"],
-    extension_names = ["envoy.bootstrap.reverse_connection.downstream_reverse_connection_socket_interface"],
+    extension_names = ["envoy.bootstrap.reverse_tunnel.downstream_socket_interface"],
     deps = [
         "//source/common/network:address_lib",
         "//source/common/network:socket_interface_lib",
@@ -30,7 +30,7 @@ envoy_extension_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:test_runtime_lib",
         "@envoy_api//envoy/extensions/bootstrap/reverse_connection_handshake/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/bootstrap/reverse_connection_socket_interface/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3:pkg_cc_proto",
     ],
 )
 

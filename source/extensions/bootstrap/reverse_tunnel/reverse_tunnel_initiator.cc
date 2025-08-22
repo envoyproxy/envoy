@@ -302,10 +302,9 @@ ReverseConnectionIOHandle::ReverseConnectionIOHandle(os_fd_t fd,
                                                      const ReverseConnectionSocketConfig& config,
                                                      Upstream::ClusterManager& cluster_manager,
                                                      ReverseTunnelInitiatorExtension* extension,
-                                                     Stats::Scope& scope)
+                                                     Stats::Scope&)
     : IoSocketHandleImpl(fd), config_(config), cluster_manager_(cluster_manager),
       extension_(extension), original_socket_fd_(fd) {
-  (void)scope; // Mark as unused
   ENVOY_LOG(
       debug,
       "Created ReverseConnectionIOHandle: fd={}, src_node={}, src_cluster: {}, num_clusters={}",
@@ -395,8 +394,7 @@ void ReverseConnectionIOHandle::cleanup() {
   ENVOY_LOG(debug, "ReverseConnectionIOHandle: Completed cleanup of reverse connection resources.");
 }
 
-Api::SysCallIntResult ReverseConnectionIOHandle::listen(int backlog) {
-  (void)backlog;
+Api::SysCallIntResult ReverseConnectionIOHandle::listen(int) {
   // No-op for reverse connections.
   return Api::SysCallIntResult{0, 0};
 }
@@ -459,9 +457,6 @@ void ReverseConnectionIOHandle::initializeFileEvent(Event::Dispatcher& dispatche
 
 Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* addr,
                                                               socklen_t* addrlen) {
-  // Mark parameters unused
-  (void)addr;
-  (void)addrlen;
 
   if (isTriggerPipeReady()) {
     char trigger_byte;
@@ -856,8 +851,7 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
 }
 
 bool ReverseConnectionIOHandle::shouldAttemptConnectionToHost(const std::string& host_address,
-                                                              const std::string& cluster_name) {
-  (void)cluster_name; // Mark as unused for now
+                                                              const std::string&) {
   if (!config_.enable_circuit_breaker) {
     return true;
   }
@@ -1430,10 +1424,8 @@ DownstreamSocketThreadLocal* ReverseTunnelInitiatorExtension::getLocalRegistry()
 Envoy::Network::IoHandlePtr
 ReverseTunnelInitiator::socket(Envoy::Network::Socket::Type socket_type,
                                Envoy::Network::Address::Type addr_type,
-                               Envoy::Network::Address::IpVersion version, bool socket_v6only,
-                               const Envoy::Network::SocketCreationOptions& options) const {
-  (void)socket_v6only;
-  (void)options;
+                               Envoy::Network::Address::IpVersion version, bool,
+                               const Envoy::Network::SocketCreationOptions&) const {
   ENVOY_LOG(debug, "ReverseTunnelInitiator: type={}, addr_type={}", static_cast<int>(socket_type),
             static_cast<int>(addr_type));
 
@@ -1544,7 +1536,7 @@ Server::BootstrapExtensionPtr ReverseTunnelInitiator::createBootstrapExtension(
     const Protobuf::Message& config, Server::Configuration::ServerFactoryContext& context) {
   ENVOY_LOG(debug, "ReverseTunnelInitiator::createBootstrapExtension()");
   const auto& message = MessageUtil::downcastAndValidate<
-      const envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
+      const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
           DownstreamReverseConnectionSocketInterface&>(config, context.messageValidationVisitor());
   context_ = &context;
   // Create the bootstrap extension and store reference to it.
@@ -1554,14 +1546,15 @@ Server::BootstrapExtensionPtr ReverseTunnelInitiator::createBootstrapExtension(
 }
 
 ProtobufTypes::MessagePtr ReverseTunnelInitiator::createEmptyConfigProto() {
-  return std::make_unique<envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
-                              DownstreamReverseConnectionSocketInterface>();
+  return std::make_unique<
+      envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
+          DownstreamReverseConnectionSocketInterface>();
 }
 
 // ReverseTunnelInitiatorExtension constructor implementation.
 ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
     Server::Configuration::ServerFactoryContext& context,
-    const envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
+    const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
         DownstreamReverseConnectionSocketInterface& config)
     : context_(context), config_(config) {
   ENVOY_LOG(debug, "Created ReverseTunnelInitiatorExtension - TLS slot will be created in "

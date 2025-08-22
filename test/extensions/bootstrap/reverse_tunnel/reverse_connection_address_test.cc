@@ -203,7 +203,7 @@ TEST_F(ReverseConnectionAddressTest, SocketInterfaceWithReverseInterface) {
     ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
 
     std::string name() const override {
-      return "envoy.bootstrap.reverse_connection.downstream_reverse_connection_socket_interface";
+      return "envoy.bootstrap.reverse_tunnel.downstream_socket_interface";
     }
 
     std::set<std::string> configTypes() override { return {}; }

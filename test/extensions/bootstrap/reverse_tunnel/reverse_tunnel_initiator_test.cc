@@ -3,7 +3,7 @@
 #include <sys/socket.h>
 
 #include "envoy/extensions/bootstrap/reverse_connection_handshake/v3/reverse_connection_handshake.pb.h"
-#include "envoy/extensions/bootstrap/reverse_connection_socket_interface/v3/reverse_connection_socket_interface.pb.h"
+#include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/network/socket_interface.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/thread_local/thread_local.h"
@@ -106,7 +106,7 @@ protected:
   Stats::ScopeSharedPtr stats_scope_;
   NiceMock<Event::MockDispatcher> dispatcher_{"worker_0"};
 
-  envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
+  envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
       DownstreamReverseConnectionSocketInterface config_;
 
   std::unique_ptr<ReverseTunnelInitiator> socket_interface_;
@@ -121,7 +121,7 @@ protected:
 // Basic functionality tests.
 TEST_F(ReverseTunnelInitiatorExtensionTest, InitializeWithDefaultConfig) {
   // Test with empty config (should initialize successfully).
-  envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
+  envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
       DownstreamReverseConnectionSocketInterface empty_config;
 
   auto extension_with_default =
@@ -614,7 +614,7 @@ protected:
   Stats::ScopeSharedPtr stats_scope_;
   NiceMock<Event::MockDispatcher> dispatcher_{"worker_0"};
 
-  envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
+  envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
       DownstreamReverseConnectionSocketInterface config_;
 
   std::unique_ptr<ReverseTunnelInitiator> socket_interface_;
@@ -630,7 +630,7 @@ protected:
 
 TEST_F(ReverseTunnelInitiatorTest, CreateBootstrapExtension) {
   // Test createBootstrapExtension function.
-  envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
+  envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
       DownstreamReverseConnectionSocketInterface config;
 
   auto extension = socket_interface_->createBootstrapExtension(config, context_);
@@ -647,7 +647,7 @@ TEST_F(ReverseTunnelInitiatorTest, CreateEmptyConfigProto) {
 
   // Should be able to cast to the correct type.
   auto* typed_config =
-      dynamic_cast<envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
+      dynamic_cast<envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
                        DownstreamReverseConnectionSocketInterface*>(config.get());
   EXPECT_NE(typed_config, nullptr);
 }
@@ -676,7 +676,7 @@ TEST_F(ReverseTunnelInitiatorTest, GetLocalRegistryWithExtension) {
 
 TEST_F(ReverseTunnelInitiatorTest, FactoryName) {
   EXPECT_EQ(socket_interface_->name(),
-            "envoy.bootstrap.reverse_connection.downstream_reverse_connection_socket_interface");
+            "envoy.bootstrap.reverse_tunnel.downstream_socket_interface");
 }
 
 TEST_F(ReverseTunnelInitiatorTest, SocketMethodBasicIPv4) {
@@ -892,7 +892,7 @@ TEST_F(ReverseTunnelInitiatorTest, SocketMethodWithSocketCreationOptions) {
 // Configuration validation tests.
 class ConfigValidationTest : public testing::Test {
 protected:
-  envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
+  envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
       DownstreamReverseConnectionSocketInterface config_;
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   NiceMock<ThreadLocal::MockInstance> thread_local_;
@@ -995,7 +995,7 @@ protected:
   Stats::ScopeSharedPtr stats_scope_;
   NiceMock<Event::MockDispatcher> dispatcher_{"worker_0"};
 
-  envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
+  envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
       DownstreamReverseConnectionSocketInterface config_;
 
   std::unique_ptr<ReverseTunnelInitiator> socket_interface_;
@@ -3201,7 +3201,7 @@ protected:
   Stats::IsolatedStoreImpl stats_store_;
   Stats::ScopeSharedPtr stats_scope_;
   NiceMock<Event::MockDispatcher> dispatcher_{"worker_0"};
-  envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
+  envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
       DownstreamReverseConnectionSocketInterface config_;
   std::unique_ptr<ReverseTunnelInitiatorExtension> extension_;
   std::unique_ptr<ReverseConnectionIOHandle> io_handle_;

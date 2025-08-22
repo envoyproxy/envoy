@@ -138,7 +138,7 @@ proto_library(
         "//envoy/extensions/access_loggers/wasm/v3:pkg",
         "//envoy/extensions/bootstrap/internal_listener/v3:pkg",
         "//envoy/extensions/bootstrap/reverse_connection_handshake/v3:pkg",
-        "//envoy/extensions/bootstrap/reverse_connection_socket_interface/v3:pkg",
+        "//envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3:pkg",
         "//envoy/extensions/clusters/aggregate/v3:pkg",
         "//envoy/extensions/clusters/common/dns/v3:pkg",
         "//envoy/extensions/clusters/dns/v3:pkg",

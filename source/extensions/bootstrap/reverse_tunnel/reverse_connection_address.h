@@ -55,8 +55,8 @@ public:
   absl::string_view addressType() const override { return "reverse_connection"; }
   const Network::SocketInterface& socketInterface() const override {
     // Return the appropriate reverse connection socket interface for downstream connections
-    auto* reverse_socket_interface = Network::socketInterface(
-        "envoy.bootstrap.reverse_connection.downstream_reverse_connection_socket_interface");
+    auto* reverse_socket_interface =
+        Network::socketInterface("envoy.bootstrap.reverse_tunnel.downstream_socket_interface");
     if (reverse_socket_interface) {
       ENVOY_LOG_MISC(debug, "Reverse connection address: using reverse socket interface");
       return *reverse_socket_interface;

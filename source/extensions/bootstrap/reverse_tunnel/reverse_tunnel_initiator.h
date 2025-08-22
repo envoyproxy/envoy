@@ -9,8 +9,8 @@
 #include <vector>
 
 #include "envoy/api/io_error.h"
-#include "envoy/extensions/bootstrap/reverse_connection_socket_interface/v3/reverse_connection_socket_interface.pb.h"
-#include "envoy/extensions/bootstrap/reverse_connection_socket_interface/v3/reverse_connection_socket_interface.pb.validate.h"
+#include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.h"
+#include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.validate.h"
 #include "envoy/network/io_handle.h"
 #include "envoy/network/socket.h"
 #include "envoy/registry/registry.h"
@@ -620,7 +620,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
   std::string name() const override {
-    return "envoy.bootstrap.reverse_connection.downstream_reverse_connection_socket_interface";
+    return "envoy.bootstrap.reverse_tunnel.downstream_socket_interface";
   }
 
   ReverseTunnelInitiatorExtension* extension_;
@@ -642,7 +642,7 @@ class ReverseTunnelInitiatorExtension : public Server::BootstrapExtension,
 public:
   ReverseTunnelInitiatorExtension(
       Server::Configuration::ServerFactoryContext& context,
-      const envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
+      const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
           DownstreamReverseConnectionSocketInterface& config);
 
   void onServerInitialized() override;
@@ -714,7 +714,7 @@ public:
 
 private:
   Server::Configuration::ServerFactoryContext& context_;
-  const envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
+  const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
       DownstreamReverseConnectionSocketInterface config_;
   ThreadLocal::TypedSlotPtr<DownstreamSocketThreadLocal> tls_slot_;
 };

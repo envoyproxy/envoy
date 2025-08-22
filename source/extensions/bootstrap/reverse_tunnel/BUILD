@@ -66,7 +66,7 @@ envoy_cc_extension(
         "//source/common/protobuf",
         "//source/common/upstream:load_balancer_context_base_lib",
         "@envoy_api//envoy/extensions/bootstrap/reverse_connection_handshake/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/bootstrap/reverse_connection_socket_interface/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3:pkg_cc_proto",
     ],
     alwayslink = 1,
 )
