@@ -795,23 +795,19 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
                                             substitution_format_config, context),
                                         Formatter::FormatterPtr);
 
-  // Initialize request ID generation configuration.
-  generate_request_id_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config_message.tunneling_config(),
-                                                         generate_request_id, false);
-  if (generate_request_id_) {
-    envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension
-        final_rid_config = config_message.tunneling_config().request_id_extension();
-    if (!final_rid_config.has_typed_config()) {
-      // Default to UUID extension.
-      final_rid_config.mutable_typed_config()->PackFrom(
-          envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig());
-    }
-    auto extension_or_error = Http::RequestIDExtensionFactory::fromProto(final_rid_config, context);
+  // Initialize request ID generation configuration. Generation is enabled only if an explicit
+  // request ID extension is configured.
+  const auto& rid_config = config_message.tunneling_config().request_id_extension();
+  if (rid_config.has_typed_config()) {
+    generate_request_id_ = true;
+    auto extension_or_error = Http::RequestIDExtensionFactory::fromProto(rid_config, context);
     if (!extension_or_error.ok()) {
       throw EnvoyException(absl::StrCat("Failed to create request ID extension: ",
                                         extension_or_error.status().ToString()));
     }
     request_id_extension_ = extension_or_error.value();
+  } else {
+    generate_request_id_ = false;
   }
 }
 

@@ -118,21 +118,15 @@ message TcpProxy {
     // by the network filters. The filter state key is ``envoy.tcp_proxy.propagate_response_trailers``.
     bool propagate_response_trailers = 6;
 
-    // Whether to generate and attach a new :ref:`x-request-id
-    // <config_http_conn_man_headers_x-request-id>` header on the synthesized upstream HTTP
-    // request if it does not exist.
+    // The configuration of the request ID extension used for generation, validation, and
+    // associated tracing operations when tunneling.
     //
-    // If this is enabled, the generated request ID is also stored in the downstream connection's
-    // filter state under the key ``envoy.tcp_proxy.tunnel_request_id``. This allows the request ID
-    // to be emitted from TCP proxy access logs via the filter-state formatter.
+    // If this field is set, a request ID is generated using the specified extension. If
+    // this field is not set, no request ID is generated.
     //
-    // This defaults to ``false``.
-    google.protobuf.BoolValue generate_request_id = 7;
-
-    // The configuration of the request ID extension used for generation, validation and
-    // associated tracing operations when tunneling. If empty, the
-    // :ref:`UuidRequestIdConfig <envoy_v3_api_msg_extensions.request_id.uuid.v3.UuidRequestIdConfig>`
-    // default extension is used with default parameters.
+    // When a request ID is generated, it is also stored in the downstream connection's
+    // filter state under the key ``envoy.tcp_proxy.tunnel_request_id`` to allow emission from TCP
+    // proxy access logs via the filter-state formatter.
     // [#extension-category: envoy.request_id]
     http_connection_manager.v3.RequestIDExtension request_id_extension = 8;
   }
