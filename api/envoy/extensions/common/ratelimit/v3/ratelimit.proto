@@ -118,6 +118,10 @@ message RateLimitDescriptor {
 
     // The unit of time.
     type.v3.RateLimitUnit unit = 2 [(validate.rules).enum = {defined_only: true}];
+
+    // Multiplier for the unit of time. For example, if unit is SECOND and unit_multiplier is 30,
+    // the rate limit will be applied per 30 seconds. If not specified, defaults to 1.
+    uint32 unit_multiplier = 3 [(validate.rules).uint32 = {gte: 1}];
   }
 
   // Descriptor entries.

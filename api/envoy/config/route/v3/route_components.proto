@@ -2293,7 +2293,8 @@ message RateLimit {
       // Metadata struct that defines the key and path to retrieve the struct value.
       // The value must be a struct containing an integer "requests_per_unit" property
       // and a "unit" property with a value parseable to :ref:`RateLimitUnit
-      // enum <envoy_v3_api_enum_type.v3.RateLimitUnit>`
+      // enum <envoy_v3_api_enum_type.v3.RateLimitUnit>`. Optionally, it can also contain
+      // a "unit_multiplier" property with an integer value to specify a custom interval.
       type.metadata.v3.MetadataKey metadata_key = 1 [(validate.rules).message = {required: true}];
     }
 

@@ -112,6 +112,10 @@ message RateLimitResponse {
 
     // The unit of time.
     Unit unit = 2;
+
+    // Multiplier for the unit of time. For example, if unit is SECOND and unit_multiplier is 30,
+    // the rate limit will be applied per 30 seconds. If not specified, defaults to 1.
+    uint32 unit_multiplier = 4;
   }
 
   // Cacheable quota for responses.

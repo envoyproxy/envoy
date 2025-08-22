@@ -11,7 +11,8 @@ namespace Envoy {
 namespace RateLimit {
 
 inline bool operator==(const RateLimitOverride& lhs, const RateLimitOverride& rhs) {
-  return lhs.requests_per_unit_ == rhs.requests_per_unit_ && lhs.unit_ == rhs.unit_;
+  return lhs.requests_per_unit_ == rhs.requests_per_unit_ && lhs.unit_ == rhs.unit_ &&
+         lhs.unit_multiplier_ == rhs.unit_multiplier_;
 }
 
 inline bool operator==(const Descriptor& lhs, const Descriptor& rhs) {

@@ -109,7 +109,21 @@ public:
           {"x-ratelimit-reset", "1"}},
          {buildDescriptorStatus(1,
                                 envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::YEAR,
-                                "unit", 1, 1)}}, );
+                                "unit", 1, 1)}},
+        // Test with unit_multiplier - 5 requests per 30 seconds
+        {{{"x-ratelimit-limit", "5, 5;w=30;name=\"custom_interval\""},
+          {"x-ratelimit-remaining", "3"},
+          {"x-ratelimit-reset", "10"}},
+         {buildDescriptorStatus(5,
+                                envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::SECOND,
+                                "custom_interval", 3, 10, 30)}},
+        // Test with unit_multiplier - 10 requests per 5 minutes (300 seconds)
+        {{{"x-ratelimit-limit", "10, 10;w=300;name=\"five_minutes\""},
+          {"x-ratelimit-remaining", "7"},
+          {"x-ratelimit-reset", "120"}},
+         {buildDescriptorStatus(10,
+                                envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::MINUTE,
+                                "five_minutes", 7, 120, 5)}}, );
   }
 };
 
