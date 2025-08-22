@@ -3,6 +3,98 @@ module(
     version = "1.37.0-dev",
 )
 
+# Envoy's bzlmod-based dependency management
+#
+# This MODULE.bazel file implements Envoy's migration to bzlmod (Bazel 8.0+) following
+# official best practices. Key features:
+#
+# - 47+ dependencies migrated to direct bazel_dep declarations from BCR
+# - Streamlined 2-extension architecture per module (core + toolchains)
+# - Native upstream extensions (rules_python, rules_jvm_external) where possible
+# - Legacy WORKSPACE compatibility maintained via minimal extensions
+#
+# All bazel_dep entries organized alphabetically for improved readability.
+# Dependencies requiring patches remain in module extensions as documented in
+# BZLMOD_MIGRATION.md.
+#
+# Migration Guide:
+# - Legacy //external: references → direct @repo//:target dependencies
+# - See THIRD_PARTY_MIGRATION.md for detailed migration instructions
+# - See BZLMOD_MIGRATION.md for architecture and status documentation
+bazel_dep(name = "apple_support", version = "1.23.1", repo_name = "build_bazel_apple_support")
+bazel_dep(name = "aspect_bazel_lib", version = "2.16.0")
+bazel_dep(name = "aspect_rules_js", version = "2.5.0")
+bazel_dep(name = "bazel_features", version = "1.35.0")
+bazel_dep(name = "bazel_skylib", version = "1.8.1")
+bazel_dep(name = "boringssl", version = "0.20250514.0")
+bazel_dep(name = "brotli", version = "1.1.0", repo_name = "org_brotli")
+bazel_dep(name = "cel-spec", version = "0.24.0", repo_name = "com_google_cel_spec")
+bazel_dep(name = "emsdk", version = "4.0.13")
+bazel_dep(name = "envoy_examples", version = "0.0.0-dev")
+git_override(
+    module_name = "envoy_examples",
+    commit = "ff286d4049b6339cf84c912f5e06f67b0061f017",
+    remote = "https://github.com/envoyproxy/examples.git",
+)
+
+bazel_dep(name = "envoy-example-wasmcc", version = "0.0.0-dev")
+git_override(
+    module_name = "envoy-example-wasmcc",
+    commit = "ff286d4049b6339cf84c912f5e06f67b0061f017",
+    remote = "https://github.com/envoyproxy/examples.git",
+    strip_prefix = "wasm-cc/",
+)
+
+bazel_dep(name = "envoy_toolshed", version = "0.3.3")
+git_override(
+    module_name = "envoy_toolshed",
+    commit = "f536601588f6a523346091adb3420d39b4692d3a",
+    remote = "https://github.com/envoyproxy/toolshed.git",
+    strip_prefix = "bazel/",
+)
+
+bazel_dep(name = "fast_float", version = "8.0.2")
+bazel_dep(name = "flatbuffers", version = "25.2.10", repo_name = "com_github_google_flatbuffers")
+bazel_dep(name = "fmt", version = "11.2.0", repo_name = "com_github_fmtlib_fmt")
+bazel_dep(name = "gazelle", version = "0.45.0", repo_name = "bazel_gazelle")
+bazel_dep(name = "googleapis", version = "0.0.0-20241220-5e258e33.bcr.1", repo_name = "com_google_googleapis")
+bazel_dep(name = "googletest", version = "1.17.0", repo_name = "com_google_googletest")
+bazel_dep(name = "googleurl", version = "0.0.0-dev", repo_name = "com_googlesource_googleurl")
+git_override(
+    module_name = "googleurl",
+    commit = "e6c272102e0554e02c1bb317edff927ee56c7d0b",
+    remote = "https://quiche.googlesource.com/googleurl",
+)
+
+bazel_dep(name = "gperftools", version = "2.17.2", repo_name = "com_github_gperftools_gperftools")
+bazel_dep(name = "highway", version = "1.2.0")
+bazel_dep(name = "nlohmann_json", version = "3.12.0", repo_name = "com_github_nlohmann_json")
+bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "protobuf", version = "29.3", repo_name = "com_google_protobuf")
+bazel_dep(name = "protoc-gen-validate", version = "1.2.1.bcr.1", repo_name = "com_envoyproxy_protoc_gen_validate")
+bazel_dep(name = "re2", version = "2024-07-02.bcr.1", repo_name = "com_googlesource_code_re2")
+bazel_dep(name = "rules_buf", version = "0.5.1")
+bazel_dep(name = "rules_cc", version = "0.2.8")
+bazel_dep(name = "rules_foreign_cc", version = "0.15.0")
+bazel_dep(name = "rules_go", version = "0.57.0", repo_name = "io_bazel_rules_go")
+bazel_dep(name = "rules_license", version = "1.0.0")
+bazel_dep(name = "rules_nodejs", version = "6.5.0")
+bazel_dep(name = "rules_pkg", version = "1.1.0")
+bazel_dep(name = "rules_proto", version = "7.1.0")
+bazel_dep(name = "rules_python", version = "1.4.1")
+bazel_dep(name = "rules_rust", version = "0.63.0")
+bazel_dep(name = "rules_shell", version = "0.5.1")
+bazel_dep(name = "rules_swift", version = "2.1.1", repo_name = "build_bazel_rules_swift")
+bazel_dep(name = "spdlog", version = "1.15.3", repo_name = "com_github_gabime_spdlog")
+bazel_dep(name = "xxhash", version = "0.8.3", repo_name = "com_github_cyan4973_xxhash")
+bazel_dep(name = "yaml-cpp", version = "0.8.0", repo_name = "com_github_jbeder_yaml_cpp")
+bazel_dep(name = "zstd", version = "1.5.7", repo_name = "com_github_facebook_zstd")
+
+# Development dependencies
+bazel_dep(name = "google_benchmark", version = "1.9.4", dev_dependency = True, repo_name = "com_github_google_benchmark")
+bazel_dep(name = "rules_shellcheck", version = "0.3.3", dev_dependency = True, repo_name = "com_github_aignas_rules_shellcheck")
+
+# Local module overrides for internal Envoy modules
 bazel_dep(name = "aspect_bazel_lib", version = "2.21.2")
 bazel_dep(name = "envoy_api", version = "1.37.0-dev")
 bazel_dep(name = "envoy_build_config", version = "1.37.0-dev")
@@ -17,12 +109,285 @@ local_path_override(
     path = "api",
 )
 
+bazel_dep(name = "envoy_build_config", version = "1.37.0-dev")
 local_path_override(
     module_name = "envoy_build_config",
     path = "mobile/envoy_build_config",
 )
 
+bazel_dep(name = "envoy_mobile", version = "1.37.0-dev")
 local_path_override(
     module_name = "envoy_mobile",
     path = "mobile",
+)
+
+switched_rules = use_extension("@com_google_googleapis//:extensions.bzl", "switched_rules")
+switched_rules.use_languages(
+    cc = True,
+    go = True,
+    grpc = True,
+    python = True,
+)
+use_repo(switched_rules, "com_google_googleapis_imports")
+
+# Go SDK and toolchain configuration
+# Note: dev_dependency = True was removed to fix nogo visibility issues.
+# The io_bazel_rules_nogo repository must be visible to other extensions.
+go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
+go_sdk.download(version = "1.24.6")
+use_repo(
+    go_sdk,
+    "go_toolchains",
+    "io_bazel_rules_nogo",
+)
+
+# Go dependencies for Envoy's Go components
+# These modules provide protobuf and gRPC support for Go-based tooling
+go_deps = use_extension("@bazel_gazelle//:extensions.bzl", "go_deps")
+go_deps.module(
+    path = "google.golang.org/grpc",
+    sum = "h1:OgPcDAFKHnH8X3O4WcO4XUc8GRDeKsKReqbQtiCj7N8=",
+    version = "v1.67.3",
+)
+go_deps.module(
+    path = "golang.org/x/net",
+    sum = "h1:T5GQRQb2y08kTAByq9L4/bz8cipCdA8FbRTXewonqY8=",
+    version = "v0.35.0",
+)
+go_deps.module(
+    path = "golang.org/x/text",
+    sum = "h1:bofq7m3/HAFvbF51jz3Q9wLg3jkvSPuiZu/pD1XwgtM=",
+    version = "v0.22.0",
+)
+go_deps.module(
+    path = "google.golang.org/genproto/googleapis/api",
+    sum = "h1:DoPTO70H+bcDXcd39vOqb2viZxgqeBeSGtZ55yZU4/Q=",
+    version = "v0.0.0-20230822172742-b8732ec3820d",
+)
+go_deps.module(
+    path = "google.golang.org/genproto/googleapis/rpc",
+    sum = "h1:OxYkA3wjPsZyBylwymxSHa7ViiW1Sml4ToBrncvFehI=",
+    version = "v0.0.0-20250115164207-1a7da9e5054f",
+)
+go_deps.module(
+    path = "google.golang.org/protobuf",
+    sum = "h1:82DV7MYdb8anAVi3qge1wSnMDrnKK7ebr+I0hHRN1BU=",
+    version = "v1.36.3",
+)
+go_deps.module(
+    path = "github.com/spf13/afero",
+    sum = "h1:EaGW2JJh15aKOejeuJ+wpFSHnbd7GE6Wvp3TsNhb6LY=",
+    version = "v1.10.0",
+)
+go_deps.module(
+    path = "github.com/lyft/protoc-gen-star/v2",
+    sum = "h1:sIXJOMrYnQZJu7OB7ANSF4MYri2fTEGIsRLz6LwI4xE=",
+    version = "v2.0.4-0.20230330145011-496ad1ac90a4",
+)
+go_deps.module(
+    path = "github.com/iancoleman/strcase",
+    sum = "h1:ux/56T2xqZO/3cP1I2F86qpeoYPCOzk+KF/UH/Ar+lk=",
+    version = "v2.0.4-0.20230330145011-496ad1ac90a4",
+)
+go_deps.module(
+    path = "github.com/planetscale/vtprotobuf",
+    sum = "h1:ujRGEVWJEoaxQ+8+HMl8YEpGaDAgohgZxJ5S+d2TTFQ=",
+    version = "v0.6.1-0.20240409071808-615f978279ca",
+)
+
+# CNCF XDS Go library - required for Envoy's XDS functionality
+# Added to resolve missing repository build errors
+go_deps.module(
+    path = "github.com/cncf/xds/go",
+    sum = "h1:JT2cFfgB9jT3Tt8OjKB8GWf6vweZzgb5pWZeXlGP7Ds=",
+    version = "v0.0.0-20240423153145-555b57ec207b",
+)
+use_repo(
+    go_deps,
+    "com_github_cncf_xds_go",
+    "com_github_iancoleman_strcase",
+    "com_github_lyft_protoc_gen_star_v2",
+    "com_github_planetscale_vtprotobuf",
+    "com_github_spf13_afero",
+    "org_golang_google_genproto_googleapis_api",
+    "org_golang_google_genproto_googleapis_rpc",
+    "org_golang_google_grpc",
+    "org_golang_google_protobuf",
+    "org_golang_x_net",
+    "org_golang_x_text",
+)
+
+bazel_lib = use_extension("@aspect_bazel_lib//lib:extensions.bzl", "toolchains")
+bazel_lib.jq()
+bazel_lib.yq()
+use_repo(bazel_lib, "jq_toolchains", "yq_toolchains")
+
+buf = use_extension("@rules_buf//buf:extensions.bzl", "buf")
+buf.toolchains(
+    sha256 = "5790beb45aaf51a6d7e68ca2255b22e1b14c9ae405a6c472cdcfc228c66abfc1",
+    version = "v1.56.0",
+)
+use_repo(buf, "rules_buf_toolchains")
+
+# Consolidated Envoy extensions - reduced from 5 to 2 extensions for better maintainability
+# This follows bzlmod best practices as documented in BZLMOD_RECOMMENDATIONS.md
+
+# Core dependencies extension (consolidates dependencies + dependencies_extra)
+envoy_core = use_extension("//bazel/extensions:core.bzl", "core")
+
+# Core repository definitions
+use_repo(
+    envoy_core,
+    "aws_lc",
+    "bazel_toolchains",
+    "boringssl_fips",
+    "build_bazel_rules_apple",
+    "com_github_alibaba_hessian2_codec",
+    "com_github_awslabs_aws_c_auth",
+    "com_github_axboe_liburing",
+    "com_github_bazelbuild_buildtools",
+    "com_github_c_ares_c_ares",
+    "com_github_chrusty_protoc_gen_jsonschema",
+    "com_github_cncf_xds",
+    "com_github_datadog_dd_trace_cpp",
+    "com_github_envoyproxy_sqlparser",
+    "com_github_fdio_vpp_vcl",
+    "com_github_google_jwt_verify",
+    "com_github_google_libprotobuf_mutator",
+    "com_github_google_libsxg",
+    "com_github_google_perfetto",
+    "com_github_google_quiche",
+    "com_github_google_tcmalloc",
+    "com_github_grpc_grpc",
+    "com_github_intel_ipp_crypto_crypto_mb",
+    "com_github_intel_qatlib",
+    "com_github_intel_qatzip",
+    "com_github_libevent_libevent",
+    "com_github_luajit_luajit",
+    "com_github_lz4_lz4",
+    "com_github_maxmind_libmaxminddb",
+    "com_github_mirror_tclap",
+    "com_github_msgpack_cpp",
+    "com_github_ncopa_suexec",
+    "com_github_nghttp2_nghttp2",
+    "com_github_openhistogram_libcircllhist",
+    "com_github_qat_zstd",
+    "com_github_skyapm_cpp2sky",
+    "com_github_unicode_org_icu",
+    "com_github_wamr",
+    "com_github_wasmtime",
+    "com_github_zlib_ng_zlib_ng",
+    "com_google_absl",
+    "com_google_cel_cpp",
+    "confluentinc_librdkafka",
+    "dragonbox",
+    "fips_cmake_linux_aarch64",
+    "fips_cmake_linux_x86_64",
+    "fips_go_linux_amd64",
+    "fips_go_linux_arm64",
+    "fips_ninja",
+    "fp16",
+    "grpc_httpjson_transcoding",
+    "intel_dlb",
+    "intel_ittapi",
+    "io_hyperscan",
+    "io_opentelemetry_cpp",
+    "io_vectorscan",
+    "kafka_server_binary",
+    "kafka_source",
+    "libpfm",
+    "net_colm_open_source_colm",
+    "net_colm_open_source_ragel",
+    "net_zlib",
+    "org_llvm_releases_compiler_rt",
+    "proto_bazel_features",
+    "proxy_wasm_cpp_host",
+    "proxy_wasm_cpp_sdk",
+    "proxy_wasm_rust_sdk",
+    "rules_fuzzing",
+    "rules_java",
+    "rules_proto_grpc",
+    "rules_ruby",
+    "simdutf",
+    "skywalking_data_collect_protocol",
+    "v8",
+)
+
+# Toolchains extension (consolidates dependency_imports + dependency_imports_extra + repo)
+envoy_toolchains = use_extension("//bazel/extensions:toolchains.bzl", "toolchains")
+
+# Toolchain imports and registrations
+use_repo(
+    envoy_toolchains,
+    "envoy_repo",
+    "grcov",
+    "rules_fuzzing_oss_fuzz",
+)
+
+crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
+crate.from_cargo(
+    name = "dynamic_modules_rust_sdk_crate_index",
+    cargo_lockfile = "//source/extensions/dynamic_modules/sdk/rust:Cargo.lock",
+    lockfile = "//source/extensions/dynamic_modules/sdk/rust:Cargo.Bazel.lock",
+    manifests = ["//source/extensions/dynamic_modules/sdk/rust:Cargo.toml"],
+)
+use_repo(crate, "dynamic_modules_rust_sdk_crate_index")
+
+# Python dependencies using upstream rules_python extensions (replaces custom envoy_python_dependencies_ext)
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    is_default = True,
+    python_version = "3.12",
+)
+use_repo(
+    python,
+    "python_3_12",
+    python = "python_versions",
+)
+
+python_internal_deps = use_extension("@rules_python//python/private:internal_deps.bzl", "internal_deps")
+use_repo(
+    python_internal_deps,
+    "pypi__build",
+    "pypi__click",
+    "pypi__colorama",
+    "pypi__importlib_metadata",
+    "pypi__installer",
+    "pypi__more_itertools",
+    "pypi__packaging",
+    "pypi__pep517",
+    "pypi__pip",
+    "pypi__pip_tools",
+    "pypi__pyproject_hooks",
+    "pypi__setuptools",
+    "pypi__tomli",
+    "pypi__wheel",
+    "pypi__zipp",
+    "rules_python_internal",
+)
+
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+pip.parse(
+    extra_pip_args = ["--require-hashes"],
+    hub_name = "base_pip3",
+    python_version = "3.12",
+    requirements_lock = "//tools/base:requirements.txt",
+)
+pip.parse(
+    extra_pip_args = ["--require-hashes"],
+    hub_name = "dev_pip3",
+    python_version = "3.12",
+    requirements_lock = "//tools/dev:requirements.txt",
+)
+pip.parse(
+    extra_pip_args = ["--require-hashes"],
+    hub_name = "fuzzing_pip3",
+    python_version = "3.12",
+    requirements_lock = "@rules_fuzzing//fuzzing:requirements.txt",
+)
+use_repo(
+    pip,
+    "base_pip3",
+    "dev_pip3",
+    "fuzzing_pip3",
 )

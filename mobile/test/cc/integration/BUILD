@@ -9,13 +9,13 @@ envoy_cc_test(
     srcs = ["send_headers_test.cc"],
     repository = "@envoy",
     deps = [
-        "//library/cc:engine_builder_lib",
-        "//library/common:engine_types_lib",
-        "//library/common/http:header_utility_lib",
-        "//test/common/http/filters/assertion:filter_cc_proto",
-        "//test/common/integration:engine_with_test_server",
-        "//test/common/integration:test_server_lib",
         "@envoy_build_config//:test_extensions",
+        "@envoy_mobile//library/cc:engine_builder_lib",
+        "@envoy_mobile//library/common:engine_types_lib",
+        "@envoy_mobile//library/common/http:header_utility_lib",
+        "@envoy_mobile//test/common/http/filters/assertion:filter_cc_proto",
+        "@envoy_mobile//test/common/integration:engine_with_test_server",
+        "@envoy_mobile//test/common/integration:test_server_lib",
     ],
 )
 

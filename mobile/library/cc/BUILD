@@ -79,15 +79,15 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
-        "//library/common:engine_types_lib",
-        "//library/common:internal_engine_lib_no_stamp",
-        "//library/common/api:c_types",
-        "//library/common/bridge:utility_lib",
-        "//library/common/extensions/key_value/platform:config",
         "@com_google_absl//absl/types:optional",
         "@envoy//source/common/buffer:buffer_lib",
         "@envoy//source/common/http:header_map_lib",
         "@envoy//source/common/http:utility_lib",
+        "@envoy_mobile//library/common:engine_types_lib",
+        "@envoy_mobile//library/common:internal_engine_lib_no_stamp",
+        "@envoy_mobile//library/common/api:c_types",
+        "@envoy_mobile//library/common/bridge:utility_lib",
+        "@envoy_mobile//library/common/extensions/key_value/platform:config",
     ],
 )
 

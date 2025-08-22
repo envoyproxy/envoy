@@ -19,7 +19,14 @@ startup --host_jvm_args="-DBAZEL_TRACK_SOURCE_DIRECTORIES=1"
 # global
 #############################################################################
 
-common --noenable_bzlmod
+
+#############################################################################
+# global
+#############################################################################
+
+# Enable bzlmod for modern dependency management (hybrid mode with WORKSPACE)
+# This allows gradual migration from WORKSPACE to MODULE.bazel
+common --enable_bzlmod
 
 fetch --color=yes
 run --color=yes

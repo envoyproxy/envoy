@@ -14,8 +14,8 @@
 
 # This becomes the BUILD file for @local_config_cc// under non-BSD unixes.
 
-load(":cc_toolchain_config.bzl", "cc_toolchain_config")
 load(":armeabi_cc_toolchain_config.bzl", "armeabi_cc_toolchain_config")
+load(":cc_toolchain_config.bzl", "cc_toolchain_config")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -37,7 +37,10 @@ filegroup(
 
 filegroup(
     name = "compiler_deps",
-    srcs = glob(["extra_tools/**"], allow_empty = True) + [":builtin_include_directory_paths"],
+    srcs = glob(
+        ["extra_tools/**"],
+        allow_empty = True,
+    ) + [":builtin_include_directory_paths"],
 )
 
 # This is the entry point for --crosstool_top.  Toolchains are found
@@ -55,18 +58,18 @@ cc_toolchain_suite(
 
 cc_toolchain(
     name = "cc-compiler-k8",
-    toolchain_identifier = "local",
-    toolchain_config = ":local",
     all_files = ":compiler_deps",
     ar_files = ":compiler_deps",
     as_files = ":compiler_deps",
     compiler_files = ":compiler_deps",
     dwp_files = ":empty",
     linker_files = ":compiler_deps",
+    module_map = ":module.modulemap",
     objcopy_files = ":empty",
     strip_files = ":empty",
     supports_param_files = 1,
-    module_map = ":module.modulemap",
+    toolchain_config = ":local",
+    toolchain_identifier = "local",
 )
 
 cc_toolchain_config(
@@ -151,11 +154,10 @@ cc_toolchain_config(
     ],
 )
 
+
 # Android tooling requires a default toolchain for the armeabi-v7a cpu.
 cc_toolchain(
     name = "cc-compiler-armeabi-v7a",
-    toolchain_identifier = "stub_armeabi-v7a",
-    toolchain_config = ":stub_armeabi-v7a",
     all_files = ":empty",
     ar_files = ":empty",
     as_files = ":empty",
@@ -165,6 +167,8 @@ cc_toolchain(
     objcopy_files = ":empty",
     strip_files = ":empty",
     supports_param_files = 1,
+    toolchain_config = ":stub_armeabi-v7a",
+    toolchain_identifier = "stub_armeabi-v7a",
 )
 
 armeabi_cc_toolchain_config(name = "stub_armeabi-v7a")

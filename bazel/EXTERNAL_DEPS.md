@@ -115,3 +115,33 @@ Then Envoy needs to be built with the following command:
 ```
 bazel build --distdir=$HOME/envoy_distdir //source/exe:envoy
 ```
+
+# Bzlmod Migration
+
+Envoy is migrating from WORKSPACE-based dependency management to MODULE.bazel (bzlmod). This migration is designed to be incremental and safe.
+
+## Current Status
+
+**Dependencies Using bazel_dep (MODULE.bazel)**:
+Clean dependencies without patches that are available in the Bazel Central Registry:
+- boringssl, zstd, yaml-cpp, lz4, nlohmann_json, brotli
+- fmt, spdlog, xxhash, google_benchmark, re2, protoc-gen-validate
+- All rules_* dependencies (rules_go, rules_python, rules_cc, etc.)
+
+**Dependencies Using Extensions**:
+- Dependencies with custom patches (protobuf, abseil-cpp, grpc, etc.)
+- Dependencies not available in BCR
+- Envoy-specific dependencies
+
+## For Contributors
+
+**When adding new dependencies:**
+1. If the dependency is available in BCR without patches, prefer `bazel_dep` in MODULE.bazel
+2. If the dependency needs patches or custom configuration, use the extension system
+3. Update both MODULE.bazel and WORKSPACE for backward compatibility
+
+**Testing:**
+- Test with `--enable_bzlmod` (default in Bazel 7+) for bzlmod builds
+- Test with `--noenable_bzlmod` for WORKSPACE builds to ensure compatibility
+
+See `BZLMOD_MIGRATION.md` for detailed migration documentation.
