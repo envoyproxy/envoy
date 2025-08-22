@@ -72,6 +72,7 @@ struct ServerCompilationSettingsStats {
 #define ALL_SERVER_STATS(COUNTER, GAUGE, HISTOGRAM)                                                \
   COUNTER(debug_assertion_failures)                                                                \
   COUNTER(envoy_bug_failures)                                                                      \
+  COUNTER(envoy_notifications)                                                                     \
   COUNTER(dynamic_unknown_fields)                                                                  \
   COUNTER(static_unknown_fields)                                                                   \
   COUNTER(wip_protos)                                                                              \
@@ -160,9 +161,10 @@ public:
 class RunHelper : Logger::Loggable<Logger::Id::main> {
 public:
   RunHelper(Instance& instance, const Options& options, Event::Dispatcher& dispatcher,
-            Upstream::ClusterManager& cm, AccessLog::AccessLogManager& access_log_manager,
-            Init::Manager& init_manager, OverloadManager& overload_manager,
-            OverloadManager& null_overload_manager, std::function<void()> workers_start_cb);
+            Config::XdsManager& xds_manager, Upstream::ClusterManager& cm,
+            AccessLog::AccessLogManager& access_log_manager, Init::Manager& init_manager,
+            OverloadManager& overload_manager, OverloadManager& null_overload_manager,
+            std::function<void()> workers_start_cb);
 
 private:
   Init::WatcherImpl init_watcher_;
@@ -392,6 +394,7 @@ private:
       server_compilation_settings_stats_;
   Assert::ActionRegistrationPtr assert_action_registration_;
   Assert::ActionRegistrationPtr envoy_bug_action_registration_;
+  Assert::ActionRegistrationPtr envoy_notification_registration_;
   ThreadLocal::Instance& thread_local_;
   Random::RandomGeneratorPtr random_generator_;
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
@@ -450,6 +453,8 @@ private:
         : RaiiListElement<T>(callbacks, callback) {}
   };
 
+  uint32_t stats_eviction_counter_{0};
+
 #ifdef ENVOY_PERFETTO
   std::unique_ptr<perfetto::TracingSession> tracing_session_{};
   os_fd_t tracing_fd_{INVALID_HANDLE};
@@ -465,6 +470,8 @@ private:
 //                     copying and probably be a cleaner API in general.
 class MetricSnapshotImpl : public Stats::MetricSnapshot {
 public:
+  // MetricSnapshotImpl captures a snapshot of metrics by latching the delta usage, and optionally
+  // marking the stats as used.
   explicit MetricSnapshotImpl(Stats::Store& store, Upstream::ClusterManager& cluster_manager,
                               TimeSource& time_source);
 

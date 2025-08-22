@@ -102,7 +102,8 @@ message HealthCheck {
     // ``/healthcheck``.
     string path = 2 [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_VALUE}];
 
-    // [#not-implemented-hide:] HTTP specific payload.
+    // HTTP specific payload to be sent as the request body during health checking.
+    // If specified, the method should support a request body (POST, PUT, PATCH, etc.).
     Payload send = 3;
 
     // Specifies a list of HTTP expected responses to match in the first ``response_buffer_size`` bytes of the response body.
@@ -161,7 +162,8 @@ message HealthCheck {
     type.matcher.v3.StringMatcher service_name_matcher = 11;
 
     // HTTP Method that will be used for health checking, default is "GET".
-    // GET, HEAD, POST, PUT, DELETE, OPTIONS, TRACE, PATCH methods are supported, but making request body is not supported.
+    // GET, HEAD, POST, PUT, DELETE, OPTIONS, TRACE, PATCH methods are supported.
+    // Request body payloads are supported for POST, PUT, PATCH, and OPTIONS methods only.
     // CONNECT method is disallowed because it is not appropriate for health check request.
     // If a non-200 response is expected by the method, it needs to be set in :ref:`expected_statuses <envoy_v3_api_field_config.core.v3.HealthCheck.HttpHealthCheck.expected_statuses>`.
     RequestMethod method = 13 [(validate.rules).enum = {defined_only: true not_in: 6}];

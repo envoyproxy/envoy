@@ -177,7 +177,7 @@ modify different aspects of the server:
 .. http:get:: /config_dump?mask={}
 
   Specify a subset of fields that you would like to be returned. The mask is parsed as a
-  ``ProtobufWkt::FieldMask`` and applied to each top level dump such as
+  ``Protobuf::FieldMask`` and applied to each top level dump such as
   :ref:`BootstrapConfigDump <envoy_v3_api_msg_admin.v3.BootstrapConfigDump>` and
   :ref:`ClustersConfigDump <envoy_v3_api_msg_admin.v3.ClustersConfigDump>`.
   This behavior changes if both resource and mask query parameters are specified. See
@@ -225,7 +225,7 @@ modify different aspects of the server:
 
   When both resource and mask query parameters are specified, the mask is applied to every element
   in the desired repeated field so that only a subset of fields are returned. The mask is parsed
-  as a ``ProtobufWkt::FieldMask``.
+  as a ``Protobuf::FieldMask``.
 
   For example, get the names of all active dynamic clusters with
   ``/config_dump?resource=dynamic_active_clusters&mask=cluster.name``
@@ -288,7 +288,7 @@ modify different aspects of the server:
 .. http:get:: /init_dump?mask={}
 
   When mask query parameters is specified, the mask value is the desired component to dump unready targets.
-  The mask is parsed as a ``ProtobufWkt::FieldMask``.
+  The mask is parsed as a ``Protobuf::FieldMask``.
 
   For example, get the unready targets of all listeners with
   ``/init_dump?mask=listener``

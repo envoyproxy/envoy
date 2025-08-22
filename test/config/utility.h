@@ -437,7 +437,7 @@ public:
   void addRuntimeOverride(absl::string_view key, absl::string_view value);
 
   // Add typed_filter_metadata to the first listener.
-  void addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value);
+  void addListenerTypedMetadata(absl::string_view key, Protobuf::Any& packed_value);
 
   // Add filter_metadata to a cluster with the given name
   void addClusterFilterMetadata(absl::string_view metadata_yaml,

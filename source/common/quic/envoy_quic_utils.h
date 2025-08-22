@@ -174,8 +174,7 @@ Http::StreamResetReason quicErrorCodeToEnvoyRemoteResetReason(quic::QuicErrorCod
 Network::ConnectionSocketPtr
 createConnectionSocket(const Network::Address::InstanceConstSharedPtr& peer_addr,
                        Network::Address::InstanceConstSharedPtr& local_addr,
-                       const Network::ConnectionSocket::OptionsSharedPtr& options,
-                       bool prefer_gro = false);
+                       const Network::ConnectionSocket::OptionsSharedPtr& options);
 
 // Convert a cert in string form to X509 object.
 // Return nullptr if the bytes passed cannot be passed.

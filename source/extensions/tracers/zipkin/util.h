@@ -55,10 +55,10 @@ public:
    * @param value unt64_t number that will be represented in string.
    * @param name std::string that is the key for the value being replaced.
    * @param replacements a container to hold the required replacements when serializing this value.
-   * @return ProtobufWkt::Value wrapped uint64_t as a string.
+   * @return Protobuf::Value wrapped uint64_t as a string.
    */
-  static ProtobufWkt::Value uint64Value(uint64_t value, absl::string_view name,
-                                        Replacements& replacements);
+  static Protobuf::Value uint64Value(uint64_t value, absl::string_view name,
+                                     Replacements& replacements);
 };
 
 } // namespace Zipkin

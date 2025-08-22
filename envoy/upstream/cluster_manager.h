@@ -46,6 +46,13 @@ class EnvoyQuicNetworkObserverRegistry;
 
 } // namespace Quic
 
+namespace Config {
+// TODO(adisuissa): This forward declaration is needed because OD-CDS code is
+// part of the Envoy::Upstream namespace but should be eventually moved to the
+// Envoy::Config namespace (next to the XdsManager).
+class XdsManager;
+} // namespace Config
+
 namespace Upstream {
 
 /**
@@ -515,9 +522,9 @@ public:
 
   using OdCdsCreationFunction = std::function<absl::StatusOr<std::shared_ptr<OdCdsApi>>(
       const envoy::config::core::v3::ConfigSource& odcds_config,
-      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator, ClusterManager& cm,
-      MissingClusterNotifier& notifier, Stats::Scope& scope,
-      ProtobufMessage::ValidationVisitor& validation_visitor)>;
+      OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
+      Config::XdsManager& xds_manager, ClusterManager& cm, MissingClusterNotifier& notifier,
+      Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor)>;
 
   virtual absl::StatusOr<OdCdsApiHandlePtr>
   allocateOdCdsApi(OdCdsCreationFunction creation_function,

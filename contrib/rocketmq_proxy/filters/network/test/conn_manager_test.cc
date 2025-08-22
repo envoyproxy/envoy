@@ -366,7 +366,7 @@ route_config:
   initializeFilter(yaml);
 
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
-  ProtobufWkt::Struct topic_route_data;
+  Protobuf::Struct topic_route_data;
   auto* fields = topic_route_data.mutable_fields();
   (*fields)[RocketmqConstants::get().ReadQueueNum] = ValueUtil::numberValue(4);
   (*fields)[RocketmqConstants::get().WriteQueueNum] = ValueUtil::numberValue(4);
@@ -374,7 +374,7 @@ route_config:
   (*fields)[RocketmqConstants::get().BrokerName] = ValueUtil::stringValue("broker-a");
   (*fields)[RocketmqConstants::get().BrokerId] = ValueUtil::numberValue(0);
   (*fields)[RocketmqConstants::get().Perm] = ValueUtil::numberValue(6);
-  metadata->mutable_filter_metadata()->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
+  metadata->mutable_filter_metadata()->insert(Protobuf::MapPair<std::string, Protobuf::Struct>(
       NetworkFilterNames::get().RocketmqProxy, topic_route_data));
   host_->metadata(metadata);
   initializeCluster();
@@ -465,7 +465,7 @@ route_config:
   initializeFilter(yaml);
 
   auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
-  ProtobufWkt::Struct topic_route_data;
+  Protobuf::Struct topic_route_data;
   auto* fields = topic_route_data.mutable_fields();
   (*fields)[RocketmqConstants::get().ReadQueueNum] = ValueUtil::numberValue(4);
   (*fields)[RocketmqConstants::get().WriteQueueNum] = ValueUtil::numberValue(4);
@@ -473,7 +473,7 @@ route_config:
   (*fields)[RocketmqConstants::get().BrokerName] = ValueUtil::stringValue("broker-a");
   (*fields)[RocketmqConstants::get().BrokerId] = ValueUtil::numberValue(0);
   (*fields)[RocketmqConstants::get().Perm] = ValueUtil::numberValue(6);
-  metadata->mutable_filter_metadata()->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
+  metadata->mutable_filter_metadata()->insert(Protobuf::MapPair<std::string, Protobuf::Struct>(
       NetworkFilterNames::get().RocketmqProxy, topic_route_data));
   host_->metadata(metadata);
   initializeCluster();

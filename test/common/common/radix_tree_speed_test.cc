@@ -5,7 +5,7 @@
 
 #include "envoy/http/header_map.h"
 
-#include "source/common/common/trie_lookup_table.h"
+#include "source/common/common/radix_tree.h"
 #include "source/common/http/headers.h"
 
 #include "benchmark/benchmark.h"
@@ -15,12 +15,12 @@ namespace Envoy {
 // NOLINT(namespace-envoy)
 
 template <class TableType>
-static void typedBmTrieLookups(benchmark::State& state, std::vector<std::string>& keys) {
+static void typedBmRadixTreeLookups(benchmark::State& state, std::vector<std::string>& keys) {
   std::mt19937 prng(1); // PRNG with a fixed seed, for repeatability
   std::uniform_int_distribution<size_t> keyindex_distribution(0, keys.size() - 1);
-  TableType trie;
+  TableType radixtree;
   for (const std::string& key : keys) {
-    trie.add(key, nullptr);
+    radixtree.add(key, nullptr);
   }
   std::vector<size_t> key_selections;
   for (size_t i = 0; i < 1024; i++) {
@@ -29,12 +29,12 @@ static void typedBmTrieLookups(benchmark::State& state, std::vector<std::string>
 
   // key_index indexes into key_selections which is a pre-selected
   // random ordering of 1024 indexes into the existing keys. This
-  // way we read from all over the trie, without spending time during
+  // way we read from all over the radixtree, without spending time during
   // the performance test generating these random choices.
   size_t key_index = 0;
   for (auto _ : state) {
     UNREFERENCED_PARAMETER(_);
-    auto v = trie.find(keys[key_selections[key_index++]]);
+    auto v = radixtree.find(keys[key_selections[key_index++]]);
     // Reset key_index to 0 whenever it reaches 1024.
     key_index &= 1023;
     benchmark::DoNotOptimize(v);
@@ -44,7 +44,7 @@ static void typedBmTrieLookups(benchmark::State& state, std::vector<std::string>
 // Range args are:
 // 0 - num_keys
 // 1 - key_length (0 is a special case that generates mixed-length keys)
-template <class TableType> static void typedBmTrieLookups(benchmark::State& state) {
+template <class TableType> static void typedBmRadixTreeLookups(benchmark::State& state) {
   std::mt19937 prng(1); // PRNG with a fixed seed, for repeatability
   int num_keys = state.range(0);
   int key_length = state.range(1);
@@ -63,27 +63,27 @@ template <class TableType> static void typedBmTrieLookups(benchmark::State& stat
     std::string key = make_key(key_length_distribution(prng));
     keys.push_back(std::move(key));
   }
-  typedBmTrieLookups<TableType>(state, keys);
+  typedBmRadixTreeLookups<TableType>(state, keys);
 }
 
-static void bmTrieLookups(benchmark::State& s) {
-  typedBmTrieLookups<TrieLookupTable<const void*>>(s);
+static void bmRadixTreeLookups(benchmark::State& s) {
+  typedBmRadixTreeLookups<RadixTree<const void*>>(s);
 }
 
 #define ADD_HEADER_TO_KEYS(name) keys.emplace_back(Http::Headers::get().name);
-static void bmTrieLookupsRequestHeaders(benchmark::State& s) {
+static void bmRadixTreeLookupsRequestHeaders(benchmark::State& s) {
   std::vector<std::string> keys;
   INLINE_REQ_HEADERS(ADD_HEADER_TO_KEYS);
-  typedBmTrieLookups<TrieLookupTable<const void*>>(s, keys);
+  typedBmRadixTreeLookups<RadixTree<const void*>>(s, keys);
 }
-static void bmTrieLookupsResponseHeaders(benchmark::State& s) {
+static void bmRadixTreeLookupsResponseHeaders(benchmark::State& s) {
   std::vector<std::string> keys;
   INLINE_RESP_HEADERS(ADD_HEADER_TO_KEYS);
-  typedBmTrieLookups<TrieLookupTable<const void*>>(s, keys);
+  typedBmRadixTreeLookups<RadixTree<const void*>>(s, keys);
 }
 
-BENCHMARK(bmTrieLookupsRequestHeaders);
-BENCHMARK(bmTrieLookupsResponseHeaders);
-BENCHMARK(bmTrieLookups)->ArgsProduct({{10, 100, 1000, 10000}, {0, 8, 128}});
+BENCHMARK(bmRadixTreeLookupsRequestHeaders);
+BENCHMARK(bmRadixTreeLookupsResponseHeaders);
+BENCHMARK(bmRadixTreeLookups)->ArgsProduct({{10, 100, 1000, 10000}, {0, 8, 128}});
 
 } // namespace Envoy

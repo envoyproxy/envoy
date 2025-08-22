@@ -377,6 +377,21 @@ TEST_F(DatadogTracerSpanTest, SetSampledFalse) {
   EXPECT_EQ(-1, found->second);
 }
 
+TEST_F(DatadogTracerSpanTest, UseLocalDecisionDefault) {
+  Span span{std::move(span_)};
+  EXPECT_EQ(false, span.useLocalDecision());
+}
+
+TEST_F(DatadogTracerSpanTest, UseLocalDecisionTrue) {
+  Span span{std::move(span_), true};
+  EXPECT_EQ(true, span.useLocalDecision());
+}
+
+TEST_F(DatadogTracerSpanTest, UseLocalDecisionFalse) {
+  Span span{std::move(span_), false};
+  EXPECT_EQ(false, span.useLocalDecision());
+}
+
 TEST_F(DatadogTracerSpanTest, Baggage) {
   // Baggage is not supported by dd-trace-cpp, so `Span::getBaggage` and
   // `Span::setBaggage` do nothing.

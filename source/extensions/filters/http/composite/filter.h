@@ -47,7 +47,7 @@ public:
   }
 
 private:
-  std::unique_ptr<ProtobufWkt::Struct> buildProtoStruct() const;
+  std::unique_ptr<Protobuf::Struct> buildProtoStruct() const;
 
   absl::flat_hash_map<std::string, std::string> actions_;
 };

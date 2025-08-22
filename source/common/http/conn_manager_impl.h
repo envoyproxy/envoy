@@ -332,10 +332,13 @@ private:
 
     void refreshCachedRoute(const Router::RouteCallback& cb);
 
-    void refreshCachedTracingCustomTags();
     void refreshDurationTimeout();
     void refreshIdleTimeout();
     void refreshAccessLogFlushTimer();
+    void refreshTracing();
+
+    void setRequestDecorator(RequestHeaderMap& headers);
+    void setResponseDecorator(ResponseHeaderMap& headers);
 
     // All state for the stream. Put here for readability.
     struct State {
@@ -369,6 +372,9 @@ private:
       bool is_tunneling_ : 1;
 
       bool decorated_propagate_ : 1;
+
+      // True if the decorator operation is overridden by the request header.
+      bool decorator_overriden_ : 1 = false;
 
       // Indicates that sending headers to the filter manager is deferred to the
       // next I/O cycle. If data or trailers are received when this flag is set
@@ -405,13 +411,6 @@ private:
     friend std::ostream& operator<<(std::ostream& os, const ActiveStream& s) {
       s.dumpState(os);
       return os;
-    }
-
-    Tracing::CustomTagMap& getOrMakeTracingCustomTagMap() {
-      if (tracing_custom_tags_ == nullptr) {
-        tracing_custom_tags_ = std::make_unique<Tracing::CustomTagMap>();
-      }
-      return *tracing_custom_tags_;
     }
 
     // Note: this method is a noop unless ENVOY_ENABLE_UHV is defined
@@ -505,9 +504,7 @@ private:
     absl::InlinedVector<Router::RouteConstSharedPtr, 3> cleared_cached_routes_;
 
     absl::optional<Upstream::ClusterInfoConstSharedPtr> cached_cluster_info_;
-    const std::string* decorated_operation_{nullptr};
     absl::optional<std::unique_ptr<RouteConfigUpdateRequester>> route_config_update_requester_;
-    std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
     Http::ServerHeaderValidatorPtr header_validator_;
 
     friend FilterManager;
@@ -517,7 +514,7 @@ private:
     // returned by the public tracingConfig() method.
     // Tracing::TracingConfig
     Tracing::OperationName operationName() const override;
-    const Tracing::CustomTagMap* customTags() const override;
+    void modifySpan(Tracing::Span& span) const override;
     bool verbose() const override;
     uint32_t maxPathTagLength() const override;
     bool spawnUpstreamSpan() const override;
@@ -526,6 +523,7 @@ private:
     std::unique_ptr<Buffer::OwnedImpl> deferred_data_;
     std::queue<MetadataMapPtr> deferred_metadata_;
     RequestTrailerMapPtr deferred_request_trailers_;
+    const bool trace_refresh_after_route_refresh_{true};
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
@@ -674,6 +672,9 @@ private:
   // request was incomplete at response completion, the stream is reset.
 
   const bool allow_upstream_half_close_{};
+
+  // Whether the connection manager is drained due to premature resets.
+  bool drained_due_to_premature_resets_{false};
 };
 
 } // namespace Http

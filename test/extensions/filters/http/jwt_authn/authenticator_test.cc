@@ -65,7 +65,7 @@ public:
                    google::jwt_verify::getStatusString(expected_status).c_str());
     };
     auto set_extracted_jwt_data_cb = [this](const std::string& name,
-                                            const ProtobufWkt::Struct& extracted_data) {
+                                            const Protobuf::Struct& extracted_data) {
       this->addExtractedData(name, extracted_data);
     };
     initTokenExtractor();
@@ -86,7 +86,7 @@ public:
 
   // This is like ContextImpl::addExtractedData in
   // source/extensions/filters/http/jwt_authn/verifier.cc.
-  void addExtractedData(const std::string& name, const ProtobufWkt::Struct& extracted_data) {
+  void addExtractedData(const std::string& name, const Protobuf::Struct& extracted_data) {
     *(*out_extracted_data_.mutable_fields())[name].mutable_struct_value() = extracted_data;
   }
 
@@ -98,7 +98,7 @@ public:
   JwksFetcherPtr fetcher_;
   AuthenticatorPtr auth_;
   ::google::jwt_verify::JwksPtr jwks_;
-  ProtobufWkt::Struct out_extracted_data_;
+  Protobuf::Struct out_extracted_data_;
   NiceMock<Tracing::MockSpan> parent_span_;
 };
 
@@ -318,7 +318,7 @@ TEST_F(AuthenticatorTest, TestSetPayload) {
   // Only one field is set.
   EXPECT_EQ(1, out_extracted_data_.fields().size());
 
-  ProtobufWkt::Value expected_payload;
+  Protobuf::Value expected_payload;
   TestUtility::loadFromJson(ExpectedPayloadJSON, expected_payload);
   EXPECT_TRUE(
       TestUtility::protoEqual(expected_payload, out_extracted_data_.fields().at("my_payload")));
@@ -350,7 +350,7 @@ TEST_F(AuthenticatorTest, TestSetPayloadWithSpaces) {
   // Only one field is set.
   EXPECT_EQ(1, out_extracted_data_.fields().size());
 
-  ProtobufWkt::Value expected_payload;
+  Protobuf::Value expected_payload;
   TestUtility::loadFromJson(ExpectedPayloadJSONWithSpaces, expected_payload);
   EXPECT_TRUE(
       TestUtility::protoEqual(expected_payload, out_extracted_data_.fields().at("my_payload")));
@@ -377,7 +377,7 @@ TEST_F(AuthenticatorTest, TestSetHeader) {
   EXPECT_EQ(1, out_extracted_data_.fields().size());
 
   // We should expect empty JWT payload.
-  ProtobufWkt::Value expected_payload;
+  Protobuf::Value expected_payload;
   TestUtility::loadFromJson(ExpectedHeaderJSON, expected_payload);
   EXPECT_TRUE(
       TestUtility::protoEqual(expected_payload, out_extracted_data_.fields().at("my_header")));
@@ -604,12 +604,12 @@ TEST_F(AuthenticatorTest, TestSetPayloadAndHeader) {
   EXPECT_EQ(2, out_extracted_data_.fields().size());
 
   // We should expect both JWT payload and header are set.
-  ProtobufWkt::Value expected_payload;
+  Protobuf::Value expected_payload;
   TestUtility::loadFromJson(ExpectedPayloadJSON, expected_payload);
   EXPECT_TRUE(
       TestUtility::protoEqual(expected_payload, out_extracted_data_.fields().at("my_payload")));
 
-  ProtobufWkt::Value expected_header;
+  Protobuf::Value expected_header;
   TestUtility::loadFromJson(ExpectedHeaderJSON, expected_header);
   EXPECT_TRUE(
       TestUtility::protoEqual(expected_header, out_extracted_data_.fields().at("my_header")));
@@ -1102,7 +1102,7 @@ public:
       ASSERT_EQ(status, expected_status);
     };
     auto set_extracted_jwt_data_cb = [this](const std::string& name,
-                                            const ProtobufWkt::Struct& extracted_data) {
+                                            const Protobuf::Struct& extracted_data) {
       out_name_ = name;
       out_extracted_data_ = extracted_data;
     };
@@ -1120,7 +1120,7 @@ public:
   ExtractorConstPtr extractor_;
   NiceMock<Tracing::MockSpan> parent_span_;
   std::string out_name_;
-  ProtobufWkt::Struct out_extracted_data_;
+  Protobuf::Struct out_extracted_data_;
 };
 
 TEST_F(AuthenticatorJwtCacheTest, TestNonProvider) {
@@ -1183,7 +1183,7 @@ TEST_F(AuthenticatorJwtCacheTest, TestCacheHit) {
   // Payload is set
   EXPECT_EQ(out_name_, "my_payload");
 
-  ProtobufWkt::Struct expected_payload;
+  Protobuf::Struct expected_payload;
   TestUtility::loadFromJson(ExpectedPayloadJSON, expected_payload);
   EXPECT_TRUE(TestUtility::protoEqual(out_extracted_data_, expected_payload));
 }

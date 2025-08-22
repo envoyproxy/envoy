@@ -24,7 +24,7 @@ LocalReplyBodyFormatter::formatWithContext(const HttpFormatterContext& context,
   return std::string(context.localReplyBody());
 }
 
-ProtobufWkt::Value
+Protobuf::Value
 LocalReplyBodyFormatter::formatValueWithContext(const HttpFormatterContext& context,
                                                 const StreamInfo::StreamInfo&) const {
   return ValueUtil::stringValue(std::string(context.localReplyBody()));
@@ -36,7 +36,7 @@ AccessLogTypeFormatter::formatWithContext(const HttpFormatterContext& context,
   return AccessLogType_Name(context.accessLogType());
 }
 
-ProtobufWkt::Value
+Protobuf::Value
 AccessLogTypeFormatter::formatValueWithContext(const HttpFormatterContext& context,
                                                const StreamInfo::StreamInfo&) const {
   return ValueUtil::stringValue(AccessLogType_Name(context.accessLogType()));
@@ -70,7 +70,7 @@ absl::optional<std::string> HeaderFormatter::format(const Http::HeaderMap& heade
   return std::string(val);
 }
 
-ProtobufWkt::Value HeaderFormatter::formatValue(const Http::HeaderMap& headers) const {
+Protobuf::Value HeaderFormatter::formatValue(const Http::HeaderMap& headers) const {
   const Http::HeaderEntry* header = findHeader(headers);
   if (!header) {
     return SubstitutionFormatUtils::unspecifiedValue();
@@ -92,7 +92,7 @@ ResponseHeaderFormatter::formatWithContext(const HttpFormatterContext& context,
   return HeaderFormatter::format(context.responseHeaders());
 }
 
-ProtobufWkt::Value
+Protobuf::Value
 ResponseHeaderFormatter::formatValueWithContext(const HttpFormatterContext& context,
                                                 const StreamInfo::StreamInfo&) const {
   return HeaderFormatter::formatValue(context.responseHeaders());
@@ -109,7 +109,7 @@ RequestHeaderFormatter::formatWithContext(const HttpFormatterContext& context,
   return HeaderFormatter::format(context.requestHeaders());
 }
 
-ProtobufWkt::Value
+Protobuf::Value
 RequestHeaderFormatter::formatValueWithContext(const HttpFormatterContext& context,
                                                const StreamInfo::StreamInfo&) const {
   return HeaderFormatter::formatValue(context.requestHeaders());
@@ -126,7 +126,7 @@ ResponseTrailerFormatter::formatWithContext(const HttpFormatterContext& context,
   return HeaderFormatter::format(context.responseTrailers());
 }
 
-ProtobufWkt::Value
+Protobuf::Value
 ResponseTrailerFormatter::formatValueWithContext(const HttpFormatterContext& context,
                                                  const StreamInfo::StreamInfo&) const {
   return HeaderFormatter::formatValue(context.responseTrailers());
@@ -156,15 +156,15 @@ HeadersByteSizeFormatter::formatWithContext(const HttpFormatterContext& context,
                                              context.responseTrailers()));
 }
 
-ProtobufWkt::Value
+Protobuf::Value
 HeadersByteSizeFormatter::formatValueWithContext(const HttpFormatterContext& context,
                                                  const StreamInfo::StreamInfo&) const {
   return ValueUtil::numberValue(extractHeadersByteSize(
       context.requestHeaders(), context.responseHeaders(), context.responseTrailers()));
 }
 
-ProtobufWkt::Value TraceIDFormatter::formatValueWithContext(const HttpFormatterContext& context,
-                                                            const StreamInfo::StreamInfo&) const {
+Protobuf::Value TraceIDFormatter::formatValueWithContext(const HttpFormatterContext& context,
+                                                         const StreamInfo::StreamInfo&) const {
   auto trace_id = context.activeSpan().getTraceId();
   if (trace_id.empty()) {
     return SubstitutionFormatUtils::unspecifiedValue();
@@ -236,7 +236,7 @@ GrpcStatusFormatter::formatWithContext(const HttpFormatterContext& context,
   PANIC_DUE_TO_CORRUPT_ENUM;
 }
 
-ProtobufWkt::Value
+Protobuf::Value
 GrpcStatusFormatter::formatValueWithContext(const HttpFormatterContext& context,
                                             const StreamInfo::StreamInfo& info) const {
   if (!Grpc::Common::isGrpcRequestHeaders(context.requestHeaders())) {
@@ -288,7 +288,7 @@ QueryParameterFormatter::formatWithContext(const HttpFormatterContext& context,
   return value;
 }
 
-ProtobufWkt::Value
+Protobuf::Value
 QueryParameterFormatter::formatValueWithContext(const HttpFormatterContext& context,
                                                 const StreamInfo::StreamInfo& stream_info) const {
   return ValueUtil::optionalStringValue(formatWithContext(context, stream_info));
@@ -334,7 +334,7 @@ absl::optional<std::string> PathFormatter::formatWithContext(const HttpFormatter
   return std::string(path_view);
 }
 
-ProtobufWkt::Value
+Protobuf::Value
 PathFormatter::formatValueWithContext(const HttpFormatterContext& context,
                                       const StreamInfo::StreamInfo& stream_info) const {
   return ValueUtil::optionalStringValue(formatWithContext(context, stream_info));

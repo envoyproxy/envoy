@@ -18,6 +18,7 @@
 #include "eval/public/cel_value.h"
 
 #include "xds/type/v3/cel.pb.h"
+#include "cel/expr/syntax.pb.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
@@ -94,13 +95,11 @@ BuilderPtr createBuilder(Protobuf::Arena* arena);
 // Gets the singleton expression builder. Must be called on the main thread.
 BuilderInstanceSharedPtr getBuilder(Server::Configuration::CommonFactoryContext& context);
 
-// Converts from CEL canonical to CEL v1alpha1
-absl::optional<google::api::expr::v1alpha1::Expr>
-getExpr(const ::xds::type::v3::CelExpression& expression);
+absl::optional<cel::expr::Expr> getExpr(const ::xds::type::v3::CelExpression& expression);
 
-// Creates an interpretable expression from a protobuf representation.
+// Creates an interpretable expression from the new CEL expr format.
 // Throws an exception if fails to construct a runtime expression.
-ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alpha1::Expr& expr);
+ExpressionPtr createExpression(Builder& builder, const cel::expr::Expr& expr);
 
 // Evaluates an expression for a request. The arena is used to hold intermediate computational
 // results and potentially the final value.

@@ -499,5 +499,20 @@ TEST(HashTest, AnyWithKnownTypeMismatch) {
   EXPECT_NE(hash(a1), hash(a2));
 }
 
+TEST(HashTest, ValidateRepeatedAnyMismatchingType) {
+  deterministichashtest::AnyContainer a1, a2;
+  deterministichashtest::Recursion value;
+  value.set_index(1);
+  a1.mutable_any()->PackFrom(value);
+  a2.mutable_any()->PackFrom(value);
+  // Set a2 Any to a mismatching invalid type.
+  a2.mutable_any()->set_type_url("RawMessage");
+  EXPECT_NE(hash(a1), hash(a2));
+
+  // Set a2 Any to a mismatching valid type.
+  a2.mutable_any()->set_type_url("google.protobuf.Struct");
+  EXPECT_NE(hash(a1), hash(a2));
+}
+
 } // namespace DeterministicProtoHash
 } // namespace Envoy

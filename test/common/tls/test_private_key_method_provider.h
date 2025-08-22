@@ -64,7 +64,7 @@ private:
 class TestPrivateKeyMethodProvider : public virtual Ssl::PrivateKeyMethodProvider {
 public:
   TestPrivateKeyMethodProvider(
-      const ProtobufWkt::Any& typed_config,
+      const Protobuf::Any& typed_config,
       Server::Configuration::TransportSocketFactoryContext& factory_context);
   // Ssl::PrivateKeyMethodProvider
   void registerPrivateKeyMethod(SSL* ssl, Ssl::PrivateKeyConnectionCallbacks& cb,

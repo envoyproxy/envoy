@@ -222,6 +222,12 @@ void BoundGenericUpstream::onEvent(Network::ConnectionEvent event) {
       encoder_decoder_->onConnectionClose(event);
     }
 
+    // Remove the connection event watcher callbacks since the upstream is already closed.
+    // If the upstream connection closes shortly after a frame that ends the stream is sent by the
+    // client codec, the downstream connection may end up being closed after this object has already
+    // been destroyed.
+    downstream_conn_.removeConnectionCallbacks(connection_event_watcher_);
+
     // If the downstream connection is not closed, close it.
     downstream_conn_.close(Network::ConnectionCloseType::FlushWrite);
   }

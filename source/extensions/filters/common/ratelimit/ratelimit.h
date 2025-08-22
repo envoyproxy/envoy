@@ -35,7 +35,7 @@ enum class LimitStatus {
 using DescriptorStatusList =
     std::vector<envoy::service::ratelimit::v3::RateLimitResponse_DescriptorStatus>;
 using DescriptorStatusListPtr = std::unique_ptr<DescriptorStatusList>;
-using DynamicMetadataPtr = std::unique_ptr<ProtobufWkt::Struct>;
+using DynamicMetadataPtr = std::unique_ptr<Protobuf::Struct>;
 
 /**
  * Async callbacks used during limit() calls.

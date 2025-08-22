@@ -53,11 +53,6 @@ jobs:
       contents: read
       packages: read
     secrets:
-      dockerhub-password: >-
-        ${{ needs.load.outputs.trusted
-            && fromJSON(needs.load.outputs.trusted)
-            && secrets.DOCKERHUB_PASSWORD
-            || '' }}
       gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
       gpg-key: >-
         ${{ needs.load.outputs.trusted
@@ -69,18 +64,27 @@ jobs:
             && fromJSON(needs.load.outputs.trusted)
             && secrets.ENVOY_GPG_MAINTAINER_KEY_PASSWORD
             || secrets.ENVOY_GPG_SNAKEOIL_KEY_PASSWORD }}
-    if: ${{ fromJSON(needs.load.outputs.request).run.publish || fromJSON(needs.load.outputs.request).run.verify }}
+    if: ${{ fromJSON(needs.load.outputs.request).run.release || fromJSON(needs.load.outputs.request).run.verify }}
     needs:
     - load
     uses: ./.github/workflows/_publish_build.yml
     name: Build
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+        - x64
+        - arm64
     with:
+      arch: ${{ matrix.arch }}
       gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
       request: ${{ needs.load.outputs.request }}
       trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
 
-  publish:
+  release:
     secrets:
+      dockerhub-password: ${{ secrets.DOCKERHUB_PASSWORD }}
+      dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
       ENVOY_CI_SYNC_APP_ID: >-
         ${{ needs.load.outputs.trusted
             && fromJSON(needs.load.outputs.trusted)
@@ -102,15 +106,25 @@ jobs:
             && secrets.ENVOY_CI_PUBLISH_APP_KEY
             || '' }}
       gcs-cache-key: ${{ secrets.GCS_CACHE_KEY }}
+      gpg-key: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_GPG_MAINTAINER_KEY
+            || secrets.ENVOY_GPG_SNAKEOIL_KEY }}
+      gpg-key-password: >-
+        ${{ needs.load.outputs.trusted
+            && fromJSON(needs.load.outputs.trusted)
+            && secrets.ENVOY_GPG_MAINTAINER_KEY_PASSWORD
+            || secrets.ENVOY_GPG_SNAKEOIL_KEY_PASSWORD }}
     permissions:
       contents: read
       packages: read
-    if: ${{ fromJSON(needs.load.outputs.request).run.publish }}
+    if: ${{ fromJSON(needs.load.outputs.request).run.release }}
     needs:
     - load
     - build
-    uses: ./.github/workflows/_publish_publish.yml
-    name: Publish
+    uses: ./.github/workflows/_publish_release.yml
+    name: Release
     with:
       gcs-cache-bucket: ${{ vars.ENVOY_CACHE_BUCKET }}
       request: ${{ needs.load.outputs.request }}
@@ -126,6 +140,7 @@ jobs:
     needs:
     - load
     - build
+    - release
     uses: ./.github/workflows/_publish_verify.yml
     name: Verify
     with:
@@ -146,12 +161,12 @@ jobs:
       && github.event.workflow_run.conclusion == 'success'
       && github.event.workflow_run.repository.full_name == github.repository
       && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
-      && (fromJSON(needs.load.outputs.request).run.publish
+      && (fromJSON(needs.load.outputs.request).run.release
           || fromJSON(needs.load.outputs.request).run.verify)
     needs:
     - load
     - build
-    - publish
+    - release
     - verify
     uses: ./.github/workflows/_finish.yml
     with:

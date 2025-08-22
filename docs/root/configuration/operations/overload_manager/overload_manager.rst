@@ -218,6 +218,14 @@ The following core load shed points are supported:
       rejected by this load shed point and there is no available capacity
       to serve the downstream request, the downstream request will fail.
 
+  * - envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch
+    - Envoy will send a ``GOAWAY`` while processing HTTP2 requests at the codec
+      level AND immediately force close the downstream connection. If both this and
+      ``http2_server_go_away_on_dispatch`` are configured and shouldShedLoad()
+      returns true for both, this takes precedence. This is a disruptive action
+      (causes downstream connections to ungracefully close) that should only be
+      used with a very high threshold (if at all).
+
 .. _config_overload_manager_reducing_timeouts:
 
 Reducing timeouts
