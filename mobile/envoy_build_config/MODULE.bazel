@@ -1,0 +1,10 @@
+module(
+    name = "envoy_build_config",
+    version = "0.0.0-dev",
+)
+
+bazel_dep(name = "envoy", version = "0.0.0-dev")
+local_path_override(
+    module_name = "envoy",
+    path = "../..",
+)
