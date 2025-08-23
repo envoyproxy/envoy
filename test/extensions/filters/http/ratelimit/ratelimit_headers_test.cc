@@ -107,9 +107,8 @@ public:
         {{{"x-ratelimit-limit", "1, 1;w=31536000;name=\"unit\""},
           {"x-ratelimit-remaining", "1"},
           {"x-ratelimit-reset", "1"}},
-         {buildDescriptorStatus(1,
-                                envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::YEAR,
-                                "unit", 1, 1)}},
+         {buildDescriptorStatus(
+             1, envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::YEAR, "unit", 1, 1)}},
         // Test with unit_multiplier - 5 requests per 30 seconds
         {{{"x-ratelimit-limit", "5, 5;w=30;name=\"custom_interval\""},
           {"x-ratelimit-remaining", "3"},
