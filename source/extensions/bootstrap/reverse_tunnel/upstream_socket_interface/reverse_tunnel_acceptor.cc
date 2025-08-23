@@ -1,16 +1,8 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
 
-#include <algorithm>
-#include <atomic>
-#include <future>
 #include <string>
-#include <thread>
 
-#include "source/common/api/os_sys_calls_impl.h"
-#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
-#include "source/common/common/random_generator.h"
-#include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/protobuf/utility.h"
@@ -114,8 +106,10 @@ ReverseTunnelAcceptor::socket(Envoy::Network::Socket::Type socket_type,
   // Emit a counter to aid diagnostics in NAT scenarios where direct connect will fail.
   if (extension_) {
     auto& scope = extension_->getStatsScope();
-    auto& counter = scope.counterFromString(
-        fmt::format("{}.fallback_no_reverse_socket", extension_->statPrefix()));
+    std::string counter_name =
+        fmt::format("{}.fallback_no_reverse_socket", extension_->statPrefix());
+    Stats::StatNameManagedStorage counter_name_storage(counter_name, scope.symbolTable());
+    auto& counter = scope.counterFromStatName(counter_name_storage.statName());
     counter.inc();
   }
   return Network::socketInterface(

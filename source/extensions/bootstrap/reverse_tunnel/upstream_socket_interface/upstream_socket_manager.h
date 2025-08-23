@@ -9,7 +9,6 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/io_handle.h"
-#include "envoy/network/listen_socket.h"
 #include "envoy/network/socket.h"
 #include "envoy/thread_local/thread_local.h"
 

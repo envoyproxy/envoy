@@ -1,19 +1,10 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 
-#include <algorithm>
-#include <atomic>
-#include <future>
 #include <string>
-#include <thread>
 
-#include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
 #include "source/common/common/random_generator.h"
-#include "source/common/network/address_impl.h"
-#include "source/common/network/io_socket_handle_impl.h"
-#include "source/common/network/socket_interface.h"
-#include "source/common/protobuf/utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 
