@@ -28,11 +28,6 @@ public:
                uint32_t timeout, absl::string_view path_prefix,
                Server::Configuration::CommonFactoryContext& context);
 
-  // Build config directly from HttpService without constructing a temporary ExtAuthz.
-  ClientConfig(const envoy::extensions::filters::http::ext_authz::v3::HttpService& http_service,
-               bool encode_raw_headers, uint32_t timeout,
-               Server::Configuration::CommonFactoryContext& context);
-
   /**
    * Returns the name of the authorization cluster.
    */
