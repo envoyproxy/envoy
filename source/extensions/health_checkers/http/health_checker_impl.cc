@@ -371,8 +371,8 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
     // If the expected response is set, check the first 1024 bytes of actual response if contains
     // the expected response.
     if (!PayloadMatcher::match(parent_.receive_bytes_, *response_body_)) {
-      ENVOY_CONN_LOG(warn, "hc failed: status_code={} reason=payload_mismatch health_flags={}", *client_,
-                     response_code, HostUtility::healthFlagsToString(*host_));
+      ENVOY_CONN_LOG(warn, "hc failed: status_code={} reason=payload_mismatch health_flags={}",
+                     *client_, response_code, HostUtility::healthFlagsToString(*host_));
 
       if (response_headers_->EnvoyImmediateHealthCheckFail() != nullptr) {
         host_->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
@@ -389,8 +389,8 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
     // seems like the least surprising behavior and we could consider relaxing this in the future.
     // TODO(mattklein123): This will not force a host set rebuild of the host was already failed.
     // This is something we could do in the future but seems unnecessary right now.
-    ENVOY_CONN_LOG(warn, "hc failed: status_code={} reason=unexpected_status health_flags={}", *client_,
-                   response_code, HostUtility::healthFlagsToString(*host_));
+    ENVOY_CONN_LOG(warn, "hc failed: status_code={} reason=unexpected_status health_flags={}",
+                   *client_, response_code, HostUtility::healthFlagsToString(*host_));
 
     if (response_headers_->EnvoyImmediateHealthCheckFail() != nullptr) {
       host_->healthFlagSet(Host::HealthFlag::EXCLUDED_VIA_IMMEDIATE_HC_FAIL);
@@ -415,8 +415,8 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
     if (parent_.service_name_matcher_->match(service_cluster_healthchecked)) {
       return degraded ? HealthCheckResult::Degraded : HealthCheckResult::Succeeded;
     } else {
-      ENVOY_CONN_LOG(warn, "hc failed: status_code={} reason=service_name_mismatch health_flags={}", *client_,
-                    response_code, HostUtility::healthFlagsToString(*host_));
+      ENVOY_CONN_LOG(warn, "hc failed: status_code={} reason=service_name_mismatch health_flags={}",
+                     *client_, response_code, HostUtility::healthFlagsToString(*host_));
       return HealthCheckResult::Failed;
     }
   }
