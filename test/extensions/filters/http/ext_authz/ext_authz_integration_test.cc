@@ -5,7 +5,6 @@
 
 #include "source/common/common/macros.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
-#include "source/extensions/filters/http/ext_authz/ext_authz.h"
 #include "source/server/config_validation/server.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -983,32 +982,6 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, ExtAuthzGrpcIntegrationTest,
                          testing::Combine(GRPC_CLIENT_INTEGRATION_PARAMS, testing::Bool(),
                                           testing::Bool()),
                          ExtAuthzGrpcIntegrationTest::testParamsToString);
-
-// Test per-route gRPC service configuration parsing
-TEST_P(ExtAuthzGrpcIntegrationTest, PerRouteGrpcServiceConfigurationParsing) {
-  // Create a simple per-route configuration with gRPC service
-  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
-  per_route_config.mutable_check_settings()
-      ->mutable_grpc_service()
-      ->mutable_envoy_grpc()
-      ->set_cluster_name("per_route_cluster");
-  (*per_route_config.mutable_check_settings()->mutable_context_extensions())["route_type"] =
-      "special";
-
-  // Test configuration parsing and validation
-  Envoy::Extensions::HttpFilters::ExtAuthz::FilterConfigPerRoute config_per_route(per_route_config);
-
-  // Verify the configuration was parsed correctly
-  ASSERT_TRUE(config_per_route.grpcService().has_value());
-  EXPECT_TRUE(config_per_route.grpcService().value().has_envoy_grpc());
-  EXPECT_EQ(config_per_route.grpcService().value().envoy_grpc().cluster_name(),
-            "per_route_cluster");
-
-  // Verify context extensions are present
-  const auto& check_settings = config_per_route.checkSettings();
-  ASSERT_TRUE(check_settings.context_extensions().contains("route_type"));
-  EXPECT_EQ(check_settings.context_extensions().at("route_type"), "special");
-}
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/1.1.

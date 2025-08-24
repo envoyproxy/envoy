@@ -476,7 +476,6 @@ message ExtAuthzPerRoute {
 }
 
 // Extra settings for the check request.
-// [#next-free-field: 6]
 message CheckSettings {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v2.CheckSettings";
@@ -514,16 +513,4 @@ message CheckSettings {
   // :ref:`disable_request_body_buffering <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.disable_request_body_buffering>`
   // may be specified.
   BufferSettings with_request_body = 3;
-
-  // Override the external authorization service for this route.
-  // This allows different routes to use different external authorization service backends
-  // and service types (gRPC or HTTP). If specified, this overrides the filter-level service
-  // configuration regardless of the original service type.
-  oneof service_override {
-    // Override with a gRPC service configuration.
-    config.core.v3.GrpcService grpc_service = 4;
-
-    // Override with an HTTP service configuration.
-    HttpService http_service = 5;
-  }
 }
