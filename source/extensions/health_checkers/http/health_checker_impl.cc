@@ -417,10 +417,10 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
     } else {
       ENVOY_CONN_LOG(debug, "connection/stream timeout health_flags={}", *client_,
                      HostUtility::healthFlagsToString(*host_));
-      ENVOY_CONN_LOG(warn, "hc failed: reason=service_name_mismatch host={} received={}", *client_,
-                     host_->address()->asString(),
-                     service_cluster_healthchecked.empty() ? "<empty>"
-                                                           : service_cluster_healthchecked);
+      // ENVOY_CONN_LOG(warn, "hc failed: reason=service_name_mismatch host={} received={}", *client_,
+      //                host_->address()->asString(),
+      //                service_cluster_healthchecked.empty() ? "<empty>"
+      //                                                      : service_cluster_healthchecked);
       return HealthCheckResult::Failed;
     }
   }
