@@ -82,8 +82,42 @@ public:
   Stats::StatNamePool stat_name_pool_;
   const Stats::StatName custom_stat_namespace_;
   // We only allow the module to create stats during envoy_dynamic_module_on_http_filter_config_new,
-  // and not later during request handling, so that we don't have to wrap the stat storage in a lock.
+  // and not later during request handling, so that we don't have to wrap the stat storage in a
+  // lock.
   bool stat_creation_frozen_ = false;
+
+  size_t addCounter(Stats::Counter& counter) {
+    size_t id = counters_.size();
+    counters_.push_back(counter);
+    return id;
+  }
+
+  Stats::Counter& getCounterById(size_t id) const {
+    ASSERT(id < counters_.size());
+    return counters_[id];
+  }
+
+  size_t addGauge(Stats::Gauge& gauge) {
+    size_t id = gauges_.size();
+    gauges_.push_back(gauge);
+    return id;
+  }
+
+  Stats::Gauge& getGaugeById(size_t id) const {
+    ASSERT(id < gauges_.size());
+    return gauges_[id];
+  }
+
+  size_t addHistogram(Stats::Histogram& hist) {
+    size_t id = hists_.size();
+    hists_.push_back(hist);
+    return id;
+  }
+
+  Stats::Histogram& getHistogramById(size_t id) const {
+    ASSERT(id < hists_.size());
+    return hists_[id];
+  }
 
 private:
   // The name of the filter passed in the constructor.
@@ -91,6 +125,11 @@ private:
 
   // The configuration for the module.
   const std::string filter_config_;
+
+  // The cached references to stats and their metadata.
+  std::vector<std::reference_wrapper<Stats::Counter>> counters_;
+  std::vector<std::reference_wrapper<Stats::Gauge>> gauges_;
+  std::vector<std::reference_wrapper<Stats::Histogram>> hists_;
 
   // The handle for the module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;

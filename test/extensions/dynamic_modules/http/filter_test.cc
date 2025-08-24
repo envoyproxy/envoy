@@ -105,6 +105,10 @@ TEST(DynamicModulesTest, StatsCallbacks) {
       stats_store.findGaugeByString("dynamicmodulescustom.concurrent_streams");
   EXPECT_TRUE(gauge.has_value());
   EXPECT_EQ(gauge->get().value(), 1);
+  Stats::GaugeOptConstRef magicNumberGauge =
+      stats_store.findGaugeByString("dynamicmodulescustom.magic_number");
+  EXPECT_TRUE(gauge.has_value());
+  EXPECT_EQ(magicNumberGauge->get().value(), 42);
   Stats::HistogramOptConstRef histogram =
       stats_store.findHistogramByString("dynamicmodulescustom.ones");
   EXPECT_TRUE(histogram.has_value());

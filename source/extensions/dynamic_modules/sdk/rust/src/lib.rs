@@ -373,17 +373,13 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
 /// mapping with the Envoy Http filter config object as well as [`HttpFilterConfig`] object.
 pub trait EnvoyHttpFilterConfig {
   /// Define a new counter scoped to this filter config with the given name.
-  // TODO what to do in these APIs when counter creation is frozen and we get a
-  // nullptr back? Unlike other APIs used so far in dynamic modules that can
-  // return nullptrs, it always indicates a programming error. Is it really
-  // correct to surface such an error in this trait? Or should we panic?
-  fn define_counter(&self, name: &str) -> EnvoyCounter;
+  fn define_counter(&mut self, name: &str) -> EnvoyCounterId;
 
   /// Define a new gauge scoped to this filter config with the given name.
-  fn define_gauge(&self, name: &str) -> EnvoyGauge;
+  fn define_gauge(&mut self, name: &str) -> EnvoyGaugeId;
 
   /// Define a new histogram scoped to this filter config with the given name.
-  fn define_histogram(&self, name: &str) -> EnvoyHistogram;
+  fn define_histogram(&mut self, name: &str) -> EnvoyHistogramId;
 }
 
 pub struct EnvoyHttpFilterConfigImpl {
@@ -391,101 +387,57 @@ pub struct EnvoyHttpFilterConfigImpl {
 }
 
 impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
-  fn define_counter(&self, name: &str) -> EnvoyCounter {
+  fn define_counter(&mut self, name: &str) -> EnvoyCounterId {
     let name_ptr = name.as_ptr();
     let name_size = name.len();
-    let counter_ptr = unsafe {
-      abi::envoy_dynamic_module_callback_metric_define_counter(
+    let id = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_define_counter(
         self.raw_ptr,
         name_ptr as *const _ as *mut _,
         name_size,
       )
     };
-    EnvoyCounter {
-      raw_ptr: counter_ptr,
-    }
+    EnvoyCounterId(id)
   }
 
-  fn define_gauge(&self, name: &str) -> EnvoyGauge {
+  fn define_gauge(&mut self, name: &str) -> EnvoyGaugeId {
     let name_ptr = name.as_ptr();
     let name_size = name.len();
-    let gauge_ptr = unsafe {
-      abi::envoy_dynamic_module_callback_metric_define_gauge(
+    let id = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_define_gauge(
         self.raw_ptr,
         name_ptr as *const _ as *mut _,
         name_size,
       )
     };
-    EnvoyGauge { raw_ptr: gauge_ptr }
+    EnvoyGaugeId(id)
   }
 
-  fn define_histogram(&self, name: &str) -> EnvoyHistogram {
+  fn define_histogram(&mut self, name: &str) -> EnvoyHistogramId {
     let name_ptr = name.as_ptr();
     let name_size = name.len();
-    let histogram_ptr = unsafe {
-      abi::envoy_dynamic_module_callback_metric_define_histogram(
+    let id = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_define_histogram(
         self.raw_ptr,
         name_ptr as *const _ as *mut _,
         name_size,
       )
     };
-    EnvoyHistogram {
-      raw_ptr: histogram_ptr,
-    }
+    EnvoyHistogramId(id)
   }
 }
 
-/// An opaque object that represents an underlying Envoy Stats::Counter that's
-/// been previously defined on an EnvoyHttpFilterConfig.
-#[derive(Copy, Clone)]
-pub struct EnvoyCounter {
-  raw_ptr: abi::envoy_dynamic_module_type_metric_counter_envoy_ptr,
-}
+/// The identifier for an EnvoyCounter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EnvoyCounterId(usize);
 
-impl EnvoyCounter {
-  /// Increment this counter by the given value.
-  pub fn increment(&self, value: u64) {
-    unsafe { abi::envoy_dynamic_module_callback_metric_increment_counter(self.raw_ptr, value) }
-  }
-}
+/// The identifier for an EnvoyGauge.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EnvoyGaugeId(usize);
 
-/// An opaque object that represents an underlying Envoy Stats::Gauge that's
-/// been previously defined on an EnvoyHttpFilterConfig.
-#[derive(Copy, Clone)]
-pub struct EnvoyGauge {
-  raw_ptr: abi::envoy_dynamic_module_type_metric_gauge_envoy_ptr,
-}
-
-impl EnvoyGauge {
-  /// Increase this gauge by the given value.
-  pub fn increase(&self, value: u64) {
-    unsafe { abi::envoy_dynamic_module_callback_metric_increase_gauge(self.raw_ptr, value) }
-  }
-
-  /// Decrease this gauge by the given value.
-  pub fn decrease(&self, value: u64) {
-    unsafe { abi::envoy_dynamic_module_callback_metric_decrease_gauge(self.raw_ptr, value) }
-  }
-
-  /// Set this gauge to the given value.
-  pub fn set(&self, value: u64) {
-    unsafe { abi::envoy_dynamic_module_callback_metric_set_gauge(self.raw_ptr, value) }
-  }
-}
-
-/// An opaque object that represents an underlying Envoy Stats::Histogram that's
-/// been previously defined on an EnvoyHttpFilterConfig.
-#[derive(Copy, Clone)]
-pub struct EnvoyHistogram {
-  raw_ptr: abi::envoy_dynamic_module_type_metric_histogram_envoy_ptr,
-}
-
-impl EnvoyHistogram {
-  /// Record the given value in this histogram.
-  pub fn record_value(&self, value: u64) {
-    unsafe { abi::envoy_dynamic_module_callback_metric_record_histogram_value(self.raw_ptr, value) }
-  }
-}
+/// The identifier for an EnvoyHistogram.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EnvoyHistogramId(usize);
 
 /// An opaque object that represents the underlying Envoy Http filter. This has one to one
 /// mapping with the Envoy Http filter object as well as [`HttpFilter`] object per HTTP stream.
@@ -888,6 +840,21 @@ pub trait EnvoyHttpFilter {
   /// }
   /// ```
   fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterScheduler>;
+
+  /// Increment the counter with the given id.
+  fn increment_counter(&self, id: EnvoyCounterId, value: u64);
+
+  /// Increase the gauge with the given id.
+  fn increase_gauge(&self, id: EnvoyGaugeId, value: u64);
+
+  /// Decrease the gauge with the given id.
+  fn decrease_gauge(&self, id: EnvoyGaugeId, value: u64);
+
+  /// Set the value of the gauge with the given id.
+  fn set_gauge(&self, id: EnvoyGaugeId, value: u64);
+
+  /// Record a value in the histogram with the given id.
+  fn record_histogram_value(&self, id: EnvoyHistogramId, value: u64);
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -1439,6 +1406,45 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       Box::new(EnvoyHttpFilterSchedulerImpl {
         raw_ptr: scheduler_ptr,
       })
+    }
+  }
+
+  fn increment_counter(&self, id: EnvoyCounterId, value: u64) {
+    let EnvoyCounterId(id) = id;
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_increment_counter(self.raw_ptr, id, value);
+    }
+  }
+
+  fn increase_gauge(&self, id: EnvoyGaugeId, value: u64) {
+    let EnvoyGaugeId(id) = id;
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_increase_gauge(self.raw_ptr, id, value);
+    }
+  }
+
+  fn decrease_gauge(&self, id: EnvoyGaugeId, value: u64) {
+    let EnvoyGaugeId(id) = id;
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_decrease_gauge(self.raw_ptr, id, value);
+    }
+  }
+
+  fn set_gauge(&self, id: EnvoyGaugeId, value: u64) {
+    let EnvoyGaugeId(id) = id;
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_set_gauge(self.raw_ptr, id, value);
+    }
+  }
+
+  fn record_histogram_value(&self, id: EnvoyHistogramId, value: u64) {
+    let EnvoyHistogramId(id) = id;
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_record_histogram_value(
+        self.raw_ptr,
+        id,
+        value,
+      );
     }
   }
 }
