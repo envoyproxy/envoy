@@ -30,9 +30,8 @@ DnsSrvCluster::DnsSrvCluster(
       respect_dns_ttl_(cluster.respect_dns_ttl()),
       resolve_timer_(context.serverFactoryContext().mainThreadDispatcher().createTimer(
           [this]() -> void { startResolve(); })),
-      local_info_(context.serverFactoryContext().localInfo()), dns_srv_cluster_(dns_srv_cluster) {
-
-  dns_lookup_family_ = getDnsLookupFamilyFromCluster(cluster);
+      local_info_(context.serverFactoryContext().localInfo()), dns_srv_cluster_(dns_srv_cluster),
+      dns_lookup_family_(getDnsLookupFamilyFromCluster(cluster)) {
 
   load_assignment_.add_endpoints()->add_lb_endpoints()->set_endpoint_name(
       dns_srv_cluster_.srv_name());
@@ -57,7 +56,7 @@ void DnsSrvCluster::startResolve() {
   ENVOY_LOG(debug, "starting async DNS resolution for {}", dns_srv_cluster_.srv_name());
   info_->configUpdateStats().update_attempt_.inc();
 
-  active_resolve_list_.reset(new ResolveList(*this));
+  active_resolve_list_ = std::make_unique<ResolveList>(*this);
 
   active_dns_query_ = dns_resolver_->resolveSrv(
       dns_srv_cluster_.srv_name(),
@@ -78,15 +77,15 @@ void DnsSrvCluster::startResolve() {
                     dns.srv().target_, 0, false);
                 address != nullptr) {
               // SRV record target is an IP address, not a hostname.
-              ResolveTargetPtr target = ResolveTargetPtr(
-                  new ResolveTarget(*active_resolve_list_, dns_resolver_, dns_lookup_family_,
-                                    dns.srv().target_, dns.srv().port_));
+              ResolveTargetPtr target = std::make_unique<ResolveTarget>(
+                  *active_resolve_list_, dns_resolver_, dns_lookup_family_, dns.srv().target_,
+                  dns.srv().priority_, dns.srv().weight_, dns.srv().port_);
 
               active_resolve_list_->addResolvedTarget(std::move(target), address);
             } else {
-              active_resolve_list_->addTarget(ResolveTargetPtr(
-                  new ResolveTarget(*active_resolve_list_, dns_resolver_, dns_lookup_family_,
-                                    dns.srv().target_, dns.srv().port_)));
+              active_resolve_list_->addTarget(std::make_unique<ResolveTarget>(
+                  *active_resolve_list_, dns_resolver_, dns_lookup_family_, dns.srv().target_,
+                  dns.srv().priority_, dns.srv().weight_, dns.srv().port_));
             }
           }
 
@@ -106,7 +105,7 @@ void DnsSrvCluster::allTargetsResolved() {
   absl::flat_hash_set<std::string> all_new_hosts;
 
   const auto& locality_lb_endpoints = load_assignment_.endpoints()[0];
-  const auto& lb_endpoint_ = load_assignment_.endpoints()[0].lb_endpoints()[0];
+  const auto& lb_endpoint = load_assignment_.endpoints()[0].lb_endpoints()[0];
 
   PriorityStateManager priority_state_manager(*this, local_info_, nullptr, random_);
   priority_state_manager.initializePriorityFor(locality_lb_endpoints);
@@ -137,12 +136,12 @@ void DnsSrvCluster::allTargetsResolved() {
       auto host_or_status = HostImpl::create(
           info_, target->srv_record_hostname_, address,
           // TODO(zyfjeff): Created through metadata shared pool
-          std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint_.metadata()),
+          std::make_shared<const envoy::config::core::v3::Metadata>(lb_endpoint.metadata()),
           std::make_shared<const envoy::config::core::v3::Metadata>(
               locality_lb_endpoints.metadata()),
-          lb_endpoint_.load_balancing_weight().value(), locality_lb_endpoints.locality(),
-          lb_endpoint_.endpoint().health_check_config(), locality_lb_endpoints.priority(),
-          lb_endpoint_.health_status(), time_source_);
+          target->weight_, locality_lb_endpoints.locality(),
+          lb_endpoint.endpoint().health_check_config(), target->priority_,
+          lb_endpoint.health_status(), time_source_);
 
       if (!host_or_status.ok()) {
         info_->configUpdateStats().update_failure_.inc();
@@ -207,7 +206,6 @@ void DnsSrvCluster::allTargetsResolved() {
   resolve_timer_->enableTimer(final_refresh_rate_ms);
 }
 
-/////////////  DnsSrvCluster::ResolveList::ResolveList  //////////////////
 DnsSrvCluster::ResolveList::ResolveList(DnsSrvCluster& parent)
     : parent_(parent), dns_ttl_refresh_rate_(std::chrono::seconds::max()) {}
 
@@ -263,14 +261,14 @@ std::chrono::seconds DnsSrvCluster::ResolveList::dnsTtlRefreshRate() const {
   return dns_ttl_refresh_rate_;
 }
 
-/////////////  DnsSrvCluster::ResolveList::ResolveTarget  //////////////////
-
 DnsSrvCluster::ResolveTarget::ResolveTarget(DnsSrvCluster::ResolveList& parent,
                                             Network::DnsResolverSharedPtr dns_resolver,
                                             Network::DnsLookupFamily dns_lookup_family,
-                                            const std::string& dns_address, const uint32_t dns_port)
+                                            const std::string& dns_address, uint32_t priority,
+                                            uint32_t weight, uint32_t dns_port)
     : parent_(parent), dns_resolver_(dns_resolver), dns_lookup_family_(dns_lookup_family),
-      srv_record_hostname_(dns_address), dns_port_(dns_port) {}
+      srv_record_hostname_(dns_address), priority_(priority), weight_(weight), dns_port_(dns_port) {
+}
 
 DnsSrvCluster::ResolveTarget::~ResolveTarget() {
   if (active_dns_query_) {
@@ -292,7 +290,7 @@ void DnsSrvCluster::ResolveTarget::startResolve() {
         if (status == Network::DnsResolver::ResolutionStatus::Completed) {
           for (const auto& resp : response) {
             const auto& addrinfo = resp.addrInfo();
-            ENVOY_LOG(debug, "Resolved ip for '{}' = {}", srv_record_hostname_,
+            ENVOY_LOG(debug, "Resolved ip for '{}' = '{}'", srv_record_hostname_,
                       addrinfo.address_->asStringView());
 
             ASSERT(addrinfo.address_ != nullptr);
@@ -315,8 +313,6 @@ void DnsSrvCluster::ResolveTarget::addResolvedTarget(
   parent_.targetResolved(this, std::chrono::seconds::max());
 }
 
-/////////////  DnsSrvClusterFactory  //////////////////
-
 absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
 DnsSrvClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,
@@ -334,10 +330,10 @@ DnsSrvClusterFactory::createClusterWithConfig(
   }
 
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::make_pair(std::shared_ptr<DnsSrvCluster>(new DnsSrvCluster(
-                                cluster, proto_config, context,
-                                std::move(dns_resolver_or_error.value()), creation_status)),
-                            nullptr);
+  auto ret = std::make_pair(
+      std::make_shared<DnsSrvCluster>(cluster, proto_config, context,
+                                      std::move(dns_resolver_or_error.value()), creation_status),
+      nullptr);
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }

@@ -470,8 +470,8 @@ ActiveDnsQuery* DnsResolverImpl::resolve(const std::string& dns_name,
 
 ActiveDnsQuery* DnsResolverImpl::resolveSrv(const std::string& dns_name, ResolveCb callback) {
 
-  std::unique_ptr<PendingSrvResolution> pending_srv_res(
-      new PendingSrvResolution(callback, dispatcher_, channel_, dns_name, *this));
+  auto pending_srv_res =
+      std::make_unique<PendingSrvResolution>(callback, dispatcher_, channel_, dns_name, *this);
 
   pending_srv_res->startResolution();
   if (pending_srv_res->completed_) {

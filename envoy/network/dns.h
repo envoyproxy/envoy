@@ -81,7 +81,8 @@ struct SrvResponse {
   std::chrono::seconds ttl_;
 
   std::string asString() const {
-    return fmt::format("{} {} {} {}", priority_, weight_, port_, target_);
+    return fmt::format("priority={}, weight={}, port={}, target='{}'", priority_, weight_, port_,
+                       target_);
   }
 };
 

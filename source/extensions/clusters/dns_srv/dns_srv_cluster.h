@@ -37,33 +37,31 @@ class DnsSrvClusterTest;
  * - Only c-ares DNS resolver is supported.
  * - Only one SRV record is supported per cluster.
  * - All resolved IP addresses will be added to cluster (acting like Strict DNS cluster).
- * - Weight and priority are ignored.
  * - Both initial SRV record and subsequent A/AAAA records resolved via the same DNS resolver.
  */
 class DnsSrvCluster : public BaseDynamicClusterImpl {
 public:
-  ~DnsSrvCluster() override;
-
-  // Upstream::Cluster
-  InitializePhase initializePhase() const override { return InitializePhase::Primary; }
-
-protected:
   DnsSrvCluster(
       const envoy::config::cluster::v3::Cluster& cluster,
       const envoy::extensions::clusters::dns_srv::v3::DnsSrvClusterConfig& dns_srv_cluster,
       ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver,
       absl::Status& creation_status);
 
+  ~DnsSrvCluster() override;
+
+  // Upstream::Cluster
+  InitializePhase initializePhase() const override { return InitializePhase::Primary; }
+
 private:
   friend class DnsSrvClusterFactory;
   friend class DnsSrvClusterTest;
 
-  struct ResolveList;
+  class ResolveList;
 
   struct ResolveTarget {
     ResolveTarget(ResolveList& parent, Network::DnsResolverSharedPtr dns_resolver,
                   Network::DnsLookupFamily dns_lookup_family, const std::string& dns_address,
-                  const uint32_t dns_port);
+                  uint32_t priority, uint32_t weight, uint32_t dns_port);
     ~ResolveTarget();
     void startResolve();
     void addResolvedTarget(Network::Address::InstanceConstSharedPtr address);
@@ -72,6 +70,8 @@ private:
     Network::DnsResolverSharedPtr dns_resolver_;
     Network::DnsLookupFamily dns_lookup_family_;
     const std::string srv_record_hostname_; // ResolveTarget needs to store its own copy
+    const uint32_t priority_;
+    const uint32_t weight_;
     const uint32_t dns_port_;
     std::list<Network::Address::InstanceConstSharedPtr> resolved_targets_;
     Network::DnsResolver::ResolutionStatus resolve_status_;
@@ -83,7 +83,8 @@ private:
   // One SRV-record may return several hostnames
   // We will need to resolve all of the hostnames to IPs.
   // Potentially, there can be several IPs for each hostname.
-  struct ResolveList {
+  class ResolveList {
+  public:
     ResolveList(DnsSrvCluster& parent);
     void addTarget(ResolveTargetPtr new_target);
     void noMoreTargets();
@@ -123,6 +124,7 @@ private:
   envoy::config::endpoint::v3::ClusterLoadAssignment load_assignment_;
   const LocalInfo::LocalInfo& local_info_;
   const envoy::extensions::clusters::dns_srv::v3::DnsSrvClusterConfig dns_srv_cluster_;
+  const Network::DnsLookupFamily dns_lookup_family_;
   ResolveListPtr active_resolve_list_;
   // Host map for current resolve target. When we have multiple resolve targets, multiple targets
   // may contain two different hosts with the same address. This has two effects:
@@ -131,7 +133,6 @@ private:
   // 2) Cross-priority global host map may not be able to search for the expected host based on
   // the address.
   HostMap all_hosts_;
-  Network::DnsLookupFamily dns_lookup_family_;
 };
 
 class DnsSrvClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
