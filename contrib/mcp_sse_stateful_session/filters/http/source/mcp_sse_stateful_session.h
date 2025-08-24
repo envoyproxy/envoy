@@ -35,7 +35,10 @@ public:
 
   Envoy::Http::McpSseSessionStatePtr
   createSessionState(Envoy::Http::RequestHeaderMap& headers) const {
-    ASSERT(factory_ != nullptr);
+    if (factory_ == nullptr) {
+      ENVOY_LOG(error, "McpSseStatefulSessionConfig::createSessionState: factory_ is nullptr");
+      return nullptr;
+    }
     return factory_->create(headers);
   }
 

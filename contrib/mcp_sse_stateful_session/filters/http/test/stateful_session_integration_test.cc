@@ -257,7 +257,7 @@ TEST_F(StatefulSessionIntegrationTest,
     auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
     ASSERT_TRUE(upstream_index.has_value());
 
-    // Expect that the selected upstream is index 1
+    // Expect that the selected upstream is index 2
     EXPECT_EQ(upstream_index.value(), 2);
 
     // Send response headers and complete stream
