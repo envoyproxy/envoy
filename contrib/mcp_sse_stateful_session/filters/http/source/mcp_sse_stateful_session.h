@@ -28,7 +28,7 @@ using ProtoConfig =
 using PerRouteProtoConfig = envoy::extensions::filters::http::mcp_sse_stateful_session::v3alpha::
     McpSseStatefulSessionPerRoute;
 
-class McpSseStatefulSessionConfig {
+class McpSseStatefulSessionConfig : public Logger::Loggable<Logger::Id::filter> {
 public:
   McpSseStatefulSessionConfig(const ProtoConfig& config,
                               Server::Configuration::GenericFactoryContext& context);
