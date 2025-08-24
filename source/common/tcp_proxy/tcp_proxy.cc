@@ -875,6 +875,25 @@ Network::FilterStatus Filter::onNewConnection() {
     resetAccessLogFlushTimer();
   }
 
+  idle_timeout_ = config_->idleTimeout();
+  if (const auto* per_connection_idle_timeout =
+          getStreamInfo().filterState()->getDataReadOnly<StreamInfo::UInt64Accessor>(
+              PerConnectionIdleTimeoutMs);
+      per_connection_idle_timeout != nullptr) {
+    idle_timeout_ = std::chrono::milliseconds(per_connection_idle_timeout->value());
+  }
+
+  if (idle_timeout_) {
+    // The idle_timer_ can be moved to a Drainer, so related callbacks call into
+    // the UpstreamCallbacks, which has the same lifetime as the timer, and can dispatch
+    // the call to either TcpProxy or to Drainer, depending on the current state.
+    idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+        [upstream_callbacks = upstream_callbacks_]() { upstream_callbacks->onIdleTimeout(); });
+    // Start the idle timer immediately so that time spent waiting for the upstream CONNECT
+    // response (i.e. tunnel establishment) is covered by the idle timeout.
+    resetIdleTimer();
+  }
+
   // Set UUID for the connection. This is used for logging and tracing.
   getStreamInfo().setStreamIdProvider(
       std::make_shared<StreamInfo::StreamIdProviderImpl>(config_->randomGenerator().uuid()));
@@ -1032,20 +1051,7 @@ void Filter::onUpstreamConnection() {
                  read_callbacks_->connection(),
                  getStreamInfo().downstreamAddressProvider().requestedServerName());
 
-  idle_timeout_ = config_->idleTimeout();
-  if (const auto* per_connection_idle_timeout =
-          getStreamInfo().filterState()->getDataReadOnly<StreamInfo::UInt64Accessor>(
-              PerConnectionIdleTimeoutMs);
-      per_connection_idle_timeout != nullptr) {
-    idle_timeout_ = std::chrono::milliseconds(per_connection_idle_timeout->value());
-  }
-
   if (idle_timeout_) {
-    // The idle_timer_ can be moved to a Drainer, so related callbacks call into
-    // the UpstreamCallbacks, which has the same lifetime as the timer, and can dispatch
-    // the call to either TcpProxy or to Drainer, depending on the current state.
-    idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
-        [upstream_callbacks = upstream_callbacks_]() { upstream_callbacks->onIdleTimeout(); });
     resetIdleTimer();
     read_callbacks_->connection().addBytesSentCallback([this](uint64_t) {
       resetIdleTimer();
