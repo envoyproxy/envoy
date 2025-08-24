@@ -1805,7 +1805,7 @@ TEST_P(TcpTunnelingIntegrationTest, IdleTimeoutNoUpstreamConnection) {
   // than UDP. The connection is established to upstream but the tunnel is not completed
   // until the upstream sends response headers. The idle timeout applies to the
   // waiting period for the upstream response.
-  
+
   // Configure a short idle timeout
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(1);
@@ -1819,17 +1819,17 @@ TEST_P(TcpTunnelingIntegrationTest, IdleTimeoutNoUpstreamConnection) {
 
     tcp_proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-            std::chrono::milliseconds(500)).count());
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
+            .count());
 
     config_blob->PackFrom(tcp_proxy_config);
   });
-  
+
   initialize();
 
   // Start a connection, and verify the upgrade headers are received upstream
   tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
-  
+
   // The CONNECT request is sent to upstream immediately
   ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
   ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
@@ -1838,13 +1838,13 @@ TEST_P(TcpTunnelingIntegrationTest, IdleTimeoutNoUpstreamConnection) {
 
   // Don't send response headers - this prevents the tunnel from being fully established.
   // The TCP proxy will wait for the response, and the idle timeout will trigger.
-  
+
   // Wait for the idle timeout to trigger
   test_server_->waitForCounterGe("tcp.tcp_stats.idle_timeout", 1);
-  
+
   // The downstream connection should be closed
   tcp_client_->waitForHalfClose();
-  
+
   // Verify the stream was reset due to timeout
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());

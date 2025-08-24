@@ -889,8 +889,8 @@ Network::FilterStatus Filter::onNewConnection() {
     // the call to either TcpProxy or to Drainer, depending on the current state.
     idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [upstream_callbacks = upstream_callbacks_]() { upstream_callbacks->onIdleTimeout(); });
-    // Start the idle timer immediately so that time spent waiting for the upstream CONNECT
-    // response (i.e. tunnel establishment) is covered by the idle timeout.
+    // Start the idle timer immediately so that if no response is received from the upstream,
+    // the downstream connection will time out.
     resetIdleTimer();
   }
 
