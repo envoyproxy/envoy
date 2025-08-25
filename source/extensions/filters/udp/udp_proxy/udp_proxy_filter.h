@@ -293,7 +293,7 @@ public:
   void onDownstreamEvent(Network::ConnectionEvent event) override {
     if (event == Network::ConnectionEvent::LocalClose ||
         event == Network::ConnectionEvent::RemoteClose) {
-      resetEncoder(event, /*by_downstream=*/true);
+      resetEncoder(event, /*by_local_close=*/true);
     }
   };
 
@@ -360,7 +360,14 @@ private:
   };
 
   const std::string resolveTargetTunnelPath();
-  void resetEncoder(Network::ConnectionEvent event, bool by_downstream = false);
+
+  /**
+   * Resets the encoder for the upstream connection.
+   * @param event the event that caused the reset.
+   * @param by_local_close whether the reset was initiated by a local close (e.g. session idle
+   * timeout, envoy termination, etc.) or by upstream close.
+   */
+  void resetEncoder(Network::ConnectionEvent event, bool by_local_close = false);
 
   ResponseDecoder response_decoder_;
   Http::RequestEncoder* request_encoder_{};

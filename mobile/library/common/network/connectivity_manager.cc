@@ -248,7 +248,8 @@ void RefreshDnsWithPostDrainHandler::onDnsResolutionComplete(
 
   // Pass predicate to only drain connections to the resolved host (for any cluster).
   cluster_manager_.drainConnections(
-      [resolved_host](const Upstream::Host& host) { return host.hostname() == resolved_host; });
+      [resolved_host](const Upstream::Host& host) { return host.hostname() == resolved_host; },
+      ConnectionPool::DrainBehavior::DrainExistingConnections);
 }
 
 void ConnectivityManagerImpl::setDrainPostDnsRefreshEnabled(bool enabled) {
