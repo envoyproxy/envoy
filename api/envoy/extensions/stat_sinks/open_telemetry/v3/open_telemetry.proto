@@ -59,20 +59,20 @@ message SinkConfig {
   // prefix added. According to the example, the full stat name will remain "foo.bar".
   string prefix = 6;
 
-    // MetricConversion is used to convert a stat to a metric. If a stat matches
+  // CustomMetricConversion defines the custom conversion from a stat to a metric. If a stat matches
   // the stat_name_matcher, the metric_name and static_metric_labels will be
-  // used to create the metric.
-  message MetricConversion {
+  // used to create the metric. If multiple custom conversions match, the first one will be applied.
+  message CustomMetricConversion {
     // The stat name matcher to match the stat name.
     type.matcher.v3.StringMatcher  stat_name_matcher = 1;
 
-    // The metric name to use for the stat.
+    // The name of the converted metric.
     string metric_name = 2;
 
-    // Static metric labels to use for the metric.
+    // Static labels will be appended to the converted metric.
     repeated opentelemetry.proto.common.v1.KeyValue static_metric_labels = 3;
   }
 
   // Metric conversions to use for the stats.
-  repeated MetricConversion metric_conversions = 8;
+  repeated CustomMetricConversion custom_metric_conversions = 8;
 }

@@ -122,7 +122,7 @@ public:
     return resource_attributes_;
   }
 
-  const absl::flat_hash_map<const Matchers::StringMatcher*, SinkConfig::MetricConversion>&
+  const absl::flat_hash_map<const Matchers::StringMatcher*, SinkConfig::CustomMetricConversion>&
   matchers() const {
     return matcher_data_.matchers_;
   }
@@ -133,12 +133,12 @@ private:
     // Owns the StringMatcherImpl instances.
     std::vector<Matchers::StringMatcherPtr> owned_matchers_;
     // Maps raw pointers to the owned StringMatcherImpl to their configurations.
-    absl::flat_hash_map<const Matchers::StringMatcher*, SinkConfig::MetricConversion> matchers_;
+    absl::flat_hash_map<const Matchers::StringMatcher*, SinkConfig::CustomMetricConversion> matchers_;
   };
 
   // Private static method to generate MatcherData.
   static MatcherData generateMatchers(
-      const Protobuf::RepeatedPtrField<SinkConfig::MetricConversion>& metric_conversions,
+      const Protobuf::RepeatedPtrField<SinkConfig::CustomMetricConversion>& custom_metric_conversions,
       Server::Configuration::ServerFactoryContext& server);
 
   const bool report_counters_as_deltas_;
@@ -184,12 +184,12 @@ private:
   template <class StatType> std::string getMetricName(const StatType& stat) const;
 
   template <class StatType>
-  const SinkConfig::MetricConversion* findMatchingMetricConfig(const StatType& stat) const;
+  const SinkConfig::CustomMetricConversion* findMatchingMetricConfig(const StatType& stat) const;
 
   template <class StatType>
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
   getCombinedAttributes(const StatType& stat,
-                        const SinkConfig::MetricConversion* metric_config) const;
+                        const SinkConfig::CustomMetricConversion* metric_config) const;
   template <class GaugeType>
   void addGaugeDataPoint(opentelemetry::proto::metrics::v1::Metric& metric,
                          const GaugeType& gauge_stat, int64_t snapshot_time_ns) const;

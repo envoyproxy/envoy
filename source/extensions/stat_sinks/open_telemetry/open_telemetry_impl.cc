@@ -196,16 +196,16 @@ OtlpOptions::OtlpOptions(const SinkConfig& sink_config,
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, use_tag_extracted_name, true)),
       stat_prefix_(!sink_config.prefix().empty() ? sink_config.prefix() + "." : ""),
       resource_attributes_(generateResourceAttributes(resource)),
-      matcher_data_(generateMatchers(sink_config.metric_conversions(), server)) {}
+      matcher_data_(generateMatchers(sink_config.custom_metric_conversions(), server)) {}
 
 OtlpOptions::MatcherData OtlpOptions::generateMatchers(
-    const Protobuf::RepeatedPtrField<SinkConfig::MetricConversion>& metric_conversions,
+    const Protobuf::RepeatedPtrField<SinkConfig::CustomMetricConversion>& custom_metric_conversions,
     Server::Configuration::ServerFactoryContext& server) {
   OtlpOptions::MatcherData result;
-  for (const auto& metric_conversions : metric_conversions) {
+  for (const auto& custom_metric_conversions : custom_metric_conversions) {
     auto matcher = std::make_unique<Envoy::Matchers::StringMatcherImpl>(
-        metric_conversions.stat_name_matcher(), server);
-    result.matchers_.emplace(matcher.get(), metric_conversions);
+        custom_metric_conversions.stat_name_matcher(), server);
+    result.matchers_.emplace(matcher.get(), custom_metric_conversions);
     result.owned_matchers_.push_back(std::move(matcher));
   }
   return result;
@@ -243,11 +243,11 @@ void OpenTelemetryGrpcMetricsExporterImpl::onFailure(Grpc::Status::GrpcStatus re
 }
 
 template <class StatType>
-const SinkConfig::MetricConversion*
+const SinkConfig::CustomMetricConversion*
 OtlpMetricsFlusherImpl::findMatchingMetricConfig(const StatType& stat) const {
   for (const auto& pair : config_->matchers()) {
     const Matchers::StringMatcher* matcher_ptr = pair.first;
-    const SinkConfig::MetricConversion& metric_config = pair.second;
+    const SinkConfig::CustomMetricConversion& metric_config = pair.second;
     if (matcher_ptr->match(stat.name())) {
       return &metric_config;
     }
@@ -268,7 +268,7 @@ std::string OtlpMetricsFlusherImpl::getMetricName(const StatType& stat) const {
 template <class StatType>
 Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
 OtlpMetricsFlusherImpl::getCombinedAttributes(
-    const StatType& stat, const SinkConfig::MetricConversion* metric_config) const {
+    const StatType& stat, const SinkConfig::CustomMetricConversion* metric_config) const {
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attributes;
   if (config_->emitTagsAsAttributes()) {
     for (const auto& tag : stat.tags()) {

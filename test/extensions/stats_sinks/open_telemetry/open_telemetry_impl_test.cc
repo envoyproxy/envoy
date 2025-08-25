@@ -44,8 +44,8 @@ public:
       bool emit_tags_as_attributes = true, bool use_tag_extracted_name = true,
       const std::string& stat_prefix = "",
       absl::flat_hash_map<std::string, std::string> resource_attributes = {},
-      std::vector<envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::MetricConversion>
-          metric_conversions = {}) {
+      std::vector<envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::CustomMetricConversion>
+          custom_metric_conversions = {}) {
     envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
     sink_config.set_report_counters_as_deltas(report_counters_as_deltas);
     sink_config.set_report_histograms_as_deltas(report_histograms_as_deltas);
@@ -56,8 +56,8 @@ public:
     for (const auto& [key, value] : resource_attributes) {
       resource.attributes_[key] = value;
     }
-    for (const auto& metric_conversions : metric_conversions) {
-      *sink_config.add_metric_conversions() = metric_conversions;
+    for (const auto& custom_metric_conversions : custom_metric_conversions) {
+      *sink_config.add_custom_metric_conversions() = custom_metric_conversions;
     }
     return std::make_shared<OtlpOptions>(sink_config, resource, server_factory_context_);
   }
@@ -152,9 +152,9 @@ public:
     snapshot_.histograms_.push_back(*histogram_storage_.back());
   }
 
-  envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::MetricConversion
-  parseMetricConversion(absl::string_view str) {
-    envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::MetricConversion config;
+  envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::CustomMetricConversion
+  parseCustomMetricConversion(absl::string_view str) {
+    envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::CustomMetricConversion config;
 
     Protobuf::TextFormat::ParseFromString(str, &config);
     return config;
@@ -597,12 +597,12 @@ TEST_F(OtlpMetricsFlusherTests, DeltaHistogramMetric) {
 TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationCounter) {
   OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "prefix", {},
                                              {
-                                                 parseMetricConversion(
+                                                 parseCustomMetricConversion(
                                                      R"pb(stat_name_matcher {
                                  safe_regex { regex: "test_counter-1" }
                                }
                                metric_name: "new_counter_name")pb"),
-                                                 parseMetricConversion(
+                                                 parseCustomMetricConversion(
                                                      R"pb(stat_name_matcher {
                                  safe_regex { regex: "test_counter-2" }
                                }
@@ -660,11 +660,11 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationCounter) {
 TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationGauge) {
   OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "prefix", {},
                                              {
-                                                 parseMetricConversion(R"pb(stat_name_matcher {
+                                                 parseCustomMetricConversion(R"pb(stat_name_matcher {
                                          safe_regex { regex: "test_gauge-1" }
                                        }
                                        metric_name: "new_gauge_name")pb"),
-                                                 parseMetricConversion(R"pb(stat_name_matcher {
+                                                 parseCustomMetricConversion(R"pb(stat_name_matcher {
                                          safe_regex { regex: "test_gauge-2" }
                                        }
                                        metric_name: "new_gauge_name")pb"),
@@ -721,12 +721,12 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationGauge) {
 TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationHistogram) {
   OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "prefix", {},
                                              {
-                                                 parseMetricConversion(
+                                                 parseCustomMetricConversion(
                                                      R"pb(stat_name_matcher {
                                  safe_regex { regex: "test_histogram-1" }
                                }
                                metric_name: "new_histogram_name")pb"),
-                                                 parseMetricConversion(
+                                                 parseCustomMetricConversion(
                                                      R"pb(stat_name_matcher {
                                  safe_regex { regex: "test_histogram-2" }
                                }
@@ -795,7 +795,7 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationHistogram) {
 
 TEST_F(OtlpMetricsFlusherTests, MetricsWithStaticMetricLabels) {
   OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "", {},
-                                             {parseMetricConversion(R"pb(stat_name_matcher {
+                                             {parseCustomMetricConversion(R"pb(stat_name_matcher {
                                       safe_regex { regex: "test_counter" }
                                     }
                                     metric_name: "static_counter"
@@ -803,7 +803,7 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithStaticMetricLabels) {
                                       key: "static_key_c"
                                       value { string_value: "static_val_c" }
                                     })pb"),
-                                              parseMetricConversion(R"pb(stat_name_matcher {
+                                              parseCustomMetricConversion(R"pb(stat_name_matcher {
                                       safe_regex { regex: "test_gauge" }
                                     }
                                     metric_name: "static_gauge"
@@ -811,7 +811,7 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithStaticMetricLabels) {
                                       key: "static_key_g"
                                       value { string_value: "static_val_g" }
                                     })pb"),
-                                              parseMetricConversion(R"pb(stat_name_matcher {
+                                              parseCustomMetricConversion(R"pb(stat_name_matcher {
                                       safe_regex { regex: "test_histogram" }
                                     }
                                     metric_name: "static_histogram"
