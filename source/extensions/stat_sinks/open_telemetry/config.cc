@@ -22,8 +22,10 @@ OpenTelemetrySinkFactory::createStatsSink(const Protobuf::Message& config,
   Tracers::OpenTelemetry::ResourceProviderPtr resource_provider =
       std::make_unique<Tracers::OpenTelemetry::ResourceProviderImpl>();
   auto otlp_options = std::make_shared<OtlpOptions>(
-      sink_config, resource_provider->getResource(sink_config.resource_detectors(), server,
-                                                  /*service_name=*/""));
+      sink_config,
+      resource_provider->getResource(sink_config.resource_detectors(), server,
+                                     /*service_name=*/""),
+      server);
   std::shared_ptr<OtlpMetricsFlusher> otlp_metrics_flusher =
       std::make_shared<OtlpMetricsFlusherImpl>(otlp_options);
 

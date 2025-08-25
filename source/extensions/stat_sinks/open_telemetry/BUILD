@@ -20,6 +20,7 @@ envoy_cc_library(
         "//source/extensions/tracers/opentelemetry/resource_detectors:resource_detector_lib",
         "@envoy_api//envoy/extensions/stat_sinks/open_telemetry/v3:pkg_cc_proto",
         "@opentelemetry_proto//:metrics_proto_cc",
+                "//source/common/common:matchers_lib",
         "@opentelemetry_proto//:metrics_service_proto_cc",
     ],
 )
