@@ -80,7 +80,6 @@ void ReverseConnFilter::getClusterDetailsUsingProtobuf(std::string* node_uuid,
 Http::FilterDataStatus ReverseConnFilter::acceptReverseConnection() {
   std::string node_uuid, cluster_uuid, tenant_uuid;
 
-  decoder_callbacks_->setReverseConnForceLocalReply(true);
   envoy::extensions::bootstrap::reverse_connection_handshake::v3::ReverseConnHandshakeRet ret;
   getClusterDetailsUsingProtobuf(&node_uuid, &cluster_uuid, &tenant_uuid);
   if (node_uuid.empty()) {
@@ -89,7 +88,6 @@ Http::FilterDataStatus ReverseConnFilter::acceptReverseConnection() {
     ret.set_status_message("Failed to parse request message or required fields missing");
     decoder_callbacks_->sendLocalReply(Http::Code::BadGateway, ret.SerializeAsString(), nullptr,
                                        absl::nullopt, "");
-    decoder_callbacks_->setReverseConnForceLocalReply(false);
     return Http::FilterDataStatus::StopIterationNoBuffer;
   }
 
@@ -147,7 +145,6 @@ Http::FilterDataStatus ReverseConnFilter::acceptReverseConnection() {
   }
 
   connection->close(Network::ConnectionCloseType::NoFlush, "accepted_reverse_conn");
-  decoder_callbacks_->setReverseConnForceLocalReply(false);
   return Http::FilterDataStatus::StopIterationNoBuffer;
 }
 
