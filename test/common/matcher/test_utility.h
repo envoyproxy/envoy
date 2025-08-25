@@ -35,7 +35,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
   std::string name() const override { return factory_name_; }
 
@@ -72,7 +72,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
   std::string name() const override { return "string"; }
 
@@ -95,7 +95,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::BoolValue>();
+    return std::make_unique<Protobuf::BoolValue>();
   }
   std::string name() const override { return "bool"; }
 
@@ -116,7 +116,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::FloatValue>();
+    return std::make_unique<Protobuf::FloatValue>();
   }
   std::string name() const override { return "float"; }
 
@@ -151,7 +151,7 @@ struct TestMatcher : public InputMatcher {
 };
 
 // An action that evaluates to a proto StringValue.
-struct StringAction : public ActionBase<ProtobufWkt::StringValue> {
+struct StringAction : public ActionBase<Protobuf::StringValue> {
   explicit StringAction(const std::string& string) : string_(string) {}
 
   const std::string string_;
@@ -164,12 +164,12 @@ class StringActionFactory : public ActionFactory<absl::string_view> {
 public:
   ActionConstSharedPtr createAction(const Protobuf::Message& config, absl::string_view&,
                                     ProtobufMessage::ValidationVisitor&) override {
-    const auto& string = dynamic_cast<const ProtobufWkt::StringValue&>(config);
+    const auto& string = dynamic_cast<const Protobuf::StringValue&>(config);
     return std::make_shared<StringAction>(string.value());
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
   std::string name() const override { return "string_action"; }
 };
@@ -194,7 +194,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
 
   std::string name() const override { return "never_match"; }
@@ -228,12 +228,12 @@ public:
   InputMatcherFactoryCb
   createInputMatcherFactoryCb(const Protobuf::Message& config,
                               Server::Configuration::ServerFactoryContext&) override {
-    const auto& string = dynamic_cast<const ProtobufWkt::StringValue&>(config);
+    const auto& string = dynamic_cast<const Protobuf::StringValue&>(config);
     return [string]() { return std::make_unique<CustomStringMatcher>(string.value()); };
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
 
   std::string name() const override { return "custom_match"; }

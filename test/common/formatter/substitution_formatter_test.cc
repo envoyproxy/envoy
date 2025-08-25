@@ -68,9 +68,8 @@ public:
                     const StreamInfo::StreamInfo& stream_info) const override {
     return formatter_->formatWithContext(context, stream_info);
   }
-  ProtobufWkt::Value
-  formatValueWithContext(const Context& context,
-                         const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValueWithContext(const Context& context,
+                                         const StreamInfo::StreamInfo& stream_info) const override {
     return formatter_->formatValueWithContext(context, stream_info);
   }
 
@@ -81,7 +80,7 @@ private:
 class TestSerializedUnknownFilterState : public StreamInfo::FilterState::Object {
 public:
   ProtobufTypes::MessagePtr serializeAsProto() const override {
-    auto any = std::make_unique<ProtobufWkt::Any>();
+    auto any = std::make_unique<Protobuf::Any>();
     any->set_type_url("UnknownType");
     any->set_value("\xde\xad\xbe\xef");
     return any;
@@ -94,7 +93,7 @@ public:
     (*struct_.mutable_fields())["inner_key"] = ValueUtil::stringValue("inner_value");
   }
 
-  explicit TestSerializedStructFilterState(const ProtobufWkt::Struct& s) : use_struct_(true) {
+  explicit TestSerializedStructFilterState(const Protobuf::Struct& s) : use_struct_(true) {
     struct_.CopyFrom(s);
   }
 
@@ -104,20 +103,20 @@ public:
 
   ProtobufTypes::MessagePtr serializeAsProto() const override {
     if (use_struct_) {
-      auto s = std::make_unique<ProtobufWkt::Struct>();
+      auto s = std::make_unique<Protobuf::Struct>();
       s->CopyFrom(struct_);
       return s;
     }
 
-    auto d = std::make_unique<ProtobufWkt::Duration>();
+    auto d = std::make_unique<Protobuf::Duration>();
     d->CopyFrom(duration_);
     return d;
   }
 
 private:
   const bool use_struct_{false};
-  ProtobufWkt::Struct struct_;
-  ProtobufWkt::Duration duration_;
+  Protobuf::Struct struct_;
+  Protobuf::Duration duration_;
 };
 
 // Class used to test serializeAsString and serializeAsProto of FilterState
@@ -128,7 +127,7 @@ public:
     return raw_string_ + " By PLAIN";
   }
   ProtobufTypes::MessagePtr serializeAsProto() const override {
-    auto message = std::make_unique<ProtobufWkt::StringValue>();
+    auto message = std::make_unique<Protobuf::StringValue>();
     message->set_value(raw_string_ + " By TYPED");
     return message;
   }
@@ -2906,12 +2905,12 @@ TEST(SubstitutionFormatterTest, TraceIDFormatter) {
  * "com.test": {"test_key":"test_value","test_obj":{"inner_key":"inner_value"}}
  */
 void populateMetadataTestData(envoy::config::core::v3::Metadata& metadata) {
-  ProtobufWkt::Struct struct_obj;
+  Protobuf::Struct struct_obj;
   auto& fields_map = *struct_obj.mutable_fields();
   fields_map["test_key"] = ValueUtil::stringValue("test_value");
-  ProtobufWkt::Struct struct_inner;
+  Protobuf::Struct struct_inner;
   (*struct_inner.mutable_fields())["inner_key"] = ValueUtil::stringValue("inner_value");
-  ProtobufWkt::Value val;
+  Protobuf::Value val;
   *val.mutable_struct_value() = struct_inner;
   fields_map["test_obj"] = val;
   (*metadata.mutable_filter_metadata())["com.test"] = struct_obj;
@@ -2930,7 +2929,7 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
     EXPECT_TRUE(val.find("\"test_key\":\"test_value\"") != std::string::npos);
     EXPECT_TRUE(val.find("\"test_obj\":{\"inner_key\":\"inner_value\"}") != std::string::npos);
 
-    ProtobufWkt::Value expected_val;
+    Protobuf::Value expected_val;
     expected_val.mutable_struct_value()->CopyFrom(metadata.filter_metadata().at("com.test"));
     EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(expected_val));
   }
@@ -2943,7 +2942,7 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
     DynamicMetadataFormatter formatter("com.test", {"test_obj"}, absl::optional<size_t>());
     EXPECT_EQ("{\"inner_key\":\"inner_value\"}", formatter.format(stream_info));
 
-    ProtobufWkt::Value expected_val;
+    Protobuf::Value expected_val;
     (*expected_val.mutable_struct_value()->mutable_fields())["inner_key"] =
         ValueUtil::stringValue("inner_value");
     EXPECT_THAT(formatter.formatValue(stream_info), ProtoEq(expected_val));
@@ -2983,9 +2982,9 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
   }
 
   {
-    ProtobufWkt::Value val;
+    Protobuf::Value val;
     val.set_number_value(std::numeric_limits<double>::quiet_NaN());
-    ProtobufWkt::Struct struct_obj;
+    Protobuf::Struct struct_obj;
     (*struct_obj.mutable_fields())["nan_val"] = val;
     (*metadata.mutable_filter_metadata())["com.test"] = struct_obj;
 
@@ -2995,9 +2994,9 @@ TEST(SubstitutionFormatterTest, DynamicMetadataFieldExtractor) {
   }
 
   {
-    ProtobufWkt::Value val;
+    Protobuf::Value val;
     val.set_number_value(std::numeric_limits<double>::infinity());
-    ProtobufWkt::Struct struct_obj;
+    Protobuf::Struct struct_obj;
     (*struct_obj.mutable_fields())["inf_val"] = val;
     (*metadata.mutable_filter_metadata())["com.test"] = struct_obj;
 
@@ -3040,7 +3039,7 @@ TEST(SubstitutionFormatterTest, FilterStateFormatter) {
 
     EXPECT_EQ("{\"inner_key\":\"inner_value\"}", formatter.format(stream_info));
 
-    ProtobufWkt::Value expected;
+    Protobuf::Value expected;
     (*expected.mutable_struct_value()->mutable_fields())["inner_key"] =
         ValueUtil::stringValue("inner_value");
 
@@ -3587,7 +3586,7 @@ TEST(SubstitutionFormatterTest, GrpcStatusFormatterNumberTest) {
   }
 }
 
-void verifyStructOutput(ProtobufWkt::Struct output,
+void verifyStructOutput(Protobuf::Struct output,
                         absl::node_hash_map<std::string, std::string> expected_map) {
   for (const auto& pair : expected_map) {
     EXPECT_EQ(output.fields().at(pair.first).string_value(), pair.second);
@@ -3609,7 +3608,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterPlainStringTest) {
     {"plain_string": "plain_string_value"}
   )EOF";
 
-  ProtobufWkt::Struct key_mapping;
+  Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     plain_string: plain_string_value
   )EOF",
@@ -3632,7 +3631,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterPlainNumberTest) {
     {"plain_number": 400}
   )EOF";
 
-  ProtobufWkt::Struct key_mapping;
+  Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     plain_number: 400
   )EOF",
@@ -3651,7 +3650,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterTypesTest) {
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-  ProtobufWkt::Struct key_mapping;
+  Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     string_type: plain_string_value
     struct_type:
@@ -3664,7 +3663,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterTypesTest) {
                             key_mapping);
   JsonFormatterImpl formatter(key_mapping, false);
 
-  const ProtobufWkt::Struct expected = TestUtility::jsonToStruct(R"EOF({
+  const Protobuf::Struct expected = TestUtility::jsonToStruct(R"EOF({
     "string_type": "plain_string_value",
     "struct_type": {
       "plain_string": "plain_string_value",
@@ -3675,7 +3674,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterTypesTest) {
       "HTTP/1.1"
     ]
   })EOF");
-  const ProtobufWkt::Struct out_struct =
+  const Protobuf::Struct out_struct =
       TestUtility::jsonToStruct(formatter.formatWithContext({}, stream_info));
   EXPECT_TRUE(TestUtility::protoEqual(out_struct, expected));
 }
@@ -3689,7 +3688,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterNestedObjectsTest) {
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
 
-  ProtobufWkt::Struct key_mapping;
+  Protobuf::Struct key_mapping;
   // For both struct and list, we test 3 nesting levels of all types (string, struct and list).
   TestUtility::loadFromYaml(R"EOF(
     struct:
@@ -3737,7 +3736,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterNestedObjectsTest) {
   )EOF",
                             key_mapping);
   JsonFormatterImpl formatter(key_mapping, false);
-  const ProtobufWkt::Struct expected = TestUtility::jsonToStruct(R"EOF({
+  const Protobuf::Struct expected = TestUtility::jsonToStruct(R"EOF({
     "struct": {
       "struct_string": "plain_string_value",
       "struct_protocol": "HTTP/1.1",
@@ -3795,7 +3794,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterNestedObjectsTest) {
       ],
     ],
   })EOF");
-  const ProtobufWkt::Struct out_struct =
+  const Protobuf::Struct out_struct =
       TestUtility::jsonToStruct(formatter.formatWithContext({}, stream_info));
   EXPECT_TRUE(TestUtility::protoEqual(out_struct, expected));
 }
@@ -3810,7 +3809,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterSingleOperatorTest) {
 
   absl::node_hash_map<std::string, std::string> expected_json_map = {{"protocol", "HTTP/1.1"}};
 
-  ProtobufWkt::Struct key_mapping;
+  Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     protocol: '%PROTOCOL%'
   )EOF",
@@ -3831,7 +3830,7 @@ TEST(SubstitutionFormatterTest, EmptyJsonFormatterTest) {
 
   absl::node_hash_map<std::string, std::string> expected_json_map = {{"protocol", ""}};
 
-  ProtobufWkt::Struct key_mapping;
+  Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     protocol: ''
   )EOF",
@@ -3859,7 +3858,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterNonExistentHeaderTest) {
     "some_response_header": "SOME_RESPONSE_HEADER"
   })EOF";
 
-  ProtobufWkt::Struct key_mapping;
+  Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     protocol: '%PROTOCOL%'
     some_request_header: '%REQ(some_request_header)%'
@@ -3894,7 +3893,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterAlternateHeaderTest) {
       {"response_absent_header_or_response_absent_header", "RESPONSE_PRESENT_HEADER"},
       {"response_present_header_or_response_absent_header", "RESPONSE_PRESENT_HEADER"}};
 
-  ProtobufWkt::Struct key_mapping;
+  Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     request_present_header_or_request_absent_header:
     '%REQ(request_present_header?request_absent_header)%'
@@ -3939,7 +3938,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterDynamicMetadataTest) {
     "test_obj.inner_key": "inner_value"
   })EOF";
 
-  ProtobufWkt::Struct key_mapping;
+  Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     test_key: '%DYNAMIC_METADATA(com.test:test_key)%'
     test_obj: '%DYNAMIC_METADATA(com.test:test_obj)%'
@@ -3979,7 +3978,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterClusterMetadataTest) {
     "test_obj.non_existing_key": null
   })EOF";
 
-  ProtobufWkt::Struct key_mapping;
+  Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     test_key: '%CLUSTER_METADATA(com.test:test_key)%'
     test_obj: '%CLUSTER_METADATA(com.test:test_obj)%'
@@ -4007,7 +4006,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterClusterMetadataNoClusterInfoTest) {
       {"test_key": null}
     )EOF";
 
-  ProtobufWkt::Struct key_mapping;
+  Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     test_key: '%CLUSTER_METADATA(com.test:test_key)%'
   )EOF",
@@ -4057,7 +4056,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterUpstreamHostMetadataTest) {
     "test_obj.non_existing_key": null
   })EOF";
 
-  ProtobufWkt::Struct key_mapping;
+  Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     test_key: '%UPSTREAM_METADATA(com.test:test_key)%'
     test_obj: '%UPSTREAM_METADATA(com.test:test_obj)%'
@@ -4085,7 +4084,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterUpstreamHostMetadataNullPtrs) {
     {"test_key": null}
   )EOF";
 
-  ProtobufWkt::Struct key_mapping;
+  Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     test_key: '%UPSTREAM_METADATA(com.test:test_key)%'
   )EOF",
@@ -4136,7 +4135,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterFilterStateTest) {
     }
   )EOF";
 
-  ProtobufWkt::Struct key_mapping;
+  Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     test_key: '%FILTER_STATE(test_key)%'
     test_obj: '%FILTER_STATE(test_obj)%'
@@ -4173,7 +4172,7 @@ TEST(SubstitutionFormatterTest, FilterStateSpeciferTest) {
     }
   )EOF";
 
-  ProtobufWkt::Struct key_mapping;
+  Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     test_key_plain: '%FILTER_STATE(test_key:PLAIN)%'
     test_key_typed: '%FILTER_STATE(test_key:TYPED)%'
@@ -4202,7 +4201,7 @@ TEST(SubstitutionFormatterTest, FilterStateErrorSpeciferTest) {
       StreamInfo::FilterState::StateType::ReadOnly);
 
   // 'ABCDE' is error specifier.
-  ProtobufWkt::Struct key_mapping;
+  Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     test_key_plain: '%FILTER_STATE(test_key:ABCDE)%'
     test_key_typed: '%FILTER_STATE(test_key:TYPED)%'
@@ -4214,7 +4213,7 @@ TEST(SubstitutionFormatterTest, FilterStateErrorSpeciferTest) {
 
 // Error specifier for PLAIN will cause an error if field is specified.
 TEST(SubstitutionFormatterTest, FilterStateErrorSpeciferFieldTest) {
-  ProtobufWkt::Struct key_mapping;
+  Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     test_key_plain: '%FILTER_STATE(test_key:PLAIN:test_field)%'
   )EOF",
@@ -4226,7 +4225,7 @@ TEST(SubstitutionFormatterTest, FilterStateErrorSpeciferFieldTest) {
 
 // Error specifier for FIELD will cause an exception to be thrown if no field is specified.
 TEST(SubstitutionFormatterTest, FilterStateErrorSpeciferFieldNoNameTest) {
-  ProtobufWkt::Struct key_mapping;
+  Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     test_key_plain: '%FILTER_STATE(test_key:FIELD)%'
   )EOF",
@@ -4260,7 +4259,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterStartTimeTest) {
        absl::FormatTime("%Y-%m-%dT%H:%M:%E3S%z", absl::FromChrono(time), absl::LocalTimeZone())},
       {"all_zeroes", "000000000.0.00.000"}};
 
-  ProtobufWkt::Struct key_mapping;
+  Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     simple_date: '%START_TIME(%Y/%m/%d)%'
     test_time: '%START_TIME(%s)%'
@@ -4293,7 +4292,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterMultiTokenTest) {
     absl::node_hash_map<std::string, std::string> expected_json_map = {
         {"multi_token_field", "HTTP/1.1 plainstring SOME_REQUEST_HEADER SOME_RESPONSE_HEADER"}};
 
-    ProtobufWkt::Struct key_mapping;
+    Protobuf::Struct key_mapping;
     TestUtility::loadFromYaml(R"EOF(
       multi_token_field: '%PROTOCOL% plainstring %REQ(some_request_header)%
       %RESP(some_response_header)%'
@@ -4330,7 +4329,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterTest) {
       .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(5000000))));
   stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
 
-  ProtobufWkt::Struct key_mapping;
+  Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     raw_bool_value: true
     raw_nummber_value: 6
@@ -4394,7 +4393,7 @@ TEST(SubstitutionFormatterTest, JsonFormatterWithOrderedPropertiesTest) {
       .WillOnce(Return(MonotonicTime(std::chrono::nanoseconds(5000000))));
   stream_info.downstream_timing_.onLastDownstreamRxByteReceived(time_system);
 
-  ProtobufWkt::Struct key_mapping;
+  Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     request_duration: '%REQUEST_DURATION%'
     bfield: valb

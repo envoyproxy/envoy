@@ -88,7 +88,7 @@ public:
                          SetExtractedJwtDataCallback set_extracted_jwt_data_cb,
                          AuthenticatorCallback callback) {
                 if (status == Status::Ok) {
-                  ProtobufWkt::Struct empty_struct;
+                  Protobuf::Struct empty_struct;
                   set_extracted_jwt_data_cb(issuer, empty_struct);
                 }
                 callback(status);
@@ -101,11 +101,11 @@ public:
 
   // This expected extracted data is only for createSyncMockAuthsAndVerifier() function
   // which set an empty extracted data struct for each issuer.
-  static ProtobufWkt::Struct getExpectedExtractedData(const std::vector<std::string>& issuers) {
-    ProtobufWkt::Struct struct_obj;
+  static Protobuf::Struct getExpectedExtractedData(const std::vector<std::string>& issuers) {
+    Protobuf::Struct struct_obj;
     auto* fields = struct_obj.mutable_fields();
     for (const auto& issuer : issuers) {
-      ProtobufWkt::Struct empty_struct;
+      Protobuf::Struct empty_struct;
       *(*fields)[issuer].mutable_struct_value() = empty_struct;
     }
     return struct_obj;
@@ -174,7 +174,7 @@ rules:
   createSyncMockAuthsAndVerifier(StatusMap{{"example_provider", Status::Ok}});
 
   EXPECT_CALL(mock_cb_, setExtractedData(_))
-      .WillOnce(Invoke([](const ProtobufWkt::Struct& extracted_data) {
+      .WillOnce(Invoke([](const Protobuf::Struct& extracted_data) {
         EXPECT_TRUE(TestUtility::protoEqual(extracted_data,
                                             getExpectedExtractedData({"example_provider"})));
       }));
@@ -231,7 +231,7 @@ TEST_F(GroupVerifierTest, TestRequiresAll) {
       StatusMap{{"example_provider", Status::Ok}, {"other_provider", Status::Ok}});
 
   EXPECT_CALL(mock_cb_, setExtractedData(_))
-      .WillOnce(Invoke([](const ProtobufWkt::Struct& extracted_data) {
+      .WillOnce(Invoke([](const Protobuf::Struct& extracted_data) {
         EXPECT_TRUE(TestUtility::protoEqual(
             extracted_data, getExpectedExtractedData({"example_provider", "other_provider"})));
       }));
@@ -319,7 +319,7 @@ TEST_F(GroupVerifierTest, TestRequiresAnyFirstAuthOK) {
   createSyncMockAuthsAndVerifier(StatusMap{{"example_provider", Status::Ok}});
 
   EXPECT_CALL(mock_cb_, setExtractedData(_))
-      .WillOnce(Invoke([](const ProtobufWkt::Struct& extracted_data) {
+      .WillOnce(Invoke([](const Protobuf::Struct& extracted_data) {
         EXPECT_TRUE(TestUtility::protoEqual(extracted_data,
                                             getExpectedExtractedData({"example_provider"})));
       }));
@@ -342,7 +342,7 @@ TEST_F(GroupVerifierTest, TestRequiresAnyLastAuthOk) {
       StatusMap{{"example_provider", Status::JwtUnknownIssuer}, {"other_provider", Status::Ok}});
 
   EXPECT_CALL(mock_cb_, setExtractedData(_))
-      .WillOnce(Invoke([](const ProtobufWkt::Struct& extracted_data) {
+      .WillOnce(Invoke([](const Protobuf::Struct& extracted_data) {
         EXPECT_TRUE(
             TestUtility::protoEqual(extracted_data, getExpectedExtractedData({"other_provider"})));
       }));
@@ -431,7 +431,7 @@ TEST_F(GroupVerifierTest, TestAnyInAllFirstAnyIsOk) {
   createSyncMockAuthsAndVerifier(StatusMap{{"provider_1", Status::Ok}, {"provider_3", Status::Ok}});
 
   EXPECT_CALL(mock_cb_, setExtractedData(_))
-      .WillOnce(Invoke([](const ProtobufWkt::Struct& extracted_data) {
+      .WillOnce(Invoke([](const Protobuf::Struct& extracted_data) {
         EXPECT_TRUE(TestUtility::protoEqual(
             extracted_data, getExpectedExtractedData({"provider_1", "provider_3"})));
       }));
@@ -451,7 +451,7 @@ TEST_F(GroupVerifierTest, TestAnyInAllLastAnyIsOk) {
                                            {"provider_3", Status::Ok}});
 
   EXPECT_CALL(mock_cb_, setExtractedData(_))
-      .WillOnce(Invoke([](const ProtobufWkt::Struct& extracted_data) {
+      .WillOnce(Invoke([](const Protobuf::Struct& extracted_data) {
         EXPECT_TRUE(TestUtility::protoEqual(
             extracted_data, getExpectedExtractedData({"provider_2", "provider_3"})));
       }));

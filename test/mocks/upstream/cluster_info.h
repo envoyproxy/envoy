@@ -71,7 +71,7 @@ public:
               (const));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Empty>();
+    return std::make_unique<Protobuf::Empty>();
   }
 
   std::string name() const override { return "mock.upstream.local.address.selector"; }

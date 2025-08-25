@@ -365,7 +365,7 @@ Filter::HandleDataStatus Filter::handleEncodeData(Envoy::Buffer::Instance& data,
 void Filter::handleRequestExtractionResult(const std::vector<ExtractedMessageMetadata>& result) {
   RELEASE_ASSERT(extractor_, "`extractor_` should be initialized when extracting fields");
 
-  Envoy::ProtobufWkt::Struct dest_metadata;
+  Envoy::Protobuf::Struct dest_metadata;
 
   auto addResultToMetadata = [&](const std::string& category, const std::string& key,
                                  const ExtractedMessageMetadata& metadata) {
@@ -399,7 +399,7 @@ void Filter::handleRequestExtractionResult(const std::vector<ExtractedMessageMet
 void Filter::handleResponseExtractionResult(const std::vector<ExtractedMessageMetadata>& result) {
   RELEASE_ASSERT(extractor_, "`extractor_` should be initialized when extracting fields");
 
-  Envoy::ProtobufWkt::Struct dest_metadata;
+  Envoy::Protobuf::Struct dest_metadata;
 
   auto addResultToMetadata = [&](const std::string& category, const std::string& key,
                                  const ExtractedMessageMetadata& metadata) {

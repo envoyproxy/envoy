@@ -188,12 +188,15 @@ public:
             // Verify that the number of received byte that is tracked in the stream info equals to
             // the length of reply response buffer.
             auto upstream_meter = this->grpc_stream_->streamInfo().getUpstreamBytesMeter();
-            uint64_t total_bytes_rev = upstream_meter->wireBytesReceived();
-            uint64_t header_bytes_rev = upstream_meter->headerBytesReceived();
+            uint64_t total_bytes_recv = upstream_meter->wireBytesReceived();
+            uint64_t header_bytes_recv = upstream_meter->headerBytesReceived();
+            uint64_t decompressed_header_bytes_recv =
+                upstream_meter->decompressedHeaderBytesReceived();
             // In HTTP2 codec, H2_FRAME_HEADER_SIZE is always included in bytes meter so we need to
             // account for it in the check here as well.
-            EXPECT_EQ(total_bytes_rev - header_bytes_rev,
+            EXPECT_EQ(total_bytes_recv - header_bytes_recv,
                       recv_buf->length() + Http::Http2::H2_FRAME_HEADER_SIZE);
+            EXPECT_GE(decompressed_header_bytes_recv, header_bytes_recv);
           }
           response_received_ = true;
           dispatcher_helper_.exitDispatcherIfNeeded();

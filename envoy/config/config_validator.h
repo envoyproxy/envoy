@@ -60,7 +60,7 @@ public:
    * Creates a ConfigValidator using the given config.
    */
   virtual ConfigValidatorPtr
-  createConfigValidator(const ProtobufWkt::Any& config,
+  createConfigValidator(const Protobuf::Any& config,
                         ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   std::string category() const override { return "envoy.config.validators"; }

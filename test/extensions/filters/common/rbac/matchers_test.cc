@@ -274,6 +274,92 @@ TEST(IPMatcher, IPMatcher) {
   checkMatcher(*downstream_remote_matcher2.value(), false, conn, headers, info);
 }
 
+// Ensure non-IP addresses (e.g., pipe) do not crash IPMatcher and simply return false.
+TEST(IPMatcher, NonIpAddressesReturnFalseAndDoNotCrash) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+
+  // Principal: source_ip (ConnectionRemote)
+  {
+    envoy::config::rbac::v3::Principal principal;
+    auto* cidr = principal.mutable_source_ip();
+    cidr->set_address_prefix("::");
+    cidr->mutable_prefix_len()->set_value(0);
+
+    auto matcher = Matcher::create(principal, factory_context);
+    ASSERT_NE(matcher, nullptr);
+
+    NiceMock<Envoy::Network::MockConnection> conn;
+    Envoy::Http::TestRequestHeaderMapImpl headers;
+    NiceMock<StreamInfo::MockStreamInfo> info;
+
+    Envoy::Network::Address::InstanceConstSharedPtr pipe =
+        *Envoy::Network::Address::PipeInstance::create("test");
+    conn.stream_info_.downstream_connection_info_provider_->setRemoteAddress(pipe);
+    EXPECT_FALSE(matcher->matches(conn, headers, info));
+  }
+
+  // Permission: destination_ip (DownstreamLocal)
+  {
+    envoy::config::rbac::v3::Permission permission;
+    auto* cidr = permission.mutable_destination_ip();
+    cidr->set_address_prefix("::");
+    cidr->mutable_prefix_len()->set_value(0);
+
+    auto matcher =
+        Matcher::create(permission, ProtobufMessage::getStrictValidationVisitor(), factory_context);
+    ASSERT_NE(matcher, nullptr);
+
+    NiceMock<Envoy::Network::MockConnection> conn;
+    Envoy::Http::TestRequestHeaderMapImpl headers;
+    NiceMock<StreamInfo::MockStreamInfo> info;
+
+    Envoy::Network::Address::InstanceConstSharedPtr pipe =
+        *Envoy::Network::Address::PipeInstance::create("test");
+    info.downstream_connection_info_provider_->setLocalAddress(pipe);
+    EXPECT_FALSE(matcher->matches(conn, headers, info));
+  }
+
+  // Principal: direct_remote_ip (DownstreamDirectRemote)
+  {
+    envoy::config::rbac::v3::Principal principal;
+    auto* cidr = principal.mutable_direct_remote_ip();
+    cidr->set_address_prefix("::");
+    cidr->mutable_prefix_len()->set_value(0);
+
+    auto matcher = Matcher::create(principal, factory_context);
+    ASSERT_NE(matcher, nullptr);
+
+    NiceMock<Envoy::Network::MockConnection> conn;
+    Envoy::Http::TestRequestHeaderMapImpl headers;
+    NiceMock<StreamInfo::MockStreamInfo> info;
+
+    Envoy::Network::Address::InstanceConstSharedPtr pipe =
+        *Envoy::Network::Address::PipeInstance::create("test");
+    info.downstream_connection_info_provider_->setDirectRemoteAddressForTest(pipe);
+    EXPECT_FALSE(matcher->matches(conn, headers, info));
+  }
+
+  // Principal: remote_ip (DownstreamRemote)
+  {
+    envoy::config::rbac::v3::Principal principal;
+    auto* cidr = principal.mutable_remote_ip();
+    cidr->set_address_prefix("::");
+    cidr->mutable_prefix_len()->set_value(0);
+
+    auto matcher = Matcher::create(principal, factory_context);
+    ASSERT_NE(matcher, nullptr);
+
+    NiceMock<Envoy::Network::MockConnection> conn;
+    Envoy::Http::TestRequestHeaderMapImpl headers;
+    NiceMock<StreamInfo::MockStreamInfo> info;
+
+    Envoy::Network::Address::InstanceConstSharedPtr pipe =
+        *Envoy::Network::Address::PipeInstance::create("test");
+    info.downstream_connection_info_provider_->setRemoteAddress(pipe);
+    EXPECT_FALSE(matcher->matches(conn, headers, info));
+  }
+}
+
 TEST(PortMatcher, PortMatcher) {
   Envoy::Network::MockConnection conn;
   Envoy::Http::TestRequestHeaderMapImpl headers;
@@ -551,9 +637,9 @@ TEST(MetadataMatcher, MetadataMatcher) {
   auto label = MessageUtil::keyValueStruct("label", "prod");
   envoy::config::core::v3::Metadata metadata;
   metadata.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<std::string, ProtobufWkt::Struct>("other", label));
+      Protobuf::MapPair<std::string, Protobuf::Struct>("other", label));
   metadata.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<std::string, ProtobufWkt::Struct>("rbac", label));
+      Protobuf::MapPair<std::string, Protobuf::Struct>("rbac", label));
   EXPECT_CALL(Const(info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
   envoy::type::matcher::v3::MetadataMatcher matcher;
@@ -768,14 +854,14 @@ TEST(MetadataMatcher, SourcedMetadataMatcher) {
   auto dynamic_label = MessageUtil::keyValueStruct("dynamic_key", "dynamic_value");
   envoy::config::core::v3::Metadata dynamic_metadata;
   dynamic_metadata.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<std::string, ProtobufWkt::Struct>("rbac", dynamic_label));
+      Protobuf::MapPair<std::string, Protobuf::Struct>("rbac", dynamic_label));
   EXPECT_CALL(Const(info), dynamicMetadata()).WillRepeatedly(ReturnRef(dynamic_metadata));
 
   // Set up route metadata
   auto route_label = MessageUtil::keyValueStruct("route_key", "route_value");
   envoy::config::core::v3::Metadata route_metadata;
   route_metadata.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<std::string, ProtobufWkt::Struct>("rbac", route_label));
+      Protobuf::MapPair<std::string, Protobuf::Struct>("rbac", route_label));
   EXPECT_CALL(*route, metadata()).WillRepeatedly(ReturnRef(route_metadata));
   EXPECT_CALL(info, route()).WillRepeatedly(Return(route));
 
@@ -961,15 +1047,15 @@ TEST(MetadataMatcher, NestedMetadata) {
   NiceMock<StreamInfo::MockStreamInfo> info;
 
   // Create nested metadata structure
-  ProtobufWkt::Struct nested_struct;
+  Protobuf::Struct nested_struct;
   (*nested_struct.mutable_fields())["nested_key"] = ValueUtil::stringValue("nested_value");
 
-  ProtobufWkt::Struct top_struct;
+  Protobuf::Struct top_struct;
   (*top_struct.mutable_fields())["top_key"] = ValueUtil::structValue(nested_struct);
 
   envoy::config::core::v3::Metadata metadata;
   metadata.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<std::string, ProtobufWkt::Struct>("rbac", top_struct));
+      Protobuf::MapPair<std::string, Protobuf::Struct>("rbac", top_struct));
   EXPECT_CALL(Const(info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
 
   // Test matching nested value

@@ -171,7 +171,7 @@ class TestConnectionBalanceFactory : public Network::ConnectionBalanceFactory {
 public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     // Using Struct instead of a custom empty config proto. This is only allowed in tests.
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
   Network::ConnectionBalancerSharedPtr
   createConnectionBalancerFromProto(const Protobuf::Message&,
@@ -2470,7 +2470,7 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     // Using Struct instead of a custom empty config proto. This is only allowed in tests.
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
 
   std::string name() const override { return "test_retry_options_predicate_factory"; }

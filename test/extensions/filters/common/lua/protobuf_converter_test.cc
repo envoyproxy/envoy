@@ -1139,10 +1139,10 @@ TEST_F(LuaProtobufConverterTest, NestedMessageWithRecursion) {
 
 TEST_F(LuaProtobufConverterTest, TypeURLEndingWithSlash) {
   // Create Any with type URL ending with slash and no type name after slash
-  ProtobufWkt::Any any_message;
+  Protobuf::Any any_message;
   any_message.set_type_url("type.googleapis.com/");
 
-  Protobuf::Map<std::string, ProtobufWkt::Any> typed_metadata_map;
+  Protobuf::Map<std::string, Protobuf::Any> typed_metadata_map;
   typed_metadata_map["test.filter"] = any_message;
 
   // Push dummy value at index 1, then filter name at index 2 (function expects index 2)
@@ -1160,11 +1160,11 @@ TEST_F(LuaProtobufConverterTest, TypeURLEndingWithSlash) {
 TEST_F(LuaProtobufConverterTest, PrototypeNotFound) {
   // Create Any with a valid but invalid message type
   // Using a well-known type that exists in descriptor pool but might not have a prototype
-  ProtobufWkt::Any any_message;
+  Protobuf::Any any_message;
   any_message.set_type_url("type.googleapis.com/google.protobuf.FileDescriptorSet");
   any_message.set_value("dummy_data");
 
-  Protobuf::Map<std::string, ProtobufWkt::Any> typed_metadata_map;
+  Protobuf::Map<std::string, Protobuf::Any> typed_metadata_map;
   typed_metadata_map["test.filter"] = any_message;
 
   // Push dummy value at index 1, then filter name at index 2 (function expects index 2)

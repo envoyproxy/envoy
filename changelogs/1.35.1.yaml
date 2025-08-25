@@ -1,0 +1,19 @@
+date: August 19, 2025
+
+behavior_changes:
+- area: ext_proc
+  change: |
+    Reverted https://github.com/envoyproxy/envoy/pull/39740 to re-enable fail_open+FULL_DUPLEX_STREAMED configuraton combination.
+
+bug_fixes:
+- area: http
+  change: |
+    Fixed a bug where the premature resets of streams may result in the recursive draining and potential
+    stack overflow. Setting proper ``max_concurrent_streams`` value for HTTP/2 or HTTP/3 could eliminate
+    the risk of the stack overflow before this fix.
+- area: listeners
+  change: |
+    Fixed issue where :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` timed out
+    when used with other listener filters. The bug was triggered when a previous listener filter processed more data
+    than the TLS inspector had requested, causing the TLS inspector to incorrectly calculate its buffer growth strategy.
+    The fix ensures that buffer growth is now based on actual bytes available rather than the previously requested amount.

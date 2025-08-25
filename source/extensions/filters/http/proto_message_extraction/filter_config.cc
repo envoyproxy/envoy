@@ -35,7 +35,7 @@ FilterConfig::FilterConfig(const ProtoMessageExtractionConfig& proto_config,
           Envoy::Grpc::Common::typeUrlPrefix(), descriptor_pool_.get()));
 
   type_finder_ = std::make_unique<const TypeFinder>(
-      [this](absl::string_view type_url) -> const ::Envoy::ProtobufWkt::Type* {
+      [this](absl::string_view type_url) -> const ::Envoy::Protobuf::Type* {
         return type_helper_->Info()->GetTypeByTypeUrl(type_url);
       });
 
