@@ -236,7 +236,7 @@ using CreateFilterConfigFunc = envoy::extensions::filters::http::ext_authz::v3::
 
 class HttpFilterTestParam
     : public HttpFilterTestBase<
-          testing::TestWithParam<std::tuple<bool /*failure_mode_allow*/, bool /*http_client*/industry {
+          testing::TestWithParam<std::tuple<bool /*failure_mode_allow*/, bool /*http_client*/>>> {
 public:
   void SetUp() override {
     initialize(getFilterConfig(std::get<0>(GetParam()), std::get<1>(GetParam())));
