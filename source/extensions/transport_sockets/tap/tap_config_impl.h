@@ -24,10 +24,6 @@ public:
   void closeSocket(Network::ConnectionEvent event) override;
   void onRead(const Buffer::Instance& data, uint32_t bytes_read) override;
   void onWrite(const Buffer::Instance& data, uint32_t bytes_written, bool end_stream) override;
-  void setStreamedBufferAgedDuration(uint32_t duration) {
-    streamed_buffer_aged_duration_ = duration;
-  }
-  uint32_t getStreamedBufferAgedDuration() const { return streamed_buffer_aged_duration_; }
 
 private:
   void initEvent(envoy::data::tap::v3::SocketEvent&);
@@ -54,9 +50,6 @@ private:
   bool shouldSendStreamedMsgByConfiguredSize() const;
   bool shouldSubmitStreamedDataPerConfiguredSizeByAgedDuration() const;
   void submitStreamedDataPerConfiguredSize();
-  void setStreamedDataPerConfiguredSize(const Buffer::Instance& data, const uint32_t buffer_offset,
-                                        const uint32_t total_bytes, const bool is_read,
-                                        const bool is_end_stream);
   void handleSendingStreamTappedMsgPerConfigSize(const Buffer::Instance& data,
                                                  const uint32_t total_bytes, const bool is_read,
                                                  const bool is_end_stream);
@@ -78,7 +71,6 @@ private:
   uint32_t tx_bytes_buffered_{};
   const bool should_output_conn_info_per_event_{false};
   uint32_t current_streamed_rx_tx_bytes_{0};
-  uint32_t streamed_buffer_aged_duration_{0};
   Extensions::Common::Tap::TraceWrapperPtr streamed_trace_{nullptr};
   const TransportTapStats stats_;
 };

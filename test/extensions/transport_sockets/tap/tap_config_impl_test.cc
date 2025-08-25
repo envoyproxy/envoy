@@ -637,7 +637,7 @@ socket_streamed_trace_segment:
           socket_address:
             address: 10.0.0.3
             port_value: 50000
-    - timestamp: 1970-01-01T00:00:12Z
+    - timestamp: 1970-01-01T00:00:15Z
       write:
         data:
           as_bytes: VGVzdCB0cmFuc3BvcnQgc29ja2V0IHRhcCBidWZmZXJlZCBkYXRhIG9uV3JpdGUgc3VibWl0
@@ -654,8 +654,7 @@ socket_streamed_trace_segment:
 )EOF")));
   tapper_->onWrite(Buffer::OwnedImpl("Test transport socket tap buffered data onWrite submit"), 54,
                    true);
-  time_system_.setSystemTime(std::chrono::seconds(12));
-  tapper_->setStreamedBufferAgedDuration(12);
+  time_system_.setSystemTime(std::chrono::seconds(15));
   tapper_->onWrite(Buffer::OwnedImpl("Test transport socket tap buffered data onWrite submit"), 54,
                    true);
 
