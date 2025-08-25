@@ -9,9 +9,9 @@
 #include "envoy/singleton/instance.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/sink.h"
-#include "source/common/common/matchers.h"
 #include "envoy/stats/stats.h"
 
+#include "source/common/common/matchers.h"
 #include "source/common/grpc/typed_async_client.h"
 #include "source/extensions/tracers/opentelemetry/resource_detectors/resource_detector.h"
 
@@ -35,54 +35,46 @@ using MetricsExportRequestPtr = std::unique_ptr<MetricsExportRequest>;
 using MetricsExportRequestSharedPtr = std::shared_ptr<MetricsExportRequest>;
 using SinkConfig = envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig;
 
-
 class MetricAggregator : public Logger::Loggable<Logger::Id::stats> {
- public:
+public:
   using AttributesMap = absl::flat_hash_map<std::string, std::string>;
 
   // Key used to group data points by their attributes.
   struct DataPointKey {
     AttributesMap attributes;
 
-    template <typename H>
-    friend H AbslHashValue(H h, const DataPointKey& k) {
+    template <typename H> friend H AbslHashValue(H h, const DataPointKey& k) {
       return H::combine(std::move(h), k.attributes);
     }
 
-    bool operator==(const DataPointKey& other) const {
-      return attributes == other.attributes;
-    }
+    bool operator==(const DataPointKey& other) const { return attributes == other.attributes; }
   };
 
   // Holds the Metric proto and maps for quick lookups of data points.
   struct MetricData {
     ::opentelemetry::proto::metrics::v1::Metric metric;
-    absl::flat_hash_map<DataPointKey,
-                        ::opentelemetry::proto::metrics::v1::NumberDataPoint*>
+    absl::flat_hash_map<DataPointKey, ::opentelemetry::proto::metrics::v1::NumberDataPoint*>
         gauge_points;
-    absl::flat_hash_map<DataPointKey,
-                        ::opentelemetry::proto::metrics::v1::NumberDataPoint*>
+    absl::flat_hash_map<DataPointKey, ::opentelemetry::proto::metrics::v1::NumberDataPoint*>
         counter_points;
-    absl::flat_hash_map<
-        DataPointKey, ::opentelemetry::proto::metrics::v1::HistogramDataPoint*>
+    absl::flat_hash_map<DataPointKey, ::opentelemetry::proto::metrics::v1::HistogramDataPoint*>
         histogram_points;
   };
 
   // Adds a gauge metric data point. Aggregates by summing if a point with the
   // same attributes exists.
-  void addGauge(absl::string_view metric_name, int64_t value,
-                int64_t snapshot_time_ns, int64_t start_time_unix_nano,
-                const Protobuf::RepeatedPtrField<
-                    opentelemetry::proto::common::v1::KeyValue>& attributes);
+  void addGauge(
+      absl::string_view metric_name, int64_t value, int64_t snapshot_time_ns,
+      int64_t start_time_unix_nano,
+      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes);
 
   // Adds a counter metric data point. Aggregates by summing the delta or value
   // based on temporality if a point with the same attributes exists.
   void addCounter(
-      absl::string_view metric_name, uint64_t value, uint64_t delta,
-      int64_t snapshot_time_ns, int64_t start_time_unix_nano,
+      absl::string_view metric_name, uint64_t value, uint64_t delta, int64_t snapshot_time_ns,
+      int64_t start_time_unix_nano,
       ::opentelemetry::proto::metrics::v1::AggregationTemporality temporality,
-      const Protobuf::RepeatedPtrField<
-          opentelemetry::proto::common::v1::KeyValue>& attributes);
+      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes);
 
   // Adds a histogram metric data point. Aggregates counts and sums if a point
   // with the same attributes and compatible bounds exists.
@@ -91,32 +83,26 @@ class MetricAggregator : public Logger::Loggable<Logger::Id::stats> {
       const Stats::HistogramStatistics& stats, int64_t snapshot_time_ns,
       int64_t start_time_unix_nano,
       ::opentelemetry::proto::metrics::v1::AggregationTemporality temporality,
-      const Protobuf::RepeatedPtrField<
-          opentelemetry::proto::common::v1::KeyValue>& attributes);
+      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes);
 
   // Returns a RepeatedPtrField of ResourceMetrics containing all aggregated
   // metrics.
-  Protobuf::RepeatedPtrField<
-      ::opentelemetry::proto::metrics::v1::ResourceMetrics>
-  getResourceMetrics(const Protobuf::RepeatedPtrField<
-                     opentelemetry::proto::common::v1::KeyValue>&
+  Protobuf::RepeatedPtrField<::opentelemetry::proto::metrics::v1::ResourceMetrics>
+  getResourceMetrics(const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>&
                          resource_attributes) const;
 
- private:
+private:
   // Converts a RepeatedPtrField of KeyValue to an AttributesMap.
   static AttributesMap GetAttributesMap(
-      const Protobuf::RepeatedPtrField<
-          opentelemetry::proto::common::v1::KeyValue>& attrs);
+      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attrs);
 
   // Gets or creates a MetricData object for a given metric name.
   MetricData& getOrCreateMetric(absl::string_view metric_name);
 
   // Sets common fields for a NumberDataPoint.
   void setCommonNumberDataPoint(
-      ::opentelemetry::proto::metrics::v1::NumberDataPoint& data_point,
-      int64_t snapshot_time_ns,
-      const Protobuf::RepeatedPtrField<
-          opentelemetry::proto::common::v1::KeyValue>& attributes);
+      ::opentelemetry::proto::metrics::v1::NumberDataPoint& data_point, int64_t snapshot_time_ns,
+      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes);
 
   absl::flat_hash_map<std::string, MetricData> metrics_;
 };
@@ -130,33 +116,29 @@ public:
   bool reportHistogramsAsDeltas() { return report_histograms_as_deltas_; }
   bool emitTagsAsAttributes() { return emit_tags_as_attributes_; }
   bool useTagExtractedName() { return use_tag_extracted_name_; }
-absl::string_view statPrefix() { return stat_prefix_; }
+  absl::string_view statPrefix() { return stat_prefix_; }
   const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>&
   resource_attributes() const {
     return resource_attributes_;
   }
 
-const absl::flat_hash_map<const Matchers::StringMatcher*,
-                            SinkConfig::MetricConversion>&
+  const absl::flat_hash_map<const Matchers::StringMatcher*, SinkConfig::MetricConversion>&
   matchers() const {
     return matcher_data_.matchers_;
   }
 
- private:
+private:
   // Helper struct to hold the owned matchers and the map.
   struct MatcherData {
     // Owns the StringMatcherImpl instances.
     std::vector<Matchers::StringMatcherPtr> owned_matchers_;
     // Maps raw pointers to the owned StringMatcherImpl to their configurations.
-    absl::flat_hash_map<const Matchers::StringMatcher*,
-                        SinkConfig::MetricConversion>
-        matchers_;
+    absl::flat_hash_map<const Matchers::StringMatcher*, SinkConfig::MetricConversion> matchers_;
   };
 
   // Private static method to generate MatcherData.
   static MatcherData generateMatchers(
-      const Protobuf::RepeatedPtrField<SinkConfig::MetricConversion>&
-          metric_conversions,
+      const Protobuf::RepeatedPtrField<SinkConfig::MetricConversion>& metric_conversions,
       Server::Configuration::ServerFactoryContext& server);
 
   const bool report_counters_as_deltas_;
@@ -164,8 +146,7 @@ const absl::flat_hash_map<const Matchers::StringMatcher*,
   const bool emit_tags_as_attributes_;
   const bool use_tag_extracted_name_;
   const std::string stat_prefix_;
-  const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
-      resource_attributes_;
+  const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> resource_attributes_;
   const MatcherData matcher_data_;
 };
 
@@ -179,7 +160,8 @@ public:
    * Creates an OTLP export request from metric snapshot.
    * @param snapshot supplies the metrics snapshot to send.
    */
-  virtual MetricsExportRequestPtr flush(Stats::MetricSnapshot& snapshot,    int64_t last_flush_time_ns) const PURE;
+  virtual MetricsExportRequestPtr flush(Stats::MetricSnapshot& snapshot,
+                                        int64_t last_flush_time_ns) const PURE;
 };
 
 using OtlpMetricsFlusherSharedPtr = std::shared_ptr<OtlpMetricsFlusher>;
@@ -189,58 +171,51 @@ using OtlpMetricsFlusherSharedPtr = std::shared_ptr<OtlpMetricsFlusher>;
  */
 class OtlpMetricsFlusherImpl : public OtlpMetricsFlusher,
                                public Logger::Loggable<Logger::Id::stats> {
- public:
-   OtlpMetricsFlusherImpl(
-      const OtlpOptionsSharedPtr config,
-      std::function<bool(const Stats::Metric&)> predicate =
-          [](const auto& metric) { return metric.used(); }) : config_(config), predicate_(predicate) {};
+public:
+  OtlpMetricsFlusherImpl(
+      const OtlpOptionsSharedPtr config, std::function<bool(const Stats::Metric&)> predicate =
+                                             [](const auto& metric) { return metric.used(); })
+      : config_(config), predicate_(predicate) {};
 
   MetricsExportRequestPtr flush(Stats::MetricSnapshot& snapshot,
                                 int64_t last_flush_time_ns) const override;
 
- private:
-  template <class StatType>
-  std::string getMetricName(const StatType& stat) const;
+private:
+  template <class StatType> std::string getMetricName(const StatType& stat) const;
 
   template <class StatType>
-  const SinkConfig::MetricConversion* findMatchingMetricConfig(
-      const StatType& stat) const;
+  const SinkConfig::MetricConversion* findMatchingMetricConfig(const StatType& stat) const;
 
   template <class StatType>
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
-  getCombinedAttributes(
-      const StatType& stat,
-      const SinkConfig::MetricConversion* metric_config) const;
+  getCombinedAttributes(const StatType& stat,
+                        const SinkConfig::MetricConversion* metric_config) const;
   template <class GaugeType>
   void addGaugeDataPoint(opentelemetry::proto::metrics::v1::Metric& metric,
-                         const GaugeType& gauge_stat,
-                         int64_t snapshot_time_ns) const;
+                         const GaugeType& gauge_stat, int64_t snapshot_time_ns) const;
 
   template <class CounterType>
   void addCounterDataPoint(opentelemetry::proto::metrics::v1::Metric& metric,
-                           const CounterType& counter, uint64_t value,
-                           uint64_t delta, int64_t snapshot_time_ns) const;
+                           const CounterType& counter, uint64_t value, uint64_t delta,
+                           int64_t snapshot_time_ns) const;
 
   void addHistogramDataPoint(opentelemetry::proto::metrics::v1::Metric& metric,
                              const Stats::ParentHistogram& parent_histogram,
                              int64_t snapshot_time_ns) const;
 
   template <class StatType>
-  void setMetricCommon(
-      opentelemetry::proto::metrics::v1::NumberDataPoint& data_point,
-      int64_t snapshot_time_ns, const StatType& stat) const;
+  void setMetricCommon(opentelemetry::proto::metrics::v1::NumberDataPoint& data_point,
+                       int64_t snapshot_time_ns, const StatType& stat) const;
 
-  void setMetricCommon(
-      opentelemetry::proto::metrics::v1::HistogramDataPoint& data_point,
-      int64_t snapshot_time_ns, const Stats::Metric& stat) const;
+  void setMetricCommon(opentelemetry::proto::metrics::v1::HistogramDataPoint& data_point,
+                       int64_t snapshot_time_ns, const Stats::Metric& stat) const;
 
   const OtlpOptionsSharedPtr config_;
   const std::function<bool(const Stats::Metric&)> predicate_;
 };
 
-class OpenTelemetryGrpcMetricsExporter
-    : public Grpc::AsyncRequestCallbacks<MetricsExportResponse> {
- public:
+class OpenTelemetryGrpcMetricsExporter : public Grpc::AsyncRequestCallbacks<MetricsExportResponse> {
+public:
   ~OpenTelemetryGrpcMetricsExporter() override = default;
 
   /**
@@ -253,31 +228,26 @@ class OpenTelemetryGrpcMetricsExporter
   void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
 };
 
-using OpenTelemetryGrpcMetricsExporterSharedPtr =
-    std::shared_ptr<OpenTelemetryGrpcMetricsExporter>;
+using OpenTelemetryGrpcMetricsExporterSharedPtr = std::shared_ptr<OpenTelemetryGrpcMetricsExporter>;
 
 /**
  * Production implementation of OpenTelemetryGrpcMetricsExporter
  */
-class OpenTelemetryGrpcMetricsExporterImpl
-    : public Singleton::Instance,
-      public OpenTelemetryGrpcMetricsExporter,
-      public Logger::Loggable<Logger::Id::stats> {
- public:
-  OpenTelemetryGrpcMetricsExporterImpl(
-      const OtlpOptionsSharedPtr config,
-      Grpc::RawAsyncClientSharedPtr raw_async_client);
+class OpenTelemetryGrpcMetricsExporterImpl : public Singleton::Instance,
+                                             public OpenTelemetryGrpcMetricsExporter,
+                                             public Logger::Loggable<Logger::Id::stats> {
+public:
+  OpenTelemetryGrpcMetricsExporterImpl(const OtlpOptionsSharedPtr config,
+                                       Grpc::RawAsyncClientSharedPtr raw_async_client);
 
   // OpenTelemetryGrpcMetricsExporter
   void send(MetricsExportRequestPtr&& metrics) override;
 
   // Grpc::AsyncRequestCallbacks
-  void onSuccess(Grpc::ResponsePtr<MetricsExportResponse>&&,
-                 Tracing::Span&) override;
-  void onFailure(Grpc::Status::GrpcStatus, const std::string&,
-                 Tracing::Span&) override;
+  void onSuccess(Grpc::ResponsePtr<MetricsExportResponse>&&, Tracing::Span&) override;
+  void onFailure(Grpc::Status::GrpcStatus, const std::string&, Tracing::Span&) override;
 
- private:
+private:
   const OtlpOptionsSharedPtr config_;
   Grpc::AsyncClient<MetricsExportRequest, MetricsExportResponse> client_;
   const Protobuf::MethodDescriptor& service_method_;
@@ -287,28 +257,24 @@ using OpenTelemetryGrpcMetricsExporterImplPtr =
     std::unique_ptr<OpenTelemetryGrpcMetricsExporterImpl>;
 
 class OpenTelemetryGrpcSink : public Stats::Sink {
- public:
-  OpenTelemetryGrpcSink(
-      const OtlpMetricsFlusherSharedPtr& otlp_metrics_flusher,
-      const OpenTelemetryGrpcMetricsExporterSharedPtr& grpc_metrics_exporter)
-      : metrics_flusher_(otlp_metrics_flusher),
-        metrics_exporter_(grpc_metrics_exporter),
+public:
+  OpenTelemetryGrpcSink(const OtlpMetricsFlusherSharedPtr& otlp_metrics_flusher,
+                        const OpenTelemetryGrpcMetricsExporterSharedPtr& grpc_metrics_exporter)
+      : metrics_flusher_(otlp_metrics_flusher), metrics_exporter_(grpc_metrics_exporter),
         last_flush_time_ns_(0) {}
 
   // Stats::Sink
   void flush(Stats::MetricSnapshot& snapshot) override {
-    const int64_t current_time_ns =
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-            snapshot.snapshotTime().time_since_epoch())
-            .count();
-    metrics_exporter_->send(
-        metrics_flusher_->flush(snapshot, last_flush_time_ns_));
+    const int64_t current_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                        snapshot.snapshotTime().time_since_epoch())
+                                        .count();
+    metrics_exporter_->send(metrics_flusher_->flush(snapshot, last_flush_time_ns_));
     last_flush_time_ns_ = current_time_ns;
   }
 
   void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
 
- private:
+private:
   const OtlpMetricsFlusherSharedPtr metrics_flusher_;
   const OpenTelemetryGrpcMetricsExporterSharedPtr metrics_exporter_;
   int64_t last_flush_time_ns_;

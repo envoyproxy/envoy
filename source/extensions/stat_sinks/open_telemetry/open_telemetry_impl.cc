@@ -7,15 +7,14 @@ namespace Extensions {
 namespace StatSinks {
 namespace OpenTelemetry {
 
-  using ::opentelemetry::proto::metrics::v1::AggregationTemporality;
+using ::opentelemetry::proto::metrics::v1::AggregationTemporality;
 using ::opentelemetry::proto::metrics::v1::HistogramDataPoint;
 using ::opentelemetry::proto::metrics::v1::Metric;
 using ::opentelemetry::proto::metrics::v1::NumberDataPoint;
 using ::opentelemetry::proto::metrics::v1::ResourceMetrics;
 
 MetricAggregator::AttributesMap MetricAggregator::GetAttributesMap(
-    const Protobuf::RepeatedPtrField<
-        opentelemetry::proto::common::v1::KeyValue>& attrs) {
+    const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attrs) {
   AttributesMap map;
   for (const auto& attr : attrs) {
     map[attr.key()] = attr.value().string_value();
@@ -23,8 +22,7 @@ MetricAggregator::AttributesMap MetricAggregator::GetAttributesMap(
   return map;
 }
 
-MetricAggregator::MetricData& MetricAggregator::getOrCreateMetric(
-    absl::string_view metric_name) {
+MetricAggregator::MetricData& MetricAggregator::getOrCreateMetric(absl::string_view metric_name) {
   auto& metric_data = metrics_[metric_name];
   if (metric_data.metric.name().empty()) {
     metric_data.metric.set_name(metric_name);
@@ -34,8 +32,7 @@ MetricAggregator::MetricData& MetricAggregator::getOrCreateMetric(
 
 void MetricAggregator::setCommonNumberDataPoint(
     NumberDataPoint& data_point, int64_t snapshot_time_ns,
-    const Protobuf::RepeatedPtrField<
-        opentelemetry::proto::common::v1::KeyValue>& attributes) {
+    const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes) {
   data_point.set_time_unix_nano(snapshot_time_ns);
   data_point.mutable_attributes()->CopyFrom(attributes);
 }
@@ -43,8 +40,7 @@ void MetricAggregator::setCommonNumberDataPoint(
 void MetricAggregator::addGauge(
     absl::string_view metric_name, int64_t value, int64_t snapshot_time_ns,
     int64_t start_time_unix_nano,
-    const Protobuf::RepeatedPtrField<
-        opentelemetry::proto::common::v1::KeyValue>& attributes) {
+    const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes) {
   MetricData& metric_data = getOrCreateMetric(metric_name);
   DataPointKey key{GetAttributesMap(attributes)};
 
@@ -62,8 +58,7 @@ void MetricAggregator::addGauge(
   }
 
   // If the data point does not exist, create a new one.
-  NumberDataPoint* data_point =
-      metric_data.metric.mutable_gauge()->add_data_points();
+  NumberDataPoint* data_point = metric_data.metric.mutable_gauge()->add_data_points();
   metric_data.gauge_points[key] = data_point;
   setCommonNumberDataPoint(*data_point, snapshot_time_ns, attributes);
   data_point->set_as_int(value);
@@ -71,11 +66,9 @@ void MetricAggregator::addGauge(
 }
 
 void MetricAggregator::addCounter(
-    absl::string_view metric_name, uint64_t value, uint64_t delta,
-    int64_t snapshot_time_ns, int64_t start_time_unix_nano,
-    AggregationTemporality temporality,
-    const Protobuf::RepeatedPtrField<
-        opentelemetry::proto::common::v1::KeyValue>& attributes) {
+    absl::string_view metric_name, uint64_t value, uint64_t delta, int64_t snapshot_time_ns,
+    int64_t start_time_unix_nano, AggregationTemporality temporality,
+    const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes) {
   MetricData& metric_data = getOrCreateMetric(metric_name);
 
   DataPointKey key{GetAttributesMap(attributes)};
@@ -89,32 +82,26 @@ void MetricAggregator::addCounter(
     // total value.
     data_point->set_as_int(
         data_point->as_int() +
-        ((temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA)
-             ? delta
-             : value));
+        ((temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta : value));
     return;
   }
 
   // If the data point does not exist, create a new one.
-  NumberDataPoint* data_point =
-      metric_data.metric.mutable_sum()->add_data_points();
+  NumberDataPoint* data_point = metric_data.metric.mutable_sum()->add_data_points();
   metric_data.metric.mutable_sum()->set_is_monotonic(true);
   metric_data.metric.mutable_sum()->set_aggregation_temporality(temporality);
   metric_data.counter_points[key] = data_point;
   data_point->set_start_time_unix_nano(start_time_unix_nano);
   setCommonNumberDataPoint(*data_point, snapshot_time_ns, attributes);
   data_point->set_as_int(
-      (temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA)
-          ? delta
-          : value);
+      (temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta : value);
 }
 
 void MetricAggregator::addHistogram(
     absl::string_view stat_name, absl::string_view metric_name,
-    const Stats::HistogramStatistics& stats, int64_t snapshot_time_ns,
-    int64_t start_time_unix_nano, AggregationTemporality temporality,
-    const Protobuf::RepeatedPtrField<
-        opentelemetry::proto::common::v1::KeyValue>& attributes) {
+    const Stats::HistogramStatistics& stats, int64_t snapshot_time_ns, int64_t start_time_unix_nano,
+    AggregationTemporality temporality,
+    const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes) {
   MetricData& metric_data = getOrCreateMetric(metric_name);
 
   DataPointKey key{GetAttributesMap(attributes)};
@@ -131,29 +118,25 @@ void MetricAggregator::addHistogram(
 
     // Aggregate bucket_counts. Assuming compatible bounds.
     std::vector<uint64_t> new_bucket_counts = stats.computeDisjointBuckets();
-    if (static_cast<size_t>(data_point->explicit_bounds_size()) == stats.supportedBuckets().size() &&
+    if (static_cast<size_t>(data_point->explicit_bounds_size()) ==
+            stats.supportedBuckets().size() &&
         static_cast<size_t>(data_point->bucket_counts_size()) == new_bucket_counts.size() + 1) {
       for (size_t i = 0; i < new_bucket_counts.size(); ++i) {
-        data_point->set_bucket_counts(
-            i, data_point->bucket_counts(i) + new_bucket_counts[i]);
+        data_point->set_bucket_counts(i, data_point->bucket_counts(i) + new_bucket_counts[i]);
       }
-      data_point->set_bucket_counts(
-          new_bucket_counts.size(),
-          data_point->bucket_counts(new_bucket_counts.size()) +
-              stats.outOfBoundCount());
+      data_point->set_bucket_counts(new_bucket_counts.size(),
+                                    data_point->bucket_counts(new_bucket_counts.size()) +
+                                        stats.outOfBoundCount());
     }
 
-    ENVOY_LOG(error,
-              "Histogram bounds mismatch for metric {} aggregated from stat {}",
-              metric_name, stat_name);
+    ENVOY_LOG(error, "Histogram bounds mismatch for metric {} aggregated from stat {}", metric_name,
+              stat_name);
     return;
   }
 
   // If the data point does not exist, create a new one.
-  HistogramDataPoint* data_point =
-      metric_data.metric.mutable_histogram()->add_data_points();
-  metric_data.metric.mutable_histogram()->set_aggregation_temporality(
-      temporality);
+  HistogramDataPoint* data_point = metric_data.metric.mutable_histogram()->add_data_points();
+  metric_data.metric.mutable_histogram()->set_aggregation_temporality(temporality);
   metric_data.histogram_points[key] = data_point;
   // Set common fields directly here
   data_point->set_time_unix_nano(snapshot_time_ns);
@@ -173,19 +156,16 @@ void MetricAggregator::addHistogram(
   data_point->add_bucket_counts(stats.outOfBoundCount());
 }
 
-Protobuf::RepeatedPtrField<ResourceMetrics>
-MetricAggregator::getResourceMetrics(
-    const Protobuf::RepeatedPtrField<
-        opentelemetry::proto::common::v1::KeyValue>& resource_attributes)
-    const {
+Protobuf::RepeatedPtrField<ResourceMetrics> MetricAggregator::getResourceMetrics(
+    const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>&
+        resource_attributes) const {
   Protobuf::RepeatedPtrField<ResourceMetrics> resource_metrics_list;
   if (metrics_.empty()) {
     return resource_metrics_list;
   }
 
   auto* resource_metrics = resource_metrics_list.Add();
-  resource_metrics->mutable_resource()->mutable_attributes()->CopyFrom(
-      resource_attributes);
+  resource_metrics->mutable_resource()->mutable_attributes()->CopyFrom(resource_attributes);
   auto* scope_metrics = resource_metrics->add_scope_metrics();
 
   for (auto const& [key, metric_data] : metrics_) {
@@ -196,8 +176,7 @@ MetricAggregator::getResourceMetrics(
 
 Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
 generateResourceAttributes(const Tracers::OpenTelemetry::Resource& resource) {
-  Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
-      resource_attributes;
+  Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> resource_attributes;
   for (const auto& attr : resource.attributes_) {
     auto* attribute = resource_attributes.Add();
     attribute->set_key(attr.first);
@@ -211,19 +190,16 @@ OtlpOptions::OtlpOptions(const SinkConfig& sink_config,
                          Server::Configuration::ServerFactoryContext& server)
     : report_counters_as_deltas_(sink_config.report_counters_as_deltas()),
       report_histograms_as_deltas_(sink_config.report_histograms_as_deltas()),
-      emit_tags_as_attributes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          sink_config, emit_tags_as_attributes, true)),
-      use_tag_extracted_name_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          sink_config, use_tag_extracted_name, true)),
-      stat_prefix_(!sink_config.prefix().empty() ? sink_config.prefix() + "."
-                                                 : ""),
+      emit_tags_as_attributes_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, emit_tags_as_attributes, true)),
+      use_tag_extracted_name_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, use_tag_extracted_name, true)),
+      stat_prefix_(!sink_config.prefix().empty() ? sink_config.prefix() + "." : ""),
       resource_attributes_(generateResourceAttributes(resource)),
-      matcher_data_(
-          generateMatchers(sink_config.metric_conversions(), server)) {}
+      matcher_data_(generateMatchers(sink_config.metric_conversions(), server)) {}
 
 OtlpOptions::MatcherData OtlpOptions::generateMatchers(
-    const Protobuf::RepeatedPtrField<SinkConfig::MetricConversion>&
-        metric_conversions,
+    const Protobuf::RepeatedPtrField<SinkConfig::MetricConversion>& metric_conversions,
     Server::Configuration::ServerFactoryContext& server) {
   OtlpOptions::MatcherData result;
   for (const auto& metric_conversions : metric_conversions) {
@@ -236,28 +212,21 @@ OtlpOptions::MatcherData OtlpOptions::generateMatchers(
 }
 
 OpenTelemetryGrpcMetricsExporterImpl::OpenTelemetryGrpcMetricsExporterImpl(
-    const OtlpOptionsSharedPtr config,
-    Grpc::RawAsyncClientSharedPtr raw_async_client)
-    : config_(config),
-      client_(raw_async_client),
-      service_method_(
-          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              "opentelemetry.proto.collector.metrics.v1.MetricsService."
-              "Export")) {}
+    const OtlpOptionsSharedPtr config, Grpc::RawAsyncClientSharedPtr raw_async_client)
+    : config_(config), client_(raw_async_client),
+      service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "opentelemetry.proto.collector.metrics.v1.MetricsService."
+          "Export")) {}
 
-void OpenTelemetryGrpcMetricsExporterImpl::send(
-    MetricsExportRequestPtr&& export_request) {
-  ENVOY_LOG(debug, "sending the OTLP request \n{}",
-            export_request->ShortDebugString());
+void OpenTelemetryGrpcMetricsExporterImpl::send(MetricsExportRequestPtr&& export_request) {
+  ENVOY_LOG(debug, "sending the OTLP request \n{}", export_request->ShortDebugString());
 
-  client_->send(service_method_, *export_request, *this,
-                Tracing::NullSpan::instance(),
+  client_->send(service_method_, *export_request, *this, Tracing::NullSpan::instance(),
                 Http::AsyncClient::RequestOptions());
 }
 
 void OpenTelemetryGrpcMetricsExporterImpl::onSuccess(
-    Grpc::ResponsePtr<MetricsExportResponse>&& export_response,
-    Tracing::Span&) {
+    Grpc::ResponsePtr<MetricsExportResponse>&& export_response, Tracing::Span&) {
   if (export_response->has_partial_success()) {
     ENVOY_LOG(debug,
               "export response with partial success; {} rejected, collector "
@@ -267,11 +236,10 @@ void OpenTelemetryGrpcMetricsExporterImpl::onSuccess(
   }
 }
 
-void OpenTelemetryGrpcMetricsExporterImpl::onFailure(
-    Grpc::Status::GrpcStatus response_status,
-    const std::string& response_message, Tracing::Span&) {
-  ENVOY_LOG(debug, "export failure; status: {}, message: {}", response_status,
-            response_message);
+void OpenTelemetryGrpcMetricsExporterImpl::onFailure(Grpc::Status::GrpcStatus response_status,
+                                                     const std::string& response_message,
+                                                     Tracing::Span&) {
+  ENVOY_LOG(debug, "export failure; status: {}, message: {}", response_status, response_message);
 }
 
 template <class StatType>
@@ -293,18 +261,15 @@ std::string OtlpMetricsFlusherImpl::getMetricName(const StatType& stat) const {
   if (metric_config != nullptr) {
     return metric_config->metric_name();
   }
-  return absl::StrCat(config_->statPrefix(), config_->useTagExtractedName()
-                                                 ? stat.tagExtractedName()
-                                                 : stat.name());
+  return absl::StrCat(config_->statPrefix(),
+                      config_->useTagExtractedName() ? stat.tagExtractedName() : stat.name());
 }
 
 template <class StatType>
 Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
 OtlpMetricsFlusherImpl::getCombinedAttributes(
-    const StatType& stat,
-    const SinkConfig::MetricConversion* metric_config) const {
-  Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
-      attributes;
+    const StatType& stat, const SinkConfig::MetricConversion* metric_config) const {
+  Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attributes;
   if (config_->emitTagsAsAttributes()) {
     for (const auto& tag : stat.tags()) {
       auto* attribute = attributes.Add();
@@ -320,15 +285,14 @@ OtlpMetricsFlusherImpl::getCombinedAttributes(
   return attributes;
 }
 
-MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(
-    Stats::MetricSnapshot& snapshot, int64_t last_flush_time_ns) const {
+MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& snapshot,
+                                                      int64_t last_flush_time_ns) const {
   auto request = std::make_unique<MetricsExportRequest>();
   MetricAggregator aggregator;
 
-  int64_t snapshot_time_ns =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(
-          snapshot.snapshotTime().time_since_epoch())
-          .count();
+  int64_t snapshot_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                 snapshot.snapshotTime().time_since_epoch())
+                                 .count();
   int64_t start_time_unix_nano = last_flush_time_ns;
 
   // Process Gauges
@@ -337,16 +301,16 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(
       const auto* metric_config = findMatchingMetricConfig(gauge.get());
       const std::string metric_name = getMetricName(gauge.get());
       auto attributes = getCombinedAttributes(gauge.get(), metric_config);
-      aggregator.addGauge(metric_name, gauge.get().value(), snapshot_time_ns,
-                          start_time_unix_nano, attributes);
+      aggregator.addGauge(metric_name, gauge.get().value(), snapshot_time_ns, start_time_unix_nano,
+                          attributes);
     }
   }
   for (const auto& gauge : snapshot.hostGauges()) {
     const auto* metric_config = findMatchingMetricConfig(gauge);
     const std::string metric_name = getMetricName(gauge);
     auto attributes = getCombinedAttributes(gauge, metric_config);
-    aggregator.addGauge(metric_name, gauge.value(), snapshot_time_ns,
-                        start_time_unix_nano, attributes);
+    aggregator.addGauge(metric_name, gauge.value(), snapshot_time_ns, start_time_unix_nano,
+                        attributes);
   }
 
   // Process Counters
@@ -356,14 +320,11 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(
           : AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE;
   for (const auto& counter : snapshot.counters()) {
     if (predicate_(counter.counter_)) {
-      const auto* metric_config =
-          findMatchingMetricConfig(counter.counter_.get());
+      const auto* metric_config = findMatchingMetricConfig(counter.counter_.get());
       const std::string metric_name = getMetricName(counter.counter_.get());
-      auto attributes =
-          getCombinedAttributes(counter.counter_.get(), metric_config);
-      aggregator.addCounter(metric_name, counter.counter_.get().value(),
-                            counter.delta_, snapshot_time_ns,
-                            start_time_unix_nano, counter_temporality,
+      auto attributes = getCombinedAttributes(counter.counter_.get(), metric_config);
+      aggregator.addCounter(metric_name, counter.counter_.get().value(), counter.delta_,
+                            snapshot_time_ns, start_time_unix_nano, counter_temporality,
                             attributes);
     }
   }
@@ -371,9 +332,8 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(
     const auto* metric_config = findMatchingMetricConfig(counter);
     const std::string metric_name = getMetricName(counter);
     auto attributes = getCombinedAttributes(counter, metric_config);
-    aggregator.addCounter(metric_name, counter.value(), counter.delta(),
-                          snapshot_time_ns, start_time_unix_nano,
-                          counter_temporality, attributes);
+    aggregator.addCounter(metric_name, counter.value(), counter.delta(), snapshot_time_ns,
+                          start_time_unix_nano, counter_temporality, attributes);
   }
 
   // Process Histograms
@@ -387,12 +347,10 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(
       const std::string metric_name = getMetricName(histogram.get());
       auto attributes = getCombinedAttributes(histogram.get(), metric_config);
       const Stats::HistogramStatistics& histogram_stats =
-          config_->reportHistogramsAsDeltas()
-              ? histogram.get().intervalStatistics()
-              : histogram.get().cumulativeStatistics();
-      aggregator.addHistogram(histogram.get().name(), metric_name,
-                              histogram_stats, snapshot_time_ns,
-                              start_time_unix_nano, histogram_temporality,
+          config_->reportHistogramsAsDeltas() ? histogram.get().intervalStatistics()
+                                              : histogram.get().cumulativeStatistics();
+      aggregator.addHistogram(histogram.get().name(), metric_name, histogram_stats,
+                              snapshot_time_ns, start_time_unix_nano, histogram_temporality,
                               attributes);
     }
   }

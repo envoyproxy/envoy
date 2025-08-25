@@ -46,7 +46,7 @@ TEST(OpenTelemetryConfigTest, OpenTelemetrySinkType) {
 
 TEST(OpenTelemetryConfigTest, OtlpOptionsTest) {
   {
-      NiceMock<Server::Configuration::MockServerFactoryContext> server;
+    NiceMock<Server::Configuration::MockServerFactoryContext> server;
     envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
     OtlpOptions options(sink_config, Tracers::OpenTelemetry::Resource(), server);
 
@@ -60,7 +60,7 @@ TEST(OpenTelemetryConfigTest, OtlpOptionsTest) {
   }
 
   {
-      NiceMock<Server::Configuration::MockServerFactoryContext> server;
+    NiceMock<Server::Configuration::MockServerFactoryContext> server;
     envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
     sink_config.mutable_emit_tags_as_attributes()->set_value(false);
     sink_config.mutable_use_tag_extracted_name()->set_value(false);
