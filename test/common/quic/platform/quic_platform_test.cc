@@ -103,7 +103,7 @@ TEST_F(QuicPlatformTest, QuicClientStats) {
   QUIC_CLIENT_HISTOGRAM_COUNTS("my.count.histogram", 123, 0, 1000, 100, "doc");
   QuicClientSparseHistogram("my.sparse.histogram", 345);
   // Make sure compiler doesn't report unused-parameter error.
-  bool should_be_used;
+  bool should_be_used = false;
   QUIC_CLIENT_HISTOGRAM_BOOL("my.bool.histogram", should_be_used, "doc");
 }
 
