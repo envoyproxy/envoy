@@ -5,6 +5,7 @@
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/extensions/request_id/uuid/v3/uuid.pb.h"
 #include "envoy/extensions/upstreams/http/tcp/v3/tcp_connection_pool.pb.h"
 
 #include "test/integration/filters/add_header_filter.pb.h"
@@ -834,7 +835,13 @@ public:
           proxy_config.set_stat_prefix("tcp_stats");
           proxy_config.set_cluster("cluster_0");
           proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
-          proxy_config.mutable_tunneling_config()->mutable_generate_request_id()->set_value(true);
+          // Configure request ID generation for tunneling using the UUID request ID extension.
+          envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension
+              request_id_extension;
+          envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig uuid_config;
+          request_id_extension.mutable_typed_config()->PackFrom(uuid_config);
+          proxy_config.mutable_tunneling_config()->mutable_request_id_extension()->CopyFrom(
+              request_id_extension);
 
           // Add a file access log to capture the filter state request id before packing.
           tunnel_access_log_path_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
