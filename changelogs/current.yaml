@@ -192,11 +192,8 @@ new_features:
 - area: tcp_proxy
   change: |
     Added support for generating and propagating a request ID on synthesized upstream HTTP requests when tunneling requests.
-    It can be configured using :ref:`generate_request_id
-    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.generate_request_id>`
-    to enable generation and :ref:`request_id_extension
-    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.request_id_extension>`
-    to customize request ID behavior.
+    It can be configured using :ref:`request_id_extension
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.request_id_extension>`.
 - area: router_check_tool
   change: |
     Added support for testing routes with :ref:`dynamic metadata matchers <envoy_v3_api_field_config.route.v3.RouteMatch.dynamic_metadata>`
