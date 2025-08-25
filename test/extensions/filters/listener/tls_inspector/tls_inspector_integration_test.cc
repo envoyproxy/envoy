@@ -179,7 +179,7 @@ typed_config:
                         const std::string& log_format = "%RESPONSE_CODE_DETAILS%",
                         const Ssl::ClientSslTransportOptions& ssl_options = {},
                         const std::string& curves_list = "", bool enable_ja3_fingerprinting = false,
-                        bool enable_ja4_fingerprinting = false, bool write_fake_data = false) {
+                        bool enable_ja4_fingerprinting = false) {
     initializeWithTlsInspector(ssl_client, log_format, listener_filter_disabled,
                                enable_ja3_fingerprinting, enable_ja4_fingerprinting);
 
@@ -210,10 +210,6 @@ typed_config:
                                             std::move(transport_socket), nullptr, nullptr);
     client_->addConnectionCallbacks(connect_callbacks_);
     client_->connect();
-    if (write_fake_data) {
-      Buffer::OwnedImpl buffer("fake data");
-      client_->write(buffer, false);
-    }
     while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
       dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     }
@@ -265,11 +261,24 @@ TEST_P(TlsInspectorIntegrationTest, ContinueOnListenerTimeout) {
 }
 
 TEST_P(TlsInspectorIntegrationTest, TlsInspectorMetadataPopulatedInAccessLog) {
-  setupConnections(
-      /*listener_filter_disabled=*/false, /*expect_connection_open=*/true,
-      /*ssl_client=*/false, /*log_format=*/"%TLS_INSPECTOR_ERROR%",
-      /*ssl_options=*/{}, /*curves_list=*/"", false, false,
-      /*write_fake_data=*/true);
+  initializeWithTlsInspector(/*ssl_client=*/false, /*log_format=*/"%TLS_INSPECTOR_ERROR%", false,
+                             false, false);
+  Network::Address::InstanceConstSharedPtr address =
+      Ssl::getSslAddress(version_, lookupPort("echo"));
+  context_ =
+      Ssl::createClientSslTransportSocketFactory(/*ssl_options=*/{}, *context_manager_, *api_);
+  auto transport_socket_factory = std::make_unique<Network::RawBufferSocketFactory>();
+  Network::TransportSocketPtr transport_socket =
+      transport_socket_factory->createTransportSocket(nullptr, nullptr);
+  client_ = dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                                std::move(transport_socket), nullptr, nullptr);
+  client_->addConnectionCallbacks(connect_callbacks_);
+  client_->connect();
+  Buffer::OwnedImpl buffer("fake data");
+  client_->write(buffer, false);
+  while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
   // The timeout is set as one seconds, advance 2 seconds to trigger the timeout.
   timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(2000));
   client_->close(Network::ConnectionCloseType::FlushWrite);
