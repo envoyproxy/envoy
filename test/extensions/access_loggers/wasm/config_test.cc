@@ -109,7 +109,7 @@ TEST_P(WasmAccessLogConfigTest, CreateWasmFromWASM) {
   config.mutable_config()->mutable_vm_config()->mutable_code()->mutable_local()->set_inline_bytes(
       code);
   // Test Any configuration.
-  ProtobufWkt::Struct some_proto;
+  Protobuf::Struct some_proto;
   config.mutable_config()->mutable_vm_config()->mutable_configuration()->PackFrom(some_proto);
 
   AccessLog::FilterPtr filter;

@@ -196,8 +196,6 @@ TEST_P(LocalJwksIntegrationTest, ExpiredTokenWithStripFailureResponse) {
   ASSERT_TRUE(response->headers().get(Http::Headers::get().WWWAuthenticate).empty());
   ASSERT_TRUE(response->body().empty());
 
-  // BalsaParser codec produces ContentLength header but HTTPParser does not
-  // when body is empty. The other headers are server, status and date.
   EXPECT_EQ("envoy", response->headers().getServerValue());
   EXPECT_EQ("401", response->headers().getStatusValue());
   ASSERT_FALSE(response->headers().getDateValue().empty());

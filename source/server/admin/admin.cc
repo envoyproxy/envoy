@@ -136,7 +136,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                {Admin::ParamDescriptor::Type::String, "mask",
                 "The mask to apply. When both resource and mask are specified, "
                 "the mask is applied to every element in the desired repeated field so that only a "
-                "subset of fields are returned. The mask is parsed as a ProtobufWkt::FieldMask"},
+                "subset of fields are returned. The mask is parsed as a Protobuf::FieldMask"},
                {Admin::ParamDescriptor::Type::String, "name_regex",
                 "Dump only the currently loaded configurations whose names match the specified "
                 "regex. Can be used with both resource and mask query parameters."},
@@ -147,7 +147,7 @@ AdminImpl::AdminImpl(const std::string& profile_path, Server::Instance& server,
                       MAKE_ADMIN_HANDLER(init_dump_handler_.handlerInitDump), false, false,
                       {{Admin::ParamDescriptor::Type::String, "mask",
                         "The desired component to dump unready targets. The mask is parsed as "
-                        "a ProtobufWkt::FieldMask. For example, get the unready targets of "
+                        "a Protobuf::FieldMask. For example, get the unready targets of "
                         "all listeners with /init_dump?mask=listener`"}}),
           makeHandler("/contention", "dump current Envoy mutex contention stats (if enabled)",
                       MAKE_ADMIN_HANDLER(stats_handler_.handlerContention), false, false),

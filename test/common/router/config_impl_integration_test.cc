@@ -7,6 +7,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/config_impl.h"
+#include "source/common/router/delegating_route_impl.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/registry.h"
@@ -28,8 +29,7 @@ public:
                               const Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
                               uint64_t) const override {
       ASSERT(dynamic_cast<const RouteEntryImplBase*>(parent.get()) != nullptr);
-      return std::make_shared<RouteEntryImplBase::DynamicRouteEntry>(
-          dynamic_cast<const RouteEntryImplBase*>(parent.get()), parent, cluster_name_);
+      return std::make_shared<Router::DynamicRouteEntry>(parent, std::string(cluster_name_));
     }
 
     const std::string cluster_name_;
@@ -39,13 +39,13 @@ public:
   ClusterSpecifierPluginSharedPtr
   createClusterSpecifierPlugin(const Protobuf::Message& config,
                                Server::Configuration::ServerFactoryContext&) override {
-    const auto& typed_config = dynamic_cast<const ProtobufWkt::Struct&>(config);
+    const auto& typed_config = dynamic_cast<const Protobuf::Struct&>(config);
     return std::make_shared<FakeClusterSpecifierPlugin>(
         typed_config.fields().at("name").string_value());
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
 
   std::string name() const override { return "envoy.router.cluster_specifier_plugin.fake"; }

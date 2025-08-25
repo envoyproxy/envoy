@@ -105,8 +105,7 @@ MockRouteEntry::MockRouteEntry()
   ON_CALL(*this, rateLimitPolicy()).WillByDefault(ReturnRef(rate_limit_policy_));
   ON_CALL(*this, retryPolicy()).WillByDefault(ReturnRef(retry_policy_));
   ON_CALL(*this, internalRedirectPolicy()).WillByDefault(ReturnRef(internal_redirect_policy_));
-  ON_CALL(*this, retryShadowBufferLimit())
-      .WillByDefault(Return(std::numeric_limits<uint32_t>::max()));
+
   ON_CALL(*this, shadowPolicies()).WillByDefault(ReturnRef(shadow_policies_));
   ON_CALL(*this, timeout()).WillByDefault(Return(std::chrono::milliseconds(10)));
   ON_CALL(*this, includeVirtualHostRateLimits()).WillByDefault(Return(true));
@@ -125,8 +124,10 @@ MockRouteEntry::MockRouteEntry()
 MockRouteEntry::~MockRouteEntry() = default;
 
 MockConfig::MockConfig() : route_(new NiceMock<MockRoute>()) {
-  ON_CALL(*this, route(_, _, _)).WillByDefault(Return(route_));
-  ON_CALL(*this, route(_, _, _, _)).WillByDefault(Return(route_));
+  ON_CALL(*this, route(_, _, _))
+      .WillByDefault(Return(VirtualHostRoute{route_->virtual_host_, route_}));
+  ON_CALL(*this, route(_, _, _, _))
+      .WillByDefault(Return(VirtualHostRoute{route_->virtual_host_, route_}));
   ON_CALL(*this, internalOnlyHeaders()).WillByDefault(ReturnRef(internal_only_headers_));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
   ON_CALL(*this, usesVhds()).WillByDefault(Return(false));
@@ -142,7 +143,12 @@ MockDecorator::MockDecorator() {
 }
 MockDecorator::~MockDecorator() = default;
 
-MockRouteTracing::MockRouteTracing() = default;
+MockRouteTracing::MockRouteTracing() {
+  ON_CALL(*this, getCustomTags()).WillByDefault(ReturnRef(custom_tags_));
+  ON_CALL(*this, getClientSampling()).WillByDefault(ReturnRef(client_sampling_));
+  ON_CALL(*this, getRandomSampling()).WillByDefault(ReturnRef(random_sampling_));
+  ON_CALL(*this, getOverallSampling()).WillByDefault(ReturnRef(overall_sampling_));
+}
 MockRouteTracing::~MockRouteTracing() = default;
 
 MockRoute::MockRoute() {
@@ -153,7 +159,7 @@ MockRoute::MockRoute() {
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
   ON_CALL(*this, typedMetadata()).WillByDefault(ReturnRef(typed_metadata_));
   ON_CALL(*this, routeName()).WillByDefault(ReturnRef(route_name_));
-  ON_CALL(*this, virtualHost()).WillByDefault(ReturnRef(virtual_host_));
+  ON_CALL(*this, virtualHost()).WillByDefault(ReturnRef(virtual_host_copy_));
 
   // Route entry methods.
   ON_CALL(*this, clusterName()).WillByDefault(ReturnRef(route_entry_.cluster_name_));
@@ -162,8 +168,7 @@ MockRoute::MockRoute() {
   ON_CALL(*this, retryPolicy()).WillByDefault(ReturnRef(route_entry_.retry_policy_));
   ON_CALL(*this, internalRedirectPolicy())
       .WillByDefault(ReturnRef(route_entry_.internal_redirect_policy_));
-  ON_CALL(*this, retryShadowBufferLimit())
-      .WillByDefault(Return(std::numeric_limits<uint32_t>::max()));
+
   ON_CALL(*this, shadowPolicies()).WillByDefault(ReturnRef(route_entry_.shadow_policies_));
   ON_CALL(*this, timeout()).WillByDefault(Return(std::chrono::milliseconds(10)));
   ON_CALL(*this, includeVirtualHostRateLimits()).WillByDefault(Return(true));

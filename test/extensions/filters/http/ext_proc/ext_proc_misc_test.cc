@@ -213,11 +213,11 @@ body_format:
 
     ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
     ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
-    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "401"}}, true);
+    upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
     if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.skip_ext_proc_on_local_reply")) {
       processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
     }
-    verifyDownstreamResponse(*response, 401);
+    verifyDownstreamResponse(*response, 200);
   }
 
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor proto_config_{};

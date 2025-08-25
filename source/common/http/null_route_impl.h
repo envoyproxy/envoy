@@ -63,7 +63,7 @@ struct NullVirtualHost : public Router::VirtualHost {
   bool includeAttemptCountInRequest() const override { return false; }
   bool includeAttemptCountInResponse() const override { return false; }
   bool includeIsTimeoutRetryHeader() const override { return false; }
-  uint32_t retryShadowBufferLimit() const override { return std::numeric_limits<uint32_t>::max(); }
+  uint64_t requestBodyBufferLimit() const override { return std::numeric_limits<uint64_t>::max(); }
   const Router::RouteSpecificFilterConfig*
   mostSpecificPerFilterConfig(absl::string_view) const override {
     return nullptr;
@@ -161,7 +161,7 @@ protected:
   }
   const Router::PathMatcherSharedPtr& pathMatcher() const override { return path_matcher_; }
   const Router::PathRewriterSharedPtr& pathRewriter() const override { return path_rewriter_; }
-  uint32_t retryShadowBufferLimit() const override { return std::numeric_limits<uint32_t>::max(); }
+  uint64_t requestBodyBufferLimit() const override { return std::numeric_limits<uint64_t>::max(); }
   const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const override {
     return shadow_policies_;
   }
@@ -268,10 +268,10 @@ struct NullRouteImpl : public Router::Route {
   }
   absl::optional<bool> filterDisabled(absl::string_view) const override { return {}; }
   const std::string& routeName() const override { return EMPTY_STRING; }
-  const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
+  const Router::VirtualHostConstSharedPtr& virtualHost() const override { return virtual_host_; }
 
   std::unique_ptr<RouteEntryImpl> route_entry_;
-  static const NullVirtualHost virtual_host_;
+  static const Router::VirtualHostConstSharedPtr virtual_host_;
 
 protected:
   NullRouteImpl(const std::string cluster_name, const Router::RetryPolicy& retry_policy,

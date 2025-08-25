@@ -59,7 +59,7 @@ routes:
   const std::vector<Envoy::Router::MetadataMatchCriterionConstSharedPtr>& mmc =
       criteria->metadataMatchCriteria();
 
-  ProtobufWkt::Value v1;
+  Protobuf::Value v1;
   v1.set_string_value("v1");
   HashedValue hv1(v1);
 

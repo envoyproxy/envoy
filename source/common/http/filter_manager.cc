@@ -84,6 +84,12 @@ void ActiveStreamFilterBase::commonContinue() {
     }
   }
 
+  if (!canContinue()) {
+    ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
+                     static_cast<const void*>(this));
+    return;
+  }
+
   // Make sure that we handle the zero byte data frame case. We make no effort to optimize this
   // case in terms of merging it into a header only request/response. This could be done in the
   // future.
@@ -92,7 +98,19 @@ void ActiveStreamFilterBase::commonContinue() {
     doHeaders(observedEndStream() && !bufferedData() && !hasTrailers());
   }
 
+  if (!canContinue()) {
+    ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
+                     static_cast<const void*>(this));
+    return;
+  }
+
   doMetadata();
+
+  if (!canContinue()) {
+    ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
+                     static_cast<const void*>(this));
+    return;
+  }
 
   // It is possible for trailers to be added during doData(). doData() itself handles continuation
   // of trailers for the non-continuation case. Thus, we must keep track of whether we had
@@ -101,6 +119,12 @@ void ActiveStreamFilterBase::commonContinue() {
   const bool had_trailers_before_data = hasTrailers();
   if (bufferedData()) {
     doData(observedEndStream() && !had_trailers_before_data);
+  }
+
+  if (!canContinue()) {
+    ENVOY_STREAM_LOG(trace, "cannot continue filter chain: filter={}", *this,
+                     static_cast<const void*>(this));
+    return;
   }
 
   if (had_trailers_before_data) {
@@ -349,10 +373,7 @@ bool ActiveStreamEncoderFilter::canContinue() {
   // As with ActiveStreamDecoderFilter::canContinue() make sure we do not
   // continue if a local reply has been sent or ActiveStreamDecoderFilter::recreateStream() is
   // called, etc.
-  return !parent_.state_.encoder_filter_chain_complete_ &&
-         (!Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.filter_chain_aborted_can_not_continue") ||
-          !parent_.stopEncoderFilterChain());
+  return !parent_.state_.encoder_filter_chain_complete_ && !parent_.stopEncoderFilterChain();
 }
 
 Buffer::InstancePtr ActiveStreamDecoderFilter::createBuffer() {
@@ -994,9 +1015,7 @@ void DownstreamFilterManager::sendLocalReply(
 
   if (!filter_manager_callbacks_.responseHeaders().has_value() &&
       (!filter_manager_callbacks_.informationalHeaders().has_value() ||
-       (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.local_reply_traverses_filter_chain_after_1xx") &&
-        !(state_.filter_call_state_ & FilterCallState::IsEncodingMask)))) {
+       !(state_.filter_call_state_ & FilterCallState::IsEncodingMask))) {
     // If the response has not started at all, or if the only response so far is an informational
     // 1xx that has already been fully processed, send the response through the filter chain.
 
@@ -1623,7 +1642,7 @@ void FilterManager::callLowWatermarkCallbacks() {
   }
 }
 
-void FilterManager::setBufferLimit(uint32_t new_limit) {
+void FilterManager::setBufferLimit(uint64_t new_limit) {
   ENVOY_STREAM_LOG(debug, "setting buffer limit to {}", *this, new_limit);
   buffer_limit_ = new_limit;
   if (buffered_request_data_) {
@@ -1738,11 +1757,11 @@ void ActiveStreamDecoderFilter::removeDownstreamWatermarkCallbacks(
   parent_.watermark_callbacks_.remove(&watermark_callbacks);
 }
 
-void ActiveStreamDecoderFilter::setDecoderBufferLimit(uint32_t limit) {
+void ActiveStreamDecoderFilter::setDecoderBufferLimit(uint64_t limit) {
   parent_.setBufferLimit(limit);
 }
 
-uint32_t ActiveStreamDecoderFilter::decoderBufferLimit() { return parent_.buffer_limit_; }
+uint64_t ActiveStreamDecoderFilter::decoderBufferLimit() { return parent_.buffer_limit_; }
 
 bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers) {
   // Because the filter's and the HCM view of if the stream has a body and if

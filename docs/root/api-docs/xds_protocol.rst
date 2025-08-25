@@ -293,7 +293,7 @@ instance version that the client indicated it has seen. The server may send addi
 at any time when the subscribed resources change.
 
 Whenever the client receives a new response, it will send another request indicating whether or
-not the resources in the response were valid (see
+not the *individual* resources in the response were valid in isolation (see
 :ref:`ACK/NACK and resource type instance version <xds_ack_nack>` for details).
 
 All server responses will contain a :ref:`nonce<envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.nonce>`, and
@@ -384,21 +384,28 @@ as well as a mechanism to ACK/NACK configuration updates.
 ACK
 ^^^
 
-If the update was successfully applied, the
+If *all* resources in the update were valid, the
 :ref:`version_info <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.version_info>` will be ``X``, as indicated
 in the sequence diagram:
 
 .. figure:: diagrams/simple-ack.svg
    :alt: Version update after ACK
 
+.. note::
+
+   ACKing simply means that the client considered each of the resources in the response to be valid
+   when evaluated in isolation.
+
 NACK
 ^^^^
 
-If Envoy had instead rejected configuration
-update ``X``, it would reply with :ref:`error_detail <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.error_detail>`
+If Envoy had instead found some resources in configuration
+update ``X`` to be invalid, it would reply with :ref:`error_detail <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.error_detail>`
 populated and its previous version, which in this case was the empty
-initial version. The :ref:`error_detail <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.error_detail>` has
-more details around the exact error message populated in the message field:
+initial version. Note that a ``NACK`` does not necessarily mean that none of the resources were
+accepted. The :ref:`error_detail
+<envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.error_detail>` has more details around the
+exact error message populated in the message field:
 
 .. figure:: diagrams/simple-nack.svg
    :alt: No version update after NACK
@@ -434,10 +441,13 @@ ACK and NACK semantics summary
   received from the management server. The :ref:`response_nonce
   <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.response_nonce>` field tells the server which of its responses
   the ``ACK`` or ``NACK`` is associated with.
-- ``ACK`` signifies successful configuration update and contains the
-  :ref:`version_info <envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.version_info>` from the
-  :ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>`.
-- ``NACK`` signifies unsuccessful configuration and is indicated by the presence of the
+- ``ACK`` signifies that the individual resources were valid and that the client's intent is to
+   apply them; however, it does not mean that the configuration has been applied successfully. After
+   the client sends ``ACK``, it can still fail to apply the resources. It contains the
+   :ref:`version_info <envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.version_info>` from
+   the :ref:`DiscoveryResponse <envoy_v3_api_msg_service.discovery.v3.DiscoveryResponse>`.
+- ``NACK`` signifies that at least one of the resources in the response were considered invalid. A ``NACK``
+  is indicated by the presence of the
   :ref:`error_detail <envoy_v3_api_field_service.discovery.v3.DiscoveryRequest.error_detail>` field. The :ref:`version_info
   <envoy_v3_api_field_service.discovery.v3.DiscoveryResponse.version_info>` indicates the most recent version that the
   client is using, although that may not be an older version in the case where the client has

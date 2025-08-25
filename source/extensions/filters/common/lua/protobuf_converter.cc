@@ -245,7 +245,7 @@ void ProtobufConverterUtils::pushLuaArrayFromRepeatedField(
 }
 
 int ProtobufConverterUtils::processDynamicTypedMetadataFromLuaCall(
-    lua_State* state, const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_metadata_map) {
+    lua_State* state, const Protobuf::Map<std::string, Protobuf::Any>& typed_metadata_map) {
 
   // Get filter name from Lua argument
   const absl::string_view filter_name = getStringViewFromLuaString(state, 2);
@@ -258,8 +258,8 @@ int ProtobufConverterUtils::processDynamicTypedMetadataFromLuaCall(
     return 1;
   }
 
-  // The typed metadata is stored as a ProtobufWkt::Any
-  const ProtobufWkt::Any& any_message = it->second;
+  // The typed metadata is stored as a Protobuf::Any
+  const Protobuf::Any& any_message = it->second;
 
   // Extract the type name from the type URL
   absl::string_view type_url = any_message.type_url();

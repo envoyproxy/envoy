@@ -1959,6 +1959,312 @@ TEST_P(SelectHandlerTest, SingleShardErrorResponse) {
 }
 
 INSTANTIATE_TEST_SUITE_P(SelectHandlerTest, SelectHandlerTest, testing::Values("select"));
+
+class RoleHandlerTest : public FragmentedRequestCommandHandlerTest,
+                        public testing::WithParamInterface<std::string> {
+public:
+  void setup(uint16_t shard_size, const std::list<uint64_t>& null_handle_indexes,
+             bool mirrored = false) {
+    std::vector<std::string> request_strings = {"role"};
+    makeRequestToShard(shard_size, request_strings, null_handle_indexes, mirrored);
+  }
+
+  Common::Redis::RespValuePtr masterResponse() {
+    Common::Redis::RespValuePtr response = std::make_unique<Common::Redis::RespValue>();
+    response->type(Common::Redis::RespType::Array);
+    std::vector<Common::Redis::RespValue> elements(3);
+    elements[0].type(Common::Redis::RespType::BulkString);
+    elements[0].asString() = "master";
+    elements[1].type(Common::Redis::RespType::Integer);
+    elements[1].asInteger() = 0;
+    elements[2].type(Common::Redis::RespType::Array);
+    response->asArray().swap(elements);
+    return response;
+  }
+
+  Common::Redis::RespValuePtr slaveResponse() {
+    Common::Redis::RespValuePtr response = std::make_unique<Common::Redis::RespValue>();
+    response->type(Common::Redis::RespType::Array);
+    std::vector<Common::Redis::RespValue> elements(5);
+    elements[0].type(Common::Redis::RespType::BulkString);
+    elements[0].asString() = "slave";
+    elements[1].type(Common::Redis::RespType::BulkString);
+    elements[1].asString() = "127.0.0.1";
+    elements[2].type(Common::Redis::RespType::Integer);
+    elements[2].asInteger() = 6379;
+    elements[3].type(Common::Redis::RespType::BulkString);
+    elements[3].asString() = "connected";
+    elements[4].type(Common::Redis::RespType::Integer);
+    elements[4].asInteger() = 0;
+    response->asArray().swap(elements);
+    return response;
+  }
+
+  Common::Redis::RespValuePtr bulkStringResponse() {
+    Common::Redis::RespValuePtr response = std::make_unique<Common::Redis::RespValue>();
+    response->type(Common::Redis::RespType::BulkString);
+    response->asString() = "master";
+    return response;
+  }
+};
+
+TEST_P(RoleHandlerTest, Normal) {
+  InSequence s;
+
+  setup(2, {});
+  EXPECT_NE(nullptr, handle_);
+
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Array);
+  std::vector<Common::Redis::RespValue> elements(2);
+  // elements[0] corresponds to pool_callbacks_[0] (master)
+  elements[0].type(Common::Redis::RespType::Array);
+  std::vector<Common::Redis::RespValue> master_elements(3);
+  master_elements[0].type(Common::Redis::RespType::BulkString);
+  master_elements[0].asString() = "master";
+  master_elements[1].type(Common::Redis::RespType::Integer);
+  master_elements[1].asInteger() = 0;
+  master_elements[2].type(Common::Redis::RespType::Array);
+  elements[0].asArray().swap(master_elements);
+  // elements[1] corresponds to pool_callbacks_[1] (slave)
+  elements[1].type(Common::Redis::RespType::Array);
+  std::vector<Common::Redis::RespValue> slave_elements(5);
+  slave_elements[0].type(Common::Redis::RespType::BulkString);
+  slave_elements[0].asString() = "slave";
+  slave_elements[1].type(Common::Redis::RespType::BulkString);
+  slave_elements[1].asString() = "127.0.0.1";
+  slave_elements[2].type(Common::Redis::RespType::Integer);
+  slave_elements[2].asInteger() = 6379;
+  slave_elements[3].type(Common::Redis::RespType::BulkString);
+  slave_elements[3].asString() = "connected";
+  slave_elements[4].type(Common::Redis::RespType::Integer);
+  slave_elements[4].asInteger() = 0;
+  elements[1].asArray().swap(slave_elements);
+  expected_response.asArray().swap(elements);
+
+  pool_callbacks_[0]->onResponse(masterResponse());
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(
+      store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "redis.foo.command." + GetParam() + ".latency"), 10));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  pool_callbacks_[1]->onResponse(slaveResponse());
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
+}
+
+TEST_P(RoleHandlerTest, Mirrored) {
+  InSequence s;
+
+  setupMirrorPolicy();
+  setup(2, {}, true);
+  EXPECT_NE(nullptr, handle_);
+
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Array);
+  std::vector<Common::Redis::RespValue> elements(2);
+  elements[0].type(Common::Redis::RespType::Array);
+  std::vector<Common::Redis::RespValue> master_elements(3);
+  master_elements[0].type(Common::Redis::RespType::BulkString);
+  master_elements[0].asString() = "master";
+  master_elements[1].type(Common::Redis::RespType::Integer);
+  master_elements[1].asInteger() = 0;
+  master_elements[2].type(Common::Redis::RespType::Array);
+  elements[0].asArray().swap(master_elements);
+  elements[1].type(Common::Redis::RespType::Array);
+  std::vector<Common::Redis::RespValue> master_elements2(3);
+  master_elements2[0].type(Common::Redis::RespType::BulkString);
+  master_elements2[0].asString() = "master";
+  master_elements2[1].type(Common::Redis::RespType::Integer);
+  master_elements2[1].asInteger() = 0;
+  master_elements2[2].type(Common::Redis::RespType::Array);
+  elements[1].asArray().swap(master_elements2);
+  expected_response.asArray().swap(elements);
+
+  pool_callbacks_[0]->onResponse(masterResponse());
+  mirror_pool_callbacks_[0]->onResponse(masterResponse());
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(
+      store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "redis.foo.command." + GetParam() + ".latency"), 10));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  pool_callbacks_[1]->onResponse(masterResponse());
+  mirror_pool_callbacks_[1]->onResponse(masterResponse());
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
+}
+
+TEST_P(RoleHandlerTest, BulkStringResponse) {
+  InSequence s;
+
+  setup(1, {});
+  EXPECT_NE(nullptr, handle_);
+
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Array);
+  std::vector<Common::Redis::RespValue> elements(1);
+  elements[0].type(Common::Redis::RespType::BulkString);
+  elements[0].asString() = "master";
+  expected_response.asArray().swap(elements);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(5));
+  EXPECT_CALL(
+      store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "redis.foo.command." + GetParam() + ".latency"), 5));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  pool_callbacks_[0]->onResponse(bulkStringResponse());
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".success").value());
+}
+
+TEST_P(RoleHandlerTest, NoUpstreamHostForAll) {
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "no upstream host";
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  setup(0, {});
+  EXPECT_EQ(nullptr, handle_);
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
+}
+
+TEST_P(RoleHandlerTest, NoUpstreamHostForOne) {
+  InSequence s;
+
+  setup(2, {0});
+  EXPECT_NE(nullptr, handle_);
+
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "finished with 1 error(s)";
+
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  pool_callbacks_[1]->onResponse(masterResponse());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
+}
+
+TEST_P(RoleHandlerTest, UpstreamFailure) {
+  InSequence s;
+
+  setup(2, {});
+  EXPECT_NE(nullptr, handle_);
+
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "finished with 1 error(s)";
+
+  pool_callbacks_[1]->onFailure();
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(5));
+  EXPECT_CALL(
+      store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "redis.foo.command." + GetParam() + ".latency"), 5));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  pool_callbacks_[0]->onResponse(masterResponse());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
+}
+
+TEST_P(RoleHandlerTest, InvalidUpstreamResponse) {
+  InSequence s;
+
+  setup(2, {});
+  EXPECT_NE(nullptr, handle_);
+
+  Common::Redis::RespValue expected_response;
+  expected_response.type(Common::Redis::RespType::Error);
+  expected_response.asString() = "finished with 1 error(s)";
+
+  pool_callbacks_[1]->onResponse(masterResponse());
+
+  Common::Redis::RespValuePtr invalid_response = std::make_unique<Common::Redis::RespValue>();
+  invalid_response->type(Common::Redis::RespType::Integer);
+  invalid_response->asInteger() = 123;
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(
+      store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "redis.foo.command." + GetParam() + ".latency"), 10));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
+  pool_callbacks_[0]->onResponse(std::move(invalid_response));
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command." + GetParam() + ".error").value());
+}
+
+TEST_P(RoleHandlerTest, Cancel) {
+  InSequence s;
+
+  setup(2, {});
+  EXPECT_NE(nullptr, handle_);
+
+  EXPECT_CALL(pool_requests_[0], cancel());
+  EXPECT_CALL(pool_requests_[1], cancel());
+  handle_->cancel();
+}
+
+TEST_F(RoleHandlerTest, RoleWithMultipleArguments) {
+  InSequence s;
+
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"role", "1", "2"});
+
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = "ERR wrong number of arguments for 'role' command";
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+}
+
+TEST_F(RoleHandlerTest, RoleNoArgs) {
+  InSequence s;
+
+  // Test the special handling path for ROLE command in makeRequest
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"role"});
+
+  // Set up the mock calls for the ROLE special handling path
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(*conn_pool_, shardSize_()).WillOnce(Return(1));
+
+  ConnPool::PoolCallbacks* pool_callback;
+  Common::Redis::Client::MockPoolRequest pool_request;
+
+  EXPECT_CALL(*conn_pool_, makeRequestToShard_(0, _, _))
+      .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callback)), Return(&pool_request)));
+
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_NE(nullptr, handle_);
+
+  // Verify that the total counter is incremented in the special handling path
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.role.total").value());
+
+  // Complete the request successfully
+  Common::Redis::RespValuePtr role_response = std::make_unique<Common::Redis::RespValue>();
+  role_response->type(Common::Redis::RespType::Array);
+  std::vector<Common::Redis::RespValue> elements(1);
+  elements[0].type(Common::Redis::RespType::BulkString);
+  elements[0].asString() = "master";
+  role_response->asArray().swap(elements);
+
+  EXPECT_CALL(callbacks_, onResponse_(_));
+  pool_callback->onResponse(std::move(role_response));
+}
+
+INSTANTIATE_TEST_SUITE_P(RoleHandlerTest, RoleHandlerTest, testing::Values("role"));
 } // namespace CommandSplitter
 } // namespace RedisProxy
 } // namespace NetworkFilters

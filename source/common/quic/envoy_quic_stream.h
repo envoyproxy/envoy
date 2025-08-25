@@ -46,7 +46,11 @@ public:
         filter_manager_connection_(filter_manager_connection),
         async_stream_blockage_change_(
             filter_manager_connection.dispatcher().createSchedulableCallback(
-                [this]() { switchStreamBlockState(); })) {}
+                [this]() { switchStreamBlockState(); })) {
+    if (http3_options_.disable_connection_flow_control_for_streams()) {
+      quic_stream_.DisableConnectionFlowControlForThisStream();
+    }
+  }
 
   ~EnvoyQuicStream() override = default;
 
@@ -213,6 +217,14 @@ protected:
   }
 
   StreamInfo::BytesMeterSharedPtr& mutableBytesMeter() { return bytes_meter_; }
+
+  void addDecompressedHeaderBytesSent(const quiche::HttpHeaderBlock& headers) {
+    bytes_meter_->addDecompressedHeaderBytesSent(headers.TotalBytesUsed());
+  }
+
+  void addDecompressedHeaderBytesReceived(const quic::QuicHeaderList& header_list) {
+    bytes_meter_->addDecompressedHeaderBytesReceived(header_list.uncompressed_header_bytes());
+  }
 
   void encodeTrailersImpl(quiche::HttpHeaderBlock&& trailers);
 

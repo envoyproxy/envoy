@@ -5,6 +5,8 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
 
+#include "cel/expr/syntax.pb.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -13,7 +15,7 @@ namespace ExternalProcessing {
 class ExpressionManager : public Logger::Loggable<Logger::Id::ext_proc> {
 public:
   struct CelExpression {
-    google::api::expr::v1alpha1::ParsedExpr parsed_expr_;
+    cel::expr::ParsedExpr parsed_expr_;
     Filters::Common::Expr::ExpressionPtr compiled_expr_;
   };
 
@@ -29,17 +31,17 @@ public:
 
   bool hasResponseExpr() const { return !response_expr_.empty(); };
 
-  ProtobufWkt::Struct
+  Protobuf::Struct
   evaluateRequestAttributes(const Filters::Common::Expr::Activation& activation) const {
     return evaluateAttributes(activation, request_expr_);
   }
 
-  ProtobufWkt::Struct
+  Protobuf::Struct
   evaluateResponseAttributes(const Filters::Common::Expr::Activation& activation) const {
     return evaluateAttributes(activation, response_expr_);
   }
 
-  static ProtobufWkt::Struct
+  static Protobuf::Struct
   evaluateAttributes(const Filters::Common::Expr::Activation& activation,
                      const absl::flat_hash_map<std::string, CelExpression>& expr);
 

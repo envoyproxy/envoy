@@ -74,7 +74,7 @@ void CorsFilter::initializeCorsPolicies() {
       policies_.push_back(*typed_cfg);
     }
 
-    if (auto* typed_cfg = route->virtualHost().corsPolicy(); typed_cfg != nullptr) {
+    if (auto* typed_cfg = route->virtualHost()->corsPolicy(); typed_cfg != nullptr) {
       policies_.push_back(*typed_cfg);
     }
   }

@@ -27,6 +27,8 @@ namespace Envoy {
 namespace Router {
 class Route;
 using RouteConstSharedPtr = std::shared_ptr<const Route>;
+class VirtualHost;
+using VirtualHostConstSharedPtr = std::shared_ptr<const VirtualHost>;
 } // namespace Router
 
 namespace Upstream {
@@ -436,9 +438,17 @@ struct BytesMeter {
   uint64_t wireBytesReceived() const { return wire_bytes_received_; }
   uint64_t headerBytesSent() const { return header_bytes_sent_; }
   uint64_t headerBytesReceived() const { return header_bytes_received_; }
+  uint64_t decompressedHeaderBytesSent() const { return decompressed_header_bytes_sent_; }
+  uint64_t decompressedHeaderBytesReceived() const { return decompressed_header_bytes_received_; }
 
   void addHeaderBytesSent(uint64_t added_bytes) { header_bytes_sent_ += added_bytes; }
   void addHeaderBytesReceived(uint64_t added_bytes) { header_bytes_received_ += added_bytes; }
+  void addDecompressedHeaderBytesSent(uint64_t added_bytes) {
+    decompressed_header_bytes_sent_ += added_bytes;
+  }
+  void addDecompressedHeaderBytesReceived(uint64_t added_bytes) {
+    decompressed_header_bytes_received_ += added_bytes;
+  }
   void addWireBytesSent(uint64_t added_bytes) { wire_bytes_sent_ += added_bytes; }
   void addWireBytesReceived(uint64_t added_bytes) { wire_bytes_received_ += added_bytes; }
 
@@ -446,6 +456,8 @@ struct BytesMeter {
     SystemTime snapshot_time;
     uint64_t header_bytes_sent{};
     uint64_t header_bytes_received{};
+    uint64_t decompressed_header_bytes_sent{};
+    uint64_t decompressed_header_bytes_received{};
     uint64_t wire_bytes_sent{};
     uint64_t wire_bytes_received{};
   };
@@ -455,6 +467,10 @@ struct BytesMeter {
     downstream_periodic_logging_bytes_snapshot_->snapshot_time = snapshot_time;
     downstream_periodic_logging_bytes_snapshot_->header_bytes_sent = header_bytes_sent_;
     downstream_periodic_logging_bytes_snapshot_->header_bytes_received = header_bytes_received_;
+    downstream_periodic_logging_bytes_snapshot_->decompressed_header_bytes_sent =
+        decompressed_header_bytes_sent_;
+    downstream_periodic_logging_bytes_snapshot_->decompressed_header_bytes_received =
+        decompressed_header_bytes_received_;
     downstream_periodic_logging_bytes_snapshot_->wire_bytes_sent = wire_bytes_sent_;
     downstream_periodic_logging_bytes_snapshot_->wire_bytes_received = wire_bytes_received_;
   }
@@ -464,6 +480,10 @@ struct BytesMeter {
     upstream_periodic_logging_bytes_snapshot_->snapshot_time = snapshot_time;
     upstream_periodic_logging_bytes_snapshot_->header_bytes_sent = header_bytes_sent_;
     upstream_periodic_logging_bytes_snapshot_->header_bytes_received = header_bytes_received_;
+    upstream_periodic_logging_bytes_snapshot_->decompressed_header_bytes_sent =
+        decompressed_header_bytes_sent_;
+    upstream_periodic_logging_bytes_snapshot_->decompressed_header_bytes_received =
+        decompressed_header_bytes_received_;
     upstream_periodic_logging_bytes_snapshot_->wire_bytes_sent = wire_bytes_sent_;
     upstream_periodic_logging_bytes_snapshot_->wire_bytes_received = wire_bytes_received_;
   }
@@ -491,6 +511,8 @@ struct BytesMeter {
     // Accumulate existing bytes.
     header_bytes_sent_ += existing.header_bytes_sent_;
     header_bytes_received_ += existing.header_bytes_received_;
+    decompressed_header_bytes_sent_ += existing.decompressed_header_bytes_sent_;
+    decompressed_header_bytes_received_ += existing.decompressed_header_bytes_received_;
     wire_bytes_sent_ += existing.wire_bytes_sent_;
     wire_bytes_received_ += existing.wire_bytes_received_;
   }
@@ -498,6 +520,8 @@ struct BytesMeter {
 private:
   uint64_t header_bytes_sent_{};
   uint64_t header_bytes_received_{};
+  uint64_t decompressed_header_bytes_sent_{};
+  uint64_t decompressed_header_bytes_received_{};
   uint64_t wire_bytes_sent_{};
   uint64_t wire_bytes_received_{};
   std::unique_ptr<BytesSnapshot> downstream_periodic_logging_bytes_snapshot_;
@@ -843,6 +867,12 @@ public:
   virtual Router::RouteConstSharedPtr route() const PURE;
 
   /**
+   * @return const Router::VirtualHostConstSharedPtr& Get the virtual host selected for this
+   * request.
+   */
+  virtual const Router::VirtualHostConstSharedPtr& virtualHost() const PURE;
+
+  /**
    * @return const envoy::config::core::v3::Metadata& the dynamic metadata associated with this
    * request
    */
@@ -855,14 +885,14 @@ public:
    * @param value the struct to set on the namespace. A merge will be performed with new values for
    * the same key overriding existing.
    */
-  virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
+  virtual void setDynamicMetadata(const std::string& name, const Protobuf::Struct& value) PURE;
 
   /**
    * @param name the namespace used in the metadata in reverse DNS format, for example:
    * envoy.test.my_filter.
    * @param value of type protobuf any to set on the namespace.
    */
-  virtual void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) PURE;
+  virtual void setDynamicTypedMetadata(const std::string& name, const Protobuf::Any& value) PURE;
 
   /**
    * Object on which filters can share data on a per-request basis. For singleton data objects, only

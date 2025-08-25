@@ -89,7 +89,7 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest, FilterStateFromDownstream) {
   ASSERT_EQ(common_access_log.mutable_filter_state_objects()->count("downstream_peer"), 1);
   ASSERT_EQ(common_access_log.mutable_filter_state_objects()->size(), 1);
   auto any = (*(common_access_log.mutable_filter_state_objects()))["downstream_peer"];
-  ProtobufWkt::BytesValue gotState;
+  Protobuf::BytesValue gotState;
   any.UnpackTo(&gotState);
   EXPECT_EQ(gotState.value(), "value_from_downstream_peer");
 }
@@ -120,7 +120,7 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest, FilterStateFromUpstream) {
   ASSERT_EQ(common_access_log.mutable_filter_state_objects()->count("upstream_peer"), 1);
   ASSERT_EQ(common_access_log.mutable_filter_state_objects()->size(), 1);
   auto any = (*(common_access_log.mutable_filter_state_objects()))["upstream_peer"];
-  ProtobufWkt::BytesValue gotState;
+  Protobuf::BytesValue gotState;
   any.UnpackTo(&gotState);
   EXPECT_EQ(gotState.value(), "value_from_upstream_peer");
 }
@@ -160,7 +160,7 @@ TEST(UtilityExtractCommonAccessLogPropertiesTest,
   ASSERT_EQ(common_access_log.mutable_filter_state_objects()->count("same_key"), 1);
   ASSERT_EQ(common_access_log.mutable_filter_state_objects()->size(), 1);
   auto any = (*(common_access_log.mutable_filter_state_objects()))["same_key"];
-  ProtobufWkt::BytesValue gotState;
+  Protobuf::BytesValue gotState;
   any.UnpackTo(&gotState);
   EXPECT_EQ(gotState.value(), "value_from_downstream_peer");
 }

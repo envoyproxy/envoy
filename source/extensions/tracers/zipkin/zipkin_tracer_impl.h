@@ -8,12 +8,7 @@
 #include "envoy/tracing/trace_driver.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "source/common/common/empty_string.h"
 #include "source/common/http/async_client_utility.h"
-#include "source/common/http/header_map_impl.h"
-#include "source/common/json/json_loader.h"
-#include "source/common/tracing/common_values.h"
-#include "source/common/tracing/null_span_impl.h"
 #include "source/common/upstream/cluster_update_tracker.h"
 #include "source/extensions/tracers/zipkin/span_buffer.h"
 #include "source/extensions/tracers/zipkin/tracer.h"
@@ -35,70 +30,6 @@ namespace Zipkin {
 struct ZipkinTracerStats {
   ZIPKIN_TRACER_STATS(GENERATE_COUNTER_STRUCT)
 };
-
-/**
- * Class for Zipkin spans, wrapping a Zipkin::Span object.
- */
-class ZipkinSpan : public Tracing::Span {
-public:
-  /**
-   * Constructor. Wraps a Zipkin::Span object.
-   *
-   * @param span to be wrapped.
-   */
-  ZipkinSpan(Zipkin::Span& span, Zipkin::Tracer& tracer);
-
-  /**
-   * Calls Zipkin::Span::finishSpan() to perform all actions needed to finalize the span.
-   * This function is called by Tracing::HttpTracerUtility::finalizeSpan().
-   */
-  void finishSpan() override;
-
-  /**
-   * This method sets the operation name on the span.
-   * @param operation the operation name
-   */
-  void setOperation(absl::string_view operation) override;
-
-  /**
-   * This function adds a Zipkin "string" binary annotation to this span.
-   * In Zipkin, binary annotations of the type "string" allow arbitrary key-value pairs
-   * to be associated with a span.
-   *
-   * Note that Tracing::HttpTracerUtility::finalizeSpan() makes several calls to this function,
-   * associating several key-value pairs with this span.
-   */
-  void setTag(absl::string_view name, absl::string_view value) override;
-
-  void log(SystemTime timestamp, const std::string& event) override;
-
-  void injectContext(Tracing::TraceContext& trace_context,
-                     const Tracing::UpstreamContext&) override;
-  Tracing::SpanPtr spawnChild(const Tracing::Config&, const std::string& name,
-                              SystemTime start_time) override;
-
-  void setSampled(bool sampled) override;
-
-  // TODO(#11622): Implement baggage storage for zipkin spans
-  void setBaggage(absl::string_view, absl::string_view) override;
-  std::string getBaggage(absl::string_view) override;
-
-  std::string getTraceId() const override { return span_.traceIdAsHexString(); };
-
-  // TODO(#34412): This method is unimplemented for Zipkin.
-  std::string getSpanId() const override { return EMPTY_STRING; };
-
-  /**
-   * @return a reference to the Zipkin::Span object.
-   */
-  Zipkin::Span& span() { return span_; }
-
-private:
-  Zipkin::Span span_;
-  Zipkin::Tracer& tracer_;
-};
-
-using ZipkinSpanPtr = std::unique_ptr<ZipkinSpan>;
 
 /**
  * Class for a Zipkin-specific Driver.
@@ -136,6 +67,11 @@ public:
   const std::string& hostname() { return hostname_; }
   Runtime::Loader& runtime() { return runtime_; }
   ZipkinTracerStats& tracerStats() { return tracer_stats_; }
+  bool w3cFallbackEnabled() const {
+    return trace_context_option_ ==
+           envoy::config::trace::v3::ZipkinConfig::USE_B3_WITH_W3C_PROPAGATION;
+  }
+  TraceContextOption traceContextOption() const { return trace_context_option_; }
 
 private:
   /**
@@ -156,6 +92,7 @@ private:
   Runtime::Loader& runtime_;
   const LocalInfo::LocalInfo& local_info_;
   TimeSource& time_source_;
+  TraceContextOption trace_context_option_;
 };
 
 /**

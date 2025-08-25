@@ -267,8 +267,7 @@ TEST_P(RedirectIntegrationTest, ConnectionCloseHeaderHonoredInInternalRedirect) 
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
   // "Connection: close" should be sent back in response.
-  EXPECT_THAT(response->headers(),
-              Envoy::Http::HeaderValueOf(Envoy::Http::Headers::get().Connection, "close"));
+  EXPECT_THAT(response->headers(), ContainsHeader(Envoy::Http::Headers::get().Connection, "close"));
 
   // Envoy should close the connection immediately.
   ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(2000)));
@@ -566,7 +565,7 @@ TEST_P(RedirectIntegrationTest, InternalRedirectCancelledDueToBufferOverflow) {
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
         auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(2)->mutable_routes(0);
-        route->mutable_per_request_buffer_limit_bytes()->set_value(1024);
+        route->mutable_request_body_buffer_limit()->set_value(1024);
       });
 
   initialize();

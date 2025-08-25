@@ -102,6 +102,10 @@ public:
     helper_handle_ = test::SystemHelperPeer::replaceSystemHelper();
     EXPECT_CALL(helper_handle_->mock_helper(), isCleartextPermitted(_))
         .WillRepeatedly(Return(true));
+    EXPECT_CALL(helper_handle_->mock_helper(), getDefaultNetworkHandle())
+        .Times(testing::AtMost(1))
+        .WillOnce(Return(-1));
+    EXPECT_CALL(helper_handle_->mock_helper(), getAllConnectedNetworks()).Times(testing::AtMost(1));
   }
 
   envoy_status_t runEngine(const std::unique_ptr<InternalEngine>& engine,
@@ -335,7 +339,7 @@ TEST_F(InternalEngineTest, BasicStream) {
 
   envoy::extensions::filters::http::buffer::v3::Buffer buffer;
   buffer.mutable_max_request_bytes()->set_value(65000);
-  ProtobufWkt::Any typed_config;
+  Protobuf::Any typed_config;
   typed_config.set_type_url("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer");
   std::string serialized_buffer;
   buffer.SerializeToString(&serialized_buffer);

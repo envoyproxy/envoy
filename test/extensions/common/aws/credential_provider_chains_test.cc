@@ -398,6 +398,62 @@ TEST_F(CustomCredentialsProviderChainTest, ContainerOnly) {
   EXPECT_EQ(1, chain.value()->getNumProviders());
 }
 
+TEST_F(CustomCredentialsProviderChainTest, AssumeRoleOnly) {
+  envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
+  credential_provider_config.set_custom_credential_provider_chain(true);
+  credential_provider_config.mutable_assume_role_credential_provider()->set_role_arn(
+      "test-role-arn");
+  credential_provider_config.mutable_assume_role_credential_provider()->set_role_session_name(
+      "test-session");
+
+  auto chain = Envoy::Extensions::Common::Aws::CommonCredentialsProviderChain::
+      customCredentialsProviderChain(context_, "us-east-1", credential_provider_config);
+  EXPECT_TRUE(chain.ok());
+  EXPECT_EQ(1, chain.value()->getNumProviders());
+}
+
+TEST_F(CustomCredentialsProviderChainTest, AssumeRoleWithEnvironment) {
+  envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
+  credential_provider_config.set_custom_credential_provider_chain(true);
+  credential_provider_config.mutable_assume_role_credential_provider()->set_role_arn(
+      "test-role-arn");
+  credential_provider_config.mutable_assume_role_credential_provider()->set_role_session_name(
+      "test-session");
+  credential_provider_config.mutable_environment_credential_provider();
+
+  auto chain = Envoy::Extensions::Common::Aws::CommonCredentialsProviderChain::
+      customCredentialsProviderChain(context_, "us-east-1", credential_provider_config);
+  EXPECT_TRUE(chain.ok());
+  EXPECT_EQ(2, chain.value()->getNumProviders());
+}
+
+TEST_F(CustomCredentialsProviderChainTest, AssumeRoleWithoutSessionName) {
+  envoy::extensions::common::aws::v3::AwsCredentialProvider credential_provider_config = {};
+  credential_provider_config.set_custom_credential_provider_chain(true);
+  credential_provider_config.mutable_assume_role_credential_provider()->set_role_arn(
+      "test-role-arn");
+  // Intentionally not setting role_session_name to test auto-generation.
+
+  std::string role_session_name;
+  time_system_.setSystemTime(std::chrono::milliseconds(1234567890));
+
+  EXPECT_CALL(factories_, createAssumeRoleCredentialsProvider(Ref(context_), _, _, _))
+      .WillOnce(Invoke(WithArg<3>(
+          [&role_session_name](
+              const envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider& provider)
+              -> CredentialsProviderSharedPtr {
+            role_session_name = provider.role_session_name();
+            return std::make_shared<MockCredentialsProvider>();
+          })));
+
+  CommonCredentialsProviderChain chain(context_, "us-east-1", credential_provider_config,
+                                       factories_);
+
+  // Verify that a session name was auto-generated based on the timestamp.
+  EXPECT_FALSE(role_session_name.empty());
+  EXPECT_EQ(role_session_name, "1234567890000000");
+}
+
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

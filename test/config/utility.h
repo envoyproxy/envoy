@@ -225,8 +225,6 @@ public:
   static std::string smallBufferFilter();
   // A string for a health check filter which can be used with prependFilter()
   static std::string defaultHealthCheckFilter();
-  // A string for a squash filter which can be used with prependFilter()
-  static std::string defaultSquashFilter();
   // A string for startTls transport socket config.
   static std::string startTlsConfig();
   // A cluster that uses the startTls transport socket.
@@ -439,7 +437,7 @@ public:
   void addRuntimeOverride(absl::string_view key, absl::string_view value);
 
   // Add typed_filter_metadata to the first listener.
-  void addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value);
+  void addListenerTypedMetadata(absl::string_view key, Protobuf::Any& packed_value);
 
   // Add filter_metadata to a cluster with the given name
   void addClusterFilterMetadata(absl::string_view metadata_yaml,

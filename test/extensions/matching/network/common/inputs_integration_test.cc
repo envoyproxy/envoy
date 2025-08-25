@@ -229,7 +229,7 @@ TEST_F(InputsIntegrationTest, DynamicMetadataInput) {
   std::string label_key("label_key");
   auto label = MessageUtil::keyValueStruct(label_key, "bar");
   metadata.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<std::string, ProtobufWkt::Struct>(metadata_key, label));
+      Protobuf::MapPair<std::string, Protobuf::Struct>(metadata_key, label));
   auto stored_metadata = data.dynamicMetadata().filter_metadata();
   EXPECT_EQ(label.fields_size(), 1);
   EXPECT_EQ(stored_metadata[metadata_key].fields_size(), 1);

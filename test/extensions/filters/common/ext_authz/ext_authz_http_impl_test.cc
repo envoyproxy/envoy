@@ -119,7 +119,7 @@ public:
     envoy::service::auth::v3::CheckRequest request;
     client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
-    ProtobufWkt::Struct expected_dynamic_metadata;
+    Protobuf::Struct expected_dynamic_metadata;
     auto* metadata_fields = expected_dynamic_metadata.mutable_fields();
     (*metadata_fields)["x-metadata-header-0"] = ValueUtil::stringValue("zero");
     (*metadata_fields)["x-metadata-header-1"] = ValueUtil::stringValue("2");

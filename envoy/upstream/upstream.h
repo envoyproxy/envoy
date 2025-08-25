@@ -678,7 +678,6 @@ public:
   COUNTER(lb_subsets_selected)                                                                     \
   COUNTER(lb_zone_cluster_too_small)                                                               \
   COUNTER(lb_zone_no_capacity_left)                                                                \
-  COUNTER(lb_zone_number_differs)                                                                  \
   COUNTER(lb_zone_routing_all_directly)                                                            \
   COUNTER(lb_zone_routing_cross_zone)                                                              \
   COUNTER(lb_zone_routing_sampled)                                                                 \
@@ -748,7 +747,8 @@ public:
   GAUGE(upstream_rq_active, Accumulate)                                                            \
   GAUGE(upstream_rq_pending_active, Accumulate)                                                    \
   HISTOGRAM(upstream_cx_connect_ms, Milliseconds)                                                  \
-  HISTOGRAM(upstream_cx_length_ms, Milliseconds)
+  HISTOGRAM(upstream_cx_length_ms, Milliseconds)                                                   \
+  HISTOGRAM(upstream_rq_per_cx, Unspecified)
 
 /**
  * All cluster load report stats. These are only use for EDS load reporting and not sent to the

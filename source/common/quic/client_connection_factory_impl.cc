@@ -10,6 +10,7 @@ PersistentQuicInfoImpl::PersistentQuicInfoImpl(Event::Dispatcher& dispatcher, ui
     : conn_helper_(dispatcher), alarm_factory_(dispatcher, *conn_helper_.GetClock()),
       buffer_limit_(buffer_limit), max_packet_length_(max_packet_length) {
   quiche::FlagRegistry::getInstance();
+  migration_config_.migrate_session_on_network_change = false;
 }
 
 std::unique_ptr<PersistentQuicInfoImpl>
@@ -53,8 +54,7 @@ std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
   ASSERT(!quic_versions.empty());
   auto connection = std::make_unique<EnvoyQuicClientConnection>(
       quic::QuicUtils::CreateRandomConnectionId(), server_addr, info_impl->conn_helper_,
-      info_impl->alarm_factory_, quic_versions, local_addr, dispatcher, options, generator,
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.prefer_quic_client_udp_gro"));
+      info_impl->alarm_factory_, quic_versions, local_addr, dispatcher, options, generator);
   // Override the max packet length of the QUIC connection if the option value is not 0.
   if (info_impl->max_packet_length_ > 0) {
     connection->SetMaxPacketLength(info_impl->max_packet_length_);

@@ -59,7 +59,7 @@ Http::FilterHeadersStatus StatefulSession::decodeHeaders(Http::RequestHeaderMap&
     if (route_config->disabled()) {
       return Http::FilterHeadersStatus::Continue;
     }
-    config = route_config->statefuleSessionConfig();
+    config = route_config->statefulSessionConfig();
   }
   session_state_ = config->createSessionState(headers);
   if (session_state_ == nullptr) {

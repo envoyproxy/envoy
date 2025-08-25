@@ -106,7 +106,7 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override;
 
 private:
-  using StructMap = absl::flat_hash_map<std::string, ProtobufWkt::Struct>;
+  using StructMap = absl::flat_hash_map<std::string, Protobuf::Struct>;
   // Handle on_missing case of the `rule` and store in `struct_map`.
   void handleOnMissing(const Rule& rule, StructMap& struct_map,
                        Http::StreamFilterCallbacks& filter_callback);
@@ -132,14 +132,14 @@ private:
   void processResponseBody();
 
   const std::string& decideNamespace(const std::string& nspace) const;
-  bool addMetadata(const std::string& meta_namespace, const std::string& key,
-                   ProtobufWkt::Value val, const bool preserve_existing_metadata_value,
-                   StructMap& struct_map, Http::StreamFilterCallbacks& filter_callback);
+  bool addMetadata(const std::string& meta_namespace, const std::string& key, Protobuf::Value val,
+                   const bool preserve_existing_metadata_value, StructMap& struct_map,
+                   Http::StreamFilterCallbacks& filter_callback);
   void applyKeyValue(const std::string& value, const KeyValuePair& keyval, StructMap& struct_map,
                      Http::StreamFilterCallbacks& filter_callback);
   void applyKeyValue(double value, const KeyValuePair& keyval, StructMap& struct_map,
                      Http::StreamFilterCallbacks& filter_callback);
-  void applyKeyValue(ProtobufWkt::Value value, const KeyValuePair& keyval, StructMap& struct_map,
+  void applyKeyValue(Protobuf::Value value, const KeyValuePair& keyval, StructMap& struct_map,
                      Http::StreamFilterCallbacks& filter_callback);
   void finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callback,
                                bool should_clear_route_cache, const StructMap& struct_map,

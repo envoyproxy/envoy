@@ -4,6 +4,7 @@
 
 #include "source/extensions/stat_sinks/open_telemetry/open_telemetry_impl.h"
 #include "source/extensions/stat_sinks/open_telemetry/open_telemetry_proto_descriptors.h"
+#include "source/extensions/tracers/opentelemetry/resource_detectors/resource_provider.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -18,7 +19,11 @@ OpenTelemetrySinkFactory::createStatsSink(const Protobuf::Message& config,
   const auto& sink_config = MessageUtil::downcastAndValidate<const SinkConfig&>(
       config, server.messageValidationContext().staticValidationVisitor());
 
-  auto otlp_options = std::make_shared<OtlpOptions>(sink_config);
+  Tracers::OpenTelemetry::ResourceProviderPtr resource_provider =
+      std::make_unique<Tracers::OpenTelemetry::ResourceProviderImpl>();
+  auto otlp_options = std::make_shared<OtlpOptions>(
+      sink_config, resource_provider->getResource(sink_config.resource_detectors(), server,
+                                                  /*service_name=*/""));
   std::shared_ptr<OtlpMetricsFlusher> otlp_metrics_flusher =
       std::make_shared<OtlpMetricsFlusherImpl>(otlp_options);
 

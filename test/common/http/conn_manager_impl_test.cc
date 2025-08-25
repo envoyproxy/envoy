@@ -735,7 +735,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseSantizedPath) {
       .WillOnce(Invoke([&](const Router::RouteCallback&, const Http::RequestHeaderMap& header_map,
                            const StreamInfo::StreamInfo&, uint64_t) {
         EXPECT_EQ(normalized_path, header_map.getPathValue());
-        return route;
+        return Router::VirtualHostRoute{route->virtual_host_, route};
       }));
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillOnce(Invoke([&](FilterChainManager&) -> bool { return false; }));
@@ -904,14 +904,17 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
   {
     InSequence seq;
     EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
-        .WillOnce(Return(default_route));
+        .WillOnce(Return(Router::VirtualHostRoute{default_route->virtual_host_, default_route}));
 
     // This filter iterates through all possible route matches and choose the last matched route
     EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
         .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
           EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
-          EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
           EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
+
+          EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
+          EXPECT_EQ(default_route->virtual_host_,
+                    decoder_filters_[0]->callbacks_->streamInfo().virtualHost());
 
           // Not clearing cached route returns cached route and doesn't invoke cb.
           Router::RouteConstSharedPtr route =
@@ -963,27 +966,30 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
 
           EXPECT_EQ(default_route, route);
           EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->route());
-          EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
           EXPECT_EQ(default_cluster->info(), decoder_filters_[0]->callbacks_->clusterInfo());
+
+          EXPECT_EQ(default_route, decoder_filters_[0]->callbacks_->streamInfo().route());
+          EXPECT_EQ(default_route->virtual_host_,
+                    decoder_filters_[0]->callbacks_->streamInfo().virtualHost());
 
           return FilterHeadersStatus::Continue;
         }));
 
     // This route config expected to be invoked for all matching routes
     EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
-        .WillOnce(Invoke([&](const Router::RouteCallback& cb, const Http::RequestHeaderMap&,
-                             const Envoy::StreamInfo::StreamInfo&,
-                             uint64_t) -> Router::RouteConstSharedPtr {
-          EXPECT_EQ(cb(foo_bar_baz_route, Router::RouteEvalStatus::HasMoreRoutes),
-                    Router::RouteMatchStatus::Continue);
-          EXPECT_EQ(cb(foo_bar_route, Router::RouteEvalStatus::HasMoreRoutes),
-                    Router::RouteMatchStatus::Continue);
-          EXPECT_EQ(cb(foo_route, Router::RouteEvalStatus::HasMoreRoutes),
-                    Router::RouteMatchStatus::Continue);
-          EXPECT_EQ(cb(default_route, Router::RouteEvalStatus::NoMoreRoutes),
-                    Router::RouteMatchStatus::Accept);
-          return default_route;
-        }));
+        .WillOnce(
+            Invoke([&](const Router::RouteCallback& cb, const Http::RequestHeaderMap&,
+                       const Envoy::StreamInfo::StreamInfo&, uint64_t) -> Router::VirtualHostRoute {
+              EXPECT_EQ(cb(foo_bar_baz_route, Router::RouteEvalStatus::HasMoreRoutes),
+                        Router::RouteMatchStatus::Continue);
+              EXPECT_EQ(cb(foo_bar_route, Router::RouteEvalStatus::HasMoreRoutes),
+                        Router::RouteMatchStatus::Continue);
+              EXPECT_EQ(cb(foo_route, Router::RouteEvalStatus::HasMoreRoutes),
+                        Router::RouteMatchStatus::Continue);
+              EXPECT_EQ(cb(default_route, Router::RouteEvalStatus::NoMoreRoutes),
+                        Router::RouteMatchStatus::Accept);
+              return Router::VirtualHostRoute{default_route->virtual_host_, default_route};
+            }));
 
     EXPECT_CALL(*decoder_filters_[0], decodeComplete());
 
@@ -991,8 +997,11 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
     EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
         .WillOnce(InvokeWithoutArgs([&]() -> FilterHeadersStatus {
           EXPECT_EQ(default_route, decoder_filters_[1]->callbacks_->route());
-          EXPECT_EQ(default_route, decoder_filters_[1]->callbacks_->streamInfo().route());
           EXPECT_EQ(default_cluster->info(), decoder_filters_[1]->callbacks_->clusterInfo());
+
+          EXPECT_EQ(default_route, decoder_filters_[1]->callbacks_->streamInfo().route());
+          EXPECT_EQ(default_route->virtual_host_,
+                    decoder_filters_[1]->callbacks_->streamInfo().virtualHost());
 
           int ctr = 0;
           const Router::RouteCallback& cb =
@@ -1019,23 +1028,26 @@ TEST_F(HttpConnectionManagerImplTest, RouteOverride) {
           decoder_filters_[1]->callbacks_->downstreamCallbacks()->route(cb);
 
           EXPECT_EQ(foo_bar_route, decoder_filters_[1]->callbacks_->route());
-          EXPECT_EQ(foo_bar_route, decoder_filters_[1]->callbacks_->streamInfo().route());
           EXPECT_EQ(foo_bar_cluster->info(), decoder_filters_[1]->callbacks_->clusterInfo());
+
+          EXPECT_EQ(foo_bar_route, decoder_filters_[1]->callbacks_->streamInfo().route());
+          EXPECT_EQ(foo_bar_route->virtual_host_,
+                    decoder_filters_[1]->callbacks_->streamInfo().virtualHost());
 
           return FilterHeadersStatus::Continue;
         }));
 
     // This route config expected to be invoked for first two matching routes
     EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
-        .WillOnce(Invoke([&](const Router::RouteCallback& cb, const Http::RequestHeaderMap&,
-                             const Envoy::StreamInfo::StreamInfo&,
-                             uint64_t) -> Router::RouteConstSharedPtr {
-          EXPECT_EQ(cb(foo_bar_baz_route, Router::RouteEvalStatus::HasMoreRoutes),
-                    Router::RouteMatchStatus::Continue);
-          EXPECT_EQ(cb(foo_bar_route, Router::RouteEvalStatus::HasMoreRoutes),
-                    Router::RouteMatchStatus::Accept);
-          return foo_bar_route;
-        }));
+        .WillOnce(
+            Invoke([&](const Router::RouteCallback& cb, const Http::RequestHeaderMap&,
+                       const Envoy::StreamInfo::StreamInfo&, uint64_t) -> Router::VirtualHostRoute {
+              EXPECT_EQ(cb(foo_bar_baz_route, Router::RouteEvalStatus::HasMoreRoutes),
+                        Router::RouteMatchStatus::Continue);
+              EXPECT_EQ(cb(foo_bar_route, Router::RouteEvalStatus::HasMoreRoutes),
+                        Router::RouteMatchStatus::Accept);
+              return Router::VirtualHostRoute{foo_bar_route->virtual_host_, foo_bar_route};
+            }));
 
     EXPECT_CALL(*decoder_filters_[1], decodeComplete());
   }
@@ -1085,7 +1097,7 @@ TEST_F(HttpConnectionManagerImplTest, FilterSetRouteToDelegatingRouteWithCluster
 
   // Route config mock
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
-      .WillOnce(Return(default_route));
+      .WillOnce(Return(Router::VirtualHostRoute{default_route->virtual_host_, default_route}));
 
   // Filter that performs setRoute (sets cached_route_ & cached_cluster_info_)
   EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
@@ -1166,7 +1178,8 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
       std::make_shared<NiceMock<Router::MockRoute>>();
   EXPECT_CALL(*route_config_provider_.route_config_, route(_, _, _, _))
       .Times(1)
-      .WillRepeatedly(Return(default_route));
+      .WillRepeatedly(
+          Return(Router::VirtualHostRoute{default_route->virtual_host_, default_route}));
   EXPECT_CALL(default_route->route_entry_, clusterName())
       .Times(1)
       .WillRepeatedly(ReturnRef(default_cluster_name));
@@ -1246,8 +1259,8 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
                 ->internalRedirectPolicy()
                 .shouldRedirectForResponseCode(Code::OK));
 
-        EXPECT_EQ(default_route->routeEntry()->retryShadowBufferLimit(),
-                  delegating_route_foo->routeEntry()->retryShadowBufferLimit());
+        EXPECT_EQ(default_route->routeEntry()->requestBodyBufferLimit(),
+                  delegating_route_foo->routeEntry()->requestBodyBufferLimit());
         EXPECT_EQ(default_route->routeEntry()->shadowPolicies().empty(),
                   delegating_route_foo->routeEntry()->shadowPolicies().empty());
         EXPECT_EQ(default_route->routeEntry()->timeout(),
@@ -1266,13 +1279,13 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
                   delegating_route_foo->routeEntry()->maxGrpcTimeout());
         EXPECT_EQ(default_route->routeEntry()->grpcTimeoutOffset(),
                   delegating_route_foo->routeEntry()->grpcTimeoutOffset());
-        EXPECT_EQ(default_route->virtualHost().virtualCluster(test_req_headers),
-                  delegating_route_foo->virtualHost().virtualCluster(test_req_headers));
+        EXPECT_EQ(default_route->virtualHost()->virtualCluster(test_req_headers),
+                  delegating_route_foo->virtualHost()->virtualCluster(test_req_headers));
 
-        EXPECT_EQ(default_route->virtualHost().corsPolicy(),
-                  delegating_route_foo->virtualHost().corsPolicy());
-        EXPECT_EQ(default_route->virtualHost().rateLimitPolicy().empty(),
-                  delegating_route_foo->virtualHost().rateLimitPolicy().empty());
+        EXPECT_EQ(default_route->virtualHost()->corsPolicy(),
+                  delegating_route_foo->virtualHost()->corsPolicy());
+        EXPECT_EQ(default_route->virtualHost()->rateLimitPolicy().empty(),
+                  delegating_route_foo->virtualHost()->rateLimitPolicy().empty());
 
         EXPECT_EQ(default_route->routeEntry()->autoHostRewrite(),
                   delegating_route_foo->routeEntry()->autoHostRewrite());
@@ -1404,7 +1417,7 @@ TEST_F(HttpConnectionManagerImplTest, RouteShouldUseNormalizedHost) {
       .WillOnce(Invoke([&](const Router::RouteCallback&, const Http::RequestHeaderMap& header_map,
                            const StreamInfo::StreamInfo&, uint64_t) {
         EXPECT_EQ(normalized_host, header_map.getHostValue());
-        return route;
+        return Router::VirtualHostRoute{route->virtual_host_, route};
       }));
   EXPECT_CALL(filter_factory_, createFilterChain(_))
       .WillOnce(Invoke([&](FilterChainManager&) -> bool { return false; }));
@@ -1575,13 +1588,15 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
       TracingConnectionManagerConfig{Tracing::OperationName::Ingress, conn_tracing_tags, percent1,
                                      percent2, percent1, false, 256});
-  NiceMock<Router::MockRouteTracing> route_tracing;
-  ON_CALL(route_tracing, getClientSampling()).WillByDefault(ReturnRef(percent1));
-  ON_CALL(route_tracing, getRandomSampling()).WillByDefault(ReturnRef(percent2));
-  ON_CALL(route_tracing, getOverallSampling()).WillByDefault(ReturnRef(percent1));
-  ON_CALL(route_tracing, getCustomTags()).WillByDefault(ReturnRef(route_tracing_tags));
+  NiceMock<Router::MockRouteTracing>& route_tracing =
+      route_config_provider_.route_config_->route_->route_tracing_;
+  route_tracing.client_sampling_ = percent1;
+  route_tracing.random_sampling_ = percent2;
+  route_tracing.overall_sampling_ = percent1;
+  route_tracing.custom_tags_ = route_tracing_tags;
+
   ON_CALL(*route_config_provider_.route_config_->route_, tracingConfig())
-      .WillByDefault(Return(&route_tracing));
+      .WillByDefault(Return(&route_config_provider_.route_config_->route_->route_tracing_));
 
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
@@ -1641,6 +1656,236 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
 
   EXPECT_EQ(1UL, tracing_stats_.service_forced_.value());
   EXPECT_EQ(0UL, tracing_stats_.random_sampling_.value());
+}
+
+TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanAndTraceDecisionRefreshAndUseDecision) {
+  setup(SetupOpts().setTracing(true));
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory = createDecoderFilterFactoryCb(filter);
+        manager.applyFilterFactoryCb({}, factory);
+        return true;
+      }));
+
+  // Treat request as internal, otherwise x-request-id header will be overwritten.
+  use_remote_address_ = false;
+  EXPECT_CALL(random_, uuid()).Times(0);
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        decoder_ = &conn_manager_->newStream(response_encoder_);
+
+        RequestHeaderMapPtr headers{
+            new TestRequestHeaderMapImpl{{":method", "GET"},
+                                         {":authority", "host"},
+                                         {":path", "/"},
+                                         {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
+
+        auto* span = new NiceMock<Tracing::MockSpan>();
+        EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
+            .WillOnce(Invoke([&](const Tracing::Config& config, Tracing::TraceContext&,
+                                 const StreamInfo::StreamInfo&,
+                                 const Tracing::Decision) -> Tracing::Span* {
+              EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
+
+              return span;
+            }));
+
+        EXPECT_CALL(runtime_.snapshot_,
+                    featureEnabled("tracing.global_enabled",
+                                   An<const envoy::type::v3::FractionalPercent&>(), _))
+            .WillOnce(Return(true));
+
+        decoder_->decodeHeaders(std::move(headers), true);
+
+        // The trace decision will be refreshed when the route is refreshed.
+        EXPECT_CALL(runtime_.snapshot_,
+                    featureEnabled("tracing.global_enabled",
+                                   An<const envoy::type::v3::FractionalPercent&>(), _))
+            .WillOnce(Return(false));
+        EXPECT_CALL(*span, useLocalDecision()).WillOnce(Return(true));
+        EXPECT_CALL(*span, setSampled(false));
+
+        // Clear route cache and refresh the route to trigger a new trace decision.
+        filter->callbacks_->downstreamCallbacks()->clearRouteCache();
+        filter->callbacks_->route();
+
+        EXPECT_CALL(*span, finishSpan());
+        EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+
+        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+        filter->callbacks_->streamInfo().setResponseCodeDetails("");
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+        filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
+        data.drain(4);
+
+        return Http::okStatus();
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_EQ(0UL, tracing_stats_.service_forced_.value());
+  EXPECT_EQ(0UL, tracing_stats_.random_sampling_.value());
+  EXPECT_EQ(1UL, tracing_stats_.not_traceable_.value());
+}
+
+TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanAndTraceDecisionRefreshAndNotUseDecision) {
+  setup(SetupOpts().setTracing(true));
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory = createDecoderFilterFactoryCb(filter);
+        manager.applyFilterFactoryCb({}, factory);
+        return true;
+      }));
+
+  // Treat request as internal, otherwise x-request-id header will be overwritten.
+  use_remote_address_ = false;
+  EXPECT_CALL(random_, uuid()).Times(0);
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        decoder_ = &conn_manager_->newStream(response_encoder_);
+
+        RequestHeaderMapPtr headers{
+            new TestRequestHeaderMapImpl{{":method", "GET"},
+                                         {":authority", "host"},
+                                         {":path", "/"},
+                                         {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
+
+        auto* span = new NiceMock<Tracing::MockSpan>();
+        EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
+            .WillOnce(Invoke([&](const Tracing::Config& config, Tracing::TraceContext&,
+                                 const StreamInfo::StreamInfo&,
+                                 const Tracing::Decision) -> Tracing::Span* {
+              EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
+
+              return span;
+            }));
+
+        EXPECT_CALL(runtime_.snapshot_,
+                    featureEnabled("tracing.global_enabled",
+                                   An<const envoy::type::v3::FractionalPercent&>(), _))
+            .WillOnce(Return(true));
+
+        decoder_->decodeHeaders(std::move(headers), true);
+
+        // The trace decision will be refreshed when the route is refreshed.
+        EXPECT_CALL(runtime_.snapshot_,
+                    featureEnabled("tracing.global_enabled",
+                                   An<const envoy::type::v3::FractionalPercent&>(), _))
+            .WillOnce(Return(false));
+        EXPECT_CALL(*span, useLocalDecision()).WillOnce(Return(false));
+        EXPECT_CALL(*span, setSampled(_)).Times(0);
+
+        // Clear route cache and refresh the route to trigger a new trace decision.
+        filter->callbacks_->downstreamCallbacks()->clearRouteCache();
+        filter->callbacks_->route();
+
+        EXPECT_CALL(*span, finishSpan());
+        EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+
+        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+        filter->callbacks_->streamInfo().setResponseCodeDetails("");
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+        filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
+        data.drain(4);
+
+        return Http::okStatus();
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_EQ(0UL, tracing_stats_.service_forced_.value());
+  EXPECT_EQ(0UL, tracing_stats_.random_sampling_.value());
+  EXPECT_EQ(1UL, tracing_stats_.not_traceable_.value());
+}
+
+TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanButDisableTraceDecisionRefresh) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.trace_refresh_after_route_refresh", "false"}});
+
+  setup(SetupOpts().setTracing(true));
+
+  std::shared_ptr<MockStreamDecoderFilter> filter(new NiceMock<MockStreamDecoderFilter>());
+
+  EXPECT_CALL(filter_factory_, createFilterChain(_))
+      .WillRepeatedly(Invoke([&](FilterChainManager& manager) -> bool {
+        auto factory = createDecoderFilterFactoryCb(filter);
+        manager.applyFilterFactoryCb({}, factory);
+        return true;
+      }));
+
+  // Treat request as internal, otherwise x-request-id header will be overwritten.
+  use_remote_address_ = false;
+  EXPECT_CALL(random_, uuid()).Times(0);
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        decoder_ = &conn_manager_->newStream(response_encoder_);
+
+        RequestHeaderMapPtr headers{
+            new TestRequestHeaderMapImpl{{":method", "GET"},
+                                         {":authority", "host"},
+                                         {":path", "/"},
+                                         {"x-request-id", "125a4afb-6f55-a4ba-ad80-413f09f48a28"}}};
+
+        auto* span = new NiceMock<Tracing::MockSpan>();
+        EXPECT_CALL(*tracer_, startSpan_(_, _, _, _))
+            .WillOnce(Invoke([&](const Tracing::Config& config, Tracing::TraceContext&,
+                                 const StreamInfo::StreamInfo&,
+                                 const Tracing::Decision) -> Tracing::Span* {
+              EXPECT_EQ(Tracing::OperationName::Ingress, config.operationName());
+
+              return span;
+            }));
+
+        EXPECT_CALL(runtime_.snapshot_,
+                    featureEnabled("tracing.global_enabled",
+                                   An<const envoy::type::v3::FractionalPercent&>(), _))
+            .WillOnce(Return(true));
+
+        decoder_->decodeHeaders(std::move(headers), true);
+
+        // The trace decision will be refreshed when the route is refreshed.
+        EXPECT_CALL(runtime_.snapshot_,
+                    featureEnabled("tracing.global_enabled",
+                                   An<const envoy::type::v3::FractionalPercent&>(), _))
+            .Times(0);
+        EXPECT_CALL(*span, useLocalDecision()).Times(0);
+        EXPECT_CALL(*span, setSampled(_)).Times(0);
+
+        // Clear route cache and refresh the route. But this will not trigger a new trace
+        // decision because the feature is disabled.
+        filter->callbacks_->downstreamCallbacks()->clearRouteCache();
+        filter->callbacks_->route();
+
+        EXPECT_CALL(*span, finishSpan());
+        EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
+
+        ResponseHeaderMapPtr response_headers{new TestResponseHeaderMapImpl{{":status", "200"}}};
+        filter->callbacks_->streamInfo().setResponseCodeDetails("");
+        filter->callbacks_->encodeHeaders(std::move(response_headers), true, "details");
+        filter->callbacks_->activeSpan().setTag("service-cluster", "scoobydoo");
+        data.drain(4);
+
+        return Http::okStatus();
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_EQ(1UL, tracing_stats_.service_forced_.value());
+  EXPECT_EQ(0UL, tracing_stats_.random_sampling_.value());
+  EXPECT_EQ(0UL, tracing_stats_.not_traceable_.value());
 }
 
 TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorator) {
@@ -1726,7 +1971,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
   route_config_provider_.route_config_->route_->decorator_.operation_ = "testOp";
   ON_CALL(route_config_provider_.route_config_->route_->decorator_, propagate())
       .WillByDefault(Return(false));
-  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(2);
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator());
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
       .WillOnce(Invoke(
           [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
@@ -1793,7 +2038,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowIngressDecorat
             return span;
           }));
   route_config_provider_.route_config_->route_->decorator_.operation_ = "initOp";
-  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(2);
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator());
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
       .WillOnce(Invoke(
           [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
@@ -1876,7 +2121,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
             return span;
           }));
   route_config_provider_.route_config_->route_->decorator_.operation_ = "testOp";
-  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(2);
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator());
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
       .WillOnce(Invoke(
           [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
@@ -1962,7 +2207,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   route_config_provider_.route_config_->route_->decorator_.operation_ = "testOp";
   ON_CALL(route_config_provider_.route_config_->route_->decorator_, propagate())
       .WillByDefault(Return(false));
-  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(2);
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator());
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
       .WillOnce(Invoke(
           [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
@@ -2046,7 +2291,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
             return span;
           }));
   route_config_provider_.route_config_->route_->decorator_.operation_ = "initOp";
-  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator()).Times(2);
+  EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator());
   EXPECT_CALL(route_config_provider_.route_config_->route_->decorator_, apply(_))
       .WillOnce(Invoke(
           [&](const Tracing::Span& apply_to_span) -> void { EXPECT_EQ(span, &apply_to_span); }));
@@ -2288,9 +2533,9 @@ TEST_F(HttpConnectionManagerImplTest, TestFilterCanEnrichAccessLogs) {
       }));
 
   EXPECT_CALL(*filter, onStreamComplete()).WillOnce(Invoke([&]() {
-    ProtobufWkt::Value metadata_value;
+    Protobuf::Value metadata_value;
     metadata_value.set_string_value("value");
-    ProtobufWkt::Struct metadata;
+    Protobuf::Struct metadata;
     metadata.mutable_fields()->insert({"field", metadata_value});
     filter->callbacks_->streamInfo().setDynamicMetadata("metadata_key", metadata);
   }));
@@ -4320,8 +4565,6 @@ TEST_F(ProxyStatusTest, PopulateProxyStatusWithDetailsAndResponseCode) {
 
 TEST_F(ProxyStatusTest, PopulateUnauthorizedProxyStatus) {
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.proxy_status_mapping_more_core_response_flags", "true"}});
   proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
   proxy_status_config_->set_remove_details(false);
 
@@ -4334,24 +4577,6 @@ TEST_F(ProxyStatusTest, PopulateUnauthorizedProxyStatus) {
   ASSERT_TRUE(altered_headers->ProxyStatus());
   EXPECT_EQ(altered_headers->getProxyStatusValue(),
             "custom_server_name; error=connection_refused; details=\"bar; UAEX\"");
-  EXPECT_EQ(altered_headers->getStatusValue(), "403");
-}
-
-TEST_F(ProxyStatusTest, NoPopulateUnauthorizedProxyStatus) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.proxy_status_mapping_more_core_response_flags", "false"}});
-  proxy_status_config_ = std::make_unique<HttpConnectionManagerProto::ProxyStatusConfig>();
-  proxy_status_config_->set_remove_details(false);
-
-  initialize();
-
-  const ResponseHeaderMap* altered_headers = sendRequestWith(
-      403, StreamInfo::CoreResponseFlag::UnauthorizedExternalService, /*details=*/"bar");
-
-  ASSERT_TRUE(altered_headers);
-  ASSERT_FALSE(altered_headers->ProxyStatus());
-  EXPECT_EQ(altered_headers->getProxyStatusValue(), "");
   EXPECT_EQ(altered_headers->getStatusValue(), "403");
 }
 

@@ -1535,51 +1535,6 @@ TEST_P(ProxyProtocolTest, V2ParseExtensionsLargeThanInitMaxReadBytes) {
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
-TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterest) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener", "false"},
-  });
-  // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
-  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
-                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x1a, 0x01, 0x02, 0x03, 0x04,
-                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
-  constexpr uint8_t tlv1[] = {0x0, 0x0, 0x1, 0xff};
-  constexpr uint8_t tlv_type_authority[] = {0x02, 0x00, 0x07, 0x66, 0x6f,
-                                            0x6f, 0x2e, 0x63, 0x6f, 0x6d};
-  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
-
-  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
-  auto rule = proto_config.add_rules();
-  rule->set_tlv_type(0x02);
-  rule->mutable_on_tlv_present()->set_key("PP2 type authority");
-
-  connect(true, &proto_config);
-  write(buffer, sizeof(buffer));
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-
-  write(tlv1, sizeof(tlv1));
-  write(tlv_type_authority, sizeof(tlv_type_authority));
-  write(data, sizeof(data));
-  expectData("DATA");
-
-  EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
-  EXPECT_EQ(0, server_connection_->streamInfo().dynamicMetadata().typed_filter_metadata_size());
-
-  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
-  EXPECT_EQ(1, metadata.size());
-  EXPECT_EQ(1, metadata.count(ProxyProtocol));
-
-  auto fields = metadata.at(ProxyProtocol).fields();
-  EXPECT_EQ(1, fields.size());
-  EXPECT_EQ(1, fields.count("PP2 type authority"));
-
-  auto value_s = fields.at("PP2 type authority").string_value();
-  ASSERT_THAT(value_s, ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d));
-  disconnect();
-  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
-}
-
 TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterestAndEmitWithSpecifiedMetadataNamespace) {
   // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
@@ -1621,76 +1576,7 @@ TEST_P(ProxyProtocolTest, V2ExtractTlvOfInterestAndEmitWithSpecifiedMetadataName
   EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
 }
 
-TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterest) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener", "false"},
-  });
-  // A well-formed ipv4/tcp with a pair of TLV extensions is accepted
-  constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
-                                0x54, 0x0a, 0x21, 0x11, 0x00, 0x39, 0x01, 0x02, 0x03, 0x04,
-                                0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
-  // a TLV of type 0x00 with size of 4 (1 byte is value)
-  constexpr uint8_t tlv1[] = {0x00, 0x00, 0x01, 0xff};
-  // a TLV of type 0x02 with size of 10 bytes (7 bytes are value)
-  constexpr uint8_t tlv_type_authority[] = {0x02, 0x00, 0x07, 0x66, 0x6f,
-                                            0x6f, 0x2e, 0x63, 0x6f, 0x6d};
-  // a TLV of type 0x0f with size of 6 bytes (3 bytes are value)
-  constexpr uint8_t tlv3[] = {0x0f, 0x00, 0x03, 0xf0, 0x00, 0x0f};
-  // a TLV of type 0xea with size of 25 bytes (22 bytes are value)
-  constexpr uint8_t tlv_vpc_id[] = {0xea, 0x00, 0x16, 0x01, 0x76, 0x70, 0x63, 0x2d, 0x30,
-                                    0x32, 0x35, 0x74, 0x65, 0x73, 0x74, 0x32, 0x66, 0x61,
-                                    0x36, 0x63, 0x36, 0x33, 0x68, 0x61, 0x37};
-  constexpr uint8_t data[] = {'D', 'A', 'T', 'A'};
-
-  envoy::extensions::filters::listener::proxy_protocol::v3::ProxyProtocol proto_config;
-  auto rule_type_authority = proto_config.add_rules();
-  rule_type_authority->set_tlv_type(0x02);
-  rule_type_authority->mutable_on_tlv_present()->set_key("PP2 type authority");
-
-  auto rule_vpc_id = proto_config.add_rules();
-  rule_vpc_id->set_tlv_type(0xea);
-  rule_vpc_id->mutable_on_tlv_present()->set_key("PP2 vpc id");
-
-  connect(true, &proto_config);
-  write(buffer, sizeof(buffer));
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-
-  write(tlv1, sizeof(tlv1));
-  write(tlv_type_authority, sizeof(tlv_type_authority));
-  write(tlv3, sizeof(tlv3));
-  write(tlv_vpc_id, sizeof(tlv_vpc_id));
-  write(data, sizeof(data));
-  expectData("DATA");
-
-  EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
-  EXPECT_EQ(0, server_connection_->streamInfo().dynamicMetadata().typed_filter_metadata_size());
-
-  auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
-  EXPECT_EQ(1, metadata.size());
-  EXPECT_EQ(1, metadata.count(ProxyProtocol));
-
-  auto fields = metadata.at(ProxyProtocol).fields();
-  EXPECT_EQ(2, fields.size());
-  EXPECT_EQ(1, fields.count("PP2 type authority"));
-  EXPECT_EQ(1, fields.count("PP2 vpc id"));
-
-  auto value_type_authority = fields.at("PP2 type authority").string_value();
-  ASSERT_THAT(value_type_authority, ElementsAre(0x66, 0x6f, 0x6f, 0x2e, 0x63, 0x6f, 0x6d));
-
-  auto value_vpc_id = fields.at("PP2 vpc id").string_value();
-  ASSERT_THAT(value_vpc_id,
-              ElementsAre(0x01, 0x76, 0x70, 0x63, 0x2d, 0x30, 0x32, 0x35, 0x74, 0x65, 0x73, 0x74,
-                          0x32, 0x66, 0x61, 0x36, 0x63, 0x36, 0x33, 0x68, 0x61, 0x37));
-  disconnect();
-  EXPECT_EQ(stats_store_.counter("proxy_proto.versions.v2.found").value(), 1);
-}
-
 TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndSanitiseNonUtf8) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({
-      {"envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener", "false"},
-  });
   // A well-formed ipv4/tcp with a pair of TLV extensions is accepted.
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x39, 0x01, 0x02, 0x03, 0x04,
@@ -1731,7 +1617,7 @@ TEST_P(ProxyProtocolTest, V2ExtractMultipleTlvsOfInterestAndSanitiseNonUtf8) {
   expectData("DATA");
 
   EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().filter_metadata_size());
-  EXPECT_EQ(0, server_connection_->streamInfo().dynamicMetadata().typed_filter_metadata_size());
+  EXPECT_EQ(1, server_connection_->streamInfo().dynamicMetadata().typed_filter_metadata_size());
 
   auto metadata = server_connection_->streamInfo().dynamicMetadata().filter_metadata();
   EXPECT_EQ(1, metadata.size());
