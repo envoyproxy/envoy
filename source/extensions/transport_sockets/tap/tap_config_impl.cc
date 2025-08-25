@@ -55,9 +55,7 @@ void PerSocketTapperImpl::closeSocket(Network::ConnectionEvent) {
       initStreamingEvent(event);
       event.mutable_closed();
       // submit directly and don't check current_streamed_rx_tx_bytes_ any more
-      sink_handle_->submitTrace(std::move(streamed_trace_));
-      buffered_trace_.reset();
-      current_streamed_rx_tx_bytes_ = 0;
+      submitStreamedDataPerConfiguredSize();
     } else {
       TapCommon::TraceWrapperPtr trace = makeTraceSegment();
       auto& event = *trace->mutable_socket_streamed_trace_segment()->mutable_event();
@@ -106,6 +104,31 @@ bool PerSocketTapperImpl::shouldSendStreamedMsgByConfiguredSize() const {
   return config_->minStreamedSentBytes() > 0;
 }
 
+void PerSocketTapperImpl::submitStreamedDataPerConfiguredSize() {
+  sink_handle_->submitTrace(std::move(streamed_trace_));
+  streamed_trace_.reset();
+  current_streamed_rx_tx_bytes_ = 0;
+}
+
+bool PerSocketTapperImpl::shouldSubmitStreamedDataPerConfiguredSizeByAgedDuration() const {
+  if (streamed_trace_ == nullptr) {
+    return false;
+  }
+  const envoy::data::tap::v3::SocketEvents& streamed_events =
+      streamed_trace_->socket_streamed_trace_segment().events();
+  auto& repeated_streamed_events = streamed_events.events();
+  if (repeated_streamed_events.size() < 2) {
+    // Only one event.
+    return false;
+  }
+
+  const Protobuf::Timestamp& first_event_ts = repeated_streamed_events[0].timestamp();
+  const Protobuf::Timestamp& last_event_ts =
+      repeated_streamed_events[repeated_streamed_events.size() - 1].timestamp();
+  return (last_event_ts.seconds() - first_event_ts.seconds()) >=
+         static_cast<int64_t>(DefaultBufferedAgedDuration);
+}
+
 void PerSocketTapperImpl::handleSendingStreamTappedMsgPerConfigSize(const Buffer::Instance& data,
                                                                     const uint32_t total_bytes,
                                                                     const bool is_read,
@@ -127,10 +150,9 @@ void PerSocketTapperImpl::handleSendingStreamTappedMsgPerConfigSize(const Buffer
     current_streamed_rx_tx_bytes_ += event.write().data().as_bytes().size();
   }
 
-  if (current_streamed_rx_tx_bytes_ >= config_->minStreamedSentBytes()) {
-    sink_handle_->submitTrace(std::move(streamed_trace_));
-    streamed_trace_.reset();
-    current_streamed_rx_tx_bytes_ = 0;
+  if (current_streamed_rx_tx_bytes_ >= config_->minStreamedSentBytes() ||
+      shouldSubmitStreamedDataPerConfiguredSizeByAgedDuration()) {
+    submitStreamedDataPerConfiguredSize();
     pegSubmitCounter(true);
   }
 }
