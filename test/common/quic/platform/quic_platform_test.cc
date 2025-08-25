@@ -98,7 +98,7 @@ TEST_F(QuicPlatformTest, QuicClientStats) {
   QUIC_CLIENT_HISTOGRAM_ENUM("my.enum.histogram", TestEnum::ONE, TestEnum::COUNT, "doc");
   QUIC_CLIENT_HISTOGRAM_BOOL("my.bool.histogram", false, "doc");
   QUIC_CLIENT_HISTOGRAM_TIMES("my.timing.histogram", QuicTime::Delta::FromSeconds(5),
-                              QuicTime::Delta::FromSeconds(1), QuicTime::Delta::FromSecond(3600),
+                              QuicTime::Delta::FromSeconds(1), QuicTime::Delta::FromSeconds(3600),
                               100, "doc");
   QUIC_CLIENT_HISTOGRAM_COUNTS("my.count.histogram", 123, 0, 1000, 100, "doc");
   QuicClientSparseHistogram("my.sparse.histogram", 345);
@@ -121,7 +121,7 @@ TEST_F(QuicPlatformTest, QuicExportedStats) {
   QUIC_HISTOGRAM_ENUM("my.enum.histogram", TestEnum::ONE, TestEnum::COUNT, "doc");
   QUIC_HISTOGRAM_BOOL("my.bool.histogram", false, "doc");
   QUIC_HISTOGRAM_TIMES("my.timing.histogram", QuicTime::Delta::FromSeconds(5),
-                       QuicTime::Delta::FromSeconds(1), QuicTime::Delta::FromSecond(3600), 100,
+                       QuicTime::Delta::FromSeconds(1), QuicTime::Delta::FromSeconds(3600), 100,
                        "doc");
   QUIC_HISTOGRAM_COUNTS("my.count.histogram", 123, 0, 1000, 100, "doc");
 }
@@ -141,7 +141,7 @@ TEST_F(QuicPlatformTest, QuicServerStats) {
   QUIC_SERVER_HISTOGRAM_ENUM("my.enum.histogram", TestEnum::ONE, TestEnum::COUNT, "doc");
   QUIC_SERVER_HISTOGRAM_BOOL("my.bool.histogram", false, "doc");
   QUIC_SERVER_HISTOGRAM_TIMES("my.timing.histogram", QuicTime::Delta::FromSeconds(5),
-                              QuicTime::Delta::FromSeconds(1), QuicTime::Delta::FromSecond(3600),
+                              QuicTime::Delta::FromSeconds(1), QuicTime::Delta::FromSeconds(3600),
                               100, "doc");
   QUIC_SERVER_HISTOGRAM_COUNTS("my.count.histogram", 123, 0, 1000, 100, "doc");
 }
