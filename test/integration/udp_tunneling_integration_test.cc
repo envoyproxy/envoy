@@ -538,6 +538,11 @@ typed_config:
     return deflated_size;
   }
 
+  void drainListeners() {
+    test_server_->server().dispatcher().post([this]() { test_server_->server().drainListeners(); });
+    test_server_->waitForCounterEq("listener_manager.listener_stopped", 1);
+  }
+
   TestConfig config_;
   Http::TestResponseHeaderMapImpl response_headers_{{":status", "200"}, {"capsule-protocol", "?1"}};
   Network::Address::InstanceConstSharedPtr listener_address_;
@@ -1550,6 +1555,25 @@ TEST_P(UdpTunnelingIntegrationTest, BytesMeterAccessLog) {
   auto expected_received_wire_bytes = expected_response_wire_size + response_capsule_size;
   EXPECT_EQ(std::to_string(expected_received_wire_bytes), access_log_parts[6]);
 
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+}
+
+TEST_P(UdpTunnelingIntegrationTest, DrainListenersWhileTunnelingActiveSessionIsStillActive) {
+  TestConfig config{"host.com",           "target.com", 1, 30, false, "",
+                    BufferOptions{1, 30}, absl::nullopt};
+  setup(config);
+
+  const std::string datagram = "hello";
+  establishConnection(datagram);
+  // Wait for buffered datagram.
+  ASSERT_TRUE(upstream_request_->waitForData(*dispatcher_, expectedCapsules({datagram})));
+
+  // Send a response and keep the session alive.
+  sendCapsuleDownstream("response", false);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 1);
+
+  // Drain listeners while udp session is still active.
+  drainListeners();
   test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
 }
 

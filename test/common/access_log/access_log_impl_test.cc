@@ -1494,7 +1494,7 @@ typed_config:
   )EOF";
 
   TestStreamInfo stream_info(time_source_);
-  ProtobufWkt::Struct metadata_val;
+  Protobuf::Struct metadata_val;
   auto& fields_a = *metadata_val.mutable_fields();
   auto& struct_b = *fields_a["a"].mutable_struct_value();
   auto& fields_b = *struct_b.mutable_fields();
@@ -1530,7 +1530,7 @@ typed_config:
   )EOF";
 
   TestStreamInfo stream_info(time_source_);
-  ProtobufWkt::Struct metadata_val;
+  Protobuf::Struct metadata_val;
   stream_info.setDynamicMetadata("some.namespace", metadata_val);
 
   const InstanceSharedPtr log =
@@ -1577,7 +1577,7 @@ typed_config:
   )EOF";
 
   TestStreamInfo stream_info(time_source_);
-  ProtobufWkt::Struct metadata_val;
+  Protobuf::Struct metadata_val;
   auto& fields_a = *metadata_val.mutable_fields();
   auto& struct_b = *fields_a["a"].mutable_struct_value();
   auto& fields_b = *struct_b.mutable_fields();
@@ -1703,14 +1703,13 @@ public:
     auto factory_config = Config::Utility::translateToFactoryConfig(
         config, context.messageValidationVisitor(), *this);
 
-    ProtobufWkt::Struct struct_config =
-        *dynamic_cast<const ProtobufWkt::Struct*>(factory_config.get());
+    Protobuf::Struct struct_config = *dynamic_cast<const Protobuf::Struct*>(factory_config.get());
     return std::make_unique<SampleExtensionFilter>(
         static_cast<uint32_t>(struct_config.fields().at("rate").number_value()));
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
 
   std::string name() const override { return "sample_extension_filter"; }

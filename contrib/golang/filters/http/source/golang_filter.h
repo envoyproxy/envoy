@@ -97,7 +97,7 @@ private:
   const std::string plugin_name_;
   const std::string so_id_;
   const std::string so_path_;
-  const ProtobufWkt::Any plugin_config_;
+  const Protobuf::Any plugin_config_;
   uint32_t concurrency_;
 
   GolangFilterStats stats_;
@@ -126,7 +126,7 @@ public:
 
 private:
   const std::string plugin_name_;
-  const ProtobufWkt::Any plugin_config_;
+  const Protobuf::Any plugin_config_;
 
   Dso::HttpFilterDsoPtr dso_lib_;
   uint64_t config_id_{0};

@@ -75,6 +75,84 @@ TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
   checkSimpleRequestSuccess(0U, 0U, response.get());
 }
 
+// Test upstream_rq_per_cx metric tracks requests per connection
+TEST_P(ProtocolIntegrationTest, UpstreamRequestsPerConnectionMetric) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send 3 requests on the same connection
+  for (int i = 0; i < 3; ++i) {
+    auto response =
+        sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+
+  // Use the proper cleanup pattern that triggers histogram recording
+  cleanupUpstreamAndDownstream();
+
+  // Wait for the histogram to actually have samples using the proper integration test pattern
+  test_server_->waitUntilHistogramHasSamples("cluster.cluster_0.upstream_rq_per_cx");
+
+  // Get the histogram and read values using the proper pattern
+  auto histogram = test_server_->histogram("cluster.cluster_0.upstream_rq_per_cx");
+
+  uint64_t sample_count =
+      TestUtility::readSampleCount(test_server_->server().dispatcher(), *histogram);
+  uint64_t sample_sum = TestUtility::readSampleSum(test_server_->server().dispatcher(), *histogram);
+
+  // Should have 1 sample with value 3 (3 requests on 1 connection)
+  EXPECT_EQ(sample_count, 1);
+  EXPECT_EQ(sample_sum, 3);
+}
+
+// Test that upstream_rq_per_cx metric is NOT recorded when handshake fails
+TEST_P(ProtocolIntegrationTest, UpstreamRequestsPerConnectionMetricHandshakeFailure) {
+  // This test intentionally causes upstream connection failures, so bypass the upstream validation
+  testing_upstream_intentionally_ = true;
+
+  // Configure upstream with invalid port to force connection failure before handshake completion
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* lb_endpoint =
+        cluster->mutable_load_assignment()->mutable_endpoints(0)->mutable_lb_endpoints(0);
+    // Use port 1 which is invalid/inaccessible to force connection establishment failure
+    lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(1);
+  });
+  config_helper_.skipPortUsageValidation();
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send request that will fail due to upstream connection failure
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // Wait for response (should fail with 503 Service Unavailable)
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+
+  // Clean up
+  codec_client_->close();
+
+  // Wait for connection failure to be recorded
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_connect_fail", 1);
+
+  // Verify that NO upstream_rq_per_cx histogram samples were recorded
+  // because hasHandshakeCompleted() returned false (connection never established)
+  auto histogram = test_server_->histogram("cluster.cluster_0.upstream_rq_per_cx");
+  uint64_t sample_count =
+      TestUtility::readSampleCount(test_server_->server().dispatcher(), *histogram);
+
+  // Key assertion: No histogram samples should be recorded for failed connections
+  EXPECT_EQ(sample_count, 0);
+
+  // Also verify connection failure was recorded (proving connection attempt was made)
+  EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_connect_fail")->value(), 1);
+}
+
 TEST_P(ProtocolIntegrationTest, LogicalDns) {
   if (use_universal_header_validator_) {
     // TODO(#27132): auto_host_rewrite is broken for IPv6 and is failing UHV validation
@@ -1137,7 +1215,7 @@ TEST_P(ProtocolIntegrationTest, RetryStreamingCancelDueToBufferOverflow) {
              hcm) {
         auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
 
-        route->mutable_per_request_buffer_limit_bytes()->set_value(1024);
+        route->mutable_request_body_buffer_limit()->set_value(1024);
         route->mutable_route()
             ->mutable_retry_policy()
             ->mutable_retry_back_off()
@@ -1401,7 +1479,7 @@ TEST_P(ProtocolIntegrationTest, RetryHittingBufferLimit) {
 // Very similar set-up to RetryHittingBufferLimits but using the route specific cap.
 TEST_P(ProtocolIntegrationTest, RetryHittingRouteLimits) {
   auto host = config_helper_.createVirtualHost("routelimit.lyft.com", "/");
-  host.mutable_per_request_buffer_limit_bytes()->set_value(0);
+  host.mutable_request_body_buffer_limit()->set_value(0);
   config_helper_.addVirtualHost(host);
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1586,8 +1664,6 @@ TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaReset) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done", "false");
   config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_balsa_delay_reset", "true");
   initialize();
 
@@ -1617,8 +1693,6 @@ TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaResetWaitFor
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done", "true");
   config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_balsa_delay_reset", "true");
   initialize();
 

@@ -42,18 +42,18 @@ ExpressionManager::initExpressions(const Protobuf::RepeatedPtrField<std::string>
   return expressions;
 }
 
-ProtobufWkt::Struct
+Protobuf::Struct
 ExpressionManager::evaluateAttributes(const Filters::Common::Expr::Activation& activation,
                                       const absl::flat_hash_map<std::string, CelExpression>& expr) {
 
-  ProtobufWkt::Struct proto;
+  Protobuf::Struct proto;
 
   if (expr.empty()) {
     return proto;
   }
 
   for (const auto& hash_entry : expr) {
-    ProtobufWkt::Arena arena;
+    Protobuf::Arena arena;
     const auto result = hash_entry.second.compiled_expr_->Evaluate(activation, &arena);
     if (!result.ok()) {
       // TODO: Stats?
@@ -84,7 +84,7 @@ ExpressionManager::evaluateAttributes(const Filters::Common::Expr::Activation& a
     // Handling all value types here would be graceful but is not currently
     // testable and drives down coverage %. This is not a _great_ reason to
     // not do it; will get feedback from reviewers.
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     switch (result.value().type()) {
     case google::api::expr::runtime::CelValue::Type::kBool:
       value.set_bool_value(result.value().BoolOrDie());

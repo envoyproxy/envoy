@@ -2,11 +2,13 @@
 
 #include <vector>
 
-#include "source/common/common/utility.h"
 #include "source/extensions/tracers/zipkin/span_context.h"
 #include "source/extensions/tracers/zipkin/util.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 #include "source/extensions/tracers/zipkin/zipkin_json_field_names.h"
+
+#include "absl/strings/str_cat.h"
+#include "fmt/format.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -24,8 +26,8 @@ Endpoint& Endpoint::operator=(const Endpoint& ep) {
   return *this;
 }
 
-const ProtobufWkt::Struct Endpoint::toStruct(Util::Replacements&) const {
-  ProtobufWkt::Struct endpoint;
+const Protobuf::Struct Endpoint::toStruct(Util::Replacements&) const {
+  Protobuf::Struct endpoint;
   auto* fields = endpoint.mutable_fields();
   if (!address_) {
     (*fields)[ENDPOINT_IPV4] = ValueUtil::stringValue("");
@@ -65,8 +67,8 @@ void Annotation::changeEndpointServiceName(const std::string& service_name) {
   }
 }
 
-const ProtobufWkt::Struct Annotation::toStruct(Util::Replacements& replacements) const {
-  ProtobufWkt::Struct annotation;
+const Protobuf::Struct Annotation::toStruct(Util::Replacements& replacements) const {
+  Protobuf::Struct annotation;
   auto* fields = annotation.mutable_fields();
   (*fields)[ANNOTATION_TIMESTAMP] = Util::uint64Value(timestamp_, SPAN_TIMESTAMP, replacements);
   (*fields)[ANNOTATION_VALUE] = ValueUtil::stringValue(value_);
@@ -97,8 +99,8 @@ BinaryAnnotation& BinaryAnnotation::operator=(const BinaryAnnotation& ann) {
   return *this;
 }
 
-const ProtobufWkt::Struct BinaryAnnotation::toStruct(Util::Replacements& replacements) const {
-  ProtobufWkt::Struct binary_annotation;
+const Protobuf::Struct BinaryAnnotation::toStruct(Util::Replacements& replacements) const {
+  Protobuf::Struct binary_annotation;
   auto* fields = binary_annotation.mutable_fields();
   (*fields)[BINARY_ANNOTATION_KEY] = ValueUtil::stringValue(key_);
   (*fields)[BINARY_ANNOTATION_VALUE] = ValueUtil::stringValue(value_);
@@ -119,8 +121,8 @@ void Span::setServiceName(const std::string& service_name) {
   }
 }
 
-const ProtobufWkt::Struct Span::toStruct(Util::Replacements& replacements) const {
-  ProtobufWkt::Struct span;
+const Protobuf::Struct Span::toStruct(Util::Replacements& replacements) const {
+  Protobuf::Struct span;
   auto* fields = span.mutable_fields();
   (*fields)[SPAN_TRACE_ID] = ValueUtil::stringValue(traceIdAsHexString());
   (*fields)[SPAN_NAME] = ValueUtil::stringValue(name_);
@@ -131,7 +133,7 @@ const ProtobufWkt::Struct Span::toStruct(Util::Replacements& replacements) const
   }
 
   if (timestamp_.has_value()) {
-    // Usually we store number to a ProtobufWkt::Struct object via ValueUtil::numberValue.
+    // Usually we store number to a Protobuf::Struct object via ValueUtil::numberValue.
     // However, due to the possibility of rendering that to a number with scientific notation, we
     // chose to store it as a string and keeping track the corresponding replacement.
     (*fields)[SPAN_TIMESTAMP] = Util::uint64Value(timestamp_.value(), SPAN_TIMESTAMP, replacements);
@@ -144,7 +146,7 @@ const ProtobufWkt::Struct Span::toStruct(Util::Replacements& replacements) const
   }
 
   if (!annotations_.empty()) {
-    std::vector<ProtobufWkt::Value> annotation_list;
+    std::vector<Protobuf::Value> annotation_list;
     annotation_list.reserve(annotations_.size());
     for (auto& annotation : annotations_) {
       annotation_list.push_back(ValueUtil::structValue(annotation.toStruct(replacements)));
@@ -153,7 +155,7 @@ const ProtobufWkt::Struct Span::toStruct(Util::Replacements& replacements) const
   }
 
   if (!binary_annotations_.empty()) {
-    std::vector<ProtobufWkt::Value> binary_annotation_list;
+    std::vector<Protobuf::Value> binary_annotation_list;
     binary_annotation_list.reserve(binary_annotations_.size());
     for (auto& binary_annotation : binary_annotations_) {
       binary_annotation_list.push_back(
@@ -213,7 +215,9 @@ void Span::log(SystemTime timestamp, const std::string& event) {
 }
 
 void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
-  // Set the trace-id and span-id headers properly, based on the newly-created span structure.
+  auto trace_context_option = tracer_.traceContextOption();
+
+  // Always inject B3 headers
   ZipkinCoreConstants::get().X_B3_TRACE_ID.setRefKey(trace_context, traceIdAsHexString());
   ZipkinCoreConstants::get().X_B3_SPAN_ID.setRefKey(trace_context, idAsHexString());
 
@@ -225,6 +229,11 @@ void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::Up
   // Set the sampled header.
   ZipkinCoreConstants::get().X_B3_SAMPLED.setRefKey(trace_context,
                                                     sampled() ? SAMPLED : NOT_SAMPLED);
+
+  // Additionally inject W3C headers if dual propagation is enabled
+  if (trace_context_option == envoy::config::trace::v3::ZipkinConfig::USE_B3_WITH_W3C_PROPAGATION) {
+    injectW3CContext(trace_context);
+  }
 }
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::string& name,
                                   SystemTime start_time) {
@@ -235,6 +244,31 @@ SpanContext Span::spanContext() const {
   // The inner_context is set to true because this SpanContext is context of Envoy created span
   // rather than the one that extracted from the downstream request headers.
   return {trace_id_high_.value_or(0), trace_id_, id_, parent_id_.value_or(0), sampled_, true};
+}
+
+void Span::injectW3CContext(Tracing::TraceContext& trace_context) {
+  // Convert Zipkin span context to W3C traceparent format
+  // W3C traceparent format: 00-{trace-id}-{span-id}-{trace-flags}
+
+  // Construct the 128-bit trace ID (32 hex chars)
+  std::string trace_id_str;
+  if (trace_id_high_.has_value() && trace_id_high_.value() != 0) {
+    // We have a 128-bit trace ID, use both high and low parts
+    trace_id_str = absl::StrCat(fmt::format("{:016x}", trace_id_high_.value()),
+                                fmt::format("{:016x}", trace_id_));
+  } else {
+    // We have a 64-bit trace ID, pad with zeros for the high part
+    trace_id_str = absl::StrCat("0000000000000000", fmt::format("{:016x}", trace_id_));
+  }
+
+  // Construct the traceparent header value in W3C format: version-traceid-spanid-flags
+  std::string traceparent_value =
+      fmt::format("00-{}-{:016x}-{}", trace_id_str, id_, sampled() ? "01" : "00");
+
+  // Set the W3C traceparent header
+  ZipkinCoreConstants::get().TRACE_PARENT.setRefKey(trace_context, traceparent_value);
+
+  // For now, we don't set tracestate as it's optional and we don't have vendor-specific data
 }
 
 } // namespace Zipkin

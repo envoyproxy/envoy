@@ -146,7 +146,7 @@ RoleBasedAccessControlRouteSpecificFilterConfig::RoleBasedAccessControlRouteSpec
 
 // Evaluates the shadow engine policy and updates metrics accordingly
 bool RoleBasedAccessControlFilter::evaluateShadowEngine(const Http::RequestHeaderMap& headers,
-                                                        ProtobufWkt::Struct& metrics) const {
+                                                        Protobuf::Struct& metrics) const {
   const auto shadow_engine =
       config_->engine(callbacks_, Filters::Common::RBAC::EnforcementMode::Shadow);
   if (shadow_engine == nullptr) {
@@ -193,7 +193,7 @@ bool RoleBasedAccessControlFilter::evaluateShadowEngine(const Http::RequestHeade
 // Evaluates the enforced engine policy and returns the appropriate filter status
 Http::FilterHeadersStatus
 RoleBasedAccessControlFilter::evaluateEnforcedEngine(Http::RequestHeaderMap& headers,
-                                                     ProtobufWkt::Struct& metrics) const {
+                                                     Protobuf::Struct& metrics) const {
   const auto engine = config_->engine(callbacks_, Filters::Common::RBAC::EnforcementMode::Enforced);
   if (engine == nullptr) {
     return Http::FilterHeadersStatus::Continue;
@@ -263,7 +263,7 @@ RoleBasedAccessControlFilter::decodeHeaders(Http::RequestHeaderMap& headers, boo
       headers, callbacks_->streamInfo().dynamicMetadata().DebugString());
 
   // Create metrics structure to hold results
-  ProtobufWkt::Struct metrics;
+  Protobuf::Struct metrics;
 
   // Evaluate shadow engine if it exists
   const bool shadow_engine_evaluated = evaluateShadowEngine(headers, metrics);

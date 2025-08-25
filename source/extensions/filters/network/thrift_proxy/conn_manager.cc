@@ -831,7 +831,7 @@ void ConnectionManager::ActiveRpc::recordResponseAccessLog(
 
 void ConnectionManager::ActiveRpc::recordResponseAccessLog(const std::string& message_type,
                                                            const std::string& reply_type) {
-  ProtobufWkt::Struct stats_obj;
+  Protobuf::Struct stats_obj;
   auto& fields_map = *stats_obj.mutable_fields();
   auto& response_fields_map = *fields_map["response"].mutable_struct_value()->mutable_fields();
 
@@ -891,7 +891,7 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
     throw EnvoyException(error.value());
   }
 
-  ProtobufWkt::Struct stats_obj;
+  Protobuf::Struct stats_obj;
   auto& fields_map = *stats_obj.mutable_fields();
   fields_map["cluster"] = ValueUtil::stringValue(cluster_name);
   fields_map["method"] = ValueUtil::stringValue(method);

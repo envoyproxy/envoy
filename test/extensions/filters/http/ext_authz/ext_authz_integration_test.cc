@@ -5,6 +5,7 @@
 
 #include "source/common/common/macros.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
+#include "source/extensions/filters/http/ext_authz/ext_authz.h"
 #include "source/server/config_validation/server.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -143,11 +144,11 @@ public:
       labels["label_1"] = "value_1";
       labels["label_2"] = "value_2";
 
-      ProtobufWkt::Struct metadata;
-      ProtobufWkt::Value val;
-      ProtobufWkt::Struct* labels_obj = val.mutable_struct_value();
+      Protobuf::Struct metadata;
+      Protobuf::Value val;
+      Protobuf::Struct* labels_obj = val.mutable_struct_value();
       for (const auto& pair : labels) {
-        ProtobufWkt::Value val;
+        Protobuf::Value val;
         val.set_string_value(pair.second);
         (*labels_obj->mutable_fields())[pair.first] = val;
       }
@@ -188,10 +189,10 @@ public:
       config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
         auto* layer = bootstrap.mutable_layered_runtime()->add_layers();
         layer->set_name("enable layer");
-        ProtobufWkt::Struct& runtime = *layer->mutable_static_layer();
+        Protobuf::Struct& runtime = *layer->mutable_static_layer();
         bootstrap.mutable_layered_runtime()->mutable_layers(0)->set_name("base layer");
 
-        ProtobufWkt::Struct& enable =
+        Protobuf::Struct& enable =
             *(*runtime.mutable_fields())["envoy.ext_authz.enable"].mutable_struct_value();
         (*enable.mutable_fields())["numerator"].set_number_value(0);
       });
@@ -982,6 +983,32 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsCientType, ExtAuthzGrpcIntegrationTest,
                          testing::Combine(GRPC_CLIENT_INTEGRATION_PARAMS, testing::Bool(),
                                           testing::Bool()),
                          ExtAuthzGrpcIntegrationTest::testParamsToString);
+
+// Test per-route gRPC service configuration parsing
+TEST_P(ExtAuthzGrpcIntegrationTest, PerRouteGrpcServiceConfigurationParsing) {
+  // Create a simple per-route configuration with gRPC service
+  envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute per_route_config;
+  per_route_config.mutable_check_settings()
+      ->mutable_grpc_service()
+      ->mutable_envoy_grpc()
+      ->set_cluster_name("per_route_cluster");
+  (*per_route_config.mutable_check_settings()->mutable_context_extensions())["route_type"] =
+      "special";
+
+  // Test configuration parsing and validation
+  Envoy::Extensions::HttpFilters::ExtAuthz::FilterConfigPerRoute config_per_route(per_route_config);
+
+  // Verify the configuration was parsed correctly
+  ASSERT_TRUE(config_per_route.grpcService().has_value());
+  EXPECT_TRUE(config_per_route.grpcService().value().has_envoy_grpc());
+  EXPECT_EQ(config_per_route.grpcService().value().envoy_grpc().cluster_name(),
+            "per_route_cluster");
+
+  // Verify context extensions are present
+  const auto& check_settings = config_per_route.checkSettings();
+  ASSERT_TRUE(check_settings.context_extensions().contains("route_type"));
+  EXPECT_EQ(check_settings.context_extensions().at("route_type"), "special");
+}
 
 // Verifies that the request body is included in the CheckRequest when the downstream protocol is
 // HTTP/1.1.

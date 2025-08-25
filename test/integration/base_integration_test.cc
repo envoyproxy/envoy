@@ -223,7 +223,7 @@ std::string BaseIntegrationTest::finalizeConfigWithPorts(ConfigHelper& config_he
     envoy::service::discovery::v3::DiscoveryResponse lds;
     lds.set_version_info("0");
     for (auto& listener : config_helper.bootstrap().static_resources().listeners()) {
-      ProtobufWkt::Any* resource = lds.add_resources();
+      Protobuf::Any* resource = lds.add_resources();
       resource->PackFrom(listener);
     }
 #ifdef ENVOY_ENABLE_YAML

@@ -357,9 +357,9 @@ bool extractFilterStateData(const StreamInfo::FilterState& filter_state, const s
     ProtobufTypes::MessagePtr serialized_proto = state->serializeAsProto();
     if (serialized_proto != nullptr) {
       auto& filter_state_objects = *common_access_log.mutable_filter_state_objects();
-      ProtobufWkt::Any& any = filter_state_objects[key];
-      if (dynamic_cast<ProtobufWkt::Any*>(serialized_proto.get()) != nullptr) {
-        any.Swap(dynamic_cast<ProtobufWkt::Any*>(serialized_proto.get()));
+      Protobuf::Any& any = filter_state_objects[key];
+      if (dynamic_cast<Protobuf::Any*>(serialized_proto.get()) != nullptr) {
+        any.Swap(dynamic_cast<Protobuf::Any*>(serialized_proto.get()));
       } else {
         any.PackFrom(*serialized_proto);
       }

@@ -624,9 +624,9 @@ std::vector<Envoy::Ssl::CertificateDetailsPtr> ContextImpl::getCertChainInformat
     auto ocsp_resp = ctx.ocsp_response_.get();
     if (ocsp_resp) {
       auto* ocsp_details = detail->mutable_ocsp_details();
-      ProtobufWkt::Timestamp* valid_from = ocsp_details->mutable_valid_from();
+      Protobuf::Timestamp* valid_from = ocsp_details->mutable_valid_from();
       TimestampUtil::systemClockToTimestamp(ocsp_resp->getThisUpdate(), *valid_from);
-      ProtobufWkt::Timestamp* expiration = ocsp_details->mutable_expiration();
+      Protobuf::Timestamp* expiration = ocsp_details->mutable_expiration();
       TimestampUtil::systemClockToTimestamp(ocsp_resp->getNextUpdate(), *expiration);
     }
     cert_details.push_back(std::move(detail));

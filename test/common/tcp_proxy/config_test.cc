@@ -297,7 +297,7 @@ TEST(ConfigTest, WeightedClustersWithMetadataMatchConfig) {
   Config config_obj(constructConfigFromYaml(yaml, factory_context));
 
   {
-    ProtobufWkt::Value v1, v2;
+    Protobuf::Value v1, v2;
     v1.set_string_value("v1");
     v2.set_string_value("v2");
     HashedValue hv1(v1), hv2(v2);
@@ -324,7 +324,7 @@ TEST(ConfigTest, WeightedClustersWithMetadataMatchConfig) {
   }
 
   {
-    ProtobufWkt::Value v3, v4;
+    Protobuf::Value v3, v4;
     v3.set_string_value("v3");
     v4.set_string_value("v4");
     HashedValue hv3(v3), hv4(v4);
@@ -383,14 +383,14 @@ TEST(ConfigTest, WeightedClustersWithMetadataMatchAndTopLevelMetadataMatchConfig
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   Config config_obj(constructConfigFromYaml(yaml, factory_context));
 
-  ProtobufWkt::Value v00, v01, v04;
+  Protobuf::Value v00, v01, v04;
   v00.set_string_value("v00");
   v01.set_string_value("v01");
   v04.set_string_value("v04");
   HashedValue hv00(v00), hv01(v01), hv04(v04);
 
   {
-    ProtobufWkt::Value v1, v2;
+    Protobuf::Value v1, v2;
     v1.set_string_value("v1");
     v2.set_string_value("v2");
     HashedValue hv1(v1), hv2(v2);
@@ -423,7 +423,7 @@ TEST(ConfigTest, WeightedClustersWithMetadataMatchAndTopLevelMetadataMatchConfig
   }
 
   {
-    ProtobufWkt::Value v3, v4;
+    Protobuf::Value v3, v4;
     v3.set_string_value("v3");
     v4.set_string_value("v4");
     HashedValue hv3(v3), hv4(v4);
@@ -474,7 +474,7 @@ TEST(ConfigTest, WeightedClustersWithTopLevelMetadataMatchConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   Config config_obj(constructConfigFromYaml(yaml, factory_context));
 
-  ProtobufWkt::Value v1, v2;
+  Protobuf::Value v1, v2;
   v1.set_string_value("v1");
   v2.set_string_value("v2");
   HashedValue hv1(v1), hv2(v2);
@@ -513,7 +513,7 @@ TEST(ConfigTest, TopLevelMetadataMatchConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   Config config_obj(constructConfigFromYaml(yaml, factory_context));
 
-  ProtobufWkt::Value v1, v2;
+  Protobuf::Value v1, v2;
   v1.set_string_value("v1");
   v2.set_string_value("v2");
   HashedValue hv1(v1), hv2(v2);
@@ -546,7 +546,7 @@ TEST(ConfigTest, ClusterWithTopLevelMetadataMatchConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   Config config_obj(constructConfigFromYaml(yaml, factory_context));
 
-  ProtobufWkt::Value v1, v2;
+  Protobuf::Value v1, v2;
   v1.set_string_value("v1");
   v2.set_string_value("v2");
   HashedValue hv1(v1), hv2(v2);
@@ -585,7 +585,7 @@ TEST(ConfigTest, PerConnectionClusterWithTopLevelMetadataMatchConfig) {
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   Config config_obj(constructConfigFromYaml(yaml, factory_context));
 
-  ProtobufWkt::Value v1, v2;
+  Protobuf::Value v1, v2;
   v1.set_string_value("v1");
   v2.set_string_value("v2");
   HashedValue hv1(v1), hv2(v2);
