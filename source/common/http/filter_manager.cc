@@ -12,6 +12,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "matching/data_impl.h"
 
@@ -467,10 +468,6 @@ void ActiveStreamDecoderFilter::modifyDecodingBuffer(
     std::function<void(Buffer::Instance&)> callback) {
   ASSERT(parent_.state_.latest_data_decoding_filter_ == this);
   callback(*parent_.buffered_request_data_.get());
-}
-
-void ActiveStreamDecoderFilter::setForceImmediateLocalReply(bool value) {
-  parent_.setForceImmediateLocalReply(value);
 }
 
 void ActiveStreamDecoderFilter::sendLocalReply(
@@ -1028,11 +1025,12 @@ void DownstreamFilterManager::sendLocalReply(
     // We only prepare a local reply to execute later if we're actively invoking filters to avoid
     // re-entrant in filters.
     //
-    // For reverse connections workflow, where Upstream Envoy receives connections from the
-    // Downstream Envoy, we need to send local replies immediately rather than queuing them.
-    // This ensures proper handling of the reverse connection lifecycle and prevents any
-    // potential issues with the connection state and filter chain processing.
-    if (!force_immediate_local_reply_ &&
+    // For reverse connections (where upstream initiates the connection to downstream), we need to
+    // send local replies immediately rather than queuing them. This ensures proper handling of the
+    // reversed connection flow and prevents potential issues with connection state and filter chain
+    // processing.
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.reverse_conn_force_local_reply") &&
         (state_.filter_call_state_ & FilterCallState::IsDecodingMask)) {
       prepareLocalReplyViaFilterChain(is_grpc_request, code, body, modify_headers, is_head_request,
                                       grpc_status, details);
