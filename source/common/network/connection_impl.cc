@@ -147,7 +147,9 @@ void ConnectionImpl::removeReadFilter(ReadFilterSharedPtr filter) {
 bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initializeReadFilters(); }
 
 void ConnectionImpl::close(ConnectionCloseType type) {
-  if (socket_ == nullptr || !socket_->isOpen()) {
+  if (!socket_->isOpen()) {
+    ENVOY_CONN_LOG_EVENT(debug, "connection_closing",
+                         "Not closing conn, socket object is null or socket is not open", *this);
     return;
   }
 
@@ -174,7 +176,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
 }
 
 void ConnectionImpl::closeInternal(ConnectionCloseType type) {
-  if (socket_ == nullptr || !socket_->isOpen()) {
+  if (!socket_->isOpen()) {
     return;
   }
 
@@ -251,7 +253,7 @@ void ConnectionImpl::closeInternal(ConnectionCloseType type) {
 }
 
 Connection::State ConnectionImpl::state() const {
-  if (socket_ == nullptr || !socket_->isOpen()) {
+  if (!socket_->isOpen()) {
     return State::Closed;
   } else if (inDelayedClose()) {
     return State::Closing;
@@ -285,11 +287,6 @@ void ConnectionImpl::setDetectedCloseType(DetectedCloseType close_type) {
   detected_close_type_ = close_type;
 }
 
-ConnectionSocketPtr ConnectionImpl::moveSocket() {
-  // Transfer socket ownership to the caller.
-  return std::move(socket_);
-}
-
 void ConnectionImpl::closeThroughFilterManager(ConnectionCloseAction close_action) {
   if (socket_ == nullptr || !socket_->isOpen()) {
     return;
@@ -306,7 +303,12 @@ void ConnectionImpl::closeThroughFilterManager(ConnectionCloseAction close_actio
 }
 
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
-  if (socket_ == nullptr || !socket_->isOpen()) {
+  ENVOY_CONN_LOG(trace, "closeSocket called, socket_={}, socket_isOpen={}, reuse_socket_={}", *this,
+                 socket_ ? "not_null" : "null", socket_ ? socket_->isOpen() : false,
+                 static_cast<bool>(reuse_socket_));
+
+  if (!socket_->isOpen()) {
+    ENVOY_CONN_LOG(trace, "closeSocket: socket is null or not open, returning", *this);
     return;
   }
 
@@ -344,7 +346,14 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   }
 
   // It is safe to call close() since there is an IO handle check.
-  socket_->close();
+  ENVOY_CONN_LOG(trace, "closeSocket: about to close socket, reuse_socket_={}", *this,
+                 static_cast<bool>(reuse_socket_));
+  if (!reuse_socket_) {
+    socket_->close();
+  } else {
+    ENVOY_CONN_LOG(trace, "closeSocket: skipping socket close due to reuse_socket_=true", *this);
+    return;
+  }
 
   // Call the base class directly as close() is called in the destructor.
   ConnectionImpl::raiseEvent(close_type);
@@ -363,7 +372,7 @@ void ConnectionImpl::noDelay(bool enable) {
   // invalid. For this call instead of plumbing through logic that will immediately indicate that a
   // connect failed, we will just ignore the noDelay() call if the socket is invalid since error is
   // going to be raised shortly anyway and it makes the calling code simpler.
-  if (socket_ == nullptr || !socket_->isOpen()) {
+  if (!socket_->isOpen()) {
     return;
   }
 
@@ -404,7 +413,7 @@ void ConnectionImpl::onRead(uint64_t read_buffer_size) {
       (enable_close_through_filter_manager_ && filter_manager_.pendingClose())) {
     return;
   }
-  ASSERT(socket_ != nullptr && socket_->isOpen());
+  ASSERT(socket_->isOpen());
 
   if (read_buffer_size == 0 && !read_end_stream_) {
     return;
@@ -930,8 +939,6 @@ bool ConnectionImpl::setSocketOption(Network::SocketOptionName name, absl::Span<
   Api::SysCallIntResult result =
       SocketOptionImpl::setSocketOption(*socket_, name, value.data(), value.size());
   if (result.return_value_ != 0) {
-    ENVOY_LOG(warn, "Setting option on socket failed, errno: {}, message: {}", result.errno_,
-              errorDetails(result.errno_));
     return false;
   }
 

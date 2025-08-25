@@ -277,9 +277,6 @@ api_listener:
                          ->readCallbacks()
                          .connection();
 
-  // Test moveSocket() - should return nullptr for SyntheticConnection
-  EXPECT_EQ(connection.moveSocket(), nullptr);
-
   // Test getSocket() - should PANIC for SyntheticConnection
   EXPECT_DEATH(connection.getSocket(), "not implemented");
 
