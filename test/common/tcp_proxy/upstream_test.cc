@@ -1,5 +1,8 @@
 #include <memory>
 
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/request_id/uuid/v3/uuid.pb.h"
+
 #include "source/common/tcp_proxy/tcp_proxy.h"
 #include "source/common/tcp_proxy/upstream.h"
 
@@ -315,7 +318,10 @@ TEST_P(HttpUpstreamRequestEncoderTest, RequestEncoderUsePostWithCustomPath) {
 }
 
 TEST_P(HttpUpstreamRequestEncoderTest, RequestIdGeneratedWhenEnabled) {
-  this->tcp_proxy_.mutable_tunneling_config()->mutable_generate_request_id()->set_value(true);
+  envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension reqid_ext;
+  envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig uuid_cfg;
+  reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
+  *this->tcp_proxy_.mutable_tunneling_config()->mutable_request_id_extension() = reqid_ext;
   this->setupUpstream();
 
   EXPECT_CALL(this->encoder_, encodeHeaders(_, false))
@@ -332,7 +338,10 @@ TEST_P(HttpUpstreamRequestEncoderTest, RequestIdGeneratedWhenEnabled) {
 }
 
 TEST_P(HttpUpstreamRequestEncoderTest, RequestIdStoredInFilterStateWhenEnabled) {
-  this->tcp_proxy_.mutable_tunneling_config()->mutable_generate_request_id()->set_value(true);
+  envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension reqid_ext;
+  envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig uuid_cfg;
+  reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
+  *this->tcp_proxy_.mutable_tunneling_config()->mutable_request_id_extension() = reqid_ext;
   this->setupUpstream();
   EXPECT_CALL(this->encoder_, encodeHeaders(_, false)).WillOnce(Return(Http::okStatus()));
   this->upstream_->setRequestEncoder(this->encoder_, false);
@@ -605,7 +614,10 @@ TEST_F(CombinedUpstreamTest, WriteUpstream) {
 }
 
 TEST_F(CombinedUpstreamTest, CombinedUpstreamGeneratesRequestIdWhenEnabled) {
-  this->tcp_proxy_.mutable_tunneling_config()->mutable_generate_request_id()->set_value(true);
+  envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension reqid_ext;
+  envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig uuid_cfg;
+  reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
+  *this->tcp_proxy_.mutable_tunneling_config()->mutable_request_id_extension() = reqid_ext;
   this->setup();
   auto* headers = this->upstream_->downstreamHeaders();
   ASSERT_NE(headers, nullptr);
