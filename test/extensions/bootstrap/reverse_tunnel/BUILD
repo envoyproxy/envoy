@@ -22,6 +22,7 @@ envoy_extension_cc_test(
         "//source/common/network:socket_interface_lib",
         "//source/common/network:utility_lib",
         "//source/common/thread_local:thread_local_lib",
+        "//source/extensions/bootstrap/reverse_tunnel:reverse_connection_handshake_cc_proto",
         "//source/extensions/bootstrap/reverse_tunnel:reverse_tunnel_initiator_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:factory_context_mocks",
@@ -29,7 +30,6 @@ envoy_extension_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:test_runtime_lib",
-        "@envoy_api//envoy/extensions/bootstrap/reverse_connection_handshake/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3:pkg_cc_proto",
     ],
 )

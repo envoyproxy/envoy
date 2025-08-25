@@ -5,7 +5,6 @@
 #include <cstring>
 
 #include "envoy/event/deferred_deletable.h"
-#include "source/extensions/bootstrap/reverse_tunnel/reverse_connection_handshake.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
@@ -23,6 +22,7 @@
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/reverse_connection_address.h"
+#include "source/extensions/bootstrap/reverse_tunnel/reverse_connection_handshake.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -146,13 +146,13 @@ Network::FilterStatus RCConnectionWrapper::SimpleConnReadFilter::onData(Buffer::
 
       if (!response_body.empty()) {
         // Try to parse the protobuf response
-        envoy::source::extensions::bootstrap::reverse_tunnel::ReverseConnHandshakeRet ret;
+        envoy::extensions::bootstrap::reverse_tunnel::ReverseConnHandshakeRet ret;
         if (ret.ParseFromString(response_body)) {
           ENVOY_LOG(debug, "Successfully parsed protobuf response: {}", ret.DebugString());
 
           // Check if the status is ACCEPTED
-          if (ret.status() == envoy::source::extensions::bootstrap::reverse_tunnel::
-                                  ReverseConnHandshakeRet::ACCEPTED) {
+          if (ret.status() ==
+              envoy::extensions::bootstrap::reverse_tunnel::ReverseConnHandshakeRet::ACCEPTED) {
             ENVOY_LOG(debug, "SimpleConnReadFilter: Reverse connection accepted by cloud side");
             parent_->onHandshakeSuccess();
             return Network::FilterStatus::StopIteration;
@@ -207,7 +207,7 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
   connection_->addReadFilter(Network::ReadFilterSharedPtr{new SimpleConnReadFilter(this)});
 
   // Use HTTP handshake logic
-  envoy::source::extensions::bootstrap::reverse_tunnel::ReverseConnHandshakeArg arg;
+  envoy::extensions::bootstrap::reverse_tunnel::ReverseConnHandshakeArg arg;
   arg.set_tenant_uuid(src_tenant_id);
   arg.set_cluster_uuid(src_cluster_id);
   arg.set_node_uuid(src_node_id);

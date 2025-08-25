@@ -1,19 +1,10 @@
 syntax = "proto3";
 
-package envoy.extensions.bootstrap.reverse_connection_handshake.v3;
+package envoy.extensions.bootstrap.reverse_tunnel;
 
-import "udpa/annotations/status.proto";
-import "udpa/annotations/versioning.proto";
-
-option java_package = "io.envoyproxy.envoy.extensions.bootstrap.reverse_connection_handshake.v3";
-option java_outer_classname = "ReverseConnectionHandshakeProto";
-option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/bootstrap/reverse_connection_handshake/v3;reverse_connection_handshakev3";
-option (udpa.annotations.file_status).package_version_status = ACTIVE;
-
-// [#protodoc-title: Reverse Connection Handshake]
-// Reverse Connection Handshake protocol for establishing reverse connections between Envoy instances.
-// [#extension: envoy.bootstrap.reverse_connection_handshake]
+// Internal proto definitions for reverse connection handshake protocol.
+// These messages are used internally by the reverse tunnel extension
+// and are not exposed to users.
 
 // Configuration for the reverse connection handshake extension.
 // This extension provides message definitions for establishing reverse connections
@@ -30,9 +21,6 @@ message ReverseConnectionHandshakeConfig {
 // sent as a response can be used to transfer/negotiate parameter between the
 // two envoys.
 message ReverseConnHandshakeArg {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.extensions.filters.http.reverse_conn.v3.ReverseConnHandshakeArg";
-
   // Tenant UUID of the local cluster.
   string tenant_uuid = 1;
 
@@ -45,8 +33,6 @@ message ReverseConnHandshakeArg {
 
 // Config used by the remote cluster in response to the above 'ReverseConnHandshakeArg'.
 message ReverseConnHandshakeRet {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.extensions.filters.http.reverse_conn.v3.ReverseConnHandshakeRet";
 
   enum ConnectionStatus {
     REJECTED = 0;
