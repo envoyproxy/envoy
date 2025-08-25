@@ -604,7 +604,7 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationCounter) {
                                metric_name: "new_counter_name")pb"),
                                                  parseCustomMetricConversion(
                                                      R"pb(stat_name_matcher {
-                                 safe_regex { regex: "test_counter-2" }
+                                 safe_regex { regex: "test_counter-." }
                                }
                                metric_name: "new_counter_name")pb"),
                                              }));
@@ -665,7 +665,7 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationGauge) {
                                        }
                                        metric_name: "new_gauge_name")pb"),
                                                  parseCustomMetricConversion(R"pb(stat_name_matcher {
-                                         safe_regex { regex: "test_gauge-2" }
+                                         safe_regex { regex: "test_gauge-." }
                                        }
                                        metric_name: "new_gauge_name")pb"),
                                              }));
@@ -728,7 +728,7 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationHistogram) {
                                metric_name: "new_histogram_name")pb"),
                                                  parseCustomMetricConversion(
                                                      R"pb(stat_name_matcher {
-                                 safe_regex { regex: "test_histogram-2" }
+                                 safe_regex { regex: "test_histogram-." }
                                }
                                metric_name: "new_histogram_name")pb"),
                                              }));
