@@ -53,6 +53,50 @@ namespace HttpFilters {
 namespace ExtAuthz {
 namespace {
 
+// Matcher to convert a Buffer::Instance to its string representation for composition.
+MATCHER_P(BufferString, m, "") {
+  return testing::ExplainMatchResult(m, arg->toString(), result_listener);
+}
+
+// Matcher to parse a buffer string into a CheckRequest proto.
+MATCHER_P(AsCheckRequest, m, "") {
+  envoy::service::auth::v3::CheckRequest check_request;
+  if (!check_request.ParseFromString(arg)) {
+    *result_listener << "failed to parse CheckRequest from buffer";
+    return false;
+  }
+  return testing::ExplainMatchResult(m, check_request, result_listener);
+}
+
+// Matcher to verify CheckRequest has specific context extension.
+MATCHER_P2(HasContextExtension, key, value, "") {
+  const auto& context_extensions = arg.attributes().context_extensions();
+  if (context_extensions.find(key) == context_extensions.end()) {
+    *result_listener << "context extension '" << key << "' not found";
+    return false;
+  }
+  if (context_extensions.at(key) != value) {
+    *result_listener << "context extension '" << key << "' has value '"
+                     << context_extensions.at(key) << "', expected '" << value << "'";
+    return false;
+  }
+  return true;
+}
+
+// Matcher to verify RequestOptions has specific timeout value.
+MATCHER_P(HasTimeout, expected_timeout_ms, "") {
+  if (!arg.timeout.has_value()) {
+    *result_listener << "timeout not set";
+    return false;
+  }
+  if (arg.timeout->count() != expected_timeout_ms) {
+    *result_listener << "timeout is " << arg.timeout->count() << "ms, expected "
+                     << expected_timeout_ms << "ms";
+    return false;
+  }
+  return true;
+}
+
 constexpr char FilterConfigName[] = "ext_authz_filter";
 
 template <class T> class HttpFilterTestBase : public T {
@@ -4582,25 +4626,52 @@ TEST_P(HttpFilterTestParam, PerRouteConfigurationIntegrationTest) {
 
   prepareCheck();
 
-  // Mock client check to capture and verify the check request has proper context extensions.
-  EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest& check_request,
-                           Tracing::Span&, const StreamInfo::StreamInfo&) -> void {
-        // Verify that per-route context extensions were merged correctly
-        auto context_extensions = check_request.attributes().context_extensions();
-        EXPECT_TRUE(context_extensions.contains("test_key"));
-        EXPECT_EQ(context_extensions.at("test_key"), "test_value");
+  // Create a new filter with server context to enable per-route client creation.
+  // We'll mock the gRPC client manager to return a controlled mock client.
+  auto new_client = std::make_unique<Filters::Common::ExtAuthz::MockClient>();
+  auto* new_client_ptr = new_client.get();
+  auto new_filter = std::make_unique<Filter>(config_, std::move(new_client), factory_context_);
+  new_filter->setDecoderFilterCallbacks(decoder_filter_callbacks_);
 
-        // Return OK to complete the test
-        auto response = std::make_unique<Filters::Common::ExtAuthz::Response>();
-        response->status = Filters::Common::ExtAuthz::CheckStatus::OK;
-        callbacks.onComplete(std::move(response));
-      }));
+  // Mock the cluster manager to successfully create a per-route gRPC client
+  // but use a mock raw gRPC client that we can control.
+  ON_CALL(factory_context_, clusterManager()).WillByDefault(ReturnRef(cm_));
+  auto mock_grpc_client_manager = std::make_shared<Grpc::MockAsyncClientManager>();
+  ON_CALL(cm_, grpcAsyncClientManager()).WillByDefault(ReturnRef(*mock_grpc_client_manager));
+
+  // Return a mock raw gRPC client for per-route client creation.
+  auto mock_raw_grpc_client = std::make_shared<Grpc::MockAsyncClient>();
+  EXPECT_CALL(*mock_grpc_client_manager, getOrCreateRawAsyncClientWithHashKey(_, _, true))
+      .WillOnce(Return(absl::StatusOr<Grpc::RawAsyncClientSharedPtr>(mock_raw_grpc_client)));
+
+  // Mock the sendRaw call with matcher-based validation for the gRPC authorization check.
+  EXPECT_CALL(*mock_raw_grpc_client,
+              sendRaw(_, _,
+                      BufferString(AsCheckRequest(HasContextExtension("test_key", "test_value"))),
+                      _, _, _))
+      .WillOnce([&](absl::string_view /*service_full_name*/, absl::string_view /*method_name*/,
+                    Buffer::InstancePtr&& /*request*/, Grpc::RawAsyncRequestCallbacks& callbacks,
+                    Tracing::Span& parent_span,
+                    const Http::AsyncClient::RequestOptions& /*options*/) -> Grpc::AsyncRequest* {
+        // Create and send successful response.
+        envoy::service::auth::v3::CheckResponse check_response;
+        check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+        check_response.mutable_ok_response();
+
+        std::string serialized_response;
+        check_response.SerializeToString(&serialized_response);
+        auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
+
+        callbacks.onSuccessRaw(std::move(response), parent_span);
+        return nullptr; // No async request handle needed for immediate response.
+      });
+
+  // Since we're using the per-route client, the default client should not be called.
+  EXPECT_CALL(*new_client_ptr, check(_, _, _, _)).Times(0);
 
   // This exercises the per-route configuration processing logic which includes
   // the getAllPerFilterConfig call and per-route gRPC service detection.
-  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, true));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, new_filter->decodeHeaders(headers, true));
 }
 
 // Test per-route gRPC client creation and usage.
@@ -4654,23 +4725,22 @@ TEST_P(HttpFilterTestParam, PerRouteGrpcClientCreationAndUsage) {
 
   // Set up expectations for the sendRaw call that will be made by the GrpcClientImpl.
   EXPECT_CALL(*mock_raw_grpc_client, sendRaw(_, _, _, _, _, _))
-      .WillOnce(
-          Invoke([](absl::string_view /*service_full_name*/, absl::string_view /*method_name*/,
-                    Buffer::InstancePtr&& /*request*/, Grpc::RawAsyncRequestCallbacks& callbacks,
-                    Tracing::Span& parent_span,
-                    const Http::AsyncClient::RequestOptions& /*options*/) -> Grpc::AsyncRequest* {
-            envoy::service::auth::v3::CheckResponse check_response;
-            check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
-            check_response.mutable_ok_response();
+      .WillOnce([](absl::string_view /*service_full_name*/, absl::string_view /*method_name*/,
+                   Buffer::InstancePtr&& /*request*/, Grpc::RawAsyncRequestCallbacks& callbacks,
+                   Tracing::Span& parent_span,
+                   const Http::AsyncClient::RequestOptions& /*options*/) -> Grpc::AsyncRequest* {
+        envoy::service::auth::v3::CheckResponse check_response;
+        check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+        check_response.mutable_ok_response();
 
-            // Serialize the response to a buffer.
-            std::string serialized_response;
-            check_response.SerializeToString(&serialized_response);
-            auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
+        // Serialize the response to a buffer.
+        std::string serialized_response;
+        check_response.SerializeToString(&serialized_response);
+        auto response = std::make_unique<Buffer::OwnedImpl>(serialized_response);
 
-            callbacks.onSuccessRaw(std::move(response), parent_span);
-            return nullptr; // No async request handle needed for immediate response.
-          }));
+        callbacks.onSuccessRaw(std::move(response), parent_span);
+        return nullptr; // No async request handle needed for immediate response.
+      });
 
   // Since per-route gRPC client creation succeeds, the per-route client should be used
   // instead of the default client. We won't see a call to new_client_ptr.
@@ -4954,15 +5024,12 @@ TEST_P(HttpFilterTestParam, PerRouteGrpcClientTimeoutConfiguration) {
   EXPECT_CALL(*mock_grpc_client_manager, getOrCreateRawAsyncClientWithHashKey(_, _, true))
       .WillOnce(Return(absl::StatusOr<Grpc::RawAsyncClientSharedPtr>(mock_raw_grpc_client)));
 
-  // Mock the sendRaw call and verify the timeout is used correctly.
-  EXPECT_CALL(*mock_raw_grpc_client, sendRaw(_, _, _, _, _, _))
-      .WillOnce(Invoke([](absl::string_view, absl::string_view, Buffer::InstancePtr&&,
-                          Grpc::RawAsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
-                          const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
-        // Verify that the timeout from the per-route config is used (30s = 30000ms)
-        EXPECT_TRUE(options.timeout.has_value());
-        EXPECT_EQ(options.timeout->count(), 30000);
-
+  // Mock the sendRaw call with matcher-based validation for timeout verification.
+  EXPECT_CALL(*mock_raw_grpc_client, sendRaw(_, _, _, _, _, HasTimeout(30000)))
+      .WillOnce([](absl::string_view /*service_full_name*/, absl::string_view /*method_name*/,
+                   Buffer::InstancePtr&& /*request*/, Grpc::RawAsyncRequestCallbacks& callbacks,
+                   Tracing::Span& parent_span,
+                   const Http::AsyncClient::RequestOptions& /*options*/) -> Grpc::AsyncRequest* {
         envoy::service::auth::v3::CheckResponse check_response;
         check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
         check_response.mutable_ok_response();
@@ -4973,7 +5040,7 @@ TEST_P(HttpFilterTestParam, PerRouteGrpcClientTimeoutConfiguration) {
 
         callbacks.onSuccessRaw(std::move(response), parent_span);
         return nullptr;
-      }));
+      });
 
   EXPECT_CALL(*new_client_ptr, check(_, _, _, _)).Times(0);
 
