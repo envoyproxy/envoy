@@ -17,6 +17,12 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: tap
+  change: |
+    Previously, streamed trace buffered data was only flushed when it reached the configured size.
+    If the threshold was never met, the data remained buffered until the connection was closed.
+    With this change, buffered data will be flushed proactively. Specifically, if the buffer does not
+    reach the configured size but has been held for more than 15 seconds, it will be sent immediately.
 - area: websocket
   change: |
       Allow 4xx and 5xx to go through the filter chain for websocket handshake response check, and the behaviour can be disabled
@@ -203,9 +209,8 @@ new_features:
     for more details.
 - area: socket
   change: |
-    Added :ref:``network_namespace_filepath <envoy_v3_api_msg_config.core.v3.SocketAddress.network_namespace_filepath>`` to
-    :ref:`SocketAddress <envoy_v3_api_msg_config.core.v3.SocketAddress>`. This field allows specifying a Linux network namespace filepath
-    for socket creation, enabling network isolation in containerized environments.
+    Added ``network_namespace_filepath`` to :ref:`SocketAddress <envoy_v3_api_msg_config.core.v3.SocketAddress>`. This field allows
+    specifying a Linux network namespace filepath for socket creation, enabling network isolation in containerized environments.
 - area: ratelimit
   change: |
     Add the :ref:`rate_limits
@@ -256,6 +261,13 @@ new_features:
     Added ``virtualHost()`` to the Stream handle API, allowing Lua scripts to retrieve virtual host information. So far, the only method
     implemented is ``metadata()``, allowing Lua scripts to access virtual host metadata scoped to the specific filter name. See
     :ref:`Virtual host object API <config_http_filters_lua_virtual_host_wrapper>` for more details.
+- area: ext_authz
+  change: |
+    Added support for per-route gRPC service override in the ``ext_authz`` HTTP filter. This allows different routes
+    to use different external authorization backends by configuring a
+    :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.grpc_service>`
+    in the per-route ``check_settings``. Routes without this configuration continue to use the default
+    authorization service.
 - area: tracing
   change: |
     Added :ref:`trace_context_option <envoy_v3_api_field_config.trace.v3.ZipkinConfig.trace_context_option>` enum
