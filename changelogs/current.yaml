@@ -17,6 +17,12 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: tap
+  change: |
+    Previously, streamed trace buffered data was only flushed when it reached the configured size.
+    If the threshold was never met, the data remained buffered until the connection was closed.
+    With this change, buffered data will be flushed proactively. Specifically, if the buffer does not
+    reach the configured size but has been held for more than 15 seconds, it will be sent immediately.
 - area: websocket
   change: |
       Allow 4xx and 5xx to go through the filter chain for websocket handshake response check, and the behaviour can be disabled
