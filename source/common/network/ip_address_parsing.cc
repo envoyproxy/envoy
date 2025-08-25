@@ -9,31 +9,15 @@ namespace Network {
 namespace IpAddressParsing {
 
 StatusOr<sockaddr_in> parseIPv4(const std::string& ip_address, uint16_t port) {
-  // Prefer getaddrinfo() with ``AI_NUMERICHOST|AI_NUMERICSERV`` for consistency with IPv6 parsing
-  // and to keep a single parsing method. This also ensures no DNS lookups occur.
-  struct addrinfo hints;
-  memset(&hints, 0, sizeof(hints));
-  struct addrinfo* res = nullptr;
-  hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
-  hints.ai_family = AF_INET;
-  hints.ai_socktype = SOCK_DGRAM;
-  hints.ai_protocol = IPPROTO_UDP;
-
-  static Api::OsSysCallsImpl os_sys_calls;
-  const Api::SysCallIntResult rc =
-      os_sys_calls.getaddrinfo(ip_address.c_str(), /*service=*/nullptr, &hints, &res);
-  if (rc.return_value_ != 0) {
-    return absl::FailedPreconditionError(absl::StrCat("getaddrinfo error: ", rc.return_value_));
-  }
-  sockaddr_in sa4 = *reinterpret_cast<sockaddr_in*>(res->ai_addr);
-  os_sys_calls.freeaddrinfo(res);
-  sa4.sin_port = htons(port);
-  // Enforce strict dotted-quad by round-tripping via inet_ntop and requiring equality.
-  char buf[INET_ADDRSTRLEN];
-  const char* printed = inet_ntop(AF_INET, &sa4.sin_addr, buf, INET_ADDRSTRLEN);
-  if (printed == nullptr || ip_address != printed) {
+  // Use inet_pton() for IPv4 as it's simpler, faster, and already enforces
+  // strict dotted-quad format while rejecting non-standard notations.
+  sockaddr_in sa4;
+  memset(&sa4, 0, sizeof(sa4));
+  if (inet_pton(AF_INET, ip_address.c_str(), &sa4.sin_addr) != 1) {
     return absl::FailedPreconditionError("failed parsing ipv4");
   }
+  sa4.sin_family = AF_INET;
+  sa4.sin_port = htons(port);
   return sa4;
 }
 

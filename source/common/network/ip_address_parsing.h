@@ -11,7 +11,7 @@ namespace Envoy {
 namespace Network {
 
 // Utilities for parsing numeric IP addresses into sockaddr structures.
-// These helpers methods avoid higher-level dependencies and are suitable for
+// These helper methods avoid higher-level dependencies and are suitable for
 // use by multiple components that need low-level parsing without constructing
 // `Address::Instance` objects.
 namespace IpAddressParsing {
