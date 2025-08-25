@@ -74,7 +74,7 @@ public:
     return std::make_unique<AlpnSocketFactory>();
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
 };
 
@@ -1774,7 +1774,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     // Using Struct instead of a custom per-filter empty config proto
     // This is only allowed in tests.
-    return std::make_unique<Envoy::ProtobufWkt::Struct>();
+    return std::make_unique<Envoy::Protobuf::Struct>();
   }
   std::string name() const override { return "envoy.test.filter"; }
 };

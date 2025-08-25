@@ -148,7 +148,7 @@ TEST_P(AdminInstanceTest, Help) {
   /clusters: upstream cluster status
   /config_dump: dump current Envoy configs (experimental)
       resource: The resource to dump
-      mask: The mask to apply. When both resource and mask are specified, the mask is applied to every element in the desired repeated field so that only a subset of fields are returned. The mask is parsed as a ProtobufWkt::FieldMask
+      mask: The mask to apply. When both resource and mask are specified, the mask is applied to every element in the desired repeated field so that only a subset of fields are returned. The mask is parsed as a Protobuf::FieldMask
       name_regex: Dump only the currently loaded configurations whose names match the specified regex. Can be used with both resource and mask query parameters.
       include_eds: Dump currently loaded configuration including EDS. See the response definition for more information
   /contention: dump current Envoy mutex contention stats (if enabled)
@@ -166,7 +166,7 @@ TEST_P(AdminInstanceTest, Help) {
   /help: print out list of admin commands
   /hot_restart_version: print the hot restart compatibility version
   /init_dump: dump current Envoy init manager information (experimental)
-      mask: The desired component to dump unready targets. The mask is parsed as a ProtobufWkt::FieldMask. For example, get the unready targets of all listeners with /init_dump?mask=listener`
+      mask: The desired component to dump unready targets. The mask is parsed as a Protobuf::FieldMask. For example, get the unready targets of all listeners with /init_dump?mask=listener`
   /listeners: print listener info
       format: File format to use; One of (text, json)
   /logging (POST): query/change logging levels

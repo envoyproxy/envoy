@@ -343,6 +343,7 @@ UdpProxyFilter::ActiveSession::~ActiveSession() {
 }
 
 void UdpProxyFilter::ActiveSession::onSessionComplete() {
+  ENVOY_BUG(!on_session_complete_called_, "onSessionComplete() called twice");
   ENVOY_LOG(debug, "deleting the session: downstream={} local={} upstream={}",
             addresses_.peer_->asStringView(), addresses_.local_->asStringView(),
             host_ != nullptr ? host_->address()->asStringView() : "unknown");
@@ -385,7 +386,7 @@ UdpProxyFilter::ActiveSession::createDownstreamConnectionInfoProvider() {
 }
 
 void UdpProxyFilter::ActiveSession::fillSessionStreamInfo() {
-  ProtobufWkt::Struct stats_obj;
+  Protobuf::Struct stats_obj;
   auto& fields_map = *stats_obj.mutable_fields();
   if (cluster_ != nullptr) {
     fields_map["cluster_name"] = ValueUtil::stringValue(cluster_->cluster_info_->name());
@@ -402,7 +403,7 @@ void UdpProxyFilter::ActiveSession::fillSessionStreamInfo() {
 }
 
 void UdpProxyFilter::fillProxyStreamInfo() {
-  ProtobufWkt::Struct stats_obj;
+  Protobuf::Struct stats_obj;
   auto& fields_map = *stats_obj.mutable_fields();
   fields_map["bytes_sent"] =
       ValueUtil::numberValue(config_->stats().downstream_sess_tx_bytes_.value());
@@ -892,21 +893,23 @@ const std::string HttpUpstreamImpl::resolveTargetTunnelPath() {
   return absl::StrCat("/.well-known/masque/udp/", target_host, "/", target_port, "/");
 }
 
-HttpUpstreamImpl::~HttpUpstreamImpl() { resetEncoder(Network::ConnectionEvent::LocalClose); }
+HttpUpstreamImpl::~HttpUpstreamImpl() {
+  resetEncoder(Network::ConnectionEvent::LocalClose, /*by_local_close=*/true);
+}
 
-void HttpUpstreamImpl::resetEncoder(Network::ConnectionEvent event, bool by_downstream) {
+void HttpUpstreamImpl::resetEncoder(Network::ConnectionEvent event, bool by_local_close) {
   if (!request_encoder_) {
     return;
   }
 
   request_encoder_->getStream().removeCallbacks(*this);
-  if (by_downstream) {
+  if (by_local_close) {
     request_encoder_->getStream().resetStream(Http::StreamResetReason::LocalReset);
   }
 
   request_encoder_ = nullptr;
 
-  if (!by_downstream) {
+  if (!by_local_close) {
     // If we did not receive a valid CONNECT response yet we treat this as a pool
     // failure, otherwise we forward the event downstream.
     if (tunnel_creation_callbacks_.has_value()) {

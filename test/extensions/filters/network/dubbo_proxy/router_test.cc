@@ -98,8 +98,8 @@ public:
   }
 
   void verifyMetadataMatchCriteriaFromRequest(bool route_entry_has_match) {
-    ProtobufWkt::Struct request_struct;
-    ProtobufWkt::Value val;
+    Protobuf::Struct request_struct;
+    Protobuf::Value val;
 
     // Populate metadata like StreamInfo.setDynamicMetadata() would.
     auto& fields_map = *request_struct.mutable_fields();
@@ -150,8 +150,8 @@ public:
   }
 
   void verifyMetadataMatchCriteriaFromRoute(bool route_entry_has_match) {
-    ProtobufWkt::Struct route_struct;
-    ProtobufWkt::Value val;
+    Protobuf::Struct route_struct;
+    Protobuf::Value val;
 
     // Populate metadata like StreamInfo.setDynamicMetadata() would.
     auto& fields_map = *route_struct.mutable_fields();
@@ -193,8 +193,8 @@ public:
   }
 
   void verifyMetadataMatchCriteriaFromPreviousCompute() {
-    ProtobufWkt::Struct request_struct;
-    ProtobufWkt::Value val;
+    Protobuf::Struct request_struct;
+    Protobuf::Value val;
 
     // Populate metadata like StreamInfo.setDynamicMetadata() would.
     auto& fields_map = *request_struct.mutable_fields();

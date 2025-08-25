@@ -645,8 +645,7 @@ public:
    */
   static std::string nonZeroedGauges(const std::vector<Stats::GaugeSharedPtr>& gauges);
 
-  template <class MessageType>
-  static inline MessageType anyConvert(const ProtobufWkt::Any& message) {
+  template <class MessageType> static inline MessageType anyConvert(const Protobuf::Any& message) {
     return MessageUtil::anyConvert<MessageType>(message);
   }
 
@@ -702,7 +701,7 @@ public:
 
   template <class MessageType>
   static Config::DecodedResourcesWrapper
-  decodeResources(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+  decodeResources(const Protobuf::RepeatedPtrField<Protobuf::Any>& resources,
                   const std::string& version, const std::string& name_field = "name") {
     TestOpaqueResourceDecoderImpl<MessageType> resource_decoder(name_field);
     std::unique_ptr<Config::DecodedResourcesWrapper> tmp_wrapper =
@@ -765,8 +764,8 @@ public:
 
 #ifdef ENVOY_ENABLE_YAML
   /**
-   * Compare two JSON strings serialized from ProtobufWkt::Struct for equality. When two identical
-   * ProtobufWkt::Struct are serialized into JSON strings, the results have the same set of
+   * Compare two JSON strings serialized from Protobuf::Struct for equality. When two identical
+   * Protobuf::Struct are serialized into JSON strings, the results have the same set of
    * properties (values), but the positions may be different.
    *
    * @param lhs JSON string on LHS.
@@ -799,7 +798,7 @@ public:
     MessageUtil::loadFromJson(json, message, ProtobufMessage::getStrictValidationVisitor());
   }
 
-  static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
+  static void loadFromJson(const std::string& json, Protobuf::Struct& message) {
     MessageUtil::loadFromJson(json, message);
   }
 
@@ -815,22 +814,22 @@ public:
   static void jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest) {
     // Explicit round-tripping to support conversions inside tests between arbitrary messages as a
     // convenience.
-    ProtobufWkt::Struct tmp;
+    Protobuf::Struct tmp;
     MessageUtil::jsonConvert(source, tmp);
     MessageUtil::jsonConvert(tmp, ProtobufMessage::getStrictValidationVisitor(), dest);
   }
 
-  static ProtobufWkt::Struct jsonToStruct(const std::string& json) {
-    ProtobufWkt::Struct message;
+  static Protobuf::Struct jsonToStruct(const std::string& json) {
+    Protobuf::Struct message;
     MessageUtil::loadFromJson(json, message);
     return message;
   }
 
-  static ProtobufWkt::Struct jsonArrayToStruct(const std::string& json) {
+  static Protobuf::Struct jsonArrayToStruct(const std::string& json) {
     // Hacky: add a surrounding root message, allowing JSON to be parsed into a struct.
     std::string root_message = absl::StrCat("{ \"testOnlyArrayRoot\": ", json, "}");
 
-    ProtobufWkt::Struct message;
+    Protobuf::Struct message;
     MessageUtil::loadFromJson(root_message, message);
     return message;
   }

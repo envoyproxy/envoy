@@ -19,7 +19,7 @@ namespace {
 struct TestFactory : public Envoy::Server::Configuration::NamedHttpFilterConfigFactory {
   std::string name() const override { return "test"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
   absl::StatusOr<Envoy::Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
@@ -293,7 +293,7 @@ xds_matcher:
             "according to allowlist");
 }
 
-struct TestAction : Matcher::ActionBase<ProtobufWkt::StringValue> {};
+struct TestAction : Matcher::ActionBase<Protobuf::StringValue> {};
 
 template <class InputType, class ActionType>
 Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>

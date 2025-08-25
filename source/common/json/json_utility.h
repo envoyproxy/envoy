@@ -11,11 +11,11 @@ namespace Json {
 class Utility {
 public:
   /**
-   * Convert a ProtobufWkt::Value to a JSON string.
+   * Convert a Protobuf::Value to a JSON string.
    * @param value message of type type.googleapis.com/google.protobuf.Value
    * @param dest JSON string.
    */
-  static void appendValueToString(const ProtobufWkt::Value& value, std::string& dest);
+  static void appendValueToString(const Protobuf::Value& value, std::string& dest);
 };
 
 } // namespace Json

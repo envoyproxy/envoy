@@ -180,7 +180,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
 
   auto factory =
       TlsCertificateSelectorConfigFactoryImpl::getDefaultTlsCertificateSelectorConfigFactory();
-  const ProtobufWkt::Any any;
+  const Protobuf::Any any;
   tls_certificate_selector_factory_ = factory->createTlsCertificateSelectorFactory(
       any, factory_context.serverFactoryContext(), ProtobufMessage::getNullValidationVisitor(),
       creation_status, for_quic);

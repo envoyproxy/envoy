@@ -37,13 +37,13 @@ public:
                                                 const StreamInfo::StreamInfo&) const override {
     return str_.string_value();
   }
-  ProtobufWkt::Value formatValueWithContext(const Context&,
-                                            const StreamInfo::StreamInfo&) const override {
+  Protobuf::Value formatValueWithContext(const Context&,
+                                         const StreamInfo::StreamInfo&) const override {
     return str_;
   }
 
 private:
-  ProtobufWkt::Value str_;
+  Protobuf::Value str_;
 };
 
 /**
@@ -59,13 +59,13 @@ public:
     std::string str = absl::StrFormat("%g", num_.number_value());
     return str;
   }
-  ProtobufWkt::Value formatValueWithContext(const Context&,
-                                            const StreamInfo::StreamInfo&) const override {
+  Protobuf::Value formatValueWithContext(const Context&,
+                                         const StreamInfo::StreamInfo&) const override {
     return num_;
   }
 
 private:
-  ProtobufWkt::Value num_;
+  Protobuf::Value num_;
 };
 
 /**
@@ -114,7 +114,7 @@ public:
   using Formatter = FormatterProviderPtr;
   using Formatters = std::vector<Formatter>;
 
-  JsonFormatterImpl(const ProtobufWkt::Struct& struct_format, bool omit_empty_values,
+  JsonFormatterImpl(const Protobuf::Struct& struct_format, bool omit_empty_values,
                     const CommandParsers& commands = {});
 
   // Formatter

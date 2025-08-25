@@ -16,6 +16,7 @@
 
 #include "source/extensions/filters/http/rate_limit_quota/client_impl.h"
 #include "source/extensions/filters/http/rate_limit_quota/filter.h"
+#include "source/extensions/filters/http/rate_limit_quota/filter_persistence.h"
 #include "source/extensions/filters/http/rate_limit_quota/global_client_impl.h"
 #include "source/extensions/filters/http/rate_limit_quota/quota_bucket_cache.h"
 
@@ -24,15 +25,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
-// Object to hold TLS slots after the factory itself has been cleaned up.
-struct TlsStore {
-  TlsStore(Server::Configuration::FactoryContext& context)
-      : global_client_tls(context.serverFactoryContext().threadLocal()),
-        buckets_tls(context.serverFactoryContext().threadLocal()) {}
-
-  ThreadLocal::TypedSlot<ThreadLocalGlobalRateLimitClientImpl> global_client_tls;
-  ThreadLocal::TypedSlot<ThreadLocalBucketsCache> buckets_tls;
-};
+using TlsStore = GlobalTlsStores::TlsStore;
 
 Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::rate_limit_quota::v3::RateLimitQuotaFilterConfig&
@@ -47,32 +40,6 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
       Grpc::GrpcServiceConfigWithHashKey(config->rlqs_server());
 
-  // Quota bucket & global client TLS objects are created with the config and
-  // kept alive via shared_ptr to a storage struct. The local rate limit client
-  // in each filter instance assumes that the slot will outlive them.
-  std::shared_ptr<TlsStore> tls_store = std::make_shared<TlsStore>(context);
-  auto tl_buckets_cache =
-      std::make_shared<ThreadLocalBucketsCache>(std::make_shared<BucketsCache>());
-  tls_store->buckets_tls.set(
-      [tl_buckets_cache]([[maybe_unused]] Envoy::Event::Dispatcher& dispatcher) {
-        return tl_buckets_cache;
-      });
-
-  // TODO(bsurber): Implement report timing & usage aggregation based on each
-  // bucket's reporting_interval field. Currently this is not supported and all
-  // usage is reported on a hardcoded interval.
-  std::chrono::milliseconds reporting_interval(5000);
-
-  // Create the global client resource to be shared via TLS to all worker
-  // threads (accessed through a filter-specific LocalRateLimitClient).
-  auto tl_global_client = std::make_shared<ThreadLocalGlobalRateLimitClientImpl>(
-      createGlobalRateLimitClientImpl(context, filter_config.domain(), reporting_interval,
-                                      tls_store->buckets_tls, config_with_hash_key));
-  tls_store->global_client_tls.set(
-      [tl_global_client]([[maybe_unused]] Envoy::Event::Dispatcher& dispatcher) {
-        return tl_global_client;
-      });
-
   RateLimitOnMatchActionContext action_context;
   RateLimitQuotaValidationVisitor visitor;
   Matcher::MatchTreeFactory<Http::HttpMatchingData, RateLimitOnMatchActionContext> matcher_factory(
@@ -83,10 +50,24 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
     matcher = matcher_factory.create(config->bucket_matchers())();
   }
 
+  // Get the rlqs_server destination from the cluster manager.
+  absl::StatusOr<Grpc::RawAsyncClientSharedPtr> rlqs_stream_client =
+      context.serverFactoryContext()
+          .clusterManager()
+          .grpcAsyncClientManager()
+          .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true);
+  if (!rlqs_stream_client.ok()) {
+    throw EnvoyException(std::string(rlqs_stream_client.status().message()));
+  }
+
+  // Get the TLS store from the global map, or create one if it doesn't exist.
+  std::shared_ptr<TlsStore> tls_store = GlobalTlsStores::getTlsStore(
+      config_with_hash_key, context, (*rlqs_stream_client)->destination(), filter_config.domain());
+
   return [&, config = std::move(config), config_with_hash_key, tls_store = std::move(tls_store),
           matcher = std::move(matcher)](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     std::unique_ptr<RateLimitClient> local_client =
-        createLocalRateLimitClient(tls_store->global_client_tls, tls_store->buckets_tls);
+        createLocalRateLimitClient(tls_store->global_client.get(), tls_store->buckets_tls);
 
     callbacks.addStreamFilter(std::make_shared<RateLimitQuotaFilter>(
         config, context, std::move(local_client), config_with_hash_key, matcher));

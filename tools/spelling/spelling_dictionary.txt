@@ -1007,6 +1007,7 @@ metaprogramming
 metatable
 microbenchmarks
 midp
+migratable
 milli
 mimics
 misconfiguration
@@ -1245,6 +1246,7 @@ reperform
 repicked
 replayable
 repo
+representable
 reproducibility
 requirepass
 reselecting

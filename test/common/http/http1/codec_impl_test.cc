@@ -218,7 +218,15 @@ public:
     auto status = codec_->dispatch(buffer);
     EXPECT_TRUE(status.ok());
     EXPECT_EQ(0U, buffer.length());
+    const StreamInfo::BytesMeterSharedPtr meter = response_encoder->getStream().bytesMeter();
+    // Verifies BytesMeter accounting for header bytes received.
+    EXPECT_GT(meter->headerBytesReceived(), 0);
+    EXPECT_GE(meter->decompressedHeaderBytesReceived(), meter->headerBytesReceived());
+
     response_encoder->encodeHeaders(TestResponseHeaderMapImpl{{":status", "200"}}, true);
+    // Verifies BytesMeter accounting for header bytes sent.
+    EXPECT_GT(meter->headerBytesSent(), 0);
+    EXPECT_GE(meter->decompressedHeaderBytesSent(), meter->headerBytesSent());
   }
 
   void createHeaderValidator() {
@@ -2612,6 +2620,10 @@ TEST_F(Http1ClientConnectionImplTest, SimpleGetWithHeaderCasing) {
   TestRequestHeaderMapImpl headers{{":method", "GET"}, {":path", "/"}, {"my-custom-header", "hey"}};
   EXPECT_TRUE(request_encoder.encodeHeaders(headers, true).ok());
   EXPECT_EQ("GET / HTTP/1.1\r\nMy-Custom-Header: hey\r\n\r\n", output);
+
+  EXPECT_GT(request_encoder.getStream().bytesMeter()->headerBytesSent(), 0);
+  EXPECT_GE(request_encoder.getStream().bytesMeter()->decompressedHeaderBytesSent(),
+            request_encoder.getStream().bytesMeter()->headerBytesSent());
 }
 
 TEST_F(Http1ClientConnectionImplTest, FullyQualifiedGet) {

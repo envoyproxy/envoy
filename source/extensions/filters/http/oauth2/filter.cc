@@ -1310,7 +1310,7 @@ OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
   // Decode the state parameter to get the original request URL and the CSRF token.
   const std::string state = Base64Url::decode(stateVal.value());
   bool has_unknown_field;
-  ProtobufWkt::Struct message;
+  Protobuf::Struct message;
 
   auto status = MessageUtil::loadFromJsonNoThrow(state, message, has_unknown_field);
   if (!status.ok()) {

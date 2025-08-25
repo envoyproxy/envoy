@@ -174,7 +174,7 @@ validateCustomSettingsParameters(const envoy::config::core::v3::Http2ProtocolOpt
 absl::StatusOr<envoy::config::core::v3::Http2ProtocolOptions>
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
                              bool hcm_stream_error_set,
-                             const ProtobufWkt::BoolValue& hcm_stream_error) {
+                             const Protobuf::BoolValue& hcm_stream_error) {
   auto ret = initializeAndValidateOptions(options);
   if (ret.status().ok() && !options.has_override_stream_error_on_invalid_http_message() &&
       hcm_stream_error_set) {
@@ -254,7 +254,7 @@ namespace Utility {
 envoy::config::core::v3::Http3ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
                              bool hcm_stream_error_set,
-                             const ProtobufWkt::BoolValue& hcm_stream_error) {
+                             const Protobuf::BoolValue& hcm_stream_error) {
   if (options.has_override_stream_error_on_invalid_http_message()) {
     return options;
   }

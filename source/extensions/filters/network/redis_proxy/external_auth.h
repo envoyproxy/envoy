@@ -48,7 +48,7 @@ struct AuthenticateResponse {
   std::string message;
 
   // The expiration time of the authentication.
-  ProtobufWkt::Timestamp expiration;
+  Protobuf::Timestamp expiration;
 };
 
 using AuthenticateResponsePtr = std::unique_ptr<AuthenticateResponse>;

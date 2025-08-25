@@ -44,6 +44,7 @@ private:
   const std::string role_arn_;
   const std::string role_session_name_;
   const std::string region_;
+  const std::string external_id_;
   absl::optional<uint16_t> session_duration_;
   std::unique_ptr<Extensions::Common::Aws::SigV4SignerImpl> assume_role_signer_;
 };
