@@ -109,7 +109,7 @@ void GrpcClientImpl::onSuccess(
       response->statuses().begin(), response->statuses().end());
   DynamicMetadataPtr dynamic_metadata =
       response->has_dynamic_metadata()
-          ? std::make_unique<ProtobufWkt::Struct>(response->dynamic_metadata())
+          ? std::make_unique<Protobuf::Struct>(response->dynamic_metadata())
           : nullptr;
   // The rate limit requests applied on stream-done will destroy the client inside the complete
   // callback, so we release the callback here to make the destructor happy.

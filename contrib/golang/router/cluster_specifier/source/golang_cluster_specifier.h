@@ -24,7 +24,7 @@ private:
   const std::string so_id_;
   const std::string so_path_;
   const std::string default_cluster_;
-  const ProtobufWkt::Any config_;
+  const Protobuf::Any config_;
   uint64_t plugin_id_{0};
   Dso::ClusterSpecifierDsoPtr dynamic_lib_;
 };

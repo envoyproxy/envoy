@@ -267,7 +267,7 @@ TEST_F(CelMatcherTest, CelMatcherDynamicMetadataNotMatched) {
 TEST_F(CelMatcherTest, CelMatcherTypedDynamicMetadataMatched) {
   ::envoy::config::core::v3::Pipe pipe;
   pipe.set_path("/foo/bar/baz.fads");
-  ProtobufWkt::Any typed_metadata;
+  Protobuf::Any typed_metadata;
   typed_metadata.PackFrom(pipe);
   stream_info_.metadata_.mutable_typed_filter_metadata()->insert(
       {std::string(kFilterNamespace), typed_metadata});

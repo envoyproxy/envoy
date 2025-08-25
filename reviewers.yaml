@@ -15,6 +15,9 @@ botengyao:
 daixiang0:
   first-pass: true
   slack: U020CJG6UU8
+danzh2010:
+  maintainer: true
+  slack: UDR2MA31P
 ggreenway:
   maintainer: true
   opsgenie: Greg
@@ -46,7 +49,7 @@ mattklein123:
   slack: U5CALEVSL
 mathetake:
   maintainer: true
-  opsgenie: Mathetake
+  opsgenie: mathetake
   slack: UG9TD2FSB
 nezdolik:
   maintainer: true

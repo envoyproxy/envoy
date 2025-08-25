@@ -975,7 +975,7 @@ protected:
   virtual bool setResolverInConstructor() const { return false; }
   virtual bool filterUnroutableFamilies() const { return false; }
   virtual bool setRotateNameservers() const { return false; }
-  virtual ProtobufWkt::UInt32Value* udpMaxQueries() const { return nullptr; }
+  virtual Protobuf::UInt32Value* udpMaxQueries() const { return nullptr; }
   Stats::TestUtil::TestStore stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<TestDnsServer> server_;
@@ -2198,10 +2198,10 @@ TEST_F(DnsImplConstructor, VerifyCustomTimeoutAndTries) {
       dns_resolvers);
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   cares.add_resolvers()->MergeFrom(dns_resolvers);
-  auto query_timeout_seconds = std::make_unique<ProtobufWkt::UInt64Value>();
+  auto query_timeout_seconds = std::make_unique<Protobuf::UInt64Value>();
   query_timeout_seconds->set_value(9);
   cares.set_allocated_query_timeout_seconds(query_timeout_seconds.release());
-  auto query_tries = std::make_unique<ProtobufWkt::UInt32Value>();
+  auto query_tries = std::make_unique<Protobuf::UInt32Value>();
   query_tries->set_value(7);
   cares.set_allocated_query_tries(query_tries.release());
   Network::Utility::addressToProtobufAddress(
@@ -2243,10 +2243,10 @@ TEST_F(DnsImplConstructor, VerifyCustomTimeoutAndTries) {
 class DnsImplAresFlagsForMaxUdpQueriesinTest : public DnsImplTest {
 protected:
   bool tcpOnly() const override { return false; }
-  ProtobufWkt::UInt32Value* udpMaxQueries() const override {
-    auto udp_max_queries = std::make_unique<ProtobufWkt::UInt32Value>();
+  Protobuf::UInt32Value* udpMaxQueries() const override {
+    auto udp_max_queries = std::make_unique<Protobuf::UInt32Value>();
     udp_max_queries->set_value(100);
-    return dynamic_cast<ProtobufWkt::UInt32Value*>(udp_max_queries.release());
+    return dynamic_cast<Protobuf::UInt32Value*>(udp_max_queries.release());
   }
 };
 

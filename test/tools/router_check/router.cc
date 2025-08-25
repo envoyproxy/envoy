@@ -253,7 +253,7 @@ void RouterCheckTool::applyDynamicMetadata(
         mut_untyped_metadata[metadata_namespace] = metadata.value();
       } else if (metadata.allow_overwrite()) {
         // Get the existing metadata at this key for merging.
-        ProtobufWkt::Struct& orig_fields = mut_untyped_metadata[metadata_namespace];
+        Protobuf::Struct& orig_fields = mut_untyped_metadata[metadata_namespace];
         const auto& to_merge = metadata.value();
 
         // Merge the new metadata into the existing metadata.

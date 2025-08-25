@@ -94,6 +94,7 @@ TEST_F(ConfigurationImplTest, DefaultStatsFlushInterval) {
 
   EXPECT_EQ(std::chrono::milliseconds(5000), config.statsConfig().flushInterval());
   EXPECT_FALSE(config.statsConfig().flushOnAdmin());
+  EXPECT_EQ(0, config.statsConfig().evictOnFlush());
 }
 
 TEST_F(ConfigurationImplTest, CustomStatsFlushInterval) {
@@ -222,6 +223,34 @@ TEST_F(ConfigurationImplTest, IntervalAndAdminFlush) {
   MainImpl config;
   EXPECT_EQ(config.initialize(bootstrap, server_, cluster_manager_factory_).message(),
             "Only one of stats_flush_interval or stats_flush_on_admin should be set!");
+}
+
+TEST_F(ConfigurationImplTest, Eviction) {
+  std::string json = R"EOF(
+  {
+    "stats_flush_interval": "0.500s",
+    "stats_eviction_interval": "1.5s"
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  MainImpl config;
+  EXPECT_TRUE(config.initialize(bootstrap, server_, cluster_manager_factory_).ok());
+  EXPECT_EQ(3, config.statsConfig().evictOnFlush());
+}
+
+TEST_F(ConfigurationImplTest, EvictionNotMultiple) {
+  std::string json = R"EOF(
+  {
+    "stats_flush_interval": "0.500s",
+    "stats_eviction_interval": "0.750s"
+  }
+  )EOF";
+
+  auto bootstrap = Upstream::parseBootstrapFromV3Json(json);
+  MainImpl config;
+  EXPECT_THAT(config.initialize(bootstrap, server_, cluster_manager_factory_).message(),
+              testing::HasSubstr("must be a multiple"));
 }
 
 TEST_F(ConfigurationImplTest, SetUpstreamClusterPerConnectionBufferLimit) {

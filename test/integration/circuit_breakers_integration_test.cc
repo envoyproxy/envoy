@@ -151,7 +151,7 @@ TEST_P(CircuitBreakersIntegrationTest, CircuitBreakerRuntimeProto) {
 
     auto* layer = bootstrap.mutable_layered_runtime()->add_layers();
     layer->set_name("enable layer");
-    ProtobufWkt::Struct& runtime = *layer->mutable_static_layer();
+    Protobuf::Struct& runtime = *layer->mutable_static_layer();
 
     (*runtime.mutable_fields())["circuit_breakers.cluster_0.default.max_requests"].set_number_value(
         0);

@@ -13,9 +13,9 @@ using testing::ReturnRef;
 
 namespace Envoy {
 
-// Provide a specialization for ProtobufWkt::Struct (for MockFilterConfigFactory)
+// Provide a specialization for Protobuf::Struct (for MockFilterConfigFactory)
 template <>
-void MessageUtil::validate(const ProtobufWkt::Struct&, ProtobufMessage::ValidationVisitor&, bool) {}
+void MessageUtil::validate(const Protobuf::Struct&, ProtobufMessage::ValidationVisitor&, bool) {}
 
 namespace Extensions {
 namespace NetworkFilters {
@@ -187,7 +187,7 @@ FilterFactoryCb MockDecoderFilterConfigFactory::createFilterFactoryFromProto(
     Server::Configuration::FactoryContext& context) {
   UNREFERENCED_PARAMETER(context);
 
-  config_struct_ = dynamic_cast<const ProtobufWkt::Struct&>(proto_config);
+  config_struct_ = dynamic_cast<const Protobuf::Struct&>(proto_config);
   config_stat_prefix_ = stats_prefix;
 
   return [this](FilterChainFactoryCallbacks& callbacks) -> void {
@@ -207,7 +207,7 @@ FilterFactoryCb MockEncoderFilterConfigFactory::createFilterFactoryFromProto(
     Server::Configuration::FactoryContext& context) {
   UNREFERENCED_PARAMETER(context);
 
-  config_struct_ = dynamic_cast<const ProtobufWkt::Struct&>(proto_config);
+  config_struct_ = dynamic_cast<const Protobuf::Struct&>(proto_config);
   config_stat_prefix_ = stats_prefix;
 
   return [this](FilterChainFactoryCallbacks& callbacks) -> void {
@@ -227,7 +227,7 @@ FilterFactoryCb MockBidirectionalFilterConfigFactory::createFilterFactoryFromPro
     Server::Configuration::FactoryContext& context) {
   UNREFERENCED_PARAMETER(context);
 
-  config_struct_ = dynamic_cast<const ProtobufWkt::Struct&>(proto_config);
+  config_struct_ = dynamic_cast<const Protobuf::Struct&>(proto_config);
   config_stat_prefix_ = stats_prefix;
 
   return [this](FilterChainFactoryCallbacks& callbacks) -> void {

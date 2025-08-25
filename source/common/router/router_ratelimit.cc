@@ -58,9 +58,9 @@ bool MatchInputRateLimitDescriptor::populateDescriptor(RateLimit::DescriptorEntr
 
 bool DynamicMetadataRateLimitOverride::populateOverride(
     RateLimit::Descriptor& descriptor, const envoy::config::core::v3::Metadata* metadata) const {
-  const ProtobufWkt::Value& metadata_value =
+  const Protobuf::Value& metadata_value =
       Envoy::Config::Metadata::metadataValue(metadata, metadata_key_);
-  if (metadata_value.kind_case() != ProtobufWkt::Value::kStructValue) {
+  if (metadata_value.kind_case() != Protobuf::Value::kStructValue) {
     return false;
   }
 
@@ -68,9 +68,9 @@ bool DynamicMetadataRateLimitOverride::populateOverride(
   const auto& limit_it = override_value.find("requests_per_unit");
   const auto& unit_it = override_value.find("unit");
   if (limit_it != override_value.end() &&
-      limit_it->second.kind_case() == ProtobufWkt::Value::kNumberValue &&
+      limit_it->second.kind_case() == Protobuf::Value::kNumberValue &&
       unit_it != override_value.end() &&
-      unit_it->second.kind_case() == ProtobufWkt::Value::kStringValue) {
+      unit_it->second.kind_case() == Protobuf::Value::kStringValue) {
     envoy::type::v3::RateLimitUnit unit;
     if (envoy::type::v3::RateLimitUnit_Parse(unit_it->second.string_value(), &unit)) {
       descriptor.limit_.emplace(RateLimit::RateLimitOverride{
