@@ -4,14 +4,14 @@ package envoy.extensions.stat_sinks.open_telemetry.v3;
 
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/grpc_service.proto";
+import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/wrappers.proto";
 
-import "udpa/annotations/status.proto";
-import "validate/validate.proto";
-import "envoy/type/matcher/v3/string.proto";
 import "opentelemetry/proto/common/v1/common.proto";
 
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.stat_sinks.open_telemetry.v3";
 option java_outer_classname = "OpenTelemetryProto";
@@ -23,8 +23,23 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Stats configuration proto schema for ``envoy.stat_sinks.open_telemetry`` sink.
 // [#extension: envoy.stat_sinks.open_telemetry]
 
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message SinkConfig {
+  // Defines a custom conversion from a stat to a metric. This can be used to rename a
+  // stat, add static labels, and aggregate multiple stats into a single metric.
+  // If a stat's name matches ``stat_name_matcher``, it is converted to a metric with the
+  // given ``metric_name`` and``static_metric_labels`` added.
+  message CustomMetricConversion {
+    // The matcher to select stats for conversion.
+    type.matcher.v3.StringMatcher stat_name_matcher = 1;
+
+    // The name of the converted metric.
+    string metric_name = 2;
+
+    // Additional static labels to be added to the converted metric.
+    repeated opentelemetry.proto.common.v1.KeyValue static_metric_labels = 3;
+  }
+
   oneof protocol_specifier {
     option (validate.required) = true;
 
@@ -59,20 +74,7 @@ message SinkConfig {
   // prefix added. According to the example, the full stat name will remain "foo.bar".
   string prefix = 6;
 
-  // CustomMetricConversion defines the custom conversion from a stat to a metric. If a stat matches
-  // the stat_name_matcher, the metric_name and static_metric_labels will be
-  // used to create the metric. If multiple custom conversions match, the first one will be applied.
-  message CustomMetricConversion {
-    // The stat name matcher to match the stat name.
-    type.matcher.v3.StringMatcher  stat_name_matcher = 1;
-
-    // The name of the converted metric.
-    string metric_name = 2;
-
-    // Static labels will be appended to the converted metric.
-    repeated opentelemetry.proto.common.v1.KeyValue static_metric_labels = 3;
-  }
-
-  // Metric conversions to use for the stats.
+  // A list of custom metric conversions to apply to stats.
+  // If a stat matches multiple conversions, the first one in the list is applied.
   repeated CustomMetricConversion custom_metric_conversions = 8;
 }

@@ -133,13 +133,15 @@ private:
     // Owns the StringMatcherImpl instances.
     std::vector<Matchers::StringMatcherPtr> owned_matchers_;
     // Maps raw pointers to the owned StringMatcherImpl to their configurations.
-    absl::flat_hash_map<const Matchers::StringMatcher*, SinkConfig::CustomMetricConversion> matchers_;
+    absl::flat_hash_map<const Matchers::StringMatcher*, SinkConfig::CustomMetricConversion>
+        matchers_;
   };
 
   // Private static method to generate MatcherData.
-  static MatcherData generateMatchers(
-      const Protobuf::RepeatedPtrField<SinkConfig::CustomMetricConversion>& custom_metric_conversions,
-      Server::Configuration::ServerFactoryContext& server);
+  static MatcherData
+  generateMatchers(const Protobuf::RepeatedPtrField<SinkConfig::CustomMetricConversion>&
+                       custom_metric_conversions,
+                   Server::Configuration::ServerFactoryContext& server);
 
   const bool report_counters_as_deltas_;
   const bool report_histograms_as_deltas_;

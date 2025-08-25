@@ -44,7 +44,8 @@ public:
       bool emit_tags_as_attributes = true, bool use_tag_extracted_name = true,
       const std::string& stat_prefix = "",
       absl::flat_hash_map<std::string, std::string> resource_attributes = {},
-      std::vector<envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::CustomMetricConversion>
+      std::vector<
+          envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::CustomMetricConversion>
           custom_metric_conversions = {}) {
     envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
     sink_config.set_report_counters_as_deltas(report_counters_as_deltas);
@@ -658,17 +659,18 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationCounter) {
 }
 
 TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationGauge) {
-  OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "prefix", {},
-                                             {
-                                                 parseCustomMetricConversion(R"pb(stat_name_matcher {
+  OtlpMetricsFlusherImpl flusher(
+      otlpOptions(false, false, true, true, "prefix", {},
+                  {
+                      parseCustomMetricConversion(R"pb(stat_name_matcher {
                                          safe_regex { regex: "test_gauge-1" }
                                        }
                                        metric_name: "new_gauge_name")pb"),
-                                                 parseCustomMetricConversion(R"pb(stat_name_matcher {
+                      parseCustomMetricConversion(R"pb(stat_name_matcher {
                                          safe_regex { regex: "test_gauge-." }
                                        }
                                        metric_name: "new_gauge_name")pb"),
-                                             }));
+                  }));
   // Add gauges with same name, different tags
   addGaugeToSnapshot("test_gauge-1", 1, true, {{"key", "valA"}});
   addGaugeToSnapshot("test_gauge-2", 2, true, {{"key", "valA"}});
