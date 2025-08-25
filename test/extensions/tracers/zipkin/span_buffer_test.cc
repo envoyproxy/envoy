@@ -29,6 +29,9 @@ public:
     return nullptr;
   }
   void reportSpan(Span&&) override {}
+  envoy::config::trace::v3::ZipkinConfig::TraceContextOption traceContextOption() const override {
+    return envoy::config::trace::v3::ZipkinConfig::USE_B3;
+  }
 };
 
 // If this default timestamp is wrapped as double (using ValueUtil::numberValue()) and then it is

@@ -15,8 +15,8 @@ namespace Formatter {
 class CELFormatter : public ::Envoy::Formatter::FormatterProvider {
 public:
   CELFormatter(const ::Envoy::LocalInfo::LocalInfo& local_info,
-               Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr, const cel::expr::Expr&,
-               absl::optional<size_t>&);
+               Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr expr_builder,
+               const cel::expr::Expr& input_expr, absl::optional<size_t>& max_length, bool typed);
 
   absl::optional<std::string>
   formatWithContext(const Envoy::Formatter::HttpFormatterContext& context,
@@ -30,6 +30,7 @@ private:
   const cel::expr::Expr parsed_expr_;
   const absl::optional<size_t> max_length_;
   Extensions::Filters::Common::Expr::ExpressionPtr compiled_expr_;
+  const bool typed_;
 };
 
 class CELFormatterCommandParser : public ::Envoy::Formatter::CommandParser {
