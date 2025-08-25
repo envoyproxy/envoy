@@ -17,7 +17,7 @@ TEST(SendTrailersTest, Success) {
   auto trailer = http_request_trailers_match->add_headers();
   trailer->set_name("trailer-key");
   trailer->set_exact_match("trailer-value");
-  ProtobufWkt::Any typed_config;
+  Protobuf::Any typed_config;
   typed_config.set_type_url(
       "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion");
   std::string serialized_assertion;

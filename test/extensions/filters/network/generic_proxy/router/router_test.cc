@@ -196,8 +196,8 @@ public:
   }
 
   void verifyMetadataMatchCriteria() {
-    ProtobufWkt::Struct request_struct;
-    ProtobufWkt::Value val;
+    Protobuf::Struct request_struct;
+    Protobuf::Value val;
 
     // Populate metadata like StreamInfo.setDynamicMetadata() would.
     auto& fields_map = *request_struct.mutable_fields();

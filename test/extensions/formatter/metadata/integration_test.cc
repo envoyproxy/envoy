@@ -24,7 +24,7 @@ public:
     config_helper_.addConfigModifier(
         [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                hcm) {
-          ProtobufWkt::Struct struct_value;
+          Protobuf::Struct struct_value;
           (*struct_value.mutable_fields())["test_key"] = ValueUtil::stringValue("test_value");
 
           (*hcm.mutable_route_config()

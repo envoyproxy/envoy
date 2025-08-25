@@ -48,7 +48,7 @@ public:
       : filter_config_name_(filter_config_name) {}
 
   ProtobufTypes::MessagePtr serializeAsProto() const override {
-    auto message = std::make_unique<ProtobufWkt::StringValue>();
+    auto message = std::make_unique<Protobuf::StringValue>();
     message->set_value(filter_config_name_);
     return message;
   }
@@ -289,8 +289,8 @@ struct ActiveStreamDecoderFilter : public ActiveStreamFilterBase,
   void addDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
   void
   removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks& watermark_callbacks) override;
-  void setDecoderBufferLimit(uint32_t limit) override;
-  uint32_t decoderBufferLimit() override;
+  void setDecoderBufferLimit(uint64_t limit) override;
+  uint64_t decoderBufferLimit() override;
   bool recreateStream(const Http::ResponseHeaderMap* original_response_headers) override;
 
   void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr& options) override;
@@ -682,7 +682,7 @@ public:
   FilterManager(FilterManagerCallbacks& filter_manager_callbacks, Event::Dispatcher& dispatcher,
                 OptRef<const Network::Connection> connection, uint64_t stream_id,
                 Buffer::BufferMemoryAccountSharedPtr account, bool proxy_100_continue,
-                uint32_t buffer_limit)
+                uint64_t buffer_limit)
       : filter_manager_callbacks_(filter_manager_callbacks), dispatcher_(dispatcher),
         connection_(connection), stream_id_(stream_id), account_(std::move(account)),
         proxy_100_continue_(proxy_100_continue), buffer_limit_(buffer_limit) {}
@@ -800,7 +800,7 @@ public:
   virtual void executeLocalReplyIfPrepared() PURE;
 
   // Possibly increases buffer_limit_ to the value of limit.
-  void setBufferLimit(uint32_t limit);
+  void setBufferLimit(uint64_t limit);
 
   /**
    * @return bool whether any above high watermark triggers are currently active
@@ -1114,7 +1114,7 @@ private:
   std::unique_ptr<MetadataMapVector> request_metadata_map_vector_;
   Buffer::InstancePtr buffered_response_data_;
   Buffer::InstancePtr buffered_request_data_;
-  uint32_t buffer_limit_{0};
+  uint64_t buffer_limit_{0};
   uint32_t high_watermark_count_{0};
   std::list<DownstreamWatermarkCallbacks*> watermark_callbacks_;
   Network::Socket::OptionsSharedPtr upstream_options_ =
@@ -1181,9 +1181,7 @@ public:
                      std::move(parent_filter_state)),
         local_reply_(local_reply), filter_chain_factory_(filter_chain_factory),
         downstream_filter_load_shed_point_(overload_manager.getLoadShedPoint(
-            Server::LoadShedPointName::get().HttpDownstreamFilterCheck)),
-        use_filter_manager_state_for_downstream_end_stream_(Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream")) {
+            Server::LoadShedPointName::get().HttpDownstreamFilterCheck)) {
     ENVOY_LOG_ONCE_IF(
         trace, downstream_filter_load_shed_point_ == nullptr,
         "LoadShedPoint envoy.load_shed_points.http_downstream_filter_check is not found. "
@@ -1219,15 +1217,7 @@ public:
   /**
    * Whether downstream has observed end_stream.
    */
-  bool decoderObservedEndStream() const override {
-    // Set by the envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream
-    // runtime flag.
-    if (use_filter_manager_state_for_downstream_end_stream_) {
-      return state_.observed_decode_end_stream_;
-    }
-
-    return hasLastDownstreamByteReceived();
-  }
+  bool decoderObservedEndStream() const override { return state_.observed_decode_end_stream_; }
 
   /**
    * Return true if the timestamp of the downstream end_stream was recorded.
@@ -1284,9 +1274,6 @@ private:
   const FilterChainFactory& filter_chain_factory_;
   Utility::PreparedLocalReplyPtr prepared_local_reply_{nullptr};
   Server::LoadShedPoint* downstream_filter_load_shed_point_{nullptr};
-  // Set by the envoy.reloadable_features.use_filter_manager_state_for_downstream_end_stream runtime
-  // flag.
-  const bool use_filter_manager_state_for_downstream_end_stream_{};
 };
 
 } // namespace Http

@@ -682,11 +682,11 @@ absl::optional<CelValue> FilterStateWrapper::operator[](CelValue key) const {
       // field support, but callers only want to access the whole object.
       if (object->hasFieldSupport()) {
         return CelValue::CreateMap(
-            ProtobufWkt::Arena::Create<FilterStateObjectWrapper>(&arena_, object));
+            Protobuf::Arena::Create<FilterStateObjectWrapper>(&arena_, object));
       }
       absl::optional<std::string> serialized = object->serializeAsString();
       if (serialized.has_value()) {
-        std::string* out = ProtobufWkt::Arena::Create<std::string>(&arena_, serialized.value());
+        std::string* out = Protobuf::Arena::Create<std::string>(&arena_, serialized.value());
         return CelValue::CreateBytes(out);
       }
     }

@@ -370,6 +370,7 @@ public:
   // Envoy::Network::ReadFilter
   Envoy::Network::FilterStatus onData(Envoy::Buffer::Instance& data, bool end_stream) override;
   Envoy::Network::FilterStatus onNewConnection() override {
+    server_codec_->onConnected();
     return Envoy::Network::FilterStatus::Continue;
   }
   void initializeReadFilterCallbacks(Envoy::Network::ReadFilterCallbacks& callbacks) override {

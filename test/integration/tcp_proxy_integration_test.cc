@@ -1058,9 +1058,9 @@ public:
 envoy::config::core::v3::Metadata
 TcpProxyMetadataMatchIntegrationTest::lbMetadata(std::map<std::string, std::string> values) {
 
-  ProtobufWkt::Struct map;
+  Protobuf::Struct map;
   auto* mutable_fields = map.mutable_fields();
-  ProtobufWkt::Value value;
+  Protobuf::Value value;
 
   std::map<std::string, std::string>::iterator it;
   for (it = values.begin(); it != values.end(); it++) {
@@ -1314,10 +1314,10 @@ public:
         return Network::FilterStatus::StopIteration;
       }
 
-      ProtobufWkt::Value val;
+      Protobuf::Value val;
       val.set_string_value(data.toString());
 
-      ProtobufWkt::Struct& map =
+      Protobuf::Struct& map =
           (*read_callbacks_->connection()
                 .streamInfo()
                 .dynamicMetadata()

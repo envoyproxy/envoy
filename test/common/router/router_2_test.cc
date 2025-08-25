@@ -112,6 +112,9 @@ public:
   WatermarkTest()
       : RouterTestBase(false, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
     EXPECT_CALL(callbacks_, activeSpan()).WillRepeatedly(ReturnRef(span_));
+    // Add default mock for requestBodyBufferLimit which is called during router initialization.
+    EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit())
+        .WillRepeatedly(Return(std::numeric_limits<uint64_t>::max()));
   };
 
   void sendRequest(bool header_only_request = true, bool pool_ready = true) {

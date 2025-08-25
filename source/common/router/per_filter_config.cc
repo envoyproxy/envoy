@@ -8,7 +8,7 @@ namespace Envoy {
 namespace Router {
 
 absl::StatusOr<std::unique_ptr<PerFilterConfigs>>
-PerFilterConfigs::create(const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
+PerFilterConfigs::create(const Protobuf::Map<std::string, Protobuf::Any>& typed_configs,
                          Server::Configuration::ServerFactoryContext& factory_context,
                          ProtobufMessage::ValidationVisitor& validator) {
   absl::Status creation_status = absl::OkStatus();
@@ -20,7 +20,7 @@ PerFilterConfigs::create(const Protobuf::Map<std::string, ProtobufWkt::Any>& typ
 
 absl::StatusOr<RouteSpecificFilterConfigConstSharedPtr>
 PerFilterConfigs::createRouteSpecificFilterConfig(
-    const std::string& name, const ProtobufWkt::Any& typed_config, bool is_optional,
+    const std::string& name, const Protobuf::Any& typed_config, bool is_optional,
     Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator) {
   Server::Configuration::NamedHttpFilterConfigFactory* factory =
@@ -61,10 +61,10 @@ PerFilterConfigs::createRouteSpecificFilterConfig(
   return object;
 }
 
-PerFilterConfigs::PerFilterConfigs(
-    const Protobuf::Map<std::string, ProtobufWkt::Any>& typed_configs,
-    Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator, absl::Status& creation_status) {
+PerFilterConfigs::PerFilterConfigs(const Protobuf::Map<std::string, Protobuf::Any>& typed_configs,
+                                   Server::Configuration::ServerFactoryContext& factory_context,
+                                   ProtobufMessage::ValidationVisitor& validator,
+                                   absl::Status& creation_status) {
 
   std::string filter_config_type(
       envoy::config::route::v3::FilterConfig::default_instance().GetTypeName());

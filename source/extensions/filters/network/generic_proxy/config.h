@@ -31,7 +31,7 @@ public:
                                RouteConfigProviderManager& route_config_provider_manager);
 
   static std::vector<NamedFilterFactoryCb>
-  filtersFactoryFromProto(const ProtobufWkt::RepeatedPtrField<TypedExtensionConfig>& filters,
+  filtersFactoryFromProto(const Protobuf::RepeatedPtrField<TypedExtensionConfig>& filters,
                           const TypedExtensionConfig& codec_config, const std::string stats_prefix,
                           Server::Configuration::FactoryContext& context);
 };

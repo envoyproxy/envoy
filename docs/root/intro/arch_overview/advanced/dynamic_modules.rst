@@ -5,8 +5,7 @@ Dynamic modules
 
 .. attention::
 
-   The dynamic modules feature is experimental and is currently under active development.
-
+   The dynamic modules feature is currently under active development.
    Capabilities will be expanded over time and it still lacks some features that are available in other extension mechanisms.
    We are looking for feedback from the community to improve the feature.
 

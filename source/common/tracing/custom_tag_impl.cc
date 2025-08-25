@@ -95,17 +95,17 @@ MetadataCustomTag::metadataToString(const envoy::config::core::v3::Metadata* met
     return absl::nullopt;
   }
 
-  const ProtobufWkt::Value& value = Envoy::Config::Metadata::metadataValue(metadata, metadata_key_);
+  const Protobuf::Value& value = Envoy::Config::Metadata::metadataValue(metadata, metadata_key_);
   switch (value.kind_case()) {
-  case ProtobufWkt::Value::kBoolValue:
+  case Protobuf::Value::kBoolValue:
     return value.bool_value() ? "true" : "false";
-  case ProtobufWkt::Value::kNumberValue:
+  case Protobuf::Value::kNumberValue:
     return absl::StrCat(value.number_value());
-  case ProtobufWkt::Value::kStringValue:
+  case Protobuf::Value::kStringValue:
     return value.string_value();
-  case ProtobufWkt::Value::kListValue:
+  case Protobuf::Value::kListValue:
     return jsonOrNullopt(value.list_value());
-  case ProtobufWkt::Value::kStructValue:
+  case Protobuf::Value::kStructValue:
     return jsonOrNullopt(value.struct_value());
   default:
     break;

@@ -64,12 +64,12 @@ public:
   static std::string canonicalizeQueryString(absl::string_view query_string);
 
   /**
-   * URI encodes the given string based on AWS requirements.
-   * See step 3 in https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
-   * @param decoded the decoded string.
-   * @return the URI encoded string.
+   * URI encodes query component while preserving %2B semantics.
+   * %2B remains as literal +, raw + becomes %20 (space).
+   * @param original the original string (may contain percent-encoded sequences).
+   * @return the properly encoded string.
    */
-  static std::string encodeQueryComponent(absl::string_view decoded);
+  static std::string encodeQueryComponentPreservingPlus(absl::string_view original);
 
   /**
    * Get the semicolon-delimited string of canonical header names.
@@ -214,6 +214,14 @@ public:
    * @return boolean
    */
   static bool shouldNormalizeUriPath(const std::string service_name);
+
+private:
+  /**
+   * Helper method to encode a character based on reserved character rules.
+   * @param c the character to encode.
+   * @param result the string to append the encoded result to.
+   */
+  static void encodeCharacter(unsigned char c, std::string& result);
 };
 
 } // namespace Aws

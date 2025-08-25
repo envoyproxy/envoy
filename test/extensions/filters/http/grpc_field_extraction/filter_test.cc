@@ -90,8 +90,8 @@ CreateApiKeyRequest makeCreateApiKeyRequest(absl::string_view pb = R"pb(
   return request;
 }
 
-void checkProtoStruct(ProtobufWkt::Struct got, absl::string_view expected_in_pbtext) {
-  ProtobufWkt::Struct expected;
+void checkProtoStruct(Protobuf::Struct got, absl::string_view expected_in_pbtext) {
+  Protobuf::Struct expected;
   ASSERT_TRUE(Protobuf::TextFormat::ParseFromString(expected_in_pbtext, &expected));
   EXPECT_TRUE(TestUtility::protoEqual(got, expected, true)) << "got:\n"
                                                             << got.DebugString() << "expected:\n"
@@ -111,7 +111,7 @@ TEST_F(FilterTestExtractOk, UnarySingleBuffer) {
   CreateApiKeyRequest request = makeCreateApiKeyRequest();
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
         checkProtoStruct(new_dynamic_metadata, expected_metadata);
       }));
@@ -133,7 +133,7 @@ TEST_F(FilterTestExtractOk, EmptyFields) {
   CreateApiKeyRequest request = makeCreateApiKeyRequest("");
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
         checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -183,7 +183,7 @@ TEST_F(FilterTestExtractOk, UnaryMultipeBuffers) {
   EXPECT_EQ(middle_request_data.length(), 0);
 
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
         checkProtoStruct(new_dynamic_metadata, expected_metadata);
       }));
@@ -235,7 +235,7 @@ extractions_by_method: {
   EXPECT_EQ(request_data3->length(), 0);
 
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
         checkProtoStruct(new_dynamic_metadata, expected_metadata);
       }));
@@ -354,7 +354,7 @@ supported_types: {
 )pb");
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
         checkProtoStruct(new_dynamic_metadata, R"pb(fields {
   key: "supported_types.double"
@@ -539,7 +539,7 @@ repeated_intermediate: {
 )pb");
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
         checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -689,7 +689,7 @@ repeated_supported_types: {
 )pb");
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.grpc_field_extraction");
         checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {

@@ -190,9 +190,8 @@ TEST(TypedExtensionConfigTest, AddTestConfig) {
   MockTapSinkFactory factory_impl;
   EXPECT_CALL(factory_impl, name).Times(AtLeast(1));
   EXPECT_CALL(factory_impl, createEmptyConfigProto)
-      .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
-        return std::make_unique<ProtobufWkt::StringValue>();
-      }));
+      .WillRepeatedly(Invoke(
+          []() -> ProtobufTypes::MessagePtr { return std::make_unique<Protobuf::StringValue>(); }));
   EXPECT_CALL(factory_impl, createSinkPtr(_, _));
 
   Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
@@ -222,9 +221,8 @@ TEST(TypedExtensionConfigTest, AddTestConfigForMinStreamedSentBytes) {
   MockTapSinkFactory factory_impl;
   EXPECT_CALL(factory_impl, name).Times(AtLeast(1));
   EXPECT_CALL(factory_impl, createEmptyConfigProto)
-      .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
-        return std::make_unique<ProtobufWkt::StringValue>();
-      }));
+      .WillRepeatedly(Invoke(
+          []() -> ProtobufTypes::MessagePtr { return std::make_unique<Protobuf::StringValue>(); }));
   EXPECT_CALL(factory_impl, createSinkPtr(_, _));
 
   Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
@@ -253,9 +251,8 @@ TEST(TypedExtensionConfigTest, BufferedAdminNoAdminStreamerRejected) {
   MockTapSinkFactory factory_impl;
   EXPECT_CALL(factory_impl, name).Times(AtLeast(1));
   EXPECT_CALL(factory_impl, createEmptyConfigProto)
-      .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
-        return std::make_unique<ProtobufWkt::StringValue>();
-      }));
+      .WillRepeatedly(Invoke(
+          []() -> ProtobufTypes::MessagePtr { return std::make_unique<Protobuf::StringValue>(); }));
   Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
 
   NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context;
@@ -281,9 +278,8 @@ TEST(TypedExtensionConfigTest, StreamingAdminNoAdminStreamerRejected) {
   MockTapSinkFactory factory_impl;
   EXPECT_CALL(factory_impl, name).Times(AtLeast(1));
   EXPECT_CALL(factory_impl, createEmptyConfigProto)
-      .WillRepeatedly(Invoke([]() -> ProtobufTypes::MessagePtr {
-        return std::make_unique<ProtobufWkt::StringValue>();
-      }));
+      .WillRepeatedly(Invoke(
+          []() -> ProtobufTypes::MessagePtr { return std::make_unique<Protobuf::StringValue>(); }));
   Registry::InjectFactory<TapSinkFactory> factory(factory_impl);
 
   NiceMock<Server::Configuration::MockGenericFactoryContext> factory_context;

@@ -58,7 +58,7 @@ public:
   }
 
   std::string childLoadBalancerName() const { return lb_config_.childLoadBalancerName(); }
-  using SubsetMetadata = std::vector<std::pair<std::string, ProtobufWkt::Value>>;
+  using SubsetMetadata = std::vector<std::pair<std::string, Protobuf::Value>>;
   static std::string describeMetadata(const SubsetMetadata& kvs);
 
 private:
@@ -149,7 +149,7 @@ private:
   using ValueSubsetMap = absl::node_hash_map<HashedValue, LbSubsetEntryPtr>;
   using LbSubsetMap = absl::node_hash_map<std::string, ValueSubsetMap>;
   using SubsetSelectorFallbackParamsRef = std::reference_wrapper<SubsetSelectorFallbackParams>;
-  using MetadataFallbacks = ProtobufWkt::RepeatedPtrField<ProtobufWkt::Value>;
+  using MetadataFallbacks = Protobuf::RepeatedPtrField<Protobuf::Value>;
 
 public:
   class LoadBalancerContextWrapper : public LoadBalancerContext {
@@ -162,7 +162,7 @@ public:
         : wrapped_(wrapped), metadata_match_(std::move(metadata_match_criteria)) {}
 
     LoadBalancerContextWrapper(LoadBalancerContext* wrapped,
-                               const ProtobufWkt::Struct& metadata_match_criteria_override);
+                               const Protobuf::Struct& metadata_match_criteria_override);
     // LoadBalancerContext
     absl::optional<uint64_t> computeHashKey() override { return wrapped_->computeHashKey(); }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
@@ -341,7 +341,7 @@ private:
                                                     const Host& host);
   HostConstSharedPtr chooseHostWithMetadataFallbacks(LoadBalancerContext* context,
                                                      const MetadataFallbacks& metadata_fallbacks);
-  const ProtobufWkt::Value* getMetadataFallbackList(LoadBalancerContext* context) const;
+  const Protobuf::Value* getMetadataFallbackList(LoadBalancerContext* context) const;
   LoadBalancerContextWrapper removeMetadataFallbackList(LoadBalancerContext* context);
 
   const SubsetLoadBalancerConfig& lb_config_;

@@ -174,7 +174,7 @@ public:
   std::string name() const override { return "envoy.default_tls_handshaker"; }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
 
   Ssl::HandshakerFactoryCb createHandshakerCb(const Protobuf::Message&,

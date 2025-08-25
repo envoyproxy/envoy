@@ -140,6 +140,12 @@ public:
   void close() override { codec_client_->close(); }
   virtual Http::RequestEncoder& newStreamEncoder(Http::ResponseDecoder& response_decoder) PURE;
   void onEvent(Network::ConnectionEvent event) override {
+    // Record request metrics only for successfully connected connections that handled requests
+    if ((event == Network::ConnectionEvent::LocalClose ||
+         event == Network::ConnectionEvent::RemoteClose) &&
+        hasHandshakeCompleted()) {
+      parent_.host()->cluster().trafficStats()->upstream_rq_per_cx_.recordValue(request_count_);
+    }
     parent_.onConnectionEvent(*this, codec_client_->connectionFailureReason(), event);
   }
   uint32_t numActiveStreams() const override { return codec_client_->numActiveRequests(); }
@@ -147,6 +153,8 @@ public:
   HttpConnPoolImplBase& parent() { return *static_cast<HttpConnPoolImplBase*>(&parent_); }
 
   Http::CodecClientPtr codec_client_;
+  // Request tracking for HTTP protocols
+  uint32_t request_count_{0};
 };
 
 /* An implementation of Envoy::ConnectionPool::ConnPoolImplBase for HTTP/1 and HTTP/2

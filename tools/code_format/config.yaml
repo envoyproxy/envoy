@@ -414,17 +414,6 @@ replacements:
     "absl::make_unique<": "std::make_unique<"
 
   protobuf_type_errors:
-    # Well-known types should be referenced from the ProtobufWkt namespace.
-    "Protobuf::Any": "ProtobufWkt::Any"
-    "Protobuf::Empty": "ProtobufWkt::Empty"
-    "Protobuf::ListValue": "ProtobufWkt::ListValue"
-    "Protobuf::NULL_VALUE": "ProtobufWkt::NULL_VALUE"
-    "Protobuf::StringValue": "ProtobufWkt::StringValue"
-    "Protobuf::Struct": "ProtobufWkt::Struct"
-    "Protobuf::Value": "ProtobufWkt::Value"
-    # Other common mis-namespacing of protobuf types.
-    "ProtobufWkt::Map": "Protobuf::Map"
-    "ProtobufWkt::MapPair": "Protobuf::MapPair"
     "ProtobufUtil::MessageDifferencer": "Protobuf::util::MessageDifferencer"
 
 include_angle: "#include <"
