@@ -70,6 +70,7 @@ constexpr absl::string_view OAUTH2_SCOPE_OPENID = "openid";
 constexpr absl::string_view SameSiteLax = ";SameSite=Lax";
 constexpr absl::string_view SameSiteStrict = ";SameSite=Strict";
 constexpr absl::string_view SameSiteNone = ";SameSite=None";
+constexpr absl::string_view CookieDeleteSecure = ";secure";
 constexpr absl::string_view HmacPayloadSeparator = "\n";
 
 constexpr int DEFAULT_CSRF_TOKEN_EXPIRES_IN = 600;
@@ -938,9 +939,9 @@ void OAuth2Filter::redirectToOAuthServer(Http::RequestHeaderMap& headers) {
 Http::FilterHeadersStatus OAuth2Filter::signOutUser(const Http::RequestHeaderMap& headers) const {
   Http::ResponseHeaderMapPtr response_headers{Http::createHeaderMap<Http::ResponseHeaderMapImpl>(
       {{Http::Headers::get().Status, std::to_string(enumToInt(Http::Code::Found))}})};
-  std::string cookie_delete_secure = "; secure";
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_secure_cookie_delete")) {
-    cookie_delete_secure = "";
+  absl::string_view cookie_delete_secure;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_secure_cookie_delete")) {
+    cookie_delete_secure = CookieDeleteSecure;
   }
 
   std::string cookie_domain;
@@ -1241,9 +1242,9 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
   absl::flat_hash_map<std::string, std::string> request_cookies =
       Http::Utility::parseCookies(*request_headers_);
 
-  std::string cookie_delete_secure = "; secure";
-  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_secure_cookie_delete")) {
-    cookie_delete_secure = "";
+  absl::string_view cookie_delete_secure;
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_secure_cookie_delete")) {
+    cookie_delete_secure = CookieDeleteSecure;
   }
 
   std::string cookie_domain;
