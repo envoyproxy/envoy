@@ -2,7 +2,7 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 
-#include "envoy/extensions/bootstrap/reverse_connection_handshake/v3/reverse_connection_handshake.pb.h"
+#include "source/extensions/bootstrap/reverse_tunnel/reverse_connection_handshake.pb.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/network/socket_interface.h"
 #include "envoy/server/factory_context.h"
@@ -559,9 +559,6 @@ protected:
     EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(*stats_scope_));
     EXPECT_CALL(context_, clusterManager()).WillRepeatedly(ReturnRef(cluster_manager_));
 
-    // Create the config.
-    config_.set_stat_prefix("test_prefix");
-
     // Create the socket interface.
     socket_interface_ = std::make_unique<ReverseTunnelInitiator>(context_);
 
@@ -944,9 +941,6 @@ protected:
     EXPECT_CALL(context_, threadLocal()).WillRepeatedly(ReturnRef(thread_local_));
     EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(*stats_scope_));
     EXPECT_CALL(context_, clusterManager()).WillRepeatedly(ReturnRef(cluster_manager_));
-
-    // Create the config.
-    config_.set_stat_prefix("test_prefix");
 
     // Create the socket interface.
     socket_interface_ = std::make_unique<ReverseTunnelInitiator>(context_);
@@ -1442,6 +1436,9 @@ TEST_F(ReverseConnectionIOHandleTest, NoThreadLocalClusterCannotConnect) {
   // Verify that CannotConnect gauge was updated for the cluster.
   auto stat_map = extension_->getCrossWorkerStatMap();
 
+  for (const auto& stat : stat_map) {
+    std::cout << stat.first << " " << stat.second << std::endl;
+  }
   EXPECT_EQ(stat_map["test_scope.reverse_connections.cluster.non-existent-cluster.cannot_connect"],
             1);
 }
@@ -2058,6 +2055,74 @@ TEST_F(ReverseConnectionIOHandleTest, InitiateOneReverseConnectionSuccess) {
   // Verify that connection wrapper is added to the map.
   const auto& connection_wrappers = getConnectionWrappers();
   EXPECT_EQ(connection_wrappers.size(), 1);
+}
+
+// Test that reverse connection initiation works with custom stat scope.
+TEST_F(ReverseConnectionIOHandleTest, InitiateReverseConnectionWithCustomScope) {
+  // Set up thread local slot first so stats can be properly tracked.
+  setupThreadLocalSlot();
+
+  // Create config with custom stat prefix.
+  ReverseConnectionSocketConfig custom_prefix_config;
+  custom_prefix_config.src_cluster_id = "test-cluster";
+  custom_prefix_config.src_node_id = "test-node";
+  custom_prefix_config.remote_clusters.push_back(RemoteClusterConnectionConfig("test-cluster", 1));
+
+  // Create a new extension with custom stat prefix.
+  envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
+      DownstreamReverseConnectionSocketInterface custom_config;
+  custom_config.set_stat_prefix("custom_stats");
+
+  auto custom_extension =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, custom_config);
+  custom_extension->setTestOnlyTLSRegistry(std::move(tls_slot_));
+
+  // Replace the class member io_handle_ with our custom one for this test
+  auto original_io_handle = std::move(io_handle_);
+  io_handle_ = std::make_unique<ReverseConnectionIOHandle>(8, // dummy fd
+                                                           custom_prefix_config, cluster_manager_,
+                                                           custom_extension.get(), *stats_scope_);
+
+  // Set up mock thread local cluster.
+  auto mock_thread_local_cluster = std::make_shared<NiceMock<Upstream::MockThreadLocalCluster>>();
+  EXPECT_CALL(cluster_manager_, getThreadLocalCluster("test-cluster"))
+      .WillRepeatedly(Return(mock_thread_local_cluster.get()));
+
+  // Set up priority set with hosts.
+  auto mock_priority_set = std::make_shared<NiceMock<Upstream::MockPrioritySet>>();
+  EXPECT_CALL(*mock_thread_local_cluster, prioritySet())
+      .WillRepeatedly(ReturnRef(*mock_priority_set));
+
+  // Create host map with a host.
+  auto host_map = std::make_shared<Upstream::HostMap>();
+  auto mock_host = createMockHost("192.168.1.1");
+  (*host_map)["192.168.1.1"] = std::const_pointer_cast<Upstream::Host>(mock_host);
+
+  EXPECT_CALL(*mock_priority_set, crossPriorityHostMap()).WillRepeatedly(Return(host_map));
+
+  // Create HostConnectionInfo entry using helper method.
+  addHostConnectionInfo("192.168.1.1", "test-cluster", 1);
+
+  // Set up mock for successful connection.
+  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+  Upstream::MockHost::MockCreateConnectionData success_conn_data;
+  success_conn_data.connection_ = mock_connection.get();
+  success_conn_data.host_description_ = mock_host;
+
+  EXPECT_CALL(*mock_thread_local_cluster, tcpConn_(_)).WillOnce(Return(success_conn_data));
+
+  mock_connection.release();
+
+  // Call initiateOneReverseConnection using the helper method - should succeed.
+  bool result = initiateOneReverseConnection("test-cluster", "192.168.1.1", mock_host);
+  EXPECT_TRUE(result);
+
+  // Verify that Connecting stats are set with custom stat prefix.
+  auto stat_map = custom_extension->getCrossWorkerStatMap();
+  EXPECT_EQ(stat_map["test_scope.custom_stats.host.192.168.1.1.connecting"], 1);
+
+  // Restore the original io_handle_
+  io_handle_ = std::move(original_io_handle);
 }
 
 // Test maintainClusterConnections skips hosts that already have enough connections.

@@ -10,35 +10,14 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3;downstream_socket_interfacev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Bootstrap settings for Downstream Reverse Connection Socket Interface]
+// [#protodoc-title: Bootstrap settings for Downstream Reverse Connection Socket Interface].
 // [#extension: envoy.bootstrap.reverse_tunnel.downstream_socket_interface]
 
 // Configuration for the downstream reverse connection socket interface.
-// This interface initiates reverse connections to upstream Envoys and provides
+// This interface initiates reverse connections to upstream Envoys and provides.
 // them as socket connections for downstream requests.
-// [#next-free-field: 6]
+// .
 message DownstreamReverseConnectionSocketInterface {
   // Stat prefix to be used for downstream reverse connection socket interface stats.
   string stat_prefix = 1;
-
-  // Source cluster ID for this reverse connection initiator
-  string src_cluster_id = 2;
-
-  // Source node ID for this reverse connection initiator
-  string src_node_id = 3;
-
-  // Source tenant ID for this reverse connection initiator
-  string src_tenant_id = 4;
-
-  // Map of remote clusters to connection counts
-  repeated RemoteClusterConnectionCount remote_cluster_to_conn_count = 5;
 }
-
-// Configuration for remote cluster connection count
-message RemoteClusterConnectionCount {
-  // Name of the remote cluster
-  string cluster_name = 1;
-
-  // Number of reverse connections to establish to this cluster
-  uint32 reverse_connection_count = 2;
-} 

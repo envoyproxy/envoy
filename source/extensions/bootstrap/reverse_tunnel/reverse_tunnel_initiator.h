@@ -717,6 +717,7 @@ private:
   const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
       DownstreamReverseConnectionSocketInterface config_;
   ThreadLocal::TypedSlotPtr<DownstreamSocketThreadLocal> tls_slot_;
+  std::string stat_prefix_; // Reverse connection stats prefix
 };
 
 /**

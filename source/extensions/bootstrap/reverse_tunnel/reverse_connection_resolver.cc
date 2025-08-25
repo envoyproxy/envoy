@@ -61,6 +61,14 @@ ReverseConnectionResolver::extractReverseConnectionConfig(
         "Invalid source info format. Expected: src_node_id:src_cluster_id:src_tenant_id");
   }
 
+  // Validate that node_id and cluster_id are not empty.
+  if (source_parts[0].empty()) {
+    return absl::InvalidArgumentError("Source node ID cannot be empty");
+  }
+  if (source_parts[1].empty()) {
+    return absl::InvalidArgumentError("Source cluster ID cannot be empty");
+  }
+
   // Parse cluster configuration (cluster_name:count)
   std::vector<std::string> cluster_parts = absl::StrSplit(parts[1], ':');
   if (cluster_parts.size() != 2) {

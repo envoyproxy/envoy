@@ -140,6 +140,26 @@ TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigInvalidSourc
   EXPECT_THAT(result.status().message(), testing::HasSubstr("Invalid source info format"));
 }
 
+// Test extraction failure for empty node ID.
+TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigEmptyNodeId) {
+  auto socket_address = createSocketAddress("rc://:cluster:tenant@remote:5");
+
+  auto result = extractReverseConnectionConfig(socket_address);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(result.status().message(), testing::HasSubstr("Source node ID cannot be empty"));
+}
+
+// Test extraction failure for empty cluster ID.
+TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigEmptyClusterId) {
+  auto socket_address = createSocketAddress("rc://node::tenant@remote:5");
+
+  auto result = extractReverseConnectionConfig(socket_address);
+  EXPECT_FALSE(result.ok());
+  EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+  EXPECT_THAT(result.status().message(), testing::HasSubstr("Source cluster ID cannot be empty"));
+}
+
 // Test extraction failure for invalid cluster config format.
 TEST_F(ReverseConnectionResolverTest, ExtractReverseConnectionConfigInvalidClusterConfig) {
   auto socket_address = createSocketAddress("rc://node:cluster:tenant@remote"); // Missing count

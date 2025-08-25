@@ -14,6 +14,8 @@ namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
+static const std::string reverse_connection_address = "127.0.0.1:0";
+
 ReverseConnectionAddress::ReverseConnectionAddress(const ReverseConnectionConfig& config)
     : config_(config) {
 
@@ -21,9 +23,9 @@ ReverseConnectionAddress::ReverseConnectionAddress(const ReverseConnectionConfig
   logical_name_ = fmt::format("rc://{}:{}:{}@{}:{}", config.src_node_id, config.src_cluster_id,
                               config.src_tenant_id, config.remote_cluster, config.connection_count);
 
-  // Use localhost with a random port for the actual address string to pass IP validation
+  // Use localhost with a static port for the actual address string to pass IP validation
   // This will be used by the filter chain manager for matching.
-  address_string_ = "127.0.0.1:0";
+  address_string_ = reverse_connection_address;
 
   ENVOY_LOG_MISC(info, "Reverse connection address: logical_name={}, address_string={}",
                  logical_name_, address_string_);
