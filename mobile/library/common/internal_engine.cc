@@ -458,9 +458,11 @@ void InternalEngine::resetHttpPropertiesAndDrainHosts(bool has_ipv6_connectivity
 
   if (disable_dns_refresh_on_network_change_) {
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.drain_pools_on_network_change")) {
-      // Since DNS refreshing is disabled, explicitly drain all connections.
+      // Since DNS refreshing is disabled, explicitly drain all non-migratable connections.
       ENVOY_LOG_EVENT(debug, "netconf_immediate_drain", "DrainAllHosts");
-      getClusterManager().drainConnections([](const Upstream::Host&) { return true; });
+      getClusterManager().drainConnections(
+          [](const Upstream::Host&) { return true; },
+          Envoy::ConnectionPool::DrainBehavior::DrainExistingNonMigratableConnections);
     }
   }
 }

@@ -574,23 +574,21 @@ OAuth2Filter::OAuth2Filter(FilterConfigSharedPtr config,
  * 5) user is unauthorized
  */
 Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  // Skip Filter and continue chain if a Passthrough header is matching.
+  // Only increment counters here; do not modify request headers, as there may be
+  // other instances of this filter configured that still need to process the request.
+  for (const auto& matcher : config_->passThroughMatchers()) {
+    if (matcher->matchesHeaders(headers)) {
+      config_->stats().oauth_passthrough_.inc();
+      return Http::FilterHeadersStatus::Continue;
+    }
+  }
+
   // Decrypt the OAuth tokens and update the corresponding cookies in the request headers
   // before forwarding the request upstream. This step must occur early to ensure that
   // other parts of the filter can access the decrypted tokens—for example, to calculate
   // the HMAC for the cookies.
   decryptAndUpdateOAuthTokenCookies(headers);
-
-  // Skip Filter and continue chain if a Passthrough header is matching
-  // Must be done before the sanitation of the authorization header,
-  // otherwise the authorization header might be altered or removed
-  for (const auto& matcher : config_->passThroughMatchers()) {
-    if (matcher->matchesHeaders(headers)) {
-      config_->stats().oauth_passthrough_.inc();
-      // Remove OAuth flow cookies to prevent them from being sent upstream.
-      removeOAuthFlowCookies(headers);
-      return Http::FilterHeadersStatus::Continue;
-    }
-  }
 
   // Only sanitize the Authorization header if preserveAuthorizationHeader is false
   if (!config_->preserveAuthorizationHeader()) {
