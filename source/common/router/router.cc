@@ -450,7 +450,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       modify_headers_from_upstream_lb_(headers);
     }
 
-    route_entry_->finalizeResponseHeaders(headers, callbacks_->streamInfo());
+    const Formatter::HttpFormatterContext formatter_context(downstream_headers_, &headers, nullptr,
+                                                            {}, {}, &callbacks_->activeSpan());
+    route_entry_->finalizeResponseHeaders(headers, formatter_context, callbacks_->streamInfo());
 
     if (attempt_count_ == 0 || !route_entry_->includeAttemptCountInResponse()) {
       return;
@@ -487,11 +489,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     direct_response->rewritePathHeader(headers, !config_->suppress_envoy_headers_);
     callbacks_->sendLocalReply(
         direct_response->responseCode(), direct_response->responseBody(),
-        [this, direct_response,
-         &request_headers = headers](Http::ResponseHeaderMap& response_headers) -> void {
+        [this, direct_response](Http::ResponseHeaderMap& response_headers) -> void {
           std::string new_uri;
-          if (request_headers.Path()) {
-            new_uri = direct_response->newUri(request_headers);
+          ASSERT(downstream_headers_ != nullptr);
+          if (downstream_headers_->Path()) {
+            new_uri = direct_response->newUri(*downstream_headers_);
           }
           // See https://tools.ietf.org/html/rfc7231#section-7.1.2.
           const auto add_location =
@@ -500,7 +502,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           if (!new_uri.empty() && add_location) {
             response_headers.addReferenceKey(Http::Headers::get().Location, new_uri);
           }
-          direct_response->finalizeResponseHeaders(response_headers, callbacks_->streamInfo());
+          const Formatter::HttpFormatterContext formatter_context(
+              downstream_headers_, &response_headers, nullptr, {}, {}, &callbacks_->activeSpan());
+          direct_response->finalizeResponseHeaders(response_headers, formatter_context,
+                                                   callbacks_->streamInfo());
         },
         absl::nullopt, StreamInfo::ResponseCodeDetails::get().DirectResponse);
     return Http::FilterHeadersStatus::StopIteration;
@@ -600,7 +605,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   callbacks_->streamInfo().setAttemptCount(attempt_count_);
 
   // Finalize the request headers before the host selection.
-  route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
+  Formatter::HttpFormatterContext formatter_context(&headers, nullptr, nullptr, {}, {},
+                                                    &callbacks_->activeSpan());
+  route_entry_->finalizeRequestHeaders(headers, formatter_context, callbacks_->streamInfo(),
                                        !config_->suppress_envoy_headers_);
 
   // Fetch a connection pool for the upstream cluster.

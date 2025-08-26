@@ -1070,8 +1070,13 @@ void DownstreamFilterManager::prepareLocalReplyViaFilterChain(
   prepared_local_reply_ = Utility::prepareLocalReply(
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route() && streamInfo().route()->routeEntry()) {
-              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
+            if (const Router::RouteConstSharedPtr& route = streamInfo().route();
+                route != nullptr && route->routeEntry() != nullptr) {
+              const Formatter::HttpFormatterContext formatter_context{
+                  filter_manager_callbacks_.requestHeaders().ptr(), &headers, {}, {}, {},
+                  &filter_manager_callbacks_.activeSpan()};
+              route->routeEntry()->finalizeResponseHeaders(headers, formatter_context,
+                                                           streamInfo());
             }
             if (modify_headers) {
               modify_headers(headers);
@@ -1121,8 +1126,13 @@ void DownstreamFilterManager::sendLocalReplyViaFilterChain(
       state_.destroyed_,
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route() && streamInfo().route()->routeEntry()) {
-              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
+            if (const Router::RouteConstSharedPtr& route = streamInfo().route();
+                route != nullptr && route->routeEntry() != nullptr) {
+              const Formatter::HttpFormatterContext formatter_context{
+                  filter_manager_callbacks_.requestHeaders().ptr(), &headers, {}, {}, {},
+                  &filter_manager_callbacks_.activeSpan()};
+              route->routeEntry()->finalizeResponseHeaders(headers, formatter_context,
+                                                           streamInfo());
             }
             if (modify_headers) {
               modify_headers(headers);
@@ -1154,8 +1164,13 @@ void DownstreamFilterManager::sendDirectLocalReply(
       state_.destroyed_,
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route() && streamInfo().route()->routeEntry()) {
-              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
+            if (const Router::RouteConstSharedPtr& route = streamInfo().route();
+                route != nullptr && route->routeEntry() != nullptr) {
+              const Formatter::HttpFormatterContext formatter_context{
+                  filter_manager_callbacks_.requestHeaders().ptr(), &headers, {}, {}, {},
+                  &filter_manager_callbacks_.activeSpan()};
+              route->routeEntry()->finalizeResponseHeaders(headers, formatter_context,
+                                                           streamInfo());
             }
             if (modify_headers) {
               modify_headers(headers);

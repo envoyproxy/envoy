@@ -1322,15 +1322,20 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
 
         EXPECT_EQ(default_route->routeName(), delegating_route_foo->routeName());
 
+        Formatter::HttpFormatterContext formatter_context;
+
         // Coverage for finalizeRequestHeaders
         NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
-        delegating_route_foo->routeEntry()->finalizeRequestHeaders(test_req_headers, stream_info,
-                                                                   true);
+        formatter_context.setRequestHeaders(test_req_headers);
+        delegating_route_foo->routeEntry()->finalizeRequestHeaders(
+            test_req_headers, formatter_context, stream_info, true);
         EXPECT_EQ("/new_endpoint/foo", test_req_headers.get_(Http::Headers::get().Path));
 
         // Coverage for finalizeResponseHeaders
         Http::TestResponseHeaderMapImpl test_resp_headers;
-        delegating_route_foo->routeEntry()->finalizeResponseHeaders(test_resp_headers, stream_info);
+        formatter_context.setResponseHeaders(test_resp_headers);
+        delegating_route_foo->routeEntry()->finalizeResponseHeaders(test_resp_headers,
+                                                                    formatter_context, stream_info);
         EXPECT_EQ(test_resp_headers, Http::TestResponseHeaderMapImpl{});
 
         return FilterHeadersStatus::StopIteration;
