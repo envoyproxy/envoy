@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package envoy.extensions.bootstrap.reverse_connection_handshake.v3;
+
+import "udpa/annotations/status.proto";
+import "udpa/annotations/versioning.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.bootstrap.reverse_connection_handshake.v3";
+option java_outer_classname = "ReverseConnectionHandshakeProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/bootstrap/reverse_connection_handshake/v3;reverse_connection_handshakev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (udpa.annotations.file_status).work_in_progress = true;
+
+// [#protodoc-title: Reverse Connection Handshake]
+// Reverse Connection Handshake :ref:`configuration overview <config_bootstrap_reverse_connection_handshake>`.
+// [#extension: envoy.bootstrap.reverse_connection_handshake]
+
+// Config sent by the local cluster as part of the Initiation workflow.
+// This message combined with message 'ReverseConnHandshakeRet' which is
+// sent as a response can be used to transfer/negotiate parameter between the
+// two envoys.
+message ReverseConnHandshakeArg {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.extensions.filters.http.reverse_conn.v3.ReverseConnHandshakeArg";
+
+  // Tenant UUID of the local cluster.
+  string tenant_uuid = 1;
+
+  // Cluster UUID of the local cluster.
+  string cluster_uuid = 2;
+
+  // Node UUID of the local cluster.
+  string node_uuid = 3;
+}
+
+// Config used by the remote cluser in response to the above 'ReverseConnHandshakeArg'.
+message ReverseConnHandshakeRet {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.extensions.filters.http.reverse_conn.v3.ReverseConnHandshakeRet";
+
+  enum ConnectionStatus {
+    REJECTED = 0;
+    ACCEPTED = 1;
+  }
+
+  // Tracks the status of the reverse connection initiation workflow.
+  ConnectionStatus status = 1;
+
+  // This field can be used to transmit success/warning/error messages
+  // describing the status of the reverse connection, if needed.
+  string status_message = 2;
+} 

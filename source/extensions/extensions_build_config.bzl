@@ -58,6 +58,12 @@ EXTENSIONS = {
     "envoy.bootstrap.wasm":                             "//source/extensions/bootstrap/wasm:config",
 
     #
+    # Reverse Connection
+    #
+
+    "envoy.bootstrap.reverse_connection.downstream_reverse_connection_socket_interface": "//source/extensions/bootstrap/reverse_tunnel:reverse_tunnel_initiator_lib",
+
+    #
     # Health checkers
     #
 
@@ -189,6 +195,7 @@ EXTENSIONS = {
     "envoy.filters.http.wasm":                          "//source/extensions/filters/http/wasm:config",
     "envoy.filters.http.stateful_session":              "//source/extensions/filters/http/stateful_session:config",
     "envoy.filters.http.header_mutation":               "//source/extensions/filters/http/header_mutation:config",
+    "envoy.filters.http.reverse_conn": "//source/extensions/filters/http/reverse_conn:config",
 
     #
     # Listener filters
