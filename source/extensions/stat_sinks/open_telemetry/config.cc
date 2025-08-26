@@ -41,7 +41,9 @@ OpenTelemetrySinkFactory::createStatsSink(const Protobuf::Message& config,
         std::make_shared<OpenTelemetryGrpcMetricsExporterImpl>(otlp_options,
                                                                client_or_error.value());
 
-    return std::make_unique<OpenTelemetryGrpcSink>(otlp_metrics_flusher, grpc_metrics_exporter);
+    return std::make_unique<OpenTelemetryGrpcSink>(
+        otlp_metrics_flusher, grpc_metrics_exporter,
+        server.timeSource().systemTime().time_since_epoch().count());
   }
 
   default:

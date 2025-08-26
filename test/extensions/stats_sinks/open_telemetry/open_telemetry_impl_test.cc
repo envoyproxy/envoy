@@ -1,5 +1,6 @@
 #include "envoy/grpc/async_client.h"
 
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/stat_sinks/open_telemetry/open_telemetry_impl.h"
 
@@ -9,7 +10,6 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 
-#include "google/protobuf/text_format.h"
 #include "gtest/gtest.h"
 
 using testing::_;
@@ -914,32 +914,28 @@ class OpenTelemetryGrpcSinkTests : public OpenTelemetryStatsSinkTests {
 public:
   OpenTelemetryGrpcSinkTests()
       : flusher_(std::make_shared<MockOtlpMetricsFlusher>()),
-        exporter_(std::make_shared<MockOpenTelemetryGrpcMetricsExporter>()) {
-    time_t expected_time_2 = 1213;
-    expected_time_ns_2_ = expected_time_2 * 1000000000;
-    SystemTime time_2 = std::chrono::system_clock::from_time_t(expected_time_2);
-    EXPECT_CALL(snapshot2_, snapshotTime()).WillRepeatedly(Return(time_2));
-  }
+        exporter_(std::make_shared<MockOpenTelemetryGrpcMetricsExporter>()) {}
 
-  long long int expected_time_ns_2_;
-  NiceMock<Stats::MockMetricSnapshot> snapshot2_;
-  const std::shared_ptr<MockOtlpMetricsFlusher> flusher_;
-  const std::shared_ptr<MockOpenTelemetryGrpcMetricsExporter> exporter_;
+  std::shared_ptr<MockOtlpMetricsFlusher> flusher_;
+  std::shared_ptr<MockOpenTelemetryGrpcMetricsExporter> exporter_;
 };
 
 TEST_F(OpenTelemetryGrpcSinkTests, BasicFlow) {
-  // First flush: last_flush_time_ns should be 0.
-  MetricsExportRequestPtr request1 = std::make_unique<MetricsExportRequest>();
-  EXPECT_CALL(*flusher_, flush(_, 0)).WillOnce(Return(ByMove(std::move(request1))));
-  EXPECT_CALL(*exporter_, send(_)).Times(2);
+  // Initialize the sink with a created_at time of 1000.
+  OpenTelemetryGrpcSink sink(flusher_, exporter_, 1000);
 
-  OpenTelemetryGrpcSink sink(flusher_, exporter_);
+  // First flush: last_flush_time_ns should be the created_at value (1000).
+  MetricsExportRequestPtr request1 = std::make_unique<MetricsExportRequest>();
+  EXPECT_CALL(*flusher_, flush(_, 1000)).WillOnce(Return(ByMove(std::move(request1))));
+  EXPECT_CALL(*exporter_, send(_));
   sink.flush(snapshot_);
 
-  // Second flush: last_flush_time_ns should be the time of the first snapshot.
+  // Second flush: last_flush_time_ns should be the snapshotTime() of the
+  // snapshot used in the first flush, which is expected_time_ns_.
   MetricsExportRequestPtr request2 = std::make_unique<MetricsExportRequest>();
   EXPECT_CALL(*flusher_, flush(_, expected_time_ns_)).WillOnce(Return(ByMove(std::move(request2))));
-  sink.flush(snapshot2_);
+  EXPECT_CALL(*exporter_, send(_));
+  sink.flush(snapshot_);
 }
 
 } // namespace

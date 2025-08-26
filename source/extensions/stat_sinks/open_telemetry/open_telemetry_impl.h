@@ -261,9 +261,11 @@ using OpenTelemetryGrpcMetricsExporterImplPtr =
 class OpenTelemetryGrpcSink : public Stats::Sink {
 public:
   OpenTelemetryGrpcSink(const OtlpMetricsFlusherSharedPtr& otlp_metrics_flusher,
-                        const OpenTelemetryGrpcMetricsExporterSharedPtr& grpc_metrics_exporter)
+                        const OpenTelemetryGrpcMetricsExporterSharedPtr& grpc_metrics_exporter,
+                        int64_t create_time_ns)
       : metrics_flusher_(otlp_metrics_flusher), metrics_exporter_(grpc_metrics_exporter),
-        last_flush_time_ns_(0) {}
+        // Use the time when the sink is created as the last flush time.
+        last_flush_time_ns_(create_time_ns) {}
 
   // Stats::Sink
   void flush(Stats::MetricSnapshot& snapshot) override {
