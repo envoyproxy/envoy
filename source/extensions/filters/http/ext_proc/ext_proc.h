@@ -471,6 +471,7 @@ public:
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) override;
   void onGrpcError(Grpc::Status::GrpcStatus error, const std::string& message) override;
   void onGrpcClose() override;
+  void onGrpcCloseWithStatus(Grpc::Status::GrpcStatus status);
   void logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info);
   void logStreamInfo() override;
 

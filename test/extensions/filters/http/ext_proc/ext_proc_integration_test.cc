@@ -6216,8 +6216,6 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoGRPCTimeout) {
   // Despite the timeout the request should succeed.
   verifyDownstreamResponse(*response, 200);
   std::string log_result = waitForAccessLog(access_log_path, 0, true);
-  ENVOY_LOG_MISC(info, "Comprehensive access log result: {}", log_result);
-
   auto json_log = Json::Factory::loadFromString(log_result).value();
   auto field_request_header_status = json_log->getString("field_request_header_call_status");
   // Should be 4:DEADLINE_EXCEEDED instead of 10:ABORTED

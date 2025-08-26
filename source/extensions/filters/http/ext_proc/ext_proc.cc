@@ -1681,6 +1681,10 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
 }
 
 void Filter::onGrpcClose() {
+  onGrpcCloseWithStatus(Grpc::Status::Aborted);
+}
+
+void Filter::onGrpcCloseWithStatus(Grpc::Status::GrpcStatus status) {
   ENVOY_STREAM_LOG(debug, "Received gRPC stream close", *decoder_callbacks_);
 
   processing_complete_ = true;
@@ -1688,7 +1692,7 @@ void Filter::onGrpcClose() {
   // Successful close. We can ignore the stream for the rest of our request
   // and response processing.
   closeStream();
-  clearAsyncState();
+  clearAsyncState(status);
 }
 
 void Filter::onMessageTimeout() {
