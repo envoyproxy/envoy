@@ -1066,6 +1066,62 @@ TEST_P(ProtocolIntegrationTest, Retry) {
       BytesCountExpectation(2204, 520, 150, 6));
 }
 
+TEST_P(ProtocolIntegrationTest, RetryWithBodyLargerThanNetworkBuffer) {
+  // Set the network buffer to be 16KB.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->listeners_size() >= 1, "");
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+
+    listener->mutable_per_connection_buffer_limit_bytes()->set_value(16 * 1024);
+  });
+  // Set the request body buffer limit to be 1MB so it can retry requests up to 1MB.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_route_config()
+            ->mutable_virtual_hosts(0)
+            ->mutable_request_body_buffer_limit()
+            ->set_value(1024 * 1024);
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // Send a request with 64Kb body so it is larger than the network 16Kb buffer.
+  constexpr uint32_t kRequestBodySize = 64 * 1024;
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}},
+      kRequestBodySize);
+  waitForNextUpstreamRequest();
+  // Note that 503 is sent with end_stream=false (response with body). This will cause Envoy to
+  // reset the response because it knows it is going to retry the request and it does not need the
+  // response body.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
+  if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,
+                                                          std::chrono::milliseconds(500)));
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(kRequestBodySize, upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(512U, response->body().size());
+}
+
 // Regression test to guarantee that buffering for retries and shadows doesn't double the body size.
 // This test is actually irrelevant for QUIC, as this issue only shows up with header-only requests.
 // QUIC will always send an empty data frame with FIN.
