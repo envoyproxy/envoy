@@ -1777,7 +1777,7 @@ TEST_P(TcpTunnelingIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
         MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
             *config_blob);
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(50))
             .count());
     config_blob->PackFrom(tcp_proxy_config);
   });
@@ -1789,6 +1789,9 @@ TEST_P(TcpTunnelingIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   std::string data(1024 * 16, 'a');
   ASSERT_TRUE(tcp_client_->write(data));
   upstream_request_->encodeData(data, false);
+
+  // Wait for the idle timeout to trigger
+  test_server_->waitForCounterGe("tcp.tcp_stats.idle_timeout", 1);
 
   tcp_client_->waitForDisconnect();
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
@@ -1819,7 +1822,7 @@ TEST_P(TcpTunnelingIntegrationTest, IdleTimeoutNoUpstreamConnection) {
 
     tcp_proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(50))
             .count());
 
     config_blob->PackFrom(tcp_proxy_config);
