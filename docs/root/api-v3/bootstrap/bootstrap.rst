@@ -7,7 +7,7 @@ Bootstrap
 
   ../config/bootstrap/v3/bootstrap.proto
   ../extensions/bootstrap/internal_listener/v3/internal_listener.proto
-  ../extensions/bootstrap/reverse_connection_handshake/v3/reverse_connection_handshake.proto
+  ../extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.proto
   ../config/metrics/v3/metrics_service.proto
   ../config/overload/v3/overload.proto
   ../config/ratelimit/v3/rls.proto
