@@ -889,9 +889,13 @@ Network::FilterStatus Filter::onNewConnection() {
     // the call to either TcpProxy or to Drainer, depending on the current state.
     idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [upstream_callbacks = upstream_callbacks_]() { upstream_callbacks->onIdleTimeout(); });
-    // Start the idle timer immediately so that if no response is received from the upstream,
-    // the downstream connection will time out.
-    resetIdleTimer();
+
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.tcp_proxy_set_idle_timer_immediately_on_new_connection")) {
+      // Start the idle timer immediately so that if no response is received from the upstream,
+      // the downstream connection will time out.
+      resetIdleTimer();
+    }
   }
 
   // Set UUID for the connection. This is used for logging and tracing.
