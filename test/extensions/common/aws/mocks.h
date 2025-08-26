@@ -157,6 +157,9 @@ public:
     provider_->metadata_fetcher_ = std::move(fetcher);
   }
   void setCacheDurationTimer(Event::Timer* timer) { provider_->cache_duration_timer_.reset(timer); }
+  void setCredentialsToAllThreads(CredentialsConstUniquePtr&& creds) {
+    provider_->setCredentialsToAllThreads(std::move(creds));
+  }
   std::shared_ptr<MetadataCredentialsProviderBase> provider_;
 };
 
