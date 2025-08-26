@@ -1655,15 +1655,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
   }
 
   if (failure_mode_allow_) {
-    // Ignore this and treat as a successful close
-    ENVOY_STREAM_LOG(debug, "Received gRPC stream close", *decoder_callbacks_);
-
-    processing_complete_ = true;
-    stats_.streams_closed_.inc();
-    // Successful close. We can ignore the stream for the rest of our request
-    // and response processing.
-    closeStream();
-    clearAsyncState(status);
+    onGrpcCloseWithStatus(status);
     stats_.failure_mode_allowed_.inc();
 
   } else {
