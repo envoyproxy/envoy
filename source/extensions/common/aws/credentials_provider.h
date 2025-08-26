@@ -172,6 +172,13 @@ using CredentialSubscriberCallbacksSharedPtr = std::shared_ptr<CredentialSubscri
 // to register itself for updates via onCredentialUpdate callback. When a credential provider has
 // successfully updated all threads with new credentials, via the setCredentialsToAllThreads method
 // it will notify all subscribers that credentials have been retrieved.
+//
+// Subscription is only relevant for metadata credentials providers, as these are the only
+// credential providers that implement async credential retrieval functionality.
+//
+// RAII is used, as credential providers may be instantiated as singletons, as such they may outlive
+// the credential provider chain.
+//
 // Uses weak_ptr to safely handle subscriber lifetime without dangling pointers.
 class CredentialSubscriberCallbacksHandle
     : public RaiiListElement<std::weak_ptr<CredentialSubscriberCallbacks>> {
