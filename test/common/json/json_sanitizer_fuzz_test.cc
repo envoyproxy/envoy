@@ -15,7 +15,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   // Cap the input string by 32KiB. The fuzzer should be able to detect issues
   // for smaller inputs.
   if (len > 32 * 1024) {
-    ENVOY_LOG_MISC(error, "The input buffer is longer than 32KiB, skipping");
+    ENVOY_LOG_MISC(warn, "The input buffer is longer than 32KiB, skipping");
     return;
   }
   FuzzedDataProvider provider(buf, len);
