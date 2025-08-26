@@ -1,7 +1,7 @@
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/singleton/threadsafe_singleton.h"
-#include "source/extensions/bootstrap/reverse_tunnel/reverse_connection_address.h"
+#include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_address.h"
 
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/registry.h"

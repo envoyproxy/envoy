@@ -1,6 +1,6 @@
 #include "envoy/config/core/v3/address.pb.h"
 
-#include "source/extensions/bootstrap/reverse_tunnel/reverse_connection_resolver.h"
+#include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_resolver.h"
 
 #include "test/test_common/logging.h"
 

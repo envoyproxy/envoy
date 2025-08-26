@@ -3,7 +3,7 @@
 #include "envoy/network/resolver.h"
 #include "envoy/registry/registry.h"
 
-#include "source/extensions/bootstrap/reverse_tunnel/reverse_connection_address.h"
+#include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_address.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -1,4 +1,4 @@
-#include "source/extensions/bootstrap/reverse_tunnel/reverse_connection_resolver.h"
+#include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_resolver.h"
 
 namespace Envoy {
 namespace Extensions {

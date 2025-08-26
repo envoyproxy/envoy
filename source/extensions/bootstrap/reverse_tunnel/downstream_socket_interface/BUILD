@@ -40,41 +40,64 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_extension(
-    name = "reverse_tunnel_initiator_lib",
-    srcs = [
-        "reverse_tunnel_initiator.cc",
+envoy_cc_library(
+    name = "reverse_tunnel_extension_lib",
+    srcs = ["reverse_tunnel_initiator_extension.cc"],
+    hdrs = ["reverse_tunnel_initiator_extension.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//envoy/server:bootstrap_extension_config_interface",
+        "//envoy/stats:stats_interface",
+        "//envoy/thread_local:thread_local_interface",
+        "//source/common/common:logger_lib",
+        "//source/common/stats:symbol_table_lib",
+        "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3:pkg_cc_proto",
     ],
-    hdrs = [
-        "reverse_tunnel_initiator.h",
-    ],
+)
+
+envoy_cc_library(
+    name = "reverse_connection_io_handle_lib",
+    srcs = ["reverse_connection_io_handle.cc"],
+    hdrs = ["reverse_connection_io_handle.h"],
     visibility = ["//visibility:public"],
     deps = [
         ":reverse_connection_address_lib",
         ":reverse_connection_handshake_cc_proto",
-        ":reverse_connection_resolver_lib",
+        ":reverse_tunnel_extension_lib",
         "//envoy/api:io_error_interface",
         "//envoy/grpc:async_client_interface",
         "//envoy/network:address_interface",
         "//envoy/network:io_handle_interface",
         "//envoy/network:socket_interface",
-        "//envoy/registry",
-        "//envoy/server:bootstrap_extension_config_interface",
         "//envoy/stats:stats_interface",
         "//envoy/stats:stats_macros",
-        "//envoy/tracing:trace_driver_interface",
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
         "//source/common/grpc:typed_async_client_lib",
-        "//source/common/http:headers_lib",
         "//source/common/network:address_lib",
         "//source/common/network:connection_socket_lib",
         "//source/common/network:default_socket_interface_lib",
         "//source/common/network:filter_lib",
-        "//source/common/protobuf",
         "//source/common/upstream:load_balancer_context_base_lib",
-        "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3:pkg_cc_proto",
     ],
-    alwayslink = 1,
+)
+
+envoy_cc_extension(
+    name = "reverse_tunnel_initiator_lib",
+    srcs = ["reverse_tunnel_initiator.cc"],
+    hdrs = ["reverse_tunnel_initiator.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":reverse_connection_address_lib",
+        ":reverse_connection_io_handle_lib",
+        ":reverse_tunnel_extension_lib",
+        "//envoy/network:socket_interface",
+        "//envoy/registry",
+        "//envoy/server:bootstrap_extension_config_interface",
+        "//source/common/common:logger_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:socket_interface_lib",
+        "//source/common/protobuf:utility_lib",
+    ],
 )

@@ -1,22 +1,13 @@
 #pragma once
 
-#include <cerrno>
-#include <chrono>
-#include <cstring>
 #include <memory>
 #include <queue>
 #include <string>
 #include <vector>
 
-#include "envoy/api/io_error.h"
-#include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.h"
-#include "envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3/downstream_reverse_connection_socket_interface.pb.validate.h"
 #include "envoy/network/io_handle.h"
 #include "envoy/network/socket.h"
-#include "envoy/registry/registry.h"
-#include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/stats/scope.h"
-#include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -36,9 +27,67 @@ namespace Bootstrap {
 namespace ReverseConnection {
 
 // Forward declarations.
-class ReverseTunnelInitiator;
 class ReverseTunnelInitiatorExtension;
 class ReverseConnectionIOHandle;
+
+namespace {
+// HTTP protocol constants.
+static constexpr absl::string_view kCrlf = "\r\n";
+static constexpr absl::string_view kDoubleCrlf = "\r\n\r\n";
+
+// Connection timing constants.
+static constexpr uint32_t kDefaultMaxReconnectAttempts = 10;
+} // namespace
+
+/**
+ * Connection state tracking for reverse connections.
+ */
+enum class ReverseConnectionState {
+  Connecting,    // Connection is being established (handshake initiated).
+  Connected,     // Connection has been successfully established.
+  Recovered,     // Connection has recovered from a previous failure.
+  Failed,        // Connection establishment failed during handshake.
+  CannotConnect, // Connection cannot be initiated (early failure).
+  Backoff        // Connection is in backoff state due to failures.
+};
+
+/**
+ * Configuration for remote cluster connections.
+ * Defines connection parameters for each remote cluster that reverse connections should be
+ * established to.
+ */
+struct RemoteClusterConnectionConfig {
+  std::string cluster_name;          // Name of the remote cluster.
+  uint32_t reverse_connection_count; // Number of reverse connections to maintain per host.
+  // TODO(basundhara-c): Implement retry logic using max_reconnect_attempts for connections to this
+  // cluster. This is the max reconnection attempts made for a cluster when the initial reverse
+  // connection attempt fails.
+  uint32_t max_reconnect_attempts; // Maximum number of reconnection attempts.
+
+  RemoteClusterConnectionConfig(const std::string& name, uint32_t count,
+                                uint32_t max_attempts = kDefaultMaxReconnectAttempts)
+      : cluster_name(name), reverse_connection_count(count), max_reconnect_attempts(max_attempts) {}
+};
+
+/**
+ * Configuration for reverse connection socket interface.
+ */
+struct ReverseConnectionSocketConfig {
+  std::string src_cluster_id; // Cluster identifier of local envoy instance.
+  std::string src_node_id;    // Node identifier of local envoy instance.
+  std::string src_tenant_id;  // Tenant identifier of local envoy instance.
+  // TODO(basundhara-c): Add support for multiple remote clusters using the same
+  // ReverseConnectionIOHandle. Currently, each ReverseConnectionIOHandle handles
+  // reverse connections for a single upstream cluster since a different ReverseConnectionAddress
+  // is created for different upstream clusters. Eventually, we should embed metadata for
+  // multiple remote clusters in the same ReverseConnectionAddress and therefore should be able
+  // to use a single ReverseConnectionIOHandle for multiple remote clusters.
+  std::vector<RemoteClusterConnectionConfig>
+      remote_clusters;         // List of remote cluster configurations.
+  bool enable_circuit_breaker; // Whether to place a cluster in backoff when reverse connection
+                               // attempts fail.
+  ReverseConnectionSocketConfig() : enable_circuit_breaker(true) {}
+};
 
 /**
  * RCConnectionWrapper manages the lifecycle of a ClientConnectionPtr for reverse connections.
@@ -135,65 +184,6 @@ private:
   Network::ClientConnectionPtr connection_;
   Upstream::HostDescriptionConstSharedPtr host_;
   const std::string cluster_name_;
-};
-
-namespace {
-// HTTP protocol constants.
-static constexpr absl::string_view kCrlf = "\r\n";
-static constexpr absl::string_view kDoubleCrlf = "\r\n\r\n";
-
-// Connection timing constants.
-static constexpr uint32_t kDefaultMaxReconnectAttempts = 10;
-} // namespace
-
-/**
- * Connection state tracking for reverse connections.
- */
-enum class ReverseConnectionState {
-  Connecting,    // Connection is being established (handshake initiated).
-  Connected,     // Connection has been successfully established.
-  Recovered,     // Connection has recovered from a previous failure.
-  Failed,        // Connection establishment failed during handshake.
-  CannotConnect, // Connection cannot be initiated (early failure).
-  Backoff        // Connection is in backoff state due to failures.
-};
-
-/**
- * Configuration for remote cluster connections.
- * Defines connection parameters for each remote cluster that reverse connections should be
- * established to.
- */
-struct RemoteClusterConnectionConfig {
-  std::string cluster_name;          // Name of the remote cluster.
-  uint32_t reverse_connection_count; // Number of reverse connections to maintain per host.
-  // TODO(basundhara-c): Implement retry logic using max_reconnect_attempts for connections to this
-  // cluster. This is the max reconnection attempts made for a cluster when the initial reverse
-  // connection attempt fails.
-  uint32_t max_reconnect_attempts; // Maximum number of reconnection attempts.
-
-  RemoteClusterConnectionConfig(const std::string& name, uint32_t count,
-                                uint32_t max_attempts = kDefaultMaxReconnectAttempts)
-      : cluster_name(name), reverse_connection_count(count), max_reconnect_attempts(max_attempts) {}
-};
-
-/**
- * Configuration for reverse connection socket interface.
- */
-struct ReverseConnectionSocketConfig {
-  std::string src_cluster_id; // Cluster identifier of local envoy instance.
-  std::string src_node_id;    // Node identifier of local envoy instance.
-  std::string src_tenant_id;  // Tenant identifier of local envoy instance.
-  // TODO(basundhara-c): Add support for multiple remote clusters using the same
-  // ReverseConnectionIOHandle. Currently, each ReverseConnectionIOHandle handles
-  // reverse connections for a single upstream cluster since a different ReverseConnectionAddress
-  // is created for different upstream clusters. Eventually, we should embed metadata for
-  // multiple remote clusters in the same ReverseConnectionAddress and therefore should be able
-  // to use a single ReverseConnectionIOHandle for multiple remote clusters.
-  std::vector<RemoteClusterConnectionConfig>
-      remote_clusters;         // List of remote cluster configurations.
-  bool enable_circuit_breaker; // Whether to place a cluster in backoff when reverse connection
-                               // attempts fail.
-  ReverseConnectionSocketConfig() : enable_circuit_breaker(true) {}
 };
 
 /**
@@ -520,204 +510,6 @@ private:
 
   // Store original socket FD for cleanup.
   os_fd_t original_socket_fd_{-1};
-};
-
-/**
- * Thread local storage for ReverseTunnelInitiator.
- * Stores the thread-local dispatcher and stats scope for each worker thread.
- */
-class DownstreamSocketThreadLocal : public ThreadLocal::ThreadLocalObject {
-public:
-  DownstreamSocketThreadLocal(Event::Dispatcher& dispatcher, Stats::Scope& scope)
-      : dispatcher_(dispatcher), scope_(scope) {}
-
-  /**
-   * @return reference to the thread-local dispatcher
-   */
-  Event::Dispatcher& dispatcher() { return dispatcher_; }
-
-  /**
-   * @return reference to the stats scope
-   */
-  Stats::Scope& scope() { return scope_; }
-
-private:
-  Event::Dispatcher& dispatcher_;
-  Stats::Scope& scope_;
-};
-
-/**
- * Socket interface that creates reverse connection sockets.
- * This class implements the SocketInterface interface to provide reverse connection
- * functionality for downstream connections.
- */
-class ReverseTunnelInitiator : public Envoy::Network::SocketInterfaceBase,
-                               public Envoy::Logger::Loggable<Envoy::Logger::Id::connection> {
-  // Friend class for testing
-  friend class ReverseTunnelInitiatorTest;
-
-public:
-  ReverseTunnelInitiator(Server::Configuration::ServerFactoryContext& context);
-
-  // Default constructor for registry
-  ReverseTunnelInitiator() : extension_(nullptr), context_(nullptr) {}
-
-  /**
-   * Create a ReverseConnectionIOHandle and kick off the reverse connection establishment.
-   * @param socket_type the type of socket to create
-   * @param addr_type the address type
-   * @param version the IP version
-   * @param socket_v6only whether to create IPv6-only socket
-   * @param options socket creation options
-   * @return IoHandlePtr for the created socket, or nullptr for unsupported types
-   */
-  Envoy::Network::IoHandlePtr
-  socket(Envoy::Network::Socket::Type socket_type, Envoy::Network::Address::Type addr_type,
-         Envoy::Network::Address::IpVersion version, bool socket_v6only,
-         const Envoy::Network::SocketCreationOptions& options) const override;
-
-  // No-op for reverse connections.
-  Envoy::Network::IoHandlePtr
-  socket(Envoy::Network::Socket::Type socket_type,
-         const Envoy::Network::Address::InstanceConstSharedPtr addr,
-         const Envoy::Network::SocketCreationOptions& options) const override;
-
-  /**
-   * @return true if the IP family is supported
-   */
-  bool ipFamilySupported(int domain) override;
-
-  /**
-   * @return pointer to the thread-local registry, or nullptr if not available.
-   */
-  DownstreamSocketThreadLocal* getLocalRegistry() const;
-
-  /**
-   * Thread-safe helper method to create reverse connection socket with config.
-   * @param socket_type the type of socket to create
-   * @param addr_type the address type
-   * @param version the IP version
-   * @param config the reverse connection configuration
-   * @return IoHandlePtr for the reverse connection socket
-   */
-  Envoy::Network::IoHandlePtr
-  createReverseConnectionSocket(Envoy::Network::Socket::Type socket_type,
-                                Envoy::Network::Address::Type addr_type,
-                                Envoy::Network::Address::IpVersion version,
-                                const ReverseConnectionSocketConfig& config) const;
-
-  /**
-   * Get the extension instance for accessing cross-thread aggregation capabilities.
-   * @return pointer to the extension, or nullptr if not available
-   */
-  ReverseTunnelInitiatorExtension* getExtension() const { return extension_; }
-
-  // BootstrapExtensionFactory implementation
-  Server::BootstrapExtensionPtr
-  createBootstrapExtension(const Protobuf::Message& config,
-                           Server::Configuration::ServerFactoryContext& context) override;
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-
-  std::string name() const override {
-    return "envoy.bootstrap.reverse_tunnel.downstream_socket_interface";
-  }
-
-  ReverseTunnelInitiatorExtension* extension_;
-
-private:
-  Server::Configuration::ServerFactoryContext* context_;
-};
-
-DECLARE_FACTORY(ReverseTunnelInitiator);
-
-/**
- * Bootstrap extension for ReverseTunnelInitiator.
- */
-class ReverseTunnelInitiatorExtension : public Server::BootstrapExtension,
-                                        public Logger::Loggable<Logger::Id::connection> {
-  // Friend class for testing
-  friend class ReverseTunnelInitiatorExtensionTest;
-
-public:
-  ReverseTunnelInitiatorExtension(
-      Server::Configuration::ServerFactoryContext& context,
-      const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
-          DownstreamReverseConnectionSocketInterface& config);
-
-  void onServerInitialized() override;
-  void onWorkerThreadInitialized() override;
-
-  /**
-   * @return pointer to the thread-local registry, or nullptr if not available.
-   */
-  DownstreamSocketThreadLocal* getLocalRegistry() const;
-
-  /**
-   * Update all connection stats for reverse connections. This updates the cross-worker stats
-   * as well as the per-worker stats.
-   * @param node_id the node identifier for the connection
-   * @param cluster_id the cluster identifier for the connection
-   * @param state_suffix the state suffix (e.g., "connecting", "connected", "failed")
-   * @param increment whether to increment (true) or decrement (false) the connection count
-   */
-  void updateConnectionStats(const std::string& node_id, const std::string& cluster_id,
-                             const std::string& state_suffix, bool increment);
-
-  /**
-   * Update per-worker connection stats for debugging purposes.
-   * Creates worker-specific stats
-   * @param node_id the node identifier for the connection
-   * @param cluster_id the cluster identifier for the connection
-   * @param state_suffix the state suffix for the connection
-   * @param increment whether to increment (true) or decrement (false) the connection count
-   */
-  void updatePerWorkerConnectionStats(const std::string& node_id, const std::string& cluster_id,
-                                      const std::string& state_suffix, bool increment);
-
-  /**
-   * Get per-worker stat map for the current dispatcher.
-   * @return map of stat names to values for the current worker thread
-   */
-  absl::flat_hash_map<std::string, uint64_t> getPerWorkerStatMap();
-
-  /**
-   * Get cross-worker stat map across all workers.
-   * @return map of stat names to values across all worker threads
-   */
-  absl::flat_hash_map<std::string, uint64_t> getCrossWorkerStatMap();
-
-  /**
-   * Get connection stats synchronously with timeout.
-   * @param timeout_ms timeout for the operation
-   * @return pair of vectors containing connected nodes and accepted connections
-   */
-  std::pair<std::vector<std::string>, std::vector<std::string>>
-  getConnectionStatsSync(std::chrono::milliseconds timeout_ms);
-
-  /**
-   * Get the stats scope for accessing stats.
-   * @return reference to the stats scope.
-   */
-  Stats::Scope& getStatsScope() const { return context_.scope(); }
-
-  /**
-   * Test-only method to set the thread local slot for testing purposes.
-   * This allows tests to inject a custom thread local registry and is used
-   * in unit tests to simulate different worker threads.
-   * @param slot the thread local slot to set
-   */
-  void setTestOnlyTLSRegistry(
-      std::unique_ptr<ThreadLocal::TypedSlot<DownstreamSocketThreadLocal>> slot) {
-    tls_slot_ = std::move(slot);
-  }
-
-private:
-  Server::Configuration::ServerFactoryContext& context_;
-  const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
-      DownstreamReverseConnectionSocketInterface config_;
-  ThreadLocal::TypedSlotPtr<DownstreamSocketThreadLocal> tls_slot_;
-  std::string stat_prefix_; // Reverse connection stats prefix
 };
 
 /**
