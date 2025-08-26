@@ -419,7 +419,7 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
                            : 100),
       locality_basis_(locality_config.has_value()
                           ? locality_config->zone_aware_lb_config().locality_basis()
-                          : LocalityLbConfig::ZoneAwareLbConfig::NUM_HEALTHY_HOSTS),
+                          : LocalityLbConfig::ZoneAwareLbConfig::HEALTHY_HOSTS_NUM),
       fail_traffic_on_panic_(locality_config.has_value()
                                  ? locality_config->zone_aware_lb_config().fail_traffic_on_panic()
                                  : false),
@@ -656,7 +656,7 @@ ZoneAwareLoadBalancerBase::calculateLocalityPercentages(
       }
       break;
     // By default it uses the number of healthy hosts in the locality.
-    case LocalityLbConfig::ZoneAwareLbConfig::NUM_HEALTHY_HOSTS:
+    case LocalityLbConfig::ZoneAwareLbConfig::HEALTHY_HOSTS_NUM:
       locality_weight = locality_hosts.size();
       break;
     default:
@@ -680,7 +680,7 @@ ZoneAwareLoadBalancerBase::calculateLocalityPercentages(
       }
       break;
     // By default it uses the number of healthy hosts in the locality.
-    case LocalityLbConfig::ZoneAwareLbConfig::NUM_HEALTHY_HOSTS:
+    case LocalityLbConfig::ZoneAwareLbConfig::HEALTHY_HOSTS_NUM:
       locality_weight = locality_hosts.size();
       break;
     default:

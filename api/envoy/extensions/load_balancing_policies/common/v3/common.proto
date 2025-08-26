@@ -29,7 +29,7 @@ message LocalityLbConfig {
     // Basis for computing per-locality percentages in zone-aware routing.
     enum LocalityBasis {
       // Use the number of healthy hosts in each locality.
-      NUM_HEALTHY_HOSTS = 0;
+      HEALTHY_HOSTS_NUM = 0;
 
       // Use the weights of healthy hosts in each locality.
       HEALTHY_HOSTS_WEIGHT = 1;
@@ -78,9 +78,9 @@ message LocalityLbConfig {
     ForceLocalZone force_local_zone = 5;
 
     // Determines how locality percentages are computed:
-    // - NUM_HEALTHY_HOSTS: proportional to the count of healthy hosts.
+    // - HEALTHY_HOSTS_NUM: proportional to the count of healthy hosts.
     // - HEALTHY_HOSTS_WEIGHT: proportional to the weights of healthy hosts.
-    // Default value is NUM_HEALTHY_HOSTS if unset.
+    // Default value is HEALTHY_HOSTS_NUM if unset.
     LocalityBasis locality_basis = 6;
   }
 
