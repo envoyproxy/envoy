@@ -1131,7 +1131,7 @@ TEST_F(ZipkinDriverTest, ReporterFlushWithCustomHeaders) {
   Http::AsyncClient::Callbacks* callback;
   const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
 
-  // Set up expectations for the HTTP request with custom headers
+  // Set up expectations for the HTTP request
   EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
               send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
       .WillOnce(
@@ -1146,6 +1146,11 @@ TEST_F(ZipkinDriverTest, ReporterFlushWithCustomHeaders) {
 
             return &request;
           }));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.min_flush_spans", 5))
+      .WillOnce(Return(1));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.request_timeout", 5000U))
+      .WillOnce(Return(5000U));
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
@@ -1196,19 +1201,24 @@ TEST_F(ZipkinDriverTest, ReporterFlushWithCustomHeadersVerifyHeaders) {
 
             // Verify custom headers are present
             auto auth_header = message->headers().get(Http::LowerCaseString("authorization"));
-            ASSERT_FALSE(auth_header.empty());
+            EXPECT_FALSE(auth_header.empty());
             EXPECT_EQ("Bearer token123", auth_header[0]->value().getStringView());
 
             auto custom_header = message->headers().get(Http::LowerCaseString("x-custom-header"));
-            ASSERT_FALSE(custom_header.empty());
+            EXPECT_FALSE(custom_header.empty());
             EXPECT_EQ("custom-value", custom_header[0]->value().getStringView());
 
             auto api_key_header = message->headers().get(Http::LowerCaseString("x-api-key"));
-            ASSERT_FALSE(api_key_header.empty());
+            EXPECT_FALSE(api_key_header.empty());
             EXPECT_EQ("api-key-123", api_key_header[0]->value().getStringView());
 
             return &request;
           }));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.min_flush_spans", 5))
+      .WillOnce(Return(1));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.request_timeout", 5000U))
+      .WillOnce(Return(5000U));
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
@@ -1257,16 +1267,21 @@ TEST_F(ZipkinDriverTest, ReporterFlushWithCustomHeadersProtobuf) {
 
             // Verify custom headers are present
             auto auth_header = message->headers().get(Http::LowerCaseString("authorization"));
-            ASSERT_FALSE(auth_header.empty());
+            EXPECT_FALSE(auth_header.empty());
             EXPECT_EQ("Bearer token123", auth_header[0]->value().getStringView());
 
             auto encoding_header =
                 message->headers().get(Http::LowerCaseString("content-encoding"));
-            ASSERT_FALSE(encoding_header.empty());
+            EXPECT_FALSE(encoding_header.empty());
             EXPECT_EQ("gzip", encoding_header[0]->value().getStringView());
 
             return &request;
           }));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.min_flush_spans", 5))
+      .WillOnce(Return(1));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.request_timeout", 5000U))
+      .WillOnce(Return(5000U));
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});

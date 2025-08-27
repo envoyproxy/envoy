@@ -104,7 +104,8 @@ struct CollectorInfo {
 
   // The version of the collector. This is related to endpoint's supported payload specification and
   // transport.
-  envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion version_;
+  envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion version_{
+      envoy::config::trace::v3::ZipkinConfig::HTTP_JSON};
 
   bool shared_span_context_{DEFAULT_SHARED_SPAN_CONTEXT};
 
