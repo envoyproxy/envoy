@@ -641,7 +641,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       original_request_url.initialize(result.original_request_url_, false);
       if (config_->redirectPathMatcher().match(original_request_url.pathAndQueryParams())) {
         sendUnauthorizedResponse(
-            fmt::format("State url query params {} matches the redirect path matcher",
+            fmt::format("State url query params matches the redirect path matcher: {}",
                         original_request_url.pathAndQueryParams()));
         return Http::FilterHeadersStatus::StopIteration;
       }
@@ -1339,7 +1339,7 @@ OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
   Http::Utility::Url url;
   if (!url.initialize(original_request_url, false)) {
     return {false, "", "",
-            fmt::format("State url {} can not be initialized", original_request_url)};
+            fmt::format("State url can not be initialized: {}", original_request_url)};
   }
 
   return {true, codeVal.value(), original_request_url, ""};
