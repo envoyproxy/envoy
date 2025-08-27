@@ -22,6 +22,16 @@ pub mod abi {
   include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 
+#[derive(Debug)]
+pub struct InitFunctions {
+  pub init_fn: ProgramInitFunction,
+  pub new_http_filter_config_fn:
+    NewHttpFilterConfigFunction<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl>,
+  pub destroy_http_filter_config_fn:
+    Option<DestroyHttpFilterConfigFunction<EnvoyHttpFilterConfigImpl>>,
+  pub new_http_filter_per_route_config_fn: Option<NewHttpFilterPerRouteConfigFunction>,
+}
+
 /// Declare the init functions for the dynamic module.
 ///
 /// The first argument has [`ProgramInitFunction`] type, and it is called when the dynamic module is
@@ -29,6 +39,12 @@ pub mod abi {
 ///
 /// The second argument has [`NewHttpFilterConfigFunction`] type, and it is called when the new HTTP
 /// filter configuration is created.
+///
+/// The third optional argument has [`NewHttpFilterPerRouteConfigFunction`] type, and it is called
+/// when the new per-route configuration is created.
+///
+/// Alternatively, a single argument [`InitFunctions`] can be passed wrapping all the possible init
+/// functions.
 ///
 /// # Example
 ///
@@ -58,33 +74,48 @@ pub mod abi {
 /// ```
 #[macro_export]
 macro_rules! declare_init_functions {
-  ($f:ident, $new_http_filter_config_fn:expr, $new_http_filter_per_route_config_fn:expr) => {
+  ($fns:expr) => {
     #[no_mangle]
     pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
-      envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
-        .get_or_init(|| $new_http_filter_config_fn);
-      envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION
-        .get_or_init(|| $new_http_filter_per_route_config_fn);
-      if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
+      let ::envoy_proxy_dynamic_modules_rust_sdk::InitFunctions {
+        init_fn,
+        new_http_filter_config_fn,
+        destroy_http_filter_config_fn,
+        new_http_filter_per_route_config_fn,
+      } = $fns;
+      ::envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
+        .get_or_init(|| new_http_filter_config_fn);
+      if let Some(f) = destroy_http_filter_config_fn {
+        ::envoy_proxy_dynamic_modules_rust_sdk::DESTROY_HTTP_FILTER_CONFIG_FUNCTION
+          .get_or_init(|| f);
+      }
+      if let Some(f) = new_http_filter_per_route_config_fn {
+        ::envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION
+          .get_or_init(|| f);
+      }
+      if (init_fn()) {
+        ::envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
           as *const ::std::os::raw::c_char
       } else {
         ::std::ptr::null()
       }
     }
   };
+  ($f:ident, $new_http_filter_config_fn:expr, $new_http_filter_per_route_config_fn:expr) => {
+    declare_init_functions!(::envoy_proxy_dynamic_modules_rust_sdk::InitFunctions {
+      init_fn: $f,
+      new_http_filter_config_fn: $new_http_filter_config_fn,
+      destroy_http_filter_config_fn: None,
+      new_http_filter_per_route_config_fn: Some($new_http_filter_per_route_config_fn),
+    });
+  };
   ($f:ident, $new_http_filter_config_fn:expr) => {
-    #[no_mangle]
-    pub extern "C" fn envoy_dynamic_module_on_program_init() -> *const ::std::os::raw::c_char {
-      envoy_proxy_dynamic_modules_rust_sdk::NEW_HTTP_FILTER_CONFIG_FUNCTION
-        .get_or_init(|| $new_http_filter_config_fn);
-      if ($f()) {
-        envoy_proxy_dynamic_modules_rust_sdk::abi::kAbiVersion.as_ptr()
-          as *const ::std::os::raw::c_char
-      } else {
-        ::std::ptr::null()
-      }
-    }
+    declare_init_functions!(::envoy_proxy_dynamic_modules_rust_sdk::InitFunctions {
+      init_fn: $f,
+      new_http_filter_config_fn: $new_http_filter_config_fn,
+      destroy_http_filter_config_fn: None,
+      new_http_filter_per_route_config_fn: None,
+    });
   };
 }
 
@@ -216,6 +247,17 @@ pub type NewHttpFilterConfigFunction<EC, EHF> = fn(
 /// `declare_init_functions` macro, and is not intended to be set directly.
 pub static NEW_HTTP_FILTER_CONFIG_FUNCTION: OnceLock<
   NewHttpFilterConfigFunction<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl>,
+> = OnceLock::new();
+
+/// The function signature for the destroy HTTP filter configuration function.
+///
+/// This is called when an HTTP filter configuration is destroyed.
+pub type DestroyHttpFilterConfigFunction<EC> = fn(envoy_filter_config: &mut EC);
+
+/// The global destroy function for HTTP filter configurations. This is set via the
+/// `declare_init_functions` macro, and is not intended to be set directly.
+pub static DESTROY_HTTP_FILTER_CONFIG_FUNCTION: OnceLock<
+  DestroyHttpFilterConfigFunction<EnvoyHttpFilterConfigImpl>,
 > = OnceLock::new();
 
 /// The function signature for the new HTTP filter per-route configuration function.
@@ -1597,10 +1639,17 @@ fn envoy_dynamic_module_on_http_filter_config_new_impl(
 
 #[no_mangle]
 unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_destroy(
+  envoy_filter_config_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
   config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
 ) {
   drop_wrapped_c_void_ptr!(config_ptr,
     HttpFilterConfig<EnvoyHttpFilterConfigImpl,EnvoyHttpFilterImpl>);
+  let mut envoy_filter_config = EnvoyHttpFilterConfigImpl {
+    raw_ptr: envoy_filter_config_ptr,
+  };
+  if let Some(destroy_fn) = DESTROY_HTTP_FILTER_CONFIG_FUNCTION.get() {
+    destroy_fn(&mut envoy_filter_config);
+  }
 }
 
 #[no_mangle]

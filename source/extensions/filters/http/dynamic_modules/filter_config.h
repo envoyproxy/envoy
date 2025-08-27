@@ -38,7 +38,7 @@ using OnHttpFilterScheduled = decltype(&envoy_dynamic_module_on_http_filter_sche
  * filter instances. This resolves and holds the symbols used for the HTTP filters.
  * Each filter instance and the factory callback holds a shared pointer to this config.
  */
-class DynamicModuleHttpFilterConfig {
+class DynamicModuleHttpFilterConfig final {
 public:
   /**
    * Constructor for the config.

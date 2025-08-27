@@ -15,4 +15,5 @@ envoy_dynamic_module_on_http_filter_config_new(
 }
 
 void envoy_dynamic_module_on_http_filter_config_destroy(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
     envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr) {}

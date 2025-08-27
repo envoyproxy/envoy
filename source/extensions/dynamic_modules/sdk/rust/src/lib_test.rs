@@ -35,7 +35,7 @@ fn test_envoy_dynamic_module_on_http_filter_config_new_impl() {
   assert!(!result.is_null());
 
   unsafe {
-    envoy_dynamic_module_on_http_filter_config_destroy(result);
+    envoy_dynamic_module_on_http_filter_config_destroy(envoy_filter_config.raw_ptr, result);
   }
 
   // None should result in null pointer.
@@ -65,20 +65,22 @@ fn test_envoy_dynamic_module_on_http_filter_config_destroy() {
     }
   }
 
+  let mut envoy_filter_config = EnvoyHttpFilterConfigImpl {
+    raw_ptr: std::ptr::null_mut(),
+  };
+
   // This is a sort of round-trip to ensure the same control flow as the actual usage.
   let new_fn: NewHttpFilterConfigFunction<EnvoyHttpFilterConfigImpl, EnvoyHttpFilterImpl> =
     |_, _, _| Some(Box::new(TestHttpFilterConfig));
   let config_ptr = envoy_dynamic_module_on_http_filter_config_new_impl(
-    &mut EnvoyHttpFilterConfigImpl {
-      raw_ptr: std::ptr::null_mut(),
-    },
+    &mut envoy_filter_config,
     "test_name",
     b"test_config",
     &new_fn,
   );
 
   unsafe {
-    envoy_dynamic_module_on_http_filter_config_destroy(config_ptr);
+    envoy_dynamic_module_on_http_filter_config_destroy(envoy_filter_config.raw_ptr, config_ptr);
   }
   // Now that the drop is called, DROPPED must be set to true.
   assert!(DROPPED.load(std::sync::atomic::Ordering::SeqCst));

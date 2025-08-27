@@ -510,10 +510,13 @@ envoy_dynamic_module_on_http_filter_config_new(
  * envoy_dynamic_module_on_http_filter_config_destroy is called when the HTTP filter configuration
  * is destroyed in Envoy. The module should release any resources associated with the corresponding
  * in-module HTTP filter configuration.
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig object for the
+ * corresponding config.
  * @param filter_config_ptr is a pointer to the in-module HTTP filter configuration whose
  * corresponding Envoy HTTP filter configuration is being destroyed.
  */
 void envoy_dynamic_module_on_http_filter_config_destroy(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
     envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr);
 
 /**

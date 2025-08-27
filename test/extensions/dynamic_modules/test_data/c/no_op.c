@@ -14,15 +14,20 @@ envoy_dynamic_module_type_abi_version_envoy_ptr envoy_dynamic_module_on_program_
   return kAbiVersion;
 }
 
+static envoy_dynamic_module_type_http_filter_config_envoy_ptr cached_filter_config_envoy_ptr;
+
 envoy_dynamic_module_type_http_filter_config_module_ptr
 envoy_dynamic_module_on_http_filter_config_new(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
     const char* name_ptr, size_t name_size, const char* config_ptr, size_t config_size) {
+  cached_filter_config_envoy_ptr = filter_config_envoy_ptr;
   return &some_variable;
 }
 
 void envoy_dynamic_module_on_http_filter_config_destroy(
+     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
     envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr) {
+  assert(filter_config_envoy_ptr == cached_filter_config_envoy_ptr);
   assert(filter_config_ptr == &some_variable);
 }
 

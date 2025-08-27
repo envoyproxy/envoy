@@ -16,7 +16,9 @@ DynamicModuleHttpFilterConfig::~DynamicModuleHttpFilterConfig() {
   // When the initialization of the dynamic module fails, the in_module_config_ is nullptr,
   // and there's nothing to destroy from the module's point of view.
   if (on_http_filter_config_destroy_) {
-    (*on_http_filter_config_destroy_)(in_module_config_);
+    // Passing this is safe as there are no cleaned up virtual functions which is guaranteed
+    // by the class type being final
+    (*on_http_filter_config_destroy_)(this, in_module_config_);
   }
 }
 

@@ -1,7 +1,12 @@
 use envoy_proxy_dynamic_modules_rust_sdk::*;
 use std::sync::atomic::{AtomicI32, Ordering};
 
-declare_init_functions!(init, new_nop_http_filter_config_fn);
+declare_init_functions!(InitFunctions {
+  init_fn: init,
+  new_http_filter_config_fn: new_nop_http_filter_config_fn,
+  destroy_http_filter_config_fn: Some(destroy_nop_http_filter_config_fn),
+  new_http_filter_per_route_config_fn: None,
+});
 
 /// This implements the [`envoy_proxy_dynamic_modules_rust_sdk::ProgramInitFunction`] signature.
 fn init() -> bool {
@@ -27,9 +32,14 @@ fn new_nop_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter
   Some(Box::new(NopHttpFilterConfig { name, config }))
 }
 
+/// This implements the [`envoy_proxy_dynamic_modules_rust_sdk::DestroyHttpFilterConfigFunction`]
+/// signature
+fn destroy_nop_http_filter_config_fn<EC: EnvoyHttpFilterConfig>(_envoy_filter_config: &mut EC) {}
+
 /// A no-op HTTP filter configuration that implements
 /// [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig`] as well as the [`Drop`] to test the
 /// cleanup of the configuration.
+#[derive(Debug, PartialEq, Eq, Clone)]
 struct NopHttpFilterConfig {
   name: String,
   config: String,
