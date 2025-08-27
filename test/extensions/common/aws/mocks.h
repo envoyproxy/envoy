@@ -160,6 +160,8 @@ public:
   void setCredentialsToAllThreads(CredentialsConstUniquePtr&& creds) {
     provider_->setCredentialsToAllThreads(std::move(creds));
   }
+  void invalidateStats() { provider_->stats_.reset(); }
+
   std::shared_ptr<MetadataCredentialsProviderBase> provider_;
 };
 

@@ -327,7 +327,7 @@ TEST_F(AsyncCredentialHandlingTest, WeakPtrProtectionInTimerCallback) {
   delete (raw_metadata_fetcher_);
 }
 
-TEST_F(AsyncCredentialHandlingTest, WeakPtrProtectionInTimerCallbackWhenReset) {
+TEST_F(AsyncCredentialHandlingTest, WeakPtrProtectionForStatsInTimerCallback) {
   MetadataFetcher::MetadataReceiver::RefreshState refresh_state =
       MetadataFetcher::MetadataReceiver::RefreshState::Ready;
   std::chrono::seconds initialization_timer = std::chrono::seconds(2);
@@ -351,14 +351,14 @@ TEST_F(AsyncCredentialHandlingTest, WeakPtrProtectionInTimerCallbackWhenReset) {
 
   timer_ = new NiceMock<Event::MockTimer>(&context_.dispatcher_);
   Event::MockTimer* timer_ptr = timer_;
-  {
-    auto provider_friend = MetadataCredentialsProviderBaseFriend(mock_provider);
-    provider_friend.onClusterAddOrUpdate();
-  }
+  auto provider_friend = MetadataCredentialsProviderBaseFriend(mock_provider);
+  provider_friend.onClusterAddOrUpdate();
 
-  // Destroy provider and verify timer callback doesn't crash due to weak_ptr protection
-  EXPECT_CALL(*mock_provider, refresh()).Times(0);
-  mock_provider.reset();
+  // Invalidate stats pointer
+  provider_friend.invalidateStats();
+
+  // Timer callback will skip the stats call due to weak_ptr lock failing
+  EXPECT_CALL(*mock_provider, refresh());
   timer_ptr->enabled_ = true;
   timer_ptr->invokeCallback();
   delete (raw_metadata_fetcher_);
