@@ -43,7 +43,7 @@ minor_behavior_changes:
     It is found to favor TCP over QUIC when UDP does not work on v6 network but works on v4.
 - area: mobile
   change: |
-    Explicitly drain connections upon network change events regardless of whether refresh DNS cache or not. This behavior
+    Explicitly drain connections upon network change events regardless of whether the DNS cache is refreshed or not. This behavior
     can be reverted by setting the runtime guard ``envoy.reloadable_features.decouple_explicit_drain_pools_and_dns_refresh``
     to false.
 - area: http
