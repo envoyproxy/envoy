@@ -1034,6 +1034,12 @@ public:
   virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
 
   /**
+   * @return optional<std::chrono::milliseconds> the route's flush timeout. Zero indicates a
+   *         disabled idle timeout, while nullopt indicates deference to the global timeout.
+   */
+  virtual absl::optional<std::chrono::milliseconds> flushTimeout() const PURE;
+
+  /**
    * @return true if new style max_stream_duration config should be used over the old style.
    */
   virtual bool usingNewTimeouts() const PURE;

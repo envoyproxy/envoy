@@ -3029,13 +3029,17 @@ envoy_cc_library(
 envoy_quic_cc_library(
     name = "quic_core_http_client_lib",
     srcs = [
+        "quiche/quic/core/http/quic_connection_migration_manager.cc",
         "quiche/quic/core/http/quic_spdy_client_session.cc",
         "quiche/quic/core/http/quic_spdy_client_session_base.cc",
+        "quiche/quic/core/http/quic_spdy_client_session_with_migration.cc",
         "quiche/quic/core/http/quic_spdy_client_stream.cc",
     ],
     hdrs = [
+        "quiche/quic/core/http/quic_connection_migration_manager.h",
         "quiche/quic/core/http/quic_spdy_client_session.h",
         "quiche/quic/core/http/quic_spdy_client_session_base.h",
+        "quiche/quic/core/http/quic_spdy_client_session_with_migration.h",
         "quiche/quic/core/http/quic_spdy_client_stream.h",
     ],
     deps = [
@@ -3047,10 +3051,12 @@ envoy_quic_cc_library(
         ":quic_core_http_server_initiated_spdy_stream_lib",
         ":quic_core_http_spdy_session_lib",
         ":quic_core_packets_lib",
+        ":quic_core_path_context_factory_interface_lib",
         ":quic_core_qpack_qpack_streams_lib",
         ":quic_core_server_id_lib",
         ":quic_core_types_lib",
         ":quic_core_utils_lib",
+        ":quic_force_blockable_packet_writer_lib",
         ":quic_platform_base",
     ],
 )
@@ -3202,6 +3208,12 @@ envoy_quic_cc_library(
         ":quic_core_http_spdy_session_lib",
         ":quic_server_session_lib",
     ],
+)
+
+envoy_quic_cc_library(
+    name = "quic_force_blockable_packet_writer_lib",
+    hdrs = ["quiche/quic/core/quic_force_blockable_packet_writer.h"],
+    deps = [":quic_core_packet_writer_lib"],
 )
 
 envoy_quic_cc_library(
@@ -3391,6 +3403,16 @@ envoy_quic_cc_library(
         ":quic_core_arena_scoped_ptr_lib",
         ":quic_core_types_lib",
         ":quic_platform_base",
+    ],
+)
+
+envoy_quic_cc_library(
+    name = "quic_core_path_context_factory_interface_lib",
+    hdrs = ["quiche/quic/core/quic_path_context_factory.h"],
+    deps = [
+        ":quic_core_path_validator_lib",
+        ":quic_platform_export",
+        ":quic_platform_socket_address",
     ],
 )
 

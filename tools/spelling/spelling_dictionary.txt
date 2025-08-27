@@ -1007,6 +1007,7 @@ metaprogramming
 metatable
 microbenchmarks
 midp
+migratable
 milli
 mimics
 misconfiguration
