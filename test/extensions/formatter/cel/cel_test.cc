@@ -339,6 +339,18 @@ TEST_F(CELFormatterTest, TestTypedInvalidExpression) {
       EnvoyException, "Not able to parse expression: .*");
 }
 
+TEST_F(CELFormatterTest, TestInvalidSemanticExpression) {
+  const std::string yaml = R"EOF(
+  text_format_source:
+    inline_string: "%CEL(f())%"
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  EXPECT_THROW_WITH_REGEX(
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
+      EnvoyException, "failed to create an expression: .*");
+}
+
 TEST_F(CELFormatterTest, TestRegexExtFunctions) {
   const std::string yaml = R"EOF(
   text_format_source:

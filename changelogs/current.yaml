@@ -17,6 +17,12 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: tap
+  change: |
+    Previously, streamed trace buffered data was only flushed when it reached the configured size.
+    If the threshold was never met, the data remained buffered until the connection was closed.
+    With this change, buffered data will be flushed proactively. Specifically, if the buffer does not
+    reach the configured size but has been held for more than 15 seconds, it will be sent immediately.
 - area: websocket
   change: |
       Allow 4xx and 5xx to go through the filter chain for websocket handshake response check, and the behaviour can be disabled
@@ -71,6 +77,12 @@ bug_fixes:
 - area: aws
   change: |
     Adds missing session name, session duration and externalid parameters in assumerole credentials provider.
+- area: oauth2
+  change: |
+    Fixed a bug introduced in PR [#40228](https://github.com/envoyproxy/envoy/pull/40228), where OAuth2 cookies were
+    removed for requests matching the ``pass_through_matcher`` configuration. This broke setups with multiple OAuth2
+    filter instances using different ``pass_through_matcher`` configurations, because the first matching instance removed
+    the OAuth2 cookies--even when a passthrough was intended--impacting subsequent filters that still needed those cookies.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -290,6 +302,11 @@ new_features:
 - area: http
   change: |
     Added ``upstream_rq_per_cx`` histogram to track requests per connection for monitoring connection reuse efficiency.
-
+- area: http
+  change: |
+    Added
+    :ref:`stream_flush_timeout
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_flush_timeout>`
+    to allow for configuring a stream flush timeout independently from the stream idle timeout.
 
 deprecated:

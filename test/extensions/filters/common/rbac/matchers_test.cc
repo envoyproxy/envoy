@@ -663,9 +663,9 @@ TEST(PolicyMatcher, PolicyMatcher) {
   policy.add_permissions()->set_destination_port(456);
   policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("foo");
   policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("bar");
-  Expr::BuilderPtr builder = Expr::createBuilder(nullptr);
+  auto builder = Expr::createBuilder(nullptr);
 
-  RBAC::PolicyMatcher matcher(policy, builder.get(), ProtobufMessage::getStrictValidationVisitor(),
+  RBAC::PolicyMatcher matcher(policy, builder, ProtobufMessage::getStrictValidationVisitor(),
                               factory_context);
 
   Envoy::Network::MockConnection conn;
