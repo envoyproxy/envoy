@@ -134,9 +134,16 @@ message OverloadAction {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.overload.v2alpha.OverloadAction";
 
-  // The name of the overload action. This is just a well-known string that listeners can
-  // use for registering callbacks. Custom overload actions should be named using reverse
-  // DNS to ensure uniqueness.
+  // The name of the overload action. This is just a well-known string that
+  // listeners can use for registering callbacks.
+  // Valid known overload actions include:
+  // - envoy.overload_actions.stop_accepting_requests
+  // - envoy.overload_actions.disable_http_keepalive
+  // - envoy.overload_actions.stop_accepting_connections
+  // - envoy.overload_actions.reject_incoming_connections
+  // - envoy.overload_actions.shrink_heap
+  // - envoy.overload_actions.reduce_timeouts
+  // - envoy.overload_actions.reset_high_memory_stream
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
   // A set of triggers for this action. The state of the action is the maximum
@@ -148,7 +155,7 @@ message OverloadAction {
   // in this list.
   repeated Trigger triggers = 2 [(validate.rules).repeated = {min_items: 1}];
 
-  // Configuration for the action being instantiated.
+  // Configuration for the action being instantiated if applicable.
   google.protobuf.Any typed_config = 3;
 }
 

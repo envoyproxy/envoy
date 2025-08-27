@@ -585,6 +585,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  // If large request buffering is enabled and its size is more than current buffer limit, update
+  // the buffer limit to a new larger value.
+  uint64_t effective_buffer_limit = calculateEffectiveBufferLimit();
+  if (effective_buffer_limit != std::numeric_limits<uint64_t>::max() &&
+      effective_buffer_limit > callbacks_->decoderBufferLimit()) {
+    ENVOY_STREAM_LOG(debug, "Setting new filter manager buffer limit: {}", *callbacks_,
+                     effective_buffer_limit);
+    callbacks_->setDecoderBufferLimit(effective_buffer_limit);
+  }
+
   // Increment the attempt count from 0 to 1 at the first upstream request.
   attempt_count_++;
   callbacks_->streamInfo().setAttemptCount(attempt_count_);
