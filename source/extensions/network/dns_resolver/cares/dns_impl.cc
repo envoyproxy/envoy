@@ -51,7 +51,10 @@ DnsResolverImpl::DnsResolverImpl(
           config, query_timeout_seconds, DEFAULT_QUERY_TIMEOUT_SECONDS))),
       query_tries_(static_cast<uint32_t>(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, query_tries, DEFAULT_QUERY_TRIES))),
-      rotate_nameservers_(config.rotate_nameservers()), resolvers_csv_(resolvers_csv),
+      rotate_nameservers_(config.rotate_nameservers()),
+      edns0_max_payload_size_(static_cast<uint32_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, edns0_max_payload_size, 0))), // 0 means use c-ares default EDNS0
+      resolvers_csv_(resolvers_csv),
       filter_unroutable_families_(config.filter_unroutable_families()),
       scope_(root_scope.createScope("dns.cares.")), stats_(generateCaresDnsResolverStats(*scope_)) {
   AresOptions options = defaultAresOptions();
@@ -124,6 +127,12 @@ DnsResolverImpl::AresOptions DnsResolverImpl::defaultAresOptions() {
     options.optmask_ |= ARES_OPT_ROTATE;
   } else {
     options.optmask_ |= ARES_OPT_NOROTATE;
+  }
+
+  // Configure EDNS0 payload size if specified
+  if (edns0_max_payload_size_ > 0) {
+    options.optmask_ |= ARES_OPT_EDNSPSZ;
+    options.options_.ednspsz = edns0_max_payload_size_;
   }
 
   // Disable query cache by default.
