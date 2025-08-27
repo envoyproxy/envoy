@@ -1068,6 +1068,209 @@ TEST_F(ZipkinDriverTest, DuplicatedHeader) {
   });
 }
 
+TEST_F(ZipkinDriverTest, DriverWithCustomHeaders) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  const std::string yaml_string = R"EOF(
+  collector_cluster: fake_cluster
+  collector_endpoint: /api/v2/spans
+  collector_endpoint_version: HTTP_JSON
+  collector_request_headers:
+    - key: "Authorization"
+      value: "Bearer token123"
+    - key: "X-Custom-Header"
+      value: "custom-value"
+    - key: "X-API-Key" 
+      value: "api-key-123"
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config;
+  TestUtility::loadFromYaml(yaml_string, zipkin_config);
+
+  setup(zipkin_config, true);
+  EXPECT_NE(nullptr, driver_);
+}
+
+TEST_F(ZipkinDriverTest, DriverWithEmptyCustomHeaders) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  const std::string yaml_string = R"EOF(
+  collector_cluster: fake_cluster
+  collector_endpoint: /api/v2/spans
+  collector_endpoint_version: HTTP_JSON
+  collector_request_headers: []
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config;
+  TestUtility::loadFromYaml(yaml_string, zipkin_config);
+
+  setup(zipkin_config, true);
+  EXPECT_NE(nullptr, driver_);
+}
+
+TEST_F(ZipkinDriverTest, DriverWithNoCustomHeaders) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  const std::string yaml_string = R"EOF(
+  collector_cluster: fake_cluster
+  collector_endpoint: /api/v2/spans
+  collector_endpoint_version: HTTP_JSON
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config;
+  TestUtility::loadFromYaml(yaml_string, zipkin_config);
+
+  setup(zipkin_config, true);
+  EXPECT_NE(nullptr, driver_);
+}
+
+TEST_F(ZipkinDriverTest, ReporterFlushWithCustomHeaders) {
+  setupValidDriverWithHostname("HTTP_JSON", "");
+
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
+  Http::AsyncClient::Callbacks* callback;
+  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+
+  // Set up expectations for the HTTP request with custom headers
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
+              send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callback = &callbacks;
+
+            // Verify standard headers are present
+            EXPECT_EQ("/api/v2/spans", message->headers().getPathValue());
+            EXPECT_EQ("fake_cluster", message->headers().getHostValue());
+            EXPECT_EQ("application/json", message->headers().getContentTypeValue());
+
+            return &request;
+          }));
+
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  span->finishSpan();
+
+  Http::ResponseHeaderMapPtr response_headers{new Http::TestResponseHeaderMapImpl{{":status", "202"}}};
+  callback->onSuccess(request, std::make_unique<Http::ResponseMessageImpl>(std::move(response_headers)));
+}
+
+TEST_F(ZipkinDriverTest, ReporterFlushWithCustomHeadersVerifyHeaders) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  const std::string yaml_string = R"EOF(
+  collector_cluster: fake_cluster
+  collector_endpoint: /api/v2/spans
+  collector_endpoint_version: HTTP_JSON
+  collector_request_headers:
+    - key: "Authorization"
+      value: "Bearer token123"
+    - key: "X-Custom-Header"
+      value: "custom-value"
+    - key: "X-API-Key"
+      value: "api-key-123"
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config;
+  TestUtility::loadFromYaml(yaml_string, zipkin_config);
+  setup(zipkin_config, true);
+
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
+  Http::AsyncClient::Callbacks* callback;
+  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+
+  // Set up expectations for the HTTP request with custom headers
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
+              send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callback = &callbacks;
+
+            // Verify standard headers are present
+            EXPECT_EQ("/api/v2/spans", message->headers().getPathValue());
+            EXPECT_EQ("fake_cluster", message->headers().getHostValue());
+            EXPECT_EQ("application/json", message->headers().getContentTypeValue());
+
+            // Verify custom headers are present
+            auto auth_header = message->headers().get(Http::LowerCaseString("authorization"));
+            ASSERT_FALSE(auth_header.empty());
+            EXPECT_EQ("Bearer token123", auth_header[0]->value().getStringView());
+
+            auto custom_header = message->headers().get(Http::LowerCaseString("x-custom-header"));
+            ASSERT_FALSE(custom_header.empty());
+            EXPECT_EQ("custom-value", custom_header[0]->value().getStringView());
+
+            auto api_key_header = message->headers().get(Http::LowerCaseString("x-api-key"));
+            ASSERT_FALSE(api_key_header.empty());
+            EXPECT_EQ("api-key-123", api_key_header[0]->value().getStringView());
+
+            return &request;
+          }));
+
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  span->finishSpan();
+
+  Http::ResponseHeaderMapPtr response_headers{new Http::TestResponseHeaderMapImpl{{":status", "202"}}};
+  callback->onSuccess(request, std::make_unique<Http::ResponseMessageImpl>(std::move(response_headers)));
+}
+
+TEST_F(ZipkinDriverTest, ReporterFlushWithCustomHeadersProtobuf) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  const std::string yaml_string = R"EOF(
+  collector_cluster: fake_cluster
+  collector_endpoint: /api/v2/spans
+  collector_endpoint_version: HTTP_PROTO
+  collector_request_headers:
+    - key: "Authorization"
+      value: "Bearer token123"
+    - key: "Content-Encoding"
+      value: "gzip"
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config;
+  TestUtility::loadFromYaml(yaml_string, zipkin_config);
+  setup(zipkin_config, true);
+
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
+  Http::AsyncClient::Callbacks* callback;
+  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+
+  // Set up expectations for the HTTP request with custom headers for protobuf version
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
+              send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callback = &callbacks;
+
+            // Verify standard headers are present
+            EXPECT_EQ("/api/v2/spans", message->headers().getPathValue());
+            EXPECT_EQ("fake_cluster", message->headers().getHostValue());
+            EXPECT_EQ("application/x-protobuf", message->headers().getContentTypeValue());
+
+            // Verify custom headers are present
+            auto auth_header = message->headers().get(Http::LowerCaseString("authorization"));
+            ASSERT_FALSE(auth_header.empty());
+            EXPECT_EQ("Bearer token123", auth_header[0]->value().getStringView());
+
+            auto encoding_header = message->headers().get(Http::LowerCaseString("content-encoding"));
+            ASSERT_FALSE(encoding_header.empty());
+            EXPECT_EQ("gzip", encoding_header[0]->value().getStringView());
+
+            return &request;
+          }));
+
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  span->finishSpan();
+
+  Http::ResponseHeaderMapPtr response_headers{new Http::TestResponseHeaderMapImpl{{":status", "202"}}};
+  callback->onSuccess(request, std::make_unique<Http::ResponseMessageImpl>(std::move(response_headers)));
+}
+
 } // namespace
 } // namespace Zipkin
 } // namespace Tracers

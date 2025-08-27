@@ -47,6 +47,11 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
       zipkin_config, shared_span_context, DEFAULT_SHARED_SPAN_CONTEXT);
   collector.shared_span_context_ = shared_span_context;
 
+  // Parse custom headers for collector requests
+  for (const auto& header : zipkin_config.collector_request_headers()) {
+    collector.request_headers_.emplace_back(header.key(), header.value());
+  }
+
   const bool split_spans_for_request = zipkin_config.split_spans_for_request();
 
   tls_->set([this, collector, &random_generator, trace_id_128bit, shared_span_context,
@@ -146,6 +151,12 @@ void ReporterImpl::flushSpans() {
         collector_.version_ == envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO
             ? Http::Headers::get().ContentTypeValues.Protobuf
             : Http::Headers::get().ContentTypeValues.Json);
+
+    // Add custom headers configured for the Zipkin collector
+    for (const auto& header : collector_.request_headers_) {
+      // Replace any existing header with the configured value
+      message->headers().setCopy(Http::LowerCaseString(header.first), header.second);
+    }
 
     message->body().add(request_body);
 

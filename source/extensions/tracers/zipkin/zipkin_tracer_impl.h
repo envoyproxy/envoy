@@ -107,6 +107,9 @@ struct CollectorInfo {
   envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion version_;
 
   bool shared_span_context_{DEFAULT_SHARED_SPAN_CONTEXT};
+
+  // Additional custom headers to include in requests to the Zipkin collector.
+  std::vector<std::pair<std::string, std::string>> request_headers_;
 };
 
 /**
