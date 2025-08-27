@@ -1,6 +1,7 @@
 package io.envoyproxy.envoymobile.engine;
 
 import io.envoyproxy.envoymobile.engine.types.EnvoyConnectionType;
+import io.envoyproxy.envoymobile.engine.types.NetworkWithType;
 
 import static android.net.ConnectivityManager.TYPE_VPN;
 import static android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET;
@@ -9,7 +10,10 @@ import static android.net.NetworkCapabilities.TRANSPORT_VPN;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.net.ConnectivityManager;
 import android.net.ConnectivityManager.NetworkCallback;
@@ -172,6 +176,10 @@ public class AndroidNetworkMonitorV2 {
   private NetworkRequest mNetworkRequest;
   private NetworkState mNetworkState;
   private boolean mRegistered = false;
+  private IntentFilter mIntentFilter;
+  private Context mApplicationContext;
+  private BroadcastReceiver mBroadcastReceiver;
+  private boolean mIgnoreNextBroadcast = false;
 
   public static void load(Context context, EnvoyEngine envoyEngine) {
     if (mInstance != null) {
@@ -292,8 +300,7 @@ public class AndroidNetworkMonitorV2 {
 
   /** Returns the current default {@link Network}, or {@code null} if disconnected. */
   private Network getDefaultNetwork() {
-    Network defaultNetwork = null;
-    defaultNetwork = mConnectivityManager.getActiveNetwork();
+    Network defaultNetwork = mConnectivityManager.getActiveNetwork();
     if (defaultNetwork != null) {
       return defaultNetwork;
     }
@@ -698,6 +705,22 @@ public class AndroidNetworkMonitorV2 {
     }
   }
 
+  private class ConnectivityBroadcastReceiver extends BroadcastReceiver {
+    @Override
+    public void onReceive(Context context, Intent intent) {
+      runOnThread(new Runnable() {
+        @Override
+        public void run() {
+          if (mIgnoreNextBroadcast) {
+            mIgnoreNextBroadcast = false;
+            return;
+          }
+          onNetworkStateChangedTo(getDefaultNetworkState(), getDefaultNetId());
+        }
+      });
+    }
+  }
+
   private void onNetworkStateChangedTo(NetworkState networkState, long netId) {
     assert mNetworkState != null;
     if (networkState.getEnvoyConnectionType() != mNetworkState.getEnvoyConnectionType() ||
@@ -710,6 +733,7 @@ public class AndroidNetworkMonitorV2 {
   }
 
   private AndroidNetworkMonitorV2(Context context, EnvoyEngine envoyEngine) {
+    mApplicationContext = context.getApplicationContext();
     int permission =
         ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_NETWORK_STATE);
     if (permission == PackageManager.PERMISSION_DENIED) {
@@ -726,7 +750,9 @@ public class AndroidNetworkMonitorV2 {
         (ConnectivityManager)context.getSystemService(Context.CONNECTIVITY_SERVICE);
     mLooper = Looper.myLooper();
     mHandler = new Handler(mLooper);
-    mDefaultNetworkCallback = new DefaultNetworkCallback();
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      mDefaultNetworkCallback = new DefaultNetworkCallback();
+    }
     mAllNetworksCallback = new AllNetworksCallback();
     mNetworkRequest = new NetworkRequest.Builder()
                           .addCapability(NET_CAPABILITY_INTERNET)
@@ -734,6 +760,9 @@ public class AndroidNetworkMonitorV2 {
                           .removeCapability(NET_CAPABILITY_NOT_VPN)
                           .build();
     mNetworkState = getDefaultNetworkState();
+    mIntentFilter = new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION);
+    // Used when mDefaultNetworkCallback is null.
+    mBroadcastReceiver = new ConnectivityBroadcastReceiver();
     registerNetworkCallbacks(false);
   }
 
@@ -746,10 +775,23 @@ public class AndroidNetworkMonitorV2 {
     }
 
     if (mDefaultNetworkCallback != null) {
-      try {
-        mConnectivityManager.registerDefaultNetworkCallback(mDefaultNetworkCallback);
-      } catch (RuntimeException e) {
-        mDefaultNetworkCallback = null;
+      // This is only reachable for Android O+.
+      // If registration fails, mDefaultNetworkCallback will be reset.
+      maybeRegisterDefaultNetworkCallback();
+    }
+    if (mDefaultNetworkCallback == null) {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        // When registering for a sticky broadcast, like CONNECTIVITY_ACTION, if
+        // registerReceiver returns non-null, it means the broadcast was previously issued
+        // and onReceive() will be immediately called with this previous Intent. Since this
+        // initial callback doesn't actually indicate a network change, we can ignore it.
+        mIgnoreNextBroadcast = (mApplicationContext.registerReceiver(
+                                    mBroadcastReceiver, mIntentFilter, /*permission*/ null,
+                                    mHandler, /*flags*/ 0) != null);
+      } else {
+        mIgnoreNextBroadcast =
+            (mApplicationContext.registerReceiver(mBroadcastReceiver, mIntentFilter,
+                                                  /*permission*/ null, mHandler) != null);
       }
     }
     mRegistered = true;
@@ -757,8 +799,12 @@ public class AndroidNetworkMonitorV2 {
     if (mAllNetworksCallback != null) {
       mAllNetworksCallback.initializeVpnInPlace();
       try {
-        mConnectivityManager.registerNetworkCallback(mNetworkRequest, mAllNetworksCallback,
-                                                     mHandler);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+          mConnectivityManager.registerNetworkCallback(mNetworkRequest, mAllNetworksCallback,
+                                                       mHandler);
+        } else {
+          mConnectivityManager.registerNetworkCallback(mNetworkRequest, mAllNetworksCallback);
+        }
       } catch (RuntimeException e) {
         // If Android thinks this app has used up all available NetworkRequests, don't
         // bother trying to register any more callbacks as Android will still think
@@ -784,6 +830,16 @@ public class AndroidNetworkMonitorV2 {
     }
   }
 
+  // This is guaranteed to be called only for Android O+.
+  @SuppressLint("NewApi")
+  private void maybeRegisterDefaultNetworkCallback() {
+    try {
+      mConnectivityManager.registerDefaultNetworkCallback(mDefaultNetworkCallback);
+    } catch (RuntimeException e) {
+      mDefaultNetworkCallback = null;
+    }
+  }
+
   public void unregisterNetworkCallbacks() {
     assert onThread();
     if (!mRegistered)
@@ -794,6 +850,23 @@ public class AndroidNetworkMonitorV2 {
     }
     if (mDefaultNetworkCallback != null) {
       mConnectivityManager.unregisterNetworkCallback(mDefaultNetworkCallback);
+    } else {
+      mApplicationContext.unregisterReceiver(mBroadcastReceiver);
     }
+  }
+
+  public NetworkWithType[] getAllNetworksAndTypes() {
+    Network[] filteredNetworks = getAllNetworksFiltered(null);
+    int size = filteredNetworks.length;
+
+    // Directly create the array with the known size.
+    NetworkWithType[] networks = new NetworkWithType[size];
+
+    for (int i = 0; i < size; i++) {
+      Network network = filteredNetworks[i];
+      final EnvoyConnectionType connectionType = getEnvoyConnectionType(network);
+      networks[i] = new NetworkWithType(network.getNetworkHandle(), connectionType);
+    }
+    return networks;
   }
 }

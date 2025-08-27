@@ -264,12 +264,14 @@ TEST_P(GrpcClientIntegrationTest, BasicStreamWithBytesMeter) {
   auto upstream_meter = stream->grpc_stream_->streamInfo().getUpstreamBytesMeter();
   uint64_t total_bytes_sent = upstream_meter->wireBytesSent();
   uint64_t header_bytes_sent = upstream_meter->headerBytesSent();
+  uint64_t decompressed_header_bytes_sent = upstream_meter->decompressedHeaderBytesSent();
   // Verify the number of sent bytes that is tracked in stream info equals to the length of
   // request buffer.
   // Note, in HTTP2 codec, H2_FRAME_HEADER_SIZE is always included in bytes meter so we need to
   // account for it in the check here as well.
   EXPECT_EQ(total_bytes_sent - header_bytes_sent,
             send_buf->length() + Http::Http2::H2_FRAME_HEADER_SIZE);
+  EXPECT_GE(decompressed_header_bytes_sent, header_bytes_sent);
 
   stream->sendReply(/*check_response_size=*/true);
   stream->sendServerTrailers(Status::WellKnownGrpcStatus::Ok, "", empty_metadata_);
@@ -344,14 +346,18 @@ TEST_P(GrpcClientIntegrationTest, MultiStreamWithBytesMeter) {
   auto upstream_meter_0 = stream_0->grpc_stream_->streamInfo().getUpstreamBytesMeter();
   uint64_t total_bytes_sent = upstream_meter_0->wireBytesSent();
   uint64_t header_bytes_sent = upstream_meter_0->headerBytesSent();
+  uint64_t decompressed_header_bytes_sent = upstream_meter_0->decompressedHeaderBytesSent();
   EXPECT_EQ(total_bytes_sent - header_bytes_sent,
             send_buf->length() + Http::Http2::H2_FRAME_HEADER_SIZE);
+  EXPECT_GE(decompressed_header_bytes_sent, header_bytes_sent);
 
   auto upstream_meter_1 = stream_1->grpc_stream_->streamInfo().getUpstreamBytesMeter();
   uint64_t total_bytes_sent_1 = upstream_meter_1->wireBytesSent();
   uint64_t header_bytes_sent_1 = upstream_meter_1->headerBytesSent();
+  uint64_t decompressed_header_bytes_sent_1 = upstream_meter_1->decompressedHeaderBytesSent();
   EXPECT_EQ(total_bytes_sent_1 - header_bytes_sent_1,
             send_buf->length() + Http::Http2::H2_FRAME_HEADER_SIZE);
+  EXPECT_GE(decompressed_header_bytes_sent_1, header_bytes_sent_1);
 
   stream_0->sendServerInitialMetadata(empty_metadata_);
   stream_0->sendReply(true);

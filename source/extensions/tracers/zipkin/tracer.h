@@ -1,12 +1,10 @@
 #pragma once
 
-#include "envoy/common/pure.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/common/time.h"
-#include "envoy/tracing/tracer.h"
+#include "envoy/config/trace/v3/zipkin.pb.h"
 
 #include "source/extensions/tracers/zipkin/span_context.h"
-#include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_types.h"
 
 namespace Envoy {
@@ -44,6 +42,20 @@ public:
         shared_span_context_(shared_span_context), time_source_(time_source),
         split_spans_for_request_(split_spans_for_request) {}
 
+  /**
+   * Sets the trace context option for header injection behavior.
+   * @param trace_context_option The trace context option from ZipkinConfig.
+   */
+  void setTraceContextOption(TraceContextOption trace_context_option) {
+    trace_context_option_ = trace_context_option;
+  }
+
+  /**
+   * Gets the current trace context option.
+   * @return The current trace context option.
+   */
+  TraceContextOption traceContextOption() const override { return trace_context_option_; }
+
   // TracerInterface
   SpanPtr startSpan(const Tracing::Config&, const std::string& span_name,
                     SystemTime timestamp) override;
@@ -67,6 +79,7 @@ private:
   const bool shared_span_context_;
   TimeSource& time_source_;
   const bool split_spans_for_request_{};
+  TraceContextOption trace_context_option_{envoy::config::trace::v3::ZipkinConfig::USE_B3};
 };
 
 using TracerPtr = std::unique_ptr<Tracer>;

@@ -360,6 +360,8 @@ public:
                const SpanContext& parent_context),
               ());
   MOCK_METHOD(void, reportSpan, (Span && span), ());
+  MOCK_METHOD(envoy::config::trace::v3::ZipkinConfig::TraceContextOption, traceContextOption, (),
+              (const));
 };
 
 TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {

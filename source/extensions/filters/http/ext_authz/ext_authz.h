@@ -6,8 +6,10 @@
 #include <vector>
 
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
+#include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -17,6 +19,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/common/common/utility.h"
+#include "source/common/grpc/typed_async_client.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/runtime/runtime_protos.h"
@@ -305,7 +308,13 @@ public:
         check_settings_(config.has_check_settings()
                             ? config.check_settings()
                             : envoy::extensions::filters::http::ext_authz::v3::CheckSettings()),
-        disabled_(config.disabled()) {
+        disabled_(config.disabled()),
+        grpc_service_(config.has_check_settings() && config.check_settings().has_grpc_service()
+                          ? absl::make_optional(config.check_settings().grpc_service())
+                          : absl::nullopt),
+        http_service_(config.has_check_settings() && config.check_settings().has_http_service()
+                          ? absl::make_optional(config.check_settings().http_service())
+                          : absl::nullopt) {
     if (config.has_check_settings() && config.check_settings().disable_request_body_buffering() &&
         config.check_settings().has_with_request_body()) {
       ExceptionUtil::throwEnvoyException(
@@ -313,6 +322,12 @@ public:
           "with_request_body can be set.");
     }
   }
+
+  // This constructor is used as a way to merge more-specific config into less-specific config in a
+  // clearly defined way (e.g. route config into VH config). All fields on this class must be const
+  // and thus must be initialized in the constructor initialization list.
+  FilterConfigPerRoute(const FilterConfigPerRoute& less_specific,
+                       const FilterConfigPerRoute& more_specific);
 
   void merge(const FilterConfigPerRoute& other);
 
@@ -329,12 +344,30 @@ public:
     return check_settings_;
   }
 
+  /**
+   * @return The gRPC service override for this route, if any.
+   */
+  const absl::optional<const envoy::config::core::v3::GrpcService>& grpcService() const {
+    return grpc_service_;
+  }
+
+  /**
+   * @return The HTTP service override for this route, if any.
+   */
+  const absl::optional<const envoy::extensions::filters::http::ext_authz::v3::HttpService>&
+  httpService() const {
+    return http_service_;
+  }
+
 private:
   // We save the context extensions as a protobuf map instead of a std::map as this allows us to
   // move it to the CheckRequest, thus avoiding a copy that would incur by converting it.
   ContextExtensionsMap context_extensions_;
   envoy::extensions::filters::http::ext_authz::v3::CheckSettings check_settings_;
-  bool disabled_;
+  const bool disabled_;
+  const absl::optional<const envoy::config::core::v3::GrpcService> grpc_service_;
+  const absl::optional<const envoy::extensions::filters::http::ext_authz::v3::HttpService>
+      http_service_;
 };
 
 /**
@@ -347,6 +380,12 @@ class Filter : public Logger::Loggable<Logger::Id::ext_authz>,
 public:
   Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client)
       : config_(config), client_(std::move(client)), stats_(config->stats()) {}
+
+  // Constructor that includes server context for per-route service support.
+  Filter(const FilterConfigSharedPtr& config, Filters::Common::ExtAuthz::ClientPtr&& client,
+         Server::Configuration::ServerFactoryContext& server_context)
+      : config_(config), client_(std::move(client)), server_context_(&server_context),
+        stats_(config->stats()) {}
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -383,6 +422,14 @@ private:
   // code.
   void rejectResponse();
 
+  // Create a new gRPC client for per-route gRPC service configuration.
+  Filters::Common::ExtAuthz::ClientPtr
+  createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grpc_service);
+
+  // Create a new HTTP client for per-route HTTP service configuration.
+  Filters::Common::ExtAuthz::ClientPtr createPerRouteHttpClient(
+      const envoy::extensions::filters::http::ext_authz::v3::HttpService& http_service);
+
   absl::optional<MonotonicTime> start_time_;
   void addResponseHeaders(Http::HeaderMap& header_map, const Http::HeaderVector& headers);
   void initiateCall(const Http::RequestHeaderMap& headers);
@@ -410,6 +457,10 @@ private:
   Http::HeaderMapPtr getHeaderMap(const Filters::Common::ExtAuthz::ResponsePtr& response);
   FilterConfigSharedPtr config_;
   Filters::Common::ExtAuthz::ClientPtr client_;
+  // Per-route gRPC client that overrides the default client when specified.
+  Filters::Common::ExtAuthz::ClientPtr per_route_client_;
+  // Server context for creating per-route clients.
+  Server::Configuration::ServerFactoryContext* server_context_{nullptr};
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
   Http::RequestHeaderMap* request_headers_;
