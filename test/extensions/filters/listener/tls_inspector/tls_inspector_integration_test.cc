@@ -282,7 +282,7 @@ TEST_P(TlsInspectorIntegrationTest, TlsInspectorMetadataPopulatedInAccessLog) {
   }
   // The timeout is set as one seconds, advance 2 seconds to trigger the timeout.
   timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(2000));
-  client_->close(Network::ConnectionCloseType::FlushWrite);
+  client_->close(Network::ConnectionCloseType::NoFlush);
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
               testing::Eq("CLIENT_HELLO_NOT_DETECTED"));
 }
