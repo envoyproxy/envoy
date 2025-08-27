@@ -48,9 +48,6 @@ uint64_t computeClientHelloSize(const BIO* bio, uint64_t prior_bytes_read,
 const unsigned Config::TLS_MIN_SUPPORTED_VERSION = TLS1_VERSION;
 const unsigned Config::TLS_MAX_SUPPORTED_VERSION = TLS1_3_VERSION;
 
-using TlsInspectorMetadata =
-    envoy::extensions::filters::listener::tls_inspector::v3::TlsInspectorMetadata;
-
 Config::Config(
     Stats::Scope& scope,
     const envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector& proto_config,
@@ -178,12 +175,11 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
   return Network::FilterStatus::StopIteration;
 }
 
-void Filter::setDynamicMetadata(TlsInspectorMetadata::ErrorType error_type) {
-  TlsInspectorMetadata metadata;
-  metadata.set_error_type(error_type);
-  Protobuf::Any typed_metadata;
-  typed_metadata.PackFrom(metadata);
-  cb_->setDynamicTypedMetadata(dynamicMetadataKey(), typed_metadata);
+void Filter::setDynamicMetadata(FailureReason failure_reason) {
+  Protobuf::Struct metadata;
+  auto& fields = *metadata.mutable_fields();
+  fields[failureReasonKey()].set_number_value(failure_reason);
+  cb_->setDynamicMetadata(dynamicMetadataKey(), metadata);
 }
 
 ParseState Filter::parseClientHello(const void* data, size_t len,
@@ -209,7 +205,7 @@ ParseState Filter::parseClientHello(const void* data, size_t len,
         // We've hit the specified size limit. This is an unreasonably large ClientHello;
         // indicate failure.
         config_->stats().client_hello_too_large_.inc();
-        setDynamicMetadata(TlsInspectorMetadata::CLIENT_HELLO_TOO_LARGE);
+        setDynamicMetadata(FailureReason::ClientHelloTooLarge);
         return ParseState::Error;
       }
       if (read_ >= requested_read_bytes_) {
@@ -231,11 +227,11 @@ ParseState Filter::parseClientHello(const void* data, size_t len,
           // We've hit the specified size limit. This is an unreasonably large ClientHello;
           // indicate failure.
           config_->stats().client_hello_too_large_.inc();
-          setDynamicMetadata(TlsInspectorMetadata::CLIENT_HELLO_TOO_LARGE);
+          setDynamicMetadata(FailureReason::ClientHelloTooLarge);
           return ParseState::Error;
         }
         config_->stats().tls_not_found_.inc();
-        setDynamicMetadata(TlsInspectorMetadata::CLIENT_HELLO_NOT_DETECTED);
+        setDynamicMetadata(FailureReason::ClientHelloNotDetected);
         ENVOY_LOG(
             debug, "tls inspector: parseClientHello failed: {}",
             Extensions::TransportSockets::Tls::Utility::getLastCryptoError().value_or("unknown"));
@@ -384,7 +380,11 @@ void Filter::createJA4Hash(const SSL_CLIENT_HELLO* ssl_client_hello) {
 }
 
 const std::string& Filter::dynamicMetadataKey() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tls_inspector_metadata");
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.filters.listener.tls_inspector");
+}
+
+const std::string& Filter::failureReasonKey() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "failure_reason");
 }
 
 } // namespace TlsInspector

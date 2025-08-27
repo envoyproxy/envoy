@@ -7,7 +7,6 @@
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
-#include "envoy/stream_info/filter_state.h"
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/listener/tls_inspector/ja4_fingerprint.h"
@@ -48,6 +47,14 @@ enum class ParseState {
   // Parser reports unrecoverable error.
   Error
 };
+
+enum FailureReason {
+  // ClientHello is too large.
+  ClientHelloTooLarge,
+  // ClientHello is not detected.
+  ClientHelloNotDetected,
+};
+
 /**
  * Global configuration for TLS inspector.
  */
@@ -95,6 +102,7 @@ public:
   size_t maxReadBytes() const override { return requested_read_bytes_; }
 
   static const std::string& dynamicMetadataKey();
+  static const std::string& failureReasonKey();
 
 private:
   ParseState parseClientHello(const void* data, size_t len, uint64_t bytes_already_processed);
@@ -104,9 +112,7 @@ private:
   void createJA3Hash(const SSL_CLIENT_HELLO* ssl_client_hello);
   void createJA4Hash(const SSL_CLIENT_HELLO* ssl_client_hello);
   uint32_t maxConfigReadBytes() const { return config_->maxClientHelloSize(); }
-  void setDynamicMetadata(
-      envoy::extensions::filters::listener::tls_inspector::v3::TlsInspectorMetadata::ErrorType
-          error_type);
+  void setDynamicMetadata(FailureReason failure_reason);
 
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_{};

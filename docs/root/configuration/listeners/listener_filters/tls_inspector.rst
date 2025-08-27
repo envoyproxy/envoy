@@ -18,7 +18,7 @@ of a :ref:`FilterChainMatch <envoy_v3_api_msg_config.listener.v3.FilterChainMatc
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.listener.tls_inspector.v3.TlsInspector>`
 
-If the filter fails to detect TLS it will populate filter state indicating the reason (eg. ``ClientHello`` too
+If the filter fails to detect TLS it will populate dynamic metadata indicating the reason (eg. ``ClientHello`` too
 large or not detected at all).
 
 Example

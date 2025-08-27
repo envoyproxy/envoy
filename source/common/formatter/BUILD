@@ -106,7 +106,6 @@ envoy_cc_library(
         "//source/common/json:json_utility_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/stream_info:utility_lib",
-        "//source/extensions/filters/listener/tls_inspector:tls_inspector_lib",
     ],
     alwayslink = 1,  # has factory registration
 )

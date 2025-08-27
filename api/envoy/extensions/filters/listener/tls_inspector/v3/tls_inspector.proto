@@ -38,18 +38,3 @@ message TlsInspector {
   google.protobuf.UInt32Value initial_read_buffer_size = 2
       [(validate.rules).uint32 = {lt: 65537 gt: 255}];
 }
-
-// [#protodoc-title: TLS Inspector Filter Metadata]
-// Message to be exported as dynamic metadata from the TLS inspector filter.
-message TlsInspectorMetadata {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.filter.listener.tls_inspector.v2.TlsInspectorMetadata";
-
-  enum ErrorType {
-    UNSPECIFIED = 0;
-    CLIENT_HELLO_TOO_LARGE = 1;
-    CLIENT_HELLO_NOT_DETECTED = 2;
-  }
-
-  ErrorType error_type = 1;
-}

@@ -29,9 +29,6 @@ using testing::ReturnNew;
 using testing::ReturnRef;
 using testing::SaveArg;
 
-using TlsInspectorMetadata =
-    envoy::extensions::filters::listener::tls_inspector::v3::TlsInspectorMetadata;
-
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
@@ -285,11 +282,10 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
   EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
   EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
 
-  TlsInspectorMetadata expected_metadata;
-  expected_metadata.set_error_type(TlsInspectorMetadata::CLIENT_HELLO_TOO_LARGE);
-  Protobuf::Any expected_any;
-  expected_any.PackFrom(expected_metadata);
-  EXPECT_CALL(cb_, setDynamicTypedMetadata(Filter::dynamicMetadataKey(), ProtoEq(expected_any)));
+  Protobuf::Struct expected_metadata;
+  auto& fields = *expected_metadata.mutable_fields();
+  fields[Filter::failureReasonKey()].set_number_value(FailureReason::ClientHelloTooLarge);
+  EXPECT_CALL(cb_, setDynamicMetadata(Filter::dynamicMetadataKey(), ProtoEq(expected_metadata)));
 
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::StopIteration, state);
@@ -420,11 +416,10 @@ TEST_P(TlsInspectorTest, NotSsl) {
   // trigger the event to copy the client hello message into buffer:q
   EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
 
-  TlsInspectorMetadata expected_metadata;
-  expected_metadata.set_error_type(TlsInspectorMetadata::CLIENT_HELLO_NOT_DETECTED);
-  Protobuf::Any expected_any;
-  expected_any.PackFrom(expected_metadata);
-  EXPECT_CALL(cb_, setDynamicTypedMetadata(Filter::dynamicMetadataKey(), ProtoEq(expected_any)));
+  Protobuf::Struct expected_metadata;
+  auto& fields = *expected_metadata.mutable_fields();
+  fields[Filter::failureReasonKey()].set_number_value(FailureReason::ClientHelloNotDetected);
+  EXPECT_CALL(cb_, setDynamicMetadata(Filter::dynamicMetadataKey(), ProtoEq(expected_metadata)));
 
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);

@@ -262,8 +262,10 @@ TEST_P(TlsInspectorIntegrationTest, ContinueOnListenerTimeout) {
 
 TEST_P(TlsInspectorIntegrationTest, TlsInspectorMetadataPopulatedInAccessLog) {
   LogLevelSetter save_levels(spdlog::level::trace);
-  initializeWithTlsInspector(/*ssl_client=*/false, /*log_format=*/"%TLS_INSPECTOR_ERROR%", false,
-                             false, false);
+  initializeWithTlsInspector(
+      /*ssl_client=*/false,
+      /*log_format=*/"%DYNAMIC_METADATA(envoy.filters.listener.tls_inspector:failure_reason)%",
+      false, false, false);
   Network::Address::InstanceConstSharedPtr address =
       Ssl::getSslAddress(version_, lookupPort("echo"));
   context_ =
@@ -273,6 +275,9 @@ TEST_P(TlsInspectorIntegrationTest, TlsInspectorMetadataPopulatedInAccessLog) {
       transport_socket_factory->createTransportSocket(nullptr, nullptr);
   client_ = dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
                                                 std::move(transport_socket), nullptr, nullptr);
+  std::shared_ptr<WaitForPayloadReader> payload_reader =
+      std::make_shared<WaitForPayloadReader>(*dispatcher_);
+  client_->addReadFilter(payload_reader);
   client_->addConnectionCallbacks(connect_callbacks_);
   client_->connect();
   Buffer::OwnedImpl buffer("fake data");
@@ -284,7 +289,7 @@ TEST_P(TlsInspectorIntegrationTest, TlsInspectorMetadataPopulatedInAccessLog) {
   timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(2000));
   client_->close(Network::ConnectionCloseType::NoFlush);
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
-              testing::Eq("CLIENT_HELLO_NOT_DETECTED"));
+              testing::Eq("1")); // 1 == ClientHelloNotDetected
 }
 
 // The `JA3` fingerprint is correct in the access log.

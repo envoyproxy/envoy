@@ -7,7 +7,6 @@
 #include "source/common/json/json_utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/utility.h"
-#include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_replace.h"
@@ -1775,27 +1774,6 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     }
                     return result;
                   });
-            }}},
-          {"TLS_INSPECTOR_ERROR",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](absl::string_view, absl::optional<size_t>) {
-              return std::make_unique<
-                  StreamInfoStringFormatterProvider>([](const StreamInfo::StreamInfo& stream_info) {
-                absl::optional<std::string> result;
-                const auto& metadata = stream_info.dynamicMetadata().typed_filter_metadata();
-                const std::string& key =
-                    Envoy::Extensions::ListenerFilters::TlsInspector::Filter::dynamicMetadataKey();
-                if (metadata.contains(key)) {
-                  using TlsInspectorMetadata =
-                      envoy::extensions::filters::listener::tls_inspector::v3::TlsInspectorMetadata;
-
-                  TlsInspectorMetadata tls_inspector_metadata;
-                  metadata.at(key).UnpackTo(&tls_inspector_metadata);
-                  result =
-                      TlsInspectorMetadata::ErrorType_Name(tls_inspector_metadata.error_type());
-                }
-                return result;
-              });
             }}},
           {"UNIQUE_ID",
            {CommandSyntaxChecker::COMMAND_ONLY,
