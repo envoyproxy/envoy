@@ -363,6 +363,10 @@ TEST_F(ConnectionManagerUtilityTest, SkipXffAppendUseRemoteAddress) {
 // Verify that we pass-thru XFF when skipXffAppend(), even if using remote
 // address and where the address is external.
 TEST_F(ConnectionManagerUtilityTest, SkipXffAppendPassThruUseRemoteAddress) {
+  // Set empty extensions to test the hardcoded logic path
+  std::vector<std::shared_ptr<OriginalIPDetection>> empty_extensions;
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(empty_extensions));
+
   EXPECT_CALL(config_, skipXffAppend()).WillOnce(Return(true));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12"));
@@ -376,6 +380,10 @@ TEST_F(ConnectionManagerUtilityTest, SkipXffAppendPassThruUseRemoteAddress) {
 
 TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternal) {
   TestScopedRuntime scoped_runtime;
+
+  // Set empty extensions to test the hardcoded logic path
+  std::vector<std::shared_ptr<OriginalIPDetection>> empty_extensions;
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(empty_extensions));
 
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
@@ -412,6 +420,10 @@ TEST_F(ConnectionManagerUtilityTest, OverwriteForwardedProtoWhenExternal) {
 
 TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternalButSetScheme) {
   TestScopedRuntime scoped_runtime;
+
+  // Set empty extensions to test the hardcoded logic path
+  std::vector<std::shared_ptr<OriginalIPDetection>> empty_extensions;
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(empty_extensions));
 
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
@@ -639,11 +651,11 @@ TEST_F(ConnectionManagerUtilityTest, DocumentationExample1) {
   const auto modifiedXFFHeader = "203.0.113.128,203.0.113.10,203.0.113.1,192.0.2.5";
   const auto envoyInternal = false;
 
-  detection_extensions_.clear();
-  detection_extensions_.push_back(getXFFExtension(xffNumTrustedHops, false));
+  // Set empty extensions to test the hardcoded logic path
+  std::vector<std::shared_ptr<OriginalIPDetection>> empty_extensions;
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(empty_extensions));
 
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(xffNumTrustedHops));
-  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
 
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>(downstreamIPAddress));
@@ -1302,6 +1314,10 @@ TEST_F(ConnectionManagerUtilityTest, PipeAddressInvalidXFFtDontUseRemote) {
 // includes only internal addresses. Note that this is legacy behavior. See the comments
 // in mutateRequestHeaders() for more info.
 TEST_F(ConnectionManagerUtilityTest, AppendInternalAddressXffNotInternalRequest) {
+  // Set empty extensions to test the hardcoded logic path
+  std::vector<std::shared_ptr<OriginalIPDetection>> empty_extensions;
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(empty_extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -2311,6 +2327,10 @@ TEST_F(ConnectionManagerUtilityTest, RedirectAfterAllOtherNormalizations) {
 
 // test preserve_external_request_id true does not reset the passed requestId if passed
 TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestId) {
+  // Set empty extensions to test the hardcoded logic path
+  std::vector<std::shared_ptr<OriginalIPDetection>> empty_extensions;
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(empty_extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -2326,6 +2346,10 @@ TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestId) {
 
 // test preserve_external_request_id true but generates new request id when not passed
 TEST_F(ConnectionManagerUtilityTest, PreseverExternalRequestIdNoReqId) {
+  // Set empty extensions to test the hardcoded logic path
+  std::vector<std::shared_ptr<OriginalIPDetection>> empty_extensions;
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(empty_extensions));
+
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
@@ -2359,6 +2383,10 @@ TEST_F(ConnectionManagerUtilityTest, PreserveExternalRequestIdNoEdgeRequestGener
 
 // Test preserve_external_request_id false and edge_request true.
 TEST_F(ConnectionManagerUtilityTest, NoPreserveExternalRequestIdEdgeRequestGenerateRequestId) {
+  // Set empty extensions to test the hardcoded logic path
+  std::vector<std::shared_ptr<OriginalIPDetection>> empty_extensions;
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(empty_extensions));
+
   ON_CALL(config_, preserveExternalRequestId()).WillByDefault(Return(false));
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("134.2.2.11"));
@@ -2428,6 +2456,172 @@ TEST_F(ConnectionManagerUtilityTest, OriginalIPDetectionExtension) {
     auto ret = callMutateRequestHeaders(headers, Protocol::Http11);
     EXPECT_EQ(ret.downstream_address_, "10.0.0.3:50000");
     EXPECT_EQ(ret.reject_request_, absl::nullopt);
+  }
+}
+
+// Test that configured extensions work with useRemoteAddress=true
+TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWithConfiguredExtensions) {
+  const std::string header_name = "x-real-ip";
+  auto detection_extension = getCustomHeaderExtension(header_name);
+  const std::vector<Http::OriginalIPDetectionSharedPtr> extensions = {detection_extension};
+
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("192.168.1.1"));
+
+  // Header is present - extension should detect this IP
+  {
+    TestRequestHeaderMapImpl headers{{header_name, "203.0.113.5"}};
+    auto ret = callMutateRequestHeaders(headers, Protocol::Http11);
+    EXPECT_EQ(ret.downstream_address_, "203.0.113.5:0");
+    EXPECT_EQ(ret.reject_request_, absl::nullopt);
+    // Should append the connection's remote address to XFF
+    EXPECT_EQ("192.168.1.1", headers.getForwardedForValue());
+  }
+
+  // Header missing - should use connection's remote address
+  {
+    TestRequestHeaderMapImpl headers;
+    auto ret = callMutateRequestHeaders(headers, Protocol::Http11);
+    EXPECT_EQ(ret.downstream_address_, "192.168.1.1:0");
+    EXPECT_EQ(ret.reject_request_, absl::nullopt);
+    // Should append the connection's remote address to XFF
+    EXPECT_EQ("192.168.1.1", headers.getForwardedForValue());
+  }
+}
+
+// Test that dynamic XFF extension is created when useRemoteAddress=true and xff_num_trusted_hops >
+// 0
+TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWithXffNumTrustedHops) {
+  // Set empty extensions to ensure dynamic XFF extension is created
+  std::vector<std::shared_ptr<OriginalIPDetection>> empty_extensions;
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(empty_extensions));
+
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
+
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+
+  // Test with XFF header containing trusted hops
+  {
+    TestRequestHeaderMapImpl headers{{"x-forwarded-for", "203.0.113.1,203.0.113.2"}};
+    auto ret = callMutateRequestHeaders(headers, Protocol::Http11);
+    // Should extract the last address (203.0.113.2) because with use_remote_address=true,
+    // trusted_hops is reduced by 1 (from 1 to 0), so no addresses are skipped
+    EXPECT_EQ(ret.downstream_address_, "203.0.113.2:0");
+    EXPECT_EQ(ret.reject_request_, absl::nullopt);
+    // Should append the connection's remote address to XFF
+    EXPECT_EQ("203.0.113.1,203.0.113.2,10.0.0.1", headers.getForwardedForValue());
+  }
+
+  // Test without XFF header - should use connection's remote address
+  {
+    TestRequestHeaderMapImpl headers;
+    auto ret = callMutateRequestHeaders(headers, Protocol::Http11);
+    EXPECT_EQ(ret.downstream_address_, "10.0.0.1:0");
+    EXPECT_EQ(ret.reject_request_, absl::nullopt);
+    // When no XFF header exists and no address is detected by extensions,
+    // the fallback logic should append the connection's remote address
+    EXPECT_EQ("10.0.0.1", headers.getForwardedForValue());
+  }
+}
+
+// Test that configured extensions take precedence over dynamic XFF extension
+TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressConfiguredExtensionsPrecedence) {
+  const std::string header_name = "x-real-ip";
+  auto detection_extension = getCustomHeaderExtension(header_name);
+  const std::vector<Http::OriginalIPDetectionSharedPtr> extensions = {detection_extension};
+
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(2)); // This should be ignored
+
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+
+  // Custom header extension should take precedence over XFF logic
+  {
+    TestRequestHeaderMapImpl headers{{header_name, "198.51.100.1"},
+                                     {"x-forwarded-for", "203.0.113.1,203.0.113.2,203.0.113.3"}};
+    auto ret = callMutateRequestHeaders(headers, Protocol::Http11);
+    // Should use the custom header, not XFF processing
+    EXPECT_EQ(ret.downstream_address_, "198.51.100.1:0");
+    EXPECT_EQ(ret.reject_request_, absl::nullopt);
+    // Should append the connection's remote address to XFF
+    EXPECT_EQ("203.0.113.1,203.0.113.2,203.0.113.3,10.0.0.1", headers.getForwardedForValue());
+  }
+}
+
+// Test useRemoteAddress=true with XFF trusted CIDRs
+TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWithXffTrustedCidrs) {
+  // Create CIDR ranges for testing
+  std::vector<Network::Address::CidrRange> cidrs;
+  cidrs.push_back(*Network::Address::CidrRange::create("10.0.0.0/8"));
+  cidrs.push_back(*Network::Address::CidrRange::create("192.168.1.0/24"));
+
+  auto xff_extension = getXFFExtension(cidrs, false);
+  const std::vector<Http::OriginalIPDetectionSharedPtr> extensions = {xff_extension};
+
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(extensions));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+
+  // Connection from trusted CIDR
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+
+  // Test with XFF header where some IPs are in trusted CIDRs
+  {
+    TestRequestHeaderMapImpl headers{{"x-forwarded-for", "203.0.113.1,192.168.1.5,10.0.0.100"}};
+    auto ret = callMutateRequestHeaders(headers, Protocol::Http11);
+    // Should extract the first non-trusted IP (203.0.113.1)
+    EXPECT_EQ(ret.downstream_address_, "203.0.113.1:0");
+    EXPECT_EQ(ret.reject_request_, absl::nullopt);
+    // Should append the connection's remote address to XFF
+    EXPECT_EQ("203.0.113.1,192.168.1.5,10.0.0.100,10.0.0.1", headers.getForwardedForValue());
+  }
+
+  // Connection from untrusted address should not process XFF
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("203.0.113.10"));
+
+  {
+    TestRequestHeaderMapImpl headers{{"x-forwarded-for", "203.0.113.1,192.168.1.5,10.0.0.100"}};
+    auto ret = callMutateRequestHeaders(headers, Protocol::Http11);
+    // Should use connection's remote address since it's not from a trusted CIDR
+    EXPECT_EQ(ret.downstream_address_, "203.0.113.10:0");
+    EXPECT_EQ(ret.reject_request_, absl::nullopt);
+    EXPECT_EQ("203.0.113.1,192.168.1.5,10.0.0.100,203.0.113.10", headers.getForwardedForValue());
+  }
+}
+
+// Test useRemoteAddress=true with skipXffAppend for extensions
+TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWithSkipXffAppendExtension) {
+  // Set empty extensions to ensure dynamic XFF extension is created
+  std::vector<std::shared_ptr<OriginalIPDetection>> empty_extensions;
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(empty_extensions));
+
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
+  ON_CALL(config_, skipXffAppend()).WillByDefault(Return(true));
+
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1"));
+
+  // Test that XFF is not appended when skipXffAppend is true
+  {
+    TestRequestHeaderMapImpl headers{{"x-forwarded-for", "203.0.113.1,203.0.113.2"}};
+    auto ret = callMutateRequestHeaders(headers, Protocol::Http11);
+    // Should extract the last address (203.0.113.2) because with use_remote_address=true,
+    // trusted_hops is reduced by 1 (from 1 to 0), so no addresses are skipped
+    EXPECT_EQ(ret.downstream_address_, "203.0.113.2:0");
+    EXPECT_EQ(ret.reject_request_, absl::nullopt);
+    // XFF should not be modified when skipXffAppend is true
+    EXPECT_EQ("203.0.113.1,203.0.113.2", headers.getForwardedForValue());
   }
 }
 
