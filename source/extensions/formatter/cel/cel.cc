@@ -17,7 +17,7 @@ namespace Formatter {
 namespace Expr = Filters::Common::Expr;
 
 CELFormatter::CELFormatter(const ::Envoy::LocalInfo::LocalInfo& local_info,
-                           Expr::BuilderInstanceSharedPtr expr_builder,
+                           Expr::BuilderInstanceSharedConstPtr expr_builder,
                            const cel::expr::Expr& input_expr, absl::optional<size_t>& max_length,
                            bool typed)
     : local_info_(local_info), max_length_(max_length), compiled_expr_([&]() {

@@ -10,7 +10,7 @@ namespace Expr = Envoy::Extensions::Filters::Common::Expr;
 
 CELAccessLogExtensionFilter::CELAccessLogExtensionFilter(
     const ::Envoy::LocalInfo::LocalInfo& local_info,
-    Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
+    Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
     const cel::expr::Expr& input_expr)
     : local_info_(local_info), expr_([&]() {
         auto compiled_expr =

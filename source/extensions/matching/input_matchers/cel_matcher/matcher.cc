@@ -10,7 +10,7 @@ using ::Envoy::Extensions::Matching::Http::CelInput::CelMatchData;
 using ::xds::type::v3::CelExpression;
 
 CelInputMatcher::CelInputMatcher(CelMatcherSharedPtr cel_matcher,
-                                 Filters::Common::Expr::BuilderInstanceSharedPtr builder)
+                                 Filters::Common::Expr::BuilderInstanceSharedConstPtr builder)
     : compiled_expr_([&]() {
         auto compiled_expr =
             Filters::Common::Expr::CompiledExpression::Create(builder, cel_matcher->expr_match());

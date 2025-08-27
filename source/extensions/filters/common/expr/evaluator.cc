@@ -143,13 +143,14 @@ BuilderInstanceSharedPtr createBuilder(Protobuf::Arena* arena) {
 
 SINGLETON_MANAGER_REGISTRATION(expression_builder);
 
-BuilderInstanceSharedPtr getBuilder(Server::Configuration::CommonFactoryContext& context) {
+BuilderInstanceSharedConstPtr getBuilder(Server::Configuration::CommonFactoryContext& context) {
   return context.singletonManager().getTyped<BuilderInstance>(
       SINGLETON_MANAGER_REGISTERED_NAME(expression_builder), [] { return createBuilder(nullptr); });
 }
 
-absl::StatusOr<CompiledExpression> CompiledExpression::Create(BuilderInstanceSharedPtr& builder,
-                                                              const cel::expr::Expr& expr) {
+absl::StatusOr<CompiledExpression>
+CompiledExpression::Create(const BuilderInstanceSharedConstPtr& builder,
+                           const cel::expr::Expr& expr) {
   std::vector<absl::Status> warnings;
   CompiledExpression out = CompiledExpression(builder, expr);
   auto cel_expression_status = out.builder_->builder().CreateExpression(
@@ -162,7 +163,7 @@ absl::StatusOr<CompiledExpression> CompiledExpression::Create(BuilderInstanceSha
 }
 
 absl::StatusOr<CompiledExpression>
-CompiledExpression::Create(BuilderInstanceSharedPtr& builder,
+CompiledExpression::Create(const BuilderInstanceSharedConstPtr& builder,
                            const xds::type::v3::CelExpression& xds_expr) {
   // First try to get expression from the new CEL canonical format
   if (xds_expr.has_cel_expr_checked()) {
@@ -183,7 +184,7 @@ CompiledExpression::Create(BuilderInstanceSharedPtr& builder,
 }
 
 absl::StatusOr<CompiledExpression>
-CompiledExpression::Create(BuilderInstanceSharedPtr& builder,
+CompiledExpression::Create(const BuilderInstanceSharedConstPtr& builder,
                            const google::api::expr::v1alpha1::Expr& expr) {
   std::string serialized;
   if (!expr.SerializeToString(&serialized)) {

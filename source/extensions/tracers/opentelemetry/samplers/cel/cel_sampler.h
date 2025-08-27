@@ -25,7 +25,7 @@ namespace Expr = Envoy::Extensions::Filters::Common::Expr;
 class CELSampler : public Sampler, Logger::Loggable<Logger::Id::tracing> {
 public:
   CELSampler(const ::Envoy::LocalInfo::LocalInfo& local_info,
-             Expr::BuilderInstanceSharedPtr builder, const xds::type::v3::CelExpression& expr);
+             Expr::BuilderInstanceSharedConstPtr builder, const xds::type::v3::CelExpression& expr);
 
   SamplingResult shouldSample(const StreamInfo::StreamInfo& stream_info,
                               const absl::optional<SpanContext> parent_context,

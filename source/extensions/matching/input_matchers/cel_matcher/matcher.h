@@ -30,7 +30,7 @@ using CelMatcherSharedPtr = std::shared_ptr<::xds::type::matcher::v3::CelMatcher
 class CelInputMatcher : public InputMatcher, public Logger::Loggable<Logger::Id::matcher> {
 public:
   CelInputMatcher(CelMatcherSharedPtr cel_matcher,
-                  Filters::Common::Expr::BuilderInstanceSharedPtr builder);
+                  Filters::Common::Expr::BuilderInstanceSharedConstPtr builder);
 
   bool match(const MatchingDataType& input) override;
 

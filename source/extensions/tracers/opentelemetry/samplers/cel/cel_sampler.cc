@@ -13,7 +13,7 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 CELSampler::CELSampler(const ::Envoy::LocalInfo::LocalInfo& local_info,
-                       Expr::BuilderInstanceSharedPtr builder,
+                       Expr::BuilderInstanceSharedConstPtr builder,
                        const xds::type::v3::CelExpression& expr)
     : local_info_(local_info), compiled_expr_([&]() {
         auto compiled_expr = Expr::CompiledExpression::Create(builder, expr);
