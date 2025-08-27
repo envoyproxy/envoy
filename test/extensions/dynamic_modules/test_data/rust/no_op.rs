@@ -35,9 +35,7 @@ struct NopHttpFilterConfig {
   config: String,
 }
 
-impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF>
-  for NopHttpFilterConfig
-{
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for NopHttpFilterConfig {
   fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(NopHttpFilter {
       on_request_headers_called: false,

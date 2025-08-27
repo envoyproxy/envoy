@@ -51,10 +51,7 @@ pub mod abi {
 ///
 /// struct MyHttpFilterConfig {}
 ///
-/// impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF>
-///   for MyHttpFilterConfig
-/// {
-/// }
+/// impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for MyHttpFilterConfig {}
 /// ```
 #[macro_export]
 macro_rules! declare_init_functions {
@@ -1599,8 +1596,7 @@ fn envoy_dynamic_module_on_http_filter_config_new_impl(
 unsafe extern "C" fn envoy_dynamic_module_on_http_filter_config_destroy(
   config_ptr: abi::envoy_dynamic_module_type_http_filter_config_module_ptr,
 ) {
-  drop_wrapped_c_void_ptr!(config_ptr,
-    HttpFilterConfig<EnvoyHttpFilterImpl>);
+  drop_wrapped_c_void_ptr!(config_ptr, HttpFilterConfig<EnvoyHttpFilterImpl>);
 }
 
 #[no_mangle]
@@ -1663,8 +1659,7 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_new(
     raw_ptr: filter_envoy_ptr,
   };
   let filter_config = {
-    let raw = filter_config_ptr
-      as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
+    let raw = filter_config_ptr as *mut *mut dyn HttpFilterConfig<EnvoyHttpFilterImpl>;
     &mut **raw
   };
   envoy_dynamic_module_on_http_filter_new_impl(&mut envoy_filter, filter_config)

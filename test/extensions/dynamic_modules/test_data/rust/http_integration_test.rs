@@ -49,9 +49,7 @@ fn new_http_filter_per_route_config_fn(name: &str, config: &[u8]) -> Option<Box<
 
 struct PassthroughHttpFilterConfig {}
 
-impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF>
-  for PassthroughHttpFilterConfig
-{
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for PassthroughHttpFilterConfig {
   fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     // Just to test that loggers can be accessible in a filter config callback.
     envoy_log_trace!("new_http_filter called");
@@ -87,9 +85,7 @@ struct HeadersHttpFilterConfig {
   headers_to_add: String,
 }
 
-impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF>
-  for HeadersHttpFilterConfig
-{
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HeadersHttpFilterConfig {
   fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     let headers_to_add: Vec<(String, String)> = self
       .headers_to_add
@@ -204,9 +200,7 @@ struct PerRouteFilterConfig {
   value: String,
 }
 
-impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF>
-  for PerRouteFilterConfig
-{
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for PerRouteFilterConfig {
   fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(PerRouteFilter {
       value: self.value.clone(),
@@ -264,9 +258,7 @@ struct BodyCallbacksFilterConfig {
   immediate_end_of_stream: bool,
 }
 
-impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF>
-  for BodyCallbacksFilterConfig
-{
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for BodyCallbacksFilterConfig {
   fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(BodyCallbacksFilter {
       immediate_end_of_stream: self.immediate_end_of_stream,
@@ -369,9 +361,7 @@ impl SendResponseHttpFilterConfig {
   }
 }
 
-impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF>
-  for SendResponseHttpFilterConfig
-{
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for SendResponseHttpFilterConfig {
   fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(self.f.clone())
   }
@@ -440,9 +430,7 @@ struct HttpCalloutsFilterConfig {
   cluster_name: String,
 }
 
-impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF>
-  for HttpCalloutsFilterConfig
-{
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HttpCalloutsFilterConfig {
   fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(HttpCalloutsFilter {
       cluster_name: self.cluster_name.clone(),
@@ -539,9 +527,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HttpCalloutsFilter {
 
 struct HttpFilterSchedulerConfig {}
 
-impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF>
-  for HttpFilterSchedulerConfig
-{
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HttpFilterSchedulerConfig {
   fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(HttpFilterScheduler {
       event_ids: vec![],
@@ -610,9 +596,7 @@ impl Drop for HttpFilterScheduler {
 /// This implements a fake external caching filter that simulates an asynchronous cache lookup.
 struct FakeExternalCachingFilterConfig {}
 
-impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF>
-  for FakeExternalCachingFilterConfig
-{
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for FakeExternalCachingFilterConfig {
   fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(FakeExternalCachingFilter { rx: None })
   }

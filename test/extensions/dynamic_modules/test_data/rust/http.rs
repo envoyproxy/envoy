@@ -34,9 +34,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
 /// related callbacks.
 struct HeaderCallbacksFilterConfig {}
 
-impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF>
-  for HeaderCallbacksFilterConfig
-{
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HeaderCallbacksFilterConfig {
   fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(HeaderCallbacksFilter {})
   }
@@ -255,9 +253,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
 /// callback
 struct SendResponseFilterConfig {}
 
-impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF>
-  for SendResponseFilterConfig
-{
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for SendResponseFilterConfig {
   fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(SendResponseFilter {})
   }
@@ -290,9 +286,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseFilter {
 /// callbacks.
 struct DynamicMetadataCallbacksFilterConfig {}
 
-impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF>
-  for DynamicMetadataCallbacksFilterConfig
-{
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for DynamicMetadataCallbacksFilterConfig {
   fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(DynamicMetadataCallbacksFilter {})
   }
@@ -450,9 +444,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
 /// callbacks.
 struct FilterStateCallbacksFilterConfig {}
 
-impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF>
-  for FilterStateCallbacksFilterConfig
-{
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for FilterStateCallbacksFilterConfig {
   fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(FilterStateCallbacksFilter {})
   }
@@ -559,9 +551,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FilterStateCallbacksFilter {
 /// to test the body related callbacks.
 struct BodyCallbacksFilterConfig {}
 
-impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF>
-  for BodyCallbacksFilterConfig
-{
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for BodyCallbacksFilterConfig {
   fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(BodyCallbacksFilter::default())
   }
