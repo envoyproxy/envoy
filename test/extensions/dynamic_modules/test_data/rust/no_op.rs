@@ -39,7 +39,6 @@ fn destroy_nop_http_filter_config_fn<EC: EnvoyHttpFilterConfig>(_envoy_filter_co
 /// A no-op HTTP filter configuration that implements
 /// [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig`] as well as the [`Drop`] to test the
 /// cleanup of the configuration.
-#[derive(Debug, PartialEq, Eq, Clone)]
 struct NopHttpFilterConfig {
   name: String,
   config: String,
