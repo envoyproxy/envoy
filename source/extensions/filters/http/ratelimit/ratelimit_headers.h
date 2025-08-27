@@ -13,8 +13,7 @@ public:
 
 private:
   static uint32_t
-  convertRateLimitUnit(envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::Unit unit,
-                       uint32_t unit_multiplier = 1);
+  convertRateLimitUnit(envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::Unit unit);
 };
 
 } // namespace RateLimitFilter

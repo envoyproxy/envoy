@@ -122,7 +122,14 @@ public:
           {"x-ratelimit-reset", "120"}},
          {buildDescriptorStatus(10,
                                 envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::MINUTE,
-                                "five_minutes", 7, 120, 5)}}, );
+                                "five_minutes", 7, 120, 5)}},
+        // Test overflow protection - large multiplier with YEAR should be clamped
+        {{{"x-ratelimit-limit", "1, 1;w=4294967295;name=\"overflow_test\""},
+          {"x-ratelimit-remaining", "1"},
+          {"x-ratelimit-reset", "1"}},
+         {buildDescriptorStatus(1,
+                                envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::YEAR,
+                                "overflow_test", 1, 1, 2000)}}, );
   }
 };
 

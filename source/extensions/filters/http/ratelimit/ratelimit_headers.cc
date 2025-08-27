@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/ratelimit/ratelimit_headers.h"
 
+#include <limits>
+
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/filters/http/common/ratelimit_headers.h"
 
@@ -29,8 +31,13 @@ Http::ResponseHeaderMapPtr XRateLimitHeaderUtils::create(
         status.limit_remaining() < min_remaining_limit_status.value().limit_remaining()) {
       min_remaining_limit_status.emplace(status);
     }
-    const uint32_t window = convertRateLimitUnit(status.current_limit().unit(),
-                                                 status.current_limit().unit_multiplier());
+    const uint32_t unit_multiplier = status.current_limit().unit_multiplier();
+    const uint64_t window_64 = static_cast<uint64_t>(unit_multiplier) *
+                               convertRateLimitUnit(status.current_limit().unit());
+    // Guard against overflow - if the result doesn't fit in uint32_t, clamp to max value
+    const uint32_t window = window_64 > std::numeric_limits<uint32_t>::max()
+                                ? std::numeric_limits<uint32_t>::max()
+                                : static_cast<uint32_t>(window_64);
     // Constructing the quota-policy per RFC
     // https://tools.ietf.org/id/draft-polli-ratelimit-headers-02.html#name-ratelimit-limit
     // Example of the result: `, 10;w=1;name="per-ip", 1000;w=3600`
@@ -66,36 +73,26 @@ Http::ResponseHeaderMapPtr XRateLimitHeaderUtils::create(
 }
 
 uint32_t XRateLimitHeaderUtils::convertRateLimitUnit(
-    const envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::Unit unit,
-    uint32_t unit_multiplier) {
-  uint32_t base_seconds;
+    const envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::Unit unit) {
   switch (unit) {
   case envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::SECOND:
-    base_seconds = 1;
-    break;
+    return 1;
   case envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::MINUTE:
-    base_seconds = 60;
-    break;
+    return 60;
   case envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::HOUR:
-    base_seconds = 60 * 60;
-    break;
+    return 60 * 60;
   case envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::DAY:
-    base_seconds = 24 * 60 * 60;
-    break;
+    return 24 * 60 * 60;
   case envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::WEEK:
-    base_seconds = 7 * 24 * 60 * 60;
-    break;
+    return 7 * 24 * 60 * 60;
   case envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::MONTH:
-    base_seconds = 30 * 24 * 60 * 60;
-    break;
+    return 30 * 24 * 60 * 60;
   case envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::YEAR:
-    base_seconds = 365 * 24 * 60 * 60;
-    break;
+    return 365 * 24 * 60 * 60;
   case envoy::service::ratelimit::v3::RateLimitResponse::RateLimit::UNKNOWN:
   default:
     return 0;
   }
-  return base_seconds * unit_multiplier;
 }
 
 } // namespace RateLimitFilter
