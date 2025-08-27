@@ -10,6 +10,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/stats/sink.h"
 #include "envoy/upstream/cluster_manager.h"
+#include "envoy/tracing/trace_driver.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
@@ -263,6 +264,7 @@ public:
 
   WasmResult grpcClose(uint32_t token) override;
   WasmResult grpcCancel(uint32_t token) override;
+
   WasmResult grpcSend(uint32_t token, std::string_view message, bool end_stream) override;
 
   // Envoy specific ABI
@@ -463,6 +465,12 @@ protected:
       state_prototypes_;
 
   proxy_wasm::AbiVersion abi_version_{proxy_wasm::AbiVersion::Unknown};
+
+  // Tracing.
+  OptRef<const Tracing::Config> trace_config_;
+  Tracing::SpanPtr trace_span_;
+  void ensureSpan();
+  Tracing::SpanPtr childSpan(const std::string& child_name);
 };
 using ContextSharedPtr = std::shared_ptr<Context>;
 

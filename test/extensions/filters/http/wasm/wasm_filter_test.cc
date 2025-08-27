@@ -867,6 +867,12 @@ TEST_P(WasmHttpFilterTest, StopAndResumeViaAsyncCall) {
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   Http::MockAsyncClientRequest request(&cluster_manager_.thread_local_cluster_.async_client_);
   Http::AsyncClient::Callbacks* callbacks = nullptr;
+
+  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
+  filter().setDecoderFilterCallbacks(decoder_callbacks);
+  // Disable tracing for this one as it might call to dispatcher() and other methods, which is uninteresting here
+  EXPECT_CALL(decoder_callbacks, tracingConfig()).WillRepeatedly(Return(OptRef<const Tracing::Config>()));
+
   cluster_manager_.initializeThreadLocalClusters({"cluster"});
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());
   EXPECT_CALL(cluster_manager_.thread_local_cluster_.async_client_, send_(_, _, _))
@@ -894,8 +900,6 @@ TEST_P(WasmHttpFilterTest, StopAndResumeViaAsyncCall) {
       }));
   EXPECT_CALL(filter(), log_(spdlog::level::info, Eq("continueRequest")));
 
-  Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
-  filter().setDecoderFilterCallbacks(decoder_callbacks);
   EXPECT_CALL(decoder_callbacks, continueDecoding()).WillOnce(Invoke([&]() {
     // Verify that we're not resuming processing from within Wasm callback.
     EXPECT_EQ(proxy_wasm::current_context_, nullptr);

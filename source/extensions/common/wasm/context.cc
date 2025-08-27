@@ -37,6 +37,7 @@
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/str_cat.h"
 #include "absl/synchronization/mutex.h"
+#include "tracing.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
@@ -918,6 +919,9 @@ WasmResult Context::httpCall(std::string_view cluster, const Pairs& request_head
   hash_policy.Add()->mutable_header()->set_header_name(Http::Headers::get().Host.get());
   options.setHashPolicy(hash_policy);
   options.setSendXff(false);
+  if (trace_span_) {
+    options.setParentSpan(*trace_span_);
+  }
   auto http_request =
       thread_local_cluster->httpAsyncClient().send(std::move(message), handler, options);
   if (!http_request) {
@@ -964,11 +968,11 @@ WasmResult Context::grpcCall(std::string_view grpc_service, std::string_view ser
   hash_policy.Add()->mutable_header()->set_header_name(Http::Headers::get().Host.get());
   options.setHashPolicy(hash_policy);
   options.setSendXff(false);
-
+  auto& parent_span = trace_span_ ? *trace_span_ : Tracing::NullSpan::instance();
   auto grpc_request =
       grpc_client->sendRaw(toAbslStringView(service_name), toAbslStringView(method_name),
                            std::make_unique<::Envoy::Buffer::OwnedImpl>(toAbslStringView(request)),
-                           handler, Tracing::NullSpan::instance(), options);
+                           handler, parent_span, options);
   if (!grpc_request) {
     grpc_call_request_.erase(token);
     return WasmResult::InternalFailure;
@@ -1400,6 +1404,7 @@ Http::FilterDataStatus convertFilterDataStatus(proxy_wasm::FilterDataStatus stat
 };
 
 Network::FilterStatus Context::onNewConnection() {
+  ensureSpan();
   onCreate();
   return convertNetworkFilterStatus(onNetworkNewConnection());
 };
@@ -1473,6 +1478,7 @@ void Context::log(const Formatter::HttpFormatterContext& log_context,
     // lifecycle. This is because Envoy does not have a well defined lifetime for the combined
     // HTTP
     // + AccessLog filter. Thus, to log these scenarios, we call onCreate() in log function below.
+    ensureSpan();
     onCreate();
   }
 
@@ -1500,6 +1506,11 @@ void Context::onDestroy() {
   destroyed_ = true;
   onDone();
   onDelete();
+
+  // Tracing.
+  if (trace_span_) {
+    trace_span_->finishSpan();
+  }
 }
 
 WasmResult Context::continueStream(WasmStreamType stream_type) {
@@ -1656,6 +1667,9 @@ WasmResult Context::sendLocalResponse(uint32_t response_code, std::string_view b
 }
 
 Http::FilterHeadersStatus Context::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
+  auto const span = childSpan("decodeHeaders");
+  span->setTag(TracingConstants::get().TraceEndOfStream, end_stream ? "true" : "false");
+
   onCreate();
   request_headers_ = &headers;
   end_of_stream_ = end_stream;
@@ -1663,6 +1677,8 @@ Http::FilterHeadersStatus Context::decodeHeaders(Http::RequestHeaderMap& headers
   if (result == Http::FilterHeadersStatus::Continue) {
     request_headers_ = nullptr;
   }
+
+  span->finishSpan();
   return result;
 }
 
@@ -1670,6 +1686,8 @@ Http::FilterDataStatus Context::decodeData(::Envoy::Buffer::Instance& data, bool
   if (!in_vm_context_created_) {
     return Http::FilterDataStatus::Continue;
   }
+  auto const span = childSpan("decodeData");
+  span->setTag(TracingConstants::get().TraceEndOfStream, end_stream ? "true" : "false");
   if (buffering_request_body_) {
     decoder_callbacks_->addDecodedData(data, false);
     if (destroyed_) {
@@ -1678,6 +1696,7 @@ Http::FilterDataStatus Context::decodeData(::Envoy::Buffer::Instance& data, bool
       // Note this is not perfect way. If the local reply processing is stopped by other
       // filters, this filter will still try to call the VM. But at least we can ensure
       // the VM has valid context.
+      span->finishSpan();
       return Http::FilterDataStatus::StopIterationAndBuffer;
     }
   }
@@ -1698,6 +1717,7 @@ Http::FilterDataStatus Context::decodeData(::Envoy::Buffer::Instance& data, bool
   case Http::FilterDataStatus::StopIterationNoBuffer:
     break;
   }
+  span->finishSpan();
   return result;
 }
 
@@ -1705,11 +1725,13 @@ Http::FilterTrailersStatus Context::decodeTrailers(Http::RequestTrailerMap& trai
   if (!in_vm_context_created_) {
     return Http::FilterTrailersStatus::Continue;
   }
+  auto const span = childSpan("decodeTrailers");
   request_trailers_ = &trailers;
   auto result = convertFilterTrailersStatus(onRequestTrailers(headerSize(&trailers)));
   if (result == Http::FilterTrailersStatus::Continue) {
     request_trailers_ = nullptr;
   }
+  span->finishSpan();
   return result;
 }
 
@@ -1717,11 +1739,13 @@ Http::FilterMetadataStatus Context::decodeMetadata(Http::MetadataMap& request_me
   if (!in_vm_context_created_) {
     return Http::FilterMetadataStatus::Continue;
   }
+  auto const span = childSpan("decodeMetadata");
   request_metadata_ = &request_metadata;
   auto result = convertFilterMetadataStatus(onRequestMetadata(headerSize(&request_metadata)));
   if (result == Http::FilterMetadataStatus::Continue) {
     request_metadata_ = nullptr;
   }
+  span->finishSpan();
   return result;
 }
 
@@ -1740,12 +1764,15 @@ Http::FilterHeadersStatus Context::encodeHeaders(Http::ResponseHeaderMap& header
   if (!in_vm_context_created_ || failure_local_reply_sent_) {
     return Http::FilterHeadersStatus::Continue;
   }
+  auto const span = childSpan("encodeHeaders");
+  span->setTag(TracingConstants::get().TraceEndOfStream, end_stream ? "true" : "false");
   response_headers_ = &headers;
   end_of_stream_ = end_stream;
   auto result = convertFilterHeadersStatus(onResponseHeaders(headerSize(&headers), end_stream));
   if (result == Http::FilterHeadersStatus::Continue) {
     response_headers_ = nullptr;
   }
+  span->finishSpan();
   return result;
 }
 
@@ -1755,6 +1782,8 @@ Http::FilterDataStatus Context::encodeData(::Envoy::Buffer::Instance& data, bool
   if (!in_vm_context_created_ || failure_local_reply_sent_) {
     return Http::FilterDataStatus::Continue;
   }
+  auto const span = childSpan("encodeData");
+  span->setTag(TracingConstants::get().TraceEndOfStream, end_stream ? "true" : "false");
   if (buffering_response_body_) {
     encoder_callbacks_->addEncodedData(data, false);
     if (destroyed_) {
@@ -1763,6 +1792,7 @@ Http::FilterDataStatus Context::encodeData(::Envoy::Buffer::Instance& data, bool
       // Note this is not perfect way. If the local reply processing is stopped by other
       // filters, this filter will still try to call the VM. But at least we can ensure
       // the VM has valid context.
+      span->finishSpan();
       return Http::FilterDataStatus::StopIterationAndBuffer;
     }
   }
@@ -1783,6 +1813,7 @@ Http::FilterDataStatus Context::encodeData(::Envoy::Buffer::Instance& data, bool
   case Http::FilterDataStatus::StopIterationNoBuffer:
     break;
   }
+  span->finishSpan();
   return result;
 }
 
@@ -1792,11 +1823,13 @@ Http::FilterTrailersStatus Context::encodeTrailers(Http::ResponseTrailerMap& tra
   if (!in_vm_context_created_ || failure_local_reply_sent_) {
     return Http::FilterTrailersStatus::Continue;
   }
+  auto const span = childSpan("encodeTrailers");
   response_trailers_ = &trailers;
   auto result = convertFilterTrailersStatus(onResponseTrailers(headerSize(&trailers)));
   if (result == Http::FilterTrailersStatus::Continue) {
     response_trailers_ = nullptr;
   }
+  span->finishSpan();
   return result;
 }
 
@@ -1806,11 +1839,13 @@ Http::FilterMetadataStatus Context::encodeMetadata(Http::MetadataMap& response_m
   if (!in_vm_context_created_ || failure_local_reply_sent_) {
     return Http::FilterMetadataStatus::Continue;
   }
+  auto const span = childSpan("encodeMetadata");
   response_metadata_ = &response_metadata;
   auto result = convertFilterMetadataStatus(onResponseMetadata(headerSize(&response_metadata)));
   if (result == Http::FilterMetadataStatus::Continue) {
     response_metadata_ = nullptr;
   }
+  span->finishSpan();
   return result;
 }
 
@@ -1995,6 +2030,41 @@ WasmResult Context::grpcCancel(uint32_t token) {
     return WasmResult::Ok;
   }
   return WasmResult::BadArgument;
+}
+
+void Context::ensureSpan() {
+  if (trace_span_) {
+    return;
+  }
+
+  auto const traceConfig = decoder_callbacks_->tracingConfig();
+
+  if (!traceConfig) {
+    return;
+  }
+
+  const auto* const wasmPlugin = plugin();
+  const std::string child_span_name = absl::StrCat("wasm ", wasmPlugin->name_);
+
+  trace_config_ = traceConfig;
+  trace_span_ = decoder_callbacks_->activeSpan().spawnChild(
+    *traceConfig, child_span_name, decoder_callbacks_->dispatcher().timeSource().systemTime());
+
+  trace_span_->setTag(TracingConstants::get().TracePluginName, wasmPlugin->name_);
+  trace_span_->setTag(TracingConstants::get().TraceVmId, wasmPlugin->vm_id_);
+  trace_span_->setTag(TracingConstants::get().TraceEngine, wasmPlugin->engine_);
+  trace_span_->setTag(TracingConstants::get().TraceRootId, wasmPlugin->root_id_);
+}
+
+Tracing::SpanPtr Context::childSpan(const std::string& child_name) {
+  ensureSpan();
+
+  if (!trace_span_ || !trace_config_) {
+    return std::make_unique<Tracing::NullSpan>();
+  }
+
+  return trace_span_->spawnChild(*trace_config_, child_name,
+                                 decoder_callbacks_->dispatcher().timeSource().systemTime());
 }
 
 } // namespace Wasm

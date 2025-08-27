@@ -28,6 +28,7 @@ envoy_cc_library(
         "context.h",
         "plugin.h",
         "stats_handler.h",
+        "tracing.h",
         "wasm.h",
         "wasm_vm.h",
     ],
