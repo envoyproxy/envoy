@@ -1080,7 +1080,7 @@ TEST_F(ZipkinDriverTest, DriverWithCustomHeaders) {
       value: "Bearer token123"
     - key: "X-Custom-Header"
       value: "custom-value"
-    - key: "X-API-Key" 
+    - key: "X-API-Key"
       value: "api-key-123"
   )EOF";
 
@@ -1151,8 +1151,10 @@ TEST_F(ZipkinDriverTest, ReporterFlushWithCustomHeaders) {
                                              operation_name_, {Tracing::Reason::Sampling, true});
   span->finishSpan();
 
-  Http::ResponseHeaderMapPtr response_headers{new Http::TestResponseHeaderMapImpl{{":status", "202"}}};
-  callback->onSuccess(request, std::make_unique<Http::ResponseMessageImpl>(std::move(response_headers)));
+  Http::ResponseHeaderMapPtr response_headers{
+      new Http::TestResponseHeaderMapImpl{{":status", "202"}}};
+  callback->onSuccess(request,
+                      std::make_unique<Http::ResponseMessageImpl>(std::move(response_headers)));
 }
 
 TEST_F(ZipkinDriverTest, ReporterFlushWithCustomHeadersVerifyHeaders) {
@@ -1212,8 +1214,10 @@ TEST_F(ZipkinDriverTest, ReporterFlushWithCustomHeadersVerifyHeaders) {
                                              operation_name_, {Tracing::Reason::Sampling, true});
   span->finishSpan();
 
-  Http::ResponseHeaderMapPtr response_headers{new Http::TestResponseHeaderMapImpl{{":status", "202"}}};
-  callback->onSuccess(request, std::make_unique<Http::ResponseMessageImpl>(std::move(response_headers)));
+  Http::ResponseHeaderMapPtr response_headers{
+      new Http::TestResponseHeaderMapImpl{{":status", "202"}}};
+  callback->onSuccess(request,
+                      std::make_unique<Http::ResponseMessageImpl>(std::move(response_headers)));
 }
 
 TEST_F(ZipkinDriverTest, ReporterFlushWithCustomHeadersProtobuf) {
@@ -1256,7 +1260,8 @@ TEST_F(ZipkinDriverTest, ReporterFlushWithCustomHeadersProtobuf) {
             ASSERT_FALSE(auth_header.empty());
             EXPECT_EQ("Bearer token123", auth_header[0]->value().getStringView());
 
-            auto encoding_header = message->headers().get(Http::LowerCaseString("content-encoding"));
+            auto encoding_header =
+                message->headers().get(Http::LowerCaseString("content-encoding"));
             ASSERT_FALSE(encoding_header.empty());
             EXPECT_EQ("gzip", encoding_header[0]->value().getStringView());
 
@@ -1267,8 +1272,10 @@ TEST_F(ZipkinDriverTest, ReporterFlushWithCustomHeadersProtobuf) {
                                              operation_name_, {Tracing::Reason::Sampling, true});
   span->finishSpan();
 
-  Http::ResponseHeaderMapPtr response_headers{new Http::TestResponseHeaderMapImpl{{":status", "202"}}};
-  callback->onSuccess(request, std::make_unique<Http::ResponseMessageImpl>(std::move(response_headers)));
+  Http::ResponseHeaderMapPtr response_headers{
+      new Http::TestResponseHeaderMapImpl{{":status", "202"}}};
+  callback->onSuccess(request,
+                      std::make_unique<Http::ResponseMessageImpl>(std::move(response_headers)));
 }
 
 } // namespace
