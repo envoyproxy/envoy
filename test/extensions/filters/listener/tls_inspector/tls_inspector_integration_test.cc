@@ -261,6 +261,7 @@ TEST_P(TlsInspectorIntegrationTest, ContinueOnListenerTimeout) {
 }
 
 TEST_P(TlsInspectorIntegrationTest, TlsInspectorMetadataPopulatedInAccessLog) {
+  LogLevelSetter save_levels(spdlog::level::trace);
   initializeWithTlsInspector(/*ssl_client=*/false, /*log_format=*/"%TLS_INSPECTOR_ERROR%", false,
                              false, false);
   Network::Address::InstanceConstSharedPtr address =
