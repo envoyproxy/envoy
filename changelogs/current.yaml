@@ -302,6 +302,11 @@ new_features:
 - area: http
   change: |
     Added ``upstream_rq_per_cx`` histogram to track requests per connection for monitoring connection reuse efficiency.
-
+- area: http
+  change: |
+    Added
+    :ref:`stream_flush_timeout
+    <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_flush_timeout>`
+    to allow for configuring a stream flush timeout independently from the stream idle timeout.
 
 deprecated:
