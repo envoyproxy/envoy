@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/singleton/instance.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "source/common/http/headers.h"
@@ -19,6 +20,7 @@
 
 #include "xds/type/v3/cel.pb.h"
 #include "cel/expr/syntax.pb.h"
+#include "envoy/extensions/bootstrap/cel/v3/cel.pb.h"
 
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
@@ -87,10 +89,14 @@ private:
 
 using BuilderInstanceSharedPtr = std::shared_ptr<BuilderInstance>;
 
+// (Removed CelRuntimeOptions, not used.)
+
 // Creates an expression builder. The optional arena is used to enable constant folding
 // for intermediate evaluation results.
 // Throws an exception if fails to construct an expression builder.
-BuilderPtr createBuilder(Protobuf::Arena* arena);
+BuilderPtr
+createBuilder(Protobuf::Arena* arena,
+              const envoy::extensions::bootstrap::cel::v3::CelEvaluatorConfig* config = nullptr);
 
 // Gets the singleton expression builder. Must be called on the main thread.
 BuilderInstanceSharedPtr getBuilder(Server::Configuration::CommonFactoryContext& context);

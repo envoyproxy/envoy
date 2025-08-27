@@ -1314,6 +1314,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.access_loggers.extension_filters.cel",
             "envoy.access_loggers.wasm",
+            "envoy.bootstrap.cel",
             "envoy.bootstrap.wasm",
             "envoy.rate_limit_descriptors.expr",
             "envoy.filters.http.ext_proc",
@@ -1346,6 +1347,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         extensions = [
             "envoy.access_loggers.extension_filters.cel",
             "envoy.access_loggers.wasm",
+            "envoy.bootstrap.cel",
             "envoy.bootstrap.wasm",
             "envoy.rate_limit_descriptors.expr",
             "envoy.filters.http.ext_proc",
@@ -1379,6 +1381,7 @@ REPOSITORY_LOCATIONS_SPEC = dict(
             "envoy.access_loggers.extension_filters.cel",
             "envoy.access_loggers.wasm",
             "envoy.formatter.cel",
+            "envoy.bootstrap.cel",
             "envoy.bootstrap.wasm",
             "envoy.rate_limit_descriptors.expr",
             "envoy.filters.http.ext_proc",
