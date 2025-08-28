@@ -80,6 +80,7 @@ categories:
 - envoy.geoip_providers
 - envoy.grpc_credentials
 - envoy.guarddog_actions
+- envoy.hash
 - envoy.health_checkers
 - envoy.health_check.event_sinks
 - envoy.http.cache

@@ -1,6 +1,8 @@
 #include "envoy/extensions/filters/http/basic_auth/v3/basic_auth.pb.h"
 
+#include "source/common/config/utility.h"
 #include "source/extensions/filters/http/basic_auth/basic_auth_filter.h"
+#include "source/extensions/hash/factory.h"
 
 #include "test/mocks/http/mocks.h"
 
@@ -15,9 +17,20 @@ namespace BasicAuth {
 class FilterTest : public testing::Test {
 public:
   FilterTest() {
+    auto* factory = Envoy::Config::Utility::getFactoryByName<
+        Envoy::Extensions::Hash::NamedAlgorithmProviderConfigFactory>("envoy.hash.sha1");
+    if (factory == nullptr) {
+      throw EnvoyException("basic auth: did not find factory named 'envoy.hash.sha1'");
+    }
+    sha_algorithm_provider_ = factory->createAlgorithmProvider();
+
     UserMap users;
-    users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}}); // user1:test1
-    users.insert({"user2", {"user2", "EJ9LPFDXsN9ynSmbxvjp75Bmlx8="}}); // user2:test2
+    users.insert(
+        {"user1",
+         {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw=", sha_algorithm_provider_}}); // user1:test1
+    users.insert(
+        {"user2",
+         {"user2", "EJ9LPFDXsN9ynSmbxvjp75Bmlx8=", sha_algorithm_provider_}}); // user2:test2
     config_ = std::make_unique<FilterConfig>(std::move(users), "x-username", "", "stats",
                                              *stats_.rootScope());
     filter_ = std::make_shared<BasicAuthFilter>(config_);
@@ -28,6 +41,7 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_filter_callbacks_;
   FilterConfigConstSharedPtr config_;
   std::shared_ptr<BasicAuthFilter> filter_;
+  Hash::AlgorithmProviderSharedPtr sha_algorithm_provider_;
 };
 
 TEST_F(FilterTest, BasicAuth) {
@@ -248,7 +262,8 @@ TEST_F(FilterTest, BasicAuthPerRouteDefaultSettings) {
 
 TEST_F(FilterTest, BasicAuthPerRouteEnabled) {
   UserMap users_for_route;
-  users_for_route.insert({"admin", {"admin", "0DPiKuNIrrVmD8IUCuw1hQxNqZc="}}); // admin:admin
+  users_for_route.insert(
+      {"admin", {"admin", "0DPiKuNIrrVmD8IUCuw1hQxNqZc=", sha_algorithm_provider_}}); // admin:admin
   FilterConfigPerRoute basic_auth_per_route(std::move(users_for_route));
 
   ON_CALL(*decoder_filter_callbacks_.route_, mostSpecificPerFilterConfig(_))
@@ -274,7 +289,8 @@ TEST_F(FilterTest, BasicAuthPerRouteEnabled) {
 
 TEST_F(FilterTest, OverrideAuthorizationHeaderProvided) {
   UserMap users;
-  users.insert({"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw="}}); // user1:test1
+  users.insert(
+      {"user1", {"user1", "tESsBmE/yNY3lb6a0L6vVQEZNqw=", sha_algorithm_provider_}}); // user1:test1
 
   FilterConfigConstSharedPtr config = std::make_unique<FilterConfig>(
       std::move(users), "x-username", "x-authorization-override", "stats", *stats_.rootScope());
