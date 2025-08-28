@@ -918,6 +918,15 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return bytes_meter ? bytes_meter->headerBytesReceived() : 0;
                   });
             }}},
+          {"UPSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) {
+                    const auto& bytes_meter = stream_info.getUpstreamBytesMeter();
+                    return bytes_meter ? bytes_meter->decompressedHeaderBytesReceived() : 0;
+                  });
+            }}},
           {"DOWNSTREAM_WIRE_BYTES_RECEIVED",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, absl::optional<size_t>) {
@@ -934,6 +943,15 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   [](const StreamInfo::StreamInfo& stream_info) {
                     const auto& bytes_meter = stream_info.getDownstreamBytesMeter();
                     return bytes_meter ? bytes_meter->headerBytesReceived() : 0;
+                  });
+            }}},
+          {"DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) {
+                    const auto& bytes_meter = stream_info.getDownstreamBytesMeter();
+                    return bytes_meter ? bytes_meter->decompressedHeaderBytesReceived() : 0;
                   });
             }}},
           {"PROTOCOL",
@@ -1010,6 +1028,15 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return bytes_meter ? bytes_meter->headerBytesSent() : 0;
                   });
             }}},
+          {"UPSTREAM_DECOMPRESSED_HEADER_BYTES_SENT",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) {
+                    const auto& bytes_meter = stream_info.getUpstreamBytesMeter();
+                    return bytes_meter ? bytes_meter->decompressedHeaderBytesSent() : 0;
+                  });
+            }}},
           {"DOWNSTREAM_WIRE_BYTES_SENT",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, absl::optional<size_t>) {
@@ -1026,6 +1053,15 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   [](const StreamInfo::StreamInfo& stream_info) {
                     const auto& bytes_meter = stream_info.getDownstreamBytesMeter();
                     return bytes_meter ? bytes_meter->headerBytesSent() : 0;
+                  });
+            }}},
+          {"DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_SENT",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) {
+                    const auto& bytes_meter = stream_info.getDownstreamBytesMeter();
+                    return bytes_meter ? bytes_meter->decompressedHeaderBytesSent() : 0;
                   });
             }}},
           {"DURATION",
