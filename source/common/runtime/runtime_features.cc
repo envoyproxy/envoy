@@ -87,7 +87,6 @@ RUNTIME_GUARD(envoy_restart_features_raise_file_limits);
 RUNTIME_GUARD(envoy_restart_features_skip_backing_cluster_check_for_sds);
 RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 RUNTIME_GUARD(envoy_restart_features_validate_http3_pseudo_headers);
-RUNTIME_GUARD(envoy_restart_features_use_cached_grpc_client_for_xds);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
 
@@ -168,6 +167,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_no_ai_flags);
 // take over the split ones, and will be used as a base for the
 // implementation of on-demand DNS.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
+
+// TODO(pradeepcrao): Create a config option to enable this instead after
+// testing.
+FALSE_RUNTIME_GUARD(envoy_restart_features_use_cached_grpc_client_for_xds);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
