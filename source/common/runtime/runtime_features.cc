@@ -87,6 +87,7 @@ RUNTIME_GUARD(envoy_restart_features_raise_file_limits);
 RUNTIME_GUARD(envoy_restart_features_skip_backing_cluster_check_for_sds);
 RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
 RUNTIME_GUARD(envoy_restart_features_validate_http3_pseudo_headers);
+RUNTIME_GUARD(envoy_restart_features_use_cached_grpc_client_for_xds);
 
 // Begin false flags. Most of them should come with a TODO to flip true.
 
