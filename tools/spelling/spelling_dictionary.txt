@@ -93,6 +93,7 @@ ETB
 ETX
 FS
 FIXME
+fc
 decrypted
 gperf
 HEXDIG
@@ -384,6 +385,7 @@ PROT
 Postgre
 Postgres
 Prereq
+Pv
 QDCOUNT
 QPACK
 QUIC
@@ -1435,6 +1437,7 @@ timestamps
 timeval
 tmp
 tmpfile
+tmpl
 tokenize
 tokenized
 tokenizes
