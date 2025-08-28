@@ -32,8 +32,12 @@ static_resources:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.cache.v3.CacheConfig
                       typed_config:
                         "@type": type.googleapis.com/envoy.extensions.http.cache.file_system_http_cache.v3.FileSystemHttpCacheConfig
-                        manager_config:
-                          thread_pool: {} # use defaults
+                        # manager_config is required for the File System backend; omitted here
+                        # because the thread-pool manager isn't available in all environments.
+                        # Configure it in deployments, for example:
+                        # manager_config:
+                        #   thread_pool:
+                        #     thread_count: 2
                         cache_path: /var/cache/envoy
                         max_cache_size_bytes: 1073741824 # 1 GiB
                   - name: envoy.filters.http.router
