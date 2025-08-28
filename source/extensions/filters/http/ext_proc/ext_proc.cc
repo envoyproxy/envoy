@@ -219,7 +219,7 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
                            const std::chrono::milliseconds message_timeout,
                            const uint32_t max_message_timeout_ms, Stats::Scope& scope,
                            const std::string& stats_prefix, bool is_upstream,
-                           Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
+                           Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
                            Server::Configuration::CommonFactoryContext& context)
     : failure_mode_allow_(config.failure_mode_allow()),
       observability_mode_(config.observability_mode()),
