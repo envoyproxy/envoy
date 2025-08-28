@@ -101,7 +101,7 @@ ActivationPtr createActivation(const LocalInfo::LocalInfo* local_info,
                                             response_trailers);
 }
 
-BuilderPtr createBuilder(Protobuf::Arena* arena) {
+BuilderInstanceSharedPtr createBuilder(Protobuf::Arena* arena) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   google::api::expr::runtime::InterpreterOptions options;
 
@@ -138,48 +138,74 @@ BuilderPtr createBuilder(Protobuf::Arena* arena) {
     throw CelException(absl::StrCat("failed to register extension regex functions: ",
                                     ext_register_status.message()));
   }
-  return builder;
+  return std::make_shared<BuilderInstance>(std::move(builder));
 }
 
 SINGLETON_MANAGER_REGISTRATION(expression_builder);
 
-BuilderInstanceSharedPtr getBuilder(Server::Configuration::CommonFactoryContext& context) {
+BuilderInstanceSharedConstPtr getBuilder(Server::Configuration::CommonFactoryContext& context) {
   return context.singletonManager().getTyped<BuilderInstance>(
-      SINGLETON_MANAGER_REGISTERED_NAME(expression_builder),
-      [] { return std::make_shared<BuilderInstance>(createBuilder(nullptr)); });
+      SINGLETON_MANAGER_REGISTERED_NAME(expression_builder), [] { return createBuilder(nullptr); });
 }
 
-absl::optional<cel::expr::Expr> getExpr(const ::xds::type::v3::CelExpression& expression) {
-  if (expression.has_cel_expr_checked()) {
-    return expression.cel_expr_checked().expr();
-  } else if (expression.has_cel_expr_parsed()) {
-    return expression.cel_expr_parsed().expr();
-  } else {
-    return {};
-  }
-}
-
-ExpressionPtr createExpression(Builder& builder, const cel::expr::Expr& expr) {
-  cel::expr::SourceInfo source_info;
+absl::StatusOr<CompiledExpression>
+CompiledExpression::Create(const BuilderInstanceSharedConstPtr& builder,
+                           const cel::expr::Expr& expr) {
   std::vector<absl::Status> warnings;
-
-  auto cel_expression_status = builder.CreateExpression(&expr, &source_info, &warnings);
+  CompiledExpression out = CompiledExpression(builder, expr);
+  auto cel_expression_status = out.builder_->builder().CreateExpression(
+      &out.source_expr_, &cel::expr::SourceInfo::default_instance(), &warnings);
   if (!cel_expression_status.ok()) {
-    throw CelException(
-        absl::StrCat("failed to create an expression: ", cel_expression_status.status().message()));
+    return cel_expression_status.status();
   }
-  return std::move(cel_expression_status.value());
+  out.expr_ = std::move(cel_expression_status.value());
+  return out;
 }
 
-absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena,
-                                  const ::Envoy::LocalInfo::LocalInfo* local_info,
-                                  const StreamInfo::StreamInfo& info,
-                                  const ::Envoy::Http::RequestHeaderMap* request_headers,
-                                  const ::Envoy::Http::ResponseHeaderMap* response_headers,
-                                  const ::Envoy::Http::ResponseTrailerMap* response_trailers) {
+absl::StatusOr<CompiledExpression>
+CompiledExpression::Create(const BuilderInstanceSharedConstPtr& builder,
+                           const xds::type::v3::CelExpression& xds_expr) {
+  // First try to get expression from the new CEL canonical format
+  if (xds_expr.has_cel_expr_checked()) {
+    return Create(builder, xds_expr.cel_expr_checked().expr());
+  } else if (xds_expr.has_cel_expr_parsed()) {
+    return Create(builder, xds_expr.cel_expr_parsed().expr());
+  }
+  // Fallback to handling legacy formats for backward compatibility
+  switch (xds_expr.expr_specifier_case()) {
+  case xds::type::v3::CelExpression::ExprSpecifierCase::kParsedExpr:
+    return Create(builder, xds_expr.parsed_expr().expr());
+  case xds::type::v3::CelExpression::ExprSpecifierCase::kCheckedExpr:
+    return Create(builder, xds_expr.checked_expr().expr());
+  default:
+    return absl::InvalidArgumentError("CEL expression not set.");
+  }
+  PANIC_DUE_TO_CORRUPT_ENUM;
+}
+
+absl::StatusOr<CompiledExpression>
+CompiledExpression::Create(const BuilderInstanceSharedConstPtr& builder,
+                           const google::api::expr::v1alpha1::Expr& expr) {
+  std::string serialized;
+  if (!expr.SerializeToString(&serialized)) {
+    return absl::InvalidArgumentError(
+        "Failed to serialize google::api::expr::v1alpha1 expression.");
+  }
+  cel::expr::Expr new_expr;
+  if (!new_expr.ParseFromString(serialized)) {
+    return absl::InvalidArgumentError("Failed to convert to cel::expr expression.");
+  }
+  return Create(builder, new_expr);
+}
+
+absl::optional<CelValue> CompiledExpression::evaluate(
+    Protobuf::Arena& arena, const ::Envoy::LocalInfo::LocalInfo* local_info,
+    const StreamInfo::StreamInfo& info, const ::Envoy::Http::RequestHeaderMap* request_headers,
+    const ::Envoy::Http::ResponseHeaderMap* response_headers,
+    const ::Envoy::Http::ResponseTrailerMap* response_trailers) const {
   auto activation =
       createActivation(local_info, info, request_headers, response_headers, response_trailers);
-  auto eval_status = expr.Evaluate(*activation, &arena);
+  auto eval_status = expr_->Evaluate(*activation, &arena);
   if (!eval_status.ok()) {
     return {};
   }
@@ -187,10 +213,15 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena& arena
   return eval_status.value();
 }
 
-bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
-             const Http::RequestHeaderMap& headers) {
+absl::StatusOr<CelValue> CompiledExpression::evaluate(const Activation& activation,
+                                                      Protobuf::Arena* arena) const {
+  return expr_->Evaluate(activation, arena);
+}
+
+bool CompiledExpression::matches(const StreamInfo::StreamInfo& info,
+                                 const Http::RequestHeaderMap& headers) const {
   Protobuf::Arena arena;
-  auto eval_status = Expr::evaluate(expr, arena, nullptr, info, &headers, nullptr, nullptr);
+  auto eval_status = evaluate(arena, nullptr, info, &headers, nullptr, nullptr);
   if (!eval_status.has_value()) {
     return false;
   }
