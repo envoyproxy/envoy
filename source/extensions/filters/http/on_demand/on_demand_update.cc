@@ -241,9 +241,8 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
     return;
   }
 
-  if (route_exists &&                  // route can be resolved after an on-demand
-                                       // VHDS update
-      !callbacks_->decodingBuffer() && // Redirects with body not yet supported.
+  if (route_exists && // route can be resolved after an on-demand
+                      // VHDS update
       callbacks_->recreateStream(/*headers=*/nullptr)) {
     return;
   }
@@ -257,8 +256,7 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
     Upstream::ClusterDiscoveryStatus cluster_status) {
   filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
   cluster_discovery_handle_.reset();
-  if (cluster_status == Upstream::ClusterDiscoveryStatus::Available &&
-      !callbacks_->decodingBuffer()) { // Redirects with body not yet supported.
+  if (cluster_status == Upstream::ClusterDiscoveryStatus::Available) {
     const Http::ResponseHeaderMap* headers = nullptr;
     if (callbacks_->recreateStream(headers)) {
       callbacks_->downstreamCallbacks()->clearRouteCache();
