@@ -1563,6 +1563,8 @@ vm_config:
 
     EXPECT_EQ(plugin_config_->wasmStats().vm_reload_success_.value(), 1);
     EXPECT_EQ(plugin_config_->wasmStats().vm_reload_backoff_.value(), 0);
+    // vm_failed should be 1 due to the RuntimeError event published when failure was detected
+    EXPECT_EQ(plugin_config_->wasmStats().vm_failed_.value(), 1);
 
     EXPECT_CALL(decoder_callbacks_,
                 sendLocalReply(Envoy::Http::Code::ServiceUnavailable, testing::Eq(""), _,
@@ -1580,6 +1582,7 @@ vm_config:
 
     EXPECT_EQ(plugin_config_->wasmStats().vm_reload_success_.value(), 1);
     EXPECT_EQ(plugin_config_->wasmStats().vm_reload_backoff_.value(), 1);
+    EXPECT_EQ(plugin_config_->wasmStats().vm_failed_.value(), 2);
 
     // Wait 2 seconds.
     server_.dispatcher_.globalTimeSystem().advanceTimeWait(std::chrono::seconds(2));

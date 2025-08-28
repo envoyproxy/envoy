@@ -110,7 +110,8 @@ protected:
   COUNTER(vm_reload)                                                                               \
   COUNTER(vm_reload_backoff)                                                                       \
   COUNTER(vm_reload_success)                                                                       \
-  COUNTER(vm_reload_failure)
+  COUNTER(vm_reload_failure)                                                                       \
+  COUNTER(vm_failed)
 
 struct WasmStats {
   WASM_STATS(GENERATE_COUNTER_STRUCT)
