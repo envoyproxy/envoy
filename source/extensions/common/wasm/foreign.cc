@@ -145,7 +145,8 @@ protected:
   class ExpressionContext : public StorageObject {
   public:
     friend class ExpressionFactory;
-    ExpressionContext(Filters::Common::Expr::BuilderPtr builder) : builder_(std::move(builder)) {}
+    ExpressionContext(Filters::Common::Expr::BuilderConstPtr builder)
+        : builder_(std::move(builder)) {}
     uint32_t createToken() {
       uint32_t token = next_expr_token_++;
       for (;;) {
@@ -159,10 +160,10 @@ protected:
     bool hasExpression(uint32_t token) { return expr_.contains(token); }
     ExpressionData& getExpression(uint32_t token) { return expr_[token]; }
     void deleteExpression(uint32_t token) { expr_.erase(token); }
-    Filters::Common::Expr::Builder* builder() { return builder_.get(); }
+    const Filters::Common::Expr::Builder* builder() const { return builder_.get(); }
 
   private:
-    Filters::Common::Expr::BuilderPtr builder_{};
+    const Filters::Common::Expr::BuilderConstPtr builder_{};
     uint32_t next_expr_token_ = 0;
     absl::flat_hash_map<uint32_t, ExpressionData> expr_;
   };
