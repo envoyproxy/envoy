@@ -1928,6 +1928,13 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
       }
     }
   }
+  for (const auto& simplification_rule : route_config.host_simplification_rules()) {
+    const auto rewrite = THROW_OR_RETURN_VALUE(
+        Regex::Utility::parseRegex(simplification_rule.pattern(), factory_context.regexEngine()),
+        Regex::CompiledMatcherPtr);
+
+    host_simplification_rules_.push_back({std::move(rewrite), simplification_rule.substitution()});
+  }
 }
 
 const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMap& headers) const {
@@ -1951,6 +1958,12 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
       host_header_value = host_header_value.substr(0, port_start);
     }
   }
+
+  for (const auto& simplifier : host_simplification_rules_) {
+    const auto& matcher = simplifier.matcher;
+    host_header_value = matcher->replaceAll(host_header_value, simplifier.substitution);
+  }
+
   // TODO (@rshriram) Match Origin header in WebSocket
   // request with VHost, using wildcard match
   // Lower-case the value of the host header, as hostnames are case insensitive.
