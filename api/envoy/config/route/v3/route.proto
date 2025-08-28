@@ -5,6 +5,7 @@ package envoy.config.route.v3;
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/route/v3/route_components.proto";
+import "envoy/type/matcher/v3/regex.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/wrappers.proto";
@@ -155,6 +156,14 @@ message RouteConfiguration {
   // For instance, if the metadata is intended for the Router filter,
   // the filter name should be specified as ``envoy.filters.http.router``.
   core.v3.Metadata metadata = 17;
+
+  // The host simplification rules are a set of regex substitutions
+  // that can modify the :authority used when matching
+  // VirtualHosts. It will not change what is sent upstream. This can
+  // be used to implement multiple-wildcard matching, by converting
+  // all but one of the wildcards into a static string.
+  // This is similar to ignore_port_in_host_matching (above), but more flexible.
+  repeated type.matcher.v3.RegexMatchAndSubstitute host_simplification_rules = 18;
 }
 
 message Vhds {

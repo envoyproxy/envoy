@@ -359,5 +359,10 @@ new_features:
     Added a new metric ``db_build_epoch`` to track the build timestamp of the MaxMind geolocation database files.
     This can be used to monitor the freshness of the databases currently in use by the filter.
     See `MaxMind DB build_epoch <https://maxmind.github.io/MaxMind-DB/#build_epoch>`_ for more details.
+- area: http
+  change: |
+    Added support for :ref:`host_simplification_rules <envoy_v3_api_field_config.route.v3.RouteConfiguration.host_simplification_rules>` to allow for
+    regular expression substitutions to "simplify" a host before doing
+    virtual host matching.
 
 deprecated:
