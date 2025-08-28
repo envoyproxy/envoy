@@ -41,6 +41,11 @@ minor_behavior_changes:
   change: |
     turn off HTTP/3 happy eyeball in upstream via runtime guard ``envoy.reloadable_features.http3_happy_eyeballs``.
     It is found to favor TCP over QUIC when UDP does not work on v6 network but works on v4.
+- area: mobile
+  change: |
+    Explicitly drain connections upon network change events regardless of whether the DNS cache is refreshed or not. This behavior
+    can be reverted by setting the runtime guard ``envoy.reloadable_features.decouple_explicit_drain_pools_and_dns_refresh``
+    to false.
 - area: http
   change: |
     Adds accounting for decompressed HTTP header bytes sent and received. Existing stats only count wire-encoded header bytes.
