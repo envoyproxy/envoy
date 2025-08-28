@@ -181,6 +181,9 @@ new_features:
     support evictable metrics. This is done :ref:`periodically
     <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_eviction_interval>`
     during the metric flush.
+- area: tap
+  change: |
+    Record the upstream connection information in the HTTP buffer trace output.
 - area: quic
   change: |
     Added new option to support :ref:`base64 encoded server ID
