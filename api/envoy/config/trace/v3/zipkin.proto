@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.config.trace.v3;
 
+import "envoy/config/core/v3/base.proto";
+
 import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
@@ -21,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the Zipkin tracer.
 // [#extension: envoy.tracers.zipkin]
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message ZipkinConfig {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.trace.v2.ZipkinConfig";
 
@@ -106,4 +108,10 @@ message ZipkinConfig {
   // Here is the spec for W3C trace headers: https://www.w3.org/TR/trace-context/
   // The default value is USE_B3 to maintain backward compatibility.
   TraceContextOption trace_context_option = 8;
+
+  // Additional HTTP headers to include in requests sent to the Zipkin collector.
+  // These headers will be added to all HTTP requests sent to the collector endpoint.
+  // This can be useful for authentication, authorization, or collector-specific routing.
+  // Note: This is different from custom tags which add metadata to individual spans.
+  repeated core.v3.HeaderValue collector_request_headers = 9;
 }

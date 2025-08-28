@@ -110,6 +110,13 @@ Alternatively the trace context can be manually propagated by the service:
     :ref:`tracestate <config_http_conn_man_headers_tracestate>`) when B3 headers are not present.
   - For upstream requests: Inject both B3 and W3C trace headers to maximize compatibility.
 
+  The Zipkin tracer also supports adding custom HTTP headers to requests sent to the Zipkin collector.
+  This is configured using the
+  :ref:`collector_request_headers <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_request_headers>` option,
+  which allows adding headers for authentication, authorization, or collector-specific routing.
+  For example, API keys or bearer tokens can be included in collector requests for authentication.
+  This is different from custom tags, which add metadata to individual spans within the trace data.
+
   This option is disabled by default (``USE_B3``) to maintain backward compatibility, where only
   B3 headers are used for both extraction and injection.
 
