@@ -49,7 +49,8 @@ minor_behavior_changes:
     ``%DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_SENT%`` access_log command operators.
 - area: ext_proc
   change: |
-    If failure_mode_allowed is true, save the grpc failure status code returned from the ext_proc server in the filter state.
+    If :ref:`failure_mode_allow <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.failure_mode_allow>` is true,
+    save the grpc failure status code returned from the ext_proc server in the filter state.
     Previously all fail-open cases would return call_status Grpc::Status::Aborted.
 
 bug_fixes:
