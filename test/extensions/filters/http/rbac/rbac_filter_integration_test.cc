@@ -2,6 +2,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
 #include "test/integration/http_protocol_integration.h"
 
@@ -1594,6 +1595,10 @@ typed_config:
   dns_cache_config:
     name: foo
     dns_lookup_family: {}
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
 )EOF",
                     save_upstream_config, Network::Test::ipVersionToDnsFamily(GetParam()));
 
@@ -1636,6 +1641,10 @@ typed_config:
   dns_cache_config:
     name: foo
     dns_lookup_family: {}
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
 )EOF",
         Network::Test::ipVersionToDnsFamily(GetParam()));
 
