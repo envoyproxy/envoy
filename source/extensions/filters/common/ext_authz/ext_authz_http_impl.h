@@ -2,6 +2,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/tracing/tracer.h"
 #include "envoy/type/matcher/v3/string.pb.h"
@@ -144,7 +145,7 @@ class RawHttpClientImpl : public Client,
                           Logger::Loggable<Logger::Id::config> {
 public:
   explicit RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config,
-                            const LocalInfo::LocalInfo& local_info);
+                             const LocalInfo::LocalInfo& local_info);
   ~RawHttpClientImpl() override;
 
   // ExtAuthz::Client

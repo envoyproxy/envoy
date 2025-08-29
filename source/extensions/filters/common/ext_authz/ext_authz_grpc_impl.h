@@ -13,6 +13,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
@@ -21,7 +22,6 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/grpc/typed_async_client.h"
-#include "envoy/local_info/local_info.h"
 #include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 
@@ -45,9 +45,8 @@ class GrpcClientImpl : public Client,
                        public Logger::Loggable<Logger::Id::ext_authz> {
 public:
   GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
-                 const absl::optional<std::chrono::milliseconds>& timeout,
-                 const LocalInfo::LocalInfo& local_info,
-                 bool include_peer_metadata_headers);
+                  const absl::optional<std::chrono::milliseconds>& timeout,
+                  const LocalInfo::LocalInfo& local_info, bool include_peer_metadata_headers);
   ~GrpcClientImpl() override;
 
   // ExtAuthz::Client

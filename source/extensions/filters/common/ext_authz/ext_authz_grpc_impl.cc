@@ -1,11 +1,11 @@
 #include "source/extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/grpc/async_client_impl.h"
-#include "envoy/local_info/local_info.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
@@ -97,8 +97,8 @@ void GrpcClientImpl::cancel() {
 void GrpcClientImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
   // Add peer metadata headers as gRPC initial metadata if enabled
   if (include_peer_metadata_headers_ && current_stream_info_ != nullptr) {
-    auto peer_headers = CheckRequestUtils::computePeerMetadataHeaders(
-        *current_stream_info_, local_info_);
+    auto peer_headers =
+        CheckRequestUtils::computePeerMetadataHeaders(*current_stream_info_, local_info_);
     for (const auto& header : peer_headers) {
       metadata.addCopy(Http::LowerCaseString(header.first), header.second);
     }

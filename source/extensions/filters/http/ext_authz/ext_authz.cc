@@ -229,8 +229,8 @@ Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grp
                                                  : "google_grpc");
 
   return std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-      client_or_error.value(), std::chrono::milliseconds(timeout_ms), 
-      server_context_->localInfo(), config_->includePeerMetadataHeaders());
+      client_or_error.value(), std::chrono::milliseconds(timeout_ms), server_context_->localInfo(),
+      config_->includePeerMetadataHeaders());
 }
 
 Filters::Common::ExtAuthz::ClientPtr Filter::createPerRouteHttpClient(

@@ -1,6 +1,7 @@
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/type/v3/http_status.pb.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/grpc/common.h"
 #include "source/common/http/headers.h"
 #include "source/common/protobuf/protobuf.h"
@@ -9,11 +10,10 @@
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/extensions/filters/common/ext_authz/test_common.h"
 #include "test/mocks/grpc/mocks.h"
-#include "test/mocks/stream_info/mocks.h"
-#include "test/mocks/tracing/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
-#include "source/common/common/base64.h"
+#include "test/mocks/stream_info/mocks.h"
+#include "test/mocks/tracing/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

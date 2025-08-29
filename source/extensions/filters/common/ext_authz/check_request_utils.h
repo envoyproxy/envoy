@@ -11,10 +11,10 @@
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
-#include "envoy/local_info/local_info.h"
 #include "envoy/service/auth/v3/attribute_context.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/tracing/tracer.h"
@@ -92,17 +92,17 @@ public:
    * @param include_tls_session whether to include the TLS session details in the check request.
    */
   static void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                             const Envoy::Http::RequestHeaderMap& headers,
-                             Protobuf::Map<std::string, std::string>&& context_extensions,
-                             envoy::config::core::v3::Metadata&& metadata_context,
-                             envoy::config::core::v3::Metadata&& route_metadata_context,
-                             envoy::service::auth::v3::CheckRequest& request,
-                             uint64_t max_request_bytes, bool pack_as_bytes,
-                             bool encode_raw_headers, bool include_peer_certificate,
-                             bool include_tls_session,
-                             const Protobuf::Map<std::string, std::string>& destination_labels,
-                             const MatcherSharedPtr& allowed_headers_matcher,
-                             const MatcherSharedPtr& disallowed_headers_matcher);
+                              const Envoy::Http::RequestHeaderMap& headers,
+                              Protobuf::Map<std::string, std::string>&& context_extensions,
+                              envoy::config::core::v3::Metadata&& metadata_context,
+                              envoy::config::core::v3::Metadata&& route_metadata_context,
+                              envoy::service::auth::v3::CheckRequest& request,
+                              uint64_t max_request_bytes, bool pack_as_bytes,
+                              bool encode_raw_headers, bool include_peer_certificate,
+                              bool include_tls_session,
+                              const Protobuf::Map<std::string, std::string>& destination_labels,
+                              const MatcherSharedPtr& allowed_headers_matcher,
+                              const MatcherSharedPtr& disallowed_headers_matcher);
 
   /**
    * createTcpCheck is used to extract the attributes from the network layer and fill them up
@@ -131,7 +131,7 @@ public:
    */
   static std::vector<std::pair<std::string, std::string>>
   computePeerMetadataHeaders(const StreamInfo::StreamInfo& stream_info,
-                            const LocalInfo::LocalInfo& local_info);
+                             const LocalInfo::LocalInfo& local_info);
 
 private:
   static void setAttrContextPeer(envoy::service::auth::v3::AttributeContext::Peer& peer,

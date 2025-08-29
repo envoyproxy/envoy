@@ -2,13 +2,13 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/type/matcher/v3/string.pb.h"
 
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/matchers.h"
-#include "envoy/local_info/local_info.h"
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/codes.h"
 #include "source/common/runtime/runtime_features.h"
@@ -157,8 +157,7 @@ ClientConfig::ClientConfig(
               http_service.authorization_request().headers_to_add(),
               envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
           Router::HeaderParserPtr)),
-      encode_raw_headers_(encode_raw_headers),
-      include_peer_metadata_headers_(false) {}
+      encode_raw_headers_(encode_raw_headers), include_peer_metadata_headers_(false) {}
 
 MatcherSharedPtr
 ClientConfig::toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list,

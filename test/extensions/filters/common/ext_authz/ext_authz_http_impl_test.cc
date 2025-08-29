@@ -1,6 +1,7 @@
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
@@ -15,7 +16,6 @@
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
-#include "source/common/common/base64.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
