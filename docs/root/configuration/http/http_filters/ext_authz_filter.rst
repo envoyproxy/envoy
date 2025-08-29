@@ -15,6 +15,29 @@ also possible. This is explained in more details at :ref:`HTTP filter <envoy_v3_
 The content of the requests that are passed to an authorization service is specified by
 :ref:`CheckRequest <envoy_v3_api_msg_service.auth.v3.CheckRequest>`.
 
+.. _config_http_filters_ext_authz_peer_metadata:
+
+Peer Metadata Headers
+--------------------
+
+When :ref:`include_peer_metadata_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.include_peer_metadata_headers>`
+is enabled, the filter will include downstream peer identity/metadata in the authorization request.
+This enables out-of-band policy and telemetry correlation in external authorization services.
+
+For HTTP authorization services, the following headers are added to the authorization request:
+
+* ``x-envoy-peer-metadata-id``: The local Envoy node ID (from LocalInfo::node().id())
+* ``x-envoy-peer-metadata``: Base64-encoded google.protobuf.Struct containing node metadata, optionally augmented with the downstream peer certificate URI SAN (if present)
+
+For gRPC authorization services, the same information is included as gRPC initial metadata.
+
+The serialized metadata is capped at 8 KB. If the metadata exceeds this limit, a minimal struct containing only the workload name and principal (if available) is sent instead.
+
+.. note::
+
+  This feature is disabled by default and must be explicitly enabled via configuration.
+  The metadata is sent on the wire (as headers/metadata) and is not included in the CheckRequest protobuf payload.
+
 .. _config_http_filters_ext_authz_http_configuration:
 
 The HTTP filter, using a gRPC/HTTP service, can be configured as follows. You can see all the
@@ -123,6 +146,19 @@ A sample filter configuration for a raw HTTP authorization server:
     :lineno-start: 41
     :linenos:
     :caption: :download:`ext-authz-http-filter.yaml <_include/ext-authz-http-filter.yaml>`
+
+A sample filter configuration with peer metadata headers enabled:
+
+.. code-block:: yaml
+
+  http_filters:
+  - name: envoy.filters.http.ext_authz
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
+      include_peer_metadata_headers: true
+      grpc_service:
+        envoy_grpc:
+          cluster_name: ext_authz
 
 Per-Route Configuration
 -----------------------
