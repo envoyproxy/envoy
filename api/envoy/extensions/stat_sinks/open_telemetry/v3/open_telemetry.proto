@@ -87,37 +87,8 @@ message SinkConfig {
   // prefix added. According to the example, the full stat name will remain "foo.bar".
   string prefix = 6;
 
-  // The custom conversion from a stat to a metric. Currently, the only supported input is `envoy.type.matcher.v3.StatFullNameMatchInput` and the only support action is `envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.ConversionAction`.`
-  //
-  // The following is an example on how to use this feature.
-  // ```
-  // matcher_list {
-  //   matchers {
-  //     predicate {
-  //       single_predicate {
-  //         input {
-  //           name: "stat_full_name_match_input"
-  //           typed_config {
-  //             [type.googleapis.com/
-  //              envoy.type.matcher.v3.StatFullNameMatchInput] {}
-  //           }
-  //         }
-  //         value_match { safe_regex { regex: "test_counter-1" } }
-  //       }
-  //     }
-  //     on_match {
-  //       action {
-  //         name: "otlp_metric_conversion"
-  //         typed_config {
-  //           [type.googleapis.com/envoy.extensions.stat_sinks
-  //                .open_telemetry.v3.SinkConfig.ConversionAction] {
-  //             metric_name: "new_counter_name"
-  //           }
-  //         }
-  //       }
-  //     }
-  //   }
-  // }
-  // ```
+  // The custom conversion from a stat to a metric. Currently, the only supported input is
+  // ``envoy.type.matcher.v3.StatFullNameMatchInput`` and the only support action is
+  // ``envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.ConversionAction``.
   xds.type.matcher.v3.Matcher custom_metric_conversions = 8;
 }
