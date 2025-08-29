@@ -2037,23 +2037,28 @@ void Context::ensureSpan() {
     return;
   }
 
-  auto const traceConfig = decoder_callbacks_->tracingConfig();
-
-  if (!traceConfig) {
+  // might happen  in tests
+  if (!decoder_callbacks_) {
     return;
   }
 
-  const auto* const wasmPlugin = plugin();
-  const std::string child_span_name = absl::StrCat("wasm ", wasmPlugin->name_);
+  auto const trace_config = decoder_callbacks_->tracingConfig();
 
-  trace_config_ = traceConfig;
+  if (!trace_config) {
+    return;
+  }
+
+  const auto* const wasm_plugin = plugin();
+  const std::string child_span_name = absl::StrCat("wasm ", wasm_plugin->name_);
+
+  trace_config_ = trace_config;
   trace_span_ = decoder_callbacks_->activeSpan().spawnChild(
-    *traceConfig, child_span_name, decoder_callbacks_->dispatcher().timeSource().systemTime());
+    *trace_config, child_span_name, decoder_callbacks_->dispatcher().timeSource().systemTime());
 
-  trace_span_->setTag(TracingConstants::get().TracePluginName, wasmPlugin->name_);
-  trace_span_->setTag(TracingConstants::get().TraceVmId, wasmPlugin->vm_id_);
-  trace_span_->setTag(TracingConstants::get().TraceEngine, wasmPlugin->engine_);
-  trace_span_->setTag(TracingConstants::get().TraceRootId, wasmPlugin->root_id_);
+  trace_span_->setTag(TracingConstants::get().TracePluginName, wasm_plugin->name_);
+  trace_span_->setTag(TracingConstants::get().TraceVmId, wasm_plugin->vm_id_);
+  trace_span_->setTag(TracingConstants::get().TraceEngine, wasm_plugin->engine_);
+  trace_span_->setTag(TracingConstants::get().TraceRootId, wasm_plugin->root_id_);
 }
 
 Tracing::SpanPtr Context::childSpan(const std::string& child_name) {
