@@ -9,7 +9,9 @@ using testing::ReturnPointee;
 namespace Envoy {
 namespace Tracing {
 
-MockSpan::MockSpan() = default;
+MockSpan::MockSpan() {
+  ON_CALL(*this, spawnChild_).WillByDefault([] { return new testing::NiceMock<MockSpan>(); });
+}
 MockSpan::~MockSpan() = default;
 
 MockConfig::MockConfig() {
