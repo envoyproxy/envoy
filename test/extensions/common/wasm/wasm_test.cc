@@ -1692,6 +1692,7 @@ vm_config:
                                testing::Eq("wasm_fail_stream")));
     EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
               context_->decodeData(request_body, true));
+    EXPECT_EQ(plugin_config_->wasmStats().vm_failed_.value(), 1);
   };
 
   test_func(false);
@@ -1770,6 +1771,8 @@ vm_config:
                                testing::Eq("wasm_fail_stream")));
     EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer,
               context_->decodeData(request_body, true));
+
+    EXPECT_EQ(plugin_config_->wasmStats().vm_failed_.value(), 1);
   };
 
   test_func(false);
@@ -1839,6 +1842,7 @@ vm_config:
     EXPECT_NE(nullptr, latest_wasm);
     EXPECT_EQ(latest_wasm, initial_wasm);
     EXPECT_EQ(latest_wasm->fail_state(), proxy_wasm::FailState::RuntimeError);
+    EXPECT_EQ(plugin_config_->wasmStats().vm_failed_.value(), 1);
   };
 
   test_func(false);
