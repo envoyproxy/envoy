@@ -15,6 +15,7 @@
 #include "test/extensions/filters/http/ext_authz/ext_authz_fuzz_lib.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/grpc/mocks.h"
+#include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"
 
@@ -66,7 +67,8 @@ public:
     }
 
     grpc_client_ = new Filters::Common::ExtAuthz::GrpcClientImpl(internal_grpc_mock_client_,
-                                                                 std::chrono::milliseconds(1000));
+                                                                 std::chrono::milliseconds(1000),
+                                                                 local_info_, false);
     return std::unique_ptr<Filters::Common::ExtAuthz::GrpcClientImpl>{grpc_client_};
   }
 
@@ -74,6 +76,7 @@ private:
   std::shared_ptr<NiceMock<Grpc::MockAsyncClient>> internal_grpc_mock_client_;
   Envoy::Tracing::MockSpan mock_span_;
   NiceMock<Grpc::MockAsyncRequest> grpc_async_request_;
+  NiceMock<Server::MockLocalInfo> local_info_;
 
   // Set by calling newGrpcClientImpl. Only one of response_ or failure_reason_ will be set.
   std::unique_ptr<envoy::service::auth::v3::CheckResponse> response_;

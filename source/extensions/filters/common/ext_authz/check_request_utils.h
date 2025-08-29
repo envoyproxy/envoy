@@ -14,6 +14,7 @@
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/local_info/local_info.h"
 #include "envoy/service/auth/v3/attribute_context.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/tracing/tracer.h"
@@ -96,10 +97,10 @@ public:
                               envoy::config::core::v3::Metadata&& metadata_context,
                               envoy::config::core::v3::Metadata&& route_metadata_context,
                               envoy::service::auth::v3::CheckRequest& request,
-                              uint64_t max_request_bytes, bool pack_as_bytes,
-                              bool encode_raw_headers, bool include_peer_certificate,
-                              bool include_tls_session,
-                              const Protobuf::Map<std::string, std::string>& destination_labels,
+                                                              uint64_t max_request_bytes, bool pack_as_bytes,
+                                bool encode_raw_headers,                                 bool include_peer_certificate,
+                                bool include_tls_session,
+                                const Protobuf::Map<std::string, std::string>& destination_labels,
                               const MatcherSharedPtr& allowed_headers_matcher,
                               const MatcherSharedPtr& disallowed_headers_matcher);
 
@@ -121,6 +122,16 @@ public:
   static std::vector<Matchers::StringMatcherPtr>
   createStringMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
                        Server::Configuration::CommonFactoryContext& context);
+
+  /**
+   * Computes peer metadata headers for authorization requests.
+   * @param stream_info supplies the stream info from which peer information can be extracted.
+   * @param local_info supplies the local node information.
+   * @return vector of header name-value pairs to be added to the authorization request.
+   */
+  static std::vector<std::pair<std::string, std::string>>
+  computePeerMetadataHeaders(const StreamInfo::StreamInfo& stream_info,
+                            const LocalInfo::LocalInfo& local_info);
 
 private:
   static void setAttrContextPeer(envoy::service::auth::v3::AttributeContext::Peer& peer,
@@ -146,6 +157,8 @@ private:
                             const Envoy::Network::Connection& connection);
   static std::string getHeaderStr(const Envoy::Http::HeaderEntry* entry);
   static Envoy::Http::HeaderMap::Iterate fillHttpHeaders(const Envoy::Http::HeaderEntry&, void*);
+
+private:
 };
 
 } // namespace ExtAuthz

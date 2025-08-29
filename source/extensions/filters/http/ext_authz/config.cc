@@ -38,7 +38,7 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoWithServ
     callback = [filter_config = std::move(filter_config), client_config,
                 &server_context](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Extensions::Filters::Common::ExtAuthz::RawHttpClientImpl>(
-          server_context.clusterManager(), client_config);
+          server_context.clusterManager(), client_config, server_context.localInfo());
       callbacks.addStreamFilter(
           std::make_shared<Filter>(filter_config, std::move(client), server_context));
     };
@@ -57,7 +57,8 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoWithServ
                                      config_with_hash_key, server_context.scope(), true);
       THROW_IF_NOT_OK_REF(client_or_error.status());
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-          client_or_error.value(), std::chrono::milliseconds(timeout_ms));
+          client_or_error.value(), std::chrono::milliseconds(timeout_ms),
+          server_context.localInfo(), filter_config->includePeerMetadataHeaders());
       callbacks.addStreamFilter(
           std::make_shared<Filter>(filter_config, std::move(client), server_context));
     };

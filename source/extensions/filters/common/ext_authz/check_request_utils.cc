@@ -20,9 +20,14 @@
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
+
+#include "source/common/common/base64.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
+#include "envoy/local_info/local_info.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -241,7 +246,7 @@ void CheckRequestUtils::createHttpCheck(
     envoy::config::core::v3::Metadata&& metadata_context,
     envoy::config::core::v3::Metadata&& route_metadata_context,
     envoy::service::auth::v3::CheckRequest& request, uint64_t max_request_bytes, bool pack_as_bytes,
-    bool encode_raw_headers, bool include_peer_certificate, bool include_tls_session,
+    bool encode_raw_headers,     bool include_peer_certificate, bool include_tls_session,
     const Protobuf::Map<std::string, std::string>& destination_labels,
     const MatcherSharedPtr& allowed_headers_matcher,
     const MatcherSharedPtr& disallowed_headers_matcher) {
@@ -297,19 +302,27 @@ CheckRequestUtils::toRequestMatchers(const envoy::type::matcher::v3::ListStringM
                                      bool add_http_headers,
                                      Server::Configuration::CommonFactoryContext& context) {
   std::vector<Matchers::StringMatcherPtr> matchers(createStringMatchers(list, context));
-
+  
+  // Historical behavior: when add_http_headers is true, add matchers for authorization, :method, :path, host
   if (add_http_headers) {
-    const std::vector<Http::LowerCaseString> keys{
-        {Http::CustomHeaders::get().Authorization, Http::Headers::get().Method,
-         Http::Headers::get().Path, Http::Headers::get().Host}};
-
-    for (const auto& key : keys) {
-      envoy::type::matcher::v3::StringMatcher matcher;
-      matcher.set_exact(key.get());
-      matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
-    }
+    // Add the four standard HTTP headers that should always be included
+    envoy::type::matcher::v3::StringMatcher auth_matcher;
+    auth_matcher.set_exact("authorization");
+    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(auth_matcher, context));
+    
+    envoy::type::matcher::v3::StringMatcher method_matcher;
+    method_matcher.set_exact(":method");
+    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(method_matcher, context));
+    
+    envoy::type::matcher::v3::StringMatcher path_matcher;
+    path_matcher.set_exact(":path");
+    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(path_matcher, context));
+    
+    envoy::type::matcher::v3::StringMatcher host_matcher;
+    host_matcher.set_exact("host");
+    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(host_matcher, context));
   }
-
+  
   return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
 }
 
@@ -321,6 +334,70 @@ CheckRequestUtils::createStringMatchers(const envoy::type::matcher::v3::ListStri
     matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
   }
   return matchers;
+}
+
+
+
+  std::vector<std::pair<std::string, std::string>>
+CheckRequestUtils::computePeerMetadataHeaders(const StreamInfo::StreamInfo& stream_info,
+                                             const LocalInfo::LocalInfo& local_info) {
+  std::vector<std::pair<std::string, std::string>> headers;
+  
+  // Use node ID as the peer identifier for stability across reloads
+  const std::string peer_id = local_info.node().id();
+  
+  // Create Istio metadata-exchange compatible headers
+  // These match the format expected by Istio's metadata-exchange filter
+  headers.emplace_back("x-envoy-peer-metadata-id", peer_id);
+  
+  // Get SSL information from stream_info if available
+  // Guard against null SSL connection and empty URI SANs
+  std::string principal = "";
+  const auto& ssl_info = stream_info.downstreamAddressProvider().sslConnection();
+  if (ssl_info != nullptr) {
+    const auto& uri_sans = ssl_info->uriSanPeerCertificate();
+    if (!uri_sans.empty()) {
+      principal = uri_sans[0];
+    }
+  }
+  
+  // Create metadata as base64-encoded protobuf Struct
+  // Prefer full node metadata; fall back to minimal if empty
+  google::protobuf::Struct metadata_struct;
+  if (local_info.node().has_metadata()) {
+    // Use the full node metadata if available
+    metadata_struct = local_info.node().metadata();
+  }
+  
+  // Ensure we have at least a minimal workload name
+  if (metadata_struct.fields().empty()) {
+    (*metadata_struct.mutable_fields())["WORKLOAD_NAME"].set_string_value(peer_id);
+  }
+  
+  // Add principal if available
+  if (!principal.empty()) {
+    (*metadata_struct.mutable_fields())["PRINCIPAL"].set_string_value(principal);
+  }
+  
+  std::string serialized = metadata_struct.SerializeAsString();
+  
+  // Add size cap to prevent header bloat
+  constexpr size_t kMaxMetadataSize = 8192; // 8KB limit
+  if (serialized.size() > kMaxMetadataSize) {
+    ENVOY_LOG_MISC(warn, "Peer metadata size {} exceeds limit {}, truncating", 
+                   serialized.size(), kMaxMetadataSize);
+    google::protobuf::Struct truncated_struct;
+    (*truncated_struct.mutable_fields())["WORKLOAD_NAME"].set_string_value(peer_id);
+    if (!principal.empty()) {
+      (*truncated_struct.mutable_fields())["PRINCIPAL"].set_string_value(principal);
+    }
+    serialized = truncated_struct.SerializeAsString();
+  }
+  
+  const std::string b64 = Envoy::Base64::encode(serialized.c_str(), serialized.size());
+  headers.emplace_back("x-envoy-peer-metadata", b64);
+  
+  return headers;
 }
 
 } // namespace ExtAuthz

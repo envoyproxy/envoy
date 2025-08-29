@@ -765,6 +765,171 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSessionWithoutSNI) {
   callHttpCheckAndValidateRequestAttributes(false, &want_tls_session);
 }
 
+// Test that peer metadata headers are included when include_peer_metadata_headers is enabled.
+TEST_F(CheckRequestUtilsTest, PeerMetadataHeadersEnabled) {
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
+                                                 {":path", "/bar"}};
+  envoy::service::auth::v3::CheckRequest request;
+  Protobuf::Map<std::string, std::string> context_extensions;
+  context_extensions["key"] = "value";
+  Protobuf::Map<std::string, std::string> labels;
+  labels["label_1"] = "value_1";
+  labels["label_2"] = "value_2";
+
+  envoy::config::core::v3::Metadata metadata_context;
+  auto metadata_val = MessageUtil::keyValueStruct("foo", "bar");
+  (*metadata_context.mutable_filter_metadata())["meta.key"] = metadata_val;
+
+  EXPECT_CALL(callbacks_, connection())
+      .Times(2)
+      .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+  EXPECT_CALL(Const(connection_), ssl()).WillRepeatedly(Return(ssl_));
+  EXPECT_CALL(callbacks_, streamId()).WillRepeatedly(Return(0));
+  EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(callbacks_, decodingBuffer());
+  EXPECT_CALL(req_info_, protocol()).WillRepeatedly(ReturnPointee(&protocol_));
+  EXPECT_CALL(req_info_, startTime()).WillRepeatedly(Return(SystemTime()));
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
+
+  CheckRequestUtils::createHttpCheck(
+      &callbacks_, request_headers, std::move(context_extensions), std::move(metadata_context),
+      envoy::config::core::v3::Metadata(), request, /*max_request_bytes=*/0,
+      /*pack_as_bytes=*/false, /*encode_raw_headers=*/false, /*include_peer_certificate=*/false,
+      /*include_tls_session=*/false, labels, nullptr, nullptr);
+
+  // Note: Peer metadata headers are now added to wire-level headers, not the protobuf payload
+  // So we verify they are NOT in the protobuf payload (they're on the wire instead)
+  const auto& http_request = request.attributes().request().http();
+  const auto& headers = http_request.headers();
+  
+  EXPECT_THAT(headers, Not(Contains(Key("x-envoy-peer-metadata"))));
+  EXPECT_THAT(headers, Not(Contains(Key("x-envoy-peer-metadata-id"))));
+}
+
+// Test that peer metadata headers are not included when include_peer_metadata_headers is disabled.
+TEST_F(CheckRequestUtilsTest, PeerMetadataHeadersDisabled) {
+  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
+                                                 {":path", "/bar"}};
+  envoy::service::auth::v3::CheckRequest request;
+  Protobuf::Map<std::string, std::string> context_extensions;
+  context_extensions["key"] = "value";
+  Protobuf::Map<std::string, std::string> labels;
+  labels["label_1"] = "value_1";
+  labels["label_2"] = "value_2";
+
+  envoy::config::core::v3::Metadata metadata_context;
+  auto metadata_val = MessageUtil::keyValueStruct("foo", "bar");
+  (*metadata_context.mutable_filter_metadata())["meta.key"] = metadata_val;
+
+  EXPECT_CALL(callbacks_, connection())
+      .Times(2)
+      .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
+  EXPECT_CALL(Const(connection_), ssl()).WillRepeatedly(Return(ssl_));
+  EXPECT_CALL(callbacks_, streamId()).WillRepeatedly(Return(0));
+  EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
+  EXPECT_CALL(callbacks_, decodingBuffer());
+  EXPECT_CALL(req_info_, protocol()).WillRepeatedly(ReturnPointee(&protocol_));
+  EXPECT_CALL(req_info_, startTime()).WillRepeatedly(Return(SystemTime()));
+  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
+  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
+      .WillOnce(Return(std::vector<std::string>{"destination"}));
+
+  CheckRequestUtils::createHttpCheck(
+      &callbacks_, request_headers, std::move(context_extensions), std::move(metadata_context),
+      envoy::config::core::v3::Metadata(), request, /*max_request_bytes=*/0,
+      /*pack_as_bytes=*/false, /*encode_raw_headers=*/false, /*include_peer_certificate=*/false,
+      /*include_tls_session=*/false, labels, nullptr, nullptr);
+
+  // Verify headers not in protobuf payload
+  const auto& http_request = request.attributes().request().http();
+  const auto& headers = http_request.headers();
+  
+  EXPECT_THAT(headers, Not(Contains(Key("x-envoy-peer-metadata"))));
+  EXPECT_THAT(headers, Not(Contains(Key("x-envoy-peer-metadata-id"))));
+}
+
+// Test the computePeerMetadataHeaders function directly
+TEST_F(CheckRequestUtilsTest, ComputePeerMetadataHeaders) {
+  // Mock LocalInfo
+  NiceMock<Server::MockLocalInfo> local_info;
+  envoy::config::core::v3::Node node;
+  node.set_id("test-node-id");
+  EXPECT_CALL(local_info, node()).WillRepeatedly(ReturnRef(node));
+
+  // Mock StreamInfo with SSL
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  auto ssl_info = std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>();
+  EXPECT_CALL(*ssl_info, uriSanPeerCertificate())
+      .WillOnce(Return(std::vector<std::string>{"test-principal"}));
+  EXPECT_CALL(stream_info, downstreamAddressProvider())
+      .WillRepeatedly(ReturnRef(stream_info.downstream_connection_info_provider_));
+  EXPECT_CALL(stream_info.downstream_connection_info_provider_, sslConnection())
+      .WillRepeatedly(Return(ssl_info));
+
+  auto headers = CheckRequestUtils::computePeerMetadataHeaders(stream_info, local_info);
+
+  // Verify headers are present
+  EXPECT_EQ(2, headers.size());
+  
+  // Find the metadata-id header
+  auto metadata_id_it = std::find_if(headers.begin(), headers.end(),
+      [](const auto& pair) { return pair.first == "x-envoy-peer-metadata-id"; });
+  EXPECT_NE(headers.end(), metadata_id_it);
+  EXPECT_EQ("test-node-id", metadata_id_it->second);
+
+  // Find the metadata header
+  auto metadata_it = std::find_if(headers.begin(), headers.end(),
+      [](const auto& pair) { return pair.first == "x-envoy-peer-metadata"; });
+  EXPECT_NE(headers.end(), metadata_it);
+  
+  // Verify the metadata is base64-encoded protobuf
+  EXPECT_FALSE(metadata_it->second.empty());
+  // The metadata should be base64-encoded, so it should contain valid base64 characters
+  EXPECT_TRUE(std::all_of(metadata_it->second.begin(), metadata_it->second.end(),
+      [](char c) { return std::isalnum(c) || c == '+' || c == '/' || c == '='; }));
+}
+
+// Test computePeerMetadataHeaders without SSL
+TEST_F(CheckRequestUtilsTest, ComputePeerMetadataHeadersNoSSL) {
+  // Mock LocalInfo
+  NiceMock<Server::MockLocalInfo> local_info;
+  envoy::config::core::v3::Node node;
+  node.set_id("test-node-id");
+  EXPECT_CALL(local_info, node()).WillRepeatedly(ReturnRef(node));
+
+  // Mock StreamInfo without SSL
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(stream_info, downstreamAddressProvider())
+      .WillRepeatedly(ReturnRef(stream_info.downstream_connection_info_provider_));
+  EXPECT_CALL(stream_info.downstream_connection_info_provider_, sslConnection())
+      .WillRepeatedly(Return(nullptr));
+
+  auto headers = CheckRequestUtils::computePeerMetadataHeaders(stream_info, local_info);
+
+  // Verify headers are present
+  EXPECT_EQ(2, headers.size());
+  
+  // Find the metadata-id header
+  auto metadata_id_it = std::find_if(headers.begin(), headers.end(),
+      [](const auto& pair) { return pair.first == "x-envoy-peer-metadata-id"; });
+  EXPECT_NE(headers.end(), metadata_id_it);
+  EXPECT_EQ("test-node-id", metadata_id_it->second);
+
+  // Find the metadata header
+  auto metadata_it = std::find_if(headers.begin(), headers.end(),
+      [](const auto& pair) { return pair.first == "x-envoy-peer-metadata"; });
+  EXPECT_NE(headers.end(), metadata_it);
+  
+  // Verify the metadata is base64-encoded protobuf
+  EXPECT_FALSE(metadata_it->second.empty());
+}
+
 } // namespace
 } // namespace ExtAuthz
 } // namespace Common

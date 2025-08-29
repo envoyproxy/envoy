@@ -238,6 +238,12 @@ message ExtAuthz {
   // :ref:`tls_session<envoy_v3_api_field_service.auth.v3.AttributeContext.tls_session>`.
   bool include_tls_session = 18;
 
+  // When set to true, the filter will include downstream peer identity/metadata in the authorization request.
+  // For HTTP authorization services, this adds headers to the authorization request.
+  // For gRPC authorization services, this adds initial metadata to the gRPC call.
+  // This enables out-of-band policy and telemetry correlation.
+  bool include_peer_metadata_headers = 30;
+
   // Whether to increment cluster statistics (e.g. cluster.<cluster_name>.upstream_rq_*) on authorization failure.
   // Defaults to true.
   google.protobuf.BoolValue charge_cluster_response_stats = 20;

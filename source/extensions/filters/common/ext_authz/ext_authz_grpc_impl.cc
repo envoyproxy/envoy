@@ -5,6 +5,7 @@
 
 #include "source/common/common/assert.h"
 #include "source/common/grpc/async_client_impl.h"
+#include "envoy/local_info/local_info.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
@@ -77,8 +78,11 @@ void copyOkResponseMutations(ResponsePtr& response,
 }
 
 GrpcClientImpl::GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
-                               const absl::optional<std::chrono::milliseconds>& timeout)
-    : async_client_(async_client), timeout_(timeout),
+                               const absl::optional<std::chrono::milliseconds>& timeout,
+                               const LocalInfo::LocalInfo& local_info,
+                               bool include_peer_metadata_headers)
+    : async_client_(async_client), timeout_(timeout), local_info_(local_info),
+      include_peer_metadata_headers_(include_peer_metadata_headers),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.auth.v3.Authorization.Check")) {}
 
@@ -90,17 +94,32 @@ void GrpcClientImpl::cancel() {
   callbacks_ = nullptr;
 }
 
+void GrpcClientImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
+  // Add peer metadata headers as gRPC initial metadata if enabled
+  if (include_peer_metadata_headers_ && current_stream_info_ != nullptr) {
+    auto peer_headers = CheckRequestUtils::computePeerMetadataHeaders(
+        *current_stream_info_, local_info_);
+    for (const auto& header : peer_headers) {
+      metadata.addCopy(Http::LowerCaseString(header.first), header.second);
+    }
+  }
+}
+
 void GrpcClientImpl::check(RequestCallbacks& callbacks,
                            const envoy::service::auth::v3::CheckRequest& request,
                            Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
+  current_stream_info_ = &stream_info;
   Http::AsyncClient::RequestOptions options;
   options.setTimeout(timeout_);
   options.setParentContext(Http::AsyncClient::ParentContext{&stream_info});
 
   ENVOY_LOG(trace, "Sending CheckRequest: {}", request.DebugString());
   request_ = async_client_->send(service_method_, request, *this, parent_span, options);
+  if (request_ == nullptr) {
+    current_stream_info_ = nullptr;
+  }
 }
 
 void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckResponse>&& response,
@@ -142,6 +161,7 @@ void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckRe
 
   callbacks_->onComplete(std::move(authz_response));
   callbacks_ = nullptr;
+  current_stream_info_ = nullptr;
 }
 
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
@@ -155,6 +175,7 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
   response.grpc_status = status;
   callbacks_->onComplete(std::make_unique<Response>(response));
   callbacks_ = nullptr;
+  current_stream_info_ = nullptr;
 }
 
 } // namespace ExtAuthz

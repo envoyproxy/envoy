@@ -199,6 +199,7 @@ public:
 
   bool includePeerCertificate() const { return include_peer_certificate_; }
   bool includeTLSSession() const { return include_tls_session_; }
+  bool includePeerMetadataHeaders() const { return include_peer_metadata_headers_; }
   const LabelsMap& destinationLabels() const { return destination_labels_; }
 
   const absl::optional<Protobuf::Struct>& filterMetadata() const { return filter_metadata_; }
@@ -272,6 +273,7 @@ private:
 
   const bool include_peer_certificate_;
   const bool include_tls_session_;
+  const bool include_peer_metadata_headers_;
   const bool charge_cluster_response_stats_;
 
   // The stats for the filter.

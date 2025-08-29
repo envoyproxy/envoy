@@ -11,6 +11,9 @@
 #include "test/mocks/grpc/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
+#include "test/mocks/network/mocks.h"
+#include "test/mocks/ssl/mocks.h"
+#include "source/common/common/base64.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -59,6 +62,7 @@ public:
   MockRequestCallbacks request_callbacks_;
   Tracing::MockSpan span_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  envoy::config::core::v3::Node node_;
   envoy::config::core::v3::ApiVersion api_version_;
 };
 
@@ -474,6 +478,75 @@ ok_response:
                                       AuthzOkResponse(expected_authz_response))));
   client_->onSuccess(std::make_unique<envoy::service::auth::v3::CheckResponse>(check_response),
                      span_);
+}
+
+// Test that gRPC client adds peer metadata headers to wire-level gRPC initial metadata
+TEST_F(ExtAuthzGrpcClientTest, WireLevelPeerMetadataHeaders) {
+  // Initialize with peer metadata headers enabled
+  const std::string yaml = R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_authz_server"
+  include_peer_metadata_headers: true
+  )EOF";
+  
+  initialize(yaml);
+  
+  // Set up local info mock
+  NiceMock<Server::MockLocalInfo> local_info;
+  node_.set_id("test-node-id");
+  ON_CALL(local_info, node()).WillByDefault(ReturnRef(node_));
+  
+  // Create client with local info and peer metadata headers enabled
+  client_ = std::make_unique<GrpcClientImpl>(async_client_, timeout_, local_info, true);
+  
+  // Set up stream info with SSL connection
+  auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  EXPECT_CALL(*ssl_info, uriSanPeerCertificate())
+      .WillRepeatedly(Return(std::vector<std::string>{"test-principal"}));
+  EXPECT_CALL(stream_info_, downstreamAddressProvider())
+      .WillRepeatedly(ReturnRef(stream_info_.downstream_connection_info_provider_));
+  EXPECT_CALL(stream_info_.downstream_connection_info_provider_, sslConnection())
+      .WillRepeatedly(Return(ssl_info));
+  
+  envoy::service::auth::v3::CheckRequest request;
+  expectCallSend(request);
+  client_->check(request_callbacks_, request, Tracing::NullSpan::instance(), stream_info_);
+  
+  // Capture the gRPC initial metadata
+  Http::TestRequestHeaderMapImpl headers;
+  client_->onCreateInitialMetadata(headers);
+  
+  // Verify that peer metadata headers are present in the wire-level gRPC initial metadata
+  EXPECT_TRUE(headers.has("x-envoy-peer-metadata-id"));
+  EXPECT_TRUE(headers.has("x-envoy-peer-metadata"));
+  
+  // Verify metadata-id value
+  auto* id_entry = headers.get(Http::LowerCaseString("x-envoy-peer-metadata-id"));
+  ASSERT_NE(id_entry, nullptr);
+  std::string metadata_id = std::string(id_entry->value().getStringView());
+  EXPECT_EQ(metadata_id, "test-node-id");
+  
+  // Verify metadata is base64-encoded
+  auto* metadata_entry = headers.get(Http::LowerCaseString("x-envoy-peer-metadata"));
+  ASSERT_NE(metadata_entry, nullptr);
+  std::string metadata_value = std::string(metadata_entry->value().getStringView());
+  EXPECT_FALSE(metadata_value.empty());
+  
+  // Verify it's valid base64
+  EXPECT_NO_THROW(Envoy::Base64::decode(metadata_value));
+  
+  auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
+  auto status = check_response->mutable_status();
+  status->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
+  
+  auto authz_response = Response{};
+  authz_response.status = CheckStatus::OK;
+  
+  EXPECT_CALL(span_, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
+  client_->onSuccess(std::move(check_response), span_);
 }
 
 } // namespace ExtAuthz

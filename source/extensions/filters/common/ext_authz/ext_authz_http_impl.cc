@@ -8,6 +8,7 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
 #include "source/common/common/matchers.h"
+#include "envoy/local_info/local_info.h"
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/codes.h"
 #include "source/common/runtime/runtime_features.h"
@@ -131,7 +132,8 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
               config.http_service().authorization_request().headers_to_add(),
               envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
           Router::HeaderParserPtr)),
-      encode_raw_headers_(config.encode_raw_headers()) {}
+      encode_raw_headers_(config.encode_raw_headers()),
+      include_peer_metadata_headers_(config.include_peer_metadata_headers()) {}
 
 ClientConfig::ClientConfig(
     const envoy::extensions::filters::http::ext_authz::v3::HttpService& http_service,
@@ -155,7 +157,8 @@ ClientConfig::ClientConfig(
               http_service.authorization_request().headers_to_add(),
               envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
           Router::HeaderParserPtr)),
-      encode_raw_headers_(encode_raw_headers) {}
+      encode_raw_headers_(encode_raw_headers),
+      include_peer_metadata_headers_(false) {}
 
 MatcherSharedPtr
 ClientConfig::toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list,
@@ -210,8 +213,9 @@ ClientConfig::toUpstreamMatchers(const envoy::type::matcher::v3::ListStringMatch
   return std::make_unique<HeaderKeyMatcher>(CheckRequestUtils::createStringMatchers(list, context));
 }
 
-RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config)
-    : cm_(cm), config_(config) {}
+RawHttpClientImpl::RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config,
+                                     const LocalInfo::LocalInfo& local_info)
+    : cm_(cm), config_(config), local_info_(local_info) {}
 
 RawHttpClientImpl::~RawHttpClientImpl() { ASSERT(callbacks_ == nullptr); }
 
@@ -277,6 +281,14 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
   }
 
   config_->requestHeaderParser().evaluateHeaders(*headers, stream_info);
+
+  // Add peer metadata headers if enabled
+  if (config_->includePeerMetadataHeaders()) {
+    auto peer_headers = CheckRequestUtils::computePeerMetadataHeaders(stream_info, local_info_);
+    for (const auto& header : peer_headers) {
+      headers->addCopy(Http::LowerCaseString(header.first), header.second);
+    }
+  }
 
   Http::RequestMessagePtr message =
       std::make_unique<Envoy::Http::RequestMessageImpl>(std::move(headers));

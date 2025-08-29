@@ -21,6 +21,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/grpc/typed_async_client.h"
+#include "envoy/local_info/local_info.h"
 #include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 
@@ -44,7 +45,9 @@ class GrpcClientImpl : public Client,
                        public Logger::Loggable<Logger::Id::ext_authz> {
 public:
   GrpcClientImpl(const Grpc::RawAsyncClientSharedPtr& async_client,
-                 const absl::optional<std::chrono::milliseconds>& timeout);
+                 const absl::optional<std::chrono::milliseconds>& timeout,
+                 const LocalInfo::LocalInfo& local_info,
+                 bool include_peer_metadata_headers);
   ~GrpcClientImpl() override;
 
   // ExtAuthz::Client
@@ -56,7 +59,7 @@ public:
   }
 
   // Grpc::AsyncRequestCallbacks
-  void onCreateInitialMetadata(Http::RequestHeaderMap&) override {}
+  void onCreateInitialMetadata(Http::RequestHeaderMap& metadata) override;
   void onSuccess(std::unique_ptr<envoy::service::auth::v3::CheckResponse>&& response,
                  Tracing::Span& span) override;
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
@@ -67,8 +70,11 @@ private:
       async_client_;
   Grpc::AsyncRequest* request_{};
   absl::optional<std::chrono::milliseconds> timeout_;
+  const LocalInfo::LocalInfo& local_info_;
+  const bool include_peer_metadata_headers_;
   RequestCallbacks* callbacks_{};
   const Protobuf::MethodDescriptor& service_method_;
+  const StreamInfo::StreamInfo* current_stream_info_{};
 };
 
 using GrpcClientImplPtr = std::unique_ptr<GrpcClientImpl>;

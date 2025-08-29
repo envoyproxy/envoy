@@ -118,6 +118,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
           config.route_typed_metadata_context_namespaces().end()),
       include_peer_certificate_(config.include_peer_certificate()),
       include_tls_session_(config.include_tls_session()),
+      include_peer_metadata_headers_(config.include_peer_metadata_headers()),
       charge_cluster_response_stats_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, charge_cluster_response_stats, true)),
       stats_(generateStats(stats_prefix, config.stat_prefix(), scope)),
@@ -228,7 +229,8 @@ Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grp
                                                  : "google_grpc");
 
   return std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-      client_or_error.value(), std::chrono::milliseconds(timeout_ms));
+      client_or_error.value(), std::chrono::milliseconds(timeout_ms), 
+      server_context_->localInfo(), config_->includePeerMetadataHeaders());
 }
 
 Filters::Common::ExtAuthz::ClientPtr Filter::createPerRouteHttpClient(
@@ -251,7 +253,7 @@ Filters::Common::ExtAuthz::ClientPtr Filter::createPerRouteHttpClient(
       http_service, config_->headersAsBytes(), timeout_ms, *server_context_);
 
   return std::make_unique<Extensions::Filters::Common::ExtAuthz::RawHttpClientImpl>(
-      server_context_->clusterManager(), client_config);
+      server_context_->clusterManager(), client_config, server_context_->localInfo());
 }
 
 void Filter::initiateCall(const Http::RequestHeaderMap& headers) {

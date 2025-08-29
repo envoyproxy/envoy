@@ -97,6 +97,11 @@ public:
    */
   bool encodeRawHeaders() const { return encode_raw_headers_; }
 
+  /**
+   * Returns whether to include peer metadata headers in the authorization request.
+   */
+  bool includePeerMetadataHeaders() const { return include_peer_metadata_headers_; }
+
 private:
   static MatcherSharedPtr toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
                                            Server::Configuration::CommonFactoryContext& context);
@@ -122,6 +127,7 @@ private:
   const std::string tracing_name_;
   Router::HeaderParserPtr request_headers_parser_;
   const bool encode_raw_headers_;
+  const bool include_peer_metadata_headers_;
 };
 
 using ClientConfigSharedPtr = std::shared_ptr<ClientConfig>;
@@ -137,7 +143,8 @@ class RawHttpClientImpl : public Client,
                           public Http::AsyncClient::Callbacks,
                           Logger::Loggable<Logger::Id::config> {
 public:
-  explicit RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config);
+  explicit RawHttpClientImpl(Upstream::ClusterManager& cm, ClientConfigSharedPtr config,
+                            const LocalInfo::LocalInfo& local_info);
   ~RawHttpClientImpl() override;
 
   // ExtAuthz::Client
@@ -157,6 +164,7 @@ private:
 
   Upstream::ClusterManager& cm_;
   ClientConfigSharedPtr config_;
+  const LocalInfo::LocalInfo& local_info_;
   Http::AsyncClient::Request* request_{};
   RequestCallbacks* callbacks_{};
 };
