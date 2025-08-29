@@ -75,7 +75,7 @@ private:
   std::shared_ptr<NiceMock<Grpc::MockAsyncClient>> internal_grpc_mock_client_;
   Envoy::Tracing::MockSpan mock_span_;
   NiceMock<Grpc::MockAsyncRequest> grpc_async_request_;
-  NiceMock<Server::MockLocalInfo> local_info_;
+  NiceMock<LocalInfo::MockLocalInfo> local_info_;
 
   // Set by calling newGrpcClientImpl. Only one of response_ or failure_reason_ will be set.
   std::unique_ptr<envoy::service::auth::v3::CheckResponse> response_;
