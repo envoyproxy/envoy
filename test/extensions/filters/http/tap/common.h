@@ -13,9 +13,8 @@ class MockHttpTapConfig : public HttpTapConfig {
 public:
   HttpPerRequestTapperPtr
   createPerRequestTapper(const envoy::extensions::filters::http::tap::v3::Tap& tap_config,
-                         uint64_t stream_id,
-                         OptRef<const Network::Connection> connection) override {
-    return HttpPerRequestTapperPtr{createPerRequestTapper_(tap_config, stream_id, connection)};
+                         Http::StreamDecoderFilterCallbacks& decoder_callbacks) override {
+    return HttpPerRequestTapperPtr{createPerRequestTapper_(tap_config, decoder_callbacks)};
   }
 
   Extensions::Common::Tap::PerTapSinkHandleManagerPtr
@@ -25,8 +24,8 @@ public:
   }
 
   MOCK_METHOD(HttpPerRequestTapper*, createPerRequestTapper_,
-              (const envoy::extensions::filters::http::tap::v3::Tap& tap_config, uint64_t stream_id,
-               OptRef<const Network::Connection>));
+              (const envoy::extensions::filters::http::tap::v3::Tap& tap_config,
+               Http::StreamDecoderFilterCallbacks& decoder_callbacks));
   MOCK_METHOD(Extensions::Common::Tap::PerTapSinkHandleManager*, createPerTapSinkHandleManager_,
               (uint64_t trace_id));
   MOCK_METHOD(uint32_t, maxBufferedRxBytes, (), (const));
