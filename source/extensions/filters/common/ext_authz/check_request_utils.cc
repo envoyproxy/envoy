@@ -21,9 +21,9 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/protobuf/message_validator_impl.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 
 #include "absl/strings/str_cat.h"

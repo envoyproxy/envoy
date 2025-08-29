@@ -40,7 +40,8 @@ public:
   ExtAuthzGrpcClientTest() : async_client_(new Grpc::MockAsyncClient()), timeout_(10) {}
 
   void initialize() {
-    client_ = std::make_unique<GrpcClientImpl>(std::shared_ptr<Grpc::MockAsyncClient>(async_client_), timeout_, local_info_, false);
+    client_ = std::make_unique<GrpcClientImpl>(
+        std::shared_ptr<Grpc::MockAsyncClient>(async_client_), timeout_, local_info_, false);
   }
 
   void expectCallSend(envoy::service::auth::v3::CheckRequest& request) {
@@ -501,7 +502,8 @@ TEST_F(ExtAuthzGrpcClientTest, WireLevelPeerMetadataHeaders) {
   ON_CALL(local_info, node()).WillByDefault(testing::ReturnRef(node_));
 
   // Create client with local info and peer metadata headers enabled
-  client_ = std::make_unique<GrpcClientImpl>(std::shared_ptr<Grpc::MockAsyncClient>(async_client_), timeout_, local_info, true);
+  client_ = std::make_unique<GrpcClientImpl>(std::shared_ptr<Grpc::MockAsyncClient>(async_client_),
+                                             timeout_, local_info, true);
 
   // Set up stream info with SSL connection
   auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
@@ -516,7 +518,6 @@ TEST_F(ExtAuthzGrpcClientTest, WireLevelPeerMetadataHeaders) {
   // Capture the gRPC initial metadata
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
-
 
   // Verify metadata is base64-encoded
   EXPECT_TRUE(headers.has("x-envoy-peer-metadata"));
