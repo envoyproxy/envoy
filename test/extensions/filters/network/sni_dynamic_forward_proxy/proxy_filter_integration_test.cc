@@ -5,6 +5,7 @@
 
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/common/tls/context_config_impl.h"
+#include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
@@ -49,6 +50,10 @@ typed_config:
     max_hosts: {}
     dns_cache_circuit_breaker:
       max_pending_requests: {}
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
   port_value: {}
 )EOF",
                       Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts,
@@ -73,6 +78,10 @@ typed_config:
     max_hosts: {}
     dns_cache_circuit_breaker:
       max_pending_requests: {}
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
 )EOF",
         Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, max_pending_requests);
 
