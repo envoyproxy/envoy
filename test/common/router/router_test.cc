@@ -793,6 +793,50 @@ TEST_F(RouterTest, NoMetadataMatchCriteria) {
   router_->onDestroy();
 }
 
+TEST_F(RouterTest, MetadataMatchCriteriaFromConnectionOnly) {
+  // Set up connection metadata only (no request metadata for debugging)
+  const std::string connection_yaml = R"EOF(
+  filter_metadata:
+    envoy.lb:
+      version: v3.1
+  )EOF";
+
+  envoy::config::core::v3::Metadata connection_metadata;
+  TestUtility::loadFromYaml(connection_yaml, connection_metadata);
+  router_->downstream_connection_.stream_info_.metadata_ = connection_metadata;
+
+  // No request metadata or route metadata
+
+  ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria()).WillByDefault(Return(nullptr));
+
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke(
+          [&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+              absl::optional<Http::Protocol>,
+              Upstream::LoadBalancerContext* context) -> absl::optional<Upstream::HttpPoolData> {
+            auto match = context->metadataMatchCriteria()->metadataMatchCriteria();
+
+            EXPECT_EQ(match.size(), 1);
+
+            auto it = match.begin();
+            EXPECT_EQ((*it)->name(), "version");
+            EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+
+            return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
+          }));
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Return(&cancellable_));
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  // When the router filter gets reset we should cancel the pool request.
+  EXPECT_CALL(cancellable_, cancel(_));
+  router_->onDestroy();
+}
+
 TEST_F(RouterTest, CancelBeforeBoundToPool) {
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
       .WillOnce(Return(&cancellable_));

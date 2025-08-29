@@ -367,18 +367,63 @@ public:
         return metadata_match_.get();
       }
 
-      // The request's metadata, if present, takes precedence over the route's.
+      // First merge in connection-level metadata, then request metadata
+      // Check if connection and its streamInfo are available before accessing metadata
+      bool has_connection_metadata = false;
+      ProtobufWkt::Struct connection_metadata_struct;
+      const auto& connection_metadata =
+          downstreamConnection()->streamInfo().dynamicMetadata().filter_metadata();
+      const auto connection_filter_it =
+          connection_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+      if (connection_filter_it != connection_metadata.end()) {
+        has_connection_metadata = true;
+        connection_metadata_struct = connection_filter_it->second;
+      }
+
+      // The request's metadata, if present, takes precedence over the connection's and route's.
       const auto& request_metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
       const auto filter_it = request_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+
       if (filter_it != request_metadata.end()) {
-        if (route_entry_->metadataMatchCriteria() != nullptr) {
-          metadata_match_ =
-              route_entry_->metadataMatchCriteria()->mergeMatchCriteria(filter_it->second);
+        // Request metadata exists - start with route metadata, then merge connection, then request
+        if (has_connection_metadata) {
+          // Both connection and request metadata exist
+          if (route_entry_->metadataMatchCriteria() != nullptr) {
+            // Start with route metadata, merge connection, then request
+            auto temp_criteria = route_entry_->metadataMatchCriteria()->mergeMatchCriteria(
+                connection_metadata_struct);
+            metadata_match_ = temp_criteria->mergeMatchCriteria(filter_it->second);
+          } else {
+            // No route metadata, merge connection then request
+            auto connection_criteria =
+                std::make_unique<Router::MetadataMatchCriteriaImpl>(connection_metadata_struct);
+            metadata_match_ = connection_criteria->mergeMatchCriteria(filter_it->second);
+          }
         } else {
-          metadata_match_ = std::make_unique<Router::MetadataMatchCriteriaImpl>(filter_it->second);
+          // Only request metadata (original logic)
+          if (route_entry_->metadataMatchCriteria() != nullptr) {
+            metadata_match_ =
+                route_entry_->metadataMatchCriteria()->mergeMatchCriteria(filter_it->second);
+          } else {
+            metadata_match_ =
+                std::make_unique<Router::MetadataMatchCriteriaImpl>(filter_it->second);
+          }
         }
         return metadata_match_.get();
       }
+
+      // No request metadata, check for connection metadata only
+      if (has_connection_metadata) {
+        if (route_entry_->metadataMatchCriteria() != nullptr) {
+          metadata_match_ =
+              route_entry_->metadataMatchCriteria()->mergeMatchCriteria(connection_metadata_struct);
+        } else {
+          metadata_match_ =
+              std::make_unique<Router::MetadataMatchCriteriaImpl>(connection_metadata_struct);
+        }
+        return metadata_match_.get();
+      }
+
       return route_entry_->metadataMatchCriteria();
     }
     return nullptr;
