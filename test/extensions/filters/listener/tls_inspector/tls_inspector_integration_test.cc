@@ -261,7 +261,6 @@ TEST_P(TlsInspectorIntegrationTest, ContinueOnListenerTimeout) {
 }
 
 TEST_P(TlsInspectorIntegrationTest, TlsInspectorMetadataPopulatedInAccessLog) {
-  LogLevelSetter save_levels(spdlog::level::trace);
   initializeWithTlsInspector(
       /*ssl_client=*/false,
       /*log_format=*/"%DYNAMIC_METADATA(envoy.filters.listener.tls_inspector:failure_reason)%",
