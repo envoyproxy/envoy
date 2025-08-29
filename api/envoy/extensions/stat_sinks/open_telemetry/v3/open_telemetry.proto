@@ -6,6 +6,7 @@ import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/type/matcher/v3/string.proto";
 
+import "xds/type/matcher/v3/matcher.proto";
 import "google/protobuf/wrappers.proto";
 
 import "opentelemetry/proto/common/v1/common.proto";
@@ -74,7 +75,17 @@ message SinkConfig {
   // prefix added. According to the example, the full stat name will remain "foo.bar".
   string prefix = 6;
 
-  // A list of custom metric conversions to apply to stats.
-  // If a stat matches multiple conversions, the first one in the list is applied.
-  repeated CustomMetricConversion custom_metric_conversions = 8;
+  // MetricConversion is used to convert a stat to a metric. If a stat matches
+  // the stat_name_matcher, the metric_name and static_metric_labels will be
+  // used to create the metric.
+  message ConversionAction {
+    // The metric name to use for the stat.
+    string metric_name = 2;
+
+    // Static metric labels to use for the metric.
+    repeated opentelemetry.proto.common.v1.KeyValue static_metric_labels = 3;
+  }
+
+  // Metric conversions to use for the stats.
+  xds.type.matcher.v3.Matcher custom_metric_conversions = 8;
 }

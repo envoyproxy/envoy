@@ -10,6 +10,20 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "stat_match_action_lib",
+    srcs = ["stat_match_action.cc"],
+    hdrs = ["stat_match_action.h"],
+    deps = [
+  "//envoy/registry",
+        "//envoy/stats:stats_interface",
+        "//source/common/matcher:matcher_lib",
+        "//source/common/matcher:validation_visitor_lib",
+        "@envoy_api//envoy/extensions/stat_sinks/open_telemetry/v3:pkg_cc_proto",
+    ],
+)
+
+
+envoy_cc_library(
     name = "open_telemetry_lib",
     srcs = ["open_telemetry_impl.cc"],
     hdrs = ["open_telemetry_impl.h"],
@@ -17,6 +31,8 @@ envoy_cc_library(
         "//envoy/grpc:async_client_interface",
         "//envoy/singleton:instance_interface",
         "//source/common/common:matchers_lib",
+        ":stat_match_action_lib",
+        "//source/common/stats:stat_match_input_lib",
         "//source/common/grpc:async_client_lib",
         "//source/extensions/tracers/opentelemetry/resource_detectors:resource_detector_lib",
         "@envoy_api//envoy/extensions/stat_sinks/open_telemetry/v3:pkg_cc_proto",
@@ -34,6 +50,7 @@ envoy_cc_library(
         "//source/common/protobuf",
     ],
 )
+
 
 envoy_cc_extension(
     name = "config",

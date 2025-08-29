@@ -35,6 +35,11 @@ using MetricsExportRequestPtr = std::unique_ptr<MetricsExportRequest>;
 using MetricsExportRequestSharedPtr = std::shared_ptr<MetricsExportRequest>;
 using SinkConfig = envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig;
 
+/**
+ * Aggregates individual metric data points into OTLP Metric protos.
+ * This class helps to group data points by metric name and attributes,
+ * which is necessary for creating a valid OTLP request.
+ */
 class MetricAggregator : public Logger::Loggable<Logger::Id::stats> {
 public:
   using AttributesMap = absl::flat_hash_map<std::string, std::string>;
@@ -122,34 +127,19 @@ public:
     return resource_attributes_;
   }
 
-  const absl::flat_hash_map<const Matchers::StringMatcher*, SinkConfig::CustomMetricConversion>&
-  matchers() const {
-    return matcher_data_.matchers_;
+  const Envoy::Matcher::MatchTreeSharedPtr<Stats::StatMatchingData> matcher()
+      const {
+    return matcher_;
   }
 
 private:
-  // Helper struct to hold the owned matchers and the map.
-  struct MatcherData {
-    // Owns the StringMatcherImpl instances.
-    std::vector<Matchers::StringMatcherPtr> owned_matchers_;
-    // Maps raw pointers to the owned StringMatcherImpl to their configurations.
-    absl::flat_hash_map<const Matchers::StringMatcher*, SinkConfig::CustomMetricConversion>
-        matchers_;
-  };
-
-  // Private static method to generate MatcherData.
-  static MatcherData
-  generateMatchers(const Protobuf::RepeatedPtrField<SinkConfig::CustomMetricConversion>&
-                       custom_metric_conversions,
-                   Server::Configuration::ServerFactoryContext& server);
-
   const bool report_counters_as_deltas_;
   const bool report_histograms_as_deltas_;
   const bool emit_tags_as_attributes_;
   const bool use_tag_extracted_name_;
   const std::string stat_prefix_;
   const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> resource_attributes_;
-  const MatcherData matcher_data_;
+    const Envoy::Matcher::MatchTreeSharedPtr<Stats::StatMatchingData> matcher_;
 };
 
 using OtlpOptionsSharedPtr = std::shared_ptr<OtlpOptions>;
@@ -183,15 +173,22 @@ public:
                                 int64_t last_flush_time_ns) const override;
 
 private:
-  template <class StatType> std::string getMetricName(const StatType& stat) const;
+
+ private:
+  template <class StatType>
+  const SinkConfig::ConversionAction* getMetricConfig(
+      const StatType& stat) const;
 
   template <class StatType>
-  const SinkConfig::CustomMetricConversion* findMatchingMetricConfig(const StatType& stat) const;
+  std::string getMetricName(
+      const StatType& stat,
+      const SinkConfig::ConversionAction* conversion_config) const;
 
   template <class StatType>
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
-  getCombinedAttributes(const StatType& stat,
-                        const SinkConfig::CustomMetricConversion* metric_config) const;
+  getCombinedAttributes(
+      const StatType& stat,
+      const SinkConfig::ConversionAction* conversion_config) const;
   template <class GaugeType>
   void addGaugeDataPoint(opentelemetry::proto::metrics::v1::Metric& metric,
                          const GaugeType& gauge_stat, int64_t snapshot_time_ns) const;

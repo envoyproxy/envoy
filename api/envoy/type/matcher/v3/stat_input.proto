@@ -1,0 +1,5 @@
+syntax = "proto3";
+
+package envoy.type.matcher.v3;
+
+message StatFullNameMatchInput {}

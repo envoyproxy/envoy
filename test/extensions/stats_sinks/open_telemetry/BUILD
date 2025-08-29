@@ -36,6 +36,7 @@ envoy_extension_cc_test(
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/server:instance_mocks",
         "//test/test_common:simulated_time_system_lib",
+            "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
