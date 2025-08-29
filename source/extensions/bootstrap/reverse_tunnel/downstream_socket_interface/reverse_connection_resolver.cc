@@ -90,11 +90,12 @@ ReverseConnectionResolver::extractReverseConnectionConfig(
   config.remote_cluster = cluster_parts[0];
   config.connection_count = count;
 
-  ENVOY_LOG_MISC(info,
-                 "Reverse connection config: src_node_id={}, src_cluster_id={}, src_tenant_id={}, "
-                 "remote_cluster={}, count={}",
-                 config.src_node_id, config.src_cluster_id, config.src_tenant_id,
-                 config.remote_cluster, config.connection_count);
+  ENVOY_LOG(
+      debug,
+      "reverse connection config: node_id={}, cluster_id={}, tenant_id={}, remote_cluster={}, "
+      "count={}",
+      config.src_node_id, config.src_cluster_id, config.src_tenant_id, config.remote_cluster,
+      config.connection_count);
 
   return config;
 }

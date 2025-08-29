@@ -7,6 +7,7 @@
 
 #include "envoy/network/address.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_interface.h"
 
@@ -18,7 +19,8 @@ namespace ReverseConnection {
 /**
  * Custom address type that embeds reverse connection metadata.
  */
-class ReverseConnectionAddress : public Network::Address::Instance {
+class ReverseConnectionAddress : public Network::Address::Instance,
+                                 public Envoy::Logger::Loggable<Envoy::Logger::Id::connection> {
 public:
   // Struct to hold reverse connection configuration
   struct ReverseConnectionConfig {
@@ -58,7 +60,7 @@ public:
     auto* reverse_socket_interface =
         Network::socketInterface("envoy.bootstrap.reverse_tunnel.downstream_socket_interface");
     if (reverse_socket_interface) {
-      ENVOY_LOG_MISC(debug, "Reverse connection address: using reverse socket interface");
+      ENVOY_LOG_MISC(debug, "reverse connection address: using reverse socket interface");
       return *reverse_socket_interface;
     }
     // Fallback to default socket interface if reverse connection interface is not available.

@@ -297,25 +297,25 @@ ReverseConnectionIOHandle::ReverseConnectionIOHandle(os_fd_t fd,
                                                      Stats::Scope&)
     : IoSocketHandleImpl(fd), config_(config), cluster_manager_(cluster_manager),
       extension_(extension), original_socket_fd_(fd) {
-  ENVOY_LOG(
+  ENVOY_LOG_MISC(
       debug,
       "Created ReverseConnectionIOHandle: fd={}, src_node={}, src_cluster: {}, num_clusters={}",
       fd_, config_.src_node_id, config_.src_cluster_id, config_.remote_clusters.size());
 }
 
 ReverseConnectionIOHandle::~ReverseConnectionIOHandle() {
-  ENVOY_LOG(info, "Destroying ReverseConnectionIOHandle - performing cleanup.");
+  ENVOY_LOG_MISC(debug, "Destroying ReverseConnectionIOHandle - performing cleanup.");
   cleanup();
 }
 
 void ReverseConnectionIOHandle::cleanup() {
-  ENVOY_LOG(debug, "Starting cleanup of reverse connection resources.");
+  ENVOY_LOG_MISC(debug, "Starting cleanup of reverse connection resources.");
 
   // Clean up pipe trigger mechanism first to prevent use-after-free.
-  ENVOY_LOG(trace,
-            "ReverseConnectionIOHandle: cleaning up trigger pipe; "
-            "trigger_pipe_write_fd_={}, trigger_pipe_read_fd_={}",
-            trigger_pipe_write_fd_, trigger_pipe_read_fd_);
+  ENVOY_LOG_MISC(trace,
+                 "ReverseConnectionIOHandle: cleaning up trigger pipe; "
+                 "trigger_pipe_write_fd_={}, trigger_pipe_read_fd_={}",
+                 trigger_pipe_write_fd_, trigger_pipe_read_fd_);
   if (trigger_pipe_write_fd_ >= 0) {
     ::close(trigger_pipe_write_fd_);
     trigger_pipe_write_fd_ = -1;
@@ -327,11 +327,12 @@ void ReverseConnectionIOHandle::cleanup() {
 
   // Cancel the retry timer safely.
   if (rev_conn_retry_timer_) {
-    ENVOY_LOG(trace, "ReverseConnectionIOHandle: cancelling and resetting retry timer.");
+    ENVOY_LOG_MISC(trace, "ReverseConnectionIOHandle: cancelling and resetting retry timer.");
     rev_conn_retry_timer_.reset();
   }
   // Graceful shutdown of connection wrappers with exception safety.
-  ENVOY_LOG(debug, "Gracefully shutting down {} connection wrappers.", connection_wrappers_.size());
+  ENVOY_LOG_MISC(debug, "Gracefully shutting down {} connection wrappers.",
+                 connection_wrappers_.size());
 
   // Signal all connections to close gracefully.
   std::vector<std::unique_ptr<RCConnectionWrapper>> wrappers_to_delete;

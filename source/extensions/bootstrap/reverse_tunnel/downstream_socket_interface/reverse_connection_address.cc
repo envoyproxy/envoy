@@ -27,8 +27,8 @@ ReverseConnectionAddress::ReverseConnectionAddress(const ReverseConnectionConfig
   // This will be used by the filter chain manager for matching.
   address_string_ = reverse_connection_address;
 
-  ENVOY_LOG_MISC(info, "Reverse connection address: logical_name={}, address_string={}",
-                 logical_name_, address_string_);
+  ENVOY_LOG_MISC(debug, "reverse connection address: logical_name={}, address={}", logical_name_,
+                 address_string_);
 }
 
 bool ReverseConnectionAddress::operator==(const Instance& rhs) const {

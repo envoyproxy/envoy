@@ -93,7 +93,7 @@ ReverseTunnelAcceptor::socket(Envoy::Network::Socket::Type socket_type,
     // Try to get a cached socket for the node.
     auto socket = socket_manager->getConnectionSocket(node_id);
     if (socket) {
-      ENVOY_LOG(info, "reverse_tunnel: reusing cached socket for node: {}", node_id);
+      ENVOY_LOG(debug, "reverse_tunnel: reusing cached socket for node: {}", node_id);
       // Create IOHandle that owns the socket using RAII.
       auto io_handle =
           std::make_unique<UpstreamReverseConnectionIOHandle>(std::move(socket), node_id);

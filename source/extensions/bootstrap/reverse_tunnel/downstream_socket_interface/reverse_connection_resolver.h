@@ -3,6 +3,7 @@
 #include "envoy/network/resolver.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/common/logger.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_address.h"
 
 namespace Envoy {
@@ -14,7 +15,8 @@ namespace ReverseConnection {
  * Custom address resolver that can create ReverseConnectionAddress instances
  * when reverse connection metadata is detected in the socket address.
  */
-class ReverseConnectionResolver : public Network::Address::Resolver {
+class ReverseConnectionResolver : public Network::Address::Resolver,
+                                  public Envoy::Logger::Loggable<Envoy::Logger::Id::connection> {
 public:
   ReverseConnectionResolver() = default;
 
