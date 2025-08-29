@@ -1,7 +1,7 @@
 #pragma once
 
+#include "envoy/extensions/matching/common_inputs/stats/v3/stats.pb.h"
 #include "envoy/stats/stats.h"
-#include "envoy/type/matcher/v3/stats.pb.h"
 
 #include "source/common/stats/stats_matcher_impl.h"
 
@@ -11,7 +11,7 @@ namespace Stats {
 class StatFullNameMatchInput : public Matcher::DataInput<Envoy::Stats::StatMatchingData> {
 public:
   Matcher::DataInputGetResult get(const Envoy::Stats::StatMatchingData& data) const override {
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, data.full_name()};
+    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable, data.fullName()};
   }
 };
 

@@ -217,8 +217,6 @@ OpenTelemetryGrpcMetricsExporterImpl::OpenTelemetryGrpcMetricsExporterImpl(
           "Export")) {}
 
 void OpenTelemetryGrpcMetricsExporterImpl::send(MetricsExportRequestPtr&& export_request) {
-  ENVOY_LOG(debug, "sending the OTLP request \n{}", export_request->ShortDebugString());
-
   client_->send(service_method_, *export_request, *this, Tracing::NullSpan::instance(),
                 Http::AsyncClient::RequestOptions());
 }

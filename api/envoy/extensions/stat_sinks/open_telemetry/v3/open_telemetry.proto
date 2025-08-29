@@ -26,22 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#next-free-field: 9]
 message SinkConfig {
-  // Defines a custom conversion from a stat to a metric. This can be used to rename a
-  // stat, add static labels, and aggregate multiple stats into a single metric.
-  // If a stat's name matches ``stat_name_matcher``, it is converted to a metric with the
-  // given ``metric_name`` and``static_metric_labels`` added.
-  message CustomMetricConversion {
-    // The matcher to select stats for conversion.
-    type.matcher.v3.StringMatcher stat_name_matcher = 1;
-
-    // The name of the converted metric.
-    string metric_name = 2;
-
-    // Additional static labels to be added to the converted metric.
-    repeated opentelemetry.proto.common.v1.KeyValue static_metric_labels = 3;
-  }
-
-  // MetricConversion is used to convert a stat to a metric. If a stat matches,
+  // ConversionAction is used to convert a stat to a metric. If a stat matches,
   // the metric_name and static_metric_labels will be
   // used to create the metric. This can be used to rename a
   // stat, add static labels, and aggregate multiple stats into a single metric.

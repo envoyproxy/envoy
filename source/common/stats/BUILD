@@ -33,7 +33,7 @@ envoy_cc_library(
         ":stats_matcher_lib",
         "//envoy/registry",
         "//envoy/stats:stats_interface",
-        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/matching/common_inputs/stats/v3:pkg_cc_proto",
     ],
 )
 
