@@ -10,8 +10,6 @@ namespace Envoy {
 namespace Tracing {
 
 MockSpan::MockSpan() {
-  ON_CALL(*this, setTag).WillByDefault(Return());
-  ON_CALL(*this, finishSpan).WillByDefault(Return());
   ON_CALL(*this, spawnChild_).WillByDefault([] {
     return new testing::NiceMock<MockSpan>();
   });
