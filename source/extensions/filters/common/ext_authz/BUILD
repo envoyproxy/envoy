@@ -89,6 +89,5 @@ envoy_cc_library(
         "//source/common/local_info:local_info_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
-        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
