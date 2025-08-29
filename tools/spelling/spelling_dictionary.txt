@@ -10,6 +10,7 @@ htonl
 ABI
 ACK
 ACL
+ACCEPTOR
 AES
 AJAX
 AllMuxes

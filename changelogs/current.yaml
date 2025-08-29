@@ -41,12 +41,22 @@ minor_behavior_changes:
   change: |
     turn off HTTP/3 happy eyeball in upstream via runtime guard ``envoy.reloadable_features.http3_happy_eyeballs``.
     It is found to favor TCP over QUIC when UDP does not work on v6 network but works on v4.
+- area: mobile
+  change: |
+    Explicitly drain connections upon network change events regardless of whether the DNS cache is refreshed or not. This behavior
+    can be reverted by setting the runtime guard ``envoy.reloadable_features.decouple_explicit_drain_pools_and_dns_refresh``
+    to false.
 - area: http
   change: |
     Adds accounting for decompressed HTTP header bytes sent and received. Existing stats only count wire-encoded header bytes.
     This can be accessed through the ``%UPSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED%``,
     ``%DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED%``, ``%UPSTREAM_DECOMPRESSED_HEADER_BYTES_SENT%``, and the
     ``%DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_SENT%`` access_log command operators.
+- area: ext_proc
+  change: |
+    If :ref:`failure_mode_allow <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.failure_mode_allow>` is true,
+    save the grpc failure status code returned from the ext_proc server in the filter state.
+    Previously all fail-open cases would return call_status Grpc::Status::Aborted.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -281,6 +291,9 @@ new_features:
     extract trace information from W3C trace headers when B3 headers are not present (downstream),
     and inject both B3 and W3C trace headers for upstream requests to maximize compatibility.
     The default value ``USE_B3`` maintains backward compatibility with B3-only behavior.
+- area: composite
+  change: |
+    Allow composite filter to be configured to insert a filter into filter chain outside of the decode headers lifecycle phase.
 - area: rbac
   change: |
     Switch the IP matcher to use LC-Trie for performance improvements.

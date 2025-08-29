@@ -82,6 +82,13 @@ envoy.bootstrap.reverse_tunnel.downstream_socket_interface:
   status: wip
   type_urls:
   - envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface
+envoy.bootstrap.reverse_tunnel.upstream_socket_interface:
+  categories:
+  - envoy.bootstrap
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface
 envoy.extensions.http.cache.file_system_http_cache:
   categories:
   - envoy.http.cache
