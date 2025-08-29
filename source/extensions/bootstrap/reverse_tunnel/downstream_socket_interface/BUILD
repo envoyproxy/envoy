@@ -28,7 +28,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "reverse_connection_resolver_lib",
     srcs = ["reverse_connection_resolver.cc"],
     hdrs = ["reverse_connection_resolver.h"],

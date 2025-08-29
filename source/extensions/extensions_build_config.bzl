@@ -492,6 +492,12 @@ EXTENSIONS = {
     "envoy.network.dns_resolver.getaddrinfo":          "//source/extensions/network/dns_resolver/getaddrinfo:config",
 
     #
+    # Address Resolvers
+    #
+
+    "envoy.resolvers.reverse_connection":               "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_resolver_lib",
+
+    #
     # Custom matchers
     #
 
