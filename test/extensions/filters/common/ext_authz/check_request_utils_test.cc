@@ -765,8 +765,8 @@ TEST_F(CheckRequestUtilsTest, CheckAttrContextPeerTLSSessionWithoutSNI) {
   callHttpCheckAndValidateRequestAttributes(false, &want_tls_session);
 }
 
-// Test that peer metadata headers are included when include_peer_metadata_headers is enabled.
-TEST_F(CheckRequestUtilsTest, PeerMetadataHeadersEnabled) {
+// Test that peer metadata headers are not included in protobuf payload (they're on the wire instead)
+TEST_F(CheckRequestUtilsTest, PeerMetadataHeadersNotInProtobuf) {
   Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
                                                  {":path", "/bar"}};
   envoy::service::auth::v3::CheckRequest request;
@@ -801,52 +801,8 @@ TEST_F(CheckRequestUtilsTest, PeerMetadataHeadersEnabled) {
       /*pack_as_bytes=*/false, /*encode_raw_headers=*/false, /*include_peer_certificate=*/false,
       /*include_tls_session=*/false, labels, nullptr, nullptr);
 
-  // Note: Peer metadata headers are now added to wire-level headers, not the protobuf payload
-  // So we verify they are NOT in the protobuf payload (they're on the wire instead)
-  const auto& http_request = request.attributes().request().http();
-  const auto& headers = http_request.headers();
-
-  EXPECT_THAT(headers, Not(Contains(Key("x-envoy-peer-metadata"))));
-  EXPECT_THAT(headers, Not(Contains(Key("x-envoy-peer-metadata-id"))));
-}
-
-// Test that peer metadata headers are not included when include_peer_metadata_headers is disabled.
-TEST_F(CheckRequestUtilsTest, PeerMetadataHeadersDisabled) {
-  Http::TestRequestHeaderMapImpl request_headers{{"x-envoy-downstream-service-cluster", "foo"},
-                                                 {":path", "/bar"}};
-  envoy::service::auth::v3::CheckRequest request;
-  Protobuf::Map<std::string, std::string> context_extensions;
-  context_extensions["key"] = "value";
-  Protobuf::Map<std::string, std::string> labels;
-  labels["label_1"] = "value_1";
-  labels["label_2"] = "value_2";
-
-  envoy::config::core::v3::Metadata metadata_context;
-  auto metadata_val = MessageUtil::keyValueStruct("foo", "bar");
-  (*metadata_context.mutable_filter_metadata())["meta.key"] = metadata_val;
-
-  EXPECT_CALL(callbacks_, connection())
-      .Times(2)
-      .WillRepeatedly(Return(OptRef<const Network::Connection>{connection_}));
-  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(addr_);
-  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(addr_);
-  EXPECT_CALL(Const(connection_), ssl()).WillRepeatedly(Return(ssl_));
-  EXPECT_CALL(callbacks_, streamId()).WillRepeatedly(Return(0));
-  EXPECT_CALL(callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
-  EXPECT_CALL(callbacks_, decodingBuffer());
-  EXPECT_CALL(req_info_, protocol()).WillRepeatedly(ReturnPointee(&protocol_));
-  EXPECT_CALL(req_info_, startTime()).WillRepeatedly(Return(SystemTime()));
-  EXPECT_CALL(*ssl_, uriSanPeerCertificate()).WillOnce(Return(std::vector<std::string>{"source"}));
-  EXPECT_CALL(*ssl_, uriSanLocalCertificate())
-      .WillOnce(Return(std::vector<std::string>{"destination"}));
-
-  CheckRequestUtils::createHttpCheck(
-      &callbacks_, request_headers, std::move(context_extensions), std::move(metadata_context),
-      envoy::config::core::v3::Metadata(), request, /*max_request_bytes=*/0,
-      /*pack_as_bytes=*/false, /*encode_raw_headers=*/false, /*include_peer_certificate=*/false,
-      /*include_tls_session=*/false, labels, nullptr, nullptr);
-
-  // Verify headers not in protobuf payload
+  // Verify that peer metadata headers are NOT in the protobuf payload
+  // (they are added to wire-level headers instead)
   const auto& http_request = request.attributes().request().http();
   const auto& headers = http_request.headers();
 
