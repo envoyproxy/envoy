@@ -1777,7 +1777,7 @@ TEST_P(TcpTunnelingIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
         MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
             *config_blob);
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100))
             .count());
     config_blob->PackFrom(tcp_proxy_config);
   });
@@ -1790,6 +1790,9 @@ TEST_P(TcpTunnelingIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   ASSERT_TRUE(tcp_client_->write(data));
   upstream_request_->encodeData(data, false);
 
+  // Wait for the idle timeout to trigger
+  test_server_->waitForCounterGe("tcp.tcp_stats.idle_timeout", 1);
+
   tcp_client_->waitForDisconnect();
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
@@ -1797,6 +1800,109 @@ TEST_P(TcpTunnelingIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
   } else {
     ASSERT_TRUE(upstream_request_->waitForReset());
   }
+}
+
+// Test idle timeout when connection establishment is prevented by not sending upstream response
+TEST_P(TcpTunnelingIntegrationTest,
+       IdleTimeoutNoUpstreamConnectionWithIdleTimeoutSetOnNewConnection) {
+  // Configure a short idle timeout
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(1);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+
+    tcp_proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
+    tcp_proxy_config.mutable_idle_timeout()->set_nanos(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100))
+            .count());
+
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  initialize();
+
+  // Start a connection, and verify the upgrade headers are received upstream
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // The CONNECT request is sent to upstream immediately
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "CONNECT");
+
+  // Don't send response headers - this prevents the tunnel from being fully established.
+  // The TCP proxy will wait for the response, and the idle timeout will trigger.
+
+  // Wait for the idle timeout to trigger
+  test_server_->waitForCounterGe("tcp.tcp_stats.idle_timeout", 1);
+
+  // The downstream connection should be closed
+  tcp_client_->waitForHalfClose();
+
+  // Verify the stream was reset due to timeout
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+
+  // Clean up the TCP client
+  tcp_client_->close();
+}
+
+// Test idle timeout when connection establishment is prevented by not sending upstream response
+TEST_P(TcpTunnelingIntegrationTest,
+       IdleTimeoutNoUpstreamConnectionNoIdleTimeoutSetOnNewConnection) {
+  // Configure a short idle timeout
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.tcp_proxy_set_idle_timer_immediately_on_new_connection", "false");
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(1);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+
+    tcp_proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
+    tcp_proxy_config.mutable_idle_timeout()->set_nanos(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100))
+            .count());
+
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  initialize();
+
+  // Start a connection, and verify the upgrade headers are received upstream
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+
+  // The CONNECT request is sent to upstream immediately
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  EXPECT_EQ(upstream_request_->headers().getMethodValue(), "CONNECT");
+
+  // Don't send response headers - this prevents the tunnel from being fully established.
+  // The TCP proxy will wait for the response, and the idle timeout will not trigger as
+  // the idle timeout is not set immediately on new connection.
+
+  // Verify the stream wasn't reset due to timeout
+  if (upstreamProtocol() == Http::CodecType::HTTP1) {
+    ASSERT_FALSE(fake_upstream_connection_->waitForDisconnect(std::chrono::milliseconds(200)));
+  } else {
+    ASSERT_FALSE(upstream_request_->waitForReset(std::chrono::milliseconds(200)));
+  }
+
+  // Clean up the TCP client
+  tcp_client_->close();
 }
 
 // Test that a downstream flush works correctly (all data is flushed)
