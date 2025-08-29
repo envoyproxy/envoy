@@ -871,11 +871,17 @@ Utility::GetLastAddressFromXffInfo Utility::getLastNonTrustedAddressFromXFF(
 }
 
 Utility::GetLastAddressFromXffInfo
-Utility::getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
-                               uint32_t num_to_skip) {
+Utility::getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers, uint32_t num_to_skip,
+                               bool use_remote_address) {
   const auto xff_header = request_headers.ForwardedFor();
   if (xff_header == nullptr) {
     return {nullptr, false};
+  }
+
+  // When use_remote_address=true, reduce num_to_skip by 1 to account for
+  // the current connection being appended to XFF
+  if (use_remote_address && num_to_skip > 0) {
+    num_to_skip = num_to_skip - 1;
   }
 
   absl::string_view xff_string(xff_header->value().getStringView());
