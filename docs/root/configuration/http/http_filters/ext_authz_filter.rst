@@ -187,8 +187,7 @@ The HTTP filter outputs statistics in the ``cluster.<route target cluster>.ext_a
   error, Counter, Total errors contacting the external service.
   denied, Counter, Total responses from the authorizations service that were to deny the traffic.
   disabled, Counter, Total requests that are allowed without calling external services due to the filter is disabled.
-  failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because
-  of failure_mode_allow set to true."
+  failure_mode_allowed, Counter, "Total requests that were error(s) but were allowed through because of failure_mode_allow set to true."
 
 Dynamic Metadata
 ----------------
