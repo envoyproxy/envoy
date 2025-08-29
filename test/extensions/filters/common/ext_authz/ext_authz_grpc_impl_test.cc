@@ -10,6 +10,7 @@
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/extensions/filters/common/ext_authz/test_common.h"
 #include "test/mocks/grpc/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -23,6 +24,7 @@ using testing::Eq;
 using testing::Invoke;
 using testing::Ref;
 using testing::Return;
+using testing::ReturnRef;
 using testing::WhenDynamicCastTo;
 
 namespace Envoy {
@@ -38,7 +40,7 @@ public:
   ExtAuthzGrpcClientTest() : async_client_(new Grpc::MockAsyncClient()), timeout_(10) {}
 
   void initialize() {
-    client_ = std::make_unique<GrpcClientImpl>(Grpc::RawAsyncClientPtr{async_client_}, timeout_);
+    client_ = std::make_unique<GrpcClientImpl>(std::shared_ptr<Grpc::MockAsyncClient>(async_client_), timeout_, local_info_, false);
   }
 
   void expectCallSend(envoy::service::auth::v3::CheckRequest& request) {
@@ -62,6 +64,7 @@ public:
   MockRequestCallbacks request_callbacks_;
   Tracing::MockSpan span_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  NiceMock<Server::MockLocalInfo> local_info_;
   envoy::config::core::v3::Node node_;
   envoy::config::core::v3::ApiVersion api_version_;
 };
@@ -495,19 +498,16 @@ TEST_F(ExtAuthzGrpcClientTest, WireLevelPeerMetadataHeaders) {
   // Set up local info mock
   NiceMock<Server::MockLocalInfo> local_info;
   node_.set_id("test-node-id");
-  ON_CALL(local_info, node()).WillByDefault(ReturnRef(node_));
+  ON_CALL(local_info, node()).WillByDefault(testing::ReturnRef(node_));
 
   // Create client with local info and peer metadata headers enabled
-  client_ = std::make_unique<GrpcClientImpl>(async_client_, timeout_, local_info, true);
+  client_ = std::make_unique<GrpcClientImpl>(std::shared_ptr<Grpc::MockAsyncClient>(async_client_), timeout_, local_info, true);
 
   // Set up stream info with SSL connection
   auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   EXPECT_CALL(*ssl_info, uriSanPeerCertificate())
       .WillRepeatedly(Return(std::vector<std::string>{"test-principal"}));
-  EXPECT_CALL(stream_info_, downstreamAddressProvider())
-      .WillRepeatedly(ReturnRef(stream_info_.downstream_connection_info_provider_));
-  EXPECT_CALL(stream_info_.downstream_connection_info_provider_, sslConnection())
-      .WillRepeatedly(Return(ssl_info));
+  stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
 
   envoy::service::auth::v3::CheckRequest request;
   expectCallSend(request);
@@ -522,15 +522,13 @@ TEST_F(ExtAuthzGrpcClientTest, WireLevelPeerMetadataHeaders) {
   EXPECT_TRUE(headers.has("x-envoy-peer-metadata"));
 
   // Verify metadata-id value
-  auto* id_entry = headers.get(Http::LowerCaseString("x-envoy-peer-metadata-id"));
-  ASSERT_NE(id_entry, nullptr);
-  std::string metadata_id = std::string(id_entry->value().getStringView());
+  EXPECT_TRUE(headers.has("x-envoy-peer-metadata-id"));
+  std::string metadata_id = headers.get_("x-envoy-peer-metadata-id");
   EXPECT_EQ(metadata_id, "test-node-id");
 
   // Verify metadata is base64-encoded
-  auto* metadata_entry = headers.get(Http::LowerCaseString("x-envoy-peer-metadata"));
-  ASSERT_NE(metadata_entry, nullptr);
-  std::string metadata_value = std::string(metadata_entry->value().getStringView());
+  EXPECT_TRUE(headers.has("x-envoy-peer-metadata"));
+  std::string metadata_value = headers.get_("x-envoy-peer-metadata");
   EXPECT_FALSE(metadata_value.empty());
 
   // Verify it's valid base64

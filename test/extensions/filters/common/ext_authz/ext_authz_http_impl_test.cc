@@ -11,6 +11,7 @@
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/extensions/filters/common/ext_authz/test_common.h"
+#include "test/mocks/local_info/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
@@ -48,7 +49,7 @@ public:
 
   void initialize(const std::string& yaml) {
     config_ = createConfig(yaml);
-    client_ = std::make_unique<RawHttpClientImpl>(cm_, config_);
+    client_ = std::make_unique<RawHttpClientImpl>(cm_, config_, local_info_);
     ON_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillByDefault(ReturnRef(async_client_));
   }
 
@@ -210,6 +211,7 @@ public:
   Tracing::MockSpan parent_span_;
   Tracing::MockSpan child_span_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
+  NiceMock<Server::MockLocalInfo> local_info_;
   envoy::config::core::v3::Node node_;
 };
 
@@ -673,7 +675,7 @@ TEST_F(ExtAuthzHttpClientTest, WireLevelPeerMetadataHeaders) {
   // Set up local info mock
   NiceMock<Server::MockLocalInfo> local_info;
   node_.set_id("test-node-id");
-  ON_CALL(local_info, node()).WillByDefault(ReturnRef(node_));
+  ON_CALL(local_info, node()).WillByDefault(testing::ReturnRef(node_));
 
   // Create client with local info
   client_ = std::make_unique<RawHttpClientImpl>(cm_, config_, local_info);
@@ -682,10 +684,7 @@ TEST_F(ExtAuthzHttpClientTest, WireLevelPeerMetadataHeaders) {
   auto ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   EXPECT_CALL(*ssl_info, uriSanPeerCertificate())
       .WillRepeatedly(Return(std::vector<std::string>{"test-principal"}));
-  EXPECT_CALL(stream_info_, downstreamAddressProvider())
-      .WillRepeatedly(ReturnRef(stream_info_.downstream_connection_info_provider_));
-  EXPECT_CALL(stream_info_.downstream_connection_info_provider_, sslConnection())
-      .WillRepeatedly(Return(ssl_info));
+  stream_info_.downstream_connection_info_provider_->setSslConnection(ssl_info);
 
   envoy::service::auth::v3::CheckRequest request;
 
@@ -709,15 +708,13 @@ TEST_F(ExtAuthzHttpClientTest, WireLevelPeerMetadataHeaders) {
   EXPECT_TRUE(headers.has("x-envoy-peer-metadata"));
 
   // Verify metadata-id value
-  auto* id_entry = headers.get(Http::LowerCaseString("x-envoy-peer-metadata-id"));
-  ASSERT_NE(id_entry, nullptr);
-  std::string metadata_id = std::string(id_entry->value().getStringView());
+  EXPECT_TRUE(headers.has("x-envoy-peer-metadata-id"));
+  std::string metadata_id = headers.get_("x-envoy-peer-metadata-id");
   EXPECT_EQ(metadata_id, "test-node-id");
 
   // Verify metadata is base64-encoded
-  auto* metadata_entry = headers.get(Http::LowerCaseString("x-envoy-peer-metadata"));
-  ASSERT_NE(metadata_entry, nullptr);
-  std::string metadata_value = std::string(metadata_entry->value().getStringView());
+  EXPECT_TRUE(headers.has("x-envoy-peer-metadata"));
+  std::string metadata_value = headers.get_("x-envoy-peer-metadata");
   EXPECT_FALSE(metadata_value.empty());
 
   // Verify it's valid base64
