@@ -1,5 +1,8 @@
 #include <memory>
 
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/request_id/uuid/v3/uuid.pb.h"
+
 #include "source/common/tcp_proxy/tcp_proxy.h"
 #include "source/common/tcp_proxy/upstream.h"
 
@@ -314,6 +317,46 @@ TEST_P(HttpUpstreamRequestEncoderTest, RequestEncoderUsePostWithCustomPath) {
   this->upstream_->setRequestEncoder(this->encoder_, false);
 }
 
+TEST_P(HttpUpstreamRequestEncoderTest, RequestIdGeneratedWhenEnabled) {
+  envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension reqid_ext;
+  envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig uuid_cfg;
+  reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
+  *this->tcp_proxy_.mutable_tunneling_config()->mutable_request_id_extension() = reqid_ext;
+  this->setupUpstream();
+
+  EXPECT_CALL(this->encoder_, encodeHeaders(_, false))
+      .WillOnce(Invoke([&](const Http::RequestHeaderMap& headers, bool) {
+        const auto* rid = headers.RequestId();
+        EXPECT_NE(rid, nullptr);
+        if (rid != nullptr) {
+          EXPECT_FALSE(rid->value().empty());
+        }
+        return Http::okStatus();
+      }));
+
+  this->upstream_->setRequestEncoder(this->encoder_, false);
+}
+
+TEST_P(HttpUpstreamRequestEncoderTest, RequestIdStoredInFilterStateWhenEnabled) {
+  envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension reqid_ext;
+  envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig uuid_cfg;
+  reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
+  *this->tcp_proxy_.mutable_tunneling_config()->mutable_request_id_extension() = reqid_ext;
+  this->setupUpstream();
+  EXPECT_CALL(this->encoder_, encodeHeaders(_, false)).WillOnce(Return(Http::okStatus()));
+  this->upstream_->setRequestEncoder(this->encoder_, false);
+  auto fs = this->downstream_stream_info_.filterState();
+  auto* obj = fs->getDataReadOnlyGeneric("envoy.tcp_proxy.tunnel_request_id");
+  EXPECT_NE(obj, nullptr);
+  if (obj != nullptr) {
+    auto val = obj->serializeAsString();
+    EXPECT_TRUE(val.has_value());
+    if (val.has_value()) {
+      EXPECT_FALSE(val->empty());
+    }
+  }
+}
+
 TEST_P(HttpUpstreamRequestEncoderTest, RequestEncoderConnectWithCustomPath) {
   this->tcp_proxy_.mutable_tunneling_config()->set_use_post(false);
   this->tcp_proxy_.mutable_tunneling_config()->set_post_path("/test");
@@ -568,6 +611,21 @@ TEST_F(CombinedUpstreamTest, WriteUpstream) {
   this->upstream_ = std::make_unique<CombinedUpstream>(*conn_pool_, callbacks_, decoder_callbacks_,
                                                        *tunnel_config_, downstream_stream_info_);
   this->upstream_->encodeData(buffer2, true);
+}
+
+TEST_F(CombinedUpstreamTest, CombinedUpstreamGeneratesRequestIdWhenEnabled) {
+  envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension reqid_ext;
+  envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig uuid_cfg;
+  reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
+  *this->tcp_proxy_.mutable_tunneling_config()->mutable_request_id_extension() = reqid_ext;
+  this->setup();
+  auto* headers = this->upstream_->downstreamHeaders();
+  ASSERT_NE(headers, nullptr);
+  const auto* rid = headers->RequestId();
+  EXPECT_NE(rid, nullptr);
+  if (rid != nullptr) {
+    EXPECT_FALSE(rid->value().empty());
+  }
 }
 
 TEST_F(CombinedUpstreamTest, WriteDownstream) {

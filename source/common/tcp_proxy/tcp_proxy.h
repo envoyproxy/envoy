@@ -12,6 +12,7 @@
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_evaluator.h"
+#include "envoy/http/request_id_extension.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
@@ -157,6 +158,9 @@ public:
 private:
   const Http::ResponseTrailerMapPtr response_trailers_;
 };
+
+// Returns the filter state key under which the generated tunnel request ID is stored.
+const std::string& TunnelRequestIdKey();
 class Config;
 class TunnelingConfigHelperImpl : public TunnelingConfigHelper,
                                   protected Logger::Loggable<Logger::Id::filter> {
@@ -169,6 +173,10 @@ public:
   bool usePost() const override { return !post_path_.empty(); }
   const std::string& postPath() const override { return post_path_; }
   Envoy::Http::HeaderEvaluator& headerEvaluator() const override { return *header_parser_; }
+  bool generateRequestId() const override { return generate_request_id_; }
+  const Envoy::Http::RequestIDExtensionSharedPtr& requestIDExtension() const override {
+    return request_id_extension_;
+  }
 
   const Envoy::Router::FilterConfig& routerFilterConfig() const override { return router_config_; }
   void
@@ -187,6 +195,9 @@ private:
   const bool propagate_response_headers_;
   const bool propagate_response_trailers_;
   std::string post_path_;
+  // Request ID generation and extension for tunneling requests.
+  bool generate_request_id_ = false;
+  Envoy::Http::RequestIDExtensionSharedPtr request_id_extension_;
   Stats::StatNameManagedStorage route_stat_name_storage_;
   const Router::FilterConfig router_config_;
   Server::Configuration::ServerFactoryContext& server_factory_context_;
