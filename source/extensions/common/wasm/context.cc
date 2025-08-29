@@ -2053,7 +2053,7 @@ void Context::ensureSpan() {
 
   trace_config_ = trace_config;
   trace_span_ = decoder_callbacks_->activeSpan().spawnChild(
-    *trace_config, child_span_name, decoder_callbacks_->dispatcher().timeSource().systemTime());
+      *trace_config, child_span_name, decoder_callbacks_->dispatcher().timeSource().systemTime());
 
   trace_span_->setTag(TracingConstants::get().TracePluginName, wasm_plugin->name_);
   trace_span_->setTag(TracingConstants::get().TraceVmId, wasm_plugin->vm_id_);
