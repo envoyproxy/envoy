@@ -134,7 +134,10 @@ def _cc_library_func(ctx, name, hdrs, srcs, copts, includes, dep_ccinfos):
         cc_toolchain = toolchain,
         compilation_outputs = compilation_outputs,
         linking_contexts = linking_contexts,
-        disallow_dynamic_library = cc_common.is_enabled(feature_configuration = feature_configuration, feature_name = "targets_windows"),
+        # Always disallow dynamic library outputs so that we only produce static archives.
+        # This avoids unresolved symbol issues when descriptor objects reference
+        # transitive dependencies that may not be available in dynamic link time.
+        disallow_dynamic_library = True,
         **blaze_only_args
     )
 
