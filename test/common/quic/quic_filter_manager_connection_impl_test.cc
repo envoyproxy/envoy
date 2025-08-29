@@ -153,8 +153,6 @@ TEST_F(QuicFilterManagerConnectionImplTest, SetSocketOption) {
   EXPECT_FALSE(impl_.setSocketOption(sockopt_name, sockopt_val));
 }
 
-TEST_F(QuicFilterManagerConnectionImplTest, MoveSocket) { EXPECT_EQ(impl_.moveSocket(), nullptr); }
-
 TEST_F(QuicFilterManagerConnectionImplTest, SetSocketReused) { impl_.setSocketReused(true); }
 
 TEST_F(QuicFilterManagerConnectionImplTest, IsSocketReused) {

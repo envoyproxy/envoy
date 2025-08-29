@@ -285,11 +285,6 @@ void ConnectionImpl::setDetectedCloseType(DetectedCloseType close_type) {
   detected_close_type_ = close_type;
 }
 
-ConnectionSocketPtr ConnectionImpl::moveSocket() {
-  // Transfer socket ownership to the caller.
-  return std::move(socket_);
-}
-
 void ConnectionImpl::closeThroughFilterManager(ConnectionCloseAction close_action) {
   if (socket_ == nullptr || !socket_->isOpen()) {
     return;
