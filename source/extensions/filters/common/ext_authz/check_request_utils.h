@@ -92,17 +92,17 @@ public:
    * @param include_tls_session whether to include the TLS session details in the check request.
    */
   static void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                              const Envoy::Http::RequestHeaderMap& headers,
-                              Protobuf::Map<std::string, std::string>&& context_extensions,
-                              envoy::config::core::v3::Metadata&& metadata_context,
-                              envoy::config::core::v3::Metadata&& route_metadata_context,
-                              envoy::service::auth::v3::CheckRequest& request,
-                                                              uint64_t max_request_bytes, bool pack_as_bytes,
-                                bool encode_raw_headers,                                 bool include_peer_certificate,
-                                bool include_tls_session,
-                                const Protobuf::Map<std::string, std::string>& destination_labels,
-                              const MatcherSharedPtr& allowed_headers_matcher,
-                              const MatcherSharedPtr& disallowed_headers_matcher);
+                             const Envoy::Http::RequestHeaderMap& headers,
+                             Protobuf::Map<std::string, std::string>&& context_extensions,
+                             envoy::config::core::v3::Metadata&& metadata_context,
+                             envoy::config::core::v3::Metadata&& route_metadata_context,
+                             envoy::service::auth::v3::CheckRequest& request,
+                             uint64_t max_request_bytes, bool pack_as_bytes,
+                             bool encode_raw_headers, bool include_peer_certificate,
+                             bool include_tls_session,
+                             const Protobuf::Map<std::string, std::string>& destination_labels,
+                             const MatcherSharedPtr& allowed_headers_matcher,
+                             const MatcherSharedPtr& disallowed_headers_matcher);
 
   /**
    * createTcpCheck is used to extract the attributes from the network layer and fill them up
