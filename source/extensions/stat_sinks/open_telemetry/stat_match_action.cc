@@ -7,7 +7,7 @@ namespace OpenTelemetry {
 
 REGISTER_FACTORY(ActionFactory, Envoy::Matcher::ActionFactory<ActionContext>);
 
-}  // namespace OpenTelemetry
-}  // namespace StatSinks
-}  // namespace Extensions
-}  // namespace Envoy
+} // namespace OpenTelemetry
+} // namespace StatSinks
+} // namespace Extensions
+} // namespace Envoy

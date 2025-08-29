@@ -31,12 +31,11 @@ envoy_cc_library(
     hdrs = ["stat_match_input.h"],
     deps = [
         ":stats_matcher_lib",
+        "//envoy/registry",
         "//envoy/stats:stats_interface",
-              "//envoy/registry",
         "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
-
 
 envoy_cc_library(
     name = "custom_stat_namespaces_lib",

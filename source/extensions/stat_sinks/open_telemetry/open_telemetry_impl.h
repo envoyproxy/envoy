@@ -127,8 +127,7 @@ public:
     return resource_attributes_;
   }
 
-  const Envoy::Matcher::MatchTreeSharedPtr<Stats::StatMatchingData> matcher()
-      const {
+  const Envoy::Matcher::MatchTreeSharedPtr<Stats::StatMatchingData> matcher() const {
     return matcher_;
   }
 
@@ -139,7 +138,7 @@ private:
   const bool use_tag_extracted_name_;
   const std::string stat_prefix_;
   const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> resource_attributes_;
-    const Envoy::Matcher::MatchTreeSharedPtr<Stats::StatMatchingData> matcher_;
+  const Envoy::Matcher::MatchTreeSharedPtr<Stats::StatMatchingData> matcher_;
 };
 
 using OtlpOptionsSharedPtr = std::shared_ptr<OtlpOptions>;
@@ -173,22 +172,18 @@ public:
                                 int64_t last_flush_time_ns) const override;
 
 private:
-
- private:
+private:
   template <class StatType>
-  const SinkConfig::ConversionAction* getMetricConfig(
-      const StatType& stat) const;
+  const SinkConfig::ConversionAction* getMetricConfig(const StatType& stat) const;
 
   template <class StatType>
-  std::string getMetricName(
-      const StatType& stat,
-      const SinkConfig::ConversionAction* conversion_config) const;
+  std::string getMetricName(const StatType& stat,
+                            const SinkConfig::ConversionAction* conversion_config) const;
 
   template <class StatType>
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
-  getCombinedAttributes(
-      const StatType& stat,
-      const SinkConfig::ConversionAction* conversion_config) const;
+  getCombinedAttributes(const StatType& stat,
+                        const SinkConfig::ConversionAction* conversion_config) const;
   template <class GaugeType>
   void addGaugeDataPoint(opentelemetry::proto::metrics::v1::Metric& metric,
                          const GaugeType& gauge_stat, int64_t snapshot_time_ns) const;

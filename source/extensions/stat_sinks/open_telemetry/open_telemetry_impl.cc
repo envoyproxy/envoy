@@ -1,7 +1,7 @@
 #include "source/extensions/stat_sinks/open_telemetry/open_telemetry_impl.h"
-#include "source/extensions/stat_sinks/open_telemetry/stat_match_action.h"
 
 #include "source/common/tracing/null_span_impl.h"
+#include "source/extensions/stat_sinks/open_telemetry/stat_match_action.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -186,9 +186,9 @@ generateResourceAttributes(const Tracers::OpenTelemetry::Resource& resource) {
   return resource_attributes;
 }
 
-Matcher::MatchTreePtr<Stats::StatMatchingData> createMatcher(
-    const xds::type::matcher::v3::Matcher& matcher_config,
-    Server::Configuration::ServerFactoryContext& server_factory_context) {
+Matcher::MatchTreePtr<Stats::StatMatchingData>
+createMatcher(const xds::type::matcher::v3::Matcher& matcher_config,
+              Server::Configuration::ServerFactoryContext& server_factory_context) {
   ActionValidationVisitor validation_visitor;
   ActionContext action_context;
   Matcher::MatchTreeFactory<Stats::StatMatchingData, ActionContext> factory{
@@ -201,38 +201,30 @@ OtlpOptions::OtlpOptions(const SinkConfig& sink_config,
                          Server::Configuration::ServerFactoryContext& server)
     : report_counters_as_deltas_(sink_config.report_counters_as_deltas()),
       report_histograms_as_deltas_(sink_config.report_histograms_as_deltas()),
-      emit_tags_as_attributes_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          sink_config, emit_tags_as_attributes, true)),
-      use_tag_extracted_name_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          sink_config, use_tag_extracted_name, true)),
-      stat_prefix_(!sink_config.prefix().empty() ? sink_config.prefix() + "."
-                                                 : ""),
+      emit_tags_as_attributes_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, emit_tags_as_attributes, true)),
+      use_tag_extracted_name_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, use_tag_extracted_name, true)),
+      stat_prefix_(!sink_config.prefix().empty() ? sink_config.prefix() + "." : ""),
       resource_attributes_(generateResourceAttributes(resource)),
       matcher_(createMatcher(sink_config.custom_metric_conversions(), server)) {}
 
 OpenTelemetryGrpcMetricsExporterImpl::OpenTelemetryGrpcMetricsExporterImpl(
-    const OtlpOptionsSharedPtr config,
-    Grpc::RawAsyncClientSharedPtr raw_async_client)
-    : config_(config),
-      client_(raw_async_client),
-      service_method_(
-          *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              "opentelemetry.proto.collector.metrics.v1.MetricsService."
-              "Export")) {}
+    const OtlpOptionsSharedPtr config, Grpc::RawAsyncClientSharedPtr raw_async_client)
+    : config_(config), client_(raw_async_client),
+      service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+          "opentelemetry.proto.collector.metrics.v1.MetricsService."
+          "Export")) {}
 
-void OpenTelemetryGrpcMetricsExporterImpl::send(
-    MetricsExportRequestPtr&& export_request) {
-  ENVOY_LOG(debug, "sending the OTLP request \n{}",
-            export_request->ShortDebugString());
+void OpenTelemetryGrpcMetricsExporterImpl::send(MetricsExportRequestPtr&& export_request) {
+  ENVOY_LOG(debug, "sending the OTLP request \n{}", export_request->ShortDebugString());
 
-  client_->send(service_method_, *export_request, *this,
-                Tracing::NullSpan::instance(),
+  client_->send(service_method_, *export_request, *this, Tracing::NullSpan::instance(),
                 Http::AsyncClient::RequestOptions());
 }
 
 void OpenTelemetryGrpcMetricsExporterImpl::onSuccess(
-    Grpc::ResponsePtr<MetricsExportResponse>&& export_response,
-    Tracing::Span&) {
+    Grpc::ResponsePtr<MetricsExportResponse>&& export_response, Tracing::Span&) {
   if (export_response->has_partial_success()) {
     ENVOY_LOG(debug,
               "export response with partial success; {} rejected, collector "
@@ -242,44 +234,38 @@ void OpenTelemetryGrpcMetricsExporterImpl::onSuccess(
   }
 }
 
-void OpenTelemetryGrpcMetricsExporterImpl::onFailure(
-    Grpc::Status::GrpcStatus response_status,
-    const std::string& response_message, Tracing::Span&) {
-  ENVOY_LOG(debug, "export failure; status: {}, message: {}", response_status,
-            response_message);
+void OpenTelemetryGrpcMetricsExporterImpl::onFailure(Grpc::Status::GrpcStatus response_status,
+                                                     const std::string& response_message,
+                                                     Tracing::Span&) {
+  ENVOY_LOG(debug, "export failure; status: {}, message: {}", response_status, response_message);
 }
 
 template <class StatType>
-const SinkConfig::ConversionAction* OtlpMetricsFlusherImpl::getMetricConfig(
-    const StatType& stat) const {
+const SinkConfig::ConversionAction*
+OtlpMetricsFlusherImpl::getMetricConfig(const StatType& stat) const {
   Stats::StatMatchingDataImpl<StatType> data(stat);
   const ::Envoy::Matcher::MatchResult result =
-      Envoy::Matcher::evaluateMatch<Stats::StatMatchingData>(
-          *config_->matcher(), data);
+      Envoy::Matcher::evaluateMatch<Stats::StatMatchingData>(*config_->matcher(), data);
   ASSERT(result.isComplete());
-  return result.isMatch() ? result.action()->getTyped<OnMatchAction>().config()
-                         : nullptr;
+  return result.isMatch() ? result.action()->getTyped<OnMatchAction>().config() : nullptr;
 }
 
 template <class StatType>
-std::string OtlpMetricsFlusherImpl::getMetricName(
-    const StatType& stat,
-    const SinkConfig::ConversionAction* conversion_config) const {
+std::string
+OtlpMetricsFlusherImpl::getMetricName(const StatType& stat,
+                                      const SinkConfig::ConversionAction* conversion_config) const {
   if (conversion_config != nullptr) {
     return conversion_config->metric_name();
   }
-  return absl::StrCat(config_->statPrefix(), config_->useTagExtractedName()
-                                                 ? stat.tagExtractedName()
-                                                 : stat.name());
+  return absl::StrCat(config_->statPrefix(),
+                      config_->useTagExtractedName() ? stat.tagExtractedName() : stat.name());
 }
 
 template <class StatType>
 Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
 OtlpMetricsFlusherImpl::getCombinedAttributes(
-    const StatType& stat,
-    const SinkConfig::ConversionAction* conversion_config) const {
-  Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
-      attributes;
+    const StatType& stat, const SinkConfig::ConversionAction* conversion_config) const {
+  Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attributes;
   if (config_->emitTagsAsAttributes()) {
     for (const auto& tag : stat.tags()) {
       auto* attribute = attributes.Add();
@@ -295,15 +281,14 @@ OtlpMetricsFlusherImpl::getCombinedAttributes(
   return attributes;
 }
 
-MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(
-    Stats::MetricSnapshot& snapshot, int64_t last_flush_time_ns) const {
+MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& snapshot,
+                                                      int64_t last_flush_time_ns) const {
   auto request = std::make_unique<MetricsExportRequest>();
   MetricAggregator aggregator;
 
-  int64_t snapshot_time_ns =
-      std::chrono::duration_cast<std::chrono::nanoseconds>(
-          snapshot.snapshotTime().time_since_epoch())
-          .count();
+  int64_t snapshot_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                                 snapshot.snapshotTime().time_since_epoch())
+                                 .count();
   int64_t start_time_unix_nano = last_flush_time_ns;
 
   // Process Gauges
@@ -312,16 +297,16 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(
       const auto* metric_config = getMetricConfig(gauge.get());
       const std::string metric_name = getMetricName(gauge.get(), metric_config);
       auto attributes = getCombinedAttributes(gauge.get(), metric_config);
-      aggregator.addGauge(metric_name, gauge.get().value(), snapshot_time_ns,
-                          start_time_unix_nano, attributes);
+      aggregator.addGauge(metric_name, gauge.get().value(), snapshot_time_ns, start_time_unix_nano,
+                          attributes);
     };
   }
   for (const auto& gauge : snapshot.hostGauges()) {
     const auto* metric_config = getMetricConfig(gauge);
     const std::string metric_name = getMetricName(gauge, metric_config);
     auto attributes = getCombinedAttributes(gauge, metric_config);
-    aggregator.addGauge(metric_name, gauge.value(), snapshot_time_ns,
-                        start_time_unix_nano, attributes);
+    aggregator.addGauge(metric_name, gauge.value(), snapshot_time_ns, start_time_unix_nano,
+                        attributes);
   }
 
   // Process Counters
@@ -332,13 +317,10 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(
   for (const auto& counter : snapshot.counters()) {
     if (predicate_(counter.counter_)) {
       const auto* metric_config = getMetricConfig(counter.counter_.get());
-      const std::string metric_name =
-          getMetricName(counter.counter_.get(), metric_config);
-      auto attributes =
-          getCombinedAttributes(counter.counter_.get(), metric_config);
-      aggregator.addCounter(metric_name, counter.counter_.get().value(),
-                            counter.delta_, snapshot_time_ns,
-                            start_time_unix_nano, counter_temporality,
+      const std::string metric_name = getMetricName(counter.counter_.get(), metric_config);
+      auto attributes = getCombinedAttributes(counter.counter_.get(), metric_config);
+      aggregator.addCounter(metric_name, counter.counter_.get().value(), counter.delta_,
+                            snapshot_time_ns, start_time_unix_nano, counter_temporality,
                             attributes);
     }
   }
@@ -346,9 +328,8 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(
     const auto* metric_config = getMetricConfig(counter);
     const std::string metric_name = getMetricName(counter, metric_config);
     auto attributes = getCombinedAttributes(counter, metric_config);
-    aggregator.addCounter(metric_name, counter.value(), counter.delta(),
-                          snapshot_time_ns, start_time_unix_nano,
-                          counter_temporality, attributes);
+    aggregator.addCounter(metric_name, counter.value(), counter.delta(), snapshot_time_ns,
+                          start_time_unix_nano, counter_temporality, attributes);
   }
 
   // Process Histograms
@@ -359,16 +340,13 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(
   for (const auto& histogram : snapshot.histograms()) {
     if (predicate_(histogram)) {
       const auto* metric_config = getMetricConfig(histogram.get());
-      const std::string metric_name =
-          getMetricName(histogram.get(), metric_config);
+      const std::string metric_name = getMetricName(histogram.get(), metric_config);
       auto attributes = getCombinedAttributes(histogram.get(), metric_config);
       const Stats::HistogramStatistics& histogram_stats =
-          config_->reportHistogramsAsDeltas()
-              ? histogram.get().intervalStatistics()
-              : histogram.get().cumulativeStatistics();
-      aggregator.addHistogram(histogram.get().name(), metric_name,
-                              histogram_stats, snapshot_time_ns,
-                              start_time_unix_nano, histogram_temporality,
+          config_->reportHistogramsAsDeltas() ? histogram.get().intervalStatistics()
+                                              : histogram.get().cumulativeStatistics();
+      aggregator.addHistogram(histogram.get().name(), metric_name, histogram_stats,
+                              snapshot_time_ns, start_time_unix_nano, histogram_temporality,
                               attributes);
     }
   }

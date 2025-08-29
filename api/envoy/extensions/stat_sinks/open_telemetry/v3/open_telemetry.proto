@@ -75,9 +75,10 @@ message SinkConfig {
   // prefix added. According to the example, the full stat name will remain "foo.bar".
   string prefix = 6;
 
-  // MetricConversion is used to convert a stat to a metric. If a stat matches
-  // the stat_name_matcher, the metric_name and static_metric_labels will be
-  // used to create the metric.
+  // MetricConversion is used to convert a stat to a metric. If a stat matches, 
+  // the metric_name and static_metric_labels will be
+  // used to create the metric. This can be used to rename a
+  // stat, add static labels, and aggregate multiple stats into a single metric.
   message ConversionAction {
     // The metric name to use for the stat.
     string metric_name = 2;
@@ -86,6 +87,35 @@ message SinkConfig {
     repeated opentelemetry.proto.common.v1.KeyValue static_metric_labels = 3;
   }
 
-  // Metric conversions to use for the stats.
+  // The custom conversion from a stat to a metric. Currently, the only supported input is `envoy.type.matcher.v3.StatFullNameMatchInput` and the only support action is `envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.ConversionAction`.`
+  //
+  // The following is an example on how to use this feature.
+  // matcher_list {
+  //   matchers {
+  //     predicate {
+  //       single_predicate {
+  //         input {
+  //           name: "stat_full_name_match_input"
+  //           typed_config {
+  //             [type.googleapis.com/
+  //              envoy.type.matcher.v3.StatFullNameMatchInput] {}
+  //           }
+  //         }
+  //         value_match { safe_regex { regex: "test_counter-1" } }
+  //       }
+  //     }
+  //     on_match {
+  //       action {
+  //         name: "otlp_metric_conversion"
+  //         typed_config {
+  //           [type.googleapis.com/envoy.extensions.stat_sinks
+  //                .open_telemetry.v3.SinkConfig.ConversionAction] {
+  //             metric_name: "new_counter_name"
+  //           }
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
   xds.type.matcher.v3.Matcher custom_metric_conversions = 8;
 }

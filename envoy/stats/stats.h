@@ -287,7 +287,7 @@ private:
 };
 
 class StatMatchingData {
- public:
+public:
   static absl::string_view name() { return "stat_matching_data"; }
 
   virtual std::string full_name() const PURE;
@@ -295,19 +295,17 @@ class StatMatchingData {
   virtual ~StatMatchingData() = default;
 };
 
-template <class StatType>
-class StatMatchingDataImpl : public StatMatchingData {
- public:
+template <class StatType> class StatMatchingDataImpl : public StatMatchingData {
+public:
   StatMatchingDataImpl(const StatType& metric) : metric_(metric) {}
 
   static std::string name() { return "stat_matching_data_impl"; }
 
   std::string full_name() const override { return metric_.name(); }
 
- private:
+private:
   const StatType& metric_;
 };
-
 
 } // namespace Stats
 } // namespace Envoy

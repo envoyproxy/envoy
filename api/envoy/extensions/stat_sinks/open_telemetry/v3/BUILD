@@ -9,7 +9,7 @@ api_proto_package(
         "//envoy/config/core/v3:pkg",
         "//envoy/type/matcher/v3:pkg",
         "@com_github_cncf_xds//udpa/annotations:pkg",
+        "@com_github_cncf_xds//xds/type/matcher/v3:pkg",
         "@opentelemetry_proto//:common_proto",
-               "@com_github_cncf_xds//xds/type/matcher/v3:pkg",
     ],
 )
