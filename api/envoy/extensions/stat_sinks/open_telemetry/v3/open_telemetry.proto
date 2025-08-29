@@ -6,10 +6,10 @@ import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/type/matcher/v3/string.proto";
 
-import "xds/type/matcher/v3/matcher.proto";
 import "google/protobuf/wrappers.proto";
 
 import "opentelemetry/proto/common/v1/common.proto";
+import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -38,6 +38,18 @@ message SinkConfig {
     string metric_name = 2;
 
     // Additional static labels to be added to the converted metric.
+    repeated opentelemetry.proto.common.v1.KeyValue static_metric_labels = 3;
+  }
+
+  // MetricConversion is used to convert a stat to a metric. If a stat matches,
+  // the metric_name and static_metric_labels will be
+  // used to create the metric. This can be used to rename a
+  // stat, add static labels, and aggregate multiple stats into a single metric.
+  message ConversionAction {
+    // The metric name to use for the stat.
+    string metric_name = 2;
+
+    // Static metric labels to use for the metric.
     repeated opentelemetry.proto.common.v1.KeyValue static_metric_labels = 3;
   }
 
@@ -75,21 +87,10 @@ message SinkConfig {
   // prefix added. According to the example, the full stat name will remain "foo.bar".
   string prefix = 6;
 
-  // MetricConversion is used to convert a stat to a metric. If a stat matches, 
-  // the metric_name and static_metric_labels will be
-  // used to create the metric. This can be used to rename a
-  // stat, add static labels, and aggregate multiple stats into a single metric.
-  message ConversionAction {
-    // The metric name to use for the stat.
-    string metric_name = 2;
-
-    // Static metric labels to use for the metric.
-    repeated opentelemetry.proto.common.v1.KeyValue static_metric_labels = 3;
-  }
-
   // The custom conversion from a stat to a metric. Currently, the only supported input is `envoy.type.matcher.v3.StatFullNameMatchInput` and the only support action is `envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.ConversionAction`.`
   //
   // The following is an example on how to use this feature.
+  // ```
   // matcher_list {
   //   matchers {
   //     predicate {
@@ -117,5 +118,6 @@ message SinkConfig {
   //     }
   //   }
   // }
+  // ```
   xds.type.matcher.v3.Matcher custom_metric_conversions = 8;
 }
