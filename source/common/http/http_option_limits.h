@@ -31,8 +31,8 @@ struct OptionsLimits {
   // NOTE: we only support increasing window size now, so this is also the minimum
   // TODO(jwfang): make this 0 to support decrease window size
   static const uint32_t MIN_INITIAL_STREAM_WINDOW_SIZE = (1 << 16) - 1;
-  // Initial value from HTTP/2 spec is 65535 and we want more (1MiB).
-  static const uint32_t DEFAULT_INITIAL_STREAM_WINDOW_SIZE = 1024 * 1024;
+  // Initial value from HTTP/2 spec is 65535 (64KiB - 1) and we want more (1MiB).
+  static const uint32_t DEFAULT_INITIAL_STREAM_WINDOW_SIZE = 16 * 1024 * 1024;
   static const uint32_t DEFAULT_INITIAL_STREAM_WINDOW_SIZE_LEGACY = 256 * 1024 * 1024;
   // maximum from HTTP/2 spec, same as NGHTTP2_MAX_WINDOW_SIZE from nghttp2
   static const uint32_t MAX_INITIAL_STREAM_WINDOW_SIZE = (1U << 31) - 1;
@@ -40,9 +40,7 @@ struct OptionsLimits {
   // CONNECTION_WINDOW_SIZE is similar to STREAM_WINDOW_SIZE, but for connection-level window
   // TODO(jwfang): make this 0 to support decrease window size
   static const uint32_t MIN_INITIAL_CONNECTION_WINDOW_SIZE = (1 << 16) - 1;
-  // nghttp2's default connection-level window equals to its stream-level,
-  // our default connection-level window also equals to our stream-level
-  static const uint32_t DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE = 1024 * 1024;
+  static const uint32_t DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE = 24 * 1024 * 1024;
   static const uint32_t DEFAULT_INITIAL_CONNECTION_WINDOW_SIZE_LEGACY = 256 * 1024 * 1024;
   static const uint32_t MAX_INITIAL_CONNECTION_WINDOW_SIZE = (1U << 31) - 1;
 
