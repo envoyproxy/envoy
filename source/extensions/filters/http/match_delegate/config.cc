@@ -119,7 +119,7 @@ void DelegatingStreamFilter::FilterMatchState::evaluateMatchTree(
 
   match_tree_evaluated_ = match_result.isComplete();
 
-  if (match_tree_evaluated_ && match_result.isMatch()) {
+  if (match_result.isMatch()) {
     const auto& result = match_result.action();
     if (result == nullptr || SkipAction().typeUrl() == result->typeUrl()) {
       skip_filter_ = true;

@@ -22,13 +22,18 @@ using ::Envoy::Http::RequestHeaderMapOptConstRef;
 using ::Envoy::Http::ResponseHeaderMapOptConstRef;
 using ::Envoy::Http::ResponseTrailerMapOptConstRef;
 
-using BaseActivationPtr = std::unique_ptr<google::api::expr::runtime::BaseActivation>;
+using StreamActivationPtr = std::unique_ptr<Filters::Common::Expr::StreamActivation>;
 
 // CEL matcher specific matching data
 class CelMatchData : public ::Envoy::Matcher::CustomMatchData {
 public:
-  explicit CelMatchData(BaseActivationPtr activation) : activation_(std::move(activation)) {}
-  BaseActivationPtr activation_;
+  explicit CelMatchData(StreamActivationPtr activation) : activation_(std::move(activation)) {}
+  bool needs_reinvoked_on_response() const {
+    // Allows us to skip re-evaluating the CEL expression if it did not rely on
+    // response path data during its first evaluation.
+    return activation_->response_path_data_needed();
+  }
+  StreamActivationPtr activation_;
 };
 
 class HttpCelDataInput : public Matcher::DataInput<Envoy::Http::HttpMatchingData> {
@@ -41,14 +46,17 @@ public:
 
     // CEL library supports mixed matching of request/response attributes(e.g., headers, trailers)
     // and attributes from stream info.
-    std::unique_ptr<google::api::expr::runtime::BaseActivation> activation =
-        Extensions::Filters::Common::Expr::createActivation(
-            nullptr, // TODO: pass local_info to CEL activation.
-            data.streamInfo(), maybe_request_headers.ptr(), maybe_response_headers.ptr(),
-            maybe_response_trailers.ptr());
+    StreamActivationPtr activation = Extensions::Filters::Common::Expr::createActivation(
+        nullptr, // TODO: pass local_info to CEL activation.
+        data.streamInfo(), maybe_request_headers.ptr(), maybe_response_headers.ptr(),
+        maybe_response_trailers.ptr());
+    Matcher::DataInputGetResult::DataAvailability availability =
+        !data.requestHeaders().has_value() || !data.responseHeaders().has_value() ||
+                !data.responseTrailers().has_value()
+            ? Matcher::DataInputGetResult::DataAvailability::MoreDataMightBeAvailable
+            : Matcher::DataInputGetResult::DataAvailability::AllDataAvailable;
 
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::make_unique<CelMatchData>(std::move(activation))};
+    return {availability, std::make_unique<CelMatchData>(std::move(activation))};
   }
 
   absl::string_view dataInputType() const override { return "cel_data_input"; }

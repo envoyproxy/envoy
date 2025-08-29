@@ -10,6 +10,7 @@
 #include "source/extensions/filters/common/expr/evaluator.h"
 #include "source/extensions/matching/http/cel_input/cel_input.h"
 
+#include "absl/types/optional.h"
 #include "absl/types/variant.h"
 #include "xds/type/matcher/v3/cel.pb.h"
 
@@ -41,6 +42,10 @@ public:
 
 private:
   const Filters::Common::Expr::CompiledExpression compiled_expr_;
+  // Result may be cached if it does not require fields which are unavailable;
+  // e.g. response path headers or trailers. Allows us to skip re-evaluation in
+  // cases where it would not change.
+  absl::optional<bool> cached_result_;
 };
 
 } // namespace CelMatcher

@@ -30,8 +30,6 @@ namespace Filters {
 namespace Common {
 namespace Expr {
 
-using Activation = google::api::expr::runtime::BaseActivation;
-using ActivationPtr = std::unique_ptr<Activation>;
 using Builder = google::api::expr::runtime::CelExpressionBuilder;
 using BuilderConstPtr = std::unique_ptr<const Builder>;
 using Expression = google::api::expr::runtime::CelExpression;
@@ -57,6 +55,7 @@ public:
   FindFunctionOverloads(absl::string_view) const override {
     return {};
   }
+  bool response_path_data_needed() const { return response_path_data_needed_; }
 
 protected:
   void resetActivation() const;
@@ -65,7 +64,11 @@ protected:
   mutable const ::Envoy::Http::RequestHeaderMap* activation_request_headers_{nullptr};
   mutable const ::Envoy::Http::ResponseHeaderMap* activation_response_headers_{nullptr};
   mutable const ::Envoy::Http::ResponseTrailerMap* activation_response_trailers_{nullptr};
+  mutable bool response_path_data_needed_{false};
 };
+
+using Activation = StreamActivation;
+using ActivationPtr = std::unique_ptr<Activation>;
 
 // Creates an activation providing the common context attributes.
 // The activation lazily creates wrappers during an evaluation using the evaluation arena.
