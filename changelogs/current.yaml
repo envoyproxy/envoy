@@ -298,6 +298,10 @@ new_features:
 - area: composite
   change: |
     Allow composite filter to be configured to insert a filter into filter chain outside of the decode headers lifecycle phase.
+- area: cel
+  change: |
+    Added functionality to reevaluate CEL expressions that attempt to read response path data on
+    the request path once the data is available. Allows CEL matching based on both request and response headers.
 - area: rbac
   change: |
     Switch the IP matcher to use LC-Trie for performance improvements.

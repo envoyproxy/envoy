@@ -263,6 +263,23 @@ TEST_F(CelMatcherTest, CelMatcherRequestInsufficientDataPathNotMatched) {
   EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
 }
 
+TEST_F(CelMatcherTest, CelMatcherCachesMatchesNotReliantOnResponseData) {
+  auto matcher_tree = buildMatcherTree(RequestHeaderCelExprString);
+
+  TestRequestHeaderMapImpl request_headers;
+  buildCustomHeader({{"authenticated_user", "not-staging"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
+
+  // Call onRequestHeaders again, but this time change the data so that it should've matched. If the
+  // CEL evaluation was cached, it will remain InsufficientData.
+  buildCustomHeader({{"authenticated_user", "staging"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
+}
+
 // Tests CEL matcher returns HasNoMatch after seeing trailers.
 TEST_F(CelMatcherTest, CelMatcherRequestResponseMoreDataAvailNotMatched) {
   auto matcher_tree = buildMatcherTree(ResponseHeaderAndPathCelExprString);
