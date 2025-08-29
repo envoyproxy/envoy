@@ -11,11 +11,11 @@
 
 #include "test/extensions/filters/common/ext_authz/mocks.h"
 #include "test/extensions/filters/common/ext_authz/test_common.h"
+#include "test/mocks/network/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
-#include "test/mocks/network/mocks.h"
-#include "test/mocks/ssl/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

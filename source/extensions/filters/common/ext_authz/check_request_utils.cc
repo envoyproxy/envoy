@@ -245,7 +245,7 @@ void CheckRequestUtils::createHttpCheck(
     envoy::config::core::v3::Metadata&& metadata_context,
     envoy::config::core::v3::Metadata&& route_metadata_context,
     envoy::service::auth::v3::CheckRequest& request, uint64_t max_request_bytes, bool pack_as_bytes,
-    bool encode_raw_headers,     bool include_peer_certificate, bool include_tls_session,
+    bool encode_raw_headers, bool include_peer_certificate, bool include_tls_session,
     const Protobuf::Map<std::string, std::string>& destination_labels,
     const MatcherSharedPtr& allowed_headers_matcher,
     const MatcherSharedPtr& disallowed_headers_matcher) {
@@ -302,26 +302,27 @@ CheckRequestUtils::toRequestMatchers(const envoy::type::matcher::v3::ListStringM
                                      Server::Configuration::CommonFactoryContext& context) {
   std::vector<Matchers::StringMatcherPtr> matchers(createStringMatchers(list, context));
   
-  // Historical behavior: when add_http_headers is true, add matchers for authorization, :method, :path, host
+  // Historical behavior: when add_http_headers is true, add matchers for authorization, :method,
+  // :path, host
   if (add_http_headers) {
     // Add the four standard HTTP headers that should always be included
     envoy::type::matcher::v3::StringMatcher auth_matcher;
     auth_matcher.set_exact("authorization");
     matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(auth_matcher, context));
-    
+
     envoy::type::matcher::v3::StringMatcher method_matcher;
     method_matcher.set_exact(":method");
     matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(method_matcher, context));
-    
+
     envoy::type::matcher::v3::StringMatcher path_matcher;
     path_matcher.set_exact(":path");
     matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(path_matcher, context));
-    
+
     envoy::type::matcher::v3::StringMatcher host_matcher;
     host_matcher.set_exact("host");
     matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(host_matcher, context));
   }
-  
+
   return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
 }
 
@@ -335,20 +336,18 @@ CheckRequestUtils::createStringMatchers(const envoy::type::matcher::v3::ListStri
   return matchers;
 }
 
-
-
-  std::vector<std::pair<std::string, std::string>>
+std::vector<std::pair<std::string, std::string>>
 CheckRequestUtils::computePeerMetadataHeaders(const StreamInfo::StreamInfo& stream_info,
                                              const LocalInfo::LocalInfo& local_info) {
   std::vector<std::pair<std::string, std::string>> headers;
-  
+
   // Use node ID as the peer identifier for stability across reloads
   const std::string peer_id = local_info.node().id();
-  
+
   // Create Istio metadata-exchange compatible headers
   // These match the format expected by Istio's metadata-exchange filter
   headers.emplace_back(Http::Headers::get().XEnvoyPeerMetadataId.get(), peer_id);
-  
+
   // Get SSL information from stream_info if available
   // Guard against null SSL connection and empty URI SANs
   std::string principal = "";
@@ -359,7 +358,7 @@ CheckRequestUtils::computePeerMetadataHeaders(const StreamInfo::StreamInfo& stre
       principal = uri_sans[0];
     }
   }
-  
+
   // Create metadata as base64-encoded protobuf Struct
   // Prefer full node metadata; fall back to minimal if empty
   ProtobufWkt::Struct metadata_struct;
@@ -367,19 +366,19 @@ CheckRequestUtils::computePeerMetadataHeaders(const StreamInfo::StreamInfo& stre
     // Use the full node metadata if available
     metadata_struct = local_info.node().metadata();
   }
-  
+
   // Ensure we have at least a minimal workload name
   if (metadata_struct.fields().empty()) {
     (*metadata_struct.mutable_fields())["WORKLOAD_NAME"].set_string_value(peer_id);
   }
-  
+
   // Add principal if available
   if (!principal.empty()) {
     (*metadata_struct.mutable_fields())["PRINCIPAL"].set_string_value(principal);
   }
-  
+
   std::string serialized = MessageUtil::hash(metadata_struct);
-  
+
   // Add size cap to prevent header bloat
   constexpr size_t kMaxMetadataSize = 8192; // 8KB limit
   if (serialized.size() > kMaxMetadataSize) {
@@ -392,10 +391,10 @@ CheckRequestUtils::computePeerMetadataHeaders(const StreamInfo::StreamInfo& stre
     }
     serialized = MessageUtil::hash(truncated_struct);
   }
-  
+
   const std::string b64 = Envoy::Base64::encode(serialized.c_str(), serialized.size());
   headers.emplace_back(Http::Headers::get().XEnvoyPeerMetadata.get(), b64);
-  
+
   return headers;
 }
 

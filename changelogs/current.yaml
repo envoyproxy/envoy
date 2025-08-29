@@ -286,7 +286,8 @@ new_features:
     authorization service.
 - area: ext_authz
   change: |
-    Added :ref:`include_peer_metadata_headers <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.include_peer_metadata_headers>`
+    Added :ref:`include_peer_metadata_headers
+    <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.include_peer_metadata_headers>`
     to the ``ext_authz`` HTTP filter. When enabled, the filter includes downstream peer identity/metadata
     in authorization requests as headers (for HTTP services) or gRPC initial metadata (for gRPC services).
     This enables out-of-band policy and telemetry correlation in external authorization services.
