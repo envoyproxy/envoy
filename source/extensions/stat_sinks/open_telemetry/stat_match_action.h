@@ -31,7 +31,7 @@ public:
   }
 
 private:
-  const envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::ConversionAction& config_;
+  const envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig::ConversionAction config_;
 };
 
 class ActionValidationVisitor
