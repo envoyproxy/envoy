@@ -870,8 +870,10 @@ TEST_P(WasmHttpFilterTest, StopAndResumeViaAsyncCall) {
 
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks;
   filter().setDecoderFilterCallbacks(decoder_callbacks);
-  // Disable tracing for this one as it might call to dispatcher() and other methods, which is uninteresting here
-  EXPECT_CALL(decoder_callbacks, tracingConfig()).WillRepeatedly(Return(OptRef<const Tracing::Config>()));
+  // Disable tracing for this one as it might call to dispatcher() and other methods, which is
+  // uninteresting here
+  EXPECT_CALL(decoder_callbacks, tracingConfig())
+      .WillRepeatedly(Return(OptRef<const Tracing::Config>()));
 
   cluster_manager_.initializeThreadLocalClusters({"cluster"});
   EXPECT_CALL(cluster_manager_.thread_local_cluster_, httpAsyncClient());

@@ -9,8 +9,8 @@
 #include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/stats/sink.h"
-#include "envoy/upstream/cluster_manager.h"
 #include "envoy/tracing/trace_driver.h"
+#include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
