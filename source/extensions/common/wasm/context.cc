@@ -2037,7 +2037,7 @@ void Context::ensureSpan() {
     return;
   }
 
-  // might happen  in tests
+  // might happen in tests
   if (!decoder_callbacks_) {
     return;
   }
