@@ -22,6 +22,7 @@ namespace RateLimit {
 struct RateLimitOverride {
   uint32_t requests_per_unit_;
   envoy::type::v3::RateLimitUnit unit_;
+  uint32_t unit_multiplier_ = 1;
 };
 
 /**

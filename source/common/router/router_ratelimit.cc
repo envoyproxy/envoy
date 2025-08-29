@@ -73,8 +73,14 @@ bool DynamicMetadataRateLimitOverride::populateOverride(
       unit_it->second.kind_case() == Protobuf::Value::kStringValue) {
     envoy::type::v3::RateLimitUnit unit;
     if (envoy::type::v3::RateLimitUnit_Parse(unit_it->second.string_value(), &unit)) {
+      uint32_t unit_multiplier = 1; // Default value
+      const auto& multiplier_it = override_value.find("unit_multiplier");
+      if (multiplier_it != override_value.end() &&
+          multiplier_it->second.kind_case() == Protobuf::Value::kNumberValue) {
+        unit_multiplier = static_cast<uint32_t>(multiplier_it->second.number_value());
+      }
       descriptor.limit_.emplace(RateLimit::RateLimitOverride{
-          static_cast<uint32_t>(limit_it->second.number_value()), unit});
+          static_cast<uint32_t>(limit_it->second.number_value()), unit, unit_multiplier});
       return true;
     }
   }
