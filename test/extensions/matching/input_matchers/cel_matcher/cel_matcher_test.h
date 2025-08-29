@@ -230,6 +230,76 @@ inline constexpr char RequestHeaderAndPathCelString[] = R"pb(
     }
 )pb";
 
+// Compiled CEL expression string: request.path == '/foo' && response.headers['content-type'] == 'text/plain'
+inline constexpr char ResponseHeaderAndPathCelExprString[] = R"pb(
+    expr {
+      id: 11
+      call_expr {
+        function: "_&&_"
+        args {
+          id: 3
+          call_expr {
+            function: "_==_"
+            args {
+              id: 2
+              select_expr {
+                operand {
+                  id: 1
+                  ident_expr {
+                    name: "request"
+                  }
+                }
+                field: "path"
+              }
+            }
+            args {
+              id: 4
+              const_expr {
+                string_value: "/foo"
+              }
+            }
+          }
+        }
+        args {
+          id: 9
+          call_expr {
+            function: "_==_"
+            args {
+              id: 7
+              call_expr {
+                function: "_[_]"
+                args {
+                  id: 6
+                  select_expr {
+                    operand {
+                      id: 5
+                      ident_expr {
+                        name: "response"
+                      }
+                    }
+                    field: "headers"
+                  }
+                }
+                args {
+                  id: 8
+                  const_expr {
+                    string_value: "content-type"
+                  }
+                }
+              }
+            }
+            args {
+              id: 10
+              const_expr {
+                string_value: "text/plain"
+              }
+            }
+          }
+        }
+      }
+    }
+)pb";
+
 // Compiled CEL expression string: response.trailers['transfer-encoding']=='chunked'
 inline constexpr char ReponseTrailerCelExprString[] = R"pb(
   expr {

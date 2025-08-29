@@ -34,6 +34,7 @@ using ::Envoy::Http::LowerCaseString;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
 using ::Envoy::Http::TestResponseTrailerMapImpl;
+using ::Envoy::Matcher::HasInsufficientData;
 using ::Envoy::Matcher::HasNoMatch;
 using ::Envoy::Matcher::HasStringAction;
 
@@ -191,7 +192,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderNotMatched) {
   buildCustomHeader({{"authenticated_user", "NOT_MATCHED"}}, request_headers);
   data_.onRequestHeaders(request_headers);
 
-  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
+  EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
 
   // Build header with request header key field mismatched case.
   TestRequestHeaderMapImpl request_headers_2 = default_headers_;
@@ -199,7 +200,90 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderNotMatched) {
   Envoy::Http::Matching::HttpMatchingDataImpl data_2 =
       Envoy::Http::Matching::HttpMatchingDataImpl(stream_info_);
   data_2.onRequestHeaders(request_headers_2);
-  EXPECT_THAT(matcher_tree->match(data_2), HasNoMatch());
+  EXPECT_THAT(matcher_tree->match(data_2), HasInsufficientData());
+}
+
+// Tests CEL expression that must be invoked twice: request headers + response headers.
+TEST_F(CelMatcherTest, CelMatcherRequestInsufficientDataResponseHeaderMatched) {
+  auto matcher_tree = buildMatcherTree(ResponseHeaderAndPathCelExprString);
+
+  TestRequestHeaderMapImpl request_headers;
+  buildCustomHeader({{":path", "/foo"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
+
+  TestResponseHeaderMapImpl response_headers;
+  response_headers.addCopy(LowerCaseString(":status"), "200");
+  response_headers.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers.addCopy(LowerCaseString("content-length"), "3");
+  data_.onResponseHeaders(response_headers);
+
+  auto result = matcher_tree->match(data_);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasStringAction("match!!"));
+}
+
+// Tests CEL expression that must be invoked twice, but does not match on the response path.
+TEST_F(CelMatcherTest, CelMatcherRequestInsufficientDataResponseHeaderNotMatched) {
+  auto matcher_tree = buildMatcherTree(ResponseHeaderAndPathCelExprString);
+
+  TestRequestHeaderMapImpl request_headers;
+  buildCustomHeader({{":path", "/foo"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
+
+  TestResponseHeaderMapImpl response_headers;
+  response_headers.addCopy(LowerCaseString(":status"), "200");
+  response_headers.addCopy(LowerCaseString("content-type"), "text/html");
+  response_headers.addCopy(LowerCaseString("content-length"), "3");
+  data_.onResponseHeaders(response_headers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
+}
+
+// Tests CEL expression that matches on both request + response, but does not match on the request
+// path.
+TEST_F(CelMatcherTest, CelMatcherRequestInsufficientDataPathNotMatched) {
+  auto matcher_tree = buildMatcherTree(ResponseHeaderAndPathCelExprString);
+
+  TestRequestHeaderMapImpl request_headers;
+  buildCustomHeader({{":path", "/bar"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
+
+  TestResponseHeaderMapImpl response_headers;
+  response_headers.addCopy(LowerCaseString(":status"), "200");
+  response_headers.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers.addCopy(LowerCaseString("content-length"), "3");
+  data_.onResponseHeaders(response_headers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
+}
+
+// Tests CEL matcher returns HasNoMatch after seeing trailers.
+TEST_F(CelMatcherTest, CelMatcherRequestResponseMoreDataAvailNotMatched) {
+  auto matcher_tree = buildMatcherTree(ResponseHeaderAndPathCelExprString);
+
+  TestRequestHeaderMapImpl request_headers;
+  buildCustomHeader({{":path", "/bar"}}, request_headers);
+  data_.onRequestHeaders(request_headers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
+
+  TestResponseHeaderMapImpl response_headers;
+  response_headers.addCopy(LowerCaseString(":status"), "200");
+  response_headers.addCopy(LowerCaseString("content-type"), "text/plain");
+  response_headers.addCopy(LowerCaseString("content-length"), "3");
+  data_.onResponseHeaders(response_headers);
+
+  EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
+
+  TestResponseTrailerMapImpl response_trailers = {{"transfer-encoding", "chunked"}};
+  data_.onResponseTrailers(response_trailers);
+  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
 }
 
 TEST_F(CelMatcherTest, CelMatcherClusterMetadataMatched) {
@@ -220,7 +304,7 @@ TEST_F(CelMatcherTest, CelMatcherClusterMetadataNotMatched) {
   auto matcher_tree = buildMatcherTree(absl::StrFormat(
       UpstreamClusterMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
 
-  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
+  EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
 }
 
 TEST_F(CelMatcherTest, CelMatcherRouteMetadataMatched) {
@@ -241,7 +325,7 @@ TEST_F(CelMatcherTest, CelMatcherRouteMetadataNotMatched) {
   auto matcher_tree = buildMatcherTree(absl::StrFormat(
       UpstreamClusterMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
 
-  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
+  EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
 }
 
 TEST_F(CelMatcherTest, CelMatcherDynamicMetadataMatched) {
@@ -261,7 +345,7 @@ TEST_F(CelMatcherTest, CelMatcherDynamicMetadataNotMatched) {
   auto matcher_tree = buildMatcherTree(
       absl::StrFormat(DynamicMetadataCelString, kFilterNamespace, kMetadataKey, kMetadataValue));
 
-  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
+  EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
 }
 
 TEST_F(CelMatcherTest, CelMatcherTypedDynamicMetadataMatched) {
@@ -307,7 +391,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderPathNotMatched) {
   buildCustomHeader({{":path", "/bar"}}, request_headers);
   data_.onRequestHeaders(request_headers);
 
-  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
+  EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
 }
 
 TEST_F(CelMatcherTest, CelMatcherResponseHeaderMatched) {
@@ -328,7 +412,7 @@ TEST_F(CelMatcherTest, CelMatcherResponseHeaderNotMatched) {
   TestResponseHeaderMapImpl response_headers = {{"content-type", "text/html"}};
   data_.onResponseHeaders(response_headers);
 
-  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
+  EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
 }
 
 TEST_F(CelMatcherTest, CelMatcherResponseTrailerMatched) {
@@ -346,7 +430,7 @@ TEST_F(CelMatcherTest, CelMatcherResponseTrailerNotMatched) {
   TestResponseTrailerMapImpl response_trailers = {{"transfer-encoding", "chunked_not_matched"}};
   data_.onResponseTrailers(response_trailers);
 
-  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
+  EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
 }
 
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderAndPathMatched) {
@@ -366,7 +450,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderAndPathNotMatched) {
   buildCustomHeader({{"user", "prod"}, {":path", "/foo"}}, request_headers);
   data_.onRequestHeaders(request_headers);
 
-  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
+  EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
 }
 
 TEST_F(CelMatcherTest, CelMatcherRequestHeaderOrPathMatched) {
@@ -386,7 +470,7 @@ TEST_F(CelMatcherTest, CelMatcherRequestHeaderOrPathNotMatched) {
   buildCustomHeader({{"user", "prod"}, {":path", "/bar"}}, request_headers);
   data_.onRequestHeaders(request_headers);
 
-  EXPECT_THAT(matcher_tree->match(data_), HasNoMatch());
+  EXPECT_THAT(matcher_tree->match(data_), HasInsufficientData());
 }
 
 TEST_F(CelMatcherTest, CelMatcherRequestResponseMatched) {

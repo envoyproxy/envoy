@@ -41,14 +41,17 @@ public:
 
     // CEL library supports mixed matching of request/response attributes(e.g., headers, trailers)
     // and attributes from stream info.
-    std::unique_ptr<google::api::expr::runtime::BaseActivation> activation =
-        Extensions::Filters::Common::Expr::createActivation(
-            nullptr, // TODO: pass local_info to CEL activation.
-            data.streamInfo(), maybe_request_headers.ptr(), maybe_response_headers.ptr(),
-            maybe_response_trailers.ptr());
+    BaseActivationPtr activation = Extensions::Filters::Common::Expr::createActivation(
+        nullptr, // TODO: pass local_info to CEL activation.
+        data.streamInfo(), maybe_request_headers.ptr(), maybe_response_headers.ptr(),
+        maybe_response_trailers.ptr());
+    Matcher::DataInputGetResult::DataAvailability availability =
+        !data.requestHeaders().has_value() || !data.responseHeaders().has_value() ||
+                !data.responseTrailers().has_value()
+            ? Matcher::DataInputGetResult::DataAvailability::MoreDataMightBeAvailable
+            : Matcher::DataInputGetResult::DataAvailability::AllDataAvailable;
 
-    return {Matcher::DataInputGetResult::DataAvailability::AllDataAvailable,
-            std::make_unique<CelMatchData>(std::move(activation))};
+    return {availability, std::make_unique<CelMatchData>(std::move(activation))};
   }
 
   absl::string_view dataInputType() const override { return "cel_data_input"; }

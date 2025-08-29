@@ -135,7 +135,7 @@ public:
   static MatchResult noMatch() { return MatchResult(NoMatch{}); }
   static MatchResult insufficientData() { return MatchResult(InsufficientData{}); }
   bool isInsufficientData() const { return absl::holds_alternative<InsufficientData>(result_); }
-  bool isComplete() const { return !isInsufficientData(); }
+  bool isComplete() const { return !isInsufficientData() || isMatch(); }
   bool isNoMatch() const { return absl::holds_alternative<NoMatch>(result_); }
   bool isMatch() const { return absl::holds_alternative<ActionConstSharedPtr>(result_); }
   const ActionConstSharedPtr& action() const {
