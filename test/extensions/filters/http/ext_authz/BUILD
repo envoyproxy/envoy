@@ -82,6 +82,7 @@ envoy_extension_cc_test(
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/filters/http/ext_authz:config",
         "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
+        "//source/extensions/network/dns_resolver/getaddrinfo:config",
         "//source/server/config_validation:server_lib",
         "//test/integration:http_integration_lib",
         "//test/mocks/server:options_mocks",
