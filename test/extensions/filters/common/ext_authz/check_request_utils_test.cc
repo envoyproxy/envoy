@@ -805,7 +805,7 @@ TEST_F(CheckRequestUtilsTest, PeerMetadataHeadersEnabled) {
   // So we verify they are NOT in the protobuf payload (they're on the wire instead)
   const auto& http_request = request.attributes().request().http();
   const auto& headers = http_request.headers();
-  
+
   EXPECT_THAT(headers, Not(Contains(Key("x-envoy-peer-metadata"))));
   EXPECT_THAT(headers, Not(Contains(Key("x-envoy-peer-metadata-id"))));
 }
@@ -849,7 +849,7 @@ TEST_F(CheckRequestUtilsTest, PeerMetadataHeadersDisabled) {
   // Verify headers not in protobuf payload
   const auto& http_request = request.attributes().request().http();
   const auto& headers = http_request.headers();
-  
+
   EXPECT_THAT(headers, Not(Contains(Key("x-envoy-peer-metadata"))));
   EXPECT_THAT(headers, Not(Contains(Key("x-envoy-peer-metadata-id"))));
 }
@@ -876,23 +876,26 @@ TEST_F(CheckRequestUtilsTest, ComputePeerMetadataHeaders) {
 
   // Verify headers are present
   EXPECT_EQ(2, headers.size());
-  
+
   // Find the metadata-id header
-  auto metadata_id_it = std::find_if(headers.begin(), headers.end(),
-      [](const auto& pair) { return pair.first == "x-envoy-peer-metadata-id"; });
+  auto metadata_id_it = std::find_if(headers.begin(), headers.end(), [](const auto& pair) {
+    return pair.first == "x-envoy-peer-metadata-id";
+  });
   EXPECT_NE(headers.end(), metadata_id_it);
   EXPECT_EQ("test-node-id", metadata_id_it->second);
 
   // Find the metadata header
-  auto metadata_it = std::find_if(headers.begin(), headers.end(),
-      [](const auto& pair) { return pair.first == "x-envoy-peer-metadata"; });
+  auto metadata_it = std::find_if(headers.begin(), headers.end(), [](const auto& pair) {
+    return pair.first == "x-envoy-peer-metadata";
+  });
   EXPECT_NE(headers.end(), metadata_it);
-  
+
   // Verify the metadata is base64-encoded protobuf
   EXPECT_FALSE(metadata_it->second.empty());
   // The metadata should be base64-encoded, so it should contain valid base64 characters
-  EXPECT_TRUE(std::all_of(metadata_it->second.begin(), metadata_it->second.end(),
-      [](char c) { return std::isalnum(c) || c == '+' || c == '/' || c == '='; }));
+  EXPECT_TRUE(std::all_of(metadata_it->second.begin(), metadata_it->second.end(), [](char c) {
+    return std::isalnum(c) || c == '+' || c == '/' || c == '=';
+  }));
 }
 
 // Test computePeerMetadataHeaders without SSL
@@ -914,18 +917,20 @@ TEST_F(CheckRequestUtilsTest, ComputePeerMetadataHeadersNoSSL) {
 
   // Verify headers are present
   EXPECT_EQ(2, headers.size());
-  
+
   // Find the metadata-id header
-  auto metadata_id_it = std::find_if(headers.begin(), headers.end(),
-      [](const auto& pair) { return pair.first == "x-envoy-peer-metadata-id"; });
+  auto metadata_id_it = std::find_if(headers.begin(), headers.end(), [](const auto& pair) {
+    return pair.first == "x-envoy-peer-metadata-id";
+  });
   EXPECT_NE(headers.end(), metadata_id_it);
   EXPECT_EQ("test-node-id", metadata_id_it->second);
 
   // Find the metadata header
-  auto metadata_it = std::find_if(headers.begin(), headers.end(),
-      [](const auto& pair) { return pair.first == "x-envoy-peer-metadata"; });
+  auto metadata_it = std::find_if(headers.begin(), headers.end(), [](const auto& pair) {
+    return pair.first == "x-envoy-peer-metadata";
+  });
   EXPECT_NE(headers.end(), metadata_it);
-  
+
   // Verify the metadata is base64-encoded protobuf
   EXPECT_FALSE(metadata_it->second.empty());
 }

@@ -66,9 +66,8 @@ public:
       ENVOY_LOG_MISC(trace, "Check Response:\n{}", response_->DebugString());
     }
 
-    grpc_client_ = new Filters::Common::ExtAuthz::GrpcClientImpl(internal_grpc_mock_client_,
-                                                                 std::chrono::milliseconds(1000),
-                                                                 local_info_, false);
+    grpc_client_ = new Filters::Common::ExtAuthz::GrpcClientImpl(
+        internal_grpc_mock_client_, std::chrono::milliseconds(1000), local_info_, false);
     return std::unique_ptr<Filters::Common::ExtAuthz::GrpcClientImpl>{grpc_client_};
   }
 

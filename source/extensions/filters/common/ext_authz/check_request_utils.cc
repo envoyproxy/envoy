@@ -301,7 +301,7 @@ CheckRequestUtils::toRequestMatchers(const envoy::type::matcher::v3::ListStringM
                                      bool add_http_headers,
                                      Server::Configuration::CommonFactoryContext& context) {
   std::vector<Matchers::StringMatcherPtr> matchers(createStringMatchers(list, context));
-  
+
   // Historical behavior: when add_http_headers is true, add matchers for authorization, :method,
   // :path, host
   if (add_http_headers) {
@@ -338,7 +338,7 @@ CheckRequestUtils::createStringMatchers(const envoy::type::matcher::v3::ListStri
 
 std::vector<std::pair<std::string, std::string>>
 CheckRequestUtils::computePeerMetadataHeaders(const StreamInfo::StreamInfo& stream_info,
-                                             const LocalInfo::LocalInfo& local_info) {
+                                              const LocalInfo::LocalInfo& local_info) {
   std::vector<std::pair<std::string, std::string>> headers;
 
   // Use node ID as the peer identifier for stability across reloads
@@ -382,8 +382,8 @@ CheckRequestUtils::computePeerMetadataHeaders(const StreamInfo::StreamInfo& stre
   // Add size cap to prevent header bloat
   constexpr size_t kMaxMetadataSize = 8192; // 8KB limit
   if (serialized.size() > kMaxMetadataSize) {
-    ENVOY_LOG_MISC(warn, "Peer metadata size {} exceeds limit {}, truncating", 
-                   serialized.size(), kMaxMetadataSize);
+    ENVOY_LOG_MISC(warn, "Peer metadata size {} exceeds limit {}, truncating", serialized.size(),
+                   kMaxMetadataSize);
     ProtobufWkt::Struct truncated_struct;
     (*truncated_struct.mutable_fields())["WORKLOAD_NAME"].set_string_value(peer_id);
     if (!principal.empty()) {

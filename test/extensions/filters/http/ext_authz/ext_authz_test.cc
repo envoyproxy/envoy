@@ -5079,10 +5079,10 @@ TEST_F(HttpFilterTest, PeerMetadataHeadersEnabled) {
         // They should be in the wire-level initial metadata instead
         const auto& http_request = request.attributes().request().http();
         const auto& headers = http_request.headers();
-        
+
         EXPECT_THAT(headers, Not(Contains(Key("x-envoy-peer-metadata"))));
         EXPECT_THAT(headers, Not(Contains(Key("x-envoy-peer-metadata-id"))));
-        
+
         request_callbacks_ = &callbacks;
       }));
 
@@ -5118,10 +5118,10 @@ TEST_F(HttpFilterTest, PeerMetadataHeadersDisabled) {
         // Verify headers not in protobuf payload
         const auto& http_request = request.attributes().request().http();
         const auto& headers = http_request.headers();
-        
+
         EXPECT_THAT(headers, Not(Contains(Key("x-envoy-peer-metadata"))));
         EXPECT_THAT(headers, Not(Contains(Key("x-envoy-peer-metadata-id"))));
-        
+
         request_callbacks_ = &callbacks;
       }));
 
@@ -5134,7 +5134,8 @@ TEST_F(HttpFilterTest, PeerMetadataHeadersDisabled) {
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 }
 
-// Test that peer metadata headers are included for HTTP service when include_peer_metadata_headers is enabled.
+// Test that peer metadata headers are included for HTTP service when include_peer_metadata_headers
+// is enabled.
 TEST_P(HttpFilterTestParam, HttpServicePeerMetadataHeadersEnabled) {
   if (!std::get<1>(GetParam())) {
     // Skip gRPC client test as this is for HTTP service.
@@ -5166,10 +5167,10 @@ TEST_P(HttpFilterTestParam, HttpServicePeerMetadataHeadersEnabled) {
         // So we verify they are NOT in the protobuf payload (they're on the wire instead)
         const auto& http_request = request.attributes().request().http();
         const auto& headers = http_request.headers();
-        
+
         EXPECT_THAT(headers, Not(Contains(Key("x-envoy-peer-metadata"))));
         EXPECT_THAT(headers, Not(Contains(Key("x-envoy-peer-metadata-id"))));
-        
+
         request_callbacks_ = &callbacks;
       }));
 
@@ -5204,10 +5205,10 @@ TEST_F(HttpFilterTest, HeadersNotInProtobufPayload) {
         // Verify headers are on wire, not in protobuf payload
         const auto& http_request = request.attributes().request().http();
         const auto& headers = http_request.headers();
-        
+
         EXPECT_THAT(headers, Not(Contains(Key("x-envoy-peer-metadata"))));
         EXPECT_THAT(headers, Not(Contains(Key("x-envoy-peer-metadata-id"))));
-        
+
         request_callbacks_ = &callbacks;
       }));
 
@@ -5219,7 +5220,6 @@ TEST_F(HttpFilterTest, HeadersNotInProtobufPayload) {
   response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
   request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
 }
-
 
 } // namespace
 } // namespace ExtAuthz
