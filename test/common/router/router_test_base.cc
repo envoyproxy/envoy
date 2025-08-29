@@ -1,7 +1,11 @@
 #include "test/common/router/router_test_base.h"
 
+#include "source/common/config/metadata.h"
+#include "source/common/config/well_known_names.h"
 #include "source/common/router/debug_config.h"
 #include "source/common/router/upstream_codec_filter.h"
+
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 namespace Router {
@@ -296,6 +300,65 @@ void RouterTestBase::recreateFilter() {
       ->setLocalAddress(host_address_);
   router_->downstream_connection_.stream_info_.downstream_connection_info_provider_
       ->setRemoteAddress(Network::Utility::parseInternetAddressAndPortNoThrow("1.2.3.4:80"));
+}
+
+void RouterTestBase::setRouteMetadataMatchCriteria(const std::string& yaml_content) {
+  envoy::config::core::v3::Metadata route_metadata;
+  TestUtility::loadFromYaml(yaml_content, route_metadata);
+  route_criteria_ = MetadataMatchCriteriaImplConstPtr(new MetadataMatchCriteriaImpl(
+      route_metadata.filter_metadata().at(Envoy::Config::MetadataFilters::get().ENVOY_LB)));
+
+  ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria())
+      .WillByDefault(Return(route_criteria_.get()));
+}
+
+void RouterTestBase::setConnectionMetadata(const std::string& yaml_content) {
+  envoy::config::core::v3::Metadata connection_metadata;
+  TestUtility::loadFromYaml(yaml_content, connection_metadata);
+  router_->downstream_connection_.stream_info_.metadata_ = connection_metadata;
+}
+
+void RouterTestBase::setRequestMetadata(const std::map<std::string, std::string>& fields) {
+  ProtobufWkt::Struct request_struct;
+  auto& fields_map = *request_struct.mutable_fields();
+
+  for (const auto& [key, value] : fields) {
+    ProtobufWkt::Value val;
+    val.set_string_value(value);
+    fields_map[key] = val;
+  }
+
+  (*callbacks_.stream_info_.metadata_
+        .mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] =
+      request_struct;
+}
+
+void RouterTestBase::executeMetadataTest(
+    std::function<void(const std::vector<Router::MetadataMatchCriterionConstSharedPtr>&)>
+        validator) {
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke([this, validator](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                                         absl::optional<Http::Protocol>,
+                                         Upstream::LoadBalancerContext* context) {
+        auto match = context->metadataMatchCriteria()->metadataMatchCriteria();
+        validator(match);
+
+        // Verify that metadataMatchCriteria() is cached (returns same object on subsequent calls)
+        EXPECT_EQ(context->metadataMatchCriteria(), context->metadataMatchCriteria());
+
+        return Upstream::HttpPoolData([]() {}, &this->cm_.thread_local_cluster_.conn_pool_);
+      }));
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Return(&cancellable_));
+  expectResponseTimerCreate();
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_->decodeHeaders(headers, true);
+
+  EXPECT_CALL(cancellable_, cancel(_));
+  router_->onDestroy();
 }
 
 } // namespace Router

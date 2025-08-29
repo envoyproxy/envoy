@@ -765,11 +765,55 @@ TEST_F(RouterTest, MetadataMatchCriteria) {
 }
 
 TEST_F(RouterTest, MetadataMatchCriteriaFromRequest) {
-  verifyMetadataMatchCriteriaFromRequest(true);
+  // Set up route metadata that will be overridden by request metadata
+  setRouteMetadataMatchCriteria(R"EOF(
+filter_metadata:
+  envoy.lb:
+    version: v3.0
+)EOF");
+
+  // Set up request metadata that overrides route metadata
+  setRequestMetadata({{"version", "v3.1"}, {"stage", "devel"}});
+
+  executeMetadataTest([](const auto& match) {
+    EXPECT_EQ(match.size(), 2);
+    auto it = match.begin();
+
+    // Note: metadataMatchCriteria() keeps its entries sorted, so the order matters.
+
+    // `stage` was only set by the request, not by the route entry.
+    EXPECT_EQ((*it)->name(), "stage");
+    EXPECT_EQ((*it)->value().value().string_value(), "devel");
+    it++;
+
+    // `version` should be what came from the request, overriding the route entry.
+    EXPECT_EQ((*it)->name(), "version");
+    EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+  });
 }
 
 TEST_F(RouterTest, MetadataMatchCriteriaFromRequestNoRouteEntryMatch) {
-  verifyMetadataMatchCriteriaFromRequest(false);
+  // No route metadata set
+  ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria()).WillByDefault(Return(nullptr));
+
+  // Set up request metadata only
+  setRequestMetadata({{"version", "v3.1"}, {"stage", "devel"}});
+
+  executeMetadataTest([](const auto& match) {
+    EXPECT_EQ(match.size(), 2);
+    auto it = match.begin();
+
+    // Note: metadataMatchCriteria() keeps its entries sorted, so the order matters.
+
+    // `stage` was only set by the request.
+    EXPECT_EQ((*it)->name(), "stage");
+    EXPECT_EQ((*it)->value().value().string_value(), "devel");
+    it++;
+
+    // `version` should be what came from the request.
+    EXPECT_EQ((*it)->name(), "version");
+    EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+  });
 }
 
 TEST_F(RouterTest, NoMetadataMatchCriteria) {
@@ -794,47 +838,162 @@ TEST_F(RouterTest, NoMetadataMatchCriteria) {
 }
 
 TEST_F(RouterTest, MetadataMatchCriteriaFromConnectionOnly) {
-  // Set up connection metadata only (no request metadata for debugging)
-  const std::string connection_yaml = R"EOF(
-  filter_metadata:
-    envoy.lb:
-      version: v3.1
-  )EOF";
-
-  envoy::config::core::v3::Metadata connection_metadata;
-  TestUtility::loadFromYaml(connection_yaml, connection_metadata);
-  router_->downstream_connection_.stream_info_.metadata_ = connection_metadata;
-
-  // No request metadata or route metadata
+  setConnectionMetadata(R"EOF(
+filter_metadata:
+  envoy.lb:
+    version: v3.1
+)EOF");
 
   ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria()).WillByDefault(Return(nullptr));
 
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
-      .WillOnce(Invoke(
-          [&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-              absl::optional<Http::Protocol>,
-              Upstream::LoadBalancerContext* context) -> absl::optional<Upstream::HttpPoolData> {
-            auto match = context->metadataMatchCriteria()->metadataMatchCriteria();
+  executeMetadataTest([](const auto& match) {
+    EXPECT_EQ(match.size(), 1);
 
-            EXPECT_EQ(match.size(), 1);
+    auto it = match.begin();
+    EXPECT_EQ((*it)->name(), "version");
+    EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+  });
+}
 
-            auto it = match.begin();
-            EXPECT_EQ((*it)->name(), "version");
-            EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
+TEST_F(RouterTest, MetadataMatchCriteriaRouteAndConnection) {
+  setRouteMetadataMatchCriteria(R"EOF(
+filter_metadata:
+  envoy.lb:
+    version: v2.0
+    env: prod
+)EOF");
 
-            return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
-          }));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
-      .WillOnce(Return(&cancellable_));
-  expectResponseTimerCreate();
+  setConnectionMetadata(R"EOF(
+filter_metadata:
+  envoy.lb:
+    version: v3.0
+    stage: devel
+)EOF");
 
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_->decodeHeaders(headers, true);
+  executeMetadataTest([](const auto& match) {
+    EXPECT_EQ(match.size(), 3);
+    auto it = match.begin();
 
-  // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel(_));
-  router_->onDestroy();
+    EXPECT_EQ((*it)->name(), "env");
+    EXPECT_EQ((*it)->value().value().string_value(), "prod");
+    it++;
+
+    EXPECT_EQ((*it)->name(), "stage");
+    EXPECT_EQ((*it)->value().value().string_value(), "devel");
+    it++;
+
+    // Connection metadata overrides route metadata for "version"
+    EXPECT_EQ((*it)->name(), "version");
+    EXPECT_EQ((*it)->value().value().string_value(), "v3.0");
+  });
+}
+
+TEST_F(RouterTest, MetadataMatchCriteriaConnectionAndRequest) {
+  setConnectionMetadata(R"EOF(
+filter_metadata:
+  envoy.lb:
+    version: v3.0
+    stage: staging
+)EOF");
+
+  setRequestMetadata({{"version", "v4.0"}, {"env", "test"}});
+
+  ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria()).WillByDefault(Return(nullptr));
+
+  executeMetadataTest([](const auto& match) {
+    EXPECT_EQ(match.size(), 3);
+    auto it = match.begin();
+
+    EXPECT_EQ((*it)->name(), "env");
+    EXPECT_EQ((*it)->value().value().string_value(), "test");
+    it++;
+
+    EXPECT_EQ((*it)->name(), "stage");
+    EXPECT_EQ((*it)->value().value().string_value(), "staging");
+    it++;
+
+    // Request metadata overrides connection metadata for "version"
+    EXPECT_EQ((*it)->name(), "version");
+    EXPECT_EQ((*it)->value().value().string_value(), "v4.0");
+  });
+}
+
+TEST_F(RouterTest, MetadataMatchCriteriaAllThreeTypes) {
+  setRouteMetadataMatchCriteria(R"EOF(
+filter_metadata:
+  envoy.lb:
+    version: v1.0
+    env: prod
+    cluster: east
+)EOF");
+
+  setConnectionMetadata(R"EOF(
+filter_metadata:
+  envoy.lb:
+    version: v2.0
+    stage: staging
+)EOF");
+
+  setRequestMetadata({{"version", "v3.0"}, {"deployment", "canary"}});
+
+  executeMetadataTest([](const auto& match) {
+    EXPECT_EQ(match.size(), 5);
+    auto it = match.begin();
+
+    // Sorted order: cluster, deployment, env, stage, version
+    EXPECT_EQ((*it)->name(), "cluster");
+    EXPECT_EQ((*it)->value().value().string_value(), "east");
+    it++;
+
+    EXPECT_EQ((*it)->name(), "deployment");
+    EXPECT_EQ((*it)->value().value().string_value(), "canary");
+    it++;
+
+    EXPECT_EQ((*it)->name(), "env");
+    EXPECT_EQ((*it)->value().value().string_value(), "prod");
+    it++;
+
+    EXPECT_EQ((*it)->name(), "stage");
+    EXPECT_EQ((*it)->value().value().string_value(), "staging");
+    it++;
+
+    // Request metadata has highest priority for "version"
+    EXPECT_EQ((*it)->name(), "version");
+    EXPECT_EQ((*it)->value().value().string_value(), "v3.0");
+  });
+}
+
+TEST_F(RouterTest, MetadataMatchCriteriaPrecedenceTest) {
+  setRouteMetadataMatchCriteria(R"EOF(
+filter_metadata:
+  envoy.lb:
+    priority_key: route_value
+    route_only: route_data
+)EOF");
+
+  setConnectionMetadata(R"EOF(
+filter_metadata:
+  envoy.lb:
+    priority_key: connection_value
+    connection_only: connection_data
+)EOF");
+
+  setRequestMetadata({{"priority_key", "request_value"}, {"request_only", "request_data"}});
+
+  executeMetadataTest([](const auto& match) {
+    EXPECT_EQ(match.size(), 4);
+
+    // Verify that request metadata wins for the conflicting key
+    bool found_priority_key = false;
+    for (const auto& criterion : match) {
+      if (criterion->name() == "priority_key") {
+        EXPECT_EQ(criterion->value().value().string_value(), "request_value");
+        found_priority_key = true;
+        break;
+      }
+    }
+    EXPECT_TRUE(found_priority_key);
+  });
 }
 
 TEST_F(RouterTest, CancelBeforeBoundToPool) {

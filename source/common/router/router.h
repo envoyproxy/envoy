@@ -36,6 +36,8 @@
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/upstream_factory_context_impl.h"
 
+#include "absl/types/optional.h"
+
 namespace Envoy {
 namespace Router {
 
@@ -359,74 +361,62 @@ public:
     return {};
   }
   const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
-    if (route_entry_) {
-      // Have we been called before? If so, there's no need to recompute because
-      // by the time this method is called for the first time, route_entry_ should
-      // not change anymore.
-      if (metadata_match_ != nullptr) {
-        return metadata_match_.get();
-      }
-
-      // First merge in connection-level metadata, then request metadata
-      // Check if connection and its streamInfo are available before accessing metadata
-      bool has_connection_metadata = false;
-      ProtobufWkt::Struct connection_metadata_struct;
-      const auto& connection_metadata =
-          downstreamConnection()->streamInfo().dynamicMetadata().filter_metadata();
-      const auto connection_filter_it =
-          connection_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
-      if (connection_filter_it != connection_metadata.end()) {
-        has_connection_metadata = true;
-        connection_metadata_struct = connection_filter_it->second;
-      }
-
-      // The request's metadata, if present, takes precedence over the connection's and route's.
-      const auto& request_metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
-      const auto filter_it = request_metadata.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
-
-      if (filter_it != request_metadata.end()) {
-        // Request metadata exists - start with route metadata, then merge connection, then request
-        if (has_connection_metadata) {
-          // Both connection and request metadata exist
-          if (route_entry_->metadataMatchCriteria() != nullptr) {
-            // Start with route metadata, merge connection, then request
-            auto temp_criteria = route_entry_->metadataMatchCriteria()->mergeMatchCriteria(
-                connection_metadata_struct);
-            metadata_match_ = temp_criteria->mergeMatchCriteria(filter_it->second);
-          } else {
-            // No route metadata, merge connection then request
-            auto connection_criteria =
-                std::make_unique<Router::MetadataMatchCriteriaImpl>(connection_metadata_struct);
-            metadata_match_ = connection_criteria->mergeMatchCriteria(filter_it->second);
-          }
-        } else {
-          // Only request metadata (original logic)
-          if (route_entry_->metadataMatchCriteria() != nullptr) {
-            metadata_match_ =
-                route_entry_->metadataMatchCriteria()->mergeMatchCriteria(filter_it->second);
-          } else {
-            metadata_match_ =
-                std::make_unique<Router::MetadataMatchCriteriaImpl>(filter_it->second);
-          }
-        }
-        return metadata_match_.get();
-      }
-
-      // No request metadata, check for connection metadata only
-      if (has_connection_metadata) {
-        if (route_entry_->metadataMatchCriteria() != nullptr) {
-          metadata_match_ =
-              route_entry_->metadataMatchCriteria()->mergeMatchCriteria(connection_metadata_struct);
-        } else {
-          metadata_match_ =
-              std::make_unique<Router::MetadataMatchCriteriaImpl>(connection_metadata_struct);
-        }
-        return metadata_match_.get();
-      }
-
-      return route_entry_->metadataMatchCriteria();
+    if (!route_entry_) {
+      return nullptr;
     }
-    return nullptr;
+
+    // Have we been called before? If so, there's no need to recompute because
+    // by the time this method is called for the first time, route_entry_ should
+    // not change anymore.
+    if (metadata_match_ != nullptr) {
+      return metadata_match_.get();
+    }
+
+    absl::optional<ProtobufWkt::Struct> connection_metadata;
+    const auto& connection_fm =
+        downstreamConnection()->streamInfo().dynamicMetadata().filter_metadata();
+    if (const auto it = connection_fm.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+        it != connection_fm.end()) {
+      connection_metadata = it->second;
+    }
+
+    absl::optional<ProtobufWkt::Struct> request_metadata;
+    const auto& request_fm = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
+    if (const auto it = request_fm.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
+        it != request_fm.end()) {
+      request_metadata = it->second;
+    }
+
+    // The precedence is: request metadata > connection metadata > route criteria.
+    // We start with the route's criteria and sequentially merge others on top.
+    const auto* base_criteria = route_entry_->metadataMatchCriteria();
+    Router::MetadataMatchCriteriaConstPtr merged_criteria;
+
+    const auto* current_base = base_criteria;
+
+    // Merge connection metadata, if it exists.
+    if (connection_metadata) {
+      merged_criteria =
+          current_base ? current_base->mergeMatchCriteria(*connection_metadata)
+                       : std::make_unique<Router::MetadataMatchCriteriaImpl>(*connection_metadata);
+      current_base = merged_criteria.get();
+    }
+
+    // Merge request metadata, if it exists.
+    if (request_metadata) {
+      merged_criteria =
+          current_base ? current_base->mergeMatchCriteria(*request_metadata)
+                       : std::make_unique<Router::MetadataMatchCriteriaImpl>(*request_metadata);
+    }
+
+    // If merged_criteria is null, no merges occurred. Return the original base criteria.
+    if (!merged_criteria) {
+      return base_criteria;
+    }
+
+    // Otherwise, cache the newly created criteria and return it.
+    metadata_match_ = std::move(merged_criteria);
+    return metadata_match_.get();
   }
   const Network::Connection* downstreamConnection() const override {
     return callbacks_->connection().ptr();
