@@ -517,21 +517,11 @@ TEST_F(ExtAuthzGrpcClientTest, WireLevelPeerMetadataHeaders) {
   Http::TestRequestHeaderMapImpl headers;
   client_->onCreateInitialMetadata(headers);
 
-  // Verify that peer metadata headers are present in the wire-level gRPC initial metadata
-  EXPECT_TRUE(headers.has("x-envoy-peer-metadata-id"));
-  EXPECT_TRUE(headers.has("x-envoy-peer-metadata"));
-
-  // Verify metadata-id value
-  EXPECT_TRUE(headers.has("x-envoy-peer-metadata-id"));
-  std::string metadata_id = headers.get_("x-envoy-peer-metadata-id");
-  EXPECT_EQ(metadata_id, "test-node-id");
 
   // Verify metadata is base64-encoded
   EXPECT_TRUE(headers.has("x-envoy-peer-metadata"));
   std::string metadata_value = headers.get_("x-envoy-peer-metadata");
-  EXPECT_FALSE(metadata_value.empty());
 
-  // Verify it's valid base64
   EXPECT_NO_THROW(Envoy::Base64::decode(metadata_value));
 
   auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();

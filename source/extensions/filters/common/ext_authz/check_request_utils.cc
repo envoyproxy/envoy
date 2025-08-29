@@ -23,6 +23,7 @@
 #include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/protobuf/message_validator_impl.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 
 #include "absl/strings/str_cat.h"
@@ -346,7 +347,7 @@ CheckRequestUtils::computePeerMetadataHeaders(const StreamInfo::StreamInfo& stre
 
   // Create Istio metadata-exchange compatible headers
   // These match the format expected by Istio's metadata-exchange filter
-  headers.emplace_back("x-envoy-peer-metadata-id", peer_id);
+  headers.emplace_back(Http::Headers::get().XEnvoyPeerMetadataId.get(), peer_id);
 
   // Get SSL information from stream_info if available
   // Guard against null SSL connection and empty URI SANs
@@ -361,7 +362,7 @@ CheckRequestUtils::computePeerMetadataHeaders(const StreamInfo::StreamInfo& stre
 
   // Create metadata as base64-encoded protobuf Struct
   // Prefer full node metadata; fall back to minimal if empty
-  google::protobuf::Struct metadata_struct;
+  ProtobufWkt::Struct metadata_struct;
   if (local_info.node().has_metadata()) {
     // Use the full node metadata if available
     metadata_struct = local_info.node().metadata();
@@ -377,23 +378,23 @@ CheckRequestUtils::computePeerMetadataHeaders(const StreamInfo::StreamInfo& stre
     (*metadata_struct.mutable_fields())["PRINCIPAL"].set_string_value(principal);
   }
 
-  std::string serialized = metadata_struct.SerializeAsString();
+  std::string serialized = MessageUtil::hash(metadata_struct);
 
   // Add size cap to prevent header bloat
   constexpr size_t kMaxMetadataSize = 8192; // 8KB limit
   if (serialized.size() > kMaxMetadataSize) {
     ENVOY_LOG_MISC(warn, "Peer metadata size {} exceeds limit {}, truncating", serialized.size(),
                    kMaxMetadataSize);
-    google::protobuf::Struct truncated_struct;
+    ProtobufWkt::Struct truncated_struct;
     (*truncated_struct.mutable_fields())["WORKLOAD_NAME"].set_string_value(peer_id);
     if (!principal.empty()) {
       (*truncated_struct.mutable_fields())["PRINCIPAL"].set_string_value(principal);
     }
-    serialized = truncated_struct.SerializeAsString();
+    serialized = MessageUtil::hash(truncated_struct);
   }
 
   const std::string b64 = Envoy::Base64::encode(serialized.c_str(), serialized.size());
-  headers.emplace_back("x-envoy-peer-metadata", b64);
+  headers.emplace_back(Http::Headers::get().XEnvoyPeerMetadata.get(), b64);
 
   return headers;
 }

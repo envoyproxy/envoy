@@ -38,8 +38,7 @@ Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProtoType
     auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
         THROW_OR_RETURN_VALUE(factory_or_error.value()->createUncachedRawAsyncClient(),
                               Grpc::RawAsyncClientPtr),
-        std::chrono::milliseconds(timeout_ms),
-        context.serverFactoryContext().localInfo(),
+        std::chrono::milliseconds(timeout_ms), context.serverFactoryContext().localInfo(),
         false); // Network ext_authz doesn't support peer metadata headers
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{
         std::make_shared<Filter>(ext_authz_config, std::move(client))});
