@@ -158,6 +158,18 @@ public:
                                          ConnectionPool::Callbacks& callbacks,
                                          const Instance::StreamOptions& options) override;
 
+  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) override {
+    if (drain_behavior ==
+            Envoy::ConnectionPool::DrainBehavior::DrainExistingNonMigratableConnections &&
+        quic_info_.migration_config_.migrate_session_on_network_change) {
+      // If connection migration is enabled, don't drain existing connections.
+      // Each connection will observe network change signals and decide whether
+      // to migrate or drain.
+      return;
+    }
+    FixedHttpConnPoolImpl::drainConnections(drain_behavior);
+  }
+
   // For HTTP/3 the base connection pool does not track stream capacity, rather
   // the HTTP3 active client does.
   bool trackStreamCapacity() override { return false; }

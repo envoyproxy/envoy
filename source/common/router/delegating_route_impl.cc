@@ -93,6 +93,10 @@ absl::optional<std::chrono::milliseconds> DelegatingRouteEntry::idleTimeout() co
   return base_route_entry_->idleTimeout();
 }
 
+absl::optional<std::chrono::milliseconds> DelegatingRouteEntry::flushTimeout() const {
+  return base_route_entry_->flushTimeout();
+}
+
 bool DelegatingRouteEntry::usingNewTimeouts() const {
   return base_route_entry_->usingNewTimeouts();
 }

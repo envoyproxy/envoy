@@ -388,6 +388,22 @@ public:
   static std::string truncateGrpcStatusMessage(absl::string_view error_message);
 
   /**
+   * Obtain Grpc service config from the api config source.
+   * @param api_config_source envoy::config::core::v3::ApiConfigSource. Must have config type GRPC.
+   * @param grpc_service_idx index of the grpc service in the api_config_source. If there's no entry
+   *                         in the given index, a nullptr factory will be returned.
+   * @param xdstp_config_source whether the config source will be used for xdstp config source.
+   *                            These sources must be of type AGGREGATED_GRPC or
+   *                            AGGREGATED_DELTA_GRPC.
+   * @return OptRef to either const envoy::config::core::v3::GrpcService or nullptr if there's no
+   *         grpc_service in the given index.
+   */
+  static absl::StatusOr<Envoy::OptRef<const envoy::config::core::v3::GrpcService>>
+  getGrpcConfigFromApiConfigSource(
+      const envoy::config::core::v3::ApiConfigSource& api_config_source, int grpc_service_idx,
+      bool xdstp_config_source);
+
+  /**
    * Obtain gRPC async client factory from a envoy::config::core::v3::ApiConfigSource.
    * @param async_client_manager gRPC async client manager.
    * @param api_config_source envoy::config::core::v3::ApiConfigSource. Must have config type GRPC.
