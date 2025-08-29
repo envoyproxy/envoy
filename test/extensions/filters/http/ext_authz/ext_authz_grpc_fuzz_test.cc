@@ -15,7 +15,7 @@
 #include "test/extensions/filters/http/ext_authz/ext_authz_fuzz_lib.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/grpc/mocks.h"
-#include "test/mocks/server/mocks.h"
+#include "test/mocks/local_info/mocks.h"
 
 #include "gmock/gmock.h"
 

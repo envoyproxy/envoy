@@ -118,6 +118,7 @@ envoy_cc_fuzz_test(
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
         "//test/extensions/filters/http/common/fuzz:http_filter_fuzzer_lib",
         "//test/mocks/grpc:grpc_mocks",
+        "//test/mocks/local_info:local_info_mocks",
         "@envoy_api//envoy/extensions/filters/http/ext_authz/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/auth/v3:pkg_cc_proto",
     ],
