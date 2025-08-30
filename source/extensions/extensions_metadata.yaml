@@ -879,6 +879,7 @@ envoy.built_in_formatters.xfcc_value:
   - envoy.built_in_formatters
   security_posture: unknown
   status: alpha
+  undocumented: true
 envoy.geoip_providers.maxmind:
   categories:
   - envoy.geoip_providers
