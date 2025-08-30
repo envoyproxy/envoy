@@ -177,17 +177,21 @@ void RouterCheckTool::assignRuntimeFraction(
 void RouterCheckTool::finalizeHeaders(ToolConfig& tool_config,
                                       Envoy::StreamInfo::StreamInfoImpl stream_info) {
   if (!headers_finalized_ && tool_config.route_ != nullptr) {
+    const Formatter::HttpFormatterContext formatter_context(tool_config.request_headers_.get(),
+                                                            tool_config.response_headers_.get(),
+                                                            nullptr, {}, {}, nullptr);
+
     if (tool_config.route_->directResponseEntry() != nullptr) {
       tool_config.route_->directResponseEntry()->rewritePathHeader(*tool_config.request_headers_,
                                                                    true);
       sendLocalReply(tool_config, *tool_config.route_->directResponseEntry());
       tool_config.route_->directResponseEntry()->finalizeResponseHeaders(
-          *tool_config.response_headers_, stream_info);
+          *tool_config.response_headers_, formatter_context, stream_info);
     } else if (tool_config.route_->routeEntry() != nullptr) {
-      tool_config.route_->routeEntry()->finalizeRequestHeaders(*tool_config.request_headers_,
-                                                               stream_info, true);
+      tool_config.route_->routeEntry()->finalizeRequestHeaders(
+          *tool_config.request_headers_, formatter_context, stream_info, true);
       tool_config.route_->routeEntry()->finalizeResponseHeaders(*tool_config.response_headers_,
-                                                                stream_info);
+                                                                formatter_context, stream_info);
     }
   }
 
