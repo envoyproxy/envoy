@@ -139,7 +139,7 @@ envoy_basic_cc_library(
     hdrs = ["fmt.h"],
     deps = [
         "//envoy/common:base_includes",
-        "@com_github_fmtlib_fmt//:fmtlib",
+        "@com_github_fmtlib_fmt//:fmt",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
     ],
