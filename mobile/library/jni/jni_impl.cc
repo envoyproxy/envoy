@@ -1397,3 +1397,34 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_callClearTestRootCertificateFro
   jni_helper.callStaticVoidMethod(java_android_network_library_class,
                                   java_clear_test_root_certificates_method_id);
 }
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_callGetDefaultNetworkHandleFromNative(JNIEnv*,
+                                                                                       jclass) {
+  return Envoy::JNI::getDefaultNetworkHandle();
+}
+
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_callGetAllConnectedNetworksFromNative(JNIEnv* env,
+                                                                                       jclass) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  std::vector<std::pair<int64_t, Envoy::ConnectionType>> networks =
+      Envoy::JNI::getAllConnectedNetworks();
+
+  jclass long_array_class = env->FindClass("[J");
+  jobjectArray result = env->NewObjectArray(networks.size(), long_array_class, nullptr);
+
+  for (size_t i = 0; i < networks.size(); ++i) {
+    jlongArray network_info_array = env->NewLongArray(2);
+    if (network_info_array == nullptr) {
+      return nullptr;
+    }
+    jlong network_info[2];
+    network_info[0] = networks[i].first;
+    network_info[1] = static_cast<jlong>(networks[i].second);
+    env->SetLongArrayRegion(network_info_array, 0, 2, network_info);
+    env->SetObjectArrayElement(result, i, network_info_array);
+    env->DeleteLocalRef(network_info_array);
+  }
+  return result;
+}

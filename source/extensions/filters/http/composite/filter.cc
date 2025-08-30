@@ -40,8 +40,6 @@ std::unique_ptr<Protobuf::Struct> MatchedActionInfo::buildProtoStruct() const {
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
-  decoded_headers_ = true;
-
   return delegateFilterActionOr(delegated_filter_, &StreamDecoderFilter::decodeHeaders,
                                 Http::FilterHeadersStatus::Continue, headers, end_stream);
 }

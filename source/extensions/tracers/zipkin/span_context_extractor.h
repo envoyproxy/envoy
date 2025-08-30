@@ -4,6 +4,7 @@
 #include "envoy/tracing/tracer.h"
 
 #include "source/common/http/header_map_impl.h"
+#include "source/extensions/tracers/opentelemetry/span_context_extractor.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,7 +22,7 @@ struct ExtractorException : public EnvoyException {
  */
 class SpanContextExtractor {
 public:
-  SpanContextExtractor(Tracing::TraceContext& trace_context);
+  SpanContextExtractor(Tracing::TraceContext& trace_context, bool w3c_fallback_enabled = false);
   ~SpanContextExtractor();
   absl::optional<bool> extractSampled();
   std::pair<SpanContext, bool> extractSpanContext(bool is_sampled);
@@ -33,8 +34,17 @@ private:
    * See: "https://github.com/openzipkin/b3-propagation
    */
   std::pair<SpanContext, bool> extractSpanContextFromB3SingleFormat(bool is_sampled);
+
+  /*
+   * Convert W3C span context to Zipkin span context format
+   */
+  std::pair<SpanContext, bool>
+  convertW3CToZipkin(const Extensions::Tracers::OpenTelemetry::SpanContext& w3c_context,
+                     bool fallback_sampled);
+
   bool tryExtractSampledFromB3SingleFormat();
   const Tracing::TraceContext& trace_context_;
+  bool w3c_fallback_enabled_;
 };
 
 } // namespace Zipkin

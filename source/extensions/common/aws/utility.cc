@@ -186,6 +186,14 @@ bool isReservedChar(const char c) {
   return std::isalnum(c) || RESERVED_CHARS.find(c) != std::string::npos;
 }
 
+void Utility::encodeCharacter(unsigned char c, std::string& result) {
+  if (isReservedChar(c)) {
+    result.push_back(c);
+  } else {
+    absl::StrAppend(&result, fmt::format(URI_ENCODE, c));
+  }
+}
+
 std::string Utility::uriEncodePath(absl::string_view original_path) {
 
   const absl::string_view::size_type query_start = original_path.find_first_of("?#");
@@ -196,10 +204,10 @@ std::string Utility::uriEncodePath(absl::string_view original_path) {
 
   for (unsigned char c : path) {
     // Do not encode slashes or unreserved chars from RFC 3986
-    if ((isReservedChar(c)) || c == PATH_SPLITTER[0]) {
+    if (c == PATH_SPLITTER[0]) {
       encoded.push_back(c);
     } else {
-      absl::StrAppend(&encoded, fmt::format(URI_ENCODE, c));
+      encodeCharacter(c, encoded);
     }
   }
 
@@ -229,13 +237,9 @@ std::string Utility::canonicalizeQueryString(absl::string_view query_string) {
 
   // Encode query params name and value separately
   for (auto& query : query_list) {
-    // The token has already been url encoded, so don't do it again
-    if (query.first == SignatureQueryParameterValues::AmzSecurityToken) {
-      query = std::make_pair(query.first, query.second);
-    } else {
-      query = std::make_pair(
-          encodeQueryComponent(Envoy::Http::Utility::PercentEncoding::decode(query.first)),
-          encodeQueryComponent(Envoy::Http::Utility::PercentEncoding::decode(query.second)));
+    if (query.first != SignatureQueryParameterValues::AmzSecurityToken) {
+      query.first = Utility::encodeQueryComponentPreservingPlus(query.first);
+      query.second = Utility::encodeQueryComponentPreservingPlus(query.second);
     }
   }
 
@@ -245,22 +249,36 @@ std::string Utility::canonicalizeQueryString(absl::string_view query_string) {
   return absl::StrJoin(query_list, QUERY_SEPERATOR, absl::PairFormatter(QUERY_PARAM_SEPERATOR));
 }
 
-// To avoid modifying the path, we handle spaces as if they have already been encoded to a plus, and
-// avoid additional equals signs in the query parameters
-std::string Utility::encodeQueryComponent(absl::string_view decoded) {
-  std::string encoded;
-  for (unsigned char c : decoded) {
-    if (isReservedChar(c)) {
-      // Escape unreserved chars from RFC 3986
-      encoded.push_back(c);
-    } else if (c == '+') {
-      // Encode '+' as space
-      absl::StrAppend(&encoded, "%20");
+// Encode query component while preserving original %2B semantics
+// %2B stays as %2B, raw + becomes %20 (space)
+std::string Utility::encodeQueryComponentPreservingPlus(absl::string_view original) {
+  std::string result;
+
+  for (size_t i = 0; i < original.size(); ++i) {
+    if (i + 2 < original.size() && absl::EqualsIgnoreCase(original.substr(i, 3), "%2B")) {
+      // %2B stays as %2B (preserve original encoding)
+      absl::StrAppend(&result, "%2B");
+      i += 2; // Skip the "2B" part
+    } else if (original[i] == '+') {
+      // Raw + becomes %20 (space)
+      absl::StrAppend(&result, "%20");
+    } else if (original[i] == '%' && i + 2 < original.size()) {
+      std::string decoded_seq =
+          Envoy::Http::Utility::PercentEncoding::decode(original.substr(i, 3));
+      if (decoded_seq.size() == 1) {
+        // Valid percent encoding - encode the decoded character
+        encodeCharacter(decoded_seq[0], result);
+        i += 2;
+      } else {
+        // Invalid percent encoding - treat as regular character
+        encodeCharacter(original[i], result);
+      }
     } else {
-      absl::StrAppend(&encoded, fmt::format(URI_ENCODE, c));
+      // Regular character
+      encodeCharacter(original[i], result);
     }
   }
-  return encoded;
+  return result;
 }
 
 std::string

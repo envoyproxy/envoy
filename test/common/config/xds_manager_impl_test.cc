@@ -36,7 +36,7 @@ public:
   MockGrpcMuxFactory(absl::string_view name = "envoy.config_mux.grpc_mux_factory") : name_(name) {
     ON_CALL(*this, create(_, _, _, _, _, _, _, _, _, _, _, _))
         .WillByDefault(Invoke(
-            [](std::unique_ptr<Grpc::RawAsyncClient>&&, std::unique_ptr<Grpc::RawAsyncClient>&&,
+            [](std::shared_ptr<Grpc::RawAsyncClient>&&, std::shared_ptr<Grpc::RawAsyncClient>&&,
                Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
                const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
                std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
@@ -50,7 +50,7 @@ public:
   void shutdownAll() override {}
 
   MOCK_METHOD(std::shared_ptr<Config::GrpcMux>, create,
-              (std::unique_ptr<Grpc::RawAsyncClient>&&, std::unique_ptr<Grpc::RawAsyncClient>&&,
+              (std::shared_ptr<Grpc::RawAsyncClient>&&, std::shared_ptr<Grpc::RawAsyncClient>&&,
                Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
                const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
                std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
@@ -173,8 +173,8 @@ TEST_F(XdsManagerImplTest, AdsReplacementPrimaryOnly) {
   NiceMock<Config::MockGrpcMux>& ads_mux(*ads_mux_shared.get());
   EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
       .WillOnce(Invoke(
-          [&ads_mux_shared](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-                            std::unique_ptr<Grpc::RawAsyncClient>&& failover_async_client,
+          [&ads_mux_shared](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+                            std::shared_ptr<Grpc::RawAsyncClient>&& failover_async_client,
                             Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
                             const envoy::config::core::v3::ApiConfigSource&,
                             const LocalInfo::LocalInfo&,
@@ -237,10 +237,10 @@ TEST_F(XdsManagerImplTest, AdsReplacementPrimaryOnly) {
   )EOF",
                             new_ads_config);
 
-  Grpc::RawAsyncClientPtr failover_client;
+  Grpc::RawAsyncClientSharedPtr failover_client;
   EXPECT_CALL(ads_mux, updateMuxSource(_, _, _, _, ProtoEq(new_ads_config)))
-      .WillOnce(Invoke([](Grpc::RawAsyncClientPtr&& primary_async_client,
-                          Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope&,
+      .WillOnce(Invoke([](Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+                          Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope&,
                           BackOffStrategyPtr&&,
                           const envoy::config::core::v3::ApiConfigSource&) -> absl::Status {
         EXPECT_NE(primary_async_client, nullptr);
@@ -264,8 +264,8 @@ TEST_F(XdsManagerImplTest, AdsReplacementPrimaryAndFailover) {
   NiceMock<Config::MockGrpcMux>& ads_mux(*ads_mux_shared.get());
   EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
       .WillOnce(Invoke(
-          [&ads_mux_shared](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-                            std::unique_ptr<Grpc::RawAsyncClient>&& failover_async_client,
+          [&ads_mux_shared](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+                            std::shared_ptr<Grpc::RawAsyncClient>&& failover_async_client,
                             Event::Dispatcher&, Random::RandomGenerator&, Stats::Scope&,
                             const envoy::config::core::v3::ApiConfigSource&,
                             const LocalInfo::LocalInfo&,
@@ -332,10 +332,10 @@ TEST_F(XdsManagerImplTest, AdsReplacementPrimaryAndFailover) {
   )EOF",
                             new_ads_config);
 
-  Grpc::RawAsyncClientPtr failover_client;
+  Grpc::RawAsyncClientSharedPtr failover_client;
   EXPECT_CALL(ads_mux, updateMuxSource(_, _, _, _, ProtoEq(new_ads_config)))
-      .WillOnce(Invoke([](Grpc::RawAsyncClientPtr&& primary_async_client,
-                          Grpc::RawAsyncClientPtr&& failover_async_client, Stats::Scope&,
+      .WillOnce(Invoke([](Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+                          Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope&,
                           BackOffStrategyPtr&&,
                           const envoy::config::core::v3::ApiConfigSource&) -> absl::Status {
         EXPECT_NE(primary_async_client, nullptr);
@@ -810,8 +810,8 @@ public:
     if (enable_authority_a) {
       EXPECT_CALL(grpc_mux_factory_, create(_, _, _, _, _, _, _, _, _, _, _, _))
           .WillOnce(Invoke(
-              [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-                  std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
+              [&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+                  std::shared_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
                   Random::RandomGenerator&, Stats::Scope&,
                   const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
                   std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
@@ -824,8 +824,8 @@ public:
     if (enable_authority_b) {
       EXPECT_CALL(grpc_mux_factory_, create(_, _, _, _, _, _, _, _, _, _, _, _))
           .WillOnce(Invoke(
-              [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-                  std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
+              [&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+                  std::shared_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
                   Random::RandomGenerator&, Stats::Scope&,
                   const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
                   std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
@@ -838,8 +838,8 @@ public:
     if (enable_default_authority) {
       EXPECT_CALL(grpc_mux_factory_, create(_, _, _, _, _, _, _, _, _, _, _, _))
           .WillOnce(Invoke(
-              [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-                  std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
+              [&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+                  std::shared_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&,
                   Random::RandomGenerator&, Stats::Scope&,
                   const envoy::config::core::v3::ApiConfigSource&, const LocalInfo::LocalInfo&,
                   std::unique_ptr<Config::CustomConfigValidators>&&, BackOffStrategyPtr&&,
@@ -1169,8 +1169,8 @@ TEST_F(XdsManagerImplXdstpConfigSourcesTest, NonDefaultConfigSourceDeltaGrpc) {
   Registry::InjectFactory<Config::MuxFactory> registry(factory);
   EXPECT_CALL(factory, create(_, _, _, _, _, _, _, _, _, _, _, _))
       .WillOnce(Invoke(
-          [&](std::unique_ptr<Grpc::RawAsyncClient>&& primary_async_client,
-              std::unique_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&, Random::RandomGenerator&,
+          [&](std::shared_ptr<Grpc::RawAsyncClient>&& primary_async_client,
+              std::shared_ptr<Grpc::RawAsyncClient>&&, Event::Dispatcher&, Random::RandomGenerator&,
               Stats::Scope&, const envoy::config::core::v3::ApiConfigSource&,
               const LocalInfo::LocalInfo&, std::unique_ptr<Config::CustomConfigValidators>&&,
               BackOffStrategyPtr&&, OptRef<Config::XdsConfigTracker>,

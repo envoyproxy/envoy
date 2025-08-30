@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/config/trace/v3/zipkin.pb.h"
 #include "envoy/tracing/trace_config.h"
 
 #include "source/extensions/tracers/zipkin/span_context.h"
@@ -13,6 +14,8 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
+
+using TraceContextOption = envoy::config::trace::v3::ZipkinConfig::TraceContextOption;
 
 class Span;
 using SpanPtr = std::unique_ptr<Span>;
@@ -69,6 +72,12 @@ public:
    */
   virtual SpanPtr startSpan(const Tracing::Config&, const std::string& span_name,
                             SystemTime timestamp, const SpanContext& previous_context) PURE;
+
+  /**
+   * Gets the current trace context option for header injection behavior.
+   * @return The current trace context option.
+   */
+  virtual TraceContextOption traceContextOption() const PURE;
 };
 
 /**

@@ -99,6 +99,7 @@ void GeoipProviderConfig::registerGeoDbStats(const absl::string_view& db_type) {
   stat_name_set_->rememberBuiltin(absl::StrCat(db_type, ".lookup_error"));
   stat_name_set_->rememberBuiltin(absl::StrCat(db_type, ".db_reload_error"));
   stat_name_set_->rememberBuiltin(absl::StrCat(db_type, ".db_reload_success"));
+  stat_name_set_->rememberBuiltin(absl::StrCat(db_type, ".db_build_epoch"));
 }
 
 bool GeoipProviderConfig::isLookupEnabledForHeader(const absl::optional<std::string>& header) {
@@ -107,6 +108,10 @@ bool GeoipProviderConfig::isLookupEnabledForHeader(const absl::optional<std::str
 
 void GeoipProviderConfig::incCounter(Stats::StatName name) {
   stats_scope_->counterFromStatName(name).inc();
+}
+
+void GeoipProviderConfig::setGuage(Stats::StatName name, const uint64_t value) {
+  stats_scope_->gaugeFromStatName(name, Stats::Gauge::ImportMode::Accumulate).set(value);
 }
 
 GeoipProvider::GeoipProvider(Event::Dispatcher& dispatcher, Api::Api& api,
@@ -395,6 +400,8 @@ MaxmindDbSharedPtr GeoipProvider::initMaxmindDb(const std::string& db_path,
                                std::string(MMDB_strerror(result_code))));
     return nullptr;
   }
+
+  config_->setDbBuildEpoch(db_type, maxmind_db.metadata.build_epoch);
 
   ENVOY_LOG(info, "Succeeded to reload Maxmind database {} from file {}.", db_type, db_path);
   return std::make_shared<MaxmindDb>(std::move(maxmind_db));

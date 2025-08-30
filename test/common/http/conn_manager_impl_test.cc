@@ -3472,6 +3472,104 @@ TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutRouteOverride) {
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Per-stream flush and idle timeouts have a somewhat complex precedence order, so here we test
+// every combination of global and per-route flush and idle timeouts. Note that global idle timeout
+// not being set or unset doesn't affect the behavior of the flush timeout since it's the same as
+// the idle timeout being set explicitly to the default value. For this reason it's a constant in
+// the below tests.
+class IdleAndFlushTimeoutTestFixture : public HttpConnectionManagerImplMixin,
+                                       public testing::TestWithParam<std::tuple<bool, bool, bool>> {
+public:
+  IdleAndFlushTimeoutTestFixture()
+      : global_flush_timeout_set_(std::get<0>(GetParam())),
+        route_flush_timeout_set_(std::get<1>(GetParam())),
+        route_idle_timeout_set_(std::get<2>(GetParam())) {
+    if (route_flush_timeout_set_) {
+      route_flush_timeout_ = std::chrono::milliseconds(30);
+    }
+    if (route_idle_timeout_set_) {
+      route_idle_timeout_ = std::chrono::milliseconds(40);
+    }
+  }
+
+protected:
+  const bool global_flush_timeout_set_;
+  const bool route_flush_timeout_set_;
+  const bool route_idle_timeout_set_;
+  absl::optional<std::chrono::milliseconds> global_flush_timeout_{absl::nullopt};
+  absl::optional<std::chrono::milliseconds> route_flush_timeout_{absl::nullopt};
+  absl::optional<std::chrono::milliseconds> route_idle_timeout_{absl::nullopt};
+};
+
+INSTANTIATE_TEST_SUITE_P(IdleAndFlushTimeoutTestFixture, IdleAndFlushTimeoutTestFixture,
+                         testing::Combine(testing::Bool(), testing::Bool(), testing::Bool()),
+                         [](const testing::TestParamInfo<std::tuple<bool, bool, bool>>& info) {
+                           return absl::StrCat(std::get<0>(info.param) ? "GlobalFlushTimeoutSet"
+                                                                       : "NoGlobalFlushTimeout",
+                                               std::get<1>(info.param) ? "RouteFlushTimeoutSet"
+                                                                       : "NoRouteFlushTimeout",
+                                               std::get<2>(info.param) ? "RouteIdleTimeoutSet"
+                                                                       : "NoRouteIdleTimeout");
+                         });
+
+TEST_P(IdleAndFlushTimeoutTestFixture, TestAllCases) {
+  stream_idle_timeout_ = std::chrono::milliseconds(10); // Constant across all cases.
+  if (global_flush_timeout_set_) {
+    stream_flush_timeout_ = std::chrono::milliseconds(20);
+  }
+  setup();
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, flushTimeout())
+      .WillByDefault(Return(route_flush_timeout_));
+  ON_CALL(route_config_provider_.route_config_->route_->route_entry_, idleTimeout())
+      .WillByDefault(Return(route_idle_timeout_));
+
+  EXPECT_CALL(*codec_, dispatch(_))
+      .WillRepeatedly(Invoke([&](Buffer::Instance& data) -> Http::Status {
+        // Both timers will get initialized in all cases here. The value of the flush timeout
+        // just depends on whether it was set explicitly or inherited from the idle timeout.
+        EXPECT_CALL(response_encoder_.stream_,
+                    setFlushTimeout(global_flush_timeout_set_ ? stream_flush_timeout_.value()
+                                                              : stream_idle_timeout_));
+        Event::MockTimer* idle_timer = setUpTimer();
+        EXPECT_CALL(*idle_timer, enableTimer(stream_idle_timeout_, _));
+        decoder_ = &conn_manager_->newStream(response_encoder_);
+
+        RequestHeaderMapPtr headers{new TestRequestHeaderMapImpl{
+            {":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+
+        if (route_flush_timeout_set_) {
+          // If a route flush timeout is set it will ALWAYS be used.
+          EXPECT_CALL(response_encoder_.stream_, setFlushTimeout(route_flush_timeout_.value()));
+        } else if (!global_flush_timeout_set_ && route_idle_timeout_set_) {
+          // If no route flush timeout is set and the global flush timeout was inherited from the
+          // idle timeout, adopt the route idle timeout. This is for backwards compatibility with
+          // existing Envoy behavior.
+          EXPECT_CALL(response_encoder_.stream_, setFlushTimeout(route_idle_timeout_.value()));
+        } else {
+          // One of the following is true:
+          // 1. No route flush or idle timeout is set, so there's nothing to do here.
+          // 2. The global flush timeout is set explicitly, so the route idle timeout is ignored.
+          EXPECT_CALL(response_encoder_.stream_, setFlushTimeout(_)).Times(0);
+        }
+
+        EXPECT_CALL(*idle_timer, disableTimer());
+        EXPECT_CALL(*idle_timer, enableTimer(route_idle_timeout_set_ ? route_idle_timeout_.value()
+                                                                     : stream_idle_timeout_,
+                                             _));
+
+        decoder_->decodeHeaders(std::move(headers), false);
+
+        data.drain(4);
+        return Http::okStatus();
+      }));
+
+  Buffer::OwnedImpl fake_input("1234");
+  conn_manager_->onData(fake_input, false);
+
+  EXPECT_EQ(0U, stats_.named_.downstream_rq_idle_timeout_.value());
+  filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
+}
+
 // Per-route zero timeout overrides the global stream idle timeout.
 TEST_F(HttpConnectionManagerImplTest, PerStreamIdleTimeoutRouteZeroOverride) {
   stream_idle_timeout_ = std::chrono::milliseconds(10);
