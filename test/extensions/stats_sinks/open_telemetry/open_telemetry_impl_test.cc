@@ -598,7 +598,7 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationCounter) {
                   name: "stat_full_name_match_input"
                   typed_config {
                     [type.googleapis.com/
-                     envoy.type.matcher.v3.StatFullNameMatchInput] {}
+                     envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
                   }
                 }
                 value_match { safe_regex { regex: "test_counter-1" } }
@@ -623,7 +623,7 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationCounter) {
                   name: "stat_full_name_match_input"
                   typed_config {
                     [type.googleapis.com/
-                     envoy.type.matcher.v3.StatFullNameMatchInput] {}
+                     envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
                   }
                 }
                 value_match { safe_regex { regex: "test_counter-." } }
@@ -703,7 +703,7 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationGauge) {
                   name: "stat_full_name_match_input"
                   typed_config {
                     [type.googleapis.com/
-                     envoy.type.matcher.v3.StatFullNameMatchInput] {}
+                     envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
                   }
                 }
                 value_match {
@@ -732,7 +732,7 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationGauge) {
                   name: "stat_full_name_match_input"
                   typed_config {
                     [type.googleapis.com/
-                     envoy.type.matcher.v3.StatFullNameMatchInput] {}
+                     envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
                   }
                 }
                 value_match {
@@ -816,7 +816,7 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationHistogram) {
                   name: "stat_full_name_match_input"
                   typed_config {
                     [type.googleapis.com/
-                     envoy.type.matcher.v3.StatFullNameMatchInput] {}
+                     envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
                   }
                 }
                 value_match {
@@ -845,7 +845,7 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationHistogram) {
                   name: "stat_full_name_match_input"
                   typed_config {
                     [type.googleapis.com/
-                     envoy.type.matcher.v3.StatFullNameMatchInput] {}
+                     envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
                   }
                 }
                 value_match {
@@ -940,7 +940,7 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithStaticMetricLabels) {
                   name: "stat_full_name_match_input"
                   typed_config {
                     [type.googleapis.com/
-                     envoy.type.matcher.v3.StatFullNameMatchInput] {}
+                     envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
                   }
                 }
                 value_match {
@@ -973,7 +973,7 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithStaticMetricLabels) {
                   name: "stat_full_name_match_input"
                   typed_config {
                     [type.googleapis.com/
-                     envoy.type.matcher.v3.StatFullNameMatchInput] {}
+                     envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
                   }
                 }
                 value_match {
@@ -1006,7 +1006,7 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithStaticMetricLabels) {
                   name: "stat_full_name_match_input"
                   typed_config {
                     [type.googleapis.com/
-                     envoy.type.matcher.v3.StatFullNameMatchInput] {}
+                     envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
                   }
                 }
                 value_match {

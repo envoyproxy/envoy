@@ -27,7 +27,8 @@ public:
   }
 
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::type::matcher::v3::StatFullNameMatchInput>();
+    return std::make_unique<
+        envoy::extensions::matching::common_inputs::stats::v3::StatFullNameMatchInput>();
   }
 };
 

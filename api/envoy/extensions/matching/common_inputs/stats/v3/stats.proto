@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.type.matcher.v3;
+package envoy.extensions.matching.common_inputs.stats.v3;
 
 import "udpa/annotations/status.proto";
 
