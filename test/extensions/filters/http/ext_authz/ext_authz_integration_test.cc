@@ -6,6 +6,7 @@
 #include "source/common/common/macros.h"
 #include "source/extensions/filters/common/ext_authz/ext_authz.h"
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
+#include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 #include "source/server/config_validation/server.h"
 
 #include "test/common/grpc/grpc_client_integration.h"

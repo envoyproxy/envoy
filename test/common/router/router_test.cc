@@ -819,7 +819,6 @@ TEST_F(RouterTest, NoHost) {
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream));
-  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeResponseHeaders(_, _, _));
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -854,7 +853,6 @@ TEST_F(RouterTest, MaintenanceMode) {
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::CoreResponseFlag::UpstreamOverflow));
-  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeResponseHeaders(_, _, _));
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -902,7 +900,6 @@ TEST_F(RouterTest, DropOverloadDropped) {
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_, setResponseFlag(StreamInfo::CoreResponseFlag::DropOverLoad));
-  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeResponseHeaders(_, _, _));
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -1234,7 +1231,6 @@ TEST_F(RouterTest, AllDebugConfig) {
   Http::TestResponseHeaderMapImpl response_headers{{":status", "204"},
                                                    {"x-envoy-not-forwarded", "true"}};
   EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
-  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeResponseHeaders(_, _, _));
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -3678,7 +3674,6 @@ TEST_F(RouterTest, RetryNoneHealthy) {
   EXPECT_CALL(callbacks_, encodeData(_, true));
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream));
-  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeResponseHeaders(_, _, _));
   router_->retry_state_->callback_();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
   // Pool failure for the first try, so only 1 upstream request was made.
