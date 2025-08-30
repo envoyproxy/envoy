@@ -16,6 +16,9 @@
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/upstream/load_balancer_context_base.h"
+#include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/downstream_reverse_connection_io_handle.h"
+#include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper.h"
+#include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_load_balancer_context.h"
 
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
@@ -88,103 +91,6 @@ struct ReverseConnectionSocketConfig {
   bool enable_circuit_breaker; // Whether to place a cluster in backoff when reverse connection
                                // attempts fail.
   ReverseConnectionSocketConfig() : enable_circuit_breaker(true) {}
-};
-
-/**
- * RCConnectionWrapper manages the lifecycle of a ClientConnectionPtr for reverse connections.
- * It handles the handshake process (both gRPC and HTTP fallback) and manages connection
- * callbacks and cleanup.
- */
-class RCConnectionWrapper : public Network::ConnectionCallbacks,
-                            public Event::DeferredDeletable,
-                            public Logger::Loggable<Logger::Id::main> {
-  friend class SimpleConnReadFilterTest;
-
-public:
-  /**
-   * Constructor for RCConnectionWrapper.
-   * @param parent reference to the parent ReverseConnectionIOHandle
-   * @param connection the client connection to wrap
-   * @param host the upstream host description
-   * @param cluster_name the name of the cluster
-   */
-  RCConnectionWrapper(ReverseConnectionIOHandle& parent, Network::ClientConnectionPtr connection,
-                      Upstream::HostDescriptionConstSharedPtr host,
-                      const std::string& cluster_name);
-
-  /**
-   * Destructor for RCConnectionWrapper.
-   * Performs defensive cleanup to prevent crashes during shutdown.
-   */
-  ~RCConnectionWrapper() override;
-
-  // Network::ConnectionCallbacks overrides
-  void onEvent(Network::ConnectionEvent event) override;
-  void onAboveWriteBufferHighWatermark() override {}
-  void onBelowWriteBufferLowWatermark() override {}
-
-  /**
-   * Initiate the reverse connection handshake (HTTP only).
-   * @param src_tenant_id the tenant identifier
-   * @param src_cluster_id the cluster identifier
-   * @param src_node_id the node identifier
-   * @return the local address as string
-   */
-  std::string connect(const std::string& src_tenant_id, const std::string& src_cluster_id,
-                      const std::string& src_node_id);
-
-  /**
-   * Handle successful handshake completion.
-   */
-  void onHandshakeSuccess();
-
-  /**
-   * Handle handshake failure.
-   * @param message error message
-   */
-  void onHandshakeFailure(const std::string& message);
-
-  /**
-   * Perform graceful shutdown of the connection.
-   */
-  void shutdown();
-
-  /**
-   * Get the underlying connection.
-   * @return pointer to the client connection
-   */
-  Network::ClientConnection* getConnection() { return connection_.get(); }
-
-  /**
-   * Get the host description.
-   * @return shared pointer to the host description
-   */
-  Upstream::HostDescriptionConstSharedPtr getHost() { return host_; }
-
-  /**
-   * Release the connection when handshake succeeds.
-   * @return the released connection
-   */
-  Network::ClientConnectionPtr releaseConnection() { return std::move(connection_); }
-
-private:
-  /**
-   * Simplified read filter for reading HTTP replies sent by upstream envoy
-   * during reverse connection handshake.
-   */
-  struct SimpleConnReadFilter : public Network::ReadFilterBaseImpl {
-    SimpleConnReadFilter(RCConnectionWrapper* parent) : parent_(parent) {}
-
-    Network::FilterStatus onData(Buffer::Instance& buffer, bool) override;
-
-    RCConnectionWrapper* parent_;
-  };
-
-  ReverseConnectionIOHandle& parent_;
-  // The connection to the upstream envoy instance.
-  Network::ClientConnectionPtr connection_;
-  Upstream::HostDescriptionConstSharedPtr host_;
-  const std::string cluster_name_;
 };
 
 /**
@@ -511,64 +417,6 @@ private:
 
   // Store original socket FD for cleanup.
   os_fd_t original_socket_fd_{-1};
-};
-
-/**
- * Custom load balancer context for reverse connections. This class enables the
- * ReverseConnectionIOHandle to propagate upstream host details to the cluster_manager, ensuring
- * that connections are initiated to specified hosts rather than random ones. It inherits
- * from the LoadBalancerContextBase class and overrides the `overrideHostToSelect` method.
- */
-class ReverseConnectionLoadBalancerContext : public Upstream::LoadBalancerContextBase {
-public:
-  explicit ReverseConnectionLoadBalancerContext(const std::string& host_to_select)
-      : host_string_(host_to_select), host_to_select_(host_string_, false) {}
-
-  /**
-   * @return optional OverrideHost specifying the host to initiate reverse connection to.
-   */
-  absl::optional<OverrideHost> overrideHostToSelect() const override {
-    return absl::make_optional(host_to_select_);
-  }
-
-private:
-  // Own the string data. This is to prevent use after free when the host_to_select
-  // is destroyed.
-  std::string host_string_;
-  OverrideHost host_to_select_;
-};
-
-/**
- * Custom IoHandle for downstream reverse connections that owns a ConnectionSocket.
- * This class is used internally by ReverseConnectionIOHandle to manage the lifecycle
- * of accepted downstream connections.
- */
-class DownstreamReverseConnectionIOHandle : public Network::IoSocketHandleImpl {
-public:
-  /**
-   * Constructor that takes ownership of the socket and stores parent pointer and connection key.
-   */
-  DownstreamReverseConnectionIOHandle(Network::ConnectionSocketPtr socket,
-                                      ReverseConnectionIOHandle* parent,
-                                      const std::string& connection_key);
-
-  ~DownstreamReverseConnectionIOHandle() override;
-
-  // Network::IoHandle overrides
-  Api::IoCallUint64Result close() override;
-
-  /**
-   * Get the owned socket for read-only access.
-   */
-  const Network::ConnectionSocket& getSocket() const { return *owned_socket_; }
-
-private:
-  // The socket that this IOHandle owns and manages lifetime for
-  Network::ConnectionSocketPtr owned_socket_;
-  // Pointer to parent ReverseConnectionIOHandle for connection lifecycle management
-  ReverseConnectionIOHandle* parent_;
-  // Connection key for tracking this specific connection
-  std::string connection_key_;
 };
 
 } // namespace ReverseConnection

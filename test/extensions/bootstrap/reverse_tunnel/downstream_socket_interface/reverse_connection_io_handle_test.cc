@@ -3093,9 +3093,8 @@ protected:
   }
 
   // Helper to create SimpleConnReadFilter.
-  std::unique_ptr<RCConnectionWrapper::SimpleConnReadFilter>
-  createFilter(RCConnectionWrapper* parent) {
-    return std::make_unique<RCConnectionWrapper::SimpleConnReadFilter>(parent);
+  std::unique_ptr<SimpleConnReadFilter> createFilter(void* parent) {
+    return std::make_unique<SimpleConnReadFilter>(parent);
   }
 
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
@@ -3316,7 +3315,6 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodSuccessfulWithAddress) {
           }));
 
   // Set up socket expectations.
-  EXPECT_CALL(*mock_connection, setSocketReused(true));
   EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::NoFlush));
 
   // Add connection to the established queue.
@@ -3364,7 +3362,6 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodAddressHandlingEdgeCases) {
               return *mock_provider;
             }));
 
-    EXPECT_CALL(*mock_connection, setSocketReused(true));
     EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::NoFlush));
 
     addConnectionToEstablishedQueue(std::move(mock_connection));
@@ -3394,7 +3391,6 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodAddressHandlingEdgeCases) {
           return *mock_provider;
         }));
 
-    EXPECT_CALL(*mock_connection, setSocketReused(true));
     EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::NoFlush));
 
     addConnectionToEstablishedQueue(std::move(mock_connection));
@@ -3426,7 +3422,6 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodAddressHandlingEdgeCases) {
           return *mock_provider;
         }));
 
-    EXPECT_CALL(*mock_connection, setSocketReused(true));
     EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::NoFlush));
 
     addConnectionToEstablishedQueue(std::move(mock_connection));
@@ -3471,7 +3466,6 @@ TEST_F(ReverseConnectionIOHandleTest, AcceptMethodSuccessfulScenarios) {
               return *mock_provider;
             }));
 
-    EXPECT_CALL(*mock_connection, setSocketReused(true));
     EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::NoFlush));
 
     addConnectionToEstablishedQueue(std::move(mock_connection));
@@ -3703,6 +3697,37 @@ TEST_F(DownstreamReverseConnectionIOHandleTest, GetSocket) {
 
   // Test that getSocket() works before close() is called.
   EXPECT_EQ(handle->fdDoNotUse(), 42);
+}
+
+// Test ignoreCloseAndShutdown() functionality.
+TEST_F(DownstreamReverseConnectionIOHandleTest, IgnoreCloseAndShutdown) {
+  auto handle = createHandle(io_handle_.get(), "test_key");
+
+  // Initially, close and shutdown should work normally
+  // Test shutdown before ignoring - we don't check the result since it depends on base
+  // implementation
+  handle->shutdown(SHUT_RDWR);
+
+  // Now enable ignore mode
+  handle->ignoreCloseAndShutdown();
+
+  // Test that close() is ignored when flag is set
+  auto close_result = handle->close();
+  EXPECT_EQ(close_result.err_, nullptr); // Should return success but do nothing
+
+  // Test that shutdown() is ignored when flag is set
+  auto shutdown_result2 = handle->shutdown(SHUT_RDWR);
+  EXPECT_EQ(shutdown_result2.return_value_, 0);
+  EXPECT_EQ(shutdown_result2.errno_, 0);
+
+  // Test different shutdown modes are all ignored
+  auto shutdown_rd = handle->shutdown(SHUT_RD);
+  EXPECT_EQ(shutdown_rd.return_value_, 0);
+  EXPECT_EQ(shutdown_rd.errno_, 0);
+
+  auto shutdown_wr = handle->shutdown(SHUT_WR);
+  EXPECT_EQ(shutdown_wr.return_value_, 0);
+  EXPECT_EQ(shutdown_wr.errno_, 0);
 }
 
 } // namespace ReverseConnection

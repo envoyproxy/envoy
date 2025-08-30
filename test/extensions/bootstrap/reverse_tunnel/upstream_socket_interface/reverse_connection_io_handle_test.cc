@@ -1,5 +1,7 @@
+#include <unistd.h>
+
 #include "source/common/network/utility.h"
-#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_connection_io_handle.h"
 
 #include "test/mocks/network/mocks.h"
 
@@ -56,6 +58,12 @@ TEST_F(TestUpstreamReverseConnectionIOHandle, GetSocketReturnsConstReference) {
   const auto& socket = io_handle_->getSocket();
 
   EXPECT_NE(&socket, nullptr);
+}
+
+TEST_F(TestUpstreamReverseConnectionIOHandle, ShutdownIgnoredWhenOwned) {
+  auto result = io_handle_->shutdown(SHUT_RDWR);
+  EXPECT_EQ(result.return_value_, 0);
+  EXPECT_EQ(result.errno_, 0);
 }
 
 class UpstreamReverseConnectionIOHandleTest : public testing::Test {

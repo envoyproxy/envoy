@@ -58,7 +58,12 @@ envoy_cc_library(
 envoy_cc_library(
     name = "reverse_connection_io_handle_lib",
     srcs = ["reverse_connection_io_handle.cc"],
-    hdrs = ["reverse_connection_io_handle.h"],
+    hdrs = [
+        "downstream_reverse_connection_io_handle.h",
+        "rc_connection_wrapper.h",
+        "reverse_connection_io_handle.h",
+        "reverse_connection_load_balancer_context.h",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":reverse_connection_address_lib",

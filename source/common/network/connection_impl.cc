@@ -303,9 +303,8 @@ void ConnectionImpl::closeThroughFilterManager(ConnectionCloseAction close_actio
 }
 
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
-  ENVOY_CONN_LOG(trace, "closeSocket called, socket_={}, socket_isOpen={}, reuse_socket_={}", *this,
-                 socket_ ? "not_null" : "null", socket_ ? socket_->isOpen() : false,
-                 static_cast<bool>(reuse_socket_));
+  ENVOY_CONN_LOG(trace, "closeSocket called, socket_={}, socket_isOpen={}", *this,
+                 socket_ ? "not_null" : "null", socket_ ? socket_->isOpen() : false);
 
   if (!socket_->isOpen()) {
     ENVOY_CONN_LOG(trace, "closeSocket: socket is null or not open, returning", *this);
@@ -346,14 +345,7 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   }
 
   // It is safe to call close() since there is an IO handle check.
-  ENVOY_CONN_LOG(trace, "closeSocket: about to close socket, reuse_socket_={}", *this,
-                 static_cast<bool>(reuse_socket_));
-  if (!reuse_socket_) {
-    socket_->close();
-  } else {
-    ENVOY_CONN_LOG(trace, "closeSocket: skipping socket close due to reuse_socket_=true", *this);
-    return;
-  }
+  socket_->close();
 
   // Call the base class directly as close() is called in the destructor.
   ConnectionImpl::raiseEvent(close_type);

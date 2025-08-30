@@ -44,12 +44,22 @@ DownstreamReverseConnectionIOHandle::~DownstreamReverseConnectionIOHandle() {
       fd_, connection_key_);
 }
 
-// DownstreamReverseConnectionIOHandle close() implementation
+// DownstreamReverseConnectionIOHandle close() implementation.
 Api::IoCallUint64Result DownstreamReverseConnectionIOHandle::close() {
   ENVOY_LOG(
       debug,
       "DownstreamReverseConnectionIOHandle: closing handle for FD: {} with connection key: {}", fd_,
       connection_key_);
+
+  // If we're ignoring close calls during socket hand-off, just return success.
+  if (ignore_close_and_shutdown_) {
+    ENVOY_LOG(
+        debug,
+        "DownstreamReverseConnectionIOHandle: ignoring close() call during socket hand-off for "
+        "connection key: {}",
+        connection_key_);
+    return Api::ioCallUint64ResultNoError();
+  }
 
   // Prevent double-closing by checking if already closed
   if (fd_ < 0) {
@@ -76,6 +86,26 @@ Api::IoCallUint64Result DownstreamReverseConnectionIOHandle::close() {
   return IoSocketHandleImpl::close();
 }
 
+// DownstreamReverseConnectionIOHandle shutdown() implementation.
+Api::SysCallIntResult DownstreamReverseConnectionIOHandle::shutdown(int how) {
+  ENVOY_LOG(trace,
+            "DownstreamReverseConnectionIOHandle: shutdown({}) called for FD: {} with connection "
+            "key: {}",
+            how, fd_, connection_key_);
+
+  // If we're ignoring shutdown calls during socket hand-off, just return success.
+  if (ignore_close_and_shutdown_) {
+    ENVOY_LOG(
+        debug,
+        "DownstreamReverseConnectionIOHandle: ignoring shutdown() call during socket hand-off "
+        "for connection key: {}",
+        connection_key_);
+    return Api::SysCallIntResult{0, 0};
+  }
+
+  return IoSocketHandleImpl::shutdown(how);
+}
+
 // RCConnectionWrapper constructor implementation
 RCConnectionWrapper::RCConnectionWrapper(ReverseConnectionIOHandle& parent,
                                          Network::ClientConnectionPtr connection,
@@ -89,7 +119,7 @@ RCConnectionWrapper::RCConnectionWrapper(ReverseConnectionIOHandle& parent,
 // RCConnectionWrapper destructor implementation
 RCConnectionWrapper::~RCConnectionWrapper() {
   ENVOY_LOG(debug, "RCConnectionWrapper destructor called");
-  shutdown();
+  this->shutdown();
 }
 
 void RCConnectionWrapper::onEvent(Network::ConnectionEvent event) {
@@ -114,15 +144,15 @@ void RCConnectionWrapper::onEvent(Network::ConnectionEvent event) {
 }
 
 // SimpleConnReadFilter::onData implementation
-Network::FilterStatus RCConnectionWrapper::SimpleConnReadFilter::onData(Buffer::Instance& buffer,
-                                                                        bool) {
+Network::FilterStatus SimpleConnReadFilter::onData(Buffer::Instance& buffer, bool) {
   if (parent_ == nullptr) {
-    ENVOY_LOG(error, "SimpleConnReadFilter: RCConnectionWrapper is null. Aborting read.");
     return Network::FilterStatus::StopIteration;
   }
 
+  // Cast parent_ back to RCConnectionWrapper
+  RCConnectionWrapper* wrapper = static_cast<RCConnectionWrapper*>(parent_);
+
   const std::string data = buffer.toString();
-  ENVOY_LOG(debug, "SimpleConnReadFilter: Received data: {}", data);
 
   // Look for HTTP response status line first (supports both HTTP/1.1 and HTTP/2)
   if (data.find("HTTP/1.1 200 OK") != std::string::npos ||
@@ -145,17 +175,17 @@ Network::FilterStatus RCConnectionWrapper::SimpleConnReadFilter::onData(Buffer::
           if (ret.status() ==
               envoy::extensions::bootstrap::reverse_tunnel::ReverseConnHandshakeRet::ACCEPTED) {
             ENVOY_LOG(debug, "SimpleConnReadFilter: Reverse connection accepted by cloud side");
-            parent_->onHandshakeSuccess();
+            wrapper->onHandshakeSuccess();
             return Network::FilterStatus::StopIteration;
           } else {
             ENVOY_LOG(error, "SimpleConnReadFilter: Reverse connection rejected: {}",
                       ret.status_message());
-            parent_->onHandshakeFailure(ret.status_message());
+            wrapper->onHandshakeFailure(ret.status_message());
             return Network::FilterStatus::StopIteration;
           }
         } else {
           ENVOY_LOG(error, "Could not parse protobuf response - invalid response format");
-          parent_->onHandshakeFailure(
+          wrapper->onHandshakeFailure(
               "Invalid response format - expected ReverseConnHandshakeRet protobuf");
           return Network::FilterStatus::StopIteration;
         }
@@ -171,7 +201,7 @@ Network::FilterStatus RCConnectionWrapper::SimpleConnReadFilter::onData(Buffer::
              data.find("HTTP/2 ") != std::string::npos) {
     // Found HTTP response but not 200 OK - this is an error
     ENVOY_LOG(error, "Received non-200 HTTP response: {}", data.substr(0, 100));
-    parent_->onHandshakeFailure("HTTP handshake failed with non-200 response");
+    wrapper->onHandshakeFailure("HTTP handshake failed with non-200 response");
     return Network::FilterStatus::StopIteration;
   } else {
     ENVOY_LOG(debug, "Waiting for HTTP response, received {} bytes", data.length());
@@ -544,8 +574,16 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
             std::move(duplicated_socket), this, connection_key);
         ENVOY_LOG(debug,
                   "ReverseConnectionIOHandle: RAII IoHandle created with duplicated socket.");
-        connection->setSocketReused(true);
-        // Close the original connection
+
+        // Reset file events on the original socket to prevent any pending operations. The socket
+        // fd has been duplicated, so we have an independent fd. Closing the original connection
+        // will only close its fd, not affect our duplicated fd.
+        //
+        // Note: For raw TCP connections, no shutdown() is called during close, only close() on
+        // the fd, which doesn't affect the duplicated fd.
+        original_socket->ioHandle().resetFileEvents();
+
+        // Close the original connection.
         connection->close(Network::ConnectionCloseType::NoFlush);
 
         ENVOY_LOG(debug, "ReverseConnectionIOHandle: returning io_handle.");
