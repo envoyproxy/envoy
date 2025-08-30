@@ -9,6 +9,32 @@
 namespace Envoy {
 namespace Io {
 
+/**
+ * Configuration for io_uring operation mode selection.
+ * Determines which underlying syscalls are used for I/O operations.
+ */
+enum class IoUringMode {
+  /**
+   * Use readv/writev operations. It provides vectored I/O with good performance
+   * for most use cases.
+   */
+  ReadWritev = 0,
+
+  /**
+   * Use send/recv operations for simple streaming data. It is optimized for TCP
+   * sockets and could provide performance improvement over readv/writev for
+   * non-vectored data transfers.
+   */
+  SendRecv = 1,
+
+  /**
+   * Use sendmsg/recvmsg operations for advanced use cases. It supports scatter-gather
+   * I/O with control messages and peer addresses and could provide performance
+   * improvement for complex I/O patterns.
+   */
+  SendmsgRecvmsg = 2,
+};
+
 class IoUringSocket;
 
 /**
@@ -19,7 +45,7 @@ public:
   /**
    * io_uring request type.
    */
-  enum class RequestType : uint8_t {
+  enum class RequestType : uint16_t {
     Accept = 0x1,
     Connect = 0x2,
     Read = 0x4,
@@ -27,6 +53,10 @@ public:
     Close = 0x10,
     Cancel = 0x20,
     Shutdown = 0x40,
+    Send = 0x80,
+    Recv = 0x100,
+    SendMsg = 0x200,
+    RecvMsg = 0x400,
   };
 
   Request(RequestType type, IoUringSocket& socket) : type_(type), socket_(socket) {}
@@ -146,6 +176,38 @@ public:
    * and IoUringResult::Ok otherwise.
    */
   virtual IoUringResult prepareShutdown(os_fd_t fd, int how, Request* user_data) PURE;
+
+  /**
+   * Prepares a send system call and puts it into the submission queue.
+   * Returns IoUringResult::Failed in case the submission queue is full already
+   * and IoUringResult::Ok otherwise.
+   */
+  virtual IoUringResult prepareSend(os_fd_t fd, const void* buf, size_t len, int flags,
+                                    Request* user_data) PURE;
+
+  /**
+   * Prepares a recv system call and puts it into the submission queue.
+   * Returns IoUringResult::Failed in case the submission queue is full already
+   * and IoUringResult::Ok otherwise.
+   */
+  virtual IoUringResult prepareRecv(os_fd_t fd, void* buf, size_t len, int flags,
+                                    Request* user_data) PURE;
+
+  /**
+   * Prepares a sendmsg system call and puts it into the submission queue.
+   * Returns IoUringResult::Failed in case the submission queue is full already
+   * and IoUringResult::Ok otherwise.
+   */
+  virtual IoUringResult prepareSendmsg(os_fd_t fd, const struct msghdr* msg, int flags,
+                                       Request* user_data) PURE;
+
+  /**
+   * Prepares a recvmsg system call and puts it into the submission queue.
+   * Returns IoUringResult::Failed in case the submission queue is full already
+   * and IoUringResult::Ok otherwise.
+   */
+  virtual IoUringResult prepareRecvmsg(os_fd_t fd, struct msghdr* msg, int flags,
+                                       Request* user_data) PURE;
 
   /**
    * Submits the entries in the submission queue to the kernel using the
@@ -347,6 +409,38 @@ public:
   virtual void onShutdown(Request* req, int32_t result, bool injected) PURE;
 
   /**
+   * On send request completed.
+   * @param req the SendRequest object which is as request user data.
+   * @param result the result of operation in the request.
+   * @param injected indicates the completion is injected or not.
+   */
+  virtual void onSend(Request* req, int32_t result, bool injected) PURE;
+
+  /**
+   * On recv request completed.
+   * @param req the RecvRequest object which is as request user data.
+   * @param result the result of operation in the request.
+   * @param injected indicates the completion is injected or not.
+   */
+  virtual void onRecv(Request* req, int32_t result, bool injected) PURE;
+
+  /**
+   * On sendmsg request completed.
+   * @param req the SendMsgRequest object which is as request user data.
+   * @param result the result of operation in the request.
+   * @param injected indicates the completion is injected or not.
+   */
+  virtual void onSendmsg(Request* req, int32_t result, bool injected) PURE;
+
+  /**
+   * On recvmsg request completed.
+   * @param req the RecvMsgRequest object which is as request user data.
+   * @param result the result of operation in the request.
+   * @param injected indicates the completion is injected or not.
+   */
+  virtual void onRecvmsg(Request* req, int32_t result, bool injected) PURE;
+
+  /**
    * Inject a request completion to the io uring instance.
    * @param type the request type of injected completion.
    */
@@ -444,9 +538,37 @@ public:
   virtual Request* submitShutdownRequest(IoUringSocket& socket, int how) PURE;
 
   /**
+   * Submit a send request for a socket.
+   */
+  virtual Request* submitSendRequest(IoUringSocket& socket, const void* buf, size_t len,
+                                     int flags) PURE;
+
+  /**
+   * Submit a recv request for a socket.
+   */
+  virtual Request* submitRecvRequest(IoUringSocket& socket, void* buf, size_t len, int flags) PURE;
+
+  /**
+   * Submit a sendmsg request for a socket.
+   */
+  virtual Request* submitSendmsgRequest(IoUringSocket& socket, const struct msghdr* msg,
+                                        int flags) PURE;
+
+  /**
+   * Submit a recvmsg request for a socket.
+   */
+  virtual Request* submitRecvmsgRequest(IoUringSocket& socket, struct msghdr* msg, int flags) PURE;
+
+  /**
    * Return the number of sockets in the worker.
    */
   virtual uint32_t getNumOfSockets() const PURE;
+
+  /**
+   * Return the configured io_uring operation mode.
+   * This determines which syscalls are used for I/O operations.
+   */
+  virtual IoUringMode getMode() const PURE;
 };
 
 /**
