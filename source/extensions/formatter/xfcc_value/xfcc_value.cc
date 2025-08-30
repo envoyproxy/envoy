@@ -62,8 +62,8 @@ absl::optional<std::string> parseKeyValuePair(absl::string_view pair, absl::stri
 }
 
 // Handles a single XFCC element (semicolon-separated key/value pairs).
-absl::optional<std::string> parseElementForKey(absl::string_view element, absl::string_view target,
-                                               absl::Status& parse_status) {
+absl::optional<std::string> parseElementForKey(absl::string_view element,
+                                               absl::string_view target) {
 
   // Scan key-value pairs in this element (by semicolon not in quotes).
   bool in_quotes = false;
@@ -90,10 +90,10 @@ absl::optional<std::string> parseElementForKey(absl::string_view element, absl::
     }
   }
 
-  if (in_quotes) {
-    parse_status = absl::InvalidArgumentError("Invalid XFCC header: unmatched quotes");
-    return absl::nullopt;
-  }
+  // Note, we should never encounter unmatched quotes here because if there is
+  // an unmatched quote, it should be handled in the parseValueFromXfccByKey()
+  // and will not enter this function.
+  ASSERT(!in_quotes);
   return absl::nullopt;
 }
 
@@ -121,12 +121,9 @@ absl::StatusOr<std::string> parseValueFromXfccByKey(const Http::RequestHeaderMap
     // If not in quotes, check for end of element.
     if (!in_quotes) {
       if (i == value.size() || value[i] == ',') {
-        absl::Status status = absl::OkStatus();
-        auto result = parseElementForKey(value.substr(start, i - start), target, status);
+        auto result = parseElementForKey(value.substr(start, i - start), target);
         if (result.has_value()) {
           return result.value();
-        } else if (!status.ok()) {
-          return status;
         }
         start = i + 1;
       }

@@ -17,83 +17,53 @@ namespace {
 class XfccValueTest : public ::testing::Test {
 public:
   StreamInfo::MockStreamInfo stream_info_;
-  envoy::config::core::v3::SubstitutionFormatString config_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
 };
 
 TEST_F(XfccValueTest, UnknownCommand) {
-  const std::string yaml = R"EOF(
-  text_format_source:
-    inline_string: "%UNKNOWN_COMMAND%"
-)EOF";
-  TestUtility::loadFromYaml(yaml, config_);
-
-  auto formatter_or_error =
-      Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  auto formatter_or_error = Envoy::Formatter::SubstitutionFormatParser::parse("%UNKNOWN_COMMAND%");
   EXPECT_EQ("Not supported field in StreamInfo: UNKNOWN_COMMAND",
             formatter_or_error.status().message());
 }
 
 TEST_F(XfccValueTest, MissingSubcommand) {
-  const std::string yaml = R"EOF(
-  text_format_source:
-    inline_string: "%XFCC_VALUE%"
-)EOF";
-
-  TestUtility::loadFromYaml(yaml, config_);
-
   EXPECT_THROW_WITH_MESSAGE(
-      {
-        auto error =
-            Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
-      },
+      { auto error = Envoy::Formatter::SubstitutionFormatParser::parse("%XFCC_VALUE%"); },
       EnvoyException, "XFCC_VALUE command requires a subcommand");
 }
 
 TEST_F(XfccValueTest, UnsupportedSubcommand) {
-  const std::string yaml = R"EOF(
-  text_format_source:
-    inline_string: "%XFCC_VALUE(unsupported_key)%"
-)EOF";
-  TestUtility::loadFromYaml(yaml, config_);
-
   EXPECT_THROW_WITH_MESSAGE(
       {
         auto error =
-            Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+            Envoy::Formatter::SubstitutionFormatParser::parse("%XFCC_VALUE(unsupported_key)%");
       },
       EnvoyException, "XFCC_VALUE command does not support subcommand: unsupported_key");
 }
 
 TEST_F(XfccValueTest, Test) {
-  const std::string yaml = R"EOF(
-  text_format_source:
-    inline_string: "%XFCC_VALUE(uri)%"
-)EOF";
-
-  TestUtility::loadFromYaml(yaml, config_);
   auto formatter =
-      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+      std::move(Envoy::Formatter::SubstitutionFormatParser::parse("%XFCC_VALUE(uri)%").value()[0]);
 
   {
     // No XFCC header.
     Http::TestRequestHeaderMapImpl headers{};
-
-    EXPECT_EQ(formatter->formatWithContext({&headers}, stream_info_), "-");
+    EXPECT_TRUE(formatter->formatValueWithContext({&headers}, stream_info_).has_null_value());
   }
 
   {
     // Normal value.
     Http::TestRequestHeaderMapImpl headers{
         {"x-forwarded-client-cert", "By=test;URI=abc;DNS=example.com"}};
-    EXPECT_EQ(formatter->formatWithContext({&headers}, stream_info_), "abc");
+    EXPECT_EQ(formatter->formatValueWithContext({&headers}, stream_info_).string_value(), "abc");
   }
 
   // Normal value with special characters.
   {
     Http::TestRequestHeaderMapImpl headers{
         {"x-forwarded-client-cert", "By=test;URI=\"a,b,c;\\\"e;f;g=x\";DNS=example.com"}};
-    EXPECT_EQ(formatter->formatWithContext({&headers}, stream_info_), "a,b,c;\"e;f;g=x");
+    EXPECT_EQ(formatter->formatValueWithContext({&headers}, stream_info_).string_value(),
+              "a,b,c;\"e;f;g=x");
   }
 
   {
@@ -101,20 +71,21 @@ TEST_F(XfccValueTest, Test) {
     Http::TestRequestHeaderMapImpl headers{
         {"x-forwarded-client-cert",
          "By=test;DNS=example.com,By=test;URI=\"a,b,c;\\\"e;f;g=x\";DNS=example.com"}};
-    EXPECT_EQ(formatter->formatWithContext({&headers}, stream_info_), "a,b,c;\"e;f;g=x");
+    EXPECT_EQ(formatter->formatValueWithContext({&headers}, stream_info_).string_value(),
+              "a,b,c;\"e;f;g=x");
   }
 
   {
     // Unclosed quotes in XFCC header.
     Http::TestRequestHeaderMapImpl headers{
         {"x-forwarded-client-cert", "By=test;URI=\"abc;DNS=example.com"}};
-    EXPECT_EQ(formatter->formatWithContext({&headers}, stream_info_), "-");
+    EXPECT_TRUE(formatter->formatValueWithContext({&headers}, stream_info_).has_null_value());
   }
 
   {
     // No required key.
     Http::TestRequestHeaderMapImpl headers{{"x-forwarded-client-cert", "By=test;DNS=example.com"}};
-    EXPECT_EQ(formatter->formatWithContext({&headers}, stream_info_), "-");
+    EXPECT_TRUE(formatter->formatValueWithContext({&headers}, stream_info_).has_null_value());
   }
 }
 
