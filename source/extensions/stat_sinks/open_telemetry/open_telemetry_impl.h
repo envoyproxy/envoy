@@ -256,7 +256,7 @@ public:
                         const OpenTelemetryGrpcMetricsExporterSharedPtr& grpc_metrics_exporter,
                         int64_t create_time_ns)
       : metrics_flusher_(otlp_metrics_flusher), metrics_exporter_(grpc_metrics_exporter),
-        // Use the time when the sink is created as the last flush time.
+        // Use the time when the sink is created as the last flush time for the first flush.
         last_flush_time_ns_(create_time_ns) {}
 
   // Stats::Sink
