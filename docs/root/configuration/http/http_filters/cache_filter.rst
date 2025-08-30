@@ -60,12 +60,10 @@ Example filter configuration with a ``SimpleHttpCache`` cache implementation:
 
 Example filter configuration with a ``FileSystemHttpCache`` cache implementation:
 
-.. literalinclude:: _include/http-cache-configuration-fs.yaml
+.. literalinclude:: _include/http-filters-cache-fs.yaml.inc
    :language: yaml
-   :start-at: http_filters:
-   :end-before: envoy.filters.http.router
    :linenos:
-   :caption: :download:`http-cache-configuration-fs.yaml <_include/http-cache-configuration-fs.yaml>`
+   :caption: :download:`http-filters-cache-fs.yaml.inc <_include/http-filters-cache-fs.yaml.inc>`
 
 .. seealso::
 
