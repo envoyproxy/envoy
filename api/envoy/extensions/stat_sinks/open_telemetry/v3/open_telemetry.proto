@@ -7,6 +7,9 @@ import "envoy/config/core/v3/grpc_service.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "opentelemetry/proto/common/v1/common.proto";
+import "xds/type/matcher/v3/matcher.proto";
+
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -20,8 +23,20 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Stats configuration proto schema for ``envoy.stat_sinks.open_telemetry`` sink.
 // [#extension: envoy.stat_sinks.open_telemetry]
 
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message SinkConfig {
+  // ConversionAction is used to convert a stat to a metric. If a stat matches,
+  // the metric_name and static_metric_labels will be
+  // used to create the metric. This can be used to rename a
+  // stat, add static labels, and aggregate multiple stats into a single metric.
+  message ConversionAction {
+    // The metric name to use for the stat.
+    string metric_name = 2;
+
+    // Static metric labels to use for the metric.
+    repeated opentelemetry.proto.common.v1.KeyValue static_metric_labels = 3;
+  }
+
   oneof protocol_specifier {
     option (validate.required) = true;
 
@@ -55,4 +70,9 @@ message SinkConfig {
   // "pre", the full stat name will be "pre.foo.bar". If this field is not set, there is no
   // prefix added. According to the example, the full stat name will remain "foo.bar".
   string prefix = 6;
+
+  // The custom conversion from a stat to a metric. Currently, the only supported input is
+  // ``envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput`` and the only support action is
+  // ``envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.ConversionAction``.
+  xds.type.matcher.v3.Matcher custom_metric_conversions = 8;
 }
