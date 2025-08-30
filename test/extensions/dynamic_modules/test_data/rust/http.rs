@@ -20,9 +20,10 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
 ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
   match name {
     "stats_callbacks" => Some(Box::new(StatsCallbacksFilterConfig {
-      requests_total: envoy_filter_config.define_counter("requests_total"),
-      magic_number: envoy_filter_config.define_gauge("magic_number"),
+      streams_total: envoy_filter_config.define_counter("streams_total"),
+      concurrent_streams: envoy_filter_config.define_gauge("concurrent_streams"),
       ones: envoy_filter_config.define_histogram("ones"),
+      magic_number: envoy_filter_config.define_gauge("magic_number"),
     })),
     "header_callbacks" => Some(Box::new(HeaderCallbacksFilterConfig {})),
     "send_response" => Some(Box::new(SendResponseFilterConfig {})),
@@ -38,21 +39,22 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
 /// [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig`] to test the stats
 /// related callbacks.
 struct StatsCallbacksFilterConfig {
-  requests_total: EnvoyCounterId,
+  streams_total: EnvoyCounterId,
+  concurrent_streams: EnvoyGaugeId,
   magic_number: EnvoyGaugeId,
   // It's full of 1s.
   ones: EnvoyHistogramId,
 }
 
-impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
-  for StatsCallbacksFilterConfig
-{
-  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StatsCallbacksFilterConfig {
+  fn new_http_filter(&mut self, envoy_filter: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    envoy_filter.increment_counter(self.streams_total, 1);
+    envoy_filter.increase_gauge(self.concurrent_streams, 1);
+    envoy_filter.set_gauge(self.magic_number, 42);
     // Copy the stats handles onto the filter so that we can observe stats while
     // handling requests.
     Box::new(StatsCallbacksFilter {
-      requests_total: self.requests_total,
-      magic_number: self.magic_number,
+      concurrent_streams: self.concurrent_streams,
       ones: self.ones,
     })
   }
@@ -60,9 +62,7 @@ impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
 
 /// An HTTP filter that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilter`].
 struct StatsCallbacksFilter {
-  requests_total: EnvoyCounterId,
-  magic_number: EnvoyGaugeId,
-  // It's full of 1s.
+  concurrent_streams: EnvoyGaugeId,
   ones: EnvoyHistogramId,
 }
 
@@ -72,10 +72,12 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
-    envoy_filter.increment_counter(self.requests_total, 1);
-    envoy_filter.set_gauge(self.magic_number, 42);
     envoy_filter.record_histogram_value(self.ones, 1);
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+
+  fn on_stream_complete(&mut self, envoy_filter: &mut EHF) {
+    envoy_filter.decrease_gauge(self.concurrent_streams, 1);
   }
 }
 
