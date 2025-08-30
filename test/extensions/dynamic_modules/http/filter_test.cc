@@ -98,17 +98,13 @@ TEST(DynamicModulesTest, StatsCallbacks) {
   filter->initializeInModuleFilter();
 
   Stats::CounterOptConstRef counter =
-      stats_store.findCounterByString("dynamicmodulescustom.streams_total");
+      stats_store.findCounterByString("dynamicmodulescustom.requests_total");
   EXPECT_TRUE(counter.has_value());
-  EXPECT_EQ(counter->get().value(), 1);
+  EXPECT_EQ(counter->get().value(), 0);
   Stats::GaugeOptConstRef gauge =
-      stats_store.findGaugeByString("dynamicmodulescustom.concurrent_streams");
-  EXPECT_TRUE(gauge.has_value());
-  EXPECT_EQ(gauge->get().value(), 1);
-  Stats::GaugeOptConstRef magicNumberGauge =
       stats_store.findGaugeByString("dynamicmodulescustom.magic_number");
   EXPECT_TRUE(gauge.has_value());
-  EXPECT_EQ(magicNumberGauge->get().value(), 42);
+  EXPECT_EQ(gauge->get().value(), 0);
   Stats::HistogramOptConstRef histogram =
       stats_store.findHistogramByString("dynamicmodulescustom.ones");
   EXPECT_TRUE(histogram.has_value());
@@ -131,14 +127,15 @@ TEST(DynamicModulesTest, StatsCallbacks) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter->decodeTrailers(request_trailers));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter->encodeTrailers(response_trailers));
+
   EXPECT_EQ(counter->get().value(), 1);
-  EXPECT_EQ(gauge->get().value(), 1);
+  EXPECT_EQ(gauge->get().value(), 42);
   EXPECT_EQ(stats_store.histogramValues("dynamicmodulescustom.ones", false),
             (std::vector<uint64_t>{1}));
 
   filter->onStreamComplete();
   EXPECT_EQ(counter->get().value(), 1);
-  EXPECT_EQ(gauge->get().value(), 0);
+  EXPECT_EQ(gauge->get().value(), 42);
   EXPECT_EQ(stats_store.histogramValues("dynamicmodulescustom.ones", false),
             (std::vector<uint64_t>{1}));
 

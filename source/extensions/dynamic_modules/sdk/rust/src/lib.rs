@@ -239,7 +239,7 @@ pub static NEW_HTTP_FILTER_PER_ROUTE_CONFIG_FUNCTION: OnceLock<
 ///
 /// The object is created when the corresponding Envoy Http filter config is created, and it is
 /// dropped when the corresponding Envoy Http filter config is destroyed. Therefore, the
-/// imlementation is recommended to implement the [`Drop`] trait to handle the necessary cleanup.
+/// implementation is recommended to implement the [`Drop`] trait to handle the necessary cleanup.
 pub trait HttpFilterConfig<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> {
   /// This is called when a HTTP filter chain is created for a new stream.
   fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
