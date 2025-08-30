@@ -502,7 +502,7 @@ message Http2ProtocolOptions {
 
   // `Maximum concurrent streams <https://httpwg.org/specs/rfc7540.html#rfc.section.5.1.2>`_
   // allowed for peer on one HTTP/2 connection. Valid values range from 1 to 2147483647 (2^31 - 1)
-  // and defaults to 1024 for safety and enough for most use cases.
+  // and defaults to 1024 for safety and should be sufficient for most use cases.
   //
   // For upstream connections, this also limits how many streams Envoy will initiate concurrently
   // on a single connection. If the limit is reached, Envoy may queue requests or establish
