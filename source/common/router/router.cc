@@ -499,7 +499,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
             response_headers.addReferenceKey(Http::Headers::get().Location, new_uri);
           }
           const Formatter::HttpFormatterContext formatter_context(
-              downstream_headers_, &response_headers, nullptr, {}, {}, &callbacks_->activeSpan());
+              downstream_headers_, &response_headers, {}, {}, {}, &callbacks_->activeSpan());
           direct_response->finalizeResponseHeaders(response_headers, formatter_context,
                                                    callbacks_->streamInfo());
         },
@@ -601,8 +601,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   callbacks_->streamInfo().setAttemptCount(attempt_count_);
 
   // Finalize the request headers before the host selection.
-  Formatter::HttpFormatterContext formatter_context(&headers, nullptr, nullptr, {}, {},
-                                                    &callbacks_->activeSpan());
+  const Formatter::HttpFormatterContext formatter_context(&headers, {}, {}, {}, {},
+                                                          &callbacks_->activeSpan());
   route_entry_->finalizeRequestHeaders(headers, formatter_context, callbacks_->streamInfo(),
                                        !config_->suppress_envoy_headers_);
 
@@ -1794,7 +1794,9 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
   // Modify response headers after we have set the final upstream info because we may need to
   // modify the headers based on the upstream host.
-  route_entry_->finalizeResponseHeaders(*headers, callbacks_->streamInfo());
+  const Formatter::HttpFormatterContext formatter_context(downstream_headers_, headers.get(), {},
+                                                          {}, {}, &callbacks_->activeSpan());
+  route_entry_->finalizeResponseHeaders(*headers, formatter_context, callbacks_->streamInfo());
   modify_headers_(*headers);
 
   if (end_stream) {
