@@ -14,11 +14,17 @@ fn init() -> bool {
 /// This implements the [`envoy_proxy_dynamic_modules_rust_sdk::NewHttpFilterConfigFunction`]
 /// signature.
 fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
-  _envoy_filter_config: &mut EC,
+  envoy_filter_config: &mut EC,
   name: &str,
   _config: &[u8],
 ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
   match name {
+    "stats_callbacks" => Some(Box::new(StatsCallbacksFilterConfig {
+      streams_total: envoy_filter_config.define_counter("streams_total"),
+      concurrent_streams: envoy_filter_config.define_gauge("concurrent_streams"),
+      ones: envoy_filter_config.define_histogram("ones"),
+      magic_number: envoy_filter_config.define_gauge("magic_number"),
+    })),
     "header_callbacks" => Some(Box::new(HeaderCallbacksFilterConfig {})),
     "send_response" => Some(Box::new(SendResponseFilterConfig {})),
     "dynamic_metadata_callbacks" => Some(Box::new(DynamicMetadataCallbacksFilterConfig {})),
@@ -26,6 +32,52 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "body_callbacks" => Some(Box::new(BodyCallbacksFilterConfig {})),
     "config_init_failure" => None,
     _ => panic!("Unknown filter name: {}", name),
+  }
+}
+
+/// An HTTP filter configuration that implements
+/// [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig`] to test the stats
+/// related callbacks.
+struct StatsCallbacksFilterConfig {
+  streams_total: EnvoyCounterId,
+  concurrent_streams: EnvoyGaugeId,
+  magic_number: EnvoyGaugeId,
+  // It's full of 1s.
+  ones: EnvoyHistogramId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StatsCallbacksFilterConfig {
+  fn new_http_filter(&mut self, envoy_filter: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    envoy_filter.increment_counter(self.streams_total, 1);
+    envoy_filter.increase_gauge(self.concurrent_streams, 1);
+    envoy_filter.set_gauge(self.magic_number, 42);
+    // Copy the stats handles onto the filter so that we can observe stats while
+    // handling requests.
+    Box::new(StatsCallbacksFilter {
+      concurrent_streams: self.concurrent_streams,
+      ones: self.ones,
+    })
+  }
+}
+
+/// An HTTP filter that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilter`].
+struct StatsCallbacksFilter {
+  concurrent_streams: EnvoyGaugeId,
+  ones: EnvoyHistogramId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    envoy_filter.record_histogram_value(self.ones, 1);
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+
+  fn on_stream_complete(&mut self, envoy_filter: &mut EHF) {
+    envoy_filter.decrease_gauge(self.concurrent_streams, 1);
   }
 }
 
@@ -87,9 +139,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(all_headers[3].0.as_slice(), b"new");
     assert_eq!(all_headers[3].1.as_slice(), b"value");
 
-    let downstrean_port =
+    let downstream_port =
       envoy_filter.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::SourcePort);
-    assert_eq!(downstrean_port, Some(1234));
+    assert_eq!(downstream_port, Some(1234));
     let downstream_addr =
       envoy_filter.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::SourceAddress);
     assert!(downstream_addr.is_some());

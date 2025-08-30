@@ -55,6 +55,7 @@ envoy_cc_test(
         "//test/extensions/dynamic_modules:util",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:thread_local_cluster_mocks",
     ],
@@ -67,8 +68,10 @@ envoy_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/dynamic_modules:abi_impl",
+        "//test/common/stats:stat_test_utility_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
     ],
 )
