@@ -17,7 +17,6 @@ Types
   ../type/matcher/v3/node.proto
   ../type/matcher/v3/number.proto
   ../type/matcher/v3/path.proto
-  ../type/matcher/v3/stats.proto
   ../type/http/v3/path_transformation.proto
   ../type/v3/percent.proto
   ../type/v3/range.proto

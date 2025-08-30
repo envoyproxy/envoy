@@ -4,7 +4,6 @@ package envoy.extensions.stat_sinks.open_telemetry.v3;
 
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/grpc_service.proto";
-import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/wrappers.proto";
 
