@@ -89,19 +89,6 @@ typedef const void* envoy_dynamic_module_type_http_filter_config_envoy_ptr;
 typedef const void* envoy_dynamic_module_type_http_filter_config_module_ptr;
 
 /**
- * envoy_dynamic_module_type_http_filter_per_route_config_module_ptr is a pointer to an in-module
- * HTTP configuration corresponding to an Envoy HTTP per route filter configuration. The config is
- * responsible for changing HTTP filter's behavior on specific routes.
- *
- * This has 1:1 correspondence with the DynamicModuleHttpPerRouteFilterConfig class in Envoy.
- *
- * OWNERSHIP: The module is responsible for managing the lifetime of the pointer. The pointer can be
- * released when envoy_dynamic_module_on_http_filter_per_route_config_destroy is called for the same
- * pointer.
- */
-typedef const void* envoy_dynamic_module_type_http_filter_per_route_config_module_ptr;
-
-/**
  * envoy_dynamic_module_type_http_filter_envoy_ptr is a raw pointer to the DynamicModuleHttpFilter
  * class in Envoy. This is passed to the module when creating a new HTTP filter for each HTTP stream
  * and used to access the HTTP filter-scoped information such as headers, body, trailers, etc.
@@ -123,19 +110,6 @@ typedef void* envoy_dynamic_module_type_http_filter_envoy_ptr;
  * released when envoy_dynamic_module_on_http_filter_destroy is called for the same pointer.
  */
 typedef const void* envoy_dynamic_module_type_http_filter_module_ptr;
-
-/**
- * envoy_dynamic_module_type_http_filter_scheduler_ptr is a raw pointer to the
- * DynamicModuleHttpFilterScheduler class in Envoy.
- *
- * OWNERSHIP: The allocation is done by Envoy but the module is responsible for managing the
- * lifetime of the pointer. Notably, it must be explicitly destroyed by the module
- * when scheduling the HTTP filter event is done. The creation of this pointer is done by
- * envoy_dynamic_module_callback_http_filter_scheduler_new and the scheduling and destruction is
- * done by envoy_dynamic_module_callback_http_filter_scheduler_delete. Since its lifecycle is
- * owned/managed by the module, this has _module_ptr suffix.
- */
-typedef void* envoy_dynamic_module_type_http_filter_scheduler_module_ptr;
 
 /**
  * envoy_dynamic_module_type_buffer_module_ptr is a pointer to a buffer in the module. A buffer
@@ -257,23 +231,6 @@ typedef enum {
 } envoy_dynamic_module_type_on_http_filter_response_trailers_status;
 
 /**
- * envoy_dynamic_module_type_metadata_source represents the location of metadata to get when calling
- * envoy_dynamic_module_callback_http_get_metadata_* functions.
- */
-typedef enum {
-  // stream's dynamic metadata.
-  envoy_dynamic_module_type_metadata_source_Dynamic,
-  // route metadata
-  envoy_dynamic_module_type_metadata_source_Route,
-  // cluster metadata
-  envoy_dynamic_module_type_metadata_source_Cluster,
-  // host (LbEndpoint in xDS) metadata
-  envoy_dynamic_module_type_metadata_source_Host,
-  // host locality (LocalityLbEndpoints in xDS) metadata
-  envoy_dynamic_module_type_metadata_source_HostLocality,
-} envoy_dynamic_module_type_metadata_source;
-
-/**
  * envoy_dynamic_module_type_attribute_id represents an attribute described in
  * https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/advanced/attributes
  */
@@ -343,21 +300,21 @@ typedef enum {
   // connection.tls_version
   envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion,
   // connection.subject_local_certificate
-  envoy_dynamic_module_type_attribute_id_ConnectionSubjectLocalCertificate,
+  envoy_dynamic_module_type_attribute_id_ConnectionSubjectLocalCertifica,
   // connection.subject_peer_certificate
-  envoy_dynamic_module_type_attribute_id_ConnectionSubjectPeerCertificate,
+  envoy_dynamic_module_type_attribute_id_ConnectionSubjectPeerCertificat,
   // connection.dns_san_local_certificate
-  envoy_dynamic_module_type_attribute_id_ConnectionDnsSanLocalCertificate,
+  envoy_dynamic_module_type_attribute_id_ConnectionDnsSanLocalCertifica,
   // connection.dns_san_peer_certificate
-  envoy_dynamic_module_type_attribute_id_ConnectionDnsSanPeerCertificate,
+  envoy_dynamic_module_type_attribute_id_ConnectionDnsSanPeerCertificat,
   // connection.uri_san_local_certificate
-  envoy_dynamic_module_type_attribute_id_ConnectionUriSanLocalCertificate,
+  envoy_dynamic_module_type_attribute_id_ConnectionUriSanLocalCertifica,
   // connection.uri_san_peer_certificate
-  envoy_dynamic_module_type_attribute_id_ConnectionUriSanPeerCertificate,
+  envoy_dynamic_module_type_attribute_id_ConnectionUriSanPeerCertificat,
   // connection.sha256_peer_certificate_digest
-  envoy_dynamic_module_type_attribute_id_ConnectionSha256PeerCertificateDigest,
+  envoy_dynamic_module_type_attribute_id_ConnectionSha256PeerCertificate,
   // connection.transport_failure_reason
-  envoy_dynamic_module_type_attribute_id_ConnectionTransportFailureReason,
+  envoy_dynamic_module_type_attribute_id_ConnectionTransportFailureReaso,
   // connection.termination_details
   envoy_dynamic_module_type_attribute_id_ConnectionTerminationDetails,
   // upstream.address
@@ -379,7 +336,7 @@ typedef enum {
   // upstream.uri_san_peer_certificate
   envoy_dynamic_module_type_attribute_id_UpstreamUriSanPeerCertificate,
   // upstream.sha256_peer_certificate_digest
-  envoy_dynamic_module_type_attribute_id_UpstreamSha256PeerCertificateDigest,
+  envoy_dynamic_module_type_attribute_id_UpstreamSha256PeerCertificateD,
   // upstream.local_address
   envoy_dynamic_module_type_attribute_id_UpstreamLocalAddress,
   // upstream.transport_failure_reason
@@ -413,34 +370,6 @@ typedef enum {
   // xds.filter_chain_name
   envoy_dynamic_module_type_attribute_id_XdsFilterChainName,
 } envoy_dynamic_module_type_attribute_id;
-
-/**
- * envoy_dynamic_module_type_http_callout_init_result represents the result of the HTTP callout
- * initialization after envoy_dynamic_module_callback_http_filter_http_callout is called.
- * Success means the callout is successfully initialized and ready to be used.
- * MissingRequiredHeaders means the callout is missing one of the required headers, :path, :method,
- * or host header. DuplicateCalloutId means the callout id is already used by another callout.
- * ClusterNotFound means the cluster is not found in the configuration. CannotCreateRequest means
- * the request cannot be created. That happens when, for example, there's no healthy upstream host
- * in the cluster.
- */
-typedef enum {
-  envoy_dynamic_module_type_http_callout_init_result_Success,
-  envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders,
-  envoy_dynamic_module_type_http_callout_init_result_ClusterNotFound,
-  envoy_dynamic_module_type_http_callout_init_result_DuplicateCalloutId,
-  envoy_dynamic_module_type_http_callout_init_result_CannotCreateRequest,
-} envoy_dynamic_module_type_http_callout_init_result;
-
-/**
- * envoy_dynamic_module_type_http_callout_result represents the result of the HTTP callout.
- * This corresponds to `AsyncClient::FailureReason::*` in envoy/http/async_client.h plus Success.
- */
-typedef enum {
-  envoy_dynamic_module_type_http_callout_result_Success,
-  envoy_dynamic_module_type_http_callout_result_Reset,
-  envoy_dynamic_module_type_http_callout_result_ExceedResponseBufferLimit,
-} envoy_dynamic_module_type_http_callout_result;
 
 // -----------------------------------------------------------------------------
 // ------------------------------- Event Hooks ---------------------------------
@@ -500,47 +429,6 @@ envoy_dynamic_module_on_http_filter_config_new(
  */
 void envoy_dynamic_module_on_http_filter_config_destroy(
     envoy_dynamic_module_type_http_filter_config_module_ptr filter_config_ptr);
-
-/**
- * envoy_dynamic_module_on_http_filter_per_route_config_new is called by the main thread when the
- * http per-route filter config is loaded. The function returns a
- * envoy_dynamic_module_type_http_filter_per_route_config_module_ptr for given name and config.
- *
- * @param name_ptr is the name of the filter.
- * @param name_size is the size of the name.
- * @param config_ptr is the configuration for the module.
- * @param config_size is the size of the configuration.
- * @return envoy_dynamic_module_type_http_filter_per_route_config_module_ptr is the pointer to the
- * in-module HTTP filter configuration. Returning nullptr indicates a failure to initialize the
- * module. When it fails, the filter configuration will be rejected.
- */
-envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
-envoy_dynamic_module_on_http_filter_per_route_config_new(const char* name_ptr, size_t name_size,
-                                                         const char* config_ptr,
-                                                         size_t config_size);
-
-/**
- * envoy_dynamic_module_callback_get_most_specific_route_config may be called by an HTTP filter
- * to retrieve the most specific per-route filter (based on the route object hierarchy).
- *
- * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the corresponding
- * HTTP filter.
- * @return null if no per-route config exist. Otherwise, a pointer to the per-route config is
- * returned.
- */
-envoy_dynamic_module_type_http_filter_per_route_config_module_ptr
-envoy_dynamic_module_callback_get_most_specific_route_config(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
-
-/**
- * envoy_dynamic_module_on_http_filter_config_destroy is called when the HTTP per-route filter
- * configuration is destroyed in Envoy. The module should release any resources associated with the
- * corresponding in-module HTTP filter configuration.
- * @param filter_config_ptr is a pointer to the in-module HTTP filter configuration whose
- * corresponding Envoy HTTP filter configuration is being destroyed.
- */
-void envoy_dynamic_module_on_http_filter_per_route_config_destroy(
-    envoy_dynamic_module_type_http_filter_per_route_config_module_ptr filter_config_ptr);
 
 /**
  * envoy_dynamic_module_on_http_filter_new is called when the HTTP filter is created for each HTTP
@@ -677,48 +565,6 @@ void envoy_dynamic_module_on_http_filter_stream_complete(
  */
 void envoy_dynamic_module_on_http_filter_destroy(
     envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr);
-
-/**
- * envoy_dynamic_module_on_http_filter_http_callout_done is called when the HTTP callout
- * response is received initiated by a HTTP filter.
- *
- * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
- * corresponding HTTP filter.
- * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
- * envoy_dynamic_module_on_http_filter_new.
- * @param callout_id is the ID of the callout. This is used to differentiate between multiple
- * calls.
- * @param result is the result of the callout.
- * @param headers is the headers of the response.
- * @param headers_size is the size of the headers.
- * @param body_vector is the body of the response.
- * @param body_vector_size is the size of the body.
- *
- * headers and body_vector are owned by Envoy, and they are guaranteed to be valid until the end of
- * this event hook. They may be null if the callout fails or the response is empty.
- */
-void envoy_dynamic_module_on_http_filter_http_callout_done(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint32_t callout_id,
-    envoy_dynamic_module_type_http_callout_result result,
-    envoy_dynamic_module_type_http_header* headers, size_t headers_size,
-    envoy_dynamic_module_type_envoy_buffer* body_vector, size_t body_vector_size);
-
-/**
- * envoy_dynamic_module_on_http_filter_scheduled is called when the HTTP filter is scheduled
- * to be executed on the worker thread where the HTTP filter is running with
- * envoy_dynamic_module_callback_http_filter_scheduler_commit callback.
- *
- * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
- * corresponding HTTP filter.
- * @param filter_module_ptr is the pointer to the in-module HTTP filter created by
- * envoy_dynamic_module_on_http_filter_new.
- * @param event_id is the ID of the event passed to
- * envoy_dynamic_module_callback_http_filter_scheduler_commit.
- */
-void envoy_dynamic_module_on_http_filter_scheduled(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_http_filter_module_ptr filter_module_ptr, uint64_t event_id);
 
 // -----------------------------------------------------------------------------
 // -------------------------------- Callbacks ----------------------------------
@@ -1053,7 +899,7 @@ bool envoy_dynamic_module_callback_http_append_response_body(
 bool envoy_dynamic_module_callback_http_drain_response_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t number_of_bytes);
 
-// ---------------------------- Metadata Callbacks -----------------------------
+// ------------------------ Dynamic Metadata Callbacks -------------------------
 
 /**
  * envoy_dynamic_module_callback_http_set_dynamic_metadata_number is called by the module to set
@@ -1090,9 +936,8 @@ bool envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
  * be stored.
  * @return true if the operation is successful, false otherwise.
  */
-bool envoy_dynamic_module_callback_http_get_metadata_number(
+bool envoy_dynamic_module_callback_http_get_dynamic_metadata_number(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_metadata_source metadata_source,
     envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
     envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length, double* result);
 
@@ -1139,9 +984,8 @@ bool envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
  * they are guaranteed to be valid until the end of the current event hook unless the setter
  * callback is called.
  */
-bool envoy_dynamic_module_callback_http_get_metadata_string(
+bool envoy_dynamic_module_callback_http_get_dynamic_metadata_string(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
-    envoy_dynamic_module_type_metadata_source metadata_source,
     envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
     envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
     envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length);
@@ -1189,54 +1033,6 @@ bool envoy_dynamic_module_callback_http_get_filter_state_bytes(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr key_ptr, size_t key_length,
     envoy_dynamic_module_type_buffer_envoy_ptr* result, size_t* result_length);
-
-// ---------------------- HTTP filter scheduler callbacks ------------------------
-
-/**
- * envoy_dynamic_module_callback_http_filter_scheduler_new is called by the module to create a new
- * HTTP filter scheduler. The scheduler is used to dispatch HTTP filter operations from any thread
- * including the ones managed by the module.
- *
- * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
- * corresponding HTTP filter.
- * @return envoy_dynamic_module_type_http_filter_scheduler_module_ptr is the pointer to the
- * created HTTP filter scheduler.
- *
- * NOTE: it is caller's responsibility to delete the scheduler using
- * envoy_dynamic_module_callback_http_filter_scheduler_delete when it is no longer needed.
- * See the comment on envoy_dynamic_module_type_http_filter_scheduler_module_ptr.
- */
-envoy_dynamic_module_type_http_filter_scheduler_module_ptr
-envoy_dynamic_module_callback_http_filter_scheduler_new(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
-
-/**
- * envoy_dynamic_module_callback_http_filter_scheduler_commit is called by the module to
- * schedule a generic event to the HTTP filter on the worker thread it is running on.
- *
- * This will eventually end up invoking envoy_dynamic_module_on_http_filter_scheduled
- * event hook on the worker thread.
- *
- * This can be called multiple times to schedule multiple events to the same filter.
- *
- * @param scheduler_module_ptr is the pointer to the HTTP filter scheduler created by
- * envoy_dynamic_module_callback_http_filter_scheduler_new.
- * @param event_id is the ID of the event. This can be used to differentiate between multiple
- * events scheduled to the same filter. It can be any module-defined value.
- */
-void envoy_dynamic_module_callback_http_filter_scheduler_commit(
-    envoy_dynamic_module_type_http_filter_scheduler_module_ptr scheduler_module_ptr,
-    uint64_t event_id);
-
-/**
- * envoy_dynamic_module_callback_http_filter_scheduler_delete is called by the module to delete
- * the HTTP filter scheduler created by envoy_dynamic_module_callback_http_filter_scheduler_new.
- *
- * @param scheduler_module_ptr is the pointer to the HTTP filter scheduler created by
- * envoy_dynamic_module_callback_http_filter_scheduler_new.
- */
-void envoy_dynamic_module_callback_http_filter_scheduler_delete(
-    envoy_dynamic_module_type_http_filter_scheduler_module_ptr scheduler_module_ptr);
 
 // ------------------- Misc Callbacks for HTTP Filters -------------------------
 
@@ -1286,52 +1082,6 @@ bool envoy_dynamic_module_callback_http_filter_get_attribute_string(
 bool envoy_dynamic_module_callback_http_filter_get_attribute_int(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_attribute_id attribute_id, uint64_t* result);
-
-/**
- * envoy_dynamic_module_callback_http_filter_http_callout is called by the module to initiate
- * an HTTP callout. The callout is initiated by the HTTP filter and the response is received in
- * envoy_dynamic_module_on_http_filter_http_callout_done.
- *
- * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
- * corresponding HTTP filter.
- * @param callout_id is the ID of the callout. This can be arbitrary and is used to
- * differentiate between multiple calls from the same filter.
- * @param cluster_name is the name of the cluster to which the callout is sent.
- * @param cluster_name_length is the length of the cluster name.
- * @param headers is the headers of the request. It must contain :method, :path and host headers.
- * @param headers_size is the size of the headers.
- * @param body is the pointer to the buffer of the body of the request.
- * @param body_size is the length of the body.
- * @param timeout_milliseconds is the timeout for the callout in milliseconds.
- * @return envoy_dynamic_module_type_http_callout_init_result is the result of the callout.
- */
-envoy_dynamic_module_type_http_callout_init_result
-envoy_dynamic_module_callback_http_filter_http_callout(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, uint32_t callout_id,
-    envoy_dynamic_module_type_buffer_module_ptr cluster_name, size_t cluster_name_length,
-    envoy_dynamic_module_type_http_header* headers, size_t headers_size,
-    envoy_dynamic_module_type_buffer_module_ptr body, size_t body_size,
-    uint64_t timeout_milliseconds);
-
-/**
- * envoy_dynamic_module_callback_http_filter_continue_decoding is called by the module to continue
- * decoding the HTTP request.
- *
- * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
- * corresponding HTTP filter.
- */
-void envoy_dynamic_module_callback_http_filter_continue_decoding(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
-
-/**
- * envoy_dynamic_module_callback_http_filter_continue_encoding is called by the module to continue
- * encoding the HTTP response.
- *
- * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
- * corresponding HTTP filter.
- */
-void envoy_dynamic_module_callback_http_filter_continue_encoding(
-    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr);
 
 #ifdef __cplusplus
 }

@@ -63,6 +63,26 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test(
+    name = "cpp_sdk_test",
+    srcs = ["sdk/cpp/cpp_sdk_test.cc"],
+    data = [
+        "//source/extensions/dynamic_modules:abi.h",
+        "//test/extensions/dynamic_modules/test_data/c:no_op",
+    ],
+    deps = [
+        ":util",
+        "//source/common/common:hex_lib",
+        "//source/common/crypto:utility_lib",
+        "//source/extensions/dynamic_modules:abi_version_lib",
+        "//source/extensions/dynamic_modules:dynamic_modules_lib",
+        "//source/extensions/dynamic_modules/sdk/cpp:envoy_proxy_dynamic_modules_cpp_sdk",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+        "//test/mocks/http:http_mocks",
+    ],
+)
+
 # We have targets for the tests of SDK itself here so that //test/... will be able to run them.
 rust_test(
     name = "rust_sdk_test",
