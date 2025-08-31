@@ -22,13 +22,16 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows
 
+// Starts a local HTTP mock server with HttpTestServerFactory.start(). Then a request is sent
+// through the following flow:
+//
 //                                               ┌──────────────────┐
 //                                               │   Envoy Proxy    │
 //                                               │ ┌──────────────┐ │
 // ┌────────────────────────┐                  ┌─┼─►listener_proxy│ │
-// │http://api.lyft.com/ping│  ┌──────────────┬┘ │ └──────┬───────┘ │ ┌────────────┐
-// │        Request         ├──►Android Engine│  │        │         │ │api.lyft.com│
-// └────────────────────────┘  └──────────────┘  │ ┌──────▼──────┐  │ └──────▲─────┘
+// │http://localhost:{port} │  ┌──────────────┬┘ │ └──────┬───────┘ │ ┌─────────────────┐
+// │        Request         ├──►Android Engine│  │        │         │ │Local mock server│
+// └────────────────────────┘  └──────────────┘  │ ┌──────▼──────┐  │ └──────▲──────────┘
 //                                               │ │cluster_proxy│  │        │
 //                                               │ └─────────────┴──┼────────┘
 //                                               │                  │

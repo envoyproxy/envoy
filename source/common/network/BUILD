@@ -205,6 +205,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "ip_address_lib",
+    srcs = ["ip_address.cc"],
+    hdrs = ["ip_address.h"],
+    deps = [
+        ":utility_lib",
+        "//envoy/network:address_interface",
+        "//envoy/registry",
+        "//envoy/stream_info:filter_state_interface",
+    ],
+)
+
+envoy_cc_library(
     name = "io_socket_error_lib",
     srcs = ["io_socket_error_impl.cc"],
     hdrs = ["io_socket_error_impl.h"],
@@ -488,6 +500,7 @@ envoy_cc_library(
     deps = [
         ":address_lib",
         ":default_socket_interface_lib",
+        ":ip_address_parsing_lib",
         ":socket_lib",
         ":socket_option_lib",
         "//envoy/api:os_sys_calls_interface",
@@ -502,6 +515,16 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "ip_address_parsing_lib",
+    srcs = ["ip_address_parsing.cc"],
+    hdrs = ["ip_address_parsing.h"],
+    deps = [
+        "//source/common/api:os_sys_calls_lib",
+        "//source/common/common:statusor_lib",
     ],
 )
 

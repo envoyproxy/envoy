@@ -108,6 +108,15 @@ An example of configuring this filter to use IAM Roles Anywhere to retrieve cred
     :linenos:
     :caption: :download:`aws-request-signing-filter-iam-roles-anywhere.yaml <_include/aws-request-signing-filter-iam-roles-anywhere.yaml>`
 
+An example of configuring this filter to use STS AssumeRole to retrieve credentials:
+
+.. literalinclude:: _include/aws-request-signing-filter-assumeroleprovider.yaml
+    :language: yaml
+    :lines: 45-60
+    :lineno-start: 45
+    :linenos:
+    :caption: :download:`aws-request-signing-filter-assumeroleprovider.yaml <_include/aws-request-signing-filter-assumeroleprovider.yaml>`
+
 Configuration as an upstream HTTP filter
 ----------------------------------------
 SigV4 or SigV4A request signatures are calculated using the HTTP host, URL and payload as input. Depending on the configuration, Envoy may modify one or more of

@@ -28,7 +28,6 @@
 #include "gtest/gtest.h"
 
 using Envoy::Http::Headers;
-using Envoy::Http::HeaderValueOf;
 using Envoy::Http::HttpStatusIs;
 using testing::Combine;
 using testing::ContainsRegex;
@@ -58,19 +57,14 @@ void setAllowHttp10WithDefaultHost(
   hcm.mutable_http_protocol_options()->set_default_host_for_http_10("default.com");
 }
 
-std::string testParamToString(
-    const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, Http1ParserImpl>>&
-        params) {
-  return absl::StrCat(TestUtility::ipVersionToString(std::get<0>(params.param)),
-                      TestUtility::http1ParserImplToString(std::get<1>(params.param)));
+std::string testParamToString(const testing::TestParamInfo<Network::Address::IpVersion>& params) {
+  return TestUtility::ipVersionToString(params.param);
 }
 
 } // namespace
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsAndHttp1Parser, IntegrationTest,
-                         Combine(ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                                 Values(Http1ParserImpl::HttpParser, Http1ParserImpl::BalsaParser)),
-                         testParamToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, IntegrationTest,
+                         ValuesIn(TestEnvironment::getIpVersionsForTest()), testParamToString);
 
 // Verify that we gracefully handle an invalid pre-bind socket option when using reuse_port.
 TEST_P(IntegrationTest, BadPrebindSocketOptionWithReusePort) {
@@ -177,7 +171,7 @@ class TestConnectionBalanceFactory : public Network::ConnectionBalanceFactory {
 public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     // Using Struct instead of a custom empty config proto. This is only allowed in tests.
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
   Network::ConnectionBalancerSharedPtr
   createConnectionBalancerFromProto(const Protobuf::Message&,
@@ -413,7 +407,7 @@ TEST_P(IntegrationTest, ConnectionCloseHeader) {
 
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
-  EXPECT_THAT(response->headers(), HeaderValueOf(Headers::get().Connection, "close"));
+  EXPECT_THAT(response->headers(), ContainsHeader(Headers::get().Connection, "close"));
   EXPECT_EQ(codec_client_->lastConnectionEvent(), Network::ConnectionEvent::RemoteClose);
 }
 
@@ -1202,27 +1196,6 @@ TEST_P(IntegrationTest, Http09Enabled) {
   EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("HTTP/1.0"));
 }
 
-TEST_P(IntegrationTest, Http09WithKeepalive) {
-  if (http1_implementation_ == Http1ParserImpl::BalsaParser) {
-    // HTTP/0.9 does not allow for headers.
-    // BalsaParser correctly ignores data after "\r\n".
-    return;
-  }
-
-  useAccessLog();
-  autonomous_upstream_ = true;
-  config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
-  initialize();
-  reinterpret_cast<AutonomousUpstream*>(fake_upstreams_.front().get())
-      ->setResponseHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
-          Http::TestResponseHeaderMapImpl({{":status", "200"}, {"content-length", "0"}})));
-  std::string response;
-  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET /\r\nConnection: keep-alive\r\n\r\n",
-                                &response, true);
-  EXPECT_THAT(response, StartsWith("HTTP/1.0 200 OK\r\n"));
-  EXPECT_THAT(response, HasSubstr("connection: keep-alive\r\n"));
-}
-
 // Turn HTTP/1.0 support on and verify the request is proxied and the default host is sent upstream.
 TEST_P(IntegrationTest, Http10Enabled) {
   autonomous_upstream_ = true;
@@ -1659,8 +1632,8 @@ TEST_P(IntegrationTest, TestHead) {
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
   EXPECT_EQ(response->headers().ContentLength(), nullptr);
   EXPECT_THAT(response->headers(),
-              HeaderValueOf(Headers::get().TransferEncoding,
-                            Http::Headers::get().TransferEncodingValues.Chunked));
+              ContainsHeader(Headers::get().TransferEncoding,
+                             Http::Headers::get().TransferEncodingValues.Chunked));
   EXPECT_EQ(0, response->body().size());
 
   // Preserve explicit content length.
@@ -1669,7 +1642,7 @@ TEST_P(IntegrationTest, TestHead) {
   response = sendRequestAndWaitForResponse(head_request, 0, content_length_response, 0);
   ASSERT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
-  EXPECT_THAT(response->headers(), HeaderValueOf(Headers::get().ContentLength, "12"));
+  EXPECT_THAT(response->headers(), ContainsHeader(Headers::get().ContentLength, "12"));
   EXPECT_EQ(response->headers().TransferEncoding(), nullptr);
   EXPECT_EQ(0, response->body().size());
 }
@@ -1782,13 +1755,13 @@ TEST_P(IntegrationTest, ViaAppendHeaderOnly) {
                                      {"via", "foo"},
                                      {"connection", "close"}});
   waitForNextUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().Via, "foo, bar"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader(Headers::get().Via, "foo, bar"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
-  EXPECT_THAT(response->headers(), HeaderValueOf(Headers::get().Via, "bar"));
+  EXPECT_THAT(response->headers(), ContainsHeader(Headers::get().Via, "bar"));
 }
 
 // Validate that 100-continue works as expected with via header addition on both request and
@@ -1960,10 +1933,8 @@ TEST_P(IntegrationTest, TrailersDroppedDownstream) {
   testTrailers(10, 10, false, false);
 }
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsAndHttp1Parser, UpstreamEndpointIntegrationTest,
-                         Combine(ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                                 Values(Http1ParserImpl::HttpParser, Http1ParserImpl::BalsaParser)),
-                         testParamToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamEndpointIntegrationTest,
+                         ValuesIn(TestEnvironment::getIpVersionsForTest()), testParamToString);
 
 TEST_P(UpstreamEndpointIntegrationTest, TestUpstreamEndpointAddress) {
   initialize();
@@ -2499,7 +2470,7 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     // Using Struct instead of a custom empty config proto. This is only allowed in tests.
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
 
   std::string name() const override { return "test_retry_options_predicate_factory"; }
@@ -2680,7 +2651,7 @@ TEST_P(IntegrationTest, AppendXForwardedPort) {
                                      {":authority", "host"},
                                      {"connection", "close"}});
   waitForNextUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), Not(HeaderValueOf(Headers::get().ForwardedPort, "")));
+  EXPECT_THAT(upstream_request_->headers(), Not(ContainsHeader(Headers::get().ForwardedPort, "")));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -2723,7 +2694,7 @@ TEST_P(IntegrationTest, IgnoreAppendingXForwardedPortIfHasBeenSet) {
                                      {"connection", "close"},
                                      {"x-forwarded-port", "8080"}});
   waitForNextUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().ForwardedPort, "8080"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader(Headers::get().ForwardedPort, "8080"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -2745,7 +2716,7 @@ TEST_P(IntegrationTest, PreserveXForwardedPortFromTrustedHop) {
                                      {"connection", "close"},
                                      {"x-forwarded-port", "80"}});
   waitForNextUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().ForwardedPort, "80"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader(Headers::get().ForwardedPort, "80"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -2767,7 +2738,8 @@ TEST_P(IntegrationTest, OverwriteXForwardedPortFromUntrustedHop) {
                                      {"connection", "close"},
                                      {"x-forwarded-port", "80"}});
   waitForNextUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), Not(HeaderValueOf(Headers::get().ForwardedPort, "80")));
+  EXPECT_THAT(upstream_request_->headers(),
+              Not(ContainsHeader(Headers::get().ForwardedPort, "80")));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(codec_client_->waitForDisconnect());
@@ -2789,7 +2761,7 @@ TEST_P(IntegrationTest, DoNotOverwriteXForwardedPortFromUntrustedHop) {
                                      {"connection", "close"},
                                      {"x-forwarded-port", "80"}});
   waitForNextUpstreamRequest();
-  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Headers::get().ForwardedPort, "80"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader(Headers::get().ForwardedPort, "80"));
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
   ASSERT_TRUE(response->waitForEndStream());
   ASSERT_TRUE(codec_client_->waitForDisconnect());

@@ -116,6 +116,43 @@ public:
     ON_CALL(*decoder_callbacks_.route_, metadata()).WillByDefault(testing::ReturnRef(metadata_));
   }
 
+  void setupVirtualHostMetadata(const std::string& yaml) {
+    TestUtility::loadFromYaml(yaml, virtual_host_metadata_);
+
+    auto virtual_host = std::make_shared<NiceMock<Router::MockVirtualHost>>();
+    stream_info_.virtual_host_ = virtual_host;
+
+    ON_CALL(*virtual_host, metadata()).WillByDefault(ReturnRef(virtual_host_metadata_));
+
+    ON_CALL(decoder_callbacks_.stream_info_, virtualHost()).WillByDefault(ReturnRef(virtual_host));
+    ON_CALL(encoder_callbacks_.stream_info_, virtualHost()).WillByDefault(ReturnRef(virtual_host));
+
+    EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
+    EXPECT_CALL(encoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
+
+    const std::string filter_name = "lua-filter-config-name";
+    ON_CALL(decoder_callbacks_, filterConfigName()).WillByDefault(Return(filter_name));
+    ON_CALL(encoder_callbacks_, filterConfigName()).WillByDefault(Return(filter_name));
+
+    EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+  }
+
+  void setupRouteMetadata(const std::string& yaml) {
+    auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+    TestUtility::loadFromYaml(yaml, route->metadata_);
+
+    ON_CALL(stream_info_, route()).WillByDefault(Return(route));
+
+    EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
+    EXPECT_CALL(encoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
+
+    const std::string filter_name = "lua-filter-config-name";
+    ON_CALL(decoder_callbacks_, filterConfigName()).WillByDefault(Return(filter_name));
+    ON_CALL(encoder_callbacks_, filterConfigName()).WillByDefault(Return(filter_name));
+
+    EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+  }
+
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   NiceMock<Api::MockApi> api_;
@@ -126,6 +163,7 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
   envoy::config::core::v3::Metadata metadata_;
+  envoy::config::core::v3::Metadata virtual_host_metadata_;
   std::shared_ptr<NiceMock<Envoy::Ssl::MockConnectionInfo>> ssl_;
   NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;
@@ -2266,17 +2304,17 @@ TEST_F(LuaHttpFilterTest, GetConnectionDynamicMetadata) {
   )EOF"};
 
   // Proxy Protocol Filter Metadata
-  ProtobufWkt::Value tlv_ea_value;
+  Protobuf::Value tlv_ea_value;
   tlv_ea_value.set_string_value("vpce-064c279a4001a055f");
-  ProtobufWkt::Struct proxy_protocol_metadata;
+  Protobuf::Struct proxy_protocol_metadata;
   proxy_protocol_metadata.mutable_fields()->insert({"tlv_ea", tlv_ea_value});
   (*stream_info_.metadata_.mutable_filter_metadata())["envoy.proxy_protocol"] =
       proxy_protocol_metadata;
 
   // LB Filter Metadata
-  ProtobufWkt::Value lb_version_value;
+  Protobuf::Value lb_version_value;
   lb_version_value.set_string_value("v1.0");
-  ProtobufWkt::Struct lb_metadata;
+  Protobuf::Struct lb_metadata;
   lb_metadata.mutable_fields()->insert({"version", lb_version_value});
   (*stream_info_.metadata_.mutable_filter_metadata())["envoy.lb"] = lb_metadata;
 
@@ -2325,10 +2363,10 @@ TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadata) {
   setup(SCRIPT);
 
   // Create a simple Struct for testing typed metadata
-  ProtobufWkt::Struct main_struct;
+  Protobuf::Struct main_struct;
 
   // Create a nested struct for typed_metadata
-  ProtobufWkt::Struct typed_metadata_struct;
+  Protobuf::Struct typed_metadata_struct;
   (*typed_metadata_struct.mutable_fields())["tlv_ea"].set_string_value("vpce-1234567890abcdef");
   (*typed_metadata_struct.mutable_fields())["pp2_type"].set_string_value("PROXY");
 
@@ -2336,7 +2374,7 @@ TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadata) {
   auto* typed_meta_value = &(*main_struct.mutable_fields())["typed_metadata"];
   typed_meta_value->mutable_struct_value()->MergeFrom(typed_metadata_struct);
 
-  ProtobufWkt::Any typed_config;
+  Protobuf::Any typed_config;
   typed_config.PackFrom(main_struct);
 
   // Add the typed metadata to the stream info
@@ -2393,14 +2431,14 @@ TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadataComplex) {
   setup(SCRIPT);
 
   // Create a complex Struct for testing
-  ProtobufWkt::Struct main_struct;
+  Protobuf::Struct main_struct;
 
   // Add simple key/value pairs
   (*main_struct.mutable_fields())["tlv_ea"].set_string_value("vpce-1234567890abcdef");
   (*main_struct.mutable_fields())["pp2_type"].set_string_value("PROXY");
 
   // Create a nested struct for SSL info
-  ProtobufWkt::Struct ssl_info;
+  Protobuf::Struct ssl_info;
   (*ssl_info.mutable_fields())["version"].set_string_value("TLSv1.3");
   (*ssl_info.mutable_fields())["cipher"].set_string_value("ECDHE-RSA-AES128-GCM-SHA256");
 
@@ -2409,7 +2447,7 @@ TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadataComplex) {
   ssl_value->mutable_struct_value()->MergeFrom(ssl_info);
 
   // Create an array of addresses
-  ProtobufWkt::ListValue addresses;
+  Protobuf::ListValue addresses;
   addresses.add_values()->set_string_value("192.168.1.1");
   addresses.add_values()->set_string_value("10.0.0.1");
   addresses.add_values()->set_string_value("172.16.0.1");
@@ -2418,7 +2456,7 @@ TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadataComplex) {
   auto* addresses_value = &(*main_struct.mutable_fields())["addresses"];
   addresses_value->mutable_list_value()->MergeFrom(addresses);
 
-  ProtobufWkt::Any typed_config;
+  Protobuf::Any typed_config;
   typed_config.PackFrom(main_struct);
 
   // Add the typed metadata to the stream info
@@ -2486,7 +2524,7 @@ TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadataInvalidType) {
   setup(SCRIPT);
 
   // Pack an invalid/unknown message type
-  ProtobufWkt::Any typed_config;
+  Protobuf::Any typed_config;
   typed_config.set_type_url("type.googleapis.com/unknown.type");
   typed_config.set_value("invalid data");
 
@@ -2517,7 +2555,7 @@ TEST_F(LuaHttpFilterTest, GetConnectionTypedMetadataUnpackFailure) {
   setup(SCRIPT);
 
   // Pack invalid data that will fail to unpack
-  ProtobufWkt::Any typed_config;
+  Protobuf::Any typed_config;
   typed_config.set_type_url("type.googleapis.com/envoy.data.core.v3.TlvsMetadata");
   typed_config.set_value("invalid protobuf data");
 
@@ -2548,10 +2586,10 @@ TEST_F(LuaHttpFilterTest, GetDynamicMetadataBinaryData) {
     end
   )EOF"};
 
-  ProtobufWkt::Value metadata_value;
+  Protobuf::Value metadata_value;
   constexpr uint8_t buffer[] = {'h', 'e', 0x00, 'l', 'l', 'o'};
   metadata_value.set_string_value(reinterpret_cast<char const*>(buffer), sizeof(buffer));
-  ProtobufWkt::Struct metadata;
+  Protobuf::Struct metadata;
   metadata.mutable_fields()->insert({"bin_data", metadata_value});
   (*stream_info_.metadata_.mutable_filter_metadata())["envoy.pp"] = metadata;
 
@@ -2603,12 +2641,12 @@ TEST_F(LuaHttpFilterTest, SetGetDynamicMetadata) {
                        .at("foo")
                        .string_value());
 
-  const ProtobufWkt::Struct& meta_complex = stream_info.dynamicMetadata()
-                                                .filter_metadata()
-                                                .at("envoy.lb")
-                                                .fields()
-                                                .at("complex")
-                                                .struct_value();
+  const Protobuf::Struct& meta_complex = stream_info.dynamicMetadata()
+                                             .filter_metadata()
+                                             .at("envoy.lb")
+                                             .fields()
+                                             .at("complex")
+                                             .struct_value();
   EXPECT_EQ("abcd", meta_complex.fields().at("x").string_value());
   EXPECT_EQ(1234.0, meta_complex.fields().at("y").number_value());
   EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
@@ -3667,6 +3705,575 @@ TEST_F(LuaHttpFilterTest, SetUpstreamOverrideHostNonIpHost) {
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
   });
   EXPECT_EQ(1, stats_store_.counter("test.lua.errors").value());
+}
+
+// Test accessing typed metadata from StreamInfo through Lua.
+TEST_F(LuaHttpFilterTest, GetStreamInfoTypedMetadata) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local typed_meta = request_handle:streamInfo():dynamicTypedMetadata("envoy.filters.http.set_metadata")
+      if typed_meta then
+        request_handle:logTrace("Has typed metadata: true")
+        -- The typed metadata is structured with field keys
+        if typed_meta.fields and typed_meta.fields.metadata_namespace then
+          request_handle:logTrace("Metadata namespace: " .. typed_meta.fields.metadata_namespace.string_value)
+        end
+        if typed_meta.fields and typed_meta.fields.allow_overwrite then
+          request_handle:logTrace("Allow overwrite: " .. tostring(typed_meta.fields.allow_overwrite.bool_value))
+        end
+      else
+        request_handle:logTrace("Has typed metadata: false")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  // Create a Struct for testing typed metadata using the set_metadata filter's proto
+  Protobuf::Struct main_struct;
+
+  // Add simple key/value pairs
+  (*main_struct.mutable_fields())["metadata_namespace"].set_string_value("test.namespace");
+  (*main_struct.mutable_fields())["allow_overwrite"].set_bool_value(true);
+
+  // Pack the Struct into an Any
+  Protobuf::Any typed_config;
+  typed_config.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  typed_config.PackFrom(main_struct);
+
+  stream_info_.metadata_.mutable_typed_filter_metadata()->insert(
+      {"envoy.filters.http.set_metadata", typed_config});
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "Has typed metadata: true"},
+                                 {"trace", "Metadata namespace: test.namespace"},
+                                 {"trace", "Allow overwrite: true"},
+                             }),
+                             {
+                               EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                         filter_->decodeHeaders(request_headers, true));
+                             });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// Test accessing complex typed metadata with nested structures and arrays.
+TEST_F(LuaHttpFilterTest, GetStreamInfoComplexTypedMetadata) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local typed_meta = request_handle:streamInfo():dynamicTypedMetadata("envoy.filters.http.complex_metadata")
+      if typed_meta then
+        request_handle:logTrace("Has typed metadata: true")
+
+        -- The typed metadata is structured with a fields key
+        if typed_meta.fields then
+          -- Access configuration info (nested struct)
+          if typed_meta.fields.config and typed_meta.fields.config.struct_value then
+            local config = typed_meta.fields.config.struct_value.fields
+            request_handle:logTrace("Config version: " .. config.version.string_value)
+            request_handle:logTrace("Config enabled: " .. tostring(config.enabled.bool_value))
+          end
+
+          -- Access servers (array)
+          if typed_meta.fields.servers and typed_meta.fields.servers.list_value then
+            local servers = typed_meta.fields.servers.list_value.values
+            for i, server in ipairs(servers) do
+              request_handle:logTrace("Server " .. i .. ": " .. server.string_value)
+            end
+          end
+        end
+      else
+        request_handle:logTrace("Has typed metadata: false")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  // Create a complex Struct for testing
+  Protobuf::Struct main_struct;
+
+  // Add simple key/value pairs
+  (*main_struct.mutable_fields())["filter_name"].set_string_value("complex_metadata");
+  (*main_struct.mutable_fields())["version"].set_string_value("v1.2.3");
+
+  // Create a nested struct for config
+  Protobuf::Struct config_struct;
+  (*config_struct.mutable_fields())["version"].set_string_value("v2.0.0");
+  (*config_struct.mutable_fields())["enabled"].set_bool_value(true);
+
+  // Add the config to the main struct
+  auto* config_value = &(*main_struct.mutable_fields())["config"];
+  *config_value->mutable_struct_value() = config_struct;
+
+  // Create a list for servers
+  Protobuf::ListValue servers_list;
+  servers_list.add_values()->set_string_value("server1.example.com");
+  servers_list.add_values()->set_string_value("server2.example.com");
+
+  // Add the servers list to the main struct
+  auto* servers_value = &(*main_struct.mutable_fields())["servers"];
+  *servers_value->mutable_list_value() = servers_list;
+
+  // Pack the Struct into an Any
+  Protobuf::Any typed_config;
+  typed_config.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  typed_config.PackFrom(main_struct);
+
+  stream_info_.metadata_.mutable_typed_filter_metadata()->insert(
+      {"envoy.filters.http.complex_metadata", typed_config});
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "Has typed metadata: true"},
+                                 {"trace", "Config version: v2.0.0"},
+                                 {"trace", "Config enabled: true"},
+                                 {"trace", "Server 1: server1.example.com"},
+                                 {"trace", "Server 2: server2.example.com"},
+                             }),
+                             {
+                               EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                         filter_->decodeHeaders(request_headers, true));
+                             });
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// Test accessing non-existent typed metadata.
+TEST_F(LuaHttpFilterTest, GetStreamInfoTypedMetadataNotFound) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local typed_meta = request_handle:streamInfo():dynamicTypedMetadata("unknown.filter")
+      if typed_meta then
+        request_handle:logTrace("Has typed metadata: true")
+      else
+        request_handle:logTrace("Has typed metadata: false")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
+  EXPECT_LOG_CONTAINS("trace", "Has typed metadata: false",
+                      EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                filter_->decodeHeaders(request_headers, true)));
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// Test behavior when the type URL in typed metadata cannot be found in the Protobuf descriptor
+// pool.
+TEST_F(LuaHttpFilterTest, GetStreamInfoTypedMetadataInvalidType) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local typed_meta = request_handle:streamInfo():dynamicTypedMetadata("envoy.test.metadata")
+      if typed_meta then
+        request_handle:logTrace("Has typed metadata: true")
+      else
+        request_handle:logTrace("Has typed metadata: false")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  // Pack an invalid/unknown message type
+  Protobuf::Any typed_config;
+  typed_config.set_type_url("type.googleapis.com/unknown.type");
+  typed_config.set_value("invalid data");
+
+  stream_info_.metadata_.mutable_typed_filter_metadata()->insert(
+      {"envoy.test.metadata", typed_config});
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
+  EXPECT_LOG_CONTAINS("trace", "Has typed metadata: false",
+                      EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                filter_->decodeHeaders(request_headers, true)));
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// Test behavior when the data in typed metadata cannot be unpacked.
+TEST_F(LuaHttpFilterTest, GetStreamInfoTypedMetadataUnpackFailure) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local typed_meta = request_handle:streamInfo():dynamicTypedMetadata("envoy.test.metadata")
+      if typed_meta then
+        request_handle:logTrace("Has typed metadata: true")
+      else
+        request_handle:logTrace("Has typed metadata: false")
+      end
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  // Pack invalid data that will fail to unpack
+  Protobuf::Any typed_config;
+  typed_config.set_type_url("type.googleapis.com/google.protobuf.Struct");
+  typed_config.set_value("invalid protobuf data");
+
+  stream_info_.metadata_.mutable_typed_filter_metadata()->insert(
+      {"envoy.test.metadata", typed_config});
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillOnce(ReturnRef(stream_info_));
+  EXPECT_LOG_CONTAINS("trace", "Has typed metadata: false",
+                      EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                filter_->decodeHeaders(request_headers, true)));
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// Test that handle:virtualHost():metadata() works when both virtual host and route match.
+// This verifies that when a virtual host is matched and a route is found for the request,
+// the virtualHost() function returns a valid object and metadata can be accessed
+// successfully from both request and response handles.
+TEST_F(LuaHttpFilterTest, GetVirtualHostMetadataFromHandle) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local metadata = request_handle:virtualHost():metadata()
+      request_handle:logTrace(metadata:get("foo.bar")["name"])
+      request_handle:logTrace(metadata:get("foo.bar")["prop"])
+    end
+    function envoy_on_response(response_handle)
+      local metadata = response_handle:virtualHost():metadata()
+      response_handle:logTrace(metadata:get("baz.bat")["name"])
+      response_handle:logTrace(metadata:get("baz.bat")["prop"])
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      lua-filter-config-name:
+        foo.bar:
+          name: foo
+          prop: bar
+        baz.bat:
+          name: baz
+          prop: bat
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+  setupVirtualHostMetadata(METADATA);
+
+  // Request path
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "foo"},
+                                 {"trace", "bar"},
+                             }),
+                             {
+                               EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                         filter_->decodeHeaders(request_headers, true));
+                             });
+
+  // Response path
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "baz"},
+                                 {"trace", "bat"},
+                             }),
+                             {
+                               EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                         filter_->encodeHeaders(response_headers, true));
+                             });
+}
+
+// Test that handle:virtualHost():metadata() returns empty metadata when no filter-specific metadata
+// exists. This verifies that when a virtual host has metadata for other filters but not for the
+// current one, the metadata object is empty.
+TEST_F(LuaHttpFilterTest, GetVirtualHostMetadataFromHandleNoLuaMetadata) {
+  const std::string SCRIPT{R"EOF(
+    function is_metadata_empty(metadata)
+      for _, _ in pairs(metadata) do
+        return false
+      end
+      return true
+    end
+    function envoy_on_request(request_handle)
+      if is_metadata_empty(request_handle:virtualHost():metadata()) then
+        request_handle:logTrace("No metadata found on request")
+      end
+    end
+    function envoy_on_response(response_handle)
+      if is_metadata_empty(response_handle:virtualHost():metadata()) then
+        response_handle:logTrace("No metadata found on response")
+      end
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      envoy.some_filter:
+        foo.bar:
+          name: foo
+          prop: bar
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+  setupVirtualHostMetadata(METADATA);
+
+  // Request path
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS("trace", "No metadata found on request", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  });
+
+  // Response path
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS("trace", "No metadata found on response", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+}
+
+// Test that handle:virtualHost() returns a valid virtual host wrapper object that can be
+// safely accessed when no virtual host matches the request authority.
+// This verifies that calling metadata() returns an empty metadata object.
+TEST_F(LuaHttpFilterTest, GetVirtualHostFromHandleNoVirtualHost) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local virtual_host = request_handle:virtualHost()
+      for _, _ in pairs(virtual_host:metadata()) do
+        return
+      end
+      request_handle:logTrace("No metadata found during request handling")
+    end
+    function envoy_on_response(response_handle)
+      local virtual_host = response_handle:virtualHost()
+      for _, _ in pairs(virtual_host:metadata()) do
+        return
+      end
+      response_handle:logTrace("No metadata found during response handling")
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  // Request path
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS("trace", "No metadata found during request handling", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  });
+
+  // Response path
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS("trace", "No metadata found during response handling", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
+}
+
+// Test that handle:virtualHost():metadata() still works when there is no route.
+// This verifies that when a virtual host is matched but no route is found for the request,
+// the virtualHost() function returns a valid object and metadata can still be accessed
+// successfully from both request and response handles.
+TEST_F(LuaHttpFilterTest, GetVirtualHostMetadataFromHandleNoRoute) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local metadata = request_handle:virtualHost():metadata()
+      request_handle:logTrace(metadata:get("foo.bar")["name"])
+      request_handle:logTrace(metadata:get("foo.bar")["prop"])
+    end
+    function envoy_on_response(response_handle)
+      local metadata = response_handle:virtualHost():metadata()
+      response_handle:logTrace(metadata:get("baz.bat")["name"])
+      response_handle:logTrace(metadata:get("baz.bat")["prop"])
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      lua-filter-config-name:
+        foo.bar:
+          name: foo
+          prop: bar
+        baz.bat:
+          name: baz
+          prop: bat
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+  setupVirtualHostMetadata(METADATA);
+
+  // Request path
+  ON_CALL(decoder_callbacks_, route()).WillByDefault(Return(nullptr));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "foo"},
+                                 {"trace", "bar"},
+                             }),
+                             {
+                               EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                         filter_->decodeHeaders(request_headers, true));
+                             });
+
+  // Response path
+  ON_CALL(encoder_callbacks_, route()).WillByDefault(Return(nullptr));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "baz"},
+                                 {"trace", "bat"},
+                             }),
+                             {
+                               EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                         filter_->encodeHeaders(response_headers, true));
+                             });
+}
+
+// Test that handle:route():metadata() returns metadata when route matches the request.
+// This verifies that when a route is found for the request, the route() function returns
+// a valid object and metadata can be successfully accessed from both request and response handles.
+TEST_F(LuaHttpFilterTest, GetRouteMetadataFromHandle) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local metadata = request_handle:route():metadata()
+      request_handle:logTrace(metadata:get("foo.bar")["name"])
+      request_handle:logTrace(metadata:get("foo.bar")["prop"])
+    end
+    function envoy_on_response(response_handle)
+      local metadata = response_handle:route():metadata()
+      response_handle:logTrace(metadata:get("baz.bat")["name"])
+      response_handle:logTrace(metadata:get("baz.bat")["prop"])
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      lua-filter-config-name:
+        foo.bar:
+          name: foo
+          prop: bar
+        baz.bat:
+          name: baz
+          prop: bat
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+  setupRouteMetadata(METADATA);
+
+  // Request path
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "foo"},
+                                 {"trace", "bar"},
+                             }),
+                             {
+                               EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                         filter_->decodeHeaders(request_headers, true));
+                             });
+
+  // Response path
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "baz"},
+                                 {"trace", "bat"},
+                             }),
+                             {
+                               EXPECT_EQ(Http::FilterHeadersStatus::Continue,
+                                         filter_->encodeHeaders(response_headers, true));
+                             });
+}
+
+// Test that handle:route():metadata() returns empty metadata when no filter-specific metadata
+// exists. This verifies that when a route has metadata for other filters but not for the
+// current one, the metadata object is empty.
+TEST_F(LuaHttpFilterTest, GetRouteMetadataFromHandleNoLuaMetadata) {
+  const std::string SCRIPT{R"EOF(
+    function is_metadata_empty(metadata)
+      for _, _ in pairs(metadata) do
+        return false
+      end
+      return true
+    end
+    function envoy_on_request(request_handle)
+      if is_metadata_empty(request_handle:route():metadata()) then
+        request_handle:logTrace("No metadata found during request handling")
+      end
+    end
+    function envoy_on_response(response_handle)
+      if is_metadata_empty(response_handle:route():metadata()) then
+        response_handle:logTrace("No metadata found during response handling")
+      end
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      envoy.some_filter:
+        foo.bar:
+          name: foo
+          prop: bar
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+  setupRouteMetadata(METADATA);
+
+  // Request path
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS("trace", "No metadata found during request handling", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  });
+
+  // Response path
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS("trace", "No metadata found during response handling", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+}
+
+// Test that handle:route() returns a valid route wrapper object that can be
+// safely accessed when no route matches the request.
+// This verifies that calling metadata() returns an empty metadata object.
+TEST_F(LuaHttpFilterTest, GetRouteFromHandleNoRoute) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      local route = request_handle:route()
+      for _, _ in pairs(route:metadata()) do
+        return
+      end
+      request_handle:logTrace("No metadata found during request handling")
+    end
+    function envoy_on_response(response_handle)
+      local route = response_handle:route()
+      for _, _ in pairs(route:metadata()) do
+        return
+      end
+      response_handle:logTrace("No metadata found during response handling")
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  // Request path
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_LOG_CONTAINS("trace", "No metadata found during request handling", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+  });
+
+  // Response path
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_LOG_CONTAINS("trace", "No metadata found during response handling", {
+    EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
+  });
+
+  EXPECT_EQ(0, stats_store_.counter("test.lua.errors").value());
 }
 
 } // namespace

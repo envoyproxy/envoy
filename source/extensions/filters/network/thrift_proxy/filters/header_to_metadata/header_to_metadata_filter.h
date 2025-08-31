@@ -81,7 +81,7 @@ public:
 
 private:
   using ProtobufRepeatedRule = Protobuf::RepeatedPtrField<ProtoRule>;
-  using StructMap = std::map<std::string, ProtobufWkt::Struct>;
+  using StructMap = std::map<std::string, Protobuf::Struct>;
 
   /**
    *  writeHeaderToMetadata encapsulates (1) searching for the header and (2) writing it to the

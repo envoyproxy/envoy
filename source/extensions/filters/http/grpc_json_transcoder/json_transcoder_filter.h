@@ -27,8 +27,8 @@ namespace GrpcJsonTranscoder {
 
 struct MethodInfo {
   const Protobuf::MethodDescriptor* descriptor_ = nullptr;
-  std::vector<const ProtobufWkt::Field*> request_body_field_path;
-  std::vector<const ProtobufWkt::Field*> response_body_field_path;
+  std::vector<const Protobuf::Field*> request_body_field_path;
+  std::vector<const Protobuf::Field*> response_body_field_path;
   bool request_type_is_http_body_ = false;
   bool response_type_is_http_body_ = false;
 };
@@ -113,7 +113,7 @@ private:
   void addFileDescriptor(const Protobuf::FileDescriptorProto& file);
   absl::Status resolveField(const Protobuf::Descriptor* descriptor,
                             const std::string& field_path_str,
-                            std::vector<const ProtobufWkt::Field*>* field_path, bool* is_http_body);
+                            std::vector<const Protobuf::Field*>* field_path, bool* is_http_body);
   absl::Status createMethodInfo(const Protobuf::MethodDescriptor* descriptor,
                                 const google::api::HttpRule& http_rule,
                                 MethodInfoSharedPtr& method_info);

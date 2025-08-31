@@ -44,9 +44,11 @@ public:
     return Upstream::Cluster::InitializePhase::Secondary;
   }
 
+  // Getters that return the values from ClusterImplBase.
+  Runtime::Loader& runtime() const { return runtime_; }
+  Random::RandomGenerator& random() const { return random_; }
+
   Upstream::ClusterManager& cluster_manager_;
-  Runtime::Loader& runtime_;
-  Random::RandomGenerator& random_;
   const ClusterSetConstSharedPtr clusters_;
 
 protected:
@@ -148,7 +150,7 @@ public:
   // Upstream::LoadBalancerFactory
   Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
     return std::make_unique<AggregateClusterLoadBalancer>(
-        cluster_.info(), cluster_.cluster_manager_, cluster_.runtime_, cluster_.random_,
+        cluster_.info(), cluster_.cluster_manager_, cluster_.runtime(), cluster_.random(),
         cluster_.clusters_);
   }
 

@@ -436,8 +436,10 @@ void Filter::UpstreamCallbacks::onEvent(Network::ConnectionEvent event) {
 }
 
 void Filter::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
+  // In case when upstream connection is draining `parent_` will be set to nullptr.
   // TCP Tunneling may call on high/low watermark multiple times.
-  ASSERT(parent_->config_->tunnelingConfigHelper() || !on_high_watermark_called_);
+  ASSERT(parent_ == nullptr || parent_->config_->tunnelingConfigHelper() ||
+         !on_high_watermark_called_);
   on_high_watermark_called_ = true;
 
   if (parent_ != nullptr) {
@@ -447,8 +449,10 @@ void Filter::UpstreamCallbacks::onAboveWriteBufferHighWatermark() {
 }
 
 void Filter::UpstreamCallbacks::onBelowWriteBufferLowWatermark() {
+  // In case when upstream connection is draining `parent_` will be set to nullptr.
   // TCP Tunneling may call on high/low watermark multiple times.
-  ASSERT(parent_->config_->tunnelingConfigHelper() || on_high_watermark_called_);
+  ASSERT(parent_ == nullptr || parent_->config_->tunnelingConfigHelper() ||
+         on_high_watermark_called_);
   on_high_watermark_called_ = false;
 
   if (parent_ != nullptr) {
@@ -761,8 +765,7 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
       // TODO(vikaschoudhary16): figure out which of the following router_config_ members are
       // not required by tcp_proxy and move them to a different class
       router_config_(context.serverFactoryContext(), route_stat_name_storage_.statName(),
-                     context.serverFactoryContext().localInfo(), stats_scope,
-                     context.serverFactoryContext().clusterManager(),
+                     stats_scope, context.serverFactoryContext().clusterManager(),
                      context.serverFactoryContext().runtime(),
                      context.serverFactoryContext().api().randomGenerator(),
                      std::make_unique<Router::ShadowWriterImpl>(

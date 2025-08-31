@@ -34,7 +34,7 @@ public:
                       HttpServerPropertiesCacheSharedPtr cache,
                       Server::OverloadManager& overload_manager)
       : HttpConnPoolImplMixed(dispatcher, random,
-                              Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()),
+                              Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
                               Upstream::ResourcePriority::Default, nullptr, nullptr, state, origin,
                               cache, overload_manager) {}
 };

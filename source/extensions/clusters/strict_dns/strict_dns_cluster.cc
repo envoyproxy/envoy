@@ -165,8 +165,7 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
                                  lb_endpoint_.load_balancing_weight().value(),
                                  locality_lb_endpoints_.locality(),
                                  lb_endpoint_.endpoint().health_check_config(),
-                                 locality_lb_endpoints_.priority(), lb_endpoint_.health_status(),
-                                 parent_.time_source_),
+                                 locality_lb_endpoints_.priority(), lb_endpoint_.health_status()),
                 std::unique_ptr<HostImpl>));
             all_new_hosts.emplace(address->asString());
             ttl_refresh_rate = min(ttl_refresh_rate, addrinfo.ttl_);
@@ -233,28 +232,6 @@ void StrictDnsClusterImpl::ResolveTarget::startResolve() {
         resolve_timer_->enableTimer(final_refresh_rate);
       });
 }
-
-absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
-StrictDnsClusterFactory::createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                                           Upstream::ClusterFactoryContext& context) {
-  absl::StatusOr<std::unique_ptr<StrictDnsClusterImpl>> cluster_or_error;
-  auto dns_resolver_or_error = selectDnsResolver(cluster, context);
-  RETURN_IF_NOT_OK(dns_resolver_or_error.status());
-
-  envoy::extensions::clusters::dns::v3::DnsCluster proto_config_legacy{};
-  createDnsClusterFromLegacyFields(cluster, proto_config_legacy);
-  cluster_or_error = StrictDnsClusterImpl::create(cluster, proto_config_legacy, context,
-                                                  std::move(*dns_resolver_or_error));
-
-  RETURN_IF_NOT_OK(cluster_or_error.status());
-  return std::make_pair(std::shared_ptr<StrictDnsClusterImpl>(std::move(*cluster_or_error)),
-                        nullptr);
-}
-
-/**
- * Static registration for the strict dns cluster factory. @see RegisterFactory.
- */
-REGISTER_FACTORY(StrictDnsClusterFactory, ClusterFactory);
 
 } // namespace Upstream
 } // namespace Envoy

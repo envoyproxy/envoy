@@ -262,13 +262,15 @@ typedef enum {
  */
 typedef enum {
   // stream's dynamic metadata.
-  envoy_dynamic_module_type_metadata_source_dynamic,
+  envoy_dynamic_module_type_metadata_source_Dynamic,
   // route metadata
-  envoy_dynamic_module_type_metadata_source_route,
+  envoy_dynamic_module_type_metadata_source_Route,
   // cluster metadata
-  envoy_dynamic_module_type_metadata_source_cluster,
+  envoy_dynamic_module_type_metadata_source_Cluster,
   // host (LbEndpoint in xDS) metadata
-  envoy_dynamic_module_type_metadata_source_host,
+  envoy_dynamic_module_type_metadata_source_Host,
+  // host locality (LocalityLbEndpoints in xDS) metadata
+  envoy_dynamic_module_type_metadata_source_HostLocality,
 } envoy_dynamic_module_type_metadata_source;
 
 /**
@@ -341,21 +343,21 @@ typedef enum {
   // connection.tls_version
   envoy_dynamic_module_type_attribute_id_ConnectionTlsVersion,
   // connection.subject_local_certificate
-  envoy_dynamic_module_type_attribute_id_ConnectionSubjectLocalCertifica,
+  envoy_dynamic_module_type_attribute_id_ConnectionSubjectLocalCertificate,
   // connection.subject_peer_certificate
-  envoy_dynamic_module_type_attribute_id_ConnectionSubjectPeerCertificat,
+  envoy_dynamic_module_type_attribute_id_ConnectionSubjectPeerCertificate,
   // connection.dns_san_local_certificate
-  envoy_dynamic_module_type_attribute_id_ConnectionDnsSanLocalCertifica,
+  envoy_dynamic_module_type_attribute_id_ConnectionDnsSanLocalCertificate,
   // connection.dns_san_peer_certificate
-  envoy_dynamic_module_type_attribute_id_ConnectionDnsSanPeerCertificat,
+  envoy_dynamic_module_type_attribute_id_ConnectionDnsSanPeerCertificate,
   // connection.uri_san_local_certificate
-  envoy_dynamic_module_type_attribute_id_ConnectionUriSanLocalCertifica,
+  envoy_dynamic_module_type_attribute_id_ConnectionUriSanLocalCertificate,
   // connection.uri_san_peer_certificate
-  envoy_dynamic_module_type_attribute_id_ConnectionUriSanPeerCertificat,
+  envoy_dynamic_module_type_attribute_id_ConnectionUriSanPeerCertificate,
   // connection.sha256_peer_certificate_digest
-  envoy_dynamic_module_type_attribute_id_ConnectionSha256PeerCertificate,
+  envoy_dynamic_module_type_attribute_id_ConnectionSha256PeerCertificateDigest,
   // connection.transport_failure_reason
-  envoy_dynamic_module_type_attribute_id_ConnectionTransportFailureReaso,
+  envoy_dynamic_module_type_attribute_id_ConnectionTransportFailureReason,
   // connection.termination_details
   envoy_dynamic_module_type_attribute_id_ConnectionTerminationDetails,
   // upstream.address
@@ -377,7 +379,7 @@ typedef enum {
   // upstream.uri_san_peer_certificate
   envoy_dynamic_module_type_attribute_id_UpstreamUriSanPeerCertificate,
   // upstream.sha256_peer_certificate_digest
-  envoy_dynamic_module_type_attribute_id_UpstreamSha256PeerCertificateD,
+  envoy_dynamic_module_type_attribute_id_UpstreamSha256PeerCertificateDigest,
   // upstream.local_address
   envoy_dynamic_module_type_attribute_id_UpstreamLocalAddress,
   // upstream.transport_failure_reason
@@ -411,6 +413,21 @@ typedef enum {
   // xds.filter_chain_name
   envoy_dynamic_module_type_attribute_id_XdsFilterChainName,
 } envoy_dynamic_module_type_attribute_id;
+
+/**
+ * envoy_dynamic_module_type_log_level represents the log level passed to
+ * envoy_dynamic_module_callback_log. This corresponds to the enum defined in
+ * source/common/common/base_logger.h.
+ */
+typedef enum {
+  envoy_dynamic_module_type_log_level_Trace,
+  envoy_dynamic_module_type_log_level_Debug,
+  envoy_dynamic_module_type_log_level_Info,
+  envoy_dynamic_module_type_log_level_Warn,
+  envoy_dynamic_module_type_log_level_Error,
+  envoy_dynamic_module_type_log_level_Critical,
+  envoy_dynamic_module_type_log_level_Off,
+} envoy_dynamic_module_type_log_level;
 
 /**
  * envoy_dynamic_module_type_http_callout_init_result represents the result of the HTTP callout
@@ -724,6 +741,31 @@ void envoy_dynamic_module_on_http_filter_scheduled(
 //
 // Callbacks are functions implemented by Envoy that can be called by the module to interact with
 // Envoy. The name of a callback must be prefixed with "envoy_dynamic_module_callback_".
+
+// --------------------------------- Logging -----------------------------------
+
+/**
+ * envoy_dynamic_module_callback_log is called by the module to log a message as part
+ * of the standard Envoy logging stream under [dynamic_modules] Id.
+ *
+ * @param level is the log level of the message.
+ * @param message_ptr is the pointer to the message to be logged.
+ * @param message_length is the length of the message.
+ *
+ */
+void envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level level,
+                                       const char* message_ptr, size_t message_length);
+
+/**
+ * envoy_dynamic_module_callback_log_enabled is called by the module to check if the log level is
+ * enabled for logging for the dynamic modules Id. This can be used to avoid unnecessary
+ * string formatting and allocation if the log level is not enabled since calling this function
+ * should be negligible in terms of performance.
+ *
+ * @param level is the log level to check.
+ * @return true if the log level is enabled, false otherwise.
+ */
+bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level level);
 
 // ---------------------- HTTP Header/Trailer callbacks ------------------------
 

@@ -34,8 +34,6 @@ static_resources:
                   cluster: cluster_0
                   upgrade_configs:
                   - upgrade_type: CONNECT
-                    connect_config:
-                      {}
           http_filters:
           - name: envoy.filters.http.router
             typed_config:

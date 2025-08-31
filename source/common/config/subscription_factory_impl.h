@@ -3,6 +3,7 @@
 #include "envoy/api/api.h"
 #include "envoy/common/random_generator.h"
 #include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/config/xds_config_tracker.h"
@@ -29,6 +30,10 @@ public:
   absl::StatusOr<SubscriptionPtr> subscriptionFromConfigSource(
       const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
       Stats::Scope& scope, SubscriptionCallbacks& callbacks,
+      OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) override;
+  absl::StatusOr<SubscriptionPtr> subscriptionOverAdsGrpcMux(
+      GrpcMuxSharedPtr& ads_grpc_mux, const envoy::config::core::v3::ConfigSource& config,
+      absl::string_view type_url, Stats::Scope& scope, SubscriptionCallbacks& callbacks,
       OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) override;
   absl::StatusOr<SubscriptionPtr>
   collectionSubscriptionFromUrl(const xds::core::v3::ResourceLocator& collection_locator,

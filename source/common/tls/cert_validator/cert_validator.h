@@ -90,10 +90,12 @@ public:
    * @param contexts the store context
    * @param handshaker_provides_certificates whether or not a handshaker implementation provides
    * certificates itself.
+   * @param scope the stats scope.
    * @return the ssl verification mode flag or an error if initialization failed.
    */
   virtual absl::StatusOr<int> initializeSslContexts(std::vector<SSL_CTX*> contexts,
-                                                    bool handshaker_provides_certificates) PURE;
+                                                    bool handshaker_provides_certificates,
+                                                    Stats::Scope& scope) PURE;
 
   /**
    * Called when calculation hash for session context ids. This hash MUST include all

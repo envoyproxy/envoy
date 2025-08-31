@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 
 #include "envoy/buffer/buffer.h"
@@ -45,7 +46,11 @@ public:
         filter_manager_connection_(filter_manager_connection),
         async_stream_blockage_change_(
             filter_manager_connection.dispatcher().createSchedulableCallback(
-                [this]() { switchStreamBlockState(); })) {}
+                [this]() { switchStreamBlockState(); })) {
+    if (http3_options_.disable_connection_flow_control_for_streams()) {
+      quic_stream_.DisableConnectionFlowControlForThisStream();
+    }
+  }
 
   ~EnvoyQuicStream() override = default;
 
@@ -110,7 +115,19 @@ public:
       send_buffer_simulation_.checkHighWatermark(new_buffered_bytes);
     } else {
       send_buffer_simulation_.checkLowWatermark(new_buffered_bytes);
+      ENVOY_BUG(
+          old_buffered_bytes - new_buffered_bytes <= reported_buffered_bytes_,
+          fmt::format("Quic stream {} previously reported {} bytes buffered to connection, which "
+                      "is insufficient to be subtracted from for the current drain of {} bytes.",
+                      quic_stream_.id(), reported_buffered_bytes_,
+                      (old_buffered_bytes - new_buffered_bytes)));
     }
+    // This value can momentarily be inconsistent with new_buffered_bytes when
+    // the buffer goes below low watermark and triggers a write in the
+    // onBelowWriteBufferLowWatermark() callstack. In this case, any buffered data from the nested
+    // write will increase reported_buffered_bytes_ and the connection level bookkeeping before the
+    // reduction of the value in the nesting call to be reported.
+    reported_buffered_bytes_ += (new_buffered_bytes - old_buffered_bytes);
     filter_manager_connection_.updateBytesBuffered(old_buffered_bytes, new_buffered_bytes);
   }
 
@@ -141,6 +158,29 @@ public:
       saw_regular_headers_ = true;
     }
     return Http::HeaderUtility::HeaderValidationResult::ACCEPT;
+  }
+
+  void startHeaderBlock() override {
+    if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.validate_http3_pseudo_headers")) {
+      return;
+    }
+    header_validator_.StartHeaderBlock();
+  }
+
+  bool finishHeaderBlock(bool is_trailing_headers) override {
+    if (!Runtime::runtimeFeatureEnabled("envoy.restart_features.validate_http3_pseudo_headers")) {
+      return true;
+    }
+    if (is_trailing_headers) {
+      return header_validator_.FinishHeaderBlock(quic_session_.perspective() ==
+                                                         quic::Perspective::IS_CLIENT
+                                                     ? http2::adapter::HeaderType::RESPONSE_TRAILER
+                                                     : http2::adapter::HeaderType::REQUEST_TRAILER);
+    }
+    return header_validator_.FinishHeaderBlock(quic_session_.perspective() ==
+                                                       quic::Perspective::IS_CLIENT
+                                                   ? http2::adapter::HeaderType::RESPONSE
+                                                   : http2::adapter::HeaderType::REQUEST);
   }
 
   absl::string_view responseDetails() override { return details_; }
@@ -178,6 +218,14 @@ protected:
 
   StreamInfo::BytesMeterSharedPtr& mutableBytesMeter() { return bytes_meter_; }
 
+  void addDecompressedHeaderBytesSent(const quiche::HttpHeaderBlock& headers) {
+    bytes_meter_->addDecompressedHeaderBytesSent(headers.TotalBytesUsed());
+  }
+
+  void addDecompressedHeaderBytesReceived(const quic::QuicHeaderList& header_list) {
+    bytes_meter_->addDecompressedHeaderBytesReceived(header_list.uncompressed_header_bytes());
+  }
+
   void encodeTrailersImpl(quiche::HttpHeaderBlock&& trailers);
 
   // Converts `header_list` into a new `Http::MetadataMap`.
@@ -190,6 +238,10 @@ protected:
     received_metadata_bytes_ += bytes;
     return received_metadata_bytes_ > 1 << 20;
   }
+
+  std::string quicStreamState();
+
+  http2::adapter::HeaderValidator& header_validator() { return header_validator_; }
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   // Setting |http_datagram_handler_| enables HTTP Datagram support.
@@ -245,6 +297,9 @@ private:
   size_t received_content_bytes_{0};
   http2::adapter::HeaderValidator header_validator_;
   size_t received_metadata_bytes_{0};
+  // Track the buffered bytes reported to connection in the
+  // most recent call of updateBytesBuffered().
+  uint64_t reported_buffered_bytes_{0u};
 };
 
 // Object used for updating a BytesMeter to track bytes sent on a QuicStream since this object was

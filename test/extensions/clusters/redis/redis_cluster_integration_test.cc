@@ -677,34 +677,35 @@ TEST_P(RedisAdsIntegrationTest, RedisClusterRemoval) {
   initialize();
 
   // Send initial configuration with a redis cluster and a redis proxy listener.
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, {}, {}, true));
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      Config::TypeUrl::get().Cluster, {buildRedisCluster("redis_cluster")},
+      Config::TestTypeUrl::get().Cluster, {buildRedisCluster("redis_cluster")},
       {buildRedisCluster("redis_cluster")}, {}, "1");
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "",
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "",
                                       {"redis_cluster"}, {"redis_cluster"}, {}));
   sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
-      Config::TypeUrl::get().ClusterLoadAssignment, {buildClusterLoadAssignment("redis_cluster")},
-      {buildClusterLoadAssignment("redis_cluster")}, {}, "1");
+      Config::TestTypeUrl::get().ClusterLoadAssignment,
+      {buildClusterLoadAssignment("redis_cluster")}, {buildClusterLoadAssignment("redis_cluster")},
+      {}, "1");
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "1", {}, {}, {}));
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "1", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}, {}, {}));
   sendDiscoveryResponse<envoy::config::listener::v3::Listener>(
-      Config::TypeUrl::get().Listener, {buildRedisListener("listener_0", "redis_cluster")},
+      Config::TestTypeUrl::get().Listener, {buildRedisListener("listener_0", "redis_cluster")},
       {buildRedisListener("listener_0", "redis_cluster")}, {}, "1");
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().ClusterLoadAssignment, "1",
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().ClusterLoadAssignment, "1",
                                       {"redis_cluster"}, {}, {}));
 
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Listener, "1", {}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Listener, "1", {}, {}, {}));
 
   // Validate that redis listener is successfully created.
   test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
 
   // Now send a CDS update, removing redis cluster added above.
   sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
-      Config::TypeUrl::get().Cluster, {buildCluster("cluster_2")}, {buildCluster("cluster_2")},
+      Config::TestTypeUrl::get().Cluster, {buildCluster("cluster_2")}, {buildCluster("cluster_2")},
       {"redis_cluster"}, "2");
 
   // Validate that the cluster is removed successfully.

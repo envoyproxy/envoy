@@ -37,9 +37,9 @@ public:
     return mode == Filters::Common::RBAC::EnforcementMode::Enforced ? engine_.get()
                                                                     : shadow_engine_.get();
   }
-  std::string rulesStatPrefix() const { return rules_stat_prefix_; }
+  absl::string_view rulesStatPrefix() const { return rules_stat_prefix_; }
 
-  std::string shadowRulesStatPrefix() const { return shadow_rules_stat_prefix_; }
+  absl::string_view shadowRulesStatPrefix() const { return shadow_rules_stat_prefix_; }
 
   bool perRuleStatsEnabled() const { return per_rule_stats_; }
 
@@ -126,12 +126,11 @@ public:
 
 private:
   // Handles shadow engine evaluation and updates metrics
-  bool evaluateShadowEngine(const Http::RequestHeaderMap& headers,
-                            ProtobufWkt::Struct& metrics) const;
+  bool evaluateShadowEngine(const Http::RequestHeaderMap& headers, Protobuf::Struct& metrics) const;
 
   // Handles enforced engine evaluation and updates metrics
   Http::FilterHeadersStatus evaluateEnforcedEngine(Http::RequestHeaderMap& headers,
-                                                   ProtobufWkt::Struct& metrics) const;
+                                                   Protobuf::Struct& metrics) const;
 
   RoleBasedAccessControlFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* callbacks_{};

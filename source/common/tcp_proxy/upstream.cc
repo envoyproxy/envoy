@@ -309,7 +309,7 @@ std::unique_ptr<Router::GenericConnPool> HttpConnPool::createConnPool(
     return nullptr;
   }
 
-  ProtobufWkt::Any message;
+  Protobuf::Any message;
   if (cluster.info()->upstreamConfig()) {
     message = cluster.info()->upstreamConfig()->typed_config();
   }
@@ -385,6 +385,7 @@ void HttpConnPool::onPoolReady(Http::RequestEncoder& request_encoder,
   }
 
   upstream_handle_ = nullptr;
+  downstream_info_.setUpstreamBytesMeter(request_encoder.getStream().bytesMeter());
   upstream_->setRequestEncoder(request_encoder,
                                host->transportSocketFactory().implementsSecureTransport());
   upstream_->setConnPoolCallbacks(std::make_unique<HttpConnPool::Callbacks>(

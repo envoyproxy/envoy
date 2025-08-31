@@ -910,8 +910,7 @@ TEST_P(QuicListenerExtensionDiscoveryIntegrationTest, BadEcdsUpdateWithoutDefaul
   Network::ClientConnectionPtr conn = makeClientConnection(lookupPort(port_name_));
   std::shared_ptr<Upstream::MockClusterInfo> cluster{new NiceMock<Upstream::MockClusterInfo>()};
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
-      cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
-      timeSystem())};
+      cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
   auto codec = std::make_unique<IntegrationCodecClient>(
       *dispatcher_, random_, std::move(conn), host_description, downstream_protocol_, true);
   EXPECT_TRUE(codec->disconnected());

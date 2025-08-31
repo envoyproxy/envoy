@@ -30,9 +30,9 @@ Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const 
   const auto days_until_expiry = Utility::getDaysUntilExpiration(cert, time_source).value_or(0);
   certificate_details->set_days_until_expiration(days_until_expiry);
 
-  ProtobufWkt::Timestamp* valid_from = certificate_details->mutable_valid_from();
+  Protobuf::Timestamp* valid_from = certificate_details->mutable_valid_from();
   TimestampUtil::systemClockToTimestamp(Utility::getValidFrom(*cert), *valid_from);
-  ProtobufWkt::Timestamp* expiration_time = certificate_details->mutable_expiration_time();
+  Protobuf::Timestamp* expiration_time = certificate_details->mutable_expiration_time();
   TimestampUtil::systemClockToTimestamp(Utility::getExpirationTime(*cert), *expiration_time);
 
   for (auto& dns_san : Utility::getSubjectAltNames(*cert, GEN_DNS)) {
@@ -417,6 +417,17 @@ Envoy::Ssl::ParsedX509NamePtr Utility::parseIssuerFromCertificate(X509& cert) {
 
 Envoy::Ssl::ParsedX509NamePtr Utility::parseSubjectFromCertificate(X509& cert) {
   return parseX509NameFromCertificate(cert, CertName::Subject);
+}
+
+std::chrono::seconds Utility::getExpirationUnixTime(const X509* cert) {
+  if (cert == nullptr) {
+    return std::chrono::seconds::max();
+  }
+  // Obtain the expiration time as system time
+  SystemTime expiration_time = Utility::getExpirationTime(*cert);
+
+  // Convert the time to duration since epoch
+  return std::chrono::duration_cast<std::chrono::seconds>(expiration_time.time_since_epoch());
 }
 
 absl::optional<uint32_t> Utility::getDaysUntilExpiration(const X509* cert,

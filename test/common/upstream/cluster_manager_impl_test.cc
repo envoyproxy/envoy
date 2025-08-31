@@ -74,7 +74,7 @@ public:
     return std::make_unique<AlpnSocketFactory>();
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
 };
 
@@ -183,8 +183,9 @@ TEST_F(ClusterManagerImplTest, OutlierEventLog) {
   }
   )EOF";
 
-  EXPECT_CALL(log_manager_, createAccessLog(Filesystem::FilePathAndType{
-                                Filesystem::DestinationType::File, "foo"}));
+  EXPECT_CALL(
+      factory_.server_context_.access_log_manager_,
+      createAccessLog(Filesystem::FilePathAndType{Filesystem::DestinationType::File, "foo"}));
   create(parseBootstrapFromV3Json(json));
 }
 
@@ -193,7 +194,7 @@ TEST_F(ClusterManagerImplTest, AdsCluster) {
   // can be set on.
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux =
       std::make_shared<NiceMock<Config::MockGrpcMux>>();
-  ON_CALL(xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
+  ON_CALL(factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
 
   const std::string yaml = R"EOF(
   dynamic_resources:
@@ -229,7 +230,7 @@ TEST_F(ClusterManagerImplTest, AdsClusterStartsMuxOnlyOnce) {
   // can be set on.
   std::shared_ptr<NiceMock<Config::MockGrpcMux>> ads_mux =
       std::make_shared<NiceMock<Config::MockGrpcMux>>();
-  ON_CALL(xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
+  ON_CALL(factory_.server_context_.xds_manager_, adsMux()).WillByDefault(Return(ads_mux));
 
   const std::string yaml = R"EOF(
   dynamic_resources:
@@ -634,7 +635,7 @@ TEST_F(ClusterManagerImplTest, ClusterProvidedLbNoLb) {
           ReturnRef(Config::Utility::getAndCheckFactoryByName<Upstream::TypedLoadBalancerFactory>(
               "envoy.load_balancing_policies.cluster_provided")));
 
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Json(json)), EnvoyException,
                             "cluster manager: cluster provided LB specified but cluster "
@@ -648,7 +649,7 @@ TEST_F(ClusterManagerImplTest, ClusterProvidedLbNotConfigured) {
 
   std::shared_ptr<MockClusterMockPrioritySet> cluster1(new NiceMock<MockClusterMockPrioritySet>());
   cluster1->info_->name_ = "cluster_0";
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster1, new MockThreadAwareLoadBalancer())));
   EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV3Json(json)), EnvoyException,
                             "cluster manager: cluster provided LB not specified but cluster "
@@ -1773,7 +1774,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     // Using Struct instead of a custom per-filter empty config proto
     // This is only allowed in tests.
-    return std::make_unique<Envoy::ProtobufWkt::Struct>();
+    return std::make_unique<Envoy::Protobuf::Struct>();
   }
   std::string name() const override { return "envoy.test.filter"; }
 };
@@ -1821,8 +1822,8 @@ class ClusterManagerInitHelperTest : public testing::Test {
 public:
   MOCK_METHOD(void, onClusterInit, (ClusterManagerCluster & cluster));
 
-  NiceMock<MockClusterManager> cm_;
-  ClusterManagerInitHelper init_helper_{cm_, [this](ClusterManagerCluster& cluster) {
+  NiceMock<Config::MockXdsManager> xds_manager_;
+  ClusterManagerInitHelper init_helper_{xds_manager_, [this](ClusterManagerCluster& cluster) {
                                           onClusterInit(cluster);
                                           return absl::OkStatus();
                                         }};

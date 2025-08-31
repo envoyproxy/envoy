@@ -134,10 +134,9 @@ class LuaClusterSpecifierPlugin : public Envoy::Router::ClusterSpecifierPlugin,
                                   Logger::Loggable<Logger::Id::lua> {
 public:
   LuaClusterSpecifierPlugin(LuaClusterSpecifierConfigSharedPtr config);
-  Envoy::Router::RouteConstSharedPtr
-  route(Envoy::Router::RouteEntryAndRouteConstSharedPtr parent,
-        const Http::RequestHeaderMap& header,
-        const StreamInfo::StreamInfo& stream_info) const override;
+  Envoy::Router::RouteConstSharedPtr route(Envoy::Router::RouteEntryAndRouteConstSharedPtr parent,
+                                           const Http::RequestHeaderMap& header,
+                                           const StreamInfo::StreamInfo&, uint64_t) const override;
 
 private:
   std::string startLua(const Http::HeaderMap& headers) const;

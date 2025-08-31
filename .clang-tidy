@@ -71,8 +71,7 @@ CheckOptions:
     |^value_or$|
     |^Ip6(ntohl|htonl)$|
     |^get_$|
-    |^HeaderHasValue(Ref)?$|
-    |^HeaderValueOf$|
+    |^ContainsHeader$|
     |^Is(Superset|Subset)OfHeaders$|
     |^LLVMFuzzerInitialize$|
     |^LLVMFuzzerTestOneInput$|

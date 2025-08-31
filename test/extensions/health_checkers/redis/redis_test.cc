@@ -258,8 +258,7 @@ public:
   }
 
   void exerciseStubs() {
-    Upstream::HostSharedPtr host =
-        Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:100", simTime());
+    Upstream::HostSharedPtr host = Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:100");
     RedisHealthChecker::RedisActiveHealthCheckSessionPtr session =
         std::make_unique<RedisHealthChecker::RedisActiveHealthCheckSession>(*health_checker_, host);
 
@@ -299,7 +298,7 @@ TEST_F(RedisHealthCheckerTest, PingWithAuth) {
   setupWithAuth();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
 
   expectSessionCreate();
   expectClientCreate();
@@ -347,7 +346,7 @@ TEST_F(RedisHealthCheckerTest, ExistsWithAuth) {
   setupExistsHealthcheckWithAuth();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
 
   expectSessionCreate();
   expectClientCreate();
@@ -393,7 +392,7 @@ TEST_F(RedisHealthCheckerTest, PingAndVariousFailures) {
   exerciseStubs();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
 
   expectSessionCreate();
   expectClientCreate();
@@ -461,7 +460,7 @@ TEST_F(RedisHealthCheckerTest, FailuresLogging) {
   setupAlwaysLogHealthCheckFailures();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
 
   expectSessionCreate();
   expectClientCreate();
@@ -519,7 +518,7 @@ TEST_F(RedisHealthCheckerTest, LogInitialFailure) {
   setup();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
 
   expectSessionCreate();
   expectClientCreate();
@@ -569,7 +568,7 @@ TEST_F(RedisHealthCheckerTest, Exists) {
   setupExistsHealthcheck();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
 
   expectSessionCreate();
   expectClientCreate();
@@ -623,7 +622,7 @@ TEST_F(RedisHealthCheckerTest, ExistsRedirected) {
   setupExistsHealthcheck();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
 
   expectSessionCreate();
   expectClientCreate();
@@ -667,7 +666,7 @@ TEST_F(RedisHealthCheckerTest, NoConnectionReuse) {
   setupDontReuseConnection();
 
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80", simTime())};
+      Upstream::makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
 
   expectSessionCreate();
   expectClientCreate();
@@ -746,9 +745,8 @@ TEST(RedisHealthCheckerIamAuthTest, CheckTokenIsRetrieved) {
   Api::ApiPtr api = Api::createApiForTest();
   Envoy::Extensions::Common::Aws::CredentialsPendingCallback capture;
 
-  Event::SimulatedTimeSystem sim;
   cluster->prioritySet().getMockHostSet(0)->hosts_ = {
-      Upstream::makeTestHost(cluster->info_, "tcp://127.0.0.1:80", sim)};
+      Upstream::makeTestHost(cluster->info_, "tcp://127.0.0.1:80")};
 
   auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
 

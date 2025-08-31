@@ -10,14 +10,12 @@ namespace Extensions {
 namespace Router {
 namespace Matcher {
 
-Envoy::Matcher::ActionFactoryCb ClusterActionFactory::createActionFactoryCb(
-    const Protobuf::Message& config, ClusterActionContext&,
-    ProtobufMessage::ValidationVisitor& validation_visitor) {
+Envoy::Matcher::ActionConstSharedPtr
+ClusterActionFactory::createAction(const Protobuf::Message& config, ClusterActionContext&,
+                                   ProtobufMessage::ValidationVisitor& validation_visitor) {
   const auto& proto_config =
       MessageUtil::downcastAndValidate<const ClusterActionProto&>(config, validation_visitor);
-  auto cluster = std::make_shared<std::string>(proto_config.cluster());
-
-  return [cluster]() { return std::make_unique<ClusterAction>(cluster); };
+  return std::make_shared<ClusterAction>(proto_config.cluster());
 }
 
 REGISTER_FACTORY(ClusterActionFactory, Envoy::Matcher::ActionFactory<ClusterActionContext>);
@@ -33,7 +31,7 @@ public:
   }
 
   void refreshRouteCluster(const Http::RequestHeaderMap& headers,
-                           const StreamInfo::StreamInfo& stream_info) {
+                           const StreamInfo::StreamInfo& stream_info) const override {
     Http::Matching::HttpMatchingDataImpl data(stream_info);
     data.onRequestHeaders(headers);
 
@@ -43,20 +41,18 @@ public:
     if (!match_result.isMatch()) {
       return;
     }
-
-    const Envoy::Matcher::ActionPtr result = match_result.action();
-    cluster_name_.emplace(result->getTyped<ClusterAction>().cluster());
+    cluster_name_.emplace(match_result.action()->getTyped<ClusterAction>().cluster());
   }
 
 private:
   Envoy::Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> match_tree_;
-  OptRef<const std::string> cluster_name_;
+  mutable OptRef<const std::string> cluster_name_;
 };
 
 Envoy::Router::RouteConstSharedPtr
 MatcherClusterSpecifierPlugin::route(Envoy::Router::RouteEntryAndRouteConstSharedPtr parent,
                                      const Http::RequestHeaderMap& headers,
-                                     const StreamInfo::StreamInfo& stream_info) const {
+                                     const StreamInfo::StreamInfo& stream_info, uint64_t) const {
   auto matcher_route = std::make_shared<MatcherRouteEntry>(parent, match_tree_);
   matcher_route->refreshRouteCluster(headers, stream_info);
   return matcher_route;

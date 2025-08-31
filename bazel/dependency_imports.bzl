@@ -24,14 +24,20 @@ load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
 
 # go version for rules_go
-GO_VERSION = "1.23.1"
+GO_VERSION = "1.24.6"
 
 JQ_VERSION = "1.7"
 YQ_VERSION = "4.24.4"
 
-BUF_VERSION = "v1.50.0"
+BUF_SHA = "5790beb45aaf51a6d7e68ca2255b22e1b14c9ae405a6c472cdcfc228c66abfc1"
+BUF_VERSION = "v1.56.0"
 
-def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, yq_version = YQ_VERSION, buf_version = BUF_VERSION):
+def envoy_dependency_imports(
+        go_version = GO_VERSION,
+        jq_version = JQ_VERSION,
+        yq_version = YQ_VERSION,
+        buf_sha = BUF_SHA,
+        buf_version = BUF_VERSION):
     rules_foreign_cc_dependencies()
     go_rules_dependencies()
     go_register_toolchains(go_version)
@@ -75,7 +81,10 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     register_yq_toolchains(version = yq_version)
     parser_deps()
 
-    rules_buf_toolchains(version = buf_version)
+    rules_buf_toolchains(
+        sha256 = buf_sha,
+        version = buf_version,
+    )
 
     setup_sanitizer_libs()
 

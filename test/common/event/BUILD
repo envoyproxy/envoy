@@ -19,7 +19,6 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//source/common/network:address_lib",
         "//source/common/stats:isolated_store_lib",
-        "//test/mocks:common_lib",
         "//test/mocks/server:watch_dog_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:simulated_time_system_lib",

@@ -167,14 +167,14 @@ public:
    *
    * @param struct_format the proto struct format configuration.
    */
-  FormatElements fromStruct(const ProtobufWkt::Struct& struct_format);
+  FormatElements fromStruct(const Protobuf::Struct& struct_format);
 
 private:
-  using ProtoDict = Protobuf::Map<std::string, ProtobufWkt::Value>;
-  using ProtoList = Protobuf::RepeatedPtrField<ProtobufWkt::Value>;
+  using ProtoDict = Protobuf::Map<std::string, Protobuf::Value>;
+  using ProtoList = Protobuf::RepeatedPtrField<Protobuf::Value>;
 
   void formatValueToFormatElements(const ProtoDict& dict_value);
-  void formatValueToFormatElements(const ProtobufWkt::Value& value);
+  void formatValueToFormatElements(const Protobuf::Value& value);
   void formatValueToFormatElements(const ProtoList& list_value);
 
   std::string buffer_;                       // JSON writer buffer.
@@ -183,7 +183,7 @@ private:
 };
 
 JsonFormatBuilder::FormatElements
-JsonFormatBuilder::fromStruct(const ProtobufWkt::Struct& struct_format) {
+JsonFormatBuilder::fromStruct(const Protobuf::Struct& struct_format) {
   elements_.clear();
 
   // This call will iterate through the map tree and serialize the key/values as JSON.
@@ -197,16 +197,16 @@ JsonFormatBuilder::fromStruct(const ProtobufWkt::Struct& struct_format) {
   return std::move(elements_);
 };
 
-void JsonFormatBuilder::formatValueToFormatElements(const ProtobufWkt::Value& value) {
+void JsonFormatBuilder::formatValueToFormatElements(const Protobuf::Value& value) {
   switch (value.kind_case()) {
-  case ProtobufWkt::Value::KIND_NOT_SET:
-  case ProtobufWkt::Value::kNullValue:
+  case Protobuf::Value::KIND_NOT_SET:
+  case Protobuf::Value::kNullValue:
     serializer_.addNull();
     break;
-  case ProtobufWkt::Value::kNumberValue:
+  case Protobuf::Value::kNumberValue:
     serializer_.addNumber(value.number_value());
     break;
-  case ProtobufWkt::Value::kStringValue: {
+  case Protobuf::Value::kStringValue: {
     absl::string_view string_format = value.string_value();
     if (!absl::StrContains(string_format, '%')) {
       serializer_.addString(string_format);
@@ -223,13 +223,13 @@ void JsonFormatBuilder::formatValueToFormatElements(const ProtobufWkt::Value& va
     elements_.push_back(FormatElement{std::string(string_format), true});
     break;
   }
-  case ProtobufWkt::Value::kBoolValue:
+  case Protobuf::Value::kBoolValue:
     serializer_.addBool(value.bool_value());
     break;
-  case ProtobufWkt::Value::kStructValue: {
+  case Protobuf::Value::kStructValue: {
     formatValueToFormatElements(value.struct_value().fields());
     break;
-  case ProtobufWkt::Value::kListValue:
+  case Protobuf::Value::kListValue:
     formatValueToFormatElements(value.list_value().values());
     break;
   }
@@ -400,8 +400,8 @@ void stringValueToLogLine(const JsonFormatterImpl::Formatters& formatters, const
   log_line.push_back('"'); // End the JSON string.
 }
 
-JsonFormatterImpl::JsonFormatterImpl(const ProtobufWkt::Struct& struct_format,
-                                     bool omit_empty_values, const CommandParsers& commands)
+JsonFormatterImpl::JsonFormatterImpl(const Protobuf::Struct& struct_format, bool omit_empty_values,
+                                     const CommandParsers& commands)
     : omit_empty_values_(omit_empty_values) {
   for (JsonFormatBuilder::FormatElement& element : JsonFormatBuilder().fromStruct(struct_format)) {
     if (element.is_template_) {

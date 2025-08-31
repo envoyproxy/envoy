@@ -346,20 +346,35 @@ The following command operators are supported:
     Number of header bytes sent to the upstream by the http stream.
 
   TCP
-    Not implemented (0).
+    Total number of HTTP header bytes sent to the upstream stream, for TCP tunneling flows. Not supported for non-tunneling.
 
   UDP
     Total number of HTTP header bytes sent to the upstream stream, For UDP tunneling flows. Not supported for non-tunneling.
+
+%UPSTREAM_DECOMPRESSED_HEADER_BYTES_SENT%
+  HTTP
+    Number of decompressed header bytes sent to the upstream by the http stream.
+
+  TCP/UDP
+    Not implemented (0).
 
 %UPSTREAM_HEADER_BYTES_RECEIVED%
   HTTP
     Number of header bytes received from the upstream by the http stream.
 
   TCP
-    Not implemented (0).
+    Total number of HTTP header bytes received from the upstream stream, for TCP tunneling flows. Not supported for non-tunneling.
 
   UDP
     Total number of HTTP header bytes received from the upstream stream, For UDP tunneling flows. Not supported for non-tunneling.
+
+%UPSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED%
+  HTTP
+    Number of decompressed header bytes received from the upstream by the http stream.
+
+  TCP/UDP
+    Not implemented (0).
+
 
 %DOWNSTREAM_WIRE_BYTES_SENT%
   HTTP
@@ -388,6 +403,13 @@ The following command operators are supported:
   TCP/UDP
     Not implemented (0).
 
+%DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_SENT%
+  HTTP
+    Number of decompressed header bytes sent to the downstream by the http stream.
+
+  TCP/UDP
+    Not implemented (0).
+
 %DOWNSTREAM_HEADER_BYTES_RECEIVED%
   HTTP
     Number of header bytes received from the downstream by the http stream.
@@ -396,6 +418,13 @@ The following command operators are supported:
     Not implemented (0).
 
   Renders a numeric value in typed JSON logs.
+
+%DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED%
+  HTTP
+    Number of decompressed header bytes received from the downstream by the http stream.
+
+  TCP/UDP
+    Not implemented (0).
 
 .. _config_access_log_format_duration:
 

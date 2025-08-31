@@ -83,7 +83,6 @@ private:
   OptRef<ProcessorCallbacks<ResponseType>> callbacks_;
   Grpc::AsyncClient<RequestType, ResponseType> client_;
   Grpc::AsyncStream<RequestType> stream_;
-  Http::AsyncClient::ParentContext grpc_context_;
   bool stream_closed_ = false;
   // The service method name. The service-method for ext-proc is statically
   // defined in Envoy's source files, so keeping a reference here is valid.
@@ -120,7 +119,6 @@ bool ProcessorStreamImpl<RequestType, ResponseType>::startStream(
     const Http::AsyncClient::StreamOptions& options) {
   client_ = std::move(client);
   auto descriptor = Protobuf::DescriptorPool::generated_pool()->FindMethodByName(service_method_);
-  grpc_context_ = options.parent_context;
   stream_ = client_.start(*descriptor, *this, options);
   // Returns true if the start succeeded and returns false on start failure.
   return stream_ != nullptr;

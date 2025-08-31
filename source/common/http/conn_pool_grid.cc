@@ -33,8 +33,7 @@ std::string getTargetHostname(const Network::TransportSocketOptionsConstSharedPt
   }
   std::string default_sni =
       std::string(host->transportSocketFactory().defaultServerNameIndication());
-  if (!default_sni.empty() ||
-      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.allow_alt_svc_for_ips")) {
+  if (!default_sni.empty()) {
     return default_sni;
   }
   // If there's no configured SNI the hostname is probably an IP address. Return it here.

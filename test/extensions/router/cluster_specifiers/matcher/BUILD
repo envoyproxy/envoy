@@ -47,6 +47,7 @@ envoy_extension_cc_test(
         "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/router/cluster_specifiers/matcher:config",
         "//test/integration:http_integration_lib",
+        "//test/integration/filters:refresh_route_cluster_filter_lib",
         "@envoy_api//envoy/extensions/router/cluster_specifiers/matcher/v3:pkg_cc_proto",
     ],
 )

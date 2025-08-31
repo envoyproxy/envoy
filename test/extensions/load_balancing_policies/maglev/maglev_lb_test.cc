@@ -6,6 +6,7 @@
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
@@ -19,6 +20,8 @@
 namespace Envoy {
 namespace Upstream {
 namespace {
+
+using testing::Return;
 
 class TestLoadBalancerContext : public LoadBalancerContextBase {
 public:
@@ -72,8 +75,13 @@ public:
       : stat_names_(stats_store_.symbolTable()), stats_(stat_names_, *stats_store_.rootScope()) {}
 
   void createLb() {
+    absl::Status creation_status;
+    TypedMaglevLbConfig typed_config(config_, context_.regex_engine_, creation_status);
+    ASSERT(creation_status.ok());
+
     lb_ = std::make_unique<MaglevLoadBalancer>(priority_set_, stats_, *stats_store_.rootScope(),
-                                               runtime_, random_, 50, config_);
+                                               context_.runtime_loader_, context_.api_.random_, 50,
+                                               typed_config.lb_config_, typed_config.hash_policy_);
   }
 
   void init(uint64_t table_size, bool locality_weighted_balancing = false) {
@@ -98,8 +106,8 @@ public:
   ClusterLbStatNames stat_names_;
   ClusterLbStats stats_;
   envoy::extensions::load_balancing_policies::maglev::v3::Maglev config_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Random::MockRandomGenerator> random_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+
   std::unique_ptr<MaglevLoadBalancer> lb_;
 };
 
@@ -141,12 +149,10 @@ TEST_F(MaglevLoadBalancerTest, DefaultMaglevTableSize) {
 
 // Basic sanity tests.
 TEST_F(MaglevLoadBalancerTest, Basic) {
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:94", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:95", simTime())};
+  host_set_.hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
+      makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93"),
+      makeTestHost(info_, "tcp://127.0.0.1:94"), makeTestHost(info_, "tcp://127.0.0.1:95")};
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks({}, {});
   init(7);
@@ -175,12 +181,12 @@ TEST_F(MaglevLoadBalancerTest, Basic) {
 // Test bounded load. This test only ensures that the
 // hash balancer factory won't break the normal load balancer process.
 TEST_F(MaglevLoadBalancerTest, BasicWithBoundedLoad) {
-  host_set_.hosts_ = {makeTestHost(info_, "90", "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "91", "tcp://127.0.0.1:91", simTime()),
-                      makeTestHost(info_, "92", "tcp://127.0.0.1:92", simTime()),
-                      makeTestHost(info_, "93", "tcp://127.0.0.1:93", simTime()),
-                      makeTestHost(info_, "94", "tcp://127.0.0.1:94", simTime()),
-                      makeTestHost(info_, "95", "tcp://127.0.0.1:95", simTime())};
+  host_set_.hosts_ = {makeTestHost(info_, "90", "tcp://127.0.0.1:90"),
+                      makeTestHost(info_, "91", "tcp://127.0.0.1:91"),
+                      makeTestHost(info_, "92", "tcp://127.0.0.1:92"),
+                      makeTestHost(info_, "93", "tcp://127.0.0.1:93"),
+                      makeTestHost(info_, "94", "tcp://127.0.0.1:94"),
+                      makeTestHost(info_, "95", "tcp://127.0.0.1:95")};
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks({}, {});
   config_.mutable_consistent_hashing_lb_config()->set_use_hostname_for_hashing(true);
@@ -210,12 +216,12 @@ TEST_F(MaglevLoadBalancerTest, BasicWithBoundedLoad) {
 
 // Basic with hostname.
 TEST_F(MaglevLoadBalancerTest, BasicWithHostName) {
-  host_set_.hosts_ = {makeTestHost(info_, "90", "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "91", "tcp://127.0.0.1:91", simTime()),
-                      makeTestHost(info_, "92", "tcp://127.0.0.1:92", simTime()),
-                      makeTestHost(info_, "93", "tcp://127.0.0.1:93", simTime()),
-                      makeTestHost(info_, "94", "tcp://127.0.0.1:94", simTime()),
-                      makeTestHost(info_, "95", "tcp://127.0.0.1:95", simTime())};
+  host_set_.hosts_ = {makeTestHost(info_, "90", "tcp://127.0.0.1:90"),
+                      makeTestHost(info_, "91", "tcp://127.0.0.1:91"),
+                      makeTestHost(info_, "92", "tcp://127.0.0.1:92"),
+                      makeTestHost(info_, "93", "tcp://127.0.0.1:93"),
+                      makeTestHost(info_, "94", "tcp://127.0.0.1:94"),
+                      makeTestHost(info_, "95", "tcp://127.0.0.1:95")};
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks({}, {});
   config_.mutable_consistent_hashing_lb_config()->set_use_hostname_for_hashing(true);
@@ -244,12 +250,12 @@ TEST_F(MaglevLoadBalancerTest, BasicWithHostName) {
 
 // Basic with metadata hash_key.
 TEST_F(MaglevLoadBalancerTest, BasicWithMetadataHashKey) {
-  host_set_.hosts_ = {makeTestHostWithHashKey(info_, "90", "tcp://127.0.0.1:90", simTime()),
-                      makeTestHostWithHashKey(info_, "91", "tcp://127.0.0.1:91", simTime()),
-                      makeTestHostWithHashKey(info_, "92", "tcp://127.0.0.1:92", simTime()),
-                      makeTestHostWithHashKey(info_, "93", "tcp://127.0.0.1:93", simTime()),
-                      makeTestHostWithHashKey(info_, "94", "tcp://127.0.0.1:94", simTime()),
-                      makeTestHostWithHashKey(info_, "95", "tcp://127.0.0.1:95", simTime())};
+  host_set_.hosts_ = {makeTestHostWithHashKey(info_, "90", "tcp://127.0.0.1:90"),
+                      makeTestHostWithHashKey(info_, "91", "tcp://127.0.0.1:91"),
+                      makeTestHostWithHashKey(info_, "92", "tcp://127.0.0.1:92"),
+                      makeTestHostWithHashKey(info_, "93", "tcp://127.0.0.1:93"),
+                      makeTestHostWithHashKey(info_, "94", "tcp://127.0.0.1:94"),
+                      makeTestHostWithHashKey(info_, "95", "tcp://127.0.0.1:95")};
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks({}, {});
   config_.mutable_consistent_hashing_lb_config()->set_use_hostname_for_hashing(true);
@@ -276,14 +282,115 @@ TEST_F(MaglevLoadBalancerTest, BasicWithMetadataHashKey) {
   }
 }
 
+TEST_F(MaglevLoadBalancerTest, MaglevLbWithHashPolicy) {
+  host_set_.hosts_ = {makeTestHostWithHashKey(info_, "90", "tcp://127.0.0.1:90"),
+                      makeTestHostWithHashKey(info_, "91", "tcp://127.0.0.1:91"),
+                      makeTestHostWithHashKey(info_, "92", "tcp://127.0.0.1:92"),
+                      makeTestHostWithHashKey(info_, "93", "tcp://127.0.0.1:93"),
+                      makeTestHostWithHashKey(info_, "94", "tcp://127.0.0.1:94"),
+                      makeTestHostWithHashKey(info_, "95", "tcp://127.0.0.1:95")};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
+
+  config_.mutable_consistent_hashing_lb_config()->set_use_hostname_for_hashing(true);
+  auto* hash_policy = config_.mutable_consistent_hashing_lb_config()->add_hash_policy();
+  *hash_policy->mutable_cookie()->mutable_name() = "test-cookie-name";
+  *hash_policy->mutable_cookie()->mutable_path() = "/test/path";
+  hash_policy->mutable_cookie()->mutable_ttl()->set_seconds(1000);
+
+  init(7);
+
+  EXPECT_EQ("maglev_lb.min_entries_per_host", lb_->stats().min_entries_per_host_.name());
+  EXPECT_EQ("maglev_lb.max_entries_per_host", lb_->stats().max_entries_per_host_.name());
+  EXPECT_EQ(1, lb_->stats().min_entries_per_host_.value());
+  EXPECT_EQ(2, lb_->stats().max_entries_per_host_.value());
+
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+
+  {
+    // Cookie exists.
+    Http::TestRequestHeaderMapImpl request_headers{{"cookie", "test-cookie-name=1234567890"}};
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+    NiceMock<Upstream::MockLoadBalancerContext> context;
+    EXPECT_CALL(context, downstreamHeaders()).Times(2).WillRepeatedly(Return(&request_headers));
+    EXPECT_CALL(context, requestStreamInfo()).Times(2).WillRepeatedly(Return(&stream_info));
+
+    EXPECT_CALL(context_.api_.random_, random()).Times(0);
+
+    auto host_1 = lb->chooseHost(&context);
+    auto host_2 = lb->chooseHost(&context);
+    EXPECT_EQ(host_1.host, host_2.host);
+  }
+
+  {
+    // Cookie not exists and no stream info is provided.
+    Http::TestRequestHeaderMapImpl request_headers{};
+
+    NiceMock<Upstream::MockLoadBalancerContext> context;
+    EXPECT_CALL(context, downstreamHeaders()).Times(2).WillRepeatedly(Return(&request_headers));
+
+    // No hash is generated and random will be used.
+    EXPECT_CALL(context_.api_.random_, random()).Times(2);
+    auto host_1 = lb->chooseHost(&context);
+    auto host_2 = lb->chooseHost(&context);
+  }
+
+  {
+    // Cookie not exists and no valid addresses.
+    Http::TestRequestHeaderMapImpl request_headers{};
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setRemoteAddress(nullptr);
+    stream_info.downstream_connection_info_provider_->setLocalAddress(nullptr);
+
+    NiceMock<Upstream::MockLoadBalancerContext> context;
+    EXPECT_CALL(context, downstreamHeaders()).Times(2).WillRepeatedly(Return(&request_headers));
+    EXPECT_CALL(context, requestStreamInfo()).Times(4).WillRepeatedly(Return(&stream_info));
+
+    // No hash is generated and random will be used.
+    EXPECT_CALL(context_.api_.random_, random()).Times(2);
+    auto host_1 = lb->chooseHost(&context);
+    auto host_2 = lb->chooseHost(&context);
+  }
+
+  {
+    // Cookie not exists and has valid addresses.
+    Http::TestRequestHeaderMapImpl request_headers{};
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+    NiceMock<Upstream::MockLoadBalancerContext> context;
+    EXPECT_CALL(context, downstreamHeaders()).Times(2).WillRepeatedly(Return(&request_headers));
+    EXPECT_CALL(context, requestStreamInfo()).Times(4).WillRepeatedly(Return(&stream_info));
+
+    const std::string address_values =
+        stream_info.downstream_connection_info_provider_->remoteAddress()->asString() +
+        stream_info.downstream_connection_info_provider_->localAddress()->asString();
+    std::string new_cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(address_values));
+
+    EXPECT_CALL(context, setHeadersModifier(_))
+        .WillRepeatedly(
+            testing::Invoke([&](std::function<void(Http::ResponseHeaderMap&)> modifier) {
+              Http::TestResponseHeaderMapImpl response;
+              modifier(response);
+              // Cookie is set.
+              EXPECT_TRUE(absl::StrContains(response.get_(Http::Headers::get().SetCookie),
+                                            new_cookie_value));
+            }));
+
+    // Hash is generated and random will not be used.
+    EXPECT_CALL(context_.api_.random_, random()).Times(0);
+    auto host_1 = lb->chooseHost(&context);
+    auto host_2 = lb->chooseHost(&context);
+    EXPECT_EQ(host_1.host, host_2.host);
+  }
+}
+
 // Same ring as the Basic test, but exercise retry host predicate behavior.
 TEST_F(MaglevLoadBalancerTest, BasicWithRetryHostPredicate) {
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:94", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:95", simTime())};
+  host_set_.hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
+      makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93"),
+      makeTestHost(info_, "tcp://127.0.0.1:94"), makeTestHost(info_, "tcp://127.0.0.1:95")};
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks({}, {});
   init(7);
@@ -326,12 +433,10 @@ TEST_F(MaglevLoadBalancerTest, BasicWithRetryHostPredicate) {
 
 // Basic stability test.
 TEST_F(MaglevLoadBalancerTest, BasicStability) {
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:94", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:95", simTime())};
+  host_set_.hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
+      makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93"),
+      makeTestHost(info_, "tcp://127.0.0.1:94"), makeTestHost(info_, "tcp://127.0.0.1:95")};
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks({}, {});
   init(7);
@@ -371,8 +476,8 @@ TEST_F(MaglevLoadBalancerTest, BasicStability) {
 
 // Weighted sanity test.
 TEST_F(MaglevLoadBalancerTest, Weighted) {
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), 2)};
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", 2)};
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks({}, {});
   init(17);
@@ -414,8 +519,8 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedSameLocalityWeights) {
   envoy::config::core::v3::Locality zone_b;
   zone_b.set_zone("B");
 
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a, 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_b, 2)};
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", zone_a, 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", zone_b, 2)};
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.hosts_per_locality_ =
       makeHostsPerLocality({{host_set_.hosts_[0]}, {host_set_.hosts_[1]}});
@@ -464,9 +569,9 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedDifferentLocalityWeights) {
   envoy::config::core::v3::Locality zone_c;
   zone_c.set_zone("C");
 
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a, 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_c, 2),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), zone_b, 3)};
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", zone_a, 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", zone_c, 2),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", zone_b, 3)};
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.hosts_per_locality_ =
       makeHostsPerLocality({{host_set_.hosts_[0]}, {host_set_.hosts_[2]}, {host_set_.hosts_[1]}});
@@ -507,7 +612,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedDifferentLocalityWeights) {
 
 // Locality weighted with all localities zero weighted.
 TEST_F(MaglevLoadBalancerTest, LocalityWeightedAllZeroLocalityWeights) {
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), 1)};
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", 1)};
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.hosts_per_locality_ = makeHostsPerLocality({{host_set_.hosts_[0]}});
   host_set_.healthy_hosts_per_locality_ = host_set_.hosts_per_locality_;
@@ -528,8 +633,8 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedGlobalPanic) {
   envoy::config::core::v3::Locality zone_b;
   zone_b.set_zone("B");
 
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a, 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_b, 2)};
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", zone_a, 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", zone_b, 2)};
   host_set_.healthy_hosts_ = {};
   host_set_.hosts_per_locality_ =
       makeHostsPerLocality({{host_set_.hosts_[0]}, {host_set_.hosts_[1]}});
@@ -580,7 +685,7 @@ TEST_F(MaglevLoadBalancerTest, LocalityWeightedLopsided) {
   HostVector heavy_but_sparse, light_but_dense;
   for (uint32_t i = 0; i < 1024; ++i) {
     auto host_locality = i == 0 ? zone_a : zone_b;
-    auto host(makeTestHost(info_, fmt::format("tcp://127.0.0.1:{}", i), simTime(), host_locality));
+    auto host(makeTestHost(info_, fmt::format("tcp://127.0.0.1:{}", i), host_locality));
     host_set_.hosts_.push_back(host);
     (i == 0 ? heavy_but_sparse : light_but_dense).push_back(host);
   }
