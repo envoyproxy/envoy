@@ -24,3 +24,14 @@ Wasm runtime emits the following statistics:
 
   wasm.<runtime>.created, Counter, Total number of execution instances created
   wasm.<runtime>.active, Gauge, Number of active execution instances
+
+Wasm plugins emit the following statistics:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: 1, 1, 2
+
+  wasm.[<plugin_name>.]vm_failed, Counter, Total number of VM failures including VM creation or runtime failures
+  wasm.[<plugin_name>.]vm_reload_success, Counter, Total number of successful VM reload attempts
+  wasm.[<plugin_name>.]vm_reload_failure, Counter, Total number of failed VM reload attempts
+  wasm.[<plugin_name>.]vm_reload_backoff, Counter, Total number of VM reload attempts that were delayed due to backoff
