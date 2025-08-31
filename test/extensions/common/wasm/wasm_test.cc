@@ -1,7 +1,3 @@
-#include "envoy/http/filter.h"
-#include "envoy/http/filter_factory.h"
-#include "envoy/server/lifecycle_notifier.h"
-
 #include "source/common/common/base64.h"
 #include "source/common/common/hex.h"
 #include "source/common/event/dispatcher_impl.h"
@@ -23,14 +19,9 @@
 #include "absl/types/optional.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "openssl/bytestring.h"
-#include "openssl/hmac.h"
 #include "openssl/sha.h"
 #include "wasm_runtime.h"
-#include "zlib.h"
 
-using StageCallbackWithCompletion =
-    Envoy::Server::ServerLifecycleNotifier::StageCallbackWithCompletion;
 using testing::AtMost;
 using testing::Eq;
 using testing::HasSubstr;
