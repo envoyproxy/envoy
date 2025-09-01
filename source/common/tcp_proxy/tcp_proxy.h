@@ -173,7 +173,6 @@ public:
   bool usePost() const override { return !post_path_.empty(); }
   const std::string& postPath() const override { return post_path_; }
   Envoy::Http::HeaderEvaluator& headerEvaluator() const override { return *header_parser_; }
-  bool generateRequestId() const override { return generate_request_id_; }
   const Envoy::Http::RequestIDExtensionSharedPtr& requestIDExtension() const override {
     return request_id_extension_;
   }
@@ -195,8 +194,7 @@ private:
   const bool propagate_response_headers_;
   const bool propagate_response_trailers_;
   std::string post_path_;
-  // Request ID generation and extension for tunneling requests.
-  bool generate_request_id_ = false;
+  // Request ID extension for tunneling requests. If null, no request ID is generated.
   Envoy::Http::RequestIDExtensionSharedPtr request_id_extension_;
   Stats::StatNameManagedStorage route_stat_name_storage_;
   const Router::FilterConfig router_config_;

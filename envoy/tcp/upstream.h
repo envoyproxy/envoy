@@ -43,9 +43,6 @@ public:
   // The evaluator to add additional HTTP request headers to the upstream request.
   virtual Envoy::Http::HeaderEvaluator& headerEvaluator() const PURE;
 
-  // Whether to generate x-request-id on the upstream tunneling request.
-  virtual bool generateRequestId() const PURE;
-
   // The request ID extension used for generation/validation when tunneling.
   virtual const Envoy::Http::RequestIDExtensionSharedPtr& requestIDExtension() const PURE;
 

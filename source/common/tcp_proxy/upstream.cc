@@ -124,8 +124,9 @@ void HttpUpstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool
 
   // Optionally generate a request ID before evaluating configured headers so
   // it is available to header formatters.
-  if (config_.generateRequestId()) {
-    // Tunneling requests are edge requests, and we don't preserve any external ID by default.
+  if (config_.requestIDExtension() != nullptr) {
+    // For tunneling requests there is no way to get the external request ID as the incoming
+    // traffic could be anything - HTTPS, MySQL, Postgres, etc.
     config_.requestIDExtension()->set(*headers, /*edge_request=*/true,
                                       /*keep_external_id=*/false);
     // Also store the request ID in filter state to allow TCP access logs to format it.
@@ -441,7 +442,7 @@ CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
     downstream_headers_->addReference(Http::Headers::get().Path, config_.postPath());
   }
 
-  if (config_.generateRequestId()) {
+  if (config_.requestIDExtension() != nullptr) {
     config_.requestIDExtension()->set(*downstream_headers_, /*edge_request=*/true,
                                       /*keep_external_id=*/false);
     const auto rid = downstream_headers_->getRequestIdValue();
