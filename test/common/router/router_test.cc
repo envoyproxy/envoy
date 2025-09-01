@@ -482,7 +482,7 @@ TEST_F(RouterTest, Http1Upstream) {
                               const Formatter::HttpFormatterContext& context,
                               const StreamInfo::StreamInfo&, bool) {
         EXPECT_EQ(&context.requestHeaders(), &headers);
-        EXPECT_EQ(&context.activeSpan(), &callbacks_.active_span_);
+        EXPECT_EQ(&context.activeSpan(), &span_);
       }));
 
   router_->decodeHeaders(headers, true);
