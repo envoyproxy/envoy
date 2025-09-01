@@ -8,9 +8,9 @@
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/extensions/tracers/zipkin/span_context_extractor.h"
+#include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 
 #include "absl/strings/string_view.h"
-#include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -26,20 +26,20 @@ std::pair<std::string, std::string> parseUri(absl::string_view uri) {
     // No scheme, treat as path only
     return {"", std::string(uri)};
   }
-  
+
   // Skip past the scheme
   size_t host_start = scheme_pos + 3;
-  
+
   // Find the path separator
   size_t path_pos = uri.find('/', host_start);
   if (path_pos == std::string::npos) {
     // No path, hostname only
     return {std::string(uri.substr(host_start)), "/"};
   }
-  
+
   std::string hostname = std::string(uri.substr(host_start, path_pos - host_start));
   std::string path = std::string(uri.substr(path_pos));
-  
+
   return {hostname, path};
 }
 } // namespace
@@ -57,21 +57,21 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
       tls_(tls.allocateSlot()), runtime_(runtime), local_info_(local_info),
       time_source_(time_source), trace_context_option_(zipkin_config.trace_context_option()) {
   CollectorInfo collector;
-  
+
   // Validate that either collector_cluster or collector_service is specified
   if (!zipkin_config.has_collector_service() && zipkin_config.collector_cluster().empty()) {
     throw EnvoyException("Either collector_cluster or collector_service must be specified");
   }
-  
+
   // Check if HttpService is configured (preferred over legacy fields)
   if (zipkin_config.has_collector_service()) {
     const auto& http_service = zipkin_config.collector_service();
     collector.http_service_ = http_service;
     collector.use_legacy_config_ = false;
-    
+
     // Extract cluster and endpoint from HttpService
     const auto& http_uri = http_service.http_uri();
-    
+
     // Validate required HttpService fields
     if (http_uri.cluster().empty()) {
       throw EnvoyException("collector_service.http_uri.cluster must be specified");
@@ -79,12 +79,12 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
     if (http_uri.uri().empty()) {
       throw EnvoyException("collector_service.http_uri.uri must be specified");
     }
-    
+
     cluster_ = http_uri.cluster();
-    
+
     // Parse the URI to extract hostname and path
     auto [parsed_hostname, parsed_path] = parseUri(http_uri.uri());
-    
+
     if (!parsed_hostname.empty()) {
       // Use the hostname from the URI
       hostname_ = parsed_hostname;
@@ -94,10 +94,10 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
       hostname_ = cluster_;
       collector.hostname_ = cluster_;
     }
-    
+
     // Use the parsed path as the endpoint
     collector.endpoint_ = parsed_path;
-    
+
     // Parse headers from HttpService
     for (const auto& header_option : http_service.request_headers_to_add()) {
       const auto& header_value = header_option.header();
@@ -106,7 +106,7 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
   } else {
     // Use legacy configuration
     collector.use_legacy_config_ = true;
-    
+
     // Validate required legacy fields
     if (zipkin_config.collector_cluster().empty()) {
       throw EnvoyException("collector_cluster must be specified when not using collector_service");
@@ -114,16 +114,16 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
     if (zipkin_config.collector_endpoint().empty()) {
       throw EnvoyException("collector_endpoint must be specified when using collector_cluster");
     }
-    
+
     cluster_ = zipkin_config.collector_cluster();
     hostname_ = !zipkin_config.collector_hostname().empty() ? zipkin_config.collector_hostname()
                                                             : zipkin_config.collector_cluster();
     collector.hostname_ = hostname_; // Store hostname in collector as well
-    
+
     if (!zipkin_config.collector_endpoint().empty()) {
       collector.endpoint_ = zipkin_config.collector_endpoint();
     }
-    
+
     // Legacy configuration has no custom headers support
     // Custom headers are only available through HttpService
   }
@@ -237,7 +237,7 @@ void ReporterImpl::flushSpans() {
     // Set path and hostname - both are stored in collector_
     message->headers().setPath(collector_.endpoint_);
     message->headers().setHost(collector_.hostname_);
-    
+
     message->headers().setReferenceContentType(
         collector_.version_ == envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO
             ? Http::Headers::get().ContentTypeValues.Protobuf

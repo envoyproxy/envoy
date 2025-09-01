@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "envoy/config/core/v3/http_service.pb.h"
+
 #include "source/extensions/tracers/zipkin/zipkin_tracer_impl.h"
 
 #include "gtest/gtest.h"
@@ -22,9 +23,9 @@ TEST(CollectorInfoTest, DefaultConstruction) {
   EXPECT_EQ(collector_info.version_, envoy::config::trace::v3::ZipkinConfig::HTTP_JSON);
   EXPECT_TRUE(collector_info.shared_span_context_);
   EXPECT_TRUE(collector_info.request_headers_.empty());
-  
+
   // New fields should have default values
-  EXPECT_TRUE(collector_info.use_legacy_config_);  // Defaults to legacy mode
+  EXPECT_TRUE(collector_info.use_legacy_config_); // Defaults to legacy mode
   EXPECT_FALSE(collector_info.http_service_.has_value());
 }
 
@@ -121,20 +122,20 @@ TEST(CollectorInfoTest, HttpServiceConfigurationMode) {
   http_uri->set_uri("/api/v2/spans");
   http_uri->set_cluster("zipkin_collector");
   http_uri->mutable_timeout()->set_seconds(5);
-  
+
   // Set up HttpService configuration
   collector_info.use_legacy_config_ = false;
   collector_info.http_service_ = http_service;
-  collector_info.endpoint_ = "/api/v2/spans";  // Should be populated from HttpService
-  collector_info.hostname_ = "zipkin_collector";  // Should be populated from cluster name
+  collector_info.endpoint_ = "/api/v2/spans";    // Should be populated from HttpService
+  collector_info.hostname_ = "zipkin_collector"; // Should be populated from cluster name
 
   // Verify HttpService configuration
   EXPECT_FALSE(collector_info.use_legacy_config_);
   EXPECT_TRUE(collector_info.http_service_.has_value());
   EXPECT_EQ(collector_info.http_service_->http_uri().uri(), "/api/v2/spans");
   EXPECT_EQ(collector_info.http_service_->http_uri().cluster(), "zipkin_collector");
-  EXPECT_EQ(collector_info.endpoint_, "/api/v2/spans");  // Should match HttpService URI
-  EXPECT_EQ(collector_info.hostname_, "zipkin_collector");  // Should match cluster name
+  EXPECT_EQ(collector_info.endpoint_, "/api/v2/spans");    // Should match HttpService URI
+  EXPECT_EQ(collector_info.hostname_, "zipkin_collector"); // Should match cluster name
 }
 
 } // namespace
