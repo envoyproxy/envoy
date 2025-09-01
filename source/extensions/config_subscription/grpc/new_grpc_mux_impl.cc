@@ -78,7 +78,7 @@ NewGrpcMuxImpl::createGrpcStreamObject(Grpc::RawAsyncClientSharedPtr&& async_cli
               std::move(backoff_strategy), rate_limit_settings,
               GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
                          envoy::service::discovery::v3::DeltaDiscoveryResponse>::
-                  ConnectedStateValue::FIRST_ENTRY);
+                  ConnectedStateValue::FirstEntry);
         },
         /*failover_stream_creator=*/
         failover_async_client
@@ -104,7 +104,7 @@ NewGrpcMuxImpl::createGrpcStreamObject(Grpc::RawAsyncClientSharedPtr&& async_cli
                         rate_limit_settings,
                         GrpcStream<envoy::service::discovery::v3::DeltaDiscoveryRequest,
                                    envoy::service::discovery::v3::DeltaDiscoveryResponse>::
-                            ConnectedStateValue::SECOND_ENTRY);
+                            ConnectedStateValue::SecondEntry);
                   })
             : absl::nullopt,
         /*grpc_mux_callbacks=*/*this,
@@ -116,7 +116,7 @@ NewGrpcMuxImpl::createGrpcStreamObject(Grpc::RawAsyncClientSharedPtr&& async_cli
       std::move(backoff_strategy), rate_limit_settings,
       GrpcStream<
           envoy::service::discovery::v3::DeltaDiscoveryRequest,
-          envoy::service::discovery::v3::DeltaDiscoveryResponse>::ConnectedStateValue::FIRST_ENTRY);
+          envoy::service::discovery::v3::DeltaDiscoveryResponse>::ConnectedStateValue::FirstEntry);
 }
 
 NewGrpcMuxImpl::~NewGrpcMuxImpl() { AllMuxes::get().erase(this); }
