@@ -7,7 +7,7 @@ import "envoy/type/matcher/v3/string.proto";
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.checksum.v3alpha";
 option java_outer_classname = "ChecksumProto";
@@ -27,12 +27,12 @@ message ChecksumConfig {
     oneof matcher {
       // A matcher for a path that is expected to have a specific checksum, as specified
       // in the ``sha256`` field.
-      type.matcher.v3.StringMatcher path_matcher = 1 [(validate.rules).message = {required: true}];
+      type.matcher.v3.StringMatcher path_matcher = 1 [(buf.validate.field).required = true];
     }
 
     // A hex-encoded sha256 string required to match the sha256sum of the response body
     // of the path specified in the ``path_matcher`` field.
-    string sha256 = 2 [(validate.rules).string = {pattern: "^[a-fA-F0-9]{64}"}];
+    string sha256 = 2 [(buf.validate.field).string = {pattern: "^[a-fA-F0-9]{64}"}];
   }
 
   // A set of matcher and checksum pairs for which, if a path matching ``path_matcher``

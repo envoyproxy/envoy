@@ -1,5 +1,4 @@
 #include "envoy/extensions/filters/network/echo/v3/echo.pb.h"
-#include "envoy/extensions/filters/network/echo/v3/echo.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 

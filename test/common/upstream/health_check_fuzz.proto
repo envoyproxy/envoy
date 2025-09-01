@@ -2,14 +2,14 @@ syntax = "proto3";
 
 package test.common.upstream;
 
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 import "test/fuzz/common.proto";
 import "envoy/config/core/v3/health_check.proto";
 import "google/protobuf/empty.proto";
 
 message HttpRespond {
   test.fuzz.Headers headers = 1;
-  uint64 status = 2 [(validate.rules).uint64.lt = 1000];
+  uint64 status = 2 [(buf.validate.field).uint64.lt = 1000];
   bytes body = 3;
 }
 
@@ -26,7 +26,7 @@ enum ServingStatus {
 
 message GrpcRespondHeaders {
   test.fuzz.Headers headers = 1;
-  uint64 status = 2 [(validate.rules).uint64.lt = 1000];
+  uint64 status = 2 [(buf.validate.field).uint64.lt = 1000];
 }
 
 message GrpcRespondUnstructuredBytes {
@@ -35,9 +35,9 @@ message GrpcRespondUnstructuredBytes {
 
 message GrpcRespondBytes {
   oneof grpc_respond_bytes_selector {
-    option (validate.required) = true;
+    
     //Structured response, which will get converted to raw bytes
-    ServingStatus status = 1 [(validate.rules).enum.defined_only = true];
+    ServingStatus status = 1 [(buf.validate.field).enum.defined_only = true];
     GrpcRespondUnstructuredBytes grpc_respond_unstructured_bytes = 2;
   }
   //This value will determine how many fixed bytes will make up a structured response
@@ -46,11 +46,11 @@ message GrpcRespondBytes {
 }
 
 message GrpcRespondTrailers {
-  test.fuzz.Headers trailers = 1 [(validate.rules).message.required = true];
+  test.fuzz.Headers trailers = 1 [(buf.validate.field).required = true];
 }
 
 message GrpcRespond {
-  GrpcRespondHeaders grpc_respond_headers = 1 [(validate.rules).message.required = true];
+  GrpcRespondHeaders grpc_respond_headers = 1 [(buf.validate.field).required = true];
   GrpcRespondBytes grpc_respond_bytes = 2;
   //Having this as a message allows the scenario with no trailers
   GrpcRespondTrailers grpc_respond_trailers = 3;
@@ -62,9 +62,9 @@ stream across all three. However, the main difference comes from the type of dat
 health checker type allows the fuzzer to choose the correct action sequence.
 */
 message Respond {
-  HttpRespond http_respond = 1 [(validate.rules).message.required = true];
-  TcpRespond tcp_respond = 2 [(validate.rules).message.required = true];
-  GrpcRespond grpc_respond = 3 [(validate.rules).message.required = true];
+  HttpRespond http_respond = 1 [(buf.validate.field).required = true];
+  TcpRespond tcp_respond = 2 [(buf.validate.field).required = true];
+  GrpcRespond grpc_respond = 3 [(buf.validate.field).required = true];
 }
 
 enum RaiseEvent {
@@ -80,19 +80,19 @@ enum RaiseGoAway {
 
 message Action {
   oneof action_selector {
-    option (validate.required) = true;
+    
     Respond respond = 1;
     google.protobuf.Empty trigger_interval_timer = 2;
     //TODO: respondBody, respondTrailers
     google.protobuf.Empty trigger_timeout_timer = 3;
-    RaiseEvent raise_event = 4 [(validate.rules).enum.defined_only = true];
+    RaiseEvent raise_event = 4 [(buf.validate.field).enum.defined_only = true];
     RaiseGoAway raise_go_away = 5;
   }
 }
 
 message HealthCheckTestCase {
   envoy.config.core.v3.HealthCheck health_check_config = 1
-      [(validate.rules).message.required = true];
+      [(buf.validate.field).required = true];
   repeated Action actions = 2;
   bool http_verify_cluster = 3; //Determines if verify cluster setting is on
   bool start_failed = 4;

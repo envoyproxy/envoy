@@ -13,7 +13,6 @@
 #include "source/extensions/filters/network/common/factory_base.h"
 
 #include "test/integration/filter_manager_integration_test.pb.h"
-#include "test/integration/filter_manager_integration_test.pb.validate.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"

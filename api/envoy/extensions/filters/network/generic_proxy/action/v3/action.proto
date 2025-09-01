@@ -11,7 +11,7 @@ import "google/protobuf/duration.proto";
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.generic_proxy.action.v3";
 option java_outer_classname = "ActionProto";
@@ -29,7 +29,7 @@ message RouteAction {
   string name = 5;
 
   oneof cluster_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Indicates the upstream cluster to which the request should be routed.
     string cluster = 1;

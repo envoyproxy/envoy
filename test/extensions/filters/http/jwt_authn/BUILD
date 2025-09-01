@@ -250,6 +250,5 @@ envoy_cc_fuzz_test(
         "//test/fuzz:utility_lib",
         "//test/mocks/server:factory_context_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )

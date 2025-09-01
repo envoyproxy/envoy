@@ -7,7 +7,7 @@ import "google/protobuf/any.proto";
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.router.cluster_specifier.golang.v3alpha";
 option java_outer_classname = "GolangProto";
@@ -24,19 +24,19 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#extension-category: envoy.router.cluster_specifier_plugin]
 message Config {
   // Globally unique ID for a dynamic library file.
-  string library_id = 1 [(validate.rules).string = {min_len: 1}];
+  string library_id = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // Path to a dynamic library implementing the
   // :repo:`ClusterSpecifier API <contrib/golang/router/cluster_specifier/source/go/pkg/api.ClusterSpecifier>`
   // interface.
   // [#comment:TODO(wangfakang): Support for downloading libraries from remote repositories.]
-  string library_path = 2 [(validate.rules).string = {min_len: 1}];
+  string library_path = 2 [(buf.validate.field).string = {min_len: 1}];
 
   // Default cluster.
   //
   // It will be used when the specifier interface return empty string or panic.
   //
-  string default_cluster = 3 [(validate.rules).string = {min_len: 1}];
+  string default_cluster = 3 [(buf.validate.field).string = {min_len: 1}];
 
   // Configuration for the Go cluster specifier plugin.
   //

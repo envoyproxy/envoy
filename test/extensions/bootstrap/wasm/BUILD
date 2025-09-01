@@ -89,7 +89,6 @@ envoy_extension_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
-        "@envoy_api//envoy/extensions/wasm/v3:pkg_cc_proto",
     ],
 )
 

@@ -1,7 +1,6 @@
 #include <string>
 
 #include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.h"
-#include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.validate.h"
 
 #include "source/extensions/filters/http/header_to_metadata/config.h"
 #include "source/extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"

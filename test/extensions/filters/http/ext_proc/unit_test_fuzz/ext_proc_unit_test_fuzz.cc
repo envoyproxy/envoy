@@ -2,7 +2,6 @@
 
 #include "test/extensions/filters/http/common/fuzz/http_filter_fuzzer.h"
 #include "test/extensions/filters/http/ext_proc/mock_server.h"
-#include "test/extensions/filters/http/ext_proc/unit_test_fuzz/ext_proc_unit_test_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"

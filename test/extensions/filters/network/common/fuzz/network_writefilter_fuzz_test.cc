@@ -3,7 +3,6 @@
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "test/config/utility.h"
-#include "test/extensions/filters/network/common/fuzz/network_writefilter_fuzz.pb.validate.h"
 #include "test/extensions/filters/network/common/fuzz/uber_writefilter.h"
 #include "test/extensions/filters/network/common/fuzz/validated_input_generator_any_map_extensions.h"
 #include "test/fuzz/fuzz_runner.h"

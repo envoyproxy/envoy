@@ -7,7 +7,6 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.h"
-#include "envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.validate.h"
 #include "envoy/extensions/filters/network/generic_proxy/v3/route.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"

@@ -2,9 +2,7 @@
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/extensions/filters/network/echo/v3/echo.pb.h"
-#include "envoy/extensions/filters/network/echo/v3/echo.pb.validate.h"
 #include "envoy/extensions/filters/network/rbac/v3/rbac.pb.h"
-#include "envoy/extensions/filters/network/rbac/v3/rbac.pb.validate.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/service/accesslog/v3/als.pb.h"
 

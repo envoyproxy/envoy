@@ -7,10 +7,8 @@
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/factory_context.h"
 
-#include "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.pb.validate.h"
 #include "contrib/golang/common/dso/test/mocks.h"
 #include "contrib/golang/filters/http/source/golang_filter.h"
-#include "contrib/golang/filters/http/test/golang_filter_fuzz.pb.validate.h"
 #include "gmock/gmock.h"
 
 using testing::Return;

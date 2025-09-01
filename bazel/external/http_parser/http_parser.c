@@ -67,7 +67,6 @@ do {                                                                 \
 #define REEXECUTE()                                                  \
   goto reexecute;                                                    \
 
-
 #ifdef __GNUC__
 # define LIKELY(X) __builtin_expect(!!(X), 1)
 # define UNLIKELY(X) __builtin_expect(!!(X), 0)
@@ -75,7 +74,6 @@ do {                                                                 \
 # define LIKELY(X) (X)
 # define UNLIKELY(X) (X)
 #endif
-
 
 /* Run the notify callback FOR, returning ER if it fails */
 #define CALLBACK_NOTIFY_(FOR, ER)                                    \
@@ -161,7 +159,6 @@ do {                                                                 \
   }                                                                  \
 } while (0)
 
-
 #define PROXY_CONNECTION "proxy-connection"
 #define CONNECTION "connection"
 #define CONTENT_LENGTH "content-length"
@@ -171,14 +168,12 @@ do {                                                                 \
 #define KEEP_ALIVE "keep-alive"
 #define CLOSE "close"
 
-
 static const char *method_strings[] =
   {
 #define XX(num, name, string) #string,
   HTTP_METHOD_MAP(XX)
 #undef XX
   };
-
 
 /* Tokens as defined by rfc 2616. Also lowercases them.
  *        token       = 1*<any CHAR except CTLs or separators>
@@ -221,7 +216,6 @@ static const char tokens[256] = {
 /* 120  x   121  y   122  z   123  {   124  |   125  }   126  ~   127 del */
        'x',     'y',     'z',      0,      '|',      0,      '~',       0 };
 
-
 static const int8_t unhex[256] =
   {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
   ,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
@@ -233,13 +227,11 @@ static const int8_t unhex[256] =
   ,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1
   };
 
-
 #if HTTP_PARSER_STRICT
 # define T(v) 0
 #else
 # define T(v) v
 #endif
-
 
 static const uint8_t normal_url_char[32] = {
 /*   0 nul    1 soh    2 stx    3 etx    4 eot    5 enq    6 ack    7 bel  */
@@ -359,9 +351,7 @@ enum state
   , s_message_done
   };
 
-
 #define PARSING_HEADER(state) (state <= s_headers_done)
-
 
 enum header_states
   { h_general = 0
@@ -453,7 +443,6 @@ enum http_host_state
 
 #define start_state (parser->type == HTTP_REQUEST ? s_start_req : s_start_res)
 
-
 #if HTTP_PARSER_STRICT
 # define STRICT_CHECK(cond)                                          \
 do {                                                                 \
@@ -467,7 +456,6 @@ do {                                                                 \
 # define STRICT_CHECK(cond)
 # define NEW_MESSAGE() start_state
 #endif
-
 
 /* Map errno values to strings for human-readable output */
 #define HTTP_STRERROR_GEN(n, s) { "HPE_" #n, s },
@@ -684,7 +672,6 @@ size_t http_parser_execute (http_parser *parser,
         return 1;
     }
   }
-
 
   if (CURRENT_STATE() == s_header_field)
     header_field_mark = data;
@@ -2156,7 +2143,6 @@ error:
   RETURN(p - data);
 }
 
-
 /* Does the parser need to see an EOF to find the end of the message? */
 int
 http_message_needs_eof (const http_parser *parser)
@@ -2186,7 +2172,6 @@ http_message_needs_eof (const http_parser *parser)
   return 1;
 }
 
-
 int
 http_should_keep_alive (const http_parser *parser)
 {
@@ -2204,7 +2189,6 @@ http_should_keep_alive (const http_parser *parser)
 
   return !http_message_needs_eof(parser);
 }
-
 
 const char *
 http_method_str (enum http_method m)

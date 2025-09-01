@@ -8,7 +8,6 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "test/integration/filters/add_header_filter.pb.h"
-#include "test/integration/filters/add_header_filter.pb.validate.h"
 #include "test/integration/filters/common.h"
 
 namespace Envoy {

@@ -4,7 +4,6 @@
 #include <string>
 
 #include "envoy/extensions/filters/http/proto_message_extraction/v3/config.pb.h"
-#include "envoy/extensions/filters/http/proto_message_extraction/v3/config.pb.validate.h"
 #include "envoy/server/filter_config.h"
 
 #include "source/common/common/logger.h"

@@ -18,7 +18,7 @@ import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.ext_proc.v3";
 option java_outer_classname = "ExtProcProto";
@@ -212,7 +212,7 @@ message ExternalProcessor {
   // timeout when the filter is running in asynchronous mode. Zero is a valid
   // config which means the timer will be triggered immediately. If not
   // configured, default is 200 milliseconds.
-  google.protobuf.Duration message_timeout = 7 [(validate.rules).duration = {
+  google.protobuf.Duration message_timeout = 7 [(buf.validate.field).duration = {
     lte {seconds: 3600}
     gte {}
   }];
@@ -237,7 +237,7 @@ message ExternalProcessor {
   // Specify the upper bound of
   // :ref:`override_message_timeout <envoy_v3_api_field_service.ext_proc.v3.ProcessingResponse.override_message_timeout>`
   // If not specified, by default it is 0, which will effectively disable the ``override_message_timeout`` API.
-  google.protobuf.Duration max_message_timeout = 10 [(validate.rules).duration = {
+  google.protobuf.Duration max_message_timeout = 10 [(buf.validate.field).duration = {
     lte {seconds: 3600}
     gte {}
   }];
@@ -409,11 +409,11 @@ message HeaderForwardingRules {
 // virtual host or cluster.
 message ExtProcPerRoute {
   oneof override {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Disable the filter for this particular vhost or route.
     // If disabled is specified in multiple per-filter-configs, the most specific one will be used.
-    bool disabled = 1 [(validate.rules).bool = {const: true}];
+    bool disabled = 1 [(buf.validate.field).bool.const = true];
 
     // Override aspects of the configuration for this route. A set of
     // overrides in a more specific configuration will override a "disabled"

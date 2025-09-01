@@ -3,7 +3,6 @@
 #include <chrono>
 
 #include "envoy/extensions/tracers/fluentd/v3/fluentd.pb.h"
-#include "envoy/extensions/tracers/fluentd/v3/fluentd.pb.validate.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/trace_driver.h"
 

@@ -4,7 +4,7 @@ package envoy.type.v3;
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.type.v3";
 option java_outer_classname = "HashPolicyProto";
@@ -30,11 +30,11 @@ message HashPolicy {
     // The name of the Object in the filterState, which is an Envoy::Hashable object. If there is no
     // data associated with the key, or the stored object is not Envoy::Hashable, no hash will be
     // produced.
-    string key = 1 [(validate.rules).string = {min_len: 1}];
+    string key = 1 [(buf.validate.field).string.min_len = 1];
   }
 
   oneof policy_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     SourceIp source_ip = 1;
 

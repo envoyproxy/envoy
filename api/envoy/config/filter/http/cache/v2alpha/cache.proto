@@ -9,7 +9,7 @@ import "google/protobuf/any.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.http.cache.v2alpha";
 option java_outer_classname = "CacheProto";
@@ -47,7 +47,7 @@ message CacheConfig {
   }
 
   // Config specific to the cache storage implementation.
-  google.protobuf.Any typed_config = 1 [(validate.rules).any = {required: true}];
+  google.protobuf.Any typed_config = 1 [(buf.validate.field).any = {required: true}];
 
   // List of matching rules that defines allowed *Vary* headers.
   //

@@ -10,7 +10,6 @@
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
-#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"

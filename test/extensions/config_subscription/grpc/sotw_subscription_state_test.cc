@@ -1,5 +1,4 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
-#include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 
 #include "source/common/config/resource_name.h"
 #include "source/common/config/utility.h"

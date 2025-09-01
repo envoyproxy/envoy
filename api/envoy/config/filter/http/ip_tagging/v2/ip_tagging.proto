@@ -6,7 +6,7 @@ import "envoy/api/v2/core/address.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.http.ip_tagging.v2";
 option java_outer_classname = "IpTaggingProto";
@@ -49,10 +49,10 @@ message IPTagging {
   }
 
   // The type of request the filter should apply to.
-  RequestType request_type = 1 [(validate.rules).enum = {defined_only: true}];
+  RequestType request_type = 1 [(buf.validate.field).enum.defined_only = true];
 
   // [#comment:TODO(ccaraman): Extend functionality to load IP tags from file system.
   // Tracked by issue https://github.com/envoyproxy/envoy/issues/2695]
   // The set of IP tags for the filter.
-  repeated IPTag ip_tags = 4 [(validate.rules).repeated = {min_items: 1}];
+  repeated IPTag ip_tags = 4 [(buf.validate.field).repeated.min_items = 1];
 }

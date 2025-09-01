@@ -5,7 +5,7 @@ package envoy.extensions.filters.http.grpc_json_reverse_transcoder.v3;
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.grpc_json_reverse_transcoder.v3";
 option java_outer_classname = "TranscoderProto";
@@ -107,7 +107,7 @@ message GrpcJsonReverseTranscoder {
   // concurrent requests.
   //
   // If unset, the current stream buffer size is used.
-  google.protobuf.UInt32Value max_request_body_size = 3 [(validate.rules).uint32 = {gt: 0}];
+  google.protobuf.UInt32Value max_request_body_size = 3 [(buf.validate.field).uint32.gt = 0];
 
   // The maximum size of a response body to be transcoded, in bytes. A body exceeding this size will
   // provoke a ``gRPC status: Internal`` response.
@@ -116,7 +116,7 @@ message GrpcJsonReverseTranscoder {
   // concurrent requests.
   //
   // If unset, the current stream buffer size is used.
-  google.protobuf.UInt32Value max_response_body_size = 4 [(validate.rules).uint32 = {gt: 0}];
+  google.protobuf.UInt32Value max_response_body_size = 4 [(buf.validate.field).uint32.gt = 0];
 
   // The name of the header field that has the API version of the request.
   string api_version_header = 5;

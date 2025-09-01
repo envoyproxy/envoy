@@ -7,7 +7,7 @@ import "google/protobuf/wrappers.proto";
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.type.matcher.v3";
 option java_outer_classname = "RegexProto";
@@ -63,7 +63,7 @@ message RegexMatcher {
 
   // The regex match string. The string must be supported by the configured engine. The regex is matched
   // against the full string, not as a partial match.
-  string regex = 2 [(validate.rules).string = {min_len: 1}];
+  string regex = 2 [(buf.validate.field).string.min_len = 1];
 }
 
 // Describes how to match a string and then produce a new string using a regular
@@ -81,7 +81,7 @@ message RegexMatchAndSubstitute {
   // so as to replace just one occurrence of a pattern. Capture groups can be
   // used in the pattern to extract portions of the subject string, and then
   // referenced in the substitution string.
-  RegexMatcher pattern = 1 [(validate.rules).message = {required: true}];
+  RegexMatcher pattern = 1 [(buf.validate.field).required = true];
 
   // The string that should be substituted into matching portions of the
   // subject string during a substitution operation to produce a new string.
@@ -92,6 +92,5 @@ message RegexMatchAndSubstitute {
   // backslash followed by the capture group number to denote a numbered
   // capture group. E.g., ``\1`` refers to capture group 1, and ``\2`` refers
   // to capture group 2.
-  string substitution = 2
-      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+  string substitution = 2;
 }

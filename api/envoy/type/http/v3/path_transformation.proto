@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.type.http.v3;
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.type.http.v3";
 option java_outer_classname = "PathTransformationProto";
@@ -43,7 +43,7 @@ message PathTransformation {
     }
 
     oneof operation_specifier {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Enable path normalization per RFC 3986.
       NormalizePathRFC3986 normalize_path_rfc_3986 = 2;

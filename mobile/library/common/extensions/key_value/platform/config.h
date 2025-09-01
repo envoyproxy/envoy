@@ -6,7 +6,6 @@
 #include "source/common/common/key_value_store_base.h"
 
 #include "library/common/extensions/key_value/platform/platform.pb.h"
-#include "library/common/extensions/key_value/platform/platform.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

@@ -4,7 +4,6 @@
 #include "envoy/common/random_generator.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/load_balancing_policies/maglev/v3/maglev.pb.h"
-#include "envoy/extensions/load_balancing_policies/maglev/v3/maglev.pb.validate.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/load_balancer.h"

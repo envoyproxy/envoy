@@ -2,9 +2,7 @@
 
 #include "envoy/common/key_value_store.h"
 #include "envoy/config/common/key_value/v3/config.pb.h"
-#include "envoy/config/common/key_value/v3/config.pb.validate.h"
 #include "envoy/extensions/key_value/file_based/v3/config.pb.h"
-#include "envoy/extensions/key_value/file_based/v3/config.pb.validate.h"
 
 #include "source/common/common/key_value_store_base.h"
 

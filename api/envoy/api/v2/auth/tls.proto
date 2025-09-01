@@ -10,7 +10,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.auth";
 option java_outer_classname = "TlsProto";
@@ -35,7 +35,7 @@ message UpstreamTlsContext {
   CommonTlsContext common_tls_context = 1;
 
   // SNI string to use when creating TLS backend connections.
-  string sni = 2 [(validate.rules).string = {max_bytes: 255}];
+  string sni = 2 [(buf.validate.field).string.max_len = 255];
 
   // If true, server-initiated TLS renegotiation will be allowed.
   //
@@ -85,7 +85,7 @@ message DownstreamTlsContext {
   // If specified, ``session_timeout`` will change the maximum lifetime (in seconds) of the TLS session.
   // Currently this value is used as a hint for the `TLS session ticket lifetime (for TLSv1.2) <https://tools.ietf.org/html/rfc5077#section-5.6>`_.
   // Only seconds can be specified (fractional seconds are ignored).
-  google.protobuf.Duration session_timeout = 6 [(validate.rules).duration = {
+  google.protobuf.Duration session_timeout = 6 [(buf.validate.field).duration = {
     lt {seconds: 4294967296}
     gte {}
   }];
@@ -97,11 +97,11 @@ message CommonTlsContext {
   message CombinedCertificateValidationContext {
     // How to validate peer certificates.
     CertificateValidationContext default_validation_context = 1
-        [(validate.rules).message = {required: true}];
+        [(buf.validate.field).required = true];
 
     // Config for fetching validation context via SDS API.
     SdsSecretConfig validation_context_sds_secret_config = 2
-        [(validate.rules).message = {required: true}];
+        [(buf.validate.field).required = true];
   }
 
   reserved 5;
@@ -119,7 +119,7 @@ message CommonTlsContext {
 
   // Configs for fetching TLS certificates via SDS API.
   repeated SdsSecretConfig tls_certificate_sds_secret_configs = 6
-      [(validate.rules).repeated = {max_items: 1}];
+      [(buf.validate.field).repeated.max_items = 1];
 
   oneof validation_context_type {
     // How to validate peer certificates.

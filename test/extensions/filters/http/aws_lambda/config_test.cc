@@ -1,5 +1,4 @@
 #include "envoy/extensions/filters/http/aws_lambda/v3/aws_lambda.pb.h"
-#include "envoy/extensions/filters/http/aws_lambda/v3/aws_lambda.pb.validate.h"
 
 #include "source/extensions/filters/http/aws_lambda/aws_lambda_filter.h"
 #include "source/extensions/filters/http/aws_lambda/config.h"

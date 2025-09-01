@@ -4,7 +4,6 @@
 
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
-#include "envoy/config/route/v3/route_components.pb.validate.h"
 
 #include "source/common/http/header_map_impl.h"
 #include "source/common/network/address_impl.h"
@@ -12,7 +11,6 @@
 #include "source/extensions/filters/common/ratelimit_config/ratelimit_config.h"
 
 #include "test/extensions/filters/common/ratelimit_config/ratelimit_config_test.pb.h"
-#include "test/extensions/filters/common/ratelimit_config/ratelimit_config_test.pb.validate.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ratelimit/mocks.h"
 #include "test/mocks/router/mocks.h"

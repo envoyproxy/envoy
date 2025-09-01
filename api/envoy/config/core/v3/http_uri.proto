@@ -6,7 +6,7 @@ import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.core.v3";
 option java_outer_classname = "HttpUriProto";
@@ -28,14 +28,14 @@ message HttpUri {
   //
   //    uri: https://www.googleapis.com/oauth2/v1/certs
   //
-  string uri = 1 [(validate.rules).string = {min_len: 1}];
+  string uri = 1 [(buf.validate.field).string.min_len = 1];
 
   // Specify how ``uri`` is to be fetched. Today, this requires an explicit
   // cluster, but in the future we may support dynamic cluster creation or
   // inline DNS resolution. See `issue
   // <https://github.com/envoyproxy/envoy/issues/1606>`_.
   oneof http_upstream_type {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // A cluster is created in the Envoy "cluster_manager" config
     // section. This field specifies the cluster name.
@@ -46,13 +46,13 @@ message HttpUri {
     //
     //    cluster: jwks_cluster
     //
-    string cluster = 2 [(validate.rules).string = {min_len: 1}];
+    string cluster = 2 [(buf.validate.field).string.min_len = 1];
   }
 
   // Sets the maximum duration in milliseconds that a response can take to arrive upon request.
-  google.protobuf.Duration timeout = 3 [(validate.rules).duration = {
-    required: true
-    lt {seconds: 4294967296}
-    gte {}
-  }];
+  google.protobuf.Duration timeout = 3 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).duration.lt = {seconds: 4294967296},
+    (buf.validate.field).duration.gte = {}
+  ];
 }

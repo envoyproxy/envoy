@@ -5,7 +5,7 @@ package envoy.extensions.filters.http.kill_request.v3;
 import "envoy/type/v3/percent.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.kill_request.v3";
 option java_outer_classname = "KillRequestProto";
@@ -31,7 +31,7 @@ message KillRequest {
 
   // The name of the kill request header. If this field is not empty, it will override the :ref:`default header <config_http_filters_kill_request_http_header>` name. Otherwise the default header name will be used.
   string kill_request_header = 2
-      [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+      ;
 
-  Direction direction = 3 [(validate.rules).enum = {defined_only: true}];
+  Direction direction = 3 [(buf.validate.field).enum.defined_only = true];
 }

@@ -9,7 +9,7 @@ import "google/protobuf/duration.proto";
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.data.dns.v3";
 option java_outer_classname = "DnsTableProto";
@@ -35,7 +35,7 @@ message DnsTable {
     // detection is done automatically when Envoy parses the string. Since this field is
     // repeated, Envoy will return as many entries from this list in the DNS response while
     // keeping the response under 512 bytes
-    repeated string address = 1 [(validate.rules).repeated = {
+    repeated string address = 1 [(buf.validate.field).repeated = {
       min_items: 1
       items {string {min_len: 3}}
     }];
@@ -44,16 +44,16 @@ message DnsTable {
   // Specify the service protocol using a numeric or string value
   message DnsServiceProtocol {
     oneof protocol_config {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Specify the protocol number for the service. Envoy will try to resolve the number to
       // the protocol name. For example, 6 will resolve to "tcp". Refer to:
       // https://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
       // for protocol names and numbers
-      uint32 number = 1 [(validate.rules).uint32 = {lt: 255}];
+      uint32 number = 1 [(buf.validate.field).uint32.lt = 255];
 
       // Specify the protocol name for the service.
-      string name = 2 [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
+      string name = 2 [(buf.validate.field).string = {min_len: 1}];
     }
   }
 
@@ -62,48 +62,48 @@ message DnsTable {
   message DnsServiceTarget {
     // Specify the name of the endpoint for the Service. The name is a hostname or a cluster
     oneof endpoint_type {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Use a resolvable hostname as the endpoint for a service.
       string host_name = 1
-          [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
+          [(buf.validate.field).string = {min_len: 1}];
 
       // Use a cluster name as the endpoint for a service.
       string cluster_name = 2
-          [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
+          [(buf.validate.field).string = {min_len: 1}];
     }
 
     // The priority of the service record target
-    uint32 priority = 3 [(validate.rules).uint32 = {lt: 65536}];
+    uint32 priority = 3 [(buf.validate.field).uint32.lt = 65536];
 
     // The weight of the service record target
-    uint32 weight = 4 [(validate.rules).uint32 = {lt: 65536}];
+    uint32 weight = 4 [(buf.validate.field).uint32.lt = 65536];
 
     // The port to which the service is bound. This value is optional if the target is a
     // cluster. Setting port to zero in this case makes the filter use the port value
     // from the cluster host
-    uint32 port = 5 [(validate.rules).uint32 = {lt: 65536}];
+    uint32 port = 5 [(buf.validate.field).uint32.lt = 65536];
   }
 
   // This message defines a service selection record returned for a service query in a domain
   message DnsService {
     // The name of the service without the protocol or domain name
     string service_name = 1
-        [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
+        [(buf.validate.field).string = {min_len: 1}];
 
     // The service protocol. This can be specified as a string or the numeric value of the protocol
     DnsServiceProtocol protocol = 2;
 
     // The service entry time to live. This is independent from the DNS Answer record TTL
-    google.protobuf.Duration ttl = 3 [(validate.rules).duration = {gte {seconds: 1}}];
+    google.protobuf.Duration ttl = 3 [(buf.validate.field).duration = {gte {seconds: 1}}];
 
     // The list of targets hosting the service
-    repeated DnsServiceTarget targets = 4 [(validate.rules).repeated = {min_items: 1}];
+    repeated DnsServiceTarget targets = 4 [(buf.validate.field).repeated.min_items = 1];
   }
 
   // Define a list of service records for a given service
   message DnsServiceList {
-    repeated DnsService services = 1 [(validate.rules).repeated = {min_items: 1}];
+    repeated DnsService services = 1 [(buf.validate.field).repeated.min_items = 1];
   }
 
   message DnsEndpoint {
@@ -111,7 +111,7 @@ message DnsTable {
         "envoy.data.dns.v2alpha.DnsTable.DnsEndpoint";
 
     oneof endpoint_config {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Define a list of addresses to return for the specified endpoint
       AddressList address_list = 1;
@@ -137,17 +137,17 @@ message DnsTable {
     // wildcard records, the longest wildcard match will be used, e.g. if there are wildcard records for
     // ``*.example.com`` and ``*.foo.example.com`` and the query is for ``bar.foo.example.com``, the latter will be used.
     // Specific records will always take precedence over wildcard records.
-    string name = 1 [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME}];
+    string name = 1 [(buf.validate.field).string = {min_len: 1}];
 
     // The configuration containing the method to determine the address of this endpoint
     DnsEndpoint endpoint = 2;
 
     // Sets the TTL in DNS answers from Envoy returned to the client. The default TTL is 300s
-    google.protobuf.Duration answer_ttl = 3 [(validate.rules).duration = {gte {seconds: 30}}];
+    google.protobuf.Duration answer_ttl = 3 [(buf.validate.field).duration = {gte {seconds: 30}}];
   }
 
   // Control how many times Envoy makes an attempt to forward a query to an external DNS server
-  uint32 external_retry_count = 1 [(validate.rules).uint32 = {lte: 3}];
+  uint32 external_retry_count = 1 [(buf.validate.field).uint32.lte = 3];
 
   // Fully qualified domain names for which Envoy will respond to DNS queries. By leaving this
   // list empty, Envoy will forward all queries to external resolvers

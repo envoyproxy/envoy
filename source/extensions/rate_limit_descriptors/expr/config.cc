@@ -1,7 +1,6 @@
 #include "source/extensions/rate_limit_descriptors/expr/config.h"
 
 #include "envoy/extensions/rate_limit_descriptors/expr/v3/expr.pb.h"
-#include "envoy/extensions/rate_limit_descriptors/expr/v3/expr.pb.validate.h"
 
 #include "source/common/protobuf/utility.h"
 

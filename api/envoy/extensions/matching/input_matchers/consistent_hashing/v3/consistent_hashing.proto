@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.extensions.matching.input_matchers.consistent_hashing.v3;
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.matching.input_matchers.consistent_hashing.v3";
 option java_outer_classname = "ConsistentHashingProto";
@@ -29,7 +29,7 @@ message ConsistentHashing {
   // The value to use for the modulus in the calculation. This effectively  bounds the hash output,
   // specifying the range of possible values.
   // This value must be above the configured threshold.
-  uint32 modulo = 2 [(validate.rules).uint32 = {gt: 0}];
+  uint32 modulo = 2 [(buf.validate.field).uint32.gt = 0];
 
   // Optional seed passed through the hash function. This allows using additional information when computing
   // the hash value: by changing the seed value, a different partition of matching and non-matching inputs will

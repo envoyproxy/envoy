@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "envoy/extensions/stat_sinks/open_telemetry/v3/open_telemetry.pb.h"
-#include "envoy/extensions/stat_sinks/open_telemetry/v3/open_telemetry.pb.validate.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/singleton/instance.h"

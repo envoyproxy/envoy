@@ -6,7 +6,6 @@
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/network/local_ratelimit/local_ratelimit.h"
 
-#include "test/extensions/filters/network/local_ratelimit/local_ratelimit_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"

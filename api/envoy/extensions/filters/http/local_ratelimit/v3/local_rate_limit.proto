@@ -11,7 +11,7 @@ import "envoy/type/v3/token_bucket.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.local_ratelimit.v3";
 option java_outer_classname = "LocalRateLimitProto";
@@ -26,7 +26,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#next-free-field: 19]
 message LocalRateLimit {
   // The human readable prefix to use when emitting stats.
-  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+  string stat_prefix = 1 [(buf.validate.field).string.min_len = 1];
 
   // This field allows for a custom HTTP response status code to the downstream client when
   // the request has been rate limited.
@@ -71,12 +71,12 @@ message LocalRateLimit {
   // has been rate limited and is also forwarded upstream. This can only occur when the
   // filter is enabled but not enforced.
   repeated config.core.v3.HeaderValueOption request_headers_to_add_when_not_enforced = 10
-      [(validate.rules).repeated = {max_items: 10}];
+      [(buf.validate.field).repeated.max_items = 10];
 
   // Specifies a list of HTTP headers that should be added to each response for requests that
   // have been rate limited. This occurs when the filter is enabled and fully enforced.
   repeated config.core.v3.HeaderValueOption response_headers_to_add = 6
-      [(validate.rules).repeated = {max_items: 10}];
+      [(buf.validate.field).repeated.max_items = 10];
 
   // The rate limit descriptor list to use in the local rate limit to override
   // on. The rate limit descriptor is selected by the first full match from the
@@ -100,7 +100,7 @@ message LocalRateLimit {
   // .. note::
   //
   //  The filter supports a range of 0 - 10 inclusively for stage numbers.
-  uint32 stage = 9 [(validate.rules).uint32 = {lte: 10}];
+  uint32 stage = 9 [(buf.validate.field).uint32.lte = 10];
 
   // Specifies the scope of the rate limiter's token bucket.
   // If set to false, the token bucket is shared across all worker threads,
@@ -146,11 +146,11 @@ message LocalRateLimit {
   //
   // Disabled by default.
   common.ratelimit.v3.XRateLimitHeadersRFCVersion enable_x_ratelimit_headers = 12
-      [(validate.rules).enum = {defined_only: true}];
+      [(buf.validate.field).enum.defined_only = true];
 
   // Specifies if the local rate limit filter should include the virtual host rate limits.
   common.ratelimit.v3.VhRateLimitsOptions vh_rate_limits = 13
-      [(validate.rules).enum = {defined_only: true}];
+      [(buf.validate.field).enum.defined_only = true];
 
   // Specifies if default token bucket should be always consumed.
   // If set to false, default token bucket will only be consumed when there is
@@ -189,5 +189,5 @@ message LocalRateLimit {
   // Actual number of dynamic descriptors will depend on the cardinality of unique values received from the http request for the omitted
   // values.
   // Minimum is 1. Default is 20.
-  google.protobuf.UInt32Value max_dynamic_descriptors = 18 [(validate.rules).uint32 = {gte: 1}];
+  google.protobuf.UInt32Value max_dynamic_descriptors = 18 [(buf.validate.field).uint32.gte = 1];
 }

@@ -48,7 +48,6 @@ envoy_cc_extension(
         "//source/common/matcher:matcher_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/custom_response/v3:pkg_cc_proto",
     ],
 )

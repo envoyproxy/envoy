@@ -2,7 +2,6 @@
 #include "source/extensions/filters/common/expr/evaluator.h"
 
 #include "test/common/stream_info/test_util.h"
-#include "test/extensions/filters/common/expr/evaluator_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 #include "test/test_common/network_utility.h"

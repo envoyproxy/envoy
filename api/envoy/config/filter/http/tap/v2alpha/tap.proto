@@ -6,7 +6,7 @@ import "envoy/config/common/tap/v2alpha/common.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.http.tap.v2alpha";
 option java_outer_classname = "TapProto";
@@ -23,5 +23,5 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 message Tap {
   // Common configuration for the HTTP tap filter.
   common.tap.v2alpha.CommonExtensionConfig common_config = 1
-      [(validate.rules).message = {required: true}];
+      [(buf.validate.field).required = true];
 }

@@ -6,7 +6,7 @@ import "envoy/config/core/v3/address.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.ip_tagging.v3";
 option java_outer_classname = "IpTaggingProto";
@@ -76,7 +76,7 @@ message IPTagging {
     // :ref:`action <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader.action>`
     // rather than the defaults for x-envoy prefixed headers.
     string header = 1
-        [(validate.rules).string = {min_len: 1 well_known_regex: HTTP_HEADER_NAME strict: false}];
+        [(buf.validate.field).string = {min_len: 1}];
 
     // Control if the :ref:`header <envoy_v3_api_field_extensions.filters.http.ip_tagging.v3.IPTagging.IpTagHeader.header>`
     // will be sanitized, or be appended to.
@@ -86,12 +86,12 @@ message IPTagging {
   }
 
   // The type of request the filter should apply to.
-  RequestType request_type = 1 [(validate.rules).enum = {defined_only: true}];
+  RequestType request_type = 1 [(buf.validate.field).enum.defined_only = true];
 
   // [#comment:TODO(ccaraman): Extend functionality to load IP tags from file system.
   // Tracked by issue https://github.com/envoyproxy/envoy/issues/2695]
   // The set of IP tags for the filter.
-  repeated IPTag ip_tags = 4 [(validate.rules).repeated = {min_items: 1}];
+  repeated IPTag ip_tags = 4 [(buf.validate.field).repeated.min_items = 1];
 
   // Specify to which header the tags will be written.
   //

@@ -7,7 +7,7 @@ import "envoy/data/tap/v3/wrapper.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.service.tap.v3";
 option java_outer_classname = "TapProto";
@@ -38,7 +38,7 @@ message StreamTapsRequest {
         "envoy.service.tap.v2alpha.StreamTapsRequest.Identifier";
 
     // The node sending taps over the stream.
-    config.core.v3.Node node = 1 [(validate.rules).message = {required: true}];
+    config.core.v3.Node node = 1 [(buf.validate.field).required = true];
 
     // The opaque identifier that was set in the :ref:`output config
     // <envoy_v3_api_field_config.tap.v3.StreamingGrpcSink.tap_id>`.

@@ -6,7 +6,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
-#include "envoy/extensions/wasm/v3/wasm.pb.validate.h"
+#include "envoy/extensions/wasm/v3/wasm.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/stats/sink.h"
 #include "envoy/upstream/cluster_manager.h"

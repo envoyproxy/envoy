@@ -1,5 +1,4 @@
 #include "envoy/extensions/resource_monitors/fixed_heap/v3/fixed_heap.pb.h"
-#include "envoy/extensions/resource_monitors/fixed_heap/v3/fixed_heap.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/extensions/resource_monitors/fixed_heap/config.h"

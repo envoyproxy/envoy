@@ -10,7 +10,7 @@ import "google/rpc/status.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.service.discovery.v3";
 option java_outer_classname = "DiscoveryProto";
@@ -349,7 +349,7 @@ message DynamicParameterConstraints {
     string key = 1;
 
     oneof constraint_type {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Matches this exact value.
       string value = 2;

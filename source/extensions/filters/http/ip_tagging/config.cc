@@ -1,7 +1,6 @@
 #include "source/extensions/filters/http/ip_tagging/config.h"
 
 #include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.h"
-#include "envoy/extensions/filters/http/ip_tagging/v3/ip_tagging.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/protobuf/utility.h"

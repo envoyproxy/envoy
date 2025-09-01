@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package test.server.config_validation;
 
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 message AddListener {
   // generates a new listener listener_x with number listener_num, which can later be removed by
@@ -25,7 +25,7 @@ message RemoveListener {
 
 message Action {
   oneof action_selector {
-    option (validate.required) = true;
+    
 
     AddListener add_listener = 1;
     AddRoute add_route = 2;

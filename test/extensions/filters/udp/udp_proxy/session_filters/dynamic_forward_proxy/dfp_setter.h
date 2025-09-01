@@ -8,7 +8,6 @@
 #include "source/extensions/filters/udp/udp_proxy/session_filters/factory_base.h"
 
 #include "test/extensions/filters/udp/udp_proxy/session_filters/dynamic_forward_proxy/dfp_setter.pb.h"
-#include "test/extensions/filters/udp/udp_proxy/session_filters/dynamic_forward_proxy/dfp_setter.pb.validate.h"
 #include "test/test_common/utility.h"
 
 namespace Envoy {

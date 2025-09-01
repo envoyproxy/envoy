@@ -9,7 +9,7 @@ import "google/protobuf/timestamp.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.data.core.v3";
 option java_outer_classname = "HealthCheckEventProto";
@@ -40,14 +40,14 @@ message HealthCheckEvent {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.core.v2alpha.HealthCheckEvent";
 
-  HealthCheckerType health_checker_type = 1 [(validate.rules).enum = {defined_only: true}];
+  HealthCheckerType health_checker_type = 1 [(buf.validate.field).enum.defined_only = true];
 
   config.core.v3.Address host = 2;
 
-  string cluster_name = 3 [(validate.rules).string = {min_len: 1}];
+  string cluster_name = 3 [(buf.validate.field).string.min_len = 1];
 
   oneof event {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // Host ejection.
     HealthCheckEjectUnhealthy eject_unhealthy_event = 4;
@@ -86,7 +86,7 @@ message HealthCheckEjectUnhealthy {
       "envoy.data.core.v2alpha.HealthCheckEjectUnhealthy";
 
   // The type of failure that caused this ejection.
-  HealthCheckFailureType failure_type = 1 [(validate.rules).enum = {defined_only: true}];
+  HealthCheckFailureType failure_type = 1 [(buf.validate.field).enum.defined_only = true];
 }
 
 message HealthCheckAddHealthy {
@@ -107,7 +107,7 @@ message HealthCheckFailure {
       "envoy.data.core.v2alpha.HealthCheckFailure";
 
   // The type of failure that caused this event.
-  HealthCheckFailureType failure_type = 1 [(validate.rules).enum = {defined_only: true}];
+  HealthCheckFailureType failure_type = 1 [(buf.validate.field).enum.defined_only = true];
 
   // Whether this event is the result of the first ever health check on a host.
   bool first_check = 2;

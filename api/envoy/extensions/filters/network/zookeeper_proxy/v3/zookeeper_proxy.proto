@@ -7,7 +7,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.zookeeper_proxy.v3";
 option java_outer_classname = "ZookeeperProxyProto";
@@ -26,7 +26,7 @@ message ZooKeeperProxy {
 
   // The human readable prefix to use when emitting :ref:`statistics
   // <config_network_filters_zookeeper_proxy_stats>`.
-  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+  string stat_prefix = 1 [(buf.validate.field).string.min_len = 1];
 
   // [#not-implemented-hide:] The optional path to use for writing ZooKeeper access logs.
   // If the access log field is empty, access logs will not be written.
@@ -52,7 +52,7 @@ message ZooKeeperProxy {
   //
   // If it is not set, the default value is 100 milliseconds.
   google.protobuf.Duration default_latency_threshold = 5
-      [(validate.rules).duration = {gte {nanos: 1000000}}];
+      [(buf.validate.field).duration = {gte {nanos: 1000000}}];
 
   // List of latency threshold overrides for opcodes.
   // If the threshold override of one opcode is not set, it will fallback to the default latency
@@ -105,11 +105,11 @@ message LatencyThresholdOverride {
   //
   // https://github.com/apache/zookeeper/blob/master/zookeeper-server/src/main/java/org/apache/zookeeper/ZooDefs.java
   //
-  Opcode opcode = 1 [(validate.rules).enum = {defined_only: true}];
+  Opcode opcode = 1 [(buf.validate.field).enum.defined_only = true];
 
   // The latency threshold override of certain opcode.
-  google.protobuf.Duration threshold = 2 [(validate.rules).duration = {
-    required: true
-    gte {nanos: 1000000}
-  }];
+  google.protobuf.Duration threshold = 2 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).duration.gte = {nanos: 1000000}
+  ];
 }

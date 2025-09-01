@@ -98,7 +98,6 @@ envoy_cc_test_library(
     deps = [
         "//test/fuzz:mutable_visitor_lib",
         "//test/fuzz:random_lib",
-        "@com_envoyproxy_protoc_gen_validate//validate:cc_validate",
         "@com_github_cncf_xds//udpa/type/v1:pkg_cc_proto",
         "@com_github_cncf_xds//xds/type/v3:pkg_cc_proto",
         "@com_github_google_libprotobuf_mutator//:libprotobuf_mutator",

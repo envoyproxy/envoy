@@ -17,7 +17,6 @@
 #include "source/common/http/http2/codec_impl.h"
 #include "source/common/http/conn_manager_utility.h"
 
-#include "test/common/http/codec_impl_fuzz.pb.validate.h"
 #include "test/common/http/http2/codec_impl_test_util.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"

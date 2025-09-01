@@ -7,7 +7,7 @@ import "envoy/type/matcher/v3/regex.proto";
 import "google/protobuf/struct.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.json_to_metadata.v3";
 option java_outer_classname = "JsonToMetadataProto";
@@ -40,7 +40,7 @@ message JsonToMetadata {
     string metadata_namespace = 1;
 
     // The key to use within the namespace.
-    string key = 2 [(validate.rules).string = {min_len: 1}];
+    string key = 2 [(buf.validate.field).string.min_len = 1];
 
     oneof value_type {
       // The value to pair with the given key.
@@ -57,7 +57,7 @@ message JsonToMetadata {
     }
 
     // The value's type — defaults to protobuf.Value.
-    ValueType type = 4 [(validate.rules).enum = {defined_only: true}];
+    ValueType type = 4 [(buf.validate.field).enum.defined_only = true];
 
     // False if we want to overwrite the existing metadata value. Default to false.
     bool preserve_existing_metadata_value = 5;
@@ -66,7 +66,7 @@ message JsonToMetadata {
   message Selector {
     oneof selector {
       // key to match
-      string key = 1 [(validate.rules).string = {min_len: 1}];
+      string key = 1 [(buf.validate.field).string.min_len = 1];
     }
   }
 
@@ -79,7 +79,7 @@ message JsonToMetadata {
     // selectors:
     // - key: foo
     // - key: bar
-    repeated Selector selectors = 1 [(validate.rules).repeated = {min_items: 1}];
+    repeated Selector selectors = 1 [(buf.validate.field).repeated.min_items = 1];
 
     // If the attribute is present, apply this metadata KeyValuePair.
     KeyValuePair on_present = 2;
@@ -97,7 +97,7 @@ message JsonToMetadata {
 
   message MatchRules {
     // The list of rules to apply.
-    repeated Rule rules = 1 [(validate.rules).repeated = {min_items: 1}];
+    repeated Rule rules = 1 [(buf.validate.field).repeated.min_items = 1];
 
     // Allowed content-type for json to metadata transformation.
     // Default to ``{"application/json"}``.
@@ -105,7 +105,7 @@ message JsonToMetadata {
     // Set ``allow_empty_content_type`` if empty/missing content-type header
     // is allowed.
     repeated string allow_content_types = 2
-        [(validate.rules).repeated = {items {string {min_len: 1}}}];
+        [(buf.validate.field).repeated = {items {string {min_len: 1}}}];
 
     // Allowed empty content-type for json to metadata transformation.
     // Default to false.

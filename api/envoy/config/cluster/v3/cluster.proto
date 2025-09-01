@@ -28,7 +28,7 @@ import "udpa/annotations/migrate.proto";
 import "udpa/annotations/security.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.cluster.v3";
 option java_outer_classname = "ClusterProto";
@@ -166,7 +166,7 @@ message Cluster {
         "envoy.api.v2.Cluster.TransportSocketMatch";
 
     // The name of the match, used in stats generation.
-    string name = 1 [(validate.rules).string = {min_len: 1}];
+    string name = 1 [(buf.validate.field).string.min_len = 1];
 
     // Optional metadata match criteria.
     // The connection to the endpoint with metadata matching what is set in this field
@@ -186,7 +186,7 @@ message Cluster {
         "envoy.api.v2.Cluster.CustomClusterType";
 
     // The type of the cluster to instantiate. The name must match a supported cluster type.
-    string name = 1 [(validate.rules).string = {min_len: 1}];
+    string name = 1 [(buf.validate.field).string.min_len = 1];
 
     // Cluster specific configuration which depends on the cluster being instantiated.
     // See the supported cluster for further documentation.
@@ -318,7 +318,7 @@ message Cluster {
       // The behavior used when no endpoint subset matches the selected route's
       // metadata.
       LbSubsetSelectorFallbackPolicy fallback_policy = 2
-          [(validate.rules).enum = {defined_only: true}];
+          [(buf.validate.field).enum.defined_only = true];
 
       // Subset of
       // :ref:`keys<envoy_v3_api_field_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetSelector.keys>` used by
@@ -335,7 +335,7 @@ message Cluster {
     // The behavior used when no endpoint subset matches the selected route's
     // metadata. The value defaults to
     // :ref:`NO_FALLBACK<envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetFallbackPolicy.NO_FALLBACK>`.
-    LbSubsetFallbackPolicy fallback_policy = 1 [(validate.rules).enum = {defined_only: true}];
+    LbSubsetFallbackPolicy fallback_policy = 1 [(buf.validate.field).enum.defined_only = true];
 
     // Specifies the default subset of endpoints used during fallback if
     // fallback_policy is
@@ -402,7 +402,7 @@ message Cluster {
     // The value defaults to
     // :ref:`METADATA_NO_FALLBACK<envoy_v3_api_enum_value_config.cluster.v3.Cluster.LbSubsetConfig.LbSubsetMetadataFallbackPolicy.METADATA_NO_FALLBACK>`.
     LbSubsetMetadataFallbackPolicy metadata_fallback_policy = 8
-        [(validate.rules).enum = {defined_only: true}];
+        [(buf.validate.field).enum.defined_only = true];
   }
 
   // Configuration for :ref:`slow start mode <arch_overview_load_balancing_slow_start>`.
@@ -446,7 +446,7 @@ message Cluster {
 
     // The number of random healthy hosts from which the host with the fewest active requests will
     // be chosen. Defaults to 2 so that we perform two-choice selection if the field is not set.
-    google.protobuf.UInt32Value choice_count = 1 [(validate.rules).uint32 = {gte: 2}];
+    google.protobuf.UInt32Value choice_count = 1 [(buf.validate.field).uint32.gte = 2];
 
     // The following formula is used to calculate the dynamic weights when hosts have different load
     // balancing weights:
@@ -501,16 +501,16 @@ message Cluster {
     // provided host) the better the request distribution will reflect the desired weights. Defaults
     // to 1024 entries, and limited to 8M entries. See also
     // :ref:`maximum_ring_size<envoy_v3_api_field_config.cluster.v3.Cluster.RingHashLbConfig.maximum_ring_size>`.
-    google.protobuf.UInt64Value minimum_ring_size = 1 [(validate.rules).uint64 = {lte: 8388608}];
+    google.protobuf.UInt64Value minimum_ring_size = 1 [(buf.validate.field).uint64.lte = 8388608];
 
     // The hash function used to hash hosts onto the ketama ring. The value defaults to
     // :ref:`XX_HASH<envoy_v3_api_enum_value_config.cluster.v3.Cluster.RingHashLbConfig.HashFunction.XX_HASH>`.
-    HashFunction hash_function = 3 [(validate.rules).enum = {defined_only: true}];
+    HashFunction hash_function = 3 [(buf.validate.field).enum.defined_only = true];
 
     // Maximum hash ring size. Defaults to 8M entries, and limited to 8M entries, but can be lowered
     // to further constrain resource use. See also
     // :ref:`minimum_ring_size<envoy_v3_api_field_config.cluster.v3.Cluster.RingHashLbConfig.minimum_ring_size>`.
-    google.protobuf.UInt64Value maximum_ring_size = 4 [(validate.rules).uint64 = {lte: 8388608}];
+    google.protobuf.UInt64Value maximum_ring_size = 4 [(buf.validate.field).uint64.lte = 8388608];
   }
 
   // Specific configuration for the :ref:`Maglev<arch_overview_load_balancing_types_maglev>`
@@ -520,7 +520,7 @@ message Cluster {
     // Minimal disruption means that when the set of upstream hosts change, a connection will likely be sent to the same
     // upstream as it was before. Increasing the table size reduces the amount of disruption.
     // The table size must be prime number limited to 5000011. If it is not specified, the default is 65537.
-    google.protobuf.UInt64Value table_size = 1 [(validate.rules).uint64 = {lte: 5000011}];
+    google.protobuf.UInt64Value table_size = 1 [(buf.validate.field).uint64.lte = 5000011];
   }
 
   // Specific configuration for the
@@ -551,7 +551,7 @@ message Cluster {
 
     // The port to override for the original dst address. This port
     // will take precedence over filter state and header override ports
-    google.protobuf.UInt32Value upstream_port_override = 3 [(validate.rules).uint32 = {lte: 65535}];
+    google.protobuf.UInt32Value upstream_port_override = 3 [(buf.validate.field).uint32.lte = 65535];
 
     // The dynamic metadata key to override destination address.
     // First the request metadata is considered, then the connection one.
@@ -624,7 +624,7 @@ message Cluster {
       //
       // This is an O(N) algorithm, unlike other load balancers. Using a lower ``hash_balance_factor`` results in more hosts
       // being probed, so use a higher value if you require better performance.
-      google.protobuf.UInt32Value hash_balance_factor = 2 [(validate.rules).uint32 = {gte: 100}];
+      google.protobuf.UInt32Value hash_balance_factor = 2 [(buf.validate.field).uint32.gte = 100];
     }
 
     // Configures the :ref:`healthy panic threshold <arch_overview_load_balancing_panic_threshold>`.
@@ -685,16 +685,16 @@ message Cluster {
     // Specifies the base interval between refreshes. This parameter is required and must be greater
     // than zero and less than
     // :ref:`max_interval <envoy_v3_api_field_config.cluster.v3.Cluster.RefreshRate.max_interval>`.
-    google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
-      required: true
-      gt {nanos: 1000000}
-    }];
+    google.protobuf.Duration base_interval = 1 [
+      (buf.validate.field).required = true,
+      (buf.validate.field).duration.gt = {nanos: 1000000}
+    ];
 
     // Specifies the maximum interval between refreshes. This parameter is optional, but must be
     // greater than or equal to the
     // :ref:`base_interval <envoy_v3_api_field_config.cluster.v3.Cluster.RefreshRate.base_interval>`  if set. The default
     // is 10 times the :ref:`base_interval <envoy_v3_api_field_config.cluster.v3.Cluster.RefreshRate.base_interval>`.
-    google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
+    google.protobuf.Duration max_interval = 2 [(buf.validate.field).duration = {gt {nanos: 1000000}}];
   }
 
   message PreconnectPolicy {
@@ -723,7 +723,7 @@ message Cluster {
     // This is limited somewhat arbitrarily to 3 because preconnecting too aggressively can
     // harm latency more than the preconnecting helps.
     google.protobuf.DoubleValue per_upstream_preconnect_ratio = 1
-        [(validate.rules).double = {lte: 3.0 gte: 1.0}];
+        [(buf.validate.field).double = {lte: 3.0 gte: 1.0}];
 
     // Indicates how many streams (rounded up) can be anticipated across a cluster for each
     // stream, useful for low QPS services. This is currently supported for a subset of
@@ -748,7 +748,7 @@ message Cluster {
     // basically preconnecting max(predictive-preconnect, per-upstream-preconnect), for each
     // upstream.
     google.protobuf.DoubleValue predictive_preconnect_ratio = 2
-        [(validate.rules).double = {lte: 3.0 gte: 1.0}];
+        [(buf.validate.field).double = {lte: 3.0 gte: 1.0}];
   }
 
   reserved 12, 15, 7, 11, 35;
@@ -814,7 +814,7 @@ message Cluster {
   // :ref:`statistics <config_cluster_manager_cluster_stats>` if :ref:`alt_stat_name
   // <envoy_v3_api_field_config.cluster.v3.Cluster.alt_stat_name>` is not provided.
   // Any ``:`` in the cluster name will be converted to ``_`` when emitting statistics.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string.min_len = 1];
 
   // An optional alternative to the cluster name to be used for observability. This name is used
   // for emitting stats for the cluster and access logging the cluster name. This will appear as
@@ -830,7 +830,7 @@ message Cluster {
   oneof cluster_discovery_type {
     // The :ref:`service discovery type <arch_overview_service_discovery_types>`
     // to use for resolving the cluster.
-    DiscoveryType type = 2 [(validate.rules).enum = {defined_only: true}];
+    DiscoveryType type = 2 [(buf.validate.field).enum.defined_only = true];
 
     // The custom cluster type.
     CustomClusterType cluster_type = 38;
@@ -841,7 +841,7 @@ message Cluster {
 
   // The timeout for new network connections to hosts in the cluster.
   // If not set, a default value of 5s will be used.
-  google.protobuf.Duration connect_timeout = 4 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration connect_timeout = 4 [(buf.validate.field).duration = {gt {}}];
 
   // Soft limit on size of the cluster’s connections read and write buffers. If
   // unspecified, an implementation defined default is applied (1MiB).
@@ -850,7 +850,7 @@ message Cluster {
 
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   // when picking a host in the cluster.
-  LbPolicy lb_policy = 6 [(validate.rules).enum = {defined_only: true}];
+  LbPolicy lb_policy = 6 [(buf.validate.field).enum.defined_only = true];
 
   // Setting this is required for specifying members of
   // :ref:`STATIC<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STATIC>`,
@@ -963,7 +963,7 @@ message Cluster {
   // :ref:`DnsCluster<envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`, this field will be ignored.
   google.protobuf.Duration dns_refresh_rate = 16 [
     deprecated = true,
-    (validate.rules).duration = {gt {nanos: 1000000}},
+    (buf.validate.field).duration = {gt {nanos: 1000000}},
     (envoy.annotations.deprecated_at_minor_version) = "3.0"
   ];
 
@@ -982,7 +982,7 @@ message Cluster {
   // :ref:`DnsCluster<envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`, this field will be ignored.
   google.protobuf.Duration dns_jitter = 58 [
     deprecated = true,
-    (validate.rules).duration = {gte {}},
+    (buf.validate.field).duration = {gte {}},
     (envoy.annotations.deprecated_at_minor_version) = "3.0"
   ];
 
@@ -1019,7 +1019,7 @@ message Cluster {
   // extension point and configuring it with :ref:`DnsCluster<envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`.
   // If :ref:`cluster_type<envoy_v3_api_field_config.cluster.v3.Cluster.cluster_type>` is configured with
   // :ref:`DnsCluster<envoy_v3_api_msg_extensions.clusters.dns.v3.DnsCluster>`, this field will be ignored.
-  DnsLookupFamily dns_lookup_family = 17 [(validate.rules).enum = {defined_only: true}];
+  DnsLookupFamily dns_lookup_family = 17 [(buf.validate.field).enum.defined_only = true];
 
   // If DNS resolvers are specified and the cluster type is either
   // :ref:`STRICT_DNS<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.STRICT_DNS>`,
@@ -1090,7 +1090,7 @@ message Cluster {
   // value defaults to 5000ms. For cluster types other than
   // :ref:`ORIGINAL_DST<envoy_v3_api_enum_value_config.cluster.v3.Cluster.DiscoveryType.ORIGINAL_DST>`
   // this setting is ignored.
-  google.protobuf.Duration cleanup_interval = 20 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration cleanup_interval = 20 [(buf.validate.field).duration = {gt {}}];
 
   // Optional configuration used to bind newly established upstream connections.
   // This overrides any bind_config specified in the bootstrap proto.
@@ -1321,7 +1321,7 @@ message UpstreamConnectionOptions {
 
     // Specify the number of addresses of the first_address_family_version being
     // attempted for connection before the other address family.
-    google.protobuf.UInt32Value first_address_family_count = 2 [(validate.rules).uint32 = {gte: 1}];
+    google.protobuf.UInt32Value first_address_family_count = 2 [(buf.validate.field).uint32.gte = 1];
   }
 
   // If set then set SO_KEEPALIVE on the socket to enable TCP Keepalives.

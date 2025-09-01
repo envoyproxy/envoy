@@ -15,7 +15,6 @@
 #include "source/common/singleton/const_singleton.h"
 
 #include "contrib/envoy/extensions/filters/network/sip_proxy/tra/v3alpha/tra.pb.h"
-#include "contrib/envoy/extensions/filters/network/sip_proxy/tra/v3alpha/tra.pb.validate.h"
 #include "contrib/sip_proxy/filters/network/source/tra/tra.h"
 
 namespace Envoy {

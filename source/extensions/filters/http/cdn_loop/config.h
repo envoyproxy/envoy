@@ -3,7 +3,6 @@
 #include <string>
 
 #include "envoy/extensions/filters/http/cdn_loop/v3/cdn_loop.pb.h"
-#include "envoy/extensions/filters/http/cdn_loop/v3/cdn_loop.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/server/factory_context.h"
 

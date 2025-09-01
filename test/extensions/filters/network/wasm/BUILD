@@ -36,7 +36,6 @@ envoy_extension_cc_test(
         "//test/extensions/filters/network/wasm/test_data:test_cpp_plugin",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
-        "@envoy_api//envoy/extensions/filters/network/wasm/v3:pkg_cc_proto",
     ],
 )
 

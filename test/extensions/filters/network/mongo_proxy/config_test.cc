@@ -1,7 +1,6 @@
 #include <string>
 
 #include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.h"
-#include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.validate.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "source/extensions/filters/network/mongo_proxy/config.h"

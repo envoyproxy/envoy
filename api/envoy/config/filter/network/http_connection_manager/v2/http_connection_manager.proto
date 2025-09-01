@@ -19,7 +19,7 @@ import "google/protobuf/wrappers.proto";
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.network.http_connection_manager.v2";
 option java_outer_classname = "HttpConnectionManagerProto";
@@ -111,7 +111,7 @@ message HttpConnectionManager {
     //  This field has been deprecated in favor of `traffic_direction`.
     OperationName operation_name = 1 [
       deprecated = true,
-      (validate.rules).enum = {defined_only: true},
+      (buf.validate.field).enum.defined_only = true,
       (envoy.annotations.disallowed_by_default) = true
     ];
 
@@ -232,15 +232,15 @@ message HttpConnectionManager {
   reserved 27;
 
   // Supplies the type of codec that the connection manager should use.
-  CodecType codec_type = 1 [(validate.rules).enum = {defined_only: true}];
+  CodecType codec_type = 1 [(buf.validate.field).enum.defined_only = true];
 
   // The human readable prefix to use when emitting statistics for the
   // connection manager. See the :ref:`statistics documentation <config_http_conn_man_stats>` for
   // more information.
-  string stat_prefix = 2 [(validate.rules).string = {min_bytes: 1}];
+  string stat_prefix = 2 [(buf.validate.field).string.min_len = 1];
 
   oneof route_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The connection manager’s route table will be dynamically loaded via the RDS API.
     Rds rds = 3;
@@ -287,13 +287,13 @@ message HttpConnectionManager {
   // By default, Envoy will overwrite the header with the value specified in
   // server_name.
   ServerHeaderTransformation server_header_transformation = 34
-      [(validate.rules).enum = {defined_only: true}];
+      [(buf.validate.field).enum.defined_only = true];
 
   // The maximum request headers size for incoming connections.
   // If unconfigured, the default max request headers allowed is 60 KiB.
   // Requests that exceed this limit will receive a 431 response.
   google.protobuf.UInt32Value max_request_headers_kb = 29
-      [(validate.rules).uint32 = {lte: 8192 gt: 0}];
+      [(buf.validate.field).uint32 = {lte: 8192 gt: 0}];
 
   // The idle timeout for connections managed by the connection manager. The
   // idle timeout is defined as the period in which there are no active
@@ -447,7 +447,7 @@ message HttpConnectionManager {
   // How to handle the :ref:`config_http_conn_man_headers_x-forwarded-client-cert` (XFCC) HTTP
   // header.
   ForwardClientCertDetails forward_client_cert_details = 16
-      [(validate.rules).enum = {defined_only: true}];
+      [(buf.validate.field).enum.defined_only = true];
 
   // This field is valid only when :ref:`forward_client_cert_details
   // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.forward_client_cert_details>`
@@ -516,19 +516,19 @@ message HttpConnectionManager {
 
 message Rds {
   // Configuration source specifier for RDS.
-  api.v2.core.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+  api.v2.core.ConfigSource config_source = 1 [(buf.validate.field).required = true];
 
   // The name of the route configuration. This name will be passed to the RDS
   // API. This allows an Envoy configuration with multiple HTTP listeners (and
   // associated HTTP connection manager filters) to use different route
   // configurations.
-  string route_config_name = 2 [(validate.rules).string = {min_bytes: 1}];
+  string route_config_name = 2 [(buf.validate.field).string.min_len = 1];
 }
 
 // This message is used to work around the limitations with 'oneof' and repeated fields.
 message ScopedRouteConfigurationsList {
   repeated api.v2.ScopedRouteConfiguration scoped_route_configurations = 1
-      [(validate.rules).repeated = {min_items: 1}];
+      [(buf.validate.field).repeated.min_items = 1];
 }
 
 // [#next-free-field: 6]
@@ -570,10 +570,10 @@ message ScopedRoutes {
           // If an element contains no separator, the whole element is parsed as key and the
           // fragment value is an empty string.
           // If there are multiple values for a matched key, the first value is returned.
-          string separator = 1 [(validate.rules).string = {min_bytes: 1}];
+          string separator = 1 [(buf.validate.field).string.min_len = 1];
 
           // The key to match on.
-          string key = 2 [(validate.rules).string = {min_bytes: 1}];
+          string key = 2 [(buf.validate.field).string.min_len = 1];
         }
 
         // The name of the header field to extract the value from.
@@ -581,7 +581,7 @@ message ScopedRoutes {
         // .. note::
         //
         //   If the header appears multiple times only the first value is used.
-        string name = 1 [(validate.rules).string = {min_bytes: 1}];
+        string name = 1 [(buf.validate.field).string.min_len = 1];
 
         // The element separator (e.g., ';' separates 'a;b;c;d').
         // Default: empty string. This causes the entirety of the header field to be extracted.
@@ -601,7 +601,7 @@ message ScopedRoutes {
       }
 
       oneof type {
-        option (validate.required) = true;
+        option (buf.validate.oneof).required = true;
 
         // Specifies how a header field's value should be extracted.
         HeaderValueExtractor header_value_extractor = 1;
@@ -611,22 +611,22 @@ message ScopedRoutes {
     // The final(built) scope key consists of the ordered union of these fragments, which are compared in order with the
     // fragments of a :ref:`ScopedRouteConfiguration<envoy_api_msg_ScopedRouteConfiguration>`.
     // A missing fragment during comparison will make the key invalid, i.e., the computed key doesn't match any key.
-    repeated FragmentBuilder fragments = 1 [(validate.rules).repeated = {min_items: 1}];
+    repeated FragmentBuilder fragments = 1 [(buf.validate.field).repeated.min_items = 1];
   }
 
   // The name assigned to the scoped routing configuration.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(buf.validate.field).string.min_len = 1];
 
   // The algorithm to use for constructing a scope key for each request.
-  ScopeKeyBuilder scope_key_builder = 2 [(validate.rules).message = {required: true}];
+  ScopeKeyBuilder scope_key_builder = 2 [(buf.validate.field).required = true];
 
   // Configuration source specifier for RDS.
   // This config source is used to subscribe to RouteConfiguration resources specified in
   // ScopedRouteConfiguration messages.
-  api.v2.core.ConfigSource rds_config_source = 3 [(validate.rules).message = {required: true}];
+  api.v2.core.ConfigSource rds_config_source = 3 [(buf.validate.field).required = true];
 
   oneof config_specifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // The set of routing scopes corresponding to the HCM. A scope is assigned to a request by
     // matching a key constructed from the request's attributes according to the algorithm specified
@@ -647,7 +647,7 @@ message ScopedRoutes {
 message ScopedRds {
   // Configuration source specifier for scoped RDS.
   api.v2.core.ConfigSource scoped_rds_config_source = 1
-      [(validate.rules).message = {required: true}];
+      [(buf.validate.field).required = true];
 }
 
 message HttpFilter {
@@ -655,7 +655,7 @@ message HttpFilter {
 
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_http_filters>`.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(buf.validate.field).string.min_len = 1];
 
   // Filter specific configuration which depends on the filter being instantiated. See the supported
   // filters for further documentation.

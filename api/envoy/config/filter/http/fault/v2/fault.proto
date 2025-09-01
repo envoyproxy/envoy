@@ -10,7 +10,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.http.fault.v2";
 option java_outer_classname = "FaultProto";
@@ -33,10 +33,10 @@ message FaultAbort {
   reserved 1;
 
   oneof error_type {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // HTTP status code to use to abort the HTTP request.
-    uint32 http_status = 2 [(validate.rules).uint32 = {lt: 600 gte: 200}];
+    uint32 http_status = 2 [(buf.validate.field).uint32 = {lt: 600 gte: 200}];
 
     // Fault aborts are controlled via an HTTP header (if applicable).
     HeaderAbort header_abort = 4;

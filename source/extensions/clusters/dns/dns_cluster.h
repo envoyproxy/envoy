@@ -3,7 +3,6 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/extensions/clusters/dns/v3/dns_cluster.pb.h"
-#include "envoy/extensions/clusters/dns/v3/dns_cluster.pb.validate.h"
 
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"

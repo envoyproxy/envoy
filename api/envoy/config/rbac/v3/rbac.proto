@@ -18,7 +18,7 @@ import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.rbac.v3";
 option java_outer_classname = "RbacProto";
@@ -134,7 +134,7 @@ message RBAC {
     // If this condition is met, all the audit loggers configured here will be invoked.
     //
     // [#not-implemented-hide:]
-    AuditCondition audit_condition = 1 [(validate.rules).enum = {defined_only: true}];
+    AuditCondition audit_condition = 1 [(buf.validate.field).enum.defined_only = true];
 
     // Configurations for RBAC-based authorization audit loggers.
     //
@@ -156,7 +156,7 @@ message RBAC {
   //    key namespace ``envoy.common``. If no policies match, it is set to ``false``.
   //    Other actions do not modify this key.
   //
-  Action action = 1 [(validate.rules).enum = {defined_only: true}];
+  Action action = 1 [(buf.validate.field).enum.defined_only = true];
 
   // Maps from policy name to policy. A match occurs when at least one policy matches the request.
   // The policies are evaluated in lexicographic order of the policy name.
@@ -179,13 +179,13 @@ message Policy {
   // Required. The set of permissions that define a role. Each permission is
   // matched with OR semantics. To match all actions for this policy, a single
   // Permission with the ``any`` field set to true should be used.
-  repeated Permission permissions = 1 [(validate.rules).repeated = {min_items: 1}];
+  repeated Permission permissions = 1 [(buf.validate.field).repeated.min_items = 1];
 
   // Required. The set of principals that are assigned/denied the role based on
   // “action”. Each principal is matched with OR semantics. To match all
   // downstreams for this policy, a single Principal with the ``any`` field set to
   // true should be used.
-  repeated Principal principals = 2 [(validate.rules).repeated = {min_items: 1}];
+  repeated Principal principals = 2 [(buf.validate.field).repeated.min_items = 1];
 
   // An optional symbolic expression specifying an access control
   // :ref:`condition <arch_overview_condition>`. The condition is combined
@@ -214,12 +214,12 @@ message SourcedMetadata {
   // Metadata matcher configuration that defines what metadata to match against. This includes the filter name,
   // metadata key path, and expected value.
   type.matcher.v3.MetadataMatcher metadata_matcher = 1
-      [(validate.rules).message = {required: true}];
+      [(buf.validate.field).required = true];
 
   // Specifies which metadata source should be used for matching. If not set,
   // defaults to DYNAMIC (dynamic metadata). Set to ROUTE to match against
   // static metadata configured on the route entry.
-  MetadataSource metadata_source = 2 [(validate.rules).enum = {defined_only: true}];
+  MetadataSource metadata_source = 2 [(buf.validate.field).enum.defined_only = true];
 }
 
 // Permission defines an action (or actions) that a principal can take.
@@ -233,11 +233,11 @@ message Permission {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.rbac.v2.Permission.Set";
 
-    repeated Permission rules = 1 [(validate.rules).repeated = {min_items: 1}];
+    repeated Permission rules = 1 [(buf.validate.field).repeated.min_items = 1];
   }
 
   oneof rule {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // A set of rules that all must match in order to define the action.
     Set and_rules = 1;
@@ -246,7 +246,7 @@ message Permission {
     Set or_rules = 2;
 
     // When any is set, it matches any action.
-    bool any = 3 [(validate.rules).bool = {const: true}];
+    bool any = 3 [(buf.validate.field).bool.const = true];
 
     // A header (or pseudo-header such as ``:path`` or ``:method``) on the incoming HTTP request. Only available
     // for HTTP request.
@@ -265,7 +265,7 @@ message Permission {
     core.v3.CidrRange destination_ip = 5;
 
     // A port number that describes the destination port connecting to.
-    uint32 destination_port = 6 [(validate.rules).uint32 = {lte: 65535}];
+    uint32 destination_port = 6 [(buf.validate.field).uint32.lte = 65535];
 
     // A port number range that describes a range of destination ports connecting to.
     type.v3.Int32Range destination_port_range = 11;
@@ -326,7 +326,7 @@ message Principal {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.rbac.v2.Principal.Set";
 
-    repeated Principal ids = 1 [(validate.rules).repeated = {min_items: 1}];
+    repeated Principal ids = 1 [(buf.validate.field).repeated.min_items = 1];
   }
 
   // Authentication attributes for a downstream.
@@ -351,7 +351,7 @@ message Principal {
   }
 
   oneof identifier {
-    option (validate.required) = true;
+    option (buf.validate.oneof).required = true;
 
     // A set of identifiers that all must match in order to define the downstream.
     Set and_ids = 1;
@@ -360,7 +360,7 @@ message Principal {
     Set or_ids = 2;
 
     // When any is set, it matches any downstream.
-    bool any = 3 [(validate.rules).bool = {const: true}];
+    bool any = 3 [(buf.validate.field).bool.const = true];
 
     // Authenticated attributes that identify the downstream.
     // It is recommended to NOT use this field, but instead use
@@ -438,7 +438,7 @@ message Principal {
 // Action defines the result of allowance or denial when a request matches the matcher.
 message Action {
   // The name indicates the policy name.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string.min_len = 1];
 
   // The action to take if the matcher matches. Every action either allows or denies a request,
   // and can also carry out action-specific operations.

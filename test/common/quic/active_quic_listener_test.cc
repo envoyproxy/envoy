@@ -1,7 +1,6 @@
 #include <cstdlib>
 #include <memory>
 
-#include "envoy/config/listener/v3/quic_config.pb.validate.h"
 #include "envoy/network/exception.h"
 
 #include "source/common/common/logger.h"

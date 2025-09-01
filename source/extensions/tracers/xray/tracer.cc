@@ -11,7 +11,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
-#include "source/extensions/tracers/xray/daemon.pb.validate.h"
+#include "source/extensions/tracers/xray/daemon.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -52,7 +52,7 @@ std::string generateTraceId(SystemTime point_in_time, Random::RandomGenerator& r
 
 void Span::finishSpan() {
   using std::chrono::time_point_cast;
-  using namespace source::extensions::tracers::xray;
+  using namespace ::source::extensions::tracers::xray;
   // X-Ray expects timestamps to be in epoch seconds with milli/micro-second precision as a fraction
   using SecondsWithFraction = std::chrono::duration<double>;
   if (!sampled()) {

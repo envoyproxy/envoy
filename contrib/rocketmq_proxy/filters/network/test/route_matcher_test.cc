@@ -2,9 +2,7 @@
 #include "test/test_common/utility.h"
 
 #include "contrib/envoy/extensions/filters/network/rocketmq_proxy/v3/rocketmq_proxy.pb.h"
-#include "contrib/envoy/extensions/filters/network/rocketmq_proxy/v3/rocketmq_proxy.pb.validate.h"
 #include "contrib/envoy/extensions/filters/network/rocketmq_proxy/v3/route.pb.h"
-#include "contrib/envoy/extensions/filters/network/rocketmq_proxy/v3/route.pb.validate.h"
 #include "contrib/rocketmq_proxy/filters/network/source/metadata.h"
 #include "contrib/rocketmq_proxy/filters/network/source/router/route_matcher.h"
 #include "gmock/gmock.h"

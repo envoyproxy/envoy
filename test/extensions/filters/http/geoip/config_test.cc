@@ -1,5 +1,4 @@
 #include "envoy/extensions/filters/http/geoip/v3/geoip.pb.h"
-#include "envoy/extensions/filters/http/geoip/v3/geoip.pb.validate.h"
 #include "envoy/geoip/geoip_provider_driver.h"
 
 #include "source/extensions/filters/http/geoip/config.h"

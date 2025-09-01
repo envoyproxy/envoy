@@ -1,6 +1,5 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3/cluster.pb.h"
-#include "envoy/extensions/clusters/aggregate/v3/cluster.pb.validate.h"
 
 #include "source/common/singleton/manager_impl.h"
 #include "source/extensions/clusters/aggregate/cluster.h"

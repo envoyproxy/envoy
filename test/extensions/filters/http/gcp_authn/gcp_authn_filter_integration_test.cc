@@ -1,7 +1,6 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
-#include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.validate.h"
 
 #include "source/extensions/filters/http/gcp_authn/gcp_authn_filter.h"
 

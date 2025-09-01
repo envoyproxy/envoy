@@ -9,7 +9,6 @@
 #include "source/extensions/compression/common/compressor/factory_base.h"
 
 #include "contrib/envoy/extensions/compression/qatzstd/compressor/v3alpha/qatzstd.pb.h"
-#include "contrib/envoy/extensions/compression/qatzstd/compressor/v3alpha/qatzstd.pb.validate.h"
 #include "contrib/qat/compression/qatzstd/compressor/source/qatzstd_compressor_impl.h"
 #include "qatseqprod.h"
 

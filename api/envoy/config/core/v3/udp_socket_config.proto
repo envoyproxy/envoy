@@ -5,7 +5,7 @@ package envoy.config.core.v3;
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.core.v3";
 option java_outer_classname = "UdpSocketConfigProto";
@@ -21,7 +21,7 @@ message UdpSocketConfig {
   // more memory per socket. Received datagrams above this size will be dropped. If not set
   // defaults to 1500 bytes.
   google.protobuf.UInt64Value max_rx_datagram_size = 1
-      [(validate.rules).uint64 = {lt: 65536 gt: 0}];
+      [(buf.validate.field).uint64 = {lt: 65536 gt: 0}];
 
   // Configures whether Generic Receive Offload (GRO)
   // <https://en.wikipedia.org/wiki/Large_receive_offload>_ is preferred when reading from the

@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.h"
-#include "envoy/extensions/filters/http/gcp_authn/v3/gcp_authn.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/http/utility.h"

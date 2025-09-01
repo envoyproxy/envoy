@@ -4,7 +4,6 @@
 #include "source/extensions/load_balancing_policies/random/random_lb.h"
 
 #include "test/extensions/load_balancing_policies/common/load_balancer_fuzz_base.h"
-#include "test/extensions/load_balancing_policies/random/random_load_balancer_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/test_common/utility.h"
 

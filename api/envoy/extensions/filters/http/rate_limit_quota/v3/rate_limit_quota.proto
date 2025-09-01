@@ -16,7 +16,7 @@ import "xds/annotations/v3/status.proto";
 import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.rate_limit_quota.v3";
 option java_outer_classname = "RateLimitQuotaProto";
@@ -36,12 +36,12 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // [#next-free-field: 7]
 message RateLimitQuotaFilterConfig {
   // Configures the gRPC Rate Limit Quota Service (RLQS) RateLimitQuotaService.
-  config.core.v3.GrpcService rlqs_server = 1 [(validate.rules).message = {required: true}];
+  config.core.v3.GrpcService rlqs_server = 1 [(buf.validate.field).required = true];
 
   // The application domain to use when calling the service. This enables sharing the quota
   // server between different applications without fear of overlap.
   // E.g., "envoy".
-  string domain = 2 [(validate.rules).string = {min_len: 1}];
+  string domain = 2 [(buf.validate.field).string.min_len = 1];
 
   // The match tree to use for grouping incoming requests into buckets.
   //
@@ -112,7 +112,7 @@ message RateLimitQuotaFilterConfig {
   //
   // Refer to :ref:`Unified Matcher API <envoy_v3_api_msg_.xds.type.matcher.v3.Matcher>`
   // documentation for more information on the matcher trees.
-  xds.type.matcher.v3.Matcher bucket_matchers = 3 [(validate.rules).message = {required: true}];
+  xds.type.matcher.v3.Matcher bucket_matchers = 3 [(buf.validate.field).required = true];
 
   // If set, this will enable -- but not necessarily enforce -- the rate limit for the given
   // fraction of requests.
@@ -135,7 +135,7 @@ message RateLimitQuotaFilterConfig {
   // has been rate limited and is also forwarded upstream. This can only occur when the
   // filter is enabled but not enforced.
   repeated config.core.v3.HeaderValueOption request_headers_to_add_when_not_enforced = 6
-      [(validate.rules).repeated = {max_items: 10}];
+      [(buf.validate.field).repeated.max_items = 10];
 }
 
 // Per-route and per-host configuration overrides. The more specific definition completely
@@ -171,7 +171,7 @@ message RateLimitQuotaBucketSettings {
   // the RLQS server returns the first quota assignment.
   message NoAssignmentBehavior {
     oneof no_assignment_behavior {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Apply pre-configured rate limiting strategy until the server sends the first assignment.
       type.v3.RateLimitStrategy fallback_rate_limit = 1;
@@ -204,10 +204,10 @@ message RateLimitQuotaBucketSettings {
     //
     // If not set, defaults to zero, and the bucket is abandoned immediately.
     google.protobuf.Duration expired_assignment_behavior_timeout = 1
-        [(validate.rules).duration = {gt {}}];
+        [(buf.validate.field).duration = {gt {}}];
 
     oneof expired_assignment_behavior {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Apply the rate limiting strategy to all requests matched into the bucket until the RLQS
       // server sends a new assignment, or the :ref:`expired_assignment_behavior_timeout
@@ -250,7 +250,7 @@ message RateLimitQuotaBucketSettings {
     // have been rate limited. Applies both to plain HTTP, and gRPC requests.
     // The headers are added even when the rate limit quota was not enforced.
     repeated config.core.v3.HeaderValueOption response_headers_to_add = 4
-        [(validate.rules).repeated = {max_items: 10}];
+        [(buf.validate.field).repeated.max_items = 10];
   }
 
   // ``BucketIdBuilder`` makes it possible to build :ref:`BucketId
@@ -264,7 +264,7 @@ message RateLimitQuotaBucketSettings {
     // <envoy_v3_api_msg_service.rate_limit_quota.v3.BucketId>` map.
     message ValueBuilder {
       oneof value_specifier {
-        option (validate.required) = true;
+        option (buf.validate.oneof).required = true;
 
         // Static string value — becomes the value in the :ref:`BucketId
         // <envoy_v3_api_msg_service.rate_limit_quota.v3.BucketId>` map as is.
@@ -290,7 +290,7 @@ message RateLimitQuotaBucketSettings {
     // See usage examples in the docs to :ref:`bucket_id_builder
     // <envoy_v3_api_field_extensions.filters.http.rate_limit_quota.v3.RateLimitQuotaBucketSettings.bucket_id_builder>`
     // field.
-    map<string, ValueBuilder> bucket_id_builder = 1 [(validate.rules).map = {min_pairs: 1}];
+    map<string, ValueBuilder> bucket_id_builder = 1 [(buf.validate.field).map = {min_pairs: 1}];
   }
 
   // ``BucketId`` builder.
@@ -395,10 +395,10 @@ message RateLimitQuotaBucketSettings {
   // <envoy_v3_api_file_envoy/service/rate_limit_quota/v3/rlqs.proto>`.
   //
   // [#comment: 100000000 nanoseconds = 0.1 seconds]
-  google.protobuf.Duration reporting_interval = 2 [(validate.rules).duration = {
-    required: true
-    gt {nanos: 100000000}
-  }];
+  google.protobuf.Duration reporting_interval = 2 [
+      (buf.validate.field).required = true,
+      (buf.validate.field).duration.gt = {nanos: 100000000}
+    ];
 
   // Customize the deny response to the requests over the rate limit.
   // If not set, the filter will be configured as if an empty message is set,

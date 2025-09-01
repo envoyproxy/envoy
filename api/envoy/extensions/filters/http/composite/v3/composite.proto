@@ -8,7 +8,7 @@ import "envoy/config/core/v3/extension.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.composite.v3";
 option java_outer_classname = "CompositeProto";
@@ -36,7 +36,7 @@ message Composite {
 // Configuration for an extension configuration discovery service with name.
 message DynamicConfig {
   // The name of the extension configuration. It also serves as a resource name in ExtensionConfigDS.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string.min_len = 1];
 
   // Configuration source specifier for an extension configuration discovery
   // service. In case of a failure and without the default configuration,

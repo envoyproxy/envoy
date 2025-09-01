@@ -4,7 +4,6 @@
 
 #include "envoy/config/core/v3/http_uri.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
-#include "envoy/config/core/v3/protocol.pb.validate.h"
 
 #include "source/common/common/fmt.h"
 #include "source/common/http/exception.h"

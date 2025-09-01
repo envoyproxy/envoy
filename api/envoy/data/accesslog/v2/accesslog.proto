@@ -11,7 +11,7 @@ import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.data.accesslog.v2";
 option java_outer_classname = "AccesslogProto";
@@ -75,7 +75,7 @@ message AccessLogCommon {
   // [#not-implemented-hide:]
   // This field indicates the rate at which this log entry was sampled.
   // Valid range is (0.0, 1.0].
-  double sample_rate = 1 [(validate.rules).double = {lte: 1.0 gt: 0.0}];
+  double sample_rate = 1 [(buf.validate.field).double = {lte: 1.0 gt: 0.0}];
 
   // This field is the remote/origin address on which the request from the user was received.
   // Note: This may not be the physical peer. E.g, if the remote address is inferred from for
@@ -301,7 +301,7 @@ message TLSProperties {
 // [#next-free-field: 14]
 message HTTPRequestProperties {
   // The request method (RFC 7231/2616).
-  api.v2.core.RequestMethod request_method = 1 [(validate.rules).enum = {defined_only: true}];
+  api.v2.core.RequestMethod request_method = 1 [(buf.validate.field).enum.defined_only = true];
 
   // The scheme portion of the incoming request URI.
   string scheme = 2;

@@ -1,7 +1,6 @@
 #include "source/extensions/filters/listener/tls_inspector/tls_inspector.h"
 
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.h"
-#include "test/extensions/filters/listener/tls_inspector/tls_inspector_fuzz_test.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 
 namespace Envoy {

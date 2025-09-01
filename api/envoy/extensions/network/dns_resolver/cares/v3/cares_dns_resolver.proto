@@ -8,7 +8,7 @@ import "envoy/config/core/v3/resolver.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.network.dns_resolver.cares.v3";
 option java_outer_classname = "CaresDnsResolverProto";
@@ -58,7 +58,7 @@ message CaresDnsResolverConfig {
   //   While the c-ares library defaults to 2 seconds, Envoy's default (if this field is unset) is 5 seconds.
   //   This adjustment was made to maintain the previous behavior after users reported an increase in DNS resolution times.
   //
-  google.protobuf.UInt64Value query_timeout_seconds = 6 [(validate.rules).uint64 = {gte: 1}];
+  google.protobuf.UInt64Value query_timeout_seconds = 6 [(buf.validate.field).uint64.gte = 1];
 
   // The maximum number of query attempts the resolver will make before giving up.
   // Each attempt may use a different name server.
@@ -67,7 +67,7 @@ message CaresDnsResolverConfig {
   //   While the c-ares library defaults to 3 attempts, Envoy's default (if this field is unset) is 4 attempts.
   //   This adjustment was made to maintain the previous behavior after users reported an increase in DNS resolution times.
   //
-  google.protobuf.UInt32Value query_tries = 7 [(validate.rules).uint32 = {gte: 1}];
+  google.protobuf.UInt32Value query_tries = 7 [(buf.validate.field).uint32.gte = 1];
 
   // Enable round-robin selection of name servers for DNS resolution. When enabled, the resolver will cycle through the
   // list of name servers for each resolution request. This can help distribute the query load across multiple name
@@ -88,5 +88,5 @@ message CaresDnsResolverConfig {
   //
   // If unset, c-ares uses its internal default (usually 1232).
   google.protobuf.UInt32Value edns0_max_payload_size = 9
-      [(validate.rules).uint32 = {lte: 4096 gte: 512}];
+      [(buf.validate.field).uint32 = {lte: 4096 gte: 512}];
 }

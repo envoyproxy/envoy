@@ -10,7 +10,6 @@
 
 #include "test/integration/filters/common.h"
 #include "test/integration/filters/non_terminal_encoding_filter.pb.h"
-#include "test/integration/filters/non_terminal_encoding_filter.pb.validate.h"
 #include "test/integration/utility.h"
 
 namespace Envoy {

@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.extensions.matching.common_inputs.network.v3;
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.matching.common_inputs.network.v3";
 option java_outer_classname = "NetworkInputsProto";
@@ -101,7 +101,7 @@ message ApplicationProtocolInput {
 // The value of the provided filter state key will be the raw string representation of the filter state object
 // [#extension: envoy.matching.inputs.filter_state]
 message FilterStateInput {
-  string key = 1 [(validate.rules).string = {min_len: 1}];
+  string key = 1 [(buf.validate.field).string.min_len = 1];
 }
 
 // Input that matches dynamic metadata by key.
@@ -135,16 +135,16 @@ message DynamicMetadataInput {
   // if the segment key refers to a list, it has to be the last segment in a path.
   message PathSegment {
     oneof segment {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // If specified, use the key to retrieve the value in a Struct.
-      string key = 1 [(validate.rules).string = {min_len: 1}];
+      string key = 1 [(buf.validate.field).string.min_len = 1];
     }
   }
 
   // The filter name to retrieve the Struct from the Metadata.
-  string filter = 1 [(validate.rules).string = {min_len: 1}];
+  string filter = 1 [(buf.validate.field).string.min_len = 1];
 
   // The path to retrieve the Value from the Struct.
-  repeated PathSegment path = 2 [(validate.rules).repeated = {min_items: 1}];
+  repeated PathSegment path = 2 [(buf.validate.field).repeated.min_items = 1];
 }

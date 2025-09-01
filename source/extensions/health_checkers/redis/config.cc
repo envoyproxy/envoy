@@ -2,7 +2,6 @@
 
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
-#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "source/common/config/utility.h"

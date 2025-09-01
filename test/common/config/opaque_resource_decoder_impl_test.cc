@@ -1,5 +1,4 @@
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
-#include "envoy/config/endpoint/v3/endpoint.pb.validate.h"
 
 #include "source/common/config/opaque_resource_decoder_impl.h"
 #include "source/common/protobuf/message_validator_impl.h"

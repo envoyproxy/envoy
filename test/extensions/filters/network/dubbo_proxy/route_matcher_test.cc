@@ -1,7 +1,5 @@
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.h"
-#include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.validate.h"
 #include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.h"
-#include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.validate.h"
 
 #include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/network/dubbo_proxy/message_impl.h"

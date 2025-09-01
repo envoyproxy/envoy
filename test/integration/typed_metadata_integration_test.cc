@@ -5,7 +5,6 @@
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/integration.h"
 #include "test/integration/typed_metadata_integration_test.pb.h"
-#include "test/integration/typed_metadata_integration_test.pb.validate.h"
 #include "test/integration/utility.h"
 #include "test/server/utility.h"
 #include "test/test_common/registry.h"
