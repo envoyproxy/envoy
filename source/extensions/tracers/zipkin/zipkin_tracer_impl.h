@@ -100,7 +100,14 @@ private:
  */
 struct CollectorInfo {
   // The Zipkin collector endpoint/path to receive the collected trace data.
+  // For legacy configuration: from collector_endpoint field.
+  // For HttpService configuration: from http_service_.http_uri().uri().
   std::string endpoint_;
+
+  // The hostname to use when sending spans to the collector.
+  // For legacy configuration: from collector_hostname field or cluster name.
+  // For HttpService configuration: cluster name.
+  std::string hostname_;
 
   // The version of the collector. This is related to endpoint's supported payload specification and
   // transport.
@@ -109,7 +116,15 @@ struct CollectorInfo {
 
   bool shared_span_context_{DEFAULT_SHARED_SPAN_CONTEXT};
 
+  // New HttpService configuration (preferred)
+  absl::optional<envoy::config::core::v3::HttpService> http_service_;
+
+  // Whether to use legacy configuration (true) or HttpService (false)
+  bool use_legacy_config_{true};
+
   // Additional custom headers to include in requests to the Zipkin collector.
+  // Only available when using HttpService configuration via request_headers_to_add.
+  // Legacy configuration does not support custom headers.
   std::vector<std::pair<std::string, std::string>> request_headers_;
 };
 

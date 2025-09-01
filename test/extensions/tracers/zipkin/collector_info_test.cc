@@ -2,6 +2,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/config/core/v3/http_service.pb.h"
 #include "source/extensions/tracers/zipkin/zipkin_tracer_impl.h"
 
 #include "gtest/gtest.h"
@@ -17,9 +18,14 @@ TEST(CollectorInfoTest, DefaultConstruction) {
 
   // Default values should be set correctly
   EXPECT_TRUE(collector_info.endpoint_.empty());
+  EXPECT_TRUE(collector_info.hostname_.empty());
   EXPECT_EQ(collector_info.version_, envoy::config::trace::v3::ZipkinConfig::HTTP_JSON);
   EXPECT_TRUE(collector_info.shared_span_context_);
   EXPECT_TRUE(collector_info.request_headers_.empty());
+  
+  // New fields should have default values
+  EXPECT_TRUE(collector_info.use_legacy_config_);  // Defaults to legacy mode
+  EXPECT_FALSE(collector_info.http_service_.has_value());
 }
 
 TEST(CollectorInfoTest, CustomHeadersAssignment) {
@@ -56,6 +62,7 @@ TEST(CollectorInfoTest, CustomHeadersWithCompleteConfiguration) {
 
   // Set all fields including custom headers
   collector_info.endpoint_ = "/api/v2/spans";
+  collector_info.hostname_ = "zipkin.example.com";
   collector_info.version_ = envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO;
   collector_info.shared_span_context_ = false;
   collector_info.request_headers_ = {{"Content-Type", "application/x-protobuf"},
@@ -64,6 +71,7 @@ TEST(CollectorInfoTest, CustomHeadersWithCompleteConfiguration) {
 
   // Verify all fields are set correctly
   EXPECT_EQ(collector_info.endpoint_, "/api/v2/spans");
+  EXPECT_EQ(collector_info.hostname_, "zipkin.example.com");
   EXPECT_EQ(collector_info.version_, envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO);
   EXPECT_FALSE(collector_info.shared_span_context_);
   EXPECT_EQ(collector_info.request_headers_.size(), 3);
@@ -87,6 +95,46 @@ TEST(CollectorInfoTest, SingleCustomHeader) {
   EXPECT_EQ(collector_info.request_headers_.size(), 1);
   EXPECT_EQ(collector_info.request_headers_[0].first, "X-Single-Header");
   EXPECT_EQ(collector_info.request_headers_[0].second, "single-value");
+}
+
+TEST(CollectorInfoTest, LegacyConfigurationMode) {
+  CollectorInfo collector_info;
+
+  // Set up legacy configuration
+  collector_info.use_legacy_config_ = true;
+  collector_info.endpoint_ = "/api/v2/spans";
+  collector_info.hostname_ = "zipkin.legacy.com";
+
+  // Verify legacy configuration
+  EXPECT_TRUE(collector_info.use_legacy_config_);
+  EXPECT_EQ(collector_info.endpoint_, "/api/v2/spans");
+  EXPECT_EQ(collector_info.hostname_, "zipkin.legacy.com");
+  EXPECT_FALSE(collector_info.http_service_.has_value());
+}
+
+TEST(CollectorInfoTest, HttpServiceConfigurationMode) {
+  CollectorInfo collector_info;
+
+  // Create mock HttpService configuration
+  envoy::config::core::v3::HttpService http_service;
+  auto* http_uri = http_service.mutable_http_uri();
+  http_uri->set_uri("/api/v2/spans");
+  http_uri->set_cluster("zipkin_collector");
+  http_uri->mutable_timeout()->set_seconds(5);
+  
+  // Set up HttpService configuration
+  collector_info.use_legacy_config_ = false;
+  collector_info.http_service_ = http_service;
+  collector_info.endpoint_ = "/api/v2/spans";  // Should be populated from HttpService
+  collector_info.hostname_ = "zipkin_collector";  // Should be populated from cluster name
+
+  // Verify HttpService configuration
+  EXPECT_FALSE(collector_info.use_legacy_config_);
+  EXPECT_TRUE(collector_info.http_service_.has_value());
+  EXPECT_EQ(collector_info.http_service_->http_uri().uri(), "/api/v2/spans");
+  EXPECT_EQ(collector_info.http_service_->http_uri().cluster(), "zipkin_collector");
+  EXPECT_EQ(collector_info.endpoint_, "/api/v2/spans");  // Should match HttpService URI
+  EXPECT_EQ(collector_info.hostname_, "zipkin_collector");  // Should match cluster name
 }
 
 } // namespace

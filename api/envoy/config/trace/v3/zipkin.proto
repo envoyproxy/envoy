@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.config.trace.v3;
 
-import "envoy/config/core/v3/base.proto";
+import "envoy/config/core/v3/http_service.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -62,11 +62,17 @@ message ZipkinConfig {
   }
 
   // The cluster manager cluster that hosts the Zipkin collectors.
-  string collector_cluster = 1 [(validate.rules).string = {min_len: 1}];
+  // Note: This field will be deprecated in future releases in favor of
+  // :ref:`collector_service <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_service>`.
+  // Either this field or collector_service must be specified.
+  string collector_cluster = 1;
 
   // The API endpoint of the Zipkin service where the spans will be sent. When
   // using a standard Zipkin installation.
-  string collector_endpoint = 2 [(validate.rules).string = {min_len: 1}];
+  // Note: This field will be deprecated in future releases in favor of
+  // :ref:`collector_service <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_service>`.
+  // Required when using collector_cluster.
+  string collector_endpoint = 2;
 
   // Determines whether a 128bit trace id will be used when creating a new
   // trace instance. The default value is false, which will result in a 64 bit trace id being used.
@@ -81,6 +87,8 @@ message ZipkinConfig {
 
   // Optional hostname to use when sending spans to the collector_cluster. Useful for collectors
   // that require a specific hostname. Defaults to :ref:`collector_cluster <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_cluster>` above.
+  // Note: This field will be deprecated in future releases in favor of
+  // :ref:`collector_service <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_service>`.
   string collector_hostname = 6;
 
   // If this is set to true, then Envoy will be treated as an independent hop in trace chain. A complete span pair will be created for a single
@@ -109,9 +117,10 @@ message ZipkinConfig {
   // The default value is USE_B3 to maintain backward compatibility.
   TraceContextOption trace_context_option = 8;
 
-  // Additional HTTP headers to include in requests sent to the Zipkin collector.
-  // These headers will be added to all HTTP requests sent to the collector endpoint.
-  // This can be useful for authentication, authorization, or collector-specific routing.
-  // Note: This is different from custom tags which add metadata to individual spans.
-  repeated core.v3.HeaderValue collector_request_headers = 9;
+  // HTTP service configuration for the Zipkin collector.
+  // When specified, this configuration takes precedence over the legacy fields:
+  // collector_cluster, collector_endpoint, and collector_hostname.
+  // This provides a complete HTTP service configuration including cluster, URI, timeout, and headers.
+  // If not specified, the legacy fields above will be used for backward compatibility.
+  core.v3.HttpService collector_service = 9;
 }

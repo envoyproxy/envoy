@@ -1068,20 +1068,28 @@ TEST_F(ZipkinDriverTest, DuplicatedHeader) {
   });
 }
 
-TEST_F(ZipkinDriverTest, DriverWithCustomHeaders) {
+TEST_F(ZipkinDriverTest, DriverWithHttpServiceCustomHeaders) {
   cm_.initializeClusters({"fake_cluster"}, {});
 
   const std::string yaml_string = R"EOF(
   collector_cluster: fake_cluster
   collector_endpoint: /api/v2/spans
+  collector_service:
+    http_uri:
+      uri: "https://zipkin-collector.example.com/api/v2/spans"
+      cluster: fake_cluster
+      timeout: 5s
+    request_headers_to_add:
+      - header:
+          key: "Authorization"
+          value: "Bearer token123"
+      - header:
+          key: "X-Custom-Header"
+          value: "custom-value"
+      - header:
+          key: "X-API-Key"
+          value: "api-key-123"
   collector_endpoint_version: HTTP_JSON
-  collector_request_headers:
-    - key: "Authorization"
-      value: "Bearer token123"
-    - key: "X-Custom-Header"
-      value: "custom-value"
-    - key: "X-API-Key"
-      value: "api-key-123"
   )EOF";
 
   envoy::config::trace::v3::ZipkinConfig zipkin_config;
@@ -1091,14 +1099,19 @@ TEST_F(ZipkinDriverTest, DriverWithCustomHeaders) {
   EXPECT_NE(nullptr, driver_);
 }
 
-TEST_F(ZipkinDriverTest, DriverWithEmptyCustomHeaders) {
+TEST_F(ZipkinDriverTest, DriverWithHttpServiceEmptyHeaders) {
   cm_.initializeClusters({"fake_cluster"}, {});
 
   const std::string yaml_string = R"EOF(
   collector_cluster: fake_cluster
   collector_endpoint: /api/v2/spans
+  collector_service:
+    http_uri:
+      uri: "https://zipkin-collector.example.com/api/v2/spans"
+      cluster: fake_cluster
+      timeout: 5s
+    request_headers_to_add: []
   collector_endpoint_version: HTTP_JSON
-  collector_request_headers: []
   )EOF";
 
   envoy::config::trace::v3::ZipkinConfig zipkin_config;
@@ -1162,20 +1175,28 @@ TEST_F(ZipkinDriverTest, ReporterFlushWithCustomHeaders) {
                       std::make_unique<Http::ResponseMessageImpl>(std::move(response_headers)));
 }
 
-TEST_F(ZipkinDriverTest, ReporterFlushWithCustomHeadersVerifyHeaders) {
+TEST_F(ZipkinDriverTest, ReporterFlushWithHttpServiceHeadersVerifyHeaders) {
   cm_.initializeClusters({"fake_cluster"}, {});
 
   const std::string yaml_string = R"EOF(
   collector_cluster: fake_cluster
   collector_endpoint: /api/v2/spans
+  collector_service:
+    http_uri:
+      uri: "https://zipkin-collector.example.com/api/v2/spans"
+      cluster: fake_cluster
+      timeout: 5s
+    request_headers_to_add:
+      - header:
+          key: "Authorization"
+          value: "Bearer token123"
+      - header:
+          key: "X-Custom-Header"
+          value: "custom-value"
+      - header:
+          key: "X-API-Key"
+          value: "api-key-123"
   collector_endpoint_version: HTTP_JSON
-  collector_request_headers:
-    - key: "Authorization"
-      value: "Bearer token123"
-    - key: "X-Custom-Header"
-      value: "custom-value"
-    - key: "X-API-Key"
-      value: "api-key-123"
   )EOF";
 
   envoy::config::trace::v3::ZipkinConfig zipkin_config;
@@ -1196,7 +1217,7 @@ TEST_F(ZipkinDriverTest, ReporterFlushWithCustomHeadersVerifyHeaders) {
 
             // Verify standard headers are present
             EXPECT_EQ("/api/v2/spans", message->headers().getPathValue());
-            EXPECT_EQ("fake_cluster", message->headers().getHostValue());
+            EXPECT_EQ("zipkin-collector.example.com", message->headers().getHostValue());
             EXPECT_EQ("application/json", message->headers().getContentTypeValue());
 
             // Verify custom headers are present
@@ -1230,18 +1251,25 @@ TEST_F(ZipkinDriverTest, ReporterFlushWithCustomHeadersVerifyHeaders) {
                       std::make_unique<Http::ResponseMessageImpl>(std::move(response_headers)));
 }
 
-TEST_F(ZipkinDriverTest, ReporterFlushWithCustomHeadersProtobuf) {
+TEST_F(ZipkinDriverTest, ReporterFlushWithHttpServiceHeadersProtobuf) {
   cm_.initializeClusters({"fake_cluster"}, {});
 
   const std::string yaml_string = R"EOF(
   collector_cluster: fake_cluster
   collector_endpoint: /api/v2/spans
+  collector_service:
+    http_uri:
+      uri: "https://zipkin-collector.example.com/api/v2/spans"
+      cluster: fake_cluster
+      timeout: 5s
+    request_headers_to_add:
+      - header:
+          key: "Authorization"
+          value: "Bearer token123"
+      - header:
+          key: "Content-Encoding"
+          value: "gzip"
   collector_endpoint_version: HTTP_PROTO
-  collector_request_headers:
-    - key: "Authorization"
-      value: "Bearer token123"
-    - key: "Content-Encoding"
-      value: "gzip"
   )EOF";
 
   envoy::config::trace::v3::ZipkinConfig zipkin_config;
@@ -1262,7 +1290,7 @@ TEST_F(ZipkinDriverTest, ReporterFlushWithCustomHeadersProtobuf) {
 
             // Verify standard headers are present
             EXPECT_EQ("/api/v2/spans", message->headers().getPathValue());
-            EXPECT_EQ("fake_cluster", message->headers().getHostValue());
+            EXPECT_EQ("zipkin-collector.example.com", message->headers().getHostValue());
             EXPECT_EQ("application/x-protobuf", message->headers().getContentTypeValue());
 
             // Verify custom headers are present

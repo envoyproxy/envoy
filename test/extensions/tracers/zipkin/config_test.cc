@@ -62,7 +62,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithTypedConfig) {
   EXPECT_NE(nullptr, zipkin_tracer);
 }
 
-TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithCustomHeaders) {
+TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithHttpService) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   context.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
 
@@ -74,13 +74,21 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithCustomHeaders) {
       collector_cluster: fake_cluster
       collector_endpoint: /api/v2/spans
       collector_endpoint_version: HTTP_JSON
-      collector_request_headers:
-        - key: "Authorization"
-          value: "Bearer token123"
-        - key: "X-Custom-Header"
-          value: "custom-value"
-        - key: "X-API-Key"
-          value: "api-key-123"
+      collector_service:
+        http_uri:
+          uri: "https://zipkin-collector.example.com/api/v2/spans"
+          cluster: fake_cluster
+          timeout: 5s
+        request_headers_to_add:
+          - header:
+              key: "Authorization"
+              value: "Bearer token123"
+          - header:
+              key: "X-Custom-Header"
+              value: "custom-value"
+          - header:
+              key: "X-API-Key"
+              value: "api-key-123"
   )EOF";
 
   envoy::config::trace::v3::Tracing configuration;
@@ -93,7 +101,7 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithCustomHeaders) {
   EXPECT_NE(nullptr, zipkin_tracer);
 }
 
-TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithEmptyCustomHeaders) {
+TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithHttpServiceEmptyHeaders) {
   NiceMock<Server::Configuration::MockTracerFactoryContext> context;
   context.server_factory_context_.cluster_manager_.initializeClusters({"fake_cluster"}, {});
 
@@ -105,7 +113,12 @@ TEST(ZipkinTracerConfigTest, ZipkinHttpTracerWithEmptyCustomHeaders) {
       collector_cluster: fake_cluster
       collector_endpoint: /api/v2/spans
       collector_endpoint_version: HTTP_JSON
-      collector_request_headers: []
+      collector_service:
+        http_uri:
+          uri: "https://zipkin-collector.example.com/api/v2/spans"
+          cluster: fake_cluster
+          timeout: 5s
+        request_headers_to_add: []
   )EOF";
 
   envoy::config::trace::v3::Tracing configuration;
