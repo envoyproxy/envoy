@@ -66,7 +66,8 @@ class HttpTapConfig : public virtual Extensions::Common::Tap::TapConfig {
 public:
   /**
    * @return a new per-request HTTP tapper which is used to handle tapping of a discrete request.
-   * @param decoder_callbacks supplies all needed information for HTTP tap
+   * @param tap_config provides http tap config.
+   * @param decoder_callbacks supplies all needed information for HTTP tap.
    */
   virtual HttpPerRequestTapperPtr
   createPerRequestTapper(const envoy::extensions::filters::http::tap::v3::Tap& tap_config,

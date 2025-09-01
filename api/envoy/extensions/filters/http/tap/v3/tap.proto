@@ -35,6 +35,6 @@ message Tap {
   // Indicates whether report downstream connection info
   bool record_downstream_connection = 3;
 
-  // Indicates whether report upstream connection info
+  // If enabled, upstream connection information will be reported.
   bool record_upstream_connection = 4;
 }

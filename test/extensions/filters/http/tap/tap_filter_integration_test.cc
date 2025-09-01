@@ -1244,7 +1244,35 @@ typed_config:
       Extensions::Common::Tap::readTracesFromPath(path_prefix);
   ASSERT_EQ(1, traces.size());
   EXPECT_TRUE(traces[0].has_http_buffered_trace());
-
+  EXPECT_TRUE(traces[0].http_buffered_trace().has_upstream_connection());
+  using ::testing::AnyOf;
+  using ::testing::StrEq;
+  std::string upstream_local_address = traces[0]
+                                           .http_buffered_trace()
+                                           .upstream_connection()
+                                           .local_address()
+                                           .socket_address()
+                                           .address();
+  EXPECT_THAT(upstream_local_address, AnyOf(StrEq("127.0.0.1"), StrEq("::1")));
+  EXPECT_TRUE(traces[0]
+                  .http_buffered_trace()
+                  .upstream_connection()
+                  .local_address()
+                  .socket_address()
+                  .has_port_value());
+  std::string upstream_remote_address = traces[0]
+                                            .http_buffered_trace()
+                                            .upstream_connection()
+                                            .remote_address()
+                                            .socket_address()
+                                            .address();
+  EXPECT_THAT(upstream_remote_address, AnyOf(StrEq("127.0.0.1"), StrEq("::1")));
+  EXPECT_TRUE(traces[0]
+                  .http_buffered_trace()
+                  .upstream_connection()
+                  .remote_address()
+                  .socket_address()
+                  .has_port_value());
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());
 }
 
