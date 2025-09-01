@@ -83,9 +83,7 @@ private:
 
     // Configure retry settings.
     auto* retry_config = composite_config.mutable_retry_config();
-    retry_config->set_overflow_behavior(overflow_option_);
-    retry_config->set_cluster_selection_method(
-        envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::DEFAULT);
+    retry_config->set_overflow_option(overflow_option_);
 
     cluster_type->mutable_typed_config()->PackFrom(composite_config);
   }
@@ -449,7 +447,7 @@ private:
 
     // Configure retry settings.
     auto* retry_config = composite_config.mutable_retry_config();
-    retry_config->set_overflow_behavior(
+    retry_config->set_overflow_option(
         envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::FAIL);
 
     cluster_type->mutable_typed_config()->PackFrom(composite_config);
@@ -521,7 +519,7 @@ public:
 
       // Configure retry settings.
       auto* retry_config = composite_config.mutable_retry_config();
-      retry_config->set_overflow_behavior(
+      retry_config->set_overflow_option(
           envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::USE_LAST_CLUSTER);
 
       cluster_type->mutable_typed_config()->PackFrom(composite_config);

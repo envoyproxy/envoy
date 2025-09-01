@@ -146,7 +146,7 @@ CompositeClusterLoadBalancer::mapRetryAttemptToClusterIndex(size_t retry_attempt
   }
 
   // Handle overflow based on configuration.
-  switch (retry_config_.overflow_behavior()) {
+  switch (retry_config_.overflow_option()) {
   case envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::FAIL:
     ENVOY_LOG(debug, "composite cluster: retry attempt {} exceeds sub-cluster count {}, failing",
               retry_attempt, sub_clusters_->size());

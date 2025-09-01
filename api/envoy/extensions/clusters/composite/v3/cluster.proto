@@ -52,39 +52,37 @@ message ClusterConfig {
       ROUND_ROBIN = 2;
     }
 
-    // Defines how to select the next cluster for retry attempts.
-    enum ClusterSelectionMethod {
-      // Sequential cluster selection based on retry attempts.
-      //
-      // The initial request is sent to the first cluster in the list.
-      // If that request fails and triggers a retry (based on retry policy),
-      // the first retry attempt uses the second cluster, the second retry
-      // attempt uses the third cluster, and so on.
-      //
-      // This progression is based on retry state. Each cluster is used
-      // independently. If the first cluster has healthy endpoints, it will
-      // still be used for the initial request. The second cluster is only
-      // selected when a retry is triggered.
-      DEFAULT = 0;
-    }
+    // The composite cluster selects sub-clusters sequentially based on retry attempts.
+    //
+    // Initial request is always routed to the first sub-cluster in ``sub_clusters``.
+    // If that request fails and a retry is triggered by the configured retry policy,
+    // the first retry uses the second sub-cluster, the second retry uses the third,
+    // and so on.
+    //
+    // This behavior is not the same as the aggregate cluster. The composite cluster
+    // does not combine host sets across sub-clusters and does not load balance across
+    // all endpoints simultaneously. Each attempt targets exactly one sub-cluster.
+    //
+    // Endpoint health within a sub-cluster is evaluated by that sub-cluster's own
+    // load balancer and health checking configuration. A partially unhealthy primary
+    // sub-cluster will still be used for the initial attempt; only healthy endpoints
+    // within that sub-cluster will be considered. If the primary sub-cluster has zero
+    // healthy endpoints, selection will yield no host for the initial attempt, which
+    // will result in a failure unless the route retry policy retries for such errors
+    // (e.g., ``connect-failure``/``no_healthy_upstream``). Subsequent retries progress
+    // to later sub-clusters in order.
 
-    // Controls the behavior when retry attempts exceed the number of
-    // configured sub-clusters.
+    // Controls the behavior when retry attempts exceed the number of configured sub-clusters.
     //
     // If not specified, defaults to ``FAIL``.
-    OverflowOption overflow_behavior = 1;
-
-    // Specifies how clusters are selected for retry attempts.
-    //
-    // If not specified, defaults to ``DEFAULT``.
-    ClusterSelectionMethod cluster_selection_method = 2;
+    OverflowOption overflow_option = 1;
 
     // If ``true``, the composite cluster will honor the retry policy configured
     // at the route level for determining retry conditions (5xx, reset, etc.).
     // If ``false``, retries will be triggered based on connection failures only.
     //
     // If not specified, defaults to ``true``.
-    google.protobuf.BoolValue honor_route_retry_policy = 3;
+    google.protobuf.BoolValue honor_route_retry_policy = 2;
   }
 
   // The list of sub-clusters that make up this composite cluster.

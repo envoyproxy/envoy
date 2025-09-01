@@ -72,7 +72,7 @@ Basic example
           - name: primary_cluster
           - name: secondary_cluster
           retry_config:
-            overflow_behavior: FAIL
+            overflow_option: FAIL
 
     # Define the sub-clusters
     - name: primary_cluster
@@ -109,7 +109,7 @@ In ``RETRY`` mode, the composite cluster selects sub-clusters based on the retry
 * **Initial request** (Attempt #1): Routes to the first sub-cluster.
 * **First retry** (Attempt #2): Routes to the second sub-cluster.
 * **Second retry** (Attempt #3): Routes to the third sub-cluster.
-* **Further retries**: Behavior determined by ``overflow_behavior``.
+* **Further retries**: Behavior determined by ``overflow_option``.
 
 The retry progression works in conjunction with Envoy's
 :ref:`retry policies <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_on>`. The route configuration
@@ -135,8 +135,7 @@ Configuration example
           - name: us_west_cluster
           - name: eu_west_cluster
           retry_config:
-            overflow_behavior: USE_LAST_CLUSTER
-            cluster_selection_method: DEFAULT
+            overflow_option: USE_LAST_CLUSTER
             honor_route_retry_policy: true
 
   # Route configuration with retry policy

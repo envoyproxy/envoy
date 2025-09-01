@@ -85,7 +85,7 @@ cluster_type:
     - name: cluster_0
     - name: cluster_1
     retry_config:
-      overflow_behavior: FAIL
+      overflow_option: FAIL
 )EOF";
 
   initialize(yaml);
@@ -95,7 +95,7 @@ cluster_type:
   EXPECT_EQ("cluster_1", (*cluster_->subClusters())[1]);
   EXPECT_TRUE(cluster_->hasRetryConfig());
   EXPECT_EQ(envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::FAIL,
-            cluster_->retryConfig().overflow_behavior());
+            cluster_->retryConfig().overflow_option());
   EXPECT_TRUE(cluster_->honorRouteRetryPolicy());
   EXPECT_EQ("composite_cluster", cluster_->name());
 }
@@ -112,7 +112,7 @@ cluster_type:
     - name: cluster_0
     - name: cluster_1
     retry_config:
-      overflow_behavior: USE_LAST_CLUSTER
+      overflow_option: USE_LAST_CLUSTER
 )EOF";
 
   initialize(yaml);
@@ -144,7 +144,7 @@ cluster_type:
     - name: cluster_1
     - name: cluster_2
     retry_config:
-      overflow_behavior: ROUND_ROBIN
+      overflow_option: ROUND_ROBIN
 )EOF";
 
   initialize(yaml);
@@ -177,7 +177,7 @@ cluster_type:
     - name: cluster_0
     - name: cluster_1
     retry_config:
-      overflow_behavior: FAIL
+      overflow_option: FAIL
 )EOF";
 
   initialize(yaml);
@@ -205,7 +205,7 @@ cluster_type:
     sub_clusters:
     - name: cluster_0
     retry_config:
-      overflow_behavior: FAIL
+      overflow_option: FAIL
     name: "custom-name"
 )EOF";
 
@@ -224,7 +224,7 @@ cluster_type:
     sub_clusters:
     - name: cluster_0
     retry_config:
-      overflow_behavior: FAIL
+      overflow_option: FAIL
       honor_route_retry_policy: false
 )EOF";
 
@@ -232,25 +232,7 @@ cluster_type:
   EXPECT_FALSE(cluster_->honorRouteRetryPolicy());
 }
 
-// Test cluster selection method configuration.
-TEST_F(CompositeClusterTest, ClusterSelectionMethodConfiguration) {
-  const std::string yaml = R"EOF(
-name: composite_cluster
-cluster_type:
-  name: envoy.clusters.composite
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-    sub_clusters:
-    - name: cluster_0
-    retry_config:
-      overflow_behavior: FAIL
-      cluster_selection_method: DEFAULT
-)EOF";
-
-  initialize(yaml);
-  EXPECT_EQ(envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig::DEFAULT,
-            cluster_->retryConfig().cluster_selection_method());
-}
+// Cluster selection method enum removed; selection is always sequential based on attempt count.
 
 // Test error conditions - missing retry_config for RETRY mode.
 TEST(CompositeClusterErrorTest, MissingRetryConfig) {
@@ -289,7 +271,7 @@ cluster_type:
     "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
     sub_clusters: []
     retry_config:
-      overflow_behavior: FAIL
+      overflow_option: FAIL
 )EOF";
 
   const auto config = TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(yaml);
@@ -363,7 +345,7 @@ cluster_type:
     - name: cluster_0
     - name: cluster_1
     retry_config:
-      overflow_behavior: FAIL
+      overflow_option: FAIL
 )EOF";
 
   initialize(yaml);
@@ -399,7 +381,7 @@ cluster_type:
     - name: cluster_0
     - name: cluster_1
     retry_config:
-      overflow_behavior: FAIL
+      overflow_option: FAIL
 )EOF";
 
   const auto config = TestUtility::parseYaml<envoy::config::cluster::v3::Cluster>(yaml);
@@ -426,7 +408,7 @@ cluster_type:
     sub_clusters:
     - name: cluster_0
     retry_config:
-      overflow_behavior: FAIL
+      overflow_option: FAIL
 )EOF";
 
   initialize(yaml);
@@ -454,7 +436,7 @@ cluster_type:
     sub_clusters:
     - name: cluster_0
     retry_config:
-      overflow_behavior: FAIL
+      overflow_option: FAIL
 )EOF";
 
   initialize(yaml);
@@ -480,7 +462,7 @@ cluster_type:
     sub_clusters:
     - name: cluster_0
     retry_config:
-      overflow_behavior: FAIL
+      overflow_option: FAIL
 )EOF";
 
   initialize(yaml);
@@ -521,7 +503,7 @@ cluster_type:
     sub_clusters:
     - name: cluster_0
     retry_config:
-      overflow_behavior: FAIL
+      overflow_option: FAIL
 )EOF";
 
   initialize(yaml);
@@ -558,7 +540,7 @@ cluster_type:
     sub_clusters:
     - name: cluster_0
     retry_config:
-      overflow_behavior: FAIL
+      overflow_option: FAIL
 )EOF";
 
   initialize(yaml);
@@ -598,7 +580,7 @@ cluster_type:
     sub_clusters:
     - name: cluster_0
     retry_config:
-      overflow_behavior: FAIL
+      overflow_option: FAIL
 )EOF";
 
   initialize(yaml);
@@ -621,7 +603,7 @@ cluster_type:
     sub_clusters:
     - name: cluster_0
     retry_config:
-      overflow_behavior: FAIL
+      overflow_option: FAIL
 )EOF";
 
   initialize(yaml);
@@ -651,7 +633,7 @@ cluster_type:
     sub_clusters:
     - name: cluster_0
     retry_config:
-      overflow_behavior: FAIL
+      overflow_option: FAIL
 )EOF";
 
   initialize(yaml);
@@ -673,7 +655,7 @@ cluster_type:
     sub_clusters:
     - name: cluster_0
     retry_config:
-      overflow_behavior: FAIL
+      overflow_option: FAIL
 )EOF";
 
   initialize(yaml);
@@ -698,7 +680,7 @@ cluster_type:
     sub_clusters:
     - name: cluster_0
     retry_config:
-      overflow_behavior: FAIL
+      overflow_option: FAIL
 )EOF";
 
   initialize(yaml);
@@ -719,7 +701,7 @@ cluster_type:
     sub_clusters:
     - name: cluster_0
     retry_config:
-      overflow_behavior: FAIL
+      overflow_option: FAIL
 )EOF";
 
   initialize(yaml);
@@ -757,7 +739,7 @@ cluster_type:
     sub_clusters:
     - name: cluster_0
     retry_config:
-      overflow_behavior: FAIL
+      overflow_option: FAIL
 )EOF";
 
   initialize(yaml);
@@ -855,7 +837,7 @@ cluster_type:
     sub_clusters:
     - name: nonexistent_cluster
     retry_config:
-      overflow_behavior: FAIL
+      overflow_option: FAIL
 )EOF";
 
   initialize(yaml);
@@ -888,7 +870,7 @@ cluster_type:
     sub_clusters:
     - name: nonexistent_cluster
     retry_config:
-      overflow_behavior: FAIL
+      overflow_option: FAIL
 )EOF";
 
   initialize(yaml);
@@ -1013,7 +995,7 @@ cluster_type:
     - name: cluster_0
     - name: cluster_1
     retry_config:
-      overflow_behavior: ROUND_ROBIN
+      overflow_option: ROUND_ROBIN
 )EOF";
 
   initialize(yaml);
@@ -1053,7 +1035,7 @@ cluster_type:
     sub_clusters:
     - name: cluster_0
     retry_config:
-      overflow_behavior: FAIL
+      overflow_option: FAIL
 )EOF";
 
   initialize(yaml);
