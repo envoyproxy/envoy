@@ -45,10 +45,17 @@ def swift_repos():
     )
 
 def kotlin_repos():
+    # Skip rules_android for now due to Bazel 8 autoloading issues
+    # http_archive(
+    #     name = "rules_android",
+    #     sha256 = "5a5182c74828da53165221987395264d4a5cee8c10c17178a0d5e123bbd1623c",
+    #     urls = ["https://github.com/bazelbuild/rules_android/releases/download/v0.6.5/rules_android-v0.6.5.tar.gz"],
+    # )
+    
     http_archive(
         name = "rules_java",
-        sha256 = "c0ee60f8757f140c157fc2c7af703d819514de6e025ebf70386d38bdd85fce83",
-        url = "https://github.com/bazelbuild/rules_java/releases/download/7.12.3/rules_java-7.12.3.tar.gz",
+        sha256 = "0a7e8811cac04b553f6c6c0d185046e3c68a4cb774e83f37a7a5fb6a3deee261",
+        url = "https://github.com/bazelbuild/rules_java/releases/download/8.15.0/rules_java-8.15.0.tar.gz",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:rules_java.patch"],
     )
@@ -95,12 +102,7 @@ def kotlin_repos():
     )
 
 def android_repos():
-    http_archive(
-        name = "rules_android",
-        urls = ["https://github.com/bazelbuild/rules_android/archive/refs/tags/v0.1.1.zip"],
-        sha256 = "cd06d15dd8bb59926e4d65f9003bfc20f9da4b2519985c27e190cddc8b7a7806",
-        strip_prefix = "rules_android-0.1.1",
-    )
+    # rules_android is already defined in kotlin_repos() with latest version
     http_archive(
         name = "rules_android_ndk",
         urls = ["https://github.com/bazelbuild/rules_android_ndk/archive/v0.1.2.tar.gz"],
