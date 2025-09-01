@@ -110,21 +110,21 @@ Alternatively the trace context can be manually propagated by the service:
     :ref:`tracestate <config_http_conn_man_headers_tracestate>`) when B3 headers are not present.
   - For upstream requests: Inject both B3 and W3C trace headers to maximize compatibility.
 
-  The Zipkin tracer supports advanced configuration using the 
-  :ref:`collector_service <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_service>` 
+  The Zipkin tracer supports advanced configuration using the
+  :ref:`collector_service <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_service>`
   configuration with HttpService. This provides two key capabilities:
 
-  1. **Custom Headers**: Add HTTP headers to collector requests for custom metadata, service identification, 
+  1. **Custom Headers**: Add HTTP headers to collector requests for custom metadata, service identification,
      or collector-specific routing (e.g., API tokens, service identifiers).
-  
+
   2. **Full URI Parsing**: The ``uri`` field supports both path-only (``/api/v2/spans``) and full URI formats
-     (``https://zipkin-collector.example.com/api/v2/spans``). When using full URIs, Envoy automatically 
-     extracts the hostname and path components - the hostname is used for the HTTP ``Host`` header, 
+     (``https://zipkin-collector.example.com/api/v2/spans``). When using full URIs, Envoy automatically
+     extracts the hostname and path components - the hostname is used for the HTTP ``Host`` header,
      and the path is used for the request path. Path-only URIs fallback to using the cluster name as hostname.
 
-  When ``collector_service`` is specified, it takes precedence over the legacy configuration fields 
-  (``collector_cluster``, ``collector_endpoint``, ``collector_hostname``), which will be deprecated 
-  in a future release. Legacy configuration does not support custom headers or URI parsing. 
+  When ``collector_service`` is specified, it takes precedence over the legacy configuration fields
+  (``collector_cluster``, ``collector_endpoint``, ``collector_hostname``), which will be deprecated
+  in a future release. Legacy configuration does not support custom headers or URI parsing.
   This feature is different from custom tags, which add metadata to individual spans within the trace data.
 
   This option is disabled by default (``USE_B3``) to maintain backward compatibility, where only

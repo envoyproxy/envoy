@@ -300,17 +300,17 @@ new_features:
     Enhanced Zipkin tracer with advanced collector configuration via
     :ref:`collector_service <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_service>`
     using HttpService. New features include:
-    
+
     1. **Custom HTTP Headers**: Add headers to collector requests for custom metadata, service identification,
        and collector-specific routing.
-    
-    2. **Full URI Parsing**: The ``uri`` field now supports both path-only (``/api/v2/spans``) and 
+
+    2. **Full URI Parsing**: The ``uri`` field now supports both path-only (``/api/v2/spans``) and
        full URI formats (``https://zipkin-collector.example.com/api/v2/spans``). When using full URIs,
        Envoy automatically extracts hostname and path components - hostname sets the HTTP ``Host`` header,
        and path sets the request path. Path-only URIs fallback to using cluster name as hostname.
-    
+
     When configured, collector_service takes precedence over legacy configuration fields (collector_cluster,
-    collector_endpoint, collector_hostname), which will be deprecated in a future release. Legacy configuration 
+    collector_endpoint, collector_hostname), which will be deprecated in a future release. Legacy configuration
     does not support custom headers or URI parsing.
 - area: composite
   change: |
