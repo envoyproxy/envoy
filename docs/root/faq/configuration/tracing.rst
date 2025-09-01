@@ -7,7 +7,7 @@ See the :ref:`architecture overview <arch_overview_tracing>`. In the addition th
 :ref:`sandboxes <start_sandboxes>` that demonstrate several different tracing providers.
 
 How do I configure the Zipkin collector with custom headers and full URIs?
-=========================================================================
+==========================================================================
 
 The Zipkin tracer supports advanced configuration using the ``collector_service`` field with HttpService.
 This allows you to add custom HTTP headers to collector requests and use full URIs with automatic
