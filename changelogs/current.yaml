@@ -97,6 +97,11 @@ bug_fixes:
     removed for requests matching the ``pass_through_matcher`` configuration. This broke setups with multiple OAuth2
     filter instances using different ``pass_through_matcher`` configurations, because the first matching instance removed
     the OAuth2 cookies--even when a passthrough was intended--impacting subsequent filters that still needed those cookies.
+- area: tls_inspector
+  change: |
+    Fixed regression in tls_inspector that caused plain text connections to be closed if more than 16Kb is read at once.
+    This behavior can be reverted by setting the runtime guard ``envoy.reloadable_features.tls_inspector_no_length_check_on_error``
+    to false.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
