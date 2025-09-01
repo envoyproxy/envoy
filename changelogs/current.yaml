@@ -265,7 +265,7 @@ new_features:
     will take precedence over this field.
 - area: redis
   change: |
-    Added support for ``GEOSEARCH`` and ``GETEX``.
+    Added support for COPY, RPOPLPUSH, SMOVE, SUNION, SDIFF, SINTER, SINTERSTORE, ZUNIONSTORE, ZINTERSTORE, PFMERGE, GEORADIUS, GEORADIUSBYMEMBER, RENAME, SORT, SORT_RO, ZMSCORE, SDIFFSTORE, MSETNX, SUBSTR, ZRANGESTORE, ZUNION, ZDIFF, SUNIONSTORE, SMISMEMBER, HRANDFIELD, GEOSEARCHSTORE, ZDIFFSTORE, ZINTER, ZRANDMEMBER, BITOP, LPOS, RENAMENX
 - area: observability
   change: |
     Added ``ENVOY_NOTIFICATION`` macro to track specific conditions in production environments.
