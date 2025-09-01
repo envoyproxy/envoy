@@ -7549,7 +7549,7 @@ virtual_hosts:
         value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
     - header:
         key: trace-id-from-formatter
-        value: %TRACE_ID%
+        value: "%TRACE_ID%"
 request_headers_to_add:
 - header:
     key: x-client-ip
