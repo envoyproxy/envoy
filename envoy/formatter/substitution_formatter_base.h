@@ -55,10 +55,10 @@ public:
    * Format the value with the given context and stream info.
    * @param context supplies the formatter context.
    * @param stream_info supplies the stream info.
-   * @return ProtobufWkt::Value containing a single value extracted from the given
+   * @return Protobuf::Value containing a single value extracted from the given
    *         context and stream info.
    */
-  virtual ProtobufWkt::Value
+  virtual Protobuf::Value
   formatValueWithContext(const Context& context,
                          const StreamInfo::StreamInfo& stream_info) const PURE;
 };

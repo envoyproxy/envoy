@@ -22,6 +22,7 @@
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/common/fmt.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/xds_resource.h"
 #include "source/common/http/conn_manager_config.h"
 #include "source/common/http/conn_manager_utility.h"
 #include "source/common/http/default_server_string.h"
@@ -206,6 +207,20 @@ createHeaderValidatorFactory([[maybe_unused]] const envoy::extensions::filters::
   return header_validator_factory;
 }
 
+// Validates that an RDS config either has a config_source or an xdstp
+// route_config_name defined.
+absl::Status
+validateRds(const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds) {
+  if (!rds.has_config_source() &&
+      !Config::XdsResourceIdentifier::hasXdsTpScheme(rds.route_config_name())) {
+    return absl::InvalidArgumentError(
+        fmt::format("An RDS config must have either a 'config_source' or an xDS-TP based "
+                    "'route_config_name'. Error while parsing RDS config:\n{}",
+                    rds.DebugString()));
+  }
+  return absl::OkStatus();
+}
+
 } // namespace
 
 // Singleton registration via macro defined in envoy/singleton/manager.h
@@ -380,6 +395,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
           PROTOBUF_GET_OPTIONAL_MS(config.common_http_protocol_options(), max_stream_duration)),
       stream_idle_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, stream_idle_timeout, StreamIdleTimeoutMs)),
+      stream_flush_timeout_(
+          PROTOBUF_GET_MS_OR_DEFAULT(config, stream_flush_timeout, stream_idle_timeout_.count())),
       request_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, request_timeout, RequestTimeoutMs)),
       request_headers_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, request_headers_timeout, RequestHeaderTimeoutMs)),
@@ -545,6 +562,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
   switch (config.route_specifier_case()) {
   case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       RouteSpecifierCase::kRds:
+    SET_AND_RETURN_IF_NOT_OK(validateRds(config.rds()), creation_status);
     route_config_provider_ = route_config_provider_manager.createRdsRouteConfigProvider(
         // At the creation of a RDS route config provider, the factory_context's initManager is
         // always valid, though the init manager may go away later when the listener goes away.

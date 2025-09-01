@@ -33,7 +33,7 @@ REGISTER_FACTORY(ActionFactory, Envoy::Matcher::ActionFactory<ActionContext>);
 void generateLog(StreamInfo::StreamInfo& info, EnforcementMode mode, bool log) {
   // If not shadow enforcement, set shared log metadata.
   if (mode != EnforcementMode::Shadow) {
-    ProtobufWkt::Struct log_metadata;
+    Protobuf::Struct log_metadata;
     auto& log_fields = *log_metadata.mutable_fields();
     log_fields[DynamicMetadataKeysSingleton::get().AccessLogKey].set_bool_value(log);
     info.setDynamicMetadata(DynamicMetadataKeysSingleton::get().CommonNamespace, log_metadata);
@@ -46,13 +46,13 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
     Server::Configuration::CommonFactoryContext& context, const EnforcementMode mode)
     : action_(rules.action()), mode_(mode) {
   // A pointer to the builder, if one will be created.
-  Expr::Builder* builder = nullptr;
+  Expr::BuilderInstanceSharedPtr builder = nullptr;
   // guard expression builder by presence of a condition in policies
   for (const auto& policy : rules.policies()) {
     if (policy.second.has_condition()) {
       builder_with_arena_ = std::make_unique<ExprBuilderWithArena>();
       builder_with_arena_->builder_ = Expr::createBuilder(&builder_with_arena_->constant_arena_);
-      builder = builder_with_arena_->builder_.get();
+      builder = builder_with_arena_->builder_;
       break;
     }
   }

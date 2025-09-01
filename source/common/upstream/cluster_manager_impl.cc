@@ -13,6 +13,7 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/core/v3/protocol.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/grpc/async_client.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
@@ -41,6 +42,8 @@
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/load_balancer_context_base.h"
 #include "source/common/upstream/priority_conn_pool_map_impl.h"
+
+#include "absl/status/status.h"
 
 #ifdef ENVOY_ENABLE_QUIC
 #include "source/common/http/conn_pool_grid.h"
@@ -223,14 +226,11 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
       // If the first CDS response doesn't have any primary cluster, ClusterLoadAssignment
       // should be already paused by CdsApiImpl::onConfigUpdate(). Need to check that to
       // avoid double pause ClusterLoadAssignment.
-      Config::ScopedResume maybe_resume_eds_leds_sds;
-      if (cm_.adsMux()) {
-        const std::vector<std::string> paused_xds_types{
-            Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
-            Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>(),
-            Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
-        maybe_resume_eds_leds_sds = cm_.adsMux()->pause(paused_xds_types);
-      }
+      const std::vector<std::string> paused_xds_types{
+          Config::getTypeUrl<envoy::config::endpoint::v3::ClusterLoadAssignment>(),
+          Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>(),
+          Config::getTypeUrl<envoy::extensions::transport_sockets::tls::v3::Secret>()};
+      Config::ScopedResume resume_eds_leds_sds = xds_manager_.pause(paused_xds_types);
       initializeSecondaryClusters();
     }
     return;
@@ -313,7 +313,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v3::Boots
                        ? absl::make_optional(bootstrap.cluster_manager().upstream_bind_config())
                        : absl::nullopt),
       local_info_(context.localInfo()), cm_stats_(generateStats(*stats_.rootScope())),
-      init_helper_(*this,
+      init_helper_(xds_manager_,
                    [this](ClusterManagerCluster& cluster) { return onClusterInit(cluster); }),
       time_source_(context.timeSource()), dispatcher_(context.mainThreadDispatcher()),
       http_context_(context.httpContext()), router_context_(context.routerContext()),
@@ -503,11 +503,11 @@ absl::Status ClusterManagerImpl::initializeSecondaryClusters(
     auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
         *async_client_manager_, load_stats_config, *stats_.rootScope(), false, 0, false);
     RETURN_IF_NOT_OK_REF(factory_or_error.status());
-    absl::StatusOr<Grpc::RawAsyncClientPtr> client_or_error =
+    absl::StatusOr<Grpc::RawAsyncClientSharedPtr> client_or_error =
         factory_or_error.value()->createUncachedRawAsyncClient();
     RETURN_IF_NOT_OK_REF(client_or_error.status());
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
-        local_info_, *this, *stats_.rootScope(), std::move(*client_or_error), dispatcher_);
+        local_info_, *this, *stats_.rootScope(), std::move(client_or_error.value()), dispatcher_);
   }
   return absl::OkStatus();
 }
@@ -952,7 +952,7 @@ void ClusterManagerImpl::updateClusterCounts() {
   if (all_clusters_initialized && xds_manager_.adsMux()) {
     const auto type_url = Config::getTypeUrl<envoy::config::cluster::v3::Cluster>();
     if (resume_cds_ == nullptr && !warming_clusters_.empty()) {
-      resume_cds_ = xds_manager_.adsMux()->pause(type_url);
+      resume_cds_ = xds_manager_.pause(type_url);
     } else if (warming_clusters_.empty()) {
       resume_cds_.reset();
     }
@@ -1073,15 +1073,16 @@ void ClusterManagerImpl::drainConnections(const std::string& cluster,
   });
 }
 
-void ClusterManagerImpl::drainConnections(DrainConnectionsHostPredicate predicate) {
+void ClusterManagerImpl::drainConnections(DrainConnectionsHostPredicate predicate,
+                                          ConnectionPool::DrainBehavior drain_behavior) {
   ENVOY_LOG_EVENT(debug, "drain_connections_call_for_all_clusters",
                   "drainConnections called for all clusters");
-  tls_.runOnAllThreads([predicate](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
-    for (const auto& cluster_entry : cluster_manager->thread_local_clusters_) {
-      cluster_entry.second->drainConnPools(predicate,
-                                           ConnectionPool::DrainBehavior::DrainExistingConnections);
-    }
-  });
+  tls_.runOnAllThreads(
+      [predicate, drain_behavior](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+        for (const auto& cluster_entry : cluster_manager->thread_local_clusters_) {
+          cluster_entry.second->drainConnPools(predicate, drain_behavior);
+        }
+      });
 }
 
 absl::Status ClusterManagerImpl::checkActiveStaticCluster(const std::string& cluster) {
@@ -1535,8 +1536,8 @@ ClusterManagerImpl::allocateOdCdsApi(OdCdsCreationFunction creation_function,
   // TODO(krnowak): Instead of creating a new handle every time, store the handles internally and
   // return an already existing one if the config or locator matches. Note that this may need a
   // way to clean up the unused handles, so we can close the unnecessary connections.
-  auto odcds_or_error = creation_function(odcds_config, odcds_resources_locator, *this, *this,
-                                          *stats_.rootScope(), validation_visitor);
+  auto odcds_or_error = creation_function(odcds_config, odcds_resources_locator, xds_manager_,
+                                          *this, *this, *stats_.rootScope(), validation_visitor);
   RETURN_IF_NOT_OK_REF(odcds_or_error.status());
   return OdCdsApiHandleImpl::create(*this, std::move(*odcds_or_error));
 }

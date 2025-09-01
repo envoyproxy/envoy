@@ -154,6 +154,21 @@ http_filters:
                             "chain.");
 }
 
+TEST_F(HttpConnectionManagerConfigTest, NonXdsTpRouteWithoutConfigSource) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+stat_prefix: router
+rds:
+  route_config_name: route1
+http_filters:
+- name: foo
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "An RDS config must have either a 'config_source' or an xDS-TP based 'route_config_name'");
+}
+
 TEST_F(HttpConnectionManagerConfigTest, MiscConfig) {
   const std::string yaml_string = R"EOF(
 codec_type: http1
@@ -889,6 +904,119 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
                                      filter_config_provider_manager_, creation_status_);
   ASSERT_TRUE(creation_status_.ok());
   EXPECT_EQ(0, config.streamIdleTimeout().count());
+}
+
+TEST_F(HttpConnectionManagerConfigTest, StreamIdleTimeoutDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  // 5 minutes -> ms.
+  EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
+}
+
+// Tracks stream_idle_timeout. If neither stream_idle_timeout nor stream_flush_timeout are set,
+// stream_flush_timeout should default to stream_idle_timeout's default.
+TEST_F(HttpConnectionManagerConfigTest, StreamFlushTimeoutDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_TRUE(config.streamFlushTimeout().has_value());
+  // 5 minutes.
+  EXPECT_EQ(5 * 60 * 1000, config.streamFlushTimeout().value().count());
+}
+
+// If stream_idle_timeout is set and stream_flush_timeout is not set, stream_flush_timeout should
+// default to stream_idle_timeout.
+TEST_F(HttpConnectionManagerConfigTest, StreamFlushTimeoutDefaultStreamIdleTimeoutSet) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  stream_idle_timeout: 10s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_TRUE(config.streamFlushTimeout().has_value());
+  // 10 seconds.
+  EXPECT_EQ(10 * 1000, config.streamFlushTimeout().value().count());
+}
+
+// Validate that an explicit zero stream flush timeout disables it.
+TEST_F(HttpConnectionManagerConfigTest, DisabledStreamFlushTimeout) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  stream_flush_timeout: 0s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_TRUE(config.streamFlushTimeout().has_value());
+  EXPECT_EQ(0, config.streamFlushTimeout().value().count());
+}
+
+// Validate that the flush timeout and idle timeout can be set independently.
+TEST_F(HttpConnectionManagerConfigTest, StreamFlushTimeoutAndStreamIdleTimeoutSet) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  stream_idle_timeout: 10s
+  stream_flush_timeout: 20s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  EXPECT_EQ(10 * 1000, config.streamIdleTimeout().count());
+  ASSERT_TRUE(config.streamFlushTimeout().has_value());
+  EXPECT_EQ(20 * 1000, config.streamFlushTimeout().value().count());
 }
 
 // Validate that idle_timeout set in common_http_protocol_options is used.
@@ -2593,7 +2721,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::UInt32Value>();
+    return std::make_unique<Protobuf::UInt32Value>();
   }
 
   std::string name() const override {
@@ -2609,7 +2737,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::UInt32Value>();
+    return std::make_unique<Protobuf::UInt32Value>();
   }
 
   std::string name() const override {
@@ -3219,7 +3347,7 @@ public:
   createFromProto(const Protobuf::Message& message,
                   Server::Configuration::ServerFactoryContext& server_context) override {
     auto mptr = ::Envoy::Config::Utility::translateAnyToFactoryConfig(
-        dynamic_cast<const ProtobufWkt::Any&>(message), server_context.messageValidationVisitor(),
+        dynamic_cast<const Protobuf::Any&>(message), server_context.messageValidationVisitor(),
         *this);
     const auto& proto_config =
         MessageUtil::downcastAndValidate<const ::envoy::extensions::http::header_validators::

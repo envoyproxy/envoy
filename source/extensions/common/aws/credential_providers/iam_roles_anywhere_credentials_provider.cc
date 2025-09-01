@@ -74,7 +74,7 @@ void IAMRolesAnywhereCredentialsProvider::refresh() {
   message.headers().setPath("/sessions");
   message.headers().setContentType("application/json");
 
-  auto json_message = ProtobufWkt::Struct();
+  auto json_message = Protobuf::Struct();
   auto& fields = *json_message.mutable_fields();
   fields["profileArn"].set_string_value(profile_arn_);
   fields["roleArn"].set_string_value(role_arn_);

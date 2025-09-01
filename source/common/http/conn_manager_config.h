@@ -126,7 +126,7 @@ struct ConnectionManagerTracingStats {
   CONN_MAN_TRACING_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-using TracingConnectionManagerConfig = Tracing::ConnectionManagerTracingConfigImpl;
+using TracingConnectionManagerConfig = Tracing::ConnectionManagerTracingConfig;
 using TracingConnectionManagerConfigPtr = std::unique_ptr<TracingConnectionManagerConfig>;
 
 /**
@@ -310,6 +310,12 @@ public:
    *         disabled idle timeout.
    */
   virtual std::chrono::milliseconds streamIdleTimeout() const PURE;
+
+  /**
+   * @return per-stream flush timeout for incoming connection manager connections. Zero indicates a
+   *         disabled idle timeout.
+   */
+  virtual absl::optional<std::chrono::milliseconds> streamFlushTimeout() const PURE;
 
   /**
    * @return request timeout for incoming connection manager connections. Zero indicates

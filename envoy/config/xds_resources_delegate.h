@@ -104,7 +104,7 @@ public:
    * @return The created XdsResourcesDelegate instance
    */
   virtual XdsResourcesDelegatePtr
-  createXdsResourcesDelegate(const ProtobufWkt::Any& config,
+  createXdsResourcesDelegate(const Protobuf::Any& config,
                              ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api,
                              Event::Dispatcher& dispatcher) PURE;
 

@@ -1,4 +1,4 @@
-#include "source/extensions/common/matcher/trie_matcher.h"
+#include "source/extensions/common/matcher/ip_range_matcher.h"
 
 #include "envoy/registry/registry.h"
 
@@ -7,11 +7,11 @@ namespace Extensions {
 namespace Common {
 namespace Matcher {
 
-REGISTER_FACTORY(NetworkTrieMatcherFactory,
+REGISTER_FACTORY(NetworkIpRangeMatcherFactory,
                  ::Envoy::Matcher::CustomMatcherFactory<Network::MatchingData>);
-REGISTER_FACTORY(UdpNetworkTrieMatcherFactory,
+REGISTER_FACTORY(UdpNetworkIpRangeMatcherFactory,
                  ::Envoy::Matcher::CustomMatcherFactory<Network::UdpMatchingData>);
-REGISTER_FACTORY(HttpTrieMatcherFactory,
+REGISTER_FACTORY(HttpIpRangeMatcherFactory,
                  ::Envoy::Matcher::CustomMatcherFactory<Http::HttpMatchingData>);
 
 } // namespace Matcher

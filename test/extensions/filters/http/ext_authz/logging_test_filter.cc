@@ -123,7 +123,7 @@ private:
   const bool expect_stats_;
   const bool expect_envoy_grpc_specific_stats_;
   const bool expect_response_bytes_;
-  const absl::optional<ProtobufWkt::Struct> filter_metadata_;
+  const absl::optional<Protobuf::Struct> filter_metadata_;
   // The gRPC status returned by the authorization server when it is making a gRPC call.
   const LoggingTestFilterConfig::GrpcStatus expect_grpc_status_;
 };

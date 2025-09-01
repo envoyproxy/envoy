@@ -14,7 +14,8 @@ class AndroidEngineBuilder(context: Context) : EngineBuilder() {
         eventTracker,
         enableProxying,
         /*useNetworkChangeEvent*/ false,
-        /*disableDnsRefreshOnNetworkChange*/ false
+        /*disableDnsRefreshOnNetworkChange*/ false,
+        /*useV2NetworkMonitor*/ false
       )
     }
   }

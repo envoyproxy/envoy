@@ -202,12 +202,12 @@ typed_config:
                       set: bar
               )EOF";
           auto yaml = absl::StrFormat(yaml_fmt, so_id);
-          ProtobufWkt::Any value;
+          Protobuf::Any value;
           TestUtility::loadFromYaml(yaml, value);
           hcm.mutable_route_config()
               ->mutable_virtual_hosts(0)
               ->mutable_typed_per_filter_config()
-              ->insert(Protobuf::MapPair<std::string, ProtobufWkt::Any>(key, value));
+              ->insert(Protobuf::MapPair<std::string, Protobuf::Any>(key, value));
 
           // route level per route config
           const auto yaml_fmt2 =
@@ -223,13 +223,13 @@ typed_config:
                       set: baz
               )EOF";
           auto yaml2 = absl::StrFormat(yaml_fmt2, so_id);
-          ProtobufWkt::Any value2;
+          Protobuf::Any value2;
           TestUtility::loadFromYaml(yaml2, value2);
 
           auto* new_route2 = hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
           new_route2->mutable_match()->set_prefix("/route-config-test");
           new_route2->mutable_typed_per_filter_config()->insert(
-              Protobuf::MapPair<std::string, ProtobufWkt::Any>(key, value2));
+              Protobuf::MapPair<std::string, Protobuf::Any>(key, value2));
           new_route2->mutable_route()->set_cluster("cluster_0");
         });
 
@@ -1758,14 +1758,14 @@ TEST_P(GolangIntegrationTest, RefreshRouteCache) {
                     value:
               )EOF";
         auto yaml = absl::StrFormat(yaml_fmt, so_id);
-        ProtobufWkt::Any value;
+        Protobuf::Any value;
         TestUtility::loadFromYaml(yaml, value);
 
         auto* route_first_matched =
             hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
         route_first_matched->mutable_match()->set_prefix("/disney/api");
         route_first_matched->mutable_typed_per_filter_config()->insert(
-            Protobuf::MapPair<std::string, ProtobufWkt::Any>(key, value));
+            Protobuf::MapPair<std::string, Protobuf::Any>(key, value));
         auto* resp_header = route_first_matched->add_response_headers_to_add();
         auto* header = resp_header->mutable_header();
         header->set_key("add-header-from");

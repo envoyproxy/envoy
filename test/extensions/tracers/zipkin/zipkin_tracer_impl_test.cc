@@ -5,11 +5,8 @@
 
 #include "envoy/config/trace/v3/zipkin.pb.h"
 
-#include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
-#include "source/common/runtime/runtime_impl.h"
-#include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 #include "source/extensions/tracers/zipkin/zipkin_tracer_impl.h"
 
@@ -204,6 +201,141 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
 
     setup(zipkin_config, true);
   }
+}
+
+TEST_F(ZipkinDriverTest, TraceContextOptionConfiguration) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  {
+    // Test default trace_context_option value (USE_B3) - W3C fallback should be disabled.
+    const std::string yaml_string = R"EOF(
+    collector_cluster: fake_cluster
+    collector_endpoint: /api/v2/spans
+    collector_endpoint_version: HTTP_JSON
+    )EOF";
+    envoy::config::trace::v3::ZipkinConfig zipkin_config;
+    TestUtility::loadFromYaml(yaml_string, zipkin_config);
+
+    setup(zipkin_config, true);
+    EXPECT_FALSE(driver_->w3cFallbackEnabled()); // W3C fallback should be disabled by default
+    EXPECT_EQ(driver_->traceContextOption(), envoy::config::trace::v3::ZipkinConfig::USE_B3);
+  }
+
+  {
+    // Test trace_context_option explicitly set to USE_B3 - W3C fallback should be disabled.
+    const std::string yaml_string = R"EOF(
+    collector_cluster: fake_cluster
+    collector_endpoint: /api/v2/spans
+    collector_endpoint_version: HTTP_JSON
+    trace_context_option: USE_B3
+    )EOF";
+    envoy::config::trace::v3::ZipkinConfig zipkin_config;
+    TestUtility::loadFromYaml(yaml_string, zipkin_config);
+
+    setup(zipkin_config, true);
+    EXPECT_FALSE(driver_->w3cFallbackEnabled()); // W3C fallback should be disabled
+    EXPECT_EQ(driver_->traceContextOption(), envoy::config::trace::v3::ZipkinConfig::USE_B3);
+  }
+
+  {
+    // Test trace_context_option set to USE_B3_WITH_W3C_PROPAGATION - W3C fallback should be
+    // enabled.
+    const std::string yaml_string = R"EOF(
+    collector_cluster: fake_cluster
+    collector_endpoint: /api/v2/spans
+    collector_endpoint_version: HTTP_JSON
+    trace_context_option: USE_B3_WITH_W3C_PROPAGATION
+    )EOF";
+    envoy::config::trace::v3::ZipkinConfig zipkin_config;
+    TestUtility::loadFromYaml(yaml_string, zipkin_config);
+
+    setup(zipkin_config, true);
+    EXPECT_TRUE(driver_->w3cFallbackEnabled()); // W3C fallback should be enabled
+    EXPECT_EQ(driver_->traceContextOption(),
+              envoy::config::trace::v3::ZipkinConfig::USE_B3_WITH_W3C_PROPAGATION);
+  }
+}
+
+TEST_F(ZipkinDriverTest, DualHeaderExtractionAndInjection) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  // Test complete dual header cycle: extract from B3 headers, then inject both B3 and W3C headers
+  const std::string yaml_string = R"EOF(
+  collector_cluster: fake_cluster
+  collector_endpoint: /api/v2/spans
+  collector_endpoint_version: HTTP_JSON
+  trace_context_option: USE_B3_WITH_W3C_PROPAGATION
+  )EOF";
+  envoy::config::trace::v3::ZipkinConfig zipkin_config;
+  TestUtility::loadFromYaml(yaml_string, zipkin_config);
+
+  setup(zipkin_config, true);
+
+  // Step 1: Simulate incoming request with B3 headers (extraction phase)
+  Tracing::TestTraceContextImpl incoming_trace_context{
+      {"x-b3-traceid", "463ac35c9f6413ad48485a3953bb6124"},
+      {"x-b3-spanid", "a2fb4a1d1a96d312"},
+      {"x-b3-sampled", "1"}};
+
+  // Create a span from the incoming B3 headers
+  Tracing::SpanPtr span = driver_->startSpan(config_, incoming_trace_context, stream_info_,
+                                             "test_operation", {Tracing::Reason::Sampling, true});
+
+  // Step 2: Inject context for outgoing request (injection phase)
+  Tracing::TestTraceContextImpl outgoing_trace_context{{}};
+  Tracing::UpstreamContext upstream_context;
+  span->injectContext(outgoing_trace_context, upstream_context);
+
+  // Step 3: Verify both B3 and W3C headers are injected
+
+  // Verify B3 headers are injected
+  auto b3_traceid = outgoing_trace_context.get("x-b3-traceid");
+  auto b3_spanid = outgoing_trace_context.get("x-b3-spanid");
+  auto b3_sampled = outgoing_trace_context.get("x-b3-sampled");
+
+  EXPECT_TRUE(b3_traceid.has_value());
+  EXPECT_TRUE(b3_spanid.has_value());
+  EXPECT_TRUE(b3_sampled.has_value());
+
+  // Verify the trace ID is preserved from extraction
+  EXPECT_EQ(b3_traceid.value(), "463ac35c9f6413ad48485a3953bb6124");
+  EXPECT_EQ(b3_sampled.value(), "1");
+
+  // Verify W3C traceparent header is also injected
+  auto traceparent = outgoing_trace_context.get("traceparent");
+  EXPECT_TRUE(traceparent.has_value());
+  EXPECT_FALSE(traceparent.value().empty());
+
+  // Verify traceparent format and contains the same trace ID
+  const std::string traceparent_value = std::string(traceparent.value());
+  EXPECT_EQ(traceparent_value.length(), 55);                                      // 2+1+32+1+16+1+2
+  EXPECT_EQ(traceparent_value.substr(0, 3), "00-");                               // version
+  EXPECT_EQ(traceparent_value.substr(3, 32), "463ac35c9f6413ad48485a3953bb6124"); // same trace ID
+  EXPECT_EQ(traceparent_value[35], '-');            // separator after trace-id
+  EXPECT_EQ(traceparent_value[52], '-');            // separator after span-id
+  EXPECT_EQ(traceparent_value.substr(53, 2), "01"); // sampled flag
+
+  // Step 4: Test W3C extraction fallback when B3 headers are not present
+  Tracing::TestTraceContextImpl w3c_only_context{
+      {"traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"}};
+
+  Tracing::SpanPtr w3c_span =
+      driver_->startSpan(config_, w3c_only_context, stream_info_, "w3c_test_operation",
+                         {Tracing::Reason::Sampling, true});
+
+  // Inject context for W3C extracted span
+  Tracing::TestTraceContextImpl w3c_outgoing_context{{}};
+  w3c_span->injectContext(w3c_outgoing_context, upstream_context);
+
+  // Verify both B3 and W3C headers are injected even when extracted from W3C
+  EXPECT_TRUE(w3c_outgoing_context.get("x-b3-traceid").has_value());
+  EXPECT_TRUE(w3c_outgoing_context.get("x-b3-spanid").has_value());
+  EXPECT_TRUE(w3c_outgoing_context.get("x-b3-sampled").has_value());
+  EXPECT_TRUE(w3c_outgoing_context.get("traceparent").has_value());
+
+  // Verify the trace ID is preserved from W3C extraction
+  auto w3c_b3_traceid = w3c_outgoing_context.get("x-b3-traceid");
+  EXPECT_EQ(w3c_b3_traceid.value(), "4bf92f3577b34da6a3ce929d0e0e4736");
 }
 
 TEST_F(ZipkinDriverTest, AllowCollectorClusterToBeAddedViaApi) {
@@ -503,8 +635,8 @@ TEST_F(ZipkinDriverTest, NoB3ContextSampledTrue) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
 
-  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
-  EXPECT_TRUE(zipkin_span->span().sampled());
+  Zipkin::SpanPtr zipkin_span(dynamic_cast<Zipkin::Span*>(span.release()));
+  EXPECT_TRUE(zipkin_span->sampled());
 }
 
 TEST_F(ZipkinDriverTest, NoB3ContextSampledFalse) {
@@ -517,8 +649,8 @@ TEST_F(ZipkinDriverTest, NoB3ContextSampledFalse) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, false});
 
-  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
-  EXPECT_FALSE(zipkin_span->span().sampled());
+  Zipkin::SpanPtr zipkin_span(dynamic_cast<Zipkin::Span*>(span.release()));
+  EXPECT_FALSE(zipkin_span->sampled());
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleTrue) {
@@ -533,8 +665,8 @@ TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleTrue) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
 
-  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
-  EXPECT_TRUE(zipkin_span->span().sampled());
+  Zipkin::SpanPtr zipkin_span(dynamic_cast<Zipkin::Span*>(span.release()));
+  EXPECT_TRUE(zipkin_span->sampled());
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleFalse) {
@@ -549,8 +681,8 @@ TEST_F(ZipkinDriverTest, PropagateB3NoSampleDecisionSampleFalse) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, false});
 
-  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
-  EXPECT_FALSE(zipkin_span->span().sampled());
+  Zipkin::SpanPtr zipkin_span(dynamic_cast<Zipkin::Span*>(span.release()));
+  EXPECT_FALSE(zipkin_span->sampled());
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3NotSampled) {
@@ -630,8 +762,8 @@ TEST_F(ZipkinDriverTest, PropagateB3SampleFalse) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
 
-  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
-  EXPECT_FALSE(zipkin_span->span().sampled());
+  Zipkin::SpanPtr zipkin_span(dynamic_cast<Zipkin::Span*>(span.release()));
+  EXPECT_FALSE(zipkin_span->sampled());
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
@@ -647,13 +779,12 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
 
-  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
+  Zipkin::SpanPtr zipkin_span(dynamic_cast<Zipkin::Span*>(span.release()));
   zipkin_span->setTag("key", "value");
 
-  Span& zipkin_zipkin_span = zipkin_span->span();
-  EXPECT_EQ(1ULL, zipkin_zipkin_span.binaryAnnotations().size());
-  EXPECT_EQ("key", zipkin_zipkin_span.binaryAnnotations()[0].key());
-  EXPECT_EQ("value", zipkin_zipkin_span.binaryAnnotations()[0].value());
+  EXPECT_EQ(1ULL, zipkin_span->binaryAnnotations().size());
+  EXPECT_EQ("key", zipkin_span->binaryAnnotations()[0].key());
+  EXPECT_EQ("value", zipkin_span->binaryAnnotations()[0].value());
 
   // ====
   // Test setTag() with SR annotated span
@@ -670,29 +801,27 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   Tracing::SpanPtr span2 = driver_->startSpan(config_, request_headers_, stream_info_,
                                               operation_name_, {Tracing::Reason::Sampling, true});
 
-  ZipkinSpanPtr zipkin_span2(dynamic_cast<ZipkinSpan*>(span2.release()));
+  Zipkin::SpanPtr zipkin_span2(dynamic_cast<Zipkin::Span*>(span2.release()));
   zipkin_span2->setTag("key2", "value2");
 
-  Span& zipkin_zipkin_span2 = zipkin_span2->span();
-  EXPECT_EQ(1ULL, zipkin_zipkin_span2.binaryAnnotations().size());
-  EXPECT_EQ("key2", zipkin_zipkin_span2.binaryAnnotations()[0].key());
-  EXPECT_EQ("value2", zipkin_zipkin_span2.binaryAnnotations()[0].value());
+  EXPECT_EQ(1ULL, zipkin_span2->binaryAnnotations().size());
+  EXPECT_EQ("key2", zipkin_span2->binaryAnnotations()[0].key());
+  EXPECT_EQ("value2", zipkin_span2->binaryAnnotations()[0].value());
 
   // ====
   // Test setTag() with empty annotations vector
   // ====
   Tracing::SpanPtr span3 = driver_->startSpan(config_, request_headers_, stream_info_,
                                               operation_name_, {Tracing::Reason::Sampling, true});
-  ZipkinSpanPtr zipkin_span3(dynamic_cast<ZipkinSpan*>(span3.release()));
-  Span& zipkin_zipkin_span3 = zipkin_span3->span();
+  Zipkin::SpanPtr zipkin_span3(dynamic_cast<Zipkin::Span*>(span3.release()));
 
   std::vector<Annotation> annotations;
-  zipkin_zipkin_span3.setAnnotations(annotations);
+  zipkin_span3->setAnnotations(annotations);
 
   zipkin_span3->setTag("key3", "value3");
-  EXPECT_EQ(1ULL, zipkin_zipkin_span3.binaryAnnotations().size());
-  EXPECT_EQ("key3", zipkin_zipkin_span3.binaryAnnotations()[0].key());
-  EXPECT_EQ("value3", zipkin_zipkin_span3.binaryAnnotations()[0].value());
+  EXPECT_EQ(1ULL, zipkin_span3->binaryAnnotations().size());
+  EXPECT_EQ("key3", zipkin_span3->binaryAnnotations()[0].key());
+  EXPECT_EQ("value3", zipkin_span3->binaryAnnotations()[0].value());
 
   // ====
   // Test effective log()
@@ -706,11 +835,10 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
       std::chrono::duration_cast<std::chrono::microseconds>(timestamp.time_since_epoch()).count();
   span4->log(timestamp, "abc");
 
-  ZipkinSpanPtr zipkin_span4(dynamic_cast<ZipkinSpan*>(span4.release()));
-  Span& zipkin_zipkin_span4 = zipkin_span4->span();
-  EXPECT_FALSE(zipkin_zipkin_span4.annotations().empty());
-  EXPECT_EQ(timestamp_count, zipkin_zipkin_span4.annotations().back().timestamp());
-  EXPECT_EQ("abc", zipkin_zipkin_span4.annotations().back().value());
+  Zipkin::SpanPtr zipkin_span4(dynamic_cast<Zipkin::Span*>(span4.release()));
+  EXPECT_FALSE(zipkin_span4->annotations().empty());
+  EXPECT_EQ(timestamp_count, zipkin_span4->annotations().back().timestamp());
+  EXPECT_EQ("abc", zipkin_span4->annotations().back().value());
 
   // ====
   // Test baggage noop
@@ -745,12 +873,12 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersTest) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
 
-  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
+  Zipkin::SpanPtr zipkin_span(dynamic_cast<Zipkin::Span*>(span.release()));
 
-  EXPECT_EQ(trace_id, zipkin_span->span().traceIdAsHexString());
-  EXPECT_EQ(span_id, zipkin_span->span().idAsHexString());
-  EXPECT_EQ(parent_id, zipkin_span->span().parentIdAsHexString());
-  EXPECT_TRUE(zipkin_span->span().sampled());
+  EXPECT_EQ(trace_id, zipkin_span->traceIdAsHexString());
+  EXPECT_EQ(span_id, zipkin_span->idAsHexString());
+  EXPECT_EQ(parent_id, zipkin_span->parentIdAsHexString());
+  EXPECT_TRUE(zipkin_span->sampled());
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersEmptyParentSpanTest) {
@@ -769,8 +897,8 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersEmptyParentSpanTest) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
 
-  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
-  EXPECT_TRUE(zipkin_span->span().sampled());
+  Zipkin::SpanPtr zipkin_span(dynamic_cast<Zipkin::Span*>(span.release()));
+  EXPECT_TRUE(zipkin_span->sampled());
 }
 
 TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3Headers128TraceIdTest) {
@@ -791,14 +919,14 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3Headers128TraceIdTest) {
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
 
-  ZipkinSpanPtr zipkin_span(dynamic_cast<ZipkinSpan*>(span.release()));
+  Zipkin::SpanPtr zipkin_span(dynamic_cast<Zipkin::Span*>(span.release()));
 
-  EXPECT_EQ(trace_id_high, zipkin_span->span().traceIdHigh());
-  EXPECT_EQ(trace_id_low, zipkin_span->span().traceId());
-  EXPECT_EQ(trace_id, zipkin_span->span().traceIdAsHexString());
-  EXPECT_EQ(span_id, zipkin_span->span().idAsHexString());
-  EXPECT_EQ(parent_id, zipkin_span->span().parentIdAsHexString());
-  EXPECT_TRUE(zipkin_span->span().sampled());
+  EXPECT_EQ(trace_id_high, zipkin_span->traceIdHigh());
+  EXPECT_EQ(trace_id_low, zipkin_span->traceId());
+  EXPECT_EQ(trace_id, zipkin_span->traceIdAsHexString());
+  EXPECT_EQ(span_id, zipkin_span->idAsHexString());
+  EXPECT_EQ(parent_id, zipkin_span->parentIdAsHexString());
+  EXPECT_TRUE(zipkin_span->sampled());
   EXPECT_EQ(trace_id, zipkin_span->getTraceId());
   EXPECT_EQ("", zipkin_span->getSpanId());
 }
@@ -877,6 +1005,38 @@ TEST_F(ZipkinDriverTest, ExplicitlySetSampledTrue) {
   auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
   // Check B3 sampled flag is set to sample
   EXPECT_EQ(SAMPLED, sampled_entry.value());
+}
+
+TEST_F(ZipkinDriverTest, UseLocalDecisionTrue) {
+  setupValidDriver("HTTP_JSON");
+
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_TRUE(span->useLocalDecision());
+
+  request_headers_.remove(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
+
+  span->injectContext(request_headers_, Tracing::UpstreamContext());
+
+  auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
+  EXPECT_EQ(SAMPLED, sampled_entry.value());
+}
+
+TEST_F(ZipkinDriverTest, UseLocalDecisionFalse) {
+  setupValidDriver("HTTP_JSON");
+  request_headers_.set(ZipkinCoreConstants::get().X_B3_SAMPLED.key(), NOT_SAMPLED);
+
+  // Envoy tracing decision is ignored if the B3 sampled header is set to not sample.
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  EXPECT_FALSE(span->useLocalDecision());
+
+  request_headers_.remove(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
+
+  span->injectContext(request_headers_, Tracing::UpstreamContext());
+
+  auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED.key());
+  EXPECT_EQ(NOT_SAMPLED, sampled_entry.value());
 }
 
 TEST_F(ZipkinDriverTest, DuplicatedHeader) {

@@ -9,12 +9,15 @@
 #include "source/extensions/filters/http/lua/wrappers.h"
 
 #include "test/extensions/filters/common/lua/lua_wrappers.h"
+#include "test/mocks/router/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
 using testing::Expectation;
 using testing::InSequence;
+using testing::Return;
 using testing::ReturnPointee;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
@@ -472,10 +475,10 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicMetadataBinaryData) {
     end
   )EOF"};
 
-  ProtobufWkt::Value metadata_value;
+  Protobuf::Value metadata_value;
   constexpr uint8_t buffer[] = {'h', 'e', 0x00, 'l', 'l', 'o'};
   metadata_value.set_string_value(reinterpret_cast<char const*>(buffer), sizeof(buffer));
-  ProtobufWkt::Struct metadata;
+  Protobuf::Struct metadata;
   metadata.mutable_fields()->insert({"bin_data", metadata_value});
 
   setup(SCRIPT);
@@ -530,18 +533,18 @@ TEST_F(LuaStreamInfoWrapperTest, SetGetComplexDynamicMetadata) {
   start("callMe");
 
   EXPECT_EQ(1, stream_info.dynamicMetadata().filter_metadata_size());
-  const ProtobufWkt::Struct& meta_foo = stream_info.dynamicMetadata()
-                                            .filter_metadata()
-                                            .at("envoy.lb")
-                                            .fields()
-                                            .at("foo")
-                                            .struct_value();
+  const Protobuf::Struct& meta_foo = stream_info.dynamicMetadata()
+                                         .filter_metadata()
+                                         .at("envoy.lb")
+                                         .fields()
+                                         .at("foo")
+                                         .struct_value();
 
   EXPECT_EQ(1234.0, meta_foo.fields().at("x").number_value());
   EXPECT_EQ("baz", meta_foo.fields().at("y").string_value());
   EXPECT_EQ(true, meta_foo.fields().at("z").bool_value());
 
-  const ProtobufWkt::ListValue& meta_so =
+  const Protobuf::ListValue& meta_so =
       stream_info.dynamicMetadata().filter_metadata().at("envoy.lb").fields().at("so").list_value();
 
   EXPECT_EQ(4, meta_so.values_size());
@@ -763,10 +766,10 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicTypedMetadataBasic) {
                                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Create test typed metadata
-  ProtobufWkt::Struct test_struct;
+  Protobuf::Struct test_struct;
   (*test_struct.mutable_fields())["test_field"].set_string_value("test_value");
 
-  ProtobufWkt::Any any_metadata;
+  Protobuf::Any any_metadata;
   any_metadata.set_type_url("type.googleapis.com/google.protobuf.Struct");
   any_metadata.PackFrom(test_struct);
 
@@ -828,10 +831,10 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicTypedMetadataComplexStructure) {
                                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Create complex test metadata
-  ProtobufWkt::Struct complex_struct;
+  Protobuf::Struct complex_struct;
 
   // Add nested structure
-  ProtobufWkt::Struct nested_struct;
+  Protobuf::Struct nested_struct;
   (*nested_struct.mutable_fields())["inner_field"].set_string_value("inner_value");
   (*complex_struct.mutable_fields())["nested"].mutable_struct_value()->CopyFrom(nested_struct);
 
@@ -840,12 +843,12 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicTypedMetadataComplexStructure) {
   (*complex_struct.mutable_fields())["number_field"].set_number_value(42.5);
 
   // Add array
-  ProtobufWkt::ListValue array_value;
+  Protobuf::ListValue array_value;
   array_value.add_values()->set_string_value("first");
   array_value.add_values()->set_string_value("second");
   (*complex_struct.mutable_fields())["array_field"].mutable_list_value()->CopyFrom(array_value);
 
-  ProtobufWkt::Any any_metadata;
+  Protobuf::Any any_metadata;
   any_metadata.set_type_url("type.googleapis.com/google.protobuf.Struct");
   any_metadata.PackFrom(complex_struct);
 
@@ -882,7 +885,7 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicTypedMetadataInvalidTypeUrl) {
                                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Create metadata with invalid/unknown type URL
-  ProtobufWkt::Any any_metadata;
+  Protobuf::Any any_metadata;
   any_metadata.set_type_url("type.googleapis.com/invalid.unknown.Type");
   any_metadata.set_value("invalid_data");
 
@@ -915,7 +918,7 @@ TEST_F(LuaStreamInfoWrapperTest, GetDynamicTypedMetadataUnpackFailure) {
                                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Create metadata with correct type URL but corrupted data
-  ProtobufWkt::Any any_metadata;
+  Protobuf::Any any_metadata;
   any_metadata.set_type_url("type.googleapis.com/google.protobuf.Struct");
   any_metadata.set_value("corrupted_protobuf_data_that_cannot_be_unpacked");
 
@@ -962,17 +965,17 @@ TEST_F(LuaStreamInfoWrapperTest, IterateDynamicTypedMetadata) {
                                          StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Create first metadata entry
-  ProtobufWkt::Struct struct1;
+  Protobuf::Struct struct1;
   (*struct1.mutable_fields())["field_one"].set_string_value("value_one");
-  ProtobufWkt::Any any1;
+  Protobuf::Any any1;
   any1.set_type_url("type.googleapis.com/google.protobuf.Struct");
   any1.PackFrom(struct1);
   (*stream_info.metadata_.mutable_typed_filter_metadata())["envoy.metadata.one"] = any1;
 
   // Create second metadata entry
-  ProtobufWkt::Struct struct2;
+  Protobuf::Struct struct2;
   (*struct2.mutable_fields())["field_two"].set_string_value("value_two");
-  ProtobufWkt::Any any2;
+  Protobuf::Any any2;
   any2.set_type_url("type.googleapis.com/google.protobuf.Struct");
   any2.PackFrom(struct2);
   (*stream_info.metadata_.mutable_typed_filter_metadata())["envoy.metadata.two"] = any2;
@@ -1411,6 +1414,290 @@ TEST_F(LuaStreamInfoWrapperTest, GetFilterStateNullObject) {
       StreamInfoWrapper::create(coroutine_->luaState(), stream_info), true);
   EXPECT_CALL(printer_, testPrint("null_filter_state_returned_nil"));
   EXPECT_CALL(printer_, testPrint("null_filter_state_field_returned_nil"));
+  start("callMe");
+  wrapper.reset();
+}
+
+class LuaVirtualHostWrapperTest
+    : public Filters::Common::Lua::LuaWrappersTestBase<VirtualHostWrapper> {
+public:
+  void setup(const std::string& script) override {
+    Filters::Common::Lua::LuaWrappersTestBase<VirtualHostWrapper>::setup(script);
+    state_->registerType<Filters::Common::Lua::MetadataMapWrapper>();
+    state_->registerType<Filters::Common::Lua::MetadataMapIterator>();
+  }
+
+  const std::string NO_METADATA_FOUND_SCRIPT{R"EOF(
+    function callMe(object)
+      for _, _ in pairs(object:metadata()) do
+        return
+      end
+      testPrint("No metadata found")
+    end
+  )EOF"};
+};
+
+// Test that VirtualHostWrapper returns metadata under the current filter configured name.
+// This verifies that when virtual host has filter metadata configured under the current filter
+// configured name, the wrapper can successfully retrieves and returns it.
+TEST_F(LuaVirtualHostWrapperTest, GetFilterMetadataBasic) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local metadata = object:metadata()
+      testPrint(metadata:get("foo.bar")["name"])
+      testPrint(metadata:get("foo.bar")["prop"])
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      lua-filter-config-name:
+        foo.bar:
+          name: foo
+          prop: bar
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  // Create a mock virtual host.
+  auto virtual_host = std::make_shared<NiceMock<Router::MockVirtualHost>>();
+  const Router::VirtualHostConstSharedPtr virtual_host_ptr = virtual_host;
+
+  // Load metadata into the mock virtual host.
+  TestUtility::loadFromYaml(METADATA, virtual_host->metadata_);
+
+  // Set up the mock stream info to return the mock virtual host.
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(stream_info, virtualHost()).WillByDefault(ReturnRef(virtual_host_ptr));
+
+  // Set up wrapper with the mock stream info.
+  Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> wrapper(
+      VirtualHostWrapper::create(coroutine_->luaState(), stream_info, "lua-filter-config-name"),
+      true);
+
+  EXPECT_CALL(printer_, testPrint("foo"));
+  EXPECT_CALL(printer_, testPrint("bar"));
+
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test that VirtualHostWrapper returns an empty metadata object when no metadata exists
+// under the current filter configured name.
+TEST_F(LuaVirtualHostWrapperTest, GetMetadataNoMetadataUnderFilterName) {
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      envoy.some_filter:
+        foo.bar:
+          name: foo
+          prop: bar
+  )EOF"};
+
+  InSequence s;
+  setup(NO_METADATA_FOUND_SCRIPT);
+
+  // Create a mock virtual host.
+  auto virtual_host = std::make_shared<NiceMock<Router::MockVirtualHost>>();
+  const Router::VirtualHostConstSharedPtr virtual_host_ptr = virtual_host;
+
+  // Load metadata into the mock virtual host.
+  TestUtility::loadFromYaml(METADATA, virtual_host->metadata_);
+
+  // Set up the mock stream info to return the mock virtual host.
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(stream_info, virtualHost()).WillByDefault(ReturnRef(virtual_host_ptr));
+
+  // Set up wrapper with the mock stream info.
+  Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> wrapper(
+      VirtualHostWrapper::create(coroutine_->luaState(), stream_info, "lua-filter-config-name"),
+      true);
+
+  EXPECT_CALL(printer_, testPrint("No metadata found"));
+
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test that VirtualHostWrapper returns an empty metadata object when no metadata is configured on
+// the virtual host. This verifies that the wrapper correctly handles cases where the virtual host
+// has no filter_metadata section, returning an empty metadata object without crashing.
+TEST_F(LuaVirtualHostWrapperTest, GetMetadataNoMetadataAtAll) {
+  InSequence s;
+  setup(NO_METADATA_FOUND_SCRIPT);
+
+  // Create a mock virtual host.
+  auto virtual_host = std::make_shared<NiceMock<Router::MockVirtualHost>>();
+  const Router::VirtualHostConstSharedPtr virtual_host_ptr = virtual_host;
+
+  // Set up the mock stream info to return the mock virtual host.
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(stream_info, virtualHost()).WillByDefault(ReturnRef(virtual_host_ptr));
+
+  // Set up wrapper with the mock stream info.
+  Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> wrapper(
+      VirtualHostWrapper::create(coroutine_->luaState(), stream_info, "lua-filter-config-name"),
+      true);
+
+  EXPECT_CALL(printer_, testPrint("No metadata found"));
+
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test that VirtualHostWrapper returns an empty metadata object when no virtual host matches the
+// request authority. This verifies that the wrapper correctly handles cases where the stream info
+// does not have a virtual host, returning an empty metadata object without crashing.
+TEST_F(LuaVirtualHostWrapperTest, GetMetadataNoVirtualHost) {
+  InSequence s;
+  setup(NO_METADATA_FOUND_SCRIPT);
+
+  // Set up the mock stream info to return the mock virtual host.
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  // Set up wrapper with the mock stream info.
+  Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> wrapper(
+      VirtualHostWrapper::create(coroutine_->luaState(), stream_info, "lua-filter-config-name"),
+      true);
+
+  EXPECT_CALL(printer_, testPrint("No metadata found"));
+
+  start("callMe");
+  wrapper.reset();
+}
+
+class LuaRouteWrapperTest : public Filters::Common::Lua::LuaWrappersTestBase<RouteWrapper> {
+public:
+  void setup(const std::string& script) override {
+    Filters::Common::Lua::LuaWrappersTestBase<RouteWrapper>::setup(script);
+    state_->registerType<Filters::Common::Lua::MetadataMapWrapper>();
+    state_->registerType<Filters::Common::Lua::MetadataMapIterator>();
+  }
+
+  const std::string NO_METADATA_FOUND_SCRIPT{R"EOF(
+    function callMe(object)
+      for _, _ in pairs(object:metadata()) do
+        return
+      end
+      testPrint("No metadata found")
+    end
+  )EOF"};
+};
+
+// Test that RouteWrapper returns metadata under the current filter configured name.
+// This verifies that when route has filter metadata configured under the current filter
+// configured name, the wrapper can successfully retrieves and returns it.
+TEST_F(LuaRouteWrapperTest, GetFilterMetadataBasic) {
+  const std::string SCRIPT{R"EOF(
+    function callMe(object)
+      local metadata = object:metadata()
+      testPrint(metadata:get("foo.bar")["name"])
+      testPrint(metadata:get("foo.bar")["prop"])
+    end
+  )EOF"};
+
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      lua-filter-config-name:
+        foo.bar:
+          name: foo
+          prop: bar
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  // Create a mock route and load metadata into it.
+  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+  TestUtility::loadFromYaml(METADATA, route->metadata_);
+
+  // Set up the mock stream info to return the mock route.
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(stream_info, route()).WillByDefault(Return(route));
+
+  // Set up wrapper with the mock stream info.
+  Filters::Common::Lua::LuaDeathRef<RouteWrapper> wrapper(
+      RouteWrapper::create(coroutine_->luaState(), stream_info, "lua-filter-config-name"), true);
+
+  EXPECT_CALL(printer_, testPrint("foo"));
+  EXPECT_CALL(printer_, testPrint("bar"));
+
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test that RouteWrapper returns an empty metadata object when no metadata exists
+// under the current filter configured name.
+TEST_F(LuaRouteWrapperTest, GetMetadataNoMetadataUnderFilterName) {
+  const std::string METADATA{R"EOF(
+    filter_metadata:
+      envoy.some_filter:
+        foo.bar:
+          name: foo
+          prop: bar
+  )EOF"};
+
+  InSequence s;
+  setup(NO_METADATA_FOUND_SCRIPT);
+
+  // Create a mock route and load metadata into it.
+  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+  TestUtility::loadFromYaml(METADATA, route->metadata_);
+
+  // Set up the mock stream info to return the mock route.
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(stream_info, route()).WillByDefault(Return(route));
+
+  // Set up wrapper with the mock stream info.
+  Filters::Common::Lua::LuaDeathRef<RouteWrapper> wrapper(
+      RouteWrapper::create(coroutine_->luaState(), stream_info, "lua-filter-config-name"), true);
+
+  EXPECT_CALL(printer_, testPrint("No metadata found"));
+
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test that RouteWrapper returns an empty metadata object when no metadata is configured on
+// the route. This verifies that the wrapper correctly handles cases where the route
+// has no filter_metadata section, returning an empty metadata object without crashing.
+TEST_F(LuaRouteWrapperTest, GetMetadataNoMetadataAtAll) {
+  InSequence s;
+  setup(NO_METADATA_FOUND_SCRIPT);
+
+  // Create a mock route but DO NOT load metadata into it.
+  auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+
+  // Set up the mock stream info to return the mock route.
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  ON_CALL(stream_info, route()).WillByDefault(Return(route));
+
+  // Set up wrapper with the mock stream info.
+  Filters::Common::Lua::LuaDeathRef<RouteWrapper> wrapper(
+      RouteWrapper::create(coroutine_->luaState(), stream_info, "lua-filter-config-name"), true);
+
+  EXPECT_CALL(printer_, testPrint("No metadata found"));
+
+  start("callMe");
+  wrapper.reset();
+}
+
+// Test that RouteWrapper returns an empty metadata object when no route matches the
+// request. This verifies that the wrapper correctly handles cases where the stream info
+// does not have a route, returning an empty metadata object without crashing.
+TEST_F(LuaRouteWrapperTest, GetMetadataNoRoute) {
+  InSequence s;
+  setup(NO_METADATA_FOUND_SCRIPT);
+
+  // Set up the mock stream info but DO NOT config it to return a valid route.
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  // Set up wrapper with the mock stream info.
+  Filters::Common::Lua::LuaDeathRef<RouteWrapper> wrapper(
+      RouteWrapper::create(coroutine_->luaState(), stream_info, "lua-filter-config-name"), true);
+
+  EXPECT_CALL(printer_, testPrint("No metadata found"));
+
   start("callMe");
   wrapper.reset();
 }

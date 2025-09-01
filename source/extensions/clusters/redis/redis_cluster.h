@@ -90,6 +90,7 @@ namespace Redis {
 
 class RedisCluster : public Upstream::BaseDynamicClusterImpl {
 public:
+  ~RedisCluster();
   static absl::StatusOr<std::unique_ptr<RedisCluster>>
   create(const envoy::config::cluster::v3::Cluster& cluster,
          const envoy::extensions::clusters::redis::v3::RedisClusterConfig& redis_cluster,
@@ -302,7 +303,10 @@ private:
   const std::string auth_password_;
   const std::string cluster_name_;
   const Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
-  const Common::Redis::ClusterRefreshManager::HandlePtr registration_handle_;
+  Common::Redis::ClusterRefreshManager::HandlePtr registration_handle_;
+
+  // Flag to prevent callbacks during destruction
+  std::atomic<bool> is_destroying_{false};
 };
 
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<

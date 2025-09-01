@@ -337,7 +337,7 @@ int DynamicMetadataMapWrapper::luaSet(lua_State* state) {
   // so push a copy of the 3rd arg ("value") to the top.
   lua_pushvalue(state, 4);
 
-  ProtobufWkt::Struct value;
+  Protobuf::Struct value;
   (*value.mutable_fields())[key] = Filters::Common::Lua::MetadataMapHelper::loadValue(state);
   streamInfo().setDynamicMetadata(filter_name, value);
 
@@ -443,6 +443,58 @@ int FilterStateWrapper::luaGet(lua_State* state) {
 
   // If string serialization is not supported, return nil.
   return 0;
+}
+
+const Protobuf::Struct& VirtualHostWrapper::getMetadata() const {
+  const auto& virtual_host = stream_info_.virtualHost();
+  if (virtual_host == nullptr) {
+    return Protobuf::Struct::default_instance();
+  }
+
+  const auto& metadata = virtual_host->metadata();
+  auto filter_it = metadata.filter_metadata().find(filter_config_name_);
+
+  if (filter_it != metadata.filter_metadata().end()) {
+    return filter_it->second;
+  }
+
+  return Protobuf::Struct::default_instance();
+}
+
+int VirtualHostWrapper::luaMetadata(lua_State* state) {
+  if (metadata_wrapper_.get() != nullptr) {
+    metadata_wrapper_.pushStack();
+  } else {
+    metadata_wrapper_.reset(Filters::Common::Lua::MetadataMapWrapper::create(state, getMetadata()),
+                            true);
+  }
+  return 1;
+}
+
+const Protobuf::Struct& RouteWrapper::getMetadata() const {
+  const auto& route = stream_info_.route();
+  if (route == nullptr) {
+    return Protobuf::Struct::default_instance();
+  }
+
+  const auto& metadata = route->metadata();
+  auto filter_it = metadata.filter_metadata().find(filter_config_name_);
+
+  if (filter_it != metadata.filter_metadata().end()) {
+    return filter_it->second;
+  }
+
+  return Protobuf::Struct::default_instance();
+}
+
+int RouteWrapper::luaMetadata(lua_State* state) {
+  if (metadata_wrapper_.get() != nullptr) {
+    metadata_wrapper_.pushStack();
+  } else {
+    metadata_wrapper_.reset(Filters::Common::Lua::MetadataMapWrapper::create(state, getMetadata()),
+                            true);
+  }
+  return 1;
 }
 
 } // namespace Lua
