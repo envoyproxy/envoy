@@ -19,8 +19,7 @@ public:
   MetadataFetcherImpl(Upstream::ClusterManager& cm, absl::string_view cluster_name)
       : cm_(cm), cluster_name_(std::string(cluster_name)) {}
 
-  // TODO(suniltheta): Verify that bypassing virtual dispatch here was intentional
-  ~MetadataFetcherImpl() override { MetadataFetcherImpl::cancel(); }
+  ~MetadataFetcherImpl() override { reset(); }
 
   void cancel() override {
     if (request_ && !complete_) {
