@@ -300,6 +300,7 @@ struct CallbackValidationResult {
   bool is_valid_;
   std::string auth_code_;
   std::string original_request_url_;
+  std::string error_details_;
 };
 
 /**
@@ -331,7 +332,7 @@ public:
 
   // a catch-all function used for request failures. we don't retry, as a user can simply refresh
   // the page in the case of a network blip.
-  void sendUnauthorizedResponse() override;
+  void sendUnauthorizedResponse(const std::string& details) override;
 
   void finishGetAccessTokenFlow();
   void finishRefreshAccessTokenFlow();
