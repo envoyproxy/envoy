@@ -71,6 +71,7 @@ public:
   void addMatcherConfig(xds::type::matcher::v3::Matcher& matcher) {
     config_.mutable_bucket_matchers()->MergeFrom(matcher);
     match_tree_ = matcher_factory_.create(matcher)();
+    EXPECT_TRUE(visitor_.errors().empty());
   }
 
   void addMatcherConfig(MatcherConfigType config_type) {
@@ -157,7 +158,7 @@ public:
     ASSERT_TRUE(match_result.ok());
     // Retrieve the matched action.
     const RateLimitOnMatchAction* match_action =
-        dynamic_cast<RateLimitOnMatchAction*>(match_result.value().get());
+        dynamic_cast<const RateLimitOnMatchAction*>(match_result.value().get());
 
     RateLimitQuotaValidationVisitor visitor = {};
     // Generate the bucket ids.
@@ -284,7 +285,7 @@ TEST_F(FilterTest, RequestMatchingWithInvalidOnNoMatch) {
   ASSERT_TRUE(match_result.ok());
   // Retrieve the matched action.
   const RateLimitOnMatchAction* match_action =
-      dynamic_cast<RateLimitOnMatchAction*>(match_result.value().get());
+      dynamic_cast<const RateLimitOnMatchAction*>(match_result.value().get());
 
   RateLimitQuotaValidationVisitor visitor = {};
   // Generate the bucket ids.

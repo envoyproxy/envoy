@@ -338,7 +338,10 @@ void CertificateValidationContextSdsApi::resolveSecret(const FileContentMap& fil
       std::make_unique<envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext>(
           *sds_certificate_validation_context_secrets_);
   // We replace path based secrets with inlined secrets on update.
-  resolveDataSource(files, *resolved_certificate_validation_context_secrets_->mutable_trusted_ca());
+  if (sds_certificate_validation_context_secrets_->has_trusted_ca()) {
+    resolveDataSource(files,
+                      *resolved_certificate_validation_context_secrets_->mutable_trusted_ca());
+  }
   if (sds_certificate_validation_context_secrets_->has_crl()) {
     resolveDataSource(files, *resolved_certificate_validation_context_secrets_->mutable_crl());
   }

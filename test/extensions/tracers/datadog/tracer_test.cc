@@ -18,6 +18,7 @@
 #include "datadog/optional.h"
 #include "datadog/propagation_style.h"
 #include "datadog/sampling_priority.h"
+#include "datadog/tags.h"
 #include "datadog/trace_segment.h"
 #include "datadog/tracer_config.h"
 #include "gtest/gtest.h"
@@ -204,6 +205,55 @@ TEST_F(DatadogTracerTest, ExtractionSuccess) {
   EXPECT_EQ(1234, dd_span.trace_id().low);
   ASSERT_TRUE(dd_span.parent_id());
   EXPECT_EQ(5678, *dd_span.parent_id());
+}
+
+TEST_F(DatadogTracerTest, UseLocalDecisionTrue) {
+  datadog::tracing::TracerConfig config;
+  config.service = "envoy";
+
+  Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
+                thread_local_slot_allocator_, time_);
+
+  const std::string operation_name = "do.thing";
+  const SystemTime start = time_.timeSystem().systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(testing::Return(start));
+
+  // trace context in the Datadog style
+  Tracing::TestTraceContextImpl context{};
+
+  const Tracing::SpanPtr span =
+      tracer.startSpan(Tracing::MockConfig{}, context, stream_info_, operation_name,
+                       {Tracing::Reason::NotTraceable, false});
+
+  // The `useLocalDecision` method is true because the span has no external trace sampling
+  // decision.
+  EXPECT_EQ(true, span->useLocalDecision());
+}
+
+TEST_F(DatadogTracerTest, UseLocalDecisionFalse) {
+  datadog::tracing::TracerConfig config;
+  config.service = "envoy";
+
+  Tracer tracer("fake_cluster", "test_host", config, cluster_manager_, *store_.rootScope(),
+                thread_local_slot_allocator_, time_);
+
+  const std::string operation_name = "do.thing";
+  const SystemTime start = time_.timeSystem().systemTime();
+  ON_CALL(stream_info_, startTime()).WillByDefault(testing::Return(start));
+
+  // trace context in the Datadog style
+  Tracing::TestTraceContextImpl context{
+      {"x-datadog-trace-id", "1234"},
+      {"x-datadog-parent-id", "5678"},
+      {"x-datadog-sampling-priority", "0"},
+  };
+
+  const Tracing::SpanPtr span =
+      tracer.startSpan(Tracing::MockConfig{}, context, stream_info_, operation_name,
+                       {Tracing::Reason::NotTraceable, false});
+  // The `useLocalDecision` method is false because the span has an external trace sampling
+  // decision.
+  EXPECT_EQ(false, span->useLocalDecision());
 }
 
 TEST_F(DatadogTracerTest, ExtractionFailure) {

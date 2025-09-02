@@ -29,12 +29,13 @@ public:
   // The entry value corresponding to the grpc stream's configuration entry index.
   enum class ConnectedStateValue {
     // The first entry in the config corresponds to the primary xDS source.
-    FIRST_ENTRY = 1,
+    FirstEntry = 1,
     // The second entry in the config corresponds to the failover xDS source.
-    SECOND_ENTRY
+    SecondEntry
   };
 
-  GrpcStream(GrpcStreamCallbacks<ResponseProto>* callbacks, Grpc::RawAsyncClientPtr async_client,
+  GrpcStream(GrpcStreamCallbacks<ResponseProto>* callbacks,
+             Grpc::RawAsyncClientSharedPtr&& async_client,
              const Protobuf::MethodDescriptor& service_method, Event::Dispatcher& dispatcher,
              Stats::Scope& scope, BackOffStrategyPtr backoff_strategy,
              const RateLimitSettings& rate_limit_settings, ConnectedStateValue connected_state_val)

@@ -35,27 +35,27 @@ struct JsonValueToDoubleConverter {
 };
 
 struct JsonValueToProtobufValueConverter {
-  absl::StatusOr<ProtobufWkt::Value> operator()(bool&& val) {
-    ProtobufWkt::Value protobuf_value;
+  absl::StatusOr<Protobuf::Value> operator()(bool&& val) {
+    Protobuf::Value protobuf_value;
     protobuf_value.set_bool_value(val);
     return protobuf_value;
   }
-  absl::StatusOr<ProtobufWkt::Value> operator()(int64_t&& val) {
-    ProtobufWkt::Value protobuf_value;
+  absl::StatusOr<Protobuf::Value> operator()(int64_t&& val) {
+    Protobuf::Value protobuf_value;
     protobuf_value.set_number_value(val);
     return protobuf_value;
   }
-  absl::StatusOr<ProtobufWkt::Value> operator()(double&& val) {
-    ProtobufWkt::Value protobuf_value;
+  absl::StatusOr<Protobuf::Value> operator()(double&& val) {
+    Protobuf::Value protobuf_value;
     protobuf_value.set_number_value(val);
     return protobuf_value;
   }
-  absl::StatusOr<ProtobufWkt::Value> operator()(std::string&& val) {
+  absl::StatusOr<Protobuf::Value> operator()(std::string&& val) {
     if (val.size() > MAX_PAYLOAD_VALUE_LEN) {
       return absl::InternalError(
           fmt::format("metadata value is too long. value.length: {}", val.size()));
     }
-    ProtobufWkt::Value protobuf_value;
+    Protobuf::Value protobuf_value;
     protobuf_value.set_string_value(std::move(val));
     return protobuf_value;
   }
@@ -171,20 +171,20 @@ void Filter::applyKeyValue(const std::string& value, const KeyValuePair& keyval,
                            StructMap& struct_map, Http::StreamFilterCallbacks& filter_callback) {
   ASSERT(!value.empty());
 
-  ProtobufWkt::Value val;
+  Protobuf::Value val;
   val.set_string_value(value);
   applyKeyValue(std::move(val), keyval, struct_map, filter_callback);
 }
 
 void Filter::applyKeyValue(double value, const KeyValuePair& keyval, StructMap& struct_map,
                            Http::StreamFilterCallbacks& filter_callback) {
-  ProtobufWkt::Value val;
+  Protobuf::Value val;
   val.set_number_value(value);
   applyKeyValue(std::move(val), keyval, struct_map, filter_callback);
 }
 
-void Filter::applyKeyValue(ProtobufWkt::Value value, const KeyValuePair& keyval,
-                           StructMap& struct_map, Http::StreamFilterCallbacks& filter_callback) {
+void Filter::applyKeyValue(Protobuf::Value value, const KeyValuePair& keyval, StructMap& struct_map,
+                           Http::StreamFilterCallbacks& filter_callback) {
   const auto& nspace = decideNamespace(keyval.metadata_namespace());
   addMetadata(nspace, keyval.key(), std::move(value), keyval.preserve_existing_metadata_value(),
               struct_map, filter_callback);
@@ -195,7 +195,7 @@ const std::string& Filter::decideNamespace(const std::string& nspace) const {
 }
 
 bool Filter::addMetadata(const std::string& meta_namespace, const std::string& key,
-                         ProtobufWkt::Value val, const bool preserve_existing_metadata_value,
+                         Protobuf::Value val, const bool preserve_existing_metadata_value,
                          StructMap& struct_map, Http::StreamFilterCallbacks& filter_callback) {
 
   if (preserve_existing_metadata_value) {

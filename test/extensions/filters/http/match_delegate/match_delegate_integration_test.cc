@@ -18,8 +18,8 @@ namespace MatchDelegate {
 namespace {
 
 using envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute;
+using Envoy::Protobuf::Any;
 using Envoy::Protobuf::MapPair;
-using Envoy::ProtobufWkt::Any;
 
 class MatchDelegateIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                      public HttpIntegrationTest {

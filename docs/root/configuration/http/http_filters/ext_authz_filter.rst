@@ -21,6 +21,49 @@ The HTTP filter, using a gRPC/HTTP service, can be configured as follows. You ca
 configuration options at
 :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`.
 
+.. _config_http_filters_ext_authz_security_considerations:
+
+Security Considerations
+-----------------------
+
+.. attention::
+
+   **Route Cache Clearing Risk**: When using per-route ExtAuthZ configuration, subsequent filters
+   in the filter chain may clear the route cache, potentially leading to privilege escalation
+   vulnerabilities where requests bypass authorization checks.
+
+   For more information about this security risk, including affected filters and general
+   mitigation strategies, see :ref:`Filter route mutation security considerations
+   <arch_overview_http_filters_route_mutation>`.
+
+   **ExtAuthZ-Specific Considerations**: The security risk is particularly important for ExtAuthZ
+   because it often handles authentication and authorization decisions that directly impact access
+   control. When route cache is cleared after ExtAuthZ has run, a request may be re-routed to
+   endpoints with different authorization requirements, bypassing those checks entirely.
+
+   **Example Vulnerable Configuration**:
+
+   .. code-block:: yaml
+
+      http_filters:
+      - name: envoy.filters.http.ext_authz
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
+          # ... ext_authz config ...
+      - name: envoy.filters.http.lua
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+          inline_code: |
+            function envoy_on_request(request_handle)
+              -- This clears route cache after ext_authz has run
+              request_handle:clearRouteCache()
+              -- Request may now match a different route with different auth requirements
+            end
+
+   In this example, if the initial route had ExtAuthZ disabled but a subsequent route match
+   (after cache clearing) requires authorization, the request will bypass the authorization
+   check entirely.
+
 Configuration Examples
 ----------------------
 
@@ -93,7 +136,6 @@ Per-Route Configuration
 
 A sample virtual host and route filter configuration.
 In this example we add additional context on the virtual host, and disabled the filter for ``/static`` prefixed routes.
-
 
 Statistics
 ----------

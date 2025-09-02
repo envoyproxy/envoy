@@ -77,8 +77,8 @@ const InternalRedirectPolicy& DelegatingRouteEntry::internalRedirectPolicy() con
   return base_route_entry_->internalRedirectPolicy();
 }
 
-uint32_t DelegatingRouteEntry::retryShadowBufferLimit() const {
-  return base_route_entry_->retryShadowBufferLimit();
+uint64_t DelegatingRouteEntry::requestBodyBufferLimit() const {
+  return base_route_entry_->requestBodyBufferLimit();
 }
 
 const std::vector<Router::ShadowPolicyPtr>& DelegatingRouteEntry::shadowPolicies() const {
@@ -91,6 +91,10 @@ std::chrono::milliseconds DelegatingRouteEntry::timeout() const {
 
 absl::optional<std::chrono::milliseconds> DelegatingRouteEntry::idleTimeout() const {
   return base_route_entry_->idleTimeout();
+}
+
+absl::optional<std::chrono::milliseconds> DelegatingRouteEntry::flushTimeout() const {
+  return base_route_entry_->flushTimeout();
 }
 
 bool DelegatingRouteEntry::usingNewTimeouts() const {

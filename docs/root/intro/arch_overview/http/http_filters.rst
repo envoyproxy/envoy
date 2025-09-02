@@ -109,6 +109,38 @@ suggested to replace ``clearRouteCache()`` if you only want to determine the tar
 the latest request attributes that have been updated by the filters and do not want to configure
 multiple similar routes at the route table.
 
+Security Considerations
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. attention::
+
+   **Route Cache Clearing and Authorization Bypass Risk**: When using per-route authorization filters
+   (such as :ref:`ExtAuthZ <config_http_filters_ext_authz>`, :ref:`RBAC <config_http_filters_rbac>`,
+   or :ref:`JWT <config_http_filters_jwt_authn>`), be aware that subsequent filters in the filter
+   chain may clear the route cache, potentially leading to privilege escalation vulnerabilities.
+
+   **The Problem**: If a request initially matches **Route A** with certain authorization settings,
+   gets authorized, but then a subsequent filter clears the route cache causing the request
+   to match **Route B** with different authorization requirements, the request will bypass Route B's
+   authorization since the authorization filter has already executed.
+
+   **Filters That Can Clear Route Cache**:
+
+   * :ref:`Lua filter <config_http_filters_lua>` - via ``clearRouteCache()`` method
+   * :ref:`ext_proc filter <config_http_filters_ext_proc>` - when configured with ``CLEAR`` route cache action or when response contains ``clear_route_cache`` directive
+   * :ref:`Golang filter <config_http_filters_golang>` - via ``clearRouteCache()`` API
+   * :ref:`Language filter <config_http_filters_language>` - when ``clear_route_cache`` is enabled
+   * :ref:`JSON to metadata filter <config_http_filters_json_to_metadata>` - when ``clear_route_cache`` is enabled
+   * :ref:`IP tagging filter <config_http_filters_ip_tagging>` - when sanitizing headers
+   * Custom filters that call ``clearRouteCache()`` on the decoder callbacks
+
+   **Mitigation Strategies**:
+
+   * Carefully review the order of filters in your HTTP filter chain when using per-route authorization filters.
+   * Avoid placing filters that clear route cache after authorization filters unless absolutely necessary.
+   * Consider using global authorization configuration at the HTTP connection manager level instead of per-route configs whenever possible.
+   * If route cache clearing is required after authorization, consider re-running authorization checks or using alternative authorization mechanisms.
+
 .. _arch_overview_http_filters_per_filter_config:
 
 Route specific config

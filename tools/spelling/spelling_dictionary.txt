@@ -5,6 +5,7 @@
 ABI
 ACK
 ACL
+ACCEPTOR
 AES
 AJAX
 AllMuxes
@@ -37,6 +38,7 @@ Millicores
 NID
 NIST
 NORMALISATION
+Radix
 SQLSTATE
 bm
 BSON
@@ -47,6 +49,7 @@ CIO
 cbegin
 cend
 constness
+cstr
 deadcode
 DFP
 Dynatrace
@@ -91,6 +94,7 @@ ETB
 ETX
 FS
 FIXME
+decrypted
 gperf
 HEXDIG
 HEXDIGIT
@@ -112,6 +116,7 @@ STX
 SkyWalking
 TIDs
 Timedout
+ULA
 WRSQ
 WASI
 ceil
@@ -1003,6 +1008,7 @@ metaprogramming
 metatable
 microbenchmarks
 midp
+migratable
 milli
 mimics
 misconfiguration
@@ -1183,6 +1189,8 @@ querydetails
 quiesce
 quitquitquit
 qvalue
+radix
+radixtree
 rapidjson
 ratelimit
 ratelimited
@@ -1239,6 +1247,7 @@ reperform
 repicked
 replayable
 repo
+representable
 reproducibility
 requirepass
 reselecting
@@ -1413,6 +1422,7 @@ templating
 templatize
 templatized
 templatizing
+teredo
 testability
 testcase
 testcases

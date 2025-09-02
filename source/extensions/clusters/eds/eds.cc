@@ -33,7 +33,7 @@ EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
       local_info_(cluster_context.serverFactoryContext().localInfo()),
       eds_resources_cache_(
           Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads")
-              ? cluster_context.clusterManager().edsResourcesCache()
+              ? cluster_context.serverFactoryContext().clusterManager().edsResourcesCache()
               : absl::nullopt) {
   RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   Event::Dispatcher& dispatcher = cluster_context.serverFactoryContext().mainThreadDispatcher();
@@ -46,11 +46,22 @@ EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
     initialize_phase_ = InitializePhase::Secondary;
   }
   const auto resource_name = getResourceName();
-  subscription_ = THROW_OR_RETURN_VALUE(
-      cluster_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(), *this,
-          resource_decoder_, {}),
-      Config::SubscriptionPtr);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.xdstp_based_config_singleton_subscriptions")) {
+    subscription_ = THROW_OR_RETURN_VALUE(
+        cluster_context.serverFactoryContext().xdsManager().subscribeToSingletonResource(
+            edsServiceName(), eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(),
+            *this, resource_decoder_, {}),
+        Config::SubscriptionPtr);
+  } else {
+    subscription_ = THROW_OR_RETURN_VALUE(
+        cluster_context.serverFactoryContext()
+            .clusterManager()
+            .subscriptionFactory()
+            .subscriptionFromConfigSource(eds_config, Grpc::Common::typeUrl(resource_name),
+                                          info_->statsScope(), *this, resource_decoder_, {}),
+        Config::SubscriptionPtr);
+  }
 }
 
 EdsClusterImpl::~EdsClusterImpl() {
@@ -246,12 +257,9 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
 
   // Pause LEDS messages until the EDS config is finished processing.
   Config::ScopedResume maybe_resume_leds;
-  if (transport_factory_context_->serverFactoryContext().clusterManager().adsMux()) {
-    const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
-    maybe_resume_leds =
-        transport_factory_context_->serverFactoryContext().clusterManager().adsMux()->pause(
-            type_url);
-  }
+  const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
+  Config::ScopedResume resume_leds =
+      transport_factory_context_->serverFactoryContext().xdsManager().pause(type_url);
 
   update(cluster_load_assignment);
   // If previously used a cached version, remove the subscription from the cache's

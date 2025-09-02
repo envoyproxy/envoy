@@ -34,6 +34,7 @@
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_connection_peer.h"
 #include "quiche/quic/test_tools/quic_server_session_base_peer.h"
+#include "quiche/quic/test_tools/quic_stream_peer.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
 using testing::_;
@@ -1177,6 +1178,42 @@ TEST_F(EnvoyQuicServerSessionTest, DisableQpack) {
   EXPECT_EQ(envoy_quic_session_.qpack_maximum_dynamic_table_capacity(), 0);
 
   installReadFilter();
+}
+
+TEST_F(EnvoyQuicServerSessionTest, ConnectionFlowControlForStreamsEnabledByDefault) {
+  installReadFilter();
+  Http::MockRequestDecoder request_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+  EXPECT_CALL(request_decoder, accessLogHandlers());
+  setupRequestDecoderMock(request_decoder);
+  auto* stream =
+      dynamic_cast<EnvoyQuicServerStream*>(createNewStream(request_decoder, stream_callbacks));
+
+  EXPECT_TRUE(quic::test::QuicStreamPeer::StreamContributesToConnectionFlowControl(stream));
+
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::LocalReset, _));
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_));
+  stream->resetStream(Http::StreamResetReason::LocalReset);
+}
+
+TEST_F(EnvoyQuicServerSessionTest, DisableConnectionFlowControlForStreams) {
+  installReadFilter();
+  envoy::config::core::v3::Http3ProtocolOptions http3_options;
+  http3_options.set_disable_connection_flow_control_for_streams(true);
+  envoy_quic_session_.setHttp3Options(http3_options);
+
+  Http::MockRequestDecoder request_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+  EXPECT_CALL(request_decoder, accessLogHandlers());
+  setupRequestDecoderMock(request_decoder);
+  auto* stream =
+      dynamic_cast<EnvoyQuicServerStream*>(createNewStream(request_decoder, stream_callbacks));
+
+  EXPECT_FALSE(quic::test::QuicStreamPeer::StreamContributesToConnectionFlowControl(stream));
+
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::LocalReset, _));
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_));
+  stream->resetStream(Http::StreamResetReason::LocalReset);
 }
 
 TEST_F(EnvoyQuicServerSessionTest, Http3OptionsTest) {

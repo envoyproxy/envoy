@@ -18,8 +18,8 @@ namespace MatchDelegate {
 namespace {
 
 using envoy::extensions::common::matching::v3::ExtensionWithMatcher;
-using Envoy::ProtobufWkt::StringValue;
-using Envoy::ProtobufWkt::UInt32Value;
+using Envoy::Protobuf::StringValue;
+using Envoy::Protobuf::UInt32Value;
 
 // A simple network filter that counts connections and data.
 class CountingFilter : public Network::Filter {

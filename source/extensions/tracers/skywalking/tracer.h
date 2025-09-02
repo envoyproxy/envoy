@@ -86,6 +86,10 @@ public:
   Tracing::SpanPtr spawnChild(const Tracing::Config& config, const std::string& name,
                               SystemTime start_time) override;
   void setSampled(bool do_sample) override;
+  // TODO(wbpcode): The SkyWalking tracer may create NullSpanImpl if the tracing decision is not to
+  // trace. That make it is impossible to update the sampling decision. So, the useLocalDecision()
+  // always return false now. This should be resolved in the future.
+  bool useLocalDecision() const override { return false; }
   std::string getBaggage(absl::string_view) override { return EMPTY_STRING; }
   void setBaggage(absl::string_view, absl::string_view) override {}
   std::string getTraceId() const override { return tracing_context_->traceId(); }

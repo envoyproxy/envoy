@@ -47,19 +47,19 @@ struct ThriftToMetadataStats {
 
 using ProtoRule = envoy::extensions::filters::http::thrift_to_metadata::v3::Rule;
 using KeyValuePair = envoy::extensions::filters::http::thrift_to_metadata::v3::KeyValuePair;
-using StructMap = absl::flat_hash_map<std::string, ProtobufWkt::Struct>;
+using StructMap = absl::flat_hash_map<std::string, Protobuf::Struct>;
 using namespace Envoy::Extensions::NetworkFilters::ThriftProxy;
 
 class ThriftDecoderHandler;
-using ThriftMetadataToProtobufValue = std::function<absl::optional<ProtobufWkt::Value>(
+using ThriftMetadataToProtobufValue = std::function<absl::optional<Protobuf::Value>(
     MessageMetadataSharedPtr, const ThriftDecoderHandler&)>;
 
 class Rule {
 public:
   Rule(const ProtoRule& rule);
   const ProtoRule& rule() const { return rule_; }
-  absl::optional<ProtobufWkt::Value> extract_value(MessageMetadataSharedPtr metadata,
-                                                   const ThriftDecoderHandler& handler) const {
+  absl::optional<Protobuf::Value> extract_value(MessageMetadataSharedPtr metadata,
+                                                const ThriftDecoderHandler& handler) const {
     return protobuf_value_extracter_(metadata, handler);
   }
 
@@ -198,12 +198,12 @@ private:
                        ThriftDecoderHandlerPtr& handler,
                        Http::StreamFilterCallbacks& filter_callback, ThriftToMetadataStats& stats,
                        bool& processing_finished_flag);
-  void handleOnPresent(ProtobufWkt::Value&& value, const Rule& rule, StructMap& struct_map);
+  void handleOnPresent(Protobuf::Value&& value, const Rule& rule, StructMap& struct_map);
 
   void handleOnMissing(const Rule& rule, StructMap& struct_map);
   void handleAllOnMissing(const Rules& rules, Http::StreamFilterCallbacks& filter_callback,
                           bool& processing_finished_flag);
-  void applyKeyValue(ProtobufWkt::Value value, const KeyValuePair& keyval, StructMap& struct_map);
+  void applyKeyValue(Protobuf::Value value, const KeyValuePair& keyval, StructMap& struct_map);
   void finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callback,
                                const StructMap& struct_map, bool& processing_finished_flag);
   const std::string& decideNamespace(const std::string& nspace) const;

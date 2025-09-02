@@ -163,6 +163,11 @@ public:
     }
 
     void setCodecCallbacks(ServerCodecCallbacks& callback) override { callback_ = &callback; }
+    void onConnected() override {
+      ASSERT(callback_->connection().has_value());
+      ASSERT(callback_->connection()->state() == Network::Connection::State::Open);
+      ASSERT(!callback_->connection()->connecting());
+    }
     void decode(Buffer::Instance& buffer, bool) override {
       ENVOY_LOG(debug, "FakeServerCodec::decode: {}", buffer.toString());
 
@@ -417,7 +422,7 @@ public:
   createCodecFactory(const Protobuf::Message& config,
                      Envoy::Server::Configuration::ServerFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
   std::set<std::string> configTypes() override { return {"envoy.generic_proxy.codecs.fake.type"}; }
   std::string name() const override { return "envoy.generic_proxy.codecs.fake"; }
@@ -442,7 +447,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
   std::string name() const override { return "envoy.generic_proxy.access_log.fake"; }
 };

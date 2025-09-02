@@ -131,11 +131,10 @@ public:
         Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(factory_name);
     auto proto_message = cluster1->info_->lb_factory_->createEmptyConfigProto();
     cluster1->info_->typed_lb_config_ =
-        cluster1->info_->lb_factory_->loadConfig(*server_.server_factory_context_, *proto_message)
-            .value();
+        cluster1->info_->lb_factory_->loadConfig(factory_.server_context_, *proto_message).value();
 
     InSequence s;
-    EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+    EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
         .WillOnce(Return(std::make_pair(cluster1, nullptr)));
     ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
     create(parseBootstrapFromV3Json(json));
@@ -185,7 +184,7 @@ private:
 
     Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override {
       if (context && context->requestStreamInfo()) {
-        ProtobufWkt::Struct value;
+        Protobuf::Struct value;
         (*value.mutable_fields())["foo"] = ValueUtil::stringValue("bar");
         context->requestStreamInfo()->setDynamicMetadata("envoy.load_balancers.metadata_writer",
                                                          value);
@@ -251,7 +250,7 @@ TEST_F(ClusterManagerImplThreadAwareLbTest, LoadBalancerCanUpdateMetadata) {
           "envoy.load_balancers.metadata_writer");
 
   InSequence s;
-  EXPECT_CALL(factory_, clusterFromProto_(_, _, _, _))
+  EXPECT_CALL(factory_, clusterFromProto_(_, _, _))
       .WillOnce(Return(std::make_pair(cluster1, nullptr)));
   ON_CALL(*cluster1, initializePhase()).WillByDefault(Return(Cluster::InitializePhase::Primary));
   create(parseBootstrapFromV3Json(json));

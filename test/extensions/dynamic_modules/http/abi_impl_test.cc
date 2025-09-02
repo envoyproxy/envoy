@@ -420,7 +420,7 @@ TEST_F(DynamicModuleHttpFilterTest, SendResponseWithBody) {
                                                    body_length);
 }
 
-TEST(ABIImpl, dynamic_metadata) {
+TEST(ABIImpl, metadata) {
   DynamicModuleHttpFilter filter{nullptr};
   const std::string namespace_str = "foo";
   const std::string key_str = "key";
@@ -443,10 +443,10 @@ TEST(ABIImpl, dynamic_metadata) {
   EXPECT_FALSE(envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
       &filter, namespace_ptr, namespace_length, key_ptr, key_length, value_ptr, value_length));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_number(
-      &filter, envoy_dynamic_module_type_metadata_source_dynamic, namespace_ptr, namespace_length,
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, namespace_ptr, namespace_length,
       key_ptr, key_length, &result_number));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_string(
-      &filter, envoy_dynamic_module_type_metadata_source_dynamic, namespace_ptr, namespace_length,
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, namespace_ptr, namespace_length,
       key_ptr, key_length, &result_str_ptr, &result_str_length));
 
   // No namespace.
@@ -463,20 +463,20 @@ TEST(ABIImpl, dynamic_metadata) {
   filter.setDecoderFilterCallbacks(callbacks);
   // Only tests get methods as setters create the namespace.
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_number(
-      &filter, envoy_dynamic_module_type_metadata_source_dynamic, namespace_ptr, namespace_length,
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, namespace_ptr, namespace_length,
       key_ptr, key_length, &result_number));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_string(
-      &filter, envoy_dynamic_module_type_metadata_source_dynamic, namespace_ptr, namespace_length,
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, namespace_ptr, namespace_length,
       key_ptr, key_length, &result_str_ptr, &result_str_length));
   // Test no metadata on all sources.
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_string(
-      &filter, envoy_dynamic_module_type_metadata_source_cluster, namespace_ptr, namespace_length,
+      &filter, envoy_dynamic_module_type_metadata_source_Cluster, namespace_ptr, namespace_length,
       key_ptr, key_length, &result_str_ptr, &result_str_length));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_string(
-      &filter, envoy_dynamic_module_type_metadata_source_route, namespace_ptr, namespace_length,
+      &filter, envoy_dynamic_module_type_metadata_source_Route, namespace_ptr, namespace_length,
       key_ptr, key_length, &result_str_ptr, &result_str_length));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_string(
-      &filter, envoy_dynamic_module_type_metadata_source_host, namespace_ptr, namespace_length,
+      &filter, envoy_dynamic_module_type_metadata_source_Host, namespace_ptr, namespace_length,
       key_ptr, key_length, &result_str_ptr, &result_str_length));
 
   // With namespace but non existing key.
@@ -488,35 +488,59 @@ TEST(ABIImpl, dynamic_metadata) {
   EXPECT_TRUE(envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
       &filter, namespace_ptr, namespace_length, key_ptr, key_length, value));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_number(
-      &filter, envoy_dynamic_module_type_metadata_source_dynamic, namespace_ptr, namespace_length,
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, namespace_ptr, namespace_length,
       non_existing_key_ptr, non_existing_key_length, &result_number));
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_string(
-      &filter, envoy_dynamic_module_type_metadata_source_dynamic, namespace_ptr, namespace_length,
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, namespace_ptr, namespace_length,
       non_existing_key_ptr, non_existing_key_length, &result_str_ptr, &result_str_length));
 
   // With namespace and key.
   EXPECT_TRUE(envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
       &filter, namespace_ptr, namespace_length, key_ptr, key_length, value));
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_number(
-      &filter, envoy_dynamic_module_type_metadata_source_dynamic, namespace_ptr, namespace_length,
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, namespace_ptr, namespace_length,
       key_ptr, key_length, &result_number));
   EXPECT_EQ(result_number, value);
   // Wrong type.
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_string(
-      &filter, envoy_dynamic_module_type_metadata_source_dynamic, namespace_ptr, namespace_length,
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, namespace_ptr, namespace_length,
       key_ptr, key_length, &result_str_ptr, &result_str_length));
 
   EXPECT_TRUE(envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
       &filter, namespace_ptr, namespace_length, key_ptr, key_length, value_ptr, value_length));
   EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
-      &filter, envoy_dynamic_module_type_metadata_source_dynamic, namespace_ptr, namespace_length,
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, namespace_ptr, namespace_length,
       key_ptr, key_length, &result_str_ptr, &result_str_length));
   EXPECT_EQ(result_str_length, value_length);
   EXPECT_EQ(std::string(result_str_ptr, result_str_length), value_str);
   // Wrong type.
   EXPECT_FALSE(envoy_dynamic_module_callback_http_get_metadata_number(
-      &filter, envoy_dynamic_module_type_metadata_source_dynamic, namespace_ptr, namespace_length,
+      &filter, envoy_dynamic_module_type_metadata_source_Dynamic, namespace_ptr, namespace_length,
       key_ptr, key_length, &result_number));
+
+  // lbEndpoints metadata.
+  const std::string lbendpoint_key = "lbendpoint_key";
+  const std::string lbendpoint_value = "lbendpoint_value";
+  auto upstream_info = std::make_shared<StreamInfo::MockUpstreamInfo>();
+  auto upstream_host = std::make_shared<Upstream::MockHostDescription>();
+  EXPECT_CALL(*upstream_info, upstreamHost).WillRepeatedly(testing::Return(upstream_host));
+  auto locality_metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  locality_metadata->mutable_filter_metadata()->insert({namespace_str, Protobuf::Struct()});
+  Protobuf::Value lbendpoint_value_proto;
+  lbendpoint_value_proto.set_string_value(lbendpoint_value);
+  locality_metadata->mutable_filter_metadata()
+      ->at(namespace_str)
+      .mutable_fields()
+      ->insert({lbendpoint_key, lbendpoint_value_proto});
+  EXPECT_CALL(*upstream_host, localityMetadata())
+      .WillRepeatedly(testing::Return(locality_metadata));
+  EXPECT_CALL(stream_info, upstreamInfo()).WillRepeatedly(testing::Return(upstream_info));
+  EXPECT_TRUE(envoy_dynamic_module_callback_http_get_metadata_string(
+      &filter, envoy_dynamic_module_type_metadata_source_HostLocality, namespace_ptr,
+      namespace_length, const_cast<char*>(lbendpoint_key.data()), lbendpoint_key.size(),
+      &result_str_ptr, &result_str_length));
+  EXPECT_EQ(result_str_length, lbendpoint_value.size());
+  EXPECT_EQ(std::string(result_str_ptr, result_str_length), lbendpoint_value);
 }
 
 TEST(ABIImpl, filter_state) {
@@ -1034,6 +1058,31 @@ TEST(ABIImpl, HttpCallout) {
                 &filter, 1, const_cast<char*>(cluster.data()), cluster.size(), nullptr, 0, nullptr,
                 0, 1000),
             envoy_dynamic_module_type_http_callout_init_result_MissingRequiredHeaders);
+}
+
+TEST(ABIImpl, Log) {
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::err);
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level_Trace));
+  EXPECT_FALSE(
+      envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level_Debug));
+  EXPECT_FALSE(envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level_Info));
+  EXPECT_FALSE(envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level_Warn));
+  EXPECT_TRUE(envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level_Error));
+  EXPECT_TRUE(
+      envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_level_Critical));
+
+  // Use all log levels, mostly for coverage.
+  const std::string msg = "test log message";
+  envoy_dynamic_module_type_buffer_module_ptr ptr = const_cast<char*>(msg.data());
+  size_t len = msg.size();
+  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Trace, ptr, len);
+  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Debug, ptr, len);
+  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Info, ptr, len);
+  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Warn, ptr, len);
+  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Error, ptr, len);
+  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Critical, ptr, len);
+  envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Off, ptr, len);
 }
 
 } // namespace HttpFilters

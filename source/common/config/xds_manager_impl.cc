@@ -1,24 +1,73 @@
 #include "source/common/config/xds_manager_impl.h"
 
-#include "envoy/config/core/v3/config_source.pb.validate.h"
+#include <algorithm>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "envoy/common/exception.h"
+#include "envoy/common/optref.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/core/v3/config_source.pb.validate.h"
+#include "envoy/config/custom_config_validators.h"
+#include "envoy/config/grpc_mux.h"
+#include "envoy/config/subscription.h"
+#include "envoy/config/subscription_factory.h"
+#include "envoy/config/xds_config_tracker.h"
+#include "envoy/config/xds_resources_delegate.h"
+#include "envoy/grpc/async_client.h"
+#include "envoy/grpc/async_client_manager.h"
+#include "envoy/stats/scope.h"
+#include "envoy/upstream/cluster_manager.h"
+
+#include "source/common/common/assert.h"
+#include "source/common/common/backoff_strategy.h"
+#include "source/common/common/cleanup.h"
+#include "source/common/common/logger.h"
 #include "source/common/common/thread.h"
 #include "source/common/config/custom_config_validators_impl.h"
 #include "source/common/config/null_grpc_mux_impl.h"
+#include "source/common/config/subscription_factory_impl.h"
 #include "source/common/config/utility.h"
+#include "source/common/config/xds_resource.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
+
+#include "absl/container/flat_hash_set.h"
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Config {
 namespace {
-absl::Status createClients(Grpc::AsyncClientFactoryPtr& primary_factory,
-                           Grpc::AsyncClientFactoryPtr& failover_factory,
-                           Grpc::RawAsyncClientPtr& primary_client,
-                           Grpc::RawAsyncClientPtr& failover_client) {
-  absl::StatusOr<Grpc::RawAsyncClientPtr> success = primary_factory->createUncachedRawAsyncClient();
+absl::Status createGrpcClients(Grpc::AsyncClientManager& async_client_manager,
+                               const envoy::config::core::v3::ApiConfigSource& config_source,
+                               Stats::Scope& stats_scope, bool skip_cluster_check,
+                               bool xdstp_config_source,
+                               Grpc::RawAsyncClientSharedPtr& primary_client,
+                               Grpc::RawAsyncClientSharedPtr& failover_client) {
+  auto factory_primary_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+      async_client_manager, config_source, stats_scope, skip_cluster_check, 0 /*grpc_service_idx*/,
+      xdstp_config_source);
+  RETURN_IF_NOT_OK_REF(factory_primary_or_error.status());
+  Grpc::AsyncClientFactoryPtr factory_failover = nullptr;
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
+    auto factory_failover_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+        async_client_manager, config_source, stats_scope, skip_cluster_check,
+        1 /*grpc_service_idx*/, xdstp_config_source);
+    RETURN_IF_NOT_OK_REF(factory_failover_or_error.status());
+    factory_failover = std::move(factory_failover_or_error.value());
+  }
+  absl::StatusOr<Grpc::RawAsyncClientPtr> success =
+      factory_primary_or_error.value()->createUncachedRawAsyncClient();
   RETURN_IF_NOT_OK_REF(success.status());
   primary_client = std::move(*success);
-  if (failover_factory) {
-    success = failover_factory->createUncachedRawAsyncClient();
+  if (factory_failover) {
+    success = factory_failover->createUncachedRawAsyncClient();
     RETURN_IF_NOT_OK_REF(success.status());
     failover_client = std::move(*success);
   }
@@ -119,22 +168,13 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
       if (!factory) {
         return absl::InvalidArgumentError(fmt::format("{} not found", name));
       }
-      auto factory_primary_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-          cm_->grpcAsyncClientManager(), dyn_resources.ads_config(), *stats_.rootScope(), false, 0,
-          false);
-      RETURN_IF_NOT_OK_REF(factory_primary_or_error.status());
-      Grpc::AsyncClientFactoryPtr factory_failover = nullptr;
-      if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
-        auto factory_failover_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-            cm_->grpcAsyncClientManager(), dyn_resources.ads_config(), *stats_.rootScope(), false,
-            1, false);
-        RETURN_IF_NOT_OK_REF(factory_failover_or_error.status());
-        factory_failover = std::move(factory_failover_or_error.value());
-      }
-      Grpc::RawAsyncClientPtr primary_client;
-      Grpc::RawAsyncClientPtr failover_client;
-      RETURN_IF_NOT_OK(createClients(factory_primary_or_error.value(), factory_failover,
-                                     primary_client, failover_client));
+      Grpc::RawAsyncClientSharedPtr primary_client;
+      Grpc::RawAsyncClientSharedPtr failover_client;
+      RETURN_IF_NOT_OK(createGrpcClients(cm_->grpcAsyncClientManager(), dyn_resources.ads_config(),
+                                         *stats_.rootScope(), /*skip_cluster_check*/ false,
+                                         /*xdstp_config_source*/ false, primary_client,
+                                         failover_client));
+
       ads_mux_ = factory->create(std::move(primary_client), std::move(failover_client),
                                  main_thread_dispatcher_, random_, *stats_.rootScope(),
                                  dyn_resources.ads_config(), local_info_,
@@ -154,24 +194,14 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
       if (!factory) {
         return absl::InvalidArgumentError(fmt::format("{} not found", name));
       }
-      auto factory_primary_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-          cm_->grpcAsyncClientManager(), dyn_resources.ads_config(), *stats_.rootScope(), false, 0,
-          false);
-      RETURN_IF_NOT_OK_REF(factory_primary_or_error.status());
-      Grpc::AsyncClientFactoryPtr factory_failover = nullptr;
-      if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
-        auto factory_failover_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-            cm_->grpcAsyncClientManager(), dyn_resources.ads_config(), *stats_.rootScope(), false,
-            1, false);
-        RETURN_IF_NOT_OK_REF(factory_failover_or_error.status());
-        factory_failover = std::move(factory_failover_or_error.value());
-      }
+      Grpc::RawAsyncClientSharedPtr primary_client;
+      Grpc::RawAsyncClientSharedPtr failover_client;
+      RETURN_IF_NOT_OK(createGrpcClients(cm_->grpcAsyncClientManager(), dyn_resources.ads_config(),
+                                         *stats_.rootScope(), /*skip_cluster_check*/ false,
+                                         /*xdstp_config_source*/ false, primary_client,
+                                         failover_client));
       OptRef<XdsResourcesDelegate> xds_resources_delegate =
           makeOptRefFromPtr<XdsResourcesDelegate>(xds_resources_delegate_.get());
-      Grpc::RawAsyncClientPtr primary_client;
-      Grpc::RawAsyncClientPtr failover_client;
-      RETURN_IF_NOT_OK(createClients(factory_primary_or_error.value(), factory_failover,
-                                     primary_client, failover_client));
       ads_mux_ = factory->create(std::move(primary_client), std::move(failover_client),
                                  main_thread_dispatcher_, random_, *stats_.rootScope(),
                                  dyn_resources.ads_config(), local_info_,
@@ -182,6 +212,109 @@ XdsManagerImpl::initializeAdsConnections(const envoy::config::bootstrap::v3::Boo
     ads_mux_ = std::make_unique<Config::NullGrpcMuxImpl>();
   }
   return absl::OkStatus();
+}
+
+void XdsManagerImpl::startXdstpAdsMuxes() {
+  // Start the ADS mux objects that were defined in `config_sources`.
+  for (AuthorityData& authority : authorities_) {
+    authority.grpc_mux_->start();
+  }
+  // Start the ADS mux of the `default_config_source`, if defined.
+  if (default_authority_ != nullptr) {
+    default_authority_->grpc_mux_->start();
+  }
+}
+
+absl::StatusOr<SubscriptionPtr> XdsManagerImpl::subscribeToSingletonResource(
+    absl::string_view resource_name, OptRef<const envoy::config::core::v3::ConfigSource> config,
+    absl::string_view type_url, Stats::Scope& scope, SubscriptionCallbacks& callbacks,
+    OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) {
+  // If the resource name is not xDS-TP based, use the old subscription way.
+  if (!XdsResourceIdentifier::hasXdsTpScheme(resource_name)) {
+    if (!config.has_value()) {
+      return absl::InvalidArgumentError(
+          fmt::format("Given subscrption to resource {} must either have an xDS-TP based "
+                      "resource or a config must be provided.",
+                      resource_name));
+    }
+    return subscription_factory_->subscriptionFromConfigSource(*config, type_url, scope, callbacks,
+                                                               resource_decoder, options);
+  }
+  absl::StatusOr<xds::core::v3::ResourceName> resource_urn_or_error =
+      XdsResourceIdentifier::decodeUrn(resource_name);
+  RETURN_IF_NOT_OK(resource_urn_or_error.status());
+  const xds::core::v3::ResourceName resource_urn = std::move(resource_urn_or_error.value());
+  // Otherwise look at whether there is a Peer-Config.
+  if (config.has_value()) {
+    // If the config has authorities defined, see if those authorities match the resource's
+    // authority.
+    bool matched_authority = false;
+    if (!config->authorities().empty()) {
+      for (const auto& authority : config->authorities()) {
+        if (authority.name() == resource_urn.authority()) {
+          matched_authority = true;
+          break;
+        }
+      }
+      if (matched_authority) {
+        // TODO(adisuissa): support this use case by adding a config-source dynamically to the
+        // XdsManager.
+        return absl::UnimplementedError(
+            "Dynamically using non-bootstrap defined xDS-TP config sources is not yet supported.");
+      }
+    }
+  }
+  AuthorityData* matched_authority = nullptr;
+  // Find the right authority from the config_sources authorities by iterating over the bootstrap
+  // defined authorities.
+  for (auto it = authorities_.begin(); (it != authorities_.end()); ++it) {
+    if (it->authority_names_.contains(resource_urn.authority())) {
+      // Found the correct authority to use, subscribe using its mux.
+      matched_authority = &(*it);
+      break;
+    }
+  }
+  // No valid authority found, fallback to use the default_config_source (if defined).
+  if ((matched_authority == nullptr) && (default_authority_ != nullptr)) {
+    matched_authority = default_authority_.get();
+  }
+  // If found an xdstp-based authority, use it.
+  if (matched_authority != nullptr) {
+    // Use the config-source from the authorities that were added in the bootstrap.
+    return subscription_factory_->subscriptionOverAdsGrpcMux(
+        matched_authority->grpc_mux_, matched_authority->config_, type_url, scope, callbacks,
+        resource_decoder, options);
+  }
+  // Nothing was matched, revert to the old-way (given the config-source) if possible.
+  // This will be used for backwards compatibility.
+  if (config.has_value()) {
+    return subscription_factory_->subscriptionFromConfigSource(*config, type_url, scope, callbacks,
+                                                               resource_decoder, options);
+  }
+  // No actual config source was found, return an error.
+  return absl::NotFoundError(
+      fmt::format("No valid authority was found for the given xDS-TP resource {}.", resource_name));
+}
+
+ScopedResume XdsManagerImpl::pause(const std::vector<std::string>& type_urls) {
+  // Apply the pause on all "ADS" based sources (old-ADS-mux, and
+  // xdstp-config-based sources) by collecting the per-xDS-mux scopes under a
+  // single scope. Using a shared_ptr here so we can pass it to the Cleanup
+  // object that is created at the return statement.
+  auto scoped_resume_collection = std::make_shared<std::vector<ScopedResume>>();
+  if (ads_mux_ != nullptr) {
+    scoped_resume_collection->emplace_back(ads_mux_->pause(type_urls));
+  }
+  for (auto& authority : authorities_) {
+    scoped_resume_collection->emplace_back(authority.grpc_mux_->pause(type_urls));
+  }
+  if (default_authority_ != nullptr) {
+    scoped_resume_collection->emplace_back(default_authority_->grpc_mux_->pause(type_urls));
+  }
+  return std::make_unique<Cleanup>([scoped_resume_collection]() {
+    // Do nothing. After this function is called the scoped_resume_collection
+    // will be destroyed, and all the internal cleanups will be invoked.
+  });
 }
 
 absl::Status
@@ -260,20 +393,12 @@ XdsManagerImpl::createAuthority(const envoy::config::core::v3::ConfigSource& con
     if (!factory) {
       return absl::InvalidArgumentError(fmt::format("{} not found", name));
     }
-    auto factory_primary_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-        cm_->grpcAsyncClientManager(), api_config_source, *stats_.rootScope(), false, 0, true);
-    RETURN_IF_NOT_OK_REF(factory_primary_or_error.status());
-    Grpc::AsyncClientFactoryPtr factory_failover = nullptr;
-    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
-      auto factory_failover_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-          cm_->grpcAsyncClientManager(), api_config_source, *stats_.rootScope(), false, 1, true);
-      RETURN_IF_NOT_OK_REF(factory_failover_or_error.status());
-      factory_failover = std::move(factory_failover_or_error.value());
-    }
-    Grpc::RawAsyncClientPtr primary_client;
-    Grpc::RawAsyncClientPtr failover_client;
-    RETURN_IF_NOT_OK(createClients(factory_primary_or_error.value(), factory_failover,
-                                   primary_client, failover_client));
+    Grpc::RawAsyncClientSharedPtr primary_client;
+    Grpc::RawAsyncClientSharedPtr failover_client;
+    RETURN_IF_NOT_OK(createGrpcClients(cm_->grpcAsyncClientManager(), api_config_source,
+                                       *stats_.rootScope(), /*skip_cluster_check*/ false,
+                                       /*xdstp_config_source*/ true, primary_client,
+                                       failover_client));
     authority_mux = factory->create(
         std::move(primary_client), std::move(failover_client), main_thread_dispatcher_, random_,
         *stats_.rootScope(), api_config_source, local_info_, std::move(custom_config_validators),
@@ -294,22 +419,14 @@ XdsManagerImpl::createAuthority(const envoy::config::core::v3::ConfigSource& con
     if (!factory) {
       return absl::InvalidArgumentError(fmt::format("{} not found", name));
     }
-    auto factory_primary_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-        cm_->grpcAsyncClientManager(), api_config_source, *stats_.rootScope(), false, 0, true);
-    RETURN_IF_NOT_OK_REF(factory_primary_or_error.status());
-    Grpc::AsyncClientFactoryPtr factory_failover = nullptr;
-    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
-      auto factory_failover_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-          cm_->grpcAsyncClientManager(), api_config_source, *stats_.rootScope(), false, 1, true);
-      RETURN_IF_NOT_OK_REF(factory_failover_or_error.status());
-      factory_failover = std::move(factory_failover_or_error.value());
-    }
+    Grpc::RawAsyncClientSharedPtr primary_client;
+    Grpc::RawAsyncClientSharedPtr failover_client;
+    RETURN_IF_NOT_OK(createGrpcClients(cm_->grpcAsyncClientManager(), api_config_source,
+                                       *stats_.rootScope(), /*skip_cluster_check*/ false,
+                                       /*xdstp_config_source*/ true, primary_client,
+                                       failover_client));
     OptRef<XdsResourcesDelegate> xds_resources_delegate =
         makeOptRefFromPtr<XdsResourcesDelegate>(xds_resources_delegate_.get());
-    Grpc::RawAsyncClientPtr primary_client;
-    Grpc::RawAsyncClientPtr failover_client;
-    RETURN_IF_NOT_OK(createClients(factory_primary_or_error.value(), factory_failover,
-                                   primary_client, failover_client));
     authority_mux = factory->create(
         std::move(primary_client), std::move(failover_client), main_thread_dispatcher_, random_,
         *stats_.rootScope(), api_config_source, local_info_, std::move(custom_config_validators),
@@ -317,7 +434,8 @@ XdsManagerImpl::createAuthority(const envoy::config::core::v3::ConfigSource& con
   }
   ASSERT(authority_mux != nullptr);
 
-  return AuthorityData(std::move(config_source_authorities), std::move(authority_mux));
+  return AuthorityData(config_source, std::move(config_source_authorities),
+                       std::move(authority_mux));
 }
 
 absl::Status
@@ -381,20 +499,11 @@ XdsManagerImpl::replaceAdsMux(const envoy::config::core::v3::ApiConfigSource& ad
   absl::Status status = Config::Utility::checkTransportVersion(ads_config);
   RETURN_IF_NOT_OK(status);
 
-  auto factory_primary_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-      cm_->grpcAsyncClientManager(), ads_config, *stats_.rootScope(), false, 0, false);
-  RETURN_IF_NOT_OK_REF(factory_primary_or_error.status());
-  Grpc::AsyncClientFactoryPtr factory_failover = nullptr;
-  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support")) {
-    auto factory_failover_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-        cm_->grpcAsyncClientManager(), ads_config, *stats_.rootScope(), false, 1, false);
-    RETURN_IF_NOT_OK_REF(factory_failover_or_error.status());
-    factory_failover = std::move(factory_failover_or_error.value());
-  }
-  Grpc::RawAsyncClientPtr primary_client;
-  Grpc::RawAsyncClientPtr failover_client;
-  RETURN_IF_NOT_OK(createClients(factory_primary_or_error.value(), factory_failover, primary_client,
-                                 failover_client));
+  Grpc::RawAsyncClientSharedPtr primary_client;
+  Grpc::RawAsyncClientSharedPtr failover_client;
+  RETURN_IF_NOT_OK(createGrpcClients(
+      cm_->grpcAsyncClientManager(), ads_config, *stats_.rootScope(), /*skip_cluster_check*/ false,
+      /*xdstp_config_source*/ false, primary_client, failover_client));
 
   // Primary client must not be null, as the primary xDS source must be a valid one.
   // The failover_client may be null (no failover defined).

@@ -15,8 +15,8 @@
 
 using absl::Status;
 using absl::StatusCode;
+using Envoy::Protobuf::Empty;
 using Envoy::Protobuf::TextFormat;
-using Envoy::ProtobufWkt::Empty;
 
 namespace Envoy {
 namespace {
@@ -1059,7 +1059,7 @@ std::string createDeepJson(int level, bool valid) {
 }
 
 std::string jsonStrToPbStrucStr(std::string json) {
-  Envoy::ProtobufWkt::Struct message;
+  Envoy::Protobuf::Struct message;
   std::string structStr;
   TestUtility::loadFromJson(json, message);
   TextFormat::PrintToString(message, &structStr);
@@ -1106,12 +1106,12 @@ TEST_P(GrpcJsonTranscoderIntegrationTest, DeepStruct) {
 }
 
 std::string createLargeJson(int level) {
-  std::shared_ptr<ProtobufWkt::Value> cur = std::make_shared<ProtobufWkt::Value>();
+  std::shared_ptr<Protobuf::Value> cur = std::make_shared<Protobuf::Value>();
   for (int i = 0; i < level - 1; ++i) {
-    std::shared_ptr<ProtobufWkt::Value> next = std::make_shared<ProtobufWkt::Value>();
-    ProtobufWkt::Value val = ProtobufWkt::Value();
-    ProtobufWkt::Value left = ProtobufWkt::Value(*cur);
-    ProtobufWkt::Value right = ProtobufWkt::Value(*cur);
+    std::shared_ptr<Protobuf::Value> next = std::make_shared<Protobuf::Value>();
+    Protobuf::Value val = Protobuf::Value();
+    Protobuf::Value left = Protobuf::Value(*cur);
+    Protobuf::Value right = Protobuf::Value(*cur);
     val.mutable_list_value()->add_values()->Swap(&left);
     val.mutable_list_value()->add_values()->Swap(&right);
     (*next->mutable_struct_value()->mutable_fields())["k"] = val;

@@ -58,8 +58,9 @@ inline Envoy::Http::Code getDenyResponseCode(const DenyResponseSettings& setting
 
 inline std::function<void(Http::ResponseHeaderMap&)>
 addDenyResponseHeadersCb(const DenyResponseSettings& settings) {
-  if (settings.response_headers_to_add().empty())
+  if (settings.response_headers_to_add().empty()) {
     return nullptr;
+  }
   // Headers copied from settings for thread-safety.
   return [headers_to_add = settings.response_headers_to_add()](Http::ResponseHeaderMap& headers) {
     for (const envoy::config::core::v3::HeaderValueOption& header : headers_to_add) {
@@ -71,7 +72,8 @@ addDenyResponseHeadersCb(const DenyResponseSettings& settings) {
 Http::FilterHeadersStatus sendDenyResponse(Http::StreamDecoderFilterCallbacks* cb,
                                            const DenyResponseSettings& settings,
                                            StreamInfo::CoreResponseFlag flag) {
-  cb->sendLocalReply(getDenyResponseCode(settings), settings.http_body().value(),
+  cb->sendLocalReply(getDenyResponseCode(settings),
+                     MessageUtil::bytesToString(settings.http_body().value()),
                      addDenyResponseHeadersCb(settings), absl::nullopt, "");
   cb->streamInfo().setResponseFlag(flag);
   return Envoy::Http::FilterHeadersStatus::StopIteration;
@@ -97,7 +99,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::recordBucketUsage(Matcher::Actio
             bucket_id, bucket_id_proto.DebugString());
 
   // Add the matched bucket_id to dynamic metadata for logging.
-  ProtobufWkt::Struct bucket_log;
+  Protobuf::Struct bucket_log;
   auto* bucket_log_fields = bucket_log.mutable_fields();
   for (const auto& bucket : bucket_id_proto.bucket()) {
     (*bucket_log_fields)[bucket.first] = ValueUtil::stringValue(bucket.second);
@@ -205,7 +207,7 @@ void RateLimitQuotaFilter::handlePreviewMatch(Matcher::ActionFactoryCb skipped_a
 
 // TODO(tyxia) Currently request matching is only performed on the request
 // header.
-absl::StatusOr<Matcher::ActionPtr>
+absl::StatusOr<Matcher::ActionConstSharedPtr>
 RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
   // Initialize the data pointer on first use and reuse it for subsequent
   // requests. This avoids creating the data object for every request, which
@@ -239,7 +241,7 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
     return absl::NotFoundError("Matching completed but no match result was found.");
   }
   // Return the matched result for `on_match` case.
-  return match_result.action();
+  return match_result.actionByMove();
 }
 
 void RateLimitQuotaFilter::onDestroy() {

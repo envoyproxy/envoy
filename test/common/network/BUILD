@@ -64,6 +64,24 @@ envoy_benchmark_test(
     benchmark_binary = "address_impl_speed_test",
 )
 
+envoy_cc_benchmark_binary(
+    name = "lc_trie_ip_list_speed_test",
+    srcs = ["lc_trie_ip_list_speed_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/network:cidr_range_lib",
+        "//source/common/network:lc_trie_lib",
+        "//source/common/network:utility_lib",
+        "//test/test_common:utility_lib",
+        "@com_github_google_benchmark//:benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "lc_trie_ip_list_speed_test_benchmark_test",
+    benchmark_binary = "lc_trie_ip_list_speed_test",
+)
+
 envoy_cc_test(
     name = "cidr_range_test",
     srcs = ["cidr_range_test.cc"],
@@ -384,6 +402,15 @@ envoy_cc_test(
         "//test/test_common:environment_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "ip_address_parsing_test",
+    srcs = ["ip_address_parsing_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/network:ip_address_parsing_lib",
     ],
 )
 

@@ -161,7 +161,7 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   const std::shared_ptr<MockRequestIDExtension> request_id_extension_;
   const std::shared_ptr<RequestIDExtension> request_id_extension_to_return_;
-  std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_{};
+  std::vector<Http::OriginalIPDetectionSharedPtr> detection_extensions_;
   NiceMock<MockConnectionManagerConfig> config_;
   NiceMock<Router::MockConfig> route_config_;
   NiceMock<Router::MockRoute> route_;
@@ -844,6 +844,7 @@ TEST_F(ConnectionManagerUtilityTest, DocumentationExample7) {
   const auto envoyInternal = false;
 
   std::vector<Network::Address::CidrRange> cidrs;
+  cidrs.reserve(xffTrustedCidrs.size());
   for (const auto& cidr : xffTrustedCidrs) {
     cidrs.push_back(Network::Address::CidrRange::create(cidr.first, cidr.second).value());
   }
@@ -884,6 +885,7 @@ TEST_F(ConnectionManagerUtilityTest, DocumentationExample8) {
   const auto envoyInternal = false;
 
   std::vector<Network::Address::CidrRange> cidrs;
+  cidrs.reserve(xffTrustedCidrs.size());
   for (const auto& cidr : xffTrustedCidrs) {
     cidrs.push_back(Network::Address::CidrRange::create(cidr.first, cidr.second).value());
   }

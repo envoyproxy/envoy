@@ -42,11 +42,11 @@ protected:
   void assertStreamInfoSize(StreamInfoImpl stream_info) {
     ASSERT_TRUE(
         // with --config=docker-msan
-        sizeof(stream_info) == 712 ||
+        sizeof(stream_info) == 728 ||
         // with --config=docker-clang
-        sizeof(stream_info) == 720 ||
+        sizeof(stream_info) == 736 ||
         // with --config=docker-clang-libc++
-        sizeof(stream_info) == 688)
+        sizeof(stream_info) == 704)
         << "If adding fields to StreamInfoImpl, please check to see if you "
            "need to add them to setFromForRecreateStream or setFrom! Current size "
         << sizeof(stream_info);
@@ -322,6 +322,16 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     EXPECT_TRUE(stream_info.healthCheck());
 
     EXPECT_EQ(nullptr, stream_info.route());
+    EXPECT_EQ(nullptr, stream_info.virtualHost());
+
+    std::shared_ptr<NiceMock<Router::MockVirtualHost>> vhost =
+        std::make_shared<NiceMock<Router::MockVirtualHost>>();
+
+    stream_info.vhost_ = vhost;
+
+    // If the route is invalid then the vhost will be used.
+    EXPECT_EQ(vhost, stream_info.virtualHost());
+
     std::shared_ptr<NiceMock<Router::MockRoute>> route =
         std::make_shared<NiceMock<Router::MockRoute>>();
     stream_info.route_ = route;
@@ -506,8 +516,8 @@ TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
   EXPECT_EQ("test_value",
             Config::Metadata::metadataValue(&stream_info.dynamicMetadata(), "com.test", "test_key")
                 .string_value());
-  ProtobufWkt::Struct struct_obj2;
-  ProtobufWkt::Value val2;
+  Protobuf::Struct struct_obj2;
+  Protobuf::Value val2;
   val2.set_string_value("another_value");
   (*struct_obj2.mutable_fields())["another_key"] = val2;
   stream_info.setDynamicMetadata("com.test", struct_obj2);

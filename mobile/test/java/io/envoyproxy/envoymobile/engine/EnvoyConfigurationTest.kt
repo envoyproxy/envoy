@@ -213,9 +213,6 @@ class EnvoyConfigurationTest {
     assertThat(resolvedTemplate).contains("buffer_filter_1")
     assertThat(resolvedTemplate).contains("type.googleapis.com/envoy.extensions.filters.http.buffer.v3.Buffer")
 
-    // Cert Validation
-    assertThat(resolvedTemplate).contains("trusted_ca")
-
     // Validate ordering between filters and platform filters
     assertThat(resolvedTemplate).matches(Pattern.compile(".*name1.*name2.*buffer_filter_1.*buffer_filter_2.*", Pattern.DOTALL))
     // Validate that createProtoString doesn't change filter order.
@@ -256,9 +253,6 @@ class EnvoyConfigurationTest {
 
     // enableDrainPostDnsRefresh = true
     assertThat(resolvedTemplate).contains("enable_drain_post_dns_refresh: true")
-
-    // UDP GRO enabled by default
-    assertThat(resolvedTemplate).contains("key: \"prefer_quic_client_udp_gro\" value { bool_value: true }")
 
     // enableDNSCache = true
     assertThat(resolvedTemplate).contains("key: \"dns_persistent_cache\"")
