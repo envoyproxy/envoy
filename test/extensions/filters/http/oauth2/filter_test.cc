@@ -135,6 +135,7 @@ public:
       int default_refresh_token_expires_in = 0, bool preserve_authorization_header = false,
       bool disable_id_token_set_cookie = false, bool set_cookie_domain = false,
       bool disable_access_token_set_cookie = false, bool disable_refresh_token_set_cookie = false,
+      bool disable_token_encryption = false,
       ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite bearer_samesite =
           ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
               CookieConfig_SameSite_DISABLED,
@@ -171,6 +172,7 @@ public:
     p.set_disable_id_token_set_cookie(disable_id_token_set_cookie);
     p.set_disable_access_token_set_cookie(disable_access_token_set_cookie);
     p.set_disable_refresh_token_set_cookie(disable_refresh_token_set_cookie);
+    p.set_disable_token_encryption(disable_token_encryption);
     p.set_stat_prefix("my_prefix");
 
     auto* useRefreshToken = p.mutable_use_refresh_token();
@@ -3767,6 +3769,67 @@ TEST_F(OAuth2Test, RequestIsUnchangedWhenPassThroughMatcherMatches) {
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_failure").value(), 0);
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_passthrough").value(), 1);
   EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 0);
+}
+
+/**
+ * Testing token encryption disable functionality.
+ */
+class DisableTokenEncryptionTest : public OAuth2Test {
+public:
+  void SetUp() override {
+    config_ = getConfig(true /* forward_bearer_token */, true /* use_refresh_token */,
+                       ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                           OAuth2Config_AuthType_URL_ENCODED_BODY,
+                       0, false, false, false, false, false, true /* disable_token_encryption */);
+    init();
+  }
+};
+
+TEST_F(DisableTokenEncryptionTest, TokensStoredInPlainText) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.oauth2_encrypt_tokens", "true"}});
+
+  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true));
+
+  const std::string access_token = "access_token_test";
+  const std::string id_token = "id_token_test";
+  const std::string refresh_token = "refresh_token_test";
+
+  filter_->onGetAccessTokenSuccess(access_token, id_token, refresh_token, std::chrono::seconds(10));
+
+  // Parse the cookies from the modified headers
+  auto cookies = Http::Utility::parseCookies(request_headers_);
+  const auto cookie_names = config_->cookieNames();
+
+  // When disable_token_encryption is true, tokens should be stored in plain text
+  EXPECT_EQ(cookies[cookie_names.bearer_token_], access_token);
+  EXPECT_EQ(cookies[cookie_names.id_token_], id_token);
+  EXPECT_EQ(cookies[cookie_names.refresh_token_], refresh_token);
+
+  // Verify HMAC is still computed correctly with plain text tokens
+  EXPECT_FALSE(cookies[cookie_names.oauth_hmac_].empty());
+  EXPECT_FALSE(cookies[cookie_names.oauth_expires_].empty());
+}
+
+TEST_F(DisableTokenEncryptionTest, DecryptionReturnsPlainText) {
+  const std::string test_token = "plain_text_token";
+
+  // When disable_token_encryption is true, decryptToken should return the input as-is
+  std::string decrypted = filter_->decryptToken(test_token);
+  EXPECT_EQ(decrypted, test_token);
+}
+
+TEST_F(DisableTokenEncryptionTest, EncryptionReturnsPlainText) {
+  const std::string test_token = "plain_text_token";
+
+  // When disable_token_encryption is true, encryptToken should return the input as-is
+  std::string encrypted = filter_->encryptToken(test_token);
+  EXPECT_EQ(encrypted, test_token);
 }
 
 } // namespace Oauth2
