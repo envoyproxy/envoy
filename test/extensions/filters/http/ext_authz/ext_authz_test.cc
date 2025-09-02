@@ -679,6 +679,13 @@ TEST_F(InvalidMutationTest, BasicInvalidKey) {
   testResponse(response);
 }
 
+TEST_F(InvalidMutationTest, InvalidHeaderAppendAction) {
+  Filters::Common::ExtAuthz::Response response;
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.saw_invalid_append_actions = true;
+  testResponse(response);
+}
+
 struct DecoderHeaderMutationRulesTestOpts {
   absl::optional<envoy::config::common::mutation_rules::v3::HeaderMutationRules> rules;
   bool expect_reject_response = false;
