@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.extensions.clusters.composite.v3;
 
-import "google/protobuf/wrappers.proto";
-
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -16,90 +14,33 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Composite cluster configuration]
 
-// Configuration for the composite cluster. The composite cluster allows Envoy to route requests
-// across multiple upstream clusters based on configurable strategies, enabling sophisticated
-// failover and retry behavior across different clusters with potentially different configurations.
+// Configuration for the composite cluster. This cluster type enables retry progression
+// across multiple sub-clusters. Initial requests are routed to the first sub-cluster,
+// first retry to the second sub-cluster, second retry to the third sub-cluster, and so on.
+//
 // [#extension: envoy.clusters.composite]
 message ClusterConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.extensions.clusters.composite.v3.ClusterConfig";
 
-  // Configuration for an individual sub-cluster within the composite cluster.
-  message SubCluster {
-    // The name of the cluster. This must match a cluster defined in the
-    // Envoy configuration. The cluster can be of any type (EDS, STRICT_DNS, etc.)
-    // and can have its own independent configuration.
-    string name = 1 [(validate.rules).string = {min_len: 1}];
+  // Behavior when retry attempts exceed the number of configured clusters.
+  enum OverflowOption {
+    // Further retry attempts fail with no host available.
+    FAIL = 0;
+
+    // Continue using the last cluster in the list for further retry attempts.
+    USE_LAST_CLUSTER = 1;
+
+    // Round-robin through available clusters for overflow attempts.
+    ROUND_ROBIN = 2;
   }
 
-  // Configuration specific to ``RETRY`` mode operation.
-  message RetryConfig {
-    // Specifies the behavior when the number of retry attempts exceeds
-    // the number of configured sub-clusters.
-    enum OverflowOption {
-      // Return an error when retry attempts exceed available clusters.
-      // This is the default behavior to prevent unbounded retries.
-      FAIL = 0;
+  // Load balancing clusters for retry progression. Clusters are prioritized based on the order they
+  // appear in this list. The first cluster is used for the initial request, the second for the
+  // first retry, and so on.
+  repeated string clusters = 1 [(validate.rules).repeated = {min_items: 1}];
 
-      // Continue using the last cluster in the list for all subsequent
-      // retry attempts. This allows for multiple retry attempts to the
-      // final cluster in the configuration.
-      USE_LAST_CLUSTER = 1;
-
-      // Cycle through the available clusters in round-robin fashion.
-      // After exhausting all clusters, retry attempts restart from the
-      // first cluster.
-      ROUND_ROBIN = 2;
-    }
-
-    // The composite cluster selects sub-clusters sequentially based on retry attempts.
-    //
-    // Initial request is always routed to the first sub-cluster in ``sub_clusters``.
-    // If that request fails and a retry is triggered by the configured retry policy,
-    // the first retry uses the second sub-cluster, the second retry uses the third,
-    // and so on.
-    //
-    // This behavior is not the same as the aggregate cluster. The composite cluster
-    // does not combine host sets across sub-clusters and does not load balance across
-    // all endpoints simultaneously. Each attempt targets exactly one sub-cluster.
-    //
-    // Endpoint health within a sub-cluster is evaluated by that sub-cluster's own
-    // load balancer and health checking configuration. A partially unhealthy primary
-    // sub-cluster will still be used for the initial attempt; only healthy endpoints
-    // within that sub-cluster will be considered. If the primary sub-cluster has zero
-    // healthy endpoints, selection will yield no host for the initial attempt, which
-    // will result in a failure unless the route retry policy retries for such errors
-    // (e.g., ``connect-failure``/``no_healthy_upstream``). Subsequent retries progress
-    // to later sub-clusters in order.
-
-    // Controls the behavior when retry attempts exceed the number of configured sub-clusters.
-    //
-    // If not specified, defaults to ``FAIL``.
-    OverflowOption overflow_option = 1;
-
-    // If ``true``, the composite cluster will honor the retry policy configured
-    // at the route level for determining retry conditions (5xx, reset, etc.).
-    // If ``false``, retries will be triggered based on connection failures only.
-    //
-    // If not specified, defaults to ``true``.
-    google.protobuf.BoolValue honor_route_retry_policy = 2;
-  }
-
-  // The list of sub-clusters that make up this composite cluster.
-  // Must contain at least one cluster. The order of clusters is important
-  // for modes like ``RETRY`` where progression follows the defined sequence.
-  repeated SubCluster sub_clusters = 1 [(validate.rules).repeated = {min_items: 1}];
-
-  // Mode-specific configuration. The operational mode is determined by which
-  // configuration is provided (e.g., ``retry_config`` for ``RETRY`` mode).
-  oneof mode_config {
-    // Configuration specific to ``RETRY`` mode.
-    // Required when mode is ``RETRY``.
-    RetryConfig retry_config = 2;
-  }
-
-  // Optional human-readable name for this composite cluster used in
-  // stats and logging. If not specified, uses the cluster name from
-  // the top-level cluster configuration.
-  string name = 3;
+  // Controls behavior when the number of retry attempts exceeds the number of configured clusters.
+  // If not specified, defaults to ``FAIL``.
+  OverflowOption overflow_option = 2;
 }

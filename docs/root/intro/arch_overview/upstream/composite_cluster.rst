@@ -1,167 +1,160 @@
 .. _arch_overview_composite_cluster:
 
-Composite cluster
+Composite Cluster
 =================
 
-The composite cluster type enables sophisticated routing and retry strategies across multiple upstream clusters.
-It provides a configurable framework for selecting among sub-clusters based on various strategies, with the
-initial implementation supporting retry-based progression.
+A composite cluster enables retry progression across multiple upstream clusters. Unlike the :ref:`aggregate cluster <arch_overview_aggregate_cluster>`, which combines host sets for load balancing, the composite cluster selects exactly one sub-cluster per request attempt based on the retry count.
 
-.. note::
-
-  The composite cluster is not a traditional load balancing cluster. It does not perform health checking or
-  outlier detection directly. Instead, it delegates to configured sub-clusters, each maintaining their own
-  health checking, outlier detection, and load balancing policies.
-
-Overview
---------
-
-The composite cluster acts as a router that selects among multiple configured sub-clusters based on the
-operational mode. Each sub-cluster is a fully configured Envoy cluster with its own settings for:
-
-* Load balancing policy
-* Health checking
-* Outlier detection
-* TLS configuration
-* Connection pool settings
-* Circuit breakers
-
-This design allows heterogeneous cluster configurations within a single logical composite cluster,
-enabling advanced use cases like cross-datacenter failover with different security policies per datacenter.
-
-Use cases
----------
-
-**Retry-based Progression**
-  Route initial requests to a primary cluster, with retries automatically progressing through
-  secondary and tertiary clusters. This enables sophisticated cross-datacenter or cross-region
-  failover strategies.
-
-**Future Use-Cases**
-  * Weighted distribution across clusters.
-  * Session affinity with cluster stickiness.
+The composite cluster is useful when different retry attempts should target completely different upstream services or configurations. For example, you might route the initial request to a high-performance cache cluster, the first retry to a standard database cluster, and the second retry to a fallback read-replica cluster.
 
 Configuration
 -------------
 
-The composite cluster is configured using the
-:ref:`ClusterConfig <envoy_v3_api_msg_extensions.clusters.composite.v3.ClusterConfig>` message.
+The composite cluster references other clusters by their names in the :ref:`configuration <envoy_v3_api_msg_extensions.clusters.composite.v3.ClusterConfig>`. The ordering of these clusters in the :ref:`clusters list <envoy_v3_api_field_extensions.clusters.composite.v3.ClusterConfig.clusters>` determines the retry progression:
 
-The configuration requires:
+* **Initial request** (attempt #1): Uses the first cluster in the list
+* **First retry** (attempt #2): Uses the second cluster in the list  
+* **Second retry** (attempt #3): Uses the third cluster in the list
+* **Further retries**: Behavior determined by :ref:`overflow_option <envoy_v3_api_field_extensions.clusters.composite.v3.ClusterConfig.overflow_option>`
 
-1. A list of ``sub_clusters`` referencing existing cluster names
-2. Mode-specific configuration (e.g., ``retry_config`` for RETRY mode)
+The composite cluster works in conjunction with Envoy's :ref:`retry policies <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_on>`. The route configuration determines *when* to retry (e.g., 5xx responses, connection failures), while the composite cluster determines *where* to send each retry attempt.
 
-The operational mode is determined by which configuration is provided (e.g., setting ``retry_config`` enables RETRY mode).
+Retry Progression
+-----------------
 
-Basic example
-~~~~~~~~~~~~~
+Each request attempt targets exactly one sub-cluster. The composite cluster does not combine host sets across clusters or load balance across multiple clusters simultaneously. This provides clear isolation between retry attempts and allows each sub-cluster to maintain its own:
 
-.. code-block:: yaml
+* Health checking and outlier detection
+* Circuit breakers and connection pools
+* Load balancing algorithms
+* TLS settings and authentication
+* Timeouts and retry policies
 
-  static_resources:
-    clusters:
-    - name: composite_cluster
-      connect_timeout: 0.25s
-      lb_policy: CLUSTER_PROVIDED  # Required for composite clusters
-      cluster_type:
-        name: envoy.clusters.composite
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-          sub_clusters:
-          - name: primary_cluster
-          - name: secondary_cluster
-          retry_config:
-            overflow_option: FAIL
+If a sub-cluster has no healthy endpoints, the load balancer selection will return no host, which typically results in an immediate failure unless the route retry policy retries for such conditions (e.g., ``connect-failure`` or ``reset``).
 
-    # Define the sub-clusters
-    - name: primary_cluster
-      type: STRICT_DNS
-      connect_timeout: 0.25s
-      load_assignment:
-        cluster_name: primary_cluster
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: primary.example.com
-                  port_value: 443
+Overflow Behavior
+-----------------
 
-    - name: secondary_cluster
-      type: STRICT_DNS
-      connect_timeout: 0.25s
-      load_assignment:
-        cluster_name: secondary_cluster
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: secondary.example.com
-                  port_value: 443
+When retry attempts exceed the number of configured sub-clusters, the behavior is determined by the :ref:`overflow_option <envoy_v3_api_field_extensions.clusters.composite.v3.ClusterConfig.overflow_option>`:
 
-Retry mode
-----------
+* ``FAIL`` (default): Further retry attempts fail with no host available
+* ``USE_LAST_CLUSTER``: Continue using the last cluster in the list for overflow attempts
+* ``ROUND_ROBIN``: Cycle through all clusters for overflow attempts
 
-In ``RETRY`` mode, the composite cluster selects sub-clusters based on the retry attempt number:
-
-* **Initial request** (Attempt #1): Routes to the first sub-cluster.
-* **First retry** (Attempt #2): Routes to the second sub-cluster.
-* **Second retry** (Attempt #3): Routes to the third sub-cluster.
-* **Further retries**: Behavior determined by ``overflow_option``.
-
-The retry progression works in conjunction with Envoy's
-:ref:`retry policies <envoy_v3_api_field_config.route.v3.RetryPolicy.retry_on>`. The route configuration
-determines what constitutes a retriable failure (5xx, reset, etc.).
-
-Configuration example
-~~~~~~~~~~~~~~~~~~~~~
+Example Configuration
+---------------------
 
 .. code-block:: yaml
 
-  static_resources:
-    clusters:
-    - name: multi_region_cluster
-      connect_timeout: 0.25s
-      lb_policy: CLUSTER_PROVIDED
-      cluster_type:
-        name: envoy.clusters.composite
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
-          name: "composite_cluster"
-          sub_clusters:
-          - name: us_east_cluster
-          - name: us_west_cluster
-          - name: eu_west_cluster
-          retry_config:
-            overflow_option: USE_LAST_CLUSTER
-            honor_route_retry_policy: true
+  clusters:
+  # Sub-clusters referenced by the composite cluster
+  - name: cache_cluster
+    connect_timeout: 0.25s
+    type: STATIC
+    load_assignment:
+      cluster_name: cache_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address: { address: 127.0.0.1, port_value: 8080 }
+
+  - name: database_cluster
+    connect_timeout: 0.25s
+    type: STATIC
+    load_assignment:
+      cluster_name: database_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address: { address: 127.0.0.1, port_value: 5432 }
+
+  - name: fallback_cluster
+    connect_timeout: 0.25s
+    type: STATIC
+    load_assignment:
+      cluster_name: fallback_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address: { address: 127.0.0.1, port_value: 3306 }
+
+  # The composite cluster
+  - name: composite_cluster
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.clusters.composite
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.composite.v3.ClusterConfig
+        clusters:
+        - cache_cluster
+        - database_cluster
+        - fallback_cluster
+        overflow_option: USE_LAST_CLUSTER
 
   # Route configuration with retry policy
-  http_filters:
-  - name: envoy.filters.http.router
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   route_config:
     virtual_hosts:
-    - name: backend
+    - name: local_service
       domains: ["*"]
       routes:
       - match:
           prefix: "/"
         route:
-          cluster: multi_region_cluster
+          cluster: composite_cluster
           retry_policy:
-            retry_on: "5xx,reset,connect-failure,retriable-4xx"
+            retry_on: 5xx,connect-failure,refused-stream
             num_retries: 5
-            retry_host_predicate:
-            - name: envoy.retry_host_predicates.previous_hosts
 
-Connection lifetime callbacks
------------------------------
+In this configuration:
 
-The composite cluster aggregates connection lifetime callbacks from all sub-clusters, providing a
-unified interface for monitoring connection events across the entire cluster set. This ensures that
-connection pool metrics and observability features work seamlessly regardless of which sub-cluster
-is selected.
+1. Initial request goes to ``cache_cluster``
+2. If that fails and triggers a retry, the first retry goes to ``database_cluster``  
+3. If that fails, the second retry goes to ``fallback_cluster``
+4. Any additional retries (up to the configured limit) continue using ``fallback_cluster`` due to the ``USE_LAST_CLUSTER`` overflow option
+
+Comparison with Aggregate Cluster
+----------------------------------
+
++---------------------------------+--------------------------------+----------------------------------+
+| Feature                         | Composite Cluster              | Aggregate Cluster                |
++=================================+================================+==================================+
+| **Load Balancing Scope**        | One cluster per request        | All clusters combined            |
++---------------------------------+--------------------------------+----------------------------------+
+| **Retry Behavior**              | Sequential cluster progression | Priority-based failover          |
++---------------------------------+--------------------------------+----------------------------------+
+| **Health Checking**             | Per-cluster isolation          | Combined health assessment       |
++---------------------------------+--------------------------------+----------------------------------+
+| **Configuration Complexity**    | Simple cluster list            | Priority linearization           |
++---------------------------------+--------------------------------+----------------------------------+
+| **Use Case**                    | Retry diversification          | Seamless failover                |
++---------------------------------+--------------------------------+----------------------------------+
+
+Important Considerations
+------------------------
+
+Circuit Breakers
+^^^^^^^^^^^^^^^^
+
+Similar to the aggregate cluster, the composite cluster should be thought of as a cluster that selects among underlying clusters for load balancing purposes only. Circuit breaking is handled at the level of the underlying clusters, not at the level of the composite cluster itself. This allows the composite cluster to maintain its retry progression capabilities whilst respecting the circuit breaker limits of each underlying cluster.
+
+When the configured limit is reached on an underlying cluster, only that cluster's circuit breaker opens. When an underlying cluster's circuit breaker opens, requests routed through the composite cluster to that underlying cluster will be rejected, potentially triggering a retry to the next cluster in the sequence.
+
+The composite cluster's circuit breaker remains closed at all times, regardless of whether the circuit breaker limits on the underlying clusters are reached or not.
+
+As with the aggregate cluster, the only circuit breaker configured at the composite cluster level is :ref:`max_retries <envoy_v3_api_field_config.cluster.v3.CircuitBreakers.Thresholds.max_retries>` because when Envoy processes a retry request, it needs to determine whether the retry limit has been exceeded before the composite cluster is able to choose the underlying cluster to use.
+
+Health Checking
+^^^^^^^^^^^^^^^
+
+Each sub-cluster maintains its own health checking independently. If a sub-cluster has no healthy endpoints when selected by the composite cluster, the request will typically fail unless the route retry policy is configured to retry on such conditions (e.g., ``no_healthy_upstream``).
+
+The composite cluster does not perform health checking aggregation across sub-clusters, which provides clear isolation between retry attempts and allows each sub-cluster to maintain its own health state.
+
+Stateful Sessions
+^^^^^^^^^^^^^^^^^
+
+:ref:`Stateful Sessions <envoy_v3_api_msg_extensions.filters.http.stateful_session.v3.StatefulSession>` are not compatible with composite clusters. Similar to aggregate clusters, the composite cluster's load balancer selects a sub-cluster first, but the stateful session filter cannot locate the specific endpoint at the composite level since the final routing decision happens within the selected sub-cluster.

@@ -1,108 +1,136 @@
 #pragma once
 
-#include <memory>
-#include <string>
-#include <vector>
-
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/composite/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/composite/v3/cluster.pb.validate.h"
-#include "envoy/http/conn_pool.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/load_balancer.h"
-#include "envoy/upstream/upstream.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/upstream/cluster_factory_impl.h"
-#include "source/extensions/clusters/composite/lb_context.h"
+#include "source/common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Clusters {
 namespace Composite {
 
-/**
- * Implementation of Upstream::Cluster for Composite cluster.
- *
- * This cluster type provides flexible sub-cluster selection strategies for various use cases
- * including retry progression, cross-cluster failover, and potential future support for
- * stateful session affinity.
- */
+// Order matters so a vector must be used for rebuilds. If the vector size becomes larger we can
+// maintain a parallel set for lookups during cluster update callbacks.
+using ClusterSet = std::vector<std::string>;
+using ClusterSetConstSharedPtr = std::shared_ptr<const ClusterSet>;
+
 class Cluster : public Upstream::ClusterImplBase {
 public:
+  // Upstream::Cluster
+  Upstream::Cluster::InitializePhase initializePhase() const override {
+    return Upstream::Cluster::InitializePhase::Secondary;
+  }
+
+  Upstream::ClusterManager& cluster_manager_;
+  const ClusterSetConstSharedPtr clusters_;
+  const envoy::extensions::clusters::composite::v3::ClusterConfig::OverflowOption overflow_option_;
+
+protected:
   Cluster(const envoy::config::cluster::v3::Cluster& cluster,
           const envoy::extensions::clusters::composite::v3::ClusterConfig& config,
           Upstream::ClusterFactoryContext& context, absl::Status& creation_status);
 
-  // Upstream::Cluster
-  Upstream::Cluster::InitializePhase initializePhase() const override {
-    return Upstream::Cluster::InitializePhase::Primary;
-  }
-
-  // Getters for testing and load balancer access.
-  Runtime::Loader& runtime() { return runtime_; }
-  Random::RandomGenerator& random() { return random_; }
-
-  // Access to configuration for load balancer.
-  const std::vector<std::string>* subClusters() const { return sub_clusters_.get(); }
-  bool hasRetryConfig() const { return has_retry_config_; }
-  const envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig&
-  retryConfig() const {
-    return retry_config_;
-  }
-  const std::string& name() const { return name_; }
-  bool honorRouteRetryPolicy() const { return honor_route_retry_policy_; }
-  Upstream::ClusterFactoryContext& context() { return context_; }
-  const Upstream::ClusterFactoryContext& context() const { return context_; }
-
 private:
+  friend class ClusterFactory;
+  friend class CompositeClusterTest;
+
+  // Upstream::ClusterImplBase
   void startPreInit() override { onPreInitComplete(); }
-
-  Upstream::ClusterFactoryContext& context_;
-  std::unique_ptr<std::vector<std::string>> sub_clusters_;
-  bool has_retry_config_;
-  envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig retry_config_;
-  std::string name_;
-  bool honor_route_retry_policy_;
 };
 
-/**
- * Connection lifetime callbacks aggregator for composite cluster.
- * Manages callbacks from all sub-clusters to provide a unified interface.
- */
-class CompositeConnectionLifetimeCallbacks
-    : public Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks {
+// Load balancer context wrapper for composite cluster.
+class CompositeLoadBalancerContext : public Upstream::LoadBalancerContext {
 public:
-  CompositeConnectionLifetimeCallbacks() = default;
+  CompositeLoadBalancerContext(Upstream::LoadBalancerContext* base_context)
+      : base_context_(base_context) {}
 
-  // Http::ConnectionPool::ConnectionLifetimeCallbacks
-  void onConnectionOpen(Envoy::Http::ConnectionPool::Instance& pool, std::vector<uint8_t>& hash_key,
-                        const Network::Connection& connection) override;
-  void onConnectionDraining(Envoy::Http::ConnectionPool::Instance& pool,
-                            std::vector<uint8_t>& hash_key,
-                            const Network::Connection& connection) override;
+  // Upstream::LoadBalancerContext
+  absl::optional<uint64_t> computeHashKey() override {
+    return base_context_ ? base_context_->computeHashKey() : absl::nullopt;
+  }
 
-  void addCallback(Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks* callback);
-  void removeCallback(Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks* callback);
-  void clearCallbacks();
+  const Network::Connection* downstreamConnection() const override {
+    return base_context_ ? base_context_->downstreamConnection() : nullptr;
+  }
+
+  const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
+    return base_context_ ? base_context_->metadataMatchCriteria() : nullptr;
+  }
+
+  const Http::RequestHeaderMap* downstreamHeaders() const override {
+    return base_context_ ? base_context_->downstreamHeaders() : nullptr;
+  }
+
+  StreamInfo::StreamInfo* requestStreamInfo() const override {
+    return base_context_ ? base_context_->requestStreamInfo() : nullptr;
+  }
+
+  uint32_t hostSelectionRetryCount() const override {
+    return base_context_ ? base_context_->hostSelectionRetryCount() : 0;
+  }
+
+  Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override {
+    return base_context_ ? base_context_->upstreamSocketOptions() : nullptr;
+  }
+
+  Network::TransportSocketOptionsConstSharedPtr upstreamTransportSocketOptions() const override {
+    return base_context_ ? base_context_->upstreamTransportSocketOptions() : nullptr;
+  }
+
+  absl::optional<std::pair<absl::string_view, bool>> overrideHostToSelect() const override {
+    return base_context_ ? base_context_->overrideHostToSelect() : absl::nullopt;
+  }
+
+  void setHeadersModifier(std::function<void(Http::ResponseHeaderMap&)> headers_modifier) override {
+    if (base_context_) {
+      base_context_->setHeadersModifier(std::move(headers_modifier));
+    }
+  }
+
+  const Upstream::HealthyAndDegradedLoad& determinePriorityLoad(
+      const Upstream::PrioritySet& priority_set,
+      const Upstream::HealthyAndDegradedLoad& original_priority_load,
+      const Upstream::RetryPriority::PriorityMappingFunc& priority_mapping_func) override {
+    ASSERT(base_context_ != nullptr);
+    return base_context_->determinePriorityLoad(priority_set, original_priority_load,
+                                                priority_mapping_func);
+  }
+
+  bool shouldSelectAnotherHost(const Upstream::Host& host) override {
+    return base_context_ ? base_context_->shouldSelectAnotherHost(host) : false;
+  }
+
+  void onAsyncHostSelection(Upstream::HostConstSharedPtr&& host, std::string&& details) override {
+    if (base_context_) {
+      base_context_->onAsyncHostSelection(std::move(host), std::move(details));
+    }
+  }
 
 private:
-  std::vector<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks*> callbacks_;
+  Upstream::LoadBalancerContext* base_context_;
 };
 
-/**
- * Load balancer implementation for Composite cluster.
- *
- * Implements the cluster selection logic based on retry attempts and configured mode.
- * Currently supports ``RETRY`` mode with various overflow handling options.
- */
+// Load balancer used by each worker thread. It will be refreshed when clusters, hosts or priorities
+// are updated.
 class CompositeClusterLoadBalancer : public Upstream::LoadBalancer,
                                      public Upstream::ClusterUpdateCallbacks,
                                      protected Logger::Loggable<Logger::Id::upstream> {
 public:
   CompositeClusterLoadBalancer(
-      const Upstream::ClusterInfo& cluster_info, Upstream::ClusterManager& cluster_manager,
-      const std::vector<std::string>* sub_clusters,
-      const envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig& retry_config,
-      bool honor_route_retry_policy);
+      const Upstream::ClusterInfoConstSharedPtr& parent_info,
+      Upstream::ClusterManager& cluster_manager, const ClusterSetConstSharedPtr& clusters,
+      envoy::extensions::clusters::composite::v3::ClusterConfig::OverflowOption overflow_option);
+
+  // Upstream::ClusterUpdateCallbacks
+  void onClusterAddOrUpdate(absl::string_view cluster_name,
+                            Upstream::ThreadLocalClusterCommand& get_cluster) override;
+  void onClusterRemoval(const std::string& cluster_name) override;
 
   // Upstream::LoadBalancer
   Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
@@ -111,77 +139,50 @@ public:
   selectExistingConnection(Upstream::LoadBalancerContext* context, const Upstream::Host& host,
                            std::vector<uint8_t>& hash_key) override;
 
+  // Simple implementation - no complex callback aggregation needed.
   OptRef<Envoy::Http::ConnectionPool::ConnectionLifetimeCallbacks> lifetimeCallbacks() override {
-    return makeOptRef(*composite_callbacks_);
+    return {};
   }
 
-  // Upstream::ClusterUpdateCallbacks
-  void onClusterAddOrUpdate(absl::string_view cluster_name,
-                            Upstream::ThreadLocalClusterCommand& get_cluster) override;
-  void onClusterRemoval(const std::string& cluster_name) override;
-
-  uint32_t getRetryAttemptCount(Upstream::LoadBalancerContext* context) const;
-  absl::optional<size_t> mapRetryAttemptToClusterIndex(size_t retry_attempt) const;
-  Upstream::ThreadLocalCluster* getClusterByIndex(size_t cluster_index) const;
-
-private:
-  void addMemberUpdateCallbackForCluster(Upstream::ThreadLocalCluster& cluster);
-
-  const Upstream::ClusterInfo& cluster_info_;
-  Upstream::ClusterManager& cluster_manager_;
-  const std::vector<std::string>* sub_clusters_;
-  envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig retry_config_;
-  bool honor_route_retry_policy_;
-  std::unique_ptr<CompositeConnectionLifetimeCallbacks> composite_callbacks_;
-
-  // Member update callback handles for cleanup.
-  std::vector<Envoy::Common::CallbackHandlePtr> member_update_cbs_;
-};
-
-/**
- * Load balancer factory for Composite cluster.
- */
-class CompositeClusterLoadBalancerFactory : public Upstream::LoadBalancerFactory {
 public:
-  CompositeClusterLoadBalancerFactory(
-      const Upstream::ClusterInfo& cluster_info, Upstream::ClusterManager& cluster_manager,
-      const std::vector<std::string>* sub_clusters,
-      const envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig& retry_config,
-      bool honor_route_retry_policy)
-      : cluster_info_(cluster_info), cluster_manager_(cluster_manager), sub_clusters_(sub_clusters),
-        retry_config_(retry_config), honor_route_retry_policy_(honor_route_retry_policy) {}
-
-  Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams /*params*/) override {
-    return std::make_unique<CompositeClusterLoadBalancer>(
-        cluster_info_, cluster_manager_, sub_clusters_, retry_config_, honor_route_retry_policy_);
-  }
+  // Test-only access methods
+  uint32_t getRetryAttemptCount(Upstream::LoadBalancerContext* context) const;
+  absl::optional<size_t> mapRetryAttemptToClusterIndex(uint32_t retry_attempt) const;
 
 private:
-  const Upstream::ClusterInfo& cluster_info_;
+  Upstream::ThreadLocalCluster* getClusterByIndex(size_t cluster_index) const;
+  void addMemberUpdateCallbackForCluster(Upstream::ThreadLocalCluster& thread_local_cluster);
+  void refresh(OptRef<const std::string> excluded_cluster = OptRef<const std::string>());
+
+  const Upstream::ClusterInfoConstSharedPtr parent_info_;
   Upstream::ClusterManager& cluster_manager_;
-  const std::vector<std::string>* sub_clusters_;
-  envoy::extensions::clusters::composite::v3::ClusterConfig::RetryConfig retry_config_;
-  bool honor_route_retry_policy_;
+  const ClusterSetConstSharedPtr clusters_;
+  const envoy::extensions::clusters::composite::v3::ClusterConfig::OverflowOption overflow_option_;
+  Upstream::ClusterUpdateCallbacksHandlePtr handle_;
+  absl::flat_hash_map<std::string, Envoy::Common::CallbackHandlePtr> member_update_cbs_;
 };
 
-// Thread aware load balancer created by the main thread.
+class CompositeLoadBalancerFactory : public Upstream::LoadBalancerFactory {
+public:
+  CompositeLoadBalancerFactory(const Cluster& cluster) : cluster_(cluster) {}
+
+  Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override;
+
+private:
+  const Cluster& cluster_;
+};
+
 struct CompositeThreadAwareLoadBalancer : public Upstream::ThreadAwareLoadBalancer {
   CompositeThreadAwareLoadBalancer(const Cluster& cluster)
-      : factory_(std::make_shared<CompositeClusterLoadBalancerFactory>(
-            *cluster.info(),
-            const_cast<Cluster&>(cluster).context().serverFactoryContext().clusterManager(),
-            cluster.subClusters(), cluster.retryConfig(), cluster.honorRouteRetryPolicy())) {}
+      : factory_(std::make_shared<CompositeLoadBalancerFactory>(cluster)) {}
 
-  // Upstream::ThreadAwareLoadBalancer
   Upstream::LoadBalancerFactorySharedPtr factory() override { return factory_; }
   absl::Status initialize() override { return absl::OkStatus(); }
 
-  std::shared_ptr<CompositeClusterLoadBalancerFactory> factory_;
+private:
+  std::shared_ptr<CompositeLoadBalancerFactory> factory_;
 };
 
-/**
- * Factory for creating Composite clusters.
- */
 class ClusterFactory : public Upstream::ConfigurableClusterFactoryBase<
                            envoy::extensions::clusters::composite::v3::ClusterConfig> {
 public:
