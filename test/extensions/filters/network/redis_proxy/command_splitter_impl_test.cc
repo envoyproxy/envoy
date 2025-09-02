@@ -1393,8 +1393,7 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestWithErrorFaultTest,
                          RedisSingleServerRequestWithErrorFaultTest,
-                         testing::ValuesIn(Common::Redis::SupportedCommands::simpleCommands()),
-                         testing::PrintToStringParamName());
+                         testing::ValuesIn(Common::Redis::SupportedCommands::simpleCommands()));
 
 TEST_P(RedisSingleServerRequestWithErrorWithDelayFaultTest, Fault) {
   InSequence s;
@@ -1428,8 +1427,7 @@ TEST_P(RedisSingleServerRequestWithErrorWithDelayFaultTest, Fault) {
 
 INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestWithErrorWithDelayFaultTest,
                          RedisSingleServerRequestWithErrorWithDelayFaultTest,
-                         testing::ValuesIn(Common::Redis::SupportedCommands::simpleCommands()),
-                         testing::PrintToStringParamName());
+                         testing::ValuesIn(Common::Redis::SupportedCommands::simpleCommands()));
 
 class RedisSingleServerRequestWithDelayFaultTest : public RedisSingleServerRequestWithFaultTest {
 public:
@@ -1481,8 +1479,7 @@ TEST_P(RedisSingleServerRequestWithDelayFaultTest, Fault) {
 
 INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestWithDelayFaultTest,
                          RedisSingleServerRequestWithDelayFaultTest,
-                         testing::ValuesIn(Common::Redis::SupportedCommands::simpleCommands()),
-                         testing::PrintToStringParamName());
+                         testing::ValuesIn(Common::Redis::SupportedCommands::simpleCommands()));
 
 class ScanHandlerTest : public FragmentedRequestCommandHandlerTest,
                         public testing::WithParamInterface<std::string> {
