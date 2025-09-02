@@ -65,7 +65,7 @@ public:
 
   // This is the maximum size of a ClientHello that boring ssl will accept.
   // Here is the check in boring ssl:
-  // https://github.com/google/boringssl/blob/56383dabf472100181226cd14249f04c69a0c10b/ssl/tls_record.cc#L133
+  // https://boringssl.googlesource.com/boringssl/+/HEAD/ssl/handshake.cc#137
   static constexpr size_t TLS_MAX_CLIENT_HELLO = SSL3_RT_MAX_PLAIN_LENGTH;
   static const unsigned TLS_MIN_SUPPORTED_VERSION;
   static const unsigned TLS_MAX_SUPPORTED_VERSION;
@@ -101,6 +101,7 @@ private:
   void createJA3Hash(const SSL_CLIENT_HELLO* ssl_client_hello);
   void createJA4Hash(const SSL_CLIENT_HELLO* ssl_client_hello);
   uint32_t maxConfigReadBytes() const { return config_->maxClientHelloSize(); }
+  ParseState getParserState(int handshake_status);
 
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_{};

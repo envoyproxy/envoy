@@ -16,6 +16,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/hex.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/tls/utility.h"
 #include "source/extensions/filters/listener/tls_inspector/ja4_fingerprint.h"
 
@@ -175,6 +176,61 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
   return Network::FilterStatus::StopIteration;
 }
 
+ParseState Filter::getParserState(int handshake_status) {
+  switch (SSL_get_error(ssl_.get(), handshake_status)) {
+  case SSL_ERROR_WANT_READ:
+    if (read_ >= maxConfigReadBytes()) {
+      // We've hit the specified size limit. This is an unreasonably large ClientHello;
+      // indicate failure.
+      config_->stats().client_hello_too_large_.inc();
+      return ParseState::Error;
+    }
+    if (read_ >= requested_read_bytes_) {
+      // Double requested bytes up to the maximum configured.
+      requested_read_bytes_ = std::min<uint32_t>(2 * read_, maxConfigReadBytes());
+    }
+    return ParseState::Continue;
+  case SSL_ERROR_SSL:
+    // There are 3 possibilities when get here:
+    // 1. A valid TLS Client Hello message was parsed (`clienthello_success_` is true)
+    // 2. A plain text message generated a parsing error
+    // 3. A TLS Client Hello that generated a parsing error (i.e. invalid cipher list)
+    // It is not practical to distinguish between 2 and 3 based on error codes, so Envoy assumes
+    // this is a plain text connection.
+    // In the future it may be possible to add some error checking to make this detection more
+    // optimal.
+    if (clienthello_success_) {
+      config_->stats().tls_found_.inc();
+      if (alpn_found_) {
+        config_->stats().alpn_found_.inc();
+      } else {
+        config_->stats().alpn_not_found_.inc();
+      }
+      cb_->socket().setDetectedTransportProtocol("tls");
+    } else {
+      // Checking max message length should not be done here as it will close all plain text
+      // connections that happened to read more than maxConfigReadBytes() in one I/O operation. With
+      // the default limit of 16Kb it is fairly likely.
+      if (!Runtime::runtimeFeatureEnabled(
+              "envoy.reloadable_features.tls_inspector_no_length_check_on_error") &&
+          read_ >= maxConfigReadBytes()) {
+        // We've hit the specified size limit. This is an unreasonably large ClientHello;
+        // indicate failure.
+        config_->stats().client_hello_too_large_.inc();
+        return ParseState::Error;
+      }
+      config_->stats().tls_not_found_.inc();
+      ENVOY_LOG(
+          debug, "tls inspector: parseClientHello failed: {}, {}: {}", ERR_peek_error(),
+          ERR_peek_last_error(),
+          Extensions::TransportSockets::Tls::Utility::getLastCryptoError().value_or("unknown"));
+    }
+    return ParseState::Done;
+  default:
+    return ParseState::Error;
+  }
+}
+
 ParseState Filter::parseClientHello(const void* data, size_t len,
                                     uint64_t bytes_already_processed) {
   // Ownership remains here though we pass a reference to it in `SSL_set0_rbio()`.
@@ -191,46 +247,7 @@ ParseState Filter::parseClientHello(const void* data, size_t len,
 
   // This should never succeed because an error is always returned from the SNI callback.
   ASSERT(ret <= 0);
-  ParseState state = [this, ret]() {
-    switch (SSL_get_error(ssl_.get(), ret)) {
-    case SSL_ERROR_WANT_READ:
-      if (read_ >= maxConfigReadBytes()) {
-        // We've hit the specified size limit. This is an unreasonably large ClientHello;
-        // indicate failure.
-        config_->stats().client_hello_too_large_.inc();
-        return ParseState::Error;
-      }
-      if (read_ >= requested_read_bytes_) {
-        // Double requested bytes up to the maximum configured.
-        requested_read_bytes_ = std::min<uint32_t>(2 * read_, maxConfigReadBytes());
-      }
-      return ParseState::Continue;
-    case SSL_ERROR_SSL:
-      if (clienthello_success_) {
-        config_->stats().tls_found_.inc();
-        if (alpn_found_) {
-          config_->stats().alpn_found_.inc();
-        } else {
-          config_->stats().alpn_not_found_.inc();
-        }
-        cb_->socket().setDetectedTransportProtocol("tls");
-      } else {
-        if (read_ >= maxConfigReadBytes()) {
-          // We've hit the specified size limit. This is an unreasonably large ClientHello;
-          // indicate failure.
-          config_->stats().client_hello_too_large_.inc();
-          return ParseState::Error;
-        }
-        config_->stats().tls_not_found_.inc();
-        ENVOY_LOG(
-            debug, "tls inspector: parseClientHello failed: {}",
-            Extensions::TransportSockets::Tls::Utility::getLastCryptoError().value_or("unknown"));
-      }
-      return ParseState::Done;
-    default:
-      return ParseState::Error;
-    }
-  }();
+  ParseState state = getParserState(ret);
 
   if (state != ParseState::Continue) {
     // Record bytes analyzed as we're done processing.
