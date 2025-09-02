@@ -18,13 +18,16 @@ public:
       envoy::test::extensions::filters::http::ext_proc::v3::TestAttributeBuilderConfig;
 
   TestAttributeBuilder(const TestAttributeBuilderConfig& config,
+                       absl::string_view default_attribute_key,
                        Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
                        Server::Configuration::CommonFactoryContext& context);
 
-  absl::optional<Protobuf::Struct> build(const BuildParams& params) const override;
+  bool build(const BuildParams& params,
+             Protobuf::Map<std::string, Protobuf::Struct>* attributes) const override;
 
 private:
   const TestAttributeBuilderConfig config_;
+  const std::string default_attribute_key_;
   const ExpressionManager expression_manager_;
 };
 
@@ -35,7 +38,7 @@ public:
 
   ~TestAttributeBuilderFactory() override = default;
   std::unique_ptr<AttributeBuilder> createAttributeBuilder(
-      const Protobuf::Message& config,
+      const Protobuf::Message& config, absl::string_view default_attribute_key,
       Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
       Envoy::Server::Configuration::CommonFactoryContext& context) const override;
 

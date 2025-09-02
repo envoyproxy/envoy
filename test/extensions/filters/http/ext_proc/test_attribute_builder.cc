@@ -15,30 +15,31 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
-// Helper function to convert proto map values to a vector of strings.
+// Helper function to convert proto map values to a unique vector of strings.
 // The order of elements in the returned vector is not guaranteed.
 Protobuf::RepeatedPtrField<std::string>
-ProtoMapValuesToVector(const Protobuf::Map<std::string, std::string>& proto_map) {
-  Protobuf::RepeatedPtrField<std::string> values;
-  for (const auto& [key, value] : proto_map) {
-    *values.Add() = value;
+ProtoMapValuesToUniqueVector(const Protobuf::Map<std::string, std::string>& proto_map) {
+  absl::flat_hash_set<std::string> values;
+  for (const auto& [_, value] : proto_map) {
+    values.insert(value);
   }
-  return values;
+  return {values.begin(), values.end()};
 }
 
 TestAttributeBuilder::TestAttributeBuilder(
-    const TestAttributeBuilderConfig& config,
+    const TestAttributeBuilderConfig& config, absl::string_view default_attribute_key,
     Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
     Server::Configuration::CommonFactoryContext& context)
-    : config_(config),
+    : config_(config), default_attribute_key_(default_attribute_key),
       expression_manager_(builder, context.localInfo(),
-                          ProtoMapValuesToVector(config.mapped_request_attributes()),
+                          ProtoMapValuesToUniqueVector(config.mapped_request_attributes()),
                           Protobuf::RepeatedPtrField<std::string>()) {}
 
-absl::optional<Protobuf::Struct> TestAttributeBuilder::build(const BuildParams& params) const {
+bool TestAttributeBuilder::build(const BuildParams& params,
+                                 Protobuf::Map<std::string, Protobuf::Struct>* attributes) const {
   if (params.traffic_direction != envoy::config::core::v3::TrafficDirection::INBOUND ||
       config_.mapped_request_attributes().empty()) {
-    return absl::nullopt;
+    return false;
   }
 
   auto activation_ptr = Filters::Common::Expr::createActivation(
@@ -46,26 +47,27 @@ absl::optional<Protobuf::Struct> TestAttributeBuilder::build(const BuildParams& 
       dynamic_cast<const Http::ResponseHeaderMap*>(params.response_headers),
       dynamic_cast<const Http::ResponseTrailerMap*>(params.response_trailers));
 
-  auto attributes = expression_manager_.evaluateRequestAttributes(*activation_ptr);
+  auto req_attributes = expression_manager_.evaluateRequestAttributes(*activation_ptr);
 
-  Protobuf::Struct remapped_attributes;
+  Protobuf::Struct& remapped_attributes = (*attributes)[default_attribute_key_];
   for (const auto& pair : config_.mapped_request_attributes()) {
     const std::string& key = pair.first;
     const std::string& cel_expr_string = pair.second;
-    if (attributes.fields().contains(cel_expr_string)) {
-      (*remapped_attributes.mutable_fields())[key] = attributes.fields().at(cel_expr_string);
+    if (req_attributes.fields().contains(cel_expr_string)) {
+      (*remapped_attributes.mutable_fields())[key] = req_attributes.fields().at(cel_expr_string);
     }
   }
-  return remapped_attributes;
+  return true;
 }
 
 std::unique_ptr<AttributeBuilder> TestAttributeBuilderFactory::createAttributeBuilder(
-    const Protobuf::Message& config,
+    const Protobuf::Message& config, absl::string_view default_attribute_key,
     Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
     Envoy::Server::Configuration::CommonFactoryContext& context) const {
   const auto& proto_config = MessageUtil::downcastAndValidate<const TestAttributeBuilderConfig&>(
       config, context.messageValidationVisitor());
-  return std::make_unique<TestAttributeBuilder>(proto_config, builder, context);
+  return std::make_unique<TestAttributeBuilder>(proto_config, default_attribute_key, builder,
+                                                context);
 }
 
 } // namespace ExternalProcessing

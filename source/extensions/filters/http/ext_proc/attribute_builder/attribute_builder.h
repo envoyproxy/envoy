@@ -31,14 +31,15 @@ public:
   };
 
   // Called to build attributes.
-  virtual absl::optional<Protobuf::Struct> build(const BuildParams& params) const PURE;
+  virtual bool build(const BuildParams& params,
+                     Protobuf::Map<std::string, Protobuf::Struct>* attributes) const PURE;
 };
 
 class AttributeBuilderFactory : public Config::TypedFactory {
 public:
   ~AttributeBuilderFactory() override = default;
   virtual std::unique_ptr<AttributeBuilder> createAttributeBuilder(
-      const Protobuf::Message& config,
+      const Protobuf::Message& config, absl::string_view default_attribute_key,
       Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr expr_builder,
       Server::Configuration::CommonFactoryContext& context) const PURE;
 

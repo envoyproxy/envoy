@@ -15,11 +15,14 @@ namespace ExternalProcessing {
 DefaultAttributeBuilder::DefaultAttributeBuilder(
     const Protobuf::RepeatedPtrField<std::string>& request_attributes,
     const Protobuf::RepeatedPtrField<std::string>& response_attributes,
+    absl::string_view default_attribute_key,
     Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
     Server::Configuration::CommonFactoryContext& context)
-    : expression_manager_(builder, context.localInfo(), request_attributes, response_attributes) {}
+    : default_attribute_key_(default_attribute_key),
+      expression_manager_(builder, context.localInfo(), request_attributes, response_attributes) {}
 
-absl::optional<Protobuf::Struct> DefaultAttributeBuilder::build(const BuildParams& params) const {
+bool DefaultAttributeBuilder::build(
+    const BuildParams& params, Protobuf::Map<std::string, Protobuf::Struct>* attributes) const {
   bool should_send = false;
   if (params.traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND) {
     should_send = expression_manager_.hasRequestExpr();
@@ -28,7 +31,7 @@ absl::optional<Protobuf::Struct> DefaultAttributeBuilder::build(const BuildParam
   }
 
   if (!should_send) {
-    return absl::nullopt;
+    return false;
   }
 
   auto activation_ptr = Filters::Common::Expr::createActivation(
@@ -36,10 +39,13 @@ absl::optional<Protobuf::Struct> DefaultAttributeBuilder::build(const BuildParam
       dynamic_cast<const Http::ResponseHeaderMap*>(params.response_headers),
       dynamic_cast<const Http::ResponseTrailerMap*>(params.response_trailers));
   if (params.traffic_direction == envoy::config::core::v3::TrafficDirection::INBOUND) {
-    return expression_manager_.evaluateRequestAttributes(*activation_ptr);
+    (*attributes)[default_attribute_key_] =
+        expression_manager_.evaluateRequestAttributes(*activation_ptr);
   } else {
-    return expression_manager_.evaluateResponseAttributes(*activation_ptr);
+    (*attributes)[default_attribute_key_] =
+        expression_manager_.evaluateResponseAttributes(*activation_ptr);
   }
+  return true;
 }
 
 } // namespace ExternalProcessing

@@ -874,6 +874,7 @@ TEST_F(HttpFilterTest, CustomAttributeBuilder) {
       "@type": type.googleapis.com/envoy.test.extensions.filters.http.ext_proc.v3.TestAttributeBuilderConfig
       mapped_request_attributes:
         "remapped.path": "request.path"
+        "remapped.uri": "request.path"
         "remapped.method": "request.method"
   )EOF");
 
@@ -884,9 +885,11 @@ TEST_F(HttpFilterTest, CustomAttributeBuilder) {
   EXPECT_EQ(1, attributes.size());
   EXPECT_TRUE(attributes.contains("envoy.filters.http.ext_proc"));
   const auto& filter_attributes = attributes.at("envoy.filters.http.ext_proc");
-  EXPECT_EQ(2, filter_attributes.fields_size());
+  EXPECT_EQ(3, filter_attributes.fields_size());
   EXPECT_TRUE(filter_attributes.fields().contains("remapped.path"));
   EXPECT_EQ("/", filter_attributes.fields().at("remapped.path").string_value());
+  EXPECT_TRUE(filter_attributes.fields().contains("remapped.uri"));
+  EXPECT_EQ("/", filter_attributes.fields().at("remapped.uri").string_value());
   EXPECT_TRUE(filter_attributes.fields().contains("remapped.method"));
   EXPECT_EQ("POST", filter_attributes.fields().at("remapped.method").string_value());
 

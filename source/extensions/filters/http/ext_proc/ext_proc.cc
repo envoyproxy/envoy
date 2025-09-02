@@ -1402,10 +1402,9 @@ void Filter::addAttributes(ProcessorState& state, ProcessingRequest& req) {
       .response_headers = state.responseHeaders(),
       .response_trailers = state.responseTrailers(),
   };
-  auto attributes = config_->attributeBuilder().build(build_params);
-  if (attributes.has_value()) {
+  auto sent = config_->attributeBuilder().build(build_params, req.mutable_attributes());
+  if (sent) {
     state.setSentAttributes(true);
-    (*req.mutable_attributes())[FilterName] = attributes.value();
   }
 }
 
@@ -1931,13 +1930,14 @@ std::unique_ptr<AttributeBuilder> FilterConfig::createAttributeBuilder(
     auto attribute_builder_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
         config.attribute_builder().typed_config(), context.messageValidationVisitor(), factory);
     if (attribute_builder_config) {
-      return factory.createAttributeBuilder(*attribute_builder_config, builder, context);
+      return factory.createAttributeBuilder(*attribute_builder_config, FilterName, builder,
+                                            context);
     } else {
       throw EnvoyException("Failed to create attribute builder");
     }
   } else {
     return std::make_unique<DefaultAttributeBuilder>(
-        config.request_attributes(), config.response_attributes(), builder, context);
+        config.request_attributes(), config.response_attributes(), FilterName, builder, context);
   }
 }
 

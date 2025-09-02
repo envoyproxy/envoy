@@ -17,12 +17,15 @@ class DefaultAttributeBuilder : public AttributeBuilder {
 public:
   DefaultAttributeBuilder(const Protobuf::RepeatedPtrField<std::string>& request_attributes,
                           const Protobuf::RepeatedPtrField<std::string>& response_attributes,
+                          absl::string_view default_attribute_key,
                           Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
                           Server::Configuration::CommonFactoryContext& context);
 
-  absl::optional<Protobuf::Struct> build(const BuildParams& params) const override;
+  bool build(const BuildParams& params,
+             Protobuf::Map<std::string, Protobuf::Struct>* attributes) const override;
 
 private:
+  const std::string default_attribute_key_;
   const ExpressionManager expression_manager_;
 };
 
