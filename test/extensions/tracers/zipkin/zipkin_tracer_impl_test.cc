@@ -1321,6 +1321,152 @@ TEST_F(ZipkinDriverTest, ReporterFlushWithHttpServiceHeadersProtobuf) {
                       std::make_unique<Http::ResponseMessageImpl>(std::move(response_headers)));
 }
 
+// Test URI parsing edge cases to improve coverage
+TEST_F(ZipkinDriverTest, DriverWithHttpServiceUriParsing) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  // Test 1: URI without hostname (should fallback to cluster name)
+  const std::string yaml_string_no_host = R"EOF(
+  collector_service:
+    http_uri:
+      uri: "/api/v2/spans"
+      cluster: fake_cluster
+      timeout: 5s
+  collector_endpoint_version: HTTP_JSON
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config_no_host;
+  TestUtility::loadFromYaml(yaml_string_no_host, zipkin_config_no_host);
+  setup(zipkin_config_no_host, false);
+  EXPECT_EQ("fake_cluster", driver_->hostname()); // Should fallback to cluster name
+}
+
+TEST_F(ZipkinDriverTest, DriverWithHttpServiceUriParsingNoPath) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  // Test 2: URI with hostname but no path (should use "/" as default)
+  const std::string yaml_string_no_path = R"EOF(
+  collector_service:
+    http_uri:
+      uri: "https://zipkin-collector.example.com"
+      cluster: fake_cluster
+      timeout: 5s
+  collector_endpoint_version: HTTP_JSON
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config_no_path;
+  TestUtility::loadFromYaml(yaml_string_no_path, zipkin_config_no_path);
+  setup(zipkin_config_no_path, false);
+  EXPECT_EQ("zipkin-collector.example.com", driver_->hostname());
+}
+
+TEST_F(ZipkinDriverTest, DriverWithHttpServiceUriParsingWithPort) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  // Test 3: URI with hostname and port
+  const std::string yaml_string_with_port = R"EOF(
+  collector_service:
+    http_uri:
+      uri: "http://zipkin-collector.example.com:9411/api/v2/spans"
+      cluster: fake_cluster
+      timeout: 5s
+  collector_endpoint_version: HTTP_JSON
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config_with_port;
+  TestUtility::loadFromYaml(yaml_string_with_port, zipkin_config_with_port);
+  setup(zipkin_config_with_port, false);
+  EXPECT_EQ("zipkin-collector.example.com:9411", driver_->hostname());
+}
+
+TEST_F(ZipkinDriverTest, DriverMissingCollectorConfiguration) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  // Test missing both collector_cluster and collector_service
+  const std::string yaml_string_missing = R"EOF(
+  collector_endpoint_version: HTTP_JSON
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config_missing;
+  TestUtility::loadFromYaml(yaml_string_missing, zipkin_config_missing);
+  
+  EXPECT_THROW_WITH_MESSAGE(setup(zipkin_config_missing, false), EnvoyException,
+                           "Either collector_cluster or collector_service must be specified");
+}
+
+TEST_F(ZipkinDriverTest, DriverWithHttpServiceMissingCluster) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  // Test collector_service with missing cluster
+  const std::string yaml_string_missing_cluster = R"EOF(
+  collector_service:
+    http_uri:
+      uri: "https://zipkin-collector.example.com/api/v2/spans"
+      timeout: 5s
+  collector_endpoint_version: HTTP_JSON
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config_missing_cluster;
+  TestUtility::loadFromYaml(yaml_string_missing_cluster, zipkin_config_missing_cluster);
+  
+  EXPECT_THROW_WITH_MESSAGE(setup(zipkin_config_missing_cluster, false), EnvoyException,
+                           "collector_service.http_uri.cluster must be specified");
+}
+
+TEST_F(ZipkinDriverTest, DriverWithHttpServiceMissingUri) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  // Test collector_service with missing URI
+  const std::string yaml_string_missing_uri = R"EOF(
+  collector_service:
+    http_uri:
+      cluster: fake_cluster
+      timeout: 5s
+  collector_endpoint_version: HTTP_JSON
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config_missing_uri;
+  TestUtility::loadFromYaml(yaml_string_missing_uri, zipkin_config_missing_uri);
+  
+  EXPECT_THROW_WITH_MESSAGE(setup(zipkin_config_missing_uri, false), EnvoyException,
+                           "collector_service.http_uri.uri must be specified");
+}
+
+TEST_F(ZipkinDriverTest, DriverLegacyConfigMissingEndpoint) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  // Test legacy config with missing collector_endpoint
+  const std::string yaml_string_missing_endpoint = R"EOF(
+  collector_cluster: fake_cluster
+  collector_endpoint_version: HTTP_JSON
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config_missing_endpoint;
+  TestUtility::loadFromYaml(yaml_string_missing_endpoint, zipkin_config_missing_endpoint);
+  
+  EXPECT_THROW_WITH_MESSAGE(setup(zipkin_config_missing_endpoint, false), EnvoyException,
+                           "collector_endpoint must be specified when using collector_cluster");
+}
+
+TEST_F(ZipkinDriverTest, DriverLegacyConfigWithHostname) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  // Test legacy config with explicit hostname different from cluster name
+  const std::string yaml_string_with_hostname = R"EOF(
+  collector_cluster: fake_cluster
+  collector_hostname: custom-zipkin-host.example.com
+  collector_endpoint: "/api/v2/spans"
+  collector_endpoint_version: HTTP_JSON
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config_with_hostname;
+  TestUtility::loadFromYaml(yaml_string_with_hostname, zipkin_config_with_hostname);
+  setup(zipkin_config_with_hostname, false);
+  
+  // Should use the custom hostname, not the cluster name
+  EXPECT_EQ("custom-zipkin-host.example.com", driver_->hostname());
+}
+
 } // namespace
 } // namespace Zipkin
 } // namespace Tracers
