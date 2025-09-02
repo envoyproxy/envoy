@@ -24,6 +24,7 @@
 #include "source/extensions/filters/common/ext_proc/client_base.h"
 #include "source/extensions/filters/common/mutation_rules/mutation_rules.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
+#include "source/extensions/filters/http/ext_proc/attribute_builder/attribute_builder.h"
 #include "source/extensions/filters/http/ext_proc/client_impl.h"
 #include "source/extensions/filters/http/ext_proc/matching_utils.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
@@ -266,8 +267,6 @@ public:
 
   const Protobuf::Struct& filterMetadata() const { return filter_metadata_; }
 
-  const ExpressionManager& expressionManager() const { return expression_manager_; }
-
   bool isUpstream() const { return is_upstream_; }
 
   const std::vector<std::string>& untypedForwardingMetadataNamespaces() const {
@@ -304,6 +303,7 @@ public:
   std::chrono::milliseconds remoteCloseTimeout() const { return remote_close_timeout_; }
 
   std::unique_ptr<OnProcessingResponse> createOnProcessingResponse() const;
+  AttributeBuilder& attributeBuilder() const { return *attribute_builder_; }
 
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,
@@ -314,6 +314,10 @@ private:
   static std::function<std::unique_ptr<OnProcessingResponse>()> createOnProcessingResponseCb(
       const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
       Envoy::Server::Configuration::CommonFactoryContext& context, const std::string& stats_prefix);
+  static std::unique_ptr<AttributeBuilder> createAttributeBuilder(
+      const envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor& config,
+      Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
+      Server::Configuration::CommonFactoryContext& context);
   const bool failure_mode_allow_;
   const bool observability_mode_;
   envoy::extensions::filters::http::ext_proc::v3::ExternalProcessor::RouteCacheAction
@@ -345,11 +349,10 @@ private:
   const std::vector<std::string> untyped_receiving_namespaces_;
   const std::vector<envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
       allowed_override_modes_;
-  const ExpressionManager expression_manager_;
-
   const ImmediateMutationChecker immediate_mutation_checker_;
 
   const std::function<std::unique_ptr<OnProcessingResponse>()> on_processing_response_factory_cb_;
+  std::unique_ptr<AttributeBuilder> attribute_builder_;
 
   ThreadLocal::SlotPtr thread_local_stream_manager_slot_;
   const std::chrono::milliseconds remote_close_timeout_;

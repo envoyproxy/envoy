@@ -349,6 +349,15 @@ message ExternalProcessor {
   // [#extension-category: envoy.http.ext_proc.response_processors]
   config.core.v3.TypedExtensionConfig on_processing_response = 23
       [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // Decorator to introduce custom logic to generate attributes.
+  //
+  // .. note::
+  //   Attribute builders are currently in alpha.
+  //
+  // [#extension-category: envoy.http.ext_proc.attribute_builders]
+  config.core.v3.TypedExtensionConfig attribute_builder = 24
+      [(xds.annotations.v3.field_status).work_in_progress = true];
 }
 
 // ExtProcHttpService is used for HTTP communication between the filter and the external processing service.

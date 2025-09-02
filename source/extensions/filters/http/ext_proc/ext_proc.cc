@@ -12,6 +12,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/filters/http/ext_proc/attribute_builder/default_attribute_builder.h"
 #include "source/extensions/filters/http/ext_proc/http_client/http_client_impl.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
@@ -251,11 +252,10 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
           config.metadata_options().receiving_namespaces().untyped().end()),
       allowed_override_modes_(config.allowed_override_modes().begin(),
                               config.allowed_override_modes().end()),
-      expression_manager_(builder, context.localInfo(), config.request_attributes(),
-                          config.response_attributes()),
       immediate_mutation_checker_(context.regexEngine()),
       on_processing_response_factory_cb_(
           createOnProcessingResponseCb(config, context, stats_prefix)),
+      attribute_builder_(createAttributeBuilder(config, builder, context)),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()),
       remote_close_timeout_(context.runtime().snapshot().getInteger(
           RemoteCloseTimeout, DefaultRemoteCloseTimeoutMilliseconds)) {
@@ -1395,18 +1395,18 @@ void Filter::addDynamicMetadata(const ProcessorState& state, ProcessingRequest& 
 }
 
 void Filter::addAttributes(ProcessorState& state, ProcessingRequest& req) {
-  if (!state.sendAttributes(config_->expressionManager())) {
-    return;
+  AttributeBuilder::BuildParams build_params = {
+      .traffic_direction = state.trafficDirection(),
+      .stream_info = state.callbacks()->streamInfo(),
+      .request_headers = state.requestHeaders(),
+      .response_headers = state.responseHeaders(),
+      .response_trailers = state.responseTrailers(),
+  };
+  auto attributes = config_->attributeBuilder().build(build_params);
+  if (attributes.has_value()) {
+    state.setSentAttributes(true);
+    (*req.mutable_attributes())[FilterName] = attributes.value();
   }
-
-  auto activation_ptr = Filters::Common::Expr::createActivation(
-      &config_->expressionManager().localInfo(), state.callbacks()->streamInfo(),
-      state.requestHeaders(), dynamic_cast<const Http::ResponseHeaderMap*>(state.responseHeaders()),
-      dynamic_cast<const Http::ResponseTrailerMap*>(state.responseTrailers()));
-  auto attributes = state.evaluateAttributes(config_->expressionManager(), *activation_ptr);
-
-  state.setSentAttributes(true);
-  (*req.mutable_attributes())[FilterName] = attributes;
 }
 
 void Filter::setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
@@ -1919,6 +1919,26 @@ std::function<std::unique_ptr<OnProcessingResponse>()> FilterConfig::createOnPro
     return factory.createOnProcessingResponse(*shared_on_processing_response_config, context,
                                               stats_prefix);
   };
+}
+
+std::unique_ptr<AttributeBuilder> FilterConfig::createAttributeBuilder(
+    const ExternalProcessor& config,
+    Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
+    Server::Configuration::CommonFactoryContext& context) {
+  if (config.has_attribute_builder()) {
+    auto& factory = Envoy::Config::Utility::getAndCheckFactory<AttributeBuilderFactory>(
+        config.attribute_builder());
+    auto attribute_builder_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
+        config.attribute_builder().typed_config(), context.messageValidationVisitor(), factory);
+    if (attribute_builder_config) {
+      return factory.createAttributeBuilder(*attribute_builder_config, builder, context);
+    } else {
+      throw EnvoyException("Failed to create attribute builder");
+    }
+  } else {
+    return std::make_unique<DefaultAttributeBuilder>(
+        config.request_attributes(), config.response_attributes(), builder, context);
+  }
 }
 
 std::unique_ptr<OnProcessingResponse> FilterConfig::createOnProcessingResponse() const {
