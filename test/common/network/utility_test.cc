@@ -851,15 +851,13 @@ TEST_F(ExecInNetnsTest, FailtoReturnToOriginalNetns) {
           return {0, 0};
         }));
 
-        // Succeed on the first setns syscall, which would jump to a different netns. The second
-        // call, which would jump back to the original netns, should fail.
+        // Succeed on the first network namespace syscall, which would jump to a different netns.
+        // The second call, which would jump back to the original netns, should fail. This is an
+        // unrecoverable error, so it should result in process death.
         EXPECT_CALL(linux_os_syscalls, setns(_, _))
             .WillOnce(Invoke([](int, int) -> Api::SysCallIntResult { return {0, 0}; }))
             .WillOnce(Invoke([](int, int) -> Api::SysCallIntResult { return {-1, -1}; }));
 
-        // No other syscalls are expected.
-
-        // Expecting failure.
         auto _ = Utility::execInNetworkNamespace([]() -> int { return 0; }, "bleh");
       },
       "failed to restore original netns .*");
