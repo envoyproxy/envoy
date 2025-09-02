@@ -65,6 +65,7 @@ Example filter configuration with a ``FileSystemHttpCache`` cache implementation
    :start-at: http_filters:
    :end-before: envoy.filters.http.router
    :linenos:
+   :lineno-match:
    :caption: :download:`http-cache-configuration-fs.yaml <_include/http-cache-configuration-fs.yaml>`
 
 .. seealso::
