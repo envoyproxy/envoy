@@ -1389,9 +1389,9 @@ TEST_F(ZipkinDriverTest, DriverMissingCollectorConfiguration) {
 
   envoy::config::trace::v3::ZipkinConfig zipkin_config_missing;
   TestUtility::loadFromYaml(yaml_string_missing, zipkin_config_missing);
-  
+
   EXPECT_THROW_WITH_MESSAGE(setup(zipkin_config_missing, false), EnvoyException,
-                           "Either collector_cluster or collector_service must be specified");
+                            "Either collector_cluster or collector_service must be specified");
 }
 
 TEST_F(ZipkinDriverTest, DriverWithHttpServiceMissingCluster) {
@@ -1408,9 +1408,9 @@ TEST_F(ZipkinDriverTest, DriverWithHttpServiceMissingCluster) {
 
   envoy::config::trace::v3::ZipkinConfig zipkin_config_missing_cluster;
   TestUtility::loadFromYaml(yaml_string_missing_cluster, zipkin_config_missing_cluster);
-  
+
   EXPECT_THROW_WITH_MESSAGE(setup(zipkin_config_missing_cluster, false), EnvoyException,
-                           "collector_service.http_uri.cluster must be specified");
+                            "collector_service.http_uri.cluster must be specified");
 }
 
 TEST_F(ZipkinDriverTest, DriverWithHttpServiceMissingUri) {
@@ -1427,9 +1427,9 @@ TEST_F(ZipkinDriverTest, DriverWithHttpServiceMissingUri) {
 
   envoy::config::trace::v3::ZipkinConfig zipkin_config_missing_uri;
   TestUtility::loadFromYaml(yaml_string_missing_uri, zipkin_config_missing_uri);
-  
+
   EXPECT_THROW_WITH_MESSAGE(setup(zipkin_config_missing_uri, false), EnvoyException,
-                           "collector_service.http_uri.uri must be specified");
+                            "collector_service.http_uri.uri must be specified");
 }
 
 TEST_F(ZipkinDriverTest, DriverLegacyConfigMissingEndpoint) {
@@ -1443,9 +1443,9 @@ TEST_F(ZipkinDriverTest, DriverLegacyConfigMissingEndpoint) {
 
   envoy::config::trace::v3::ZipkinConfig zipkin_config_missing_endpoint;
   TestUtility::loadFromYaml(yaml_string_missing_endpoint, zipkin_config_missing_endpoint);
-  
+
   EXPECT_THROW_WITH_MESSAGE(setup(zipkin_config_missing_endpoint, false), EnvoyException,
-                           "collector_endpoint must be specified when using collector_cluster");
+                            "collector_endpoint must be specified when using collector_cluster");
 }
 
 TEST_F(ZipkinDriverTest, DriverLegacyConfigWithHostname) {
@@ -1462,7 +1462,7 @@ TEST_F(ZipkinDriverTest, DriverLegacyConfigWithHostname) {
   envoy::config::trace::v3::ZipkinConfig zipkin_config_with_hostname;
   TestUtility::loadFromYaml(yaml_string_with_hostname, zipkin_config_with_hostname);
   setup(zipkin_config_with_hostname, false);
-  
+
   // Should use the custom hostname, not the cluster name
   EXPECT_EQ("custom-zipkin-host.example.com", driver_->hostname());
 }
