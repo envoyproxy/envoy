@@ -469,9 +469,10 @@ FilterConfig::FilterConfig(
               ? CookieSettings(proto_config.cookie_configs().code_verifier_cookie_config())
               : CookieSettings()) {
   if (!context.clusterManager().clusters().hasCluster(oauth_token_endpoint_.cluster())) {
-    throw EnvoyException(fmt::format("OAuth2 filter: unknown cluster '{}' in config. Please "
-                                     "specify which cluster to direct OAuth requests to.",
-                                     oauth_token_endpoint_.cluster()));
+    // This is not necessarily a configuration error — sometimes cluster is sent later than the
+    // listener in the xDS stream.
+    ENVOY_LOG(warn, "OAuth2 filter: unknown cluster '{}' in config. ",
+              oauth_token_endpoint_.cluster());
   }
   if (!authorization_endpoint_url_.initialize(authorization_endpoint_,
                                               /*is_connect_request=*/false)) {
@@ -631,7 +632,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       // https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2
       const CallbackValidationResult result = validateOAuthCallback(headers, path_str);
       if (!result.is_valid_) {
-        sendUnauthorizedResponse();
+        sendUnauthorizedResponse(result.error_details_);
         return Http::FilterHeadersStatus::StopIteration;
       }
 
@@ -640,9 +641,9 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       Http::Utility::Url original_request_url;
       original_request_url.initialize(result.original_request_url_, false);
       if (config_->redirectPathMatcher().match(original_request_url.pathAndQueryParams())) {
-        ENVOY_LOG(debug, "state url query params {} matches the redirect path matcher",
-                  original_request_url.pathAndQueryParams());
-        sendUnauthorizedResponse();
+        sendUnauthorizedResponse(
+            fmt::format("State url query params matches the redirect path matcher: {}",
+                        original_request_url.pathAndQueryParams()));
         return Http::FilterHeadersStatus::StopIteration;
       }
 
@@ -685,8 +686,8 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
       redirectToOAuthServer(headers);
       return Http::FilterHeadersStatus::StopIteration;
     } else {
-      ENVOY_LOG(debug, "unauthorized, redirecting to OAuth server is not allowed", path_str);
-      sendUnauthorizedResponse();
+      sendUnauthorizedResponse(fmt::format(
+          "Unauthorized, and redirecting to OAuth server is not allowed: {}", path_str));
       return Http::FilterHeadersStatus::StopIteration;
     }
   }
@@ -696,7 +697,7 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   // token.
   const CallbackValidationResult result = validateOAuthCallback(headers, path_str);
   if (!result.is_valid_) {
-    sendUnauthorizedResponse();
+    sendUnauthorizedResponse(result.error_details_);
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -710,16 +711,14 @@ Http::FilterHeadersStatus OAuth2Filter::decodeHeaders(Http::RequestHeaderMap& he
   std::string encrypted_code_verifier =
       Http::Utility::parseCookieValue(headers, config_->cookieNames().code_verifier_);
   if (encrypted_code_verifier.empty()) {
-    ENVOY_LOG(error, "code verifier cookie is missing in the request");
-    sendUnauthorizedResponse();
+    sendUnauthorizedResponse("Code verifier cookie is missing in the request");
     return Http::FilterHeadersStatus::StopIteration;
   }
 
   DecryptResult decrypt_result = decrypt(encrypted_code_verifier, config_->hmacSecret());
   if (decrypt_result.error.has_value()) {
-    ENVOY_LOG(error, "failed to decrypt code verifier: {}, error: {}", encrypted_code_verifier,
-              decrypt_result.error.value());
-    sendUnauthorizedResponse();
+    sendUnauthorizedResponse(fmt::format("Failed to decrypt code verifier: {}, error: {}",
+                                         encrypted_code_verifier, decrypt_result.error.value()));
     return Http::FilterHeadersStatus::StopIteration;
   }
 
@@ -1213,7 +1212,8 @@ void OAuth2Filter::onRefreshAccessTokenFailure() {
   if (canRedirectToOAuthServer(*request_headers_)) {
     redirectToOAuthServer(*request_headers_);
   } else {
-    sendUnauthorizedResponse();
+    sendUnauthorizedResponse(
+        "Failed to refresh the access token, and redirecting to OAuth server is not allowed");
   }
 }
 
@@ -1274,10 +1274,11 @@ void OAuth2Filter::addResponseCookies(Http::ResponseHeaderMap& headers,
   }
 }
 
-void OAuth2Filter::sendUnauthorizedResponse() {
+void OAuth2Filter::sendUnauthorizedResponse(const std::string& details) {
+  ENVOY_LOG(warn, "Responding with 401 Unauthorized. Cause: {}", details);
   config_->stats().oauth_failure_.inc();
   decoder_callbacks_->sendLocalReply(Http::Code::Unauthorized, UnauthorizedBodyMessage, nullptr,
-                                     absl::nullopt, EMPTY_STRING);
+                                     absl::nullopt, details);
 }
 
 // Validates the OAuth callback request.
@@ -1291,16 +1292,17 @@ OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
   // Return 401 unauthorized if the query parameters contain an error response.
   const auto query_parameters = Http::Utility::QueryParamsMulti::parseQueryString(path_str);
   if (query_parameters.getFirstValue(queryParamsError).has_value()) {
-    ENVOY_LOG(debug, "OAuth server returned an error: \n{}", query_parameters.data());
-    return {false, "", ""};
+    return {false, "", "",
+            fmt::format("OAuth server returned an error: {}", query_parameters.toString())};
   }
 
   // Return 401 unauthorized if the query parameters do not contain the code and state.
   auto codeVal = query_parameters.getFirstValue(queryParamsCode);
   auto stateVal = query_parameters.getFirstValue(queryParamsState);
   if (!codeVal.has_value() || !stateVal.has_value()) {
-    ENVOY_LOG(error, "code or state query param does not exist: \n{}", query_parameters.data());
-    return {false, "", ""};
+    return {
+        false, "", "",
+        fmt::format("Code or state query param does not exist: {}", query_parameters.toString())};
   }
 
   // Return 401 unauthorized if the state query parameter does not contain the original request URL
@@ -1312,15 +1314,14 @@ OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
 
   auto status = MessageUtil::loadFromJsonNoThrow(state, message, has_unknown_field);
   if (!status.ok()) {
-    ENVOY_LOG(error, "state query param is not a valid JSON: \n{}", state);
-    return {false, "", ""};
+    return {false, "", "", fmt::format("State query param is not a valid JSON: {}", state)};
   }
 
   const auto& filed_value_pair = message.fields();
   if (!filed_value_pair.contains(stateParamsUrl) ||
       !filed_value_pair.contains(stateParamsCsrfToken)) {
-    ENVOY_LOG(error, "state query param does not contain url or CSRF token: \n{}", state);
-    return {false, "", ""};
+    return {false, "", "",
+            fmt::format("State query param does not contain url or CSRF token: {}", state)};
   }
 
   // Return 401 unauthorized if the CSRF token cookie does not match the CSRF token in the state.
@@ -1331,19 +1332,18 @@ OAuth2Filter::validateOAuthCallback(const Http::RequestHeaderMap& headers,
   // More information can be found at https://datatracker.ietf.org/doc/html/rfc6819#section-5.3.5
   std::string csrf_token = filed_value_pair.at(stateParamsCsrfToken).string_value();
   if (!validateCsrfToken(headers, csrf_token)) {
-    ENVOY_LOG(error, "csrf token validation failed");
-    return {false, "", ""};
+    return {false, "", "", "CSRF token validation failed"};
   }
   const std::string original_request_url = filed_value_pair.at(stateParamsUrl).string_value();
 
   // Return 401 unauthorized if the URL in the state is not valid.
   Http::Utility::Url url;
   if (!url.initialize(original_request_url, false)) {
-    ENVOY_LOG(error, "state url {} can not be initialized", original_request_url);
-    return {false, "", ""};
+    return {false, "", "",
+            fmt::format("State url can not be initialized: {}", original_request_url)};
   }
 
-  return {true, codeVal.value(), original_request_url};
+  return {true, codeVal.value(), original_request_url, ""};
 }
 
 // Validates the csrf_token in the state parameter against the one in the cookie.
