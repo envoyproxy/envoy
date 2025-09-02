@@ -95,7 +95,7 @@ jobs:
             architectures:
             - amd64
             - arm64
-            artifact-pattern: envoy-dev.{arch}.tar
+            artifact-pattern: envoy-debug.{arch}.tar
             additional-tags:
             - debug-dev-${{ github.sha }}
           - name: ${{ inputs.dockerhub-repo }}
