@@ -1395,6 +1395,9 @@ void Filter::addDynamicMetadata(const ProcessorState& state, ProcessingRequest& 
 }
 
 void Filter::addAttributes(ProcessorState& state, ProcessingRequest& req) {
+  if (!state.sendAttributes()) {
+    return;
+  }
   AttributeBuilder::BuildParams build_params = {
       .traffic_direction = state.trafficDirection(),
       .stream_info = state.callbacks()->streamInfo(),
@@ -1402,8 +1405,7 @@ void Filter::addAttributes(ProcessorState& state, ProcessingRequest& req) {
       .response_headers = state.responseHeaders(),
       .response_trailers = state.responseTrailers(),
   };
-  auto sent = config_->attributeBuilder().build(build_params, req.mutable_attributes());
-  if (sent) {
+  if (config_->attributeBuilder().build(build_params, req.mutable_attributes())) {
     state.setSentAttributes(true);
   }
 }

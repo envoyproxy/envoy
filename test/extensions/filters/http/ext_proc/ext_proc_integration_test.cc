@@ -4528,7 +4528,7 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
                           *(resp.mutable_response_trailers()) = trailer_resp;
 
                           EXPECT_TRUE(req.has_response_trailers());
-                          EXPECT_TRUE(req.attributes().empty());
+                          EXPECT_TRUE(req.attributes().empty()) << req.DebugString();
                           return true;
                         });
 
