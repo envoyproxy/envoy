@@ -166,7 +166,8 @@ TEST_P(ProtocolIntegrationTest, LogicalDns) {
     cluster.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::ALL);
     auto* typed_dns_resolver_config = cluster.mutable_typed_dns_resolver_config();
     typed_dns_resolver_config->set_name("envoy.network.dns_resolver.getaddrinfo");
-    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig getaddrinfo_config;
+    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+        getaddrinfo_config;
     typed_dns_resolver_config->mutable_typed_config()->PackFrom(getaddrinfo_config);
   });
   config_helper_.addConfigModifier(
@@ -192,7 +193,8 @@ TEST_P(ProtocolIntegrationTest, StrictDns) {
     cluster.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::ALL);
     auto* typed_dns_resolver_config = cluster.mutable_typed_dns_resolver_config();
     typed_dns_resolver_config->set_name("envoy.network.dns_resolver.getaddrinfo");
-    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig getaddrinfo_config;
+    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+        getaddrinfo_config;
     typed_dns_resolver_config->mutable_typed_config()->PackFrom(getaddrinfo_config);
   });
   initialize();
