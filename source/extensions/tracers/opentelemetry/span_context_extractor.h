@@ -1,12 +1,12 @@
 #pragma once
 
 #include "envoy/common/exception.h"
-#include "envoy/tracing/tracer.h"
 
 #include "source/common/common/statusor.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/tracing/trace_context_impl.h"
 #include "source/extensions/tracers/opentelemetry/span_context.h"
+#include "source/extensions/propagators/opentelemetry/propagator.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -22,18 +22,20 @@ public:
 using OpenTelemetryConstants = ConstSingleton<OpenTelemetryConstantValues>;
 
 /**
- * This class is used to SpanContext extracted from the HTTP traceparent header
- * See https://www.w3.org/TR/trace-context/#traceparent-header.
+ * This class is used to extract SpanContext from HTTP headers using configured propagators.
+ * Supports multiple propagation formats (W3C, B3, etc.) based on configuration.
  */
 class SpanContextExtractor {
 public:
-  SpanContextExtractor(Tracing::TraceContext& trace_context);
+  SpanContextExtractor(Tracing::TraceContext& trace_context,
+                       Propagators::OpenTelemetry::CompositePropagatorPtr propagator);
   ~SpanContextExtractor();
   absl::StatusOr<SpanContext> extractSpanContext();
   bool propagationHeaderPresent();
 
 private:
   const Tracing::TraceContext& trace_context_;
+  Propagators::OpenTelemetry::CompositePropagatorPtr propagator_;
 };
 
 } // namespace OpenTelemetry

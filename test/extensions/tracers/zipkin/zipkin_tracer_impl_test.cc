@@ -7,6 +7,7 @@
 
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
+#include "source/extensions/tracers/common/utils/trace.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 #include "source/extensions/tracers/zipkin/zipkin_tracer_impl.h"
 
@@ -146,7 +147,9 @@ public:
   // real time, not mock-time. When that is switched to use mock-time instead, I think
   // generateRandom64() may not be as random as we want, and we'll need to inject entropy
   // appropriate for the test.
-  uint64_t generateRandom64() { return Util::generateRandom64(time_source_); }
+  uint64_t generateRandom64() {
+    return Extensions::Tracers::Common::Utils::Trace::generateRandom64(time_source_);
+  }
 
   const std::string operation_name_{"test"};
   Tracing::TestTraceContextImpl request_headers_{

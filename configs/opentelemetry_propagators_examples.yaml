@@ -1,0 +1,385 @@
+# OpenTelemetry Multi-Propagator Configuration Examples
+# 
+# This file demonstrates various configurations for OpenTelemetry propagators
+# in Envoy, showing different scenarios and use cases.
+
+# Example 1: Default Configuration (W3C Trace Context only)
+# This is the minimal configuration that provides W3C Trace Context propagation
+---
+static_resources:
+  listeners:
+    - name: listener_0
+      address:
+        socket_address:
+          protocol: TCP
+          address: 0.0.0.0
+          port_value: 10000
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: ingress_http
+                route_config:
+                  name: local_route
+                  virtual_hosts:
+                    - name: local_service
+                      domains: ["*"]
+                      routes:
+                        - match:
+                            prefix: "/"
+                          route:
+                            cluster: service_backend
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                # Basic tracing configuration - defaults to tracecontext propagator
+                tracing:
+                  provider:
+                    name: envoy.tracers.opentelemetry
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.config.trace.v3.OpenTelemetryConfig
+                      grpc_service:
+                        envoy_grpc:
+                          cluster_name: otel_collector
+                      service_name: example-service-default
+
+  clusters:
+    - name: service_backend
+      connect_timeout: 30s
+      type: LOGICAL_DNS
+      dns_lookup_family: V4_ONLY
+      load_assignment:
+        cluster_name: service_backend
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: backend.example.com
+                      port_value: 80
+    - name: otel_collector
+      connect_timeout: 30s
+      type: LOGICAL_DNS
+      http2_protocol_options: {}
+      dns_lookup_family: V4_ONLY
+      load_assignment:
+        cluster_name: otel_collector
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: otel-collector.example.com
+                      port_value: 4317
+
+---
+# Example 2: Multi-Format Interoperability
+# This configuration supports W3C, Baggage, and B3 formats for maximum compatibility
+static_resources:
+  listeners:
+    - name: listener_0
+      address:
+        socket_address:
+          protocol: TCP
+          address: 0.0.0.0
+          port_value: 10000
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: ingress_http
+                route_config:
+                  name: local_route
+                  virtual_hosts:
+                    - name: local_service
+                      domains: ["*"]
+                      routes:
+                        - match:
+                            prefix: "/"
+                          route:
+                            cluster: service_backend
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                tracing:
+                  provider:
+                    name: envoy.tracers.opentelemetry
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.config.trace.v3.OpenTelemetryConfig
+                      grpc_service:
+                        envoy_grpc:
+                          cluster_name: otel_collector
+                      service_name: example-service-multi
+                      # Multi-propagator configuration for maximum interoperability
+                      propagators:
+                        - tracecontext  # W3C Trace Context (primary)
+                        - baggage       # W3C Baggage for cross-service metadata
+                        - b3           # Zipkin B3 for legacy service compatibility
+
+  clusters:
+    - name: service_backend
+      connect_timeout: 30s
+      type: LOGICAL_DNS
+      dns_lookup_family: V4_ONLY
+      load_assignment:
+        cluster_name: service_backend
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: backend.example.com
+                      port_value: 80
+    - name: otel_collector
+      connect_timeout: 30s
+      type: LOGICAL_DNS
+      http2_protocol_options: {}
+      dns_lookup_family: V4_ONLY
+      load_assignment:
+        cluster_name: otel_collector
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: otel-collector.example.com
+                      port_value: 4317
+
+---
+# Example 3: Zipkin Compatibility Mode
+# This configuration prioritizes B3 format for Zipkin-heavy environments
+static_resources:
+  listeners:
+    - name: listener_0
+      address:
+        socket_address:
+          protocol: TCP
+          address: 0.0.0.0
+          port_value: 10000
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: ingress_http
+                route_config:
+                  name: local_route
+                  virtual_hosts:
+                    - name: local_service
+                      domains: ["*"]
+                      routes:
+                        - match:
+                            prefix: "/"
+                          route:
+                            cluster: service_backend
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                tracing:
+                  provider:
+                    name: envoy.tracers.opentelemetry
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.config.trace.v3.OpenTelemetryConfig
+                      grpc_service:
+                        envoy_grpc:
+                          cluster_name: otel_collector
+                      service_name: example-service-zipkin
+                      # B3-first configuration for Zipkin-heavy environments
+                      propagators:
+                        - b3           # Zipkin B3 (primary for legacy compatibility)
+                        - tracecontext # W3C fallback for modern services
+
+  clusters:
+    - name: service_backend
+      connect_timeout: 30s
+      type: LOGICAL_DNS
+      dns_lookup_family: V4_ONLY
+      load_assignment:
+        cluster_name: service_backend
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: backend.example.com
+                      port_value: 80
+    - name: otel_collector
+      connect_timeout: 30s
+      type: LOGICAL_DNS
+      http2_protocol_options: {}
+      dns_lookup_family: V4_ONLY
+      load_assignment:
+        cluster_name: otel_collector
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: otel-collector.example.com
+                      port_value: 4317
+
+---
+# Example 4: Environment Variable Configuration
+# This shows how to use OTEL_PROPAGATORS instead of explicit config
+# Set environment variable: OTEL_PROPAGATORS=tracecontext,baggage,b3
+static_resources:
+  listeners:
+    - name: listener_0
+      address:
+        socket_address:
+          protocol: TCP
+          address: 0.0.0.0
+          port_value: 10000
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: ingress_http
+                route_config:
+                  name: local_route
+                  virtual_hosts:
+                    - name: local_service
+                      domains: ["*"]
+                      routes:
+                        - match:
+                            prefix: "/"
+                          route:
+                            cluster: service_backend
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                tracing:
+                  provider:
+                    name: envoy.tracers.opentelemetry
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.config.trace.v3.OpenTelemetryConfig
+                      grpc_service:
+                        envoy_grpc:
+                          cluster_name: otel_collector
+                      service_name: example-service-env
+                      # No propagators field - reads from OTEL_PROPAGATORS environment variable
+                      # Expected: OTEL_PROPAGATORS=tracecontext,baggage,b3
+
+  clusters:
+    - name: service_backend
+      connect_timeout: 30s
+      type: LOGICAL_DNS
+      dns_lookup_family: V4_ONLY
+      load_assignment:
+        cluster_name: service_backend
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: backend.example.com
+                      port_value: 80
+    - name: otel_collector
+      connect_timeout: 30s
+      type: LOGICAL_DNS
+      http2_protocol_options: {}
+      dns_lookup_family: V4_ONLY
+      load_assignment:
+        cluster_name: otel_collector
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: otel-collector.example.com
+                      port_value: 4317
+
+---
+# Example 5: Advanced Configuration with Resource Detectors and Samplers
+# This shows a complete production-ready configuration
+static_resources:
+  listeners:
+    - name: listener_0
+      address:
+        socket_address:
+          protocol: TCP
+          address: 0.0.0.0
+          port_value: 10000
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: ingress_http
+                route_config:
+                  name: local_route
+                  virtual_hosts:
+                    - name: local_service
+                      domains: ["*"]
+                      routes:
+                        - match:
+                            prefix: "/"
+                          route:
+                            cluster: service_backend
+                http_filters:
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                tracing:
+                  provider:
+                    name: envoy.tracers.opentelemetry
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.config.trace.v3.OpenTelemetryConfig
+                      grpc_service:
+                        envoy_grpc:
+                          cluster_name: otel_collector
+                      service_name: example-service-advanced
+                      # Multi-propagator configuration
+                      propagators:
+                        - tracecontext
+                        - baggage
+                        - b3
+                      # Resource detection for automatic metadata collection
+                      resource_detectors:
+                        - name: envoy.tracers.opentelemetry.resource_detectors.environment
+                          typed_config:
+                            "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.resource_detectors.v3.EnvironmentResourceDetectorConfig
+                      # Sampling configuration
+                      sampler:
+                        name: envoy.tracers.opentelemetry.samplers.trace_id_ratio_based
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.tracers.opentelemetry.samplers.v3.TraceIdRatioBasedSamplerConfig
+                          sampling_ratio: 0.1  # Sample 10% of traces
+                      # Span cache configuration
+                      max_cache_size: 2048
+
+  clusters:
+    - name: service_backend
+      connect_timeout: 30s
+      type: LOGICAL_DNS
+      dns_lookup_family: V4_ONLY
+      load_assignment:
+        cluster_name: service_backend
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: backend.example.com
+                      port_value: 80
+    - name: otel_collector
+      connect_timeout: 30s
+      type: LOGICAL_DNS
+      http2_protocol_options: {}
+      dns_lookup_family: V4_ONLY
+      load_assignment:
+        cluster_name: otel_collector
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: otel-collector.example.com
+                      port_value: 4317

@@ -15,6 +15,7 @@
 #include "source/extensions/tracers/opentelemetry/resource_detectors/resource_detector.h"
 #include "source/extensions/tracers/opentelemetry/samplers/sampler.h"
 #include "source/extensions/tracers/opentelemetry/span_context.h"
+#include "source/extensions/propagators/opentelemetry/propagator.h"
 
 #include "absl/strings/escaping.h"
 
@@ -40,7 +41,7 @@ public:
   Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_source,
          Random::RandomGenerator& random, Runtime::Loader& runtime, Event::Dispatcher& dispatcher,
          OpenTelemetryTracerStats tracing_stats, const ResourceConstSharedPtr resource,
-         SamplerSharedPtr sampler, uint64_t max_cache_size);
+         SamplerSharedPtr sampler, uint64_t max_cache_size, CompositePropagatorPtr propagator);
 
   void sendSpan(::opentelemetry::proto::trace::v1::Span& span);
 
@@ -55,6 +56,11 @@ public:
                              const SpanContext& previous_span_context,
                              OptRef<const Tracing::TraceContext> trace_context,
                              OTelSpanKind span_kind);
+
+  /**
+   * @return Reference to the propagator for context extraction/injection.
+   */
+  CompositePropagator& propagator() { return *propagator_; }
 
 private:
   /**
@@ -76,6 +82,7 @@ private:
   const ResourceConstSharedPtr resource_;
   SamplerSharedPtr sampler_;
   uint64_t max_cache_size_;
+  CompositePropagatorPtr propagator_;
 };
 
 /**
@@ -86,7 +93,7 @@ class Span : Logger::Loggable<Logger::Id::tracing>, public Tracing::Span {
 public:
   Span(const std::string& name, const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
        Envoy::TimeSource& time_source, Tracer& parent_tracer, OTelSpanKind span_kind,
-       bool use_local_decision = false);
+       CompositePropagator& propagator, bool use_local_decision = false);
 
   // Tracing::Span functions
   void setOperation(absl::string_view /*operation*/) override;
@@ -176,6 +183,7 @@ private:
   const StreamInfo::StreamInfo& stream_info_;
   Tracer& parent_tracer_;
   Envoy::TimeSource& time_source_;
+  CompositePropagator& propagator_;
   bool sampled_;
   const bool use_local_decision_{false};
 };

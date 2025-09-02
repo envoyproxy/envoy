@@ -21,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the OpenTelemetry tracer.
 //  [#extension: envoy.tracers.opentelemetry]
-// [#next-free-field: 7]
+// [#next-free-field: 8]
 message OpenTelemetryConfig {
   // The upstream gRPC cluster that will receive OTLP traces.
   // Note that the tracer drops traces if the server does not read data fast enough.
@@ -64,4 +64,59 @@ message OpenTelemetryConfig {
   // This field specifies the maximum number of spans that can be cached. If not specified, the
   // default is 1024.
   google.protobuf.UInt32Value max_cache_size = 6;
+
+  // List of trace context propagators to be used by the OpenTelemetry tracer.
+  // This field configures which trace context propagation formats Envoy should support.
+  //
+  // **Extraction Behavior (Inbound Requests):**
+  // Propagators are tried in the configured order. The first propagator that successfully
+  // extracts valid trace context from incoming headers is used. This allows graceful fallback
+  // between different propagation formats used by upstream services.
+  //
+  // **Injection Behavior (Outbound Requests):**
+  // All configured propagators inject their respective headers into outgoing requests.
+  // This maximizes compatibility with downstream services that may expect specific formats.
+  //
+  // **Configuration Priority (highest to lowest):**
+  // 1. Explicit configuration (this field)
+  // 2. ``OTEL_PROPAGATORS`` environment variable (comma-separated list)
+  // 3. Default: ``["tracecontext"]`` for W3C Trace Context propagation
+  //
+  // **Supported Propagators:**
+  //
+  // * ``tracecontext``: W3C Trace Context propagation using ``traceparent`` and ``tracestate`` headers.
+  //   This is the default and recommended format for new deployments.
+  // * ``baggage``: W3C Baggage propagation using the ``baggage`` header. Enables cross-service
+  //   metadata propagation throughout the request lifecycle.
+  // * ``b3``: Zipkin B3 propagation with automatic format detection:
+  //
+  //   - Single-header format: ``b3: {trace-id}-{span-id}-{sampling-state}-{parent-span-id}``
+  //   - Multi-header format: ``X-B3-TraceId``, ``X-B3-SpanId``, ``X-B3-Sampled``, etc.
+  //
+  //   Both formats are supported for extraction; injection uses both for maximum compatibility.
+  //
+  // **Configuration Examples:**
+  //
+  // W3C-only (default):
+  //
+  // .. code-block:: yaml
+  //
+  //   propagators: ["tracecontext"]
+  //
+  // Full interoperability setup:
+  //
+  // .. code-block:: yaml
+  //
+  //   propagators: ["tracecontext", "baggage", "b3"]
+  //
+  // **Environment Variable Usage:**
+  //
+  // .. code-block:: bash
+  //
+  //   export OTEL_PROPAGATORS=tracecontext,baggage,b3
+  //
+  // **Backward Compatibility:**
+  // When no propagators are configured, the tracer defaults to W3C Trace Context only,
+  // maintaining compatibility with existing OpenTelemetry deployments.
+  repeated string propagators = 7;
 }

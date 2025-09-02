@@ -26,14 +26,6 @@ using opentelemetry::proto::collector::trace::v1::ExportTraceServiceRequest;
 
 namespace {
 
-const Tracing::TraceContextHandler& traceParentHeader() {
-  CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, "traceparent");
-}
-
-const Tracing::TraceContextHandler& traceStateHeader() {
-  CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, "tracestate");
-}
-
 void callSampler(SamplerSharedPtr sampler, const StreamInfo::StreamInfo& stream_info,
                  const absl::optional<SpanContext> span_context, Span& new_span,
                  const std::string& operation_name,
@@ -60,9 +52,9 @@ void callSampler(SamplerSharedPtr sampler, const StreamInfo::StreamInfo& stream_
 
 Span::Span(const std::string& name, const StreamInfo::StreamInfo& stream_info,
            SystemTime start_time, Envoy::TimeSource& time_source, Tracer& parent_tracer,
-           OTelSpanKind span_kind, bool use_local_decision)
+           OTelSpanKind span_kind, CompositePropagator& propagator, bool use_local_decision)
     : stream_info_(stream_info), parent_tracer_(parent_tracer), time_source_(time_source),
-      use_local_decision_(use_local_decision) {
+      propagator_(propagator), use_local_decision_(use_local_decision) {
   span_ = ::opentelemetry::proto::trace::v1::Span();
 
   span_.set_kind(span_kind);
@@ -92,16 +84,12 @@ void Span::finishSpan() {
 void Span::setOperation(absl::string_view operation) { span_.set_name(operation); };
 
 void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
-  std::string trace_id_hex = absl::BytesToHexString(span_.trace_id());
-  std::string span_id_hex = absl::BytesToHexString(span_.span_id());
-  std::vector<uint8_t> trace_flags_vec{sampled()};
-  std::string trace_flags_hex = Hex::encode(trace_flags_vec);
-  std::string traceparent_header_value =
-      absl::StrCat(kDefaultVersion, "-", trace_id_hex, "-", span_id_hex, "-", trace_flags_hex);
-  // Set the traceparent in the trace_context.
-  traceParentHeader().setRefKey(trace_context, traceparent_header_value);
-  // Also set the tracestate.
-  traceStateHeader().setRefKey(trace_context, span_.trace_state());
+  // Create span context from current span state
+  SpanContext span_context(kDefaultVersion, getTraceId(), spanId(), sampled(),
+                           std::string(tracestate()));
+
+  // Use the propagator to inject the context
+  propagator_.inject(span_context, trace_context);
 }
 
 void Span::setAttribute(absl::string_view name, const OTelAttribute& attribute_value) {
@@ -187,10 +175,10 @@ Tracer::Tracer(OpenTelemetryTraceExporterPtr exporter, Envoy::TimeSource& time_s
                Random::RandomGenerator& random, Runtime::Loader& runtime,
                Event::Dispatcher& dispatcher, OpenTelemetryTracerStats tracing_stats,
                const ResourceConstSharedPtr resource, SamplerSharedPtr sampler,
-               uint64_t max_cache_size)
+               uint64_t max_cache_size, CompositePropagatorPtr propagator)
     : exporter_(std::move(exporter)), time_source_(time_source), random_(random), runtime_(runtime),
       tracing_stats_(tracing_stats), resource_(resource), sampler_(sampler),
-      max_cache_size_(max_cache_size) {
+      max_cache_size_(max_cache_size), propagator_(std::move(propagator)) {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     tracing_stats_.timer_flushed_.inc();
     flushSpans();
@@ -278,7 +266,7 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
 
   // Create an Tracers::OpenTelemetry::Span class that will contain the OTel span.
   auto new_span = std::make_unique<Span>(operation_name, stream_info, start_time, time_source_,
-                                         *this, span_kind, use_local_decision);
+                                         *this, span_kind, *propagator_, use_local_decision);
   uint64_t trace_id_high = random_.random();
   uint64_t trace_id = random_.random();
   new_span->setTraceId(absl::StrCat(Hex::uint64ToHex(trace_id_high), Hex::uint64ToHex(trace_id)));
@@ -302,7 +290,7 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
 
   // Create a new span and populate details from the span context.
   auto new_span = std::make_unique<Span>(operation_name, stream_info, start_time, time_source_,
-                                         *this, span_kind, false);
+                                         *this, span_kind, *propagator_, false);
   new_span->setTraceId(parent_context.traceId());
   if (!parent_context.spanId().empty()) {
     new_span->setParentId(parent_context.spanId());
