@@ -7,7 +7,6 @@
 #include "source/extensions/filters/network/well_known_names.h"
 
 #include "contrib/envoy/extensions/filters/network/rocketmq_proxy/v3/rocketmq_proxy.pb.h"
-#include "contrib/envoy/extensions/filters/network/rocketmq_proxy/v3/rocketmq_proxy.pb.validate.h"
 #include "contrib/rocketmq_proxy/filters/network/source/conn_manager.h"
 #include "contrib/rocketmq_proxy/filters/network/source/router/route_matcher.h"
 #include "contrib/rocketmq_proxy/filters/network/source/router/router_impl.h"

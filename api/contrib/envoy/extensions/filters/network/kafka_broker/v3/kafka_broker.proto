@@ -4,7 +4,7 @@ package envoy.extensions.filters.network.kafka_broker.v3;
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.kafka_broker.v3";
 option java_outer_classname = "KafkaBrokerProto";
@@ -21,7 +21,7 @@ message KafkaBroker {
       "envoy.config.filter.network.kafka_broker.v2alpha1.KafkaBroker";
 
   // The prefix to use when emitting :ref:`statistics <config_network_filters_kafka_broker_stats>`.
-  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+  string stat_prefix = 1 [(buf.validate.field).string = {min_len: 1}];
 
   // Set to true if broker filter should attempt to serialize the received responses from the
   // upstream broker instead of passing received bytes as is.
@@ -43,12 +43,12 @@ message KafkaBroker {
   // Optional list of allowed Kafka API keys. Only requests with provided API keys will be
   // routed, otherwise the connection will be closed. No effect if empty.
   repeated uint32 api_keys_allowed = 4
-      [(validate.rules).repeated = {items {uint32 {lte: 32767 gte: 0}}}];
+      [(buf.validate.field).repeated = {items {uint32 {lte: 32767 gte: 0}}}];
 
   // Optional list of denied Kafka API keys. Requests with API keys matching this list will have
   // the connection closed. No effect if empty.
   repeated uint32 api_keys_denied = 5
-      [(validate.rules).repeated = {items {uint32 {lte: 32767 gte: 0}}}];
+      [(buf.validate.field).repeated = {items {uint32 {lte: 32767 gte: 0}}}];
 }
 
 // Collection of rules matching by broker ID.
@@ -59,15 +59,15 @@ message IdBasedBrokerRewriteSpec {
 // Defines a rule to rewrite broker address data.
 message IdBasedBrokerRewriteRule {
   // Broker ID to match.
-  uint32 id = 1 [(validate.rules).uint32 = {gte: 0}];
+  uint32 id = 1 [(buf.validate.field).uint32 = {gte: 0}];
 
   // The host value to use (resembling the host part of Kafka's advertised.listeners).
   // The value should point to the Envoy (not Kafka) listener, so that all client traffic goes
   // through Envoy.
-  string host = 2 [(validate.rules).string = {min_len: 1}];
+  string host = 2 [(buf.validate.field).string = {min_len: 1}];
 
   // The port value to use (resembling the port part of Kafka's advertised.listeners).
   // The value should point to the Envoy (not Kafka) listener, so that all client traffic goes
   // through Envoy.
-  uint32 port = 3 [(validate.rules).uint32 = {lte: 65535}];
+  uint32 port = 3 [(buf.validate.field).uint32 = {lte: 65535}];
 }

@@ -11,7 +11,6 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/time.h"
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"

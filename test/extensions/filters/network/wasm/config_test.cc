@@ -1,5 +1,3 @@
-#include "envoy/extensions/filters/network/wasm/v3/wasm.pb.validate.h"
-
 #include "source/common/common/base64.h"
 #include "source/common/common/hex.h"
 #include "source/common/crypto/utility.h"

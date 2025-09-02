@@ -6,7 +6,6 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/optref.h"
 #include "envoy/extensions/load_balancing_policies/override_host/v3/override_host.pb.h"
-#include "envoy/extensions/load_balancing_policies/override_host/v3/override_host.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/factory_context.h"
 #include "envoy/upstream/load_balancer.h"

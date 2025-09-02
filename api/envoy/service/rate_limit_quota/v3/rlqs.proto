@@ -9,7 +9,7 @@ import "google/protobuf/duration.proto";
 import "xds/annotations/v3/status.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.service.rate_limit_quota.v3";
 option java_outer_classname = "RlqsProto";
@@ -71,13 +71,11 @@ message RateLimitQuotaUsageReports {
   //   the RLQS client is subscribing for the future assignments for this ``BucketId``.
   message BucketQuotaUsage {
     // ``BucketId`` for which request quota usage is reported.
-    BucketId bucket_id = 1 [(validate.rules).message = {required: true}];
+    BucketId bucket_id = 1 [(buf.validate.field).required = true];
 
     // Time elapsed since the last report.
-    google.protobuf.Duration time_elapsed = 2 [(validate.rules).duration = {
-      required: true
-      gt {}
-    }];
+    google.protobuf.Duration time_elapsed = 2 [(buf.validate.field).required = true,
+    (buf.validate.field).duration.gt = {}];
 
     // Requests the data plane has allowed through.
     uint64 num_requests_allowed = 3;
@@ -93,11 +91,11 @@ message RateLimitQuotaUsageReports {
   // Should only be provided in the first report, all subsequent messages on the same
   // stream are considered to be in the same domain. In case the domain needs to be
   // changes, close the stream, and reopen a new one with the different domain.
-  string domain = 1 [(validate.rules).string = {min_len: 1}];
+  string domain = 1 [(buf.validate.field).string.min_len = 1];
 
   // A list of quota usage reports. The list is processed by the RLQS server in the same order
   // it's provided by the client.
-  repeated BucketQuotaUsage bucket_quota_usages = 2 [(validate.rules).repeated = {min_items: 1}];
+  repeated BucketQuotaUsage bucket_quota_usages = 2 [(buf.validate.field).repeated.min_items = 1];
 }
 
 message RateLimitQuotaResponse {
@@ -159,7 +157,7 @@ message RateLimitQuotaResponse {
       //   the assignment. While expiring the assignment just transitions the bucket to
       //   the "expired assignment" state; abandoning the assignment completely erases
       //   the bucket from the data plane memory, and stops the usage reports.
-      google.protobuf.Duration assignment_time_to_live = 2 [(validate.rules).duration = {gte {}}];
+      google.protobuf.Duration assignment_time_to_live = 2 [(buf.validate.field).duration = {gte {}}];
 
       // Configures the local rate limiter for the request matched to the bucket.
       // If not set, allow all requests.
@@ -200,10 +198,10 @@ message RateLimitQuotaResponse {
     }
 
     // ``BucketId`` for which request the action is applied.
-    BucketId bucket_id = 1 [(validate.rules).message = {required: true}];
+    BucketId bucket_id = 1 [(buf.validate.field).required = true];
 
     oneof bucket_action {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Apply the quota assignment to the bucket.
       //
@@ -226,7 +224,7 @@ message RateLimitQuotaResponse {
 
   // An ordered list of actions to be applied to the buckets. The actions are applied in the
   // given order, from top to bottom.
-  repeated BucketAction bucket_action = 1 [(validate.rules).repeated = {min_items: 1}];
+  repeated BucketAction bucket_action = 1 [(buf.validate.field).repeated.min_items = 1];
 }
 
 // The identifier for the bucket. Used to match the bucket between the control plane (RLQS server),
@@ -250,7 +248,7 @@ message RateLimitQuotaResponse {
 //   The order of ``BucketId`` keys do not matter. Buckets ``{ a: 'A', b: 'B' }`` and
 //   ``{ b: 'B', a: 'A' }`` are identical.
 message BucketId {
-  map<string, string> bucket = 1 [(validate.rules).map = {
+  map<string, string> bucket = 1 [(buf.validate.field).map = {
     min_pairs: 1
     keys {string {min_len: 1}}
     values {string {min_len: 1}}

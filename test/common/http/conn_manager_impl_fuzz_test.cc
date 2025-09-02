@@ -25,7 +25,6 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
 
-#include "test/common/http/conn_manager_impl_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/fuzz/utility.h"
 #include "test/mocks/access_log/mocks.h"

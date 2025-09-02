@@ -9,7 +9,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.common.dynamic_forward_proxy.v2alpha";
 option java_outer_classname = "DnsCacheProto";
@@ -30,7 +30,7 @@ message DnsCacheConfig {
   // configurations with the same name *must* otherwise have the same settings when referenced
   // from different configuration components. Configuration will fail to load if this is not
   // the case.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(buf.validate.field).string.min_len = 1];
 
   // The DNS lookup family to use during resolution.
   //
@@ -41,7 +41,7 @@ message DnsCacheConfig {
   // address and return the one that wins. This same method could potentially also be used for
   // QUIC to TCP fall back.]
   api.v2.Cluster.DnsLookupFamily dns_lookup_family = 2
-      [(validate.rules).enum = {defined_only: true}];
+      [(buf.validate.field).enum.defined_only = true];
 
   // The DNS refresh rate for currently cached DNS hosts. If not specified defaults to 60s.
   //
@@ -54,7 +54,7 @@ message DnsCacheConfig {
   //
   // The refresh rate is rounded to the closest millisecond, and must be at least 1ms.
   google.protobuf.Duration dns_refresh_rate = 3
-      [(validate.rules).duration = {gte {nanos: 1000000}}];
+      [(buf.validate.field).duration = {gte {nanos: 1000000}}];
 
   // The TTL for hosts that are unused. Hosts that have not been used in the configured time
   // interval will be purged. If not specified defaults to 5m.
@@ -68,7 +68,7 @@ message DnsCacheConfig {
   //  .. note:
   //
   //   The TTL has no relation to DNS TTL and is only used to control Envoy's resource usage.
-  google.protobuf.Duration host_ttl = 4 [(validate.rules).duration = {gt {}}];
+  google.protobuf.Duration host_ttl = 4 [(buf.validate.field).duration = {gt {}}];
 
   // The maximum number of hosts that the cache will hold. If not specified defaults to 1024.
   //
@@ -77,7 +77,7 @@ message DnsCacheConfig {
   //   The implementation is approximate and enforced independently on each worker thread, thus
   //   it is possible for the maximum hosts in the cache to go slightly above the configured
   //   value depending on timing. This is similar to how other circuit breakers work.
-  google.protobuf.UInt32Value max_hosts = 5 [(validate.rules).uint32 = {gt: 0}];
+  google.protobuf.UInt32Value max_hosts = 5 [(buf.validate.field).uint32.gt = 0];
 
   // If the DNS failure refresh rate is specified,
   // this is used as the cache's DNS refresh rate when DNS requests are failing. If this setting is

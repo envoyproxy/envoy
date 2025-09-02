@@ -5,7 +5,6 @@
 #include "source/extensions/filters/http/common/factory_base.h"
 
 #include "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.pb.h"
-#include "contrib/envoy/extensions/filters/http/golang/v3alpha/golang.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

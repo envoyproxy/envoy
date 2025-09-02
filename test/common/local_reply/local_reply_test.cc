@@ -1,4 +1,3 @@
-#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/http/codes.h"
 
 #include "source/common/http/header_utility.h"

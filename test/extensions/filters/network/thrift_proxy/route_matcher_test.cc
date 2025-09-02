@@ -1,7 +1,5 @@
 #include "envoy/config/filter/thrift/router/v2alpha1/router.pb.h"
-#include "envoy/config/filter/thrift/router/v2alpha1/router.pb.validate.h"
 #include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.validate.h"
 
 #include "source/common/config/metadata.h"
 #include "source/extensions/filters/network/thrift_proxy/router/config.h"

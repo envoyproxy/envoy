@@ -5,7 +5,6 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/types/optional.h"
 #include "contrib/envoy/extensions/filters/network/kafka_broker/v3/kafka_broker.pb.h"
-#include "contrib/envoy/extensions/filters/network/kafka_broker/v3/kafka_broker.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

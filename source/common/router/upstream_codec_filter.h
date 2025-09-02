@@ -7,7 +7,6 @@
 #include <string>
 
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
-#include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.validate.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/http/filter.h"
 

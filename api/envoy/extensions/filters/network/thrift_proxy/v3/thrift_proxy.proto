@@ -13,7 +13,7 @@ import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.thrift_proxy.v3";
 option java_outer_classname = "ThriftProxyProto";
@@ -66,7 +66,7 @@ enum ProtocolType {
 message Trds {
   // Configuration source specifier.
   // In case of ``api_config_source`` only aggregated ``api_type`` is supported.
-  config.core.v3.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+  config.core.v3.ConfigSource config_source = 1 [(buf.validate.field).required = true];
 
   // The name of the route configuration. This allows to use different route
   // configurations. Tells which route configuration should be fetched from the configuration source.
@@ -81,14 +81,14 @@ message ThriftProxy {
 
   // Supplies the type of transport that the Thrift proxy should use. Defaults to
   // :ref:`AUTO_TRANSPORT<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.TransportType.AUTO_TRANSPORT>`.
-  TransportType transport = 2 [(validate.rules).enum = {defined_only: true}];
+  TransportType transport = 2 [(buf.validate.field).enum.defined_only = true];
 
   // Supplies the type of protocol that the Thrift proxy should use. Defaults to
   // :ref:`AUTO_PROTOCOL<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.AUTO_PROTOCOL>`.
-  ProtocolType protocol = 3 [(validate.rules).enum = {defined_only: true}];
+  ProtocolType protocol = 3 [(buf.validate.field).enum.defined_only = true];
 
   // The human readable prefix to use when emitting statistics.
-  string stat_prefix = 1 [(validate.rules).string = {min_len: 1}];
+  string stat_prefix = 1 [(buf.validate.field).string.min_len = 1];
 
   // The route table for the connection manager is static and is specified in this property.
   // It is invalid to define both ``route_config`` and ``trds``.
@@ -141,7 +141,7 @@ message ThriftFilter {
   // [#comment:TODO(zuercher): Auto generate the following list]
   // * :ref:`envoy.filters.thrift.router <config_thrift_filters_router>`
   // * :ref:`envoy.filters.thrift.rate_limit <config_thrift_filters_rate_limit>`
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string.min_len = 1];
 
   // Filter specific configuration which depends on the filter being instantiated. See the supported
   // filters for further documentation.
@@ -162,11 +162,11 @@ message ThriftProtocolOptions {
   // Selecting
   // :ref:`AUTO_TRANSPORT<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.TransportType.AUTO_TRANSPORT>`,
   // which is the default, causes the proxy to use the same transport as the downstream connection.
-  TransportType transport = 1 [(validate.rules).enum = {defined_only: true}];
+  TransportType transport = 1 [(buf.validate.field).enum.defined_only = true];
 
   // Supplies the type of protocol that the Thrift proxy should use for upstream connections.
   // Selecting
   // :ref:`AUTO_PROTOCOL<envoy_v3_api_enum_value_extensions.filters.network.thrift_proxy.v3.ProtocolType.AUTO_PROTOCOL>`,
   // which is the default, causes the proxy to use the same protocol as the downstream connection.
-  ProtocolType protocol = 2 [(validate.rules).enum = {defined_only: true}];
+  ProtocolType protocol = 2 [(buf.validate.field).enum.defined_only = true];
 }

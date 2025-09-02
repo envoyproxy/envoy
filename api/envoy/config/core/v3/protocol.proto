@@ -14,7 +14,7 @@ import "xds/annotations/v3/status.proto";
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.core.v3";
 option java_outer_classname = "ProtocolProto";
@@ -47,7 +47,7 @@ message QuicKeepAliveSettings {
   // The value should be smaller than :ref:`connection idle_timeout <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.idle_timeout>` to prevent idle timeout and smaller than max_interval to take effect.
   //
   // If absent, disable keepalive probing for a server connection. For a client connection, if :ref:`max_interval <envoy_v3_api_field_config.core.v3.QuicKeepAliveSettings.max_interval>` is zero, do not keepalive, otherwise use max_interval or QUICHE default to probe all the time.
-  google.protobuf.Duration initial_interval = 2 [(validate.rules).duration = {
+  google.protobuf.Duration initial_interval = 2 [(buf.validate.field).duration = {
     lte {}
     gte {nanos: 1000000}
   }];
@@ -58,7 +58,7 @@ message QuicKeepAliveSettings {
 message QuicProtocolOptions {
   // Maximum number of streams that the client can negotiate per connection. 100
   // if not specified.
-  google.protobuf.UInt32Value max_concurrent_streams = 1 [(validate.rules).uint32 = {gte: 1}];
+  google.protobuf.UInt32Value max_concurrent_streams = 1 [(buf.validate.field).uint32.gte = 1];
 
   // `Initial stream-level flow-control receive window
   // <https://tools.ietf.org/html/draft-ietf-quic-transport-34#section-4.1>`_ size. Valid values range from
@@ -74,7 +74,7 @@ message QuicProtocolOptions {
   // QUIC stream send and receive buffers. Once the buffer reaches this pointer, watermark callbacks will fire to
   // stop the flow of data to the stream buffers.
   google.protobuf.UInt32Value initial_stream_window_size = 2
-      [(validate.rules).uint32 = {lte: 16777216 gte: 1}];
+      [(buf.validate.field).uint32 = {lte: 16777216 gte: 1}];
 
   // Similar to ``initial_stream_window_size``, but for connection-level
   // flow-control. Valid values range from 1 to 25165824 (24MB, maximum supported by QUICHE) and defaults
@@ -86,14 +86,14 @@ message QuicProtocolOptions {
   //   window size now, so it's also the minimum.
   //
   google.protobuf.UInt32Value initial_connection_window_size = 3
-      [(validate.rules).uint32 = {lte: 25165824 gte: 1}];
+      [(buf.validate.field).uint32 = {lte: 25165824 gte: 1}];
 
   // The number of timeouts that can occur before port migration is triggered for QUIC clients.
   // This defaults to 4. If set to 0, port migration will not occur on path degrading.
   // Timeout here refers to QUIC internal path degrading timeout mechanism, such as PTO.
   // This has no effect on server sessions.
   google.protobuf.UInt32Value num_timeouts_to_trigger_port_migration = 4
-      [(validate.rules).uint32 = {lte: 5 gte: 0}];
+      [(buf.validate.field).uint32 = {lte: 5 gte: 0}];
 
   // Probes the peer at the configured interval to solicit traffic, i.e. ACK or PATH_RESPONSE, from the peer to push back connection idle timeout.
   // If absent, use the default keepalive behavior of which a client connection sends PINGs every 15s, and a server connection doesn't do anything.
@@ -111,9 +111,13 @@ message QuicProtocolOptions {
   // default 600s will be applied.
   // For internal corporate network, a long timeout is often fine.
   // But for client facing network, 30s is usually a good choice.
-  // Do not add an upper bound here. A long idle timeout is useful for maintaining warm connections at non-front-line proxy for low QPS services."
-  google.protobuf.Duration idle_network_timeout = 8
-      [(validate.rules).duration = {gte {seconds: 1}}];
+  //
+  // // Do not add an upper bound here. A long idle timeout is useful for maintaining warm connections at
+  // non-front-line proxy for low QPS services.
+  google.protobuf.Duration idle_network_timeout = 8 [(buf.validate.field).duration = {
+    lte {seconds: 600}
+    gte {seconds: 1}
+  }];
 
   // Maximum packet length for QUIC connections. It refers to the largest size of a QUIC packet that can be transmitted over the connection.
   // If not specified, one of the `default values in QUICHE <https://github.com/google/quiche/blob/main/quiche/quic/core/quic_constants.h>`_ is used.
@@ -153,7 +157,7 @@ message UpstreamHttpProtocolOptions {
   // If none of these fields are set then setting this would be a no-op.
   // Does nothing if a filter before the http router filter sets the corresponding metadata.
   string override_auto_sni_header = 3
-      [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+      [(buf.validate.field).string.min_len = 1];
 }
 
 // Configures the alternate protocols cache which tracks alternate protocols that can be used to
@@ -174,10 +178,10 @@ message AlternateProtocolsCacheOptions {
   message AlternateProtocolsCacheEntry {
     // The host name for the alternate protocol entry.
     string hostname = 1
-        [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
+        [(buf.validate.field).string.min_len = 1];
 
     // The port for the alternate protocol entry.
-    uint32 port = 2 [(validate.rules).uint32 = {lt: 65535 gt: 0}];
+    uint32 port = 2 [(buf.validate.field).uint32 = {lt: 65535 gt: 0}];
   }
 
   // The name of the cache. Multiple named caches allow independent alternate protocols cache
@@ -185,7 +189,7 @@ message AlternateProtocolsCacheOptions {
   // alternate protocols cache options with the same name *must* be equal in all fields when
   // referenced from different configuration components. Configuration will fail to load if this is
   // not the case.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
+  string name = 1 [(buf.validate.field).string.min_len = 1];
 
   // The maximum number of entries that the cache will hold. If not specified defaults to 1024.
   //
@@ -194,7 +198,7 @@ message AlternateProtocolsCacheOptions {
   //   The implementation is approximate and enforced independently on each worker thread, thus
   //   it is possible for the maximum entries in the cache to go slightly above the configured
   //   value depending on timing. This is similar to how other circuit breakers work.
-  google.protobuf.UInt32Value max_entries = 2 [(validate.rules).uint32 = {gt: 0}];
+  google.protobuf.UInt32Value max_entries = 2 [(buf.validate.field).uint32.gt = 0];
 
   // Allows configuring a persistent
   // :ref:`key value store <envoy_v3_api_msg_config.common.key_value.v3.KeyValueStoreConfig>` to flush
@@ -276,7 +280,7 @@ message HttpProtocolOptions {
   // Downstream requests that exceed this limit will receive a 431 response for HTTP/1.x and cause a stream
   // reset for HTTP/2.
   // Upstream responses that exceed this limit will result in a 502 response.
-  google.protobuf.UInt32Value max_headers_count = 2 [(validate.rules).uint32 = {gte: 1}];
+  google.protobuf.UInt32Value max_headers_count = 2 [(buf.validate.field).uint32.gte = 1];
 
   // The maximum size of response headers.
   // If unconfigured, the default is 60 KiB, except for HTTP/1 response headers which have a default
@@ -295,7 +299,7 @@ message HttpProtocolOptions {
   //   * HTTP/3 limits a single header to around 1024kb.
   //
   google.protobuf.UInt32Value max_response_headers_kb = 7
-      [(validate.rules).uint32 = {lte: 8192 gt: 0}];
+      [(buf.validate.field).uint32 = {lte: 8192 gt: 0}];
 
   // Total duration to keep alive an HTTP request/response stream. If the time limit is reached the stream will be
   // reset independent of any other timeouts. If not specified, this value is not set.
@@ -337,7 +341,7 @@ message Http1ProtocolOptions {
     }
 
     oneof header_format {
-      option (validate.required) = true;
+      option (buf.validate.oneof).required = true;
 
       // Formats the header by proper casing words: the first character and any character following
       // a special character will be capitalized if it's an alpha character. For example,
@@ -446,16 +450,16 @@ message Http1ProtocolOptions {
 message KeepaliveSettings {
   // Send HTTP/2 PING frames at this period, in order to test that the connection is still alive.
   // If this is zero, interval PINGs will not be sent.
-  google.protobuf.Duration interval = 1 [(validate.rules).duration = {gte {nanos: 1000000}}];
+  google.protobuf.Duration interval = 1 [(buf.validate.field).duration = {gte {nanos: 1000000}}];
 
   // How long to wait for a response to a keepalive PING. If a response is not received within this
   // time period, the connection will be aborted. Note that in order to prevent the influence of
   // Head-of-line (HOL) blocking the timeout period is extended when *any* frame is received on
   // the connection, under the assumption that if a frame is received the connection is healthy.
-  google.protobuf.Duration timeout = 2 [(validate.rules).duration = {
-    required: true
-    gte {nanos: 1000000}
-  }];
+  google.protobuf.Duration timeout = 2 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).duration.gte = {nanos: 1000000}
+  ];
 
   // A random jitter amount as a percentage of interval that will be added to each interval.
   // A value of zero means there will be no jitter.
@@ -470,7 +474,7 @@ message KeepaliveSettings {
   //
   // The same feature for HTTP/3 is given by inheritance from QUICHE which uses :ref:`connection idle_timeout <envoy_v3_api_field_config.listener.v3.QuicProtocolOptions.idle_timeout>` and the current PTO of the connection to decide whether to probe before sending a new request.
   google.protobuf.Duration connection_idle_interval = 4
-      [(validate.rules).duration = {gte {nanos: 1000000}}];
+      [(buf.validate.field).duration = {gte {nanos: 1000000}}];
 }
 
 // [#next-free-field: 18]
@@ -486,12 +490,12 @@ message Http2ProtocolOptions {
 
     // The 16 bit parameter identifier.
     google.protobuf.UInt32Value identifier = 1 [
-      (validate.rules).uint32 = {lte: 65535 gte: 0},
-      (validate.rules).message = {required: true}
+      (buf.validate.field).uint32 = {lte: 65535 gte: 0},
+      (buf.validate.field).required = true
     ];
 
     // The 32 bit parameter value.
-    google.protobuf.UInt32Value value = 2 [(validate.rules).message = {required: true}];
+    google.protobuf.UInt32Value value = 2 [(buf.validate.field).required = true];
   }
 
   // `Maximum table size <https://httpwg.org/specs/rfc7541.html#rfc.section.4.2>`_
@@ -512,7 +516,7 @@ message Http2ProtocolOptions {
   // connection based on upstream settings. Config dumps will reflect the configured upper bound,
   // not the per-connection negotiated limits.
   google.protobuf.UInt32Value max_concurrent_streams = 2
-      [(validate.rules).uint32 = {lte: 2147483647 gte: 1}];
+      [(buf.validate.field).uint32 = {lte: 2147483647 gte: 1}];
 
   // `Initial stream-level flow-control window
   // <https://httpwg.org/specs/rfc7540.html#rfc.section.6.9.2>`_ size. Valid values range from 65535
@@ -528,12 +532,12 @@ message Http2ProtocolOptions {
   // HTTP/2 codec buffers. Once the buffer reaches this pointer, watermark callbacks will fire to
   // stop the flow of data to the codec buffers.
   google.protobuf.UInt32Value initial_stream_window_size = 3
-      [(validate.rules).uint32 = {lte: 2147483647 gte: 65535}];
+      [(buf.validate.field).uint32 = {lte: 2147483647 gte: 65535}];
 
   // Similar to ``initial_stream_window_size``, but for connection-level flow-control
   // window. Currently, this has the same minimum/maximum/default as ``initial_stream_window_size``.
   google.protobuf.UInt32Value initial_connection_window_size = 4
-      [(validate.rules).uint32 = {lte: 2147483647 gte: 65535}];
+      [(buf.validate.field).uint32 = {lte: 2147483647 gte: 65535}];
 
   // Allows proxying Websocket and other upgrades over H2 connect.
   bool allow_connect = 5;
@@ -550,14 +554,14 @@ message Http2ProtocolOptions {
   // be written into the socket). Exceeding this limit triggers flood mitigation and connection is
   // terminated. The ``http2.outbound_flood`` stat tracks the number of terminated connections due
   // to flood mitigation. The default limit is 10000.
-  google.protobuf.UInt32Value max_outbound_frames = 7 [(validate.rules).uint32 = {gte: 1}];
+  google.protobuf.UInt32Value max_outbound_frames = 7 [(buf.validate.field).uint32.gte = 1];
 
   // Limit the number of pending outbound downstream frames of types PING, SETTINGS and RST_STREAM,
   // preventing high memory utilization when receiving continuous stream of these frames. Exceeding
   // this limit triggers flood mitigation and connection is terminated. The
   // ``http2.outbound_control_flood`` stat tracks the number of terminated connections due to flood
   // mitigation. The default limit is 1000.
-  google.protobuf.UInt32Value max_outbound_control_frames = 8 [(validate.rules).uint32 = {gte: 1}];
+  google.protobuf.UInt32Value max_outbound_control_frames = 8 [(buf.validate.field).uint32.gte = 1];
 
   // Limit the number of consecutive inbound frames of types HEADERS, CONTINUATION and DATA with an
   // empty payload and no end stream flag. Those frames have no legitimate use and are abusive, but
@@ -595,7 +599,7 @@ message Http2ProtocolOptions {
   // Setting this to 1 should be enough to support HTTP/2 implementations with basic flow control,
   // but more complex implementations that try to estimate available bandwidth require at least 2.
   google.protobuf.UInt32Value max_inbound_window_update_frames_per_data_frame_sent = 11
-      [(validate.rules).uint32 = {gte: 1}];
+      [(buf.validate.field).uint32.gte = 1];
 
   // Allows invalid HTTP messaging and headers. When this option is disabled (default), then
   // the whole HTTP/2 connection is terminated upon receiving invalid HEADERS frame. However,
@@ -719,7 +723,7 @@ message SchemeHeaderTransformation {
   oneof transformation {
     // Overwrite any Scheme header with the contents of this string.
     // If set, takes precedence over match_upstream.
-    string scheme_to_overwrite = 1 [(validate.rules).string = {in: "http" in: "https"}];
+    string scheme_to_overwrite = 1;
   }
 
   // Set the Scheme header to match the upstream transport protocol. For example, should a

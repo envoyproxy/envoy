@@ -1,7 +1,6 @@
 #include <string>
 
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
-#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
 
 #include "source/extensions/filters/network/tcp_proxy/config.h"
 

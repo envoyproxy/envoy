@@ -11,7 +11,6 @@
 
 #include "absl/types/optional.h"
 #include "contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha/kafka_mesh.pb.h"
-#include "contrib/envoy/extensions/filters/network/kafka_mesh/v3alpha/kafka_mesh.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {

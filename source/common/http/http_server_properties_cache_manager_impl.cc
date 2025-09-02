@@ -2,7 +2,6 @@
 
 #include "envoy/common/key_value_store.h"
 #include "envoy/config/common/key_value/v3/config.pb.h"
-#include "envoy/config/common/key_value/v3/config.pb.validate.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/http/http_server_properties_cache_impl.h"

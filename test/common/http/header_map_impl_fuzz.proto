@@ -4,7 +4,7 @@ package test.common.http;
 
 import "google/protobuf/empty.proto";
 
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 // Structured input for header_map_impl_fuzz_test.
 
@@ -72,7 +72,7 @@ message Get {
 
 message Action {
   oneof action_selector {
-    option (validate.required) = true;
+    
     AddReference add_reference = 1;
     AddReferenceKey add_reference_key = 2;
     AddCopy add_copy = 3;

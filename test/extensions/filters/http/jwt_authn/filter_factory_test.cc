@@ -1,5 +1,4 @@
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
-#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.validate.h"
 
 #include "source/extensions/filters/http/jwt_authn/filter_config.h"
 #include "source/extensions/filters/http/jwt_authn/filter_factory.h"

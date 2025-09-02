@@ -68,7 +68,6 @@ typedef unsigned __int64 uint64_t;
 typedef struct http_parser http_parser;
 typedef struct http_parser_settings http_parser_settings;
 
-
 /* Callbacks should return non-zero to indicate an error. The parser will
  * then halt execution.
  *
@@ -89,7 +88,6 @@ typedef struct http_parser_settings http_parser_settings;
  */
 typedef int (*http_data_cb) (http_parser*, const char *at, size_t length);
 typedef int (*http_cb) (http_parser*);
-
 
 /* Status Codes */
 #define HTTP_STATUS_MAP(XX)                                                 \
@@ -160,7 +158,6 @@ enum http_status
 #undef XX
   };
 
-
 /* Request Methods */
 #define HTTP_METHOD_MAP(XX)         \
   XX(0,  DELETE,      DELETE)       \
@@ -213,9 +210,7 @@ enum http_method
 #undef XX
   };
 
-
 enum http_parser_type { HTTP_REQUEST, HTTP_RESPONSE, HTTP_BOTH };
-
 
 /* Flag values for http_parser.flags field */
 enum flags
@@ -228,7 +223,6 @@ enum flags
   , F_SKIPBODY              = 1 << 6
   , F_CONTENTLENGTH         = 1 << 7
   };
-
 
 /* Map for errno-related constants
  *
@@ -281,7 +275,6 @@ enum flags
   XX(INVALID_TRANSFER_ENCODING,                                      \
      "request has invalid transfer-encoding")                        \
 
-
 /* Define HPE_* values for each errno value above */
 #define HTTP_ERRNO_GEN(n, s) HPE_##n,
 enum http_errno {
@@ -289,10 +282,8 @@ enum http_errno {
 };
 #undef HTTP_ERRNO_GEN
 
-
 /* Get an http_errno value from an http_parser */
 #define HTTP_PARSER_ERRNO(p)            ((enum http_errno) (p)->http_errno)
-
 
 struct http_parser {
   /** PRIVATE **/
@@ -330,7 +321,6 @@ struct http_parser {
   void *data; /* A pointer to get hook to the "connection" or "socket" object */
 };
 
-
 struct http_parser_settings {
   http_cb      on_message_begin;
   http_data_cb on_url;
@@ -347,7 +337,6 @@ struct http_parser_settings {
   http_cb      on_chunk_complete;
 };
 
-
 enum http_parser_url_fields
   { UF_SCHEMA           = 0
   , UF_HOST             = 1
@@ -358,7 +347,6 @@ enum http_parser_url_fields
   , UF_USERINFO         = 6
   , UF_MAX              = 7
   };
-
 
 /* Result structure for http_parser_parse_url().
  *
@@ -377,7 +365,6 @@ struct http_parser_url {
   } field_data[UF_MAX];
 };
 
-
 /* Returns the library version. Bits 16-23 contain the major version number,
  * bits 8-15 the minor version number and bits 0-7 the patch level.
  * Usage example:
@@ -392,11 +379,9 @@ unsigned long http_parser_version(void);
 
 void http_parser_init(http_parser *parser, enum http_parser_type type);
 
-
 /* Initialize http_parser_settings members to 0
  */
 void http_parser_settings_init(http_parser_settings *settings);
-
 
 /* Executes the parser. Returns number of parsed bytes. Sets
  * `parser->http_errno` on error. */
@@ -404,7 +389,6 @@ size_t http_parser_execute(http_parser *parser,
                            const http_parser_settings *settings,
                            const char *data,
                            size_t len);
-
 
 /* If http_should_keep_alive() in the on_headers_complete or
  * on_message_complete callback returns 0, then this should be

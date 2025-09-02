@@ -3,7 +3,6 @@
 #include <string>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/metrics/v3/stats.pb.h"
 

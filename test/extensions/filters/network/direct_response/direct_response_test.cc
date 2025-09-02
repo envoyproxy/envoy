@@ -1,5 +1,3 @@
-#include "envoy/extensions/filters/network/direct_response/v3/config.pb.validate.h"
-
 #include "source/extensions/filters/network/direct_response/filter.h"
 
 #include "test/mocks/api/mocks.h"

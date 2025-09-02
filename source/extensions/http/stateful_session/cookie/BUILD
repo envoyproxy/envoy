@@ -34,7 +34,6 @@ envoy_cc_extension(
         "//envoy/http:stateful_session_interface",
         "//envoy/registry",
         "//source/common/config:utility_lib",
-        "@envoy_api//envoy/extensions/http/stateful_session/cookie/v3:pkg_cc_proto",
     ],
 )
 

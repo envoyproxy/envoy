@@ -2,7 +2,6 @@
 #include "source/extensions/http/header_validators/envoy_default/http1_header_validator.h"
 
 #include "test/extensions/http/header_validators/envoy_default/path_normalizer_fuzz.pb.h"
-#include "test/extensions/http/header_validators/envoy_default/path_normalizer_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 #include "test/mocks/http/header_validator.h"
 #include "test/test_common/utility.h"

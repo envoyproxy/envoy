@@ -10,7 +10,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.health_check.v3";
 option java_outer_classname = "HealthCheckProto";
@@ -30,7 +30,7 @@ message HealthCheck {
   reserved 2;
 
   // Specifies whether the filter operates in pass through mode or not.
-  google.protobuf.BoolValue pass_through_mode = 1 [(validate.rules).message = {required: true}];
+  google.protobuf.BoolValue pass_through_mode = 1 [(buf.validate.field).required = true];
 
   // If operating in pass through mode, the amount of time in milliseconds
   // that the filter should cache the upstream response.

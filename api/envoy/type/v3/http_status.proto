@@ -4,7 +4,7 @@ package envoy.type.v3;
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.type.v3";
 option java_outer_classname = "HttpStatusProto";
@@ -195,5 +195,5 @@ message HttpStatus {
   option (udpa.annotations.versioning).previous_message_type = "envoy.type.HttpStatus";
 
   // Supplies HTTP response code.
-  StatusCode code = 1 [(validate.rules).enum = {defined_only: true not_in: 0}];
+  StatusCode code = 1 [(buf.validate.field).enum = {defined_only: true not_in: 0}];
 }

@@ -6,7 +6,7 @@ import "google/protobuf/struct.proto";
 
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.accesslog.v2";
 option java_outer_classname = "FileProto";
@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 // AccessLog.
 message FileAccessLog {
   // A path to a local file to which to write the access log entries.
-  string path = 1 [(validate.rules).string = {min_bytes: 1}];
+  string path = 1 [(buf.validate.field).string.min_len = 1];
 
   oneof access_log_format {
     // Access log :ref:`format string<config_access_log_format_strings>`.

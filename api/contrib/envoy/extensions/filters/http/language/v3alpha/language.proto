@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.extensions.filters.http.language.v3alpha;
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.language.v3alpha";
 option java_outer_classname = "LanguageProto";
@@ -21,14 +21,14 @@ message Language {
   // The value will be included in the list of the supported languages.
   //
   // See https://unicode-org.github.io/icu/userguide/locale/
-  string default_language = 1 [(validate.rules).string = {min_len: 2}];
+  string default_language = 1 [(buf.validate.field).string = {min_len: 2}];
 
   // The set of supported languages. There is no order priority.
   // The order will be determined by the Accept-Language header priority list
   // of the client.
   //
   // See https://unicode-org.github.io/icu/userguide/locale/
-  repeated string supported_languages = 2 [(validate.rules).repeated = {
+  repeated string supported_languages = 2 [(buf.validate.field).repeated = {
     min_items: 1
     unique: true
     items {string {min_len: 2}}

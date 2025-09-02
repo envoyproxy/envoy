@@ -18,7 +18,7 @@
 #include "source/common/protobuf/message_validator_impl.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/singleton/const_singleton.h"
-#include "source/extensions/filters/http/aws_lambda/request_response.pb.validate.h"
+#include "source/extensions/filters/http/aws_lambda/request_response.pb.h"
 
 #include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
@@ -308,7 +308,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
 
 void Filter::jsonizeRequest(Http::RequestHeaderMap const& headers, const Buffer::Instance* body,
                             Buffer::Instance& out) const {
-  using source::extensions::filters::http::aws_lambda::Request;
+  using ::source::extensions::filters::http::aws_lambda::Request;
   Request json_req;
   if (headers.Path()) {
     json_req.set_raw_path(std::string(headers.getPathValue()));
@@ -362,7 +362,7 @@ void Filter::jsonizeRequest(Http::RequestHeaderMap const& headers, const Buffer:
 
 void Filter::dejsonizeResponse(Http::ResponseHeaderMap& headers, const Buffer::Instance& json_buf,
                                Buffer::Instance& body) {
-  using source::extensions::filters::http::aws_lambda::Response;
+  using ::source::extensions::filters::http::aws_lambda::Response;
   Response json_resp;
   TRY_NEEDS_AUDIT {
     MessageUtil::loadFromJson(json_buf.toString(), json_resp,

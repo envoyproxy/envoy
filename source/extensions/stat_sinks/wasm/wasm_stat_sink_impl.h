@@ -2,7 +2,6 @@
 
 #include <memory>
 
-#include "envoy/extensions/filters/network/wasm/v3/wasm.pb.validate.h"
 #include "envoy/stats/sink.h"
 
 #include "source/extensions/common/wasm/wasm.h"

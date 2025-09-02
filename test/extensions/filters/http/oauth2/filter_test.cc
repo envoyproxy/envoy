@@ -2,7 +2,6 @@
 #include <string>
 
 #include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.h"
-#include "envoy/extensions/filters/http/oauth2/v3/oauth.pb.validate.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/message.h"
 

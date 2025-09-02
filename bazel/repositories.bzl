@@ -83,6 +83,8 @@ def _cc_deps():
             "rm src/google/protobuf/stubs/common_unittest.cc",
             "rm src/google/protobuf/util/converter/port_def.inc",
             "rm src/google/protobuf/util/converter/port_undef.inc",
+            "find . -name 'WORKSPACE' -delete",
+            "find . -name 'WORKSPACE.bazel' -delete",
         ],
     )
     external_http_archive("com_google_protofieldextraction")
@@ -212,6 +214,11 @@ def envoy_dependencies(skip_targets = []):
     _rules_fuzzing()
     external_http_archive("proxy_wasm_rust_sdk")
     _com_google_cel_cpp()
+    external_http_archive(
+        name = "com_bufbuild_protovalidate_cc",
+        patch_cmds = ["rm -f REPO.bazel"],
+    )
+    external_http_archive("com_github_bufbuild_protovalidate")
     _com_github_google_perfetto()
     _rules_ruby()
     external_http_archive("com_github_google_flatbuffers")
@@ -562,7 +569,11 @@ def _com_github_nghttp2_nghttp2():
 def _com_github_msgpack_cpp():
     external_http_archive(
         name = "com_github_msgpack_cpp",
-        build_file = "@envoy//bazel/external:msgpack.BUILD",
+        patch_cmds = [
+            "rm -f BUILD.bazel || true",
+            "rm -f BUILD || true",
+            'cat > BUILD << EOF\nlicenses(["notice"])  # Apache 2\n\ncc_library(\n    name = "msgpack",\n    srcs = glob([\n        "src/*.c",\n        "include/**/*.h",\n        "include/**/*.hpp",\n    ], allow_empty = True),\n    defines = ["MSGPACK_NO_BOOST"],\n    includes = [\n        "include",\n    ],\n    strip_include_prefix = "include",\n    visibility = ["//visibility:public"],\n)\nEOF',
+        ],
     )
 
 def _io_hyperscan():
@@ -1038,3 +1049,8 @@ def _com_github_maxmind_libmaxminddb():
         name = "com_github_maxmind_libmaxminddb",
         build_file_content = BUILD_ALL_CONTENT,
     )
+
+def _protovalidate_cc_deps():
+    # Ensure any additional protovalidate-cc toolchain deps are loaded if needed.
+    # Currently nothing to do; kept for symmetry and future extensions.
+    pass

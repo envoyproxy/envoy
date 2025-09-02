@@ -1,7 +1,6 @@
 #include "source/extensions/filters/listener/proxy_protocol/proxy_protocol.h"
 
 #include "test/extensions/filters/listener/common/fuzz/listener_filter_fuzzer.h"
-#include "test/extensions/filters/listener/proxy_protocol/proxy_protocol_fuzz_test.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
 
 namespace Envoy {

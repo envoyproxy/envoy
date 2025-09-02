@@ -7,7 +7,6 @@
 
 #include "contrib/client_ssl_auth/filters/network/source/config.h"
 #include "contrib/envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
-#include "contrib/envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.validate.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 

@@ -5,7 +5,7 @@ package envoy.extensions.filters.http.grpc_field_extraction.v3;
 import "envoy/config/core/v3/base.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.grpc_field_extraction.v3";
 option java_outer_classname = "ConfigProto";
@@ -145,7 +145,7 @@ message GrpcFieldExtractionConfig {
   //
   // It could be passed by a local file through ``Datasource.filename`` or embedded in the
   // ``Datasource.inline_bytes``.
-  config.core.v3.DataSource descriptor_set = 1 [(validate.rules).message = {required: true}];
+  config.core.v3.DataSource descriptor_set = 1 [(buf.validate.field).required = true];
 
   // Specify the extraction info.
   // The key is the fully qualified gRPC method name.

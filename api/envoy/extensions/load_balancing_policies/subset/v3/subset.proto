@@ -8,7 +8,7 @@ import "google/protobuf/struct.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.subset.v3";
 option java_outer_classname = "SubsetProto";
@@ -126,7 +126,7 @@ message Subset {
     // The behavior used when no endpoint subset matches the selected route's
     // metadata.
     LbSubsetSelectorFallbackPolicy fallback_policy = 2
-        [(validate.rules).enum = {defined_only: true}];
+        [(buf.validate.field).enum.defined_only = true];
 
     // Subset of
     // :ref:`keys<envoy_v3_api_field_extensions.load_balancing_policies.subset.v3.Subset.LbSubsetSelector.keys>` used by
@@ -143,7 +143,7 @@ message Subset {
   // The behavior used when no endpoint subset matches the selected route's
   // metadata. The value defaults to
   // :ref:`NO_FALLBACK<envoy_v3_api_enum_value_extensions.load_balancing_policies.subset.v3.Subset.LbSubsetFallbackPolicy.NO_FALLBACK>`.
-  LbSubsetFallbackPolicy fallback_policy = 1 [(validate.rules).enum = {defined_only: true}];
+  LbSubsetFallbackPolicy fallback_policy = 1 [(buf.validate.field).enum.defined_only = true];
 
   // Specifies the default subset of endpoints used during fallback if
   // fallback_policy is
@@ -252,9 +252,9 @@ message Subset {
   // :ref:`METADATA_NO_FALLBACK
   // <envoy_v3_api_enum_value_extensions.load_balancing_policies.subset.v3.subset.LbSubsetMetadataFallbackPolicy.METADATA_NO_FALLBACK>`.
   LbSubsetMetadataFallbackPolicy metadata_fallback_policy = 8
-      [(validate.rules).enum = {defined_only: true}];
+      [(buf.validate.field).enum.defined_only = true];
 
   // The child LB policy to create for endpoint-picking within the chosen subset.
   config.cluster.v3.LoadBalancingPolicy subset_lb_policy = 9
-      [(validate.rules).message = {required: true}];
+      [(buf.validate.field).required = true];
 }

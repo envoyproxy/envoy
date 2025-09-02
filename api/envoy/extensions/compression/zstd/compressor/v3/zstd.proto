@@ -7,7 +7,7 @@ import "envoy/config/core/v3/base.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
-import "validate/validate.proto";
+import "buf/validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.compression.zstd.compressor.v3";
 option java_outer_classname = "ZstdProto";
@@ -50,7 +50,7 @@ message Zstd {
   // The higher the value of selected strategy, the more complex it is,
   // resulting in stronger and slower compression.
   // Special: value 0 means "use default strategy".
-  Strategy strategy = 3 [(validate.rules).enum = {defined_only: true}];
+  Strategy strategy = 3 [(buf.validate.field).enum.defined_only = true];
 
   // A dictionary for compression. Zstd offers dictionary compression, which greatly improves
   // efficiency on small files and messages. Each dictionary will be generated with a dictionary ID
@@ -60,5 +60,5 @@ message Zstd {
   config.core.v3.DataSource dictionary = 4;
 
   // Value for compressor's next output buffer. If not set, defaults to 4096.
-  google.protobuf.UInt32Value chunk_size = 5 [(validate.rules).uint32 = {lte: 65536 gte: 4096}];
+  google.protobuf.UInt32Value chunk_size = 5 [(buf.validate.field).uint32 = {lte: 65536 gte: 4096}];
 }
