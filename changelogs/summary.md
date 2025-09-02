@@ -1,7 +1,4 @@
 **Summary of changes**:
 
-* Release images:
-  - Update Ubuntu and distroless base images.
-
-* Bug fixes
-  - Assorted bug fixes for TLS inspector, and HTTP listeners.
+* Security fixes:
+  - Fix for OAuth cookie issue [CVE-2025-55162](https://github.com/envoyproxy/envoy/security/advisories/GHSA-95j4-hw7f-v2rh).
