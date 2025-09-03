@@ -22,5 +22,8 @@ removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
 
 new_features:
+- area: tls_inspector
+  change: |
+    Added dynamic metadata when failing to parse the ``ClientHello``.
 
 deprecated:
