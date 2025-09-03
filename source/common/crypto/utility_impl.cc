@@ -71,10 +71,60 @@ const VerificationOutput UtilityImpl::verifySignature(absl::string_view hash, Cr
   return {false, absl::StrCat("Failed to verify digest. Error code: ", ok)};
 }
 
+const SignOutput UtilityImpl::signSignature(absl::string_view hash, CryptoObject& key,
+                                           const std::vector<uint8_t>& text) {
+  // Step 1: initialize EVP_MD_CTX
+  bssl::ScopedEVP_MD_CTX ctx;
+
+  // Step 2: initialize EVP_MD
+  const EVP_MD* md = getHashFunction(hash);
+
+  if (md == nullptr) {
+    return {false, {}, absl::StrCat(hash, " is not supported.")};
+  }
+
+  // Step 3: initialize EVP_DigestSign
+  auto pkey_wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(key);
+  EVP_PKEY* pkey = pkey_wrapper->getEVP_PKEY();
+
+  if (pkey == nullptr) {
+    return {false, {}, "Failed to initialize digest sign."};
+  }
+
+  int ok = EVP_DigestSignInit(ctx.get(), nullptr, md, nullptr, pkey);
+  if (!ok) {
+    return {false, {}, "Failed to initialize digest sign."};
+  }
+
+  // Step 4: get signature length
+  size_t sig_len = 0;
+  ok = EVP_DigestSign(ctx.get(), nullptr, &sig_len, text.data(), text.size());
+  if (!ok) {
+    return {false, {}, "Failed to get signature length."};
+  }
+
+  // Step 5: create signature
+  std::vector<uint8_t> signature(sig_len);
+  ok = EVP_DigestSign(ctx.get(), signature.data(), &sig_len, text.data(), text.size());
+  if (!ok) {
+    return {false, {}, "Failed to create signature."};
+  }
+
+  // Step 6: resize signature to actual length and return
+  signature.resize(sig_len);
+  return {true, signature, ""};
+}
+
 CryptoObjectPtr UtilityImpl::importPublicKey(const std::vector<uint8_t>& key) {
   CBS cbs({key.data(), key.size()});
 
   return std::make_unique<PublicKeyObject>(EVP_parse_public_key(&cbs));
+}
+
+CryptoObjectPtr UtilityImpl::importPrivateKey(const std::vector<uint8_t>& key) {
+  CBS cbs({key.data(), key.size()});
+
+  return std::make_unique<PrivateKeyObject>(EVP_parse_private_key(&cbs, nullptr, nullptr, nullptr));
 }
 
 const EVP_MD* UtilityImpl::getHashFunction(absl::string_view name) {
