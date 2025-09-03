@@ -1,13 +1,6 @@
-date: Pending
-
-behavior_changes:
-# *Changes that are expected to cause an incompatibility if applicable; deployment changes are likely required*
-
-minor_behavior_changes:
-# *Changes that may cause incompatibilities for some users, but should not for most*
+date: September 3, 2025
 
 bug_fixes:
-# *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: oauth2
   change: |
     Fixed an issue where cookies prefixed with ``__Secure-`` or ``__Host-`` were not receiving a
@@ -22,10 +15,3 @@ bug_fixes:
     ``cluster.<cluster_name>.ssl.certificate.<cert_name>.<metric_name>``
     and ``listener.<address>.ssl.certificate.<cert_name>.<metric_name>``
     was not being properly extracted in the final prometheus stat name.
-
-removed_config_or_runtime:
-# *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
-
-new_features:
-
-deprecated:
