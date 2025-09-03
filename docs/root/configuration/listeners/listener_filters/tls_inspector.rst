@@ -18,9 +18,6 @@ of a :ref:`FilterChainMatch <envoy_v3_api_msg_config.listener.v3.FilterChainMatc
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.listener.tls_inspector.v3.TlsInspector>`
 
-If the filter fails to detect TLS it will populate dynamic metadata indicating the reason (eg. ``ClientHello`` too
-large or not detected at all).
-
 Example
 -------
 
@@ -84,4 +81,12 @@ This filter has a statistics tree rooted at *tls_inspector* with the following s
       If the connection terminates early nothing is recorded if we didn't have
       sufficient bytes for either of the cases above.
 
+  .. _config_listener_filters_tls_inspector_dynamic_metadata:
+
+  Dynamic Metadata
+  ----------------
+
+  If the filter fails to detect TLS it will populate dynamic metadata under the key
+  `envoy.filters.listener.tls_inspector` indicating the reason (eg. ``ClientHello`` too
+  large or not detected at all).
 
