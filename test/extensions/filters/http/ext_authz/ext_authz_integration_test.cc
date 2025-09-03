@@ -1,4 +1,5 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
@@ -458,7 +459,8 @@ public:
                             const Headers& response_headers_to_append,
                             const Headers& response_headers_to_set,
                             const Headers& response_headers_to_append_if_absent,
-                            const Headers& response_headers_to_set_if_exists = {}) {
+                            const Headers& response_headers_to_set_if_exists = {},
+                            bool add_sentinel_header_append_action = false) {
     ext_authz_request_->startGrpcStream();
     envoy::service::auth::v3::CheckResponse check_response;
     check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
@@ -517,6 +519,20 @@ public:
       entry->mutable_header()->set_key(key);
       entry->mutable_header()->set_value(value);
       ENVOY_LOG_MISC(trace, "sendExtAuthzResponse: set response_header_to_add {}={}", key, value);
+    }
+
+    if (add_sentinel_header_append_action) {
+      auto* entry = check_response.mutable_ok_response()->mutable_response_headers_to_add()->Add();
+      entry->set_append_action(
+          static_cast<envoy::config::core::v3::HeaderValueOption::HeaderAppendAction>(
+              std::numeric_limits<int32_t>::max()));
+      const auto key = std::string("invalid-append-action");
+      const auto value = std::string("invalid-append-action-value");
+      entry->mutable_header()->set_key(key);
+      entry->mutable_header()->set_value(value);
+      ENVOY_LOG_MISC(trace,
+                     "sendExtAuthzResponse: set response header with invalid append action {}={}",
+                     key, value);
     }
 
     for (const auto& response_header_to_set : response_headers_to_set) {
@@ -1292,6 +1308,49 @@ TEST_P(ExtAuthzGrpcIntegrationTest, ValidateMutations) {
   EXPECT_EQ("500", response_->headers().getStatusValue());
   test_server_->waitForCounterEq("cluster.cluster_0.ext_authz.invalid", 1);
 
+  cleanup();
+}
+
+TEST_P(ExtAuthzGrpcIntegrationTest, ValidateMutationsSentinelAppendAction) {
+  GrpcInitializeConfigOpts opts;
+  opts.validate_mutations = true;
+  initializeConfig(opts);
+
+  // Use h1, set up the test.
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  // Start a client connection and request.
+  initiateClientConnection(0);
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+  sendExtAuthzResponse({}, {}, {}, {}, {}, {}, {}, {}, {},
+                       /*add_sentinel_header_append_action=*/true);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("500", response_->headers().getStatusValue());
+  test_server_->waitForCounterEq("cluster.cluster_0.ext_authz.invalid", 1);
+
+  cleanup();
+}
+
+// Ignore invalid header append actions when validate_mutations is false.
+TEST_P(ExtAuthzGrpcIntegrationTest, NoValidateMutationsSentinelAppendAction) {
+  GrpcInitializeConfigOpts opts;
+  opts.validate_mutations = false;
+  initializeConfig(opts);
+
+  // Use h1, set up the test.
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  // Start a client connection and request.
+  initiateClientConnection(0);
+
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+  sendExtAuthzResponse({}, {}, {}, {}, {}, {}, {}, {}, {},
+                       /*add_sentinel_header_append_action=*/true);
+  waitForSuccessfulUpstreamResponse("200");
   cleanup();
 }
 
