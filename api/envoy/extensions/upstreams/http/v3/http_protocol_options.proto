@@ -130,6 +130,13 @@ message HttpProtocolOptions {
     config.core.v3.AlternateProtocolsCacheOptions alternate_protocols_cache_options = 4;
   }
 
+  message OutlierDetection {
+    // If specified, only responses matching the matcher will be treated by outlier detection as errors.
+    // If not specified, only 5xx codes are treated by outlier detection as errors.
+    config.common.matcher.v3.MatchPredicate error_matcher = 1
+        [(validate.rules).message = {required: true}];
+  }
+
   // This contains options common across HTTP/1 and HTTP/2
   config.core.v3.HttpProtocolOptions common_http_protocol_options = 1;
 
@@ -175,13 +182,6 @@ message HttpProtocolOptions {
   // [#not-implemented-hide:]
   // [#extension-category: envoy.http.header_validators]
   config.core.v3.TypedExtensionConfig header_validation_config = 7;
-
-  message OutlierDetection {
-    // If specified, only responses matching the matcher will be treated by outlier detection as errors.
-    // If not specified, only 5xx codes are treated by outlier detection as errors.
-    config.common.matcher.v3.MatchPredicate error_matcher = 1
-        [(validate.rules).message = {required: true}];
-  }
 
   // Defines http specific outlier detection parameters.
   OutlierDetection outlier_detection = 8;
