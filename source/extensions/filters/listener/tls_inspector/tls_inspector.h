@@ -48,13 +48,6 @@ enum class ParseState {
   Error
 };
 
-enum FailureReason {
-  // ClientHello is too large.
-  ClientHelloTooLarge,
-  // ClientHello is not detected.
-  ClientHelloNotDetected,
-};
-
 /**
  * Global configuration for TLS inspector.
  */
@@ -103,6 +96,8 @@ public:
 
   static const std::string& dynamicMetadataKey();
   static const std::string& failureReasonKey();
+  static const std::string& failureReasonClientHelloTooLarge();
+  static const std::string& failureReasonClientHelloNotDetected();
 
 private:
   ParseState parseClientHello(const void* data, size_t len, uint64_t bytes_already_processed);
@@ -112,7 +107,7 @@ private:
   void createJA3Hash(const SSL_CLIENT_HELLO* ssl_client_hello);
   void createJA4Hash(const SSL_CLIENT_HELLO* ssl_client_hello);
   uint32_t maxConfigReadBytes() const { return config_->maxClientHelloSize(); }
-  void setDynamicMetadata(FailureReason failure_reason);
+  void setDynamicMetadata(absl::string_view failure_reason);
 
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_{};

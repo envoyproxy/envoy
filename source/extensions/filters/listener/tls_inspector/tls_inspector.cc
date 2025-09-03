@@ -175,10 +175,10 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
   return Network::FilterStatus::StopIteration;
 }
 
-void Filter::setDynamicMetadata(FailureReason failure_reason) {
+void Filter::setDynamicMetadata(absl::string_view failure_reason) {
   Protobuf::Struct metadata;
   auto& fields = *metadata.mutable_fields();
-  fields[failureReasonKey()].set_number_value(failure_reason);
+  fields[failureReasonKey()].set_string_value(failure_reason);
   cb_->setDynamicMetadata(dynamicMetadataKey(), metadata);
 }
 
@@ -205,7 +205,7 @@ ParseState Filter::parseClientHello(const void* data, size_t len,
         // We've hit the specified size limit. This is an unreasonably large ClientHello;
         // indicate failure.
         config_->stats().client_hello_too_large_.inc();
-        setDynamicMetadata(FailureReason::ClientHelloTooLarge);
+        setDynamicMetadata(failureReasonClientHelloTooLarge());
         return ParseState::Error;
       }
       if (read_ >= requested_read_bytes_) {
@@ -227,11 +227,11 @@ ParseState Filter::parseClientHello(const void* data, size_t len,
           // We've hit the specified size limit. This is an unreasonably large ClientHello;
           // indicate failure.
           config_->stats().client_hello_too_large_.inc();
-          setDynamicMetadata(FailureReason::ClientHelloTooLarge);
+          setDynamicMetadata(failureReasonClientHelloTooLarge());
           return ParseState::Error;
         }
         config_->stats().tls_not_found_.inc();
-        setDynamicMetadata(FailureReason::ClientHelloNotDetected);
+        setDynamicMetadata(failureReasonClientHelloNotDetected());
         ENVOY_LOG(
             debug, "tls inspector: parseClientHello failed: {}",
             Extensions::TransportSockets::Tls::Utility::getLastCryptoError().value_or("unknown"));
@@ -385,6 +385,14 @@ const std::string& Filter::dynamicMetadataKey() {
 
 const std::string& Filter::failureReasonKey() {
   CONSTRUCT_ON_FIRST_USE(std::string, "failure_reason");
+}
+
+const std::string& Filter::failureReasonClientHelloTooLarge() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "ClientHelloTooLarge");
+}
+
+const std::string& Filter::failureReasonClientHelloNotDetected() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "ClientHelloNotDetected");
 }
 
 } // namespace TlsInspector

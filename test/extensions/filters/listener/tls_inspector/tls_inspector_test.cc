@@ -284,7 +284,7 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
 
   Protobuf::Struct expected_metadata;
   auto& fields = *expected_metadata.mutable_fields();
-  fields[Filter::failureReasonKey()].set_number_value(FailureReason::ClientHelloTooLarge);
+  fields[Filter::failureReasonKey()].set_string_value(Filter::failureReasonClientHelloTooLarge());
   EXPECT_CALL(cb_, setDynamicMetadata(Filter::dynamicMetadataKey(), ProtoEq(expected_metadata)));
 
   auto state = filter_->onData(*buffer_);
@@ -418,7 +418,8 @@ TEST_P(TlsInspectorTest, NotSsl) {
 
   Protobuf::Struct expected_metadata;
   auto& fields = *expected_metadata.mutable_fields();
-  fields[Filter::failureReasonKey()].set_number_value(FailureReason::ClientHelloNotDetected);
+  fields[Filter::failureReasonKey()].set_string_value(
+      Filter::failureReasonClientHelloNotDetected());
   EXPECT_CALL(cb_, setDynamicMetadata(Filter::dynamicMetadataKey(), ProtoEq(expected_metadata)));
 
   auto state = filter_->onData(*buffer_);

@@ -287,8 +287,7 @@ TEST_P(TlsInspectorIntegrationTest, TlsInspectorMetadataPopulatedInAccessLog) {
   // The timeout is set as one seconds, advance 2 seconds to trigger the timeout.
   timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(2000));
   client_->close(Network::ConnectionCloseType::NoFlush);
-  EXPECT_THAT(waitForAccessLog(listener_access_log_name_),
-              testing::Eq("1")); // 1 == ClientHelloNotDetected
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::Eq("ClientHelloNotDetected"));
 }
 
 // The `JA3` fingerprint is correct in the access log.
