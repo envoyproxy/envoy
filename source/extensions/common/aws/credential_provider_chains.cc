@@ -39,12 +39,27 @@ CommonCredentialsProviderChain::customCredentialsProviderChain(
         "Custom credential provider chain must have at least one credential provider");
   }
 
-  return std::make_shared<CommonCredentialsProviderChain>(context, region,
-                                                          credential_provider_config);
+  auto chain =
+      std::make_shared<CommonCredentialsProviderChain>(context, region, credential_provider_config);
+  chain->setupSubscriptions();
+  return chain;
 }
 CredentialsProviderChainSharedPtr CommonCredentialsProviderChain::defaultCredentialsProviderChain(
     Server::Configuration::ServerFactoryContext& context, absl::string_view region) {
-  return std::make_shared<CommonCredentialsProviderChain>(context, region, absl::nullopt);
+  auto chain = std::make_shared<CommonCredentialsProviderChain>(context, region, absl::nullopt);
+  chain->setupSubscriptions();
+  return chain;
+}
+
+void CommonCredentialsProviderChain::setupSubscriptions() {
+  for (auto& provider : providers_) {
+    // Set up subscription for each provider that supports it
+    auto metadata_provider = std::dynamic_pointer_cast<MetadataCredentialsProviderBase>(provider);
+    if (metadata_provider) {
+      storeSubscription(metadata_provider->subscribeToCredentialUpdates(
+          std::static_pointer_cast<CredentialSubscriberCallbacks>(shared_from_this())));
+    }
+  }
 }
 
 CommonCredentialsProviderChain::CommonCredentialsProviderChain(
@@ -272,8 +287,7 @@ CredentialsProviderSharedPtr CommonCredentialsProviderChain::createAssumeRoleCre
     credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
   }
 
-  storeSubscription(credential_provider->subscribeToCredentialUpdates(*this));
-
+  // Note: Subscription will be set up after construction
   return credential_provider;
 };
 
@@ -308,8 +322,7 @@ CredentialsProviderSharedPtr CommonCredentialsProviderChain::createContainerCred
     credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
   }
 
-  storeSubscription(credential_provider->subscribeToCredentialUpdates(*this));
-
+  // Note: Subscription will be set up after construction
   return credential_provider;
 }
 
@@ -342,8 +355,7 @@ CommonCredentialsProviderChain::createInstanceProfileCredentialsProvider(
     credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
   }
 
-  storeSubscription(credential_provider->subscribeToCredentialUpdates(*this));
-
+  // Note: Subscription will be set up after construction
   return credential_provider;
 }
 
@@ -374,8 +386,7 @@ CredentialsProviderSharedPtr CommonCredentialsProviderChain::createWebIdentityCr
     credential_provider->setClusterReadyCallbackHandle(std::move(handleOr.value()));
   }
 
-  storeSubscription(credential_provider->subscribeToCredentialUpdates(*this));
-
+  // Note: Subscription will be set up after construction
   return credential_provider;
 };
 

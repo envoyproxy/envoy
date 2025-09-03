@@ -328,8 +328,11 @@ public class CronetHttp3Test {
   @SmallTest
   @Feature({"Cronet"})
   public void networkChangeNoDrains() throws Exception {
-    // Disable dns refreshment so that the engine will attempt immediate draining.
-    disableDnsRefreshOnNetworkChange = true;
+    if (!JniLibrary.runtimeFeatureEnabled(
+            "envoy.reloadable_features.decouple_explicit_drain_pools_and_dns_refresh")) {
+      // Disable dns refreshment so that the engine will attempt immediate draining.
+      disableDnsRefreshOnNetworkChange = true;
+    }
     drainOnNetworkChange = false;
     setUp(printEnvoyLogs);
 
@@ -367,8 +370,11 @@ public class CronetHttp3Test {
   @SmallTest
   @Feature({"Cronet"})
   public void networkChangeWithDrains() throws Exception {
-    // Disable dns refreshment so that the engine will attempt immediate draining.
-    disableDnsRefreshOnNetworkChange = true;
+    if (!JniLibrary.runtimeFeatureEnabled(
+            "envoy.reloadable_features.decouple_explicit_drain_pools_and_dns_refresh")) {
+      // Disable dns refreshment so that the engine will attempt immediate draining.
+      disableDnsRefreshOnNetworkChange = true;
+    }
     drainOnNetworkChange = true;
     setUp(printEnvoyLogs);
 
@@ -407,8 +413,11 @@ public class CronetHttp3Test {
   @SmallTest
   @Feature({"Cronet"})
   public void networkChangeMonitorV2FromCellToWifi() throws Exception {
-    // Disable dns refreshment so that the engine will attempt immediate draining.
-    disableDnsRefreshOnNetworkChange = true;
+    if (!JniLibrary.runtimeFeatureEnabled(
+            "envoy.reloadable_features.decouple_explicit_drain_pools_and_dns_refresh")) {
+      // Disable dns refreshment so that the engine will attempt immediate draining.
+      disableDnsRefreshOnNetworkChange = true;
+    }
     drainOnNetworkChange = true;
     useAndroidNetworkMonitorV2 = true;
     setUp(printEnvoyLogs);
@@ -494,8 +503,11 @@ public class CronetHttp3Test {
   @SmallTest
   @Feature({"Cronet"})
   public void networkChangeMonitorV2FromDisconnectedCellToWifi() throws Exception {
-    // Disable dns refreshment so that the engine will attempt immediate draining.
-    disableDnsRefreshOnNetworkChange = true;
+    if (!JniLibrary.runtimeFeatureEnabled(
+            "envoy.reloadable_features.decouple_explicit_drain_pools_and_dns_refresh")) {
+      // Disable dns refreshment so that the engine will attempt immediate draining.
+      disableDnsRefreshOnNetworkChange = true;
+    }
     drainOnNetworkChange = true;
     useAndroidNetworkMonitorV2 = true;
     setUp(printEnvoyLogs);
@@ -572,8 +584,11 @@ public class CronetHttp3Test {
   @SmallTest
   @Feature({"Cronet"})
   public void networkChangeMonitorV2VpnOnAndOff() throws Exception {
-    // Disable dns refreshment so that the engine will attempt immediate draining.
-    disableDnsRefreshOnNetworkChange = true;
+    if (!JniLibrary.runtimeFeatureEnabled(
+            "envoy.reloadable_features.decouple_explicit_drain_pools_and_dns_refresh")) {
+      // Disable dns refreshment so that the engine will attempt immediate draining.
+      disableDnsRefreshOnNetworkChange = true;
+    }
     drainOnNetworkChange = true;
     useAndroidNetworkMonitorV2 = true;
     setUp(printEnvoyLogs);

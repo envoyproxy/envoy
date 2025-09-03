@@ -287,7 +287,13 @@ TEST_F(ConnectivityManagerTest, NetworkChangeResultsInDifferentSocketOptionsHash
   for (const auto& option : *options2) {
     option->hashKey(hash2);
   }
-  EXPECT_NE(hash1, hash2);
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.decouple_explicit_drain_pools_and_dns_refresh") ||
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.drain_pools_on_network_change")) {
+    EXPECT_NE(hash1, hash2);
+  } else {
+    EXPECT_EQ(hash1, hash2);
+  }
 }
 
 // Verifies that when the platform notifies about the same default network

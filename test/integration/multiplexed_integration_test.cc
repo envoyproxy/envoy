@@ -254,6 +254,51 @@ TEST_P(MultiplexedIntegrationTest, CodecStreamIdleTimeout) {
   ASSERT_TRUE(response->waitForReset());
 }
 
+// Test that the codec stream flush timeout can be overridden independently from
+// the connection manager stream idle timeout.
+TEST_P(MultiplexedIntegrationTest, CodecStreamIdleTimeoutOverride) {
+  config_helper_.setBufferLimits(1024, 1024);
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        // Disable the generic stream idle timeout. This will be overridden by the
+        // stream_flush_timeout and the test should work exactly the same as the
+        // CodecStreamIdleTimeout test.
+        hcm.mutable_stream_idle_timeout()->set_seconds(0);
+        hcm.mutable_stream_idle_timeout()->set_nanos(0);
+
+        hcm.mutable_stream_flush_timeout()->set_seconds(0);
+        constexpr uint64_t FlushTimeoutMs = 400;
+        hcm.mutable_stream_flush_timeout()->set_nanos(FlushTimeoutMs * 1000 * 1000);
+      });
+  initialize();
+  const size_t stream_flow_control_window =
+      downstream_protocol_ == Http::CodecType::HTTP3 ? 32 * 1024 : 65535;
+  envoy::config::core::v3::Http2ProtocolOptions http2_options =
+      ::Envoy::Http2::Utility::initializeAndValidateOptions(
+          envoy::config::core::v3::Http2ProtocolOptions())
+          .value();
+  http2_options.mutable_initial_stream_window_size()->set_value(stream_flow_control_window);
+#ifdef ENVOY_ENABLE_QUIC
+  if (downstream_protocol_ == Http::CodecType::HTTP3) {
+    dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+        .quic_config_.SetInitialStreamFlowControlWindowToSend(stream_flow_control_window);
+    dynamic_cast<Quic::PersistentQuicInfoImpl&>(*quic_connection_persistent_info_)
+        .quic_config_.SetInitialSessionFlowControlWindowToSend(stream_flow_control_window);
+  }
+#endif
+  codec_client_ = makeRawHttpConnection(makeClientConnection(lookupPort("http")), http2_options);
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(stream_flow_control_window + 2000, true);
+  std::string flush_timeout_counter(downstreamProtocol() == Http::CodecType::HTTP3
+                                        ? "http3.tx_flush_timeout"
+                                        : "http2.tx_flush_timeout");
+  test_server_->waitForCounterEq(flush_timeout_counter, 1);
+  ASSERT_TRUE(response->waitForReset());
+}
+
 TEST_P(MultiplexedIntegrationTest, Http2DownstreamKeepalive) {
   EXCLUDE_DOWNSTREAM_HTTP3; // Http3 keepalive doesn't timeout and close connection.
   constexpr uint64_t interval_ms = 1;

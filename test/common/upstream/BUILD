@@ -542,7 +542,6 @@ envoy_cc_test(
         "//source/extensions/upstreams/tcp:config",
         "//source/server:transport_socket_config_lib",
         "//test/common/stats:stat_test_utility_lib",
-        "//test/mocks:common_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/protobuf:protobuf_mocks",

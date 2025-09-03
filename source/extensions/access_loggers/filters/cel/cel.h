@@ -20,7 +20,7 @@ namespace CEL {
 class CELAccessLogExtensionFilter : public AccessLog::Filter {
 public:
   CELAccessLogExtensionFilter(const ::Envoy::LocalInfo::LocalInfo& local_info,
-                              Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr,
+                              Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr,
                               const cel::expr::Expr&);
 
   bool evaluate(const Formatter::HttpFormatterContext& log_context,
@@ -28,9 +28,7 @@ public:
 
 private:
   const ::Envoy::LocalInfo::LocalInfo& local_info_;
-  Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder_;
-  const cel::expr::Expr parsed_expr_;
-  Extensions::Filters::Common::Expr::ExpressionPtr compiled_expr_;
+  const Extensions::Filters::Common::Expr::CompiledExpression expr_;
 };
 
 } // namespace CEL
