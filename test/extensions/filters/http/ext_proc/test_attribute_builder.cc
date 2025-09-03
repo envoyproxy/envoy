@@ -15,6 +15,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ExternalProcessing {
 
+using envoy::test::extensions::filters::http::ext_proc::v3::TestAttributeBuilderConfig;
+
 // Helper function to convert proto map values to a unique vector of strings.
 // The order of elements in the returned vector is not guaranteed.
 Protobuf::RepeatedPtrField<std::string>

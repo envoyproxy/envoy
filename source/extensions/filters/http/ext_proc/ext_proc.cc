@@ -1405,7 +1405,7 @@ void Filter::addAttributes(ProcessorState& state, ProcessingRequest& req) {
       .response_headers = state.responseHeaders(),
       .response_trailers = state.responseTrailers(),
   };
-  if (config_->attributeBuilder().build(build_params, req.mutable_attributes())) {
+  if (config_->attributeBuilder()->build(build_params, req.mutable_attributes())) {
     state.setSentAttributes(true);
   }
 }

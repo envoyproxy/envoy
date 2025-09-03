@@ -303,7 +303,7 @@ public:
   std::chrono::milliseconds remoteCloseTimeout() const { return remote_close_timeout_; }
 
   std::unique_ptr<OnProcessingResponse> createOnProcessingResponse() const;
-  AttributeBuilder& attributeBuilder() const { return *attribute_builder_; }
+  AttributeBuilder* attributeBuilder() const { return attribute_builder_.get(); }
 
 private:
   ExtProcFilterStats generateStats(const std::string& prefix,

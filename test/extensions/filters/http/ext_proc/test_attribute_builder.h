@@ -14,28 +14,24 @@ namespace ExternalProcessing {
 
 class TestAttributeBuilder : public AttributeBuilder {
 public:
-  using TestAttributeBuilderConfig =
-      envoy::test::extensions::filters::http::ext_proc::v3::TestAttributeBuilderConfig;
-
-  TestAttributeBuilder(const TestAttributeBuilderConfig& config,
-                       absl::string_view default_attribute_key,
-                       Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
-                       Server::Configuration::CommonFactoryContext& context);
+  TestAttributeBuilder(
+      const envoy::test::extensions::filters::http::ext_proc::v3::TestAttributeBuilderConfig&
+          config,
+      absl::string_view default_attribute_key,
+      Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
+      Server::Configuration::CommonFactoryContext& context);
 
   bool build(const BuildParams& params,
              Protobuf::Map<std::string, Protobuf::Struct>* attributes) const override;
 
 private:
-  const TestAttributeBuilderConfig config_;
+  const envoy::test::extensions::filters::http::ext_proc::v3::TestAttributeBuilderConfig config_;
   const std::string default_attribute_key_;
   const ExpressionManager expression_manager_;
 };
 
 class TestAttributeBuilderFactory : public AttributeBuilderFactory {
 public:
-  using TestAttributeBuilderConfig =
-      envoy::test::extensions::filters::http::ext_proc::v3::TestAttributeBuilderConfig;
-
   ~TestAttributeBuilderFactory() override = default;
   std::unique_ptr<AttributeBuilder> createAttributeBuilder(
       const Protobuf::Message& config, absl::string_view default_attribute_key,
@@ -43,7 +39,8 @@ public:
       Envoy::Server::Configuration::CommonFactoryContext& context) const override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<TestAttributeBuilderConfig>();
+    return std::make_unique<
+        envoy::test::extensions::filters::http::ext_proc::v3::TestAttributeBuilderConfig>();
   }
 
   std::string name() const override { return "test_attribute_builder"; }
