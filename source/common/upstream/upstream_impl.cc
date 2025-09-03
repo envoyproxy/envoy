@@ -1593,7 +1593,7 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
 
 absl::optional<bool>
 ClusterInfoImpl::processHttpForOutlierDetection(Http::ResponseHeaderMap& headers) const {
-  if (http_protocol_options_->outlier_detection_http_error_matcher_[0] == nullptr) {
+  if (http_protocol_options_->outlier_detection_http_error_matcher_.empty()) {
     return absl::nullopt;
   }
 
