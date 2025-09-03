@@ -29,7 +29,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message OnDemandCds {
   // A configuration source for the service that will be used for
   // on-demand cluster discovery.
-  config.core.v3.ConfigSource source = 1 [(validate.rules).message = {required: true}];
+  config.core.v3.ConfigSource source = 1;
 
   // xdstp:// resource locator for on-demand cluster collection.
   string resources_locator = 2;
