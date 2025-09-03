@@ -18,7 +18,10 @@ public:
   const VerificationOutput verifySignature(absl::string_view hash, CryptoObject& key,
                                            const std::vector<uint8_t>& signature,
                                            const std::vector<uint8_t>& text) override;
+  const SignOutput signSignature(absl::string_view hash, CryptoObject& key,
+                                const std::vector<uint8_t>& text) override;
   CryptoObjectPtr importPublicKey(const std::vector<uint8_t>& key) override;
+  CryptoObjectPtr importPrivateKey(const std::vector<uint8_t>& key) override;
 
 private:
   const EVP_MD* getHashFunction(absl::string_view name);

@@ -27,6 +27,24 @@ struct VerificationOutput {
   std::string error_message_;
 };
 
+struct SignOutput {
+  /**
+   * Signing result. If result_ is true, error_message_ is empty.
+   */
+  bool result_;
+
+  /**
+   * Generated signature when signing succeeded.
+   */
+  std::vector<uint8_t> signature_;
+
+  /**
+   * Error message when signing failed.
+   * TODO(crazyxy): switch to absl::StatusOr when available
+   */
+  std::string error_message_;
+};
+
 class Utility {
 public:
   virtual ~Utility() = default;
@@ -61,11 +79,29 @@ public:
                                                    const std::vector<uint8_t>& text) PURE;
 
   /**
+   * Create cryptographic signatures.
+   * @param hash hash function(including SHA1, SHA224, SHA256, SHA384, SHA512)
+   * @param key pointer to EVP_PKEY private key
+   * @param text clear text to sign
+   * @return If the result_ is true, the signature_ contains the generated signature and error_message_ is empty; otherwise,
+   * the error_message_ stores the error message
+   */
+  virtual const SignOutput signSignature(absl::string_view hash, CryptoObject& key,
+                                        const std::vector<uint8_t>& text) PURE;
+
+  /**
    * Import public key.
    * @param key key string
    * @return pointer to EVP_PKEY public key
    */
   virtual CryptoObjectPtr importPublicKey(const std::vector<uint8_t>& key) PURE;
+
+  /**
+   * Import private key.
+   * @param key key string
+   * @return pointer to EVP_PKEY private key
+   */
+  virtual CryptoObjectPtr importPrivateKey(const std::vector<uint8_t>& key) PURE;
 };
 
 using UtilitySingleton = InjectableSingleton<Utility>;

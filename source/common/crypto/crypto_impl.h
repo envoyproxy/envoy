@@ -21,6 +21,18 @@ private:
   bssl::UniquePtr<EVP_PKEY> pkey_;
 };
 
+class PrivateKeyObject : public Envoy::Common::Crypto::CryptoObject {
+public:
+  PrivateKeyObject() = default;
+  PrivateKeyObject(EVP_PKEY* pkey) : pkey_(pkey) {}
+  PrivateKeyObject(const PrivateKeyObject& pkey_wrapper);
+  EVP_PKEY* getEVP_PKEY() const;
+  void setEVP_PKEY(EVP_PKEY* pkey);
+
+private:
+  bssl::UniquePtr<EVP_PKEY> pkey_;
+};
+
 } // namespace Crypto
 } // namespace Common
 } // namespace Envoy

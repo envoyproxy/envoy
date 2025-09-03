@@ -9,6 +9,7 @@
 #include "source/extensions/common/wasm/ext/envoy_proxy_wasm_api.h"
 #include "source/extensions/common/wasm/ext/declare_property.pb.h"
 #include "source/extensions/common/wasm/ext/verify_signature.pb.h"
+#include "source/extensions/common/wasm/ext/sign_signature.pb.h"
 #else
 #include "source/extensions/common/wasm/ext/envoy_null_plugin.h"
 #include "absl/base/casts.h"
@@ -868,6 +869,146 @@ void TestRootContext::onTick() {
           }
 
           ::free(out);
+      }
+  } else if (test_ == "sign_signature") {
+      std::string function = "sign_signature";
+
+      static const std::string data = "hello";
+      static const std::vector<uint8_t> private_key = {48, 130, 1, 34, 48, 13, 6, 9, 42, 134, 72, 134, 247, 13, 1, 1, 1, 5, 0, 3, 130, 1, 15, 0, 48, 130, 1, 10, 2, 130, 1, 1, 0, 167, 71, 18, 102, 208, 29, 22, 3, 8, 215, 52, 9, 192, 111, 46, 141, 53, 197, 49, 196, 88, 211, 228, 128, 233, 243, 25, 24, 71, 208, 98, 236, 92, 207, 247, 188, 81, 233, 73, 213, 242, 195, 84, 12, 24, 154, 78, 202, 30, 134, 51, 166, 44, 242, 208, 146, 49, 1, 194, 126, 56, 1, 62, 113, 222, 154, 233, 26, 112, 72, 73, 191, 247, 251, 226, 206, 91, 244, 189, 102, 111, 217, 115, 17, 2, 165, 49, 147, 254, 90, 154, 90, 80, 100, 79, 248, 177, 24, 63, 168, 151, 100, 101, 152, 202, 173, 34, 163, 127, 149, 68, 81, 8, 54, 55, 43, 68, 197, 140, 152, 88, 111, 183, 20, 70, 41, 205, 140, 148, 121, 89, 45, 153, 109, 50, 255, 109, 57, 92, 11, 132, 66, 236, 90, 161, 239, 128, 81, 82, 158, 160, 227, 117, 136, 60, 239, 199, 44, 4, 227, 96, 180, 239, 143, 87, 96, 101, 5, 137, 202, 129, 73, 24, 246, 120, 238, 227, 155, 136, 77, 90, 248, 19, 106, 150, 48, 166, 204, 12, 222, 21, 125, 200, 224, 15, 57, 84, 6, 40, 213, 243, 53, 178, 195, 108, 84, 199, 200, 188, 55, 56, 166, 178, 26, 207, 248, 21, 64, 90, 250, 40, 229, 24, 63, 85, 13, 172, 25, 171, 207, 17, 69, 167, 249, 206, 217, 135, 219, 104, 14, 74, 34, 156, 172, 117, 222, 227, 71, 236, 158, 188, 225, 252, 61, 187, 187, 2, 3, 1, 0, 1};
+      std::string private_key_str(private_key.begin(), private_key.end());
+      static const std::string hashFunc = "sha256";
+
+      {
+          envoy::source::extensions::common::wasm::SignSignatureArguments args;
+
+          args.set_text(data);
+          args.set_private_key(private_key_str);
+          args.set_hash_function(hashFunc);
+
+          std::string in;
+          args.SerializeToString(&in);
+          char* out = nullptr;
+          size_t out_size = 0;
+
+          if (WasmResult::Ok == proxy_call_foreign_function(function.data(), function.size(), in.data(),
+                                                            in.size(), &out, &out_size)) {
+              envoy::source::extensions::common::wasm::SignSignatureResult result;
+              if (result.ParseFromArray(out, static_cast<int>(out_size)) && result.result()) {
+                  logInfo("signature created successfully");
+              } else {
+                  logError(result.error());
+              }
+          }
+          ::free(out);
+      }
+
+      {
+          envoy::source::extensions::common::wasm::SignSignatureArguments args;
+
+          args.set_text(data);
+          args.set_private_key(private_key_str);
+          args.set_hash_function("unknown");
+
+          std::string in;
+          args.SerializeToString(&in);
+          char* out = nullptr;
+          size_t out_size = 0;
+          if (WasmResult::Ok == proxy_call_foreign_function(function.data(), function.size(), in.data(),
+                                                            in.size(), &out, &out_size)) {
+              envoy::source::extensions::common::wasm::SignSignatureResult result;
+              if (result.ParseFromArray(out, static_cast<int>(out_size)) && result.result()) {
+                  logCritical("signature should not be ok");
+              } else {
+                  logError(result.error());
+              }
+          }
+          ::free(out);
+      }
+      
+      {
+          envoy::source::extensions::common::wasm::SignSignatureArguments args;
+
+          args.set_text("xxxx");
+          args.set_private_key("0000");
+          args.set_hash_function(hashFunc);
+
+          std::string in;
+          args.SerializeToString(&in);
+          char* out = nullptr;
+          size_t out_size = 0;
+          if (WasmResult::Ok == proxy_call_foreign_function(function.data(), function.size(), in.data(),
+                                                            in.size(), &out, &out_size)) {
+              envoy::source::extensions::common::wasm::SignSignatureResult result;
+              if (result.ParseFromArray(out, static_cast<int>(out_size)) && result.result()) {
+                  logCritical("signature should not be ok");
+              } else {
+                  logError(result.error());
+              }
+          }
+          ::free(out);
+      }
+  } else if (test_ == "sign_and_verify_signature") {
+      std::string sign_function = "sign_signature";
+      std::string verify_function = "verify_signature";
+
+      static const std::string data = "hello world";
+      static const std::vector<uint8_t> private_key = {48, 130, 1, 34, 48, 13, 6, 9, 42, 134, 72, 134, 247, 13, 1, 1, 1, 5, 0, 3, 130, 1, 15, 0, 48, 130, 1, 10, 2, 130, 1, 1, 0, 167, 71, 18, 102, 208, 29, 22, 3, 8, 215, 52, 9, 192, 111, 46, 141, 53, 197, 49, 196, 88, 211, 228, 128, 233, 243, 25, 24, 71, 208, 98, 236, 92, 207, 247, 188, 81, 233, 73, 213, 242, 195, 84, 12, 24, 154, 78, 202, 30, 134, 51, 166, 44, 242, 208, 146, 49, 1, 194, 126, 56, 1, 62, 113, 222, 154, 233, 26, 112, 72, 73, 191, 247, 251, 226, 206, 91, 244, 189, 102, 111, 217, 115, 17, 2, 165, 49, 147, 254, 90, 154, 90, 80, 100, 79, 248, 177, 24, 63, 168, 151, 100, 101, 152, 202, 173, 34, 163, 127, 149, 68, 81, 8, 54, 55, 43, 68, 197, 140, 152, 88, 111, 183, 20, 70, 41, 205, 140, 148, 121, 89, 45, 153, 109, 50, 255, 109, 57, 92, 11, 132, 66, 236, 90, 161, 239, 128, 81, 82, 158, 160, 227, 117, 136, 60, 239, 199, 44, 4, 227, 96, 180, 239, 143, 87, 96, 101, 5, 137, 202, 129, 73, 24, 246, 120, 238, 227, 155, 136, 77, 90, 248, 19, 106, 150, 48, 166, 204, 12, 222, 21, 125, 200, 224, 15, 57, 84, 6, 40, 213, 243, 53, 178, 195, 108, 84, 199, 200, 188, 55, 56, 166, 178, 26, 207, 248, 21, 64, 90, 250, 40, 229, 24, 63, 85, 13, 172, 25, 171, 207, 17, 69, 167, 249, 206, 217, 135, 219, 104, 14, 74, 34, 156, 172, 117, 222, 227, 71, 236, 158, 188, 225, 252, 61, 187, 187, 2, 3, 1, 0, 1};
+      static const std::vector<uint8_t> public_key = {48, 130, 1, 34, 48, 13, 6, 9, 42, 134, 72, 134, 247, 13, 1, 1, 1, 5, 0, 3, 130, 1, 15, 0, 48, 130, 1, 10, 2, 130, 1, 1, 0, 167, 71, 18, 102, 208, 29, 22, 3, 8, 215, 52, 9, 192, 111, 46, 141, 53, 197, 49, 196, 88, 211, 228, 128, 233, 243, 25, 24, 71, 208, 98, 236, 92, 207, 247, 188, 81, 233, 73, 213, 242, 195, 84, 12, 24, 154, 78, 202, 30, 134, 51, 166, 44, 242, 208, 146, 49, 1, 194, 126, 56, 1, 62, 113, 222, 154, 233, 26, 112, 72, 73, 191, 247, 251, 226, 206, 91, 244, 189, 102, 111, 217, 115, 17, 2, 165, 49, 147, 254, 90, 154, 90, 80, 100, 79, 248, 177, 24, 63, 168, 151, 100, 101, 152, 202, 173, 34, 163, 127, 149, 68, 81, 8, 54, 55, 43, 68, 197, 140, 152, 88, 111, 183, 20, 70, 41, 205, 140, 148, 121, 89, 45, 153, 109, 50, 255, 109, 57, 92, 11, 132, 66, 236, 90, 161, 239, 128, 81, 82, 158, 160, 227, 117, 136, 60, 239, 199, 44, 4, 227, 96, 180, 239, 143, 87, 96, 101, 5, 137, 202, 129, 73, 24, 246, 120, 238, 227, 155, 136, 77, 90, 248, 19, 106, 150, 48, 166, 204, 12, 222, 21, 125, 200, 224, 15, 57, 84, 6, 40, 213, 243, 53, 178, 195, 108, 84, 199, 200, 188, 55, 56, 166, 178, 26, 207, 248, 21, 64, 90, 250, 40, 229, 24, 63, 85, 13, 172, 25, 171, 207, 17, 69, 167, 249, 206, 217, 135, 219, 104, 14, 74, 34, 156, 172, 117, 222, 227, 71, 236, 158, 188, 225, 252, 61, 187, 187, 2, 3, 1, 0, 1};
+      std::string private_key_str(private_key.begin(), private_key.end());
+      std::string public_key_str(public_key.begin(), public_key.end());
+      static const std::string hashFunc = "sha256";
+
+      // Step 1: Create a signature using sign_signature
+      {
+          envoy::source::extensions::common::wasm::SignSignatureArguments sign_args;
+          sign_args.set_text(data);
+          sign_args.set_private_key(private_key_str);
+          sign_args.set_hash_function(hashFunc);
+
+          std::string sign_in;
+          sign_args.SerializeToString(&sign_in);
+          char* sign_out = nullptr;
+          size_t sign_out_size = 0;
+
+          if (WasmResult::Ok == proxy_call_foreign_function(sign_function.data(), sign_function.size(), sign_in.data(),
+                                                            sign_in.size(), &sign_out, &sign_out_size)) {
+              envoy::source::extensions::common::wasm::SignSignatureResult sign_result;
+              if (sign_result.ParseFromArray(sign_out, static_cast<int>(sign_out_size)) && sign_result.result()) {
+                  logInfo("signature created successfully, length: " + std::to_string(sign_result.signature().size()));
+
+                  // Step 2: Verify the signature using verify_signature
+                  {
+                      envoy::source::extensions::common::wasm::VerifySignatureArguments verify_args;
+                      verify_args.set_text(data);
+                      verify_args.set_public_key(public_key_str);
+                      verify_args.set_signature(sign_result.signature());
+                      verify_args.set_hash_function(hashFunc);
+
+                      std::string verify_in;
+                      verify_args.SerializeToString(&verify_in);
+                      char* verify_out = nullptr;
+                      size_t verify_out_size = 0;
+
+                      if (WasmResult::Ok == proxy_call_foreign_function(verify_function.data(), verify_function.size(), verify_in.data(),
+                                                                        verify_in.size(), &verify_out, &verify_out_size)) {
+                          envoy::source::extensions::common::wasm::VerifySignatureResult verify_result;
+                          if (verify_result.ParseFromArray(verify_out, static_cast<int>(verify_out_size)) && verify_result.result()) {
+                              logInfo("end-to-end test passed: signature created and verified successfully");
+                          } else {
+                              logError("end-to-end test failed: signature verification failed: " + verify_result.error());
+                          }
+                      } else {
+                          logError("end-to-end test failed: verify_signature call failed");
+                      }
+                      ::free(verify_out);
+                  }
+              } else {
+                  logError("end-to-end test failed: signature creation failed: " + sign_result.error());
+              }
+          } else {
+              logError("end-to-end test failed: sign_signature call failed");
+          }
+          ::free(sign_out);
       }
   }
 }

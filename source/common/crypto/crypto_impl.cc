@@ -8,6 +8,10 @@ EVP_PKEY* PublicKeyObject::getEVP_PKEY() const { return pkey_.get(); }
 
 void PublicKeyObject::setEVP_PKEY(EVP_PKEY* pkey) { pkey_.reset(pkey); }
 
+EVP_PKEY* PrivateKeyObject::getEVP_PKEY() const { return pkey_.get(); }
+
+void PrivateKeyObject::setEVP_PKEY(EVP_PKEY* pkey) { pkey_.reset(pkey); }
+
 } // namespace Crypto
 } // namespace Common
 } // namespace Envoy
