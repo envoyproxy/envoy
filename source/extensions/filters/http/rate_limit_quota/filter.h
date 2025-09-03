@@ -78,9 +78,10 @@ private:
                                                 CachedBucket& cached_bucket);
   bool shouldAllowRequest(const CachedBucket& cached_bucket);
   // Handle the first Matcher that's marked with keep_matching as a preview/darklaunch.
-  void handlePreviewMatch(Matcher::ActionFactoryCb skipped_action);
+  void handlePreviewMatch(const Matcher::ActionConstSharedPtr& skipped_action);
   // Record the usage of a bucket, including bucket creation if hitting a new bucket.
-  Http::FilterHeadersStatus recordBucketUsage(Matcher::ActionPtr matched, bool is_preview_match);
+  Http::FilterHeadersStatus recordBucketUsage(const Matcher::ActionConstSharedPtr& matched,
+                                              bool is_preview_match);
 
   FilterConfigConstSharedPtr config_;
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;

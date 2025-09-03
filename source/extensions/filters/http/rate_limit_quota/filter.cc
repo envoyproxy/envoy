@@ -79,8 +79,9 @@ Http::FilterHeadersStatus sendDenyResponse(Http::StreamDecoderFilterCallbacks* c
   return Envoy::Http::FilterHeadersStatus::StopIteration;
 }
 
-Http::FilterHeadersStatus RateLimitQuotaFilter::recordBucketUsage(Matcher::ActionPtr matched,
-                                                                  bool is_preview_match) {
+Http::FilterHeadersStatus
+RateLimitQuotaFilter::recordBucketUsage(const Matcher::ActionConstSharedPtr& matched,
+                                        bool is_preview_match) {
   // Generate the bucket id for this request based on match action when
   // the request matching succeeds.
   const RateLimitOnMatchAction& match_action = matched->getTyped<RateLimitOnMatchAction>();
@@ -176,7 +177,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
                                                               bool end_stream) {
   ENVOY_LOG(trace, "decodeHeaders: end_stream = {}", end_stream);
   // First, perform the request matching.
-  absl::StatusOr<Matcher::ActionPtr> match_result = requestMatching(headers);
+  absl::StatusOr<Matcher::ActionConstSharedPtr> match_result = requestMatching(headers);
   if (!match_result.ok()) {
     // When the request is not matched by any matchers, it is ALLOWED by default
     // (i.e., fail-open) and its quota usage will not be reported to RLQS
@@ -191,7 +192,7 @@ Http::FilterHeadersStatus RateLimitQuotaFilter::decodeHeaders(Http::RequestHeade
   return recordBucketUsage(std::move(*match_result), false);
 }
 
-void RateLimitQuotaFilter::handlePreviewMatch(Matcher::ActionFactoryCb skipped_action) {
+void RateLimitQuotaFilter::handlePreviewMatch(const Matcher::ActionConstSharedPtr& skipped_action) {
   // The first skipped match is the one that would have been hit if the matcher
   // wasn't in preview mode.
   if (!first_skipped_match_) {
@@ -200,7 +201,7 @@ void RateLimitQuotaFilter::handlePreviewMatch(Matcher::ActionFactoryCb skipped_a
   first_skipped_match_ = false;
 
   // Assumes non-nullptr input.
-  Http::FilterHeadersStatus status = recordBucketUsage(skipped_action(), true);
+  Http::FilterHeadersStatus status = recordBucketUsage(skipped_action, true);
   ENVOY_LOG(debug, "Previewed matcher would have resulted in FilterHeadersStatus::{}",
             (status == Http::FilterHeadersStatus::Continue) ? "Continue" : "StopIteration");
 }
@@ -229,7 +230,7 @@ RateLimitQuotaFilter::requestMatching(const Http::RequestHeaderMap& headers) {
 
   // Perform the matching.
   Matcher::MatchResult match_result = Matcher::evaluateMatch<Http::HttpMatchingData>(
-      *matcher_, *data_ptr_, [&](Matcher::ActionFactoryCb skipped_action) {
+      *matcher_, *data_ptr_, [&](const Matcher::ActionConstSharedPtr& skipped_action) {
         // The filter handles Matchers with keep_matching as previews / darklaunches.
         return handlePreviewMatch(skipped_action);
       });
