@@ -1395,7 +1395,7 @@ void Filter::addDynamicMetadata(const ProcessorState& state, ProcessingRequest& 
 }
 
 void Filter::addAttributes(ProcessorState& state, ProcessingRequest& req) {
-  if (!state.sendAttributes()) {
+  if (config_->attributeBuilder() == nullptr || !state.sendAttributes()) {
     return;
   }
   AttributeBuilder::BuildParams build_params = {
@@ -1935,7 +1935,9 @@ std::unique_ptr<AttributeBuilder> FilterConfig::createAttributeBuilder(
       return factory.createAttributeBuilder(*attribute_builder_config, FilterName, builder,
                                             context);
     } else {
-      throw EnvoyException("Failed to create attribute builder");
+      IS_ENVOY_BUG(absl::StrCat("Invalid attribute_builder config with name: ",
+                                config.attribute_builder().name()));
+      return nullptr;
     }
   } else {
     return std::make_unique<DefaultAttributeBuilder>(

@@ -827,6 +827,7 @@ TEST_F(HttpFilterTest, SendAttributes) {
     envoy_grpc:
       cluster_name: "ext_proc_server"
   request_attributes: ["request.path"]
+  response_attributes: ["response.code"]
   )EOF");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
@@ -836,13 +837,13 @@ TEST_F(HttpFilterTest, SendAttributes) {
   // The response from the processor doesn't matter here.
   EXPECT_TRUE(last_request_.has_request_headers());
   EXPECT_GT(last_request_.attributes_size(), 0);
-  const auto& attributes = last_request_.attributes();
-  EXPECT_EQ(1, attributes.size());
-  EXPECT_TRUE(attributes.contains("envoy.filters.http.ext_proc"));
-  const auto& filter_attributes = attributes.at("envoy.filters.http.ext_proc");
-  EXPECT_EQ(1, filter_attributes.fields_size());
-  EXPECT_TRUE(filter_attributes.fields().contains("request.path"));
-  EXPECT_EQ("/", filter_attributes.fields().at("request.path").string_value());
+  const auto& req_attributes = last_request_.attributes();
+  EXPECT_EQ(1, req_attributes.size());
+  EXPECT_TRUE(req_attributes.contains("envoy.filters.http.ext_proc"));
+  const auto& req_filter_attributes = req_attributes.at("envoy.filters.http.ext_proc");
+  EXPECT_EQ(1, req_filter_attributes.fields_size());
+  EXPECT_TRUE(req_filter_attributes.fields().contains("request.path"));
+  EXPECT_EQ("/", req_filter_attributes.fields().at("request.path").string_value());
   processRequestHeaders(false, absl::nullopt);
 
   // Let the rest of the request play out
@@ -851,7 +852,18 @@ TEST_F(HttpFilterTest, SendAttributes) {
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
 
   response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_CALL(stream_info_, responseCode()).WillRepeatedly(Return(200));
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  EXPECT_TRUE(last_request_.has_response_headers());
+  EXPECT_GT(last_request_.attributes_size(), 0);
+  const auto& resp_attributes = last_request_.attributes();
+  EXPECT_EQ(1, resp_attributes.size());
+  EXPECT_TRUE(resp_attributes.contains("envoy.filters.http.ext_proc"));
+  const auto& resp_filter_attributes = resp_attributes.at("envoy.filters.http.ext_proc");
+  EXPECT_EQ(1, resp_filter_attributes.fields_size());
+  EXPECT_TRUE(resp_filter_attributes.fields().contains("response.code"));
+  EXPECT_EQ(200, resp_filter_attributes.fields().at("response.code").number_value());
   processResponseHeaders(false, absl::nullopt);
 
   Buffer::OwnedImpl resp_data("bar");

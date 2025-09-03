@@ -493,9 +493,7 @@ public:
 
   Http::StreamFilterCallbacks* callbacks() const override { return decoder_callbacks_; }
 
-  bool sendAttributes() const override {
-    return !attributes_sent_;
-  }
+  bool sendAttributes() const override { return !attributes_sent_; }
 
   const Http::RequestOrResponseHeaderMap* responseHeaders() const override { return nullptr; }
 
@@ -579,9 +577,7 @@ public:
 
   Http::StreamFilterCallbacks* callbacks() const override { return encoder_callbacks_; }
 
-  bool sendAttributes() const override {
-    return !attributes_sent_;
-  }
+  bool sendAttributes() const override { return !attributes_sent_; }
 
   const Http::RequestOrResponseHeaderMap* responseHeaders() const override { return headers_; }
 

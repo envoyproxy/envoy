@@ -350,7 +350,8 @@ message ExternalProcessor {
   config.core.v3.TypedExtensionConfig on_processing_response = 23
       [(xds.annotations.v3.field_status).work_in_progress = true];
 
-  // Decorator to introduce custom logic to generate attributes.
+  // Decorator to introduce custom logic to generate attributes. If not set, then the ``request_attributes`` and ``response_attributes``
+  // specified above will be used. However, if this is set, then all attributes should be plumbed through here instead.
   //
   // .. note::
   //   Attribute builders are currently in alpha.
