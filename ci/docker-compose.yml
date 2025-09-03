@@ -53,6 +53,7 @@ x-envoy-build-base: &envoy-build-base
   - ENVOY_REPO
   - ENVOY_BUILD_ARCH
   - ENVOY_GEN_COMPDB_OPTIONS
+  - ENVOY_STDLIB
 
   # Publishing and artifacts
   - DOCKERHUB_USERNAME
