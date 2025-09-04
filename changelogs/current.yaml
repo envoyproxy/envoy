@@ -341,7 +341,7 @@ new_features:
     See https://maxmind.github.io/MaxMind-DB/#build_epoch for more details.
 - area: wasm
   change: |
-    Added ``sign_signature`` foreign function to create cryptographic signatures.
+    Added ``sign`` foreign function to create cryptographic signatures.
     See :ref:`Wasm foreign functions <arch_overview_wasm_foreign_functions>` for more details.
 
 deprecated:

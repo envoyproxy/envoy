@@ -72,7 +72,7 @@ Foreign functions
 Envoy offers additional functionality over the Proxy-Wasm ABI via `proxy_call_foreign_function
 <https://github.com/proxy-wasm/spec/tree/main/abi-versions/v0.2.1#proxy_call_foreign_function>`_ binary interface:
 
-* ``sign_signature`` creates cryptographic signatures.
+* ``sign`` creates cryptographic signatures.
 * ``verify_signature`` verifies cryptographic signatures.
 * ``compress`` applies ``zlib`` compression.
 * ``uncompress`` applies ``zlib`` decompression.
