@@ -353,5 +353,5 @@ public class JniLibrary {
   /**
    * Returns true if the runtime feature is enabled.
    */
-  public static native boolean isRuntimeFeatureEnabled(String featureName);
+  public static native boolean runtimeFeatureEnabled(String featureName);
 }
