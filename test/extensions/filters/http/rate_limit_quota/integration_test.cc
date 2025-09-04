@@ -850,17 +850,34 @@ TEST_P(RateLimitQuotaIntegrationTest, MultiDifferentRequestNoAssignementAllowAll
 // also be evaluated & its allow decision respected.
 TEST_P(RateLimitQuotaIntegrationTest, MultiSameRequestAllowAllPreviewDenyAll) {
   Matcher preview_matcher = constructPreviewMatcher();
+
   BucketId preview_bucket_id;
   preview_bucket_id.mutable_bucket()->insert(
       {{"name", "prod"}, {"environment", "staging"}, {"group", "preview rule"}});
 
-  // Set the previewed FieldMatcher to log denials but allow the request via the on_no_match.
+  BucketId skipped_preview_id;
+  skipped_preview_id.mutable_bucket()->insert(
+      {{"name", "prod"}, {"environment", "staging"}, {"group", "another preview rule"}});
+
+  // Set the previewed FieldMatcher to log the skipped denial decision but allow the request via the
+  // on_no_match. The second preview FieldMatcher is ignored entirely as it would not have been hit
+  // had all these Matchers been enforceable.
   manipulateOnMatch(
       {
           .no_assignment_blanket_rule = RateLimitStrategy::DENY_ALL,
           .custom_bucket_id = preview_bucket_id,
       },
       preview_matcher.mutable_matcher_list()->mutable_matchers(0)->mutable_on_match());
+  // Copy the first preview matcher to a second, with a different no_assignment behavior & bucket
+  // id. We expect the second preview-mode matcher to be ignored entirely.
+  auto* skipped_preview_matcher = preview_matcher.mutable_matcher_list()->mutable_matchers()->Add();
+  skipped_preview_matcher->CopyFrom(preview_matcher.matcher_list().matchers(0));
+  manipulateOnMatch(
+      {
+          .no_assignment_blanket_rule = RateLimitStrategy::ALLOW_ALL,
+          .custom_bucket_id = skipped_preview_id,
+      },
+      skipped_preview_matcher->mutable_on_match());
   manipulateOnMatch(
       {
           .no_assignment_blanket_rule = RateLimitStrategy::ALLOW_ALL,
