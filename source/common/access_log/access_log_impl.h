@@ -18,6 +18,7 @@
 #include "source/common/grpc/status.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
 
 #include "absl/container/node_hash_set.h"
 #include "absl/hash/hash.h"
@@ -77,6 +78,24 @@ public:
   // AccessLog::Filter
   bool evaluate(const Formatter::HttpFormatterContext& context,
                 const StreamInfo::StreamInfo& info) const override;
+};
+
+/**
+ * Filter logs based on a token bucket rate limit.
+ */
+class LocalRateLimitFilter : public Filter {
+public:
+  LocalRateLimitFilter(const envoy::config::accesslog::v3::LocalRateLimitFilter& config,
+                       Server::Configuration::FactoryContext& context);
+
+  // AccessLog::Filter
+  bool evaluate(const Formatter::HttpFormatterContext& context,
+                const StreamInfo::StreamInfo& info) const override;
+
+private:
+  std::string singleton_key_;
+  mutable Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterMapSingleton::RateLimiter
+      rate_limiter_;
 };
 
 /**

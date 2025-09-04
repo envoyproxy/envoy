@@ -59,6 +59,8 @@ public:
     stream_info_.protocol(Http::Protocol::Http11);
     // Clear default stream id provider.
     stream_info_.stream_id_provider_ = nullptr;
+    time_system_ = new Envoy::Event::SimulatedTimeSystem();
+    context_.server_factory_context_.dispatcher_.time_system_.reset(time_system_);
   }
 
 protected:
@@ -75,6 +77,7 @@ protected:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
+  Envoy::Event::SimulatedTimeSystem* time_system_;
 };
 
 TEST_F(AccessLogImplTest, LogMoreData) {
@@ -1596,6 +1599,105 @@ typed_config:
   EXPECT_CALL(*file_, write(_));
 
   default_true_log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info);
+}
+
+TEST_F(AccessLogImplTest, RateLimitFilter) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  local_rate_limit_filter: 
+    token_bucket:
+      fill_interval: 1s
+      max_tokens: 1
+      tokens_per_fill: 1
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+  EXPECT_CALL(*file_, write(_));
+  log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+
+  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+  EXPECT_CALL(*file_, write(_));
+  log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+}
+
+TEST_F(AccessLogImplTest, SharedRateLimitFilter) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  local_rate_limit_filter:
+    token_bucket:
+      fill_interval: 1s
+      max_tokens: 1
+      tokens_per_fill: 1
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log1 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+  InstanceSharedPtr log2 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  EXPECT_CALL(*file_, write(_));
+  log1->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log2->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+
+  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+  EXPECT_CALL(*file_, write(_));
+  log2->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log1->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+}
+
+TEST_F(AccessLogImplTest, NonSharedRateLimitFilter) {
+  const std::string yaml1 = R"EOF(
+name: accesslog
+filter:
+  local_rate_limit_filter:
+    token_bucket:
+      fill_interval: 1s
+      max_tokens: 1
+      tokens_per_fill: 1
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+  const std::string yaml2 = R"EOF(
+name: accesslog
+filter:
+  local_rate_limit_filter:
+    key: this-is-key
+    token_bucket:
+      fill_interval: 1s
+      max_tokens: 1
+      tokens_per_fill: 1
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log1 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml1), context_);
+  InstanceSharedPtr log2 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml2), context_);
+
+  // Each logger has its own bucket, so the first log from each should succeed.
+  EXPECT_CALL(*file_, write(_));
+  log1->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+  EXPECT_CALL(*file_, write(_));
+  log2->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+
+  // Both buckets are now empty, so subsequent logs should fail.
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log1->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log2->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 }
 
 class TestHeaderFilterFactory : public ExtensionFilterFactory {
