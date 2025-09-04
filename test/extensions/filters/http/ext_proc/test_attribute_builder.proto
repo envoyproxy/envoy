@@ -11,6 +11,6 @@ option java_multiple_files = true;
 message TestAttributeBuilderConfig {
   // A map of request attributes to set in the attributes struct.
   // The key is the attribute name, the value is the attribute value,
-  // interpetable by CEL. This allows for the re-mapping of attributes.
+  // interpretable by CEL. This allows for the re-mapping of attributes.
   map<string, string> mapped_request_attributes = 1;
 }
