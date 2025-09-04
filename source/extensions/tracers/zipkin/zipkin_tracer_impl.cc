@@ -92,10 +92,10 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
     // Parse headers from HttpService
     for (const auto& header_option : http_service.request_headers_to_add()) {
       const auto& header_value = header_option.header();
-      collector.request_headers_.emplace_back(Http::LowerCaseString(header_value.key()), header_value.value());
+      collector.request_headers_.emplace_back(Http::LowerCaseString(header_value.key()),
+                                              header_value.value());
     }
   } else {
-
 
     // Validate required legacy fields
     if (zipkin_config.collector_cluster().empty()) {

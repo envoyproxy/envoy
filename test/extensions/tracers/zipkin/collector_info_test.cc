@@ -33,8 +33,10 @@ TEST(CollectorInfoTest, CustomHeadersAssignment) {
   CollectorInfo collector_info;
 
   // Add custom headers
-  collector_info.request_headers_.emplace_back(Http::LowerCaseString("Authorization"), "Bearer token123");
-  collector_info.request_headers_.emplace_back(Http::LowerCaseString("X-Custom-Header"), "custom-value");
+  collector_info.request_headers_.emplace_back(Http::LowerCaseString("Authorization"),
+                                               "Bearer token123");
+  collector_info.request_headers_.emplace_back(Http::LowerCaseString("X-Custom-Header"),
+                                               "custom-value");
   collector_info.request_headers_.emplace_back(Http::LowerCaseString("X-API-Key"), "api-key-123");
 
   // Verify headers were set correctly
@@ -66,8 +68,10 @@ TEST(CollectorInfoTest, CustomHeadersWithCompleteConfiguration) {
   collector_info.hostname_ = "zipkin.example.com";
   collector_info.version_ = envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO;
   collector_info.shared_span_context_ = false;
-  collector_info.request_headers_.emplace_back(Http::LowerCaseString("Content-Type"), "application/x-protobuf");
-  collector_info.request_headers_.emplace_back(Http::LowerCaseString("Authorization"), "Bearer secret-token");
+  collector_info.request_headers_.emplace_back(Http::LowerCaseString("Content-Type"),
+                                               "application/x-protobuf");
+  collector_info.request_headers_.emplace_back(Http::LowerCaseString("Authorization"),
+                                               "Bearer secret-token");
   collector_info.request_headers_.emplace_back(Http::LowerCaseString("X-Zipkin-Trace"), "enabled");
 
   // Verify all fields are set correctly
@@ -90,7 +94,8 @@ TEST(CollectorInfoTest, SingleCustomHeader) {
   CollectorInfo collector_info;
 
   // Add single custom header
-  collector_info.request_headers_.emplace_back(Http::LowerCaseString("X-Single-Header"), "single-value");
+  collector_info.request_headers_.emplace_back(Http::LowerCaseString("X-Single-Header"),
+                                               "single-value");
 
   // Verify single header was set correctly
   EXPECT_EQ(collector_info.request_headers_.size(), 1);
