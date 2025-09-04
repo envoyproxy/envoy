@@ -4,6 +4,7 @@
 #include "envoy/common/time.h"
 
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/propagators/xray/xray_propagator.h"
 #include "source/extensions/tracers/xray/daemon.pb.h"
 #include "source/extensions/tracers/xray/daemon.pb.validate.h"
 #include "source/extensions/tracers/xray/tracer.h"
@@ -23,6 +24,8 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace XRay {
+
+using XRayConstants = Envoy::Extensions::Propagators::XRay::XRayConstants;
 
 namespace {
 using ::testing::_;
@@ -512,7 +515,7 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeader) {
                                absl::nullopt /*client_ip from x-forwarded-for header*/);
   Tracing::TestTraceContextImpl request_headers{};
   span->injectContext(request_headers, Tracing::UpstreamContext());
-  auto header = request_headers.get(xRayTraceHeader().key());
+  auto header = request_headers.get(XRayConstants::get().X_AMZN_TRACE_ID.key());
   ASSERT_FALSE(!header.has_value());
   EXPECT_NE(header.value().find("Root="), absl::string_view::npos);
   EXPECT_NE(header.value().find("Parent="), absl::string_view::npos);
@@ -530,7 +533,7 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeaderNonSampled) {
   auto span = tracer.createNonSampledSpan(absl::nullopt /*headers*/);
   Tracing::TestTraceContextImpl request_headers{};
   span->injectContext(request_headers, Tracing::UpstreamContext());
-  auto header = request_headers.get(xRayTraceHeader().key());
+  auto header = request_headers.get(XRayConstants::get().X_AMZN_TRACE_ID.key());
   ASSERT_FALSE(!header.has_value());
   EXPECT_NE(header.value().find("Root="), absl::string_view::npos);
   EXPECT_NE(header.value().find("Parent="), absl::string_view::npos);

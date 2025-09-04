@@ -14,6 +14,8 @@ namespace Extensions {
 namespace Tracers {
 namespace Fluentd {
 
+using W3cConstants = Envoy::Extensions::Propagators::W3c::W3cConstants;
+
 // Handle Span and Trace context extraction and validation
 // Adapted from OpenTelemetry tracer extension @alexanderellis @yanavlasov
 // See https://www.w3.org/TR/trace-context/#traceparent-header
@@ -38,12 +40,12 @@ SpanContextExtractor::SpanContextExtractor(Tracing::TraceContext& trace_context)
 SpanContextExtractor::~SpanContextExtractor() = default;
 
 bool SpanContextExtractor::propagationHeaderPresent() {
-  auto propagation_header = FluentdConstants::get().TRACE_PARENT.get(trace_context_);
+  auto propagation_header = W3cConstants::get().TRACE_PARENT.get(trace_context_);
   return propagation_header.has_value();
 }
 
 absl::StatusOr<SpanContext> SpanContextExtractor::extractSpanContext() {
-  auto propagation_header = FluentdConstants::get().TRACE_PARENT.get(trace_context_);
+  auto propagation_header = W3cConstants::get().TRACE_PARENT.get(trace_context_);
   if (!propagation_header.has_value()) {
     // We should have already caught this, but just in case.
     return absl::InvalidArgumentError("No propagation header found");
@@ -89,7 +91,7 @@ absl::StatusOr<SpanContext> SpanContextExtractor::extractSpanContext() {
   // it is invalid and MUST be discarded. Because we're already checking for the
   // traceparent header above, we don't need to check here.
   // See https://www.w3.org/TR/trace-context/#processing-model-for-working-with-trace-context
-  const auto tracestate_values = FluentdConstants::get().TRACE_STATE.getAll(trace_context_);
+  const auto tracestate_values = W3cConstants::get().TRACE_STATE.getAll(trace_context_);
 
   SpanContext parent_context(version, trace_id, parent_id, sampled,
                              absl::StrJoin(tracestate_values, ","));
@@ -99,14 +101,6 @@ absl::StatusOr<SpanContext> SpanContextExtractor::extractSpanContext() {
 // Define default version and trace context construction// Define default version and trace context
 // construction
 constexpr absl::string_view kDefaultVersion = "00";
-
-const Tracing::TraceContextHandler& traceParentHeader() {
-  CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, "traceparent");
-}
-
-const Tracing::TraceContextHandler& traceStateHeader() {
-  CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, "tracestate");
-}
 
 // Initialize the Fluentd driver
 Driver::Driver(const FluentdConfigSharedPtr fluentd_config,
@@ -239,10 +233,10 @@ void Span::injectContext(Tracing::TraceContext& trace_context,
       absl::StrCat(kDefaultVersion, "-", trace_id_hex, "-", span_id_hex, "-", trace_flags_hex);
 
   // Set the traceparent in the trace_context.
-  traceParentHeader().setRefKey(trace_context, traceparent_header_value);
+  W3cConstants::get().TRACE_PARENT.setRefKey(trace_context, traceparent_header_value);
   if (!span_context_.tracestate().empty()) {
     // Also set the tracestate.
-    traceStateHeader().setRefKey(trace_context, span_context_.tracestate());
+    W3cConstants::get().TRACE_STATE.setRefKey(trace_context, span_context_.tracestate());
   }
 }
 

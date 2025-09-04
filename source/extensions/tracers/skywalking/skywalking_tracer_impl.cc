@@ -5,6 +5,7 @@
 #include "source/common/common/macros.h"
 #include "source/common/common/utility.h"
 #include "source/common/http/path_utility.h"
+#include "source/extensions/propagators/skywalking/skywalking_propagator.h"
 
 #include "cpp2sky/propagation.h"
 
@@ -12,6 +13,8 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace SkyWalking {
+
+using SkyWalkingConstants = Envoy::Extensions::Propagators::SkyWalking::SkyWalkingConstants;
 
 namespace {
 constexpr uint32_t DEFAULT_DELAYED_SEGMENTS_CACHE_SIZE = 1024;
@@ -52,7 +55,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config&, Tracing::TraceContext
   auto& tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer();
   TracingContextSharedPtr tracing_context;
   // TODO(shikugawa): support extension span header.
-  auto propagation_header = skywalkingPropagationHeaderKey().get(trace_context);
+  auto propagation_header = SkyWalkingConstants::get().SW8.get(trace_context);
   if (!propagation_header.has_value()) {
     // Although a sampling flag can be added to the propagation header, it will be ignored by most
     // of SkyWalking agent. The agent will enable tracing anyway if it see the propagation header.

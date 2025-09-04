@@ -20,8 +20,6 @@ namespace SkyWalking {
 using cpp2sky::TracingContextSharedPtr;
 using cpp2sky::TracingSpanSharedPtr;
 
-const Tracing::TraceContextHandler& skywalkingPropagationHeaderKey();
-
 class Tracer {
 public:
   Tracer(TraceSegmentReporterPtr reporter);

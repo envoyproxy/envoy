@@ -11,12 +11,15 @@
 #include "source/common/common/fmt.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/propagators/xray/xray_propagator.h"
 #include "source/extensions/tracers/xray/daemon.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace XRay {
+
+using XRayConstants = Envoy::Extensions::Propagators::XRay::XRayConstants;
 
 namespace {
 constexpr absl::string_view XRaySerializationVersion = "1";
@@ -101,10 +104,6 @@ void Span::finishSpan() {
   broker_.send(json);
 } // namespace XRay
 
-const Tracing::TraceContextHandler& xRayTraceHeader() {
-  CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, "x-amzn-trace-id");
-}
-
 const Tracing::TraceContextHandler& xForwardedForHeader() {
   CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, "x-forwarded-for");
 }
@@ -112,7 +111,7 @@ const Tracing::TraceContextHandler& xForwardedForHeader() {
 void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::UpstreamContext&) {
   const std::string xray_header_value =
       fmt::format("Root={};Parent={};Sampled={}", traceId(), id(), sampled() ? "1" : "0");
-  xRayTraceHeader().setRefKey(trace_context, xray_header_value);
+  XRayConstants::get().X_AMZN_TRACE_ID.setRefKey(trace_context, xray_header_value);
 }
 
 Tracing::SpanPtr Span::spawnChild(const Tracing::Config& config, const std::string& operation_name,

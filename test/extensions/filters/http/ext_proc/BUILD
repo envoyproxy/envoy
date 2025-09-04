@@ -440,6 +440,7 @@ envoy_extension_cc_test_library(
         "//source/common/protobuf",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing:trace_context_lib",
+        "//source/extensions/propagators/w3c/tracecontext:tracecontext_propagator_lib",
         "//source/extensions/tracers/common:factory_base_lib",
     ],
 )

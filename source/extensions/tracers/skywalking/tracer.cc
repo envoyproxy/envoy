@@ -2,19 +2,19 @@
 
 #include <string>
 
+#include "source/extensions/propagators/skywalking/skywalking_propagator.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace SkyWalking {
 
+using SkyWalkingConstants = Envoy::Extensions::Propagators::SkyWalking::SkyWalkingConstants;
+
 namespace {
 static constexpr absl::string_view StatusCodeTag = "status_code";
 static constexpr absl::string_view UrlTag = "url";
 } // namespace
-
-const Tracing::TraceContextHandler& skywalkingPropagationHeaderKey() {
-  CONSTRUCT_ON_FIRST_USE(Tracing::TraceContextHandler, "sw8");
-}
 
 void Span::setTag(absl::string_view name, absl::string_view value) {
   if (name == Tracing::Tags::get().HttpUrl) {
@@ -55,7 +55,7 @@ void Span::injectContext(Tracing::TraceContext& trace_context,
   auto sw8_header =
       tracing_context_->createSW8HeaderValue({remote_address.data(), remote_address.size()});
   if (sw8_header.has_value()) {
-    skywalkingPropagationHeaderKey().setRefKey(trace_context, sw8_header.value());
+    SkyWalkingConstants::get().SW8.setRefKey(trace_context, sw8_header.value());
 
     // Rewrite operation name with latest upstream request path for the EXIT span.
     absl::string_view upstream_request_path = trace_context.path();

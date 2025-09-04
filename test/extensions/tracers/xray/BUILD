@@ -23,6 +23,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.tracers.xray"],
     rbe_pool = "6gig",
     deps = [
+        "//source/extensions/propagators/xray:xray_propagator_lib",
         "//source/extensions/tracers/xray:xray_lib",
         "//test/mocks:common_lib",
         "//test/mocks/http:http_mocks",

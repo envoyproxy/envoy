@@ -53,6 +53,7 @@ envoy_cc_library(
         "//source/common/tracing:common_values_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/tracing:null_span_lib",
+        "//source/extensions/propagators/xray:xray_propagator_lib",
     ],
 )
 
