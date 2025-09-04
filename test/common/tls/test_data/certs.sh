@@ -156,7 +156,7 @@ generate_x509_cert_no_extension() {
     generate_info_header "$1"
     # Older OpenSSLs do not correctly generate this certificate. See
     # https://github.com/openssl/openssl/issues/28397
-    if openssl asn1parse -in "${1}_cert.pem" | fgrep 'cont [ 3 ]' > /dev/null; then
+    if openssl asn1parse -in "${1}_cert.pem" | grep -F 'cont [ 3 ]' > /dev/null; then
       echo "ERROR: ${1}_cert.pem was not generated correctly. Use a newer OpenSSL."
       exit 1
     fi
