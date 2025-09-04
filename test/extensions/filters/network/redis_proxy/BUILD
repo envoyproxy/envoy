@@ -16,10 +16,10 @@ envoy_package()
 
 envoy_extension_cc_test(
     name = "command_splitter_impl_test",
+    size = "large",  # 15 minutes instead of default 5 minutes
     srcs = ["command_splitter_impl_test.cc"],
     extension_names = ["envoy.filters.network.redis_proxy"],
     rbe_pool = "4core",
-    size = "large",      # 15 minutes instead of default 5 minutes
     deps = [
         ":redis_mocks",
         "//source/common/stats:isolated_store_lib",
