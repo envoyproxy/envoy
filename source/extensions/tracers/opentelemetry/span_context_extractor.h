@@ -13,17 +13,10 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
-class OpenTelemetryConstantValues {
-public:
-  const Tracing::TraceContextHandler TRACE_PARENT{"traceparent"};
-  const Tracing::TraceContextHandler TRACE_STATE{"tracestate"};
-};
-
-using OpenTelemetryConstants = ConstSingleton<OpenTelemetryConstantValues>;
-
 /**
  * This class is used to SpanContext extracted from the HTTP traceparent header
  * See https://www.w3.org/TR/trace-context/#traceparent-header.
+ * Uses the W3C propagator component for extraction.
  */
 class SpanContextExtractor {
 public:

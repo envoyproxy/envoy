@@ -350,5 +350,21 @@ new_features:
     Added a new metric ``db_build_epoch`` to track the build timestamp of the Maxmind geolocation database files.
     This can be used to monitor the freshness of the databases currently in use by the filter.
     See https://maxmind.github.io/MaxMind-DB/#build_epoch for more details.
+- area: tracing
+  change: |
+    Implemented reusable components for W3C trace context and Baggage propagation.
+    This update introduces standardized propagation for distributed tracing,
+    allowing Envoy tracers to extract and inject trace context and baggage according
+    to the W3C specification.
 
+    The new components replace previous propagation logic in traces, improving interoperability with other systems and
+    tools that support W3C trace context and baggage.
+    Tracers now leverage these components for consistent context propagation across service boundaries.
+
+    Highlights:
+    - W3C trace context and baggage propagation are now available as reusable components for tracers.
+    - Existing traces have been updated to use the new W3C-compliant propagation logic.
+    - Enhances compatibility with distributed tracing systems and observability platforms.
+    - Comprehensive unit and integration tests validate correct propagation behavior.
+    - Documentation updated to reflect new support and usage guidelines.
 deprecated:

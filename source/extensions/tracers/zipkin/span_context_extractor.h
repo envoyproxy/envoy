@@ -4,6 +4,7 @@
 #include "envoy/tracing/tracer.h"
 
 #include "source/common/http/header_map_impl.h"
+#include "source/extensions/propagators/w3c/trace_context.h"
 #include "source/extensions/tracers/opentelemetry/span_context_extractor.h"
 
 namespace Envoy {
@@ -38,9 +39,8 @@ private:
   /*
    * Convert W3C span context to Zipkin span context format
    */
-  std::pair<SpanContext, bool>
-  convertW3CToZipkin(const Extensions::Tracers::OpenTelemetry::SpanContext& w3c_context,
-                     bool fallback_sampled);
+  std::pair<SpanContext, bool> convertW3CToZipkin(const Propagators::W3C::TraceContext& w3c_context,
+                                                  bool fallback_sampled);
 
   bool tryExtractSampledFromB3SingleFormat();
   const Tracing::TraceContext& trace_context_;

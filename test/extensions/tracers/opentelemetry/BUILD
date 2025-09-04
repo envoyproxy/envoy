@@ -32,6 +32,7 @@ envoy_extension_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
+        "//source/extensions/propagators/w3c:propagator_lib",
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
         "//test/mocks:common_lib",
         "//test/mocks/http:http_mocks",
@@ -137,5 +138,20 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "w3c_propagator_integration_test",
+    srcs = ["w3c_propagator_integration_test.cc"],
+    extension_names = [
+        "envoy.tracers.opentelemetry",
+        "envoy.propagators.w3c",
+    ],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/extensions/propagators/w3c:propagator_lib",
+        "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
+        "//test/test_common:utility_lib",
     ],
 )
