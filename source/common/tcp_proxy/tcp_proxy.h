@@ -309,6 +309,8 @@ public:
   const absl::optional<double>& maxDownstreamConnectionDurationJitterPercentage() const {
     return shared_config_->maxDownstreamConnectionDurationJitterPercentage();
   }
+  const absl::optional<std::chrono::milliseconds>
+  calculateMaxDownstreamConnectionDurationWithJitter();
   const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() const {
     return shared_config_->accessLogFlushInterval();
   }
