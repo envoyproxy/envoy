@@ -39,3 +39,13 @@ envoy_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "dns_impl_integration_test",
+    srcs = ["dns_impl_integration_test.cc"],
+    tags = ["fails_on_clang_cl"],
+    deps = [
+        "//source/extensions/clusters/dns:dns_cluster_lib",
+        "//test/integration:http_integration_lib",
+    ],
+)
