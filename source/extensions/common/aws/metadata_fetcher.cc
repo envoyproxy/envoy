@@ -19,7 +19,7 @@ public:
   MetadataFetcherImpl(Upstream::ClusterManager& cm, absl::string_view cluster_name)
       : cm_(cm), cluster_name_(std::string(cluster_name)) {}
 
-  ~MetadataFetcherImpl() override { reset(); }
+  ~MetadataFetcherImpl() override { MetadataFetcherImpl::cancel(); }
 
   void cancel() override {
     if (request_ && !complete_) {
