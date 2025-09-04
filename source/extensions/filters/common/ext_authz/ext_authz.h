@@ -110,6 +110,8 @@ struct Response {
   // "setCopy") to the response sent back to the downstream client on OK auth responses
   // only if the headers were returned from the authz server.
   UnsafeHeaderVector response_headers_to_overwrite_if_exists{};
+  // Whether the authorization server returned any headers with an invalid append action type.
+  bool saw_invalid_append_actions{false};
   // A set of HTTP headers consumed by the authorization server, will be removed
   // from the request to the upstream server.
   std::vector<std::string> headers_to_remove{};

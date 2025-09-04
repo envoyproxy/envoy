@@ -526,7 +526,8 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   listener_address.value_ = "0.0.0.0_0";
   regex_tester.testRegex(
       "listener.0.0.0.0_0.ssl.certificate.server_cert.expiration_unix_time_seconds",
-      "listener.ssl.certificate", {listener_address, certificate_name});
+      "listener.ssl.certificate.expiration_unix_time_seconds",
+      {listener_address, certificate_name});
 
   // Cluster test
   Tag test_cluster;
@@ -534,7 +535,7 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   test_cluster.value_ = "test_cluster";
   regex_tester.testRegex(
       "cluster.test_cluster.ssl.certificate.server_cert.expiration_unix_time_seconds",
-      "cluster.ssl.certificate", {test_cluster, certificate_name});
+      "cluster.ssl.certificate.expiration_unix_time_seconds", {test_cluster, certificate_name});
 }
 
 TEST(TagExtractorTest, ExtAuthzTagExtractors) {

@@ -502,6 +502,17 @@ TEST_P(GrpcWebFilterTest, MediaTypeWithParameter) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(data, false));
 }
 
+TEST_P(GrpcWebFilterTest, RemoveResponseContentLength) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {"content-type", Http::Headers::get().ContentTypeValues.GrpcWeb}, {":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"}, {"content-type", "application/grpc"}, {"content-length", "123"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
+  EXPECT_EQ(nullptr, response_headers.ContentLength());
+}
+
 TEST_P(GrpcWebFilterTest, Unary) {
   // Tests request headers.
   request_headers_.addCopy(Http::Headers::get().ContentType, requestContentType());
