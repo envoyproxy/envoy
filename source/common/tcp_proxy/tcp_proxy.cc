@@ -134,6 +134,10 @@ Config::SharedConfig::SharedConfig(
         DurationUtil::durationToMilliseconds(config.max_downstream_connection_duration());
     max_downstream_connection_duration_ = std::chrono::milliseconds(connection_duration);
   }
+  if (config.has_max_downstream_connection_duration_jitter_percentage()) {
+    max_downstream_connection_duration_jitter_percentage_ =
+        config.max_downstream_connection_duration_jitter_percentage().value();
+  }
 
   if (config.has_access_log_options()) {
     if (config.flush_access_log_on_connected() /* deprecated */) {

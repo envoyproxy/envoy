@@ -223,6 +223,21 @@ max_downstream_connection_duration: 10s
   EXPECT_EQ(std::chrono::seconds(10), config_obj.maxDownstreamConnectionDuration().value());
 }
 
+TEST(ConfigTest, MaxDownstreamConnectionDurationJitterPercentage) {
+  const std::string yaml = R"EOF(
+stat_prefix: name
+cluster: foo
+max_downstream_connection_duration: 10s
+max_downstream_connection_duration_jitter_percentage:
+  value: 50.0
+)EOF";
+
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context;
+  Config config_obj(constructConfigFromYaml(yaml, factory_context));
+  EXPECT_EQ(std::chrono::seconds(10), config_obj.maxDownstreamConnectionDuration().value());
+  EXPECT_EQ(50.0, config_obj.maxDownstreamConnectionDurationJitterPercentage().value());
+}
+
 TEST(ConfigTest, NoRouteConfig) {
   const std::string yaml = R"EOF(
   stat_prefix: name
