@@ -46,6 +46,7 @@ envoy_cc_test(
     tags = ["fails_on_clang_cl"],
     deps = [
         "//source/extensions/clusters/dns:dns_cluster_lib",
+        "//source/extensions/network/dns_resolver/cares:config",
         "//test/integration:http_integration_lib",
     ],
 )
