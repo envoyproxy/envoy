@@ -847,4 +847,90 @@ routes:
 }
 
 } // namespace
+
+namespace Extensions {
+namespace HttpFilters {
+namespace OnDemand {
+
+using OnDemandIntegrationTest = VhdsIntegrationTest;
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OnDemandIntegrationTest,
+                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+
+// Integration test specifically for the GitHub issue #17891 fix:
+// Verify that VHDS requests with body don't result in 404 responses
+TEST_P(OnDemandIntegrationTest, VhdsWithRequestBodyShouldNotReturn404) {
+  autonomous_upstream_ = true;
+  initialize();
+
+  // Send a POST request with body to trigger VHDS discovery
+  const std::string request_body = "test request body data";
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/test"},
+          {":scheme", "http"},
+          {":authority", fmt::format("vhds.example.com:{}", lookupPort("http"))},
+      }, 
+      request_body);
+
+  // Wait for the response - this should NOT be a 404
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  
+  // Before the fix, this would be "404" due to route being nullptr
+  // After the fix, this should be "200" from the upstream
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  
+  // Verify the upstream received the full request body
+  EXPECT_EQ(request_body, response->body());
+}
+
+// Integration test for requests without body (should still work)
+TEST_P(OnDemandIntegrationTest, VhdsWithoutBodyStillWorksCorrectly) {
+  autonomous_upstream_ = true;
+  initialize();
+
+  // Send a GET request without body
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "GET"},
+          {":path", "/test"},
+          {":scheme", "http"},
+          {":authority", fmt::format("vhds.example.com:{}", lookupPort("http"))},
+      });
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Integration test for large request bodies to ensure proper buffering
+TEST_P(OnDemandIntegrationTest, VhdsWithLargeRequestBodyBuffersCorrectly) {
+  autonomous_upstream_ = true;
+  initialize();
+
+  // Create a large request body to test buffering behavior
+  std::string large_body(10000, 'x'); // 10KB of 'x' characters
+  
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/test"},  
+          {":scheme", "http"},
+          {":authority", fmt::format("vhds.example.com:{}", lookupPort("http"))},
+      },
+      large_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  
+  // Verify the entire large body was properly buffered and forwarded
+  EXPECT_EQ(large_body, response->body());
+}
+
+} // namespace OnDemand
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
