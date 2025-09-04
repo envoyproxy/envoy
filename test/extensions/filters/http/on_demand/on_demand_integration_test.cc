@@ -871,17 +871,17 @@ TEST_P(OnDemandIntegrationTest, VhdsWithRequestBodyShouldNotReturn404) {
           {":path", "/test"},
           {":scheme", "http"},
           {":authority", fmt::format("vhds.example.com:{}", lookupPort("http"))},
-      }, 
+      },
       request_body);
 
   // Wait for the response - this should NOT be a 404
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
-  
+
   // Before the fix, this would be "404" due to route being nullptr
   // After the fix, this should be "200" from the upstream
   EXPECT_EQ("200", response->headers().getStatusValue());
-  
+
   // Verify the upstream received the full request body
   EXPECT_EQ(request_body, response->body());
 }
@@ -892,13 +892,12 @@ TEST_P(OnDemandIntegrationTest, VhdsWithoutBodyStillWorksCorrectly) {
   initialize();
 
   // Send a GET request without body
-  auto response = codec_client_->makeHeaderOnlyRequest(
-      Http::TestRequestHeaderMapImpl{
-          {":method", "GET"},
-          {":path", "/test"},
-          {":scheme", "http"},
-          {":authority", fmt::format("vhds.example.com:{}", lookupPort("http"))},
-      });
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/test"},
+      {":scheme", "http"},
+      {":authority", fmt::format("vhds.example.com:{}", lookupPort("http"))},
+  });
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
@@ -912,11 +911,11 @@ TEST_P(OnDemandIntegrationTest, VhdsWithLargeRequestBodyBuffersCorrectly) {
 
   // Create a large request body to test buffering behavior
   std::string large_body(10000, 'x'); // 10KB of 'x' characters
-  
+
   auto response = codec_client_->makeRequestWithBody(
       Http::TestRequestHeaderMapImpl{
           {":method", "POST"},
-          {":path", "/test"},  
+          {":path", "/test"},
           {":scheme", "http"},
           {":authority", fmt::format("vhds.example.com:{}", lookupPort("http"))},
       },
@@ -925,7 +924,7 @@ TEST_P(OnDemandIntegrationTest, VhdsWithLargeRequestBodyBuffersCorrectly) {
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  
+
   // Verify the entire large body was properly buffered and forwarded
   EXPECT_EQ(large_body, response->body());
 }
