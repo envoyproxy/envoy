@@ -119,13 +119,10 @@ struct CollectorInfo {
   // New HttpService configuration (preferred)
   absl::optional<envoy::config::core::v3::HttpService> http_service_;
 
-  // Whether to use legacy configuration (true) or HttpService (false)
-  bool use_legacy_config_{true};
-
   // Additional custom headers to include in requests to the Zipkin collector.
   // Only available when using HttpService configuration via request_headers_to_add.
   // Legacy configuration does not support custom headers.
-  std::vector<std::pair<std::string, std::string>> request_headers_;
+  std::vector<std::pair<Http::LowerCaseString, std::string>> request_headers_;
 };
 
 /**

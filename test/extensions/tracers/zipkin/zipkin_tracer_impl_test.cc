@@ -1409,28 +1409,12 @@ TEST_F(ZipkinDriverTest, DriverWithHttpServiceMissingCluster) {
   envoy::config::trace::v3::ZipkinConfig zipkin_config_missing_cluster;
   TestUtility::loadFromYaml(yaml_string_missing_cluster, zipkin_config_missing_cluster);
 
-  EXPECT_THROW_WITH_MESSAGE(setup(zipkin_config_missing_cluster, false), EnvoyException,
-                            "collector_service.http_uri.cluster must be specified");
+  // The setup should still fail because cluster is empty (unknown cluster validation)
+  EXPECT_THROW(setup(zipkin_config_missing_cluster, false), EnvoyException);
 }
 
-TEST_F(ZipkinDriverTest, DriverWithHttpServiceMissingUri) {
-  cm_.initializeClusters({"fake_cluster"}, {});
-
-  // Test collector_service with missing URI
-  const std::string yaml_string_missing_uri = R"EOF(
-  collector_service:
-    http_uri:
-      cluster: fake_cluster
-      timeout: 5s
-  collector_endpoint_version: HTTP_JSON
-  )EOF";
-
-  envoy::config::trace::v3::ZipkinConfig zipkin_config_missing_uri;
-  TestUtility::loadFromYaml(yaml_string_missing_uri, zipkin_config_missing_uri);
-
-  EXPECT_THROW_WITH_MESSAGE(setup(zipkin_config_missing_uri, false), EnvoyException,
-                            "collector_service.http_uri.uri must be specified");
-}
+// Note: Test for missing URI was removed as we now rely on proto validation
+// instead of runtime validation for required fields.
 
 TEST_F(ZipkinDriverTest, DriverLegacyConfigMissingEndpoint) {
   cm_.initializeClusters({"fake_cluster"}, {});

@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "envoy/config/core/v3/http_service.pb.h"
+#include "envoy/http/header_map.h"
 
 #include "source/extensions/tracers/zipkin/zipkin_tracer_impl.h"
 
@@ -25,7 +26,6 @@ TEST(CollectorInfoTest, DefaultConstruction) {
   EXPECT_TRUE(collector_info.request_headers_.empty());
 
   // New fields should have default values
-  EXPECT_TRUE(collector_info.use_legacy_config_); // Defaults to legacy mode
   EXPECT_FALSE(collector_info.http_service_.has_value());
 }
 
@@ -33,25 +33,25 @@ TEST(CollectorInfoTest, CustomHeadersAssignment) {
   CollectorInfo collector_info;
 
   // Add custom headers
-  collector_info.request_headers_ = {{"Authorization", "Bearer token123"},
-                                     {"X-Custom-Header", "custom-value"},
-                                     {"X-API-Key", "api-key-123"}};
+  collector_info.request_headers_.emplace_back(Http::LowerCaseString("Authorization"), "Bearer token123");
+  collector_info.request_headers_.emplace_back(Http::LowerCaseString("X-Custom-Header"), "custom-value");
+  collector_info.request_headers_.emplace_back(Http::LowerCaseString("X-API-Key"), "api-key-123");
 
   // Verify headers were set correctly
   EXPECT_EQ(collector_info.request_headers_.size(), 3);
-  EXPECT_EQ(collector_info.request_headers_[0].first, "Authorization");
+  EXPECT_EQ(collector_info.request_headers_[0].first.get(), "authorization");
   EXPECT_EQ(collector_info.request_headers_[0].second, "Bearer token123");
-  EXPECT_EQ(collector_info.request_headers_[1].first, "X-Custom-Header");
+  EXPECT_EQ(collector_info.request_headers_[1].first.get(), "x-custom-header");
   EXPECT_EQ(collector_info.request_headers_[1].second, "custom-value");
-  EXPECT_EQ(collector_info.request_headers_[2].first, "X-API-Key");
+  EXPECT_EQ(collector_info.request_headers_[2].first.get(), "x-api-key");
   EXPECT_EQ(collector_info.request_headers_[2].second, "api-key-123");
 }
 
 TEST(CollectorInfoTest, EmptyCustomHeaders) {
   CollectorInfo collector_info;
 
-  // Explicitly set empty headers
-  collector_info.request_headers_ = {};
+  // Explicitly clear headers
+  collector_info.request_headers_.clear();
 
   // Verify headers are empty
   EXPECT_TRUE(collector_info.request_headers_.empty());
@@ -66,9 +66,9 @@ TEST(CollectorInfoTest, CustomHeadersWithCompleteConfiguration) {
   collector_info.hostname_ = "zipkin.example.com";
   collector_info.version_ = envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO;
   collector_info.shared_span_context_ = false;
-  collector_info.request_headers_ = {{"Content-Type", "application/x-protobuf"},
-                                     {"Authorization", "Bearer secret-token"},
-                                     {"X-Zipkin-Trace", "enabled"}};
+  collector_info.request_headers_.emplace_back(Http::LowerCaseString("Content-Type"), "application/x-protobuf");
+  collector_info.request_headers_.emplace_back(Http::LowerCaseString("Authorization"), "Bearer secret-token");
+  collector_info.request_headers_.emplace_back(Http::LowerCaseString("X-Zipkin-Trace"), "enabled");
 
   // Verify all fields are set correctly
   EXPECT_EQ(collector_info.endpoint_, "/api/v2/spans");
@@ -78,11 +78,11 @@ TEST(CollectorInfoTest, CustomHeadersWithCompleteConfiguration) {
   EXPECT_EQ(collector_info.request_headers_.size(), 3);
 
   // Verify specific headers
-  EXPECT_EQ(collector_info.request_headers_[0].first, "Content-Type");
+  EXPECT_EQ(collector_info.request_headers_[0].first.get(), "content-type");
   EXPECT_EQ(collector_info.request_headers_[0].second, "application/x-protobuf");
-  EXPECT_EQ(collector_info.request_headers_[1].first, "Authorization");
+  EXPECT_EQ(collector_info.request_headers_[1].first.get(), "authorization");
   EXPECT_EQ(collector_info.request_headers_[1].second, "Bearer secret-token");
-  EXPECT_EQ(collector_info.request_headers_[2].first, "X-Zipkin-Trace");
+  EXPECT_EQ(collector_info.request_headers_[2].first.get(), "x-zipkin-trace");
   EXPECT_EQ(collector_info.request_headers_[2].second, "enabled");
 }
 
@@ -90,11 +90,11 @@ TEST(CollectorInfoTest, SingleCustomHeader) {
   CollectorInfo collector_info;
 
   // Add single custom header
-  collector_info.request_headers_ = {{"X-Single-Header", "single-value"}};
+  collector_info.request_headers_.emplace_back(Http::LowerCaseString("X-Single-Header"), "single-value");
 
   // Verify single header was set correctly
   EXPECT_EQ(collector_info.request_headers_.size(), 1);
-  EXPECT_EQ(collector_info.request_headers_[0].first, "X-Single-Header");
+  EXPECT_EQ(collector_info.request_headers_[0].first.get(), "x-single-header");
   EXPECT_EQ(collector_info.request_headers_[0].second, "single-value");
 }
 
@@ -102,12 +102,10 @@ TEST(CollectorInfoTest, LegacyConfigurationMode) {
   CollectorInfo collector_info;
 
   // Set up legacy configuration
-  collector_info.use_legacy_config_ = true;
   collector_info.endpoint_ = "/api/v2/spans";
   collector_info.hostname_ = "zipkin.legacy.com";
 
   // Verify legacy configuration
-  EXPECT_TRUE(collector_info.use_legacy_config_);
   EXPECT_EQ(collector_info.endpoint_, "/api/v2/spans");
   EXPECT_EQ(collector_info.hostname_, "zipkin.legacy.com");
   EXPECT_FALSE(collector_info.http_service_.has_value());
@@ -124,13 +122,11 @@ TEST(CollectorInfoTest, HttpServiceConfigurationMode) {
   http_uri->mutable_timeout()->set_seconds(5);
 
   // Set up HttpService configuration
-  collector_info.use_legacy_config_ = false;
   collector_info.http_service_ = http_service;
   collector_info.endpoint_ = "/api/v2/spans";    // Should be populated from HttpService
   collector_info.hostname_ = "zipkin_collector"; // Should be populated from cluster name
 
   // Verify HttpService configuration
-  EXPECT_FALSE(collector_info.use_legacy_config_);
   EXPECT_TRUE(collector_info.http_service_.has_value());
   EXPECT_EQ(collector_info.http_service_->http_uri().uri(), "/api/v2/spans");
   EXPECT_EQ(collector_info.http_service_->http_uri().cluster(), "zipkin_collector");

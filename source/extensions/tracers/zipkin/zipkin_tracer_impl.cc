@@ -67,18 +67,9 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
   if (zipkin_config.has_collector_service()) {
     const auto& http_service = zipkin_config.collector_service();
     collector.http_service_ = http_service;
-    collector.use_legacy_config_ = false;
 
     // Extract cluster and endpoint from HttpService
     const auto& http_uri = http_service.http_uri();
-
-    // Validate required HttpService fields
-    if (http_uri.cluster().empty()) {
-      throw EnvoyException("collector_service.http_uri.cluster must be specified");
-    }
-    if (http_uri.uri().empty()) {
-      throw EnvoyException("collector_service.http_uri.uri must be specified");
-    }
 
     cluster_ = http_uri.cluster();
 
@@ -101,11 +92,10 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
     // Parse headers from HttpService
     for (const auto& header_option : http_service.request_headers_to_add()) {
       const auto& header_value = header_option.header();
-      collector.request_headers_.emplace_back(header_value.key(), header_value.value());
+      collector.request_headers_.emplace_back(Http::LowerCaseString(header_value.key()), header_value.value());
     }
   } else {
-    // Use legacy configuration
-    collector.use_legacy_config_ = true;
+
 
     // Validate required legacy fields
     if (zipkin_config.collector_cluster().empty()) {
@@ -243,12 +233,10 @@ void ReporterImpl::flushSpans() {
             ? Http::Headers::get().ContentTypeValues.Protobuf
             : Http::Headers::get().ContentTypeValues.Json);
 
-    // Add custom headers only for HttpService configuration
-    if (!collector_.use_legacy_config_) {
-      for (const auto& header : collector_.request_headers_) {
-        // Replace any existing header with the configured value
-        message->headers().setCopy(Http::LowerCaseString(header.first), header.second);
-      }
+    // Add custom headers from collector configuration
+    for (const auto& header : collector_.request_headers_) {
+      // Replace any existing header with the configured value
+      message->headers().setCopy(header.first, header.second);
     }
 
     message->body().add(request_body);
