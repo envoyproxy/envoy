@@ -7,8 +7,6 @@
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
-#include "source/common/stream_info/bool_accessor_impl.h"
-#include "source/common/tcp_proxy/tcp_proxy.h"
 #include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
@@ -21,19 +19,6 @@ InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope
   const std::string final_prefix = fmt::format("ext_authz.{}.", name);
   return {ALL_TCP_EXT_AUTHZ_STATS(POOL_COUNTER_PREFIX(scope, final_prefix),
                                   POOL_GAUGE_PREFIX(scope, final_prefix))};
-}
-
-void Filter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
-  filter_callbacks_ = &callbacks;
-  filter_callbacks_->connection().addConnectionCallbacks(*this);
-
-  // When checking on new connection with a tcp proxy filter we need to prevent the proxy filter
-  // from disabling reads at initialization time
-  if (config_->checkOnNewConnection()) {
-    filter_callbacks_->connection().streamInfo().filterState()->setData(
-        TcpProxy::ReceiveBeforeConnectKey, std::make_unique<StreamInfo::BoolAccessorImpl>(true),
-        StreamInfo::FilterState::StateType::Mutable, StreamInfo::FilterState::LifeSpan::Connection);
-  }
 }
 
 void Filter::callCheck() {
