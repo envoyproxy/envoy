@@ -6,7 +6,7 @@ namespace {
 
 class DnsImplIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                                public HttpIntegrationTest {
- public:
+public:
   DnsImplIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP2, GetParam()) {}
 };
 
@@ -14,8 +14,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-
-TEST_P(DnsImplIntegrationTest, LogicalDns) {
+TEST_P(DnsImplIntegrationTest, LogicalDnsWithCaresResolver) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
     auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
@@ -37,7 +36,7 @@ TEST_P(DnsImplIntegrationTest, LogicalDns) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
-TEST_P(DnsImplIntegrationTest, StrictDns) {
+TEST_P(DnsImplIntegrationTest, StrictDnsWithCaresResolver) {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
     auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
@@ -54,5 +53,5 @@ TEST_P(DnsImplIntegrationTest, StrictDns) {
 }
 
 } // namespace
-} // namespace network
+} // namespace Network
 } // namespace Envoy
