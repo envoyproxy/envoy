@@ -22,6 +22,9 @@ CelInputMatcher::CelInputMatcher(CelMatcherSharedPtr cel_matcher,
       }()) {}
 
 bool CelInputMatcher::match(const MatchingDataType& input) {
+  if (cached_result_.has_value()) {
+    return *cached_result_;
+  }
   Protobuf::Arena arena;
   if (auto* ptr = absl::get_if<std::shared_ptr<::Envoy::Matcher::CustomMatchData>>(&input);
       ptr != nullptr) {
@@ -32,7 +35,11 @@ bool CelInputMatcher::match(const MatchingDataType& input) {
 
     auto eval_result = compiled_expr_.evaluate(*cel_data->activation_, &arena);
     if (eval_result.ok() && eval_result.value().IsBool()) {
-      return eval_result.value().BoolOrDie();
+      bool result = eval_result.value().BoolOrDie();
+      if (!cel_data->needs_reinvoked_on_response()) {
+        cached_result_ = result;
+      }
+      return result;
     }
   }
 
