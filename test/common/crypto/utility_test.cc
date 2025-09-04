@@ -185,6 +185,100 @@ TEST(UtilityTest, TestVerifySignature) {
   EXPECT_EQ("Failed to verify digest. Error code: 0", result.error_message_);
 }
 
+TEST(UtilityTest, TestImportPrivateKey) {
+  auto key = "30820122300d06092a864886f70d01010105000382010f003082010a0282010100a7471266d01d160308d"
+             "73409c06f2e8d35c531c458d3e480e9f3191847d062ec5ccff7bc51e949d5f2c3540c189a4eca1e8633a6"
+             "2cf2d0923101c27e38013e71de9ae91a704849bff7fbe2ce5bf4bd666fd9731102a53193fe5a9a5a50644"
+             "ff8b1183fa897646598caad22a37f9544510836372b44c58c98586fb7144629cd8c9479592d996d32ff6d"
+             "395c0b8442ec5aa1ef8051529ea0e375883cefc72c04e360b4ef8f5760650589ca814918f678eee39b884"
+             "d5af8136a9630a6cc0cde157dc8e00f39540628d5f335b2c36c54c7c8bc3738a6b21acff815405afa28e5"
+             "183f550dac19abcf1145a7f9ced987db680e4a229cac75dee347ec9ebce1fc3dbbbb0203010001";
+
+  Common::Crypto::CryptoObjectPtr crypto_ptr(
+      Common::Crypto::UtilitySingleton::get().importPrivateKey(Hex::decode(key)));
+  auto wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(*crypto_ptr);
+  EVP_PKEY* pkey = wrapper->getEVP_PKEY();
+  EXPECT_NE(nullptr, pkey);
+
+  key = "badkey";
+  crypto_ptr = Common::Crypto::UtilitySingleton::get().importPrivateKey(Hex::decode(key));
+  wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(*crypto_ptr);
+  pkey = wrapper->getEVP_PKEY();
+  EXPECT_EQ(nullptr, pkey);
+
+  EVP_PKEY* empty_pkey = EVP_PKEY_new();
+  wrapper->setEVP_PKEY(empty_pkey);
+  pkey = wrapper->getEVP_PKEY();
+  EXPECT_NE(nullptr, pkey);
+}
+
+TEST(UtilityTest, TestSign) {
+  auto private_key =
+      "30820122300d06092a864886f70d01010105000382010f003082010a0282010100a7471266d01d160308d"
+      "73409c06f2e8d35c531c458d3e480e9f3191847d062ec5ccff7bc51e949d5f2c3540c189a4eca1e8633a6"
+      "2cf2d0923101c27e38013e71de9ae91a704849bff7fbe2ce5bf4bd666fd9731102a53193fe5a9a5a50644"
+      "ff8b1183fa897646598caad22a37f9544510836372b44c58c98586fb7144629cd8c9479592d996d32ff6d"
+      "395c0b8442ec5aa1ef8051529ea0e375883cefc72c04e360b4ef8f5760650589ca814918f678eee39b884"
+      "d5af8136a9630a6cc0cde157dc8e00f39540628d5f335b2c36c54c7c8bc3738a6b21acff815405afa28e5"
+      "183f550dac19abcf1145a7f9ced987db680e4a229cac75dee347ec9ebce1fc3dbbbb0203010001";
+  auto data = "hello\n";
+
+  Common::Crypto::CryptoObjectPtr crypto_ptr(
+      Common::Crypto::UtilitySingleton::get().importPrivateKey(Hex::decode(private_key)));
+  Common::Crypto::CryptoObject* crypto(crypto_ptr.get());
+
+  std::vector<uint8_t> text(data, data + strlen(data));
+
+  // Test signing with different hash functions
+  std::vector<std::string> hash_functions = {"sha1", "sha224", "sha256", "sha384", "sha512"};
+
+  for (const auto& hash_func : hash_functions) {
+    auto result = UtilitySingleton::get().sign(hash_func, *crypto, text);
+    EXPECT_EQ(true, result.result_);
+    EXPECT_EQ("", result.error_message_);
+    EXPECT_FALSE(result.signature_.empty());
+
+    // Verify the signature can be verified with the corresponding public key
+    auto public_key =
+        "30820122300d06092a864886f70d01010105000382010f003082010a0282010100a7471266d01d160308d"
+        "73409c06f2e8d35c531c458d3e480e9f3191847d062ec5ccff7bc51e949d5f2c3540c189a4eca1e8633a6"
+        "2cf2d0923101c27e38013e71de9ae91a704849bff7fbe2ce5bf4bd666fd9731102a53193fe5a9a5a50644"
+        "ff8b1183fa897646598caad22a37f9544510836372b44c58c98586fb7144629cd8c9479592d996d32ff6d"
+        "395c0b8442ec5aa1ef8051529ea0e375883cefc72c04e360b4ef8f5760650589ca814918f678eee39b884"
+        "d5af8136a9630a6cc0cde157dc8e00f39540628d5f335b2c36c54c7c8bc3738a6b21acff815405afa28e5"
+        "183f550dac19abcf1145a7f9ced987db680e4a229cac75dee347ec9ebce1fc3dbbbb0203010001";
+
+    Common::Crypto::CryptoObjectPtr public_crypto_ptr(
+        Common::Crypto::UtilitySingleton::get().importPublicKey(Hex::decode(public_key)));
+    Common::Crypto::CryptoObject* public_crypto(public_crypto_ptr.get());
+
+    auto verify_result =
+        UtilitySingleton::get().verifySignature(hash_func, *public_crypto, result.signature_, text);
+    EXPECT_EQ(true, verify_result.result_);
+    EXPECT_EQ("", verify_result.error_message_);
+  }
+
+  // Test with unknown hash function
+  auto result = UtilitySingleton::get().sign("unknown", *crypto, text);
+  EXPECT_EQ(false, result.result_);
+  EXPECT_EQ("unknown is not supported.", result.error_message_);
+  EXPECT_TRUE(result.signature_.empty());
+
+  // Test with empty crypto object
+  auto empty_crypto = std::make_unique<PrivateKeyObject>();
+  result = UtilitySingleton::get().sign("sha256", *empty_crypto, text);
+  EXPECT_EQ(false, result.result_);
+  EXPECT_EQ("Failed to initialize digest sign.", result.error_message_);
+  EXPECT_TRUE(result.signature_.empty());
+
+  // Test with empty text
+  std::vector<uint8_t> empty_text;
+  result = UtilitySingleton::get().sign("sha256", *crypto, empty_text);
+  EXPECT_EQ(true, result.result_);
+  EXPECT_EQ("", result.error_message_);
+  EXPECT_FALSE(result.signature_.empty());
+}
+
 } // namespace
 } // namespace Crypto
 } // namespace Common

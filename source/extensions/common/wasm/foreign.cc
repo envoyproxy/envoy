@@ -1,7 +1,7 @@
 #include "source/common/common/logger.h"
 #include "source/extensions/common/wasm/ext/declare_property.pb.h"
 #include "source/extensions/common/wasm/ext/set_envoy_filter_state.pb.h"
-#include "source/extensions/common/wasm/ext/sign_signature.pb.h"
+#include "source/extensions/common/wasm/ext/sign.pb.h"
 #include "source/extensions/common/wasm/ext/verify_signature.pb.h"
 #include "source/extensions/common/wasm/wasm.h"
 
@@ -13,8 +13,6 @@
 #include "zlib.h"
 #include "source/common/crypto/crypto_impl.h"
 #include "source/common/crypto/utility.h"
-
-#include "source/common/common/logger.h"
 
 using proxy_wasm::RegisterForeignFunction;
 using proxy_wasm::WasmForeignFunction;
@@ -77,11 +75,11 @@ RegisterForeignFunction registerVerifySignatureForeignFunction(
       return WasmResult::BadArgument;
     });
 
-RegisterForeignFunction registerSignSignatureForeignFunction(
-    "sign_signature",
+RegisterForeignFunction registerSignForeignFunction(
+    "sign",
     [](WasmBase&, std::string_view arguments,
        const std::function<void*(size_t size)>& alloc_result) -> WasmResult {
-      envoy::source::extensions::common::wasm::SignSignatureArguments args;
+      envoy::source::extensions::common::wasm::SignArguments args;
       if (args.ParseFromArray(arguments.data(), arguments.size())) {
         const auto& hash = args.hash_function();
         auto key_str = args.private_key();
@@ -93,9 +91,9 @@ RegisterForeignFunction registerSignSignatureForeignFunction(
         auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
         Envoy::Common::Crypto::CryptoObjectPtr crypto_ptr = crypto_util.importPrivateKey(key);
 
-        auto output = crypto_util.signSignature(hash, *crypto_ptr, text);
+        auto output = crypto_util.sign(hash, *crypto_ptr, text);
 
-        envoy::source::extensions::common::wasm::SignSignatureResult signing_result;
+        envoy::source::extensions::common::wasm::SignResult signing_result;
         signing_result.set_result(output.result_);
         if (output.result_) {
           signing_result.set_signature(output.signature_.data(), output.signature_.size());

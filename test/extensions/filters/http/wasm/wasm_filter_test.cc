@@ -2208,12 +2208,12 @@ TEST_P(WasmHttpFilterTest, VerifySignature) {
   rootContext().onTick(0);
 }
 
-TEST_P(WasmHttpFilterTest, SignSignature) {
+TEST_P(WasmHttpFilterTest, Sign) {
   if (std::get<1>(GetParam()) == "rust") {
     // TODO(patricio78): test not yet implemented using Rust SDK.
     return;
   }
-  setupTest("", "sign_signature");
+  setupTest("", "sign");
   setupFilter();
   EXPECT_CALL(rootContext(),
               log_(spdlog::level::info, Eq(absl::string_view("signature created successfully"))));

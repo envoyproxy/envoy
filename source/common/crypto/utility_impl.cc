@@ -71,8 +71,8 @@ const VerificationOutput UtilityImpl::verifySignature(absl::string_view hash, Cr
   return {false, absl::StrCat("Failed to verify digest. Error code: ", ok)};
 }
 
-const SignOutput UtilityImpl::signSignature(absl::string_view hash, CryptoObject& key,
-                                            const std::vector<uint8_t>& text) {
+const SignOutput UtilityImpl::sign(absl::string_view hash, CryptoObject& key,
+                                   const std::vector<uint8_t>& text) {
   // Step 1: initialize EVP_MD_CTX
   bssl::ScopedEVP_MD_CTX ctx;
 
