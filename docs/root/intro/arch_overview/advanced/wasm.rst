@@ -66,6 +66,8 @@ Wasm ABI exposes Envoy-specific host attributes via the dedicated `proxy_get_pro
 standard :ref:`attributes <arch_overview_attributes>` and the values are returned via the type-specific binary
 serialization.
 
+.. _arch_overview_wasm_foreign_functions:
+
 Foreign functions
 -----------------
 
