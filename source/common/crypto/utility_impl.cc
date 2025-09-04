@@ -72,7 +72,7 @@ const VerificationOutput UtilityImpl::verifySignature(absl::string_view hash, Cr
 }
 
 const SignOutput UtilityImpl::signSignature(absl::string_view hash, CryptoObject& key,
-                                           const std::vector<uint8_t>& text) {
+                                            const std::vector<uint8_t>& text) {
   // Step 1: initialize EVP_MD_CTX
   bssl::ScopedEVP_MD_CTX ctx;
 
@@ -118,13 +118,23 @@ const SignOutput UtilityImpl::signSignature(absl::string_view hash, CryptoObject
 CryptoObjectPtr UtilityImpl::importPublicKey(const std::vector<uint8_t>& key) {
   CBS cbs({key.data(), key.size()});
 
-  return std::make_unique<PublicKeyObject>(EVP_parse_public_key(&cbs));
+  EVP_PKEY* pkey = EVP_parse_public_key(&cbs);
+  if (pkey == nullptr) {
+    return nullptr;
+  }
+
+  return std::make_unique<PublicKeyObject>(pkey);
 }
 
 CryptoObjectPtr UtilityImpl::importPrivateKey(const std::vector<uint8_t>& key) {
   CBS cbs({key.data(), key.size()});
 
-  return std::make_unique<PrivateKeyObject>(EVP_parse_private_key(&cbs));
+  EVP_PKEY* pkey = EVP_parse_private_key(&cbs);
+  if (pkey == nullptr) {
+    return nullptr;
+  }
+
+  return std::make_unique<PrivateKeyObject>(pkey);
 }
 
 const EVP_MD* UtilityImpl::getHashFunction(absl::string_view name) {
