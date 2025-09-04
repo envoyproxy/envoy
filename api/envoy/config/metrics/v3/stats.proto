@@ -303,7 +303,7 @@ message HistogramBucketSettings {
   }];
 
   // Initial number of bins for the `circllhist` thread local histogram per time series. Default value is 100.
-  google.protobuf.UInt32Value bins = 3 [(validate.rules).uint32 = {gt: 0, lte: 46082}];
+  google.protobuf.UInt32Value bins = 3 [(validate.rules).uint32 = {lte: 46082 gt: 0}];
 }
 
 // Stats configuration proto schema for built-in ``envoy.stat_sinks.statsd`` sink. This sink does not support
