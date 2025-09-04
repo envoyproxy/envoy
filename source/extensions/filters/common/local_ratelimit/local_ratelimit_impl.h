@@ -169,10 +169,14 @@ using LocalRateLimiterMapSingletonSharedPtr = std::shared_ptr<LocalRateLimiterMa
 class LocalRateLimiterMapSingleton : public Singleton::Instance {
 public:
   struct RateLimiter {
-    // The rate limiter map singleton isn't pinned in the process and is shared among all the
-    // access log rate limit filters, so this struct holds its shared pointer for ownership.
+    // The `map_` holds the ownership of this singleton by shared
+    // pointer, as the rate limiter map singleton isn't pinned and is shared among all the
+    // access log rate limit filters.
     LocalRateLimiterMapSingletonSharedPtr map_;
-    LocalRateLimiterImpl& limiter_;
+
+    // The `limiter_` holds the ownership by shared pointer, as the rate limiter(with the underlying
+    // token bucket) is shared by all the access log rate limit filters using the same key.
+    std::shared_ptr<LocalRateLimiterImpl> limiter_;
   };
 
   static RateLimiter getRateLimiter(
@@ -185,7 +189,7 @@ public:
       const uint32_t lru_size);
 
 private:
-  absl::flat_hash_map<std::string, std::unique_ptr<LocalRateLimiterImpl>> limiter_map_;
+  absl::flat_hash_map<std::string, std::weak_ptr<LocalRateLimiterImpl>> limiter_map_;
 };
 
 } // namespace LocalRateLimit

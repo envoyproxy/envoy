@@ -343,14 +343,15 @@ LocalRateLimiterMapSingleton::RateLimiter LocalRateLimiterMapSingleton::getRateL
   const std::string key(limiter_key);
   auto it = map->limiter_map_.find(key);
   if (it == map->limiter_map_.end()) {
-    it = map->limiter_map_
-             .emplace(key, std::make_unique<LocalRateLimiterImpl>(
-                               fill_interval, max_tokens, tokens_per_fill, dispatcher, descriptors,
-                               always_consume_default_token_bucket, shared_provider, lru_size))
-             .first;
+    auto limiter = std::make_shared<LocalRateLimiterImpl>(
+        fill_interval, max_tokens, tokens_per_fill, dispatcher, descriptors,
+        always_consume_default_token_bucket, shared_provider, lru_size);
+
+    map->limiter_map_.insert({key, limiter});
+    return {map, limiter};
   }
-  auto& limiter = *it->second;
-  return {map, limiter};
+
+  return {map, it->second.lock()};
 }
 
 } // namespace LocalRateLimit

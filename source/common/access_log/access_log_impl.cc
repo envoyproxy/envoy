@@ -344,7 +344,7 @@ LocalRateLimitFilter::LocalRateLimitFilter(
 
 bool LocalRateLimitFilter::evaluate(const Formatter::HttpFormatterContext&,
                                     const StreamInfo::StreamInfo&) const {
-  auto result = rate_limiter_.limiter_.requestAllowed(absl::Span<const RateLimit::Descriptor>());
+  auto result = rate_limiter_.limiter_->requestAllowed(absl::Span<const RateLimit::Descriptor>());
 
   return result.allowed;
 }
