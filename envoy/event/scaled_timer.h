@@ -83,6 +83,9 @@ enum class ScaledTimerType {
   // The max time an HTTP connection to a downstream client can be connected at all. This
   // corresponds to the HTTP_DOWNSTREAM_CONNECTION_MAX TimerType in overload.proto.
   HttpDownstreamMaxConnectionTimeout,
+  // The max time the downstream codec will wait to flush an ended response stream. This corresponds
+  // to HTTP_DOWNSTREAM_STREAM_FLUSH TimerType in overload.proto.
+  HttpDownstreamStreamFlush,
 };
 
 using ScaledTimerTypeMap = absl::flat_hash_map<ScaledTimerType, ScaledTimerMinimum>;

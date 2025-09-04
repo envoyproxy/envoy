@@ -330,5 +330,8 @@ new_features:
     Added a new metric ``db_build_epoch`` to track the build timestamp of the Maxmind geolocation database files.
     This can be used to monitor the freshness of the databases currently in use by the filter.
     See https://maxmind.github.io/MaxMind-DB/#build_epoch for more details.
+- area: overload management
+  change: |
+    Added a new scaled timer type `HttpDownstreamStreamFlush` to the overload manager. This allows Envoy to scale the periodic timer for flushing downstream responses based on resource pressure. The new timer can be configured via the :ref:`ScaleTimersOverloadActionConfig <envoy_v3_api_msg_config.overload.v3.ScaleTimersOverloadActionConfig>`.
 
 deprecated:
