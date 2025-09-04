@@ -83,11 +83,11 @@ public:
    * @param hash hash function(including SHA1, SHA224, SHA256, SHA384, SHA512)
    * @param key pointer to EVP_PKEY private key
    * @param text clear text to sign
-   * @return If the result_ is true, the signature_ contains the generated signature and error_message_ is empty; otherwise,
-   * the error_message_ stores the error message
+   * @return If the result_ is true, the signature_ contains the generated signature and
+   * error_message_ is empty; otherwise, the error_message_ stores the error message
    */
   virtual const SignOutput signSignature(absl::string_view hash, CryptoObject& key,
-                                        const std::vector<uint8_t>& text) PURE;
+                                         const std::vector<uint8_t>& text) PURE;
 
   /**
    * Import public key.

@@ -2220,8 +2220,8 @@ TEST_P(WasmHttpFilterTest, SignSignature) {
 
   EXPECT_CALL(rootContext(),
               log_(spdlog::level::err, Eq(absl::string_view("unknown is not supported."))));
-  EXPECT_CALL(rootContext(), log_(spdlog::level::err,
-                                  Eq(absl::string_view("Failed to initialize digest sign."))))
+  EXPECT_CALL(rootContext(),
+              log_(spdlog::level::err, Eq(absl::string_view("Failed to initialize digest sign."))))
       .Times(2);
   rootContext().onTick(0);
 }
@@ -2234,9 +2234,12 @@ TEST_P(WasmHttpFilterTest, SignAndVerifySignature) {
   setupTest("", "sign_and_verify_signature");
   setupFilter();
   EXPECT_CALL(rootContext(),
-              log_(spdlog::level::info, Eq(absl::string_view("signature created successfully, length: 256"))));
+              log_(spdlog::level::info,
+                   Eq(absl::string_view("signature created successfully, length: 256"))));
   EXPECT_CALL(rootContext(),
-              log_(spdlog::level::info, Eq(absl::string_view("end-to-end test passed: signature created and verified successfully"))));
+              log_(spdlog::level::info,
+                   Eq(absl::string_view(
+                       "end-to-end test passed: signature created and verified successfully"))));
   rootContext().onTick(0);
 }
 
