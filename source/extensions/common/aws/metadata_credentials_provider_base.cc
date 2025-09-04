@@ -31,6 +31,23 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
       [&](Event::Dispatcher&) { return std::make_shared<ThreadLocalCredentialsCache>(); });
 };
 
+MetadataCredentialsProviderBase::~MetadataCredentialsProviderBase() {
+  if (metadata_fetcher_) {
+    // If we're on the main thread, cancel directly
+    if (context_.mainThreadDispatcher().isThreadSafe()) {
+      metadata_fetcher_->cancel();
+      metadata_fetcher_.reset();
+    } else {
+      // Post cleanup to main thread to avoid thread safety issues
+      auto fetcher = std::move(metadata_fetcher_);
+      context_.mainThreadDispatcher().post([fetcher = std::move(fetcher)]() mutable {
+        fetcher->cancel();
+        fetcher.reset();
+      });
+    }
+  }
+}
+
 void MetadataCredentialsProviderBase::onClusterAddOrUpdate() {
   ENVOY_LOG(debug, "Received callback from aws cluster manager for cluster {}", cluster_name_);
   if (!cache_duration_timer_) {

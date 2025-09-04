@@ -7,7 +7,10 @@ namespace Extensions {
 namespace Common {
 namespace Aws {
 
-MockMetadataFetcher::MockMetadataFetcher() = default;
+MockMetadataFetcher::MockMetadataFetcher() {
+  // Allow cancel() to be called 0 or more times to handle destructor calls
+  EXPECT_CALL(*this, cancel()).Times(testing::AtLeast(0));
+}
 
 MockMetadataFetcher::~MockMetadataFetcher() = default;
 
