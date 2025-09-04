@@ -213,7 +213,7 @@ TEST_F(OnDemandFilterTest, VhdsWithRequestBodyShouldContinueDecoding) {
   // Now simulate route discovery completion with a body present
   // The fix ensures this will continue decoding with buffered body, not recreate stream
   EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
-  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(1);
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
 
   // This should now continue decoding with the buffered body
   filter_->onRouteConfigUpdateCompletion(true);
@@ -267,7 +267,7 @@ TEST_F(OnDemandFilterTest, VhdsAndCdsWithRequestBodyShouldContinueDecoding) {
   // When cluster discovery completes with body present, should continue decoding, not recreate
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
-  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(1);
+  EXPECT_CALL(decoder_callbacks_, continueDecoding());
 
   filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
 }
