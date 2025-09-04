@@ -323,6 +323,36 @@ DynamicDescriptor::addOrGetDescriptor(const RateLimit::Descriptor& request_descr
   return token_bucket;
 }
 
+SINGLETON_MANAGER_REGISTRATION(local_ratelimit);
+static constexpr const auto kLocalRateLimitSingletonManagerName =
+    SINGLETON_MANAGER_REGISTERED_NAME(local_ratelimit);
+
+LocalRateLimiterMapSingleton::RateLimiter LocalRateLimiterMapSingleton::getRateLimiter(
+    Singleton::Manager& manager, absl::string_view limiter_key,
+    const std::chrono::milliseconds fill_interval, const uint64_t max_tokens,
+    const uint64_t tokens_per_fill, Event::Dispatcher& dispatcher,
+    const Protobuf::RepeatedPtrField<
+        envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
+    bool always_consume_default_token_bucket, ShareProviderSharedPtr shared_provider,
+    const uint32_t lru_size) {
+  LocalRateLimiterMapSingletonSharedPtr map =
+      manager.getTyped<LocalRateLimiterMapSingleton>(kLocalRateLimitSingletonManagerName, [] {
+        return std::make_shared<LocalRateLimiterMapSingleton>();
+      });
+
+  const std::string key(limiter_key);
+  auto it = map->limiter_map_.find(key);
+  if (it == map->limiter_map_.end()) {
+    it = map->limiter_map_
+             .emplace(key, std::make_unique<LocalRateLimiterImpl>(
+                               fill_interval, max_tokens, tokens_per_fill, dispatcher, descriptors,
+                               always_consume_default_token_bucket, shared_provider, lru_size))
+             .first;
+  }
+  auto& limiter = *it->second;
+  return {map, limiter};
+}
+
 } // namespace LocalRateLimit
 } // namespace Common
 } // namespace Filters

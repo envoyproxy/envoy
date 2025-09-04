@@ -164,6 +164,31 @@ private:
   const bool always_consume_default_token_bucket_{};
 };
 
+class LocalRateLimiterMapSingleton;
+using LocalRateLimiterMapSingletonSharedPtr = std::shared_ptr<LocalRateLimiterMapSingleton>;
+class LocalRateLimiterMapSingleton : public Singleton::Instance {
+public:
+  struct RateLimiter {
+    // The rate limiter map singleton isn't pinned and is shared among all the
+    // access log rate limit filters and hold its shared pointer to ensure its
+    // liveness.
+    LocalRateLimiterMapSingletonSharedPtr map_;
+    LocalRateLimiterImpl& limiter_;
+  };
+
+  static RateLimiter getRateLimiter(
+      Singleton::Manager& manager, absl::string_view limiter_key,
+      const std::chrono::milliseconds fill_interval, const uint64_t max_tokens,
+      const uint64_t tokens_per_fill, Event::Dispatcher& dispatcher,
+      const Protobuf::RepeatedPtrField<
+          envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
+      bool always_consume_default_token_bucket, ShareProviderSharedPtr shared_provider,
+      const uint32_t lru_size);
+
+private:
+  absl::flat_hash_map<std::string, std::unique_ptr<LocalRateLimiterImpl>> limiter_map_;
+};
+
 } // namespace LocalRateLimit
 } // namespace Common
 } // namespace Filters

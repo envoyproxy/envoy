@@ -28,6 +28,7 @@
 
 namespace Envoy {
 namespace AccessLog {
+constexpr absl::string_view kRateLimitFilterDefaultKey = "access_log_rate_limit_default_key";
 
 ComparisonFilter::ComparisonFilter(const envoy::config::accesslog::v3::ComparisonFilter& config,
                                    Runtime::Loader& runtime)
@@ -85,6 +86,8 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
     return FilterPtr{new MetadataFilter(config.metadata_filter(), context.serverFactoryContext())};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kLogTypeFilter:
     return FilterPtr{new LogTypeFilter(config.log_type_filter())};
+  case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kLocalRateLimitFilter:
+    return FilterPtr{new LocalRateLimitFilter(config.local_rate_limit_filter(), context)};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kExtensionFilter:
     MessageUtil::validate(config, validation_visitor);
     {
@@ -322,6 +325,28 @@ bool MetadataFilter::evaluate(const Formatter::HttpFormatterContext&,
   // If the key does not correspond to a set value in dynamic metadata, return true if
   // 'match_if_key_not_found' is set to true and false otherwise
   return default_match_;
+}
+
+LocalRateLimitFilter::LocalRateLimitFilter(
+    const envoy::config::accesslog::v3::LocalRateLimitFilter& config,
+    Server::Configuration::FactoryContext& context)
+    : singleton_key_(config.key().empty() ? kRateLimitFilterDefaultKey : config.key()),
+      rate_limiter_(
+          Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterMapSingleton::getRateLimiter(
+              context.serverFactoryContext().singletonManager(), singleton_key_,
+              std::chrono::milliseconds(Protobuf::util::TimeUtil::DurationToMilliseconds(
+                  config.token_bucket().fill_interval())),
+              config.token_bucket().max_tokens(),
+              PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.token_bucket(), tokens_per_fill, 1),
+              context.serverFactoryContext().mainThreadDispatcher(), {},
+              /*always_consume_default_token_bucket=*/false,
+              /*shared_provider=*/nullptr, /*lru_size=*/0)) {}
+
+bool LocalRateLimitFilter::evaluate(const Formatter::HttpFormatterContext&,
+                                    const StreamInfo::StreamInfo&) const {
+  auto result = rate_limiter_.limiter_.requestAllowed(absl::Span<const RateLimit::Descriptor>());
+
+  return result.allowed;
 }
 
 InstanceSharedPtr
