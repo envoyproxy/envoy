@@ -21,6 +21,9 @@ namespace Aws {
 
 class MockMetadataFetcher : public MetadataFetcher {
 public:
+  MockMetadataFetcher();
+  ~MockMetadataFetcher() override;
+
   MOCK_METHOD(void, cancel, ());
   MOCK_METHOD(absl::string_view, failureToString, (MetadataFetcher::MetadataReceiver::Failure));
   MOCK_METHOD(void, fetch,
