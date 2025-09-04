@@ -169,9 +169,8 @@ using LocalRateLimiterMapSingletonSharedPtr = std::shared_ptr<LocalRateLimiterMa
 class LocalRateLimiterMapSingleton : public Singleton::Instance {
 public:
   struct RateLimiter {
-    // The rate limiter map singleton isn't pinned and is shared among all the
-    // access log rate limit filters and hold its shared pointer to ensure its
-    // liveness.
+    // The rate limiter map singleton isn't pinned in the process and is shared among all the
+    // access log rate limit filters, so this struct holds its shared pointer for ownership.
     LocalRateLimiterMapSingletonSharedPtr map_;
     LocalRateLimiterImpl& limiter_;
   };
