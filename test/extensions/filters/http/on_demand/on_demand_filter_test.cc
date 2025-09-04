@@ -193,7 +193,7 @@ TEST_F(OnDemandFilterTest, OnClusterDiscoveryCompletionClusterFoundRedirectWithB
 
 // Test case specifically for the GitHub issue fix: OnDemand VHDS with request body
 // This test verifies that requests with bodies now properly continue processing
-// after route discovery instead of trying to recreate the stream, fixing the 
+// after route discovery instead of trying to recreate the stream, fixing the
 // bug where they would get 404 NR responses
 TEST_F(OnDemandFilterTest, VhdsWithRequestBodyShouldContinueDecoding) {
   Http::TestRequestHeaderMapImpl headers;
@@ -242,32 +242,33 @@ TEST_F(OnDemandFilterTest, VhdsWithoutBodyShouldRecreateStream) {
 // Test case for VHDS with body and cluster discovery
 TEST_F(OnDemandFilterTest, VhdsAndCdsWithRequestBodyShouldContinueDecoding) {
   setupWithCds();
-  
+
   Http::TestRequestHeaderMapImpl headers;
   Buffer::OwnedImpl request_body("test request body");
-  
+
   auto route = std::make_shared<NiceMock<Router::MockRoute>>();
   auto route_entry = std::make_shared<NiceMock<Router::MockRouteEntry>>();
-  
+
   EXPECT_CALL(*route, routeEntry()).WillRepeatedly(Return(route_entry.get()));
   static const std::string test_cluster_name = "test_cluster";
   EXPECT_CALL(*route_entry, clusterName()).WillRepeatedly(ReturnRef(test_cluster_name));
   EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(route));
-  EXPECT_CALL(decoder_callbacks_, clusterInfo()).WillRepeatedly(Return(nullptr)); // No cluster initially
+  EXPECT_CALL(decoder_callbacks_, clusterInfo())
+      .WillRepeatedly(Return(nullptr)); // No cluster initially
   EXPECT_CALL(*odcds_, requestOnDemandClusterDiscovery(_, _, _));
 
   // Headers processing should stop iteration to wait for cluster discovery
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
-  
+
   // Body data should be buffered
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark,
             filter_->decodeData(request_body, true));
-  
+
   // When cluster discovery completes with body present, should continue decoding, not recreate
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
   EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
   EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(1);
-  
+
   filter_->onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus::Available);
 }
 
@@ -279,9 +280,9 @@ TEST_F(OnDemandFilterTest, RouteDiscoveryCompletionDuringDecodeHeaders) {
   EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(nullptr));
   EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_));
 
-  // Start headers processing 
+  // Start headers processing
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
-  
+
   // Add body data
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark,
             filter_->decodeData(request_body, true));
@@ -293,7 +294,7 @@ TEST_F(OnDemandFilterTest, RouteDiscoveryCompletionDuringDecodeHeaders) {
 
   // Manually set decode_headers_active_ to simulate being called during decodeHeaders
   filter_->setFilterIterationState(Http::FilterHeadersStatus::StopIteration);
-  
+
   // This should return early due to decode_headers_active_ check
   filter_->onRouteConfigUpdateCompletion(true);
 }
