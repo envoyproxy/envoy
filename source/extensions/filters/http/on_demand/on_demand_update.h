@@ -97,6 +97,7 @@ private:
   Upstream::ClusterDiscoveryCallbackHandlePtr cluster_discovery_handle_;
   Envoy::Http::FilterHeadersStatus filter_iteration_state_{Http::FilterHeadersStatus::Continue};
   bool decode_headers_active_{false};
+  bool has_body_data_{false};
 };
 
 } // namespace OnDemand
