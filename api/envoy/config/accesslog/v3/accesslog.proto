@@ -45,7 +45,7 @@ message AccessLog {
   }
 }
 
-// [#next-free-field: 14]
+// [#next-free-field: 15]
 message AccessLogFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.AccessLogFilter";
@@ -355,8 +355,6 @@ message ExtensionFilter {
   }
 }
 
-
-
 // Filters for rate limiting the access logs using token buckets.
 // The token buckets are stored in a singleton map and looked up by key.
 //  If no key is specified, the access log will use the global token bucket.
@@ -373,6 +371,5 @@ message LocalRateLimitFilter {
   //   In the current implementation the token bucket's :ref:`fill_interval
   //   <envoy_v3_api_field_type.v3.TokenBucket.fill_interval>` must be >= 50ms
   //   to avoid too aggressive refills.
-  type.v3.TokenBucket token_bucket = 2
-      [(validate.rules).message = { required: true }];
+  type.v3.TokenBucket token_bucket = 2 [(validate.rules).message = {required: true}];
 }
