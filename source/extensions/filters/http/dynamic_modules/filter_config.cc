@@ -9,9 +9,9 @@ DynamicModuleHttpFilterConfig::DynamicModuleHttpFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
     Server::Configuration::ServerFactoryContext& context)
-    : cluster_manager_(context.clusterManager()), stats_scope_(stats_scope.createScope("")),
-      stat_name_pool_(stats_scope_->symbolTable()),
-      custom_stat_namespace_(stat_name_pool_.add(CustomStatNamespace)), filter_name_(filter_name),
+    : cluster_manager_(context.clusterManager()),
+      stats_scope_(stats_scope.createScope(std::string(CustomStatNamespace) + ".")),
+      stat_name_pool_(stats_scope_->symbolTable()), filter_name_(filter_name),
       filter_config_(filter_config), dynamic_module_(std::move(dynamic_module)) {};
 
 DynamicModuleHttpFilterConfig::~DynamicModuleHttpFilterConfig() {

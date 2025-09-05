@@ -80,43 +80,215 @@ public:
   Envoy::Upstream::ClusterManager& cluster_manager_;
   const Stats::ScopeSharedPtr stats_scope_;
   Stats::StatNamePool stat_name_pool_;
-  const Stats::StatName custom_stat_namespace_;
   // We only allow the module to create stats during envoy_dynamic_module_on_http_filter_config_new,
   // and not later during request handling, so that we don't have to wrap the stat storage in a
   // lock.
   bool stat_creation_frozen_ = false;
 
-  size_t addCounter(Stats::Counter& counter) {
+  using StatNameVecConstOptRef = OptRef<const Stats::StatNameVec>;
+
+  class ModuleMetricHandle {
+  public:
+    virtual ~ModuleMetricHandle() = default;
+
+    virtual StatNameVecConstOptRef getLabelNames() const { return StatNameVecConstOptRef(); };
+  };
+
+  class ModuleCounterHandle : public ModuleMetricHandle {
+  public:
+    virtual ~ModuleCounterHandle() = default;
+
+    // Increment the counter by the given amount.
+    virtual void add(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
+                     uint64_t amount) const PURE;
+  };
+  using ModuleCounterHandlePtr = std::unique_ptr<ModuleCounterHandle>;
+
+  class ModuleCounterHandleImpl : public ModuleCounterHandle {
+  public:
+    ModuleCounterHandleImpl(Stats::Counter& counter) : counter_(counter) {}
+    void add(Stats::Scope&, Stats::StatNameTagVectorOptConstRef tags,
+             uint64_t amount) const override {
+      ASSERT(!tags.has_value());
+      counter_.add(amount);
+    }
+
+  private:
+    Stats::Counter& counter_;
+  };
+
+  class ModuleCounterVecHandleImpl : public ModuleCounterHandle {
+  public:
+    ModuleCounterVecHandleImpl(Stats::StatName name, Stats::StatNameVec label_names)
+        : name_(name), label_names_(label_names) {}
+
+    // ModuleMetricHandle
+    virtual StatNameVecConstOptRef getLabelNames() const override {
+      return StatNameVecConstOptRef(label_names_);
+    }
+
+    virtual void add(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
+                     uint64_t amount) const override {
+      ASSERT(tags.has_value());
+      Stats::Utility::counterFromElements(scope, {name_}, tags).add(amount);
+    }
+
+  private:
+    Stats::StatName name_;
+    Stats::StatNameVec label_names_;
+  };
+
+  class ModuleGaugeHandle : public ModuleMetricHandle {
+  public:
+    virtual ~ModuleGaugeHandle() = default;
+
+    // Increase the gauge by the given amount.
+    virtual void increase(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
+                          uint64_t amount) const PURE;
+
+    // Decrease the gauge by the given amount.
+    virtual void decrease(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
+                          uint64_t amount) const PURE;
+
+    // Set the value of the gauge to the given amount.
+    virtual void set(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
+                     uint64_t amount) const PURE;
+  };
+  using ModuleGaugeHandlePtr = std::unique_ptr<ModuleGaugeHandle>;
+
+  class ModuleGaugeHandleImpl : public ModuleGaugeHandle {
+  public:
+    ModuleGaugeHandleImpl(Stats::Gauge& gauge) : gauge_(gauge) {}
+    virtual void increase(Stats::Scope&, Stats::StatNameTagVectorOptConstRef tags,
+                          uint64_t amount) const override {
+      ASSERT(!tags.has_value());
+      gauge_.add(amount);
+    }
+    virtual void decrease(Stats::Scope&, Stats::StatNameTagVectorOptConstRef tags,
+                          uint64_t amount) const override {
+      ASSERT(!tags.has_value());
+      gauge_.sub(amount);
+    }
+    virtual void set(Stats::Scope&, Stats::StatNameTagVectorOptConstRef tags,
+                     uint64_t amount) const override {
+      ASSERT(!tags.has_value());
+      gauge_.set(amount);
+    }
+
+  private:
+    Stats::Gauge& gauge_;
+  };
+
+  class ModuleGaugeVecHandleImpl : public ModuleGaugeHandle {
+  public:
+    ModuleGaugeVecHandleImpl(Stats::StatName name, Stats::StatNameVec label_names,
+                             Stats::Gauge::ImportMode import_mode)
+        : name_(name), label_names_(label_names), import_mode_(import_mode) {}
+
+    // ModuleMetricHandle
+    virtual StatNameVecConstOptRef getLabelNames() const override {
+      return StatNameVecConstOptRef(label_names_);
+    }
+
+    virtual void increase(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
+                          uint64_t amount) const override {
+      ASSERT(tags.has_value());
+      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).add(amount);
+    }
+    virtual void decrease(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
+                          uint64_t amount) const override {
+      ASSERT(tags.has_value());
+      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).sub(amount);
+    }
+    virtual void set(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
+                     uint64_t amount) const override {
+      ASSERT(tags.has_value());
+      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).set(amount);
+    }
+
+  private:
+    Stats::StatName name_;
+    Stats::StatNameVec label_names_;
+    Stats::Gauge::ImportMode import_mode_;
+  };
+
+  class ModuleHistogramHandle : public ModuleMetricHandle {
+  public:
+    virtual ~ModuleHistogramHandle() = default;
+
+    // Record the given value.
+    virtual void recordValue(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
+                             uint64_t value) const PURE;
+  };
+  using ModuleHistogramHandlePtr = std::unique_ptr<ModuleHistogramHandle>;
+
+  class ModuleHistogramHandleImpl : public ModuleHistogramHandle {
+  public:
+    ModuleHistogramHandleImpl(Stats::Histogram& histogram) : histogram_(histogram) {}
+    virtual void recordValue(Stats::Scope&, Stats::StatNameTagVectorOptConstRef tags,
+                             uint64_t value) const override {
+      ASSERT(!tags.has_value());
+      histogram_.recordValue(value);
+    }
+
+  private:
+    Stats::Histogram& histogram_;
+  };
+
+  class ModuleHistogramVecHandleImpl : public ModuleHistogramHandle {
+  public:
+    ModuleHistogramVecHandleImpl(Stats::StatName name, Stats::StatNameVec label_names,
+                                 Stats::Histogram::Unit unit)
+        : name_(name), label_names_(label_names), unit_(unit) {}
+
+    // ModuleMetricHandle
+    virtual StatNameVecConstOptRef getLabelNames() const override {
+      return StatNameVecConstOptRef(label_names_);
+    }
+
+    virtual void recordValue(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
+                             uint64_t value) const override {
+      ASSERT(tags.has_value());
+      Stats::Utility::histogramFromElements(scope, {name_}, unit_, tags).recordValue(value);
+    }
+
+  private:
+    Stats::StatName name_;
+    Stats::StatNameVec label_names_;
+    Stats::Histogram::Unit unit_;
+  };
+
+  size_t addCounter(ModuleCounterHandlePtr&& counter) {
     size_t id = counters_.size();
-    counters_.push_back(counter);
+    counters_.push_back(std::move(counter));
     return id;
   }
 
-  Stats::Counter& getCounterById(size_t id) const {
+  const ModuleCounterHandle& getCounterById(size_t id) const {
     ASSERT(id < counters_.size());
-    return counters_[id];
+    return *counters_[id];
   }
 
-  size_t addGauge(Stats::Gauge& gauge) {
+  size_t addGauge(ModuleGaugeHandlePtr&& gauge) {
     size_t id = gauges_.size();
-    gauges_.push_back(gauge);
+    gauges_.push_back(std::move(gauge));
     return id;
   }
 
-  Stats::Gauge& getGaugeById(size_t id) const {
+  const ModuleGaugeHandle& getGaugeById(size_t id) const {
     ASSERT(id < gauges_.size());
-    return gauges_[id];
+    return *gauges_[id];
   }
 
-  size_t addHistogram(Stats::Histogram& hist) {
+  size_t addHistogram(ModuleHistogramHandlePtr&& hist) {
     size_t id = hists_.size();
-    hists_.push_back(hist);
+    hists_.push_back(std::move(hist));
     return id;
   }
 
-  Stats::Histogram& getHistogramById(size_t id) const {
+  const ModuleHistogramHandle& getHistogramById(size_t id) const {
     ASSERT(id < hists_.size());
-    return hists_[id];
+    return *hists_[id];
   }
 
 private:
@@ -127,9 +299,9 @@ private:
   const std::string filter_config_;
 
   // The cached references to stats and their metadata.
-  std::vector<std::reference_wrapper<Stats::Counter>> counters_;
-  std::vector<std::reference_wrapper<Stats::Gauge>> gauges_;
-  std::vector<std::reference_wrapper<Stats::Histogram>> hists_;
+  std::vector<ModuleCounterHandlePtr> counters_;
+  std::vector<ModuleGaugeHandlePtr> gauges_;
+  std::vector<ModuleHistogramHandlePtr> hists_;
 
   // The handle for the module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;

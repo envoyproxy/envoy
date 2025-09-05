@@ -24,6 +24,12 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
       concurrent_streams: envoy_filter_config.define_gauge("concurrent_streams"),
       ones: envoy_filter_config.define_histogram("ones"),
       magic_number: envoy_filter_config.define_gauge("magic_number"),
+      test_counter_vec: envoy_filter_config
+        .define_counter_vec("test_counter_vec", &["test_label".into()]),
+      test_gauge_vec: envoy_filter_config
+        .define_gauge_vec("test_gauge_vec", &["test_label".into()]),
+      test_histogram_vec: envoy_filter_config
+        .define_histogram_vec("test_histogram_vec", &["test_label".into()]),
     })),
     "header_callbacks" => Some(Box::new(HeaderCallbacksFilterConfig {})),
     "send_response" => Some(Box::new(SendResponseFilterConfig {})),
@@ -44,6 +50,9 @@ struct StatsCallbacksFilterConfig {
   magic_number: EnvoyGaugeId,
   // It's full of 1s.
   ones: EnvoyHistogramId,
+  test_counter_vec: EnvoyCounterId,
+  test_gauge_vec: EnvoyGaugeId,
+  test_histogram_vec: EnvoyHistogramId,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StatsCallbacksFilterConfig {
@@ -51,6 +60,12 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StatsCallbacksFilterConfig 
     envoy_filter.increment_counter(self.streams_total, 1);
     envoy_filter.increase_gauge(self.concurrent_streams, 1);
     envoy_filter.set_gauge(self.magic_number, 42);
+    envoy_filter.increment_counter_vec(self.test_counter_vec, &["increment".into()], 1);
+    envoy_filter.increase_gauge_vec(self.test_gauge_vec, &["increase".into()], 1);
+    envoy_filter.increase_gauge_vec(self.test_gauge_vec, &["decrease".into()], 10);
+    envoy_filter.decrease_gauge_vec(self.test_gauge_vec, &["decrease".into()], 8);
+    envoy_filter.set_gauge_vec(self.test_gauge_vec, &["set".into()], 9001);
+    envoy_filter.record_histogram_value_vec(self.test_histogram_vec, &["record".into()], 1);
     // Copy the stats handles onto the filter so that we can observe stats while
     // handling requests.
     Box::new(StatsCallbacksFilter {
