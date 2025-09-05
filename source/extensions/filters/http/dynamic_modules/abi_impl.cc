@@ -1,11 +1,11 @@
+#include "source/extensions/filters/http/dynamic_modules/abi_impl.h"
+
 #include <functional>
 
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/router/string_accessor_impl.h"
-#include "source/extensions/dynamic_modules/abi.h"
-#include "source/extensions/filters/http/dynamic_modules/filter.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -74,78 +74,183 @@ bool getSslInfo(
 size_t envoy_dynamic_module_callback_http_filter_config_define_counter(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length) {
+  return envoy_dynamic_module_callback_http_filter_config_define_counter_vec(
+      filter_config_envoy_ptr, name, name_length, nullptr, 0);
+}
+
+size_t envoy_dynamic_module_callback_http_filter_config_define_counter_vec(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length,
+    envoy_dynamic_module_type_module_str* label_names, size_t label_names_length) {
   auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
   ASSERT(!filter_config->stat_creation_frozen_);
   absl::string_view name_view(name, name_length);
-  Stats::StatNameManagedStorage storage(name_view, filter_config->stats_scope_->symbolTable());
-  Stats::StatName stat_name = storage.statName();
-  Stats::Counter& c = Stats::Utility::counterFromStatNames(
-      *filter_config->stats_scope_, {filter_config->custom_stat_namespace_, stat_name});
-  return filter_config->addCounter(c);
+  Stats::StatName main_stat_name = filter_config->stat_name_pool_.add(name_view);
+  if (label_names_length == 0) {
+    ASSERT(label_names == nullptr);
+    Stats::Counter& c =
+        Stats::Utility::counterFromStatNames(*filter_config->stats_scope_, {main_stat_name});
+    return filter_config->addCounter(
+        std::make_unique<DynamicModuleHttpFilterConfig::ModuleCounterHandleImpl>(c));
+  } else {
+    Stats::StatNameVec label_names_vec;
+    for (size_t i = 0; i < label_names_length; i++) {
+      absl::string_view label_name_view(label_names[i].ptr, label_names[i].length);
+      label_names_vec.push_back(filter_config->stat_name_pool_.add(label_name_view));
+    }
+    return filter_config->addCounter(
+        std::make_unique<DynamicModuleHttpFilterConfig::ModuleCounterVecHandleImpl>(
+            main_stat_name, label_names_vec));
+  }
 }
 
 void envoy_dynamic_module_callback_http_filter_increment_counter(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value) {
+  envoy_dynamic_module_callback_http_filter_increment_counter_vec(filter_envoy_ptr, id, nullptr, 0,
+                                                                  value);
+}
+
+void envoy_dynamic_module_callback_http_filter_increment_counter_vec(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_str* label_values, size_t label_values_length,
+    uint64_t value) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto& counter = filter->getFilterConfig().getCounterById(id);
-  return counter.add(value);
+  auto tags = buildTagsForModuleMetric(*filter, counter, label_values, label_values_length);
+  return counter.add(*filter->getFilterConfig().stats_scope_, tags, value);
 }
 
 size_t envoy_dynamic_module_callback_http_filter_config_define_gauge(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length) {
+  return envoy_dynamic_module_callback_http_filter_config_define_gauge_vec(
+      filter_config_envoy_ptr, name, name_length, nullptr, 0);
+}
+
+size_t envoy_dynamic_module_callback_http_filter_config_define_gauge_vec(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length,
+    envoy_dynamic_module_type_module_str* label_names, size_t label_names_length) {
   auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
   ASSERT(!filter_config->stat_creation_frozen_);
   absl::string_view name_view(name, name_length);
-  Stats::StatNameManagedStorage storage(name_view, filter_config->stats_scope_->symbolTable());
-  Stats::StatName stat_name = storage.statName();
-  Stats::Gauge& g = Stats::Utility::gaugeFromStatNames(
-      *filter_config->stats_scope_, {filter_config->custom_stat_namespace_, stat_name},
-      Stats::Gauge::ImportMode::Accumulate);
-  return filter_config->addGauge(g);
+  Stats::StatName main_stat_name = filter_config->stat_name_pool_.add(name_view);
+  Stats::Gauge::ImportMode import_mode =
+      Stats::Gauge::ImportMode::Accumulate; // TODO: make this configurable?
+  if (label_names_length == 0) {
+    ASSERT(label_names == nullptr);
+    Stats::Gauge& g = Stats::Utility::gaugeFromStatNames(*filter_config->stats_scope_,
+                                                         {main_stat_name}, import_mode);
+    return filter_config->addGauge(
+        std::make_unique<DynamicModuleHttpFilterConfig::ModuleGaugeHandleImpl>(g));
+  } else {
+    Stats::StatNameVec label_names_vec;
+    for (size_t i = 0; i < label_names_length; i++) {
+      absl::string_view label_name_view(label_names[i].ptr, label_names[i].length);
+      label_names_vec.push_back(filter_config->stat_name_pool_.add(label_name_view));
+    }
+    return filter_config->addGauge(
+        std::make_unique<DynamicModuleHttpFilterConfig::ModuleGaugeVecHandleImpl>(
+            main_stat_name, label_names_vec, import_mode));
+  }
 }
 
 void envoy_dynamic_module_callback_http_filter_increase_gauge(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value) {
+  envoy_dynamic_module_callback_http_filter_increase_gauge_vec(filter_envoy_ptr, id, nullptr, 0,
+                                                               value);
+}
+
+void envoy_dynamic_module_callback_http_filter_increase_gauge_vec(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_str* label_values, size_t label_values_length,
+    uint64_t value) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto& gauge = filter->getFilterConfig().getGaugeById(id);
-  return gauge.add(value);
+  auto tags = buildTagsForModuleMetric(*filter, gauge, label_values, label_values_length);
+  return gauge.increase(*filter->getFilterConfig().stats_scope_, tags, value);
 }
 
 void envoy_dynamic_module_callback_http_filter_decrease_gauge(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value) {
+  envoy_dynamic_module_callback_http_filter_decrease_gauge_vec(filter_envoy_ptr, id, nullptr, 0,
+                                                               value);
+}
+
+void envoy_dynamic_module_callback_http_filter_decrease_gauge_vec(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_str* label_values, size_t label_values_length,
+    uint64_t value) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto& gauge = filter->getFilterConfig().getGaugeById(id);
-  return gauge.sub(value);
+  auto tags = buildTagsForModuleMetric(*filter, gauge, label_values, label_values_length);
+  return gauge.decrease(*filter->getFilterConfig().stats_scope_, tags, value);
 }
 
 void envoy_dynamic_module_callback_http_filter_set_gauge(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value) {
+  envoy_dynamic_module_callback_http_filter_set_gauge_vec(filter_envoy_ptr, id, nullptr, 0, value);
+}
+
+void envoy_dynamic_module_callback_http_filter_set_gauge_vec(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_str* label_values, size_t label_values_length,
+    uint64_t value) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto& gauge = filter->getFilterConfig().getGaugeById(id);
-  return gauge.set(value);
+  auto tags = buildTagsForModuleMetric(*filter, gauge, label_values, label_values_length);
+  return gauge.set(*filter->getFilterConfig().stats_scope_, tags, value);
 }
 
 size_t envoy_dynamic_module_callback_http_filter_config_define_histogram(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length) {
+  return envoy_dynamic_module_callback_http_filter_config_define_histogram_vec(
+      filter_config_envoy_ptr, name, name_length, nullptr, 0);
+}
+
+size_t envoy_dynamic_module_callback_http_filter_config_define_histogram_vec(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length,
+    envoy_dynamic_module_type_module_str* label_names, size_t label_names_length) {
   auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
   ASSERT(!filter_config->stat_creation_frozen_);
   absl::string_view name_view(name, name_length);
-  Stats::StatNameManagedStorage storage(name_view, filter_config->stats_scope_->symbolTable());
-  Stats::StatName stat_name = storage.statName();
-  Stats::Histogram& h = Stats::Utility::histogramFromStatNames(
-      *filter_config->stats_scope_, {filter_config->custom_stat_namespace_, stat_name},
-      // TODO should we allow callers to specify this?
-      Stats::Histogram::Unit::Unspecified);
-  return filter_config->addHistogram(h);
+  Stats::StatName main_stat_name = filter_config->stat_name_pool_.add(name_view);
+  Stats::Histogram::Unit unit =
+      Stats::Histogram::Unit::Unspecified; // TODO: make this configurable?
+  if (label_names_length == 0) {
+    ASSERT(label_names == nullptr);
+    Stats::Histogram& h = Stats::Utility::histogramFromStatNames(*filter_config->stats_scope_,
+                                                                 {main_stat_name}, unit);
+    return filter_config->addHistogram(
+        std::make_unique<DynamicModuleHttpFilterConfig::ModuleHistogramHandleImpl>(h));
+  } else {
+    Stats::StatNameVec label_names_vec;
+    for (size_t i = 0; i < label_names_length; i++) {
+      absl::string_view label_name_view(label_names[i].ptr, label_names[i].length);
+      label_names_vec.push_back(filter_config->stat_name_pool_.add(label_name_view));
+    }
+    return filter_config->addHistogram(
+        std::make_unique<DynamicModuleHttpFilterConfig::ModuleHistogramVecHandleImpl>(
+            main_stat_name, label_names_vec, unit));
+  }
 }
 
 void envoy_dynamic_module_callback_http_filter_record_histogram_value(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value) {
+  envoy_dynamic_module_callback_http_filter_record_histogram_value_vec(filter_envoy_ptr, id,
+                                                                       nullptr, 0, value);
+}
+
+void envoy_dynamic_module_callback_http_filter_record_histogram_value_vec(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_str* label_values, size_t label_values_length,
+    uint64_t value) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto& hist = filter->getFilterConfig().getHistogramById(id);
-  hist.recordValue(value);
+  auto tags = buildTagsForModuleMetric(*filter, hist, label_values, label_values_length);
+  hist.recordValue(*filter->getFilterConfig().stats_scope_, tags, value);
 }
 
 size_t envoy_dynamic_module_callback_http_get_request_header(
