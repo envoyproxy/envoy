@@ -1673,6 +1673,26 @@ typed_config:
 // The rate limiter is stored in a singleton map with a weak_ptr, so it will be destroyed
 // when all shared_ptrs are gone.
 TEST_F(AccessLogImplTest, SharedRateLimitedReconstructed) {
+  const std::string yaml0 = R"EOF(
+name: accesslog
+filter:
+  extension_filter:
+    name: local_ratelimit_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.local_ratelimit.v3.LocalRateLimitFilter
+      token_bucket:
+        fill_interval: 1s
+        max_tokens: 1
+        tokens_per_fill: 1
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+  // log0 is to ensure the singleton map is alive during this test otherwise when log1 is
+  // destructed, a new singleton map will be recreated and we cannot validate the code path of a
+  // weak_ptr getting expired.
+  InstanceSharedPtr log0 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml0), context_);
+
   const std::string yaml = R"EOF(
 name: accesslog
 filter:
@@ -1693,14 +1713,13 @@ typed_config:
   InstanceSharedPtr log1 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   // First log succeeds.
-  EXPECT_CALL(*file_, write(_)).Times(1);
+  EXPECT_CALL(*file_, write(_));
   log1->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
   // Destroy the first logger instance. The underlying rate limiter should be destroyed as well.
   log1.reset();
-
   // Create a new logger instance with the same key. It should get a new rate limiter.
   InstanceSharedPtr log2 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
-  EXPECT_CALL(*file_, write(_)).Times(1);
+  EXPECT_CALL(*file_, write(_));
   log2->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 
   // Create a third logger instance, which shares the rate limiter with the second one.
@@ -1709,7 +1728,7 @@ typed_config:
   log3->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 
   time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
-  EXPECT_CALL(*file_, write(_)).Times(1);
+  EXPECT_CALL(*file_, write(_));
   log2->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
   EXPECT_CALL(*file_, write(_)).Times(0);
   log3->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
