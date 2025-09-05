@@ -455,8 +455,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       modify_headers_from_upstream_lb_(headers);
     }
 
-    route_entry_->finalizeResponseHeaders(headers, callbacks_->streamInfo());
-
     if (attempt_count_ == 0 || !route_entry_->includeAttemptCountInResponse()) {
       return;
     }
@@ -1758,6 +1756,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
   // Modify response headers after we have set the final upstream info because we may need to
   // modify the headers based on the upstream host.
+  route_entry_->finalizeResponseHeaders(*headers, callbacks_->streamInfo());
   modify_headers_(*headers);
 
   if (end_stream) {
