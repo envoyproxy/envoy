@@ -168,11 +168,11 @@ public:
     notifier_.notifyMissingCluster(resource_name);
   }
 
-  absl::Status addSubscription(absl::string_view resource_name) {
+  void addSubscription(absl::string_view resource_name) {
     if (subscriptions_.contains(resource_name)) {
       ENVOY_LOG(debug, "ODCDS-manager: resource {} is already subscribed to, skipping",
                 resource_name);
-      return absl::OkStatus();
+      return;
     }
     ENVOY_LOG(trace, "ODCDS-manager: adding a subscription for resource {}", resource_name);
     // Subscribe using the xds-manager.
@@ -181,8 +181,16 @@ public:
     absl::Status status = subscription->initializeSubscription();
     if (status.ok()) {
       subscriptions_.emplace(std::string(resource_name), std::move(subscription));
+    } else {
+      // There was an error while subscribing. This could be, for example, when
+      // the cluster_name isn't a valid xdstp resource, or its config-source was
+      // not added to the bootstrap's config_sources.
+      ENVOY_LOG(info,
+                "ODCDS-manager: xDS-TP resource {} could not be registered: {}. Treating as "
+                "missing cluster",
+                resource_name, status.message());
+      onFailure(resource_name);
     }
-    return status;
   }
 
 private:
@@ -318,16 +326,7 @@ XdstpOdCdsApiImpl::subscriptionsManager(Server::Configuration::ServerFactoryCont
 }
 
 void XdstpOdCdsApiImpl::updateOnDemand(std::string cluster_name) {
-  absl::Status status = subscriptions_manager_->addSubscription(cluster_name);
-  if (!status.ok()) {
-    // There was an error while subscribing. This could be, for example, when
-    // the cluster_name isn't a valid xdstp resource, or its config-source was
-    // not added to the bootstrap's config_sources.
-    ENVOY_LOG_MISC(
-        info, "odcds: xDS-TP resource {} could not be registered: {}. Treating as missing cluster",
-        cluster_name, status.message());
-    subscriptions_manager_->onFailure(cluster_name);
-  }
+  subscriptions_manager_->addSubscription(cluster_name);
 }
 } // namespace Upstream
 } // namespace Envoy
