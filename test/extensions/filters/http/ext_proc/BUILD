@@ -211,6 +211,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ext_proc:config",
         "//source/extensions/filters/http/ext_proc:on_processing_response_interface",
         "//source/extensions/filters/http/set_metadata:config",
+        "//source/extensions/http/ext_proc/attribute_builders/default_attribute_builder:default_attribute_builder_lib",
         "//source/extensions/retry/host/previous_hosts:config",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",

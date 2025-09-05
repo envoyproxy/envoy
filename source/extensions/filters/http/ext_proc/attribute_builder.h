@@ -30,7 +30,8 @@ public:
     const Http::HeaderMap* response_trailers;
   };
 
-  // Called to build attributes.
+  // Called to build attributes. Takes in the params needed to create the attributes.
+  // Implementations are expected to set attributes and then return true iff any were set.
   virtual bool build(const BuildParams& params,
                      Protobuf::Map<std::string, Protobuf::Struct>* attributes) const PURE;
 };
