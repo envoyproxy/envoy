@@ -1693,14 +1693,14 @@ typed_config:
   InstanceSharedPtr log1 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   // First log succeeds.
-  EXPECT_CALL(*file_, write(_));
+  EXPECT_CALL(*file_, write(_)).Times(1);
   log1->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
   // Destroy the first logger instance. The underlying rate limiter should be destroyed as well.
   log1.reset();
 
   // Create a new logger instance with the same key. It should get a new rate limiter.
   InstanceSharedPtr log2 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
-  EXPECT_CALL(*file_, write(_));
+  EXPECT_CALL(*file_, write(_)).Times(1);
   log2->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 
   // Create a third logger instance, which shares the rate limiter with the second one.
@@ -1709,7 +1709,7 @@ typed_config:
   log3->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 
   time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
-  EXPECT_CALL(*file_, write(_));
+  EXPECT_CALL(*file_, write(_)).Times(1);
   log2->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
   EXPECT_CALL(*file_, write(_)).Times(0);
   log3->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
