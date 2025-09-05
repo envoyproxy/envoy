@@ -473,8 +473,9 @@ TEST_F(CelMatcherTest, CelMatcherRequestResponseNotMatchedWithParsedExprUseCel) 
 }
 
 TEST_F(CelMatcherTest, NoCelExpression) {
-  EXPECT_DEATH(buildMatcherTree(RequestHeaderCelExprString, ExpressionType::NoExpression),
-               ".*panic: unset oneof.*");
+  EXPECT_THROW_WITH_REGEX(
+      buildMatcherTree(RequestHeaderCelExprString, ExpressionType::NoExpression), EnvoyException,
+      ".*CEL expression not set.*");
 }
 
 // Add a test case specifically for testing format conversion

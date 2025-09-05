@@ -248,7 +248,8 @@ void RefreshDnsWithPostDrainHandler::onDnsResolutionComplete(
 
   // Pass predicate to only drain connections to the resolved host (for any cluster).
   cluster_manager_.drainConnections(
-      [resolved_host](const Upstream::Host& host) { return host.hostname() == resolved_host; });
+      [resolved_host](const Upstream::Host& host) { return host.hostname() == resolved_host; },
+      ConnectionPool::DrainBehavior::DrainExistingConnections);
 }
 
 void ConnectivityManagerImpl::setDrainPostDnsRefreshEnabled(bool enabled) {
@@ -331,11 +332,16 @@ Socket::OptionsSharedPtr ConnectivityManagerImpl::getUpstreamSocketOptions(int n
     return getAlternateInterfaceSocketOptions(network);
   }
 
-  // Envoy uses the hash signature of overridden socket options to choose a connection pool.
-  // Setting a dummy socket option is a hack that allows us to select a different
-  // connection pool without materially changing the socket configuration.
   auto options = std::make_shared<Socket::Options>();
-  options->push_back(std::make_shared<NetworkTypeSocketOptionImpl>(network));
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.decouple_explicit_drain_pools_and_dns_refresh") ||
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.drain_pools_on_network_change")) {
+    // Envoy uses the hash signature of overridden socket options to choose a connection pool.
+    // Setting a dummy socket option is a hack that allows us to select a different
+    // connection pool without materially changing the socket configuration when
+    // pools are not explicitly drained during network change.
+    options->push_back(std::make_shared<NetworkTypeSocketOptionImpl>(network));
+  }
 
   return options;
 }

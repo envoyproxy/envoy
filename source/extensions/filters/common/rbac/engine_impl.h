@@ -92,7 +92,7 @@ private:
   // allocated if CEL is configured.
   struct ExprBuilderWithArena {
     Protobuf::Arena constant_arena_;
-    Expr::BuilderPtr builder_;
+    Expr::BuilderInstanceSharedPtr builder_;
   };
   std::unique_ptr<ExprBuilderWithArena> builder_with_arena_;
 };

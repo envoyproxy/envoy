@@ -8,7 +8,7 @@ namespace Server {
 namespace Configuration {
 
 absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFactoryFromProtoTyped(
-    const FilterConfig& proto_config, const std::string&, DualInfo,
+    const FilterConfig& proto_config, const std::string&, DualInfo dual_info,
     Server::Configuration::ServerFactoryContext& context) {
 
   const auto& module_config = proto_config.dynamic_module_config();
@@ -29,12 +29,17 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
       Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilterConfigSharedPtr>
       filter_config =
           Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-              proto_config.filter_name(), config, std::move(dynamic_module.value()), context);
+              proto_config.filter_name(), config, std::move(dynamic_module.value()),
+              dual_info.scope, context);
 
   if (!filter_config.ok()) {
     return absl::InvalidArgumentError("Failed to create filter config: " +
                                       std::string(filter_config.status().message()));
   }
+
+  context.api().customStatNamespaces().registerStatNamespace(
+      Extensions::DynamicModules::HttpFilters::CustomStatNamespace);
+
   return [config = filter_config.value()](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter =
         std::make_shared<Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilter>(

@@ -36,7 +36,7 @@ directories:
   source/extensions/common/wasm/ext: 100.0
   source/extensions/filters/common: 97.1
   source/extensions/filters/common/fault: 94.5
-  source/extensions/filters/common/rbac: 92.6
+  source/extensions/filters/common/rbac: 95.4
   source/extensions/filters/common/lua: 95.6
   source/extensions/filters/http/cache: 95.9
   source/extensions/filters/http/dynamic_forward_proxy: 94.8
@@ -53,7 +53,7 @@ directories:
   source/extensions/filters/network/dubbo_proxy: 96.2
   source/extensions/filters/network/mongo_proxy: 96.1
   source/extensions/filters/network/sni_cluster: 88.9
-  source/extensions/formatter/cel: 93.9
+  source/extensions/formatter/cel: 100.0
   source/extensions/internal_redirect: 86.2
   source/extensions/internal_redirect/safe_cross_scheme: 81.3
   source/extensions/internal_redirect/allow_listed_routes: 85.7
@@ -79,4 +79,4 @@ directories:
   source/extensions/health_checkers/http: 94.6
   source/extensions/health_checkers/grpc: 92.3
   source/extensions/config_subscription/rest: 94.9
-  source/extensions/matching/input_matchers/cel_matcher: 82.6  # Death tests don't report LCOV
+  source/extensions/matching/input_matchers/cel_matcher: 100.0

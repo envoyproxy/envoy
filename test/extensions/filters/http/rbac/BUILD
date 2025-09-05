@@ -78,6 +78,7 @@ envoy_extension_cc_test(
         "//source/extensions/matching/input_matchers/cel_matcher:config",
         "//source/extensions/matching/input_matchers/ip:config",
         "//source/extensions/matching/network/common:inputs_lib",
+        "//source/extensions/network/dns_resolver/getaddrinfo:config",
         "//test/config:utility_lib",
         "//test/integration:http_protocol_integration_lib",
         "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",

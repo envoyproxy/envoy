@@ -163,6 +163,11 @@ public:
     }
 
     void setCodecCallbacks(ServerCodecCallbacks& callback) override { callback_ = &callback; }
+    void onConnected() override {
+      ASSERT(callback_->connection().has_value());
+      ASSERT(callback_->connection()->state() == Network::Connection::State::Open);
+      ASSERT(!callback_->connection()->connecting());
+    }
     void decode(Buffer::Instance& buffer, bool) override {
       ENVOY_LOG(debug, "FakeServerCodec::decode: {}", buffer.toString());
 

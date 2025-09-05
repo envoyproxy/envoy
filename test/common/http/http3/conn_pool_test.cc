@@ -281,6 +281,17 @@ TEST_F(Http3ConnPoolImplTest, NewAndDrainClientBeforeConnect) {
   cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::CloseExcess);
 }
 
+TEST_F(Http3ConnPoolImplTest, MigrationEnabledNoDrain) {
+  quic_info_.migration_config_.migrate_session_on_network_change = true;
+  createNewStream();
+  EXPECT_FALSE(pool_->isIdle());
+  // Draining non-migratable connections should not drain the connection which might be able to
+  // migrate.
+  pool_->drainConnections(
+      Envoy::ConnectionPool::DrainBehavior::DrainExistingNonMigratableConnections);
+  EXPECT_FALSE(pool_->isIdle());
+}
+
 } // namespace Http3
 } // namespace Http
 } // namespace Envoy

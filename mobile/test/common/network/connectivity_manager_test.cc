@@ -111,7 +111,7 @@ TEST_F(ConnectivityManagerTest, WhenDrainPostDnsRefreshEnabledDrainsPostDnsRefre
   envoy_netconf_t configuration_key = connectivity_manager_->getConfigurationKey();
   connectivity_manager_->refreshDns(configuration_key, true);
 
-  EXPECT_CALL(cm_, drainConnections(_));
+  EXPECT_CALL(cm_, drainConnections(_, ConnectionPool::DrainBehavior::DrainExistingConnections));
   dns_completion_callback->onDnsResolutionComplete(
       "cached.example.com",
       std::make_shared<Extensions::Common::DynamicForwardProxy::MockDnsHostInfo>(),
@@ -287,7 +287,13 @@ TEST_F(ConnectivityManagerTest, NetworkChangeResultsInDifferentSocketOptionsHash
   for (const auto& option : *options2) {
     option->hashKey(hash2);
   }
-  EXPECT_NE(hash1, hash2);
+  if (!Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.decouple_explicit_drain_pools_and_dns_refresh") ||
+      !Runtime::runtimeFeatureEnabled("envoy.reloadable_features.drain_pools_on_network_change")) {
+    EXPECT_NE(hash1, hash2);
+  } else {
+    EXPECT_EQ(hash1, hash2);
+  }
 }
 
 // Verifies that when the platform notifies about the same default network

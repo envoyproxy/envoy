@@ -966,6 +966,83 @@ TEST_P(RoundRobinLoadBalancerTest, ZoneAwareDifferentZoneSize) {
   EXPECT_EQ(2U, stats_.lb_zone_routing_cross_zone_.value());
 }
 
+TEST_P(RoundRobinLoadBalancerTest, ZoneAwareUseHostWeight) {
+  if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
+    return;
+  }
+  envoy::config::core::v3::Locality zone_a;
+  zone_a.set_zone("A");
+  envoy::config::core::v3::Locality zone_b;
+  zone_b.set_zone("B");
+
+  // Setup is:
+  // L = local envoy
+  // U = upstream host
+  //
+  // Zone A: 2L with 100 weight each, 1U with 100 weight
+  // Zone B: 1L with 200 weight, 1U with 100 weight
+
+  HostVectorSharedPtr upstream_hosts(
+      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:80", zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:81", zone_b)}));
+  HostVectorSharedPtr local_hosts(
+      new HostVector({makeTestHost(info_, "tcp://127.0.0.1:0", zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:1", zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:2", zone_b)}));
+  HostsPerLocalitySharedPtr upstream_hosts_per_locality =
+      makeHostsPerLocality({{// zone A
+                             makeTestHost(info_, "tcp://127.0.0.1:80", zone_a)},
+                            {// zone B
+                             makeTestHost(info_, "tcp://127.0.0.1:81", zone_b)}});
+  HostsPerLocalitySharedPtr local_hosts_per_locality =
+      makeHostsPerLocality({{// zone A
+                             makeTestHost(info_, "tcp://127.0.0.1:0", zone_a),
+                             makeTestHost(info_, "tcp://127.0.0.1:1", zone_a)},
+                            {// zone B
+                             makeTestHost(info_, "tcp://127.0.0.1:2", zone_b)}});
+
+  local_hosts_per_locality->get()[0][0]->weight(100);
+  local_hosts_per_locality->get()[0][1]->weight(100);
+  local_hosts_per_locality->get()[1][0]->weight(200);
+  upstream_hosts_per_locality->get()[0][0]->weight(100);
+  upstream_hosts_per_locality->get()[1][0]->weight(100);
+
+  hostSet().healthy_hosts_ = *upstream_hosts;
+  hostSet().hosts_ = *upstream_hosts;
+  hostSet().healthy_hosts_per_locality_ = upstream_hosts_per_locality;
+  common_config_.mutable_healthy_panic_threshold()->set_value(100);
+  round_robin_lb_config_.mutable_locality_lb_config()
+      ->mutable_zone_aware_lb_config()
+      ->mutable_routing_enabled()
+      ->set_value(100);
+  round_robin_lb_config_.mutable_locality_lb_config()
+      ->mutable_zone_aware_lb_config()
+      ->mutable_min_cluster_size()
+      ->set_value(2);
+  round_robin_lb_config_.mutable_locality_lb_config()
+      ->mutable_zone_aware_lb_config()
+      ->set_locality_basis(envoy::extensions::load_balancing_policies::common::v3::
+                               LocalityLbConfig::ZoneAwareLbConfig::HEALTHY_HOSTS_WEIGHT);
+  init(true);
+  updateHosts(local_hosts, local_hosts_per_locality);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 100))
+      .WillRepeatedly(Return(50));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.force_local_zone.min_size", 0))
+      .WillRepeatedly(Return(0));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 2))
+      .WillRepeatedly(Return(2));
+
+  // Although there are two local hosts in zone A, the zone A and zone B has the same total weight
+  // in total. So all traffic should go directly to the same zone.
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(1U, stats_.lb_zone_routing_all_directly_.value());
+  EXPECT_EQ(hostSet().healthy_hosts_per_locality_->get()[0][0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(2U, stats_.lb_zone_routing_all_directly_.value());
+}
+
 TEST_P(RoundRobinLoadBalancerTest, ZoneAwareRoutingLargeZoneSwitchOnOff) {
   if (&hostSet() == &failover_host_set_) { // P = 1 does not support zone-aware routing.
     return;

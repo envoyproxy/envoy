@@ -15,6 +15,9 @@ botengyao:
 daixiang0:
   first-pass: true
   slack: U020CJG6UU8
+danzh2010:
+  maintainer: true
+  slack: UDR2MA31P
 ggreenway:
   maintainer: true
   opsgenie: Greg

@@ -22,11 +22,19 @@ public:
   virtual ~ServerCodec() = default;
 
   /**
-   * Set callbacks of server codec.
+   * Set callbacks of server codec. Called before onConnected().
    * @param callbacks callbacks of server codec. This callback will have same or longer
    * lifetime as the server codec.
    */
   virtual void setCodecCallbacks(ServerCodecCallbacks& callbacks) PURE;
+
+  /**
+   * Called when the downstream connection is established.
+   *
+   * The connection obtained from ServerCodecCallbacks::connection() will be valid when this
+   * callback is invoked. It should not be relied upon to be valid until this point.
+   */
+  virtual void onConnected() {}
 
   /**
    * Decode request frame from downstream connection.

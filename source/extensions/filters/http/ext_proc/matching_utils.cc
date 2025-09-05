@@ -27,12 +27,13 @@ ExpressionManager::initExpressions(const Protobuf::RepeatedPtrField<std::string>
 
     const auto& parsed_expr = parse_status.value();
     const cel::expr::Expr& cel_expr = parsed_expr.expr();
-
-    Filters::Common::Expr::ExpressionPtr compiled_expression =
-        Extensions::Filters::Common::Expr::createExpression(builder_->builder(), cel_expr);
-
-    expressions.emplace(
-        matcher, ExpressionManager::CelExpression{parsed_expr, std::move(compiled_expression)});
+    auto compiled_expression =
+        Extensions::Filters::Common::Expr::CompiledExpression::Create(builder_, cel_expr);
+    if (!compiled_expression.ok()) {
+      throw EnvoyException(
+          absl::StrCat("failed to create an expression: ", compiled_expression.status().message()));
+    }
+    expressions.emplace(matcher, std::move(compiled_expression.value()));
   }
 #else
   ENVOY_LOG(warn, "CEL expression parsing is not available for use in this environment."
@@ -54,7 +55,7 @@ ExpressionManager::evaluateAttributes(const Filters::Common::Expr::Activation& a
 
   for (const auto& hash_entry : expr) {
     Protobuf::Arena arena;
-    const auto result = hash_entry.second.compiled_expr_->Evaluate(activation, &arena);
+    const auto result = hash_entry.second.evaluate(activation, &arena);
     if (!result.ok()) {
       // TODO: Stats?
       continue;

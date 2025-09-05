@@ -519,24 +519,28 @@ public:
   virtual ~PrioritySet() = default;
 
   /**
-   * Install a callback that will be invoked when any of the HostSets in the PrioritySet changes.
-   * hosts_added and hosts_removed will only be populated when a host is added or completely removed
-   * from the PrioritySet.
-   * This includes when a new HostSet is created.
+   * Install a callback that will be invoked when anything on any host in the PrioritySet is
+   * changed.
+   *
+   * hosts_added and hosts_removed will only be populated when a host is added or
+   * completely removed from the PrioritySet. This includes when a new HostSet is created.
    *
    * @param callback supplies the callback to invoke.
-   * @return Common::CallbackHandlePtr a handle which can be used to unregister the callback.
+   * @return Common::CallbackHandlePtr a handle which unregisters the callback upon its destruction.
    */
   ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
   addMemberUpdateCb(MemberUpdateCb callback) const PURE;
 
   /**
-   * Install a callback that will be invoked when a host set changes. Triggers when any change
-   * happens to the hosts within the host set. If hosts are added/removed from the host set, the
-   * added/removed hosts will be passed to the callback.
+   * Install a callback that will be invoked when a host changes. Triggers when any change
+   * happens to the hosts within that priority, and is invoked once for each priority that has a
+   * change.
+   *
+   * If hosts are added/removed from the host set, the added/removed hosts will be passed to
+   * the callback.
    *
    * @param callback supplies the callback to invoke.
-   * @return Common::CallbackHandlePtr a handle which can be used to unregister the callback.
+   * @return Common::CallbackHandlePtr a handle which unregisters the callback upon its destruction.
    */
   ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
   addPriorityUpdateCb(PriorityUpdateCb callback) const PURE;

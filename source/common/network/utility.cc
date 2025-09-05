@@ -22,6 +22,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/io_socket_error_impl.h"
+#include "source/common/network/ip_address_parsing.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
@@ -106,75 +107,18 @@ Api::IoCallUint64Result receiveMessage(uint64_t max_rx_datagram_size, Buffer::In
   return result;
 }
 
-StatusOr<sockaddr_in> parseV4Address(const std::string& ip_address, uint16_t port) {
-  sockaddr_in sa4;
-  memset(&sa4, 0, sizeof(sa4));
-  if (inet_pton(AF_INET, ip_address.c_str(), &sa4.sin_addr) != 1) {
-    return absl::FailedPreconditionError("failed parsing ipv4");
-  }
-  sa4.sin_family = AF_INET;
-  sa4.sin_port = htons(port);
-  return sa4;
-}
-
-StatusOr<sockaddr_in6> parseV6Address(const std::string& ip_address, uint16_t port) {
-  // Parse IPv6 with optional scope using getaddrinfo().
-  // While inet_pton() would be faster and simpler, it does not support IPv6
-  // addresses that specify a scope, e.g. `::%eth0` to listen on only one interface.
-  struct addrinfo hints;
-  memset(&hints, 0, sizeof(hints));
-  struct addrinfo* res = nullptr;
-  // Suppresses any potentially lengthy network host address lookups and inhibit the invocation of
-  // a name resolution service.
-  hints.ai_flags = AI_NUMERICHOST | AI_NUMERICSERV;
-  hints.ai_family = AF_INET6;
-  // Given that we don't specify a service but we use getaddrinfo() to only parse the node
-  // address, specifying the socket type allows to hint the getaddrinfo() to return only an
-  // element with the below socket type. The behavior though remains platform dependent and anyway
-  // we consume only the first element (if the call succeeds).
-  hints.ai_socktype = SOCK_DGRAM;
-  hints.ai_protocol = IPPROTO_UDP;
-
-  // We want to use the interface of OsSysCalls for this for the
-  // platform-independence, but we don't want to use the common
-  // OsSysCallsSingleton.
-  //
-  // The problem with using OsSysCallsSingleton is that we likely
-  // want to override getaddrinfo() for DNS lookups in tests, but
-  // typically that override would resolve a name to e.g.
-  // the address from resolveUrl("tcp://[::1]:80") - but resolveUrl
-  // calls parseV6Address, which calls getaddrinfo(), so if we use
-  // the mock *here* then mocking DNS causes infinite recursion.
-  //
-  // We don't ever need to mock *this* getaddrinfo() call, because
-  // it's only used to parse numeric IP addresses, per `ai_flags`,
-  // so it should be deterministic resolution; there's no need to
-  // mock it to test failure cases.
-  static Api::OsSysCallsImpl os_sys_calls;
-
-  const Api::SysCallIntResult rc =
-      os_sys_calls.getaddrinfo(ip_address.c_str(), /*service=*/nullptr, &hints, &res);
-  if (rc.return_value_ != 0) {
-    return absl::FailedPreconditionError(fmt::format("getaddrinfo error: {}", rc.return_value_));
-  }
-  sockaddr_in6 sa6 = *reinterpret_cast<sockaddr_in6*>(res->ai_addr);
-  os_sys_calls.freeaddrinfo(res);
-  sa6.sin6_port = htons(port);
-  return sa6;
-}
-
 } // namespace
 
 Address::InstanceConstSharedPtr
 Utility::parseInternetAddressNoThrow(const std::string& ip_address, uint16_t port, bool v6only,
                                      absl::optional<std::string> network_namespace) {
-  StatusOr<sockaddr_in> sa4 = parseV4Address(ip_address, port);
+  StatusOr<sockaddr_in> sa4 = IpAddressParsing::parseIPv4(ip_address, port);
   if (sa4.ok()) {
     return instanceOrNull(Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(
         &sa4.value(), nullptr, network_namespace));
   }
 
-  StatusOr<sockaddr_in6> sa6 = parseV6Address(ip_address, port);
+  StatusOr<sockaddr_in6> sa6 = IpAddressParsing::parseIPv6(ip_address, port);
   if (sa6.ok()) {
     return instanceOrNull(Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(
         *sa6, v6only, nullptr, network_namespace));
@@ -200,7 +144,7 @@ Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool 
     if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
       return nullptr;
     }
-    StatusOr<sockaddr_in6> sa6 = parseV6Address(ip_str, port64);
+    StatusOr<sockaddr_in6> sa6 = IpAddressParsing::parseIPv6(ip_str, static_cast<uint16_t>(port64));
     if (sa6.ok()) {
       return instanceOrNull(Address::InstanceFactory::createInstancePtr<Address::Ipv6Instance>(
           *sa6, v6only, nullptr, network_namespace));
@@ -218,7 +162,7 @@ Utility::parseInternetAddressAndPortNoThrow(const std::string& ip_address, bool 
   if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
     return nullptr;
   }
-  StatusOr<sockaddr_in> sa4 = parseV4Address(ip_str, port64);
+  StatusOr<sockaddr_in> sa4 = IpAddressParsing::parseIPv4(ip_str, static_cast<uint16_t>(port64));
   if (sa4.ok()) {
     return instanceOrNull(Address::InstanceFactory::createInstancePtr<Address::Ipv4Instance>(
         &sa4.value(), nullptr, network_namespace));

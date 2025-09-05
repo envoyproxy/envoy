@@ -1293,6 +1293,28 @@ TEST_F(IoHandleImplNotImplementedTest, ErrorOnGetOption) {
 TEST_F(IoHandleImplNotImplementedTest, ErrorOnIoctl) {
   EXPECT_THAT(io_handle_->ioctl(0, nullptr, 0, nullptr, 0, nullptr), IsNotSupportedResult());
 }
+
+class TestPassthroughState : public PassthroughStateImpl {};
+
+TEST(IoHandleFactoryTest, UseExistingPassthroughState) {
+  {
+    auto [io_handle, io_handle_peer] =
+        IoHandleFactory::createIoHandlePair(std::make_unique<TestPassthroughState>());
+    EXPECT_NE(std::dynamic_pointer_cast<TestPassthroughState>(io_handle->passthroughState()),
+              nullptr);
+    EXPECT_NE(std::dynamic_pointer_cast<TestPassthroughState>(io_handle_peer->passthroughState()),
+              nullptr);
+  }
+  {
+    auto [io_handle, io_handle_peer] = IoHandleFactory::createBufferLimitedIoHandlePair(
+        1024, std::make_unique<TestPassthroughState>());
+    EXPECT_NE(std::dynamic_pointer_cast<TestPassthroughState>(io_handle->passthroughState()),
+              nullptr);
+    EXPECT_NE(std::dynamic_pointer_cast<TestPassthroughState>(io_handle_peer->passthroughState()),
+              nullptr);
+  }
+}
+
 } // namespace
 } // namespace UserSpace
 } // namespace IoSocket

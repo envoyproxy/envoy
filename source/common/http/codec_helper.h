@@ -89,11 +89,11 @@ private:
 class MultiplexedStreamImplBase : public Stream, public StreamCallbackHelper {
 public:
   MultiplexedStreamImplBase(Event::Dispatcher& dispatcher) : dispatcher_(dispatcher) {}
-  ~MultiplexedStreamImplBase() override { ASSERT(stream_idle_timer_ == nullptr); }
+  ~MultiplexedStreamImplBase() override { ASSERT(stream_flush_timer_ == nullptr); }
   // TODO(mattklein123): Optimally this would be done in the destructor but there are currently
   // deferred delete lifetime issues that need sorting out if the destructor of the stream is
   // going to be able to refer to the parent connection.
-  virtual void destroy() { disarmStreamIdleTimer(); }
+  virtual void destroy() { disarmStreamFlushTimer(); }
 
   void onLocalEndStream() {
     ASSERT(local_end_stream_);
@@ -102,11 +102,11 @@ public:
     }
   }
 
-  void disarmStreamIdleTimer() {
-    if (stream_idle_timer_ != nullptr) {
+  void disarmStreamFlushTimer() {
+    if (stream_flush_timer_ != nullptr) {
       // To ease testing and the destructor assertion.
-      stream_idle_timer_->disableTimer();
-      stream_idle_timer_.reset();
+      stream_flush_timer_->disableTimer();
+      stream_flush_timer_.reset();
     }
   }
 
@@ -117,18 +117,18 @@ public:
 
 protected:
   void setFlushTimeout(std::chrono::milliseconds timeout) override {
-    stream_idle_timeout_ = timeout;
+    stream_flush_timeout_ = timeout;
   }
 
   void createPendingFlushTimer() {
-    ASSERT(stream_idle_timer_ == nullptr);
-    if (stream_idle_timeout_.count() > 0) {
-      stream_idle_timer_ = dispatcher_.createTimer([this] { onPendingFlushTimer(); });
-      stream_idle_timer_->enableTimer(stream_idle_timeout_);
+    ASSERT(stream_flush_timer_ == nullptr);
+    if (stream_flush_timeout_.count() > 0) {
+      stream_flush_timer_ = dispatcher_.createTimer([this] { onPendingFlushTimer(); });
+      stream_flush_timer_->enableTimer(stream_flush_timeout_);
     }
   }
 
-  virtual void onPendingFlushTimer() { stream_idle_timer_.reset(); }
+  virtual void onPendingFlushTimer() { stream_flush_timer_.reset(); }
 
   virtual bool hasPendingData() PURE;
 
@@ -136,9 +136,9 @@ protected:
 
 private:
   Event::Dispatcher& dispatcher_;
-  // See HttpConnectionManager.stream_idle_timeout.
-  std::chrono::milliseconds stream_idle_timeout_{};
-  Event::TimerPtr stream_idle_timer_;
+  // See HttpConnectionManager.stream_flush_timeout.
+  std::chrono::milliseconds stream_flush_timeout_{};
+  Event::TimerPtr stream_flush_timer_;
 };
 
 } // namespace Http

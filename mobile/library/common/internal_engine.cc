@@ -456,11 +456,15 @@ void InternalEngine::resetHttpPropertiesAndDrainHosts(bool has_ipv6_connectivity
     cache_manager.forEachThreadLocalCache(clear_brokenness);
   }
 
-  if (disable_dns_refresh_on_network_change_) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.decouple_explicit_drain_pools_and_dns_refresh") ||
+      disable_dns_refresh_on_network_change_) {
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.drain_pools_on_network_change")) {
-      // Since DNS refreshing is disabled, explicitly drain all connections.
+      // Since DNS refreshing is disabled, explicitly drain all non-migratable connections.
       ENVOY_LOG_EVENT(debug, "netconf_immediate_drain", "DrainAllHosts");
-      getClusterManager().drainConnections([](const Upstream::Host&) { return true; });
+      getClusterManager().drainConnections(
+          [](const Upstream::Host&) { return true; },
+          Envoy::ConnectionPool::DrainBehavior::DrainExistingNonMigratableConnections);
     }
   }
 }
@@ -594,25 +598,31 @@ Network::Address::InstanceConstSharedPtr InternalEngine::probeAndGetLocalAddr(in
     return nullptr;
   }
 
-  if ((*address)->ip() == nullptr) {
-    ENVOY_LOG(trace, "Local address is not an IP address: {}.", (*address)->asString());
-    return nullptr;
-  }
-  if ((*address)->ip()->isLinkLocalAddress()) {
-    ENVOY_LOG(trace, "Ignoring link-local address: {}.", (*address)->asString());
-    return nullptr;
-  }
-  if ((*address)->ip()->isUniqueLocalAddress()) {
-    ENVOY_LOG(trace, "Ignoring unique-local address: {}.", (*address)->asString());
-    return nullptr;
-  }
-  if ((*address)->ip()->isSiteLocalAddress()) {
-    ENVOY_LOG(trace, "Ignoring site-local address: {}.", (*address)->asString());
-    return nullptr;
-  }
-  if ((*address)->ip()->isTeredoAddress()) {
-    ENVOY_LOG(trace, "Ignoring teredo address: {}.", (*address)->asString());
-    return nullptr;
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.mobile_ipv6_probe_simple_filtering")) {
+    if ((*address)->ip() == nullptr) {
+      ENVOY_LOG(trace, "Local address is not an IP address: {}.", (*address)->asString());
+      return nullptr;
+    }
+    if ((*address)->ip()->isLinkLocalAddress()) {
+      ENVOY_LOG(trace, "Ignoring link-local address: {}.", (*address)->asString());
+      return nullptr;
+    }
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.mobile_ipv6_probe_advanced_filtering")) {
+      if ((*address)->ip()->isUniqueLocalAddress()) {
+        ENVOY_LOG(trace, "Ignoring unique-local address: {}.", (*address)->asString());
+        return nullptr;
+      }
+      if ((*address)->ip()->isSiteLocalAddress()) {
+        ENVOY_LOG(trace, "Ignoring site-local address: {}.", (*address)->asString());
+        return nullptr;
+      }
+      if ((*address)->ip()->isTeredoAddress()) {
+        ENVOY_LOG(trace, "Ignoring teredo address: {}.", (*address)->asString());
+        return nullptr;
+      }
+    }
   }
 
   ENVOY_LOG(trace, "Found {} connectivity.", domain == AF_INET6 ? "IPv6" : "IPv4");

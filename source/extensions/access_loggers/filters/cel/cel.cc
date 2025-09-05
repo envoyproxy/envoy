@@ -10,19 +10,24 @@ namespace Expr = Envoy::Extensions::Filters::Common::Expr;
 
 CELAccessLogExtensionFilter::CELAccessLogExtensionFilter(
     const ::Envoy::LocalInfo::LocalInfo& local_info,
-    Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
+    Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
     const cel::expr::Expr& input_expr)
-    : local_info_(local_info), builder_(builder), parsed_expr_(input_expr) {
-  compiled_expr_ =
-      Extensions::Filters::Common::Expr::createExpression(builder_->builder(), parsed_expr_);
-}
+    : local_info_(local_info), expr_([&]() {
+        auto compiled_expr =
+            Extensions::Filters::Common::Expr::CompiledExpression::Create(builder, input_expr);
+        if (!compiled_expr.ok()) {
+          throw EnvoyException(
+              absl::StrCat("failed to create an expression: ", compiled_expr.status().message()));
+        }
+        return std::move(compiled_expr.value());
+      }()) {}
 
 bool CELAccessLogExtensionFilter::evaluate(const Formatter::HttpFormatterContext& log_context,
                                            const StreamInfo::StreamInfo& stream_info) const {
   Protobuf::Arena arena;
-  const auto result = Extensions::Filters::Common::Expr::evaluate(
-      *compiled_expr_.get(), arena, &local_info_, stream_info, &log_context.requestHeaders(),
-      &log_context.responseHeaders(), &log_context.responseTrailers());
+  const auto result =
+      expr_.evaluate(arena, &local_info_, stream_info, &log_context.requestHeaders(),
+                     &log_context.responseHeaders(), &log_context.responseTrailers());
   if (!result.has_value() || result.value().IsError()) {
     return false;
   }

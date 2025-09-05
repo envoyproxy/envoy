@@ -569,6 +569,12 @@ protected:
 TEST_P(Http2CodecImplTest, SimpleRequestResponse) {
   initialize();
 
+  const StreamInfo::BytesMeterSharedPtr send_meter = request_encoder_->getStream().bytesMeter();
+  EXPECT_EQ(send_meter->headerBytesSent(), 0);
+  EXPECT_EQ(send_meter->decompressedHeaderBytesSent(), 0);
+  EXPECT_EQ(send_meter->headerBytesReceived(), 0);
+  EXPECT_EQ(send_meter->decompressedHeaderBytesReceived(), 0);
+
   InSequence s;
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
@@ -578,6 +584,10 @@ TEST_P(Http2CodecImplTest, SimpleRequestResponse) {
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
 
+  // Verify BytesMeter send-side metrics.
+  EXPECT_GT(send_meter->headerBytesSent(), 0);
+  EXPECT_GE(send_meter->decompressedHeaderBytesSent(), send_meter->headerBytesSent());
+
   // Queue request body.
   Buffer::OwnedImpl request_body(std::string(1024, 'a'));
   request_encoder_->encodeData(request_body, true);
@@ -585,6 +595,11 @@ TEST_P(Http2CodecImplTest, SimpleRequestResponse) {
   // Flush request body.
   EXPECT_CALL(request_decoder_, decodeData(_, true)).Times(AtLeast(1));
   driveToCompletion();
+
+  // Verify BytesMeter receive-side metrics.
+  EXPECT_GT(response_encoder_->getStream().bytesMeter()->headerBytesReceived(), 0);
+  EXPECT_GE(response_encoder_->getStream().bytesMeter()->decompressedHeaderBytesReceived(),
+            response_encoder_->getStream().bytesMeter()->headerBytesReceived());
 
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
 

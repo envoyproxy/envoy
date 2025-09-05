@@ -78,7 +78,7 @@ std::unique_ptr<GrpcStreamInterface<RQ, RS>> GrpcMuxImpl<S, F, RQ, RS>::createGr
           return std::make_unique<GrpcStream<RQ, RS>>(
               callbacks, std::move(async_client), service_method, dispatcher, scope,
               std::move(backoff_strategy), rate_limit_settings,
-              GrpcStream<RQ, RS>::ConnectedStateValue::FIRST_ENTRY);
+              GrpcStream<RQ, RS>::ConnectedStateValue::FirstEntry);
         },
         /*failover_stream_creator=*/
         failover_async_client
@@ -93,7 +93,7 @@ std::unique_ptr<GrpcStreamInterface<RQ, RS>> GrpcMuxImpl<S, F, RQ, RS>::createGr
                         // be the same as the primary source.
                         std::make_unique<FixedBackOffStrategy>(
                             GrpcMuxFailover<RQ, RS>::DefaultFailoverBackoffMilliseconds),
-                        rate_limit_settings, GrpcStream<RQ, RS>::ConnectedStateValue::SECOND_ENTRY);
+                        rate_limit_settings, GrpcStream<RQ, RS>::ConnectedStateValue::SecondEntry);
                   })
             : absl::nullopt,
         /*grpc_mux_callbacks=*/*this,
@@ -102,7 +102,7 @@ std::unique_ptr<GrpcStreamInterface<RQ, RS>> GrpcMuxImpl<S, F, RQ, RS>::createGr
   return std::make_unique<GrpcStream<RQ, RS>>(this, std::move(async_client), service_method,
                                               dispatcher_, scope, std::move(backoff_strategy),
                                               rate_limit_settings,
-                                              GrpcStream<RQ, RS>::ConnectedStateValue::FIRST_ENTRY);
+                                              GrpcStream<RQ, RS>::ConnectedStateValue::FirstEntry);
 }
 
 template <class S, class F, class RQ, class RS> GrpcMuxImpl<S, F, RQ, RS>::~GrpcMuxImpl() {

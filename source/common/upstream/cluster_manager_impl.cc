@@ -1073,15 +1073,16 @@ void ClusterManagerImpl::drainConnections(const std::string& cluster,
   });
 }
 
-void ClusterManagerImpl::drainConnections(DrainConnectionsHostPredicate predicate) {
+void ClusterManagerImpl::drainConnections(DrainConnectionsHostPredicate predicate,
+                                          ConnectionPool::DrainBehavior drain_behavior) {
   ENVOY_LOG_EVENT(debug, "drain_connections_call_for_all_clusters",
                   "drainConnections called for all clusters");
-  tls_.runOnAllThreads([predicate](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
-    for (const auto& cluster_entry : cluster_manager->thread_local_clusters_) {
-      cluster_entry.second->drainConnPools(predicate,
-                                           ConnectionPool::DrainBehavior::DrainExistingConnections);
-    }
-  });
+  tls_.runOnAllThreads(
+      [predicate, drain_behavior](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+        for (const auto& cluster_entry : cluster_manager->thread_local_clusters_) {
+          cluster_entry.second->drainConnPools(predicate, drain_behavior);
+        }
+      });
 }
 
 absl::Status ClusterManagerImpl::checkActiveStaticCluster(const std::string& cluster) {

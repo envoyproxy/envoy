@@ -361,7 +361,8 @@ public:
   void drainConnections(const std::string& cluster,
                         DrainConnectionsHostPredicate predicate) override;
 
-  void drainConnections(DrainConnectionsHostPredicate predicate) override;
+  void drainConnections(DrainConnectionsHostPredicate predicate,
+                        ConnectionPool::DrainBehavior drain_behavior) override;
 
   absl::Status checkActiveStaticCluster(const std::string& cluster) override;
 

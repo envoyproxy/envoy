@@ -503,7 +503,8 @@ public:
    * @param predicate supplies the optional drain connections host predicate. If not supplied, all
    *                  hosts are drained.
    */
-  virtual void drainConnections(DrainConnectionsHostPredicate predicate) PURE;
+  virtual void drainConnections(DrainConnectionsHostPredicate predicate,
+                                ConnectionPool::DrainBehavior drain_behavior) PURE;
 
   /**
    * Check if the cluster is active and statically configured, and if not, return an error

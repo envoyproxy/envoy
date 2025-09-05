@@ -232,6 +232,12 @@ public:
 
 TEST_F(FilterTest, SimpleOnNewConnection) {
   initializeFilter();
+
+  EXPECT_CALL(*server_codec_, onConnected()).WillOnce(Invoke([this] {
+    ASSERT_NE(server_codec_callbacks_, nullptr);
+    ASSERT_EQ(&filter_callbacks_.connection_, server_codec_callbacks_->connection().ptr());
+  }));
+
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
 }
 

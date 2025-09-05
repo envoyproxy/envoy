@@ -14,7 +14,6 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 
-#include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/server/watch_dog.h"
 #include "test/mocks/stats/mocks.h"
@@ -47,10 +46,10 @@ private:
   std::function<void()> on_destroy_;
 };
 
-void onWatcherReady(evwatch*, const evwatch_prepare_cb_info*, void* arg) {
-  // `arg` contains the ReadyWatcher passed in from evwatch_prepare_new.
-  auto watcher = static_cast<ReadyWatcher*>(arg);
-  watcher->ready();
+void callPrepareCallback(evwatch*, const evwatch_prepare_cb_info*, void* arg) {
+  // `arg` contains the MockFunction passed in from evwatch_prepare_new.
+  auto callback = static_cast<MockFunction<void()>*>(arg);
+  callback->Call();
 }
 
 class SchedulableCallbackImplTest : public testing::Test {
@@ -68,9 +67,9 @@ protected:
 };
 
 TEST_F(SchedulableCallbackImplTest, ScheduleCurrentAndCancel) {
-  ReadyWatcher watcher;
+  MockFunction<void()> callback;
 
-  auto cb = dispatcher_->createSchedulableCallback([&]() { watcher.ready(); });
+  auto cb = dispatcher_->createSchedulableCallback(callback.AsStdFunction());
 
   // Cancel is a no-op if not scheduled.
   cb->cancel();
@@ -85,7 +84,7 @@ TEST_F(SchedulableCallbackImplTest, ScheduleCurrentAndCancel) {
 
   // Scheduled callback executes.
   cb->scheduleCallbackCurrentIteration();
-  EXPECT_CALL(watcher, ready());
+  EXPECT_CALL(callback, Call);
   dispatcher_->run(Dispatcher::RunType::Block);
 
   // Callbacks implicitly cancelled if runner is deleted.
@@ -95,9 +94,9 @@ TEST_F(SchedulableCallbackImplTest, ScheduleCurrentAndCancel) {
 }
 
 TEST_F(SchedulableCallbackImplTest, ScheduleNextAndCancel) {
-  ReadyWatcher watcher;
+  MockFunction<void()> callback;
 
-  auto cb = dispatcher_->createSchedulableCallback([&]() { watcher.ready(); });
+  auto cb = dispatcher_->createSchedulableCallback(callback.AsStdFunction());
 
   // Cancel is a no-op if not scheduled.
   cb->cancel();
@@ -112,7 +111,7 @@ TEST_F(SchedulableCallbackImplTest, ScheduleNextAndCancel) {
 
   // Scheduled callback executes.
   cb->scheduleCallbackNextIteration();
-  EXPECT_CALL(watcher, ready());
+  EXPECT_CALL(callback, Call);
   dispatcher_->run(Dispatcher::RunType::Block);
 
   // Callbacks implicitly cancelled if runner is deleted.
@@ -122,12 +121,12 @@ TEST_F(SchedulableCallbackImplTest, ScheduleNextAndCancel) {
 }
 
 TEST_F(SchedulableCallbackImplTest, ScheduleOrder) {
-  ReadyWatcher watcher0;
-  createCallback([&]() { watcher0.ready(); });
-  ReadyWatcher watcher1;
-  createCallback([&]() { watcher1.ready(); });
-  ReadyWatcher watcher2;
-  createCallback([&]() { watcher2.ready(); });
+  MockFunction<void()> callback0;
+  createCallback(callback0.AsStdFunction());
+  MockFunction<void()> callback1;
+  createCallback(callback1.AsStdFunction());
+  MockFunction<void()> callback2;
+  createCallback(callback2.AsStdFunction());
 
   // Current iteration callbacks run in the order they are scheduled. Next iteration callbacks run
   // after current iteration callbacks.
@@ -135,73 +134,71 @@ TEST_F(SchedulableCallbackImplTest, ScheduleOrder) {
   callbacks_[1]->scheduleCallbackCurrentIteration();
   callbacks_[2]->scheduleCallbackCurrentIteration();
   InSequence s;
-  EXPECT_CALL(watcher1, ready());
-  EXPECT_CALL(watcher2, ready());
-  EXPECT_CALL(watcher0, ready());
+  EXPECT_CALL(callback1, Call);
+  EXPECT_CALL(callback2, Call);
+  EXPECT_CALL(callback0, Call);
   dispatcher_->run(Dispatcher::RunType::Block);
 }
 
 TEST_F(SchedulableCallbackImplTest, ScheduleChainingAndCancellation) {
   DispatcherImpl* dispatcher_impl = static_cast<DispatcherImpl*>(dispatcher_.get());
-  ReadyWatcher prepare_watcher;
-  evwatch_prepare_new(&dispatcher_impl->base(), onWatcherReady, &prepare_watcher);
+  MockFunction<void()> prepare_callback;
+  evwatch_prepare_new(&dispatcher_impl->base(), callPrepareCallback, &prepare_callback);
 
-  ReadyWatcher watcher0;
-  createCallback([&]() {
-    watcher0.ready();
+  MockFunction<void()> callback0, callback1, callback2, callback3, callback4, callback5;
+  createCallback(callback0.AsStdFunction());
+  createCallback(callback1.AsStdFunction());
+  createCallback(callback2.AsStdFunction());
+  createCallback(callback3.AsStdFunction());
+  createCallback(callback4.AsStdFunction());
+  createCallback(callback5.AsStdFunction());
+
+  // Chained callbacks run in the same event loop iteration, as signaled by a single call to
+  // prepare_callback. callback3 and callback4 are not invoked because cb2 cancels
+  // cb3 and deletes cb4 as part of its execution. cb5 runs after a second call to the
+  // prepare callback since it's scheduled for the next iteration.
+  callbacks_[0]->scheduleCallbackCurrentIteration();
+  InSequence s;
+  EXPECT_CALL(prepare_callback, Call);
+  EXPECT_CALL(callback0, Call).WillOnce([this]() {
     callbacks_[1]->scheduleCallbackCurrentIteration();
   });
-
-  ReadyWatcher watcher1;
-  createCallback([&]() {
-    watcher1.ready();
+  EXPECT_CALL(callback1, Call).WillOnce([this]() {
     callbacks_[2]->scheduleCallbackCurrentIteration();
     callbacks_[3]->scheduleCallbackCurrentIteration();
     callbacks_[4]->scheduleCallbackCurrentIteration();
     callbacks_[5]->scheduleCallbackNextIteration();
   });
-
-  ReadyWatcher watcher2;
-  createCallback([&]() {
-    watcher2.ready();
+  EXPECT_CALL(callback2, Call).WillOnce([this]() {
     EXPECT_TRUE(callbacks_[3]->enabled());
     callbacks_[3]->cancel();
     EXPECT_TRUE(callbacks_[4]->enabled());
     callbacks_[4].reset();
   });
-
-  ReadyWatcher watcher3;
-  createCallback([&]() { watcher3.ready(); });
-
-  ReadyWatcher watcher4;
-  createCallback([&]() { watcher4.ready(); });
-
-  ReadyWatcher watcher5;
-  createCallback([&]() { watcher5.ready(); });
-
-  // Chained callbacks run in the same event loop iteration, as signaled by a single call to
-  // prepare_watcher.ready(). watcher3 and watcher4 are not invoked because cb2 cancels
-  // cb3 and deletes cb4 as part of its execution. cb5 runs after a second call to the
-  // prepare callback since it's scheduled for the next iteration.
-  callbacks_[0]->scheduleCallbackCurrentIteration();
-  InSequence s;
-  EXPECT_CALL(prepare_watcher, ready());
-  EXPECT_CALL(watcher0, ready());
-  EXPECT_CALL(watcher1, ready());
-  EXPECT_CALL(watcher2, ready());
-  EXPECT_CALL(prepare_watcher, ready());
-  EXPECT_CALL(watcher5, ready());
+  EXPECT_CALL(prepare_callback, Call);
+  EXPECT_CALL(callback5, Call);
   dispatcher_->run(Dispatcher::RunType::Block);
 }
 
 TEST_F(SchedulableCallbackImplTest, RescheduleNext) {
   DispatcherImpl* dispatcher_impl = static_cast<DispatcherImpl*>(dispatcher_.get());
-  ReadyWatcher prepare_watcher;
-  evwatch_prepare_new(&dispatcher_impl->base(), onWatcherReady, &prepare_watcher);
+  MockFunction<void()> prepare_callback;
+  evwatch_prepare_new(&dispatcher_impl->base(), callPrepareCallback, &prepare_callback);
 
-  ReadyWatcher watcher0;
-  createCallback([&]() {
-    watcher0.ready();
+  MockFunction<void()> callback0, callback1, callback2, callback3;
+  createCallback(callback0.AsStdFunction());
+  createCallback(callback1.AsStdFunction());
+  createCallback(callback2.AsStdFunction());
+  createCallback(callback3.AsStdFunction());
+
+  // Schedule callbacks 0 and 1 outside the loop, both will run in the same iteration of the event
+  // loop.
+  callbacks_[0]->scheduleCallbackCurrentIteration();
+  callbacks_[1]->scheduleCallbackNextIteration();
+
+  InSequence s;
+  EXPECT_CALL(prepare_callback, Call);
+  EXPECT_CALL(callback0, Call).WillOnce([this]() {
     // Callback 1 was scheduled from the previous iteration, expect it to fire in the current
     // iteration despite the attempt to reschedule.
     callbacks_[1]->scheduleCallbackNextIteration();
@@ -212,26 +209,10 @@ TEST_F(SchedulableCallbackImplTest, RescheduleNext) {
     callbacks_[3]->scheduleCallbackNextIteration();
     callbacks_[3]->scheduleCallbackCurrentIteration();
   });
-
-  ReadyWatcher watcher1;
-  createCallback([&]() { watcher1.ready(); });
-  ReadyWatcher watcher2;
-  createCallback([&]() { watcher2.ready(); });
-  ReadyWatcher watcher3;
-  createCallback([&]() { watcher3.ready(); });
-
-  // Schedule callbacks 0 and 1 outside the loop, both will run in the same iteration of the event
-  // loop.
-  callbacks_[0]->scheduleCallbackCurrentIteration();
-  callbacks_[1]->scheduleCallbackNextIteration();
-
-  InSequence s;
-  EXPECT_CALL(prepare_watcher, ready());
-  EXPECT_CALL(watcher0, ready());
-  EXPECT_CALL(watcher1, ready());
-  EXPECT_CALL(watcher2, ready());
-  EXPECT_CALL(prepare_watcher, ready());
-  EXPECT_CALL(watcher3, ready());
+  EXPECT_CALL(callback1, Call);
+  EXPECT_CALL(callback2, Call);
+  EXPECT_CALL(prepare_callback, Call);
+  EXPECT_CALL(callback3, Call);
   dispatcher_->run(Dispatcher::RunType::Block);
 }
 
@@ -257,30 +238,29 @@ TEST(DeferredDeleteTest, DeferredDelete) {
   InSequence s;
   Api::ApiPtr api = Api::createApiForTest();
   DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-  ReadyWatcher watcher1;
+  MockFunction<void()> callback1;
 
   dispatcher->deferredDelete(
-      DeferredDeletablePtr{new TestDeferredDeletable([&]() -> void { watcher1.ready(); })});
+      DeferredDeletablePtr{new TestDeferredDeletable(callback1.AsStdFunction())});
 
   // The first one will get deleted inline.
-  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(callback1, Call);
   dispatcher->clearDeferredDeleteList();
 
   // This one does a nested deferred delete. We should need two clear calls to actually get
   // rid of it with the vector swapping. We also test that inline clear() call does nothing.
-  ReadyWatcher watcher2;
-  ReadyWatcher watcher3;
-  dispatcher->deferredDelete(DeferredDeletablePtr{new TestDeferredDeletable([&]() -> void {
-    watcher2.ready();
-    dispatcher->deferredDelete(
-        DeferredDeletablePtr{new TestDeferredDeletable([&]() -> void { watcher3.ready(); })});
-    dispatcher->clearDeferredDeleteList();
-  })});
+  MockFunction<void()> callback2, callback3;
+  dispatcher->deferredDelete(
+      DeferredDeletablePtr{new TestDeferredDeletable(callback2.AsStdFunction())});
 
-  EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(callback2, Call).WillOnce([&]() {
+    dispatcher->deferredDelete(
+        DeferredDeletablePtr{new TestDeferredDeletable(callback3.AsStdFunction())});
+    dispatcher->clearDeferredDeleteList();
+  });
   dispatcher->clearDeferredDeleteList();
 
-  EXPECT_CALL(watcher3, ready());
+  EXPECT_CALL(callback3, Call);
   dispatcher->clearDeferredDeleteList();
 }
 
@@ -288,20 +268,19 @@ TEST(DeferredTaskTest, DeferredTask) {
   InSequence s;
   Api::ApiPtr api = Api::createApiForTest();
   DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-  ReadyWatcher watcher1;
+  MockFunction<void()> callback1;
 
-  DeferredTaskUtil::deferredRun(*dispatcher, [&watcher1]() -> void { watcher1.ready(); });
+  DeferredTaskUtil::deferredRun(*dispatcher, callback1.AsStdFunction());
   // The first one will get deleted inline.
-  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(callback1, Call);
   dispatcher->clearDeferredDeleteList();
 
   // Deferred task is scheduled FIFO.
-  ReadyWatcher watcher2;
-  ReadyWatcher watcher3;
-  DeferredTaskUtil::deferredRun(*dispatcher, [&watcher2]() -> void { watcher2.ready(); });
-  DeferredTaskUtil::deferredRun(*dispatcher, [&watcher3]() -> void { watcher3.ready(); });
-  EXPECT_CALL(watcher2, ready());
-  EXPECT_CALL(watcher3, ready());
+  MockFunction<void()> callback2, callback3;
+  DeferredTaskUtil::deferredRun(*dispatcher, callback2.AsStdFunction());
+  DeferredTaskUtil::deferredRun(*dispatcher, callback3.AsStdFunction());
+  EXPECT_CALL(callback2, Call);
+  EXPECT_CALL(callback3, Call);
   dispatcher->clearDeferredDeleteList();
 }
 
@@ -310,16 +289,15 @@ TEST(DeferredDeleteTest, DeferredDeleteAndPostOrdering) {
 
   Api::ApiPtr api = Api::createApiForTest();
   DispatcherPtr dispatcher(api->allocateDispatcher("test_thread"));
-  ReadyWatcher post_watcher;
-  ReadyWatcher delete_watcher;
+  MockFunction<void()> post_callback, delete_callback;
 
   // DeferredDelete should always run before post callbacks.
-  EXPECT_CALL(delete_watcher, ready());
-  EXPECT_CALL(post_watcher, ready());
+  EXPECT_CALL(delete_callback, Call);
+  EXPECT_CALL(post_callback, Call);
 
-  dispatcher->post([&]() { post_watcher.ready(); });
+  dispatcher->post(post_callback.AsStdFunction());
   dispatcher->deferredDelete(
-      std::make_unique<TestDeferredDeletable>([&]() -> void { delete_watcher.ready(); }));
+      std::make_unique<TestDeferredDeletable>(delete_callback.AsStdFunction()));
   dispatcher->run(Dispatcher::RunType::NonBlock);
 }
 
@@ -411,33 +389,27 @@ TEST_F(DispatcherImplTest, Post) {
 }
 
 TEST_F(DispatcherImplTest, PostExecuteAndDestructOrder) {
-  ReadyWatcher parent_watcher;
-  ReadyWatcher deferred_delete_watcher;
-  ReadyWatcher run_watcher1;
-  ReadyWatcher delete_watcher1;
-  ReadyWatcher run_watcher2;
-  ReadyWatcher delete_watcher2;
+  MockFunction<void()> parent_callback, deferred_delete_callback, run_callback1, delete_callback1,
+      run_callback2, delete_callback2;
 
   // Expect the following events to happen in order. The destructor of the post callback should run
   // before execution of the next post callback starts. The post callback runner should yield after
   // running each group of callbacks in a chain, so the deferred deletion should run before the
   // post callbacks that are also scheduled by the parent post callback.
   InSequence s;
-  EXPECT_CALL(parent_watcher, ready());
-  EXPECT_CALL(deferred_delete_watcher, ready());
-  EXPECT_CALL(run_watcher1, ready());
-  EXPECT_CALL(delete_watcher1, ready());
-  EXPECT_CALL(run_watcher2, ready());
-  EXPECT_CALL(delete_watcher2, ready());
+  EXPECT_CALL(parent_callback, Call);
+  EXPECT_CALL(deferred_delete_callback, Call);
+  EXPECT_CALL(run_callback1, Call);
+  EXPECT_CALL(delete_callback1, Call);
+  EXPECT_CALL(run_callback2, Call);
+  EXPECT_CALL(delete_callback2, Call);
 
   dispatcher_->post([&]() {
-    parent_watcher.ready();
-    auto on_delete_task1 =
-        std::make_shared<RunOnDelete>([&delete_watcher1]() { delete_watcher1.ready(); });
-    dispatcher_->post([&run_watcher1, on_delete_task1]() { run_watcher1.ready(); });
-    auto on_delete_task2 =
-        std::make_shared<RunOnDelete>([&delete_watcher2]() { delete_watcher2.ready(); });
-    dispatcher_->post([&run_watcher2, on_delete_task2]() { run_watcher2.ready(); });
+    parent_callback.Call();
+    auto on_delete_task1 = std::make_shared<RunOnDelete>(delete_callback1.AsStdFunction());
+    dispatcher_->post([&run_callback1, on_delete_task1]() { run_callback1.Call(); });
+    auto on_delete_task2 = std::make_shared<RunOnDelete>(delete_callback2.AsStdFunction());
+    dispatcher_->post([&run_callback2, on_delete_task2]() { run_callback2.Call(); });
     dispatcher_->post([this]() {
       {
         Thread::LockGuard lock(mu_);
@@ -446,8 +418,8 @@ TEST_F(DispatcherImplTest, PostExecuteAndDestructOrder) {
       }
       cv_.notifyOne();
     });
-    dispatcher_->deferredDelete(std::make_unique<TestDeferredDeletable>(
-        [&deferred_delete_watcher]() -> void { deferred_delete_watcher.ready(); }));
+    dispatcher_->deferredDelete(
+        std::make_unique<TestDeferredDeletable>(deferred_delete_callback.AsStdFunction()));
   });
 
   Thread::LockGuard lock(mu_);
@@ -517,21 +489,17 @@ TEST_F(DispatcherImplTest, DispatcherThreadDeleted) {
 TEST(DispatcherThreadDeletedImplTest, DispatcherThreadDeletedAtNextCycle) {
   Api::ApiPtr api_(Api::createApiForTest());
   DispatcherPtr dispatcher(api_->allocateDispatcher("test_thread"));
-  std::vector<std::unique_ptr<ReadyWatcher>> watchers;
-  watchers.reserve(3);
-  for (int i = 0; i < 3; ++i) {
-    watchers.push_back(std::make_unique<ReadyWatcher>());
-  }
+  std::vector<MockFunction<void()>> callbacks(3);
   dispatcher->deleteInDispatcherThread(
-      std::make_unique<TestDispatcherThreadDeletable>([&watchers]() { watchers[0]->ready(); }));
-  EXPECT_CALL(*watchers[0], ready());
+      std::make_unique<TestDispatcherThreadDeletable>(callbacks[0].AsStdFunction()));
+  EXPECT_CALL(callbacks[0], Call);
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
   dispatcher->deleteInDispatcherThread(
-      std::make_unique<TestDispatcherThreadDeletable>([&watchers]() { watchers[1]->ready(); }));
+      std::make_unique<TestDispatcherThreadDeletable>(callbacks[1].AsStdFunction()));
   dispatcher->deleteInDispatcherThread(
-      std::make_unique<TestDispatcherThreadDeletable>([&watchers]() { watchers[2]->ready(); }));
-  EXPECT_CALL(*watchers[1], ready());
-  EXPECT_CALL(*watchers[2], ready());
+      std::make_unique<TestDispatcherThreadDeletable>(callbacks[2].AsStdFunction()));
+  EXPECT_CALL(callbacks[1], Call);
+  EXPECT_CALL(callbacks[2], Call);
   dispatcher->run(Event::Dispatcher::RunType::NonBlock);
 }
 
@@ -545,47 +513,44 @@ protected:
 };
 
 TEST_F(DispatcherShutdownTest, ShutdownClearThreadLocalDeletables) {
-  ReadyWatcher watcher;
+  MockFunction<void()> callback;
 
   dispatcher_->deleteInDispatcherThread(
-      std::make_unique<TestDispatcherThreadDeletable>([&watcher]() { watcher.ready(); }));
-  EXPECT_CALL(watcher, ready());
+      std::make_unique<TestDispatcherThreadDeletable>(callback.AsStdFunction()));
+  EXPECT_CALL(callback, Call);
   dispatcher_->shutdown();
 }
 
 TEST_F(DispatcherShutdownTest, ShutdownDoesnotClearDeferredListOrPostCallback) {
-  ReadyWatcher watcher;
-  ReadyWatcher deferred_watcher;
-  ReadyWatcher post_watcher;
+  MockFunction<void()> callback, deferred_callback, post_callback;
 
   {
     InSequence s;
 
-    dispatcher_->deferredDelete(std::make_unique<TestDeferredDeletable>(
-        [&deferred_watcher]() { deferred_watcher.ready(); }));
-    dispatcher_->post([&post_watcher]() { post_watcher.ready(); });
+    dispatcher_->deferredDelete(
+        std::make_unique<TestDeferredDeletable>(deferred_callback.AsStdFunction()));
+    dispatcher_->post(post_callback.AsStdFunction());
     dispatcher_->deleteInDispatcherThread(
-        std::make_unique<TestDispatcherThreadDeletable>([&watcher]() { watcher.ready(); }));
-    EXPECT_CALL(watcher, ready());
+        std::make_unique<TestDispatcherThreadDeletable>(callback.AsStdFunction()));
+    EXPECT_CALL(callback, Call);
     dispatcher_->shutdown();
 
-    ::testing::Mock::VerifyAndClearExpectations(&watcher);
-    EXPECT_CALL(deferred_watcher, ready());
+    ::testing::Mock::VerifyAndClearExpectations(&callback);
+    EXPECT_CALL(deferred_callback, Call);
     dispatcher_.reset();
   }
 }
 
 TEST_F(DispatcherShutdownTest, DestroyClearAllList) {
-  ReadyWatcher watcher;
-  ReadyWatcher deferred_watcher;
+  MockFunction<void()> callback, deferred_callback;
   dispatcher_->deferredDelete(
-      std::make_unique<TestDeferredDeletable>([&deferred_watcher]() { deferred_watcher.ready(); }));
+      std::make_unique<TestDeferredDeletable>(deferred_callback.AsStdFunction()));
   dispatcher_->deleteInDispatcherThread(
-      std::make_unique<TestDispatcherThreadDeletable>([&watcher]() { watcher.ready(); }));
+      std::make_unique<TestDispatcherThreadDeletable>(callback.AsStdFunction()));
   {
     InSequence s;
-    EXPECT_CALL(deferred_watcher, ready());
-    EXPECT_CALL(watcher, ready());
+    EXPECT_CALL(deferred_callback, Call);
+    EXPECT_CALL(callback, Call);
     dispatcher_.reset();
   }
 }
@@ -862,7 +827,7 @@ class TimerImplTest : public testing::Test {
 protected:
   TimerImplTest() {
     // Hook into event loop prepare and check events.
-    evwatch_prepare_new(&libevent_base_, onWatcherReady, &prepare_watcher_);
+    evwatch_prepare_new(&libevent_base_, callPrepareCallback, &prepare_callback_);
     evwatch_check_new(&libevent_base_, onCheck, this);
   }
   ~TimerImplTest() override { ASSERT(check_callbacks_.empty()); }
@@ -903,7 +868,7 @@ protected:
   Api::ApiPtr api_{Api::createApiForTest()};
   DispatcherPtr dispatcher_{api_->allocateDispatcher("test_thread")};
   event_base& libevent_base_{static_cast<DispatcherImpl&>(*dispatcher_).base()};
-  ReadyWatcher prepare_watcher_;
+  MockFunction<void()> prepare_callback_;
   std::vector<SchedulableCallbackPtr> callbacks_;
 
 private:
@@ -949,32 +914,28 @@ TEST_F(TimerImplTest, TimerEnabledDisabled) {
   EXPECT_FALSE(timer->enabled());
   timer->enableTimer(std::chrono::milliseconds(0));
   EXPECT_TRUE(timer->enabled());
-  EXPECT_CALL(prepare_watcher_, ready());
+  EXPECT_CALL(prepare_callback_, Call);
   dispatcher_->run(Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(timer->enabled());
   timer->enableHRTimer(std::chrono::milliseconds(0));
   EXPECT_TRUE(timer->enabled());
-  EXPECT_CALL(prepare_watcher_, ready());
+  EXPECT_CALL(prepare_callback_, Call);
   dispatcher_->run(Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(timer->enabled());
 }
 
 TEST_F(TimerImplTest, ChangeTimerBackwardsBeforeRun) {
-  ReadyWatcher watcher1;
-  Event::TimerPtr timer1 = dispatcher_->createTimer([&] { watcher1.ready(); });
+  MockFunction<void()> callback1, callback2, callback3;
+  Event::TimerPtr timer1 = dispatcher_->createTimer(callback1.AsStdFunction());
+  Event::TimerPtr timer2 = dispatcher_->createTimer(callback2.AsStdFunction());
+  Event::TimerPtr timer3 = dispatcher_->createTimer(callback3.AsStdFunction());
 
-  ReadyWatcher watcher2;
-  Event::TimerPtr timer2 = dispatcher_->createTimer([&] { watcher2.ready(); });
-
-  ReadyWatcher watcher3;
-  Event::TimerPtr timer3 = dispatcher_->createTimer([&] { watcher3.ready(); });
-
-  // Expect watcher3 to trigger first because the deadlines for timers 1 and 2 was moved backwards.
+  // Expect callback3 to trigger first because the deadlines for timers 1 and 2 was moved backwards.
   InSequence s;
-  EXPECT_CALL(prepare_watcher_, ready());
-  EXPECT_CALL(watcher3, ready());
-  EXPECT_CALL(watcher2, ready());
-  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(prepare_callback_, Call);
+  EXPECT_CALL(callback3, Call);
+  EXPECT_CALL(callback2, Call);
+  EXPECT_CALL(callback1, Call);
   runInEventLoop([&]() {
     timer1->enableTimer(std::chrono::milliseconds(0));
     timer2->enableTimer(std::chrono::milliseconds(1));
@@ -988,17 +949,15 @@ TEST_F(TimerImplTest, ChangeTimerBackwardsBeforeRun) {
 }
 
 TEST_F(TimerImplTest, ChangeTimerForwardsToZeroBeforeRun) {
-  ReadyWatcher watcher1;
-  Event::TimerPtr timer1 = dispatcher_->createTimer([&] { watcher1.ready(); });
+  MockFunction<void()> callback1, callback2;
+  Event::TimerPtr timer1 = dispatcher_->createTimer(callback1.AsStdFunction());
+  Event::TimerPtr timer2 = dispatcher_->createTimer(callback2.AsStdFunction());
 
-  ReadyWatcher watcher2;
-  Event::TimerPtr timer2 = dispatcher_->createTimer([&] { watcher2.ready(); });
-
-  // Expect watcher1 to trigger first because timer1's deadline was moved forward.
+  // Expect callback1 to trigger first because timer1's deadline was moved forward.
   InSequence s;
-  EXPECT_CALL(prepare_watcher_, ready());
-  EXPECT_CALL(watcher1, ready());
-  EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(prepare_callback_, Call);
+  EXPECT_CALL(callback1, Call);
+  EXPECT_CALL(callback2, Call);
   runInEventLoop([&]() {
     timer1->enableTimer(std::chrono::milliseconds(2));
     timer2->enableTimer(std::chrono::milliseconds(1));
@@ -1010,17 +969,15 @@ TEST_F(TimerImplTest, ChangeTimerForwardsToZeroBeforeRun) {
 }
 
 TEST_F(TimerImplTest, ChangeTimerForwardsToNonZeroBeforeRun) {
-  ReadyWatcher watcher1;
-  Event::TimerPtr timer1 = dispatcher_->createTimer([&] { watcher1.ready(); });
+  MockFunction<void()> callback1, callback2;
+  Event::TimerPtr timer1 = dispatcher_->createTimer(callback1.AsStdFunction());
+  Event::TimerPtr timer2 = dispatcher_->createTimer(callback2.AsStdFunction());
 
-  ReadyWatcher watcher2;
-  Event::TimerPtr timer2 = dispatcher_->createTimer([&] { watcher2.ready(); });
-
-  // Expect watcher1 to trigger first because timer1's deadline was moved forward.
+  // Expect callback1 to trigger first because timer1's deadline was moved forward.
   InSequence s;
-  EXPECT_CALL(prepare_watcher_, ready());
-  EXPECT_CALL(watcher1, ready());
-  EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(prepare_callback_, Call);
+  EXPECT_CALL(callback1, Call);
+  EXPECT_CALL(callback2, Call);
   runInEventLoop([&]() {
     timer1->enableTimer(std::chrono::milliseconds(3));
     timer2->enableTimer(std::chrono::milliseconds(2));
@@ -1032,17 +989,15 @@ TEST_F(TimerImplTest, ChangeTimerForwardsToNonZeroBeforeRun) {
 }
 
 TEST_F(TimerImplTest, ChangeLargeTimerForwardToZeroBeforeRun) {
-  ReadyWatcher watcher1;
-  Event::TimerPtr timer1 = dispatcher_->createTimer([&] { watcher1.ready(); });
+  MockFunction<void()> callback1, callback2;
+  Event::TimerPtr timer1 = dispatcher_->createTimer(callback1.AsStdFunction());
+  Event::TimerPtr timer2 = dispatcher_->createTimer(callback2.AsStdFunction());
 
-  ReadyWatcher watcher2;
-  Event::TimerPtr timer2 = dispatcher_->createTimer([&] { watcher2.ready(); });
-
-  // Expect watcher1 to trigger because timer1's deadline was moved forward.
+  // Expect callback1 to trigger because timer1's deadline was moved forward.
   InSequence s;
-  EXPECT_CALL(prepare_watcher_, ready());
-  EXPECT_CALL(watcher1, ready());
-  EXPECT_CALL(prepare_watcher_, ready());
+  EXPECT_CALL(prepare_callback_, Call);
+  EXPECT_CALL(callback1, Call);
+  EXPECT_CALL(prepare_callback_, Call);
   runInEventLoop([&]() {
     timer1->enableTimer(std::chrono::seconds(2000));
     timer2->enableTimer(std::chrono::seconds(1000));
@@ -1051,17 +1006,15 @@ TEST_F(TimerImplTest, ChangeLargeTimerForwardToZeroBeforeRun) {
 }
 
 TEST_F(TimerImplTest, ChangeLargeTimerForwardToNonZeroBeforeRun) {
-  ReadyWatcher watcher1;
-  Event::TimerPtr timer1 = dispatcher_->createTimer([&] { watcher1.ready(); });
+  MockFunction<void()> callback1, callback2;
+  Event::TimerPtr timer1 = dispatcher_->createTimer(callback1.AsStdFunction());
+  Event::TimerPtr timer2 = dispatcher_->createTimer(callback2.AsStdFunction());
 
-  ReadyWatcher watcher2;
-  Event::TimerPtr timer2 = dispatcher_->createTimer([&] { watcher2.ready(); });
-
-  // Expect watcher1 to trigger because timer1's deadline was moved forward.
+  // Expect callback1 to trigger because timer1's deadline was moved forward.
   InSequence s;
-  EXPECT_CALL(prepare_watcher_, ready());
-  EXPECT_CALL(watcher1, ready());
-  EXPECT_CALL(prepare_watcher_, ready());
+  EXPECT_CALL(prepare_callback_, Call);
+  EXPECT_CALL(callback1, Call);
+  EXPECT_CALL(prepare_callback_, Call);
   runInEventLoop([&]() {
     timer1->enableTimer(std::chrono::seconds(2000));
     timer2->enableTimer(std::chrono::seconds(1000));
@@ -1074,21 +1027,17 @@ TEST_F(TimerImplTest, ChangeLargeTimerForwardToNonZeroBeforeRun) {
 
 // Timers scheduled at different times execute in order.
 TEST_F(TimerImplTest, TimerOrdering) {
-  ReadyWatcher watcher1;
-  Event::TimerPtr timer1 = dispatcher_->createTimer([&] { watcher1.ready(); });
+  MockFunction<void()> callback1, callback2, callback3;
+  Event::TimerPtr timer1 = dispatcher_->createTimer(callback1.AsStdFunction());
+  Event::TimerPtr timer2 = dispatcher_->createTimer(callback2.AsStdFunction());
+  Event::TimerPtr timer3 = dispatcher_->createTimer(callback3.AsStdFunction());
 
-  ReadyWatcher watcher2;
-  Event::TimerPtr timer2 = dispatcher_->createTimer([&] { watcher2.ready(); });
-
-  ReadyWatcher watcher3;
-  Event::TimerPtr timer3 = dispatcher_->createTimer([&] { watcher3.ready(); });
-
-  // Expect watcher calls to happen in order since timers have different times.
+  // Expect callback calls to happen in order since timers have different times.
   InSequence s;
-  EXPECT_CALL(prepare_watcher_, ready());
-  EXPECT_CALL(watcher1, ready());
-  EXPECT_CALL(watcher2, ready());
-  EXPECT_CALL(watcher3, ready());
+  EXPECT_CALL(prepare_callback_, Call);
+  EXPECT_CALL(callback1, Call);
+  EXPECT_CALL(callback2, Call);
+  EXPECT_CALL(callback3, Call);
 
   runInEventLoop([&]() {
     timer1->enableTimer(std::chrono::milliseconds(0));
@@ -1106,23 +1055,16 @@ TEST_F(TimerImplTest, TimerOrdering) {
 
 // Alarms that are scheduled to execute and are cancelled do not trigger.
 TEST_F(TimerImplTest, TimerOrderAndDisableAlarm) {
-  ReadyWatcher watcher3;
-  Event::TimerPtr timer3 = dispatcher_->createTimer([&] { watcher3.ready(); });
+  MockFunction<void()> callback1, callback2, callback3;
+  Event::TimerPtr timer3 = dispatcher_->createTimer(callback3.AsStdFunction());
+  Event::TimerPtr timer2 = dispatcher_->createTimer(callback2.AsStdFunction());
+  Event::TimerPtr timer1 = dispatcher_->createTimer(callback1.AsStdFunction());
 
-  ReadyWatcher watcher2;
-  Event::TimerPtr timer2 = dispatcher_->createTimer([&] { watcher2.ready(); });
-
-  ReadyWatcher watcher1;
-  Event::TimerPtr timer1 = dispatcher_->createTimer([&] {
-    timer2->disableTimer();
-    watcher1.ready();
-  });
-
-  // Expect watcher calls to happen in order since timers have different times.
+  // Expect callback calls to happen in order since timers have different times.
   InSequence s;
-  EXPECT_CALL(prepare_watcher_, ready());
-  EXPECT_CALL(watcher1, ready());
-  EXPECT_CALL(watcher3, ready());
+  EXPECT_CALL(prepare_callback_, Call);
+  EXPECT_CALL(callback1, Call).WillOnce([&]() { timer2->disableTimer(); });
+  EXPECT_CALL(callback3, Call);
   runInEventLoop([&]() {
     timer1->enableTimer(std::chrono::milliseconds(0));
     timer2->enableTimer(std::chrono::milliseconds(1));
@@ -1140,38 +1082,31 @@ TEST_F(TimerImplTest, TimerOrderAndDisableAlarm) {
 // Change the registration time for a timer that is already activated by disabling and re-enabling
 // the timer. Verify that execution is delayed.
 TEST_F(TimerImplTest, TimerOrderDisableAndReschedule) {
-  ReadyWatcher watcher4;
-  Event::TimerPtr timer4 = dispatcher_->createTimer([&] { watcher4.ready(); });
-
-  ReadyWatcher watcher3;
-  Event::TimerPtr timer3 = dispatcher_->createTimer([&] { watcher3.ready(); });
-
-  ReadyWatcher watcher2;
-  Event::TimerPtr timer2 = dispatcher_->createTimer([&] { watcher2.ready(); });
-
-  ReadyWatcher watcher1;
-  Event::TimerPtr timer1 = dispatcher_->createTimer([&] {
-    timer2->disableTimer();
-    timer2->enableTimer(std::chrono::milliseconds(0));
-    timer3->disableTimer();
-    timer3->enableTimer(std::chrono::milliseconds(1));
-    watcher1.ready();
-  });
+  MockFunction<void()> callback1, callback2, callback3, callback4;
+  Event::TimerPtr timer4 = dispatcher_->createTimer(callback4.AsStdFunction());
+  Event::TimerPtr timer3 = dispatcher_->createTimer(callback3.AsStdFunction());
+  Event::TimerPtr timer2 = dispatcher_->createTimer(callback2.AsStdFunction());
+  Event::TimerPtr timer1 = dispatcher_->createTimer(callback1.AsStdFunction());
 
   // timer1 is expected to run first and reschedule timers 2 and 3. timer4 should fire before
   // timer2 and timer3 since timer4's registration is unaffected.
   InSequence s;
-  EXPECT_CALL(prepare_watcher_, ready());
-  EXPECT_CALL(watcher1, ready());
-  EXPECT_CALL(watcher4, ready());
+  EXPECT_CALL(prepare_callback_, Call);
+  EXPECT_CALL(callback1, Call).WillOnce([&]() {
+    timer2->disableTimer();
+    timer2->enableTimer(std::chrono::milliseconds(0));
+    timer3->disableTimer();
+    timer3->enableTimer(std::chrono::milliseconds(1));
+  });
+  EXPECT_CALL(callback4, Call);
   // Sleep during prepare to ensure that enough time has elapsed before timer evaluation to ensure
   // that timers 2 and 3 are picked up by the same loop iteration. Without the sleep the two
   // timers could execute in different loop iterations.
-  EXPECT_CALL(prepare_watcher_, ready()).WillOnce(testing::InvokeWithoutArgs([&]() {
+  EXPECT_CALL(prepare_callback_, Call).WillOnce([this]() {
     advanceLibeventTimeNextIteration(absl::Milliseconds(10));
-  }));
-  EXPECT_CALL(watcher2, ready());
-  EXPECT_CALL(watcher3, ready());
+  });
+  EXPECT_CALL(callback2, Call);
+  EXPECT_CALL(callback3, Call);
   runInEventLoop([&]() {
     timer1->enableTimer(std::chrono::milliseconds(0));
     timer2->enableTimer(std::chrono::milliseconds(1));
@@ -1191,37 +1126,30 @@ TEST_F(TimerImplTest, TimerOrderDisableAndReschedule) {
 // Change the registration time for a timer that is already activated by re-enabling the timer
 // without calling disableTimer first.
 TEST_F(TimerImplTest, TimerOrderAndReschedule) {
-  ReadyWatcher watcher4;
-  Event::TimerPtr timer4 = dispatcher_->createTimer([&] { watcher4.ready(); });
-
-  ReadyWatcher watcher3;
-  Event::TimerPtr timer3 = dispatcher_->createTimer([&] { watcher3.ready(); });
-
-  ReadyWatcher watcher2;
-  Event::TimerPtr timer2 = dispatcher_->createTimer([&] { watcher2.ready(); });
-
-  ReadyWatcher watcher1;
-  Event::TimerPtr timer1 = dispatcher_->createTimer([&] {
-    timer2->enableTimer(std::chrono::milliseconds(0));
-    timer3->enableTimer(std::chrono::milliseconds(1));
-    watcher1.ready();
-  });
+  MockFunction<void()> callback1, callback2, callback3, callback4;
+  Event::TimerPtr timer4 = dispatcher_->createTimer(callback4.AsStdFunction());
+  Event::TimerPtr timer3 = dispatcher_->createTimer(callback3.AsStdFunction());
+  Event::TimerPtr timer2 = dispatcher_->createTimer(callback2.AsStdFunction());
+  Event::TimerPtr timer1 = dispatcher_->createTimer(callback1.AsStdFunction());
 
   // Rescheduling timers that are already scheduled to run in the current event loop iteration has
   // no effect if the time delta is 0. Expect timers 1, 2 and 4 to execute in the original order.
   // Timer 3 is delayed since it is rescheduled with a non-zero delta.
   InSequence s;
-  EXPECT_CALL(prepare_watcher_, ready());
-  EXPECT_CALL(watcher1, ready());
-  EXPECT_CALL(watcher4, ready());
+  EXPECT_CALL(prepare_callback_, Call);
+  EXPECT_CALL(callback1, Call).WillOnce([&]() {
+    timer2->enableTimer(std::chrono::milliseconds(0));
+    timer3->enableTimer(std::chrono::milliseconds(1));
+  });
+  EXPECT_CALL(callback4, Call);
   // Sleep during prepare to ensure that enough time has elapsed before timer evaluation to ensure
   // that timers 2 and 3 are picked up by the same loop iteration. Without the sleep the two
   // timers could execute in different loop iterations.
-  EXPECT_CALL(prepare_watcher_, ready()).WillOnce(testing::InvokeWithoutArgs([&]() {
+  EXPECT_CALL(prepare_callback_, Call).WillOnce([this]() {
     advanceLibeventTimeNextIteration(absl::Milliseconds(10));
-  }));
-  EXPECT_CALL(watcher2, ready());
-  EXPECT_CALL(watcher3, ready());
+  });
+  EXPECT_CALL(callback2, Call);
+  EXPECT_CALL(callback3, Call);
   runInEventLoop([&]() {
     timer1->enableTimer(std::chrono::milliseconds(0));
     timer2->enableTimer(std::chrono::milliseconds(1));
@@ -1239,26 +1167,11 @@ TEST_F(TimerImplTest, TimerOrderAndReschedule) {
 }
 
 TEST_F(TimerImplTest, TimerChaining) {
-  ReadyWatcher watcher1;
-  Event::TimerPtr timer1 = dispatcher_->createTimer([&] { watcher1.ready(); });
-
-  ReadyWatcher watcher2;
-  Event::TimerPtr timer2 = dispatcher_->createTimer([&] {
-    watcher2.ready();
-    timer1->enableTimer(std::chrono::milliseconds(0));
-  });
-
-  ReadyWatcher watcher3;
-  Event::TimerPtr timer3 = dispatcher_->createTimer([&] {
-    watcher3.ready();
-    timer2->enableTimer(std::chrono::milliseconds(0));
-  });
-
-  ReadyWatcher watcher4;
-  Event::TimerPtr timer4 = dispatcher_->createTimer([&] {
-    watcher4.ready();
-    timer3->enableTimer(std::chrono::milliseconds(0));
-  });
+  MockFunction<void()> callback1, callback2, callback3, callback4;
+  Event::TimerPtr timer4 = dispatcher_->createTimer(callback4.AsStdFunction());
+  Event::TimerPtr timer3 = dispatcher_->createTimer(callback3.AsStdFunction());
+  Event::TimerPtr timer2 = dispatcher_->createTimer(callback2.AsStdFunction());
+  Event::TimerPtr timer1 = dispatcher_->createTimer(callback1.AsStdFunction());
 
   timer4->enableTimer(std::chrono::milliseconds(0));
 
@@ -1267,14 +1180,20 @@ TEST_F(TimerImplTest, TimerChaining) {
   EXPECT_FALSE(timer3->enabled());
   EXPECT_TRUE(timer4->enabled());
   InSequence s;
-  EXPECT_CALL(prepare_watcher_, ready());
-  EXPECT_CALL(watcher4, ready());
-  EXPECT_CALL(prepare_watcher_, ready());
-  EXPECT_CALL(watcher3, ready());
-  EXPECT_CALL(prepare_watcher_, ready());
-  EXPECT_CALL(watcher2, ready());
-  EXPECT_CALL(prepare_watcher_, ready());
-  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(prepare_callback_, Call);
+  EXPECT_CALL(callback4, Call).WillOnce([&]() {
+    timer3->enableTimer(std::chrono::milliseconds(0));
+  });
+  EXPECT_CALL(prepare_callback_, Call);
+  EXPECT_CALL(callback3, Call).WillOnce([&]() {
+    timer2->enableTimer(std::chrono::milliseconds(0));
+  });
+  EXPECT_CALL(prepare_callback_, Call);
+  EXPECT_CALL(callback2, Call).WillOnce([&]() {
+    timer1->enableTimer(std::chrono::milliseconds(0));
+  });
+  EXPECT_CALL(prepare_callback_, Call);
+  EXPECT_CALL(callback1, Call);
   dispatcher_->run(Dispatcher::RunType::NonBlock);
 
   EXPECT_FALSE(timer1->enabled());
@@ -1284,21 +1203,14 @@ TEST_F(TimerImplTest, TimerChaining) {
 }
 
 TEST_F(TimerImplTest, TimerChainDisable) {
-  ReadyWatcher watcher;
+  MockFunction<void()> callback;
   Event::TimerPtr timer1;
   Event::TimerPtr timer2;
   Event::TimerPtr timer3;
 
-  auto timer_cb = [&] {
-    watcher.ready();
-    timer1->disableTimer();
-    timer2->disableTimer();
-    timer3->disableTimer();
-  };
-
-  timer1 = dispatcher_->createTimer(timer_cb);
-  timer2 = dispatcher_->createTimer(timer_cb);
-  timer3 = dispatcher_->createTimer(timer_cb);
+  timer1 = dispatcher_->createTimer(callback.AsStdFunction());
+  timer2 = dispatcher_->createTimer(callback.AsStdFunction());
+  timer3 = dispatcher_->createTimer(callback.AsStdFunction());
 
   timer3->enableTimer(std::chrono::milliseconds(0));
   timer2->enableTimer(std::chrono::milliseconds(0));
@@ -1308,28 +1220,25 @@ TEST_F(TimerImplTest, TimerChainDisable) {
   EXPECT_TRUE(timer2->enabled());
   EXPECT_TRUE(timer3->enabled());
   InSequence s;
-  // Only 1 call to watcher ready since the other 2 timers were disabled by the first timer.
-  EXPECT_CALL(prepare_watcher_, ready());
-  EXPECT_CALL(watcher, ready());
+  // Only 1 call to callback since the other 2 timers were disabled by the first timer.
+  EXPECT_CALL(prepare_callback_, Call);
+  EXPECT_CALL(callback, Call).WillOnce([&]() {
+    timer1->disableTimer();
+    timer2->disableTimer();
+    timer3->disableTimer();
+  });
   dispatcher_->run(Dispatcher::RunType::NonBlock);
 }
 
 TEST_F(TimerImplTest, TimerChainDelete) {
-  ReadyWatcher watcher;
+  MockFunction<void()> callback;
   Event::TimerPtr timer1;
   Event::TimerPtr timer2;
   Event::TimerPtr timer3;
 
-  auto timer_cb = [&] {
-    watcher.ready();
-    timer1.reset();
-    timer2.reset();
-    timer3.reset();
-  };
-
-  timer1 = dispatcher_->createTimer(timer_cb);
-  timer2 = dispatcher_->createTimer(timer_cb);
-  timer3 = dispatcher_->createTimer(timer_cb);
+  timer1 = dispatcher_->createTimer(callback.AsStdFunction());
+  timer2 = dispatcher_->createTimer(callback.AsStdFunction());
+  timer3 = dispatcher_->createTimer(callback.AsStdFunction());
 
   timer3->enableTimer(std::chrono::milliseconds(0));
   timer2->enableTimer(std::chrono::milliseconds(0));
@@ -1339,9 +1248,13 @@ TEST_F(TimerImplTest, TimerChainDelete) {
   EXPECT_TRUE(timer2->enabled());
   EXPECT_TRUE(timer3->enabled());
   InSequence s;
-  // Only 1 call to watcher ready since the other 2 timers were deleted by the first timer.
-  EXPECT_CALL(prepare_watcher_, ready());
-  EXPECT_CALL(watcher, ready());
+  // Only 1 call to callback since the other 2 timers were deleted by the first timer.
+  EXPECT_CALL(prepare_callback_, Call);
+  EXPECT_CALL(callback, Call).WillOnce([&]() {
+    timer1.reset();
+    timer2.reset();
+    timer3.reset();
+  });
   dispatcher_->run(Dispatcher::RunType::NonBlock);
 }
 
@@ -1504,61 +1417,61 @@ TEST_F(DispatcherWithWatchdogTest, PeriodicTouchTimer) {
 }
 
 TEST_F(DispatcherWithWatchdogTest, TouchBeforeEachPostCallback) {
-  ReadyWatcher watcher1;
-  ReadyWatcher watcher2;
-  ReadyWatcher watcher3;
-  dispatcher_->post([&]() { watcher1.ready(); });
-  dispatcher_->post([&]() { watcher2.ready(); });
-  dispatcher_->post([&]() { watcher3.ready(); });
+  MockFunction<void()> callback1;
+  MockFunction<void()> callback2;
+  MockFunction<void()> callback3;
+  dispatcher_->post(callback1.AsStdFunction());
+  dispatcher_->post(callback2.AsStdFunction());
+  dispatcher_->post(callback3.AsStdFunction());
 
   InSequence s;
   EXPECT_CALL(*watchdog_, touch());
-  EXPECT_CALL(watcher1, ready());
+  EXPECT_CALL(callback1, Call);
   EXPECT_CALL(*watchdog_, touch());
-  EXPECT_CALL(watcher2, ready());
+  EXPECT_CALL(callback2, Call);
   EXPECT_CALL(*watchdog_, touch());
-  EXPECT_CALL(watcher3, ready());
+  EXPECT_CALL(callback3, Call);
   dispatcher_->run(Dispatcher::RunType::NonBlock);
 }
 
 TEST_F(DispatcherWithWatchdogTest, TouchBeforeDeferredDelete) {
-  ReadyWatcher watcher1;
-  ReadyWatcher watcher2;
-  ReadyWatcher watcher3;
+  MockFunction<void()> callback1;
+  MockFunction<void()> callback2;
+  MockFunction<void()> callback3;
 
-  DeferredTaskUtil::deferredRun(*dispatcher_, [&watcher1]() -> void { watcher1.ready(); });
-  DeferredTaskUtil::deferredRun(*dispatcher_, [&watcher2]() -> void { watcher2.ready(); });
-  DeferredTaskUtil::deferredRun(*dispatcher_, [&watcher3]() -> void { watcher3.ready(); });
+  DeferredTaskUtil::deferredRun(*dispatcher_, callback1.AsStdFunction());
+  DeferredTaskUtil::deferredRun(*dispatcher_, callback2.AsStdFunction());
+  DeferredTaskUtil::deferredRun(*dispatcher_, callback3.AsStdFunction());
 
   InSequence s;
   EXPECT_CALL(*watchdog_, touch());
-  EXPECT_CALL(watcher1, ready());
-  EXPECT_CALL(watcher2, ready());
-  EXPECT_CALL(watcher3, ready());
+  EXPECT_CALL(callback1, Call);
+  EXPECT_CALL(callback2, Call);
+  EXPECT_CALL(callback3, Call);
   dispatcher_->run(Dispatcher::RunType::NonBlock);
 }
 
 TEST_F(DispatcherWithWatchdogTest, TouchBeforeSchedulableCallback) {
-  ReadyWatcher watcher;
+  MockFunction<void()> callback;
 
-  auto cb = dispatcher_->createSchedulableCallback([&]() { watcher.ready(); });
+  auto cb = dispatcher_->createSchedulableCallback(callback.AsStdFunction());
   cb->scheduleCallbackCurrentIteration();
 
   InSequence s;
   EXPECT_CALL(*watchdog_, touch());
-  EXPECT_CALL(watcher, ready());
+  EXPECT_CALL(callback, Call);
   dispatcher_->run(Dispatcher::RunType::NonBlock);
 }
 
 TEST_F(DispatcherWithWatchdogTest, TouchBeforeTimer) {
-  ReadyWatcher watcher;
+  MockFunction<void()> callback;
 
-  auto timer = dispatcher_->createTimer([&]() { watcher.ready(); });
+  auto timer = dispatcher_->createTimer(callback.AsStdFunction());
   timer->enableTimer(std::chrono::milliseconds(0));
 
   InSequence s;
   EXPECT_CALL(*watchdog_, touch());
-  EXPECT_CALL(watcher, ready());
+  EXPECT_CALL(callback, Call);
   dispatcher_->run(Dispatcher::RunType::NonBlock);
 }
 
@@ -1566,21 +1479,16 @@ TEST_F(DispatcherWithWatchdogTest, TouchBeforeFdEvent) {
   os_fd_t fd = os_sys_calls_.socket(AF_INET6, SOCK_DGRAM, 0).return_value_;
   ASSERT_TRUE(SOCKET_VALID(fd));
 
-  ReadyWatcher watcher;
+  MockFunction<absl::Status(uint32_t)> callback;
 
   const FileTriggerType trigger = Event::PlatformDefaultTriggerType;
-  Event::FileEventPtr file_event = dispatcher_->createFileEvent(
-      fd,
-      [&](uint32_t) {
-        watcher.ready();
-        return absl::OkStatus();
-      },
-      trigger, FileReadyType::Read);
+  Event::FileEventPtr file_event =
+      dispatcher_->createFileEvent(fd, callback.AsStdFunction(), trigger, FileReadyType::Read);
   file_event->activate(FileReadyType::Read);
 
   InSequence s;
   EXPECT_CALL(*watchdog_, touch()).Times(2);
-  EXPECT_CALL(watcher, ready());
+  EXPECT_CALL(callback, Call).WillOnce(Return(absl::OkStatus()));
   dispatcher_->run(Dispatcher::RunType::NonBlock);
 }
 

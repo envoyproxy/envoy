@@ -312,6 +312,12 @@ public:
   virtual std::chrono::milliseconds streamIdleTimeout() const PURE;
 
   /**
+   * @return per-stream flush timeout for incoming connection manager connections. Zero indicates a
+   *         disabled idle timeout.
+   */
+  virtual absl::optional<std::chrono::milliseconds> streamFlushTimeout() const PURE;
+
+  /**
    * @return request timeout for incoming connection manager connections. Zero indicates
    *         a disabled request timeout.
    */

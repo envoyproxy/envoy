@@ -747,12 +747,16 @@ public:
     GrpcTimeoutHeaderMax,
     GrpcTimeoutHeaderOffset,
     MaxGrpcTimeout,
-    GrpcTimeoutOffset
+    GrpcTimeoutOffset,
+    FlushTimeout,
   };
-  using OptionalTimeouts = PackedStruct<std::chrono::milliseconds, 6, OptionalTimeoutNames>;
+  using OptionalTimeouts = PackedStruct<std::chrono::milliseconds, 7, OptionalTimeoutNames>;
 
   absl::optional<std::chrono::milliseconds> idleTimeout() const override {
     return getOptionalTimeout<OptionalTimeoutNames::IdleTimeout>();
+  }
+  absl::optional<std::chrono::milliseconds> flushTimeout() const override {
+    return getOptionalTimeout<OptionalTimeoutNames::FlushTimeout>();
   }
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
     return getOptionalTimeout<OptionalTimeoutNames::MaxStreamDuration>();

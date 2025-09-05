@@ -642,12 +642,16 @@ void DnsCacheImpl::ThreadLocalHostInfo::onHostMapUpdate(
     const HostMapUpdateInfoSharedPtr& resolved_host) {
   auto host_it = pending_resolutions_.find(resolved_host->host_);
   if (host_it != pending_resolutions_.end()) {
-    for (auto* resolution : host_it->second) {
+    // Calling the onLoadDnsCacheComplete may trigger more host resolutions adding more elements
+    // to the `pending_resolutions_` map, potentially invalidating the host_it iterator. So we
+    // copy the list of handles to a local variable before cleaning up the map.
+    std::list<LoadDnsCacheEntryHandleImpl*> completed_resolutions(std::move(host_it->second));
+    pending_resolutions_.erase(host_it);
+    for (auto* resolution : completed_resolutions) {
       auto& callbacks = resolution->callbacks_;
       resolution->cancel();
       callbacks.onLoadDnsCacheComplete(resolved_host->info_);
     }
-    pending_resolutions_.erase(host_it);
   }
 }
 

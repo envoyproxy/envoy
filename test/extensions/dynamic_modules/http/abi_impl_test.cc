@@ -1,7 +1,9 @@
 #include "source/extensions/filters/http/dynamic_modules/filter.h"
 
+#include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
@@ -1083,6 +1085,56 @@ TEST(ABIImpl, Log) {
   envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Error, ptr, len);
   envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Critical, ptr, len);
   envoy_dynamic_module_callback_log(envoy_dynamic_module_type_log_level_Off, ptr, len);
+}
+
+TEST(ABIImpl, Stats) {
+  Stats::TestUtil::TestStore stats_store;
+  Stats::TestUtil::TestScope stats_scope{"", stats_store};
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto filter_config = std::make_shared<DynamicModuleHttpFilterConfig>(
+      "some_name", "some_config", nullptr, stats_scope, context);
+  DynamicModuleHttpFilter filter{filter_config};
+
+  const std::string counter_name{"some_counter"};
+  size_t counter_id = envoy_dynamic_module_callback_http_filter_config_define_counter(
+      filter_config.get(), const_cast<char*>(counter_name.data()), counter_name.size());
+  Stats::CounterOptConstRef counter =
+      stats_store.findCounterByString("dynamicmodulescustom.some_counter");
+  EXPECT_TRUE(counter.has_value());
+  EXPECT_EQ(counter->get().value(), 0);
+  envoy_dynamic_module_callback_http_filter_increment_counter(&filter, counter_id, 10);
+  EXPECT_EQ(counter->get().value(), 10);
+  envoy_dynamic_module_callback_http_filter_increment_counter(&filter, counter_id, 42);
+  EXPECT_EQ(counter->get().value(), 52);
+
+  const std::string gauge_name{"some_gauge"};
+  size_t gauge_id = envoy_dynamic_module_callback_http_filter_config_define_gauge(
+      filter_config.get(), const_cast<char*>(gauge_name.data()), gauge_name.size());
+  Stats::GaugeOptConstRef gauge = stats_store.findGaugeByString("dynamicmodulescustom.some_gauge");
+  EXPECT_TRUE(gauge.has_value());
+  EXPECT_EQ(gauge->get().value(), 0);
+  envoy_dynamic_module_callback_http_filter_increase_gauge(&filter, gauge_id, 10);
+  EXPECT_EQ(gauge->get().value(), 10);
+  envoy_dynamic_module_callback_http_filter_increase_gauge(&filter, gauge_id, 42);
+  EXPECT_EQ(gauge->get().value(), 52);
+  envoy_dynamic_module_callback_http_filter_decrease_gauge(&filter, gauge_id, 50);
+  EXPECT_EQ(gauge->get().value(), 2);
+  envoy_dynamic_module_callback_http_filter_set_gauge(&filter, gauge_id, 9001);
+  EXPECT_EQ(gauge->get().value(), 9001);
+
+  const std::string histogram_name{"some_histogram"};
+  size_t histogram_id = envoy_dynamic_module_callback_http_filter_config_define_histogram(
+      filter_config.get(), const_cast<char*>(histogram_name.data()), histogram_name.size());
+  Stats::HistogramOptConstRef histogram =
+      stats_store.findHistogramByString("dynamicmodulescustom.some_histogram");
+  EXPECT_TRUE(histogram.has_value());
+  EXPECT_FALSE(stats_store.histogramRecordedValues("dynamicmodulescustom.some_histogram"));
+  envoy_dynamic_module_callback_http_filter_record_histogram_value(&filter, histogram_id, 10);
+  EXPECT_EQ(stats_store.histogramValues("dynamicmodulescustom.some_histogram", false),
+            (std::vector<uint64_t>{10}));
+  envoy_dynamic_module_callback_http_filter_record_histogram_value(&filter, histogram_id, 42);
+  EXPECT_EQ(stats_store.histogramValues("dynamicmodulescustom.some_histogram", false),
+            (std::vector<uint64_t>{10, 42}));
 }
 
 } // namespace HttpFilters

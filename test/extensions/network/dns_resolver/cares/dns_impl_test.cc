@@ -727,6 +727,11 @@ public:
     cares.set_allocated_udp_max_queries(udpMaxQueries());
     cares.set_rotate_nameservers(setRotateNameservers());
 
+    // Set EDNS0 configuration if specified
+    if (getEdns0MaxPayloadSize() > 0) {
+      cares.mutable_edns0_max_payload_size()->set_value(getEdns0MaxPayloadSize());
+    }
+
     // Copy over the dns_resolver_options_.
     cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options);
     // setup the typed config
@@ -976,6 +981,7 @@ protected:
   virtual bool filterUnroutableFamilies() const { return false; }
   virtual bool setRotateNameservers() const { return false; }
   virtual Protobuf::UInt32Value* udpMaxQueries() const { return nullptr; }
+  virtual uint32_t getEdns0MaxPayloadSize() const { return 0; }
   Stats::TestUtil::TestStore stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<TestDnsServer> server_;
@@ -2311,6 +2317,35 @@ TEST_P(DnsImplAresFlagsForNoNameserverRotationTest, NameserverRotationDisabled) 
   EXPECT_TRUE((optmask & ARES_OPT_NOROTATE) == ARES_OPT_NOROTATE);
   EXPECT_NE(nullptr,
             resolveWithUnreferencedParameters("some.good.domain", DnsLookupFamily::Auto, true));
+  ares_destroy_options(&opts);
+}
+
+// EDNS0 configuration test
+
+class DnsImplEdns0Test : public DnsImplTest {
+protected:
+  bool tcpOnly() const override { return false; }
+  uint32_t getEdns0MaxPayloadSize() const override { return 4096; }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplEdns0Test,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Test: Verify EDNS0 configuration is applied to c-ares options
+// Note: EDNS0 is only relevant for UDP DNS queries.
+// The DNS tests in this file use TCP-only mode to avoid instability and flakiness from UDP.
+// Therefore, this test only verifies that the EDNS0 configuration flag is set in c-ares,
+// not its functional behavior.
+TEST_P(DnsImplEdns0Test, Edns0ConfigurationApplied) {
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
+
+  // Verify EDNS0 payload size flag is set and value is correct
+  EXPECT_TRUE((optmask & ARES_OPT_EDNSPSZ) == ARES_OPT_EDNSPSZ);
+  EXPECT_EQ(opts.ednspsz, 4096);
+
   ares_destroy_options(&opts);
 }
 
