@@ -88,6 +88,7 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
     return FilterPtr{new LogTypeFilter(config.log_type_filter())};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kLocalRateLimitFilter: {
     auto filter = LocalRateLimitFilter::create(config.local_rate_limit_filter(), context);
+    // TODO(taoxuy): replace throwing exception with return status to make this file exception free.
     THROW_IF_NOT_OK(filter.status());
     return std::move(filter.value());
   }
