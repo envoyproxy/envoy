@@ -479,6 +479,7 @@ new_features:
     :ref:`remove_on_match <envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutation.remove_on_match>`
     allows removing headers that match a specified key pattern. This enables more flexible and
     dynamic header manipulation based on header names.
+    Support rate limiting on access log emission.
 - area: geoip
   change: |
     Added a new metric ``db_build_epoch`` to track the build timestamp of the MaxMind geolocation database files.

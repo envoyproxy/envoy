@@ -324,8 +324,6 @@ DynamicDescriptor::addOrGetDescriptor(const RateLimit::Descriptor& request_descr
 }
 
 SINGLETON_MANAGER_REGISTRATION(local_ratelimit);
-static constexpr const auto kLocalRateLimitSingletonManagerName =
-    SINGLETON_MANAGER_REGISTERED_NAME(local_ratelimit);
 
 LocalRateLimiterMapSingleton::RateLimiter LocalRateLimiterMapSingleton::getRateLimiter(
     Singleton::Manager& manager, absl::string_view limiter_key,
@@ -335,10 +333,9 @@ LocalRateLimiterMapSingleton::RateLimiter LocalRateLimiterMapSingleton::getRateL
         envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
     bool always_consume_default_token_bucket, ShareProviderSharedPtr shared_provider,
     const uint32_t lru_size) {
-  LocalRateLimiterMapSingletonSharedPtr map =
-      manager.getTyped<LocalRateLimiterMapSingleton>(kLocalRateLimitSingletonManagerName, [] {
-        return std::make_shared<LocalRateLimiterMapSingleton>();
-      });
+  LocalRateLimiterMapSingletonSharedPtr map = manager.getTyped<LocalRateLimiterMapSingleton>(
+      SINGLETON_MANAGER_REGISTERED_NAME(local_ratelimit),
+      [] { return std::make_shared<LocalRateLimiterMapSingleton>(); });
 
   const std::string key(limiter_key);
   auto it = map->limiter_map_.find(key);
@@ -350,7 +347,18 @@ LocalRateLimiterMapSingleton::RateLimiter LocalRateLimiterMapSingleton::getRateL
     return LocalRateLimiterMapSingleton::RateLimiter{map, limiter};
   }
 
-  return LocalRateLimiterMapSingleton::RateLimiter{map, it->second.lock()};
+  std::shared_ptr<LocalRateLimiterImpl> ptr = it->second.lock();
+  // Check if the rate limiter has been destructed.
+  if (ptr == nullptr) {
+    map->limiter_map_.erase(it);
+    auto limiter = std::make_shared<LocalRateLimiterImpl>(
+        fill_interval, max_tokens, tokens_per_fill, dispatcher, descriptors,
+        always_consume_default_token_bucket, shared_provider, lru_size);
+    map->limiter_map_.insert({key, limiter});
+    return LocalRateLimiterMapSingleton::RateLimiter{map, limiter};
+  }
+
+  return LocalRateLimiterMapSingleton::RateLimiter{map, ptr};
 }
 
 } // namespace LocalRateLimit
