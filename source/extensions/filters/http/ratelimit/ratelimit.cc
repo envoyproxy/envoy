@@ -97,8 +97,8 @@ void Filter::populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descript
   }
 
   // Rate Limit config in typed_per_filter_config takes precedence over route's rate limit.
-  if (config_.get()->hasRateLimitConfigs()) {
-    config_.get()->populateDescriptors(headers, callbacks_->streamInfo(), descriptors);
+  if (config_->hasRateLimitConfigs()) {
+    config_->populateDescriptors(headers, callbacks_->streamInfo(), descriptors, on_stream_done);
     return;
   }
 

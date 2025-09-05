@@ -6,6 +6,7 @@
 #include "test/extensions/common/tap/common.h"
 #include "test/extensions/filters/http/tap/common.h"
 #include "test/mocks/common.h"
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -28,6 +29,7 @@ namespace TapCommon = Extensions::Common::Tap;
 class HttpPerRequestTapperImplTest : public testing::Test {
 public:
   HttpPerRequestTapperImplTest() {
+    EXPECT_CALL(callbacks_, streamId()).WillRepeatedly(Return(1));
     EXPECT_CALL(*config_, createPerTapSinkHandleManager_(1)).WillOnce(Return(sink_manager_));
     EXPECT_CALL(*config_, createMatchStatusVector())
         .WillOnce(Return(ByMove(TapCommon::Matcher::MatchStatusVector(1))));
@@ -35,8 +37,7 @@ public:
     EXPECT_CALL(*config_, timeSource()).WillRepeatedly(ReturnRef(time_system_));
     time_system_.setSystemTime(std::chrono::seconds(0));
     EXPECT_CALL(matcher_, onNewStream(_)).WillOnce(SaveArgAddress(&statuses_));
-    tapper_ = std::make_unique<HttpPerRequestTapperImpl>(config_, tap_config_, 1,
-                                                         OptRef<const Network::Connection>{});
+    tapper_ = std::make_unique<HttpPerRequestTapperImpl>(config_, tap_config_, callbacks_);
   }
 
   std::shared_ptr<MockHttpTapConfig> config_{std::make_shared<MockHttpTapConfig>()};
@@ -52,6 +53,7 @@ public:
   const Http::TestRequestTrailerMapImpl request_trailers_{{"c", "d"}};
   const Http::TestResponseHeaderMapImpl response_headers_{{"e", "f"}};
   const Http::TestResponseTrailerMapImpl response_trailers_{{"g", "h"}};
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   Event::SimulatedTimeSystem time_system_;
 };
 
@@ -324,23 +326,27 @@ http_streamed_trace_segment:
 class HttpPerRequestTapperImplForSpecificConfigTest : public testing::Test {
 public:
   HttpPerRequestTapperImplForSpecificConfigTest() {
+    EXPECT_CALL(callbacks_, streamId()).WillRepeatedly(Return(1));
     EXPECT_CALL(*config_, createPerTapSinkHandleManager_(1)).WillOnce(Return(sink_manager_));
     EXPECT_CALL(*config_, createMatchStatusVector())
         .WillOnce(Return(ByMove(TapCommon::Matcher::MatchStatusVector(1))));
     EXPECT_CALL(*config_, rootMatcher()).WillRepeatedly(ReturnRef(matcher_));
     EXPECT_CALL(*config_, timeSource()).WillRepeatedly(ReturnRef(time_system_));
-    time_system_.setSystemTime(std::chrono::seconds(0));
+    time_system_.setSystemTime(std::chrono::seconds(9));
     EXPECT_CALL(matcher_, onNewStream(_)).WillOnce(SaveArgAddress(&statuses_));
 
     tap_config_.set_record_headers_received_time(true);
     tap_config_.set_record_downstream_connection(true);
+    tap_config_.set_record_upstream_connection(true);
 
     connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234));
     connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 4321));
 
-    tapper_ = std::make_unique<HttpPerRequestTapperImpl>(config_, tap_config_, 1, connection_);
+    EXPECT_CALL(callbacks_, connection())
+        .WillRepeatedly(Return(OptRef<const Network::Connection>(connection_)));
+    tapper_ = std::make_unique<HttpPerRequestTapperImpl>(config_, tap_config_, callbacks_);
 
     Network::ConnectionInfoProviderSharedPtr local_connection_info_provider =
         std::make_shared<Network::ConnectionInfoSetterImpl>(
@@ -363,6 +369,7 @@ public:
   const Http::TestResponseTrailerMapImpl response_trailers_{{"g", "h"}};
   Event::SimulatedTimeSystem time_system_;
   NiceMock<const Network::MockConnection> connection_;
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
 };
 
 // Buffered tap with a match and with record_headers_received_time is true.
@@ -399,7 +406,7 @@ http_buffered_trace:
     trailers:
       - key: c
         value: d
-    headers_received_time: 1970-01-01T00:00:00Z
+    headers_received_time: 1970-01-01T00:00:09Z
   response:
     headers:
       - key: e
@@ -409,7 +416,7 @@ http_buffered_trace:
     trailers:
       - key: g
         value: h
-    headers_received_time: 1970-01-01T00:00:00Z
+    headers_received_time: 1970-01-01T00:00:09Z
   downstream_connection:
     local_address:
       socket_address:
@@ -419,6 +426,15 @@ http_buffered_trace:
       socket_address:
         address: 127.0.0.1
         port_value: 4321
+  upstream_connection:
+    local_address:
+      socket_address:
+        address: 127.1.2.3
+        port_value: 58443
+    remote_address:
+      socket_address:
+        address: 10.0.0.1
+        port_value: 443
 )EOF")));
   EXPECT_TRUE(tapper_->onDestroyLog());
 }

@@ -37,6 +37,8 @@ enum class FilterRequestType { Internal, External, Both };
  */
 enum class VhRateLimitOptions { Override, Include, Ignore };
 
+using RateLimitConfig = Extensions::Filters::Common::RateLimit::RateLimitConfig;
+
 /**
  * Global configuration for the HTTP rate limit filter.
  */
@@ -116,9 +118,11 @@ public:
   }
   void populateDescriptors(const Http::RequestHeaderMap& headers,
                            const StreamInfo::StreamInfo& info,
-                           Filters::Common::RateLimit::RateLimitDescriptors& descriptors) const {
+                           Filters::Common::RateLimit::RateLimitDescriptors& descriptors,
+                           bool on_stream_done) const {
     ASSERT(rate_limit_config_ != nullptr);
-    rate_limit_config_->populateDescriptors(headers, info, local_info_.clusterName(), descriptors);
+    rate_limit_config_->populateDescriptors(headers, info, local_info_.clusterName(), descriptors,
+                                            on_stream_done);
   }
 
 private:
@@ -167,7 +171,7 @@ private:
   const absl::optional<Envoy::Runtime::FractionalPercent> filter_enabled_;
   const absl::optional<Envoy::Runtime::FractionalPercent> filter_enforced_;
   const absl::optional<Envoy::Runtime::FractionalPercent> failure_mode_deny_percent_;
-  std::unique_ptr<Extensions::Filters::Common::RateLimit::RateLimitConfig> rate_limit_config_;
+  std::unique_ptr<RateLimitConfig> rate_limit_config_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -210,7 +214,7 @@ private:
   const envoy::extensions::filters::http::ratelimit::v3::RateLimitPerRoute::VhRateLimitsOptions
       vh_rate_limits_;
   const std::string domain_;
-  std::unique_ptr<Extensions::Filters::Common::RateLimit::RateLimitConfig> rate_limit_config_;
+  std::unique_ptr<RateLimitConfig> rate_limit_config_;
 };
 
 using FilterConfigPerRouteSharedPtr = std::shared_ptr<FilterConfigPerRoute>;

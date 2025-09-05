@@ -312,8 +312,8 @@ QuicPacketizer::QuicPacketPtr QuicPacketizer::serializePacket(const QuicFrame& f
     auto quic_stop = quic::QuicStopSendingFrame(f.control_frame_id(), f.stream_id(), error_code);
     return serialize(quic::QuicFrame(quic_stop));
   }
-  case QuicFrame::kMessageFrame:
-    return serializeMessageFrame(frame.message_frame());
+  case QuicFrame::kDatagramFrame:
+    return serializeDatagramFrame(frame.datagram_frame());
   case QuicFrame::kNewToken:
     return serializeNewTokenFrame(frame.new_token());
   case QuicFrame::kAckFrequency: {
@@ -404,12 +404,12 @@ QuicPacketizer::serializeNewTokenFrame(const test::common::quic::QuicNewTokenFra
 }
 
 QuicPacketizer::QuicPacketPtr
-QuicPacketizer::serializeMessageFrame(const test::common::quic::QuicMessageFrame& frame) {
+QuicPacketizer::serializeDatagramFrame(const test::common::quic::QuicDatagramFrame& frame) {
   char buffer[1024];
   auto message = frame.data();
   size_t len = std::min(message.size(), sizeof(buffer));
   memcpy(buffer, message.data(), len);
-  auto message_frame = quic::QuicMessageFrame(buffer, len);
+  auto message_frame = quic::QuicDatagramFrame(buffer, len);
   return serialize(quic::QuicFrame(&message_frame));
 }
 
