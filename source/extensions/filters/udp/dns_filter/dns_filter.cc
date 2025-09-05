@@ -177,11 +177,16 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
   } else {
     // In case client_config doesn't exist, use the bootstrap DNS resolver if it is configured.
     if (context.serverFactoryContext().bootstrap().has_typed_dns_resolver_config() &&
-        !context.serverFactoryContext().bootstrap().typed_dns_resolver_config().typed_config().type_url().empty()) {
+        !context.serverFactoryContext()
+             .bootstrap()
+             .typed_dns_resolver_config()
+             .typed_config()
+             .type_url()
+             .empty()) {
       typed_dns_resolver_config_.MergeFrom(
-        context.serverFactoryContext().bootstrap().typed_dns_resolver_config());
-      dns_resolver_factory_ = &Network::createDnsResolverFactoryFromTypedConfig(
-          typed_dns_resolver_config_);
+          context.serverFactoryContext().bootstrap().typed_dns_resolver_config());
+      dns_resolver_factory_ =
+          &Network::createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config_);
     } else {
       // Otherwise create default DNS resolver factory and save it.
       dns_resolver_factory_ = &Network::createDefaultDnsResolverFactory(typed_dns_resolver_config_);
