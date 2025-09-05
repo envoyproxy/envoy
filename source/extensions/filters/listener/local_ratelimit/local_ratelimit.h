@@ -49,7 +49,7 @@ private:
 
   const Runtime::FeatureFlag enabled_;
   const LocalRateLimitStats stats_;
-  Filters::Common::LocalRateLimit::LocalRateLimiterImpl rate_limiter_;
+  std::unique_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl> rate_limiter_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
