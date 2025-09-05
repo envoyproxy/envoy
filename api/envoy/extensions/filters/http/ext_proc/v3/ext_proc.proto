@@ -195,6 +195,7 @@ message ExternalProcessor {
   // matched against that list and populated in the ``request_headers`` message.
   // See the :ref:`attribute documentation <arch_overview_request_attributes>`
   // for the list of supported attributes and their types.
+  // If ``attribute_builder`` is set below, then this is not used.
   repeated string request_attributes = 5;
 
   // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
@@ -202,6 +203,7 @@ message ExternalProcessor {
   // matched against that list and populated in the ``response_headers`` message.
   // See the :ref:`attribute documentation <arch_overview_attributes>`
   // for the list of supported attributes and their types.
+  // If ``attribute_builder`` is set below, then this is not used.
   repeated string response_attributes = 6;
 
   // Specifies the timeout for each individual message sent on the stream and
