@@ -14,7 +14,6 @@ FilterConfig::FilterConfig(
       stats_(generateStats(proto_config.stat_prefix(), scope)) {
   absl::Status create_status;
   rate_limiter_ = std::make_unique<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>(
-
       std::chrono::milliseconds(
           PROTOBUF_GET_MS_REQUIRED(proto_config.token_bucket(), fill_interval)),
       proto_config.token_bucket().max_tokens(),
