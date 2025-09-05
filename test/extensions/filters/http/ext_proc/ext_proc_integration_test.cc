@@ -950,6 +950,7 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStream) {
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
+  proto_config_.mutable_message_timeout()->set_seconds(1);
   // Turn on debug to troubleshoot possible flaky test.
   // TODO(cainelli): Remove this and the debug logs in the tracer test filter after a test failure
   // occurs.
