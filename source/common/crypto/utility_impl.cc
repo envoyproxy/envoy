@@ -38,6 +38,8 @@ std::vector<uint8_t> UtilityImpl::getSha256Hmac(const std::vector<uint8_t>& key,
 const VerificationOutput UtilityImpl::verifySignature(absl::string_view hash, CryptoObject& key,
                                                       const std::vector<uint8_t>& signature,
                                                       const std::vector<uint8_t>& text) {
+  // Verify cryptographic signature using a public key
+  // The key must be imported via importPublicKey() which supports both DER and PEM formats
   // Step 1: initialize EVP_MD_CTX
   bssl::ScopedEVP_MD_CTX ctx;
 
@@ -49,6 +51,9 @@ const VerificationOutput UtilityImpl::verifySignature(absl::string_view hash, Cr
   }
   // Step 3: initialize EVP_DigestVerify
   auto pkey_wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(key);
+  if (pkey_wrapper == nullptr) {
+    return {false, "Failed to initialize digest verify."};
+  }
   EVP_PKEY* pkey = pkey_wrapper->getEVP_PKEY();
 
   if (pkey == nullptr) {
@@ -73,6 +78,8 @@ const VerificationOutput UtilityImpl::verifySignature(absl::string_view hash, Cr
 
 const SignOutput UtilityImpl::sign(absl::string_view hash, CryptoObject& key,
                                    const std::vector<uint8_t>& text) {
+  // Sign data using a private key
+  // The key must be imported via importPrivateKey() which supports both DER and PEM formats
   // Step 1: initialize EVP_MD_CTX
   bssl::ScopedEVP_MD_CTX ctx;
 
@@ -85,6 +92,9 @@ const SignOutput UtilityImpl::sign(absl::string_view hash, CryptoObject& key,
 
   // Step 3: initialize EVP_DigestSign
   auto pkey_wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(key);
+  if (pkey_wrapper == nullptr) {
+    return {false, {}, "Failed to initialize digest sign."};
+  }
   EVP_PKEY* pkey = pkey_wrapper->getEVP_PKEY();
 
   if (pkey == nullptr) {
@@ -116,25 +126,57 @@ const SignOutput UtilityImpl::sign(absl::string_view hash, CryptoObject& key,
 }
 
 CryptoObjectPtr UtilityImpl::importPublicKey(const std::vector<uint8_t>& key) {
-  CBS cbs({key.data(), key.size()});
-
-  EVP_PKEY* pkey = EVP_parse_public_key(&cbs);
-  if (pkey == nullptr) {
-    return nullptr;
+  // Auto-detect format: PEM or DER
+  // PEM format detection: looks for "-----BEGIN" markers and newlines
+  // DER format: binary data without PEM markers (typically hex-encoded)
+  bool is_pem = false;
+  if (key.size() > 10) {
+    std::string key_str(key.begin(), key.end());
+    if (key_str.find("-----BEGIN") != std::string::npos &&
+        key_str.find('\n') != std::string::npos) {
+      is_pem = true;
+    }
   }
 
-  return std::make_unique<PublicKeyObject>(pkey);
+  if (is_pem) {
+    // PEM format: Use PEM parsing which automatically handles both PKCS#1 and PKCS#8 formats
+    // This resolves the format inconsistency issue when using PEM keys
+    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(key.data(), key.size()));
+    return std::make_unique<PublicKeyObject>(
+        PEM_read_bio_PUBKEY(bio.get(), nullptr, nullptr, nullptr));
+  } else {
+    // DER format: Use DER parsing (expects PKCS#1 public key format)
+    // This maintains backward compatibility with existing hex-encoded DER keys
+    CBS cbs({key.data(), key.size()});
+    return std::make_unique<PublicKeyObject>(EVP_parse_public_key(&cbs));
+  }
 }
 
 CryptoObjectPtr UtilityImpl::importPrivateKey(const std::vector<uint8_t>& key) {
-  CBS cbs({key.data(), key.size()});
-
-  EVP_PKEY* pkey = EVP_parse_private_key(&cbs);
-  if (pkey == nullptr) {
-    return nullptr;
+  // Auto-detect format: PEM or DER
+  // PEM format detection: looks for "-----BEGIN" markers and newlines
+  // DER format: binary data without PEM markers (typically hex-encoded)
+  bool is_pem = false;
+  if (key.size() > 10) {
+    std::string key_str(key.begin(), key.end());
+    if (key_str.find("-----BEGIN") != std::string::npos &&
+        key_str.find('\n') != std::string::npos) {
+      is_pem = true;
+    }
   }
 
-  return std::make_unique<PrivateKeyObject>(pkey);
+  if (is_pem) {
+    // PEM format: Use PEM parsing which automatically handles both PKCS#1 and PKCS#8 formats
+    // This resolves the format inconsistency issue when using PEM keys
+    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(key.data(), key.size()));
+    return std::make_unique<PrivateKeyObject>(
+        PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
+  } else {
+    // DER format: Use DER parsing (expects PKCS#8 private key format)
+    // This maintains backward compatibility with existing hex-encoded DER keys
+    CBS cbs({key.data(), key.size()});
+    return std::make_unique<PrivateKeyObject>(EVP_parse_private_key(&cbs));
+  }
 }
 
 const EVP_MD* UtilityImpl::getHashFunction(absl::string_view name) {
