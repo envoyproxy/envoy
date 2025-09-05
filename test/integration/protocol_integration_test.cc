@@ -26,6 +26,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
 #include "test/common/http/http2/http2_frame.h"
 #include "test/common/upstream/utility.h"
@@ -75,6 +76,84 @@ TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
   checkSimpleRequestSuccess(0U, 0U, response.get());
 }
 
+// Test upstream_rq_per_cx metric tracks requests per connection
+TEST_P(ProtocolIntegrationTest, UpstreamRequestsPerConnectionMetric) {
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send 3 requests on the same connection
+  for (int i = 0; i < 3; ++i) {
+    auto response =
+        sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0);
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+  }
+
+  // Use the proper cleanup pattern that triggers histogram recording
+  cleanupUpstreamAndDownstream();
+
+  // Wait for the histogram to actually have samples using the proper integration test pattern
+  test_server_->waitUntilHistogramHasSamples("cluster.cluster_0.upstream_rq_per_cx");
+
+  // Get the histogram and read values using the proper pattern
+  auto histogram = test_server_->histogram("cluster.cluster_0.upstream_rq_per_cx");
+
+  uint64_t sample_count =
+      TestUtility::readSampleCount(test_server_->server().dispatcher(), *histogram);
+  uint64_t sample_sum = TestUtility::readSampleSum(test_server_->server().dispatcher(), *histogram);
+
+  // Should have 1 sample with value 3 (3 requests on 1 connection)
+  EXPECT_EQ(sample_count, 1);
+  EXPECT_EQ(sample_sum, 3);
+}
+
+// Test that upstream_rq_per_cx metric is NOT recorded when handshake fails
+TEST_P(ProtocolIntegrationTest, UpstreamRequestsPerConnectionMetricHandshakeFailure) {
+  // This test intentionally causes upstream connection failures, so bypass the upstream validation
+  testing_upstream_intentionally_ = true;
+
+  // Configure upstream with invalid port to force connection failure before handshake completion
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* lb_endpoint =
+        cluster->mutable_load_assignment()->mutable_endpoints(0)->mutable_lb_endpoints(0);
+    // Use port 1 which is invalid/inaccessible to force connection establishment failure
+    lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(1);
+  });
+  config_helper_.skipPortUsageValidation();
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send request that will fail due to upstream connection failure
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  // Wait for response (should fail with 503 Service Unavailable)
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("503", response->headers().getStatusValue());
+
+  // Clean up
+  codec_client_->close();
+
+  // Wait for connection failure to be recorded
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_connect_fail", 1);
+
+  // Verify that NO upstream_rq_per_cx histogram samples were recorded
+  // because hasHandshakeCompleted() returned false (connection never established)
+  auto histogram = test_server_->histogram("cluster.cluster_0.upstream_rq_per_cx");
+  uint64_t sample_count =
+      TestUtility::readSampleCount(test_server_->server().dispatcher(), *histogram);
+
+  // Key assertion: No histogram samples should be recorded for failed connections
+  EXPECT_EQ(sample_count, 0);
+
+  // Also verify connection failure was recorded (proving connection attempt was made)
+  EXPECT_GE(test_server_->counter("cluster.cluster_0.upstream_cx_connect_fail")->value(), 1);
+}
+
 TEST_P(ProtocolIntegrationTest, LogicalDns) {
   if (use_universal_header_validator_) {
     // TODO(#27132): auto_host_rewrite is broken for IPv6 and is failing UHV validation
@@ -85,6 +164,11 @@ TEST_P(ProtocolIntegrationTest, LogicalDns) {
     auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
     cluster.set_type(envoy::config::cluster::v3::Cluster::LOGICAL_DNS);
     cluster.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::ALL);
+    auto* typed_dns_resolver_config = cluster.mutable_typed_dns_resolver_config();
+    typed_dns_resolver_config->set_name("envoy.network.dns_resolver.getaddrinfo");
+    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+        getaddrinfo_config;
+    typed_dns_resolver_config->mutable_typed_config()->PackFrom(getaddrinfo_config);
   });
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -107,6 +191,11 @@ TEST_P(ProtocolIntegrationTest, StrictDns) {
     auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
     cluster.set_type(envoy::config::cluster::v3::Cluster::STRICT_DNS);
     cluster.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::ALL);
+    auto* typed_dns_resolver_config = cluster.mutable_typed_dns_resolver_config();
+    typed_dns_resolver_config->set_name("envoy.network.dns_resolver.getaddrinfo");
+    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+        getaddrinfo_config;
+    typed_dns_resolver_config->mutable_typed_config()->PackFrom(getaddrinfo_config);
   });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -988,6 +1077,62 @@ TEST_P(ProtocolIntegrationTest, Retry) {
       BytesCountExpectation(2204, 520, 150, 6));
 }
 
+TEST_P(ProtocolIntegrationTest, RetryWithBodyLargerThanNetworkBuffer) {
+  // Set the network buffer to be 16KB.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->listeners_size() >= 1, "");
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+
+    listener->mutable_per_connection_buffer_limit_bytes()->set_value(16 * 1024);
+  });
+  // Set the request body buffer limit to be 1MB so it can retry requests up to 1MB.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_route_config()
+            ->mutable_virtual_hosts(0)
+            ->mutable_request_body_buffer_limit()
+            ->set_value(1024 * 1024);
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  // Send a request with 64Kb body so it is larger than the network 16Kb buffer.
+  constexpr uint32_t kRequestBodySize = 64 * 1024;
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/test/long/url"},
+                                     {":scheme", "http"},
+                                     {":authority", "sni.lyft.com"},
+                                     {"x-forwarded-for", "10.0.0.1"},
+                                     {"x-envoy-retry-on", "5xx"}},
+      kRequestBodySize);
+  waitForNextUpstreamRequest();
+  // Note that 503 is sent with end_stream=false (response with body). This will cause Envoy to
+  // reset the response because it knows it is going to retry the request and it does not need the
+  // response body.
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "503"}}, false);
+  if (fake_upstreams_[0]->httpType() == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_,
+                                                          std::chrono::milliseconds(500)));
+  } else {
+    ASSERT_TRUE(upstream_request_->waitForReset());
+  }
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(kRequestBodySize, upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ(512U, response->body().size());
+}
+
 // Regression test to guarantee that buffering for retries and shadows doesn't double the body size.
 // This test is actually irrelevant for QUIC, as this issue only shows up with header-only requests.
 // QUIC will always send an empty data frame with FIN.
@@ -1137,7 +1282,7 @@ TEST_P(ProtocolIntegrationTest, RetryStreamingCancelDueToBufferOverflow) {
              hcm) {
         auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
 
-        route->mutable_per_request_buffer_limit_bytes()->set_value(1024);
+        route->mutable_request_body_buffer_limit()->set_value(1024);
         route->mutable_route()
             ->mutable_retry_policy()
             ->mutable_retry_back_off()
@@ -1401,7 +1546,7 @@ TEST_P(ProtocolIntegrationTest, RetryHittingBufferLimit) {
 // Very similar set-up to RetryHittingBufferLimits but using the route specific cap.
 TEST_P(ProtocolIntegrationTest, RetryHittingRouteLimits) {
   auto host = config_helper_.createVirtualHost("routelimit.lyft.com", "/");
-  host.mutable_per_request_buffer_limit_bytes()->set_value(0);
+  host.mutable_request_body_buffer_limit()->set_value(0);
   config_helper_.addVirtualHost(host);
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1586,8 +1731,6 @@ TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaReset) {
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done", "false");
   config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_balsa_delay_reset", "true");
   initialize();
 
@@ -1617,8 +1760,6 @@ TEST_P(DownstreamProtocolIntegrationTest, EnvoyProxying102DelayBalsaResetWaitFor
   config_helper_.addConfigModifier(
       [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
               hcm) -> void { hcm.set_proxy_100_continue(true); });
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.wait_for_first_byte_before_balsa_msg_done", "true");
   config_helper_.addRuntimeOverride("envoy.reloadable_features.http1_balsa_delay_reset", "true");
   initialize();
 

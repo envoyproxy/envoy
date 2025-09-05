@@ -30,9 +30,9 @@ Envoy::Ssl::CertificateDetailsPtr Utility::certificateDetails(X509* cert, const 
   const auto days_until_expiry = Utility::getDaysUntilExpiration(cert, time_source).value_or(0);
   certificate_details->set_days_until_expiration(days_until_expiry);
 
-  ProtobufWkt::Timestamp* valid_from = certificate_details->mutable_valid_from();
+  Protobuf::Timestamp* valid_from = certificate_details->mutable_valid_from();
   TimestampUtil::systemClockToTimestamp(Utility::getValidFrom(*cert), *valid_from);
-  ProtobufWkt::Timestamp* expiration_time = certificate_details->mutable_expiration_time();
+  Protobuf::Timestamp* expiration_time = certificate_details->mutable_expiration_time();
   TimestampUtil::systemClockToTimestamp(Utility::getExpirationTime(*cert), *expiration_time);
 
   for (auto& dns_san : Utility::getSubjectAltNames(*cert, GEN_DNS)) {

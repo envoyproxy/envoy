@@ -118,8 +118,8 @@ Network::PostIoAction TsiSocket::doHandshakeNextDone(NextResultPtr&& next_result
                        err);
         return Network::PostIoAction::Close;
       }
-      ProtobufWkt::Struct dynamic_metadata;
-      ProtobufWkt::Value val;
+      Protobuf::Struct dynamic_metadata;
+      Protobuf::Value val;
       val.set_string_value(tsi_info.peer_identity_);
       dynamic_metadata.mutable_fields()->insert({std::string("peer_identity"), val});
       callbacks_->connection().streamInfo().setDynamicMetadata(

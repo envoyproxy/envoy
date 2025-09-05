@@ -45,12 +45,12 @@ public:
     filter_->onDestroy();
   }
 
-  void checkKeyInt(const ProtobufWkt::Struct& s, std::string key, int val) {
+  void checkKeyInt(const Protobuf::Struct& s, std::string key, int val) {
     const auto& fields = s.fields();
     const auto it = fields.find(key);
     ASSERT_NE(it, fields.end());
     const auto& pbval = it->second;
-    ASSERT_EQ(pbval.kind_case(), ProtobufWkt::Value::kNumberValue);
+    ASSERT_EQ(pbval.kind_case(), Protobuf::Value::kNumberValue);
     EXPECT_EQ(pbval.number_value(), val);
   }
 
@@ -80,7 +80,7 @@ TEST_F(SetMetadataFilterTest, DeprecatedSimple) {
   const auto it_tags = fields.find("tags");
   ASSERT_NE(it_tags, fields.end());
   const auto& tags = it_tags->second;
-  ASSERT_EQ(tags.kind_case(), ProtobufWkt::Value::kStructValue);
+  ASSERT_EQ(tags.kind_case(), Protobuf::Value::kStructValue);
   checkKeyInt(tags.struct_value(), "mytag0", 1);
 }
 
@@ -125,18 +125,18 @@ TEST_F(SetMetadataFilterTest, DeprecatedWithMerge) {
   const auto it_mylist = fields.find("mylist");
   ASSERT_NE(it_mylist, fields.end());
   const auto& mylist = it_mylist->second;
-  ASSERT_EQ(mylist.kind_case(), ProtobufWkt::Value::kListValue);
+  ASSERT_EQ(mylist.kind_case(), Protobuf::Value::kListValue);
   const auto& vals = mylist.list_value().values();
   ASSERT_EQ(vals.size(), 2);
-  ASSERT_EQ(vals[0].kind_case(), ProtobufWkt::Value::kStringValue);
+  ASSERT_EQ(vals[0].kind_case(), Protobuf::Value::kStringValue);
   EXPECT_EQ(vals[0].string_value(), "a");
-  ASSERT_EQ(vals[1].kind_case(), ProtobufWkt::Value::kStringValue);
+  ASSERT_EQ(vals[1].kind_case(), Protobuf::Value::kStringValue);
   EXPECT_EQ(vals[1].string_value(), "b");
 
   const auto it_tags = fields.find("tags");
   ASSERT_NE(it_tags, fields.end());
   const auto& tags = it_tags->second;
-  ASSERT_EQ(tags.kind_case(), ProtobufWkt::Value::kStructValue);
+  ASSERT_EQ(tags.kind_case(), Protobuf::Value::kStructValue);
   const auto& tags_struct = tags.struct_value();
 
   checkKeyInt(tags_struct, "mytag0", 1);
@@ -163,7 +163,7 @@ TEST_F(SetMetadataFilterTest, UntypedSimple) {
   const auto it_tags = fields.find("tags");
   ASSERT_NE(it_tags, fields.end());
   const auto& tags = it_tags->second;
-  ASSERT_EQ(tags.kind_case(), ProtobufWkt::Value::kStructValue);
+  ASSERT_EQ(tags.kind_case(), Protobuf::Value::kStructValue);
   checkKeyInt(tags.struct_value(), "mytag0", 1);
 }
 
@@ -228,18 +228,18 @@ TEST_F(SetMetadataFilterTest, UntypedWithAllowOverwrite) {
   const auto it_mylist = fields.find("mylist");
   ASSERT_NE(it_mylist, fields.end());
   const auto& mylist = it_mylist->second;
-  ASSERT_EQ(mylist.kind_case(), ProtobufWkt::Value::kListValue);
+  ASSERT_EQ(mylist.kind_case(), Protobuf::Value::kListValue);
   const auto& vals = mylist.list_value().values();
   ASSERT_EQ(vals.size(), 2);
-  ASSERT_EQ(vals[0].kind_case(), ProtobufWkt::Value::kStringValue);
+  ASSERT_EQ(vals[0].kind_case(), Protobuf::Value::kStringValue);
   EXPECT_EQ(vals[0].string_value(), "a");
-  ASSERT_EQ(vals[1].kind_case(), ProtobufWkt::Value::kStringValue);
+  ASSERT_EQ(vals[1].kind_case(), Protobuf::Value::kStringValue);
   EXPECT_EQ(vals[1].string_value(), "b");
 
   const auto it_tags = fields.find("tags");
   ASSERT_NE(it_tags, fields.end());
   const auto& tags = it_tags->second;
-  ASSERT_EQ(tags.kind_case(), ProtobufWkt::Value::kStructValue);
+  ASSERT_EQ(tags.kind_case(), Protobuf::Value::kStructValue);
   const auto& tags_struct = tags.struct_value();
 
   checkKeyInt(tags_struct, "mytag0", 1);
@@ -280,16 +280,16 @@ TEST_F(SetMetadataFilterTest, UntypedWithNoAllowOverwrite) {
   const auto it_mylist = fields.find("mylist");
   ASSERT_NE(it_mylist, fields.end());
   const auto& mylist = it_mylist->second;
-  ASSERT_EQ(mylist.kind_case(), ProtobufWkt::Value::kListValue);
+  ASSERT_EQ(mylist.kind_case(), Protobuf::Value::kListValue);
   const auto& vals = mylist.list_value().values();
   ASSERT_EQ(vals.size(), 1);
-  ASSERT_EQ(vals[0].kind_case(), ProtobufWkt::Value::kStringValue);
+  ASSERT_EQ(vals[0].kind_case(), Protobuf::Value::kStringValue);
   EXPECT_EQ(vals[0].string_value(), "a");
 
   const auto it_tags = fields.find("tags");
   ASSERT_NE(it_tags, fields.end());
   const auto& tags = it_tags->second;
-  ASSERT_EQ(tags.kind_case(), ProtobufWkt::Value::kStructValue);
+  ASSERT_EQ(tags.kind_case(), Protobuf::Value::kStructValue);
   const auto& tags_struct = tags.struct_value();
 
   checkKeyInt(tags_struct, "mytag0", 1);
@@ -392,7 +392,7 @@ TEST_F(SetMetadataFilterTest, UntypedWithDeprecated) {
   const auto it_tags = fields.find("tags");
   ASSERT_NE(it_tags, fields.end());
   const auto& tags = it_tags->second;
-  ASSERT_EQ(tags.kind_case(), ProtobufWkt::Value::kStructValue);
+  ASSERT_EQ(tags.kind_case(), Protobuf::Value::kStructValue);
   checkKeyInt(tags.struct_value(), "mytag0", 1);
 }
 
@@ -422,7 +422,7 @@ TEST_F(SetMetadataFilterTest, TypedWithDeprecated) {
   const auto it_tags = fields.find("tags");
   ASSERT_NE(it_tags, fields.end());
   const auto& tags = it_tags->second;
-  ASSERT_EQ(tags.kind_case(), ProtobufWkt::Value::kStructValue);
+  ASSERT_EQ(tags.kind_case(), Protobuf::Value::kStructValue);
   checkKeyInt(tags.struct_value(), "mytag0", 0);
 
   // Verify that `metadata` contains our typed Config.

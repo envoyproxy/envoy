@@ -17,7 +17,7 @@ absl::StatusOr<Envoy::Http::OriginalIPDetectionSharedPtr>
 XffIPDetectionFactory::createExtension(const Protobuf::Message& message,
                                        Server::Configuration::FactoryContext& context) {
   auto mptr = Envoy::Config::Utility::translateAnyToFactoryConfig(
-      dynamic_cast<const ProtobufWkt::Any&>(message), context.messageValidationVisitor(), *this);
+      dynamic_cast<const Protobuf::Any&>(message), context.messageValidationVisitor(), *this);
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::http::original_ip_detection::xff::v3::XffConfig&>(
       *mptr, context.messageValidationVisitor());

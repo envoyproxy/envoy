@@ -74,12 +74,11 @@ public:
           response_header->set_value("fake_value");
 
           // Metadata variables for the virtual host and route.
-          std::string key;
-          ProtobufWkt::Struct value;
+          const std::string key = "lua";
+          Protobuf::Struct value;
           std::string yaml;
 
           // Sets the virtual host's metadata.
-          key = "lua";
           yaml =
               R"EOF(
             foo.bar:
@@ -91,10 +90,9 @@ public:
               ->mutable_virtual_hosts(0)
               ->mutable_metadata()
               ->mutable_filter_metadata()
-              ->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(key, value));
+              ->insert(Protobuf::MapPair<std::string, Protobuf::Struct>(key, value));
 
           // Sets the route's metadata.
-          key = "envoy.filters.http.lua";
           yaml =
               R"EOF(
             foo.bar:
@@ -109,7 +107,7 @@ public:
               ->mutable_routes(0)
               ->mutable_metadata()
               ->mutable_filter_metadata()
-              ->insert(Protobuf::MapPair<std::string, ProtobufWkt::Struct>(key, value));
+              ->insert(Protobuf::MapPair<std::string, Protobuf::Struct>(key, value));
         });
 
     // This filter is not compatible with the async load balancer, as httpCall with data will
@@ -344,6 +342,80 @@ typed_config:
   EXPECT_TRUE(response.find("HTTP/1.1 400 Bad Request\r\n") == 0);
 }
 
+// Test that handle:metadata() falls back to metadata under the filter canonical name
+// (envoy.filters.http.lua) when no metadata is present under the filter configured name.
+TEST_P(LuaIntegrationTest, MetadataFallbackToCanonicalName) {
+  const std::string filter_config =
+      R"EOF(
+name: lua-filter-custom-name
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        local foo_bar = request_handle:metadata():get("foo.bar")
+        request_handle:logTrace(foo_bar["name"])
+        request_handle:logTrace(foo_bar["prop"])
+      end
+      function envoy_on_response(response_handle)
+        local baz_bat = response_handle:metadata():get("baz.bat")
+        response_handle:logTrace(baz_bat["name"])
+        response_handle:logTrace(baz_bat["prop"])
+      end
+)EOF";
+
+  const std::string route_config =
+      R"EOF(
+name: test_routes
+virtual_hosts:
+- name: test_vhost
+  domains: ["foo.lyft.com"]
+  routes:
+  - match:
+      path: "/test/long/url"
+    metadata:
+      filter_metadata:
+        envoy.filters.http.lua:
+          foo.bar:
+            name: foo
+            prop: bar
+          baz.bat:
+            name: baz
+            prop: bat
+    route:
+      cluster: cluster_0
+)EOF";
+
+  initializeWithYaml(filter_config, route_config);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "foo.lyft.com"},
+                                                 {"x-forwarded-for", "10.0.0.1"}};
+
+  IntegrationStreamDecoderPtr response;
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "foo"},
+                                 {"trace", "bar"},
+                                 {"trace", "baz"},
+                                 {"trace", "bat"},
+                             }),
+                             {
+                               response = codec_client_->makeHeaderOnlyRequest(request_headers);
+                               waitForNextUpstreamRequest();
+
+                               upstream_request_->encodeHeaders(default_response_headers_, true);
+                               ASSERT_TRUE(response->waitForEndStream());
+                             });
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  cleanup();
+}
+
 // Basic request and response.
 TEST_P(LuaIntegrationTest, RequestAndResponse) {
   const std::string FILTER_AND_CODE =
@@ -362,6 +434,7 @@ typed_config:
         request_handle:logCritical("log test")
 
         local vhost_metadata = request_handle:virtualHost():metadata():get("foo.bar")
+        local route_metadata = request_handle:route():metadata():get("foo.bar")
         local metadata = request_handle:metadata():get("foo.bar")
         local body_length = request_handle:body():length()
 
@@ -385,6 +458,8 @@ typed_config:
         request_handle:headers():add("request_body_size", body_length)
         request_handle:headers():add("request_vhost_metadata_foo", vhost_metadata["foo"])
         request_handle:headers():add("request_vhost_metadata_baz", vhost_metadata["baz"])
+        request_handle:headers():add("request_route_metadata_foo", route_metadata["foo"])
+        request_handle:headers():add("request_route_metadata_baz", route_metadata["baz"])
         request_handle:headers():add("request_metadata_foo", metadata["foo"])
         request_handle:headers():add("request_metadata_baz", metadata["baz"])
         if request_handle:connection():ssl() == nil then
@@ -408,10 +483,13 @@ typed_config:
 
       function envoy_on_response(response_handle)
         local vhost_metadata = response_handle:virtualHost():metadata():get("foo.bar")
+        local route_metadata = response_handle:route():metadata():get("foo.bar")
         local metadata = response_handle:metadata():get("foo.bar")
         local body_length = response_handle:body():length()
         response_handle:headers():add("response_vhost_metadata_foo", vhost_metadata["foo"])
         response_handle:headers():add("response_vhost_metadata_baz", vhost_metadata["baz"])
+        response_handle:headers():add("response_route_metadata_foo", route_metadata["foo"])
+        response_handle:headers():add("response_route_metadata_baz", route_metadata["baz"])
         response_handle:headers():add("response_metadata_foo", metadata["foo"])
         response_handle:headers():add("response_metadata_baz", metadata["baz"])
         response_handle:headers():add("response_body_size", body_length)
@@ -501,6 +579,16 @@ typed_config:
                              .getStringView());
 
   EXPECT_EQ("bar", upstream_request_->headers()
+                       .get(Http::LowerCaseString("request_route_metadata_foo"))[0]
+                       ->value()
+                       .getStringView());
+
+  EXPECT_EQ("bat", upstream_request_->headers()
+                       .get(Http::LowerCaseString("request_route_metadata_baz"))[0]
+                       ->value()
+                       .getStringView());
+
+  EXPECT_EQ("bar", upstream_request_->headers()
                        .get(Http::LowerCaseString("request_metadata_foo"))[0]
                        ->value()
                        .getStringView());
@@ -582,6 +670,14 @@ typed_config:
                              .get(Http::LowerCaseString("response_vhost_metadata_baz"))[0]
                              ->value()
                              .getStringView());
+  EXPECT_EQ("bar", response->headers()
+                       .get(Http::LowerCaseString("response_route_metadata_foo"))[0]
+                       ->value()
+                       .getStringView());
+  EXPECT_EQ("bat", response->headers()
+                       .get(Http::LowerCaseString("response_route_metadata_baz"))[0]
+                       ->value()
+                       .getStringView());
   EXPECT_EQ("bar", response->headers()
                        .get(Http::LowerCaseString("response_metadata_foo"))[0]
                        ->value()
@@ -1515,7 +1611,7 @@ public:
     (*typed_metadata_map)["ssl_cn"] = "client.example.com";
 
     // Pack metadata into Any
-    ProtobufWkt::Any typed_config;
+    Protobuf::Any typed_config;
     typed_config.PackFrom(metadata);
     typed_filter_metadata.insert({metadata_key, typed_config});
 
@@ -1543,7 +1639,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Any>();
+    return std::make_unique<Protobuf::Any>();
   }
 
   std::string name() const override { return "envoy.test.typed_metadata"; }
@@ -1591,7 +1687,7 @@ public:
     (*typed_metadata_map)["ssl_cipher"] = "ECDHE-RSA-AES128-GCM-SHA256";
 
     // Pack metadata into Any
-    ProtobufWkt::Any typed_config;
+    Protobuf::Any typed_config;
     typed_config.PackFrom(metadata);
     typed_filter_metadata.insert({metadata_key, typed_config});
 
@@ -1619,7 +1715,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Any>();
+    return std::make_unique<Protobuf::Any>();
   }
 
   std::string name() const override { return "envoy.test.ppv2.typed_metadata"; }
@@ -2253,6 +2349,86 @@ typed_config:
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("404", response->headers().getStatusValue());
+  cleanup();
+}
+
+// Test that handle:route() returns a valid object when no route matches the request.
+// This verifies that metadata() returns an empty metadata object that can be safely
+// iterated.
+TEST_P(LuaIntegrationTest, RouteValidWhenNoRouteMatch) {
+  if (!testing_downstream_filter_) {
+    GTEST_SKIP() << "This is a local reply test that does not go upstream";
+  }
+
+  const std::string filter_config =
+      R"EOF(
+name: lua
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+  default_source_code:
+    inline_string: |
+      function envoy_on_request(request_handle)
+        local route = request_handle:route()
+        for _, _ in pairs(route:metadata()) do
+          return
+        end
+        request_handle:logTrace("No metadata found during request handling")
+      end
+      function envoy_on_response(response_handle)
+        local route = response_handle:route()
+        for _, _ in pairs(route:metadata()) do
+          return
+        end
+        response_handle:logTrace("No metadata found during response handling")
+      end
+)EOF";
+
+  const std::string route_config =
+      R"EOF(
+name: test_routes
+virtual_hosts:
+- name: test_vhost
+  domains: ["foo.lyft.com"]
+  routes:
+  - match:
+      path: "/existing/route"
+    metadata:
+      filter_metadata:
+        lua:
+          foo.bar:
+            name: foo
+            prop: bar
+          baz.bat:
+            name: baz
+            prop: bat
+    route:
+      cluster: cluster_0
+)EOF";
+
+  initializeWithYaml(filter_config, route_config);
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/non/existing/path"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "foo.lyft.com"},
+                                                 {"x-forwarded-for", "10.0.0.1"}};
+
+  IntegrationStreamDecoderPtr response;
+  EXPECT_LOG_CONTAINS_ALL_OF(Envoy::ExpectedLogMessages({
+                                 {"trace", "No metadata found during request handling"},
+                                 {"trace", "No metadata found during response handling"},
+                             }),
+                             {
+                               auto encoder_decoder = codec_client_->startRequest(request_headers);
+                               response = std::move(encoder_decoder.second);
+
+                               ASSERT_TRUE(response->waitForEndStream());
+                             });
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("404", response->headers().getStatusValue());
+
   cleanup();
 }
 

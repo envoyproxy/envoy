@@ -193,7 +193,7 @@ public:
   void mergeInto(envoy::config::core::v3::Metadata& metadata,
                  StreamInfo::FilterState& filter_state) override;
 
-private:
+protected:
   enum class State { Created, Initialized, Done };
   State state_{State::Created};
   std::unique_ptr<envoy::config::core::v3::Metadata> metadata_;
@@ -203,27 +203,22 @@ private:
 using IoHandleImplPtr = std::unique_ptr<IoHandleImpl>;
 class IoHandleFactory {
 public:
-  static std::pair<IoHandleImplPtr, IoHandleImplPtr> createIoHandlePair() {
-    auto state = std::make_shared<PassthroughStateImpl>();
-    auto p = std::pair<IoHandleImplPtr, IoHandleImplPtr>{new IoHandleImpl(state),
-                                                         new IoHandleImpl(state)};
-    p.first->setPeerHandle(p.second.get());
-    p.second->setPeerHandle(p.first.get());
-    return p;
-  }
+  /**
+   * @return a pair of connected IoHandleImpl instances.
+   * @param state optional existing value to use as the shared PassthroughState. If omitted, a
+   * newly constructed PassthroughStateImpl will be used.
+   */
   static std::pair<IoHandleImplPtr, IoHandleImplPtr>
-  createBufferLimitedIoHandlePair(uint32_t buffer_size) {
-    auto state = std::make_shared<PassthroughStateImpl>();
-    auto p = std::pair<IoHandleImplPtr, IoHandleImplPtr>{new IoHandleImpl(state),
-                                                         new IoHandleImpl(state)};
-    // This buffer watermark setting emulates the OS socket buffer parameter
-    // `/proc/sys/net/ipv4/tcp_{r,w}mem`.
-    p.first->setWatermarks(buffer_size);
-    p.second->setWatermarks(buffer_size);
-    p.first->setPeerHandle(p.second.get());
-    p.second->setPeerHandle(p.first.get());
-    return p;
-  }
+  createIoHandlePair(PassthroughStatePtr state = nullptr);
+
+  /**
+   * @return a pair of connected IoHandleImpl instances with pre-configured watermarks.
+   * @param buffer_size buffer watermark size in bytes
+   * @param state optional existing value to use as the shared PassthroughState. If omitted, a
+   * newly constructed PassthroughStateImpl will be used.
+   */
+  static std::pair<IoHandleImplPtr, IoHandleImplPtr>
+  createBufferLimitedIoHandlePair(uint32_t buffer_size, PassthroughStatePtr state = nullptr);
 };
 } // namespace UserSpace
 } // namespace IoSocket

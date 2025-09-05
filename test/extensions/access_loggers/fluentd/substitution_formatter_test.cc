@@ -19,7 +19,7 @@ namespace Fluentd {
 namespace {
 
 TEST(FluentdFormatterImplTest, FormatMsgpack) {
-  ProtobufWkt::Struct log_struct;
+  Protobuf::Struct log_struct;
   (*log_struct.mutable_fields())["Message"].set_string_value("SomeValue");
   (*log_struct.mutable_fields())["LogType"].set_string_value("%ACCESS_LOG_TYPE%");
 

@@ -75,13 +75,13 @@ envoy.bootstrap.wasm:
   status: alpha
   type_urls:
   - envoy.extensions.wasm.v3.WasmService
-envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface:
+envoy.bootstrap.reverse_tunnel.upstream_socket_interface:
   categories:
   - envoy.bootstrap
   security_posture: unknown
   status: wip
   type_urls:
-  - envoy.extensions.bootstrap.reverse_connection_socket_interface.v3.UpstreamReverseConnectionSocketInterface
+  - envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface
 envoy.clusters.reverse_connection:
   categories:
   - envoy.clusters

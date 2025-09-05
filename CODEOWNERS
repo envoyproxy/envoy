@@ -87,7 +87,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # redis cluster extension
 /*/extensions/clusters/redis @msukalski @henryyyang @mattklein123
 # reverse conn cluster extension
-/*/extensions/clusters/reverse_connection @basundhara-c @agrawroh @botengyao @yanavlasov
+/*/extensions/clusters/reverse_connection @agrawroh @basundhara-c @botengyao @yanavlasov
 /*/extensions/common/redis @msukalski @henryyyang @mattklein123
 /*/extensions/health_checkers/redis @mattklein123 @UNOWNED
 /*/extensions/filters/network/redis_proxy @mattklein123 @UNOWNED
@@ -208,7 +208,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # user space socket pair, event, connection and listener
 /*/extensions/io_socket/user_space @kyessenov @lambdai
 /*/extensions/bootstrap/internal_listener @kyessenov @adisuissa
-/*/extensions/bootstrap/reverse_tunnel @agrawroh @basundhara-c @botengyao @yanavlasov
+/*/extensions/bootstrap/reverse_tunnel/ @agrawroh @basundhara-c @botengyao @yanavlasov
 # Default UUID4 request ID extension
 /*/extensions/request_id/uuid @mattklein123 @botengyao
 # HTTP header formatters

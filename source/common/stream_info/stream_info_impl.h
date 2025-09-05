@@ -306,11 +306,11 @@ struct StreamInfoImpl : public StreamInfo {
   envoy::config::core::v3::Metadata& dynamicMetadata() override { return metadata_; };
   const envoy::config::core::v3::Metadata& dynamicMetadata() const override { return metadata_; };
 
-  void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override {
+  void setDynamicMetadata(const std::string& name, const Protobuf::Struct& value) override {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) override {
+  void setDynamicTypedMetadata(const std::string& name, const Protobuf::Any& value) override {
     (*metadata_.mutable_typed_filter_metadata())[name].MergeFrom(value);
   }
 

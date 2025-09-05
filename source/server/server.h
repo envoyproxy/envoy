@@ -453,6 +453,8 @@ private:
         : RaiiListElement<T>(callbacks, callback) {}
   };
 
+  uint32_t stats_eviction_counter_{0};
+
 #ifdef ENVOY_PERFETTO
   std::unique_ptr<perfetto::TracingSession> tracing_session_{};
   os_fd_t tracing_fd_{INVALID_HANDLE};
@@ -468,6 +470,8 @@ private:
 //                     copying and probably be a cleaner API in general.
 class MetricSnapshotImpl : public Stats::MetricSnapshot {
 public:
+  // MetricSnapshotImpl captures a snapshot of metrics by latching the delta usage, and optionally
+  // marking the stats as used.
   explicit MetricSnapshotImpl(Stats::Store& store, Upstream::ClusterManager& cluster_manager,
                               TimeSource& time_source);
 

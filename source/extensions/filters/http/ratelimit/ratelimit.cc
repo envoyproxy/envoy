@@ -97,8 +97,8 @@ void Filter::populateRateLimitDescriptors(std::vector<Envoy::RateLimit::Descript
   }
 
   // Rate Limit config in typed_per_filter_config takes precedence over route's rate limit.
-  if (config_.get()->hasRateLimitConfigs()) {
-    config_.get()->populateDescriptors(headers, callbacks_->streamInfo(), descriptors);
+  if (config_->hasRateLimitConfigs()) {
+    config_->populateDescriptors(headers, callbacks_->streamInfo(), descriptors, on_stream_done);
     return;
   }
 
@@ -133,11 +133,11 @@ double Filter::getHitAddend() {
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
+  request_headers_ = &headers;
   if (!config_->enabled()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  request_headers_ = &headers;
   initiateCall(headers);
   return (state_ == State::Calling || state_ == State::Responded)
              ? Http::FilterHeadersStatus::StopIteration
@@ -190,7 +190,10 @@ void Filter::onDestroy() {
   if (state_ == State::Calling) {
     state_ = State::Complete;
     client_->cancel();
-  } else if (client_ != nullptr) {
+  } else if (client_ != nullptr &&
+             request_headers_ != nullptr) // If decodeHeaders is not called because of a local
+                                          // reply, we do not set request_headers_.
+  {
     std::vector<Envoy::RateLimit::Descriptor> descriptors;
     populateRateLimitDescriptors(descriptors, *request_headers_, true);
     if (!descriptors.empty()) {

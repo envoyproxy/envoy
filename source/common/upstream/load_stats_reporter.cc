@@ -11,7 +11,7 @@ namespace Upstream {
 
 LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
                                      ClusterManager& cluster_manager, Stats::Scope& scope,
-                                     Grpc::RawAsyncClientPtr async_client,
+                                     Grpc::RawAsyncClientSharedPtr&& async_client,
                                      Event::Dispatcher& dispatcher)
     : cm_(cluster_manager),
       stats_{ALL_LOAD_REPORTER_STATS(POOL_COUNTER_PREFIX(scope, "load_reporter."))},

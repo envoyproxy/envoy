@@ -27,7 +27,7 @@ ClusterFactoryImplBase::create(const envoy::config::cluster::v3::Cluster& cluste
   // try to look up by typed_config
   if (cluster.has_cluster_type() && cluster.cluster_type().has_typed_config() &&
       (TypeUtil::typeUrlToDescriptorFullName(cluster.cluster_type().typed_config().type_url()) !=
-       ProtobufWkt::Struct::GetDescriptor()->full_name())) {
+       Protobuf::Struct::GetDescriptor()->full_name())) {
     cluster_config_type_name =
         TypeUtil::typeUrlToDescriptorFullName(cluster.cluster_type().typed_config().type_url());
     factory = Registry::FactoryRegistry<ClusterFactory>::getFactoryByType(cluster_config_type_name);

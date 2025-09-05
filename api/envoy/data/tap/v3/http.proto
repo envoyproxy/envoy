@@ -49,6 +49,9 @@ message HttpBufferedTrace {
 
   // downstream connection
   Connection downstream_connection = 3;
+
+  // upstream connection
+  Connection upstream_connection = 4;
 }
 
 // A streamed HTTP trace segment. Multiple segments make up a full trace.

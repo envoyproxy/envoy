@@ -309,7 +309,7 @@ std::unique_ptr<Router::GenericConnPool> HttpConnPool::createConnPool(
     return nullptr;
   }
 
-  ProtobufWkt::Any message;
+  Protobuf::Any message;
   if (cluster.info()->upstreamConfig()) {
     message = cluster.info()->upstreamConfig()->typed_config();
   }

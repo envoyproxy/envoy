@@ -29,7 +29,15 @@ TEST_F(RouterTestSuppressEnvoyHeaders, Http1Upstream) {
 
   Http::TestRequestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
-  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeRequestHeaders(_, _, false));
+
+  EXPECT_CALL(callbacks_.route_->route_entry_, finalizeRequestHeaders(_, _, _, false))
+      .WillOnce(Invoke([this](Http::RequestHeaderMap& headers,
+                              const Formatter::HttpFormatterContext& context,
+                              const StreamInfo::StreamInfo&, bool) {
+        EXPECT_EQ(&context.requestHeaders(), &headers);
+        EXPECT_EQ(&context.activeSpan(), &callbacks_.active_span_);
+      }));
+
   router_->decodeHeaders(headers, true);
   EXPECT_FALSE(headers.has("x-envoy-expected-rq-timeout-ms"));
 
@@ -112,6 +120,9 @@ public:
   WatermarkTest()
       : RouterTestBase(false, false, false, false, Protobuf::RepeatedPtrField<std::string>{}) {
     EXPECT_CALL(callbacks_, activeSpan()).WillRepeatedly(ReturnRef(span_));
+    // Add default mock for requestBodyBufferLimit which is called during router initialization.
+    EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit())
+        .WillRepeatedly(Return(std::numeric_limits<uint64_t>::max()));
   };
 
   void sendRequest(bool header_only_request = true, bool pool_ready = true) {

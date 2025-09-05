@@ -64,7 +64,7 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
 
     try {
       // Create struct for JSON formatter.
-      ProtobufWkt::Struct struct_for_json_formatter;
+      Protobuf::Struct struct_for_json_formatter;
       TestUtility::loadFromYaml(fmt::format(R"EOF(
       may_empty_a: '%REQ(may_empty)%'
       raw_bool_value: true
@@ -111,7 +111,7 @@ DEFINE_PROTO_FUZZER(const test::common::substitution::TestCase& input) {
         formatter_omit_empty->formatWithContext(formatter_context, *stream_info);
 
     // Ensure the result is legal JSON.
-    ProtobufWkt::Struct proto_struct;
+    Protobuf::Struct proto_struct;
     TestUtility::loadFromJson(keep_empty_result, proto_struct);
     TestUtility::loadFromJson(omit_empty_result, proto_struct);
 

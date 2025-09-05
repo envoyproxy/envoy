@@ -48,6 +48,11 @@ TEST(HeaderMutationFilterTest, RequestMutationTest) {
           key: "flag-header-6"
           value: "flag-header-6-value"
         append_action: "OVERWRITE_IF_EXISTS"
+    - append:
+        header:
+          key: "flag-header-7"
+          value: "%TRACE_ID%"
+        append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
   )EOF";
 
   const std::string config_yaml = R"EOF(
@@ -79,6 +84,10 @@ TEST(HeaderMutationFilterTest, RequestMutationTest) {
     HeaderMutation filter{global_config};
     filter.setDecoderFilterCallbacks(decoder_callbacks);
     filter.setEncoderFilterCallbacks(encoder_callbacks);
+
+    EXPECT_CALL(decoder_callbacks, activeSpan());
+    EXPECT_CALL(decoder_callbacks.active_span_, getTraceId())
+        .WillOnce(testing::Return("trace-id-value"));
 
     EXPECT_CALL(*decoder_callbacks.route_, perFilterConfigs(_))
         .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
@@ -113,6 +122,8 @@ TEST(HeaderMutationFilterTest, RequestMutationTest) {
     EXPECT_FALSE(headers.has("flag-header-5"));
     // 'flag-header-6' was present and should be overwritten.
     EXPECT_EQ("flag-header-6-value", headers.get_("flag-header-6"));
+    // 'flag-header-7' should the value extracted from the trace ID.
+    EXPECT_EQ("trace-id-value", headers.get_("flag-header-7"));
     // global header is added.
     EXPECT_EQ("global-flag-header-value", headers.get_("global-flag-header"));
   }
@@ -153,6 +164,11 @@ TEST(HeaderMutationFilterTest, ResponseMutationTest) {
           key: "flag-header-6"
           value: "flag-header-6-value"
         append_action: "OVERWRITE_IF_EXISTS"
+    - append:
+        header:
+          key: "flag-header-7"
+          value: "%TRACE_ID%"
+        append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
   )EOF";
 
   const std::string config_yaml = R"EOF(
@@ -181,6 +197,10 @@ TEST(HeaderMutationFilterTest, ResponseMutationTest) {
     HeaderMutation filter{global_config};
     filter.setDecoderFilterCallbacks(decoder_callbacks);
     filter.setEncoderFilterCallbacks(encoder_callbacks);
+
+    EXPECT_CALL(encoder_callbacks, activeSpan());
+    EXPECT_CALL(encoder_callbacks.active_span_, getTraceId())
+        .WillOnce(testing::Return("trace-id-value"));
 
     EXPECT_CALL(*encoder_callbacks.route_, perFilterConfigs(_))
         .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
@@ -219,6 +239,8 @@ TEST(HeaderMutationFilterTest, ResponseMutationTest) {
     EXPECT_FALSE(headers.has("flag-header-5"));
     // 'flag-header-6' was present and should be overwritten.
     EXPECT_EQ("flag-header-6-value", headers.get_("flag-header-6"));
+    // 'flag-header-7' should the value extracted from the trace ID.
+    EXPECT_EQ("trace-id-value", headers.get_("flag-header-7"));
     // global header is removed.
     EXPECT_FALSE(headers.has("global-flag-header"));
   }
@@ -318,6 +340,11 @@ TEST(HeaderMutationFilterTest, ResponseTrailerMutationTest) {
           key: "flag-header-6"
           value: "flag-header-6-value"
         append_action: "OVERWRITE_IF_EXISTS"
+    - append:
+        header:
+          key: "flag-header-7"
+          value: "%TRACE_ID%"
+        append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
   )EOF";
 
   const std::string config_yaml = R"EOF(
@@ -346,6 +373,10 @@ TEST(HeaderMutationFilterTest, ResponseTrailerMutationTest) {
     HeaderMutation filter{global_config};
     filter.setDecoderFilterCallbacks(decoder_callbacks);
     filter.setEncoderFilterCallbacks(encoder_callbacks);
+
+    EXPECT_CALL(encoder_callbacks, activeSpan());
+    EXPECT_CALL(encoder_callbacks.active_span_, getTraceId())
+        .WillOnce(testing::Return("trace-id-value"));
 
     EXPECT_CALL(*encoder_callbacks.route_, perFilterConfigs(_))
         .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
@@ -393,6 +424,8 @@ TEST(HeaderMutationFilterTest, ResponseTrailerMutationTest) {
     EXPECT_FALSE(trailers.has("flag-header-5"));
     // 'flag-header-6' was present and should be overwritten.
     EXPECT_EQ("flag-header-6-value", trailers.get_("flag-header-6"));
+    // 'flag-header-7' should the value extracted from the trace ID.
+    EXPECT_EQ("trace-id-value", trailers.get_("flag-header-7"));
     // global header is removed.
     EXPECT_FALSE(trailers.has("global-flag-header"));
   }
@@ -727,6 +760,11 @@ TEST(HeaderMutationFilterTest, RequestTrailerMutationTest) {
           key: "flag-header-6"
           value: "flag-header-6-value"
         append_action: "OVERWRITE_IF_EXISTS"
+    - append:
+        header:
+          key: "flag-header-7"
+          value: "%TRACE_ID%"
+        append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
   )EOF";
 
   const std::string config_yaml = R"EOF(
@@ -756,7 +794,11 @@ TEST(HeaderMutationFilterTest, RequestTrailerMutationTest) {
     filter.setDecoderFilterCallbacks(decoder_callbacks);
     filter.setEncoderFilterCallbacks(encoder_callbacks);
 
-    EXPECT_CALL(*encoder_callbacks.route_, perFilterConfigs(_))
+    EXPECT_CALL(decoder_callbacks, activeSpan());
+    EXPECT_CALL(decoder_callbacks.active_span_, getTraceId())
+        .WillOnce(testing::Return("trace-id-value"));
+
+    EXPECT_CALL(*decoder_callbacks.route_, perFilterConfigs(_))
         .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
           return {config.get()};
         }));
@@ -774,7 +816,7 @@ TEST(HeaderMutationFilterTest, RequestTrailerMutationTest) {
 
     Http::RequestHeaderMapPtr request_headers_pointer{
         new Envoy::Http::TestRequestHeaderMapImpl{{"req-flag-header", "req-header-value"}}};
-    EXPECT_CALL(encoder_callbacks, requestHeaders())
+    EXPECT_CALL(decoder_callbacks, requestHeaders())
         .WillOnce(testing::Return(makeOptRefFromPtr(request_headers_pointer.get())));
 
     EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter.decodeTrailers(trailers));
@@ -795,6 +837,8 @@ TEST(HeaderMutationFilterTest, RequestTrailerMutationTest) {
     EXPECT_FALSE(trailers.has("flag-header-5"));
     // 'flag-header-6' was present and should be overwritten.
     EXPECT_EQ("flag-header-6-value", trailers.get_("flag-header-6"));
+    // 'flag-header-7' should the value extracted from the trace ID.
+    EXPECT_EQ("trace-id-value", trailers.get_("flag-header-7"));
     // global header is removed.
     EXPECT_FALSE(trailers.has("global-flag-header"));
   }
@@ -809,7 +853,7 @@ TEST(HeaderMutationFilterTest, RequestTrailerMutationTest) {
     filter.setDecoderFilterCallbacks(decoder_callbacks);
     filter.setEncoderFilterCallbacks(encoder_callbacks);
 
-    EXPECT_CALL(*encoder_callbacks.route_, perFilterConfigs(_))
+    EXPECT_CALL(*decoder_callbacks.route_, perFilterConfigs(_))
         .WillOnce(Invoke([&](absl::string_view) -> Router::RouteSpecificFilterConfigs {
           return {config.get()};
         }));
@@ -825,7 +869,7 @@ TEST(HeaderMutationFilterTest, RequestTrailerMutationTest) {
         {":status", "200"},
     };
 
-    EXPECT_CALL(encoder_callbacks, requestHeaders())
+    EXPECT_CALL(decoder_callbacks, requestHeaders())
         .WillOnce(testing::Return(Http::RequestHeaderMapOptRef{}));
 
     EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter.decodeTrailers(trailers));

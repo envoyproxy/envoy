@@ -36,7 +36,7 @@ public:
   /**
    * Check whether the value is matched to the matcher.
    */
-  virtual bool match(const ProtobufWkt::Value& value) const PURE;
+  virtual bool match(const Protobuf::Value& value) const PURE;
 
   /**
    * Create the matcher object.
@@ -50,14 +50,14 @@ public:
   /**
    * Check whether the value is NULL.
    */
-  bool match(const ProtobufWkt::Value& value) const override;
+  bool match(const Protobuf::Value& value) const override;
 };
 
 class BoolMatcher : public ValueMatcher {
 public:
   BoolMatcher(bool matcher) : matcher_(matcher) {}
 
-  bool match(const ProtobufWkt::Value& value) const override;
+  bool match(const Protobuf::Value& value) const override;
 
 private:
   const bool matcher_;
@@ -67,7 +67,7 @@ class PresentMatcher : public ValueMatcher {
 public:
   PresentMatcher(bool matcher) : matcher_(matcher) {}
 
-  bool match(const ProtobufWkt::Value& value) const override;
+  bool match(const Protobuf::Value& value) const override;
 
 private:
   const bool matcher_;
@@ -77,7 +77,7 @@ class DoubleMatcher : public ValueMatcher {
 public:
   DoubleMatcher(const envoy::type::matcher::v3::DoubleMatcher& matcher) : matcher_(matcher) {}
 
-  bool match(const ProtobufWkt::Value& value) const override;
+  bool match(const Protobuf::Value& value) const override;
 
 private:
   const envoy::type::matcher::v3::DoubleMatcher matcher_;
@@ -249,8 +249,8 @@ public:
   }
 
   // ValueMatcher
-  bool match(const ProtobufWkt::Value& value) const override {
-    if (value.kind_case() != ProtobufWkt::Value::kStringValue) {
+  bool match(const Protobuf::Value& value) const override {
+    if (value.kind_case() != Protobuf::Value::kStringValue) {
       return false;
     }
 
@@ -347,7 +347,7 @@ public:
   ListMatcher(const envoy::type::matcher::v3::ListMatcher& matcher,
               Server::Configuration::CommonFactoryContext& context);
 
-  bool match(const ProtobufWkt::Value& value) const override;
+  bool match(const Protobuf::Value& value) const override;
 
 private:
   ValueMatcherConstSharedPtr oneof_value_matcher_;
@@ -358,7 +358,7 @@ public:
   OrMatcher(const envoy::type::matcher::v3::OrMatcher& matcher,
             Server::Configuration::CommonFactoryContext& context);
 
-  bool match(const ProtobufWkt::Value& value) const override;
+  bool match(const Protobuf::Value& value) const override;
 
 private:
   std::vector<ValueMatcherConstSharedPtr> or_matchers_;

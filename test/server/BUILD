@@ -69,7 +69,6 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:configuration_lib",
         "//test/common/upstream:utility_lib",
-        "//test/mocks:common_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:instance_mocks",

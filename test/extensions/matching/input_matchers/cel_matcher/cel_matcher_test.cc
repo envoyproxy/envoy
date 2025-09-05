@@ -267,7 +267,7 @@ TEST_F(CelMatcherTest, CelMatcherDynamicMetadataNotMatched) {
 TEST_F(CelMatcherTest, CelMatcherTypedDynamicMetadataMatched) {
   ::envoy::config::core::v3::Pipe pipe;
   pipe.set_path("/foo/bar/baz.fads");
-  ProtobufWkt::Any typed_metadata;
+  Protobuf::Any typed_metadata;
   typed_metadata.PackFrom(pipe);
   stream_info_.metadata_.mutable_typed_filter_metadata()->insert(
       {std::string(kFilterNamespace), typed_metadata});
@@ -473,8 +473,9 @@ TEST_F(CelMatcherTest, CelMatcherRequestResponseNotMatchedWithParsedExprUseCel) 
 }
 
 TEST_F(CelMatcherTest, NoCelExpression) {
-  EXPECT_DEATH(buildMatcherTree(RequestHeaderCelExprString, ExpressionType::NoExpression),
-               ".*panic: unset oneof.*");
+  EXPECT_THROW_WITH_REGEX(
+      buildMatcherTree(RequestHeaderCelExprString, ExpressionType::NoExpression), EnvoyException,
+      ".*CEL expression not set.*");
 }
 
 // Add a test case specifically for testing format conversion
