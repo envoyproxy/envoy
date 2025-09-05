@@ -10,8 +10,8 @@
 
 namespace Envoy {
 
-uint32_t CgroupCpuUtil::getCpuLimit(Filesystem::Instance& fs, uint32_t hardware_threads) {
-  uint32_t min_limit = hardware_threads;
+uint32_t CgroupCpuUtil::getCpuLimit(Filesystem::Instance& fs, uint32_t hw_threads) {
+  uint32_t min_limit = hw_threads;
 
   // Try cgroup v2 first with hierarchy scanning
   if (isV2Available(fs)) {

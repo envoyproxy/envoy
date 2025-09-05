@@ -15,10 +15,10 @@ public:
    * Detects CPU limit from cgroup v2 or v1 with hierarchy scanning, falling back to hardware count.
    * Scans cgroup hierarchy and takes minimum effective limit for container-aware CPU detection.
    * @param fs Filesystem instance for file operations.
-   * @param hardware_threads Hardware thread count as fallback.
-   * @return CPU limit or hardware_threads if no cgroup limit found.
+   * @param hw_threads Hardware thread count as fallback.
+   * @return CPU limit or hw_threads if no cgroup limit found.
    */
-  static uint32_t getCpuLimit(Filesystem::Instance& fs, uint32_t hardware_threads);
+  static uint32_t getCpuLimit(Filesystem::Instance& fs, uint32_t hw_threads);
 
 private:
   /**
