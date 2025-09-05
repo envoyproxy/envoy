@@ -10,10 +10,39 @@
 #include "source/extensions/tracers/zipkin/span_context_extractor.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Zipkin {
+
+namespace {
+// Helper function to parse URI and extract hostname and path
+std::pair<std::string, std::string> parseUri(absl::string_view uri) {
+  // Find the scheme separator
+  size_t scheme_pos = uri.find("://");
+  if (scheme_pos == std::string::npos) {
+    // No scheme, treat as path only
+    return {"", std::string(uri)};
+  }
+
+  // Skip past the scheme
+  size_t host_start = scheme_pos + 3;
+
+  // Find the path separator
+  size_t path_pos = uri.find('/', host_start);
+  if (path_pos == std::string::npos) {
+    // No path, hostname only
+    return {std::string(uri.substr(host_start)), "/"};
+  }
+
+  std::string hostname = std::string(uri.substr(host_start, path_pos - host_start));
+  std::string path = std::string(uri.substr(path_pos));
+
+  return {hostname, path};
+}
+} // namespace
 
 Driver::TlsTracer::TlsTracer(TracerPtr&& tracer, Driver& driver)
     : tracer_(std::move(tracer)), driver_(driver) {}
@@ -27,18 +56,73 @@ Driver::Driver(const envoy::config::trace::v3::ZipkinConfig& zipkin_config,
       tracer_stats_{ZIPKIN_TRACER_STATS(POOL_COUNTER_PREFIX(scope, "tracing.zipkin."))},
       tls_(tls.allocateSlot()), runtime_(runtime), local_info_(local_info),
       time_source_(time_source), trace_context_option_(zipkin_config.trace_context_option()) {
-  THROW_IF_NOT_OK_REF(Config::Utility::checkCluster("envoy.tracers.zipkin",
-                                                    zipkin_config.collector_cluster(), cm_,
+  CollectorInfo collector;
+
+  // Validate that either collector_cluster or collector_service is specified
+  if (!zipkin_config.has_collector_service() && zipkin_config.collector_cluster().empty()) {
+    throw EnvoyException("Either collector_cluster or collector_service must be specified");
+  }
+
+  // Check if HttpService is configured (preferred over legacy fields)
+  if (zipkin_config.has_collector_service()) {
+    const auto& http_service = zipkin_config.collector_service();
+    collector.http_service_ = http_service;
+
+    // Extract cluster and endpoint from HttpService
+    const auto& http_uri = http_service.http_uri();
+
+    cluster_ = http_uri.cluster();
+
+    // Parse the URI to extract hostname and path
+    auto [parsed_hostname, parsed_path] = parseUri(http_uri.uri());
+
+    if (!parsed_hostname.empty()) {
+      // Use the hostname from the URI
+      hostname_ = parsed_hostname;
+      collector.hostname_ = parsed_hostname;
+    } else {
+      // Fallback to cluster name if no hostname in URI
+      hostname_ = cluster_;
+      collector.hostname_ = cluster_;
+    }
+
+    // Use the parsed path as the endpoint
+    collector.endpoint_ = parsed_path;
+
+    // Parse headers from HttpService
+    for (const auto& header_option : http_service.request_headers_to_add()) {
+      const auto& header_value = header_option.header();
+      collector.request_headers_.emplace_back(Http::LowerCaseString(header_value.key()),
+                                              header_value.value());
+    }
+  } else {
+
+    // Validate required legacy fields
+    if (zipkin_config.collector_cluster().empty()) {
+      throw EnvoyException("collector_cluster must be specified when not using collector_service");
+    }
+    if (zipkin_config.collector_endpoint().empty()) {
+      throw EnvoyException("collector_endpoint must be specified when using collector_cluster");
+    }
+
+    cluster_ = zipkin_config.collector_cluster();
+    hostname_ = !zipkin_config.collector_hostname().empty() ? zipkin_config.collector_hostname()
+                                                            : zipkin_config.collector_cluster();
+    collector.hostname_ = hostname_; // Store hostname in collector as well
+
+    if (!zipkin_config.collector_endpoint().empty()) {
+      collector.endpoint_ = zipkin_config.collector_endpoint();
+    }
+
+    // Legacy configuration has no custom headers support
+    // Custom headers are only available through HttpService
+  }
+
+  // Validate cluster exists
+  THROW_IF_NOT_OK_REF(Config::Utility::checkCluster("envoy.tracers.zipkin", cluster_, cm_,
                                                     /* allow_added_via_api */ true)
                           .status());
-  cluster_ = zipkin_config.collector_cluster();
-  hostname_ = !zipkin_config.collector_hostname().empty() ? zipkin_config.collector_hostname()
-                                                          : zipkin_config.collector_cluster();
 
-  CollectorInfo collector;
-  if (!zipkin_config.collector_endpoint().empty()) {
-    collector.endpoint_ = zipkin_config.collector_endpoint();
-  }
   // The current default version of collector_endpoint_version is HTTP_JSON.
   collector.version_ = zipkin_config.collector_endpoint_version();
   const bool trace_id_128bit = zipkin_config.trace_id_128bit();
@@ -140,12 +224,20 @@ void ReporterImpl::flushSpans() {
     const std::string request_body = span_buffer_->serialize();
     Http::RequestMessagePtr message = std::make_unique<Http::RequestMessageImpl>();
     message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
+    // Set path and hostname - both are stored in collector_
     message->headers().setPath(collector_.endpoint_);
-    message->headers().setHost(driver_.hostname());
+    message->headers().setHost(collector_.hostname_);
+
     message->headers().setReferenceContentType(
         collector_.version_ == envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO
             ? Http::Headers::get().ContentTypeValues.Protobuf
             : Http::Headers::get().ContentTypeValues.Json);
+
+    // Add custom headers from collector configuration
+    for (const auto& header : collector_.request_headers_) {
+      // Replace any existing header with the configured value
+      message->headers().setCopy(header.first, header.second);
+    }
 
     message->body().add(request_body);
 

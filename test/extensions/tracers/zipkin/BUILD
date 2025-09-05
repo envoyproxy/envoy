@@ -14,6 +14,7 @@ envoy_package()
 envoy_extension_cc_test(
     name = "zipkin_test",
     srcs = [
+        "collector_info_test.cc",
         "span_buffer_test.cc",
         "span_context_extractor_test.cc",
         "tracer_test.cc",
@@ -45,6 +46,7 @@ envoy_extension_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@com_google_absl//absl/types:optional",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
