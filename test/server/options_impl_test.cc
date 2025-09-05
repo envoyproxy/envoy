@@ -664,20 +664,22 @@ TEST_F(OptionsImplPlatformLinuxTest, AffinityTest4) {
 TEST_F(OptionsImplPlatformLinuxTest, CgroupV2CpuLimit) {
   // Test cgroup v2 CPU limit detection following the same mocking pattern
   Filesystem::MockInstance mock_fs;
-  
+
   // Mock cgroup v2 available and v1 not available
   EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max")).WillRepeatedly(Return(true));
-  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.cfs_quota_us")).WillRepeatedly(Return(false));
-  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.cfs_period_us")).WillRepeatedly(Return(false));
-  
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.cfs_quota_us"))
+      .WillRepeatedly(Return(false));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.cfs_period_us"))
+      .WillRepeatedly(Return(false));
+
   // Mock no hierarchy info available (fallback to root)
   EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/cgroup"))
       .WillRepeatedly(Return(absl::InvalidArgumentError("not found")));
-      
+
   // Mock cgroup v2 cpu.max content: 150000 / 100000 = 1.5 CPUs, ceil = 2
   EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/cpu.max"))
       .WillOnce(Return(std::string("150000 100000")));
-  
+
   uint32_t result = CgroupCpuUtil::getCpuLimit(mock_fs, 8);
   EXPECT_EQ(result, 2); // max(1, ceil(1.5)) = max(1, 2) = 2
 }
@@ -685,22 +687,24 @@ TEST_F(OptionsImplPlatformLinuxTest, CgroupV2CpuLimit) {
 TEST_F(OptionsImplPlatformLinuxTest, CgroupV1CpuLimit) {
   // Test cgroup v1 CPU limit detection
   Filesystem::MockInstance mock_fs;
-  
+
   // Mock cgroup v1 available and v2 not available
   EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max")).WillRepeatedly(Return(false));
-  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.cfs_quota_us")).WillRepeatedly(Return(true));
-  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.cfs_period_us")).WillRepeatedly(Return(true));
-  
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.cfs_quota_us"))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.cfs_period_us"))
+      .WillRepeatedly(Return(true));
+
   // Mock no hierarchy info available
   EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/cgroup"))
       .WillRepeatedly(Return(absl::InvalidArgumentError("not found")));
-      
+
   // Mock cgroup v1 content: 50000 / 100000 = 0.5 CPUs, ceil = 1
   EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/cpu/cpu.cfs_quota_us"))
       .WillOnce(Return(std::string("50000")));
   EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/cpu/cpu.cfs_period_us"))
       .WillOnce(Return(std::string("100000")));
-  
+
   uint32_t result = CgroupCpuUtil::getCpuLimit(mock_fs, 8);
   EXPECT_EQ(result, 1); // max(1, ceil(0.5)) = max(1, 1) = 1
 }
@@ -708,19 +712,21 @@ TEST_F(OptionsImplPlatformLinuxTest, CgroupV1CpuLimit) {
 TEST_F(OptionsImplPlatformLinuxTest, CgroupUnlimited) {
   // Test when cgroup shows unlimited CPU
   Filesystem::MockInstance mock_fs;
-  
+
   // Mock cgroup v2 available
   EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max")).WillRepeatedly(Return(true));
-  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.cfs_quota_us")).WillRepeatedly(Return(false));
-  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.cfs_period_us")).WillRepeatedly(Return(false));
-  
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.cfs_quota_us"))
+      .WillRepeatedly(Return(false));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.cfs_period_us"))
+      .WillRepeatedly(Return(false));
+
   EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/cgroup"))
       .WillRepeatedly(Return(absl::InvalidArgumentError("not found")));
-      
+
   // Mock unlimited: "max 100000"
   EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/cpu.max"))
       .WillOnce(Return(std::string("max 100000")));
-  
+
   uint32_t result = CgroupCpuUtil::getCpuLimit(mock_fs, 8);
   EXPECT_EQ(result, 8); // Should return max(1, hw_threads) when unlimited
 }
@@ -728,10 +734,10 @@ TEST_F(OptionsImplPlatformLinuxTest, CgroupUnlimited) {
 TEST_F(OptionsImplPlatformLinuxTest, NoCgroupFilesAvailable) {
   // Test fallback when no cgroup files exist
   Filesystem::MockInstance mock_fs;
-  
+
   // Mock no cgroup files available
   EXPECT_CALL(mock_fs, fileExists(_)).WillRepeatedly(Return(false));
-  
+
   uint32_t result = CgroupCpuUtil::getCpuLimit(mock_fs, 8);
   EXPECT_EQ(result, 8); // Should return max(1, hw_threads) = 8
 }
@@ -741,7 +747,7 @@ TEST_F(OptionsImplPlatformLinuxTest, GoMaxprocsAlgorithm) {
   unsigned int fake_hw_threads = 8;
   Api::MockLinuxOsSysCalls linux_os_sys_calls;
   TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_sys_calls);
-  
+
   // Mock CPU affinity: 4 CPUs available
   cpu_set_t test_set;
   CPU_ZERO(&test_set);
@@ -750,11 +756,11 @@ TEST_F(OptionsImplPlatformLinuxTest, GoMaxprocsAlgorithm) {
   }
   EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
       .WillOnce(DoAll(SetArgPointee<2>(test_set), Return(Api::SysCallIntResult{0, 0})));
-  
+
   // Note: This test validates the affinity part. The complete integration with cgroup
   // would require injecting the filesystem mock into OptionsImplPlatform::getCpuCount(),
   // which would require refactoring that function to accept a filesystem parameter.
-  
+
   uint32_t affinity_result = OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads);
   EXPECT_EQ(affinity_result, 4); // Should respect CPU affinity constraint
 }
@@ -762,18 +768,20 @@ TEST_F(OptionsImplPlatformLinuxTest, GoMaxprocsAlgorithm) {
 TEST_F(OptionsImplPlatformLinuxTest, CgroupMinimumEnforcement) {
   // Test that we always return at least 1 CPU (Envoy's minimum)
   Filesystem::MockInstance mock_fs;
-  
+
   EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu.max")).WillRepeatedly(Return(true));
-  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.cfs_quota_us")).WillRepeatedly(Return(false));
-  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.cfs_period_us")).WillRepeatedly(Return(false));
-  
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.cfs_quota_us"))
+      .WillRepeatedly(Return(false));
+  EXPECT_CALL(mock_fs, fileExists("/sys/fs/cgroup/cpu/cpu.cfs_period_us"))
+      .WillRepeatedly(Return(false));
+
   EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/cgroup"))
       .WillRepeatedly(Return(absl::InvalidArgumentError("not found")));
-      
+
   // Mock very low CPU limit: 10000 / 100000 = 0.1 CPUs
   EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/cpu.max"))
       .WillOnce(Return(std::string("10000 100000")));
-  
+
   uint32_t result = CgroupCpuUtil::getCpuLimit(mock_fs, 8);
   EXPECT_EQ(result, 1); // max(1, ceil(0.1)) = max(1, 1) = 1
 }

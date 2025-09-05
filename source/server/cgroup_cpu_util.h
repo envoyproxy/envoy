@@ -79,7 +79,7 @@ private:
   static constexpr const char* const CGROUP_V1_CPU_QUOTA = "/sys/fs/cgroup/cpu/cpu.cfs_quota_us";
   static constexpr const char* const CGROUP_V1_CPU_PERIOD = "/sys/fs/cgroup/cpu/cpu.cfs_period_us";
   static constexpr const char* const CGROUP_V1_BASE_PATH = "/sys/fs/cgroup/cpu";
-  
+
   // Process cgroup info
   static constexpr const char* const PROC_CGROUP_PATH = "/proc/self/cgroup";
 };

@@ -42,17 +42,17 @@ uint32_t OptionsImplPlatformLinux::getCpuAffinityCount(unsigned int hw_threads) 
 uint32_t OptionsImplPlatform::getCpuCount() {
   // Step 1: Get hardware thread count
   unsigned int hw_threads = std::max(1U, std::thread::hardware_concurrency());
-  
+
   // Step 2: Get CPU affinity count (respects taskset, cpuset, etc.)
   uint32_t affinity_count = OptionsImplPlatformLinux::getCpuAffinityCount(hw_threads);
-  
+
   // Step 3: Get cgroup CPU limit (Go-style algorithm with hierarchy scanning)
   Filesystem::InstanceImpl fs;
   uint32_t cgroup_limit = CgroupCpuUtil::getCpuLimit(fs, hw_threads);
-  
+
   // Step 4: Apply Go's GOMAXPROCS algorithm - minimum of all constraints
   uint32_t effective_count = std::min({hw_threads, affinity_count, cgroup_limit});
-  
+
   // Step 5: Ensure minimum of 1 (modified from Go's max(2, ceil(effective_cpu_limit)))
   return std::max(1U, effective_count);
 }
