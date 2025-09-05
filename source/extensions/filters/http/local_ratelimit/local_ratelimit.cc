@@ -110,11 +110,9 @@ FilterConfig::FilterConfig(
     share_provider = share_provider_manager_->getShareProvider(config.local_cluster_rate_limit());
   }
 
-  creation_status = absl::OkStatus();
   rate_limiter_ = std::make_unique<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>(
-      fill_interval_, max_tokens_, tokens_per_fill_, dispatcher_, descriptors_, creation_status,
+      fill_interval_, max_tokens_, tokens_per_fill_, dispatcher_, descriptors_,
       always_consume_default_token_bucket_, std::move(share_provider), max_dynamic_descriptors_);
-  THROW_IF_NOT_OK_REF(creation_status);
 }
 
 Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result

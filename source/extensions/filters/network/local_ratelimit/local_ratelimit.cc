@@ -70,18 +70,14 @@ Config::Config(
           []() { return std::make_shared<SharedRateLimitSingleton>(); })) {
 
   std::tie(rate_limiter_, shared_bucket_key_) = shared_bucket_registry_->get(proto_config, [&]() {
-    absl::Status create_status;
-    auto limiter = std::make_shared<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>(
+    return std::make_shared<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>(
         std::chrono::milliseconds(
             PROTOBUF_GET_MS_REQUIRED(proto_config.token_bucket(), fill_interval)),
         proto_config.token_bucket().max_tokens(),
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.token_bucket(), tokens_per_fill, 1),
         dispatcher,
         Protobuf::RepeatedPtrField<
-            envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>(),
-        create_status);
-    THROW_IF_NOT_OK(create_status);
-    return limiter;
+            envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>());
   });
 }
 

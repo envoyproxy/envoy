@@ -137,7 +137,6 @@ paths:
     - source/common/grpc/google_grpc_creds_impl.cc
     - source/server/drain_manager_impl.cc
     - source/common/router/rds_impl.cc
-    - source/common/access_log/access_log_impl.cc
     - source/server/hot_restarting_parent.cc
     - source/common/io/io_uring_worker_impl.cc
     - source/common/event/file_event_impl.cc
@@ -191,7 +190,6 @@ paths:
     - source/extensions/filters/network/dubbo_proxy
     - source/extensions/filters/network/rbac
     - source/extensions/filters/network/common
-    - source/extensions/filters/network/local_ratelimit
     - source/extensions/filters/network/redis_proxy
     - source/extensions/filters/network/zookeeper_proxy
     - source/extensions/filters/network/ext_authz
@@ -437,7 +435,6 @@ visibility_excludes:
 - source/extensions/clusters/logical_dns/
 - source/extensions/clusters/dns/
 - source/extensions/early_data/BUILD
-- source/extensions/filters/common/local_ratelimit/BUILD
 - source/extensions/filters/http/buffer/BUILD
 - source/extensions/filters/network/common/BUILD
 - source/extensions/filters/network/generic_proxy/interface/BUILD

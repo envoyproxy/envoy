@@ -28,7 +28,6 @@
 
 namespace Envoy {
 namespace AccessLog {
-constexpr absl::string_view kRateLimitFilterDefaultKey = "access_log_rate_limit_default_key";
 
 ComparisonFilter::ComparisonFilter(const envoy::config::accesslog::v3::ComparisonFilter& config,
                                    Runtime::Loader& runtime)
@@ -86,12 +85,6 @@ FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLog
     return FilterPtr{new MetadataFilter(config.metadata_filter(), context.serverFactoryContext())};
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kLogTypeFilter:
     return FilterPtr{new LogTypeFilter(config.log_type_filter())};
-  case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kLocalRateLimitFilter: {
-    auto filter = LocalRateLimitFilter::create(config.local_rate_limit_filter(), context);
-    // TODO(taoxuy): replace throwing exception with return status to make this file exception free.
-    THROW_IF_NOT_OK(filter.status());
-    return std::move(filter.value());
-  }
   case envoy::config::accesslog::v3::AccessLogFilter::FilterSpecifierCase::kExtensionFilter:
     MessageUtil::validate(config, validation_visitor);
     {
@@ -329,30 +322,6 @@ bool MetadataFilter::evaluate(const Formatter::HttpFormatterContext&,
   // If the key does not correspond to a set value in dynamic metadata, return true if
   // 'match_if_key_not_found' is set to true and false otherwise
   return default_match_;
-}
-
-bool LocalRateLimitFilter::evaluate(const Formatter::HttpFormatterContext&,
-                                    const StreamInfo::StreamInfo&) const {
-  // The rate limiter is shared across all the worker threads.
-  return rate_limiter_.limiter_->requestAllowed({}).allowed;
-}
-
-absl::StatusOr<AccessLog::FilterPtr>
-LocalRateLimitFilter::create(const envoy::config::accesslog::v3::LocalRateLimitFilter& config,
-                             Server::Configuration::FactoryContext& context) {
-  const absl::string_view key = config.key().empty() ? kRateLimitFilterDefaultKey : config.key();
-  auto rate_limiter =
-      Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterMapSingleton::getRateLimiter(
-          context.serverFactoryContext().singletonManager(), key,
-          std::chrono::milliseconds(Protobuf::util::TimeUtil::DurationToMilliseconds(
-              config.token_bucket().fill_interval())),
-          config.token_bucket().max_tokens(),
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.token_bucket(), tokens_per_fill, 1),
-          context.serverFactoryContext().mainThreadDispatcher(), {},
-          /*always_consume_default_token_bucket=*/false,
-          /*shared_provider=*/nullptr, /*lru_size=*/0);
-  RETURN_IF_NOT_OK(rate_limiter.status());
-  return AccessLog::FilterPtr{new LocalRateLimitFilter(std::move(rate_limiter.value()))};
 }
 
 InstanceSharedPtr
