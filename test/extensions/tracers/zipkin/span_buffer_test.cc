@@ -29,6 +29,9 @@ public:
     return nullptr;
   }
   void reportSpan(Span&&) override {}
+  envoy::config::trace::v3::ZipkinConfig::TraceContextOption traceContextOption() const override {
+    return envoy::config::trace::v3::ZipkinConfig::USE_B3;
+  }
 };
 
 // If this default timestamp is wrapped as double (using ValueUtil::numberValue()) and then it is
@@ -160,7 +163,7 @@ template <typename Type> std::string serializedMessageToJson(const std::string& 
 TEST(ZipkinSpanBufferTest, TestSerializeTimestamp) {
   const std::string default_timestamp_string = std::to_string(DEFAULT_TEST_TIMESTAMP);
 
-  ProtobufWkt::Struct object;
+  Protobuf::Struct object;
   auto* fields = object.mutable_fields();
   Util::Replacements replacements;
   (*fields)["timestamp"] = Util::uint64Value(DEFAULT_TEST_TIMESTAMP, "timestamp", replacements);
@@ -462,7 +465,7 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
 }
 
 TEST(ZipkinSpanBufferTest, TestSerializeTimestampInTheFuture) {
-  ProtobufWkt::Struct objectWithScientificNotation;
+  Protobuf::Struct objectWithScientificNotation;
   auto* objectWithScientificNotationFields = objectWithScientificNotation.mutable_fields();
   (*objectWithScientificNotationFields)["timestamp"] = ValueUtil::numberValue(
       DEFAULT_TEST_TIMESTAMP); // the value of DEFAULT_TEST_TIMESTAMP is 1584324295476870.
@@ -472,7 +475,7 @@ TEST(ZipkinSpanBufferTest, TestSerializeTimestampInTheFuture) {
   // see the value is rendered with scientific notation (1.58432429547687e+15).
   EXPECT_EQ(R"({"timestamp":1.58432429547687e+15})", objectWithScientificNotationJson);
 
-  ProtobufWkt::Struct object;
+  Protobuf::Struct object;
   auto* objectFields = object.mutable_fields();
   Util::Replacements replacements;
   (*objectFields)["timestamp"] =
@@ -486,7 +489,7 @@ TEST(ZipkinSpanBufferTest, TestSerializeTimestampInTheFuture) {
 
   SpanBuffer bufferDeprecatedJsonV1(envoy::config::trace::v3::ZipkinConfig::HTTP_JSON, true, 2);
   bufferDeprecatedJsonV1.addSpan(createSpan({"cs"}, IpType::V4));
-  // We do "HasSubstr" here since we could not compare the serialized JSON of a ProtobufWkt::Struct
+  // We do "HasSubstr" here since we could not compare the serialized JSON of a Protobuf::Struct
   // object, since the positions of keys are not consistent between calls.
   EXPECT_THAT(bufferDeprecatedJsonV1.serialize(), HasSubstr(R"("timestamp":1584324295476871)"));
   EXPECT_THAT(bufferDeprecatedJsonV1.serialize(),

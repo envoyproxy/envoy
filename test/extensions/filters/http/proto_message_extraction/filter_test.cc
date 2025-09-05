@@ -32,7 +32,7 @@ using ::Envoy::Http::MockStreamDecoderFilterCallbacks;
 using ::Envoy::Http::MockStreamEncoderFilterCallbacks;
 using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
-using ::Envoy::ProtobufWkt::Struct;
+using ::Envoy::Protobuf::Struct;
 using ::testing::Eq;
 
 constexpr absl::string_view kFilterName = "envoy.filters.http.proto_message_extraction";
@@ -95,8 +95,8 @@ fields {
 }
 )pb";
 
-void checkProtoStruct(Envoy::ProtobufWkt::Struct got, absl::string_view expected_in_pbtext) {
-  Envoy::ProtobufWkt::Struct expected;
+void checkProtoStruct(Envoy::Protobuf::Struct got, absl::string_view expected_in_pbtext) {
+  Envoy::Protobuf::Struct expected;
   ASSERT_THAT(Envoy::Protobuf::TextFormat::ParseFromString(expected_in_pbtext, &expected), true);
   EXPECT_THAT(Envoy::TestUtility::protoEqual(got, expected, true), true)
       << "got:\n"
@@ -217,7 +217,7 @@ TEST_F(FilterTestExtractOk, UnarySingleBuffer) {
 
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, kExpectedRequestExtractedResult);
           }));
@@ -240,7 +240,7 @@ TEST_F(FilterTestExtractOk, UnarySingleBuffer) {
 
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, kExpectedResponseExtractedResult);
           }));
@@ -278,7 +278,7 @@ TEST_F(FilterTestExtractOk, UnarySingleBufferWithMultipleFields) {
 
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -347,7 +347,7 @@ fields {
 
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -420,7 +420,7 @@ TEST_F(FilterTestExtractOk, UnarySingleBufferWithMultipleFieldsforResponseOnly) 
 
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -464,7 +464,7 @@ fields {
 
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -569,7 +569,7 @@ fields {
 
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -670,7 +670,7 @@ TEST_F(FilterTestExtractOk, UnaryMultipeBuffers) {
 
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, kExpectedResponseExtractedResult);
           }));
@@ -737,7 +737,7 @@ extraction_by_method: {
 )pb");
   Envoy::Buffer::InstancePtr request_data4 = Envoy::Grpc::Common::serializeToGrpcFrame(request4);
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.proto_message_extraction");
         checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -854,7 +854,7 @@ fields {
 )pb");
   Envoy::Buffer::InstancePtr response_data4 = Envoy::Grpc::Common::serializeToGrpcFrame(response4);
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.proto_message_extraction");
         checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -930,7 +930,7 @@ TEST_F(FilterTestExtractOk, RequestResponseWithTrailers) {
 
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -988,7 +988,7 @@ fields {
 
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -1123,7 +1123,7 @@ supported_types: {
 )pb");
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.proto_message_extraction");
         checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -1250,7 +1250,7 @@ fields {
 
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -1394,7 +1394,7 @@ repeated_supported_types: {
 )pb");
   Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.proto_message_extraction");
         checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -1628,7 +1628,7 @@ TEST_F(FilterTestWithExtractRedacted, UnarySingleBuffer) {
 
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -1692,7 +1692,7 @@ fields {
 
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -1793,7 +1793,7 @@ extraction_by_method: {
 )pb");
   Envoy::Buffer::InstancePtr request_data4 = Envoy::Grpc::Common::serializeToGrpcFrame(request4);
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.proto_message_extraction");
         checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -1912,7 +1912,7 @@ fields {
 )pb");
   Envoy::Buffer::InstancePtr response_data4 = Envoy::Grpc::Common::serializeToGrpcFrame(response4);
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(Invoke([](const std::string& ns, const ProtobufWkt::Struct& new_dynamic_metadata) {
+      .WillOnce(Invoke([](const std::string& ns, const Protobuf::Struct& new_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.proto_message_extraction");
         checkProtoStruct(new_dynamic_metadata, R"pb(
 fields {
@@ -2168,7 +2168,7 @@ TEST_F(FilterTestWithExtractModeUnspecified, ModeUnspecified) {
 
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, kExpectedRequestExtractedResult);
           }));
@@ -2191,7 +2191,7 @@ TEST_F(FilterTestWithExtractModeUnspecified, ModeUnspecified) {
 
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, kExpectedResponseExtractedResult);
           }));
@@ -2228,7 +2228,7 @@ TEST_F(FilterTestWithExtractDirectiveUnspecified, HappyPath) {
 
   EXPECT_CALL(mock_decoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, kExpectedRequestExtractedResult);
           }));
@@ -2251,7 +2251,7 @@ TEST_F(FilterTestWithExtractDirectiveUnspecified, HappyPath) {
 
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(
-          Invoke([](const std::string& ns, const Envoy::ProtobufWkt::Struct& new_dynamic_metadata) {
+          Invoke([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
             EXPECT_EQ(ns, kFilterName);
             checkProtoStruct(new_dynamic_metadata, kExpectedResponseExtractedResult);
           }));

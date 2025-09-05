@@ -184,7 +184,7 @@ private:
 
     Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override {
       if (context && context->requestStreamInfo()) {
-        ProtobufWkt::Struct value;
+        Protobuf::Struct value;
         (*value.mutable_fields())["foo"] = ValueUtil::stringValue("bar");
         context->requestStreamInfo()->setDynamicMetadata("envoy.load_balancers.metadata_writer",
                                                          value);

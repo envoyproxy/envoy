@@ -1112,7 +1112,7 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::config::route::v3::Route& rou
       return ret;
     }
     for (const auto& it : filter_metadata->second.fields()) {
-      if (it.second.kind_case() == ProtobufWkt::Value::kStringValue) {
+      if (it.second.kind_case() == Protobuf::Value::kStringValue) {
         ret.emplace(it.first, it.second.string_value());
       }
     }
@@ -1188,6 +1188,7 @@ RouteEntryImplBase::OptionalTimeouts RouteEntryImplBase::buildOptionalTimeouts(
   // Calculate how many values are actually set, to initialize `OptionalTimeouts` packed_struct,
   // avoiding memory re-allocation on each set() call.
   int num_timeouts_set = route.has_idle_timeout() ? 1 : 0;
+  num_timeouts_set += route.has_flush_timeout() ? 1 : 0;
   num_timeouts_set += route.has_max_grpc_timeout() ? 1 : 0;
   num_timeouts_set += route.has_grpc_timeout_offset() ? 1 : 0;
   if (route.has_max_stream_duration()) {
@@ -1199,6 +1200,10 @@ RouteEntryImplBase::OptionalTimeouts RouteEntryImplBase::buildOptionalTimeouts(
   if (route.has_idle_timeout()) {
     timeouts.set<OptionalTimeoutNames::IdleTimeout>(
         std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(route, idle_timeout)));
+  }
+  if (route.has_flush_timeout()) {
+    timeouts.set<OptionalTimeoutNames::FlushTimeout>(
+        std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(route, flush_timeout)));
   }
   if (route.has_max_grpc_timeout()) {
     timeouts.set<OptionalTimeoutNames::MaxGrpcTimeout>(

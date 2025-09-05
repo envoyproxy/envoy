@@ -375,10 +375,13 @@ TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponseWithAccounting) {
   EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->wireBytesReceived());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->headerBytesReceived());
+  EXPECT_EQ(0, quic_stream_->bytesMeter()->decompressedHeaderBytesReceived());
   size_t offset = receiveRequestHeaders(false);
   // Received header bytes do not include the HTTP/3 frame overhead.
   EXPECT_EQ(quic_stream_->stream_bytes_read() - 2,
             quic_stream_->bytesMeter()->headerBytesReceived());
+  EXPECT_LE(quic_stream_->stream_bytes_read() - 2,
+            quic_stream_->bytesMeter()->decompressedHeaderBytesReceived());
   EXPECT_EQ(quic_stream_->stream_bytes_read(), quic_stream_->bytesMeter()->wireBytesReceived());
   size_t body_size = receiveRequestBody(offset, request_body_, true, request_body_.size() * 2);
   EXPECT_EQ(quic_stream_->stream_bytes_read(), quic_stream_->bytesMeter()->wireBytesReceived());
@@ -389,13 +392,18 @@ TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponseWithAccounting) {
             quic_stream_->bytesMeter()->wireBytesReceived());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->wireBytesSent());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->headerBytesSent());
+  EXPECT_EQ(0, quic_stream_->bytesMeter()->decompressedHeaderBytesSent());
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
   EXPECT_GE(27, quic_stream_->bytesMeter()->headerBytesSent());
   EXPECT_GE(27, quic_stream_->bytesMeter()->wireBytesSent());
+  EXPECT_GE(quic_stream_->bytesMeter()->decompressedHeaderBytesSent(),
+            quic_stream_->bytesMeter()->headerBytesSent());
 
   quic_stream_->encodeTrailers(response_trailers_);
   EXPECT_GE(52, quic_stream_->bytesMeter()->headerBytesSent());
   EXPECT_GE(52, quic_stream_->bytesMeter()->wireBytesSent());
+  EXPECT_GE(quic_stream_->bytesMeter()->decompressedHeaderBytesSent(),
+            quic_stream_->bytesMeter()->headerBytesSent());
 }
 
 TEST_F(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
@@ -890,10 +898,10 @@ TEST_F(EnvoyQuicServerStreamTest, MetadataNotSupported) {
 TEST_F(EnvoyQuicServerStreamTest, EncodeCapsule) {
   setUpCapsuleProtocol(false, true);
   Buffer::OwnedImpl buffer(capsule_fragment_);
-  EXPECT_CALL(quic_connection_, SendMessage(_, _, _))
-      .WillOnce([this](quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice> message, bool) {
+  EXPECT_CALL(quic_connection_, SendDatagram(_, _, _))
+      .WillOnce([this](quic::QuicDatagramId, absl::Span<quiche::QuicheMemSlice> message, bool) {
         EXPECT_EQ(message.data()->AsStringView(), datagram_fragment_);
-        return quic::MESSAGE_STATUS_SUCCESS;
+        return quic::DATAGRAM_STATUS_SUCCESS;
       });
   quic_stream_->encodeData(buffer, /*end_stream=*/true);
 }
@@ -901,7 +909,7 @@ TEST_F(EnvoyQuicServerStreamTest, EncodeCapsule) {
 TEST_F(EnvoyQuicServerStreamTest, DecodeHttp3Datagram) {
   setUpCapsuleProtocol(true, false);
   EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(capsule_fragment_), _));
-  quic_session_.OnMessageReceived(datagram_fragment_);
+  quic_session_.OnDatagramReceived(datagram_fragment_);
 }
 #endif
 

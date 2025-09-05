@@ -10,6 +10,7 @@ PersistentQuicInfoImpl::PersistentQuicInfoImpl(Event::Dispatcher& dispatcher, ui
     : conn_helper_(dispatcher), alarm_factory_(dispatcher, *conn_helper_.GetClock()),
       buffer_limit_(buffer_limit), max_packet_length_(max_packet_length) {
   quiche::FlagRegistry::getInstance();
+  migration_config_.migrate_session_on_network_change = false;
 }
 
 std::unique_ptr<PersistentQuicInfoImpl>

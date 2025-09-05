@@ -184,6 +184,10 @@ public:
     - request_headers:
         header_name: "x-header-name"
         descriptor_key: "header-name"
+  - actions:
+    - generic_key:
+        descriptor_value: "generic-key"
+    apply_on_stream_done: true
   )EOF";
 
   Filters::Common::RateLimit::MockClient* client_;
@@ -767,13 +771,13 @@ TEST_F(HttpRateLimitFilterTest, LimitResponseWithDynamicMetadata) {
             filter_->decodeHeaders(request_headers_, false));
 
   Filters::Common::RateLimit::DynamicMetadataPtr dynamic_metadata =
-      std::make_unique<ProtobufWkt::Struct>();
+      std::make_unique<Protobuf::Struct>();
   auto* fields = dynamic_metadata->mutable_fields();
   (*fields)["name"] = ValueUtil::stringValue("my-limit");
   (*fields)["x"] = ValueUtil::numberValue(3);
   EXPECT_CALL(filter_callbacks_.stream_info_, setDynamicMetadata(_, _))
       .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
-                                           const ProtobufWkt::Struct& returned_dynamic_metadata) {
+                                           const Protobuf::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, "envoy.filters.http.ratelimit");
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, *dynamic_metadata));
       }));
@@ -2217,6 +2221,61 @@ TEST_F(HttpRateLimitFilterTest, PerRouteOverridesInlinedRateLimit) {
       1U,
       filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_429_).value());
   EXPECT_EQ("request_rate_limited", filter_callbacks_.details());
+}
+
+TEST_F(HttpRateLimitFilterTest, InlinedRateLimitActionOnStreamDone) {
+  setUpTest(inlined_rate_limit_actions_config_);
+  request_headers_.addCopy("x-header-name", "header-value");
+
+  EXPECT_CALL(*client_, limit(_, _, _, _, _, 0))
+      .WillOnce(Invoke(
+          [this](Filters::Common::RateLimit::RequestCallbacks& callbacks, const std::string& domain,
+                 const std::vector<Envoy::RateLimit::Descriptor>& descriptors, Tracing::Span&,
+                 OptRef<const StreamInfo::StreamInfo>, uint32_t) -> void {
+            request_callbacks_ = &callbacks;
+            EXPECT_EQ("bar", domain);
+            EXPECT_EQ(1, descriptors.size());
+            EXPECT_EQ("header-name", descriptors[0].entries_[0].key_);
+            EXPECT_EQ("header-value", descriptors[0].entries_[0].value_);
+          }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+
+  EXPECT_CALL(filter_callbacks_, continueDecoding());
+
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr,
+                               std::make_unique<Http::TestResponseHeaderMapImpl>(), nullptr, "",
+                               nullptr);
+
+  EXPECT_CALL(*client_, limit(_, _, _, _, _, 0))
+      .WillOnce(Invoke(
+          [this](Filters::Common::RateLimit::RequestCallbacks& callbacks, const std::string& domain,
+                 const std::vector<Envoy::RateLimit::Descriptor>& descriptors, Tracing::Span&,
+                 OptRef<const StreamInfo::StreamInfo>, uint32_t) -> void {
+            request_callbacks_ = &callbacks;
+            EXPECT_EQ("bar", domain);
+            EXPECT_EQ(1, descriptors.size());
+            EXPECT_EQ("generic_key", descriptors[0].entries_[0].key_);
+            EXPECT_EQ("generic-key", descriptors[0].entries_[0].value_);
+          }));
+  filter_->onDestroy();
+
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr,
+                               std::make_unique<Http::TestResponseHeaderMapImpl>(), nullptr, "",
+                               nullptr);
+
+  EXPECT_EQ(0U, filter_callbacks_.clusterInfo()
+                    ->statsScope()
+                    .counterFromStatName(ratelimit_over_limit_)
+                    .value());
+
+  EXPECT_EQ(
+      0U,
+      filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_4xx_).value());
+  EXPECT_EQ(
+      0U,
+      filter_callbacks_.clusterInfo()->statsScope().counterFromStatName(upstream_rq_429_).value());
 }
 
 } // namespace

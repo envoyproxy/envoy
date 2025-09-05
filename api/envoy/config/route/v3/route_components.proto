@@ -793,7 +793,7 @@ message CorsPolicy {
   google.protobuf.BoolValue forward_not_matching_preflights = 13;
 }
 
-// [#next-free-field: 42]
+// [#next-free-field: 43]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -1318,7 +1318,27 @@ message RouteAction {
   // If the :ref:`overload action <config_overload_manager_overload_actions>` "envoy.overload_actions.reduce_timeouts"
   // is configured, this timeout is scaled according to the value for
   // :ref:`HTTP_DOWNSTREAM_STREAM_IDLE <envoy_v3_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_STREAM_IDLE>`.
+  //
+  // This timeout may also be used in place of ``flush_timeout`` in very specific cases. See the
+  // documentation for ``flush_timeout`` for more details.
   google.protobuf.Duration idle_timeout = 24;
+
+  // Specifies the codec stream flush timeout for the route.
+  //
+  // If not specified, the first preference is the global :ref:`stream_flush_timeout
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_flush_timeout>`,
+  // but only if explicitly configured.
+  //
+  // If neither the explicit HCM-wide flush timeout nor this route-specific flush timeout is configured,
+  // the route's stream idle timeout is reused for this timeout. This is for
+  // backwards compatibility since both behaviors were historically controlled by the one timeout.
+  //
+  // If the route also does not have an idle timeout configured, the global :ref:`stream_idle_timeout
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_idle_timeout>`. used, again
+  // for backwards compatibility. That timeout defaults to 5 minutes.
+  //
+  // A value of 0 via any of the above paths will completely disable the timeout for a given route.
+  google.protobuf.Duration flush_timeout = 42;
 
   // Specifies how to send request over TLS early data.
   // If absent, allows `safe HTTP requests <https://www.rfc-editor.org/rfc/rfc7231#section-4.2.1>`_ to be sent on early data.

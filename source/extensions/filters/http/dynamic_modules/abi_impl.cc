@@ -71,6 +71,83 @@ bool getSslInfo(
   return true;
 }
 
+size_t envoy_dynamic_module_callback_http_filter_config_define_counter(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length) {
+  auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
+  ASSERT(!filter_config->stat_creation_frozen_);
+  absl::string_view name_view(name, name_length);
+  Stats::StatNameManagedStorage storage(name_view, filter_config->stats_scope_->symbolTable());
+  Stats::StatName stat_name = storage.statName();
+  Stats::Counter& c = Stats::Utility::counterFromStatNames(
+      *filter_config->stats_scope_, {filter_config->custom_stat_namespace_, stat_name});
+  return filter_config->addCounter(c);
+}
+
+void envoy_dynamic_module_callback_http_filter_increment_counter(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto& counter = filter->getFilterConfig().getCounterById(id);
+  return counter.add(value);
+}
+
+size_t envoy_dynamic_module_callback_http_filter_config_define_gauge(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length) {
+  auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
+  ASSERT(!filter_config->stat_creation_frozen_);
+  absl::string_view name_view(name, name_length);
+  Stats::StatNameManagedStorage storage(name_view, filter_config->stats_scope_->symbolTable());
+  Stats::StatName stat_name = storage.statName();
+  Stats::Gauge& g = Stats::Utility::gaugeFromStatNames(
+      *filter_config->stats_scope_, {filter_config->custom_stat_namespace_, stat_name},
+      Stats::Gauge::ImportMode::Accumulate);
+  return filter_config->addGauge(g);
+}
+
+void envoy_dynamic_module_callback_http_filter_increase_gauge(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto& gauge = filter->getFilterConfig().getGaugeById(id);
+  return gauge.add(value);
+}
+
+void envoy_dynamic_module_callback_http_filter_decrease_gauge(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto& gauge = filter->getFilterConfig().getGaugeById(id);
+  return gauge.sub(value);
+}
+
+void envoy_dynamic_module_callback_http_filter_set_gauge(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto& gauge = filter->getFilterConfig().getGaugeById(id);
+  return gauge.set(value);
+}
+
+size_t envoy_dynamic_module_callback_http_filter_config_define_histogram(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length) {
+  auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
+  ASSERT(!filter_config->stat_creation_frozen_);
+  absl::string_view name_view(name, name_length);
+  Stats::StatNameManagedStorage storage(name_view, filter_config->stats_scope_->symbolTable());
+  Stats::StatName stat_name = storage.statName();
+  Stats::Histogram& h = Stats::Utility::histogramFromStatNames(
+      *filter_config->stats_scope_, {filter_config->custom_stat_namespace_, stat_name},
+      // TODO should we allow callers to specify this?
+      Stats::Histogram::Unit::Unspecified);
+  return filter_config->addHistogram(h);
+}
+
+void envoy_dynamic_module_callback_http_filter_record_histogram_value(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value) {
+  auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
+  auto& hist = filter->getFilterConfig().getHistogramById(id);
+  hist.recordValue(value);
+}
+
 size_t envoy_dynamic_module_callback_http_get_request_header(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr key, size_t key_length,
@@ -283,7 +360,7 @@ void envoy_dynamic_module_callback_http_send_response(
  * each variant differs in the returned type of the metadata. For example, route metadata will
  * return OptRef vs upstream host metadata will return a shared pointer.
  */
-const ProtobufWkt::Struct*
+const Protobuf::Struct*
 getMetadataNamespaceImpl(const envoy::config::core::v3::Metadata& metadata,
                          envoy_dynamic_module_type_buffer_module_ptr namespace_ptr,
                          size_t namespace_length) {
@@ -306,7 +383,7 @@ getMetadataNamespaceImpl(const envoy::config::core::v3::Metadata& metadata,
  * @param namespace_length is the length of the namespace.
  * @return the metadata namespace if it exists, nullptr otherwise.
  */
-const ProtobufWkt::Struct*
+const Protobuf::Struct*
 getMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
                      envoy_dynamic_module_type_metadata_source metadata_source,
                      envoy_dynamic_module_type_buffer_module_ptr namespace_ptr,
@@ -379,7 +456,7 @@ getMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envo
  * @param namespace_length is the length of the namespace.
  * @return the metadata namespace if it exists, nullptr otherwise.
  */
-ProtobufWkt::Struct*
+Protobuf::Struct*
 getDynamicMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
                             envoy_dynamic_module_type_buffer_module_ptr namespace_ptr,
                             size_t namespace_length) {
@@ -394,7 +471,7 @@ getDynamicMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filt
   absl::string_view namespace_view(static_cast<const char*>(namespace_ptr), namespace_length);
   auto metadata_namespace = metadata->find(namespace_view);
   if (metadata_namespace == metadata->end()) {
-    metadata_namespace = metadata->emplace(namespace_view, ProtobufWkt::Struct{}).first;
+    metadata_namespace = metadata->emplace(namespace_view, Protobuf::Struct{}).first;
   }
   return &metadata_namespace->second;
 }
@@ -410,7 +487,7 @@ getDynamicMetadataNamespace(envoy_dynamic_module_type_http_filter_envoy_ptr filt
  * @param key_length is the length of the key.
  * @return the metadata value if it exists, nullptr otherwise.
  */
-const ProtobufWkt::Value*
+const Protobuf::Value*
 getMetadataValue(envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
                  envoy_dynamic_module_type_metadata_source metadata_source,
                  envoy_dynamic_module_type_buffer_module_ptr namespace_ptr, size_t namespace_length,
@@ -441,7 +518,7 @@ bool envoy_dynamic_module_callback_http_set_dynamic_metadata_number(
     return false;
   }
   absl::string_view key_view(static_cast<const char*>(key_ptr), key_length);
-  ProtobufWkt::Struct metadata_value;
+  Protobuf::Struct metadata_value;
   (*metadata_value.mutable_fields())[key_view].set_number_value(value);
   metadata_namespace->MergeFrom(metadata_value);
   return true;
@@ -481,7 +558,7 @@ bool envoy_dynamic_module_callback_http_set_dynamic_metadata_string(
   }
   absl::string_view key_view(static_cast<const char*>(key_ptr), key_length);
   absl::string_view value_view(static_cast<const char*>(value_ptr), value_length);
-  ProtobufWkt::Struct metadata_value;
+  Protobuf::Struct metadata_value;
   (*metadata_value.mutable_fields())[key_view].set_string_value(value_view);
   metadata_namespace->MergeFrom(metadata_value);
   return true;

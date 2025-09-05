@@ -30,8 +30,8 @@ template <class... Ts> Overloaded(Ts...) -> Overloaded<Ts...>;
 
 } // namespace
 
-std::unique_ptr<ProtobufWkt::Struct> MatchedActionInfo::buildProtoStruct() const {
-  auto message = std::make_unique<ProtobufWkt::Struct>();
+std::unique_ptr<Protobuf::Struct> MatchedActionInfo::buildProtoStruct() const {
+  auto message = std::make_unique<Protobuf::Struct>();
   auto& fields = *message->mutable_fields();
   for (const auto& p : actions_) {
     fields[p.first] = ValueUtil::stringValue(p.second);
@@ -40,8 +40,6 @@ std::unique_ptr<ProtobufWkt::Struct> MatchedActionInfo::buildProtoStruct() const
 }
 
 Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers, bool end_stream) {
-  decoded_headers_ = true;
-
   return delegateFilterActionOr(delegated_filter_, &StreamDecoderFilter::decodeHeaders,
                                 Http::FilterHeadersStatus::Continue, headers, end_stream);
 }

@@ -16,11 +16,10 @@
 #include "envoy/upstream/health_check_host_monitor.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/access_log/access_log_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/cleanup.h"
-#include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
-#include "source/common/common/scope_tracker.h"
 #include "source/common/common/utility.h"
 #include "source/common/config/utility.h"
 #include "source/common/grpc/common.h"
@@ -29,20 +28,16 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
-#include "source/common/network/application_protocol.h"
-#include "source/common/network/socket_option_factory.h"
 #include "source/common/network/transport_socket_options_impl.h"
 #include "source/common/network/upstream_server_name.h"
 #include "source/common/network/upstream_socket_options_filter_state.h"
 #include "source/common/network/upstream_subject_alt_names.h"
 #include "source/common/orca/orca_load_metrics.h"
 #include "source/common/orca/orca_parser.h"
-#include "source/common/router/config_impl.h"
 #include "source/common/router/debug_config.h"
 #include "source/common/router/retry_state_impl.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/uint32_accessor_impl.h"
-#include "source/common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -455,8 +450,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       modify_headers_from_upstream_lb_(headers);
     }
 
-    route_entry_->finalizeResponseHeaders(headers, callbacks_->streamInfo());
-
     if (attempt_count_ == 0 || !route_entry_->includeAttemptCountInResponse()) {
       return;
     }
@@ -588,6 +581,16 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
   // Support DROP_OVERLOAD config from control plane to drop certain percentage of traffic.
   if (checkDropOverload(*cluster)) {
     return Http::FilterHeadersStatus::StopIteration;
+  }
+
+  // If large request buffering is enabled and its size is more than current buffer limit, update
+  // the buffer limit to a new larger value.
+  uint64_t effective_buffer_limit = calculateEffectiveBufferLimit();
+  if (effective_buffer_limit != std::numeric_limits<uint64_t>::max() &&
+      effective_buffer_limit > callbacks_->decoderBufferLimit()) {
+    ENVOY_STREAM_LOG(debug, "Setting new filter manager buffer limit: {}", *callbacks_,
+                     effective_buffer_limit);
+    callbacks_->setDecoderBufferLimit(effective_buffer_limit);
   }
 
   // Increment the attempt count from 0 to 1 at the first upstream request.
@@ -1786,6 +1789,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
   // Modify response headers after we have set the final upstream info because we may need to
   // modify the headers based on the upstream host.
+  route_entry_->finalizeResponseHeaders(*headers, callbacks_->streamInfo());
   modify_headers_(*headers);
 
   if (end_stream) {

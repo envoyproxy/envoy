@@ -4,7 +4,6 @@
 #include <random>
 
 #include "source/common/common/radix_tree.h"
-#include "source/common/common/trie_lookup_table.h"
 #include "source/common/http/headers.h"
 
 #include "benchmark/benchmark.h"
@@ -87,25 +86,9 @@ template <class TableType> static void typedBmPrefixMatching(benchmark::State& s
   typedBmPrefixMatching<TableType>(state, keys, search_keys);
 }
 
-// Benchmark for TrieLookupTable
-static void bmTrieLookupTablePrefixMatching(benchmark::State& s) {
-  typedBmPrefixMatching<TrieLookupTable<const void*>>(s);
-}
-
 // Benchmark for RadixTree
 static void bmRadixTreePrefixMatching(benchmark::State& s) {
   typedBmPrefixMatching<RadixTree<const void*>>(s);
-}
-
-// Real-world scenario benchmarks using HTTP headers
-static void bmTrieLookupTableRequestHeadersPrefixMatching(benchmark::State& s) {
-  std::vector<std::string> keys;
-  INLINE_REQ_HEADERS(ADD_HEADER_TO_KEYS);
-
-  // Generate search keys based on the headers
-  std::vector<std::string> search_keys = generateSearchKeys(keys, 1000);
-
-  typedBmPrefixMatching<TrieLookupTable<const void*>>(s, keys, search_keys);
 }
 
 static void bmRadixTreeRequestHeadersPrefixMatching(benchmark::State& s) {
@@ -118,16 +101,6 @@ static void bmRadixTreeRequestHeadersPrefixMatching(benchmark::State& s) {
   typedBmPrefixMatching<RadixTree<const void*>>(s, keys, search_keys);
 }
 
-static void bmTrieLookupTableResponseHeadersPrefixMatching(benchmark::State& s) {
-  std::vector<std::string> keys;
-  INLINE_RESP_HEADERS(ADD_HEADER_TO_KEYS);
-
-  // Generate search keys based on the headers
-  std::vector<std::string> search_keys = generateSearchKeys(keys, 1000);
-
-  typedBmPrefixMatching<TrieLookupTable<const void*>>(s, keys, search_keys);
-}
-
 static void bmRadixTreeResponseHeadersPrefixMatching(benchmark::State& s) {
   std::vector<std::string> keys;
   INLINE_RESP_HEADERS(ADD_HEADER_TO_KEYS);
@@ -138,23 +111,11 @@ static void bmRadixTreeResponseHeadersPrefixMatching(benchmark::State& s) {
   typedBmPrefixMatching<RadixTree<const void*>>(s, keys, search_keys);
 }
 
-// Register benchmarks for synthetic data
-BENCHMARK(bmTrieLookupTablePrefixMatching)
-    ->ArgsProduct({{100, 1000, 10000}, {3, 5, 8}, {1000}})
-    ->Name("TrieLookupTable/PrefixMatching");
-
 BENCHMARK(bmRadixTreePrefixMatching)
     ->ArgsProduct({{100, 1000, 10000}, {3, 5, 8}, {1000}})
     ->Name("RadixTree/PrefixMatching");
 
-// Register benchmarks for real-world HTTP headers
-BENCHMARK(bmTrieLookupTableRequestHeadersPrefixMatching)
-    ->Name("TrieLookupTable/RequestHeadersPrefixMatching");
-
 BENCHMARK(bmRadixTreeRequestHeadersPrefixMatching)->Name("RadixTree/RequestHeadersPrefixMatching");
-
-BENCHMARK(bmTrieLookupTableResponseHeadersPrefixMatching)
-    ->Name("TrieLookupTable/ResponseHeadersPrefixMatching");
 
 BENCHMARK(bmRadixTreeResponseHeadersPrefixMatching)
     ->Name("RadixTree/ResponseHeadersPrefixMatching");

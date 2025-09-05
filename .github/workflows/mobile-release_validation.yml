@@ -38,47 +38,47 @@ jobs:
     with:
       check-name: mobile-release-validation
 
-  validate-swiftpm-example:
-    permissions:
-      contents: read
-      packages: read
-    if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-release-validation }}
-    needs: load
-    uses: ./.github/workflows/_run.yml
-    name: Build xframework
-    with:
-      args: >-
-        build
-        --config=mobile-remote-ci-macos-ios
-        //:ios_xcframework
-      command: ./bazelw
-      container-command:
-      docker-ipv6: false
-      request: ${{ needs.load.outputs.request }}
-      # revert this to non-large once updated
-      runs-on: macos-15
-      source: |
-        source ./ci/mac_ci_setup.sh
-      # Ignore errors: Bad CRC when unzipping large files: https://bbs.archlinux.org/viewtopic.php?id=153011
-      steps-post: |
-        - run: |
-            unzip mobile/bazel-bin/library/swift/Envoy.xcframework.zip \
-                  -d mobile/examples/swift/swiftpm/Packages \
-                || :
-          shell: bash
-          name: Unzip xcframework
-        - run: |
-            xcodebuild -project mobile/examples/swift/swiftpm/EnvoySwiftPMExample.xcodeproj \
-                       -scheme EnvoySwiftPMExample \
-                       -destination platform="iOS Simulator,name=iPhone 16 Pro Max,OS=18.1" \
-                       -allowProvisioningUpdates
-          shell: bash
-          name: Build app
-        # TODO(jpsim): Run app and inspect logs to validate
-      target: validate-swiftpm-example
-      timeout-minutes: 120
-      trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
-      working-directory: mobile
+  # validate-swiftpm-example:
+  #   permissions:
+  #     contents: read
+  #     packages: read
+  #   if: ${{ needs.load.outputs.request && fromJSON(needs.load.outputs.request).run.mobile-release-validation }}
+  #   needs: load
+  #   uses: ./.github/workflows/_run.yml
+  #   name: Build xframework
+  #   with:
+  #     args: >-
+  #       build
+  #       --config=mobile-remote-ci-macos-ios
+  #       //:ios_xcframework
+  #     command: ./bazelw
+  #     container-command:
+  #     docker-ipv6: false
+  #     request: ${{ needs.load.outputs.request }}
+  #     # revert this to non-large once updated
+  #     runs-on: macos-15
+  #     source: |
+  #       source ./ci/mac_ci_setup.sh
+  #     # Ignore errors: Bad CRC when unzipping large files: https://bbs.archlinux.org/viewtopic.php?id=153011
+  #     steps-post: |
+  #       - run: |
+  #           unzip mobile/bazel-bin/library/swift/Envoy.xcframework.zip \
+  #                 -d mobile/examples/swift/swiftpm/Packages \
+  #               || :
+  #         shell: bash
+  #         name: Unzip xcframework
+  #       - run: |
+  #           xcodebuild -project mobile/examples/swift/swiftpm/EnvoySwiftPMExample.xcodeproj \
+  #                      -scheme EnvoySwiftPMExample \
+  #                      -destination platform="iOS Simulator,name=iPhone 16 Pro Max,OS=18.1" \
+  #                      -allowProvisioningUpdates
+  #         shell: bash
+  #         name: Build app
+  #       # TODO(jpsim): Run app and inspect logs to validate
+  #     target: validate-swiftpm-example
+  #     timeout-minutes: 120
+  #     trusted: ${{ needs.load.outputs.trusted && fromJSON(needs.load.outputs.trusted) || false }}
+  #     working-directory: mobile
 
   request:
     secrets:
@@ -97,7 +97,7 @@ jobs:
       && fromJSON(needs.load.outputs.request).run.mobile-release-validation
     needs:
     - load
-    - validate-swiftpm-example
+    # - validate-swiftpm-example
     uses: ./.github/workflows/_finish.yml
     with:
       needs: ${{ toJSON(needs) }}

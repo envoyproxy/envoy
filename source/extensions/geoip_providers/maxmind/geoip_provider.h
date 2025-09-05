@@ -67,6 +67,12 @@ public:
                                           unknown_hit_));
   }
 
+  void setDbBuildEpoch(absl::string_view maxmind_db_type, const uint64_t value) {
+    setGuage(
+        stat_name_set_->getBuiltin(absl::StrCat(maxmind_db_type, ".db_build_epoch"), unknown_hit_),
+        value);
+  }
+
   void registerGeoDbStats(const absl::string_view& db_type);
 
   Stats::Scope& getStatsScopeForTest() const { return *stats_scope_; }
@@ -95,6 +101,7 @@ private:
   Stats::StatNameSetPtr stat_name_set_;
   const Stats::StatName unknown_hit_;
   void incCounter(Stats::StatName name);
+  void setGuage(Stats::StatName name, const uint64_t value);
 };
 
 using GeoipProviderConfigSharedPtr = std::shared_ptr<GeoipProviderConfig>;

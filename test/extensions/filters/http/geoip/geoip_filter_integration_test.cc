@@ -349,6 +349,13 @@ TEST_P(GeoipFilterIntegrationTest, OnlyApplePrivateRelayHeaderIsPopulated) {
   EXPECT_EQ(1, test_server_->counter("http.config_test.maxmind.isp_db.hit")->value());
 }
 
+TEST_P(GeoipFilterIntegrationTest, MetricForDbBuildEpochIsEmitted) {
+  config_helper_.prependFilter(TestEnvironment::substitute(ConfigWithXff));
+  initialize();
+  EXPECT_EQ(1671567063,
+            test_server_->gauge("http.config_test.maxmind.city_db.db_build_epoch")->value());
+}
+
 } // namespace
 } // namespace Geoip
 } // namespace HttpFilters

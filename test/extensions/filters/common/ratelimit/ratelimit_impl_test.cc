@@ -47,7 +47,7 @@ public:
               (LimitStatus status, const DescriptorStatusList* descriptor_statuses,
                const Http::ResponseHeaderMap* response_headers_to_add,
                const Http::RequestHeaderMap* request_headers_to_add,
-               const std::string& response_body, const ProtobufWkt::Struct* dynamic_metadata));
+               const std::string& response_body, const Protobuf::Struct* dynamic_metadata));
 };
 
 class RateLimitGrpcClientTest : public testing::Test {

@@ -69,7 +69,7 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOk) {
   auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
   auto status = check_response->mutable_status();
 
-  ProtobufWkt::Struct expected_dynamic_metadata;
+  Protobuf::Struct expected_dynamic_metadata;
   auto* metadata_fields = expected_dynamic_metadata.mutable_fields();
   (*metadata_fields)["foo"] = ValueUtil::stringValue("ok");
   (*metadata_fields)["bar"] = ValueUtil::numberValue(1);
@@ -344,12 +344,12 @@ TEST_F(ExtAuthzGrpcClientTest, AuthorizationOkWithDynamicMetadata) {
   auto check_response = std::make_unique<envoy::service::auth::v3::CheckResponse>();
   auto status = check_response->mutable_status();
 
-  ProtobufWkt::Struct expected_dynamic_metadata;
+  Protobuf::Struct expected_dynamic_metadata;
   auto* metadata_fields = expected_dynamic_metadata.mutable_fields();
   (*metadata_fields)["original"] = ValueUtil::stringValue("true");
   check_response->mutable_dynamic_metadata()->MergeFrom(expected_dynamic_metadata);
 
-  ProtobufWkt::Struct overridden_dynamic_metadata;
+  Protobuf::Struct overridden_dynamic_metadata;
   metadata_fields = overridden_dynamic_metadata.mutable_fields();
   (*metadata_fields)["original"] = ValueUtil::stringValue("false");
 
@@ -445,6 +445,10 @@ ok_response:
       key: overwrite-if-exists-or-add
       value: overwrite-if-exists-or-add-value
     append_action: OVERWRITE_IF_EXISTS_OR_ADD
+  - header:
+      key: invalid-append-action
+      value: invalid-append-action-value
+    append_action: 404
 )EOF",
                             check_response);
 
@@ -458,6 +462,7 @@ ok_response:
           UnsafeHeaderVector{{"add-if-absent", "add-if-absent-value"}},
       .response_headers_to_overwrite_if_exists =
           UnsafeHeaderVector{{"overwrite-if-exists", "overwrite-if-exists-value"}},
+      .saw_invalid_append_actions = true,
       .status_code = Http::Code::OK,
       .grpc_status = Grpc::Status::WellKnownGrpcStatus::Ok,
   };

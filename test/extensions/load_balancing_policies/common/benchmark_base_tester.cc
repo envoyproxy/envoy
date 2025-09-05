@@ -13,9 +13,9 @@ BaseTester::BaseTester(uint64_t num_hosts, uint32_t weighted_subset_percent, uin
     const auto effective_weight = should_weight ? weight : 1;
     if (attach_metadata) {
       envoy::config::core::v3::Metadata metadata;
-      ProtobufWkt::Value value;
+      Protobuf::Value value;
       value.set_number_value(i);
-      ProtobufWkt::Struct& map =
+      Protobuf::Struct& map =
           (*metadata.mutable_filter_metadata())[Config::MetadataFilters::get().ENVOY_LB];
       (*map.mutable_fields())[std::string(metadata_key)] = value;
 

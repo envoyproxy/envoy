@@ -39,8 +39,8 @@ using envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute;
 using envoy::extensions::filters::http::ext_proc::v3::ProcessingMode;
 using envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
 using Envoy::Extensions::HttpFilters::ExternalProcessing::verifyMultipleHeaderValues;
+using Envoy::Protobuf::Any;
 using Envoy::Protobuf::MapPair;
-using Envoy::ProtobufWkt::Any;
 using envoy::service::ext_proc::v3::BodyResponse;
 using envoy::service::ext_proc::v3::CommonResponse;
 using envoy::service::ext_proc::v3::HeadersResponse;
@@ -187,7 +187,7 @@ protected:
         auto* untyped_md = set_metadata_config.add_metadata();
         untyped_md->set_metadata_namespace("forwarding_ns_untyped");
         untyped_md->set_allow_overwrite(true);
-        ProtobufWkt::Struct test_md_val;
+        Protobuf::Struct test_md_val;
         (*test_md_val.mutable_fields())["foo"].set_string_value("value from set_metadata");
         (*untyped_md->mutable_value()) = test_md_val;
 
@@ -254,7 +254,7 @@ protected:
       processing_response_factory_registration_ =
           std::make_unique<Envoy::Registry::InjectFactory<OnProcessingResponseFactory>>(
               *processing_response_factory_);
-      ProtobufWkt::Struct config;
+      Protobuf::Struct config;
       proto_config_.mutable_on_processing_response()->set_name("test-on-processing-response");
       proto_config_.mutable_on_processing_response()->mutable_typed_config()->PackFrom(config);
     }
@@ -721,10 +721,10 @@ protected:
   }
 
   void testSendDyanmicMetadata() {
-    ProtobufWkt::Struct test_md_struct;
+    Protobuf::Struct test_md_struct;
     (*test_md_struct.mutable_fields())["foo"].set_string_value("value from ext_proc");
 
-    ProtobufWkt::Value md_val;
+    Protobuf::Value md_val;
     *(md_val.mutable_struct_value()) = test_md_struct;
 
     processGenericMessage(
@@ -732,7 +732,7 @@ protected:
         [md_val](const ProcessingRequest& req, ProcessingResponse& resp) {
           // Verify the processing request contains the untyped metadata we injected.
           EXPECT_TRUE(req.metadata_context().filter_metadata().contains("forwarding_ns_untyped"));
-          const ProtobufWkt::Struct& fwd_metadata =
+          const Protobuf::Struct& fwd_metadata =
               req.metadata_context().filter_metadata().at("forwarding_ns_untyped");
           EXPECT_EQ(1, fwd_metadata.fields_size());
           EXPECT_TRUE(fwd_metadata.fields().contains("foo"));
@@ -741,7 +741,7 @@ protected:
           // Verify the processing request contains the typed metadata we injected.
           EXPECT_TRUE(
               req.metadata_context().typed_filter_metadata().contains("forwarding_ns_typed"));
-          const ProtobufWkt::Any& fwd_typed_metadata =
+          const Protobuf::Any& fwd_typed_metadata =
               req.metadata_context().typed_filter_metadata().at("forwarding_ns_typed");
           EXPECT_EQ("type.googleapis.com/envoy.extensions.filters.http.set_metadata.v3.Metadata",
                     fwd_typed_metadata.type_url());
@@ -950,6 +950,7 @@ TEST_P(ExtProcIntegrationTest, GetAndCloseStream) {
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndCloseStreamWithTracing) {
+  proto_config_.mutable_message_timeout()->set_seconds(1);
   // Turn on debug to troubleshoot possible flaky test.
   // TODO(cainelli): Remove this and the debug logs in the tracer test filter after a test failure
   // occurs.
@@ -5890,6 +5891,89 @@ TEST_P(ExtProcIntegrationTest, RequestHeaderModeIgnoredInModeOverrideComparison)
   verifyDownstreamResponse(*response, 200);
 }
 
+TEST_P(ExtProcIntegrationTest, ModeOverrideNoneToFullDuplex) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.set_allow_mode_override(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  std::string body_str = std::string(10, 'a');
+  std::string upstream_body_str = std::string(5, 'b');
+  auto response = sendDownstreamRequestWithBody(body_str, absl::nullopt);
+  // Process request header message.
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [](const ProcessingRequest&, ProcessingResponse& resp) {
+        resp.mutable_request_headers();
+        resp.mutable_mode_override()->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+        return true;
+      });
+
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false,
+      [&body_str, &upstream_body_str](const HttpBody& body, BodyResponse& resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        EXPECT_EQ(body.body(), body_str);
+        auto* streamed_response =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed_response->set_body(upstream_body_str);
+        streamed_response->set_end_of_stream(true);
+        return true;
+      });
+  handleUpstreamRequest();
+  EXPECT_EQ(upstream_request_->body().toString(), upstream_body_str);
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, NoneToFullDuplexMoreDataAfterModeOverride) {
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+  proto_config_.set_allow_mode_override(true);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  auto encoder_decoder = codec_client_->startRequest(headers);
+  request_encoder_ = &encoder_decoder.first;
+  codec_client_->sendData(*request_encoder_, 10, false);
+  IntegrationStreamDecoderPtr response = std::move(encoder_decoder.second);
+  // Process request header message.
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [](const ProcessingRequest&, ProcessingResponse& resp) {
+        resp.mutable_request_headers();
+        resp.mutable_mode_override()->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+        return true;
+      });
+
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& resp) {
+        EXPECT_FALSE(body.end_of_stream());
+        EXPECT_EQ(body.body().size(), 10);
+        auto* streamed_response =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed_response->set_body("bbbbb");
+        streamed_response->set_end_of_stream(false);
+        return true;
+      });
+
+  codec_client_->sendData(*request_encoder_, 20, true);
+
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        EXPECT_EQ(body.body().size(), 20);
+        auto* streamed_response =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed_response->set_body("0123456789");
+        streamed_response->set_end_of_stream(true);
+        return true;
+      });
+
+  handleUpstreamRequest();
+  EXPECT_EQ(upstream_request_->body().toString(), "bbbbb0123456789");
+  verifyDownstreamResponse(*response, 200);
+}
+
 TEST_P(ExtProcIntegrationTest, BufferedModeOverSizeRequestLocalReply) {
   proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
@@ -6096,6 +6180,47 @@ TEST_P(ExtProcIntegrationTest, FilterStateAccessLogSerialization) {
   ENVOY_LOG_MISC(info, "PLAIN: {}", *plain_value);
   ENVOY_LOG_MISC(info, "TYPED: {}", typed_json_str);
   ENVOY_LOG_MISC(info, "Sample FIELD: bytes_sent={}", *bytes_sent);
+}
+
+TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoGRPCTimeout) {
+  auto access_log_path = TestEnvironment::temporaryPath("ext_proc_filter_state_access.log");
+
+  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
+    auto* access_log = cm.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
+
+    (*json_format->mutable_fields())["field_request_header_call_status"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_call_status)%");
+
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+  proto_config_.set_failure_mode_allow(true);
+  proto_config_.mutable_message_timeout()->set_nanos(200000000);
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest(absl::nullopt);
+  processRequestHeadersMessage(*grpc_upstreams_[0], true,
+                               [this](const HttpHeaders&, HeadersResponse&) {
+                                 // Travel forward 400 ms
+                                 timeSystem().advanceTimeWaitImpl(400ms);
+                                 return false;
+                               });
+
+  // We should be able to continue from here since the error was ignored
+  handleUpstreamRequest();
+  // Since we are ignoring errors, the late response to the request headers
+  // message meant that subsequent messages are spurious and the response
+  // headers message was never sent.
+  // Despite the timeout the request should succeed.
+  verifyDownstreamResponse(*response, 200);
+  std::string log_result = waitForAccessLog(access_log_path, 0, true);
+  auto json_log = Json::Factory::loadFromString(log_result).value();
+  auto field_request_header_status = json_log->getString("field_request_header_call_status");
+  // Should be 4:DEADLINE_EXCEEDED instead of 10:ABORTED
+  EXPECT_EQ(*field_request_header_status, "4");
 }
 
 } // namespace Envoy

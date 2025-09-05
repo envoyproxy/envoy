@@ -36,7 +36,6 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/common/upstream/test_local_address_selector.h"
 #include "test/common/upstream/utility.h"
-#include "test/mocks/common.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/protobuf/mocks.h"
@@ -63,12 +62,17 @@ using testing::_;
 using testing::AnyNumber;
 using testing::ContainerEq;
 using testing::Invoke;
+using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
 namespace Upstream {
+
+using MockInitializeCallback = MockFunction<absl::Status()>;
+using MockPriorityUpdateCallback =
+    MockFunction<absl::Status(uint32_t, const HostVector&, const HostVector&)>;
 
 class UpstreamImplTestBase {
 protected:
@@ -184,7 +188,6 @@ public:
     scoped_runtime.mergeValues(
         {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
     auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
-    ReadyWatcher initialized;
     const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -226,7 +229,6 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
-  ReadyWatcher initialized;
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -243,7 +245,6 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
                     address: foo.bar.com
                     port_value: 443
   )EOF";
-  EXPECT_CALL(initialized, ready());
   EXPECT_CALL(*dns_resolver, resolve("foo.bar.com", std::get<1>(GetParam()), _))
       .WillOnce(Invoke([&](const std::string&, Network::DnsLookupFamily,
                            Network::DnsResolver::ResolveCb cb) -> Network::ActiveDnsQuery* {
@@ -257,10 +258,12 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
                                                              false);
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver);
 
-  cluster->initialize([&]() -> absl::Status {
-    initialized.ready();
-    return absl::OkStatus();
-  });
+  {
+    MockInitializeCallback initialize_cb;
+    EXPECT_CALL(initialize_cb, Call).WillOnce(Return(absl::OkStatus()));
+    cluster->initialize(initialize_cb.AsStdFunction());
+    // initialize_cb going out of scope ensures it was called here.
+  }
   EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
@@ -270,7 +273,6 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicMillion) {
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
-  ReadyWatcher initialized;
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -299,7 +301,6 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBasicTenThousand) {
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
-  ReadyWatcher initialized;
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -328,7 +329,6 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadDenominator) {
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
-  ReadyWatcher initialized;
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -358,7 +358,6 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestBadNumerator) {
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
-  ReadyWatcher initialized;
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -389,7 +388,6 @@ TEST_P(StrictDnsParamTest, DropOverLoadConfigTestMultipleCategory) {
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", std::get<3>(GetParam())}});
   auto dns_resolver = std::make_shared<NiceMock<Network::MockDnsResolver>>();
-  ReadyWatcher initialized;
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -449,7 +447,6 @@ INSTANTIATE_TEST_SUITE_P(DnsImplementations, StrictDnsClusterImplParamTest,
                          testing::ValuesIn({"true", "false"}));
 
 TEST_P(StrictDnsClusterImplParamTest, ZeroHostsIsInializedImmediately) {
-  ReadyWatcher initialized;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
 
@@ -468,18 +465,19 @@ TEST_P(StrictDnsClusterImplParamTest, ZeroHostsIsInializedImmediately) {
                                                              false);
 
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
-  EXPECT_CALL(initialized, ready());
-  cluster->initialize([&]() -> absl::Status {
-    initialized.ready();
-    return absl::OkStatus();
-  });
+
+  {
+    MockInitializeCallback initialize_cb;
+    EXPECT_CALL(initialize_cb, Call).WillOnce(Return(absl::OkStatus()));
+    cluster->initialize(initialize_cb.AsStdFunction());
+    // initialize_cb going out of scope ensures it was called here.
+  }
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
 // Resolve zero hosts, while using health checking.
 TEST_P(StrictDnsClusterImplParamTest, ZeroHostsHealthChecker) {
-  ReadyWatcher initialized;
   scoped_runtime.mergeValues(
       {{"envoy.reloadable_features.enable_new_dns_implementation", GetParam()}});
 
@@ -509,13 +507,13 @@ TEST_P(StrictDnsClusterImplParamTest, ZeroHostsHealthChecker) {
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   cluster->setHealthChecker(health_checker);
-  cluster->initialize([&]() -> absl::Status {
-    initialized.ready();
-    return absl::OkStatus();
-  });
+
+  MockInitializeCallback initialize_cb;
+  cluster->initialize(initialize_cb.AsStdFunction());
 
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
-  EXPECT_CALL(initialized, ready());
+  // We expect initialize_cb to only be called on resolve, not during initialize.
+  EXPECT_CALL(initialize_cb, Call).WillOnce(Return(absl::OkStatus()));
   EXPECT_CALL(*resolver.timer_, enableTimer(_, _));
   resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "", {});
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
@@ -553,25 +551,19 @@ TEST_P(StrictDnsClusterImplParamTest, DontWaitForDNSOnInit) {
                                                              false);
 
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
+  {
+    MockInitializeCallback initialize_cb;
+    EXPECT_CALL(initialize_cb, Call).WillOnce(Return(absl::OkStatus()));
+    cluster->initialize(initialize_cb.AsStdFunction());
+    // initialize_cb going out of scope validates that it was called here.
+  }
 
-  ReadyWatcher initialized;
-
-  // Initialized without completing DNS resolution.
-  EXPECT_CALL(initialized, ready());
-  cluster->initialize([&]() -> absl::Status {
-    initialized.ready();
-    return absl::OkStatus();
-  });
-
-  ReadyWatcher membership_updated;
-  auto priority_update_cb = cluster->prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) {
-        membership_updated.ready();
-        return absl::OkStatus();
-      });
+  MockPriorityUpdateCallback priority_update_cb;
+  auto priority_update_handle =
+      cluster->prioritySet().addPriorityUpdateCb(priority_update_cb.AsStdFunction());
 
   EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  EXPECT_CALL(membership_updated, ready());
+  EXPECT_CALL(priority_update_cb, Call).WillOnce(Return(absl::OkStatus()));
   resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                          TestUtility::makeDnsResponse({"127.0.0.2", "127.0.0.1"}));
 }
@@ -672,18 +664,15 @@ TEST_P(StrictDnsClusterImplParamTest, Basic) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.maintenance_mode.name", 0));
   EXPECT_FALSE(cluster->info()->maintenanceMode());
 
-  ReadyWatcher membership_updated;
-  auto priority_update_cb = cluster->prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) {
-        membership_updated.ready();
-        return absl::OkStatus();
-      });
+  MockPriorityUpdateCallback priority_update_cb;
+  auto priority_update_handle =
+      cluster->prioritySet().addPriorityUpdateCb(priority_update_cb.AsStdFunction());
 
   cluster->initialize([] { return absl::OkStatus(); });
 
   resolver1.expectResolve(*dns_resolver_);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  EXPECT_CALL(membership_updated, ready());
+  EXPECT_CALL(priority_update_cb, Call).WillOnce(Return(absl::OkStatus()));
   resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
   EXPECT_THAT(
@@ -712,7 +701,7 @@ TEST_P(StrictDnsClusterImplParamTest, Basic) {
 
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  EXPECT_CALL(membership_updated, ready());
+  EXPECT_CALL(priority_update_cb, Call).WillOnce(Return(absl::OkStatus()));
   resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"127.0.0.3"}));
   EXPECT_THAT(
@@ -721,7 +710,7 @@ TEST_P(StrictDnsClusterImplParamTest, Basic) {
 
   // Make sure we de-dup the same address.
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  EXPECT_CALL(membership_updated, ready());
+  EXPECT_CALL(priority_update_cb, Call).WillOnce(Return(absl::OkStatus()));
   resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
   EXPECT_THAT(
@@ -743,7 +732,7 @@ TEST_P(StrictDnsClusterImplParamTest, Basic) {
   resolver1.expectResolve(*dns_resolver_);
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  EXPECT_CALL(membership_updated, ready());
+  EXPECT_CALL(priority_update_cb, Call).WillOnce(Return(absl::OkStatus()));
   resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({}));
   EXPECT_THAT(
@@ -876,11 +865,9 @@ TEST_P(StrictDnsClusterImplParamTest, HostRemovalAfterHcFail) {
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   cluster->setHealthChecker(health_checker);
-  ReadyWatcher initialized;
-  cluster->initialize([&]() -> absl::Status {
-    initialized.ready();
-    return absl::OkStatus();
-  });
+
+  MockInitializeCallback initialize_cb;
+  cluster->initialize(initialize_cb.AsStdFunction());
 
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(*resolver.timer_, enableTimer(_, _)).Times(2);
@@ -899,7 +886,8 @@ TEST_P(StrictDnsClusterImplParamTest, HostRemovalAfterHcFail) {
       hosts[i]->healthFlagClear(Host::HealthFlag::FAILED_ACTIVE_HC);
       hosts[i]->healthFlagClear(Host::HealthFlag::PENDING_ACTIVE_HC);
       if (i == 1) {
-        EXPECT_CALL(initialized, ready());
+        // We only expect initialize_cb to be called on the second time around this loop.
+        EXPECT_CALL(initialize_cb, Call).WillOnce(Return(absl::OkStatus()));
       }
       health_checker->runCallbacks(hosts[i], HealthTransition::Changed, HealthState::Healthy);
     }
@@ -960,12 +948,10 @@ TEST_P(StrictDnsClusterImplParamTest, HostUpdateWithDisabledACEndpoint) {
   EXPECT_CALL(*health_checker, start());
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   cluster->setHealthChecker(health_checker);
-  ReadyWatcher initialized;
-  cluster->initialize([&]() -> absl::Status {
-    initialized.ready();
-    return absl::OkStatus();
-  });
-  EXPECT_CALL(initialized, ready());
+  MockInitializeCallback initialize_cb;
+  cluster->initialize(initialize_cb.AsStdFunction());
+  // initialize_cb should only be called during dns_callback_;
+  EXPECT_CALL(initialize_cb, Call).WillOnce(Return(absl::OkStatus()));
 
   EXPECT_CALL(*health_checker, addHostCheckCompleteCb(_));
   EXPECT_CALL(*resolver.timer_, enableTimer(_, _)).Times(2);
@@ -1102,18 +1088,15 @@ TEST_P(StrictDnsClusterImplParamTest, LoadAssignmentBasic) {
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("upstream.maintenance_mode.name", 0));
   EXPECT_FALSE(cluster->info()->maintenanceMode());
 
-  ReadyWatcher membership_updated;
-  auto priority_update_cb = cluster->prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) {
-        membership_updated.ready();
-        return absl::OkStatus();
-      });
+  MockPriorityUpdateCallback priority_update_cb;
+  auto priority_update_handle =
+      cluster->prioritySet().addPriorityUpdateCb(priority_update_cb.AsStdFunction());
 
   cluster->initialize([] { return absl::OkStatus(); });
 
   resolver1.expectResolve(*dns_resolver_);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  EXPECT_CALL(membership_updated, ready());
+  EXPECT_CALL(priority_update_cb, Call).WillOnce(Return(absl::OkStatus()));
   resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
   EXPECT_THAT(
@@ -1160,7 +1143,7 @@ TEST_P(StrictDnsClusterImplParamTest, LoadAssignmentBasic) {
   EXPECT_EQ(2UL, stats_.counter("cluster.name.update_no_rebuild").value());
 
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  EXPECT_CALL(membership_updated, ready());
+  EXPECT_CALL(priority_update_cb, Call).WillOnce(Return(absl::OkStatus()));
   resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
 
@@ -1178,7 +1161,7 @@ TEST_P(StrictDnsClusterImplParamTest, LoadAssignmentBasic) {
 
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  EXPECT_CALL(membership_updated, ready());
+  EXPECT_CALL(priority_update_cb, Call).WillOnce(Return(absl::OkStatus()));
   resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"127.0.0.3"}));
   EXPECT_THAT(
@@ -1201,7 +1184,7 @@ TEST_P(StrictDnsClusterImplParamTest, LoadAssignmentBasic) {
 
   // Make sure that we *don't* de-dup between resolve targets.
   EXPECT_CALL(*resolver3.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  EXPECT_CALL(membership_updated, ready());
+  EXPECT_CALL(priority_update_cb, Call).WillOnce(Return(absl::OkStatus()));
   resolver3.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"10.0.0.1"}));
 
@@ -1238,12 +1221,12 @@ TEST_P(StrictDnsClusterImplParamTest, LoadAssignmentBasic) {
       });
 
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  EXPECT_CALL(membership_updated, ready());
+  EXPECT_CALL(priority_update_cb, Call).WillOnce(Return(absl::OkStatus()));
   resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({}));
 
   EXPECT_CALL(*resolver3.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  EXPECT_CALL(membership_updated, ready());
+  EXPECT_CALL(priority_update_cb, Call).WillOnce(Return(absl::OkStatus()));
   resolver3.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({}));
 
@@ -1321,18 +1304,15 @@ TEST_P(StrictDnsClusterImplParamTest, LoadAssignmentBasicMultiplePriorities) {
 
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
-  ReadyWatcher membership_updated;
-  auto priority_update_cb = cluster->prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) {
-        membership_updated.ready();
-        return absl::OkStatus();
-      });
+  MockPriorityUpdateCallback priority_update_cb;
+  auto priority_update_handle =
+      cluster->prioritySet().addPriorityUpdateCb(priority_update_cb.AsStdFunction());
 
   cluster->initialize([] { return absl::OkStatus(); });
 
   resolver1.expectResolve(*dns_resolver_);
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  EXPECT_CALL(membership_updated, ready());
+  EXPECT_CALL(priority_update_cb, Call).WillOnce(Return(absl::OkStatus()));
   resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"127.0.0.1", "127.0.0.2"}));
   EXPECT_THAT(
@@ -1361,7 +1341,7 @@ TEST_P(StrictDnsClusterImplParamTest, LoadAssignmentBasicMultiplePriorities) {
 
   resolver1.timer_->invokeCallback();
   EXPECT_CALL(*resolver1.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  EXPECT_CALL(membership_updated, ready());
+  EXPECT_CALL(priority_update_cb, Call).WillOnce(Return(absl::OkStatus()));
   resolver1.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"127.0.0.3"}));
   EXPECT_THAT(
@@ -1370,7 +1350,7 @@ TEST_P(StrictDnsClusterImplParamTest, LoadAssignmentBasicMultiplePriorities) {
 
   // Make sure we de-dup the same address.
   EXPECT_CALL(*resolver2.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  EXPECT_CALL(membership_updated, ready());
+  EXPECT_CALL(priority_update_cb, Call).WillOnce(Return(absl::OkStatus()));
   resolver2.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"10.0.0.1", "10.0.0.1"}));
   EXPECT_THAT(
@@ -1387,7 +1367,7 @@ TEST_P(StrictDnsClusterImplParamTest, LoadAssignmentBasicMultiplePriorities) {
   }
 
   EXPECT_CALL(*resolver3.timer_, enableTimer(std::chrono::milliseconds(4000), _));
-  EXPECT_CALL(membership_updated, ready());
+  EXPECT_CALL(priority_update_cb, Call).WillOnce(Return(absl::OkStatus()));
   resolver3.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                           TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}));
 
@@ -1661,24 +1641,21 @@ TEST_P(StrictDnsClusterImplParamTest, TtlAsDnsRefreshRateNoJitter) {
 
   auto cluster = *createStrictDnsCluster(cluster_config, factory_context, dns_resolver_);
 
-  ReadyWatcher membership_updated;
-  auto priority_update_cb = cluster->prioritySet().addPriorityUpdateCb(
-      [&](uint32_t, const HostVector&, const HostVector&) {
-        membership_updated.ready();
-        return absl::OkStatus();
-      });
+  MockPriorityUpdateCallback priority_update_cb;
+  auto priority_update_handle =
+      cluster->prioritySet().addPriorityUpdateCb(priority_update_cb.AsStdFunction());
 
   cluster->initialize([] { return absl::OkStatus(); });
 
   // TTL is recorded when the DNS response is successful and not empty
-  EXPECT_CALL(membership_updated, ready());
+  EXPECT_CALL(priority_update_cb, Call).WillOnce(Return(absl::OkStatus()));
   EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(5000), _));
   resolver.dns_callback_(
       Network::DnsResolver::ResolutionStatus::Completed, "",
       TestUtility::makeDnsResponse({"192.168.1.1", "192.168.1.2"}, std::chrono::seconds(5)));
 
   // If the response is successful but empty, the cluster uses the cluster configured refresh rate.
-  EXPECT_CALL(membership_updated, ready());
+  EXPECT_CALL(priority_update_cb, Call).WillOnce(Return(absl::OkStatus()));
   EXPECT_CALL(*resolver.timer_, enableTimer(std::chrono::milliseconds(4000), _));
   resolver.dns_callback_(Network::DnsResolver::ResolutionStatus::Completed, "",
                          TestUtility::makeDnsResponse({}, std::chrono::seconds(5)));
@@ -2871,11 +2848,8 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
   std::shared_ptr<MockHealthChecker> health_checker(new NiceMock<MockHealthChecker>());
   cluster->setHealthChecker(health_checker);
 
-  ReadyWatcher initialized;
-  cluster->initialize([&initialized] {
-    initialized.ready();
-    return absl::OkStatus();
-  });
+  MockInitializeCallback initialize_cb;
+  cluster->initialize(initialize_cb.AsStdFunction());
 
   EXPECT_EQ(2UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -2888,7 +2862,7 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
                                HealthTransition::Changed, HealthState::Healthy);
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
-  EXPECT_CALL(initialized, ready());
+  EXPECT_CALL(initialize_cb, Call).WillOnce(Return(absl::OkStatus()));
   health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1],
                                HealthTransition::Changed, HealthState::Healthy);
 
@@ -3014,11 +2988,8 @@ TEST_F(StaticClusterImplTest, InitialHostsDisableHC) {
   std::shared_ptr<MockHealthChecker> health_checker(new NiceMock<MockHealthChecker>());
   cluster->setHealthChecker(health_checker);
 
-  ReadyWatcher initialized;
-  cluster->initialize([&initialized] {
-    initialized.ready();
-    return absl::OkStatus();
-  });
+  MockInitializeCallback initialize_cb;
+  cluster->initialize(initialize_cb.AsStdFunction());
 
   // The endpoint with disabled active health check should not be set FAILED_ACTIVE_HC
   // at beginning.
@@ -3034,7 +3005,7 @@ TEST_F(StaticClusterImplTest, InitialHostsDisableHC) {
   EXPECT_EQ(0UL, cluster->info()->endpointStats().membership_degraded_.value());
 
   // Perform a health check for the second host, and then the initialization is finished.
-  EXPECT_CALL(initialized, ready());
+  EXPECT_CALL(initialize_cb, Call).WillOnce(Return(absl::OkStatus()));
   cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[1]->healthFlagClear(
       Host::HealthFlag::FAILED_ACTIVE_HC);
   health_checker->runCallbacks(cluster->prioritySet().hostSetsPerPriority()[0]->hosts()[0],
@@ -3975,7 +3946,7 @@ TEST_F(StaticClusterImplTest, CustomUpstreamLocalAddressSelector) {
   envoy::config::cluster::v3::Cluster config;
   config.set_name("staticcluster");
   config.mutable_connect_timeout();
-  ProtobufWkt::Empty empty;
+  Protobuf::Empty empty;
   auto address_selector_config =
       server_context_.cluster_manager_.mutableBindConfig().mutable_local_address_selector();
   address_selector_config->mutable_typed_config()->PackFrom(empty);
@@ -4048,7 +4019,6 @@ class ClusterImplTest : public testing::Test, public UpstreamImplTestBase {};
 // configured.
 TEST_F(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
   auto dns_resolver = std::make_shared<Network::MockDnsResolver>();
-  ReadyWatcher initialized;
 
   const std::string yaml = R"EOF(
     name: name
@@ -4299,7 +4269,6 @@ public:
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver_{new NiceMock<Network::MockDnsResolver>()};
 
-  ReadyWatcher initialized_;
   envoy::config::cluster::v3::Cluster cluster_config_;
 };
 
@@ -4321,7 +4290,7 @@ public:
   std::string name() const override { return "baz"; }
   // Returns nullptr (conversion failure) if d is empty.
   std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
-  parse(const ProtobufWkt::Struct& d) const override {
+  parse(const Protobuf::Struct& d) const override {
     if (d.fields().find("name") != d.fields().end()) {
       return std::make_unique<Baz>(d.fields().at("name").string_value());
     }
@@ -4329,7 +4298,7 @@ public:
   }
 
   std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
-  parse(const ProtobufWkt::Any&) const override {
+  parse(const Protobuf::Any&) const override {
     return nullptr;
   }
 };
@@ -5140,9 +5109,9 @@ TEST_F(ClusterInfoImplTest, ExtensionProtocolOptionsForFilterWithOptions) {
   auto protocol_options = std::make_shared<TestFilterProtocolOptionsConfig>();
 
   TestFilterConfigFactoryBase factoryBase(
-      []() -> ProtobufTypes::MessagePtr { return std::make_unique<ProtobufWkt::Struct>(); },
+      []() -> ProtobufTypes::MessagePtr { return std::make_unique<Protobuf::Struct>(); },
       [&](const Protobuf::Message& msg) -> Upstream::ProtocolOptionsConfigConstSharedPtr {
-        const auto& msg_struct = dynamic_cast<const ProtobufWkt::Struct&>(msg);
+        const auto& msg_struct = dynamic_cast<const Protobuf::Struct&>(msg);
         EXPECT_TRUE(msg_struct.fields().find("option") != msg_struct.fields().end());
 
         return protocol_options;

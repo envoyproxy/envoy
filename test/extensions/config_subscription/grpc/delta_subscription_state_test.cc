@@ -474,7 +474,7 @@ TEST_P(DeltaSubscriptionStateTestBlank, AmbiguousResourceTTL) {
     }
 
     if (ttl_s) {
-      ProtobufWkt::Duration ttl;
+      Protobuf::Duration ttl;
       ttl.set_seconds(ttl_s->count());
       resource->mutable_ttl()->CopyFrom(ttl);
     }
@@ -1197,7 +1197,7 @@ TEST_P(DeltaSubscriptionStateTest, ResourceTTL) {
     }
 
     if (ttl_s) {
-      ProtobufWkt::Duration ttl;
+      Protobuf::Duration ttl;
       ttl.set_seconds(ttl_s->count());
       resource->mutable_ttl()->CopyFrom(ttl);
     }
@@ -1264,7 +1264,7 @@ TEST_P(DeltaSubscriptionStateTest, HeartbeatResourcesNotProcessed) {
     }
 
     if (ttl_s) {
-      ProtobufWkt::Duration ttl;
+      Protobuf::Duration ttl;
       ttl.set_seconds(ttl_s->count());
       resource.mutable_ttl()->CopyFrom(ttl);
     }
@@ -1412,7 +1412,7 @@ TEST_P(VhdsDeltaSubscriptionStateTest, ResourceTTL) {
       resource->mutable_resource();
     }
 
-    ProtobufWkt::Duration ttl;
+    Protobuf::Duration ttl;
     ttl.set_seconds(1);
     resource->mutable_ttl()->CopyFrom(ttl);
 

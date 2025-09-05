@@ -66,6 +66,20 @@ envoy_cc_test_library(
     alwayslink = 1,
 )
 
+envoy_cc_test_library(
+    name = "modify_host_filter_lib",
+    srcs = ["modify_host_filter.cc"],
+    deps = [
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+        "//test/integration/filters:common_lib",
+    ],
+)
+
 envoy_extension_cc_test(
     name = "proxy_filter_integration_test",
     size = "large",
@@ -79,6 +93,7 @@ envoy_extension_cc_test(
     #   https://gist.github.com/wrowe/a152cb1d12c2f751916122aed39d8517
     tags = ["fails_on_clang_cl"],
     deps = [
+        ":modify_host_filter_lib",
         ":test_resolver_lib",
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
@@ -88,6 +103,7 @@ envoy_extension_cc_test(
         "//source/extensions/network/dns_resolver/getaddrinfo:config",
         "//test/integration:http_integration_lib",
         "//test/integration/filters:stream_info_to_headers_filter_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
@@ -113,6 +129,7 @@ envoy_extension_cc_test(
     #   https://gist.github.com/wrowe/a152cb1d12c2f751916122aed39d8517
     tags = ["fails_on_clang_cl"],
     deps = [
+        ":modify_host_filter_lib",
         ":test_resolver_lib",
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
@@ -122,6 +139,7 @@ envoy_extension_cc_test(
         "//source/extensions/network/dns_resolver/getaddrinfo:config",
         "//test/integration:http_integration_lib",
         "//test/integration/filters:stream_info_to_headers_filter_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
