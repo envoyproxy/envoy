@@ -151,10 +151,10 @@ public:
 private:
   void maybeInitializeRouteConfigs(Http::StreamFilterCallbacks* callbacks);
 
-  HeaderMutationConfigSharedPtr config_{};
+  HeaderMutationConfigSharedPtr config_;
   // The lifetime of route config pointers is same as the matched route.
   bool route_configs_initialized_{false};
-  absl::InlinedVector<std::reference_wrapper<const PerRouteHeaderMutation>, 4> route_configs_{};
+  absl::InlinedVector<std::reference_wrapper<const PerRouteHeaderMutation>, 4> route_configs_;
 };
 
 } // namespace HeaderMutation
