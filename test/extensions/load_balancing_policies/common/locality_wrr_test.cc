@@ -1,6 +1,6 @@
 #include "envoy/upstream/upstream.h"
 
-#include "source/common/upstream/locality_wrr.h"
+#include "source/extensions/load_balancing_policies/common/locality_wrr.h"
 #include "source/common/upstream/upstream_impl.h"
 
 #include "test/common/upstream/utility.h"
@@ -16,50 +16,29 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-class LocalityWrrTest : public Event::TestUsingSimulatedTime,
-                        public ::testing::TestWithParam<bool> {
+class LocalityWrrTest : public Event::TestUsingSimulatedTime, public ::testing::Test {
 public:
   LocalityWrrTest() {
-    if (using_host_set) {
-      scoped_runtime_.mergeValues(
-          {{"envoy.restart_features.move_locality_schedulers_to_lb", "false"}});
-
-    } else {
-      scoped_runtime_.mergeValues(
-          {{"envoy.restart_features.move_locality_schedulers_to_lb", "true"}});
-    }
     host_set_ = std::make_unique<HostSetImpl>(0, false, kDefaultOverProvisioningFactor);
   }
 
-  absl::optional<uint32_t> chooseDegradedLocality() {
-    return using_host_set ? host_set_->chooseDegradedLocality()
-                          : locality_wrr_->chooseDegradedLocality();
-  }
+  absl::optional<uint32_t> chooseDegradedLocality() { return locality_wrr_->chooseDegradedLocality(); }
 
-  absl::optional<uint32_t> chooseHealthyLocality() {
-    return using_host_set ? host_set_->chooseHealthyLocality()
-                          : locality_wrr_->chooseHealthyLocality();
-  }
+  absl::optional<uint32_t> chooseHealthyLocality() { return locality_wrr_->chooseHealthyLocality(); }
 
-  const bool using_host_set = GetParam();
-  TestScopedRuntime scoped_runtime_;
-  LocalityWeightsConstSharedPtr locality_weights_;
   std::unique_ptr<HostSetImpl> host_set_;
   std::unique_ptr<LocalityWrr> locality_wrr_ = nullptr;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
 };
 
-INSTANTIATE_TEST_SUITE_P(LocalityWrrTest, LocalityWrrTest, ::testing::Bool());
+TEST_F(LocalityWrrTest, HostSetEmpty) {
+  locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
 
-TEST_P(LocalityWrrTest, HostSetEmpty) {
-  if (!using_host_set) {
-    locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
-  }
   EXPECT_EQ(chooseHealthyLocality(), absl::nullopt);
   EXPECT_EQ(chooseDegradedLocality(), absl::nullopt);
 }
 
-TEST_P(LocalityWrrTest, AllHostsUnhealthy) {
+TEST_F(LocalityWrrTest, AllHostsUnhealthy) {
   envoy::config::core::v3::Locality zone_a;
   zone_a.set_zone("A");
   envoy::config::core::v3::Locality zone_b;
@@ -75,16 +54,15 @@ TEST_P(LocalityWrrTest, AllHostsUnhealthy) {
   LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1, 1}};
   auto hosts_const_shared = std::make_shared<const HostVector>(hosts);
   host_set_->updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality),
-                         locality_weights, {}, {}, 0, absl::nullopt);
-  if (!using_host_set) {
-    locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
-  }
+                         locality_weights, {}, {}, absl::nullopt);
+  locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
+
   EXPECT_FALSE(chooseHealthyLocality().has_value());
 }
 
 // When a locality has endpoints that have not yet been warmed, weight calculation should ignore
 // these hosts.
-TEST_P(LocalityWrrTest, NotWarmedHostsLocality) {
+TEST_F(LocalityWrrTest, NotWarmedHostsLocality) {
   envoy::config::core::v3::Locality zone_a;
   zone_a.set_zone("A");
   envoy::config::core::v3::Locality zone_b;
@@ -114,10 +92,9 @@ TEST_P(LocalityWrrTest, NotWarmedHostsLocality) {
           HostsPerLocalityImpl::empty(),
           makeHostsFromHostsPerLocality<ExcludedHostVector>(excluded_hosts_per_locality),
           excluded_hosts_per_locality),
-      locality_weights, {}, {}, 0, absl::nullopt);
-  if (!using_host_set) {
-    locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
-  }
+      locality_weights, {}, {}, absl::nullopt);
+  locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
+
   // We should RR between localities with equal weight.
   EXPECT_EQ(0, chooseHealthyLocality().value());
   EXPECT_EQ(1, chooseHealthyLocality().value());
@@ -125,7 +102,7 @@ TEST_P(LocalityWrrTest, NotWarmedHostsLocality) {
   EXPECT_EQ(1, chooseHealthyLocality().value());
 }
 
-TEST_P(LocalityWrrTest, AllZeroWeights) {
+TEST_F(LocalityWrrTest, AllZeroWeights) {
   envoy::config::core::v3::Locality zone_a;
   zone_a.set_zone("A");
   envoy::config::core::v3::Locality zone_b;
@@ -140,13 +117,12 @@ TEST_P(LocalityWrrTest, AllZeroWeights) {
                                            std::make_shared<const HealthyHostVector>(hosts),
                                            hosts_per_locality),
                          locality_weights, {}, {}, 0);
-  if (!using_host_set) {
-    locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
-  }
+  locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
+
   EXPECT_FALSE(chooseHealthyLocality().has_value());
 }
 
-TEST_P(LocalityWrrTest, UnweightedLocalities) {
+TEST_F(LocalityWrrTest, UnweightedLocalities) {
   envoy::config::core::v3::Locality zone_a;
   zone_a.set_zone("A");
   envoy::config::core::v3::Locality zone_b;
@@ -164,11 +140,10 @@ TEST_P(LocalityWrrTest, UnweightedLocalities) {
   host_set_->updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality,
                                            std::make_shared<const HealthyHostVector>(hosts),
                                            hosts_per_locality),
-                         locality_weights, {}, {}, 0, absl::nullopt);
+                         locality_weights, {}, {}, absl::nullopt);
 
-  if (!using_host_set) {
-    locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
-  }
+  locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
+
   EXPECT_EQ(0, chooseHealthyLocality().value());
   EXPECT_EQ(1, chooseHealthyLocality().value());
   EXPECT_EQ(2, chooseHealthyLocality().value());
@@ -178,7 +153,7 @@ TEST_P(LocalityWrrTest, UnweightedLocalities) {
 }
 
 // When locality weights differ, we have weighted RR behavior.
-TEST_P(LocalityWrrTest, WeightedLocalities) {
+TEST_F(LocalityWrrTest, WeightedLocalities) {
   envoy::config::core::v3::Locality zone_a;
   zone_a.set_zone("A");
   envoy::config::core::v3::Locality zone_b;
@@ -192,11 +167,10 @@ TEST_P(LocalityWrrTest, WeightedLocalities) {
   host_set_->updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality,
                                            std::make_shared<const HealthyHostVector>(hosts),
                                            hosts_per_locality),
-                         locality_weights, {}, {}, 0, absl::nullopt);
+                         locality_weights, {}, {}, absl::nullopt);
 
-  if (!using_host_set) {
-    locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
-  }
+  locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
+
   EXPECT_EQ(1, chooseHealthyLocality().value());
   EXPECT_EQ(0, chooseHealthyLocality().value());
   EXPECT_EQ(1, chooseHealthyLocality().value());
@@ -205,7 +179,7 @@ TEST_P(LocalityWrrTest, WeightedLocalities) {
   EXPECT_EQ(1, chooseHealthyLocality().value());
 }
 // Localities with no weight assignment are never picked.
-TEST_P(LocalityWrrTest, MissingWeight) {
+TEST_F(LocalityWrrTest, MissingWeight) {
   envoy::config::core::v3::Locality zone_a;
   zone_a.set_zone("A");
   envoy::config::core::v3::Locality zone_b;
@@ -223,10 +197,9 @@ TEST_P(LocalityWrrTest, MissingWeight) {
   host_set_->updateHosts(updateHostsParams(hosts_const_shared, hosts_per_locality,
                                            std::make_shared<const HealthyHostVector>(hosts),
                                            hosts_per_locality),
-                         locality_weights, {}, {}, 0, absl::nullopt);
-  if (!using_host_set) {
-    locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
-  }
+                         locality_weights, {}, {}, absl::nullopt);
+  locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
+
   EXPECT_EQ(0, chooseHealthyLocality().value());
   EXPECT_EQ(2, chooseHealthyLocality().value());
   EXPECT_EQ(0, chooseHealthyLocality().value());
@@ -237,7 +210,7 @@ TEST_P(LocalityWrrTest, MissingWeight) {
 
 // Validates that with weighted initialization all localities are chosen
 // proportionally to their weight.
-TEST_P(LocalityWrrTest, WeightedAllChosen) {
+TEST_F(LocalityWrrTest, WeightedAllChosen) {
   envoy::config::core::v3::Locality zone_a;
   zone_a.set_zone("A");
   envoy::config::core::v3::Locality zone_b;
@@ -265,9 +238,8 @@ TEST_P(LocalityWrrTest, WeightedAllChosen) {
                                              std::make_shared<const HealthyHostVector>(hosts),
                                              hosts_per_locality),
                            locality_weights, {}, {}, i, absl::nullopt);
-    if (!using_host_set) {
-      locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, i);
-    }
+    locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, i);
+
     locality_picked_count[chooseHealthyLocality().value()]++;
   }
   EXPECT_EQ(locality_picked_count[0], 1);
@@ -276,7 +248,7 @@ TEST_P(LocalityWrrTest, WeightedAllChosen) {
 }
 
 // Gentle failover between localities as health diminishes.
-TEST_P(LocalityWrrTest, UnhealthyFailover) {
+TEST_F(LocalityWrrTest, UnhealthyFailover) {
   envoy::config::core::v3::Locality zone_a;
   zone_a.set_zone("A");
   envoy::config::core::v3::Locality zone_b;
@@ -288,9 +260,8 @@ TEST_P(LocalityWrrTest, UnhealthyFailover) {
                    makeTestHost(info_, "tcp://127.0.0.1:84", zone_a),
                    makeTestHost(info_, "tcp://127.0.0.1:85", zone_b)};
 
-  if (!using_host_set) {
-    locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
-  }
+  locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
+
   const auto setHealthyHostCount = [this, hosts](uint32_t host_count) {
     LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 2}};
     HostsPerLocalitySharedPtr hosts_per_locality =
@@ -307,10 +278,8 @@ TEST_P(LocalityWrrTest, UnhealthyFailover) {
                                              makeHostsFromHostsPerLocality<HealthyHostVector>(
                                                  healthy_hosts_per_locality),
                                              healthy_hosts_per_locality),
-                           locality_weights, {}, {}, 0, absl::nullopt);
-    if (!using_host_set) {
-      locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
-    }
+                           locality_weights, {}, {}, absl::nullopt);
+    locality_wrr_ = std::make_unique<LocalityWrr>(*host_set_, 0);
   };
 
   const auto expectPicks = [this](uint32_t locality_0_picks, uint32_t locality_1_picks) {
@@ -365,61 +334,11 @@ TEST(OverProvisioningFactorTest, LocalityPickChanges) {
     host_set.updateHosts(updateHostsParams(std::make_shared<const HostVector>(hosts),
                                            hosts_per_locality, healthy_hosts,
                                            healthy_hosts_per_locality),
-                         locality_weights, {}, {}, 0, absl::nullopt);
+                         locality_weights, {}, {}, absl::nullopt);
     LocalityWrr locality_wrr(host_set, 0);
     uint32_t cnts[] = {0, 0};
     for (uint32_t i = 0; i < 100; ++i) {
       absl::optional<uint32_t> locality_index = locality_wrr.chooseHealthyLocality();
-      if (!locality_index.has_value()) {
-        // It's possible locality scheduler is nullptr (when factor is 0).
-        continue;
-      }
-      ASSERT_LT(locality_index.value(), 2);
-      ++cnts[locality_index.value()];
-    }
-    EXPECT_EQ(pick_0, cnts[0]);
-    EXPECT_EQ(pick_1, cnts[1]);
-  };
-
-  // NOTE: effective locality weight: weight * min(1, factor * healthy-ratio).
-
-  // Picks in localities match to weight(1) * healthy-ratio when
-  // overprovisioning factor is 1.
-  setUpHostSetWithOPFAndTestPicks(100, 33, 67);
-  // Picks in localities match to weights as factor * healthy-ratio > 1.
-  setUpHostSetWithOPFAndTestPicks(200, 50, 50);
-};
-
-TEST(OverProvisioningFactorTest, LocalityPickChangesUsingHostSet) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.restart_features.move_locality_schedulers_to_lb", "false"}});
-  auto setUpHostSetWithOPFAndTestPicks = [](const uint32_t overprovisioning_factor,
-                                            const uint32_t pick_0, const uint32_t pick_1) {
-    HostSetImpl host_set(0, false, overprovisioning_factor);
-    std::shared_ptr<MockClusterInfo> cluster_info{new NiceMock<MockClusterInfo>()};
-    auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
-    envoy::config::core::v3::Locality zone_a;
-    zone_a.set_zone("A");
-    envoy::config::core::v3::Locality zone_b;
-    zone_b.set_zone("B");
-    HostVector hosts{makeTestHost(cluster_info, "tcp://127.0.0.1:80", zone_a),
-                     makeTestHost(cluster_info, "tcp://127.0.0.1:81", zone_a),
-                     makeTestHost(cluster_info, "tcp://127.0.0.1:82", zone_b)};
-    LocalityWeightsConstSharedPtr locality_weights{new LocalityWeights{1, 1}};
-    HostsPerLocalitySharedPtr hosts_per_locality =
-        makeHostsPerLocality({{hosts[0], hosts[1]}, {hosts[2]}});
-    // Healthy ratio: (1/2, 1).
-    HostsPerLocalitySharedPtr healthy_hosts_per_locality =
-        makeHostsPerLocality({{hosts[0]}, {hosts[2]}});
-    auto healthy_hosts =
-        makeHostsFromHostsPerLocality<HealthyHostVector>(healthy_hosts_per_locality);
-    host_set.updateHosts(updateHostsParams(std::make_shared<const HostVector>(hosts),
-                                           hosts_per_locality, healthy_hosts,
-                                           healthy_hosts_per_locality),
-                         locality_weights, {}, {}, 0, absl::nullopt);
-    uint32_t cnts[] = {0, 0};
-    for (uint32_t i = 0; i < 100; ++i) {
-      absl::optional<uint32_t> locality_index = host_set.chooseHealthyLocality();
       if (!locality_index.has_value()) {
         // It's possible locality scheduler is nullptr (when factor is 0).
         continue;

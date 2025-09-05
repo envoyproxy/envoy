@@ -242,7 +242,7 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
   all_hosts->emplace_back(host);
   priority_set_.updateHosts(
       0, HostSetImpl::partitionHosts(all_hosts, HostsPerLocalityImpl::empty()), {},
-      {std::move(host)}, {}, random_.random(), absl::nullopt, absl::nullopt);
+      {std::move(host)}, {}, absl::nullopt, absl::nullopt);
 }
 
 void OriginalDstCluster::cleanup() {

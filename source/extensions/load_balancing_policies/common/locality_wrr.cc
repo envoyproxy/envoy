@@ -1,4 +1,4 @@
-#include "source/common/upstream/locality_wrr.h"
+#include "source/extensions/load_balancing_policies/common/locality_wrr.h"
 
 namespace Envoy {
 namespace Upstream {

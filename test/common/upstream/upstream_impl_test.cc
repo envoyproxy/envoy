@@ -4090,7 +4090,7 @@ public:
           updateHostsParams(hosts_, hosts_per_locality_,
                             std::make_shared<const HealthyHostVector>(*hosts_),
                             hosts_per_locality_),
-          {}, hosts_added, hosts_removed, random_.random(), absl::nullopt, absl::nullopt);
+          {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
     }
 
     // Remove the host from P1.
@@ -4103,7 +4103,7 @@ public:
           updateHostsParams(empty_hosts, HostsPerLocalityImpl::empty(),
                             std::make_shared<const HealthyHostVector>(*empty_hosts),
                             HostsPerLocalityImpl::empty()),
-          {}, hosts_added, hosts_removed, random_.random(), absl::nullopt, absl::nullopt);
+          {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt);
     }
   }
 
@@ -4163,7 +4163,7 @@ TEST(PrioritySet, Extend) {
                              updateHostsParams(hosts, hosts_per_locality,
                                                std::make_shared<const HealthyHostVector>(*hosts),
                                                hosts_per_locality),
-                             {}, hosts_added, hosts_removed, 0, absl::nullopt, absl::nullopt,
+                             {}, hosts_added, hosts_removed, absl::nullopt, absl::nullopt,
                              fake_cross_priority_host_map);
   }
   EXPECT_EQ(1, priority_changes);
@@ -4229,7 +4229,7 @@ TEST(PrioritySet, MainPrioritySetTest) {
                              updateHostsParams(hosts, hosts_per_locality,
                                                std::make_shared<const HealthyHostVector>(*hosts),
                                                hosts_per_locality),
-                             {}, hosts_added, hosts_removed, 0, absl::nullopt);
+                             {}, hosts_added, hosts_removed, absl::nullopt);
   }
 
   // Only mutable host map can be updated directly. Read only host map will not be updated before
@@ -4250,7 +4250,7 @@ TEST(PrioritySet, MainPrioritySetTest) {
                              updateHostsParams(hosts, hosts_per_locality,
                                                std::make_shared<const HealthyHostVector>(*hosts),
                                                hosts_per_locality),
-                             {}, hosts_added, hosts_removed, 0, absl::nullopt);
+                             {}, hosts_added, hosts_removed, absl::nullopt);
   }
 
   // New mutable host map will be created and all update will be applied to new mutable host map.
@@ -6200,11 +6200,9 @@ TEST_F(PriorityStateManagerTest, LocalityClusterUpdate) {
   cluster->initialize([] { return absl::OkStatus(); });
   EXPECT_EQ(1UL, cluster->prioritySet().hostSetsPerPriority()[0]->hosts().size());
 
-  NiceMock<Random::MockRandomGenerator> random;
   // Make priority state manager and fill it with the initial state of the cluster and the added
   // hosts
-  PriorityStateManager priority_state_manager(*cluster, server_context_.local_info_, nullptr,
-                                              random);
+  PriorityStateManager priority_state_manager(*cluster, server_context_.local_info_, nullptr);
 
   auto current_hosts = cluster->prioritySet().hostSetsPerPriority()[0]->hosts();
   HostVector hosts_added{makeTestHost(cluster->info(), "tcp://127.0.0.1:81", zone_b),

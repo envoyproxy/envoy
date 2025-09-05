@@ -24,7 +24,7 @@
 #include "source/common/runtime/runtime_protos.h"
 #include "source/common/upstream/edf_scheduler.h"
 #include "source/common/upstream/load_balancer_context_base.h"
-#include "source/common/upstream/locality_wrr.h"
+#include "source/extensions/load_balancing_policies/common/locality_wrr.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -438,19 +438,13 @@ private:
   }
 
   absl::optional<uint32_t> chooseHealthyLocality(HostSet& host_set) const {
-    if (locality_scheduler_on_lb_) {
-      ASSERT(per_priority_state_[host_set.priority()]->locality_wrr_);
-      return per_priority_state_[host_set.priority()]->locality_wrr_->chooseHealthyLocality();
-    }
-    return host_set.chooseHealthyLocality();
+    ASSERT(per_priority_state_[host_set.priority()]->locality_wrr_);
+    return per_priority_state_[host_set.priority()]->locality_wrr_->chooseHealthyLocality();
   };
 
   absl::optional<uint32_t> chooseDegradedLocality(HostSet& host_set) const {
-    if (locality_scheduler_on_lb_) {
-      ASSERT(per_priority_state_[host_set.priority()]->locality_wrr_);
-      return per_priority_state_[host_set.priority()]->locality_wrr_->chooseDegradedLocality();
-    }
-    return host_set.chooseDegradedLocality();
+    ASSERT(per_priority_state_[host_set.priority()]->locality_wrr_);
+    return per_priority_state_[host_set.priority()]->locality_wrr_->chooseDegradedLocality();
   };
 
   // The set of local Envoy instances which are load balancing across priority_set_.
@@ -487,8 +481,6 @@ private:
 
   // If locality weight aware routing is enabled.
   const bool locality_weighted_balancing_ : 1;
-  const bool locality_scheduler_on_lb_{
-      Runtime::runtimeFeatureEnabled("envoy.restart_features.move_locality_schedulers_to_lb")};
 
   friend class TestZoneAwareLoadBalancer;
 };

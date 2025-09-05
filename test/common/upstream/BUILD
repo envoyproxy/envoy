@@ -30,20 +30,6 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "locality_wrr_test",
-    srcs = ["locality_wrr_test.cc"],
-    deps = [
-        ":utility_lib",
-        "//envoy/upstream:upstream_interface",
-        "//source/common/upstream:locality_wrr_lib",
-        "//source/common/upstream:upstream_includes",
-        "//test/mocks/upstream:cluster_info_mocks",
-        "//test/test_common:simulated_time_system_lib",
-        "//test/test_common:test_runtime_lib",
-    ],
-)
-
-envoy_cc_test(
     name = "cds_api_impl_test",
     srcs = ["cds_api_impl_test.cc"],
     rbe_pool = "6gig",

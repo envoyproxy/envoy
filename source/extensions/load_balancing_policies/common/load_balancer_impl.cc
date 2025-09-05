@@ -424,7 +424,7 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
                                    locality_config->has_locality_weighted_lb_config()) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
   resizePerPriorityState();
-  if (locality_weighted_balancing_ && locality_scheduler_on_lb_) {
+  if (locality_weighted_balancing_) {
     for (uint32_t priority = 0; priority < priority_set_.hostSetsPerPriority().size(); ++priority) {
       rebuildLocalityWrrForPriority(priority);
     }
@@ -440,7 +440,7 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
           regenerateLocalityRoutingStructures();
         }
 
-        if (locality_weighted_balancing_ && locality_scheduler_on_lb_) {
+        if (locality_weighted_balancing_) {
           rebuildLocalityWrrForPriority(priority);
         }
         return absl::OkStatus();
