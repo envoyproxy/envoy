@@ -46,6 +46,7 @@ envoy_cc_library(
     hdrs = ["reverse_tunnel_initiator_extension.h"],
     visibility = ["//visibility:public"],
     deps = [
+        ":reverse_connection_handshake_cc_proto",
         "//envoy/server:bootstrap_extension_config_interface",
         "//envoy/stats:stats_interface",
         "//envoy/thread_local:thread_local_interface",
@@ -57,7 +58,11 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "reverse_connection_io_handle_lib",
-    srcs = ["reverse_connection_io_handle.cc"],
+    srcs = [
+        "downstream_reverse_connection_io_handle.cc",
+        "rc_connection_wrapper.cc",
+        "reverse_connection_io_handle.cc",
+    ],
     hdrs = [
         "downstream_reverse_connection_io_handle.h",
         "rc_connection_wrapper.h",

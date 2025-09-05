@@ -6,16 +6,6 @@ package envoy.extensions.bootstrap.reverse_tunnel;
 // These messages are used internally by the reverse tunnel extension
 // and are not exposed to users.
 
-// Configuration for the reverse connection handshake extension.
-// This extension provides message definitions for establishing reverse connections
-// between Envoy instances.
-message ReverseConnectionHandshakeConfig {
-  // This is a placeholder config message for the reverse connection handshake extension.
-  // The extension primarily provides message definitions for the handshake protocol
-  // rather than configuration.
-  bool enabled = 1;
-}
-
 // Config sent by the local cluster as part of the Initiation workflow.
 // This message combined with message 'ReverseConnHandshakeRet' which is
 // sent as a response can be used to transfer/negotiate parameter between the

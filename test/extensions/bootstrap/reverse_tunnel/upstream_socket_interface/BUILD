@@ -58,9 +58,9 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
-    name = "reverse_connection_io_handle_test",
+    name = "upstream_reverse_connection_io_handle_test",
     size = "medium",
-    srcs = ["reverse_connection_io_handle_test.cc"],
+    srcs = ["upstream_reverse_connection_io_handle_test.cc"],
     deps = [
         "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
         "//test/mocks/network:network_mocks",
