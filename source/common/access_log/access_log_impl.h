@@ -85,15 +85,20 @@ public:
  */
 class LocalRateLimitFilter : public Filter {
 public:
-  LocalRateLimitFilter(const envoy::config::accesslog::v3::LocalRateLimitFilter& config,
-                       Server::Configuration::FactoryContext& context);
+  static absl::StatusOr<FilterPtr>
+  create(const envoy::config::accesslog::v3::LocalRateLimitFilter& config,
+         Server::Configuration::FactoryContext& context);
 
   // AccessLog::Filter
   bool evaluate(const Formatter::HttpFormatterContext& context,
                 const StreamInfo::StreamInfo& info) const override;
 
 private:
-  std::string singleton_key_;
+  LocalRateLimitFilter(
+      Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterMapSingleton::RateLimiter&&
+          rate_limiter)
+      : rate_limiter_(std::move(rate_limiter)) {};
+
   mutable Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterMapSingleton::RateLimiter
       rate_limiter_;
 };

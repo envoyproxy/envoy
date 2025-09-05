@@ -52,8 +52,8 @@ using DynamicDescriptorSharedPtr = std::shared_ptr<DynamicDescriptor>;
 class DynamicDescriptorMap : public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
   // add a new user configured descriptor to the set.
-  void addDescriptor(const RateLimit::LocalDescriptor& descriptor,
-                     DynamicDescriptorSharedPtr dynamic_descriptor);
+  absl::Status addDescriptor(const RateLimit::LocalDescriptor& descriptor,
+                             DynamicDescriptorSharedPtr dynamic_descriptor);
   // pass request_descriptors to the dynamic descriptor set to get the token bucket.
   RateLimitTokenBucketSharedPtr getBucket(const RateLimit::Descriptor);
 
@@ -145,7 +145,7 @@ public:
       const uint64_t tokens_per_fill, Event::Dispatcher& dispatcher,
       const Protobuf::RepeatedPtrField<
           envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
-      bool always_consume_default_token_bucket = true,
+      absl::Status& create_status, bool always_consume_default_token_bucket = true,
       ShareProviderSharedPtr shared_provider = nullptr, const uint32_t lru_size = 20);
   ~LocalRateLimiterImpl();
 
@@ -180,7 +180,7 @@ public:
     std::shared_ptr<LocalRateLimiterImpl> limiter_;
   };
 
-  static RateLimiter getRateLimiter(
+  static absl::StatusOr<RateLimiter> getRateLimiter(
       Singleton::Manager& manager, absl::string_view limiter_key,
       const std::chrono::milliseconds fill_interval, const uint64_t max_tokens,
       const uint64_t tokens_per_fill, Event::Dispatcher& dispatcher,
