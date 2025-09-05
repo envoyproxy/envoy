@@ -11,7 +11,9 @@
 # TODO: Adding just to test android
 startup --host_jvm_args=-Xmx3g
 
-common --noenable_bzlmod
+# Enable bzlmod for modern dependency management (hybrid mode with WORKSPACE)
+# This allows gradual migration from WORKSPACE to MODULE.bazel
+common --enable_bzlmod
 
 fetch --color=yes
 run --color=yes
@@ -275,7 +277,7 @@ build:fuzz-coverage --test_tag_filters=-nocoverage
 # resources required to build and run the tests.
 build:fuzz-coverage --define=wasm=disabled
 build:fuzz-coverage --config=fuzz-coverage-config
-build:fuzz-coverage-config --//tools/coverage:config=//test:fuzz_coverage_config
+build:fuzz-coverage-config --//tools/coverage:config=@envoy//test:fuzz_coverage_config
 
 build:cache-local --remote_cache=grpc://localhost:9092
 
@@ -562,7 +564,7 @@ common:remote-cache-envoy-engflow --config=common-envoy-engflow
 common:remote-cache-envoy-engflow --config=cache-envoy-engflow
 
 # Specifies the rustfmt.toml for all rustfmt_test targets.
-build --@rules_rust//rust/settings:rustfmt.toml=//:rustfmt.toml
+build --@rules_rust//rust/settings:rustfmt.toml=@envoy//:rustfmt.toml
 
 #############################################################################
 # debug: Various Bazel debugging flags
