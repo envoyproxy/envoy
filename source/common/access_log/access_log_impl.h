@@ -97,7 +97,7 @@ private:
   LocalRateLimitFilter(
       Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterMapSingleton::RateLimiter&&
           rate_limiter)
-      : rate_limiter_(std::move(rate_limiter)) {};
+      : rate_limiter_(std::move(rate_limiter)) {}
 
   mutable Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterMapSingleton::RateLimiter
       rate_limiter_;

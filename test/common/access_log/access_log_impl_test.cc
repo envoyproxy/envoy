@@ -1605,7 +1605,7 @@ TEST_F(AccessLogImplTest, RateLimitFilter) {
   const std::string yaml = R"EOF(
 name: accesslog
 filter:
-  local_rate_limit_filter: 
+  local_rate_limit_filter:
     token_bucket:
       fill_interval: 1s
       max_tokens: 1
