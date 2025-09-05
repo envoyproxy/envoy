@@ -13,13 +13,12 @@ class CgroupCpuUtil {
 public:
   /**
    * Detects CPU limit from cgroup v2 or v1 with hierarchy scanning, falling back to hardware count.
-   * Similar to Go's GOMAXPROCS algorithm: scans cgroup hierarchy and takes minimum limit.
-   * Returns minimum of 1 CPU (modified from Go's minimum of 2).
+   * Scans cgroup hierarchy and takes minimum effective limit for container-aware CPU detection.
    * @param fs Filesystem instance for file operations.
-   * @param hw_threads Hardware thread count as fallback.
-   * @return CPU limit or hw_threads if no cgroup limit found.
+   * @param hardware_threads Hardware thread count as fallback.
+   * @return CPU limit or hardware_threads if no cgroup limit found.
    */
-  static uint32_t getCpuLimit(Filesystem::Instance& fs, uint32_t hw_threads);
+  static uint32_t getCpuLimit(Filesystem::Instance& fs, uint32_t hardware_threads);
 
 private:
   /**

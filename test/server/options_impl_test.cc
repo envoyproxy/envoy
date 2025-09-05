@@ -590,7 +590,7 @@ public:
 
 TEST_F(OptionsImplPlatformLinuxTest, AffinityTest1) {
   // Success case: cpuset size and hardware thread count are the same.
-  unsigned int fake_hw_threads = 4;
+  unsigned int fake_hardware_threads = 4;
   cpu_set_t test_set;
   Api::MockLinuxOsSysCalls linux_os_sys_calls;
   TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_sys_calls);
@@ -603,12 +603,12 @@ TEST_F(OptionsImplPlatformLinuxTest, AffinityTest1) {
 
   EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
       .WillOnce(DoAll(SetArgPointee<2>(test_set), Return(Api::SysCallIntResult{0, 0})));
-  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), 4);
+  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hardware_threads), 4);
 }
 
 TEST_F(OptionsImplPlatformLinuxTest, AffinityTest2) {
   // Success case: cpuset size is half of the hardware thread count.
-  unsigned int fake_hw_threads = 16;
+  unsigned int fake_hardware_threads = 16;
   cpu_set_t test_set;
   Api::MockLinuxOsSysCalls linux_os_sys_calls;
   TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_sys_calls);
@@ -621,12 +621,12 @@ TEST_F(OptionsImplPlatformLinuxTest, AffinityTest2) {
 
   EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
       .WillOnce(DoAll(SetArgPointee<2>(test_set), Return(Api::SysCallIntResult{0, 0})));
-  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), 8);
+  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hardware_threads), 8);
 }
 
 TEST_F(OptionsImplPlatformLinuxTest, AffinityTest3) {
   // Failure case: cpuset size is bigger than the hardware thread count.
-  unsigned int fake_hw_threads = 4;
+  unsigned int fake_hardware_threads = 4;
   cpu_set_t test_set;
   Api::MockLinuxOsSysCalls linux_os_sys_calls;
   TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_sys_calls);
@@ -639,12 +639,13 @@ TEST_F(OptionsImplPlatformLinuxTest, AffinityTest3) {
 
   EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
       .WillOnce(DoAll(SetArgPointee<2>(test_set), Return(Api::SysCallIntResult{0, 0})));
-  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_hw_threads);
+  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hardware_threads),
+            fake_hardware_threads);
 }
 
 TEST_F(OptionsImplPlatformLinuxTest, AffinityTest4) {
   // When sched_getaffinity() fails, expect to get the hardware thread count.
-  unsigned int fake_hw_threads = 8;
+  unsigned int fake_hardware_threads = 8;
   cpu_set_t test_set;
   Api::MockLinuxOsSysCalls linux_os_sys_calls;
   TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_sys_calls);
@@ -657,7 +658,8 @@ TEST_F(OptionsImplPlatformLinuxTest, AffinityTest4) {
 
   EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
       .WillOnce(DoAll(SetArgPointee<2>(test_set), Return(Api::SysCallIntResult{-1, 0})));
-  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_hw_threads);
+  EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hardware_threads),
+            fake_hardware_threads);
 }
 
 // Pure cgroup mock tests - use filesystem mocks to work on Linux
@@ -728,7 +730,7 @@ TEST_F(OptionsImplPlatformLinuxTest, CgroupUnlimited) {
       .WillOnce(Return(std::string("max 100000")));
 
   uint32_t result = CgroupCpuUtil::getCpuLimit(mock_fs, 8);
-  EXPECT_EQ(result, 8); // Should return max(1, hw_threads) when unlimited
+  EXPECT_EQ(result, 8); // Should return max(1, hardware_threads) when unlimited
 }
 
 TEST_F(OptionsImplPlatformLinuxTest, NoCgroupFilesAvailable) {
@@ -739,12 +741,12 @@ TEST_F(OptionsImplPlatformLinuxTest, NoCgroupFilesAvailable) {
   EXPECT_CALL(mock_fs, fileExists(_)).WillRepeatedly(Return(false));
 
   uint32_t result = CgroupCpuUtil::getCpuLimit(mock_fs, 8);
-  EXPECT_EQ(result, 8); // Should return max(1, hw_threads) = 8
+  EXPECT_EQ(result, 8); // Should return max(1, hardware_threads) = 8
 }
 
-TEST_F(OptionsImplPlatformLinuxTest, GoMaxprocsAlgorithm) {
+TEST_F(OptionsImplPlatformLinuxTest, CpuCountIntegration) {
   // Test the complete getCpuCount() integration that combines hardware, affinity, and cgroup
-  unsigned int fake_hw_threads = 8;
+  unsigned int fake_hardware_threads = 8;
   Api::MockLinuxOsSysCalls linux_os_sys_calls;
   TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_sys_calls);
 
@@ -761,7 +763,7 @@ TEST_F(OptionsImplPlatformLinuxTest, GoMaxprocsAlgorithm) {
   // would require injecting the filesystem mock into OptionsImplPlatform::getCpuCount(),
   // which would require refactoring that function to accept a filesystem parameter.
 
-  uint32_t affinity_result = OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads);
+  uint32_t affinity_result = OptionsImplPlatformLinux::getCpuAffinityCount(fake_hardware_threads);
   EXPECT_EQ(affinity_result, 4); // Should respect CPU affinity constraint
 }
 

@@ -10,8 +10,8 @@
 
 namespace Envoy {
 
-uint32_t CgroupCpuUtil::getCpuLimit(Filesystem::Instance& fs, uint32_t hw_threads) {
-  uint32_t min_limit = hw_threads;
+uint32_t CgroupCpuUtil::getCpuLimit(Filesystem::Instance& fs, uint32_t hardware_threads) {
+  uint32_t min_limit = hardware_threads;
 
   // Try cgroup v2 first with hierarchy scanning
   if (isV2Available(fs)) {
@@ -29,7 +29,7 @@ uint32_t CgroupCpuUtil::getCpuLimit(Filesystem::Instance& fs, uint32_t hw_thread
     }
   }
 
-  // Apply Go's algorithm: max(1, ceil(effective_cpu_limit))
+  // Return minimum of 1 CPU
   return std::max(1U, min_limit);
 }
 
@@ -41,7 +41,7 @@ uint32_t CgroupCpuUtil::getCgroupV2CpuLimit(Filesystem::Instance& fs) {
     return readCgroupV2CpuLimit(fs, CGROUP_V2_CPU_MAX);
   }
 
-  // Read only the leaf cgroup (like Go runtime for simplicity and stability)
+  // Read only the leaf cgroup for simplicity and stability
   std::string current_path = absl::StrCat(CGROUP_V2_BASE_PATH, cgroup_path);
   std::string cpu_max_path = absl::StrCat(current_path, "/cpu.max");
   return readCgroupV2CpuLimit(fs, cpu_max_path);
@@ -55,7 +55,7 @@ uint32_t CgroupCpuUtil::getCgroupV1CpuLimit(Filesystem::Instance& fs) {
     return readCgroupV1CpuLimit(fs, CGROUP_V1_CPU_QUOTA, CGROUP_V1_CPU_PERIOD);
   }
 
-  // Read only the leaf cgroup (like Go runtime for simplicity and stability)
+  // Read only the leaf cgroup for simplicity and stability
   std::string current_path = absl::StrCat(CGROUP_V1_BASE_PATH, cgroup_path);
   std::string quota_path = absl::StrCat(current_path, "/cpu.cfs_quota_us");
   std::string period_path = absl::StrCat(current_path, "/cpu.cfs_period_us");
@@ -91,7 +91,7 @@ uint32_t CgroupCpuUtil::readCgroupV2CpuLimit(Filesystem::Instance& fs,
     return 0;
   }
 
-  // Calculate CPU limit: quota / period, rounded up (like Go's ceil)
+  // Calculate CPU limit: quota / period, rounded up
   const uint32_t cpu_limit = static_cast<uint32_t>(std::ceil(static_cast<double>(quota) / period));
   return cpu_limit > 0 ? cpu_limit : 1; // Ensure at least 1 CPU
 }
@@ -128,7 +128,7 @@ uint32_t CgroupCpuUtil::readCgroupV1CpuLimit(Filesystem::Instance& fs,
     return 0;
   }
 
-  // Calculate CPU limit: quota / period, rounded up (like Go's ceil)
+  // Calculate CPU limit: quota / period, rounded up
   const uint32_t cpu_limit = static_cast<uint32_t>(std::ceil(static_cast<double>(quota) / period));
   return cpu_limit > 0 ? cpu_limit : 1; // Ensure at least 1 CPU
 }
