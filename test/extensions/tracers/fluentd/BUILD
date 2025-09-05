@@ -19,6 +19,7 @@ envoy_extension_cc_test(
     # TODO(wrowe): envoy_extension_ rules don't currently exclude windows extensions
     tags = ["skip_on_windows"],
     deps = [
+        "//source/extensions/propagators/w3c:propagator_lib",
         "//source/extensions/tracers/fluentd:config",
         "//source/extensions/tracers/fluentd:fluentd_tracer_lib",
         "//test/mocks/server:factory_context_mocks",
