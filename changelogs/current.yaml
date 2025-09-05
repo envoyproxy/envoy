@@ -353,7 +353,7 @@ new_features:
     to allow for configuring a stream flush timeout independently from the stream idle timeout.
 - area: access_log
   change: |
-    Support rate limiting on access log.
+    Support rate limiting on access log emission.
 - area: geoip
   change: |
     Added a new metric ``db_build_epoch`` to track the build timestamp of the MaxMind geolocation database files.
