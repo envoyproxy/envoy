@@ -12,7 +12,6 @@ envoy_cc_library(
     name = "local_ratelimit_lib",
     srcs = ["local_ratelimit_impl.cc"],
     hdrs = ["local_ratelimit_impl.h"],
-    visibility = ["//visibility:public"],
     deps = [
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",

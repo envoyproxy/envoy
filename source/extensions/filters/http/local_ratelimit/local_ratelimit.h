@@ -55,20 +55,16 @@ public:
       uint32_t max_dynamic_descriptors, Envoy::Event::Dispatcher& dispatcher,
       const Protobuf::RepeatedPtrField<
           envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptor,
-      bool always_consume_default_token_bucket) {
-    absl::Status create_status;
-    rate_limiter_ = std::make_unique<Filters::Common::LocalRateLimit::LocalRateLimiterImpl>(
-        fill_interval, max_tokens, tokens_per_fill, dispatcher, descriptor, create_status,
-        always_consume_default_token_bucket, nullptr, max_dynamic_descriptors);
-    THROW_IF_NOT_OK(create_status);
-  }
+      bool always_consume_default_token_bucket)
+      : rate_limiter_(fill_interval, max_tokens, tokens_per_fill, dispatcher, descriptor,
+                      always_consume_default_token_bucket, nullptr, max_dynamic_descriptors) {}
   static const std::string& key();
   const Filters::Common::LocalRateLimit::LocalRateLimiterImpl& value() const {
-    return *rate_limiter_;
+    return rate_limiter_;
   }
 
 private:
-  std::unique_ptr<Filters::Common::LocalRateLimit::LocalRateLimiterImpl> rate_limiter_;
+  Filters::Common::LocalRateLimit::LocalRateLimiterImpl rate_limiter_;
 };
 
 /**

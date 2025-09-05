@@ -1605,11 +1605,14 @@ TEST_F(AccessLogImplTest, RateLimitFilter) {
   const std::string yaml = R"EOF(
 name: accesslog
 filter:
-  local_rate_limit_filter:
-    token_bucket:
-      fill_interval: 1s
-      max_tokens: 1
-      tokens_per_fill: 1
+  extension_filter:
+    name: local_ratelimit_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.local_ratelimit.v3.LocalRateLimitFilter
+      token_bucket:
+        fill_interval: 1s
+        max_tokens: 1
+        tokens_per_fill: 1
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
@@ -1632,11 +1635,14 @@ TEST_F(AccessLogImplTest, SharedRateLimitFilter) {
   const std::string yaml = R"EOF(
 name: accesslog
 filter:
-  local_rate_limit_filter:
-    token_bucket:
-      fill_interval: 1s
-      max_tokens: 1
-      tokens_per_fill: 1
+  extension_filter:
+    name: local_ratelimit_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.local_ratelimit.v3.LocalRateLimitFilter
+      token_bucket:
+        fill_interval: 1s
+        max_tokens: 1
+        tokens_per_fill: 1
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
@@ -1661,11 +1667,14 @@ TEST_F(AccessLogImplTest, NonSharedRateLimitFilter) {
   const std::string yaml1 = R"EOF(
 name: accesslog
 filter:
-  local_rate_limit_filter:
-    token_bucket:
-      fill_interval: 1s
-      max_tokens: 1
-      tokens_per_fill: 1
+  extension_filter:
+    name: local_ratelimit_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.local_ratelimit.v3.LocalRateLimitFilter
+      token_bucket:
+        fill_interval: 1s
+        max_tokens: 1
+        tokens_per_fill: 1
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
@@ -1673,17 +1682,19 @@ typed_config:
   const std::string yaml2 = R"EOF(
 name: accesslog
 filter:
-  local_rate_limit_filter:
-    key: this-is-key
-    token_bucket:
-      fill_interval: 1s
-      max_tokens: 1
-      tokens_per_fill: 1
+  extension_filter:
+    name: local_ratelimit_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.local_ratelimit.v3.LocalRateLimitFilter
+      key: "this-is-key"
+      token_bucket:
+        fill_interval: 1s
+        max_tokens: 1
+        tokens_per_fill: 1
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
   )EOF";
-
   InstanceSharedPtr log1 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml1), context_);
   InstanceSharedPtr log2 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml2), context_);
 

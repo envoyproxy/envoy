@@ -115,13 +115,10 @@ class LocalRateLimiterImplTest : public testing::Test {
 public:
   void initializeWithAtomicTokenBucket(const std::chrono::milliseconds fill_interval,
                                        const uint32_t max_tokens, const uint32_t tokens_per_fill,
-                                       ShareProviderSharedPtr share_provider = nullptr,
-                                       bool always_consume_default_token_bucket = true) {
-    absl::Status create_status;
-    rate_limiter_ = std::make_shared<LocalRateLimiterImpl>(
-        fill_interval, max_tokens, tokens_per_fill, dispatcher_, descriptors_, create_status,
-        always_consume_default_token_bucket, share_provider);
-    THROW_IF_NOT_OK(create_status);
+                                       ShareProviderSharedPtr share_provider = nullptr) {
+    rate_limiter_ =
+        std::make_shared<LocalRateLimiterImpl>(fill_interval, max_tokens, tokens_per_fill,
+                                               dispatcher_, descriptors_, true, share_provider);
   }
 
   Envoy::Protobuf::RepeatedPtrField<
@@ -135,24 +132,20 @@ public:
 
 // Make sure we fail with a fill rate this is too fast.
 TEST_F(LocalRateLimiterImplTest, TooFastFillRate) {
-  absl::Status create_status;
-  LocalRateLimiterImpl limiter(std::chrono::milliseconds(49), 100, 1, dispatcher_, descriptors_,
-                               create_status);
-  EXPECT_EQ(create_status.code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_EQ(create_status.message(), "local rate limit token bucket fill timer must be >= 50ms");
+  EXPECT_THROW_WITH_MESSAGE(
+      LocalRateLimiterImpl(std::chrono::milliseconds(49), 100, 1, dispatcher_, descriptors_),
+      EnvoyException, "local rate limit token bucket fill timer must be >= 50ms");
 }
 
 class LocalRateLimiterDescriptorImplTest : public LocalRateLimiterImplTest {
 public:
   void initializeWithAtomicTokenBucketDescriptor(const std::chrono::milliseconds fill_interval,
                                                  const uint32_t max_tokens,
-                                                 const uint32_t tokens_per_fill, bool enabled,
+                                                 const uint32_t tokens_per_fill,
                                                  uint32_t lru_size = 20) {
-    absl::Status create_status;
-    rate_limiter_ = std::make_shared<LocalRateLimiterImpl>(
-        fill_interval, max_tokens, tokens_per_fill, dispatcher_, descriptors_, create_status,
-        enabled, nullptr, lru_size);
-    THROW_IF_NOT_OK(create_status);
+    rate_limiter_ =
+        std::make_shared<LocalRateLimiterImpl>(fill_interval, max_tokens, tokens_per_fill,
+                                               dispatcher_, descriptors_, true, nullptr, lru_size);
   }
 
   static constexpr absl::string_view single_descriptor_config_yaml = R"(
@@ -212,18 +205,18 @@ TEST_F(LocalRateLimiterImplTest, DuplicatedDynamicTokenBucketDescriptor) {
       fmt::format(LocalRateLimiterDescriptorImplTest::wildcard_descriptor_config_yaml, 2, 1, "60s"),
       *descriptors_.Add());
 
-  absl::Status create_status;
-  LocalRateLimiterImpl(std::chrono::milliseconds(60000), 2, 1, dispatcher_, descriptors_,
-                       create_status, true, nullptr, 1);
-  EXPECT_EQ(create_status.code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_EQ(create_status.message(), "duplicate descriptor in the local rate descriptor: user=");
+  EXPECT_THROW_WITH_MESSAGE(LocalRateLimiterImpl(std::chrono::milliseconds(60000), 2, 1,
+                                                 dispatcher_, descriptors_, true, nullptr, 1),
+
+                            EnvoyException,
+                            "duplicate descriptor in the local rate descriptor: user=");
 }
 
 // Verify dynamic token bucket functionality with a single entry descriptor.
 TEST_F(LocalRateLimiterDescriptorImplTest, DynamicTokenBuckets) {
   TestUtility::loadFromYaml(fmt::format(wildcard_descriptor_config_yaml, 2, 2, "1s"),
                             *descriptors_.Add());
-  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 20, 2, true, 1);
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 20, 2, 1);
 
   std::vector<RateLimit::Descriptor> descriptors{{{{"user", "A"}}}};
 
@@ -261,7 +254,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, DynamicTokenBuckets) {
 TEST_F(LocalRateLimiterDescriptorImplTest, DynamicTokenBucketswildcardWithMultipleEntries) {
   TestUtility::loadFromYaml(fmt::format(multiple_wildcard_descriptor_config_yaml, 2, 2, "1s"),
                             *descriptors_.Add());
-  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 20, 2, true, 1);
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 20, 2, 1);
 
   std::vector<RateLimit::Descriptor> descriptors{{{{"user", "A"}}}};
   // Descriptor from 2 -> 2 tokens
@@ -302,7 +295,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, DynamicTokenBucketswildcardWithMultip
 TEST_F(LocalRateLimiterDescriptorImplTest, DynamicTokenBucketsMixedRequestOrder) {
   TestUtility::loadFromYaml(fmt::format(wildcard_descriptor_config_yaml, 2, 2, "1s"),
                             *descriptors_.Add());
-  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 4, 2, true, 2);
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 4, 2, 2);
 
   std::vector<RateLimit::Descriptor> descriptors{{{{"user", "A"}}}};
   std::vector<RateLimit::Descriptor> descriptors2{{{{"user", "B"}}}};
@@ -327,12 +320,9 @@ TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorRateLimitSmallFillInterval)
   TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 10, 10, "0.010s"),
                             *descriptors_.Add());
 
-  absl::Status create_status;
-  LocalRateLimiterImpl(std::chrono::milliseconds(59000), 2, 1, dispatcher_, descriptors_,
-                       create_status);
-  EXPECT_EQ(create_status.code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_EQ(create_status.message(),
-            "local rate limit descriptor token bucket fill timer must be >= 50ms");
+  EXPECT_THROW_WITH_MESSAGE(
+      LocalRateLimiterImpl(std::chrono::milliseconds(59000), 2, 1, dispatcher_, descriptors_),
+      EnvoyException, "local rate limit descriptor token bucket fill timer must be >= 50ms");
 }
 
 TEST_F(LocalRateLimiterDescriptorImplTest, DuplicateDescriptor) {
@@ -340,20 +330,16 @@ TEST_F(LocalRateLimiterDescriptorImplTest, DuplicateDescriptor) {
                             *descriptors_.Add());
   TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "0.1s"),
                             *descriptors_.Add());
-  absl::Status create_status;
-  LocalRateLimiterImpl(std::chrono::milliseconds(50), 1, 1, dispatcher_, descriptors_,
-                       create_status);
-  EXPECT_EQ(create_status.code(), absl::StatusCode::kInvalidArgument);
-  EXPECT_EQ(create_status.message(),
-            "duplicate descriptor in the local rate descriptor: foo2=bar2");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      LocalRateLimiterImpl(std::chrono::milliseconds(50), 1, 1, dispatcher_, descriptors_),
+      EnvoyException, "duplicate descriptor in the local rate descriptor: foo2=bar2");
 }
 
 // Verify no exception for per route config without descriptors.
 TEST_F(LocalRateLimiterDescriptorImplTest, DescriptorRateLimitNoExceptionWithoutDescriptor) {
-  absl::Status create_status;
-  LocalRateLimiterImpl(std::chrono::milliseconds(59000), 2, 1, dispatcher_, descriptors_,
-                       create_status);
-  EXPECT_TRUE(create_status.ok());
+  VERBOSE_EXPECT_NO_THROW(
+      LocalRateLimiterImpl(std::chrono::milliseconds(59000), 2, 1, dispatcher_, descriptors_));
 }
 
 // Verify token bucket functionality with a single token.
@@ -385,7 +371,7 @@ TEST_F(LocalRateLimiterImplTest, AtomicTokenBucket) {
 
 // Verify token bucket functionality with max tokens and tokens per fill > 1.
 TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketMultipleTokensPerFill) {
-  initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 2, 2, nullptr, true);
+  initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 2, 2);
 
   // 2 -> 0 tokens
   EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
@@ -414,7 +400,7 @@ TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketMultipleTokensPerFillWithShare
   EXPECT_CALL(*share_provider, getTokensShareFactor())
       .WillRepeatedly(testing::Invoke([]() -> double { return 0.5; }));
 
-  initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 2, 2, share_provider, true);
+  initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 2, 2, share_provider);
 
   // Every request will consume 1 / factor = 2 tokens.
 
@@ -439,7 +425,7 @@ TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketMultipleTokensPerFillWithShare
 
 // Verify token bucket functionality with max tokens > tokens per fill.
 TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketMaxTokensGreaterThanTokensPerFill) {
-  initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 2, 1, nullptr, true);
+  initializeWithAtomicTokenBucket(std::chrono::milliseconds(200), 2, 1, nullptr);
 
   // 2 -> 0 tokens
   EXPECT_TRUE(rate_limiter_->requestAllowed(route_descriptors_).allowed);
@@ -456,7 +442,7 @@ TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketMaxTokensGreaterThanTokensPerF
 
 // Verify token bucket status of max tokens, remaining tokens and remaining fill interval.
 TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketStatus) {
-  initializeWithAtomicTokenBucket(std::chrono::milliseconds(3000), 2, 2, nullptr, true);
+  initializeWithAtomicTokenBucket(std::chrono::milliseconds(3000), 2, 2);
 
   // 2 -> 1 tokens
   auto rate_limit_result = rate_limiter_->requestAllowed(route_descriptors_);
@@ -496,7 +482,7 @@ TEST_F(LocalRateLimiterImplTest, AtomicTokenBucketStatus) {
 TEST_F(LocalRateLimiterDescriptorImplTest, AtomicTokenBucketDescriptorBase) {
   TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "0.1s"),
                             *descriptors_.Add());
-  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 1, 1, true);
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 1, 1);
 
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
   EXPECT_FALSE(rate_limiter_->requestAllowed(descriptor_).allowed);
@@ -506,7 +492,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, AtomicTokenBucketDescriptorBase) {
 TEST_F(LocalRateLimiterDescriptorImplTest, AtomicTokenBucketDescriptor) {
   TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "0.1s"),
                             *descriptors_.Add());
-  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 1, 1, true);
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 1, 1);
 
   // 1 -> 0 tokens
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
@@ -534,7 +520,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, AtomicTokenBucketDescriptor) {
 TEST_F(LocalRateLimiterDescriptorImplTest, AtomicTokenBucketMultipleTokensPerFillDescriptor) {
   TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 2, 2, "0.1s"),
                             *descriptors_.Add());
-  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 2, 2, true);
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 2, 2);
 
   // 2 -> 0 tokens
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor_).allowed);
@@ -563,7 +549,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest,
                             *descriptors_.Add());
   TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 1, 1, "2s"),
                             *descriptors_.Add());
-  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(1000), 3, 3, true);
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(1000), 3, 3);
 
   // 1 -> 0 tokens for descriptor_ and descriptor2_
   EXPECT_TRUE(rate_limiter_->requestAllowed(descriptor2_).allowed);
@@ -587,7 +573,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest,
                             *descriptors_.Add());
   TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 2, 2, "1s"),
                             *descriptors_.Add());
-  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 3, 3, true);
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(50), 3, 3);
 
   std::vector<RateLimit::Descriptor> descriptors{{{{"hello", "world"}, {"foo", "bar"}}},
                                                  {{{"foo2", "bar2"}}}};
@@ -614,7 +600,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest,
   TestUtility::loadFromYaml(fmt::format(multiple_descriptor_config_yaml, 4, 4, "1s"),
                             *descriptors_.Add());
 
-  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(1000), 8, 8, true);
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(1000), 8, 8);
 
   std::vector<RateLimit::Descriptor> descriptors;
   descriptors.push_back(descriptor_[0]);
@@ -651,7 +637,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest,
 TEST_F(LocalRateLimiterDescriptorImplTest, AtomicTokenBucketDescriptorStatus) {
   TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 2, 2, "3s"),
                             *descriptors_.Add());
-  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(1000), 2, 2, true);
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(1000), 2, 2);
 
   // 2 -> 1 tokens
   auto rate_limit_result = rate_limiter_->requestAllowed(descriptor_);
@@ -691,7 +677,7 @@ TEST_F(LocalRateLimiterDescriptorImplTest, AtomicTokenBucketDescriptorStatus) {
 TEST_F(LocalRateLimiterDescriptorImplTest, NullDefaultTokenBucket) {
   TestUtility::loadFromYaml(fmt::format(single_descriptor_config_yaml, 2, 2, "3s"),
                             *descriptors_.Add());
-  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(0), 0, 0, true);
+  initializeWithAtomicTokenBucketDescriptor(std::chrono::milliseconds(0), 0, 0);
 
   // 2 -> 1 tokens
   auto rate_limit_result = rate_limiter_->requestAllowed(descriptor_);
