@@ -102,8 +102,8 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
   if (fill_interval.count() > 0) {
     if (fill_interval < std::chrono::milliseconds(50)) {
       SET_AND_RETURN_IF_NOT_OK(
-          create_status,
-          absl::InvalidArgumentError("local rate limit token bucket fill timer must be >= 50ms"));
+          absl::InvalidArgumentError("local rate limit token bucket fill timer must be >= 50ms"),
+          create_status);
     }
     default_token_bucket_ = std::make_shared<RateLimitTokenBucket>(max_tokens, tokens_per_fill,
                                                                    fill_interval, time_source_);
@@ -129,19 +129,19 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     // Validate that the descriptor's fill interval is logically correct (same
     // constraint of >=50msec as for fill_interval).
     if (per_descriptor_fill_interval < std::chrono::milliseconds(50)) {
-      SET_AND_RETURN_IF_NOT_OK(create_status,
-                               absl::InvalidArgumentError(
+      SET_AND_RETURN_IF_NOT_OK(absl::InvalidArgumentError(
                                    "local rate limit descriptor token bucket fill timer must be >= "
-                                   "50ms"));
+                                   "50ms"),
+                               create_status);
     }
 
     if (wildcard_found) {
       DynamicDescriptorSharedPtr dynamic_descriptor = std::make_shared<DynamicDescriptor>(
           per_descriptor_max_tokens, per_descriptor_tokens_per_fill, per_descriptor_fill_interval,
           lru_size, dispatcher.timeSource());
-      SET_AND_RETURN_IF_NOT_OK(create_status,
-                               dynamic_descriptors_.addDescriptor(std::move(new_descriptor),
-                                                                  std::move(dynamic_descriptor)));
+      SET_AND_RETURN_IF_NOT_OK(dynamic_descriptors_.addDescriptor(std::move(new_descriptor),
+                                                                  std::move(dynamic_descriptor)),
+                               create_status);
       continue;
     }
     RateLimitTokenBucketSharedPtr per_descriptor_token_bucket =
@@ -151,10 +151,10 @@ LocalRateLimiterImpl::LocalRateLimiterImpl(
     auto result =
         descriptors_.emplace(std::move(new_descriptor), std::move(per_descriptor_token_bucket));
     if (!result.second) {
-      SET_AND_RETURN_IF_NOT_OK(
-          create_status, absl::InvalidArgumentError(
-                             absl::StrCat("duplicate descriptor in the local rate descriptor: ",
-                                          result.first->first.toString())));
+      SET_AND_RETURN_IF_NOT_OK(absl::InvalidArgumentError(absl::StrCat(
+                                   "duplicate descriptor in the local rate descriptor: ",
+                                   result.first->first.toString())),
+                               create_status);
     }
   }
 }
