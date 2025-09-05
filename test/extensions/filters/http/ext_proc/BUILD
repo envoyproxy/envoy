@@ -55,6 +55,7 @@ envoy_extension_cc_test(
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/http/ext_proc",
         "//source/extensions/filters/http/ext_proc:on_processing_response_interface",
+        "//source/extensions/http/ext_proc/attribute_builders/default_attribute_builder:default_attribute_builder_lib",
         "//source/extensions/http/ext_proc/response_processors/save_processing_response:save_processing_response_lib",
         "//test/common/http:common_lib",
         "//test/common/http:conn_manager_impl_test_base_lib",
@@ -87,8 +88,8 @@ envoy_extension_cc_test_library(
         ":test_attribute_builder_proto_cc_proto",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
+        "//source/extensions/filters/http/ext_proc:attribute_builder_interface",
         "//source/extensions/filters/http/ext_proc:matching_utils_lib",
-        "//source/extensions/filters/http/ext_proc/attribute_builder:attribute_builder_interface",
     ],
 )
 

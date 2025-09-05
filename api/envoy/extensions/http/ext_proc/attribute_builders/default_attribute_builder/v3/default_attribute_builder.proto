@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package envoy.extensions.http.ext_proc.attribute_builders.default_attribute_builder.v3;
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.ext_proc.attribute_builders.default_attribute_builder.v3";
+option java_outer_classname = "DefaultAttributeBuilderProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/ext_proc/attribute_builders/default_attribute_builder/v3;default_attribute_builderv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Default attribute builder for external processor.]
+// [#extension: envoy.http.ext_proc.attribute_builders.default_attribute_builder]
+
+// Extension to set default attributes for the external processor. These attributes are plumbed from the
+// main ExternalProcessor config.
+//
+// .. note::
+//   Attribute builders are currently in alpha.
+//
+// [#next-free-field: 3]
+message DefaultAttributeBuilder {
+  // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
+  // for expressive policies. Each attribute name provided in this field will be
+  // matched against that list and populated in the ``request_headers`` message.
+  // See the :ref:`attribute documentation <arch_overview_request_attributes>`
+  // for the list of supported attributes and their types.
+  repeated string request_attributes = 1;
+
+  // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
+  // for expressive policies. Each attribute name provided in this field will be
+  // matched against that list and populated in the ``response_headers`` message.
+  // See the :ref:`attribute documentation <arch_overview_attributes>`
+  // for the list of supported attributes and their types.
+  repeated string response_attributes = 2;
+}

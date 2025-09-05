@@ -1,5 +1,7 @@
-#include "source/extensions/filters/http/ext_proc/attribute_builder/default_attribute_builder.h"
+#include "source/extensions/http/ext_proc/attribute_builders/default_attribute_builder/default_attribute_builder.h"
 
+#include "envoy/extensions/http/ext_proc/attribute_builders/default_attribute_builder/v3/default_attribute_builder.pb.h"
+#include "envoy/extensions/http/ext_proc/attribute_builders/default_attribute_builder/v3/default_attribute_builder.pb.validate.h"
 #include "envoy/http/header_map.h"
 
 #include "source/extensions/filters/common/expr/evaluator.h"
@@ -8,18 +10,16 @@
 #include "absl/types/optional.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace HttpFilters {
+namespace Http {
 namespace ExternalProcessing {
 
 DefaultAttributeBuilder::DefaultAttributeBuilder(
-    const Protobuf::RepeatedPtrField<std::string>& request_attributes,
-    const Protobuf::RepeatedPtrField<std::string>& response_attributes,
-    absl::string_view default_attribute_key,
+    const DefaultAttributeBuilderProto& config, absl::string_view default_attribute_key,
     Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
     Server::Configuration::CommonFactoryContext& context)
     : default_attribute_key_(default_attribute_key),
-      expression_manager_(builder, context.localInfo(), request_attributes, response_attributes) {}
+      expression_manager_(builder, context.localInfo(), config.request_attributes(),
+                          config.response_attributes()) {}
 
 bool DefaultAttributeBuilder::build(
     const BuildParams& params, Protobuf::Map<std::string, Protobuf::Struct>* attributes) const {
@@ -34,7 +34,7 @@ bool DefaultAttributeBuilder::build(
     return false;
   }
 
-  auto activation_ptr = Filters::Common::Expr::createActivation(
+  auto activation_ptr = Extensions::Filters::Common::Expr::createActivation(
       &expression_manager_.localInfo(), params.stream_info, params.request_headers,
       dynamic_cast<const Http::ResponseHeaderMap*>(params.response_headers),
       dynamic_cast<const Http::ResponseTrailerMap*>(params.response_trailers));
@@ -49,6 +49,5 @@ bool DefaultAttributeBuilder::build(
 }
 
 } // namespace ExternalProcessing
-} // namespace HttpFilters
-} // namespace Extensions
+} // namespace Http
 } // namespace Envoy

@@ -4,7 +4,7 @@
 #include <string>
 
 #include "source/extensions/filters/common/expr/evaluator.h"
-#include "source/extensions/filters/http/ext_proc/attribute_builder/attribute_builder.h"
+#include "source/extensions/filters/http/ext_proc/attribute_builder.h"
 #include "source/extensions/filters/http/ext_proc/matching_utils.h"
 
 #include "test/extensions/filters/http/ext_proc/test_attribute_builder.pb.h"

@@ -7,12 +7,14 @@
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/processing_mode.pb.h"
+#include "envoy/extensions/http/ext_proc/attribute_builders/default_attribute_builder/v3/default_attribute_builder.pb.h"
+#include "envoy/extensions/http/ext_proc/attribute_builders/default_attribute_builder/v3/default_attribute_builder.pb.validate.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
-#include "source/extensions/filters/http/ext_proc/attribute_builder/default_attribute_builder.h"
+#include "source/extensions/filters/http/ext_proc/attribute_builder.h"
 #include "source/extensions/filters/http/ext_proc/http_client/http_client_impl.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
@@ -184,6 +186,18 @@ void mergeHeaderValuesField(
   if (!has_key) {
     metadata.Add()->CopyFrom(header);
   }
+}
+
+envoy::config::core::v3::TypedExtensionConfig
+makeDefaultAttributeBuilderConfig(const ExternalProcessor& ext_proc_config) {
+  envoy::extensions::http::ext_proc::attribute_builders::default_attribute_builder::v3::
+      DefaultAttributeBuilder config;
+  *config.mutable_request_attributes() = ext_proc_config.request_attributes();
+  *config.mutable_response_attributes() = ext_proc_config.response_attributes();
+  envoy::config::core::v3::TypedExtensionConfig typed_config;
+  typed_config.set_name("envoy.extensions.http.ext_proc.default_attribute_builder");
+  typed_config.mutable_typed_config()->PackFrom(config);
+  return typed_config;
 }
 
 // Changes to headers are normally tested against the MutationRules supplied
@@ -1926,22 +1940,23 @@ std::unique_ptr<AttributeBuilder> FilterConfig::createAttributeBuilder(
     const ExternalProcessor& config,
     Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
     Server::Configuration::CommonFactoryContext& context) {
+  envoy::config::core::v3::TypedExtensionConfig attribute_builder;
   if (config.has_attribute_builder()) {
-    auto& factory = Envoy::Config::Utility::getAndCheckFactory<AttributeBuilderFactory>(
-        config.attribute_builder());
-    auto attribute_builder_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
-        config.attribute_builder().typed_config(), context.messageValidationVisitor(), factory);
-    if (attribute_builder_config) {
-      return factory.createAttributeBuilder(*attribute_builder_config, FilterName, builder,
-                                            context);
-    } else {
-      IS_ENVOY_BUG(absl::StrCat("Invalid attribute_builder config with name: ",
-                                config.attribute_builder().name()));
-      return nullptr;
-    }
+    attribute_builder = config.attribute_builder();
   } else {
-    return std::make_unique<DefaultAttributeBuilder>(
-        config.request_attributes(), config.response_attributes(), FilterName, builder, context);
+    attribute_builder = makeDefaultAttributeBuilderConfig(config);
+  }
+
+  auto& factory =
+      Envoy::Config::Utility::getAndCheckFactory<AttributeBuilderFactory>(attribute_builder);
+  auto attribute_builder_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
+      attribute_builder.typed_config(), context.messageValidationVisitor(), factory);
+  if (attribute_builder_config != nullptr) {
+    return factory.createAttributeBuilder(*attribute_builder_config, FilterName, builder, context);
+  } else {
+    IS_ENVOY_BUG(absl::StrCat("Invalid attribute_builder config with name: ",
+                              config.attribute_builder().name()));
+    return nullptr;
   }
 }
 
