@@ -5,8 +5,9 @@ namespace Router {
 
 // Router:DelegatingRouteEntry
 void DelegatingRouteEntry::finalizeResponseHeaders(
-    Http::ResponseHeaderMap& headers, const StreamInfo::StreamInfo& stream_info) const {
-  return base_route_entry_->finalizeResponseHeaders(headers, stream_info);
+    Http::ResponseHeaderMap& headers, const Formatter::HttpFormatterContext& context,
+    const StreamInfo::StreamInfo& stream_info) const {
+  return base_route_entry_->finalizeResponseHeaders(headers, context, stream_info);
 }
 
 Http::HeaderTransforms
@@ -33,9 +34,10 @@ DelegatingRouteEntry::currentUrlPathAfterRewrite(const Http::RequestHeaderMap& h
 }
 
 void DelegatingRouteEntry::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
+                                                  const Formatter::HttpFormatterContext& context,
                                                   const StreamInfo::StreamInfo& stream_info,
                                                   bool insert_envoy_original_path) const {
-  return base_route_entry_->finalizeRequestHeaders(headers, stream_info,
+  return base_route_entry_->finalizeRequestHeaders(headers, context, stream_info,
                                                    insert_envoy_original_path);
 }
 
