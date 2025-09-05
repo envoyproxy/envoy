@@ -2,8 +2,10 @@
 
 #include "source/common/crypto/utility.h"
 
+#include "openssl/bio.h"
 #include "openssl/bytestring.h"
 #include "openssl/hmac.h"
+#include "openssl/pem.h"
 #include "openssl/sha.h"
 
 namespace Envoy {

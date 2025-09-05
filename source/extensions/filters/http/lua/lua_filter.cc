@@ -220,8 +220,12 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
       {
           [](lua_State* state) {
             lua_newtable(state);
-            { LUA_ENUM(state, MILLISECOND, Timestamp::Resolution::Millisecond); }
-            { LUA_ENUM(state, MICROSECOND, Timestamp::Resolution::Microsecond); }
+            {
+              LUA_ENUM(state, MILLISECOND, Timestamp::Resolution::Millisecond);
+            }
+            {
+              LUA_ENUM(state, MICROSECOND, Timestamp::Resolution::Microsecond);
+            }
             lua_setglobal(state, "EnvoyTimestampResolution");
           },
           // Add more initializers here.
@@ -731,12 +735,18 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
     Envoy::Common::Crypto::CryptoObjectPtr crypto_ptr = crypto_util.importPublicKey(key);
     auto wrapper = Envoy::Common::Crypto::Access::getTyped<Envoy::Common::Crypto::PublicKeyObject>(
         *crypto_ptr);
+    if (wrapper == nullptr) {
+      // Failed to cast to PublicKeyObject, create empty wrapper
+      public_key_wrapper_.reset(PublicKeyWrapper::create(state, EMPTY_STRING), true);
+      return 1;
+    }
     EVP_PKEY* pkey = wrapper->getEVP_PKEY();
     if (pkey == nullptr) {
       // TODO(dio): Call luaL_error here instead of failing silently. However, the current behavior
       // is to return nil (when calling get() to the wrapped object, hence we create a wrapper
       // initialized by an empty string here) when importing a public key is failed.
       public_key_wrapper_.reset(PublicKeyWrapper::create(state, EMPTY_STRING), true);
+      return 1;
     }
 
     public_key_storage_.insert({std::string(str).substr(0, n), std::move(crypto_ptr)});
