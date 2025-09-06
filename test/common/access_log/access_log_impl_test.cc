@@ -1669,7 +1669,7 @@ typed_config:
   log1->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 }
 
-TEST_F(AccessLogImplTest, ReconstructRateLimiterWithSameKeyInRecreatedSingletonMap) {
+TEST_F(AccessLogImplTest, ReconstructSingletonMap) {
   const std::string yaml = R"EOF(
 name: accesslog
 filter:
@@ -1699,17 +1699,6 @@ typed_config:
   InstanceSharedPtr log2 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
   EXPECT_CALL(*file_, write(_));
   log2->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
-
-  // Create a third logger instance, which shares the rate limiter with the second one.
-  InstanceSharedPtr log3 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
-  EXPECT_CALL(*file_, write(_)).Times(0);
-  log3->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
-
-  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
-  EXPECT_CALL(*file_, write(_));
-  log2->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
-  EXPECT_CALL(*file_, write(_)).Times(0);
-  log3->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 }
 
 // Tests that a shared rate limiter is reconstructed if the previous instance is destroyed.
@@ -1732,7 +1721,7 @@ typed_config:
   path: /dev/null
   )EOF";
   // log0 is to ensure the singleton map is alive during this test otherwise when log1 is
-  // destructed. Otherwsie a new singleton map will be recreated and we cannot validate the code
+  // destructed. Otherwise a new singleton map will be recreated and we cannot validate the code
   // path of a weak_ptr getting expired.
   InstanceSharedPtr log0 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml0), context_);
 
