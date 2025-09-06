@@ -177,9 +177,11 @@ const OnDemandFilterConfig* OnDemandRouteUpdate::getConfig() {
 }
 
 Http::FilterDataStatus OnDemandRouteUpdate::decodeData(Buffer::Instance&, bool) {
-  return filter_iteration_state_ == Http::FilterHeadersStatus::StopIteration
-             ? Http::FilterDataStatus::StopIterationAndWatermark
-             : Http::FilterDataStatus::Continue;
+  if (filter_iteration_state_ == Http::FilterHeadersStatus::StopIteration) {
+    has_body_data_ = true;
+    return Http::FilterDataStatus::StopIterationAndWatermark;
+  }
+  return Http::FilterDataStatus::Continue;
 }
 
 Http::FilterTrailersStatus OnDemandRouteUpdate::decodeTrailers(Http::RequestTrailerMap&) {
@@ -210,11 +212,18 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
     return;
   }
 
-  if (route_exists &&                  // route can be resolved after an on-demand
-                                       // VHDS update
-      !callbacks_->decodingBuffer() && // Redirects with body not yet supported.
-      callbacks_->recreateStream(/*headers=*/nullptr)) {
-    return;
+  if (route_exists) {
+    // If we have body data, we cannot recreate the stream as it would lose the buffered body.
+    // Instead, we continue processing with the current stream which has the body already buffered.
+    if (has_body_data_) {
+      callbacks_->continueDecoding();
+      return;
+    }
+
+    // For requests without body data, we can still use stream recreation for cleaner restart
+    if (callbacks_->recreateStream(/*headers=*/nullptr)) {
+      return;
+    }
   }
 
   // route cannot be resolved after an on-demand VHDS update or
@@ -226,11 +235,19 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
     Upstream::ClusterDiscoveryStatus cluster_status) {
   filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
   cluster_discovery_handle_.reset();
-  if (cluster_status == Upstream::ClusterDiscoveryStatus::Available &&
-      !callbacks_->decodingBuffer()) { // Redirects with body not yet supported.
+  if (cluster_status == Upstream::ClusterDiscoveryStatus::Available) {
+    callbacks_->downstreamCallbacks()->clearRouteCache();
+
+    // If we have body data, we cannot recreate the stream as it would lose the buffered body.
+    // Instead, we continue processing with the current stream which has the body already buffered.
+    if (has_body_data_) {
+      callbacks_->continueDecoding();
+      return;
+    }
+
+    // For requests without body data, we can still use stream recreation for cleaner restart
     const Http::ResponseHeaderMap* headers = nullptr;
     if (callbacks_->recreateStream(headers)) {
-      callbacks_->downstreamCallbacks()->clearRouteCache();
       return;
     }
   }
