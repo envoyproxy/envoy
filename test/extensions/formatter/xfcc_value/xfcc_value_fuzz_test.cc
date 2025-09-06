@@ -12,6 +12,7 @@ namespace Formatter {
 namespace {
 
 DEFINE_FUZZER(const uint8_t* buf, size_t len) {
+  Http::HeaderStringValidator::disable_validation_for_tests_ = true;
   absl::string_view sv(reinterpret_cast<const char*>(buf), len);
 
   // We just want to make sure that the parser doesn't crash with any input.
