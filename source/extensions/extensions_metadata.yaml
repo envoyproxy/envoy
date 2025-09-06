@@ -715,6 +715,13 @@ envoy.filters.network.ext_proc:
   status: wip
   type_urls:
   - envoy.extensions.filters.network.ext_proc.v3.NetworkExternalProcessor
+envoy.filters.network.reverse_tunnel:
+  categories:
+  - envoy.filters.network
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.reverse_tunnel.v3.ReverseTunnel
 envoy.filters.network.http_connection_manager:
   categories:
   - envoy.filters.network

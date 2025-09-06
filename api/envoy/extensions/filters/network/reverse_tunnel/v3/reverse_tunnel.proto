@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.reverse_tunnel.v3;
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.reverse_tunnel.v3";
+option java_outer_classname = "ReverseTunnelProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/reverse_tunnel/v3;reverse_tunnelv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Reverse Tunnel Network Filter]
+// Reverse Tunnel Network Filter :ref:`configuration overview <config_network_filters_reverse_tunnel>`.
+// [#extension: envoy.filters.network.reverse_tunnel]
+
+// Configuration for the reverse tunnel network filter.
+// This filter handles reverse tunnel connection acceptance and rejection by processing
+// HTTP requests where required identification values are provided via HTTP headers.
+// [#next-free-field: 6]
+message ReverseTunnel {
+  // Ping interval for health checks on established reverse tunnel connections.
+  // If not specified, defaults to 2 seconds.
+  google.protobuf.Duration ping_interval = 1 [(validate.rules).duration = {
+    lte {seconds: 300}
+    gte {nanos: 1000000}
+  }];
+
+  // Whether to automatically close connections after processing reverse tunnel requests.
+  // When set to true, connections are closed after acceptance or rejection.
+  // When set to false, connections remain open for potential reuse. Defaults to false.
+  bool auto_close_connections = 2;
+
+  // HTTP path to match for reverse tunnel requests.
+  // If not specified, defaults to "/reverse_connections/request".
+  string request_path = 3 [(validate.rules).string = {min_len: 1 max_len: 255}];
+
+  // HTTP method to match for reverse tunnel requests.
+  // If not specified, defaults to "POST".
+  string request_method = 4 [(validate.rules).string = {min_len: 1 max_len: 10}];
+
+  // Configuration for validating reverse tunnel connection requests using filter state.
+  // This allows previous filters in the network chain to populate validation data
+  // that can be used to authenticate and authorize reverse tunnel connections.
+  ValidationConfig validation_config = 5;
+}
+
+// Configuration for validating reverse tunnel connections using filter state keys.
+// Previous filters in the network chain can populate the connection's filter state
+// with validation data (e.g., extracted from client certificates or authentication tokens)
+// that this filter will use to validate incoming reverse tunnel requests.
+message ValidationConfig {
+  // Filter state key for the expected node ID.
+  // If specified, the filter will validate that the node identifier from the reverse
+  // tunnel request matches the value stored under this key in the connection's filter state.
+  // The filter state value must be a string.
+  string node_id_filter_state_key = 1 [(validate.rules).string = {max_len: 255}];
+
+  // Filter state key for the expected cluster ID.
+  // If specified, the filter will validate that the cluster uuid from the reverse tunnel
+  // request matches the value stored under this key in the connection's filter state.
+  // The filter state value must be a string.
+  string cluster_id_filter_state_key = 2 [(validate.rules).string = {max_len: 255}];
+
+  // Filter state key for the expected tenant ID.
+  // If specified, the filter will validate that the tenant uuid from the reverse tunnel
+  // request matches the value stored under this key in the connection's filter state.
+  // The filter state value must be a string.
+  string tenant_id_filter_state_key = 3 [(validate.rules).string = {max_len: 255}];
+}

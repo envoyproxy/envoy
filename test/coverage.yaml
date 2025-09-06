@@ -53,6 +53,7 @@ directories:
   source/extensions/filters/listener/tls_inspector: 94.1
   source/extensions/filters/network/dubbo_proxy: 96.2
   source/extensions/filters/network/mongo_proxy: 96.1
+  source/extensions/filters/network/reverse_tunnel: 80.0
   source/extensions/filters/network/sni_cluster: 88.9
   source/extensions/formatter/cel: 100.0
   source/extensions/internal_redirect: 86.2
