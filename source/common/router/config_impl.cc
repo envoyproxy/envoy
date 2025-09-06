@@ -1929,6 +1929,17 @@ RouteMatcher::RouteMatcher(const envoy::config::route::v3::RouteConfiguration& r
       }
     }
   }
+  for (const auto& simplification_rule : route_config.host_simplification_rules()) {
+    auto result =
+        Regex::Utility::parseRegex(simplification_rule.pattern(), factory_context.regexEngine());
+
+    SET_AND_RETURN_IF_NOT_OK(result.status(), creation_status);
+
+    std::unique_ptr<SimplificationRule> rule = std::make_unique<SimplificationRule>(
+        std::move(*result), simplification_rule.substitution());
+
+    host_simplification_rules_.push_back(std::move(rule));
+  }
 }
 
 const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMap& headers) const {
@@ -1952,6 +1963,16 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
       host_header_value = host_header_value.substr(0, port_start);
     }
   }
+
+  // If any host simplification rules exist, process them in order to
+  // rewrite the host header used when looking up virtual hosts. (This
+  // is notionally similar to the handling of
+  // `ignore_port_in_host_matching`, but more flexible.)
+  for (const auto& simplifier : host_simplification_rules_) {
+    host_header_value =
+        simplifier->matcher->replaceAll(host_header_value, simplifier->substitution);
+  }
+
   // TODO (@rshriram) Match Origin header in WebSocket
   // request with VHost, using wildcard match
   // Lower-case the value of the host header, as hostnames are case insensitive.
