@@ -174,10 +174,14 @@ public:
     // access log rate limit filters.
     LocalRateLimiterMapSingletonSharedPtr map_;
 
+    // The key for `limiter_` in `map_`.
+    std::string key_;
     // The `limiter_` holds the ownership of the rate limiter(with the underlying
     // token bucket) by shared pointer, as it is shared by all the access log rate limit
     // filters using the same key.
     std::shared_ptr<LocalRateLimiterImpl> limiter_;
+
+    ~RateLimiter();
   };
 
   static RateLimiter getRateLimiter(
