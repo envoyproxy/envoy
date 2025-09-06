@@ -1,5 +1,6 @@
 #include <string>
 
+#include "source/extensions/propagators/xray/xray_propagator.h"
 #include "source/extensions/tracers/xray/tracer.h"
 #include "source/extensions/tracers/xray/xray_configuration.h"
 #include "source/extensions/tracers/xray/xray_tracer_impl.h"
@@ -17,6 +18,8 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace XRay {
+
+using XRayConstants = Envoy::Extensions::Propagators::XRay::XRayConstants;
 
 namespace {
 
@@ -43,7 +46,8 @@ public:
 };
 
 TEST_F(XRayDriverTest, XRayTraceHeaderNotSampled) {
-  request_headers_.set(xRayTraceHeader().key(), "Root=1-272793;Parent=5398ad8;Sampled=0");
+  request_headers_.set(XRayConstants::get().X_AMZN_TRACE_ID.key(),
+                       "Root=1-272793;Parent=5398ad8;Sampled=0");
 
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/,
                            "" /*origin*/, aws_metadata_};
@@ -59,7 +63,8 @@ TEST_F(XRayDriverTest, XRayTraceHeaderNotSampled) {
 }
 
 TEST_F(XRayDriverTest, XRayTraceHeaderSampled) {
-  request_headers_.set(xRayTraceHeader().key(), "Root=1-272793;Parent=5398ad8;Sampled=1");
+  request_headers_.set(XRayConstants::get().X_AMZN_TRACE_ID.key(),
+                       "Root=1-272793;Parent=5398ad8;Sampled=1");
 
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/,
                            "" /*origin*/, aws_metadata_};
@@ -73,7 +78,8 @@ TEST_F(XRayDriverTest, XRayTraceHeaderSampled) {
 }
 
 TEST_F(XRayDriverTest, XRayTraceHeaderSamplingUnknown) {
-  request_headers_.set(xRayTraceHeader().key(), "Root=1-272793;Parent=5398ad8;Sampled=");
+  request_headers_.set(XRayConstants::get().X_AMZN_TRACE_ID.key(),
+                       "Root=1-272793;Parent=5398ad8;Sampled=");
 
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", "" /*sampling_rules*/,
                            "" /*origin*/, aws_metadata_};
@@ -91,7 +97,7 @@ TEST_F(XRayDriverTest, XRayTraceHeaderSamplingUnknown) {
 }
 
 TEST_F(XRayDriverTest, XRayTraceHeaderWithoutSamplingDecision) {
-  request_headers_.set(xRayTraceHeader().key(), "Root=1-272793;Parent=5398ad8;");
+  request_headers_.set(XRayConstants::get().X_AMZN_TRACE_ID.key(), "Root=1-272793;Parent=5398ad8;");
   // sampling rules with default fixed_target = 0 & rate = 0
   XRayConfiguration config{"" /*daemon_endpoint*/, "test_segment_name", R"EOF(
 {

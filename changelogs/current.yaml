@@ -217,6 +217,11 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.proxy_104`` and legacy code paths.
 
 new_features:
+- area: tracing
+  change: |
+    Moved propagator constants infrastructure to separate extension with unified organization and enhanced constant reuse.
+    Each trace propagation standard (B3, W3C, XRay, SkyWalking) now has its own dedicated extension module with consistent
+    organization of constants and propagator implementations.
 - area: stats
   change: |
     Added support to remove unused metrics from memory for extensions that

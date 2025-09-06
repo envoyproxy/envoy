@@ -267,6 +267,11 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # lua
 /*/extensions/filters/http/lua @mattklein123 @wbpcode
 /*/extensions/filters/common/lua @mattklein123 @wbpcode
+* propagators
+/*/extensions/propagators/b3 @wbpcode @Shikugawa @basvanbeek
+/*/extensions/propagators/skywalking @wbpcode @Shikugawa
+/*/extensions/propagators/w3c @alexanderellis @yanavlasov @wbpcode @Shikugawa @basvanbeek @kevintan250
+/*/extensions/propagators/xray @mattklein123 @nbaws
 # rbac
 /*/extensions/filters/network/rbac @yangminzhu @yanavlasov
 /*/extensions/filters/http/rbac @yangminzhu @yanavlasov
