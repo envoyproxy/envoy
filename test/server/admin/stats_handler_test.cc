@@ -43,13 +43,17 @@ public:
   }
 
   // Set buckets for tests.
-  void setHistogramBucketSettings(const std::string& prefix, const std::vector<double>& buckets) {
+  void setHistogramBucketSettings(const std::string& prefix, const std::vector<double>& buckets,
+                                  absl::optional<uint32_t> bins) {
     envoy::config::metrics::v3::StatsConfig config;
     auto& bucket_settings = *config.mutable_histogram_bucket_settings();
 
     envoy::config::metrics::v3::HistogramBucketSettings setting;
     setting.mutable_match()->set_prefix(prefix);
     setting.mutable_buckets()->Add(buckets.begin(), buckets.end());
+    if (bins) {
+      setting.mutable_bins()->set_value(*bins);
+    }
 
     bucket_settings.Add(std::move(setting));
     store_->setHistogramSettings(std::make_unique<Stats::HistogramSettingsImpl>(config, context_));
@@ -332,7 +336,7 @@ TEST_F(AdminStatsTest, HandlerStatsJsonNoHistograms) {
 TEST_F(AdminStatsFilterTest, HandlerStatsJsonHistogramBucketsCumulative) {
   const std::string url = "/stats?histogram_buckets=cumulative&format=json";
   // Set h as prefix to match both histograms.
-  setHistogramBucketSettings("h", {1, 2, 3, 4});
+  setHistogramBucketSettings("h", {1, 2, 3, 4}, {});
 
   Stats::Counter& c1 = store_->counterFromString("c1");
 
@@ -488,7 +492,7 @@ TEST_F(AdminStatsFilterTest, HandlerStatsHiddenInvalid) {
 TEST_F(AdminStatsFilterTest, HandlerStatsJsonHistogramBucketsDisjoint) {
   const std::string url = "/stats?histogram_buckets=disjoint&format=json";
   // Set h as prefix to match both histograms.
-  setHistogramBucketSettings("h", {1, 2, 3, 4});
+  setHistogramBucketSettings("h", {1, 2, 3, 4}, 1);
 
   Stats::Counter& c1 = store_->counterFromString("c1");
 
