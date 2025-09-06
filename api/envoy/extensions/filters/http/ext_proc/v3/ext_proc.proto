@@ -98,7 +98,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 24]
+// [#next-free-field: 25]
 message ExternalProcessor {
   // Describes the route cache action to be taken when an external processor response
   // is received in response to request headers.
@@ -195,6 +195,7 @@ message ExternalProcessor {
   // matched against that list and populated in the ``request_headers`` message.
   // See the :ref:`attribute documentation <arch_overview_request_attributes>`
   // for the list of supported attributes and their types.
+  // If ``attribute_builder`` is set below, then this is not used.
   repeated string request_attributes = 5;
 
   // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
@@ -202,6 +203,7 @@ message ExternalProcessor {
   // matched against that list and populated in the ``response_headers`` message.
   // See the :ref:`attribute documentation <arch_overview_attributes>`
   // for the list of supported attributes and their types.
+  // If ``attribute_builder`` is set below, then this is not used.
   repeated string response_attributes = 6;
 
   // Specifies the timeout for each individual message sent on the stream and
@@ -348,6 +350,16 @@ message ExternalProcessor {
   //
   // [#extension-category: envoy.http.ext_proc.response_processors]
   config.core.v3.TypedExtensionConfig on_processing_response = 23
+      [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // Decorator to introduce custom logic to generate attributes. If not set, then the ``request_attributes`` and ``response_attributes``
+  // specified above will be used. However, if this is set, then all attributes should be plumbed through here instead.
+  //
+  // .. note::
+  //   Attribute builders are currently in alpha.
+  //
+  // [#extension-category: envoy.http.ext_proc.attribute_builders]
+  config.core.v3.TypedExtensionConfig attribute_builder = 24
       [(xds.annotations.v3.field_status).work_in_progress = true];
 }
 

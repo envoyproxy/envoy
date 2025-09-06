@@ -221,13 +221,9 @@ public:
 
   virtual Http::StreamFilterCallbacks* callbacks() const PURE;
 
-  virtual bool sendAttributes(const ExpressionManager& mgr) const PURE;
+  virtual bool sendAttributes() const PURE;
 
   void setSentAttributes(bool sent) { attributes_sent_ = sent; }
-
-  virtual Protobuf::Struct
-  evaluateAttributes(const ExpressionManager& mgr,
-                     const Filters::Common::Expr::Activation& activation) const PURE;
 
 protected:
   void setBodyMode(
@@ -497,16 +493,9 @@ public:
 
   Http::StreamFilterCallbacks* callbacks() const override { return decoder_callbacks_; }
 
-  bool sendAttributes(const ExpressionManager& mgr) const override {
-    return !attributes_sent_ && mgr.hasRequestExpr();
-  }
+  bool sendAttributes() const override { return !attributes_sent_; }
 
   const Http::RequestOrResponseHeaderMap* responseHeaders() const override { return nullptr; }
-  Protobuf::Struct
-  evaluateAttributes(const ExpressionManager& mgr,
-                     const Filters::Common::Expr::Activation& activation) const override {
-    return mgr.evaluateRequestAttributes(activation);
-  }
 
 private:
   void setProcessingModeInternal(
@@ -588,17 +577,9 @@ public:
 
   Http::StreamFilterCallbacks* callbacks() const override { return encoder_callbacks_; }
 
-  bool sendAttributes(const ExpressionManager& mgr) const override {
-    return !attributes_sent_ && mgr.hasResponseExpr();
-  }
+  bool sendAttributes() const override { return !attributes_sent_; }
 
   const Http::RequestOrResponseHeaderMap* responseHeaders() const override { return headers_; }
-
-  Protobuf::Struct
-  evaluateAttributes(const ExpressionManager& mgr,
-                     const Filters::Common::Expr::Activation& activation) const override {
-    return mgr.evaluateResponseAttributes(activation);
-  }
 
 private:
   void setProcessingModeInternal(

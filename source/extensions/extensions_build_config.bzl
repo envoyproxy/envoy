@@ -423,6 +423,11 @@ EXTENSIONS = {
     "envoy.http.custom_response.local_response_policy":       "//source/extensions/http/custom_response/local_response_policy:local_response_policy_lib",
 
     #
+    # External Processing Attribute Builders
+    #
+    "envoy.http.ext_proc.attribute_builders.default_attribute_builder":         "//source/extensions/http/ext_proc/attribute_builders/default_attribute_builder:default_attribute_builder_lib",
+    
+    #
     # External Processing Response Processors
     #
     "envoy.http.ext_proc.response_processors.save_processing_response":         "//source/extensions/http/ext_proc/response_processors/save_processing_response:save_processing_response_lib",
