@@ -199,14 +199,20 @@ private:
 class PolicyMatcher : public Matcher, NonCopyable {
 public:
   PolicyMatcher(const envoy::config::rbac::v3::Policy& policy,
-                Expr::BuilderInstanceSharedPtr& builder,
                 ProtobufMessage::ValidationVisitor& validation_visitor,
                 Server::Configuration::CommonFactoryContext& context)
       : permissions_(policy.permissions(), validation_visitor, context),
         principals_(policy.principals(), context),
         expr_([&]() -> absl::optional<Expr::CompiledExpression> {
           if (policy.has_condition()) {
-            auto compiled = Expr::CompiledExpression::Create(builder, policy.condition());
+            // Use the CEL configuration from the policy if available.
+            const envoy::config::core::v3::CelExpressionConfig* config =
+                policy.has_cel_config() ? &policy.cel_config() : nullptr;
+            absl::StatusOr<Expr::CompiledExpression> compiled =
+                config != nullptr ? Expr::CompiledExpression::Create(
+                                        Expr::getBuilder(context, *config), policy.condition())
+                                  : Expr::CompiledExpression::Create(Expr::getBuilder(context),
+                                                                     policy.condition());
             if (!compiled.ok()) {
               throw Expr::CelException(
                   absl::StrCat("failed to create an expression: ", compiled.status().message()));
