@@ -323,6 +323,18 @@ DynamicDescriptor::addOrGetDescriptor(const RateLimit::Descriptor& request_descr
   return token_bucket;
 }
 
+LocalRateLimiterMapSingleton::RateLimiter::~RateLimiter() {
+  limiter_.reset();
+  // If weak_ptr in the singleton map gets expired, remove the rate limiter from the singleton map.
+  auto it = map_->limiter_map_.find(key_);
+  ENVOY_BUG(it != map_->limiter_map_.end(),
+            "the rate limiter should be tracked in the singleton map");
+  std::shared_ptr<LocalRateLimiterImpl> ptr = it->second.lock();
+  if (ptr == nullptr) {
+    map_->limiter_map_.erase(it);
+  }
+}
+
 SINGLETON_MANAGER_REGISTRATION(local_ratelimit);
 
 LocalRateLimiterMapSingleton::RateLimiter LocalRateLimiterMapSingleton::getRateLimiter(
@@ -344,21 +356,13 @@ LocalRateLimiterMapSingleton::RateLimiter LocalRateLimiterMapSingleton::getRateL
         fill_interval, max_tokens, tokens_per_fill, dispatcher, descriptors,
         always_consume_default_token_bucket, shared_provider, lru_size);
     map->limiter_map_.insert({key, limiter});
-    return LocalRateLimiterMapSingleton::RateLimiter{map, limiter};
+    return LocalRateLimiterMapSingleton::RateLimiter{map, key, limiter};
   }
 
   std::shared_ptr<LocalRateLimiterImpl> ptr = it->second.lock();
-  // Check if the rate limiter has been destructed.
-  if (ptr == nullptr) {
-    map->limiter_map_.erase(it);
-    auto limiter = std::make_shared<LocalRateLimiterImpl>(
-        fill_interval, max_tokens, tokens_per_fill, dispatcher, descriptors,
-        always_consume_default_token_bucket, shared_provider, lru_size);
-    map->limiter_map_.insert({key, limiter});
-    return LocalRateLimiterMapSingleton::RateLimiter{map, limiter};
-  }
-
-  return LocalRateLimiterMapSingleton::RateLimiter{map, ptr};
+  ENVOY_BUG(ptr != nullptr, "the rate limiter should still be alive otherwise it should be "
+                            "destructed in `~RateLimiter()`");
+  return LocalRateLimiterMapSingleton::RateLimiter{map, key, ptr};
 }
 
 } // namespace LocalRateLimit
