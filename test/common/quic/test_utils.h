@@ -62,8 +62,8 @@ public:
   MOCK_METHOD(void, SendConnectionClosePacket,
               (quic::QuicErrorCode, quic::QuicIetfTransportErrorCodes, const std::string&));
   MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame));
-  MOCK_METHOD(quic::MessageStatus, SendMessage,
-              (quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice>, bool));
+  MOCK_METHOD(quic::DatagramStatus, SendDatagram,
+              (quic::QuicDatagramId, absl::Span<quiche::QuicheMemSlice>, bool));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 };
 
@@ -81,8 +81,8 @@ public:
                                   supported_versions, dispatcher, std::move(connection_socket),
                                   generator) {}
 
-  MOCK_METHOD(quic::MessageStatus, SendMessage,
-              (quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice>, bool));
+  MOCK_METHOD(quic::DatagramStatus, SendDatagram,
+              (quic::QuicDatagramId, absl::Span<quiche::QuicheMemSlice>, bool));
 };
 
 class TestQuicCryptoStream : public quic::test::MockQuicCryptoStream {

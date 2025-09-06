@@ -260,6 +260,36 @@ TEST_P(TlsInspectorIntegrationTest, ContinueOnListenerTimeout) {
   EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::Eq("-"));
 }
 
+TEST_P(TlsInspectorIntegrationTest, TlsInspectorMetadataPopulatedInAccessLog) {
+  initializeWithTlsInspector(
+      /*ssl_client=*/false,
+      /*log_format=*/"%DYNAMIC_METADATA(envoy.filters.listener.tls_inspector:failure_reason)%",
+      false, false, false);
+  Network::Address::InstanceConstSharedPtr address =
+      Ssl::getSslAddress(version_, lookupPort("echo"));
+  context_ =
+      Ssl::createClientSslTransportSocketFactory(/*ssl_options=*/{}, *context_manager_, *api_);
+  auto transport_socket_factory = std::make_unique<Network::RawBufferSocketFactory>();
+  Network::TransportSocketPtr transport_socket =
+      transport_socket_factory->createTransportSocket(nullptr, nullptr);
+  client_ = dispatcher_->createClientConnection(address, Network::Address::InstanceConstSharedPtr(),
+                                                std::move(transport_socket), nullptr, nullptr);
+  std::shared_ptr<WaitForPayloadReader> payload_reader =
+      std::make_shared<WaitForPayloadReader>(*dispatcher_);
+  client_->addReadFilter(payload_reader);
+  client_->addConnectionCallbacks(connect_callbacks_);
+  client_->connect();
+  Buffer::OwnedImpl buffer("fake data");
+  client_->write(buffer, false);
+  while (!connect_callbacks_.connected() && !connect_callbacks_.closed()) {
+    dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  }
+  // The timeout is set as one seconds, advance 2 seconds to trigger the timeout.
+  timeSystem().advanceTimeWaitImpl(std::chrono::milliseconds(2000));
+  client_->close(Network::ConnectionCloseType::NoFlush);
+  EXPECT_THAT(waitForAccessLog(listener_access_log_name_), testing::Eq("ClientHelloNotDetected"));
+}
+
 // The `JA3` fingerprint is correct in the access log.
 TEST_P(TlsInspectorIntegrationTest, JA3FingerprintIsSet) {
   // These TLS options will create a client hello message with

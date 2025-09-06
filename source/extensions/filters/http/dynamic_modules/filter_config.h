@@ -11,10 +11,14 @@ namespace Extensions {
 namespace DynamicModules {
 namespace HttpFilters {
 
-using OnHttpConfigDestoryType = decltype(&envoy_dynamic_module_on_http_filter_config_destroy);
+// The custom stat namespace which prepends all the user-defined metrics.
+// Note that the prefix is removed from the final output of /stats endpoints.
+constexpr absl::string_view CustomStatNamespace = "dynamicmodulescustom";
+
+using OnHttpConfigDestroyType = decltype(&envoy_dynamic_module_on_http_filter_config_destroy);
 using OnHttpFilterNewType = decltype(&envoy_dynamic_module_on_http_filter_new);
 
-using OnHttpPerRouteConfigDestoryType =
+using OnHttpPerRouteConfigDestroyType =
     decltype(&envoy_dynamic_module_on_http_filter_per_route_config_destroy);
 using OnHttpFilterRequestHeadersType =
     decltype(&envoy_dynamic_module_on_http_filter_request_headers);
@@ -49,7 +53,7 @@ public:
    */
   DynamicModuleHttpFilterConfig(const absl::string_view filter_name,
                                 const absl::string_view filter_config,
-                                DynamicModulePtr dynamic_module,
+                                DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
                                 Server::Configuration::ServerFactoryContext& context);
 
   ~DynamicModuleHttpFilterConfig();
@@ -60,7 +64,7 @@ public:
   // The function pointers for the module related to the HTTP filter. All of them are resolved
   // during the construction of the config and made sure they are not nullptr after that.
 
-  OnHttpConfigDestoryType on_http_filter_config_destroy_ = nullptr;
+  OnHttpConfigDestroyType on_http_filter_config_destroy_ = nullptr;
   OnHttpFilterNewType on_http_filter_new_ = nullptr;
   OnHttpFilterRequestHeadersType on_http_filter_request_headers_ = nullptr;
   OnHttpFilterRequestBodyType on_http_filter_request_body_ = nullptr;
@@ -74,6 +78,46 @@ public:
   OnHttpFilterScheduled on_http_filter_scheduled_ = nullptr;
 
   Envoy::Upstream::ClusterManager& cluster_manager_;
+  const Stats::ScopeSharedPtr stats_scope_;
+  Stats::StatNamePool stat_name_pool_;
+  const Stats::StatName custom_stat_namespace_;
+  // We only allow the module to create stats during envoy_dynamic_module_on_http_filter_config_new,
+  // and not later during request handling, so that we don't have to wrap the stat storage in a
+  // lock.
+  bool stat_creation_frozen_ = false;
+
+  size_t addCounter(Stats::Counter& counter) {
+    size_t id = counters_.size();
+    counters_.push_back(counter);
+    return id;
+  }
+
+  Stats::Counter& getCounterById(size_t id) const {
+    ASSERT(id < counters_.size());
+    return counters_[id];
+  }
+
+  size_t addGauge(Stats::Gauge& gauge) {
+    size_t id = gauges_.size();
+    gauges_.push_back(gauge);
+    return id;
+  }
+
+  Stats::Gauge& getGaugeById(size_t id) const {
+    ASSERT(id < gauges_.size());
+    return gauges_[id];
+  }
+
+  size_t addHistogram(Stats::Histogram& hist) {
+    size_t id = hists_.size();
+    hists_.push_back(hist);
+    return id;
+  }
+
+  Stats::Histogram& getHistogramById(size_t id) const {
+    ASSERT(id < hists_.size());
+    return hists_[id];
+  }
 
 private:
   // The name of the filter passed in the constructor.
@@ -81,6 +125,11 @@ private:
 
   // The configuration for the module.
   const std::string filter_config_;
+
+  // The cached references to stats and their metadata.
+  std::vector<std::reference_wrapper<Stats::Counter>> counters_;
+  std::vector<std::reference_wrapper<Stats::Gauge>> gauges_;
+  std::vector<std::reference_wrapper<Stats::Histogram>> hists_;
 
   // The handle for the module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
@@ -90,14 +139,14 @@ class DynamicModuleHttpPerRouteFilterConfig : public Router::RouteSpecificFilter
 public:
   DynamicModuleHttpPerRouteFilterConfig(
       envoy_dynamic_module_type_http_filter_config_module_ptr config,
-      OnHttpPerRouteConfigDestoryType destroy)
+      OnHttpPerRouteConfigDestroyType destroy)
       : config_(config), destroy_(destroy) {}
   ~DynamicModuleHttpPerRouteFilterConfig() override;
 
   envoy_dynamic_module_type_http_filter_config_module_ptr config_;
 
 private:
-  OnHttpPerRouteConfigDestoryType destroy_;
+  OnHttpPerRouteConfigDestroyType destroy_;
 };
 
 using DynamicModuleHttpFilterConfigSharedPtr = std::shared_ptr<DynamicModuleHttpFilterConfig>;
@@ -117,11 +166,10 @@ newDynamicModuleHttpPerRouteConfig(const absl::string_view per_route_config_name
  * @param context the server factory context.
  * @return a shared pointer to the new config object or an error if the module could not be loaded.
  */
-absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr>
-newDynamicModuleHttpFilterConfig(const absl::string_view filter_name,
-                                 const absl::string_view filter_config,
-                                 Extensions::DynamicModules::DynamicModulePtr dynamic_module,
-                                 Server::Configuration::ServerFactoryContext& context);
+absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilterConfig(
+    const absl::string_view filter_name, const absl::string_view filter_config,
+    Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
+    Server::Configuration::ServerFactoryContext& context);
 
 } // namespace HttpFilters
 } // namespace DynamicModules
