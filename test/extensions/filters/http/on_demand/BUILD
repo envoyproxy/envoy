@@ -67,6 +67,7 @@ envoy_extension_cc_test(
         "//test/integration:fake_upstream_lib",
         "//test/integration:http_integration_lib",
         "//test/integration:scoped_rds_lib",
+        "//test/integration:xdstp_config_sources_integration_lib",
         "//test/test_common:resources_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
