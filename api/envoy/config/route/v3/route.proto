@@ -169,10 +169,10 @@ message RouteConfiguration {
   // must be set to match the results of the simplification rule.
   // An example may help:
   //
-  // host_simplification_rules:
-  // - pattern:
-  //     regex: "^(foo)[.]([^.]+)[.](example[.]org)$"
-  //   substitution: \1.bar.\3
+  // > host_simplification_rules:
+  // > - pattern:
+  // >    regex: "^(foo)[.]([^.]+)[.](example[.]org)$"
+  // >  substitution: \1.bar.\3
   //
   // will allow a HTTP request with an :authority header of
   // 'foo.anything.example.org' or 'foo.something.example.org' to both
