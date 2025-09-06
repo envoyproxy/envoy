@@ -220,12 +220,8 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
       {
           [](lua_State* state) {
             lua_newtable(state);
-            {
-              LUA_ENUM(state, MILLISECOND, Timestamp::Resolution::Millisecond);
-            }
-            {
-              LUA_ENUM(state, MICROSECOND, Timestamp::Resolution::Microsecond);
-            }
+            { LUA_ENUM(state, MILLISECOND, Timestamp::Resolution::Millisecond); }
+            { LUA_ENUM(state, MICROSECOND, Timestamp::Resolution::Microsecond); }
             lua_setglobal(state, "EnvoyTimestampResolution");
           },
           // Add more initializers here.

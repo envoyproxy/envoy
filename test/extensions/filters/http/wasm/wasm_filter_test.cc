@@ -2221,8 +2221,7 @@ TEST_P(WasmHttpFilterTest, Sign) {
   EXPECT_CALL(rootContext(),
               log_(spdlog::level::err, Eq(absl::string_view("unknown is not supported."))));
   EXPECT_CALL(rootContext(),
-              log_(spdlog::level::err, Eq(absl::string_view("Failed to initialize digest sign."))))
-      .Times(1);
+              log_(spdlog::level::err, Eq(absl::string_view("Failed to initialize digest sign."))));
   rootContext().onTick(0);
 }
 
