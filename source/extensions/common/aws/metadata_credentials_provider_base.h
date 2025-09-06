@@ -43,6 +43,8 @@ public:
                                   MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
                                   std::chrono::seconds initialization_timer);
 
+  ~MetadataCredentialsProviderBase() override;
+
   Credentials getCredentials() override;
   bool credentialsPending() override;
 
