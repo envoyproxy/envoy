@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package envoy.extensions.access_loggers.filters.local_ratelimit.v3;
+
+import "envoy/type/v3/token_bucket.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.access_loggers.filters.local_ratelimit.v3";
+option java_outer_classname = "LocalRatelimitProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/access_loggers/filters/local_ratelimit/v3;local_ratelimitv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: LocalRateLimitFilter]
+// [#extension: envoy.access_loggers.extension_filters.local_ratelimit]
+
+// Filters for rate limiting the access logs using token buckets.
+// The token buckets are stored in a singleton map and looked up by key.
+message LocalRateLimitFilter {
+  // The key is used to find the token bucket.
+  // - if the key is set and not found in the singleton map, a new token bucket will be created and used.
+  // - if the key is set and found in the singleton map, the found token bucket will be shared.
+  // - if the key is not set, the access log will use the global token bucket.
+  string key = 1;
+
+  // The token bucket configuration to use for rate limiting
+  // access logs.
+  type.v3.TokenBucket token_bucket = 2 [(validate.rules).message = {required: true}];
+}

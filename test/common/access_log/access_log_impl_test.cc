@@ -59,6 +59,8 @@ public:
     stream_info_.protocol(Http::Protocol::Http11);
     // Clear default stream id provider.
     stream_info_.stream_id_provider_ = nullptr;
+    time_system_ = new Envoy::Event::SimulatedTimeSystem();
+    context_.server_factory_context_.dispatcher_.time_system_.reset(time_system_);
   }
 
 protected:
@@ -75,6 +77,7 @@ protected:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
+  Envoy::Event::SimulatedTimeSystem* time_system_;
 };
 
 TEST_F(AccessLogImplTest, LogMoreData) {
@@ -1596,6 +1599,220 @@ typed_config:
   EXPECT_CALL(*file_, write(_));
 
   default_true_log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info);
+}
+
+// Test for rate limit filter with a simple token bucket configuration.
+TEST_F(AccessLogImplTest, RateLimitFilter) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  extension_filter:
+    name: local_ratelimit_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.local_ratelimit.v3.LocalRateLimitFilter
+      token_bucket:
+        fill_interval: 1s
+        max_tokens: 1
+        tokens_per_fill: 1
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+  EXPECT_CALL(*file_, write(_));
+  log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+  // The second log should be rate limited as the token bucket is empty.
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+
+  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+  EXPECT_CALL(*file_, write(_));
+  log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+  // The fourth log should be rate limited as the token bucket is empty again.
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+}
+
+// Tests that rate limiters with the same key are shared across different filter instances.
+TEST_F(AccessLogImplTest, SharedRateLimitFilter) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  extension_filter:
+    name: local_ratelimit_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.local_ratelimit.v3.LocalRateLimitFilter
+      key: "this-is-key"
+      token_bucket:
+        fill_interval: 1s
+        max_tokens: 1
+        tokens_per_fill: 1
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  // Both loggers use the same key, so they should share the same token bucket.
+  InstanceSharedPtr log1 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+  InstanceSharedPtr log2 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  EXPECT_CALL(*file_, write(_));
+  log1->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log2->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+
+  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+  EXPECT_CALL(*file_, write(_));
+  log2->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log1->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+}
+
+TEST_F(AccessLogImplTest, ReconstructSingletonMap) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  extension_filter:
+    name: local_ratelimit_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.local_ratelimit.v3.LocalRateLimitFilter
+      key: "this-is-key"
+      token_bucket:
+        fill_interval: 1s
+        max_tokens: 1
+        tokens_per_fill: 1
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log1 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  // First log succeeds.
+  EXPECT_CALL(*file_, write(_));
+  log1->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+  // Destroy the first logger instance. The underlying rate limiter should be destroyed as well.
+  // In fact, since there is no rate limiter, the singleton map will be destructed as well.
+  log1.reset();
+  // Create a new logger instance with the same key. It should get a new rate limiter.
+  InstanceSharedPtr log2 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+  EXPECT_CALL(*file_, write(_));
+  log2->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+}
+
+// Tests that a shared rate limiter is reconstructed if the previous instance is destroyed.
+// The rate limiter is stored in a singleton map with a weak_ptr, so it will be destroyed
+// when all shared_ptrs are gone.
+TEST_F(AccessLogImplTest, ReconstructRateLimiterWithSameKeyInSameSingletonMap) {
+  const std::string yaml0 = R"EOF(
+name: accesslog
+filter:
+  extension_filter:
+    name: local_ratelimit_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.local_ratelimit.v3.LocalRateLimitFilter
+      token_bucket:
+        fill_interval: 1s
+        max_tokens: 1
+        tokens_per_fill: 1
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+  // log0 is to ensure the singleton map is alive during this test otherwise when log1 is
+  // destructed. Otherwise a new singleton map will be recreated and we cannot validate the code
+  // path of a weak_ptr getting expired.
+  InstanceSharedPtr log0 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml0), context_);
+
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  extension_filter:
+    name: local_ratelimit_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.local_ratelimit.v3.LocalRateLimitFilter
+      key: "this-is-key"
+      token_bucket:
+        fill_interval: 1s
+        max_tokens: 1
+        tokens_per_fill: 1
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  InstanceSharedPtr log1 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+
+  // First log succeeds.
+  EXPECT_CALL(*file_, write(_));
+  log1->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+  // Destroy the first logger instance. The underlying rate limiter should be destroyed as well.
+  log1.reset();
+  // Create a new logger instance with the same key. It should get a new rate limiter.
+  InstanceSharedPtr log2 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+  EXPECT_CALL(*file_, write(_));
+  log2->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+
+  // Create a third logger instance, which shares the rate limiter with the second one.
+  InstanceSharedPtr log3 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log3->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+
+  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+  EXPECT_CALL(*file_, write(_));
+  log2->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log3->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+}
+
+// Tests that rate limiters are not shared when different keys are used.
+TEST_F(AccessLogImplTest, NonSharedRateLimitFilter) {
+  const std::string yaml1 = R"EOF(
+name: accesslog
+filter:
+  extension_filter:
+    name: local_ratelimit_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.local_ratelimit.v3.LocalRateLimitFilter
+      token_bucket:
+        fill_interval: 1s
+        max_tokens: 1
+        tokens_per_fill: 1
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+  const std::string yaml2 = R"EOF(
+name: accesslog
+filter:
+  extension_filter:
+    name: local_ratelimit_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.local_ratelimit.v3.LocalRateLimitFilter
+      key: "this-is-key"
+      token_bucket:
+        fill_interval: 1s
+        max_tokens: 1
+        tokens_per_fill: 1
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+  InstanceSharedPtr log1 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml1), context_);
+  InstanceSharedPtr log2 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml2), context_);
+
+  // Each logger has its own bucket, so the first log from each should succeed.
+  EXPECT_CALL(*file_, write(_));
+  log1->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+  EXPECT_CALL(*file_, write(_));
+  log2->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+
+  // Both buckets are now empty, so subsequent logs should fail.
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log1->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log2->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 }
 
 class TestHeaderFilterFactory : public ExtensionFilterFactory {
