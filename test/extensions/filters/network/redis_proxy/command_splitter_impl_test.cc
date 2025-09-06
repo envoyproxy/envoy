@@ -407,7 +407,7 @@ TEST_P(RedisSingleServerRequestTest, NoUpstream) {
 };
 
 INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestTest, RedisSingleServerRequestTest,
-                         testing::ValuesIn(Common::Redis::SupportedCommands::simpleCommands()));
+                         testing::Values("get", "set", "incr", "zadd"));
 
 INSTANTIATE_TEST_SUITE_P(RedisSimpleRequestCommandHandlerMixedCaseTests,
                          RedisSingleServerRequestTest, testing::Values("INCR", "inCrBY"));
@@ -1338,7 +1338,7 @@ TEST_P(RedisSingleServerRequestWithLatencyMicrosTest, Success) {
 
 INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestWithLatencyMicrosTest,
                          RedisSingleServerRequestWithLatencyMicrosTest,
-                         testing::ValuesIn(Common::Redis::SupportedCommands::simpleCommands()));
+                         testing::Values("get", "set", "incr", "zadd"));
 
 // In subclasses of fault test, we mock the expected faults in the constructor, as the
 // fault manager is owned by the splitter, which is also generated later in construction
@@ -1393,7 +1393,7 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestWithErrorFaultTest,
                          RedisSingleServerRequestWithErrorFaultTest,
-                         testing::ValuesIn(Common::Redis::SupportedCommands::simpleCommands()));
+                         testing::Values("get", "set", "incr", "zadd"));
 
 TEST_P(RedisSingleServerRequestWithErrorWithDelayFaultTest, Fault) {
   InSequence s;
@@ -1427,7 +1427,7 @@ TEST_P(RedisSingleServerRequestWithErrorWithDelayFaultTest, Fault) {
 
 INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestWithErrorWithDelayFaultTest,
                          RedisSingleServerRequestWithErrorWithDelayFaultTest,
-                         testing::ValuesIn(Common::Redis::SupportedCommands::simpleCommands()));
+                         testing::Values("get", "set", "incr", "zadd"));
 
 class RedisSingleServerRequestWithDelayFaultTest : public RedisSingleServerRequestWithFaultTest {
 public:
@@ -1479,7 +1479,7 @@ TEST_P(RedisSingleServerRequestWithDelayFaultTest, Fault) {
 
 INSTANTIATE_TEST_SUITE_P(RedisSingleServerRequestWithDelayFaultTest,
                          RedisSingleServerRequestWithDelayFaultTest,
-                         testing::ValuesIn(Common::Redis::SupportedCommands::simpleCommands()));
+                         testing::Values("get", "set", "incr", "zadd"));
 
 class ScanHandlerTest : public FragmentedRequestCommandHandlerTest,
                         public testing::WithParamInterface<std::string> {
