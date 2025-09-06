@@ -163,6 +163,22 @@ message RouteConfiguration {
   // be used to implement multiple-wildcard matching, by converting
   // all but one of the wildcards into a static string.
   // This is similar to ignore_port_in_host_matching (above), but more flexible.
+  // To use this, at least one simplification rule must be configured,
+  // and then a
+  // :ref:`envoy_v3_api_msg_config.route.v3.VirtualHost`.domains field
+  // must be set to match the results of the simplification rule.
+  // An example may help:
+  //
+  // host_simplification_rules:
+  // - pattern:
+  //     regex: "^(foo)[.]([^.]+)[.](example[.]org)$"
+  //   substitution: \1.bar.\3
+  //
+  // will allow a HTTP request with an :authority header of
+  // 'foo.anything.example.org' or 'foo.something.example.org' to both
+  // be matched by a VirtualHost with a domain entry of
+  // 'foo.bar.example.org', due to the second label in the domain
+  // being replaced by the simplification rule to 'bar'.
   repeated type.matcher.v3.RegexMatchAndSubstitute host_simplification_rules = 18;
 }
 
