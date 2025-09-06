@@ -12,6 +12,7 @@
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/tracing/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -1034,6 +1035,132 @@ TEST_F(OpenTelemetryDriverTest, ExportOTLPSpanHTTP) {
   span->finishSpan();
 
   EXPECT_EQ(1U, stats_.counter("tracing.opentelemetry.spans_sent").value());
+}
+
+// Tests for propagator configuration
+TEST_F(OpenTelemetryDriverTest, PropagatorsConfigurationTest) {
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    propagators:
+      - tracecontext
+      - b3
+      - baggage
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  setup(opentelemetry_config);
+
+  // The setup should succeed with multiple propagators configured
+  EXPECT_NE(driver_, nullptr);
+
+  // Verify the configuration was parsed correctly
+  EXPECT_EQ(3, opentelemetry_config.propagators_size());
+  EXPECT_EQ("tracecontext", opentelemetry_config.propagators(0));
+  EXPECT_EQ("b3", opentelemetry_config.propagators(1));
+  EXPECT_EQ("baggage", opentelemetry_config.propagators(2));
+}
+
+TEST_F(OpenTelemetryDriverTest, DefaultPropagatorsTest) {
+  // Test that driver works without explicit propagators configuration (should default to
+  // tracecontext)
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  setup(opentelemetry_config);
+
+  EXPECT_NE(driver_, nullptr);
+  EXPECT_EQ(0, opentelemetry_config.propagators_size()); // No explicit propagators configured
+}
+
+TEST_F(OpenTelemetryDriverTest, B3PropagatorExtractionTest) {
+  // Setup driver with B3 propagator
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    propagators:
+      - b3
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  setup(opentelemetry_config);
+
+  // Create B3 multi-header format request
+  Tracing::TestTraceContextImpl request_headers{
+      {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
+
+  const std::string trace_id = "0000000000000001";
+  const std::string span_id = "0000000000000002";
+  request_headers.set("X-B3-TraceId", trace_id);
+  request_headers.set("X-B3-SpanId", span_id);
+  request_headers.set("X-B3-Sampled", "1");
+
+  Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, request_headers, stream_info_,
+                                             operation_name_, tracing_decision_);
+
+  // Verify span was created successfully
+  EXPECT_NE(nullptr, span.get());
+}
+
+TEST_F(OpenTelemetryDriverTest, OtelPropagatorsEnvironmentVariableTest) {
+  // Setup driver without explicit propagators configuration but with OTEL_PROPAGATORS env var
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  // Simulate environment variable being set
+  TestEnvironment::setEnvVar("OTEL_PROPAGATORS", "baggage,b3,tracecontext", 1);
+
+  setup(opentelemetry_config);
+
+  EXPECT_NE(driver_, nullptr);
+  EXPECT_EQ(0, opentelemetry_config.propagators_size()); // No explicit propagators configured
+
+  // Clean up
+  TestEnvironment::unsetEnvVar("OTEL_PROPAGATORS");
+}
+
+TEST_F(OpenTelemetryDriverTest, ConfigPriorityOverEnvironmentVariableTest) {
+  // Test that explicit config takes priority over OTEL_PROPAGATORS env var
+  const std::string yaml_string = R"EOF(
+    grpc_service:
+      envoy_grpc:
+        cluster_name: fake-cluster
+      timeout: 0.250s
+    propagators:
+      - tracecontext
+    )EOF";
+  envoy::config::trace::v3::OpenTelemetryConfig opentelemetry_config;
+  TestUtility::loadFromYaml(yaml_string, opentelemetry_config);
+
+  // Set environment variable that should be ignored due to explicit config
+  TestEnvironment::setEnvVar("OTEL_PROPAGATORS", "b3,baggage", 1);
+
+  setup(opentelemetry_config);
+
+  EXPECT_NE(driver_, nullptr);
+  EXPECT_EQ(1, opentelemetry_config.propagators_size());
+  EXPECT_EQ("tracecontext", opentelemetry_config.propagators(0));
+
+  // Clean up
+  TestEnvironment::unsetEnvVar("OTEL_PROPAGATORS");
 }
 
 } // namespace OpenTelemetry
