@@ -274,10 +274,11 @@ private:
     // End-of-stream with no additional message.
     PendingMessage() = default;
 
-    const absl::optional<grpc::ByteBuffer> buf_{};
+    const absl::optional<grpc::ByteBuffer> buf_;
     const bool end_stream_{true};
   };
 
+protected:
   GoogleAsyncTag init_tag_{*this, GoogleAsyncTag::Operation::Init};
   GoogleAsyncTag read_initial_metadata_tag_{*this, GoogleAsyncTag::Operation::ReadInitialMetadata};
   GoogleAsyncTag read_tag_{*this, GoogleAsyncTag::Operation::Read};
@@ -298,7 +299,7 @@ private:
   std::string service_full_name_;
   std::string method_name_;
   RawAsyncStreamCallbacks& callbacks_;
-  const Http::AsyncClient::StreamOptions options_;
+  Http::AsyncClient::StreamOptions options_;
   grpc::ClientContext ctxt_;
   std::unique_ptr<grpc::GenericClientAsyncReaderWriter> rw_;
   std::queue<PendingMessage> write_pending_queue_;
@@ -352,6 +353,7 @@ public:
   const StreamInfo::StreamInfo& streamInfo() const override {
     return GoogleAsyncStreamImpl::streamInfo();
   }
+  void detach() override;
 
 private:
   using GoogleAsyncStreamImpl::streamInfo;

@@ -86,12 +86,13 @@ public:
    * @param parent_span source for generating an egress child span as part of the trace.
    * @param stream_info supplies the stream info for the request.
    * @param hits_addend supplies the number of hits to add to the rate limit counter.
+   * @param detach should the request be detached from the current context after being sent.
    *
    */
   virtual void limit(RequestCallbacks& callbacks, const std::string& domain,
                      const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                     Tracing::Span& parent_span, OptRef<const StreamInfo::StreamInfo> stream_info,
-                     uint32_t hits_addend) PURE;
+                     Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info,
+                     uint32_t hits_addend, bool detach = false) PURE;
 };
 
 using ClientPtr = std::unique_ptr<Client>;

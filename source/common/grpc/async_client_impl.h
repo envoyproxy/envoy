@@ -121,6 +121,7 @@ private:
   // Deliver notification and update span when the connection closes.
   void notifyRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message);
 
+protected:
   Event::Dispatcher* dispatcher_{};
   Http::RequestMessagePtr headers_message_;
   AsyncClientImpl& parent_;
@@ -153,6 +154,7 @@ public:
   // Grpc::AsyncRequest
   void cancel() override;
   const StreamInfo::StreamInfo& streamInfo() const override;
+  void detach() override;
 
 private:
   using AsyncStreamImpl::streamInfo;

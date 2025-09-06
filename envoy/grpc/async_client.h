@@ -34,6 +34,15 @@ public:
    * Returns the underlying stream info.
    */
   virtual const StreamInfo::StreamInfo& streamInfo() const PURE;
+
+  /**
+   * Detach the pending request. This will not cancel the request but will clean up
+   * all context associated with downstream request to avoid dangling references.
+   * NOTE: the callbacks that registered to take the response will be kept to handle
+   * the response when it arrives. The caller is responsible for ensuring that the
+   * callbacks have enough lifetime to handle the response.
+   */
+  virtual void detach() PURE;
 };
 
 /**
