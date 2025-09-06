@@ -190,19 +190,22 @@ void Filter::onDestroy() {
   if (state_ == State::Calling) {
     state_ = State::Complete;
     client_->cancel();
-  } else if (client_ != nullptr &&
-             request_headers_ != nullptr) // If decodeHeaders is not called because of a local
-                                          // reply, we do not set request_headers_.
-  {
-    std::vector<Envoy::RateLimit::Descriptor> descriptors;
-    populateRateLimitDescriptors(descriptors, *request_headers_, true);
-    if (!descriptors.empty()) {
-      // Since this filter is being destroyed, we need to keep the client alive until the request
-      // is complete by leaking the client with OnStreamDoneCallBack.
-      auto callback = new OnStreamDoneCallBack(std::move(client_));
-      callback->client().limit(*callback, getDomain(), descriptors, Tracing::NullSpan::instance(),
-                               absl::nullopt, getHitAddend());
-    }
+    return;
+  }
+
+  if (client_ == nullptr || request_headers_ == nullptr) {
+    // If decodeHeaders is not called because of a local reply, we do not set request_headers_.
+    return;
+  }
+
+  std::vector<Envoy::RateLimit::Descriptor> descriptors;
+  populateRateLimitDescriptors(descriptors, *request_headers_, true);
+  if (!descriptors.empty()) {
+    // Since this filter is being destroyed, we need to keep the client alive until the request
+    // is complete by leaking the client with OnStreamDoneCallBack.
+    auto callback = new OnStreamDoneCallBack(std::move(client_));
+    callback->client().limit(*callback, getDomain(), descriptors, Tracing::NullSpan::instance(),
+                             callbacks_->streamInfo(), getHitAddend(), true);
   }
 }
 

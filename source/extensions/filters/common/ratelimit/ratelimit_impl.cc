@@ -29,7 +29,10 @@ GrpcClientImpl::~GrpcClientImpl() { ASSERT(!callbacks_); }
 
 void GrpcClientImpl::cancel() {
   ASSERT(callbacks_ != nullptr);
-  request_->cancel();
+  if (request_) {
+    request_->cancel();
+    request_ = nullptr;
+  }
   callbacks_ = nullptr;
 }
 
@@ -62,8 +65,8 @@ void GrpcClientImpl::createRequest(envoy::service::ratelimit::v3::RateLimitReque
 
 void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domain,
                            const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                           Tracing::Span& parent_span,
-                           OptRef<const StreamInfo::StreamInfo> stream_info, uint32_t hits_addend) {
+                           Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info,
+                           uint32_t hits_addend, bool detach) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
@@ -71,10 +74,16 @@ void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domai
   createRequest(request, domain, descriptors, hits_addend);
 
   auto options = Http::AsyncClient::RequestOptions().setTimeout(timeout_);
-  if (stream_info.has_value()) {
-    options.setParentContext(Http::AsyncClient::ParentContext{stream_info.ptr()});
+  options.setParentContext(Http::AsyncClient::ParentContext{&stream_info});
+  auto async_request = async_client_->send(service_method_, request, *this, parent_span, options);
+  if (async_request == nullptr) {
+    // The request failed directly.
+    return;
   }
-  request_ = async_client_->send(service_method_, request, *this, parent_span, options);
+  if (detach) {
+    async_request->detach();
+  }
+  request_ = async_request;
 }
 
 void GrpcClientImpl::onSuccess(

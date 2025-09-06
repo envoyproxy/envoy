@@ -266,6 +266,11 @@ new_features:
     :ref:`RouteAction.rate_limits<envoy_v3_api_field_config.route.v3.RouteAction.rate_limits>` fields will be ignored. However,
     :ref:`RateLimitPerRoute.rate_limits<envoy_v3_api_field_extensions.filters.http.ratelimit.v3.RateLimitPerRoute.rate_limits>`
     will take precedence over this field.
+- area: ratelimit
+  change: |
+    Enhanced the rate limit filter to support substitution formatters for descriptors that generated
+    at the stream complete phase. Before this change, substitution formatters at the stream complete
+    phase cannot work because rate limit filter does not provide the necessary context.
 - area: redis
   change: |
     Added support for ``GEOSEARCH`` and ``GETEX``.
