@@ -228,8 +228,8 @@ absl::string_view RevConCluster::getHostIdValue(const Http::RequestHeaderMap* re
 }
 
 BootstrapReverseConnection::UpstreamSocketManager* RevConCluster::getUpstreamSocketManager() const {
-  auto* upstream_interface = Network::socketInterface(
-      "envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface");
+  auto* upstream_interface =
+      Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
   if (upstream_interface == nullptr) {
     ENVOY_LOG(error, "Upstream reverse socket interface not found");
     return nullptr;

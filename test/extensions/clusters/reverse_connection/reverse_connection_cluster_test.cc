@@ -16,7 +16,7 @@
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/singleton/threadsafe_singleton.h"
 #include "source/common/upstream/upstream_impl.h"
-#include "source/extensions/bootstrap/reverse_tunnel/reverse_tunnel_acceptor.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
 #include "source/extensions/clusters/reverse_connection/reverse_connection.h"
 #include "source/extensions/transport_sockets/raw_buffer/config.h"
 #include "source/server/transport_socket_config_impl.h"
@@ -100,8 +100,8 @@ public:
         *socket_interface_, server_context_, config_);
 
     // Get the registered socket interface from the global registry and set up its extension.
-    auto* registered_socket_interface = Network::socketInterface(
-        "envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface");
+    auto* registered_socket_interface =
+        Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
     if (registered_socket_interface) {
       auto* registered_acceptor = dynamic_cast<BootstrapReverseConnection::ReverseTunnelAcceptor*>(
           const_cast<Network::SocketInterface*>(registered_socket_interface));
@@ -276,7 +276,7 @@ public:
   // Stats and config.
   Stats::IsolatedStoreImpl stats_store_;
   Stats::ScopeSharedPtr stats_scope_;
-  envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
+  envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
       UpstreamReverseConnectionSocketInterface config_;
 };
 
@@ -724,8 +724,7 @@ TEST_F(ReverseConnectionClusterTest, SocketInterfaceNotRegistered) {
   // Find and remove the specific socket interface factory.
   auto& factories =
       Registry::FactoryRegistry<Server::Configuration::BootstrapExtensionFactory>::factories();
-  auto it = factories.find(
-      "envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface");
+  auto it = factories.find("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
   if (it != factories.end()) {
     factories.erase(it);
   }
@@ -1270,8 +1269,8 @@ public:
     extension_->setTestOnlyTLSRegistry(std::move(tls_slot_));
 
     // Get the registered socket interface from the global registry and set up its extension.
-    auto* registered_socket_interface = Network::socketInterface(
-        "envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface");
+    auto* registered_socket_interface =
+        Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
     if (registered_socket_interface) {
       auto* registered_acceptor = dynamic_cast<BootstrapReverseConnection::ReverseTunnelAcceptor*>(
           const_cast<Network::SocketInterface*>(registered_socket_interface));
@@ -1298,7 +1297,7 @@ public:
   std::unique_ptr<BootstrapReverseConnection::ReverseTunnelAcceptorExtension> extension_;
 
   // Configuration for the extension.
-  envoy::extensions::bootstrap::reverse_connection_socket_interface::v3::
+  envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
       UpstreamReverseConnectionSocketInterface config_;
 
   // Stats store and scope.
@@ -1420,8 +1419,7 @@ TEST_F(UpstreamReverseConnectionAddressTest, SocketInterfaceWithUnavailableInter
   // Find and remove the specific socket interface factory.
   auto& factories =
       Registry::FactoryRegistry<Server::Configuration::BootstrapExtensionFactory>::factories();
-  auto it = factories.find(
-      "envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface");
+  auto it = factories.find("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
   if (it != factories.end()) {
     factories.erase(it);
   }

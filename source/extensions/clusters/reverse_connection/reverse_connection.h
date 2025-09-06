@@ -18,7 +18,9 @@
 #include "source/common/network/socket_interface.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
-#include "source/extensions/bootstrap/reverse_tunnel/reverse_tunnel_acceptor.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 
 #include "absl/status/statusor.h"
 
@@ -85,8 +87,8 @@ public:
   const Network::SocketInterface& socketInterface() const override {
     ENVOY_LOG(debug, "UpstreamReverseConnectionAddress: socketInterface() called for node: {}",
               node_id_);
-    auto* upstream_interface = Network::socketInterface(
-        "envoy.bootstrap.reverse_connection.upstream_reverse_connection_socket_interface");
+    auto* upstream_interface =
+        Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
     if (upstream_interface) {
       ENVOY_LOG(debug, "UpstreamReverseConnectionAddress: Using ReverseTunnelAcceptor for node: {}",
                 node_id_);

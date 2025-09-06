@@ -19,7 +19,7 @@ envoy_cc_extension(
         "//source/common/network:address_lib",
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:upstream_includes",
-        "//source/extensions/bootstrap/reverse_tunnel:reverse_tunnel_acceptor_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
