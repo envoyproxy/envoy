@@ -12,7 +12,7 @@ StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& 
     : ClusterImplBase(cluster, context, creation_status) {
   SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
   priority_state_manager_ = std::make_unique<PriorityStateManager>(
-      *this, context.serverFactoryContext().localInfo(), nullptr, random_);
+      *this, context.serverFactoryContext().localInfo(), nullptr);
   const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment =
       cluster.load_assignment();
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
