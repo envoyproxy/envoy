@@ -1693,7 +1693,7 @@ typed_config:
   EXPECT_CALL(*file_, write(_));
   log1->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
   // Destroy the first logger instance. The underlying rate limiter should be destroyed as well.
-  // In fact, since there is no rate limiter, the singleton map will be detsructed as well.
+  // In fact, since there is no rate limiter, the singleton map will be destructed as well.
   log1.reset();
   // Create a new logger instance with the same key. It should get a new rate limiter.
   InstanceSharedPtr log2 = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
