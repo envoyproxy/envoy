@@ -126,7 +126,7 @@ message ZipkinConfig {
   //
   // * ``http_uri.cluster`` - Must be specified and non-empty
   // * ``http_uri.uri`` - Must be specified and non-empty
-  // * ``http_uri.timeout`` - Must be specified
+  // * ``http_uri.timeout`` - Optional
   //
   // Full URI Support with Automatic Parsing:
   //
