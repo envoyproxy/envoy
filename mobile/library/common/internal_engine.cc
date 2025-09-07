@@ -456,7 +456,9 @@ void InternalEngine::resetHttpPropertiesAndDrainHosts(bool has_ipv6_connectivity
     cache_manager.forEachThreadLocalCache(clear_brokenness);
   }
 
-  if (disable_dns_refresh_on_network_change_) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.decouple_explicit_drain_pools_and_dns_refresh") ||
+      disable_dns_refresh_on_network_change_) {
     if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.drain_pools_on_network_change")) {
       // Since DNS refreshing is disabled, explicitly drain all non-migratable connections.
       ENVOY_LOG_EVENT(debug, "netconf_immediate_drain", "DrainAllHosts");

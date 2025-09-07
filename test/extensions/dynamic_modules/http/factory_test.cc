@@ -37,6 +37,8 @@ filter_config:
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
+  Api::ApiPtr api = Api::createApiForTest();
+  EXPECT_CALL(context.server_factory_context_, api()).WillRepeatedly(testing::ReturnRef(*api));
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
@@ -66,6 +68,8 @@ filter_name: foo
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
+  Api::ApiPtr api = Api::createApiForTest();
+  EXPECT_CALL(context.server_factory_context_, api()).WillRepeatedly(testing::ReturnRef(*api));
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
@@ -98,6 +102,8 @@ filter_config:
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
+  Api::ApiPtr api = Api::createApiForTest();
+  EXPECT_CALL(context.server_factory_context_, api()).WillRepeatedly(testing::ReturnRef(*api));
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
