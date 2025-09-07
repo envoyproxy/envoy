@@ -1,0 +1,16 @@
+faults:
+- fault_type: ERROR
+  fault_enabled:
+    default_value:
+      numerator: 10
+      denominator: HUNDRED
+    runtime_key: "bogus_key"
+    commands:
+    - GET
+  - fault_type: DELAY
+    fault_enabled:
+      default_value:
+        numerator: 10
+        denominator: HUNDRED
+      runtime_key: "bogus_key"
+    delay: 2s

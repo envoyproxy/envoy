@@ -1,0 +1,13 @@
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
+  stat_prefix: redis_stats
+  prefix_routes:
+    catch_all_route:
+      cluster: cluster_0
+  settings:
+    op_timeout: 5s
+    enable_redirection: true
+    dns_cache_config:
+      name: dns_cache_for_redis
+      dns_lookup_family: V4_ONLY
+      max_hosts: 100
