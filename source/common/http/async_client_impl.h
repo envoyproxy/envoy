@@ -279,6 +279,7 @@ private:
   const Tracing::Config& tracing_config_;
   const LocalReply::LocalReply& local_reply_;
   const std::unique_ptr<const Router::RetryPolicy> retry_policy_;
+  Router::RouteConstSharedPtr parent_route_;
   std::shared_ptr<NullRouteImpl> route_;
   uint32_t high_watermark_calls_{};
   bool local_closed_{};
