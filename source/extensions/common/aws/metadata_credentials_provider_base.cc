@@ -39,9 +39,8 @@ MetadataCredentialsProviderBase::~MetadataCredentialsProviderBase() {
       metadata_fetcher_.reset();
     } else {
       auto fetcher = std::move(metadata_fetcher_);
-      context_.mainThreadDispatcher().post([fetcher = std::move(fetcher)]() mutable {
-        fetcher->cancel();
-      });
+      context_.mainThreadDispatcher().post(
+          [fetcher = std::move(fetcher)]() mutable { fetcher->cancel(); });
     }
   }
 }
