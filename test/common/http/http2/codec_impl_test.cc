@@ -212,9 +212,6 @@ public:
     if (expect_buffered_data_on_teardown_) {
       EXPECT_TRUE(client_wrapper_->buffer_.length() > 0 || server_wrapper_->buffer_.length() > 0);
     } else {
-      std::cout << "client: " << client_wrapper_->buffer_.toString() << std::endl;
-      std::cout << "server: " << server_wrapper_->buffer_.toString() << std::endl;
-
       EXPECT_EQ(client_wrapper_->buffer_.length(), 0);
       EXPECT_EQ(server_wrapper_->buffer_.length(), 0);
     }
