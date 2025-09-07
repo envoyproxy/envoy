@@ -2,7 +2,7 @@
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
 #include "source/common/version/version.h"
-#include "source/extensions/tracers/opentelemetry/grpc_trace_exporter.h"
+#include "source/extensions/common/opentelemetry/exporters/otlp/grpc_trace_exporter.h"
 
 #include "test/mocks/grpc/mocks.h"
 
@@ -10,8 +10,10 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace Tracers {
+namespace Common {
 namespace OpenTelemetry {
+namespace Exporters {
+namespace OTLP {
 
 using testing::_;
 using testing::Invoke;
@@ -140,7 +142,9 @@ TEST_F(OpenTelemetryGrpcTraceExporterTest, ExportPartialSuccess) {
                           exporter.onSuccess(std::move(response), null_span));
 }
 
+} // namespace OTLP
+} // namespace Exporters
 } // namespace OpenTelemetry
-} // namespace Tracers
+} // namespace Common
 } // namespace Extensions
 } // namespace Envoy

@@ -1,21 +1,17 @@
-#include "source/extensions/tracers/opentelemetry/otlp_utils.h"
+#include "source/extensions/common/opentelemetry/exporters/otlp/otlp_utils.h"
 
 #include <cstdint>
 #include <string>
 
 #include "source/common/common/fmt.h"
 #include "source/common/common/macros.h"
-#include "source/common/version/version.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace Tracers {
+namespace Common {
 namespace OpenTelemetry {
-
-const std::string& OtlpUtils::getOtlpUserAgentHeader() {
-  CONSTRUCT_ON_FIRST_USE(std::string,
-                         fmt::format("OTel-OTLP-Exporter-Envoy/{}", Envoy::VersionInfo::version()));
-}
+namespace Exporters {
+namespace OTLP {
 
 void OtlpUtils::populateAnyValue(opentelemetry::proto::common::v1::AnyValue& value_proto,
                                  const OTelAttribute& attribute_value) {
@@ -51,7 +47,9 @@ void OtlpUtils::populateAnyValue(opentelemetry::proto::common::v1::AnyValue& val
   }
 }
 
+} // namespace OTLP
+} // namespace Exporters
 } // namespace OpenTelemetry
-} // namespace Tracers
+} // namespace Common
 } // namespace Extensions
 } // namespace Envoy

@@ -85,7 +85,9 @@ private:
 };
 
 // add Dynatrace specific span attributes
-void addSamplingAttributes(uint32_t sampling_exponent, OtelAttributes& attributes) {
+void addSamplingAttributes(
+    uint32_t sampling_exponent,
+    Envoy::Extensions::Common::OpenTelemetry::Sdk::Common::OTelAttributes& attributes) {
 
   const auto multiplicity = SamplingState::toMultiplicity(sampling_exponent);
   // The denominator of the sampling ratio. If, for example, the Dynatrace OneAgent samples with a
@@ -121,15 +123,14 @@ DynatraceSampler::DynatraceSampler(
   timer_->enableTimer(SAMPLING_UPDATE_TIMER_DURATION);
 }
 
-SamplingResult DynatraceSampler::shouldSample(const StreamInfo::StreamInfo&,
-                                              const absl::optional<SpanContext> parent_context,
-                                              const std::string& trace_id,
-                                              const std::string& /*name*/, OTelSpanKind /*kind*/,
-                                              OptRef<const Tracing::TraceContext> trace_context,
-                                              const std::vector<SpanContext>& /*links*/) {
+SamplingResult DynatraceSampler::shouldSample(
+    const StreamInfo::StreamInfo&, const absl::optional<SpanContext> parent_context,
+    const std::string& trace_id, const std::string& /*name*/,
+    Envoy::Extensions::Common::OpenTelemetry::Sdk::Trace::OTelSpanKind /*kind*/,
+    OptRef<const Tracing::TraceContext> trace_context, const std::vector<SpanContext>& /*links*/) {
 
   SamplingResult result;
-  OtelAttributes att;
+  Envoy::Extensions::Common::OpenTelemetry::Sdk::Common::OTelAttributes att;
 
   // trace_context->path() returns path and query. query part is removed in getSamplingKey()
   const std::string sampling_key =
@@ -175,7 +176,9 @@ SamplingResult DynatraceSampler::shouldSample(const StreamInfo::StreamInfo&,
   }
 
   if (!att.empty()) {
-    result.attributes = std::make_unique<const OtelAttributes>(std::move(att));
+    result.attributes = std::make_unique<
+        const Envoy::Extensions::Common::OpenTelemetry::Sdk::Common::OTelAttributes>(
+        std::move(att));
   }
 
   return result;

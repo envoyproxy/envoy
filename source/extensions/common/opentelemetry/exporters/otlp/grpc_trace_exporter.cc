@@ -1,22 +1,27 @@
-#include "source/extensions/tracers/opentelemetry/grpc_trace_exporter.h"
+#include "source/extensions/common/opentelemetry/exporters/otlp/grpc_trace_exporter.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/grpc/status.h"
-#include "source/extensions/tracers/opentelemetry/otlp_utils.h"
+#include "source/extensions/common/opentelemetry/exporters/otlp/otlp_utils.h"
+#include "source/extensions/common/opentelemetry/exporters/otlp/user_agent.h"
+#include "source/extensions/common/opentelemetry/sdk/trace/constants.h"
 
 namespace Envoy {
 namespace Extensions {
-namespace Tracers {
+namespace Common {
 namespace OpenTelemetry {
+namespace Exporters {
+namespace OTLP {
 
 OpenTelemetryGrpcTraceExporter::OpenTelemetryGrpcTraceExporter(
     const Grpc::RawAsyncClientSharedPtr& client)
     : client_(client),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-          "opentelemetry.proto.collector.trace.v1.TraceService.Export")) {}
+          std::string(Envoy::Extensions::Common::OpenTelemetry::Sdk::Trace::Constants::
+                          TRACE_SERVICE_EXPORT_METHOD))) {}
 
 void OpenTelemetryGrpcTraceExporter::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
-  metadata.setReferenceUserAgent(OtlpUtils::getOtlpUserAgentHeader());
+  metadata.setReferenceUserAgent(OtlpUserAgent::getUserAgentHeader());
 }
 
 void OpenTelemetryGrpcTraceExporter::onSuccess(
@@ -46,7 +51,9 @@ bool OpenTelemetryGrpcTraceExporter::log(const ExportTraceServiceRequest& reques
   return true;
 }
 
+} // namespace OTLP
+} // namespace Exporters
 } // namespace OpenTelemetry
-} // namespace Tracers
+} // namespace Common
 } // namespace Extensions
 } // namespace Envoy

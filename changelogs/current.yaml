@@ -217,6 +217,12 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.proxy_104`` and legacy code paths.
 
 new_features:
+- area: tracing
+  change: |
+    Moved all OpenTelemetry extension source and tests to source/extensions/common/opentelemetry/
+    and test/extensions/common/opentelemetry/ for better reuse and organization across different
+    extension types (tracers, access loggers, stat sinks). Updated OpenTelemetry Logs SDK to use
+    the new Common namespace structure for consistency.
 - area: stats
   change: |
     Added support to remove unused metrics from memory for extensions that

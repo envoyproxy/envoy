@@ -10,7 +10,7 @@
 #include "source/common/tracing/common_values.h"
 #include "source/common/tracing/trace_context_impl.h"
 #include "source/common/version/version.h"
-#include "source/extensions/tracers/opentelemetry/otlp_utils.h"
+#include "source/extensions/common/opentelemetry/exporters/otlp/otlp_utils.h"
 
 #include "opentelemetry/proto/collector/trace/v1/trace_service.pb.h"
 #include "opentelemetry/proto/trace/v1/trace.pb.h"
@@ -19,6 +19,9 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
+
+// Import OTLP utilities from new namespace
+using OtlpUtils = ::Envoy::Extensions::Common::OpenTelemetry::Exporters::OTLP::OtlpUtils;
 
 constexpr absl::string_view kDefaultVersion = "00";
 
@@ -60,7 +63,8 @@ void callSampler(SamplerSharedPtr sampler, const StreamInfo::StreamInfo& stream_
 
 Span::Span(const std::string& name, const StreamInfo::StreamInfo& stream_info,
            SystemTime start_time, Envoy::TimeSource& time_source, Tracer& parent_tracer,
-           OTelSpanKind span_kind, bool use_local_decision)
+           Envoy::Extensions::Common::OpenTelemetry::Sdk::Trace::OTelSpanKind span_kind,
+           bool use_local_decision)
     : stream_info_(stream_info), parent_tracer_(parent_tracer), time_source_(time_source),
       use_local_decision_(use_local_decision) {
   span_ = ::opentelemetry::proto::trace::v1::Span();
@@ -104,7 +108,9 @@ void Span::injectContext(Tracing::TraceContext& trace_context, const Tracing::Up
   traceStateHeader().setRefKey(trace_context, span_.trace_state());
 }
 
-void Span::setAttribute(absl::string_view name, const OTelAttribute& attribute_value) {
+void Span::setAttribute(
+    absl::string_view name,
+    const Envoy::Extensions::Common::OpenTelemetry::Sdk::Common::OTelAttribute& attribute_value) {
   // The attribute key MUST be a non-null and non-empty string.
   if (name.empty()) {
     return;
@@ -266,11 +272,11 @@ void Tracer::sendSpan(::opentelemetry::proto::trace::v1::Span& span) {
   }
 }
 
-Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
-                                   const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
-                                   Tracing::Decision tracing_decision,
-                                   OptRef<const Tracing::TraceContext> trace_context,
-                                   OTelSpanKind span_kind) {
+Tracing::SpanPtr
+Tracer::startSpan(const std::string& operation_name, const StreamInfo::StreamInfo& stream_info,
+                  SystemTime start_time, Tracing::Decision tracing_decision,
+                  OptRef<const Tracing::TraceContext> trace_context,
+                  Envoy::Extensions::Common::OpenTelemetry::Sdk::Trace::OTelSpanKind span_kind) {
   // If reached here, then this is main span for request and there is no previous span context.
   // If the custom sampler is set, then the Envoy tracing decision is ignored and the custom sampler
   // should make a sampling decision, otherwise the local Envoy tracing decision is used.
@@ -292,11 +298,11 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
   return new_span;
 }
 
-Tracing::SpanPtr Tracer::startSpan(const std::string& operation_name,
-                                   const StreamInfo::StreamInfo& stream_info, SystemTime start_time,
-                                   const SpanContext& parent_context,
-                                   OptRef<const Tracing::TraceContext> trace_context,
-                                   OTelSpanKind span_kind) {
+Tracing::SpanPtr
+Tracer::startSpan(const std::string& operation_name, const StreamInfo::StreamInfo& stream_info,
+                  SystemTime start_time, const SpanContext& parent_context,
+                  OptRef<const Tracing::TraceContext> trace_context,
+                  Envoy::Extensions::Common::OpenTelemetry::Sdk::Trace::OTelSpanKind span_kind) {
   // If reached here, then this is main span for request with a parent context or this is
   // subsequent spans. Ignore the Envoy tracing decision anyway.
 

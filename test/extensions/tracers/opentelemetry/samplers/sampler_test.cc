@@ -28,7 +28,8 @@ class TestSampler : public Sampler {
 public:
   MOCK_METHOD(SamplingResult, shouldSample,
               ((const StreamInfo::StreamInfo&), (const absl::optional<SpanContext>),
-               (const std::string&), (const std::string&), (OTelSpanKind),
+               (const std::string&), (const std::string&),
+               (Envoy::Extensions::Common::OpenTelemetry::Sdk::Trace::OTelSpanKind),
                (OptRef<const Tracing::TraceContext>), (const std::vector<SpanContext>&)),
               (override));
   MOCK_METHOD(std::string, getDescription, (), (const, override));
@@ -141,7 +142,8 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
   // shouldSample returns a result without additional attributes and Decision::RecordAndSample
   EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, _, _, _))
       .WillOnce([](const StreamInfo::StreamInfo&, const absl::optional<SpanContext>,
-                   const std::string&, const std::string&, OTelSpanKind,
+                   const std::string&, const std::string&,
+                   Envoy::Extensions::Common::OpenTelemetry::Sdk::Trace::OTelSpanKind,
                    OptRef<const Tracing::TraceContext>, const std::vector<SpanContext>&) {
         SamplingResult res;
         res.decision = Decision::RecordAndSample;
@@ -161,11 +163,12 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
   // shouldSamples return a result containing additional attributes and Decision::Drop
   EXPECT_CALL(*test_sampler, shouldSample(_, _, _, _, _, _, _))
       .WillOnce([](const StreamInfo::StreamInfo&, const absl::optional<SpanContext>,
-                   const std::string&, const std::string&, OTelSpanKind,
+                   const std::string&, const std::string&,
+                   Envoy::Extensions::Common::OpenTelemetry::Sdk::Trace::OTelSpanKind,
                    OptRef<const Tracing::TraceContext>, const std::vector<SpanContext>&) {
         SamplingResult res;
         res.decision = Decision::Drop;
-        OtelAttributes attributes;
+        Envoy::Extensions::Common::OpenTelemetry::Sdk::Common::OTelAttributes attributes;
         attributes["char_key"] = "char_value";
         attributes["sv_key"] = absl::string_view("sv_value");
         attributes["bool_key"] = true;
@@ -176,7 +179,9 @@ TEST_F(SamplerFactoryTest, TestWithSampler) {
         attributes["double_key"] = 0.123;
         attributes["not_supported_span"] = opentelemetry::nostd::span<bool>();
 
-        res.attributes = std::make_unique<const OtelAttributes>(std::move(attributes));
+        res.attributes = std::make_unique<
+            const Envoy::Extensions::Common::OpenTelemetry::Sdk::Common::OTelAttributes>(
+            std::move(attributes));
         res.tracestate = "this_is=another_tracesate";
         return res;
       });

@@ -23,6 +23,8 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/extensions/access_loggers/common:grpc_access_logger",
         "//source/extensions/access_loggers/common:grpc_access_logger_clients_lib",
+        "//source/extensions/common/opentelemetry/sdk/common:types_lib",
+        "//source/extensions/common/opentelemetry/sdk/logs:sdk_logs_lib",
         "@envoy_api//envoy/extensions/access_loggers/grpc/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/open_telemetry/v3:pkg_cc_proto",
         "@opentelemetry_proto//:logs_proto_cc",
@@ -57,6 +59,7 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
+        "//source/extensions/common/opentelemetry/sdk/logs:constants_lib",
     ],
 )
 

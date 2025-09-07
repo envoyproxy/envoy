@@ -24,12 +24,11 @@ CELSampler::CELSampler(const ::Envoy::LocalInfo::LocalInfo& local_info,
         return std::move(compiled_expr.value());
       }()) {}
 
-SamplingResult CELSampler::shouldSample(const StreamInfo::StreamInfo& stream_info,
-                                        const absl::optional<SpanContext> parent_context,
-                                        const std::string& /*trace_id*/,
-                                        const std::string& /*name*/, OTelSpanKind /*kind*/,
-                                        OptRef<const Tracing::TraceContext> trace_context,
-                                        const std::vector<SpanContext>& /*links*/) {
+SamplingResult CELSampler::shouldSample(
+    const StreamInfo::StreamInfo& stream_info, const absl::optional<SpanContext> parent_context,
+    const std::string& /*trace_id*/, const std::string& /*name*/,
+    Envoy::Extensions::Common::OpenTelemetry::Sdk::Trace::OTelSpanKind /*kind*/,
+    OptRef<const Tracing::TraceContext> trace_context, const std::vector<SpanContext>& /*links*/) {
 
   Protobuf::Arena arena;
   const ::Envoy::Http::RequestHeaderMap* request_headers = nullptr;

@@ -11,12 +11,11 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
 
-SamplingResult ParentBasedSampler::shouldSample(const StreamInfo::StreamInfo& stream_info,
-                                                const absl::optional<SpanContext> parent_context,
-                                                const std::string& trace_id,
-                                                const std::string& name, OTelSpanKind kind,
-                                                OptRef<const Tracing::TraceContext> trace_context,
-                                                const std::vector<SpanContext>& links) {
+SamplingResult ParentBasedSampler::shouldSample(
+    const StreamInfo::StreamInfo& stream_info, const absl::optional<SpanContext> parent_context,
+    const std::string& trace_id, const std::string& name,
+    Envoy::Extensions::Common::OpenTelemetry::Sdk::Trace::OTelSpanKind kind,
+    OptRef<const Tracing::TraceContext> trace_context, const std::vector<SpanContext>& links) {
   if (!parent_context.has_value() || parent_context->traceId().empty()) {
     return wrapped_sampler_->shouldSample(stream_info, parent_context, trace_id, name, kind,
                                           trace_context, links);
