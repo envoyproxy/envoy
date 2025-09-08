@@ -478,8 +478,7 @@ void ConnPoolImplBase::checkForIdleAndCloseIdleConnsIfDraining() {
 }
 
 void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
-                                         Network::ConnectionEvent event,
-                                         bool purge_pending_streams) {
+                                         Network::ConnectionEvent event) {
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
   case Network::ConnectionEvent::LocalClose: {
@@ -507,6 +506,8 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       host_->cluster().trafficStats()->upstream_cx_connect_fail_.inc();
       host_->stats().cx_connect_fail_.inc();
 
+      // If this is a connection close event caused by recoverable error, e.g. network change, do not regard it as pool failure and keep any existing pending streams waiting for newer connections.
+      if (!client.isConnectionErrorTransient()) {
       onConnectFailed(client);
       // Purge pending streams only if this client doesn't contribute to the local connecting
       // stream capacity. In other words, the rest clients  would be able to handle all the
@@ -520,7 +521,6 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
         reason = ConnectionPool::PoolFailureReason::LocalConnectionFailure;
       }
 
-      if (purge_pending_streams) {
         // Raw connect failures should never happen under normal circumstances. If we have an
         // upstream that is behaving badly, streams can get stuck here in the pending state. If we
         // see a connect failure, we purge all pending streams so that calling code can determine

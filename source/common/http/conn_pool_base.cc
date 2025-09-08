@@ -109,19 +109,6 @@ void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
   }
 }
 
-void MultiplexedActiveClientBase::onConnectionNetworkChanged() {
-  ENVOY_CONN_LOG(debug, "network changed", *codec_client_);
-  parent_.host()->cluster().trafficStats()->upstream_cx_close_notify_.inc();
-  if (state() != ActiveClient::State::Draining) {
-    if (codec_client_->numActiveRequests() == 0) {
-      close_after_network_change_ = true;
-      codec_client_->close();
-    } else {
-      parent_.transitionActiveClientState(*this, ActiveClient::State::Draining);
-    }
-  }
-}
-
 // Adjust the concurrent stream limit if the negotiated concurrent stream limit
 // is lower than the local max configured streams.
 //
@@ -208,7 +195,6 @@ MultiplexedActiveClientBase::MultiplexedActiveClientBase(
           effective_concurrent_streams, max_configured_concurrent_streams, data) {
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
-  codec_client_->setNetworkChangeCallbacks(*this);
   cx_total.inc();
 }
 

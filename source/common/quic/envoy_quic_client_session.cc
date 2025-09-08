@@ -167,10 +167,17 @@ void EnvoyQuicClientSession::OnHttp3GoAway(uint64_t stream_id) {
   }
 }
 
-void EnvoyQuicClientSession::notifyNetworkChange() {
-  if (network_change_callbacks_.has_value()) {
-    network_change_callbacks_->onConnectionNetworkChanged();
+void EnvoyQuicClientSession::onNetworkMadeDefault() {
+  if (!session_.HasActiveRequestStreams()) {
+     CloseConnectionWithDetails(quic::QUIC_CONNECTION_MIGRATION_NO_MIGRATABLE_STREAMS,
+                                        "net_error");
+     return;
   }
+  // Treat it as if a GOAWAY is received. The callback will drain this connection.
+   if (http_connection_callbacks_ != nullptr) {
+    http_connection_callbacks_->onGoAway(Http::GoAwayErrorCode::NoError);
+  }
+
 }
 
 void EnvoyQuicClientSession::OnRstStream(const quic::QuicRstStreamFrame& frame) {

@@ -212,7 +212,7 @@ void Http3ConnPoolImplTest::createNewStream() {
   EXPECT_CALL(connect_result_callback_, onHandshakeComplete()).WillOnce(Invoke([cancellable]() {
     cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
   }));
-  pool_->onConnectionEvent(*clients.front(), "", Network::ConnectionEvent::Connected, true);
+  pool_->onConnectionEvent(*clients.front(), "", Network::ConnectionEvent::Connected);
 }
 
 TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) { createNewStream(); }

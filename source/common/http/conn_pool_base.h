@@ -140,20 +140,13 @@ public:
   void close() override { codec_client_->close(); }
   virtual Http::RequestEncoder& newStreamEncoder(Http::ResponseDecoder& response_decoder) PURE;
   void onEvent(Network::ConnectionEvent event) override {
-    // If this is a connection close event caused by network change, do not regard it as pool
-    // failure and keep any existing pending streams waiting for newer connections.
-    parent_.onConnectionEvent(*this, codec_client_->connectionFailureReason(),
-                              event, /*purge_pending_streams*/
-                              !close_after_network_change_);
+    parent_.onConnectionEvent(*this, codec_client_->connectionFailureReason(), event);
   }
   uint32_t numActiveStreams() const override { return codec_client_->numActiveRequests(); }
   uint64_t id() const override { return codec_client_->id(); }
   HttpConnPoolImplBase& parent() { return *static_cast<HttpConnPoolImplBase*>(&parent_); }
 
   Http::CodecClientPtr codec_client_;
-  // If true, the connection has been closed because of underlying network change. And any
-  // following connection close events shouldn't be regarded as pool failure.
-  bool close_after_network_change_{false};
 };
 
 /* An implementation of Envoy::ConnectionPool::ConnPoolImplBase for HTTP/1 and HTTP/2
@@ -207,8 +200,7 @@ protected:
  */
 class MultiplexedActiveClientBase : public CodecClientCallbacks,
                                     public Http::ConnectionCallbacks,
-                                    public Envoy::Http::ActiveClient,
-                                    public Network::NetworkChangeCallbacks {
+                                    public Envoy::Http::ActiveClient {
 public:
   MultiplexedActiveClientBase(HttpConnPoolImplBase& parent, uint32_t effective_concurrent_streams,
                               uint32_t max_configured_concurrent_streams, Stats::Counter& cx_total,
@@ -228,9 +220,6 @@ public:
   // Http::ConnectionCallbacks
   void onGoAway(Http::GoAwayErrorCode error_code) override;
   void onSettings(ReceivedSettings& settings) override;
-
-  // Network::NetworkChangeCallbacks
-  void onConnectionNetworkChanged() override;
 
 private:
   bool closed_with_active_rq_{};

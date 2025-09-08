@@ -288,7 +288,7 @@ void InternalEngine::onDefaultNetworkAvailable() {
 void InternalEngine::onDefaultNetworkChanged(NetworkType network) {
   ENVOY_LOG_MISC(trace, "Calling the default network changed callback");
   dispatcher_->post([&, network]() -> void {
-    envoy_netconf_t configuration = connectivity_manager_->onNetworkMadeDefault(network);
+    envoy_netconf_t configuration = Network::ConnectivityManagerImpl::setPreferredNetwork(network);
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.dns_cache_set_ip_version_to_remove")) {
       // The IP version to remove flag must be set first before refreshing the DNS cache so that

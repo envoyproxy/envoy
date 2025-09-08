@@ -126,6 +126,11 @@ public:
     return state_ != State::Connecting;
   }
 
+  // Whether the failure is universal or not.
+  // Called by the connection pool upon connection close during handshake to
+  // infer if other connecting attempts will also fail for the same reason or not and decide whether to early fail all pending requests.
+  virtual bool isConnectionErrorTransient() const { return false; }
+
   ConnPoolImplBase& parent_;
   // The count of remaining streams allowed for this connection.
   // This will start out as the total number of streams per connection if capped
@@ -254,7 +259,7 @@ public:
   // If the event is a connection close and purge_pending_streams is false, do not propagate this as
   // a pool failure, but keep trying connecting new connections to handle these pending stream.
   void onConnectionEvent(ActiveClient& client, absl::string_view failure_reason,
-                         Network::ConnectionEvent event, bool purge_pending_streams);
+                         Network::ConnectionEvent event);
 
   // Check if the pool has gone idle and invoke idle notification callbacks.
   void checkForIdleAndNotify();

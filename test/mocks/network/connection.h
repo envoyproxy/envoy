@@ -130,7 +130,6 @@ public:
 
   // Network::ClientConnection
   MOCK_METHOD(void, connect, ());
-  MOCK_METHOD(void, setNetworkChangeCallbacks, (NetworkChangeCallbacks&));
 };
 
 /**
