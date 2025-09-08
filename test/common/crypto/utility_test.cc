@@ -450,6 +450,249 @@ TEST(UtilityTest, TestSign) {
   EXPECT_FALSE(result.signature_.empty());
 }
 
+TEST(UtilityTest, TestHashFunctionSupport) {
+  // Test hash function support through sign/verify operations
+  // This indirectly tests getHashFunction() coverage
+
+  auto private_key =
+      "308204be020100300d06092a864886f70d0101010500048204a8308204a40201000282010100ce7901c29654f7e0"
+      "4e0802cf6410c9e354ce0bcaafa6de2521e453f0f3f8c07607389bbc6aaba22e41bff51244d0a7b87d1d271d27da"
+      "98d16b324d0ace80bc9c236c33c24a96e7009b4e2e618d2449130415e4001cc08e5daca7b5794ed61fee1db5bf87"
+      "9a29ece0ec2af927819e5a5c37e45c0fc3ae13adf3992828e4d97d7d7b5bfd7a0631812f2badd1ba6c6f88cfd767"
+      "e53d64f47ac4f61525e435db626356570f1e02ff0ce4d7bb92bd865edfd0f3978a7ccc059c034a6065cf917821da"
+      "e0b9a721df188b744151ce8cc289625b8186f68aba5290b8d5686d8b7f66231328db9a42d5c03c24685a0922aa9e"
+      "34d95e643e11555598d620cc1f7185a5d4170203010001028201004d5cf1d7e3543afc84c063ad29a550c0294a7b"
+      "089b003f44528aa7192591132c265083a9f99e0dca9f4039a77ab963deb0a277c168e9735124855870b02774845c"
+      "9172635e67646ec9c265868fc804c967427c87be3e3819c9539d9fb27670c85bc179de6959443492c9174a423aff"
+      "488678be35f9f003d7adeab92d7972349e5f5a4d21ecc9eecb812132dfcec4477454e09c07f51684df4720e04a9e"
+      "24362db8cd2196c1804782a682174b4dc977a84eb27c1f664f22eb64b3abae433d045fb4eea3730bc4ef30d0fb85"
+      "98471dea2c78f654ebcded8b7436155c1f03362e8409c0636022b8116bced4c46099c53fa4d8d8d1f4f6be7775fd"
+      "448ea888444da102818100f11fb88f8514202d4e3b137270f3cb98d8e17fc9caf77c76eda9a1bc0e2cebc4c3997a"
+      "bf96bcdb945beede3e01d6464913f446d594218677619ecdb584b63dca81cacd9fa9030a00d5bb143483b8aaa86a"
+      "7d8616adc16645376c8904e259e784e5fced37135ea8f776940cd3371550acdc1af2d409bfc1ad7253ab1541540f"
+      "dd02818100db3602515c160b41803d732afbbb8f411fc024648932e44e7dd8e728cbfe7bc5282a6f57027964c8ba"
+      "22618a83f1161d187251efd5de3bb7c83d50db6295b1392e9e87c205761858daed057317d815cafe52253eaf2f72"
+      "6897965ed46f0a212d8355a2d2e64882e9e32166cca7e4336cc3b279ace0f67abee126e39087682e8302818100ec"
+      "091b481303a283f722c964abc15bba62044c6da32c2540de61c19b2f5d35e6c57ac6b829bcf24e06b88c01b316a8"
+      "72fcff911f9e043b773dae90bc720f5be992a88e250ef394a5409403b16c882736fa17aa5d24f63f40de827696bb"
+      "653ac7d3c3860af60121f22cb7bcde3dfbb59fa14f180a0d091374d087aae001b5625902818011561922d4148e39"
+      "54ea0734ac09ee4f693269ee658757d4f950f11f21daf370e93749ece8ae2f114cdf3135a22fabdf0b32e755ff64"
+      "fef60ee9027f0731ed7d2739b464dcc7b52f39c92af82a3795a9a3295df6b2261f77341dd94c15a8086db00852c3"
+      "39211cf1605c20e42896fc962a77eff583291b16037a6ededc4699ff02818100cadc0cbd4e4f00301e3594190529"
+      "c8324c19ed77138b7582288a229f86c6f261f95b93d47a318856b3585e68b1b90be6c8467a4e8f97f6e820064f8d"
+      "2793ddf93e1cfa119f1f166de15d6588d9e8ac5ffd30c953374c22557d3f80d24982425dfe00754cfab810c8ff12"
+      "6adfb09964d360d1d2d337cf3076c53e4d59f911feee";
+
+  Common::Crypto::CryptoObjectPtr crypto_ptr(
+      Common::Crypto::UtilitySingleton::get().importPrivateKey(Hex::decode(private_key)));
+  Common::Crypto::CryptoObject* crypto(crypto_ptr.get());
+
+  auto data = "test hash functions";
+  std::vector<uint8_t> text(data, data + strlen(data));
+
+  // Test all supported hash functions (this exercises getHashFunction internally)
+  std::vector<std::string> supported_hashes = {"sha1", "sha224", "sha256", "sha384", "sha512"};
+  for (const auto& hash : supported_hashes) {
+    auto result = UtilitySingleton::get().sign(hash, *crypto, text);
+    EXPECT_EQ(true, result.result_) << "Signing failed with " << hash;
+    EXPECT_EQ("", result.error_message_) << "Signing error with " << hash;
+    EXPECT_FALSE(result.signature_.empty()) << "Signature empty with " << hash;
+  }
+
+  // Test case insensitive hash functions
+  std::vector<std::string> case_variants = {"SHA1", "SHA256", "Sha384"};
+  for (const auto& hash : case_variants) {
+    auto result = UtilitySingleton::get().sign(hash, *crypto, text);
+    EXPECT_EQ(true, result.result_) << "Case insensitive signing failed with " << hash;
+    EXPECT_EQ("", result.error_message_) << "Case insensitive signing error with " << hash;
+    EXPECT_FALSE(result.signature_.empty()) << "Case insensitive signature empty with " << hash;
+  }
+
+  // Test unsupported hash functions
+  std::vector<std::string> unsupported_hashes = {"md5", "sha3", "unknown", ""};
+  for (const auto& hash : unsupported_hashes) {
+    auto result = UtilitySingleton::get().sign(hash, *crypto, text);
+    EXPECT_EQ(false, result.result_) << "Unsupported hash should fail: " << hash;
+    EXPECT_EQ(hash + " is not supported.", result.error_message_)
+        << "Wrong error message for " << hash;
+    EXPECT_TRUE(result.signature_.empty())
+        << "Signature should be empty for unsupported hash: " << hash;
+  }
+}
+
+TEST(UtilityTest, TestFormatDetectionEdgeCases) {
+  // Test very small keys (should not trigger PEM detection)
+  auto tiny_key = std::vector<uint8_t>{1, 2, 3};
+  auto crypto_ptr = UtilitySingleton::get().importPublicKey(tiny_key);
+  auto wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*crypto_ptr);
+  EVP_PKEY* pkey = wrapper->getEVP_PKEY();
+  EXPECT_EQ(nullptr, pkey) << "Tiny key should fail to parse";
+
+  // Test key with "-----BEGIN" but no newlines (should not be detected as PEM)
+  std::string no_newline_key =
+      "-----BEGIN PUBLIC KEY-----MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA";
+  auto crypto_ptr2 = UtilitySingleton::get().importPublicKey(
+      std::vector<uint8_t>(no_newline_key.begin(), no_newline_key.end()));
+  auto wrapper2 = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*crypto_ptr2);
+  EVP_PKEY* pkey2 = wrapper2->getEVP_PKEY();
+  EXPECT_EQ(nullptr, pkey2) << "Key without newlines should not be detected as PEM";
+
+  // Test key with newlines but no "-----BEGIN" (should not be detected as PEM)
+  std::string no_begin_key = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA\n";
+  auto crypto_ptr3 = UtilitySingleton::get().importPublicKey(
+      std::vector<uint8_t>(no_begin_key.begin(), no_begin_key.end()));
+  auto wrapper3 = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*crypto_ptr3);
+  EVP_PKEY* pkey3 = wrapper3->getEVP_PKEY();
+  EXPECT_EQ(nullptr, pkey3) << "Key without BEGIN marker should not be detected as PEM";
+}
+
+TEST(UtilityTest, TestSignErrorPaths) {
+  // Test with empty crypto object
+  auto empty_crypto = std::make_unique<PrivateKeyObject>();
+  auto data = "test data";
+  std::vector<uint8_t> text(data, data + strlen(data));
+
+  auto result = UtilitySingleton::get().sign("sha256", *empty_crypto, text);
+  EXPECT_EQ(false, result.result_);
+  EXPECT_EQ("Failed to initialize digest sign.", result.error_message_);
+  EXPECT_TRUE(result.signature_.empty());
+
+  // Test with crypto object that has null EVP_PKEY
+  auto crypto_with_null = std::make_unique<PrivateKeyObject>();
+  crypto_with_null->setEVP_PKEY(nullptr);
+  result = UtilitySingleton::get().sign("sha256", *crypto_with_null, text);
+  EXPECT_EQ(false, result.result_);
+  EXPECT_EQ("Failed to initialize digest sign.", result.error_message_);
+  EXPECT_TRUE(result.signature_.empty());
+}
+
+TEST(UtilityTest, TestVerifySignatureErrorPaths) {
+  // Test with empty crypto object
+  auto empty_crypto = std::make_unique<PublicKeyObject>();
+  auto data = "test data";
+  std::vector<uint8_t> text(data, data + strlen(data));
+  auto signature = std::vector<uint8_t>{1, 2, 3, 4};
+
+  auto result = UtilitySingleton::get().verifySignature("sha256", *empty_crypto, signature, text);
+  EXPECT_EQ(false, result.result_);
+  EXPECT_EQ("Failed to initialize digest verify.", result.error_message_);
+
+  // Test with crypto object that has null EVP_PKEY
+  auto crypto_with_null = std::make_unique<PublicKeyObject>();
+  crypto_with_null->setEVP_PKEY(nullptr);
+  result = UtilitySingleton::get().verifySignature("sha256", *crypto_with_null, signature, text);
+  EXPECT_EQ(false, result.result_);
+  EXPECT_EQ("Failed to initialize digest verify.", result.error_message_);
+}
+
+TEST(UtilityTest, TestSingletonAccess) {
+  // Test that singleton returns the same instance
+  auto& singleton1 = UtilitySingleton::get();
+  auto& singleton2 = UtilitySingleton::get();
+  EXPECT_EQ(&singleton1, &singleton2) << "Singleton should return same instance";
+
+  // Test that singleton methods work
+  const Buffer::OwnedImpl buffer("test");
+  const auto digest = singleton1.getSha256Digest(buffer);
+  EXPECT_FALSE(digest.empty());
+  EXPECT_EQ(32, digest.size()); // SHA256 produces 32 bytes
+}
+
+TEST(UtilityTest, TestPEMKeyImport) {
+  // Test PEM public key import (exercises PEM parsing branch)
+  std::string pem_public_key = "-----BEGIN PUBLIC KEY-----\n"
+                               "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6OoWDroNyolwOKZPQQ/b\n"
+                               "wyQwG6fCN/A/3ixsm5GvNLIdZVaYjmq34brLdV6AQQnO+hrnVp9P/DexyZSFnl1w\n"
+                               "9tANGV9anVLY2BQLtcPDTuD4T+4CvWwoAMxcTtT33vx1MQmxDbM1OBddcMZMiSbK\n"
+                               "usJaSlc3iCfyBHK7gAy3tzax8tqJ/TmbSzTPh6y7Kzeka+eSV3Yc3zJ2QWzHf8x1\n"
+                               "0lSIabOC2fYryRjon9fB8nDWogO5zvb44ZppiqRxIdjSNz29/xufWI2UaZe6YNk4\n"
+                               "OT/m1e3n+1BECPGHfIPq8CVGY6liC75w+gweugFMOF+RHcDDxpWQn0Q2vDDKteXf\n"
+                               "twIDAQAB\n"
+                               "-----END PUBLIC KEY-----";
+
+  Common::Crypto::CryptoObjectPtr pem_crypto_ptr(
+      Common::Crypto::UtilitySingleton::get().importPublicKey(
+          std::vector<uint8_t>(pem_public_key.begin(), pem_public_key.end())));
+  auto pem_wrapper =
+      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*pem_crypto_ptr);
+  EVP_PKEY* pem_pkey = pem_wrapper->getEVP_PKEY();
+  EXPECT_NE(nullptr, pem_pkey) << "PEM public key import should succeed";
+
+  // Test PEM private key import (exercises PEM parsing branch)
+  std::string pem_private_key = "-----BEGIN PRIVATE KEY-----\n"
+                                "MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDo6hYOug3KiXA4\n"
+                                "pk9BD9vDJDAbp8I38D/eLGybka80sh1lVpiOarfhust1XoBBCc76GudWn0/8N7HJ\n"
+                                "lIWeXXD20A0ZX1qdUtjYFAu1w8NO4PhP7gK9bCgAzFxO1Pfe/HUxCbENszU4F11w\n"
+                                "xkyJJsq6wlpKVzeIJ/IEcruADLe3NrHy2on9OZtLNM+HrLsrN6Rr55JXdhzfMnZB\n"
+                                "bMd/zHXSVIhps4LZ9ivJGOif18HycNaiA7nO9vjhmmmKpHEh2NI3Pb3/G59YjZRp\n"
+                                "l7pg2Tg5P+bV7ef7UEQI8Yd8g+rwJUZjqWILvnD6DB66AUw4X5EdwMPGlZCfRDa8\n"
+                                "MMq15d+3AgMBAAECggEBAMKFbjKSdJ4ots65JwvBgNqzSHJwYyZwwgZ9t58dxuQN\n"
+                                "tbtC3VpkCnq9lNrLN/YZiQEcowSXPSf6I8OlBQtEIuoezDHaj0VBQdUEuNrvShiA\n"
+                                "jyHCOAuXXrl788Pq3bEfy4hO/c3hU5sq+GENXDJXcY0UcHAR81EFe3z3jVzeQjkC\n"
+                                "Hxpt3cK/eXAw91QpCfKRbquBBAdXM5wYS/1Uoksg0UmWi7CxKmwzU8gCWgctaqCR\n"
+                                "lNClF9+2tqVTF4NLYxciqenolS9+c5AUUEAY6VxXDb7/EsiQORm6lbQQ9V7ob+Cw\n"
+                                "jR6AZ33epEc1tWx19C2Bi+mT2UceMTC+PVE/ggDwY9ECgYEA+ULupsMKzLfqdNHy\n"
+                                "vk0vrsUZavX9zvW9JkZW53sYgqIBZ9ySJud8EoBBMzyf764lb1SHyWvNvCikYJxJ\n"
+                                "Qs/4/f14+ij/dK2HTm+TWLE1hST1ndKITa0fNuIpn5n1Uq8GmrkRjArqXEvtF9rp\n"
+                                "laY/R25XKC5p8b9UhCTQCpy779MCgYEA7zYFRj1xFN2IrNXsIsXcxjFTYWKiK33F\n"
+                                "iOdV5dtJPj771f3RZKProeOSbiDjmu+b2omiBwVj+Ktoam3x7v0RsSm22ZgceG2a\n"
+                                "wzEZbm4hDniJZmDSwCwH83rrhTdTrW/JXCZObrrp3cfAi41xC0bcyilk5ggbV7ZD\n"
+                                "86mWQrq9Rg0CgYBSeOblnlsQaTnV9TFP7dH9DZHfZgzYUU6IP3W5mWz+rAOzDbP9\n"
+                                "01Gl/XGVNlXkw8X3FAzphBXKT9gzbwJ+bLmBsEA65R3AyTmfpiMmkVuX9iaeVW5r\n"
+                                "5QAS9Lm46QPWm7qfruQzZdktOKH15qSqsxr003la/iBnsFqSbmu3VyyHqQKBgGNi\n"
+                                "4WweiQYvSOLueo60AJdD1S3ICjLhrZnE69Z1dofrKTzumPokdPktESC6f3ZXCT0S\n"
+                                "JASgw7mElfxqM7Ok553hA/yCC4opl7xzgOp1zTwy7ntfzRBU+vS5ZHNT2mtb36Bu\n"
+                                "tfWhqRshLCmPGaGizoccDbTZN2sI6lCpbCnLZmpdAoGBAMXtTsgXfvKTN2+BxuQN\n"
+                                "4qxfkhXgFLZyLxSDhSKzTUWatAjP8vjovZkYVIAWRrBwhGY0qETMAkdqLt8HRSZu\n"
+                                "uqe4lF8MortkdsDth/7oHyk+ye9kJzcC2Fe7aD+554Lj1yuMG+ogopgNIkhavd1i\n"
+                                "6hNaip95fqDTbi3D0R2Hz/qk\n"
+                                "-----END PRIVATE KEY-----";
+
+  Common::Crypto::CryptoObjectPtr pem_private_crypto_ptr(
+      Common::Crypto::UtilitySingleton::get().importPrivateKey(
+          std::vector<uint8_t>(pem_private_key.begin(), pem_private_key.end())));
+  auto pem_private_wrapper =
+      Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(*pem_private_crypto_ptr);
+  EVP_PKEY* pem_private_pkey = pem_private_wrapper->getEVP_PKEY();
+  EXPECT_NE(nullptr, pem_private_pkey) << "PEM private key import should succeed";
+}
+
+TEST(UtilityTest, TestSmallKeyEdgeCase) {
+  // Test keys with size <= 10 (exercises key size edge case)
+  auto small_key = std::vector<uint8_t>{1, 2, 3, 4, 5};
+  auto crypto_ptr = UtilitySingleton::get().importPublicKey(small_key);
+  auto wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*crypto_ptr);
+  EVP_PKEY* pkey = wrapper->getEVP_PKEY();
+  EXPECT_EQ(nullptr, pkey) << "Small key should fail to parse";
+
+  // Test with exactly 10 bytes
+  auto ten_byte_key = std::vector<uint8_t>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  auto crypto_ptr2 = UtilitySingleton::get().importPrivateKey(ten_byte_key);
+  auto wrapper2 = Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(*crypto_ptr2);
+  EVP_PKEY* pkey2 = wrapper2->getEVP_PKEY();
+  EXPECT_EQ(nullptr, pkey2) << "10-byte key should fail to parse";
+}
+
+TEST(UtilityTest, TestCryptoObjectMethods) {
+  // Test PublicKeyObject methods (exercises crypto_impl.cc)
+  auto public_obj = std::make_unique<PublicKeyObject>();
+  EXPECT_EQ(nullptr, public_obj->getEVP_PKEY()) << "New PublicKeyObject should have null pkey";
+
+  // Create a dummy EVP_PKEY for testing
+  EVP_PKEY* test_pkey = EVP_PKEY_new();
+  public_obj->setEVP_PKEY(test_pkey);
+  EXPECT_EQ(test_pkey, public_obj->getEVP_PKEY()) << "setEVP_PKEY should set the key";
+
+  // Test PrivateKeyObject methods (exercises crypto_impl.cc)
+  auto private_obj = std::make_unique<PrivateKeyObject>();
+  EXPECT_EQ(nullptr, private_obj->getEVP_PKEY()) << "New PrivateKeyObject should have null pkey";
+
+  EVP_PKEY* test_private_pkey = EVP_PKEY_new();
+  private_obj->setEVP_PKEY(test_private_pkey);
+  EXPECT_EQ(test_private_pkey, private_obj->getEVP_PKEY())
+      << "setEVP_PKEY should set the private key";
+}
+
 } // namespace
 } // namespace Crypto
 } // namespace Common
