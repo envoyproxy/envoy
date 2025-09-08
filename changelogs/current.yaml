@@ -92,6 +92,9 @@ bug_fixes:
   change: |
     Fixed a bug where the ``response_headers_to_add`` may be processed multiple times for the local responses from
     the router filter.
+- area: formatter
+  change: |
+    Fixed a bug where the ``%TRACE_ID%`` command cannot work properly at the header mutations.
 - area: listeners
   change: |
     Fixed issue where :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` timed out
