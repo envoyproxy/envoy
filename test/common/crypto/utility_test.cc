@@ -2,6 +2,7 @@
 #include "source/common/common/hex.h"
 #include "source/common/crypto/crypto_impl.h"
 #include "source/common/crypto/utility.h"
+#include "source/common/crypto/utility_impl.h"
 
 #include "gtest/gtest.h"
 
@@ -520,32 +521,6 @@ TEST(UtilityTest, TestHashFunctionSupport) {
   }
 }
 
-TEST(UtilityTest, TestFormatDetectionEdgeCases) {
-  // Test very small keys (should not trigger PEM detection)
-  auto tiny_key = std::vector<uint8_t>{1, 2, 3};
-  auto crypto_ptr = UtilitySingleton::get().importPublicKey(tiny_key);
-  auto wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*crypto_ptr);
-  EVP_PKEY* pkey = wrapper->getEVP_PKEY();
-  EXPECT_EQ(nullptr, pkey) << "Tiny key should fail to parse";
-
-  // Test key with "-----BEGIN" but no newlines (should not be detected as PEM)
-  std::string no_newline_key =
-      "-----BEGIN PUBLIC KEY-----MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA";
-  auto crypto_ptr2 = UtilitySingleton::get().importPublicKey(
-      std::vector<uint8_t>(no_newline_key.begin(), no_newline_key.end()));
-  auto wrapper2 = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*crypto_ptr2);
-  EVP_PKEY* pkey2 = wrapper2->getEVP_PKEY();
-  EXPECT_EQ(nullptr, pkey2) << "Key without newlines should not be detected as PEM";
-
-  // Test key with newlines but no "-----BEGIN" (should not be detected as PEM)
-  std::string no_begin_key = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA\n";
-  auto crypto_ptr3 = UtilitySingleton::get().importPublicKey(
-      std::vector<uint8_t>(no_begin_key.begin(), no_begin_key.end()));
-  auto wrapper3 = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*crypto_ptr3);
-  EVP_PKEY* pkey3 = wrapper3->getEVP_PKEY();
-  EXPECT_EQ(nullptr, pkey3) << "Key without BEGIN marker should not be detected as PEM";
-}
-
 TEST(UtilityTest, TestSignErrorPaths) {
   // Test with empty crypto object
   auto empty_crypto = std::make_unique<PrivateKeyObject>();
@@ -657,22 +632,6 @@ TEST(UtilityTest, TestPEMKeyImport) {
   EXPECT_NE(nullptr, pem_private_pkey) << "PEM private key import should succeed";
 }
 
-TEST(UtilityTest, TestSmallKeyEdgeCase) {
-  // Test keys with size <= 10 (exercises key size edge case)
-  auto small_key = std::vector<uint8_t>{1, 2, 3, 4, 5};
-  auto crypto_ptr = UtilitySingleton::get().importPublicKey(small_key);
-  auto wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*crypto_ptr);
-  EVP_PKEY* pkey = wrapper->getEVP_PKEY();
-  EXPECT_EQ(nullptr, pkey) << "Small key should fail to parse";
-
-  // Test with exactly 10 bytes
-  auto ten_byte_key = std::vector<uint8_t>{1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-  auto crypto_ptr2 = UtilitySingleton::get().importPrivateKey(ten_byte_key);
-  auto wrapper2 = Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(*crypto_ptr2);
-  EVP_PKEY* pkey2 = wrapper2->getEVP_PKEY();
-  EXPECT_EQ(nullptr, pkey2) << "10-byte key should fail to parse";
-}
-
 TEST(UtilityTest, TestCryptoObjectMethods) {
   // Test PublicKeyObject methods (exercises crypto_impl.cc)
   auto public_obj = std::make_unique<PublicKeyObject>();
@@ -716,6 +675,147 @@ TEST(UtilityTest, TestBoundaryConditions) {
   std::string empty_message;
   auto empty_hmac = UtilitySingleton::get().getSha256Hmac(empty_key, empty_message);
   EXPECT_EQ(32, empty_hmac.size()) << "HMAC with empty inputs should still be 32 bytes";
+}
+
+TEST(UtilityTest, TestFormatDetectionAndHelpers) {
+  // Comprehensive test of format detection and helper functions (consolidates multiple previous
+  // tests)
+
+  auto impl = std::make_unique<UtilityImpl>();
+
+  // Test isPEMFormat function comprehensively
+
+  // Valid PEM format detection
+  std::string valid_pem =
+      "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A\n-----END PUBLIC KEY-----";
+  std::vector<uint8_t> valid_pem_bytes(valid_pem.begin(), valid_pem.end());
+  EXPECT_TRUE(impl->isPEMFormat(valid_pem_bytes)) << "Valid PEM should be detected";
+
+  // Small key edge cases (≤ 10 bytes)
+  std::vector<uint8_t> tiny_key = {1, 2, 3};
+  EXPECT_FALSE(impl->isPEMFormat(tiny_key)) << "Tiny key should not be PEM";
+
+  std::vector<uint8_t> small_key = {1, 2, 3, 4, 5};
+  EXPECT_FALSE(impl->isPEMFormat(small_key)) << "Small key should not be PEM";
+
+  std::vector<uint8_t> ten_bytes = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  EXPECT_FALSE(impl->isPEMFormat(ten_bytes)) << "10-byte key should not be PEM";
+
+  // Format detection edge cases
+  std::string no_newline = "-----BEGIN PUBLIC KEY-----CONTENT";
+  std::vector<uint8_t> no_newline_bytes(no_newline.begin(), no_newline.end());
+  EXPECT_FALSE(impl->isPEMFormat(no_newline_bytes)) << "No newline should not be PEM";
+
+  std::string no_begin = "CONTENT\nMORE CONTENT";
+  std::vector<uint8_t> no_begin_bytes(no_begin.begin(), no_begin.end());
+  EXPECT_FALSE(impl->isPEMFormat(no_begin_bytes)) << "No BEGIN should not be PEM";
+
+  // DER format (binary data)
+  std::vector<uint8_t> der_key = {0x30, 0x82, 0x01, 0x22, 0x30, 0x0d}; // DER SEQUENCE
+  EXPECT_FALSE(impl->isPEMFormat(der_key)) << "DER key should not be detected as PEM";
+
+  // Test that small keys also fail through the main import functions
+  auto crypto_ptr = UtilitySingleton::get().importPublicKey(tiny_key);
+  auto wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*crypto_ptr);
+  EXPECT_EQ(nullptr, wrapper->getEVP_PKEY()) << "Tiny key should fail import";
+
+  auto private_crypto_ptr = UtilitySingleton::get().importPrivateKey(ten_bytes);
+  auto private_wrapper =
+      Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(*private_crypto_ptr);
+  EXPECT_EQ(nullptr, private_wrapper->getEVP_PKEY()) << "10-byte key should fail private import";
+}
+
+TEST(UtilityTest, TestPEMParsingFailures) {
+  // Test PEM parsing with malformed PEM data to exercise error paths
+
+  // Invalid PEM public key (has markers but corrupted content)
+  std::string invalid_pem_public = "-----BEGIN PUBLIC KEY-----\n"
+                                   "INVALID_BASE64_CONTENT_HERE\n"
+                                   "-----END PUBLIC KEY-----";
+
+  auto crypto_ptr = UtilitySingleton::get().importPublicKey(
+      std::vector<uint8_t>(invalid_pem_public.begin(), invalid_pem_public.end()));
+  auto wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*crypto_ptr);
+  EVP_PKEY* pkey = wrapper->getEVP_PKEY();
+  EXPECT_EQ(nullptr, pkey) << "Invalid PEM public key should fail to parse";
+
+  // Invalid PEM private key (has markers but corrupted content)
+  std::string invalid_pem_private = "-----BEGIN PRIVATE KEY-----\n"
+                                    "INVALID_BASE64_CONTENT_HERE\n"
+                                    "-----END PRIVATE KEY-----";
+
+  auto private_crypto_ptr = UtilitySingleton::get().importPrivateKey(
+      std::vector<uint8_t>(invalid_pem_private.begin(), invalid_pem_private.end()));
+  auto private_wrapper =
+      Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(*private_crypto_ptr);
+  EVP_PKEY* private_pkey = private_wrapper->getEVP_PKEY();
+  EXPECT_EQ(nullptr, private_pkey) << "Invalid PEM private key should fail to parse";
+
+  // Test with very large key data to exercise string construction path
+  std::vector<uint8_t> large_key_data(50000, 'A'); // 50KB of 'A' characters
+  large_key_data[0] = '-';
+  large_key_data[1] = '-'; // Make it look like PEM start
+  auto large_crypto_ptr = UtilitySingleton::get().importPublicKey(large_key_data);
+  auto large_wrapper =
+      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*large_crypto_ptr);
+  EVP_PKEY* large_pkey = large_wrapper->getEVP_PKEY();
+  EXPECT_EQ(nullptr, large_pkey) << "Large invalid key should fail to parse";
+}
+
+TEST(UtilityTest, TestDeepErrorPaths) {
+  // Try to trigger deeper OpenSSL error conditions that might be uncovered
+  auto private_key =
+      "308204be020100300d06092a864886f70d0101010500048204a8308204a40201000282010100ce7901c29654f7e0"
+      "4e0802cf6410c9e354ce0bcaafa6de2521e453f0f3f8c07607389bbc6aaba22e41bff51244d0a7b87d1d271d27da"
+      "98d16b324d0ace80bc9c236c33c24a96e7009b4e2e618d2449130415e4001cc08e5daca7b5794ed61fee1db5bf87"
+      "9a29ece0ec2af927819e5a5c37e45c0fc3ae13adf3992828e4d97d7d7b5bfd7a0631812f2badd1ba6c6f88cfd767"
+      "e53d64f47ac4f61525e435db626356570f1e02ff0ce4d7bb92bd865edfd0f3978a7ccc059c034a6065cf917821da"
+      "e0b9a721df188b744151ce8cc289625b8186f68aba5290b8d5686d8b7f66231328db9a42d5c03c24685a0922aa9e"
+      "34d95e643e11555598d620cc1f7185a5d4170203010001028201004d5cf1d7e3543afc84c063ad29a550c0294a7b"
+      "089b003f44528aa7192591132c265083a9f99e0dca9f4039a77ab963deb0a277c168e9735124855870b02774845c"
+      "9172635e67646ec9c265868fc804c967427c87be3e3819c9539d9fb27670c85bc179de6959443492c9174a423aff"
+      "488678be35f9f003d7adeab92d7972349e5f5a4d21ecc9eecb812132dfcec4477454e09c07f51684df4720e04a9e"
+      "24362db8cd2196c1804782a682174b4dc977a84eb27c1f664f22eb64b3abae433d045fb4eea3730bc4ef30d0fb85"
+      "98471dea2c78f654ebcded8b7436155c1f03362e8409c0636022b8116bced4c46099c53fa4d8d8d1f4f6be7775fd"
+      "448ea888444da102818100f11fb88f8514202d4e3b137270f3cb98d8e17fc9caf77c76eda9a1bc0e2cebc4c3997a"
+      "bf96bcdb945beede3e01d6464913f446d594218677619ecdb584b63dca81cacd9fa9030a00d5bb143483b8aaa86a"
+      "7d8616adc16645376c8904e259e784e5fced37135ea8f776940cd3371550acdc1af2d409bfc1ad7253ab1541540f"
+      "dd02818100db3602515c160b41803d732afbbb8f411fc024648932e44e7dd8e728cbfe7bc5282a6f57027964c8ba"
+      "22618a83f1161d187251efd5de3bb7c83d50db6295b1392e9e87c205761858daed057317d815cafe52253eaf2f72"
+      "6897965ed46f0a212d8355a2d2e64882e9e32166cca7e4336cc3b279ace0f67abee126e39087682e8302818100ec"
+      "091b481303a283f722c964abc15bba62044c6da32c2540de61c19b2f5d35e6c57ac6b829bcf24e06b88c01b316a8"
+      "72fcff911f9e043b773dae90bc720f5be992a88e250ef394a5409403b16c882736fa17aa5d24f63f40de827696bb"
+      "653ac7d3c3860af60121f22cb7bcde3dfbb59fa14f180a0d091374d087aae001b5625902818011561922d4148e39"
+      "54ea0734ac09ee4f693269ee658757d4f950f11f21daf370e93749ece8ae2f114cdf3135a22fabdf0b32e755ff64"
+      "fef60ee9027f0731ed7d2739b464dcc7b52f39c92af82a3795a9a3295df6b2261f77341dd94c15a8086db00852c3"
+      "39211cf1605c20e42896fc962a77eff583291b16037a6ededc4699ff02818100cadc0cbd4e4f00301e3594190529"
+      "c8324c19ed77138b7582288a229f86c6f261f95b93d47a318856b3585e68b1b90be6c8467a4e8f97f6e820064f8d"
+      "2793ddf93e1cfa119f1f166de15d6588d9e8ac5ffd30c953374c22557d3f80d24982425dfe00754cfab810c8ff12"
+      "6adfb09964d360d1d2d337cf3076c53e4d59f911feee";
+
+  Common::Crypto::CryptoObjectPtr crypto_ptr(
+      Common::Crypto::UtilitySingleton::get().importPrivateKey(Hex::decode(private_key)));
+  Common::Crypto::CryptoObject* crypto(crypto_ptr.get());
+
+  // Test signing with extremely large text to potentially trigger EVP_DigestSign errors
+  std::vector<uint8_t> huge_text(100000000, 'X'); // 100MB of data
+  auto result = UtilitySingleton::get().sign("sha256", *crypto, huge_text);
+  // This should still succeed but exercises the signature length/creation paths
+  EXPECT_EQ(true, result.result_) << "Large text signing should succeed";
+  EXPECT_FALSE(result.signature_.empty()) << "Large text signature should not be empty";
+
+  // Test with corrupted key that might cause EVP_DigestVerifyInit to fail
+  auto corrupted_key = std::make_unique<PublicKeyObject>();
+  // Create a partially valid but corrupted EVP_PKEY that might cause init failures
+  EVP_PKEY* corrupted_pkey = EVP_PKEY_new();
+  corrupted_key->setEVP_PKEY(corrupted_pkey);
+
+  std::vector<uint8_t> test_data = {'t', 'e', 's', 't'};
+  std::vector<uint8_t> dummy_sig = {1, 2, 3, 4};
+
+  auto verify_result =
+      UtilitySingleton::get().verifySignature("sha256", *corrupted_key, dummy_sig, test_data);
+  EXPECT_EQ(false, verify_result.result_) << "Corrupted key should fail verification";
 }
 
 } // namespace

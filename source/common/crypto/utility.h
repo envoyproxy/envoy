@@ -99,7 +99,8 @@ public:
    * @param key Public key in DER (hex-encoded) or PEM format
    * @return pointer to EVP_PKEY public key
    * @note Supports both DER (hex-encoded) and PEM formats with auto-detection
-   * @note DER format: PKCS#1 public key format (SEQUENCE { SEQUENCE { OID, NULL }, BIT STRING })
+   * @note DER format: SubjectPublicKeyInfo format (SEQUENCE { SEQUENCE { OID, NULL }, BIT STRING })
+   * containing PKCS#1 key
    * @note PEM format: Automatically handles both PKCS#1 and PKCS#8 formats
    */
   virtual CryptoObjectPtr importPublicKey(const std::vector<uint8_t>& key) PURE;
@@ -109,8 +110,8 @@ public:
    * @param key Private key in DER (hex-encoded) or PEM format
    * @return pointer to EVP_PKEY private key
    * @note Supports both DER (hex-encoded) and PEM formats with auto-detection
-   * @note DER format: PKCS#8 private key format (SEQUENCE { INTEGER, SEQUENCE { OID, NULL }, OCTET
-   * STRING })
+   * @note DER format: PKCS#8 PrivateKeyInfo format (SEQUENCE { INTEGER, SEQUENCE { OID, NULL },
+   * OCTET STRING })
    * @note PEM format: Automatically handles both PKCS#1 and PKCS#8 formats
    */
   virtual CryptoObjectPtr importPrivateKey(const std::vector<uint8_t>& key) PURE;

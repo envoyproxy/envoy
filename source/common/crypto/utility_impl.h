@@ -25,6 +25,13 @@ public:
   CryptoObjectPtr importPublicKey(const std::vector<uint8_t>& key) override;
   CryptoObjectPtr importPrivateKey(const std::vector<uint8_t>& key) override;
 
+  // Helper functions for format detection and parsing (enables 100% test coverage)
+  bool isPEMFormat(const std::vector<uint8_t>& key);
+  CryptoObjectPtr importPublicKeyPEM(const std::vector<uint8_t>& key);
+  CryptoObjectPtr importPublicKeyDER(const std::vector<uint8_t>& key);
+  CryptoObjectPtr importPrivateKeyPEM(const std::vector<uint8_t>& key);
+  CryptoObjectPtr importPrivateKeyDER(const std::vector<uint8_t>& key);
+
 private:
   const EVP_MD* getHashFunction(absl::string_view name);
 };

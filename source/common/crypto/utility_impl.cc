@@ -125,57 +125,62 @@ const SignOutput UtilityImpl::sign(absl::string_view hash, CryptoObject& key,
   return {true, signature, ""};
 }
 
-CryptoObjectPtr UtilityImpl::importPublicKey(const std::vector<uint8_t>& key) {
-  // Auto-detect format: PEM or DER
+bool UtilityImpl::isPEMFormat(const std::vector<uint8_t>& key) {
   // PEM format detection: looks for "-----BEGIN" markers and newlines
   // DER format: binary data without PEM markers (typically hex-encoded)
-  bool is_pem = false;
-  if (key.size() > 10) {
-    std::string key_str(key.begin(), key.end());
-    if (key_str.find("-----BEGIN") != std::string::npos &&
-        key_str.find('\n') != std::string::npos) {
-      is_pem = true;
-    }
+  if (key.size() <= 10) {
+    return false;
   }
 
-  if (is_pem) {
-    // PEM format: Use PEM parsing which automatically handles both PKCS#1 and PKCS#8 formats
-    // This resolves the format inconsistency issue when using PEM keys
-    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(key.data(), key.size()));
-    return std::make_unique<PublicKeyObject>(
-        PEM_read_bio_PUBKEY(bio.get(), nullptr, nullptr, nullptr));
+  std::string key_str(key.begin(), key.end());
+  return key_str.find("-----BEGIN") != std::string::npos && key_str.find('\n') != std::string::npos;
+}
+
+CryptoObjectPtr UtilityImpl::importPublicKeyPEM(const std::vector<uint8_t>& key) {
+  // PEM format: Use PEM parsing which automatically handles both PKCS#1 and PKCS#8 formats
+  // This resolves the format inconsistency issue when using PEM keys
+  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(key.data(), key.size()));
+  return std::make_unique<PublicKeyObject>(
+      PEM_read_bio_PUBKEY(bio.get(), nullptr, nullptr, nullptr));
+}
+
+CryptoObjectPtr UtilityImpl::importPublicKeyDER(const std::vector<uint8_t>& key) {
+  // DER format: Use DER parsing (expects SubjectPublicKeyInfo format containing PKCS#1 key)
+  // This maintains backward compatibility with existing hex-encoded DER keys
+  CBS cbs({key.data(), key.size()});
+  return std::make_unique<PublicKeyObject>(EVP_parse_public_key(&cbs));
+}
+
+CryptoObjectPtr UtilityImpl::importPublicKey(const std::vector<uint8_t>& key) {
+  // Auto-detect format: PEM or DER
+  if (isPEMFormat(key)) {
+    return importPublicKeyPEM(key);
   } else {
-    // DER format: Use DER parsing (expects PKCS#1 public key format)
-    // This maintains backward compatibility with existing hex-encoded DER keys
-    CBS cbs({key.data(), key.size()});
-    return std::make_unique<PublicKeyObject>(EVP_parse_public_key(&cbs));
+    return importPublicKeyDER(key);
   }
+}
+
+CryptoObjectPtr UtilityImpl::importPrivateKeyPEM(const std::vector<uint8_t>& key) {
+  // PEM format: Use PEM parsing which automatically handles both PKCS#1 and PKCS#8 formats
+  // This resolves the format inconsistency issue when using PEM keys
+  bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(key.data(), key.size()));
+  return std::make_unique<PrivateKeyObject>(
+      PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
+}
+
+CryptoObjectPtr UtilityImpl::importPrivateKeyDER(const std::vector<uint8_t>& key) {
+  // DER format: Use DER parsing (expects PKCS#8 PrivateKeyInfo format)
+  // This maintains backward compatibility with existing hex-encoded DER keys
+  CBS cbs({key.data(), key.size()});
+  return std::make_unique<PrivateKeyObject>(EVP_parse_private_key(&cbs));
 }
 
 CryptoObjectPtr UtilityImpl::importPrivateKey(const std::vector<uint8_t>& key) {
   // Auto-detect format: PEM or DER
-  // PEM format detection: looks for "-----BEGIN" markers and newlines
-  // DER format: binary data without PEM markers (typically hex-encoded)
-  bool is_pem = false;
-  if (key.size() > 10) {
-    std::string key_str(key.begin(), key.end());
-    if (key_str.find("-----BEGIN") != std::string::npos &&
-        key_str.find('\n') != std::string::npos) {
-      is_pem = true;
-    }
-  }
-
-  if (is_pem) {
-    // PEM format: Use PEM parsing which automatically handles both PKCS#1 and PKCS#8 formats
-    // This resolves the format inconsistency issue when using PEM keys
-    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(key.data(), key.size()));
-    return std::make_unique<PrivateKeyObject>(
-        PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
+  if (isPEMFormat(key)) {
+    return importPrivateKeyPEM(key);
   } else {
-    // DER format: Use DER parsing (expects PKCS#8 private key format)
-    // This maintains backward compatibility with existing hex-encoded DER keys
-    CBS cbs({key.data(), key.size()});
-    return std::make_unique<PrivateKeyObject>(EVP_parse_private_key(&cbs));
+    return importPrivateKeyDER(key);
   }
 }
 
