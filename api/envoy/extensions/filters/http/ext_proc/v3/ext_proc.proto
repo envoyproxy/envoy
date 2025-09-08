@@ -206,6 +206,17 @@ message ExternalProcessor {
   // If ``attribute_builder`` is set below, then this is not used.
   repeated string response_attributes = 6;
 
+  // Decorator to introduce custom logic to generate attributes. If not set, then
+  // the ``request_attributes`` and ``response_attributes`` specified above will be used.
+  // However, if this is set, then all attributes should be plumbed through here instead.
+  //
+  // .. note::
+  //   Attribute builders are currently in alpha.
+  //
+  // [#extension-category: envoy.http.ext_proc.attribute_builders]
+  config.core.v3.TypedExtensionConfig attribute_builder = 24
+      [(xds.annotations.v3.field_status).work_in_progress = true];
+
   // Specifies the timeout for each individual message sent on the stream and
   // when the filter is running in synchronous mode. Whenever the proxy sends
   // a message on the stream that requires a response, it will reset this timer,
@@ -350,16 +361,6 @@ message ExternalProcessor {
   //
   // [#extension-category: envoy.http.ext_proc.response_processors]
   config.core.v3.TypedExtensionConfig on_processing_response = 23
-      [(xds.annotations.v3.field_status).work_in_progress = true];
-
-  // Decorator to introduce custom logic to generate attributes. If not set, then the ``request_attributes`` and ``response_attributes``
-  // specified above will be used. However, if this is set, then all attributes should be plumbed through here instead.
-  //
-  // .. note::
-  //   Attribute builders are currently in alpha.
-  //
-  // [#extension-category: envoy.http.ext_proc.attribute_builders]
-  config.core.v3.TypedExtensionConfig attribute_builder = 24
       [(xds.annotations.v3.field_status).work_in_progress = true];
 }
 

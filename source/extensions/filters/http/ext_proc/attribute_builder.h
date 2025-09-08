@@ -41,7 +41,7 @@ public:
   ~AttributeBuilderFactory() override = default;
 
   /**
-   * Creates a new attribute builder based on the type supplied by the confg.
+   * Creates a new attribute builder based on the type supplied by the config.
    *
    * @param config The config passed from the ExternalProcessing proto. Contains the builder type.
    * @param default_attribute_key The default attribute key to use when setting request and response
