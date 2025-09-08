@@ -693,6 +693,31 @@ TEST(UtilityTest, TestCryptoObjectMethods) {
       << "setEVP_PKEY should set the private key";
 }
 
+TEST(UtilityTest, TestBoundaryConditions) {
+  // Test with maximum size buffers to ensure all code paths in getSha256Digest
+  Buffer::OwnedImpl large_buffer;
+  for (int i = 0; i < 1000; ++i) {
+    large_buffer.add("This is a large buffer to test digest computation with multiple slices. ");
+  }
+
+  auto digest = UtilitySingleton::get().getSha256Digest(large_buffer);
+  EXPECT_EQ(32, digest.size()) << "SHA256 digest should always be 32 bytes";
+  EXPECT_FALSE(digest.empty()) << "Digest should not be empty";
+
+  // Test HMAC with large key and message
+  std::vector<uint8_t> large_key(1024, 0xAB);
+  std::string large_message(10000, 'X');
+  auto hmac = UtilitySingleton::get().getSha256Hmac(large_key, large_message);
+  EXPECT_EQ(32, hmac.size()) << "HMAC should always be 32 bytes";
+  EXPECT_FALSE(hmac.empty()) << "HMAC should not be empty";
+
+  // Test with zero-length key and message
+  std::vector<uint8_t> empty_key;
+  std::string empty_message;
+  auto empty_hmac = UtilitySingleton::get().getSha256Hmac(empty_key, empty_message);
+  EXPECT_EQ(32, empty_hmac.size()) << "HMAC with empty inputs should still be 32 bytes";
+}
+
 } // namespace
 } // namespace Crypto
 } // namespace Common
