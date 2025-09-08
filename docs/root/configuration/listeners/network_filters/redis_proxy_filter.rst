@@ -101,6 +101,9 @@ Example configuration:
 
 .. literalinclude:: _include/redis-fault-injection.yaml
    :language: yaml
+   :lines: 19-34
+   :linenos:
+   :caption: :download:`redis-fault-injection.yaml <_include/redis-fault-injection.yaml>`
 
 This creates two faults- an error, applying only to GET commands at 10%, and a delay, applying to all
 commands at 10%. This means that 20% of GET commands will have a fault applied, as discussed earlier.
@@ -112,6 +115,9 @@ As noted in the :ref:`architecture overview <arch_overview_redis>`, when Envoy s
 
 .. literalinclude:: _include/redis-dns-lookups.yaml
    :language: yaml
+   :lines: 11-23
+   :linenos:
+   :caption: :download:`redis-dns-lookups.yaml <_include/redis-dns-lookups.yaml>`
 
 
 .. _config_network_filters_redis_proxy_aws_iam:
@@ -133,3 +139,6 @@ an AWS IAM Policy containing the Action `memorydb:Connect`, and that policy must
 
 .. literalinclude:: _include/redis-aws-iam-auth.yaml
    :language: yaml
+   :lines: 8-41
+   :linenos:
+   :caption: :download:`redis-aws-iam-auth.yaml <_include/redis-aws-iam-auth.yaml>`
