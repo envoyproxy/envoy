@@ -36,10 +36,10 @@ HttpTapConfigImpl::HttpTapConfigImpl(const envoy::config::tap::v3::TapConfig& pr
       time_source_(context.serverFactoryContext().mainThreadDispatcher().timeSource()) {}
 
 HttpPerRequestTapperPtr HttpTapConfigImpl::createPerRequestTapper(
-    const envoy::extensions::filters::http::tap::v3::Tap& tap_config, uint64_t stream_id,
-    OptRef<const Network::Connection> connection) {
-  return std::make_unique<HttpPerRequestTapperImpl>(shared_from_this(), tap_config, stream_id,
-                                                    connection);
+    const envoy::extensions::filters::http::tap::v3::Tap& tap_config,
+    Http::StreamDecoderFilterCallbacks& decoder_callbacks) {
+  return std::make_unique<HttpPerRequestTapperImpl>(shared_from_this(), tap_config,
+                                                    decoder_callbacks);
 }
 
 void HttpPerRequestTapperImpl::streamRequestHeaders() {
@@ -163,6 +163,24 @@ void HttpPerRequestTapperImpl::onResponseTrailers(const Http::ResponseTrailerMap
   }
 }
 
+void HttpPerRequestTapperImpl::setUpstreamConnection(
+    envoy::data::tap::v3::Connection& up_stream_conn) {
+  envoy::config::core::v3::Address local_address;
+  envoy::config::core::v3::Address remote_address;
+  auto& stream_info = decoder_callbacks_.streamInfo();
+  if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamLocalAddress()) {
+    Envoy::Network::Utility::addressToProtobufAddress(
+        *stream_info.upstreamInfo()->upstreamLocalAddress(), local_address);
+    up_stream_conn.mutable_local_address()->MergeFrom(local_address);
+  }
+
+  if (stream_info.upstreamInfo() && stream_info.upstreamInfo()->upstreamRemoteAddress()) {
+    Envoy::Network::Utility::addressToProtobufAddress(
+        *stream_info.upstreamInfo()->upstreamRemoteAddress(), remote_address);
+    up_stream_conn.mutable_remote_address()->MergeFrom(remote_address);
+  }
+}
+
 bool HttpPerRequestTapperImpl::onDestroyLog() {
   if (config_->streaming() || !config_->rootMatcher().matchStatus(statuses_).matches_) {
     return config_->rootMatcher().matchStatus(statuses_).matches_;
@@ -205,6 +223,10 @@ bool HttpPerRequestTapperImpl::onDestroyLog() {
         downstream_local_address);
     http_trace.mutable_downstream_connection()->mutable_remote_address()->MergeFrom(
         downstream_remote_address);
+  }
+
+  if (should_record_upstream_connection_) {
+    setUpstreamConnection(*http_trace.mutable_upstream_connection());
   }
 
   ENVOY_LOG(debug, "submitting buffered trace sink");

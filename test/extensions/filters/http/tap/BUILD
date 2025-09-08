@@ -47,6 +47,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/tap:tap_config_impl",
         "//test/extensions/common/tap:common",
         "//test/mocks:common_lib",
+        "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
