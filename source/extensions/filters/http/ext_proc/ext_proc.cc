@@ -188,15 +188,15 @@ void mergeHeaderValuesField(
   }
 }
 
-envoy::config::core::v3::TypedExtensionConfig
+std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig>
 makeDefaultAttributeBuilderConfig(const ExternalProcessor& ext_proc_config) {
   envoy::extensions::http::ext_proc::attribute_builders::default_attribute_builder::v3::
       DefaultAttributeBuilder config;
   *config.mutable_request_attributes() = ext_proc_config.request_attributes();
   *config.mutable_response_attributes() = ext_proc_config.response_attributes();
-  envoy::config::core::v3::TypedExtensionConfig typed_config;
-  typed_config.set_name("envoy.extensions.http.ext_proc.default_attribute_builder");
-  typed_config.mutable_typed_config()->PackFrom(config);
+  auto typed_config = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
+  typed_config->set_name("envoy.extensions.http.ext_proc.default_attribute_builder");
+  typed_config->mutable_typed_config()->PackFrom(config);
   return typed_config;
 }
 
@@ -1940,17 +1940,19 @@ std::unique_ptr<AttributeBuilder> FilterConfig::createAttributeBuilder(
     const ExternalProcessor& config,
     Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
     Server::Configuration::CommonFactoryContext& context) {
-  envoy::config::core::v3::TypedExtensionConfig attribute_builder;
+  std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> attribute_builder_holder;
+  const envoy::config::core::v3::TypedExtensionConfig* attribute_builder;
   if (config.has_attribute_builder()) {
-    attribute_builder = config.attribute_builder();
+    attribute_builder = &config.attribute_builder();
   } else {
-    attribute_builder = makeDefaultAttributeBuilderConfig(config);
+    attribute_builder_holder = makeDefaultAttributeBuilderConfig(config);
+    attribute_builder = attribute_builder_holder.get();
   }
 
   auto& factory =
-      Envoy::Config::Utility::getAndCheckFactory<AttributeBuilderFactory>(attribute_builder);
+      Envoy::Config::Utility::getAndCheckFactory<AttributeBuilderFactory>(*attribute_builder);
   auto attribute_builder_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
-      attribute_builder.typed_config(), context.messageValidationVisitor(), factory);
+      attribute_builder->typed_config(), context.messageValidationVisitor(), factory);
   if (attribute_builder_config != nullptr) {
     return factory.createAttributeBuilder(*attribute_builder_config, FilterName, builder, context);
   } else {

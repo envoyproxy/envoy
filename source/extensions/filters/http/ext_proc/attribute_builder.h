@@ -39,6 +39,19 @@ public:
 class AttributeBuilderFactory : public Config::TypedFactory {
 public:
   ~AttributeBuilderFactory() override = default;
+
+  /**
+   * Creates a new attribute builder based on the type supplied by the confg.
+   *
+   * @param config The config passed from the ExternalProcessing proto. Contains the builder type.
+   * @param default_attribute_key The default attribute key to use when setting request and response
+   * attributes. Custom attributes builders can choose to ignore this and use their own key space.
+   * @param expr_builder The builder to use for CEL expression construction. This allows custom
+   * attribute builders to more easily build attributes from CEL expressions. Other implementations
+   * are possible, in which case this can be ignored.
+   * @param context The main server context.
+   * @return Status of the operation
+   */
   virtual std::unique_ptr<AttributeBuilder> createAttributeBuilder(
       const Protobuf::Message& config, absl::string_view default_attribute_key,
       Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr expr_builder,

@@ -280,6 +280,7 @@ envoy_extension_cc_test(
         ":utils_lib",
         "//source/common/network:address_lib",
         "//source/extensions/filters/http/ext_proc:config",
+        "//source/extensions/http/ext_proc/attribute_builders/default_attribute_builder:default_attribute_builder_lib",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
