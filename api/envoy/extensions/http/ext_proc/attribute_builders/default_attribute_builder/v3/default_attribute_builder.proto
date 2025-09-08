@@ -22,7 +22,6 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // .. note::
 //   Attribute builders are currently in alpha.
 //
-// [#next-free-field: 3]
 message DefaultAttributeBuilder {
   // Envoy provides a number of :ref:`attributes <arch_overview_attributes>`
   // for expressive policies. Each attribute name provided in this field will be
