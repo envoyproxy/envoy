@@ -849,8 +849,7 @@ HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(
 void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,
                                                     const HostHashSet& matching_hosts,
                                                     const HostVector& hosts_added,
-                                                    const HostVector& hosts_removed
-                                                    ) {
+                                                    const HostVector& hosts_removed) {
   const auto& host_subset = getOrCreateHostSet(priority);
   updateSubset(priority, matching_hosts, hosts_added, hosts_removed);
 

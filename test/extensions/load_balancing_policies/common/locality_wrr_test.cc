@@ -1,7 +1,7 @@
 #include "envoy/upstream/upstream.h"
 
-#include "source/extensions/load_balancing_policies/common/locality_wrr.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/load_balancing_policies/common/locality_wrr.h"
 
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
@@ -22,9 +22,13 @@ public:
     host_set_ = std::make_unique<HostSetImpl>(0, false, kDefaultOverProvisioningFactor);
   }
 
-  absl::optional<uint32_t> chooseDegradedLocality() { return locality_wrr_->chooseDegradedLocality(); }
+  absl::optional<uint32_t> chooseDegradedLocality() {
+    return locality_wrr_->chooseDegradedLocality();
+  }
 
-  absl::optional<uint32_t> chooseHealthyLocality() { return locality_wrr_->chooseHealthyLocality(); }
+  absl::optional<uint32_t> chooseHealthyLocality() {
+    return locality_wrr_->chooseHealthyLocality();
+  }
 
   std::unique_ptr<HostSetImpl> host_set_;
   std::unique_ptr<LocalityWrr> locality_wrr_ = nullptr;
