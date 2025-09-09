@@ -338,7 +338,7 @@ LocalRateLimiterMapSingleton::RateLimiter::~RateLimiter() {
 SINGLETON_MANAGER_REGISTRATION(local_ratelimit);
 
 LocalRateLimiterMapSingleton::RateLimiter LocalRateLimiterMapSingleton::getRateLimiter(
-    Singleton::Manager& manager, absl::string_view key,
+    Singleton::Manager& manager, absl::string_view key_prefix,
     const envoy::type::v3::TokenBucket& token_bucket, Event::Dispatcher& dispatcher,
     const Protobuf::RepeatedPtrField<
         envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
@@ -348,7 +348,7 @@ LocalRateLimiterMapSingleton::RateLimiter LocalRateLimiterMapSingleton::getRateL
       SINGLETON_MANAGER_REGISTERED_NAME(local_ratelimit),
       [] { return std::make_shared<LocalRateLimiterMapSingleton>(); });
 
-  RateLimiterKey final_key = {std::string(key), MessageUtil::hash(token_bucket)};
+  RateLimiterKey final_key = {std::string(key_prefix), MessageUtil::hash(token_bucket)};
 
   auto it = map->limiter_map_.find(final_key);
   if (it == map->limiter_map_.end()) {
