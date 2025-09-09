@@ -244,9 +244,27 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
   }
 
   if (route_exists) {
-    // If we have body data, we cannot recreate the stream as it would lose the buffered body.
-    // Instead, we continue processing with the current stream which has the body already buffered.
+    // IMPORTANT: Two different processing paths based on request body presence
+    //
+    // The choice between continueDecoding() and recreateStream() is critical for correctness:
+    //
+    // Path 1: continueDecoding() - Used when request has body data
+    //   - Preserves already-buffered request body during VHDS discovery
+    //   - Continues processing with current stream to avoid losing buffered content
+    //   - Essential for POST/PUT requests with payloads (fixes GitHub issue #17891)
+    //
+    // Path 2: recreateStream() - Used when request has no body data
+    //   - Provides cleaner restart by recreating the entire request processing pipeline
+    //   - More efficient for GET requests and other body-less requests
+    //   - Ensures fresh state without unnecessary buffered data overhead
+    //
+    // This dual approach ensures both correctness (no data loss) and efficiency
+    // (optimal processing path based on request characteristics).
+
     if (has_body_data_) {
+      // If we have body data, we cannot recreate the stream as it would lose the buffered body.
+      // Instead, we continue processing with the current stream which has the body already
+      // buffered.
       callbacks_->continueDecoding();
       return;
     }
@@ -269,9 +287,14 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
   if (cluster_status == Upstream::ClusterDiscoveryStatus::Available) {
     callbacks_->downstreamCallbacks()->clearRouteCache();
 
-    // If we have body data, we cannot recreate the stream as it would lose the buffered body.
-    // Instead, we continue processing with the current stream which has the body already buffered.
+    // IMPORTANT: Same dual-path logic as in onRouteConfigUpdateCompletion()
+    // See detailed explanation above - this ensures body data preservation
+    // while optimizing processing for body-less requests during cluster discovery.
+
     if (has_body_data_) {
+      // If we have body data, we cannot recreate the stream as it would lose the buffered body.
+      // Instead, we continue processing with the current stream which has the body already
+      // buffered.
       callbacks_->continueDecoding();
       return;
     }
