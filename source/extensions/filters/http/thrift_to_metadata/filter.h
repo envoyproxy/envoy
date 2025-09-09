@@ -59,7 +59,7 @@ public:
   Rule(const ProtoRule& rule);
   const ProtoRule& rule() const { return rule_; }
   absl::optional<Protobuf::Value> extractValue(MessageMetadataSharedPtr metadata,
-                                                const ThriftDecoderHandler& handler) const {
+                                               const ThriftDecoderHandler& handler) const {
     return protobuf_value_extracter_(metadata, handler);
   }
 
