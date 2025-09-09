@@ -49,6 +49,32 @@ message OnDemand {
   // process. When the discovery is finished (successfully or not), the
   // request will be resumed for further processing.
   OnDemandCds odcds = 1;
+
+  // Controls behavior for requests with body data during VH discovery.
+  // 
+  // **IMPORTANT LIMITATION**: When VH discovery brings in per-route filter
+  // configuration overrides, requests with body data cannot use stream recreation
+  // because it would lose the buffered request body. This creates inconsistent
+  // behavior where:
+  // 
+  // - Bodyless requests (GET, HEAD, etc.) receive per-route config overrides ✓
+  // - Requests with body (POST, PUT, etc.) do NOT receive per-route config overrides ✗
+  // 
+  // This setting allows you to choose the behavior for requests with body data:
+  // 
+  // - If ``false`` (default): Requests with body continue with original filter chain
+  //   configuration to preserve body data. Per-route overrides are NOT applied.
+  //   This is the safest option but creates inconsistent behavior.
+  // 
+  // - If ``true``: Requests with body will attempt stream recreation to apply
+  //   per-route overrides, but this will LOSE the buffered request body data.
+  //   Only enable this if you understand the data loss implications.
+  // 
+  // **Recommendation**: Keep this ``false`` unless you have a specific need for
+  // consistent per-route configuration behavior and can tolerate request body loss.
+  // The ideal solution is to make stream recreation work with buffered bodies,
+  // but that requires significant architectural changes.
+  bool allow_body_data_loss_for_per_route_config = 2;
 }
 
 // Per-route configuration for On Demand Discovery.
