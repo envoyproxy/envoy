@@ -31,7 +31,7 @@ struct OptionsLimits {
   // NOTE: we only support increasing window size now, so this is also the minimum
   // TODO(jwfang): make this 0 to support decrease window size
   static const uint32_t MIN_INITIAL_STREAM_WINDOW_SIZE = (1 << 16) - 1;
-  // Initial value from HTTP/2 spec is 65535 (64KiB - 1) and we want more (1MiB).
+  // Initial value from HTTP/2 spec is 65535 (64KiB - 1) and we want more (16MiB).
   static const uint32_t DEFAULT_INITIAL_STREAM_WINDOW_SIZE = 16 * 1024 * 1024;
   static const uint32_t DEFAULT_INITIAL_STREAM_WINDOW_SIZE_LEGACY = 256 * 1024 * 1024;
   // maximum from HTTP/2 spec, same as NGHTTP2_MAX_WINDOW_SIZE from nghttp2
