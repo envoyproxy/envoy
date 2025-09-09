@@ -293,7 +293,7 @@ void Filter::processMetadata(MessageMetadataSharedPtr metadata, const Rules& rul
                              ThriftToMetadataStats& stats, bool& processing_finished_flag) {
   StructMap struct_map;
   for (const auto& rule : rules) {
-    absl::optional<Protobuf::Value> val_opt = rule.extract_value(metadata, *handler);
+    absl::optional<Protobuf::Value> val_opt = rule.extractValue(metadata, *handler);
 
     if (val_opt.has_value()) {
       handleOnPresent(std::move(val_opt).value(), rule, struct_map);

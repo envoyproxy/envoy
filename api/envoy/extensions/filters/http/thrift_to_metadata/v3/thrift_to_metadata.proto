@@ -83,7 +83,9 @@ message FieldSelector {
 
 // [#next-free-field: 6]
 message Rule {
-  // The field to match on. If set, takes precedence over field_selector.
+  // The field to match on.
+  // :ref:`field_selector<envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.field_selector>`
+  // takes precedence if both are set.
   Field field = 1;
 
   // Specifies that a match will be performed on the value of a field in the thrift body.
