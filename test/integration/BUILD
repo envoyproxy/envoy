@@ -1286,7 +1286,6 @@ envoy_cc_test_library(
         "//source/extensions/load_balancing_policies/maglev:config",
         "//source/extensions/load_balancing_policies/random:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
-        "//source/extensions/network/dns_resolver/cares:config",
     ],
 )
 
