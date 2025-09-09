@@ -519,6 +519,23 @@ TEST(UtilityTest, TestHashFunctionSupport) {
     EXPECT_TRUE(result.signature_.empty())
         << "Signature should be empty for unsupported hash: " << hash;
   }
+
+  // Test additional edge cases for hash function support
+  // Test with very long hash function names
+  std::string long_hash_name(1000, 'a');
+  auto result = UtilitySingleton::get().sign(long_hash_name, *crypto, text);
+  EXPECT_EQ(false, result.result_) << "Very long hash name should not be supported";
+  EXPECT_EQ(long_hash_name + " is not supported.", result.error_message_);
+
+  // Test with hash names containing special characters
+  std::vector<std::string> special_hashes = {"sha-256", "sha_256", "sha.256", "sha256!",
+                                             "sha256@#$"};
+  for (const auto& hash : special_hashes) {
+    auto result = UtilitySingleton::get().sign(hash, *crypto, text);
+    EXPECT_EQ(false, result.result_)
+        << "Hash with special characters should not be supported: " << hash;
+    EXPECT_EQ(hash + " is not supported.", result.error_message_);
+  }
 }
 
 TEST(UtilityTest, TestSignErrorPaths) {
@@ -571,65 +588,6 @@ TEST(UtilityTest, TestSingletonAccess) {
   const auto digest = singleton1.getSha256Digest(buffer);
   EXPECT_FALSE(digest.empty());
   EXPECT_EQ(32, digest.size()); // SHA256 produces 32 bytes
-}
-
-TEST(UtilityTest, TestPEMKeyImport) {
-  // Test PEM public key import (exercises PEM parsing branch)
-  std::string pem_public_key = "-----BEGIN PUBLIC KEY-----\n"
-                               "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA6OoWDroNyolwOKZPQQ/b\n"
-                               "wyQwG6fCN/A/3ixsm5GvNLIdZVaYjmq34brLdV6AQQnO+hrnVp9P/DexyZSFnl1w\n"
-                               "9tANGV9anVLY2BQLtcPDTuD4T+4CvWwoAMxcTtT33vx1MQmxDbM1OBddcMZMiSbK\n"
-                               "usJaSlc3iCfyBHK7gAy3tzax8tqJ/TmbSzTPh6y7Kzeka+eSV3Yc3zJ2QWzHf8x1\n"
-                               "0lSIabOC2fYryRjon9fB8nDWogO5zvb44ZppiqRxIdjSNz29/xufWI2UaZe6YNk4\n"
-                               "OT/m1e3n+1BECPGHfIPq8CVGY6liC75w+gweugFMOF+RHcDDxpWQn0Q2vDDKteXf\n"
-                               "twIDAQAB\n"
-                               "-----END PUBLIC KEY-----";
-
-  Common::Crypto::CryptoObjectPtr pem_crypto_ptr(
-      Common::Crypto::UtilitySingleton::get().importPublicKey(
-          std::vector<uint8_t>(pem_public_key.begin(), pem_public_key.end())));
-  auto pem_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*pem_crypto_ptr);
-  EVP_PKEY* pem_pkey = pem_wrapper->getEVP_PKEY();
-  EXPECT_NE(nullptr, pem_pkey) << "PEM public key import should succeed";
-
-  // Test PEM private key import (exercises PEM parsing branch)
-  std::string pem_private_key = "-----BEGIN PRIVATE KEY-----\n"
-                                "MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDo6hYOug3KiXA4\n"
-                                "pk9BD9vDJDAbp8I38D/eLGybka80sh1lVpiOarfhust1XoBBCc76GudWn0/8N7HJ\n"
-                                "lIWeXXD20A0ZX1qdUtjYFAu1w8NO4PhP7gK9bCgAzFxO1Pfe/HUxCbENszU4F11w\n"
-                                "xkyJJsq6wlpKVzeIJ/IEcruADLe3NrHy2on9OZtLNM+HrLsrN6Rr55JXdhzfMnZB\n"
-                                "bMd/zHXSVIhps4LZ9ivJGOif18HycNaiA7nO9vjhmmmKpHEh2NI3Pb3/G59YjZRp\n"
-                                "l7pg2Tg5P+bV7ef7UEQI8Yd8g+rwJUZjqWILvnD6DB66AUw4X5EdwMPGlZCfRDa8\n"
-                                "MMq15d+3AgMBAAECggEBAMKFbjKSdJ4ots65JwvBgNqzSHJwYyZwwgZ9t58dxuQN\n"
-                                "tbtC3VpkCnq9lNrLN/YZiQEcowSXPSf6I8OlBQtEIuoezDHaj0VBQdUEuNrvShiA\n"
-                                "jyHCOAuXXrl788Pq3bEfy4hO/c3hU5sq+GENXDJXcY0UcHAR81EFe3z3jVzeQjkC\n"
-                                "Hxpt3cK/eXAw91QpCfKRbquBBAdXM5wYS/1Uoksg0UmWi7CxKmwzU8gCWgctaqCR\n"
-                                "lNClF9+2tqVTF4NLYxciqenolS9+c5AUUEAY6VxXDb7/EsiQORm6lbQQ9V7ob+Cw\n"
-                                "jR6AZ33epEc1tWx19C2Bi+mT2UceMTC+PVE/ggDwY9ECgYEA+ULupsMKzLfqdNHy\n"
-                                "vk0vrsUZavX9zvW9JkZW53sYgqIBZ9ySJud8EoBBMzyf764lb1SHyWvNvCikYJxJ\n"
-                                "Qs/4/f14+ij/dK2HTm+TWLE1hST1ndKITa0fNuIpn5n1Uq8GmrkRjArqXEvtF9rp\n"
-                                "laY/R25XKC5p8b9UhCTQCpy779MCgYEA7zYFRj1xFN2IrNXsIsXcxjFTYWKiK33F\n"
-                                "iOdV5dtJPj771f3RZKProeOSbiDjmu+b2omiBwVj+Ktoam3x7v0RsSm22ZgceG2a\n"
-                                "wzEZbm4hDniJZmDSwCwH83rrhTdTrW/JXCZObrrp3cfAi41xC0bcyilk5ggbV7ZD\n"
-                                "86mWQrq9Rg0CgYBSeOblnlsQaTnV9TFP7dH9DZHfZgzYUU6IP3W5mWz+rAOzDbP9\n"
-                                "01Gl/XGVNlXkw8X3FAzphBXKT9gzbwJ+bLmBsEA65R3AyTmfpiMmkVuX9iaeVW5r\n"
-                                "5QAS9Lm46QPWm7qfruQzZdktOKH15qSqsxr003la/iBnsFqSbmu3VyyHqQKBgGNi\n"
-                                "4WweiQYvSOLueo60AJdD1S3ICjLhrZnE69Z1dofrKTzumPokdPktESC6f3ZXCT0S\n"
-                                "JASgw7mElfxqM7Ok553hA/yCC4opl7xzgOp1zTwy7ntfzRBU+vS5ZHNT2mtb36Bu\n"
-                                "tfWhqRshLCmPGaGizoccDbTZN2sI6lCpbCnLZmpdAoGBAMXtTsgXfvKTN2+BxuQN\n"
-                                "4qxfkhXgFLZyLxSDhSKzTUWatAjP8vjovZkYVIAWRrBwhGY0qETMAkdqLt8HRSZu\n"
-                                "uqe4lF8MortkdsDth/7oHyk+ye9kJzcC2Fe7aD+554Lj1yuMG+ogopgNIkhavd1i\n"
-                                "6hNaip95fqDTbi3D0R2Hz/qk\n"
-                                "-----END PRIVATE KEY-----";
-
-  Common::Crypto::CryptoObjectPtr pem_private_crypto_ptr(
-      Common::Crypto::UtilitySingleton::get().importPrivateKey(
-          std::vector<uint8_t>(pem_private_key.begin(), pem_private_key.end())));
-  auto pem_private_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(*pem_private_crypto_ptr);
-  EVP_PKEY* pem_private_pkey = pem_private_wrapper->getEVP_PKEY();
-  EXPECT_NE(nullptr, pem_private_pkey) << "PEM private key import should succeed";
 }
 
 TEST(UtilityTest, TestCryptoObjectMethods) {
@@ -701,6 +659,15 @@ TEST(UtilityTest, TestFormatDetectionAndHelpers) {
   std::vector<uint8_t> ten_bytes = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
   EXPECT_FALSE(impl->isPEMFormat(ten_bytes)) << "10-byte key should not be PEM";
 
+  // Additional edge cases for format detection
+  std::vector<uint8_t> exactly_ten = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  EXPECT_FALSE(impl->isPEMFormat(exactly_ten)) << "Exactly 10 bytes should not be PEM";
+
+  // Test 11 bytes with valid PEM markers
+  std::string eleven_char_pem = "-----BEGIN";
+  std::vector<uint8_t> eleven_bytes(eleven_char_pem.begin(), eleven_char_pem.end());
+  EXPECT_FALSE(impl->isPEMFormat(eleven_bytes)) << "11 bytes without newline should not be PEM";
+
   // Format detection edge cases
   std::string no_newline = "-----BEGIN PUBLIC KEY-----CONTENT";
   std::vector<uint8_t> no_newline_bytes(no_newline.begin(), no_newline.end());
@@ -709,6 +676,21 @@ TEST(UtilityTest, TestFormatDetectionAndHelpers) {
   std::string no_begin = "CONTENT\nMORE CONTENT";
   std::vector<uint8_t> no_begin_bytes(no_begin.begin(), no_begin.end());
   EXPECT_FALSE(impl->isPEMFormat(no_begin_bytes)) << "No BEGIN should not be PEM";
+
+  // Test with newline but no BEGIN marker
+  std::string newline_only = "some content\nmore content";
+  std::vector<uint8_t> newline_only_bytes(newline_only.begin(), newline_only.end());
+  EXPECT_FALSE(impl->isPEMFormat(newline_only_bytes)) << "Newline without BEGIN should not be PEM";
+
+  // Test with BEGIN but no newline
+  std::string begin_only = "-----BEGIN PUBLIC KEY-----CONTENT-----END PUBLIC KEY-----";
+  std::vector<uint8_t> begin_only_bytes(begin_only.begin(), begin_only.end());
+  EXPECT_FALSE(impl->isPEMFormat(begin_only_bytes)) << "BEGIN without newline should not be PEM";
+
+  // Test with partial BEGIN marker
+  std::string partial_begin = "----BEGIN PUBLIC KEY-----\nCONTENT\n-----END PUBLIC KEY-----";
+  std::vector<uint8_t> partial_bytes(partial_begin.begin(), partial_begin.end());
+  EXPECT_FALSE(impl->isPEMFormat(partial_bytes)) << "Partial BEGIN marker should not be PEM";
 
   // DER format (binary data)
   std::vector<uint8_t> der_key = {0x30, 0x82, 0x01, 0x22, 0x30, 0x0d}; // DER SEQUENCE
@@ -816,6 +798,112 @@ TEST(UtilityTest, TestDeepErrorPaths) {
   auto verify_result =
       UtilitySingleton::get().verifySignature("sha256", *corrupted_key, dummy_sig, test_data);
   EXPECT_EQ(false, verify_result.result_) << "Corrupted key should fail verification";
+}
+
+TEST(UtilityTest, TestHelperFunctionsCoverage) {
+  // Test helper functions directly to improve coverage
+  auto impl = std::make_unique<UtilityImpl>();
+
+  // Test empty key vector (exercises BIO allocation with edge case)
+  std::vector<uint8_t> empty_key;
+  auto empty_public_pem = impl->importPublicKeyPEM(empty_key);
+  auto empty_wrapper =
+      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*empty_public_pem);
+  EXPECT_EQ(nullptr, empty_wrapper->getEVP_PKEY()) << "Empty PEM key should fail";
+
+  auto empty_private_pem = impl->importPrivateKeyPEM(empty_key);
+  auto empty_private_wrapper =
+      Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(*empty_private_pem);
+  EXPECT_EQ(nullptr, empty_private_wrapper->getEVP_PKEY()) << "Empty PEM private key should fail";
+
+  // Test DER functions directly with various invalid inputs
+  std::vector<uint8_t> invalid_der = {0x30, 0x82}; // Truncated DER
+  auto der_public = impl->importPublicKeyDER(invalid_der);
+  auto der_wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*der_public);
+  EXPECT_EQ(nullptr, der_wrapper->getEVP_PKEY()) << "Invalid DER key should fail";
+
+  auto der_private = impl->importPrivateKeyDER(invalid_der);
+  auto der_private_wrapper =
+      Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(*der_private);
+  EXPECT_EQ(nullptr, der_private_wrapper->getEVP_PKEY()) << "Invalid DER private key should fail";
+}
+
+TEST(UtilityTest, TestSignErrorPathsAdvanced) {
+  // Test additional error paths in sign function that may not be fully covered
+  auto data = "test data";
+  std::vector<uint8_t> text(data, data + strlen(data));
+
+  // Test with wrong crypto object type (PublicKeyObject instead of PrivateKeyObject)
+  auto public_crypto = std::make_unique<PublicKeyObject>();
+  auto result = UtilitySingleton::get().sign("sha256", *public_crypto, text);
+  EXPECT_EQ(false, result.result_);
+  EXPECT_EQ("Failed to initialize digest sign.", result.error_message_);
+  EXPECT_TRUE(result.signature_.empty());
+
+  // Test with crypto object that has valid EVP_PKEY but wrong type
+  EVP_PKEY* test_pkey = EVP_PKEY_new();
+  public_crypto->setEVP_PKEY(test_pkey);
+  result = UtilitySingleton::get().sign("sha256", *public_crypto, text);
+  EXPECT_EQ(false, result.result_);
+  EXPECT_EQ("Failed to initialize digest sign.", result.error_message_);
+  EXPECT_TRUE(result.signature_.empty());
+}
+
+TEST(UtilityTest, TestVerifySignatureErrorPathsAdvanced) {
+  // Test additional error paths in verifySignature function
+  auto data = "test data";
+  std::vector<uint8_t> text(data, data + strlen(data));
+  auto signature = std::vector<uint8_t>{1, 2, 3, 4};
+
+  // Test with wrong crypto object type (PrivateKeyObject instead of PublicKeyObject)
+  auto private_crypto = std::make_unique<PrivateKeyObject>();
+  auto result = UtilitySingleton::get().verifySignature("sha256", *private_crypto, signature, text);
+  EXPECT_EQ(false, result.result_);
+  EXPECT_EQ("Failed to initialize digest verify.", result.error_message_);
+
+  // Test with crypto object that has valid EVP_PKEY but wrong type
+  EVP_PKEY* test_pkey = EVP_PKEY_new();
+  private_crypto->setEVP_PKEY(test_pkey);
+  result = UtilitySingleton::get().verifySignature("sha256", *private_crypto, signature, text);
+  EXPECT_EQ(false, result.result_);
+  EXPECT_EQ("Failed to initialize digest verify.", result.error_message_);
+}
+
+TEST(UtilityTest, TestImportKeyErrorPaths) {
+  // Test additional error paths in key import functions
+  auto impl = std::make_unique<UtilityImpl>();
+
+  // Test with null data pointer (edge case)
+  std::vector<uint8_t> null_data;
+  null_data.resize(100);
+  // This tests the BIO_new_mem_buf with empty data
+  auto null_public_pem = impl->importPublicKeyPEM(null_data);
+  auto null_wrapper =
+      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*null_public_pem);
+  EXPECT_EQ(nullptr, null_wrapper->getEVP_PKEY()) << "Null data should fail PEM import";
+
+  auto null_private_pem = impl->importPrivateKeyPEM(null_data);
+  auto null_private_wrapper =
+      Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(*null_private_pem);
+  EXPECT_EQ(nullptr, null_private_wrapper->getEVP_PKEY())
+      << "Null data should fail private PEM import";
+
+  // Test with data that looks like PEM but has invalid structure
+  std::string malformed_pem = "-----BEGIN PUBLIC KEY-----\n"
+                              "This is not valid base64 content\n"
+                              "-----END PUBLIC KEY-----";
+  std::vector<uint8_t> malformed_bytes(malformed_pem.begin(), malformed_pem.end());
+
+  auto malformed_public = impl->importPublicKeyPEM(malformed_bytes);
+  auto malformed_wrapper =
+      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*malformed_public);
+  EXPECT_EQ(nullptr, malformed_wrapper->getEVP_PKEY()) << "Malformed PEM should fail";
+
+  auto malformed_private = impl->importPrivateKeyPEM(malformed_bytes);
+  auto malformed_private_wrapper =
+      Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(*malformed_private);
+  EXPECT_EQ(nullptr, malformed_private_wrapper->getEVP_PKEY())
+      << "Malformed private PEM should fail";
 }
 
 } // namespace

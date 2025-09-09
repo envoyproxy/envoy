@@ -140,6 +140,9 @@ CryptoObjectPtr UtilityImpl::importPublicKeyPEM(const std::vector<uint8_t>& key)
   // PEM format: Use PEM parsing which automatically handles both PKCS#1 and PKCS#8 formats
   // This resolves the format inconsistency issue when using PEM keys
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(key.data(), key.size()));
+  if (!bio) {
+    return std::make_unique<PublicKeyObject>(nullptr);
+  }
   return std::make_unique<PublicKeyObject>(
       PEM_read_bio_PUBKEY(bio.get(), nullptr, nullptr, nullptr));
 }
@@ -164,6 +167,9 @@ CryptoObjectPtr UtilityImpl::importPrivateKeyPEM(const std::vector<uint8_t>& key
   // PEM format: Use PEM parsing which automatically handles both PKCS#1 and PKCS#8 formats
   // This resolves the format inconsistency issue when using PEM keys
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(key.data(), key.size()));
+  if (!bio) {
+    return std::make_unique<PrivateKeyObject>(nullptr);
+  }
   return std::make_unique<PrivateKeyObject>(
       PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
 }
