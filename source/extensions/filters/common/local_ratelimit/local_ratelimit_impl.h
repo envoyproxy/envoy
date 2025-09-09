@@ -169,8 +169,8 @@ class LocalRateLimiterMapSingleton;
 using LocalRateLimiterMapSingletonSharedPtr = std::shared_ptr<LocalRateLimiterMapSingleton>;
 class LocalRateLimiterMapSingleton : public Singleton::Instance {
 public:
-  // The first element is the `key` field in LocalRateLimitFilter config and the second element is
-  // the hash of the `token_bucket` field in LocalRateLimitFilter config.
+  // The first element is the `key_prefix` field in LocalRateLimitFilter config and the second
+  // element is the hash of the `token_bucket` field in LocalRateLimitFilter config.
   using RateLimiterKey = std::pair<std::string, std::size_t>;
   struct RateLimiter {
     // The `map_` holds the ownership of this singleton by shared

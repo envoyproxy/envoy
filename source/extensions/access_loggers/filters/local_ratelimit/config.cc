@@ -24,7 +24,7 @@ AccessLog::FilterPtr LocalRateLimitFilterFactory::createFilter(
   auto rate_limiter =
       Envoy::Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterMapSingleton::
           getRateLimiter(context.serverFactoryContext().singletonManager(),
-                         local_ratelimit_config.key(), local_ratelimit_config.token_bucket(),
+                         local_ratelimit_config.key_prefix(), local_ratelimit_config.token_bucket(),
                          context.serverFactoryContext().mainThreadDispatcher(), {},
                          /*always_consume_default_token_bucket=*/false,
                          /*shared_provider=*/nullptr, /*lru_size=*/0);

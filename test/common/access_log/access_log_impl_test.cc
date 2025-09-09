@@ -1643,7 +1643,7 @@ filter:
     name: local_ratelimit_extension_filter
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.local_ratelimit.v3.LocalRateLimitFilter
-      key: "this-is-key"
+      key_prefix: "this-is-key"
       token_bucket:
         fill_interval: 1s
         max_tokens: 1
@@ -1677,7 +1677,7 @@ filter:
     name: local_ratelimit_extension_filter
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.local_ratelimit.v3.LocalRateLimitFilter
-      key: "this-is-key"
+      key_prefix: "this-is-key"
       token_bucket:
         fill_interval: 1s
         max_tokens: 1
@@ -1732,7 +1732,7 @@ filter:
     name: local_ratelimit_extension_filter
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.local_ratelimit.v3.LocalRateLimitFilter
-      key: "this-is-key"
+      key_prefix: "this-is-key"
       token_bucket:
         fill_interval: 1s
         max_tokens: 1
@@ -1790,7 +1790,7 @@ filter:
     name: local_ratelimit_extension_filter
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.local_ratelimit.v3.LocalRateLimitFilter
-      key: "this-is-key"
+      key_prefix: "this-is-key"
       token_bucket:
         fill_interval: 1s
         max_tokens: 1
