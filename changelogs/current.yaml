@@ -18,10 +18,10 @@ behavior_changes:
     has been changed from 2147483647 to 1024.
     The default value for the :ref:`initial stream window size in HTTP/2
     <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.initial_stream_window_size>`
-    has been changed from 256MiB to 1MiB.
+    has been changed from 256MiB to 16MiB.
     The default value for the :ref:`initial connection window size in HTTP/2
     <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.initial_connection_window_size>`
-    has been changed from 256MiB to 1MiB.
+    has been changed from 256MiB to 24MiB.
     This change could be reverted temporarily by
     setting the runtime guard ``envoy.reloadable_features.safe_http2_options``
     to ``false``.
