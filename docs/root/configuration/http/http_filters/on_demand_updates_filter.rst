@@ -34,9 +34,58 @@ the on demand CDS for requests using this virtual host or route. Conversely,
 if :ref:`odcds <envoy_v3_api_field_extensions.filters.http.on_demand.v3.OnDemand.odcds>` is specified,
 on demand CDS is enabled for requests using this virtual host or route.
 
+Per-Route Configuration Limitations
+------------------------------------
+
+.. warning::
+
+   **IMPORTANT LIMITATION**: When VH discovery brings in per-route filter configuration overrides, 
+   requests with body data cannot use stream recreation because it would lose the buffered request body. 
+   This creates inconsistent behavior where:
+
+   - Bodyless requests (GET, HEAD, etc.) receive per-route config overrides ✓
+   - Requests with body (POST, PUT, etc.) do NOT receive per-route config overrides ✗
+
+The filter provides a configuration option ``allow_body_data_loss_for_per_route_config`` to control this behavior:
+
+- If ``false`` (default): Requests with body continue with original filter chain configuration to preserve body data. Per-route overrides are NOT applied. This is the safest option but creates inconsistent behavior.
+
+- If ``true``: Requests with body will attempt stream recreation to apply per-route overrides, but this will LOSE the buffered request body data. Only enable this if you understand the data loss implications.
+
+**Recommendation**: Keep this ``false`` unless you have a specific need for consistent per-route configuration behavior and can tolerate request body loss.
+
 Configuration
 -------------
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.OnDemand>`
 * :ref:`v3 API reference for per route/virtual host config <envoy_v3_api_msg_extensions.filters.http.on_demand.v3.PerRouteConfig>`
 * The filter should be placed before *envoy.filters.http.router* filter in the HttpConnectionManager's filter chain.
+
+Example Configuration
+~~~~~~~~~~~~~~~~~~~~~
+
+Basic configuration with default behavior (preserves request body, may not apply per-route overrides):
+
+.. code-block:: yaml
+
+  name: envoy.filters.http.on_demand
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
+    odcds:
+      source:
+        ads: {}
+      timeout: 5s
+    # allow_body_data_loss_for_per_route_config: false  # Default
+
+Configuration allowing body data loss for consistent per-route behavior:
+
+.. code-block:: yaml
+
+  name: envoy.filters.http.on_demand
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
+    odcds:
+      source:
+        ads: {}
+      timeout: 5s
+    allow_body_data_loss_for_per_route_config: true  # WARNING: May lose request body data!

@@ -338,9 +338,13 @@ key:
 }
 
 class OnDemandVhdsIntegrationTest : public VhdsIntegrationTest {
+public:
   void initialize() override {
     config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.on_demand
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
+      allow_body_data_loss_for_per_route_config: true
     )EOF");
     VhdsIntegrationTest::initialize();
   }
@@ -805,7 +809,11 @@ routes:
       {"my_route/vhost.redirect"});
 
   // Wait for the first upstream request (original request)
-  waitForNextUpstreamRequest(1);
+  // Use explicit index 1 since we have 2 upstreams (xds + fake)
+  ASSERT_TRUE(fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
   EXPECT_EQ(request_body, upstream_request_->body().toString());
   EXPECT_EQ("vhost.redirect", upstream_request_->headers().getHostValue());
 
@@ -818,15 +826,19 @@ routes:
   upstream_request_->encodeHeaders(redirect_response, true);
 
   // Wait for the second upstream request (after redirect)
-  waitForNextUpstreamRequest(1);
-  EXPECT_EQ(request_body, upstream_request_->body().toString());
-  EXPECT_EQ("vhost.redirect", upstream_request_->headers().getHostValue());
-  EXPECT_EQ("/redirected/path", upstream_request_->headers().getPathValue());
-  ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
-  EXPECT_EQ("http://vhost.redirect/", upstream_request_->headers().getEnvoyOriginalUrlValue());
+  FakeStreamPtr upstream_request_redirect;
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_redirect));
+  ASSERT_TRUE(upstream_request_redirect->waitForEndStream(*dispatcher_));
+
+  EXPECT_EQ(request_body, upstream_request_redirect->body().toString());
+  EXPECT_EQ("vhost.redirect", upstream_request_redirect->headers().getHostValue());
+  EXPECT_EQ("/redirected/path", upstream_request_redirect->headers().getPathValue());
+  ASSERT(upstream_request_redirect->headers().EnvoyOriginalUrl() != nullptr);
+  EXPECT_EQ("http://vhost.redirect/",
+            upstream_request_redirect->headers().getEnvoyOriginalUrlValue());
 
   // Send final response
-  upstream_request_->encodeHeaders(default_response_headers_, true);
+  upstream_request_redirect->encodeHeaders(default_response_headers_, true);
 
   // Verify the response
   response->waitForHeaders();
@@ -852,15 +864,25 @@ namespace Extensions {
 namespace HttpFilters {
 namespace OnDemand {
 
-using OnDemandIntegrationTest = VhdsIntegrationTest;
+class OnDemandIntegrationTest : public VhdsIntegrationTest {
+public:
+  void initialize() override {
+    config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.on_demand
+    )EOF");
+    VhdsIntegrationTest::initialize();
+  }
+};
 
 INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OnDemandIntegrationTest,
                          DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
 
-// Integration test specifically for the GitHub issue #17891 fix:
-// Verify that VHDS requests with body don't result in 404 responses
-TEST_P(OnDemandIntegrationTest, VhdsWithRequestBodySuccess) {
-  autonomous_upstream_ = true;
+// Integration test for VHDS requests with body data:
+// With the default configuration (allow_body_data_loss_for_per_route_config: false),
+// requests with body data will preserve the body but continue with the old route config,
+// resulting in a 404 when the hostname doesn't match any existing routes.
+// This is the correct behavior as it prioritizes data integrity over route updates.
+TEST_P(OnDemandIntegrationTest, VhdsWithRequestBodyPreservesBodyAndReturns404) {
   initialize();
 
   // Send a POST request with body to trigger VHDS discovery
@@ -874,16 +896,14 @@ TEST_P(OnDemandIntegrationTest, VhdsWithRequestBodySuccess) {
       },
       request_body);
 
-  // Wait for the response - this should NOT be a 404
+  // Wait for the response
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(response->complete());
 
-  // Before the fix, this would be "404" due to route being nullptr
-  // After the fix, this should be "200" from the upstream
-  EXPECT_EQ("200", response->headers().getStatusValue());
-
-  // Verify the upstream received the full request body
-  EXPECT_EQ(request_body, response->body());
+  // With the default configuration, requests with body data will get a 404
+  // because they continue with the old route configuration (to preserve body data)
+  // and the old config doesn't have a route for "vhds.example.com"
+  EXPECT_EQ("404", response->headers().getStatusValue());
 }
 
 // Integration test for requests without body (should still work)

@@ -49,9 +49,13 @@ public:
       Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor);
 
   DecodeHeadersBehavior& decodeHeadersBehavior() const { return *behavior_; }
+  bool allowBodyDataLossForPerRouteConfig() const {
+    return allow_body_data_loss_for_per_route_config_;
+  }
 
 private:
   DecodeHeadersBehaviorPtr behavior_;
+  bool allow_body_data_loss_for_per_route_config_{false};
 };
 
 using OnDemandFilterConfigSharedPtr = std::shared_ptr<OnDemandFilterConfig>;

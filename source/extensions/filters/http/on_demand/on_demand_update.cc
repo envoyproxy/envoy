@@ -127,8 +127,9 @@ OnDemandFilterConfig::OnDemandFilterConfig(DecodeHeadersBehaviorPtr behavior)
 OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
     Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor)
-    : OnDemandFilterConfig(
-          createDecodeHeadersBehavior(getOdCdsConfig(proto_config), cm, validation_visitor)) {}
+    : behavior_(createDecodeHeadersBehavior(getOdCdsConfig(proto_config), cm, validation_visitor)),
+      allow_body_data_loss_for_per_route_config_(
+          proto_config.allow_body_data_loss_for_per_route_config()) {}
 
 OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,
@@ -252,24 +253,30 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
     //   - Preserves already-buffered request body during VHDS discovery
     //   - Continues processing with current stream to avoid losing buffered content
     //   - Essential for POST/PUT requests with payloads (fixes GitHub issue #17891)
+    //   - LIMITATION: Per-route configuration overrides discovered during VH discovery
+    //     are NOT applied because we cannot recreate the stream without losing body data
     //
     // Path 2: recreateStream() - Used when request has no body data
-    //   - Provides cleaner restart by recreating the entire request processing pipeline
-    //   - More efficient for GET requests and other body-less requests
-    //   - Ensures fresh state without unnecessary buffered data overhead
+    //   - Recreates the entire request processing pipeline with updated per-route config
+    //   - Ensures per-route configuration overrides are properly applied
+    //   - Safe for GET requests and other body-less requests
     //
-    // This dual approach ensures both correctness (no data loss) and efficiency
-    // (optimal processing path based on request characteristics).
+    // IDEAL SOLUTION: Make recreateStream() work with buffered body data to eliminate
+    // this trade-off. This would require significant architectural changes to preserve
+    // buffered body state during stream recreation, but would provide consistent
+    // per-route configuration behavior for all request types.
 
-    if (has_body_data_) {
-      // If we have body data, we cannot recreate the stream as it would lose the buffered body.
+    if (has_body_data_ && !getConfig()->allowBodyDataLossForPerRouteConfig()) {
+      // If we have body data and the configuration doesn't allow data loss,
+      // we cannot recreate the stream as it would lose the buffered body.
       // Instead, we continue processing with the current stream which has the body already
-      // buffered.
+      // buffered. This means per-route configuration overrides will NOT be applied.
       callbacks_->continueDecoding();
       return;
     }
 
-    // For requests without body data, we can still use stream recreation for cleaner restart
+    // For requests without body data, or when explicitly allowing body data loss,
+    // we can use stream recreation to apply per-route config overrides
     if (callbacks_->recreateStream(/*headers=*/nullptr)) {
       return;
     }
@@ -288,18 +295,21 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
     callbacks_->downstreamCallbacks()->clearRouteCache();
 
     // IMPORTANT: Same dual-path logic as in onRouteConfigUpdateCompletion()
-    // See detailed explanation above - this ensures body data preservation
-    // while optimizing processing for body-less requests during cluster discovery.
+    // See detailed explanation above - this preserves body data but creates
+    // inconsistent per-route configuration behavior. The ideal solution would
+    // be to make recreateStream() work with buffered body data.
 
-    if (has_body_data_) {
-      // If we have body data, we cannot recreate the stream as it would lose the buffered body.
+    if (has_body_data_ && !getConfig()->allowBodyDataLossForPerRouteConfig()) {
+      // If we have body data and the configuration doesn't allow data loss,
+      // we cannot recreate the stream as it would lose the buffered body.
       // Instead, we continue processing with the current stream which has the body already
-      // buffered.
+      // buffered. This means per-route configuration overrides will NOT be applied.
       callbacks_->continueDecoding();
       return;
     }
 
-    // For requests without body data, we can still use stream recreation for cleaner restart
+    // For requests without body data, or when explicitly allowing body data loss,
+    // we can use stream recreation to apply per-route config overrides
     const Http::ResponseHeaderMap* headers = nullptr;
     if (callbacks_->recreateStream(headers)) {
       return;
