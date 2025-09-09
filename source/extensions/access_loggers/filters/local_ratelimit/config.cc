@@ -12,8 +12,6 @@ namespace AccessLoggers {
 namespace Filters {
 namespace LocalRateLimit {
 
-constexpr absl::string_view kRateLimitFilterDefaultKey = "access_log_rate_limit_default_key";
-
 AccessLog::FilterPtr LocalRateLimitFilterFactory::createFilter(
     const envoy::config::accesslog::v3::ExtensionFilter& config,
     Server::Configuration::FactoryContext& context) {
@@ -23,16 +21,10 @@ AccessLog::FilterPtr LocalRateLimitFilterFactory::createFilter(
       const envoy::extensions::access_loggers::filters::local_ratelimit::v3::LocalRateLimitFilter&>(
       *factory_config);
 
-  const absl::string_view key = local_ratelimit_config.key().empty() ? kRateLimitFilterDefaultKey
-                                                                     : local_ratelimit_config.key();
   auto rate_limiter =
       Envoy::Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterMapSingleton::
-          getRateLimiter(context.serverFactoryContext().singletonManager(), key,
-                         std::chrono::milliseconds(Protobuf::util::TimeUtil::DurationToMilliseconds(
-                             local_ratelimit_config.token_bucket().fill_interval())),
-                         local_ratelimit_config.token_bucket().max_tokens(),
-                         PROTOBUF_GET_WRAPPED_OR_DEFAULT(local_ratelimit_config.token_bucket(),
-                                                         tokens_per_fill, 1),
+          getRateLimiter(context.serverFactoryContext().singletonManager(),
+                         local_ratelimit_config.key(), local_ratelimit_config.token_bucket(),
                          context.serverFactoryContext().mainThreadDispatcher(), {},
                          /*always_consume_default_token_bucket=*/false,
                          /*shared_provider=*/nullptr, /*lru_size=*/0);

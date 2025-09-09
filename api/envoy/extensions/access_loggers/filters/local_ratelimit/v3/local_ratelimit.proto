@@ -17,12 +17,9 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.access_loggers.extension_filters.local_ratelimit]
 
 // Filters for rate limiting the access logs using token buckets.
-// The token buckets are shared among the access logs in the process by being stored in a singleton map and looked up by ``key``.
-// - if the ``key`` is not set, the access log will use the global token bucket with key="access_log_rate_limit_default_key" by default.
-// - if the ``key`` is set, the access logs with the same ``key`` will share the same token bucket configured with the ``token_bucket``.
-// For the filters sharing the token bucket, please keep all the ``token_bucket`` configurations same as only one of them will be applied.
+// The token buckets are shared among the access logs in the process by being stored in a singleton map and looked up by ``key`` plus the hash of the ``token_bucket``.
 message LocalRateLimitFilter {
-  // The key is used to find the token bucket in the singleton map.
+  // The key is used to find the token bucket in the singleton map.`
   string key = 1;
 
   // The token bucket configuration to use for rate limiting
