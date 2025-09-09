@@ -1068,6 +1068,208 @@ TEST_F(ZipkinDriverTest, DuplicatedHeader) {
   });
 }
 
+TEST_F(ZipkinDriverTest, DriverWithHttpServiceCustomHeaders) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  const std::string yaml_string = R"EOF(
+  collector_cluster: fake_cluster
+  collector_endpoint: /api/v2/spans
+  collector_service:
+    http_uri:
+      uri: "https://zipkin-collector.example.com/api/v2/spans"
+      cluster: fake_cluster
+      timeout: 5s
+    request_headers_to_add:
+      - header:
+          key: "Authorization"
+          value: "Bearer token123"
+      - header:
+          key: "X-Custom-Header"
+          value: "custom-value"
+      - header:
+          key: "X-API-Key"
+          value: "api-key-123"
+  collector_endpoint_version: HTTP_JSON
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config;
+  TestUtility::loadFromYaml(yaml_string, zipkin_config);
+
+  setup(zipkin_config, true);
+  EXPECT_NE(nullptr, driver_);
+}
+
+TEST_F(ZipkinDriverTest, DriverWithHttpServiceEmptyHeaders) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  const std::string yaml_string = R"EOF(
+  collector_cluster: fake_cluster
+  collector_endpoint: /api/v2/spans
+  collector_service:
+    http_uri:
+      uri: "https://zipkin-collector.example.com/api/v2/spans"
+      cluster: fake_cluster
+      timeout: 5s
+    request_headers_to_add: []
+  collector_endpoint_version: HTTP_JSON
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config;
+  TestUtility::loadFromYaml(yaml_string, zipkin_config);
+
+  setup(zipkin_config, true);
+  EXPECT_NE(nullptr, driver_);
+}
+
+TEST_F(ZipkinDriverTest, ReporterFlushWithHttpServiceHeadersVerifyHeaders) {
+  cm_.initializeClusters({"fake_cluster", "legacy_cluster"}, {});
+
+  const std::string yaml_string = R"EOF(
+  collector_cluster: legacy_cluster
+  collector_endpoint: /legacy/api/v1/spans
+  collector_service:
+    http_uri:
+      uri: "https://zipkin-collector.example.com/api/v2/spans"
+      cluster: fake_cluster
+      timeout: 5s
+    request_headers_to_add:
+      - header:
+          key: "Authorization"
+          value: "Bearer token123"
+      - header:
+          key: "X-Custom-Header"
+          value: "custom-value"
+      - header:
+          key: "X-API-Key"
+          value: "api-key-123"
+  collector_endpoint_version: HTTP_JSON
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config;
+  TestUtility::loadFromYaml(yaml_string, zipkin_config);
+  setup(zipkin_config, true);
+
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
+  Http::AsyncClient::Callbacks* callback;
+  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+
+  // Set up expectations for the HTTP request with custom headers
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
+              send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callback = &callbacks;
+
+            // Verify standard headers are present
+            EXPECT_EQ("/api/v2/spans", message->headers().getPathValue());
+            EXPECT_EQ("zipkin-collector.example.com", message->headers().getHostValue());
+            EXPECT_EQ("application/json", message->headers().getContentTypeValue());
+
+            // Verify custom headers are present
+            auto auth_header = message->headers().get(Http::LowerCaseString("authorization"));
+            EXPECT_FALSE(auth_header.empty());
+            EXPECT_EQ("Bearer token123", auth_header[0]->value().getStringView());
+
+            auto custom_header = message->headers().get(Http::LowerCaseString("x-custom-header"));
+            EXPECT_FALSE(custom_header.empty());
+            EXPECT_EQ("custom-value", custom_header[0]->value().getStringView());
+
+            auto api_key_header = message->headers().get(Http::LowerCaseString("x-api-key"));
+            EXPECT_FALSE(api_key_header.empty());
+            EXPECT_EQ("api-key-123", api_key_header[0]->value().getStringView());
+
+            return &request;
+          }));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.min_flush_spans", 5))
+      .WillOnce(Return(1));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.request_timeout", 5000U))
+      .WillOnce(Return(5000U));
+
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  span->finishSpan();
+
+  Http::ResponseHeaderMapPtr response_headers{
+      new Http::TestResponseHeaderMapImpl{{":status", "202"}}};
+  callback->onSuccess(request,
+                      std::make_unique<Http::ResponseMessageImpl>(std::move(response_headers)));
+}
+
+// Test URI parsing edge cases to improve coverage
+TEST_F(ZipkinDriverTest, DriverWithHttpServiceUriParsing) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  // Test 1: URI without hostname (should fallback to cluster name)
+  const std::string yaml_string_no_host = R"EOF(
+  collector_service:
+    http_uri:
+      uri: "/api/v2/spans"
+      cluster: fake_cluster
+      timeout: 5s
+  collector_endpoint_version: HTTP_JSON
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config_no_host;
+  TestUtility::loadFromYaml(yaml_string_no_host, zipkin_config_no_host);
+  setup(zipkin_config_no_host, false);
+  EXPECT_EQ("fake_cluster", driver_->hostname()); // Should fallback to cluster name
+}
+
+TEST_F(ZipkinDriverTest, DriverWithHttpServiceUriParsingNoPath) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  // Test 2: URI with hostname but no path (should use "/" as default)
+  const std::string yaml_string_no_path = R"EOF(
+  collector_service:
+    http_uri:
+      uri: "https://zipkin-collector.example.com"
+      cluster: fake_cluster
+      timeout: 5s
+  collector_endpoint_version: HTTP_JSON
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config_no_path;
+  TestUtility::loadFromYaml(yaml_string_no_path, zipkin_config_no_path);
+  setup(zipkin_config_no_path, false);
+  EXPECT_EQ("zipkin-collector.example.com", driver_->hostname());
+}
+
+TEST_F(ZipkinDriverTest, DriverWithHttpServiceUriParsingWithPort) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  // Test 3: URI with hostname and port
+  const std::string yaml_string_with_port = R"EOF(
+  collector_service:
+    http_uri:
+      uri: "http://zipkin-collector.example.com:9411/api/v2/spans"
+      cluster: fake_cluster
+      timeout: 5s
+  collector_endpoint_version: HTTP_JSON
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config_with_port;
+  TestUtility::loadFromYaml(yaml_string_with_port, zipkin_config_with_port);
+  setup(zipkin_config_with_port, false);
+  EXPECT_EQ("zipkin-collector.example.com:9411", driver_->hostname());
+}
+
+TEST_F(ZipkinDriverTest, DriverMissingCollectorConfiguration) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  // Test missing both collector_cluster and collector_service
+  const std::string yaml_string_missing = R"EOF(
+  collector_endpoint_version: HTTP_JSON
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config_missing;
+  TestUtility::loadFromYaml(yaml_string_missing, zipkin_config_missing);
+
+  EXPECT_THROW_WITH_MESSAGE(setup(zipkin_config_missing, false), EnvoyException,
+                            "Either collector_cluster or collector_service must be specified");
+}
+
 } // namespace
 } // namespace Zipkin
 } // namespace Tracers
