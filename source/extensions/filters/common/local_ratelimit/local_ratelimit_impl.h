@@ -8,6 +8,7 @@
 #include "envoy/extensions/common/ratelimit/v3/ratelimit.pb.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/singleton/instance.h"
+#include "envoy/type/v3/token_bucket.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/common/thread_synchronizer.h"
@@ -168,6 +169,9 @@ class LocalRateLimiterMapSingleton;
 using LocalRateLimiterMapSingletonSharedPtr = std::shared_ptr<LocalRateLimiterMapSingleton>;
 class LocalRateLimiterMapSingleton : public Singleton::Instance {
 public:
+  // The first element is the `key` field in LocalRateLimitFilter config and the second element is
+  // the hash of the `token_bucket` field in LocalRateLimitFilter config.
+  using RateLimiterKey = std::pair<std::string, std::size_t>;
   struct RateLimiter {
     // The `map_` holds the ownership of this singleton by shared
     // pointer, as the rate limiter map singleton isn't pinned and is shared among all the
@@ -175,7 +179,8 @@ public:
     LocalRateLimiterMapSingletonSharedPtr map_;
 
     // The key for `limiter_` in `map_`.
-    std::string key_;
+    RateLimiterKey key_;
+
     // The `limiter_` holds the ownership of the rate limiter(with the underlying
     // token bucket) by shared pointer, as it is shared by all the access log rate limit
     // filters using the same key.
@@ -185,16 +190,15 @@ public:
   };
 
   static RateLimiter getRateLimiter(
-      Singleton::Manager& manager, absl::string_view limiter_key,
-      const std::chrono::milliseconds fill_interval, const uint64_t max_tokens,
-      const uint64_t tokens_per_fill, Event::Dispatcher& dispatcher,
+      Singleton::Manager& manager, absl::string_view key,
+      const envoy::type::v3::TokenBucket& token_bucket, Event::Dispatcher& dispatcher,
       const Protobuf::RepeatedPtrField<
           envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
       bool always_consume_default_token_bucket, ShareProviderSharedPtr shared_provider,
       const uint32_t lru_size);
 
 private:
-  absl::flat_hash_map<std::string, std::weak_ptr<LocalRateLimiterImpl>> limiter_map_;
+  absl::flat_hash_map<RateLimiterKey, std::weak_ptr<LocalRateLimiterImpl>> limiter_map_;
 };
 
 } // namespace LocalRateLimit
