@@ -227,6 +227,9 @@ new_features:
   change: |
     Add :ref:`record_upstream_connection <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_upstream_connection>`
     to determine whether upstream connection information is recorded in the HTTP buffer trace output.
+- area: udp_sink
+  change: |
+    Enhance UDP sink to handle the tapped message which the size is bigger than 64K.
 - area: quic
   change: |
     Added new option to support :ref:`base64 encoded server ID

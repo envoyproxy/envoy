@@ -101,29 +101,13 @@ void UdpTapSink::UdpTapSinkHandle::handleSocketStreamedTrace(
       trace->socket_streamed_trace_segment();
 
   if (src_streamed_trace.has_events()) {
-    // Handle events in next PR.
-    doSubmitTrace(std::move(trace), format);
+    handleSocketStreamedTraceForMultiEvents(std::move(trace), format);
     return;
   }
 
   // Handle single event
-  size_t total_body_bytes = 0;
-  bool is_read_event = false;
-  if (src_streamed_trace.event().has_read()) {
-    is_read_event = true;
-    if (format == envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING) {
-      total_body_bytes = src_streamed_trace.event().read().data().as_string().size();
-    } else {
-      total_body_bytes = src_streamed_trace.event().read().data().as_bytes().size();
-    }
-  } else {
-    if (format == envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING) {
-      total_body_bytes = src_streamed_trace.event().write().data().as_string().size();
-    } else {
-      total_body_bytes = src_streamed_trace.event().write().data().as_bytes().size();
-    }
-  }
-
+  size_t total_body_bytes = getEventBodysize(src_streamed_trace.event(), format);
+  bool is_read_event = src_streamed_trace.event().has_read();
   size_t max_size_of_each_sub_data = static_cast<size_t>(parent_.getUdpMaxSendMsgDataSize(format));
   if (total_body_bytes <= max_size_of_each_sub_data) {
     // Submit directly as normal.
@@ -154,6 +138,103 @@ void UdpTapSink::UdpTapSinkHandle::handleSocketStreamedTrace(
       setStreamedTraceDataAndSubmit(new_trace_cnt, src_streamed_trace, is_read_event, copy_offset,
                                     remaining_data_size, format);
       break;
+    }
+  }
+}
+
+size_t
+UdpTapSink::UdpTapSinkHandle::getEventBodysize(const envoy::data::tap::v3::SocketEvent& event,
+                                               envoy::config::tap::v3::OutputSink::Format format) {
+  size_t total_body_bytes = 0;
+  if (event.has_read()) {
+    if (format == envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING) {
+      total_body_bytes = event.read().data().as_string().size();
+    } else {
+      total_body_bytes = event.read().data().as_bytes().size();
+    }
+  } else {
+    if (format == envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING) {
+      total_body_bytes = event.write().data().as_string().size();
+    } else {
+      total_body_bytes = event.write().data().as_bytes().size();
+    }
+  }
+  return total_body_bytes;
+}
+
+void UdpTapSink::UdpTapSinkHandle::handleSocketStreamedTraceForMMultiEventsBigBody(
+    envoy::config::tap::v3::OutputSink::Format format,
+    const envoy::data::tap::v3::SocketEvent& event, uint64_t trace_id) {
+
+  // Create an new trace message with this event.
+  TapCommon::TraceWrapperPtr new_trace = std::make_unique<envoy::data::tap::v3::TraceWrapper>();
+  envoy::data::tap::v3::SocketStreamedTraceSegment& new_streamed_trace =
+      *new_trace->mutable_socket_streamed_trace_segment();
+
+  new_streamed_trace.set_trace_id(trace_id);
+  *new_streamed_trace.mutable_event() = event;
+
+  // Socket streamed trace with single event which the body size is bigger than 64K.
+  handleSocketStreamedTrace(std::move(new_trace), format);
+}
+
+void UdpTapSink::UdpTapSinkHandle::handleSocketStreamedTraceForMultiEvents(
+    TapCommon::TraceWrapperPtr&& trace, envoy::config::tap::v3::OutputSink::Format format) {
+
+  // Send directly because the total size of whole trace is less than 64K
+  size_t max_size_of_each_sub_data = static_cast<size_t>(parent_.getUdpMaxSendMsgDataSize(format));
+  size_t the_total_trace_size = static_cast<uint64_t>(trace->ByteSizeLong());
+  if (the_total_trace_size <= max_size_of_each_sub_data) {
+    doSubmitTrace(std::move(trace), format);
+    return;
+  }
+
+  envoy::data::tap::v3::SocketEvents* src_events =
+      trace->mutable_socket_streamed_trace_segment()->mutable_events();
+  auto* src_repeated_events = src_events->mutable_events();
+
+  // Handle the body size of single event is bigger than 64K.
+  for (int curr_event_index = src_repeated_events->size() - 1; curr_event_index >= 0;
+       --curr_event_index) {
+    const envoy::data::tap::v3::SocketEvent& curr_event =
+        src_repeated_events->Get(curr_event_index);
+    if (getEventBodysize(curr_event, format) > max_size_of_each_sub_data) {
+      // Slice and send the message
+      handleSocketStreamedTraceForMMultiEventsBigBody(
+          format, curr_event, trace->socket_streamed_trace_segment().trace_id());
+      // Event is handled and remove it.
+      src_repeated_events->DeleteSubrange(curr_event_index, 1);
+    }
+  }
+
+  // The total size of trace is still bigger than 64K.
+  size_t left_total_trace_size = static_cast<uint64_t>(trace->ByteSizeLong());
+  for (int curr_event_index = src_repeated_events->size() - 1; curr_event_index >= 0;
+       --curr_event_index) {
+    if (left_total_trace_size > max_size_of_each_sub_data) {
+
+      if (src_repeated_events->size() == 1) {
+        // Send directly.
+        doSubmitTrace(std::move(trace), format);
+        break;
+      }
+      // Construct new trace message and send.
+      TapCommon::TraceWrapperPtr new_trace = std::make_unique<envoy::data::tap::v3::TraceWrapper>();
+
+      envoy::data::tap::v3::SocketStreamedTraceSegment& new_streamed_trace =
+          *new_trace->mutable_socket_streamed_trace_segment();
+
+      new_streamed_trace.set_trace_id(trace->socket_streamed_trace_segment().trace_id());
+      auto* new_event = new_streamed_trace.mutable_events()->add_events();
+      *new_event = src_repeated_events->Get(curr_event_index);
+      doSubmitTrace(std::move(new_trace), format);
+
+      src_repeated_events->DeleteSubrange(curr_event_index, 1);
+
+      left_total_trace_size = static_cast<uint64_t>(trace->ByteSizeLong());
+    } else {
+      // Send the rest events directly in one message.
+      doSubmitTrace(std::move(trace), format);
     }
   }
 }
