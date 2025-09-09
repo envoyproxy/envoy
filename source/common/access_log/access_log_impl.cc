@@ -209,11 +209,11 @@ bool NotHealthCheckFilter::evaluate(const Formatter::HttpFormatterContext&,
 
 HeaderFilter::HeaderFilter(const envoy::config::accesslog::v3::HeaderFilter& config,
                            Server::Configuration::CommonFactoryContext& context)
-    : header_data_(std::make_unique<Http::HeaderUtility::HeaderData>(config.header(), context)) {}
+    : header_data_(Http::HeaderUtility::createHeaderData(config.header(), context)) {}
 
 bool HeaderFilter::evaluate(const Formatter::HttpFormatterContext& context,
                             const StreamInfo::StreamInfo&) const {
-  return Http::HeaderUtility::matchHeaders(context.requestHeaders(), *header_data_);
+  return header_data_->matchesHeaders(context.requestHeaders());
 }
 
 ResponseFlagFilter::ResponseFlagFilter(
@@ -328,8 +328,10 @@ bool MetadataFilter::evaluate(const Formatter::HttpFormatterContext&,
   return default_match_;
 }
 
-InstanceSharedPtr AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
-                                              Server::Configuration::FactoryContext& context) {
+InstanceSharedPtr
+AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
+                            Server::Configuration::FactoryContext& context,
+                            std::vector<Formatter::CommandParserPtr>&& command_parsers) {
   FilterPtr filter;
   if (config.has_filter()) {
     filter = FilterFactory::fromProto(config.filter(), context);
@@ -339,7 +341,8 @@ InstanceSharedPtr AccessLogFactory::fromProto(const envoy::config::accesslog::v3
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       config, context.messageValidationVisitor(), factory);
 
-  return factory.createAccessLogInstance(*message, std::move(filter), context);
+  return factory.createAccessLogInstance(*message, std::move(filter), context,
+                                         std::move(command_parsers));
 }
 
 } // namespace AccessLog

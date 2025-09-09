@@ -33,15 +33,19 @@ absl::StatusOr<VhdsSubscriptionPtr> VhdsSubscription::createVhdsSubscription(
     return absl::InvalidArgumentError("vhds: only 'DELTA_GRPC' is supported as an api_type.");
   }
 
-  return std::unique_ptr<VhdsSubscription>(new VhdsSubscription(
-      config_update_info, factory_context, stat_prefix, route_config_provider));
+  auto status = absl::OkStatus();
+  auto ret = std::unique_ptr<VhdsSubscription>(new VhdsSubscription(
+      config_update_info, factory_context, stat_prefix, route_config_provider, status));
+  RETURN_IF_ERROR(status);
+  return ret;
 }
 
 // Implements callbacks to handle DeltaDiscovery protocol for VirtualHostDiscoveryService
 VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                                    Server::Configuration::ServerFactoryContext& factory_context,
                                    const std::string& stat_prefix,
-                                   Rds::RouteConfigProvider* route_config_provider)
+                                   Rds::RouteConfigProvider* route_config_provider,
+                                   absl::Status& status)
     : Envoy::Config::SubscriptionBase<envoy::config::route::v3::VirtualHost>(
           factory_context.messageValidationContext().dynamicValidationVisitor(), "name"),
       config_update_info_(config_update_info),
@@ -58,11 +62,12 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
   const auto resource_name = getResourceName();
   Envoy::Config::SubscriptionOptions options;
   options.use_namespace_matching_ = true;
-  subscription_ = THROW_OR_RETURN_VALUE(
+  absl::StatusOr<Envoy::Config::SubscriptionPtr> status_or =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_update_info_->protobufConfigurationCast().vhds().config_source(),
-          Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, options),
-      Envoy::Config::SubscriptionPtr);
+          Grpc::Common::typeUrl(resource_name), *scope_, *this, resource_decoder_, options);
+  SET_AND_RETURN_IF_NOT_OK(status_or.status(), status);
+  subscription_ = std::move(status_or.value());
 }
 
 void VhdsSubscription::updateOnDemand(const std::string& with_route_config_name_prefix) {

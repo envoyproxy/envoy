@@ -57,14 +57,7 @@ private:
 
   private:
     ThriftHealthChecker& parent_;
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdangling-reference"
-#endif
     const std::string& hostname_;
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC diagnostic pop
-#endif
     ClientPtr client_;
     bool expect_close_{};
   };

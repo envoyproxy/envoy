@@ -10,6 +10,7 @@
 #include "source/extensions/filters/http/proto_message_extraction/extractor.h"
 
 #include "absl/log/log.h"
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "grpc_transcoding/type_helper.h"
 
@@ -34,7 +35,7 @@ FilterConfig::FilterConfig(const ProtoMessageExtractionConfig& proto_config,
           Envoy::Grpc::Common::typeUrlPrefix(), descriptor_pool_.get()));
 
   type_finder_ = std::make_unique<const TypeFinder>(
-      [this](absl::string_view type_url) -> const ::Envoy::ProtobufWkt::Type* {
+      [this](absl::string_view type_url) -> const ::Envoy::Protobuf::Type* {
         return type_helper_->Info()->GetTypeByTypeUrl(type_url);
       });
 
@@ -59,8 +60,9 @@ void FilterConfig::initExtractors(ExtractorFactory& extractor_factory) {
 
     auto extractor = extractor_factory.createExtractor(
         *type_helper_, *type_finder_,
-        Envoy::Grpc::Common::typeUrlPrefix() + "/" + method->input_type()->full_name(),
-        Envoy::Grpc::Common::typeUrlPrefix() + "/" + method->output_type()->full_name(), it.second);
+        absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/", method->input_type()->full_name()),
+        absl::StrCat(Envoy::Grpc::Common::typeUrlPrefix(), "/", method->output_type()->full_name()),
+        it.second);
     if (!extractor.ok()) {
       throw EnvoyException(fmt::format("couldn't init extractor for method `{}`: {}", it.first,
                                        extractor.status().message()));

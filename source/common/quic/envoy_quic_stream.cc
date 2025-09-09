@@ -17,7 +17,7 @@ void EnvoyQuicStream::encodeData(Buffer::Instance& data, bool end_stream) {
     return;
   }
   if (quic_stream_.write_side_closed()) {
-    IS_ENVOY_BUG("encodeData is called on write-closed stream.");
+    IS_ENVOY_BUG(fmt::format("encodeData is called on write-closed stream. {}", quicStreamState()));
     return;
   }
   ASSERT(!local_end_stream_);
@@ -45,7 +45,7 @@ void EnvoyQuicStream::encodeData(Buffer::Instance& data, bool end_stream) {
       single_slice_buffer->move(data, slice.len_);
       quic_slices.emplace_back(
           reinterpret_cast<char*>(slice.mem_), slice.len_,
-          [single_slice_buffer = std::move(single_slice_buffer)](const char*) mutable {
+          [single_slice_buffer = std::move(single_slice_buffer)](absl::string_view) mutable {
             // Free this memory explicitly when the callback is invoked.
             single_slice_buffer = nullptr;
           });
@@ -183,6 +183,19 @@ void EnvoyQuicStream::encodeMetadata(const Http::MetadataMapVector& metadata_map
       return;
     }
   }
+}
+
+std::string EnvoyQuicStream::quicStreamState() {
+  return fmt::format(
+      "QUIC stream state: local_end_stream_ {}, rst_received "
+      "{}, rst_sent {}, fin_received {}, fin_sent {}, fin_buffered {}, fin_outstanding {}, "
+      "stream_error {}, connection_error {}, connection connected: {}.",
+      local_end_stream_, quic_stream_.rst_received(), quic_stream_.rst_sent(),
+      quic_stream_.fin_received(), quic_stream_.fin_sent(), quic_stream_.fin_buffered(),
+      quic_stream_.fin_outstanding(),
+      quic::QuicRstStreamErrorCodeToString(quic_stream_.stream_error()),
+      quic::QuicErrorCodeToString(quic_stream_.connection_error()),
+      quic_session_.connection()->connected());
 }
 
 } // namespace Quic

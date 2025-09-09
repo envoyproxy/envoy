@@ -18,7 +18,7 @@ class MetadataFormatterTest : public ::testing::Test {
 public:
   MetadataFormatterTest() : metadata_(std::make_shared<envoy::config::core::v3::Metadata>()) {
     // Create metadata object with test values.
-    ProtobufWkt::Struct struct_obj;
+    Protobuf::Struct struct_obj;
     auto& fields_map = *struct_obj.mutable_fields();
     fields_map["test_key"] = ValueUtil::stringValue("test_value");
     (*metadata_->mutable_filter_metadata())["metadata.test"] = struct_obj;
@@ -30,6 +30,19 @@ public:
     const std::string yaml = fmt::format(R"EOF(
   text_format_source:
     inline_string: "%{}({}:metadata.test:test_key)%"
+)EOF",
+                                         tag, type);
+    TestUtility::loadFromYaml(yaml, config_);
+    return THROW_OR_RETURN_VALUE(
+        Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
+        Envoy::Formatter::FormatterPtr);
+  }
+
+  ::Envoy::Formatter::FormatterPtr getTestMetadataFormatterLegacy(std::string type,
+                                                                  std::string tag = "METADATA") {
+    const std::string yaml = fmt::format(R"EOF(
+  text_format_source:
+    inline_string: "%{}({}:metadata.test:test_key)%"
   formatters:
     - name: envoy.formatter.metadata
       typed_config:
@@ -37,7 +50,9 @@ public:
 )EOF",
                                          tag, type);
     TestUtility::loadFromYaml(yaml, config_);
-    return Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+    return THROW_OR_RETURN_VALUE(
+        Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
+        Envoy::Formatter::FormatterPtr);
   }
 
   Http::TestRequestHeaderMapImpl request_headers_;
@@ -75,6 +90,15 @@ TEST_F(MetadataFormatterTest, DynamicMetadata) {
 
   EXPECT_EQ("test_value", getTestMetadataFormatter("DYNAMIC")->formatWithContext(formatter_context_,
                                                                                  stream_info_));
+}
+
+TEST_F(MetadataFormatterTest, DynamicMetadataWithLegacyConfiguration) {
+  // Make sure that formatter accesses dynamic metadata.
+  EXPECT_CALL(testing::Const(stream_info_), dynamicMetadata())
+      .WillRepeatedly(testing::ReturnRef(*metadata_));
+
+  EXPECT_EQ("test_value", getTestMetadataFormatterLegacy("DYNAMIC")->formatWithContext(
+                              formatter_context_, stream_info_));
 }
 
 // Extensive testing of Cluster Metadata formatter is in
@@ -148,27 +172,15 @@ TEST_F(MetadataFormatterTest, NoListenerMetadata) {
 
 // Test that METADATA(VIRTUAL_HOST accesses selected virtual host metadata.
 TEST_F(MetadataFormatterTest, VirtualHostMetadata) {
-  std::shared_ptr<Router::MockRoute> route{new NiceMock<Router::MockRoute>()};
-  EXPECT_CALL(stream_info_, route()).WillRepeatedly(testing::Return(route));
+  auto mock_virtual_host = std::make_shared<NiceMock<Router::MockVirtualHost>>();
+  stream_info_.virtual_host_ = mock_virtual_host;
+  EXPECT_CALL(*mock_virtual_host, metadata()).WillRepeatedly(testing::ReturnRef(*metadata_));
 
-  std::shared_ptr<Router::MockVirtualHost> virtual_host{new NiceMock<Router::MockVirtualHost>()};
-  EXPECT_CALL(*route, virtualHost()).WillRepeatedly(testing::ReturnRef(*virtual_host));
-
-  EXPECT_CALL(*virtual_host, metadata()).WillRepeatedly(testing::ReturnRef(*metadata_));
   EXPECT_EQ("test_value", getTestMetadataFormatter("VIRTUAL_HOST")
                               ->formatWithContext(formatter_context_, stream_info_));
 }
 
-TEST_F(MetadataFormatterTest, VirtualHostMetadataNoRoute) {
-  EXPECT_CALL(stream_info_, route()).WillRepeatedly(testing::Return(nullptr));
-  EXPECT_EQ("-", getTestMetadataFormatter("VIRTUAL_HOST")
-                     ->formatWithContext(formatter_context_, stream_info_));
-}
-
-TEST_F(MetadataFormatterTest, VirtualHostMetadataNoRouteEntry) {
-  std::shared_ptr<Router::MockRoute> route{new NiceMock<Router::MockRoute>()};
-  EXPECT_CALL(stream_info_, route()).WillRepeatedly(testing::Return(route));
-  EXPECT_CALL(*route, routeEntry()).WillRepeatedly(testing::Return(nullptr));
+TEST_F(MetadataFormatterTest, VirtualHostMetadataNoVirtualHost) {
   EXPECT_EQ("-", getTestMetadataFormatter("VIRTUAL_HOST")
                      ->formatWithContext(formatter_context_, stream_info_));
 }

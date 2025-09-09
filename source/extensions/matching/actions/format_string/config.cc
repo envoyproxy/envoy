@@ -23,18 +23,19 @@ ActionImpl::get(const Server::Configuration::FilterChainsByName& filter_chains_b
   return nullptr;
 }
 
-Matcher::ActionFactoryCb
-ActionFactory::createActionFactoryCb(const Protobuf::Message& proto_config,
-                                     FilterChainActionFactoryContext& context,
-                                     ProtobufMessage::ValidationVisitor& validator) {
+Matcher::ActionConstSharedPtr
+ActionFactory::createAction(const Protobuf::Message& proto_config,
+                            FilterChainActionFactoryContext& context,
+                            ProtobufMessage::ValidationVisitor& validator) {
   const auto& config =
       MessageUtil::downcastAndValidate<const envoy::config::core::v3::SubstitutionFormatString&>(
           proto_config, validator);
 
   Server::GenericFactoryContextImpl generic_context(context, validator);
-  Formatter::FormatterConstSharedPtr formatter =
-      Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config, generic_context);
-  return [formatter]() { return std::make_unique<ActionImpl>(formatter); };
+  Formatter::FormatterConstSharedPtr formatter = THROW_OR_RETURN_VALUE(
+      Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config, generic_context),
+      Formatter::FormatterPtr);
+  return std::make_shared<ActionImpl>(std::move(formatter));
 }
 
 REGISTER_FACTORY(ActionFactory, Matcher::ActionFactory<FilterChainActionFactoryContext>);

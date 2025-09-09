@@ -61,7 +61,8 @@ public:
 private:
   VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                    Server::Configuration::ServerFactoryContext& factory_context,
-                   const std::string& stat_prefix, Rds::RouteConfigProvider* route_config_provider);
+                   const std::string& stat_prefix, Rds::RouteConfigProvider* route_config_provider,
+                   absl::Status& creation_status);
 
   // Config::SubscriptionCallbacks
   absl::Status onConfigUpdate(const std::vector<Envoy::Config::DecodedResourceRef>&,

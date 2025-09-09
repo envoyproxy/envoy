@@ -9,6 +9,9 @@ import "envoy/config/core/v3/health_check.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "xds/core/v3/collection_entry.proto";
+
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
 import "validate/validate.proto";
@@ -133,14 +136,24 @@ message LbEndpoint {
   google.protobuf.UInt32Value load_balancing_weight = 4 [(validate.rules).uint32 = {gte: 1}];
 }
 
+// LbEndpoint list collection. Entries are `LbEndpoint` resources or references.
 // [#not-implemented-hide:]
-// A configuration for a LEDS collection.
+message LbEndpointCollection {
+  xds.core.v3.CollectionEntry entries = 1;
+}
+
+// A configuration for an LEDS collection.
 message LedsClusterLocalityConfig {
   // Configuration for the source of LEDS updates for a Locality.
   core.v3.ConfigSource leds_config = 1;
 
-  // The xDS transport protocol glob collection resource name.
-  // The service is only supported in delta xDS (incremental) mode.
+  // The name of the LbEndpoint collection resource.
+  //
+  // If the name ends in ``/*``, it indicates an LbEndpoint glob collection,
+  // which is supported only in the xDS incremental protocol variants.
+  // Otherwise, it indicates an LbEndpointCollection list collection.
+  //
+  // Envoy currently supports only glob collections.
   string leds_collection_name = 2;
 }
 
@@ -165,18 +178,20 @@ message LocalityLbEndpoints {
   core.v3.Metadata metadata = 9;
 
   // The group of endpoints belonging to the locality specified.
-  // [#comment:TODO(adisuissa): Once LEDS is implemented this field needs to be
-  // deprecated and replaced by ``load_balancer_endpoints``.]
+  // This is ignored if :ref:`leds_cluster_locality_config
+  // <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.leds_cluster_locality_config>` is set.
   repeated LbEndpoint lb_endpoints = 2;
 
-  // [#not-implemented-hide:]
   oneof lb_config {
-    // The group of endpoints belonging to the locality.
-    // [#comment:TODO(adisuissa): Once LEDS is implemented the ``lb_endpoints`` field
-    // needs to be deprecated.]
-    LbEndpointList load_balancer_endpoints = 7;
+    // [#not-implemented-hide:]
+    // Not implemented and deprecated.
+    LbEndpointList load_balancer_endpoints = 7
+        [deprecated = true, (envoy.annotations.deprecated_at_minor_version) = "3.0"];
 
     // LEDS Configuration for the current locality.
+    // If this is set, the :ref:`lb_endpoints
+    // <envoy_v3_api_field_config.endpoint.v3.LocalityLbEndpoints.lb_endpoints>`
+    // field is ignored.
     LedsClusterLocalityConfig leds_cluster_locality_config = 8;
   }
 

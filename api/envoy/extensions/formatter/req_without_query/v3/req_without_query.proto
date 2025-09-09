@@ -25,6 +25,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //   the HTTP request header named X first and if it's not set, then request header Y is used. If
 //   none of the headers are present '-' symbol will be in the log.
 
+// .. warning::
+//   Please use %PATH% to replace this extension.
+//   See :ref:`access log formats <config_access_log_format>` for more details.
+
 // Configuration for the request without query formatter.
 message ReqWithoutQuery {
 }

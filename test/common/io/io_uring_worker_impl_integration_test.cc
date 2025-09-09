@@ -18,8 +18,7 @@ namespace {
 class IoUringSocketTestImpl : public IoUringSocketEntry {
 public:
   IoUringSocketTestImpl(os_fd_t fd, IoUringWorkerImpl& parent)
-      : IoUringSocketEntry(
-            fd, parent, [](uint32_t) { return absl::OkStatus(); }, false) {}
+      : IoUringSocketEntry(fd, parent, [](uint32_t) { return absl::OkStatus(); }, false) {}
 
   void onAccept(Request* req, int32_t result, bool injected) override {
     IoUringSocketEntry::onAccept(req, result, injected);

@@ -92,8 +92,18 @@ A corresponding upstream cluster configuration could be:
 
 The request thrift structure could be:
 
-.. literalinclude:: _include/request.proto
-    :language: proto
+.. code-block:: thrift
+
+   namespace py schemas.service
+
+   struct Info {
+      1: string version
+   }
+
+   service Service {
+      void foo(1: string data, 2: Info info);
+   }
+
 
 This would then allow requests of method name ``foo`` with the ``version`` payload field which is
 under ``info`` field set to be matched against endpoints with the corresponding version. Whereas

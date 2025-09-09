@@ -86,11 +86,12 @@ RequestParser::TableDescriptor RequestParser::parseTable(const std::string& oper
   // Simple operations on a single table, have "TableName" explicitly specified.
   if (find(SINGLE_TABLE_OPERATIONS.begin(), SINGLE_TABLE_OPERATIONS.end(), operation) !=
       SINGLE_TABLE_OPERATIONS.end()) {
-    table.table_name = json_data.getString("TableName", "");
+    table.table_name = THROW_OR_RETURN_VALUE(json_data.getString("TableName", ""), std::string);
   } else if (find(BATCH_OPERATIONS.begin(), BATCH_OPERATIONS.end(), operation) !=
              BATCH_OPERATIONS.end()) {
-    Json::ObjectSharedPtr tables = json_data.getObject("RequestItems", true);
-    tables->iterate([&table](const std::string& key, const Json::Object&) {
+    Json::ObjectSharedPtr tables =
+        THROW_OR_RETURN_VALUE(json_data.getObject("RequestItems", true), Json::ObjectSharedPtr);
+    THROW_IF_NOT_OK(tables->iterate([&table](const std::string& key, const Json::Object&) {
       if (table.table_name.empty()) {
         table.table_name = key;
       } else {
@@ -101,11 +102,11 @@ RequestParser::TableDescriptor RequestParser::parseTable(const std::string& oper
         }
       }
       return true;
-    });
+    }));
   } else if (find(TRANSACT_OPERATIONS.begin(), TRANSACT_OPERATIONS.end(), operation) !=
              TRANSACT_OPERATIONS.end()) {
-    std::vector<Json::ObjectSharedPtr> transact_items =
-        json_data.getObjectArray("TransactItems", true);
+    std::vector<Json::ObjectSharedPtr> transact_items = THROW_OR_RETURN_VALUE(
+        json_data.getObjectArray("TransactItems", true), std::vector<Json::ObjectSharedPtr>);
     for (const Json::ObjectSharedPtr& transact_item : transact_items) {
       const auto next_table_name = getTableNameFromTransactItem(*transact_item);
       if (!next_table_name.has_value()) {
@@ -129,8 +130,9 @@ RequestParser::TableDescriptor RequestParser::parseTable(const std::string& oper
 absl::optional<std::string>
 RequestParser::getTableNameFromTransactItem(const Json::Object& transact_item) {
   for (const std::string& operation : TRANSACT_ITEM_OPERATIONS) {
-    Json::ObjectSharedPtr item = transact_item.getObject(operation, true);
-    std::string table_name = item->getString("TableName", "");
+    Json::ObjectSharedPtr item =
+        THROW_OR_RETURN_VALUE(transact_item.getObject(operation, true), Json::ObjectSharedPtr);
+    std::string table_name = THROW_OR_RETURN_VALUE(item->getString("TableName", ""), std::string);
     if (!table_name.empty()) {
       return absl::make_optional(table_name);
     }
@@ -140,17 +142,19 @@ RequestParser::getTableNameFromTransactItem(const Json::Object& transact_item) {
 
 std::vector<std::string> RequestParser::parseBatchUnProcessedKeys(const Json::Object& json_data) {
   std::vector<std::string> unprocessed_tables;
-  Json::ObjectSharedPtr tables = json_data.getObject("UnprocessedKeys", true);
-  tables->iterate([&unprocessed_tables](const std::string& key, const Json::Object&) {
-    unprocessed_tables.emplace_back(key);
-    return true;
-  });
+  Json::ObjectSharedPtr tables =
+      THROW_OR_RETURN_VALUE(json_data.getObject("UnprocessedKeys", true), Json::ObjectSharedPtr);
+  THROW_IF_NOT_OK(
+      tables->iterate([&unprocessed_tables](const std::string& key, const Json::Object&) {
+        unprocessed_tables.emplace_back(key);
+        return true;
+      }));
 
   return unprocessed_tables;
 }
 
 std::string RequestParser::parseErrorType(const Json::Object& json_data) {
-  std::string error_type = json_data.getString("__type", "");
+  std::string error_type = THROW_OR_RETURN_VALUE(json_data.getString("__type", ""), std::string);
   if (error_type.empty()) {
     return "";
   }
@@ -173,18 +177,21 @@ std::vector<RequestParser::PartitionDescriptor>
 RequestParser::parsePartitions(const Json::Object& json_data) {
   std::vector<RequestParser::PartitionDescriptor> partition_descriptors;
 
+  Json::ObjectSharedPtr capacity =
+      THROW_OR_RETURN_VALUE(json_data.getObject("ConsumedCapacity", true), Json::ObjectSharedPtr);
   Json::ObjectSharedPtr partitions =
-      json_data.getObject("ConsumedCapacity", true)->getObject("Partitions", true);
-  partitions->iterate([&partition_descriptors, &partitions](const std::string& key,
-                                                            const Json::Object&) {
-    // For a given partition id, the amount of capacity used is returned in the body as a double.
-    // A stat will be created to track the capacity consumed for the operation, table and partition.
-    // Stats counter only increments by whole numbers, capacity is round up to the nearest integer
-    // to account for this.
-    uint64_t capacity_integer = static_cast<uint64_t>(std::ceil(partitions->getDouble(key, 0.0)));
-    partition_descriptors.emplace_back(key, capacity_integer);
-    return true;
-  });
+      THROW_OR_RETURN_VALUE(capacity->getObject("Partitions", true), Json::ObjectSharedPtr);
+  THROW_IF_NOT_OK(partitions->iterate(
+      [&partition_descriptors, &partitions](const std::string& key, const Json::Object&) {
+        // For a given partition id, the amount of capacity used is returned in the body as a
+        // double. A stat will be created to track the capacity consumed for the operation, table
+        // and partition. Stats counter only increments by whole numbers, capacity is round up to
+        // the nearest integer to account for this.
+        uint64_t capacity_integer = static_cast<uint64_t>(
+            std::ceil(THROW_OR_RETURN_VALUE(partitions->getDouble(key, 0.0), double)));
+        partition_descriptors.emplace_back(key, capacity_integer);
+        return true;
+      }));
 
   return partition_descriptors;
 }

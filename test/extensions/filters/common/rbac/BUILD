@@ -16,14 +16,17 @@ envoy_extension_cc_test(
     name = "matchers_test",
     srcs = ["matchers_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         "//source/common/stream_info:filter_state_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
         "//source/extensions/filters/common/rbac:matchers_lib",
+        "//source/extensions/filters/common/rbac/principals/mtls_authenticated:config",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
+        "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/rbac/v3:pkg_cc_proto",
@@ -36,6 +39,7 @@ envoy_extension_cc_test(
     name = "engine_impl_test",
     srcs = ["engine_impl_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/common/rbac:engine_lib",
@@ -56,6 +60,7 @@ envoy_extension_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     extension_names = ["envoy.filters.http.rbac"],
+    rbe_pool = "6gig",
     tags = ["skip_on_windows"],
     deps = [
         "//source/extensions/filters/common/rbac:utility_lib",

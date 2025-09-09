@@ -12,9 +12,6 @@ envoy_cc_library(
     name = "access_log_lib",
     srcs = ["access_log_impl.cc"],
     hdrs = ["access_log_impl.h"],
-    external_deps = [
-        "abseil_hash",
-    ],
     deps = [
         "//envoy/access_log:access_log_config_interface",
         "//envoy/access_log:access_log_interface",
@@ -34,6 +31,7 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
+        "@com_google_absl//absl/hash",
         "@envoy_api//envoy/config/accesslog/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],

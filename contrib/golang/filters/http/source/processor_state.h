@@ -78,7 +78,9 @@ enum class GolangStatus {
   StopNoBuffer,
 };
 
-class ProcessorState : public processState, public Logger::Loggable<Logger::Id::http>, NonCopyable {
+class ProcessorState : public processState,
+                       public Logger::Loggable<Logger::Id::golang>,
+                       NonCopyable {
 public:
   explicit ProcessorState(Filter& filter, httpRequest* r) : filter_(filter) {
     req = r;
@@ -157,6 +159,8 @@ public:
                               std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
                               Grpc::Status::GrpcStatus grpc_status, absl::string_view details) PURE;
 
+  virtual void addData(Buffer::Instance& data, bool is_streaming) PURE;
+
   const StreamInfo::StreamInfo& streamInfo() const { return getFilterCallbacks()->streamInfo(); }
   StreamInfo::StreamInfo& streamInfo() { return getFilterCallbacks()->streamInfo(); }
 
@@ -210,6 +214,15 @@ public:
                                        details);
   };
 
+  void addData(Buffer::Instance& data, bool is_streaming) override {
+    ENVOY_LOG(debug, "golang filter addData when decoding, is_streaming: {}", is_streaming);
+    decoder_callbacks_->addDecodedData(data, is_streaming);
+  }
+
+  void setUpstreamOverrideHost(std::pair<std::string, bool> host_and_strict) {
+    decoder_callbacks_->setUpstreamOverrideHost(host_and_strict);
+  }
+
 private:
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{nullptr};
 };
@@ -241,6 +254,11 @@ public:
     encoder_callbacks_->sendLocalReply(response_code, body_text, modify_headers, grpc_status,
                                        details);
   };
+
+  void addData(Buffer::Instance& data, bool is_streaming) override {
+    ENVOY_LOG(debug, "golang filter addData when encoding, is_streaming: {}", is_streaming);
+    encoder_callbacks_->addEncodedData(data, is_streaming);
+  }
 
 private:
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{nullptr};

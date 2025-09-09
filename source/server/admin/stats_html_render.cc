@@ -78,7 +78,7 @@ void StatsHtmlRender::noStats(Buffer::Instance& response, absl::string_view type
 void StatsHtmlRender::generate(Buffer::Instance& response, const std::string& name,
                                const Stats::ParentHistogram& histogram) {
   if (json_histograms_) {
-    Json::Streamer streamer(response);
+    Json::BufferStreamer streamer(response);
 
     // If this is the first histogram we are rendering, then we need to first
     // generate the supported-percentiles array sand save it in a constant.

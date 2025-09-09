@@ -1,0 +1,26 @@
+date: March 20, 2025
+
+minor_behavior_changes:
+- area: rds
+  change: |
+    When a new RDS provider config is pushed via xDS and the only difference is change to
+    :ref:`initial_fetch_timeout <envoy_v3_api_field_config.core.v3.ConfigSource.initial_fetch_timeout>`,
+    the already existing provider will be reused. Envoy will not ask RDS server for routes
+    config because existing provider already has up to date routes config.
+    This behavioral change can be enabled by setting runtime guard
+    ``envoy.reloadable_features.normalize_rds_provider_config`` to true.
+
+bug_fixes:
+- area: lrs
+  change: |
+    Fixes errors stat being incremented and warning log spamming for LoadStatsReporting graceful stream close.
+- area: ext_proc
+  change: |
+    Fixes a bug where local replies were incorrectly sent to the ext_proc server for external processing.
+    This change can be temporarily reverted by setting runtime guard ``envoy_reloadable_features_skip_ext_proc_on_local_reply``
+    to ``false``.
+- area: router
+  change: |
+    Fixes an Envoy crash issue when a local reply is sent.
+    This change can be temporarily reverted by setting runtime guard
+    ``envoy_reloadable_features_router_filter_resetall_on_local_reply`` to ``false``.

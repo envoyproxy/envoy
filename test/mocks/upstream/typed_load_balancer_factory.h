@@ -26,15 +26,15 @@ public:
                const PrioritySet& priority_set, Runtime::Loader& runtime,
                Random::RandomGenerator& random, TimeSource& time_source));
 
-  LoadBalancerConfigPtr loadConfig(Upstream::LoadBalancerFactoryContext&, const Protobuf::Message&,
-                                   ProtobufMessage::ValidationVisitor&) override {
+  absl::StatusOr<LoadBalancerConfigPtr> loadConfig(Server::Configuration::ServerFactoryContext&,
+                                                   const Protobuf::Message&) override {
     return std::make_unique<EmptyLoadBalancerConfig>();
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     // Using Struct instead of a custom per-filter empty config proto
     // This is only allowed in tests.
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
 };
 } // namespace Upstream

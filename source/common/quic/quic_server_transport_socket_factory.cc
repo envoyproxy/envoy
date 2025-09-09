@@ -31,7 +31,8 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
 
   auto factory_or_error = QuicServerTransportSocketFactory::create(
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(quic_transport, enable_early_data, true),
-      context.statsScope(), std::move(server_config), context.sslContextManager(), server_names);
+      context.statsScope(), std::move(server_config),
+      context.serverFactoryContext().sslContextManager(), server_names);
   RETURN_IF_NOT_OK(factory_or_error.status());
   (*factory_or_error)->initialize();
   return std::move(*factory_or_error);
@@ -113,16 +114,12 @@ QuicServerTransportSocketFactory::QuicServerTransportSocketFactory(
     bool enable_early_data, Stats::Scope& scope, Ssl::ServerContextConfigPtr config,
     Envoy::Ssl::ContextManager& manager, const std::vector<std::string>& server_names,
     absl::Status& creation_status)
-    : QuicTransportSocketFactoryBase(scope, "server"),
-      handle_certs_with_shared_tls_code_(Runtime::runtimeFeatureEnabled(
-          "envoy.restart_features.quic_handle_certs_with_shared_tls_code")),
-      manager_(manager), stats_scope_(scope), config_(std::move(config)),
-      server_names_(server_names), enable_early_data_(enable_early_data) {
-  if (handle_certs_with_shared_tls_code_) {
-    auto ctx_or_error = createSslServerContext();
-    SET_AND_RETURN_IF_NOT_OK(ctx_or_error.status(), creation_status);
-    ssl_ctx_ = *ctx_or_error;
-  }
+    : QuicTransportSocketFactoryBase(scope, "server"), manager_(manager), stats_scope_(scope),
+      config_(std::move(config)), server_names_(server_names),
+      enable_early_data_(enable_early_data) {
+  auto ctx_or_error = createSslServerContext();
+  SET_AND_RETURN_IF_NOT_OK(ctx_or_error.status(), creation_status);
+  ssl_ctx_ = *ctx_or_error;
 }
 
 QuicServerTransportSocketFactory::~QuicServerTransportSocketFactory() {
@@ -171,8 +168,9 @@ QuicServerTransportSocketFactory::getTlsCertificateAndKey(absl::string_view sni,
   }
   auto ctx =
       std::dynamic_pointer_cast<Extensions::TransportSockets::Tls::ServerContextImpl>(ssl_ctx);
-  auto [tls_context, ocsp_staple_action] = ctx->findTlsContext(
-      sni, true /* TODO: ecdsa_capable */, false /* TODO: ocsp_capable */, cert_matched_sni);
+  auto [tls_context, ocsp_staple_action] =
+      ctx->findTlsContext(sni, Ssl::CurveNIDVector{NID_X9_62_prime256v1} /* TODO: ecdsa_capable */,
+                          false /* TODO: ocsp_capable */, cert_matched_sni);
 
   // Thread safety note: accessing the tls_context requires holding a shared_ptr to the ``ssl_ctx``.
   // Both of these members are themselves reference counted, so it is safe to use them after
@@ -183,15 +181,13 @@ QuicServerTransportSocketFactory::getTlsCertificateAndKey(absl::string_view sni,
 absl::Status QuicServerTransportSocketFactory::onSecretUpdated() {
   ENVOY_LOG(debug, "Secret is updated.");
 
-  if (handle_certs_with_shared_tls_code_) {
-    auto ctx_or_error = createSslServerContext();
-    RETURN_IF_NOT_OK(ctx_or_error.status());
-    {
-      absl::WriterMutexLock l(&ssl_ctx_mu_);
-      std::swap(*ctx_or_error, ssl_ctx_);
-    }
-    manager_.removeContext(*ctx_or_error);
+  auto ctx_or_error = createSslServerContext();
+  RETURN_IF_NOT_OK(ctx_or_error.status());
+  {
+    absl::WriterMutexLock l(&ssl_ctx_mu_);
+    std::swap(*ctx_or_error, ssl_ctx_);
   }
+  manager_.removeContext(*ctx_or_error);
 
   stats_.context_config_update_by_sds_.inc();
   return absl::OkStatus();

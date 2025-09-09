@@ -52,9 +52,10 @@ ValidationInstance::ValidationInstance(
     Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
     Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
     const ProcessContextOptRef& process_context)
-    : options_(options), validation_context_(options_.allowUnknownStaticFields(),
-                                             !options.rejectUnknownDynamicFields(),
-                                             !options.ignoreUnknownDynamicFields()),
+    : options_(options),
+      validation_context_(options_.allowUnknownStaticFields(),
+                          !options.rejectUnknownDynamicFields(),
+                          !options.ignoreUnknownDynamicFields(), options.skipDeprecatedLogs()),
       stats_store_(store),
       api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system,
                                    random_generator_, bootstrap_, process_context)),
@@ -64,14 +65,26 @@ ValidationInstance::ValidationInstance(
       grpc_context_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
       router_context_(stats_store_.symbolTable()), time_system_(time_system),
       server_contexts_(*this), quic_stat_names_(stats_store_.symbolTable()) {
+
+  // Register the server factory context on the main thread.
+  Configuration::ServerFactoryContextInstance::initialize(&server_contexts_);
+
   TRY_ASSERT_MAIN_THREAD { initialize(options, local_address, component_factory); }
   END_TRY
   catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
     shutdown();
+
+    // Clear the server factory context on the main thread.
+    Configuration::ServerFactoryContextInstance::clear();
     throw;
   }
+}
+
+ValidationInstance::~ValidationInstance() {
+  // Clear the server factory context on the main thread.
+  Configuration::ServerFactoryContextInstance::clear();
 }
 
 void ValidationInstance::initialize(const Options& options,
@@ -102,7 +115,7 @@ void ValidationInstance::initialize(const Options& options,
 
   auto producer_or_error =
       Stats::TagProducerImpl::createTagProducer(bootstrap_.stats_config(), options_.statsTags());
-  THROW_IF_STATUS_NOT_OK(producer_or_error, throw);
+  THROW_IF_NOT_OK_REF(producer_or_error.status());
   if (!bootstrap_.node().user_agent_build_version().has_version()) {
     *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
   }
@@ -144,10 +157,12 @@ void ValidationInstance::initialize(const Options& options,
           serverFactoryContext(), messageValidationContext().staticValidationVisitor(),
           thread_local_);
 
+  xds_manager_ = std::make_unique<Config::XdsManagerImpl>(*dispatcher_, *api_, stats_store_,
+                                                          *local_info_, validation_context_, *this);
+
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
-      server_contexts_, stats(), threadLocal(), http_context_,
-      [this]() -> Network::DnsResolverSharedPtr { return this->dnsResolver(); },
-      sslContextManager(), *secret_manager_, quic_stat_names_, *this);
+      server_contexts_, [this]() -> Network::DnsResolverSharedPtr { return this->dnsResolver(); },
+      quic_stat_names_);
   THROW_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
   THROW_IF_NOT_OK(runtime().initialize(clusterManager()));
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });

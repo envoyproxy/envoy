@@ -77,7 +77,8 @@ func handleCApiStatus(status C.CAPIStatus) {
 	case C.CAPIFilterIsGone,
 		C.CAPIFilterIsDestroy,
 		C.CAPINotInGo,
-		C.CAPIInvalidPhase:
+		C.CAPIInvalidPhase,
+		C.CAPIInvalidScene:
 		panic(capiStatusToStr(status))
 	}
 }
@@ -92,6 +93,8 @@ func capiStatusToStr(status C.CAPIStatus) string {
 		return errNotInGo
 	case C.CAPIInvalidPhase:
 		return errInvalidPhase
+	case C.CAPIInvalidScene:
+		return errInvalidScene
 	}
 
 	return "unknown status"
@@ -105,9 +108,28 @@ func capiStatusToErr(status C.CAPIStatus) error {
 		return api.ErrInternalFailure
 	case C.CAPISerializationFailure:
 		return api.ErrSerializationFailure
+	case C.CAPIInvalidIPAddress:
+		return api.ErrInvalidIPAddress
 	}
 
 	return errors.New("unknown status")
+}
+
+// This require go1.22 which include https://go-review.googlesource.com/c/go/+/527156
+// Passed header strings are not garanteed to be backed by go allocated array
+func goHeadersToCHeaders(headers map[string][]string) ([]string, func()) {
+	var pinner runtime.Pinner
+	hLen := len(headers)
+	strs := make([]string, 0, hLen*2)
+	// Pinning strs is not enough as golang does not garantee transitive pointer pinning
+	for k, h := range headers {
+		for _, v := range h {
+			pinner.Pin(unsafe.StringData(k))
+			pinner.Pin(unsafe.StringData(v))
+			strs = append(strs, k, v)
+		}
+	}
+	return strs, pinner.Unpin
 }
 
 func (c *httpCApiImpl) HttpContinue(s unsafe.Pointer, status uint64) {
@@ -120,21 +142,8 @@ func (c *httpCApiImpl) HttpContinue(s unsafe.Pointer, status uint64) {
 // won't panic with errInvalidPhase and others, otherwise will cause deadloop, see RecoverPanic for the details.
 func (c *httpCApiImpl) HttpSendLocalReply(s unsafe.Pointer, responseCode int, bodyText string, headers map[string][]string, grpcStatus int64, details string) {
 	state := (*processState)(s)
-	hLen := len(headers)
-	strs := make([]*C.char, 0, hLen*2)
-	defer func() {
-		for _, s := range strs {
-			C.free(unsafe.Pointer(s))
-		}
-	}()
-	// TODO: use runtime.Pinner after go1.22 release for better performance.
-	for k, h := range headers {
-		for _, v := range h {
-			keyStr := C.CString(k)
-			valueStr := C.CString(v)
-			strs = append(strs, keyStr, valueStr)
-		}
-	}
+	strs, cleanup := goHeadersToCHeaders(headers)
+	defer cleanup()
 	res := C.envoyGoFilterHttpSendLocalReply(unsafe.Pointer(state.processState), C.int(responseCode),
 		unsafe.Pointer(unsafe.StringData(bodyText)), C.int(len(bodyText)),
 		unsafe.Pointer(unsafe.SliceData(strs)), C.int(len(strs)),
@@ -145,6 +154,19 @@ func (c *httpCApiImpl) HttpSendLocalReply(s unsafe.Pointer, responseCode int, bo
 func (c *httpCApiImpl) HttpSendPanicReply(s unsafe.Pointer, details string) {
 	state := (*processState)(s)
 	res := C.envoyGoFilterHttpSendPanicReply(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(details)), C.int(len(details)))
+	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpAddData(s unsafe.Pointer, data []byte, isStreaming bool) {
+	state := (*processState)(s)
+	res := C.envoyGoFilterHttpAddData(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.SliceData(data)), C.int(len(data)), C.bool(isStreaming))
+	handleCApiStatus(res)
+}
+
+func (c *httpCApiImpl) HttpInjectData(s unsafe.Pointer, data []byte) {
+	state := (*processState)(s)
+	res := C.envoyGoFilterHttpInjectData(unsafe.Pointer(state.processState),
+		unsafe.Pointer(unsafe.SliceData(data)), C.int(len(data)))
 	handleCApiStatus(res)
 }
 
@@ -301,9 +323,20 @@ func (c *httpCApiImpl) HttpRemoveTrailer(s unsafe.Pointer, key string) {
 	handleCApiStatus(res)
 }
 
-func (c *httpCApiImpl) ClearRouteCache(r unsafe.Pointer) {
+func (c *httpCApiImpl) HttpSetUpstreamOverrideHost(s unsafe.Pointer, host string, strict bool) error {
+	state := (*processState)(s)
+	res := C.envoyGoFilterHttpSetUpstreamOverrideHost(unsafe.Pointer(state.processState), unsafe.Pointer(unsafe.StringData(host)), C.int(len(host)), C.bool(strict))
+	handleCApiStatus(res)
+	if res != C.CAPIOK {
+		return capiStatusToErr(res)
+	}
+
+	return nil
+}
+
+func (c *httpCApiImpl) ClearRouteCache(r unsafe.Pointer, refresh bool) {
 	req := (*httpRequest)(r)
-	res := C.envoyGoFilterHttpClearRouteCache(unsafe.Pointer(req.req))
+	res := C.envoyGoFilterHttpClearRouteCache(unsafe.Pointer(req.req), C.bool(refresh))
 	handleCApiStatus(res)
 }
 
@@ -435,6 +468,26 @@ func (c *httpCApiImpl) HttpGetStringProperty(r unsafe.Pointer, key string) (stri
 	}
 
 	return "", capiStatusToErr(res)
+}
+
+func (c *httpCApiImpl) HttpGetStringSecret(r unsafe.Pointer, key string) (string, bool) {
+	req := (*httpRequest)(r)
+	var valueData C.uint64_t
+	var valueLen C.int
+	req.mutex.Lock()
+	defer req.mutex.Unlock()
+	req.markMayWaitingCallback()
+	res := C.envoyGoFilterHttpGetStringSecret(unsafe.Pointer(req.req), unsafe.Pointer(unsafe.StringData(key)), C.int(len(key)), &valueData, &valueLen)
+	if res == C.CAPIYield {
+		req.checkOrWaitCallback()
+	} else {
+		req.markNoWaitingCallback()
+		handleCApiStatus(res)
+	}
+	if valueLen == -1 {
+		return "", false
+	}
+	return strings.Clone(unsafe.String((*byte)(unsafe.Pointer(uintptr(valueData))), int(valueLen))), true
 }
 
 func (c *httpCApiImpl) HttpLog(level api.LogType, message string) {

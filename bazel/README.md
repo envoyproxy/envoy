@@ -98,7 +98,7 @@ for how to update or override dependencies.
     ```
 
     ### Linux
-    On Linux, we recommend using the prebuilt Clang+LLVM package from [LLVM official site](http://releases.llvm.org/download.html) for Clang 14.
+    On Linux, we recommend using the prebuilt Clang+LLVM package from [LLVM official site](http://releases.llvm.org/download.html) for Clang 18.
 
     Extract the tar.xz and run the following:
     ```console
@@ -110,14 +110,21 @@ for how to update or override dependencies.
     echo "build --config=clang" >> user.bazelrc
     ```
 
-    Note: Either `libc++` or `libstdc++-7-dev` (or higher) must be installed.
+    Note: `libc++` is the recommended standard library for Envoy development and is automatically used with `--config=clang`.
 
-    #### Config Flag Choices
-    Different [config](https://docs.bazel.build/versions/master/guide.html#--config) flags specify the compiler libraries:
+    #### Compiler and Standard Library Configuration
+    Envoy supports the following compiler toolchains:
 
-    - `--config=libc++` means using `clang` + `libc++`
-    - `--config=clang` means using `clang` + `libstdc++`
-    - no config flag means using `gcc` + `libstdc++`
+    - `--config=clang` (recommended): Uses `clang` compiler with `libc++` (LLVM standard library)
+    - `--config=gcc`: Uses `gcc` compiler with `libstdc++` (GNU standard library)
+    - No config flag: Uses system default compiler settings
+
+    Note: While it's possible to use `clang` with `libstdc++` by setting CC/CXX environment variables without a config flag, this combination is not tested or supported.
+
+    For more granular control:
+    - `--config=clang-common`: Provides base clang configuration without standard library settings
+    - `--config=libc++`: Provides just the libc++ standard library flags
+    - `--config=libstdc++`: Provides just the libstdc++ standard library flags
 
 
     ### macOS
@@ -186,7 +193,7 @@ for how to update or override dependencies.
     is set.
 
     Bazel also creates file symlinks when building Envoy. It's strongly recommended to enable file symlink support
-    using [Bazel's instructions](https://docs.bazel.build/versions/master/windows.html#enable-symlink-support).
+    using [Bazel's instructions](https://docs.bazel.build/versions/master/windows.html#symlink).
     For other common issues, see the
     [Using Bazel on Windows](https://docs.bazel.build/versions/master/windows.html) page.
 
@@ -278,6 +285,7 @@ for how to update or override dependencies.
    in your shell for buildozer to work. If GOPATH is not set, it is $HOME/go by default.
 1. `bazel build envoy` from the Envoy source directory. Add `-c opt` for an optimized release build or
    `-c dbg` for an unoptimized, fully instrumented debugging build.
+1. For debug builds on macOS, pass additionally: `--spawn_strategy=local --features=oso_prefix_is_pwd`
 
 ## Building Envoy with the CI Docker image
 
@@ -337,15 +345,11 @@ set different options. See below to configure test IP versions.
 
 ## Linking against libc++ on Linux
 
-To link Envoy against libc++, follow the [quick start](#quick-start-bazel-build-for-developers) to setup Clang+LLVM and run:
-```
-bazel build --config=libc++ envoy
-```
+When using `--config=clang`, Envoy is automatically linked against libc++. No additional configuration is needed.
 
-Or use our configuration with Remote Execution or Docker sandbox, pass `--config=remote-clang-libc++` or
-`--config=docker-clang-libc++` respectively.
+For remote execution or Docker sandbox builds, use `--config=remote-clang` or `--config=docker-clang` respectively.
 
-If you want to make libc++ as default, add a line `build --config=libc++` to the `user.bazelrc` file in Envoy source root.
+If you want to ensure clang with libc++ is always used by default, add `build --config=clang` to the `user.bazelrc` file in Envoy source root.
 
 ## Using a compiler toolchain in a non-standard location
 
@@ -360,8 +364,8 @@ for more details.
 
 ## Supported compiler versions
 
-We now require Clang >= 9 due to C++17 support and tcmalloc requirement. GCC >= 9 is also known to work.
-Currently the CI is running with Clang 14.
+We now require Clang >= 18 due to C++20 support (for Clang >= 14, your mileage may vary) and tcmalloc requirement. GCC >= 13 is also known to work for C++20.
+Currently the CI is running with Clang 18.
 
 ## Clang STL debug symbols
 
@@ -398,7 +402,7 @@ bazel test //test/...
 ```
 
 An individual test target can be run with a more specific Bazel
-[label](https://bazel.build/versions/master/docs/build-ref.html#Labels), e.g. to build and run only
+[label](https://bazel.build/concepts/labels), e.g. to build and run only
 the units tests in
 [test/common/http/async_client_impl_test.cc](https://github.com/envoyproxy/envoy/blob/main/test/common/http/async_client_impl_test.cc):
 
@@ -412,11 +416,12 @@ To observe more verbose test output:
 bazel test --test_output=streamed //test/common/http:async_client_impl_test
 ```
 
-It's also possible to pass into an Envoy test additional command-line args via `--test_arg`. For
+It's also possible to pass into an Envoy test additional command-line args via `--test_arg`. Note
+that `--test_arg="--"` should be added to pass Envoy command-line arguments. For
 example, for extremely verbose test debugging:
 
 ```
-bazel test --test_output=streamed //test/common/http:async_client_impl_test --test_arg="-l trace"
+bazel test --test_output=streamed //test/common/http:async_client_impl_test --test_arg="--" --test_arg="-l trace"
 ```
 
 By default, testing exercises both IPv4 and IPv6 address connections. In IPv4 or IPv6 only
@@ -441,7 +446,7 @@ bazel test //test/... --test_env=HEAPCHECK=minimal
 ```
 
 If you see a leak detected, by default the reported offsets will require `addr2line` interpretation.
-You can run under `--config=clang-asan` to have this automatically applied.
+You can run under `--config=asan` to have this automatically applied.
 
 Bazel will by default cache successful test results. To force it to rerun tests:
 
@@ -451,7 +456,7 @@ bazel test //test/common/http:async_client_impl_test --cache_test_results=no
 
 Bazel will by default run all tests inside a sandbox, which disallows access to the
 local filesystem. If you need to break out of the sandbox (for example to run under a
-local script or tool with [`--run_under`](https://docs.bazel.build/versions/master/user-manual.html#flag--run_under)),
+local script or tool with [`--run_under`](https://docs.bazel.build/versions/master/user-manual.html#test-run-under)),
 you can run the test with `--strategy=TestRunner=local`, e.g.:
 
 ```
@@ -562,7 +567,7 @@ RUN_REMOTE=yes MOUNT_LOCAL=yes tools/bazel-test-docker.sh  //test/integration:in
 # Additional Envoy build and test options
 
 In general, there are 3 [compilation
-modes](https://docs.bazel.build/versions/master/user-manual.html#flag--compilation_mode)
+modes](https://docs.bazel.build/versions/master/user-manual.html#compilation-mode)
 that Bazel supports:
 
 * `fastbuild`: `-O0`, aimed at developer speed (default).
@@ -584,10 +589,9 @@ bazel build envoy --config=sizeopt
 
 ## Sanitizers
 
-To build and run tests with the gcc compiler's [address sanitizer
-(ASAN)](https://github.com/google/sanitizers/wiki/AddressSanitizer) and
-[undefined behavior
-(UBSAN)](https://developers.redhat.com/blog/2014/10/16/gcc-undefined-behavior-sanitizer-ubsan) sanitizer enabled:
+**Note: Sanitizer testing requires the Clang toolchain.**
+
+To build and run tests with [address sanitizer (ASAN)](https://github.com/google/sanitizers/wiki/AddressSanitizer) and [undefined behavior (UBSAN)](https://developers.redhat.com/blog/2014/10/16/gcc-undefined-behavior-sanitizer-ubsan) sanitizer enabled:
 
 ```
 bazel test -c dbg --config=asan //test/...
@@ -596,12 +600,6 @@ bazel test -c dbg --config=asan //test/...
 The ASAN failure stack traces include line numbers as a result of running ASAN with a `dbg` build above. If the
 stack trace is not symbolized, try setting the ASAN_SYMBOLIZER_PATH environment variable to point to the
 llvm-symbolizer binary (or make sure the llvm-symbolizer is in your $PATH).
-
-If you have clang-5.0 or newer, additional checks are provided with:
-
-```
-bazel test -c dbg --config=clang-asan //test/...
-```
 
 [Thread sanitizer (TSAN)](https://github.com/google/sanitizers/wiki/ThreadSanitizerCppManual) tests rely on
 a TSAN-instrumented version of libc++ and can be run under the docker sandbox:
@@ -665,7 +663,7 @@ logging at `-l trace`. For example, in tests:
 
 ```
 bazel test //test/integration:protocol_integration_test --test_output=streamed \
-  --test_arg="-l trace" --test_env="ENVOY_NGHTTP2_TRACE="
+  --test_arg="--" --test_arg="-l trace" --test_env="ENVOY_NGHTTP2_TRACE="
 ```
 
 Similarly, `QUICHE` verbose logs can be enabled by setting `ENVOY_QUICHE_VERBOSITY=n` in the
@@ -748,9 +746,9 @@ You may persist those options in `user.bazelrc` in Envoy repo or your `.bazelrc`
 Contrib extensions can be enabled and disabled similarly to above when building the contrib
 executable. For example:
 
-`bazel build //contrib/exe:envoy-static --//contrib/squash/filters/http/source:enabled=false`
+`bazel build //contrib/exe:envoy-static --//contrib/dynamo/filters/http/source:enabled=false`
 
-Will disable the squash extension when building the contrib executable.
+Will disable the dynamo extension when building the contrib executable.
 
 ## Customize extension build config
 
@@ -848,7 +846,7 @@ have seen some issues with seeing the artifacts tab. If you can't see it, log ou
 then log back in and it should start working.
 
 The latest coverage report for main is available
-[here](https://storage.googleapis.com/envoy-postsubmit/main/coverage/index.html). The latest fuzz coverage report for main is available [here](https://storage.googleapis.com/envoy-postsubmit/main/fuzz_coverage/index.html).
+[here](https://storage.googleapis.com/envoy-cncf-postsubmit/main/coverage/index.html). The latest fuzz coverage report for main is available [here](https://storage.googleapis.com/envoy-cncf-postsubmit/main/fuzz_coverage/index.html).
 
 It's also possible to specialize the coverage build to a specified test or test dir. This is useful
 when doing things like exploring the coverage of a fuzzer over its corpus. This can be done by
@@ -923,10 +921,15 @@ This requires Python 3.8.0+, download from [here](https://www.python.org/downloa
 
 Use the following command to prepare a compilation database:
 
-```
+```console
 TEST_TMPDIR=/tmp tools/gen_compilation_database.py
 ```
 
+On macOS:
+
+```console
+tools/gen_compilation_database.py --exclude_contrib
+```
 
 # Running format linting without docker
 

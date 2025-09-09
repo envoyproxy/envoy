@@ -23,11 +23,6 @@ envoy.compression.qatzstd.compressor:
   - envoy.compression.compressor
   security_posture: robust_to_untrusted_downstream_and_upstream
   status: alpha
-envoy.filters.http.squash:
-  categories:
-  - envoy.filters.http
-  security_posture: requires_trusted_downstream_and_upstream
-  status: stable
 envoy.filters.http.sxg:
   categories:
   - envoy.filters.http
@@ -113,6 +108,15 @@ envoy.regex_engines.hyperscan:
   - envoy.regex_engines
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.tap_sinks.udp_sink:
+  categories:
+  - envoy.filters.http
+  - envoy.transport_sockets.downstream
+  - envoy.transport_sockets.upstream
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.tap_sinks.udp_sink.v3alpha.UdpSink
 envoy.xds_delegates.kv_store:
   categories:
   - envoy.xds_delegates
@@ -128,5 +132,10 @@ envoy.generic_proxy.codecs.kafka:
 envoy.router.cluster_specifier_plugin.golang:
   categories:
   - envoy.router.cluster_specifier_plugin
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+envoy.upstreams.http.tcp.golang:
+  categories:
+  - envoy.upstreams
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha

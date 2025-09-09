@@ -24,8 +24,8 @@ private:
   public:
     LbImpl(const Upstream::HostSharedPtr& host) : host_(host) {}
 
-    Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext*) override {
-      return host_;
+    Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext*) override {
+      return {host_};
     }
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
@@ -73,9 +73,8 @@ public:
     return std::make_unique<ThreadAwareLbImpl>();
   }
 
-  Upstream::LoadBalancerConfigPtr loadConfig(Upstream::LoadBalancerFactoryContext&,
-                                             const Protobuf::Message&,
-                                             ProtobufMessage::ValidationVisitor&) override {
+  absl::StatusOr<Upstream::LoadBalancerConfigPtr>
+  loadConfig(Server::Configuration::ServerFactoryContext&, const Protobuf::Message&) override {
     return std::make_unique<EmptyLoadBalancerConfig>();
   }
 };

@@ -145,8 +145,9 @@ TEST_F(ZstdDecompressorImplTest, IllegalConfig) {
   ]
 })EOF";
   TestUtility::loadFromJson(json, zstd);
-  EXPECT_DEATH({ lib_factory.createDecompressorFactoryFromProto(zstd, mock_context); },
-               "assert failure: id != 0. Details: Illegal Zstd dictionary");
+  EXPECT_DEATH(
+      { lib_factory.createDecompressorFactoryFromProto(zstd, mock_context); },
+      "assert failure: id != 0. Details: Illegal Zstd dictionary");
 }
 
 // Detect excessive compression ratio by compressing a long whitespace string

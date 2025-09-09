@@ -19,8 +19,8 @@ namespace Tls {
 // validation.
 class PlatformBridgeCertValidator : public CertValidator, Logger::Loggable<Logger::Id::connection> {
 public:
-  PlatformBridgeCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
-                              SslStats& stats);
+  static absl::StatusOr<std::unique_ptr<PlatformBridgeCertValidator>>
+  create(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats);
 
   ~PlatformBridgeCertValidator() override;
 
@@ -53,15 +53,15 @@ public:
                     absl::string_view hostname) override;
   // Returns SSL_VERIFY_PEER so that doVerifyCertChain() will be called from the TLS stack.
   absl::StatusOr<int> initializeSslContexts(std::vector<SSL_CTX*> /*contexts*/,
-                                            bool /*handshaker_provides_certificates*/) override {
+                                            bool /*handshaker_provides_certificates*/,
+                                            Stats::Scope& /*scope*/) override {
     return SSL_VERIFY_PEER;
   }
 
-private:
-  GTEST_FRIEND_CLASS(PlatformBridgeCertValidatorTest, ThreadCreationFailed);
-
+protected:
   PlatformBridgeCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
-                              SslStats& stats, Thread::PosixThreadFactoryPtr thread_factory);
+                              SslStats& stats, Thread::PosixThreadFactoryPtr thread_factory,
+                              absl::Status& creation_status);
 
   enum class ValidationFailureType {
     Success,
@@ -73,17 +73,24 @@ private:
   // Once the validation is done, the result will be posted back to the current
   // thread to trigger callback and update verify stats.
   // Must be called on the validation thread.
-  static void verifyCertChainByPlatform(Event::Dispatcher* dispatcher,
-                                        std::vector<std::string> cert_chain, std::string hostname,
-                                        std::vector<std::string> subject_alt_names,
-                                        PlatformBridgeCertValidator* parent);
+  //
+  // `protected` for testing purposes.
+  virtual void verifyCertChainByPlatform(Event::Dispatcher* dispatcher,
+                                         std::vector<std::string> cert_chain, std::string hostname,
+                                         std::vector<std::string> subject_alt_names);
 
   // Must be called on the validation thread.
+  // `protected` for testing purposes.
   static void postVerifyResultAndCleanUp(bool success, std::string hostname,
                                          absl::string_view error_details, uint8_t tls_alert,
                                          ValidationFailureType failure_type,
                                          Event::Dispatcher* dispatcher,
                                          PlatformBridgeCertValidator* parent);
+
+  Thread::PosixThreadFactoryPtr& threadFactory() { return thread_factory_; }
+
+private:
+  GTEST_FRIEND_CLASS(PlatformBridgeCertValidatorTest, ThreadCreationFailed);
 
   // Called when a pending verification completes. Must be invoked on the main thread.
   void onVerificationComplete(const Thread::ThreadId& thread_id, const std::string& hostname,
@@ -100,6 +107,7 @@ private:
   absl::flat_hash_map<Thread::ThreadId, ValidationJob> validation_jobs_;
   std::shared_ptr<size_t> alive_indicator_{new size_t(1)};
   Thread::PosixThreadFactoryPtr thread_factory_;
+  absl::optional<int> thread_priority_;
 };
 
 } // namespace Tls

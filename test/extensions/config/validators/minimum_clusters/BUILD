@@ -15,6 +15,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.config.validators.minimum_clusters_validator"],
+    rbe_pool = "6gig",
     deps = [
         "//envoy/registry",
         "//source/common/protobuf:message_validator_lib",
@@ -27,6 +28,7 @@ envoy_extension_cc_test(
     name = "minimum_clusters_validator_test",
     srcs = ["minimum_clusters_validator_test.cc"],
     extension_names = ["envoy.config.validators.minimum_clusters_validator"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/config:decoded_resource_lib",
         "//source/extensions/config/validators/minimum_clusters:minimum_clusters_validator",
@@ -40,6 +42,7 @@ envoy_extension_cc_test(
     size = "large",
     srcs = ["minimum_clusters_validator_integration_test.cc"],
     extension_names = ["envoy.config.validators.minimum_clusters_validator"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf:utility_lib",

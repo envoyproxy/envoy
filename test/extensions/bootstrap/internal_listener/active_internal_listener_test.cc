@@ -330,9 +330,7 @@ public:
     Network::ConnectionBalancer& connectionBalancer(const Network::Address::Instance&) override {
       return *connection_balancer_;
     }
-    const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
-      return access_logs_;
-    }
+    const AccessLog::InstanceSharedPtrVector& accessLogs() const override { return access_logs_; }
     ResourceLimit& openConnections() override { return open_connections_; }
     uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
     uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
@@ -359,7 +357,7 @@ public:
     std::unique_ptr<InternalListenerConfigImpl> internal_listener_config_;
     Network::ConnectionBalancerSharedPtr connection_balancer_;
     BasicResourceLimitImpl open_connections_;
-    const std::vector<AccessLog::InstanceSharedPtr> access_logs_;
+    const AccessLog::InstanceSharedPtrVector access_logs_;
     std::shared_ptr<NiceMock<Network::MockFilterChainManager>> inline_filter_chain_manager_;
     std::unique_ptr<Init::Manager> init_manager_;
     const bool ignore_global_conn_limit_;

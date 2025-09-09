@@ -71,11 +71,13 @@ const static bool should_log = true;
   FUNCTION(kafka)                                                                                  \
   FUNCTION(key_value_store)                                                                        \
   FUNCTION(lua)                                                                                    \
+  FUNCTION(local_rate_limit)                                                                       \
   FUNCTION(main)                                                                                   \
   FUNCTION(matcher)                                                                                \
   FUNCTION(misc)                                                                                   \
   FUNCTION(mongo)                                                                                  \
   FUNCTION(multi_connection)                                                                       \
+  FUNCTION(notification)                                                                           \
   FUNCTION(oauth2)                                                                                 \
   FUNCTION(quic)                                                                                   \
   FUNCTION(quic_stream)                                                                            \
@@ -97,7 +99,8 @@ const static bool should_log = true;
   FUNCTION(wasm)                                                                                   \
   FUNCTION(websocket)                                                                              \
   FUNCTION(golang)                                                                                 \
-  FUNCTION(stats_sinks)
+  FUNCTION(stats_sinks)                                                                            \
+  FUNCTION(dynamic_modules)
 
 // clang-format off
 enum class Id {

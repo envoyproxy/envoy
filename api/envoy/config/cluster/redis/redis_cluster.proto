@@ -43,14 +43,14 @@ option (udpa.annotations.file_status).package_version_status = FROZEN;
 //       address: foo.bar.com
 //       port_value: 22120
 //     cluster_type:
-//     name: envoy.clusters.redis
-//     typed_config:
-//       "@type": type.googleapis.com/google.protobuf.Struct
-//       value:
-//         cluster_refresh_rate: 30s
-//         cluster_refresh_timeout: 0.5s
-//         redirect_refresh_interval: 10s
-//         redirect_refresh_threshold: 10
+//       name: envoy.clusters.redis
+//       typed_config:
+//         "@type": type.googleapis.com/google.protobuf.Struct
+//         value:
+//           cluster_refresh_rate: 30s
+//           cluster_refresh_timeout: 0.5s
+//           redirect_refresh_interval: 10s
+//           redirect_refresh_threshold: 10
 // [#extension: envoy.clusters.redis]
 
 // [#next-free-field: 7]

@@ -5,7 +5,7 @@ import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPFilterFactory;
 import io.envoyproxy.envoymobile.engine.types.EnvoyKeyValueStore;
 import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
-import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType;
+import io.envoyproxy.envoymobile.engine.types.EnvoyConnectionType;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStatus;
@@ -14,10 +14,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /* Concrete implementation of the `EnvoyEngine` interface. */
 public class EnvoyEngineImpl implements EnvoyEngine {
-  private static final int ENVOY_NET_GENERIC = 0;
-  private static final int ENVOY_NET_WWAN = 1;
-  private static final int ENVOY_NET_WLAN = 2;
-
   private final long engineHandle;
   private final AtomicBoolean terminated = new AtomicBoolean(false);
 
@@ -27,9 +23,10 @@ public class EnvoyEngineImpl implements EnvoyEngine {
    * @param eventTracker    The event tracking interface.
    */
   public EnvoyEngineImpl(EnvoyOnEngineRunning runningCallback, EnvoyLogger logger,
-                         EnvoyEventTracker eventTracker) {
+                         EnvoyEventTracker eventTracker, Boolean disableDnsRefreshOnNetworkChange) {
     JniLibrary.load();
-    this.engineHandle = JniLibrary.initEngine(runningCallback, logger, eventTracker);
+    this.engineHandle = JniLibrary.initEngine(runningCallback, logger, eventTracker,
+                                              disableDnsRefreshOnNetworkChange.booleanValue());
   }
 
   /**
@@ -141,9 +138,36 @@ public class EnvoyEngineImpl implements EnvoyEngine {
   }
 
   @Override
-  public void onDefaultNetworkChanged(EnvoyNetworkType network) {
+  public void onDefaultNetworkChanged(int network) {
     checkIsTerminated();
-    JniLibrary.onDefaultNetworkChanged(engineHandle, network.getValue());
+    JniLibrary.onDefaultNetworkChanged(engineHandle, network);
+  }
+
+  @Override
+  public void onDefaultNetworkChangeEvent(int network) {
+    checkIsTerminated();
+    JniLibrary.onDefaultNetworkChangeEvent(engineHandle, network);
+  }
+
+  @Override
+  public void onDefaultNetworkChangedV2(EnvoyConnectionType network_type, long net_id) {
+    checkIsTerminated();
+    JniLibrary.onDefaultNetworkChangedV2(engineHandle, network_type.getValue(), net_id);
+  }
+
+  @Override
+  public void onNetworkDisconnect(long net_id) {
+    JniLibrary.onNetworkDisconnect(engineHandle, net_id);
+  }
+
+  @Override
+  public void onNetworkConnect(EnvoyConnectionType network_type, long net_id) {
+    JniLibrary.onNetworkConnect(engineHandle, network_type.getValue(), net_id);
+  }
+
+  @Override
+  public void purgeActiveNetworkList(long[] activeNetIds) {
+    JniLibrary.purgeActiveNetworkList(engineHandle, activeNetIds);
   }
 
   @Override

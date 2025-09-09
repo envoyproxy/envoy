@@ -18,9 +18,7 @@ envoy_cc_library(
     hdrs = [
         "grpc_tsi.h",
     ],
-    external_deps = [
-        "grpc",
-    ],
+    external_deps = ["grpc"],
     visibility = ["//visibility:private"],
     deps = [
         "//source/common/common:c_smart_ptr_lib",
@@ -35,9 +33,6 @@ envoy_cc_extension(
     hdrs = [
         "config.h",
     ],
-    external_deps = [
-        "abseil_node_hash_set",
-    ],
     deps = [
         ":alts_channel_pool",
         ":tsi_handshaker",
@@ -45,6 +40,7 @@ envoy_cc_extension(
         "//envoy/registry",
         "//envoy/server:transport_socket_config_interface",
         "//source/common/grpc:google_grpc_context_lib",
+        "@com_google_absl//absl/container:node_hash_set",
         "@envoy_api//envoy/extensions/transport_sockets/alts/v3:pkg_cc_proto",
     ],
 )
@@ -117,9 +113,7 @@ envoy_cc_library(
     name = "alts_channel_pool",
     srcs = ["alts_channel_pool.cc"],
     hdrs = ["alts_channel_pool.h"],
-    external_deps = [
-        "grpc",
-    ],
+    external_deps = ["grpc"],
     deps = [
         "@com_google_absl//absl/random",
     ],
@@ -134,14 +128,12 @@ envoy_cc_library(
     name = "alts_proxy",
     srcs = ["alts_proxy.cc"],
     hdrs = ["alts_proxy.h"],
-    external_deps = [
-        "abseil_memory",
-        "abseil_status",
-        "abseil_statusor",
-        "grpc",
-    ],
+    external_deps = ["grpc"],
     deps = [
         ":handshaker_cc_grpc",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
     ],
 )
 
@@ -149,14 +141,12 @@ envoy_cc_library(
     name = "alts_tsi_handshaker",
     srcs = ["alts_tsi_handshaker.cc"],
     hdrs = ["alts_tsi_handshaker.h"],
-    external_deps = [
-        "abseil_memory",
-        "abseil_status",
-        "grpc",
-    ],
+    external_deps = ["grpc"],
     deps = [
         ":alts_proxy",
         ":handshaker_cc_grpc",
         ":tsi_frame_protector",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
     ],
 )

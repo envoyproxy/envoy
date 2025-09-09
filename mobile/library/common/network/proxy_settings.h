@@ -6,6 +6,7 @@
 
 #include "source/common/network/utility.h"
 
+#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -36,7 +37,7 @@ public:
    *             (i.e., Android) allow users to specify proxy using either one of these.
    * @param port The proxy port.
    */
-  ProxySettings(const std::string& host, const uint16_t port);
+  ProxySettings(absl::string_view host, const uint16_t port);
 
   /**
    * Parses given host and domain and creates proxy settings. Returns nullptr for an empty host
@@ -49,7 +50,7 @@ public:
    * @return The created proxy settings, nullptr if the passed host is an empty string and
    *         port is equal to 0.
    */
-  static ProxySettingsConstSharedPtr parseHostAndPort(const std::string& host, const uint16_t port);
+  static ProxySettingsConstSharedPtr parseHostAndPort(absl::string_view host, const uint16_t port);
 
   /**
    * Creates a ProxySettings instance to represent a direct connection (i.e. no proxy at all).
@@ -121,9 +122,9 @@ public:
   bool operator!=(ProxySettings const& rhs) const;
 
 private:
-  Envoy::Network::Address::InstanceConstSharedPtr address_;
   std::string hostname_;
   uint16_t port_;
+  Envoy::Network::Address::InstanceConstSharedPtr address_;
 };
 
 /**

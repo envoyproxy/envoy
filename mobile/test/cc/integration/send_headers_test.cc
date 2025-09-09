@@ -23,7 +23,7 @@ TEST(SendHeadersTest, Success) {
   auto* headers3 = http_request_headers_match->add_headers();
   headers3->set_name(":path");
   headers3->set_exact_match("/");
-  ProtobufWkt::Any typed_config;
+  Protobuf::Any typed_config;
   typed_config.set_type_url(
       "type.googleapis.com/envoymobile.extensions.filters.http.assertion.Assertion");
   std::string serialized_assertion;

@@ -1,4 +1,4 @@
-package main
+package passthrough
 
 import (
 	"github.com/envoyproxy/envoy/contrib/golang/filters/http/source/go/pkg/http"
@@ -6,7 +6,4 @@ import (
 
 func init() {
 	http.RegisterHttpFilterFactoryAndConfigParser("passthrough", http.PassThroughFactory, http.NullParser)
-}
-
-func main() {
 }

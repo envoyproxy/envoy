@@ -224,6 +224,10 @@ public:
         lookupPort("http"), "GET", "/cluster_0", "", downstream_protocol_, version_, "foo.com");
     ASSERT_TRUE(response->complete());
     EXPECT_EQ(status, response->headers().getStatusValue());
+    if (numerator == 100) {
+      EXPECT_THAT(response->headers(),
+                  ContainsHeader("x-envoy-unconditional-drop-overload", "true"));
+    }
     cleanupUpstreamAndDownstream();
   }
 

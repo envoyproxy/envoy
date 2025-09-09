@@ -27,6 +27,7 @@ envoy_cc_library(
         {
             "//bazel:windows_x86_64": [],
             "//conditions:default": [
+                "@com_google_cel_cpp//eval/public:value_export_util",
                 "@com_google_cel_cpp//parser",
             ],
         },
@@ -43,6 +44,10 @@ envoy_cc_extension(
             "-DUSE_CEL_PARSER",
         ],
     }),
+    # Ensure this could be used in tests.
+    extra_visibility = [
+        "//test:__subpackages__",
+    ],
     deps = [
         "//envoy/registry",
         "//source/extensions/formatter/cel:cel_lib",

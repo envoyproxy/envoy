@@ -1,4 +1,3 @@
-#include "ext_authz.h"
 #include "source/extensions/filters/http/ext_authz/ext_authz.h"
 
 #include <chrono>
@@ -20,6 +19,9 @@ namespace HttpFilters {
 namespace ExtAuthz {
 
 namespace {
+
+// Default timeout for per-route gRPC client creation.
+constexpr uint32_t kDefaultPerRouteTimeoutMs = 200;
 
 using MetadataProto = ::envoy::config::core::v3::Metadata;
 using Filters::Common::MutationRules::CheckOperation;
@@ -90,6 +92,7 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::ext_authz::v3
       runtime_(factory_context.runtime()), http_context_(factory_context.httpContext()),
       filter_metadata_(config.has_filter_metadata() ? absl::optional(config.filter_metadata())
                                                     : absl::nullopt),
+      emit_filter_state_stats_(config.emit_filter_state_stats()),
       filter_enabled_(config.has_filter_enabled()
                           ? absl::optional<Runtime::FractionalPercent>(
                                 Runtime::FractionalPercent(config.filter_enabled(), runtime_))
@@ -171,25 +174,169 @@ void FilterConfigPerRoute::merge(const FilterConfigPerRoute& other) {
   }
 }
 
+// Constructor used for merging configurations from different levels (vhost, route, etc.)
+FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_specific,
+                                           const FilterConfigPerRoute& more_specific)
+    : context_extensions_(less_specific.context_extensions_),
+      check_settings_(more_specific.check_settings_), disabled_(more_specific.disabled_),
+      // Only use the most specific per-route override. Do not inherit overrides from less
+      // specific configuration. If the more specific configuration has no override, leave both
+      // unset so that the main filter configuration is used.
+      grpc_service_(more_specific.grpc_service_.has_value() ? more_specific.grpc_service_
+                                                            : absl::nullopt),
+      http_service_(more_specific.http_service_.has_value() ? more_specific.http_service_
+                                                            : absl::nullopt) {
+  // Merge context extensions from more specific configuration, overriding less specific ones.
+  for (const auto& extension : more_specific.context_extensions_) {
+    context_extensions_[extension.first] = extension.second;
+  }
+}
+
+Filters::Common::ExtAuthz::ClientPtr
+Filter::createPerRouteGrpcClient(const envoy::config::core::v3::GrpcService& grpc_service) {
+  if (server_context_ == nullptr) {
+    ENVOY_STREAM_LOG(
+        debug, "ext_authz filter: server context not available for per-route gRPC client creation.",
+        *decoder_callbacks_);
+    return nullptr;
+  }
+
+  // Use the timeout from the gRPC service configuration, use default if not specified.
+  const uint32_t timeout_ms =
+      PROTOBUF_GET_MS_OR_DEFAULT(grpc_service, timeout, kDefaultPerRouteTimeoutMs);
+
+  // We can skip transport version check for per-route gRPC service here.
+  // The transport version is already validated at the main configuration level.
+  Envoy::Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
+      Envoy::Grpc::GrpcServiceConfigWithHashKey(grpc_service);
+
+  auto client_or_error = server_context_->clusterManager()
+                             .grpcAsyncClientManager()
+                             .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key,
+                                                                   server_context_->scope(), true);
+  if (!client_or_error.ok()) {
+    ENVOY_STREAM_LOG(warn,
+                     "ext_authz filter: failed to create per-route gRPC client: {}. Falling back "
+                     "to default client.",
+                     *decoder_callbacks_, client_or_error.status().ToString());
+    return nullptr;
+  }
+
+  ENVOY_STREAM_LOG(debug, "ext_authz filter: created per-route gRPC client for cluster: {}.",
+                   *decoder_callbacks_,
+                   grpc_service.has_envoy_grpc() ? grpc_service.envoy_grpc().cluster_name()
+                                                 : "google_grpc");
+
+  return std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
+      client_or_error.value(), std::chrono::milliseconds(timeout_ms));
+}
+
+Filters::Common::ExtAuthz::ClientPtr Filter::createPerRouteHttpClient(
+    const envoy::extensions::filters::http::ext_authz::v3::HttpService& http_service) {
+  if (server_context_ == nullptr) {
+    ENVOY_STREAM_LOG(
+        debug, "ext_authz filter: server context not available for per-route HTTP client creation.",
+        *decoder_callbacks_);
+    return nullptr;
+  }
+
+  // Use the timeout from the HTTP service configuration, use default if not specified.
+  const uint32_t timeout_ms =
+      PROTOBUF_GET_MS_OR_DEFAULT(http_service.server_uri(), timeout, kDefaultPerRouteTimeoutMs);
+
+  ENVOY_STREAM_LOG(debug, "ext_authz filter: creating per-route HTTP client for URI: {}.",
+                   *decoder_callbacks_, http_service.server_uri().uri());
+
+  const auto client_config = std::make_shared<Extensions::Filters::Common::ExtAuthz::ClientConfig>(
+      http_service, config_->headersAsBytes(), timeout_ms, *server_context_);
+
+  return std::make_unique<Extensions::Filters::Common::ExtAuthz::RawHttpClientImpl>(
+      server_context_->clusterManager(), client_config);
+}
+
 void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
   if (filter_return_ == FilterReturn::StopDecoding) {
     return;
   }
 
+  // Now that we'll definitely be making the request, add filter state stats if configured to do so.
+  const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
+      decoder_callbacks_->streamInfo().filterState();
+  if ((config_->emitFilterStateStats() || config_->filterMetadata().has_value())) {
+    if (!filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
+      filter_state->setData(decoder_callbacks_->filterConfigName(),
+                            std::make_shared<ExtAuthzLoggingInfo>(config_->filterMetadata()),
+                            Envoy::StreamInfo::FilterState::StateType::Mutable,
+                            Envoy::StreamInfo::FilterState::LifeSpan::Request);
+
+      // This may return nullptr (if there's a value at this name whose type doesn't match or isn't
+      // mutable, for example), so we must check logging_info_ is not nullptr later.
+      logging_info_ =
+          filter_state->getDataMutable<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName());
+    }
+    if (logging_info_ == nullptr) {
+      stats_.filter_state_name_collision_.inc();
+      ENVOY_STREAM_LOG(debug,
+                       "Could not find logging info at {}! (Did another filter already put data "
+                       "at this name?)",
+                       *decoder_callbacks_, decoder_callbacks_->filterConfigName());
+    }
+  }
+
   absl::optional<FilterConfigPerRoute> maybe_merged_per_route_config;
-  for (const auto* cfg :
+  for (const FilterConfigPerRoute& cfg :
        Http::Utility::getAllPerFilterConfig<FilterConfigPerRoute>(decoder_callbacks_)) {
-    ASSERT(cfg != nullptr);
     if (maybe_merged_per_route_config.has_value()) {
-      maybe_merged_per_route_config.value().merge(*cfg);
+      FilterConfigPerRoute current_config = maybe_merged_per_route_config.value();
+      maybe_merged_per_route_config.emplace(current_config, cfg);
     } else {
-      maybe_merged_per_route_config = *cfg;
+      maybe_merged_per_route_config.emplace(cfg);
     }
   }
 
   Protobuf::Map<std::string, std::string> context_extensions;
   if (maybe_merged_per_route_config) {
     context_extensions = maybe_merged_per_route_config.value().takeContextExtensions();
+  }
+
+  // Check if we need to use a per-route service override (gRPC or HTTP).
+  Filters::Common::ExtAuthz::Client* client_to_use = client_.get();
+  if (maybe_merged_per_route_config) {
+    if (maybe_merged_per_route_config->grpcService().has_value()) {
+      const auto& grpc_service = maybe_merged_per_route_config->grpcService().value();
+      ENVOY_STREAM_LOG(debug, "ext_authz filter: using per-route gRPC service configuration.",
+                       *decoder_callbacks_);
+
+      // Create a new gRPC client for this route.
+      per_route_client_ = createPerRouteGrpcClient(grpc_service);
+      if (per_route_client_ != nullptr) {
+        client_to_use = per_route_client_.get();
+        ENVOY_STREAM_LOG(debug, "ext_authz filter: successfully created per-route gRPC client.",
+                         *decoder_callbacks_);
+      } else {
+        ENVOY_STREAM_LOG(
+            warn,
+            "ext_authz filter: failed to create per-route gRPC client, falling back to default.",
+            *decoder_callbacks_);
+      }
+    } else if (maybe_merged_per_route_config->httpService().has_value()) {
+      const auto& http_service = maybe_merged_per_route_config->httpService().value();
+      ENVOY_STREAM_LOG(debug, "ext_authz filter: using per-route HTTP service configuration.",
+                       *decoder_callbacks_);
+
+      // Create a new HTTP client for this route.
+      per_route_client_ = createPerRouteHttpClient(http_service);
+      if (per_route_client_ != nullptr) {
+        client_to_use = per_route_client_.get();
+        ENVOY_STREAM_LOG(debug, "ext_authz filter: successfully created per-route HTTP client.",
+                         *decoder_callbacks_);
+      } else {
+        ENVOY_STREAM_LOG(
+            warn,
+            "ext_authz filter: failed to create per-route HTTP client, falling back to default.",
+            *decoder_callbacks_);
+      }
+    }
   }
 
   // If metadata_context_namespaces or typed_metadata_context_namespaces is specified,
@@ -217,7 +364,7 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
       config_->destinationLabels(), config_->allowedHeadersMatcher(),
       config_->disallowedHeadersMatcher());
 
-  ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server", *decoder_callbacks_);
+  ENVOY_STREAM_LOG(trace, "ext_authz filter calling authorization server.", *decoder_callbacks_);
   // Store start time of ext_authz filter call
   start_time_ = decoder_callbacks_->dispatcher().timeSource().monotonicTime();
 
@@ -226,8 +373,8 @@ void Filter::initiateCall(const Http::RequestHeaderMap& headers) {
                                                // going to invoke check call.
   cluster_ = decoder_callbacks_->clusterInfo();
   initiating_call_ = true;
-  client_->check(*this, check_request_, decoder_callbacks_->activeSpan(),
-                 decoder_callbacks_->streamInfo());
+  client_to_use->check(*this, check_request_, decoder_callbacks_->activeSpan(),
+                       decoder_callbacks_->streamInfo());
   initiating_call_ = false;
 }
 
@@ -384,14 +531,44 @@ Http::FilterMetadataStatus Filter::encodeMetadata(Http::MetadataMap&) {
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   decoder_callbacks_ = &callbacks;
-  const Envoy::StreamInfo::FilterStateSharedPtr& filter_state =
-      decoder_callbacks_->streamInfo().filterState();
-  if (config_->filterMetadata().has_value() &&
-      !filter_state->hasData<ExtAuthzLoggingInfo>(decoder_callbacks_->filterConfigName())) {
-    filter_state->setData(decoder_callbacks_->filterConfigName(),
-                          std::make_shared<ExtAuthzLoggingInfo>(*config_->filterMetadata()),
-                          Envoy::StreamInfo::FilterState::StateType::ReadOnly,
-                          Envoy::StreamInfo::FilterState::LifeSpan::Request);
+}
+
+void Filter::updateLoggingInfo(const absl::optional<Grpc::Status::GrpcStatus>& grpc_status) {
+  if (!config_->emitFilterStateStats()) {
+    return;
+  }
+
+  if (logging_info_ == nullptr) {
+    return;
+  }
+
+  if (grpc_status.has_value()) {
+    logging_info_->setGrpcStatus(grpc_status.value());
+  }
+
+  // Latency is the only stat available if we aren't using envoy grpc.
+  if (start_time_.has_value()) {
+    logging_info_->setLatency(std::chrono::duration_cast<std::chrono::microseconds>(
+        decoder_callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value()));
+  }
+
+  auto const* stream_info = client_->streamInfo();
+  if (stream_info == nullptr) {
+    return;
+  }
+
+  const auto& bytes_meter = stream_info->getUpstreamBytesMeter();
+  if (bytes_meter != nullptr) {
+    logging_info_->setBytesSent(bytes_meter->wireBytesSent());
+    logging_info_->setBytesReceived(bytes_meter->wireBytesReceived());
+  }
+  if (stream_info->upstreamInfo().has_value()) {
+    logging_info_->setUpstreamHost(stream_info->upstreamInfo()->upstreamHost());
+  }
+  absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info =
+      stream_info->upstreamClusterInfo();
+  if (cluster_info) {
+    logging_info_->setClusterInfo(std::move(*cluster_info));
   }
 }
 
@@ -422,6 +599,19 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
   using Filters::Common::ExtAuthz::CheckStatus;
   Stats::StatName empty_stat_name;
 
+  updateLoggingInfo(response->grpc_status);
+
+  if (response->saw_invalid_append_actions) {
+    if (config_->validateMutations()) {
+      ENVOY_STREAM_LOG(trace, "Rejecting response with invalid header append action.",
+                       *decoder_callbacks_);
+      rejectResponse();
+      return;
+    }
+    ENVOY_STREAM_LOG(trace, "Ignoring response headers with invalid header append action.",
+                     *decoder_callbacks_);
+  }
+
   if (!response->dynamic_metadata.fields().empty()) {
     if (!config_->enableDynamicMetadataIngestion()) {
       ENVOY_STREAM_LOG(trace,
@@ -432,7 +622,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
     } else {
       // Add duration of call to dynamic metadata if applicable
       if (start_time_.has_value() && response->status == CheckStatus::OK) {
-        ProtobufWkt::Value ext_authz_duration_value;
+        Protobuf::Value ext_authz_duration_value;
         auto duration =
             decoder_callbacks_->dispatcher().timeSource().monotonicTime() - start_time_.value();
         ext_authz_duration_value.set_number_value(

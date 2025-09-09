@@ -7,23 +7,37 @@ load("@com_github_chrusty_protoc_gen_jsonschema//:deps.bzl", protoc_gen_jsonsche
 load("@com_google_cel_cpp//bazel:deps.bzl", "parser_deps")
 load("@dev_pip3//:requirements.bzl", pip_dev_dependencies = "install_deps")
 load("@emsdk//:emscripten_deps.bzl", "emscripten_deps")
+load("@emsdk//:toolchains.bzl", "register_emscripten_toolchains")
+load("@envoy_toolshed//compile:sanitizer_libs.bzl", "setup_sanitizer_libs")
+load("@envoy_toolshed//coverage/grcov:grcov_repository.bzl", "grcov_repository")
 load("@fuzzing_pip3//:requirements.bzl", pip_fuzzing_dependencies = "install_deps")
 load("@io_bazel_rules_go//go:deps.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
+load("@rules_buf//buf:repositories.bzl", "rules_buf_toolchains")
 load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_toolchains")
+load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
+load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencies")
 load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
 
 # go version for rules_go
-GO_VERSION = "1.22.5"
+GO_VERSION = "1.24.6"
 
 JQ_VERSION = "1.7"
 YQ_VERSION = "4.24.4"
 
-def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, yq_version = YQ_VERSION):
+BUF_SHA = "5790beb45aaf51a6d7e68ca2255b22e1b14c9ae405a6c472cdcfc228c66abfc1"
+BUF_VERSION = "v1.56.0"
+
+def envoy_dependency_imports(
+        go_version = GO_VERSION,
+        jq_version = JQ_VERSION,
+        yq_version = YQ_VERSION,
+        buf_sha = BUF_SHA,
+        buf_version = BUF_VERSION):
     rules_foreign_cc_dependencies()
     go_rules_dependencies()
     go_register_toolchains(go_version)
@@ -35,6 +49,9 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
     pip_dev_dependencies()
     pip_fuzzing_dependencies()
     rules_pkg_dependencies()
+    emscripten_deps(emscripten_version = "4.0.6")
+    register_emscripten_toolchains()
+
     rust_repository_set(
         name = "rust_linux_s390x",
         exec_triple = "s390x-unknown-linux-gnu",
@@ -51,16 +68,25 @@ def envoy_dependency_imports(go_version = GO_VERSION, jq_version = JQ_VERSION, y
             "wasm32-wasi",
         ],
     )
+    crate_universe_dependencies()
+    crates_repositories()
+    grcov_repository()
     shellcheck_dependencies()
     proxy_wasm_rust_sdk_dependencies()
     rules_fuzzing_dependencies(
         oss_fuzz = True,
         honggfuzz = False,
     )
-    emscripten_deps(emscripten_version = "3.1.7")
     register_jq_toolchains(version = jq_version)
     register_yq_toolchains(version = yq_version)
     parser_deps()
+
+    rules_buf_toolchains(
+        sha256 = buf_sha,
+        version = buf_version,
+    )
+
+    setup_sanitizer_libs()
 
     # These dependencies, like most of the Go in this repository, exist only for the API.
     # These repos also have transient dependencies - `build_external` allows them to use them.
@@ -195,4 +221,12 @@ def envoy_download_go_sdks(go_version):
         goos = "darwin",
         goarch = "arm64",
         version = go_version,
+    )
+
+def crates_repositories():
+    crates_repository(
+        name = "dynamic_modules_rust_sdk_crate_index",
+        cargo_lockfile = "@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.lock",
+        lockfile = Label("@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.Bazel.lock"),
+        manifests = ["@envoy//source/extensions/dynamic_modules/sdk/rust:Cargo.toml"],
     )

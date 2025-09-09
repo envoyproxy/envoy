@@ -32,9 +32,10 @@ absl::string_view NotReadySslSocket::failureReason() const { return NotReadyReas
 absl::StatusOr<std::unique_ptr<SslSocket>>
 SslSocket::create(Envoy::Ssl::ContextSharedPtr ctx, InitialState state,
                   const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                  Ssl::HandshakerFactoryCb handshaker_factory_cb) {
+                  Ssl::HandshakerFactoryCb handshaker_factory_cb,
+                  Upstream::HostDescriptionConstSharedPtr host) {
   std::unique_ptr<SslSocket> socket(new SslSocket(ctx, transport_socket_options));
-  auto status = socket->initialize(state, handshaker_factory_cb);
+  auto status = socket->initialize(state, handshaker_factory_cb, host);
   if (status.ok()) {
     return socket;
   } else {
@@ -48,8 +49,9 @@ SslSocket::SslSocket(Envoy::Ssl::ContextSharedPtr ctx,
       ctx_(std::dynamic_pointer_cast<ContextImpl>(ctx)) {}
 
 absl::Status SslSocket::initialize(InitialState state,
-                                   Ssl::HandshakerFactoryCb handshaker_factory_cb) {
-  auto status_or_ssl = ctx_->newSsl(transport_socket_options_);
+                                   Ssl::HandshakerFactoryCb handshaker_factory_cb,
+                                   Upstream::HostDescriptionConstSharedPtr host) {
+  auto status_or_ssl = ctx_->newSsl(transport_socket_options_, host);
   if (!status_or_ssl.ok()) {
     return status_or_ssl.status();
   }

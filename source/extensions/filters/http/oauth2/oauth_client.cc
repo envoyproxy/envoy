@@ -25,10 +25,11 @@ namespace Oauth2 {
 
 namespace {
 constexpr const char* UrlBodyTemplateWithCredentialsForAuthCode =
-    "grant_type=authorization_code&code={0}&client_id={1}&client_secret={2}&redirect_uri={3}";
+    "grant_type=authorization_code&code={0}&client_id={1}&client_secret={2}&redirect_uri={3}&code_"
+    "verifier={4}";
 
 constexpr const char* UrlBodyTemplateWithoutCredentialsForAuthCode =
-    "grant_type=authorization_code&code={0}&redirect_uri={1}";
+    "grant_type=authorization_code&code={0}&redirect_uri={1}&code_verifier={2}";
 
 constexpr const char* UrlBodyTemplateWithCredentialsForRefreshToken =
     "grant_type=refresh_token&refresh_token={0}&client_id={1}&client_secret={2}";
@@ -40,7 +41,8 @@ constexpr const char* UrlBodyTemplateWithoutCredentialsForRefreshToken =
 
 void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
                                            const std::string& client_id, const std::string& secret,
-                                           const std::string& cb_url, AuthType auth_type) {
+                                           const std::string& cb_url,
+                                           const std::string& code_verifier, AuthType auth_type) {
   ASSERT(state_ == OAuthState::Idle);
   state_ = OAuthState::PendingAccessToken;
 
@@ -52,7 +54,8 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
   case AuthType::UrlEncodedBody:
     body = fmt::format(UrlBodyTemplateWithCredentialsForAuthCode, auth_code,
                        Http::Utility::PercentEncoding::encode(client_id, ":/=&?"),
-                       Http::Utility::PercentEncoding::encode(secret, ":/=&?"), encoded_cb_url);
+                       Http::Utility::PercentEncoding::encode(secret, ":/=&?"), encoded_cb_url,
+                       code_verifier);
     break;
   case AuthType::BasicAuth:
     const auto basic_auth_token = absl::StrCat(client_id, ":", secret);
@@ -60,7 +63,8 @@ void OAuth2ClientImpl::asyncGetAccessToken(const std::string& auth_code,
     const auto basic_auth_header_value = absl::StrCat("Basic ", encoded_token);
     request->headers().appendCopy(Http::CustomHeaders::get().Authorization,
                                   basic_auth_header_value);
-    body = fmt::format(UrlBodyTemplateWithoutCredentialsForAuthCode, auth_code, encoded_cb_url);
+    body = fmt::format(UrlBodyTemplateWithoutCredentialsForAuthCode, auth_code, encoded_cb_url,
+                       code_verifier);
     break;
   }
 
@@ -117,7 +121,7 @@ void OAuth2ClientImpl::dispatchRequest(Http::RequestMessagePtr&& msg) {
     in_flight_request_ =
         thread_local_cluster->httpAsyncClient().send(std::move(msg), *this, options);
   } else {
-    parent_->sendUnauthorizedResponse();
+    parent_->sendUnauthorizedResponse("Token endpoint cluster not found");
   }
 }
 
@@ -138,7 +142,9 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
     ENVOY_LOG(debug, "Oauth response body: {}", message->bodyAsString());
     switch (oldState) {
     case OAuthState::PendingAccessToken:
-      parent_->sendUnauthorizedResponse();
+      parent_->sendUnauthorizedResponse(
+          fmt::format("Failed to get access token, response code: {}, response body: {}",
+                      response_code, message->bodyAsString()));
       break;
     case OAuthState::PendingAccessTokenByRefreshToken:
       parent_->onRefreshAccessTokenFailure();
@@ -156,17 +162,16 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
     MessageUtil::loadFromJson(response_body, response, ProtobufMessage::getNullValidationVisitor());
   }
   END_TRY catch (EnvoyException& e) {
-    ENVOY_LOG(debug, "Error parsing response body, received exception: {}", e.what());
-    ENVOY_LOG(debug, "Response body: {}", response_body);
-    parent_->sendUnauthorizedResponse();
+    parent_->sendUnauthorizedResponse(fmt::format(
+        "Failed to parse oauth response body: {}, exception: {}", response_body, e.what()));
     return;
   }
 
   // TODO(snowp): Should this be a pgv validation instead? A more readable log
   // message might be good enough reason to do this manually?
   if (!response.has_access_token()) {
-    ENVOY_LOG(debug, "No access token after asyncGetAccessToken");
-    parent_->sendUnauthorizedResponse();
+    parent_->sendUnauthorizedResponse(
+        fmt::format("No access token found in the token exchange response: {}", response_body));
     return;
   }
 
@@ -179,8 +184,9 @@ void OAuth2ClientImpl::onSuccess(const Http::AsyncClient::Request&,
     expires_in = std::chrono::seconds{response.expires_in().value()};
   }
   if (expires_in <= 0s) {
-    ENVOY_LOG(debug, "No default or explicit access token expiration after asyncGetAccessToken");
-    parent_->sendUnauthorizedResponse();
+    parent_->sendUnauthorizedResponse(fmt::format(
+        "No default or explicit access token expiration found in the token exchange response: {}",
+        response_body));
     return;
   }
 
@@ -205,7 +211,7 @@ void OAuth2ClientImpl::onFailure(const Http::AsyncClient::Request&,
 
   switch (oldState) {
   case OAuthState::PendingAccessToken:
-    parent_->sendUnauthorizedResponse();
+    parent_->sendUnauthorizedResponse("Failed to get access token due to HTTP request failure");
     break;
   case OAuthState::PendingAccessTokenByRefreshToken:
     parent_->onRefreshAccessTokenFailure();

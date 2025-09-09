@@ -122,7 +122,7 @@ int QatHandle::getNodeAffinity() { return info_.nodeAffinity; }
 
 int QatHandle::isDone() { return done_; }
 
-QatSection::QatSection(LibQatCryptoSharedPtr libqat) : libqat_(libqat){};
+QatSection::QatSection(LibQatCryptoSharedPtr libqat) : libqat_(libqat) {};
 
 bool QatSection::startSection(Api::Api& api, std::chrono::milliseconds poll_delay) {
 

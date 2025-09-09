@@ -168,7 +168,7 @@ void EnvoyQuicClientSession::OnHttp3GoAway(uint64_t stream_id) {
 }
 
 void EnvoyQuicClientSession::onNetworkMadeDefault() {
-  if (!session_.HasActiveRequestStreams()) {
+  if (!HasActiveRequestStreams()) {
      CloseConnectionWithDetails(quic::QUIC_CONNECTION_MIGRATION_NO_MIGRATABLE_STREAMS,
                                         "net_error");
      return;
@@ -259,6 +259,11 @@ std::unique_ptr<quic::QuicCryptoClientStreamBase> EnvoyQuicClientSession::Create
 void EnvoyQuicClientSession::setHttp3Options(
     const envoy::config::core::v3::Http3ProtocolOptions& http3_options) {
   QuicFilterManagerConnectionImpl::setHttp3Options(http3_options);
+  if (http3_options_->disable_qpack()) {
+    DisableHuffmanEncoding();
+    DisableCookieCrumbling();
+    set_qpack_maximum_dynamic_table_capacity(0);
+  }
   if (!http3_options_->has_quic_protocol_options()) {
     return;
   }

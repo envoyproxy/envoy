@@ -3,6 +3,7 @@
 #include "envoy/common/conn_pool.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/connection.h"
+#include "envoy/server/overload/overload_manager.h"
 #include "envoy/stats/timespan.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -84,12 +85,6 @@ public:
     ASSERT(!supportsEarlyData());
     return state_ == State::Ready;
   }
-
-  // This function is called onStreamClosed to see if there was a negative delta
-  // and (if necessary) update associated bookkeeping.
-  // HTTP/1 and TCP pools can not have negative delta so the default implementation simply returns
-  // false. The HTTP/2 connection pool can have this state, so overrides this function.
-  virtual bool hadNegativeDeltaOnStreamClosed() { return false; }
 
   enum class State {
     Connecting,        // Connection is not yet established.
@@ -194,7 +189,8 @@ public:
                    Event::Dispatcher& dispatcher,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                   Upstream::ClusterConnectivityState& state);
+                   Upstream::ClusterConnectivityState& state,
+                   Server::OverloadManager& overload_manager);
   virtual ~ConnPoolImplBase();
 
   void deleteIsPendingImpl();
@@ -293,16 +289,19 @@ public:
   bool hasPendingStreams() const { return !pending_streams_.empty(); }
 
   void decrClusterStreamCapacity(uint32_t delta) {
-    state_.decrConnectingAndConnectedStreamCapacity(delta);
+    cluster_connectivity_state_.decrConnectingAndConnectedStreamCapacity(delta);
+    connecting_and_connected_stream_capacity_ -= delta;
   }
   void incrClusterStreamCapacity(uint32_t delta) {
-    state_.incrConnectingAndConnectedStreamCapacity(delta);
+    cluster_connectivity_state_.incrConnectingAndConnectedStreamCapacity(delta);
+    connecting_and_connected_stream_capacity_ += delta;
   }
   void dumpState(std::ostream& os, int indent_level = 0) const {
     const char* spaces = spacesForLevel(indent_level);
     os << spaces << "ConnPoolImplBase " << this << DUMP_MEMBER(ready_clients_.size())
        << DUMP_MEMBER(busy_clients_.size()) << DUMP_MEMBER(connecting_clients_.size())
-       << DUMP_MEMBER(connecting_stream_capacity_) << DUMP_MEMBER(num_active_streams_)
+       << DUMP_MEMBER(connecting_stream_capacity_)
+       << DUMP_MEMBER(connecting_and_connected_stream_capacity_) << DUMP_MEMBER(num_active_streams_)
        << DUMP_MEMBER(pending_streams_.size())
        << " per upstream preconnect ratio: " << perUpstreamPreconnectRatio();
   }
@@ -311,7 +310,9 @@ public:
     s.dumpState(os);
     return os;
   }
-  Upstream::ClusterConnectivityState& state() { return state_; }
+
+  // Helper for use as the 2nd argument to ASSERT.
+  std::string dumpState() const;
 
   void decrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client);
   void incrConnectingAndConnectedStreamCapacity(uint32_t delta, ActiveClient& client);
@@ -332,6 +333,7 @@ protected:
     ShouldNotConnect,
     NoConnectionRateLimited,
     CreatedButRateLimited,
+    LoadShed,
   };
   // Creates up to 3 connections, based on the preconnect ratio.
   // Returns the ConnectionResult of the last attempt.
@@ -356,13 +358,11 @@ protected:
   ConnectionPool::Cancellable*
   addPendingStream(Envoy::ConnectionPool::PendingStreamPtr&& pending_stream) {
     LinkedList::moveIntoList(std::move(pending_stream), pending_streams_);
-    state_.incrPendingStreams(1);
+    cluster_connectivity_state_.incrPendingStreams(1);
     return pending_streams_.front().get();
   }
 
   bool hasActiveStreams() const { return num_active_streams_ > 0; }
-
-  Upstream::ClusterConnectivityState& state_;
 
   const Upstream::HostConstSharedPtr host_;
   const Upstream::ResourcePriority priority_;
@@ -404,7 +404,15 @@ private:
   // Prerequisite: the given clients shouldn't be idle.
   void drainClients(std::list<ActiveClientPtr>& clients);
 
+  void assertCapacityCountsAreCorrect();
+
+  Upstream::ClusterConnectivityState& cluster_connectivity_state_;
+
   std::list<PendingStreamPtr> pending_streams_;
+
+  // The number of streams that can be immediately dispatched from the current
+  // `ready_clients_` plus `connecting_stream_capacity_`.
+  int64_t connecting_and_connected_stream_capacity_{0};
 
   // The number of streams currently attached to clients.
   uint32_t num_active_streams_{0};
@@ -418,6 +426,7 @@ private:
 
   Event::SchedulableCallbackPtr upstream_ready_cb_;
   Common::DebugRecursionChecker recursion_checker_;
+  Server::LoadShedPoint* create_new_connection_load_shed_{nullptr};
 };
 
 } // namespace ConnectionPool

@@ -107,7 +107,7 @@ size_t SharedConsumerManagerImpl::getConsumerCountForTest() const {
 
 // RecordDistributor
 
-RecordDistributor::RecordDistributor() : RecordDistributor({}, {}){};
+RecordDistributor::RecordDistributor() : RecordDistributor({}, {}) {};
 
 RecordDistributor::RecordDistributor(const PartitionMap<RecordCbSharedPtr>& callbacks,
                                      const PartitionMap<InboundRecordSharedPtr>& records)

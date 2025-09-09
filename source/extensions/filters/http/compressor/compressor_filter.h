@@ -121,6 +121,8 @@ public:
     const ResponseCompressorStats& responseStats() const { return response_stats_; }
     bool disableOnEtagHeader() const { return disable_on_etag_header_; }
     bool removeAcceptEncodingHeader() const { return remove_accept_encoding_header_; }
+    bool areAllResponseCodesCompressible() const;
+    bool isResponseCodeCompressible(uint32_t response_code) const;
 
   private:
     static ResponseCompressorStats generateResponseStats(const std::string& prefix,
@@ -135,6 +137,7 @@ public:
 
     const bool disable_on_etag_header_;
     const bool remove_accept_encoding_header_;
+    const absl::flat_hash_set<uint32_t> uncompressible_response_codes_;
     const ResponseCompressorStats response_stats_;
   };
 

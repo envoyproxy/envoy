@@ -12,16 +12,6 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-// Both EscapedUrnOldColon and EscapedUrnWithManyQueryParamsOldColon should be
-// removed once envoy.reloadable_features.xdstp_path_avoid_colon_encoding is
-// removed.
-const std::string EscapedUrnOldColon =
-    "xdstp://f123%25%2F%3F%23o/envoy.config.listener.v3.Listener/b%25%3A%3F%23%5B%5Dar//"
-    "baz?%25%23%5B%5D%26%3Dab=cde%25%23%5B%5D%26%3Df";
-const std::string EscapedUrnWithManyQueryParamsOldColon =
-    "xdstp://f123%25%2F%3F%23o/envoy.config.listener.v3.Listener/b%25%3A%3F%23%5B%5Dar//"
-    "baz?%25%23%5B%5D%26%3D=bar&%25%23%5B%5D%26%3Dab=cde%25%23%5B%5D%26%3Df&foo=%25%23%5B%5D%26%3D";
-
 const std::string EscapedUrn =
     "xdstp://f123%25%2F%3F%23o/envoy.config.listener.v3.Listener/b%25:%3F%23%5B%5Dar//"
     "baz?%25%23%5B%5D%26%3Dab=cde%25%23%5B%5D%26%3Df";
@@ -49,15 +39,8 @@ TEST(XdsResourceIdentifierTest, DecodeEncode) {
       "xdstp://foo/envoy.config.listener.v3.Listener/bar/baz?=cd",
       "xdstp://foo/envoy.config.listener.v3.Listener/bar/baz?ab=cde&ba=edc&z=f",
       // Sets the escaped string contents depending on whether
-      // envoy.reloadable_features.xdstp_path_avoid_colon_encoding is set.
-      // This should be replaced by using the plain EscapedUrn and EscapedUrnWithManyQueryParams
-      // once envoy.reloadable_features.xdstp_path_avoid_colon_encoding is removed.
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.xdstp_path_avoid_colon_encoding")
-          ? EscapedUrn
-          : EscapedUrnOldColon,
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.xdstp_path_avoid_colon_encoding")
-          ? EscapedUrnWithManyQueryParams
-          : EscapedUrnWithManyQueryParamsOldColon,
+      EscapedUrn,
+      EscapedUrnWithManyQueryParams,
   };
 
   XdsResourceIdentifier::EncodeOptions encode_options;
@@ -95,39 +78,6 @@ TEST(XdsResourceIdentifierTest, ColonNotEncodedInPath) {
         XdsResourceIdentifier::decodeUrl("xdstp:///type/foo:bar/baz").value();
     EXPECT_EQ("foo:bar/baz", resource_locator.id());
     EXPECT_EQ("xdstp:///type/foo:bar/baz", XdsResourceIdentifier::encodeUrl(resource_locator));
-  }
-}
-
-// Encoding of ":" in path if envoy.reloadable_features.xdstp_path_avoid_colon_encoding
-// is set. This test should be removed once
-// envoy.reloadable_features.xdstp_path_avoid_colon_encoding is removed.
-TEST(XdsResourceIdentifierTest, ColonEncodedInPath) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.xdstp_path_avoid_colon_encoding", "false"}});
-  // Validate decoding of %3A in path is converted to colon.
-  {
-    const auto resource_name =
-        XdsResourceIdentifier::decodeUrn("xdstp:///type/foo%3Abar/baz").value();
-    EXPECT_EQ("foo:bar/baz", resource_name.id());
-  }
-  {
-    const auto resource_locator =
-        XdsResourceIdentifier::decodeUrl("xdstp:///type/foo%3Abar/baz").value();
-    EXPECT_EQ("foo:bar/baz", resource_locator.id());
-  }
-  // Validate decoding and encoding of ":" is converted to %3A and back.
-  {
-    const auto resource_name =
-        XdsResourceIdentifier::decodeUrn("xdstp:///type/foo:bar/baz").value();
-    EXPECT_EQ("foo:bar/baz", resource_name.id());
-    EXPECT_EQ("xdstp:///type/foo%3Abar/baz", XdsResourceIdentifier::encodeUrn(resource_name));
-  }
-  {
-    const auto resource_locator =
-        XdsResourceIdentifier::decodeUrl("xdstp:///type/foo:bar/baz").value();
-    EXPECT_EQ("foo:bar/baz", resource_locator.id());
-    EXPECT_EQ("xdstp:///type/foo%3Abar/baz", XdsResourceIdentifier::encodeUrl(resource_locator));
   }
 }
 
@@ -267,7 +217,27 @@ TEST(XdsResourceLocatorTest, Schemes) {
   }
 }
 
-// extra tests for fragment handling
+// Validate parsing for resources with alt directives.
+TEST(XdsResourceLocatorTest, AltFragements) {
+  {
+    constexpr absl::string_view alternative_uri = "xdstp://foo2/bar/baz/blah";
+    const auto alternative_locator = XdsResourceIdentifier::decodeUrl(alternative_uri).value();
+    const auto resource_locator =
+        XdsResourceIdentifier::decodeUrl(
+            absl::StrCat("xdstp://foo/bar/baz/blah?a=b#alt=", alternative_uri))
+            .value();
+    EXPECT_EQ(xds::core::v3::ResourceLocator::XDSTP, resource_locator.scheme());
+    EXPECT_EQ("foo", resource_locator.authority());
+    EXPECT_EQ("bar", resource_locator.resource_type());
+    EXPECT_EQ(resource_locator.id(), "baz/blah");
+    EXPECT_CONTEXT_PARAMS(resource_locator.exact_context(), Pair("a", "b"));
+    EXPECT_EQ(1, resource_locator.directives().size());
+    EXPECT_TRUE(
+        TestUtility::protoEqual(alternative_locator, resource_locator.directives()[0].alt()));
+    EXPECT_EQ(absl::StrCat("xdstp://foo/bar/baz/blah?a=b#alt=", alternative_uri),
+              XdsResourceIdentifier::encodeUrl(resource_locator));
+  }
+}
 
 } // namespace
 } // namespace Config

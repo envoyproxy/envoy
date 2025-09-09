@@ -17,15 +17,15 @@ class WasmAccessLogFactory : public AccessLog::AccessLogInstanceFactory,
 public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-                          Server::Configuration::FactoryContext& context) override;
+                          Server::Configuration::FactoryContext& context,
+                          std::vector<Formatter::CommandParserPtr>&& = {}) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
   std::string name() const override;
 
 private:
-  absl::flat_hash_map<std::string, std::string> convertJsonFormatToMap(ProtobufWkt::Struct config);
-  RemoteAsyncDataProviderPtr remote_data_provider_;
+  absl::flat_hash_map<std::string, std::string> convertJsonFormatToMap(Protobuf::Struct config);
 };
 
 } // namespace Wasm

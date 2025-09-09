@@ -57,12 +57,9 @@ public:
       : ::Envoy::Formatter::MetadataFormatter(filter_namespace, path, max_length,
                                               [](const StreamInfo::StreamInfo& stream_info)
                                                   -> const envoy::config::core::v3::Metadata* {
-                                                Router::RouteConstSharedPtr route =
-                                                    stream_info.route();
-                                                if (route == nullptr) {
-                                                  return nullptr;
-                                                }
-                                                return &route->virtualHost().metadata();
+                                                const auto& vhost = stream_info.virtualHost();
+                                                return vhost != nullptr ? &vhost->metadata()
+                                                                        : nullptr;
                                               }) {}
 };
 
@@ -132,9 +129,7 @@ MetadataFormatterCommandParser::parse(absl::string_view command, absl::string_vi
     }
 
     // Return a pointer to formatter provider.
-    return std::make_unique<
-        Envoy::Formatter::StreamInfoFormatterWrapper<Envoy::Formatter::HttpFormatterContext>>(
-        provider->second(filter_namespace, path, max_length));
+    return provider->second(filter_namespace, path, max_length);
   }
   return nullptr;
 }

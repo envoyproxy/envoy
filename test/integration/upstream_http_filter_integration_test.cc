@@ -11,6 +11,7 @@
 #include "test/integration/filters/add_header_filter.pb.h"
 #include "test/integration/filters/repick_cluster_filter.h"
 #include "test/integration/http_integration.h"
+#include "test/mocks/http/mocks.h"
 
 #include "http_integration.h"
 
@@ -30,6 +31,7 @@ constexpr absl::string_view expected_types[] = {
 
 using HttpFilterProto =
     envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter;
+using testing::Not;
 
 class UpstreamHttpFilterIntegrationTestBase : public HttpIntegrationTest {
 public:
@@ -61,7 +63,7 @@ public:
         [config](
             envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
                 hcm) -> void {
-          HttpFilterProto& router_filter = *hcm.mutable_http_filters(0);
+          HttpFilterProto& router_filter = *hcm.mutable_http_filters()->rbegin();
           ASSERT_EQ(router_filter.name(), "envoy.filters.http.router");
           envoy::extensions::filters::http::router::v3::Router router;
           router_filter.typed_config().UnpackTo(&router);
@@ -71,12 +73,13 @@ public:
   }
 
   const HttpFilterProto getAddHeaderFilterConfig(const std::string& name, const std::string& key,
-                                                 const std::string& value) {
+                                                 const std::string& value, bool disabled = false) {
     HttpFilterProto filter_config;
     filter_config.set_name(name);
     auto configuration = test::integration::filters::AddHeaderFilterConfig();
     configuration.set_header_key(key);
     configuration.set_header_value(value);
+    filter_config.set_disabled(disabled);
     filter_config.mutable_typed_config()->PackFrom(configuration);
     return filter_config;
   }
@@ -156,6 +159,63 @@ TEST_P(StaticRouterOrClusterFiltersIntegrationTest, BasicSuccess) {
 
   auto headers = sendRequestAndGetHeaders();
   expectHeaderKeyAndValue(headers, default_header_key_, default_header_value_);
+}
+
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest,
+       ClusterUpstreamFiltersOverrideRouterUpstreamFilters) {
+  // If both cluster and router upstream filters are set, only the cluster ones are applied.
+  addStaticRouterFilter(
+      getAddHeaderFilterConfig("envoy.test.add_header_upstream", "x-test-router", "aa"));
+  addCodecRouterFilter();
+  addStaticClusterFilter(
+      getAddHeaderFilterConfig("envoy.test.add_header_upstream", "x-test-cluster", "bb"));
+  addCodecClusterFilter();
+  initialize();
+
+  auto headers = sendRequestAndGetHeaders();
+  EXPECT_THAT(*headers, Not(ContainsHeader("x-test-router", "aa")));
+  EXPECT_THAT(*headers, ContainsHeader("x-test-cluster", "bb"));
+}
+
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest, ClusterUpstreamFiltersDisabled) {
+  addStaticRouterFilter(
+      getAddHeaderFilterConfig("envoy.test.add_header_upstream", "x-test-router", "aa", true));
+  addCodecRouterFilter();
+  initialize();
+
+  auto headers = sendRequestAndGetHeaders();
+  EXPECT_THAT(*headers, Not(ContainsHeader("x-test-router", "aa")));
+}
+
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest, RouterUpstreamFiltersDisabled) {
+  addStaticClusterFilter(
+      getAddHeaderFilterConfig("envoy.test.add_header_upstream", "x-test-cluster", "bb", true));
+  addCodecClusterFilter();
+  initialize();
+
+  auto headers = sendRequestAndGetHeaders();
+  EXPECT_THAT(*headers, Not(ContainsHeader("x-test-cluster", "bb")));
+}
+
+TEST_P(StaticRouterOrClusterFiltersIntegrationTest,
+       AsyncClientUsesClusterFiltersButNotRouterFilters) {
+  // This filter intercepts the downstream request and reissues it via AsyncClient,
+  // which should bypass the main filter chain and should use cluster upstream filters.
+  config_helper_.prependFilter(R"(
+  name: "envoy.test.async_upstream"
+  typed_config:
+      "@type": "type.googleapis.com/test.integration.filters.AsyncUpstreamFilterConfig"
+  )");
+  addStaticFilter("envoy.test.add_header_upstream", default_header_key_, default_header_value_);
+  addCodecFilter();
+  initialize();
+
+  auto headers = sendRequestAndGetHeaders();
+  if (useRouterFilters()) {
+    EXPECT_THAT(*headers, Not(ContainsHeader(default_header_key_, default_header_value_)));
+  } else {
+    EXPECT_THAT(*headers, ContainsHeader(default_header_key_, default_header_value_));
+  }
 }
 
 TEST_P(StaticRouterOrClusterFiltersIntegrationTest, TwoFilters) {
@@ -414,7 +474,7 @@ public:
   void sendLdsResponse(const std::string& version) {
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
-    response.set_type_url(Config::TypeUrl::get().Listener);
+    response.set_type_url(Config::TestTypeUrl::get().Listener);
     response.add_resources()->PackFrom(listener_config_);
     lds_stream_->sendGrpcMessage(response);
   }
@@ -695,10 +755,11 @@ TEST_P(DynamicRouterOrClusterFiltersIntegrationTest, BasicSuccessWithConfigDump)
   BufferingStreamDecoderPtr response;
   EXPECT_EQ("200", request("admin", "GET", "/config_dump", response));
   EXPECT_EQ("application/json", contentType(response));
-  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
+  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body()).value();
   size_t index = 0;
-  for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs")) {
-    EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type")) == 0);
+  auto array = json->getObjectArray("configs").value();
+  for (const Json::ObjectSharedPtr& obj_ptr : array) {
+    EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type").value()) == 0);
     index++;
   }
 

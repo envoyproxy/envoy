@@ -66,8 +66,8 @@ public:
                               unsigned long out_buffer_len, unsigned long* bytes_returned) override;
   Api::SysCallIntResult setBlocking(bool blocking) override;
   absl::optional<int> domain() override;
-  Envoy::Network::Address::InstanceConstSharedPtr localAddress() override;
-  Envoy::Network::Address::InstanceConstSharedPtr peerAddress() override;
+  absl::StatusOr<Envoy::Network::Address::InstanceConstSharedPtr> localAddress() override;
+  absl::StatusOr<Envoy::Network::Address::InstanceConstSharedPtr> peerAddress() override;
   Api::SysCallIntResult shutdown(int) override { return {0, 0}; }
 
   void initializeFileEvent(Event::Dispatcher& dispatcher, Event::FileReadyCb cb,

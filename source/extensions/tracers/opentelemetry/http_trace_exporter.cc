@@ -70,6 +70,8 @@ bool OpenTelemetryHttpTraceExporter::log(const ExportTraceServiceRequest& reques
   Http::AsyncClient::Request* in_flight_request =
       thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
 
+  OpenTelemetryTraceExporter::logExportedSpans(request);
+
   if (in_flight_request == nullptr) {
     return false;
   }

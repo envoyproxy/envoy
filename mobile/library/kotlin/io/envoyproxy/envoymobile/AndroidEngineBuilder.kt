@@ -12,7 +12,10 @@ class AndroidEngineBuilder(context: Context) : EngineBuilder() {
         onEngineRunning,
         { level, msg -> logger?.let { it(LogLevel.from(level), msg) } },
         eventTracker,
-        enableProxying
+        enableProxying,
+        /*useNetworkChangeEvent*/ false,
+        /*disableDnsRefreshOnNetworkChange*/ false,
+        /*useV2NetworkMonitor*/ false
       )
     }
   }

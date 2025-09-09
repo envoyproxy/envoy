@@ -17,7 +17,7 @@ public:
    * @param headers, that should be wrapped by the receiver. The wrapper will hold onto
    *                 the passed headers and free them once the receiver is not used anymore.
    */
-  ManagedEnvoyHeaders(envoy_headers headers) : headers_(headers){};
+  ManagedEnvoyHeaders(envoy_headers headers) : headers_(headers) {};
   ~ManagedEnvoyHeaders() { release_envoy_headers(headers_); }
   const envoy_headers& get() const { return headers_; }
 

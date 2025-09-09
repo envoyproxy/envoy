@@ -83,13 +83,13 @@ public:
   // MySQLProxy::DecoderCallback
   void onProtocolError() override;
   void onNewMessage(MySQLSession::State state) override;
-  void onServerGreeting(ServerGreeting&) override{};
+  void onServerGreeting(ServerGreeting&) override {};
   void onClientLogin(ClientLogin& message) override;
   void onClientLoginResponse(ClientLoginResponse& message) override;
-  void onClientSwitchResponse(ClientSwitchResponse&) override{};
+  void onClientSwitchResponse(ClientSwitchResponse&) override {};
   void onMoreClientLoginResponse(ClientLoginResponse& message) override;
   void onCommand(Command& message) override;
-  void onCommandResponse(CommandResponse&) override{};
+  void onCommandResponse(CommandResponse&) override {};
 
   void doDecode(Buffer::Instance& buffer);
   DecoderPtr createDecoder(DecoderCallbacks& callbacks);

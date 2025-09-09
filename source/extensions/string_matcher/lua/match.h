@@ -19,8 +19,11 @@ public:
   // ThreadLocal::ThreadLocalObject
   ~LuaStringMatcher() override = default;
 
+  // To avoid hiding other implementations of match.
+  using Matchers::StringMatcher::match;
+
   // Matchers::StringMatcher
-  bool match(const absl::string_view value) const override;
+  bool match(absl::string_view value) const override;
 
 private:
   CSmartPtr<lua_State, lua_close> state_;

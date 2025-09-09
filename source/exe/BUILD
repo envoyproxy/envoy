@@ -29,6 +29,7 @@ envoy_cc_binary(
         "//bazel:windows_opt_build": ["generate_pdb_file"],
         "//conditions:default": [],
     }),
+    rbe_pool = "6gig",
     stamped = True,
     deps = [":envoy_main_entry_lib"],
 )
@@ -47,9 +48,11 @@ envoy_cc_library(
     ] + select({
         "//bazel:enable_http3_on_windows_x86_64": envoy_all_extensions(WINDOWS_SKIP_TARGETS),
         "//bazel:enable_http3_on_linux_ppc": envoy_all_extensions(PPC_SKIP_TARGETS),
+        "//bazel:enable_http3_on_linux_ppc64le": envoy_all_extensions(PPC_SKIP_TARGETS),
         "//bazel:disable_http3_on_windows_x86_64": envoy_all_extensions(NO_HTTP3_SKIP_TARGETS + WINDOWS_SKIP_TARGETS),
         "//bazel:disable_http3_on_linux_ppc": envoy_all_extensions(NO_HTTP3_SKIP_TARGETS + PPC_SKIP_TARGETS),
-        "//bazel:disable_http3": envoy_all_extensions(NO_HTTP3_SKIP_TARGETS),
+        "//bazel:disable_http3_on_linux_ppc64le": envoy_all_extensions(PPC_SKIP_TARGETS + NO_HTTP3_SKIP_TARGETS),
+        "//bazel:disable_http3_on_not_x86_ppc": envoy_all_extensions(NO_HTTP3_SKIP_TARGETS),
         "//conditions:default": envoy_all_extensions(),
     }),
 )
@@ -57,14 +60,13 @@ envoy_cc_library(
 envoy_cc_library(
     name = "envoy_main_entry_lib",
     srcs = ["main.cc"],
-    external_deps = [
-        "abseil_symbolize",
-    ],
+    rbe_pool = "6gig",
     deps = [
         ":envoy_main_common_lib",
         ":platform_impl_lib",
         ":scm_impl_lib",
         "//source/server:options_lib",
+        "@com_google_absl//absl/debugging:symbolize",
     ],
 )
 
@@ -72,6 +74,7 @@ envoy_cc_library(
     name = "stripped_main_base_lib",
     srcs = ["stripped_main_base.cc"],
     hdrs = ["stripped_main_base.h"],
+    rbe_pool = "6gig",
     deps = [
         ":platform_impl_lib",
         ":process_wide_lib",
@@ -105,6 +108,7 @@ envoy_cc_library(
     hdrs = [
         "main_common.h",
     ],
+    rbe_pool = "6gig",
     deps = envoy_select_admin_functionality([":admin_response_lib"]) + [
         ":platform_impl_lib",
         ":process_wide_lib",

@@ -35,60 +35,53 @@ std::unique_ptr<Buffer::Instance> Fragment::extract() {
 
 std::unique_ptr<Buffer::Instance> MemoryFragment::extract() { return std::move(buffer_); }
 
-absl::StatusOr<CancelFunction>
-Fragment::toStorage(AsyncFileHandle file, off_t offset,
-                    std::function<void(std::function<void()>)> dispatch,
-                    std::function<void(absl::Status)> on_done) {
+absl::StatusOr<CancelFunction> Fragment::toStorage(AsyncFileHandle file, off_t offset,
+                                                   Event::Dispatcher& dispatcher,
+                                                   absl::AnyInvocable<void(absl::Status)> on_done) {
   ASSERT(isMemory());
   auto data = absl::get<MemoryFragment>(data_).extract();
   data_.emplace<WritingFragment>();
+  // This callback is only called if the filter was not destroyed in the meantime,
+  // so it is safe to use `this`.
   return file->write(
-      *data, offset,
-      [this, dispatch = std::move(dispatch), size = size_, on_done = std::move(on_done),
-       offset](absl::StatusOr<size_t> result) {
-        // size is captured because we can't safely use 'this' until we're in the dispatch callback.
+      &dispatcher, *data, offset,
+      [this, on_done = std::move(on_done), offset](absl::StatusOr<size_t> result) mutable {
         if (!result.ok()) {
-          dispatch([status = result.status(), on_done = std::move(on_done)]() { on_done(status); });
-        } else if (result.value() != size) {
+          std::move(on_done)(result.status());
+        } else if (result.value() != size_) {
           auto status = absl::AbortedError(
-              fmt::format("buffer write wrote {} bytes, wanted {}", result.value(), size));
-          dispatch(
-              [on_done = std::move(on_done), status = std::move(status)]() { on_done(status); });
+              fmt::format("buffer write wrote {} bytes, wanted {}", result.value(), size_));
+          std::move(on_done)(status);
         } else {
-          dispatch([this, status = result.status(), offset, on_done = std::move(on_done)] {
-            data_.emplace<StorageFragment>(offset);
-            on_done(absl::OkStatus());
-          });
+          data_.emplace<StorageFragment>(offset);
+          std::move(on_done)(absl::OkStatus());
         }
       });
 }
 
 absl::StatusOr<CancelFunction>
-Fragment::fromStorage(AsyncFileHandle file, std::function<void(std::function<void()>)> dispatch,
-                      std::function<void(absl::Status)> on_done) {
+Fragment::fromStorage(AsyncFileHandle file, Event::Dispatcher& dispatcher,
+                      absl::AnyInvocable<void(absl::Status)> on_done) {
   ASSERT(isStorage());
   off_t offset = absl::get<StorageFragment>(data_).offset();
   data_.emplace<ReadingFragment>();
-  return file->read(
-      offset, size_,
-      [this, dispatch = std::move(dispatch), size = size_,
-       on_done = std::move(on_done)](absl::StatusOr<std::unique_ptr<Buffer::Instance>> result) {
-        // size is captured because we can't safely use 'this' until we're in the dispatch callback.
-        if (!result.ok()) {
-          dispatch([on_done = std::move(on_done), status = result.status()]() { on_done(status); });
-        } else if (result.value()->length() != size) {
-          auto status = absl::AbortedError(
-              fmt::format("buffer read got {} bytes, wanted {}", result.value()->length(), size));
-          dispatch(
-              [on_done = std::move(on_done), status = std::move(status)]() { on_done(status); });
-        } else {
-          auto buffer = std::shared_ptr<Buffer::Instance>(std::move(result.value()));
-          dispatch([this, on_done = std::move(on_done), buffer = std::move(buffer)]() {
-            data_.emplace<MemoryFragment>(*buffer);
-            on_done(absl::OkStatus());
-          });
-        }
-      });
+  // This callback is only called if the filter was not destroyed in the meantime,
+  // so it is safe to use `this`.
+  return file->read(&dispatcher, offset, size_,
+                    [this, on_done = std::move(on_done)](
+                        absl::StatusOr<std::unique_ptr<Buffer::Instance>> result) mutable {
+                      if (!result.ok()) {
+                        std::move(on_done)(result.status());
+                      } else if (result.value()->length() != size_) {
+                        auto status =
+                            absl::AbortedError(fmt::format("buffer read got {} bytes, wanted {}",
+                                                           result.value()->length(), size_));
+                        std::move(on_done)(status);
+                      } else {
+                        data_.emplace<MemoryFragment>(*result.value());
+                        std::move(on_done)(absl::OkStatus());
+                      }
+                    });
 }
 
 } // namespace FileSystemBuffer

@@ -25,7 +25,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/instance.h"
-#include "test/mocks/server/server_factory_context.h"
+#include "test/mocks/server/listener_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
@@ -89,9 +89,8 @@ protected:
     return std::make_unique<TestActiveQuicListener>(
         runtime, worker_index, concurrency, dispatcher, parent, std::move(listen_socket),
         listener_config, quic_config, kernel_worker_routing, enabled, quic_stat_names,
-        packets_to_read_to_connection_count_ratio, /*receive_ecn=*/true,
-        crypto_server_stream_factory, proof_source_factory, std::move(cid_generator),
-        testWorkerSelector, std::nullopt);
+        packets_to_read_to_connection_count_ratio, crypto_server_stream_factory,
+        proof_source_factory, std::move(cid_generator), testWorkerSelector, std::nullopt);
   }
 };
 
@@ -118,7 +117,7 @@ public:
   }
   static EnvoyQuicConnectionDebugVisitorFactoryInterfaceOptRef
   debugVisitorFactory(ActiveQuicListenerFactory* factory) {
-    return factory->connection_debug_visitor_factory_;
+    return makeOptRefFromPtr(factory->connection_debug_visitor_factory_.get());
   }
 };
 
@@ -141,7 +140,6 @@ protected:
   }
 
   void SetUp() override {
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_receive_ecn", true);
     envoy::config::bootstrap::v3::LayeredRuntime config;
     config.add_layers()->mutable_admin_layer();
     listen_socket_ =
@@ -365,7 +363,7 @@ protected:
                        handshake_timeout_);
   }
 
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  testing::NiceMock<Server::Configuration::MockListenerFactoryContext> context_;
   TestScopedRuntime scoped_runtime_;
   Network::Address::IpVersion version_;
   Event::SimulatedTimeSystemHelper simulated_time_system_;
@@ -647,7 +645,6 @@ TEST_P(ActiveQuicListenerTest, EcnReportingIsEnabled) {
 }
 
 TEST_P(ActiveQuicListenerTest, EcnReporting) {
-  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_receive_ecn", true);
   initialize();
   maybeConfigureMocks(/* connection_count = */ 1);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
@@ -665,7 +662,6 @@ TEST_P(ActiveQuicListenerTest, EcnReportingDualStack) {
   if (local_address_->ip()->version() == Network::Address::IpVersion::v4) {
     return;
   }
-  Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_receive_ecn", true);
   initialize();
   maybeConfigureMocks(/* connection_count = */ 1);
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
@@ -727,13 +723,13 @@ protected:
   std::unique_ptr<ActiveQuicListenerFactory>
   createQuicListenerFactory(envoy::config::listener::v3::QuicProtocolOptions options) {
     return std::make_unique<ActiveQuicListenerFactory>(options, /*concurrency=*/1, quic_stat_names_,
-                                                       validation_visitor_, server_context_);
+                                                       validation_visitor_, listener_context_);
   }
 
   Stats::SymbolTable symbol_table_;
   QuicStatNames quic_stat_names_ = QuicStatNames(symbol_table_);
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
-  testing::NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
+  testing::NiceMock<Server::Configuration::MockListenerFactoryContext> listener_context_;
 };
 
 TEST_F(ActiveQuicListenerFactoryTest, NoDebugVisitorConfigured) {
@@ -743,10 +739,6 @@ TEST_F(ActiveQuicListenerFactoryTest, NoDebugVisitorConfigured) {
 }
 
 TEST_F(ActiveQuicListenerFactoryTest, DebugVisitorConfigured) {
-  TestProcessObject test_process_object;
-  ProcessContextImpl context(test_process_object);
-  EXPECT_CALL(server_context_, processContext())
-      .WillRepeatedly(Return(ProcessContextOptRef(context)));
   envoy::config::listener::v3::QuicProtocolOptions quic_config;
   quic_config.mutable_connection_debug_visitor_config()->set_name(
       "envoy.quic.connection_debug_visitor.mock");
@@ -756,10 +748,6 @@ TEST_F(ActiveQuicListenerFactoryTest, DebugVisitorConfigured) {
   auto debug_visitor_factory =
       ActiveQuicListenerFactoryPeer::debugVisitorFactory(listener_factory.get());
   EXPECT_TRUE(debug_visitor_factory.has_value());
-  auto test_debug_visitor_factory =
-      dynamic_cast<TestEnvoyQuicConnectionDebugVisitorFactory*>(debug_visitor_factory.ptr());
-  EXPECT_TRUE(test_debug_visitor_factory->processContext().has_value());
-  EXPECT_EQ(&test_debug_visitor_factory->processContext().value().get(), &context);
 }
 
 } // namespace Quic

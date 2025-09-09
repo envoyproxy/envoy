@@ -46,7 +46,14 @@ Api::IoCallBoolResult FileImplPosix::open(FlagSet in) {
   if (isOpen()) {
     return resultSuccess(true);
   }
-
+  if (destinationType() == DestinationType::Stdout) {
+    fd_ = ::dup(fileno(stdout));
+    return fd_ != -1 ? resultSuccess(true) : resultFailure(false, errno);
+  }
+  if (destinationType() == DestinationType::Stderr) {
+    fd_ = ::dup(fileno(stderr));
+    return fd_ != -1 ? resultSuccess(true) : resultFailure(false, errno);
+  }
   const auto flags_and_mode = translateFlag(in);
   fd_ = ::open(path().c_str(), flags_and_mode.flags_, flags_and_mode.mode_);
   return fd_ != -1 ? resultSuccess(true) : resultFailure(false, errno);

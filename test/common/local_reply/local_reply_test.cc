@@ -51,7 +51,7 @@ public:
 
 TEST_F(LocalReplyTest, TestEmptyConfig) {
   // Empty LocalReply config.
-  auto local = Factory::create(config_, context_);
+  auto local = *Factory::create(config_, context_);
 
   local->rewrite(nullptr, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, TestInitCode);
@@ -114,7 +114,7 @@ TEST_F(LocalReplyTest, TestDefaultTextFormatter) {
        inline_string: "%LOCAL_REPLY_BODY% %RESPONSE_CODE%"
 )";
   TestUtility::loadFromYaml(yaml, config_);
-  auto local = Factory::create(config_, context_);
+  auto local = *Factory::create(config_, context_);
 
   local->rewrite(nullptr, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, TestInitCode);
@@ -136,7 +136,7 @@ TEST_F(LocalReplyTest, TestDefaultJsonFormatter) {
       body: "%LOCAL_REPLY_BODY%"
 )";
   TestUtility::loadFromYaml(yaml, config_);
-  auto local = Factory::create(config_, context_);
+  auto local = *Factory::create(config_, context_);
 
   local->rewrite(&request_headers_, response_headers_, stream_info_, code_, body_, content_type_);
   EXPECT_EQ(code_, TestInitCode);
@@ -203,7 +203,7 @@ TEST_F(LocalReplyTest, TestMapperRewrite) {
               runtime_key: key_b
 )";
   TestUtility::loadFromYaml(yaml, config_);
-  auto local = Factory::create(config_, context_);
+  auto local = *Factory::create(config_, context_);
 
   // code=400 matches the first filter; rewrite code and body
   resetData(400);
@@ -270,7 +270,7 @@ TEST_F(LocalReplyTest, DEPRECATED_FEATURE_TEST(TestMapperRewriteDeprecatedTextFo
         text_format: ""
 )";
   TestUtility::loadFromYaml(yaml, config_);
-  auto local = Factory::create(config_, context_);
+  auto local = *Factory::create(config_, context_);
 
   // code=404 matches the only filter; does not rewrite code, sets an empty body and content_type.
   resetData(404);
@@ -318,7 +318,7 @@ TEST_F(LocalReplyTest, TestMapperFormat) {
         inline_string: "%LOCAL_REPLY_BODY% %RESPONSE_CODE% default formatter"
 )";
   TestUtility::loadFromYaml(yaml, config_);
-  auto local = Factory::create(config_, context_);
+  auto local = *Factory::create(config_, context_);
 
   // code=400 matches the first filter; rewrite code and body
   // has its own formatter
@@ -377,7 +377,7 @@ TEST_F(LocalReplyTest, TestHeaderAddition) {
             value: '%REQ(req-id)%'
 )";
   TestUtility::loadFromYaml(yaml, config_);
-  auto local = Factory::create(config_, context_);
+  auto local = *Factory::create(config_, context_);
 
   response_headers_.addCopy("foo-2", "bar2");
   response_headers_.addCopy("foo-3", "bar3");
@@ -444,7 +444,7 @@ TEST_F(LocalReplyTest, TestMapperWithContentType) {
       content_type: "text/html; charset=UTF-8"
 )";
   TestUtility::loadFromYaml(yaml, config_);
-  auto local = Factory::create(config_, context_);
+  auto local = *Factory::create(config_, context_);
 
   // code=400 matches the first filter; rewrite code and body
   // has its own formatter.

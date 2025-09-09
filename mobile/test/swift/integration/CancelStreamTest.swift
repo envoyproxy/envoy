@@ -53,7 +53,7 @@ final class CancelStreamTests: XCTestCase {
     let runExpectation = self.expectation(description: "Run called with expected cancellation")
     let filterExpectation = self.expectation(description: "Filter called with cancellation")
 
-    EnvoyTestServer.startHttp1PlaintextServer()
+    EnvoyTestServer.startHttp1Server()
 
     let engine = EngineBuilder()
       .setLogLevel(.debug)
@@ -68,7 +68,7 @@ final class CancelStreamTests: XCTestCase {
 
     let client = engine.streamClient()
 
-    let port = String(EnvoyTestServer.getEnvoyPort())
+    let port = String(EnvoyTestServer.getHttpPort())
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "http",
                                                authority: "localhost:" + port, path: "/")
       .build()
@@ -86,6 +86,6 @@ final class CancelStreamTests: XCTestCase {
     XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 10), .completed)
 
     engine.terminate()
-    EnvoyTestServer.shutdownTestServer()
+    EnvoyTestServer.shutdownTestHttpServer()
   }
 }

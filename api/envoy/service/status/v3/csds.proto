@@ -72,6 +72,11 @@ enum ClientConfigStatus {
   // config dump is not the NACKed version, but the most recent accepted one. If
   // no config is accepted yet, the attached config dump will be empty.
   CLIENT_NACKED = 3;
+
+  // Client received an error from the control plane. The attached config
+  // dump is the most recent accepted one. If no config is accepted yet,
+  // the attached config dump will be empty.
+  CLIENT_RECEIVED_ERROR = 4;
 }
 
 // Request for client status of clients identified by a list of NodeMatchers.

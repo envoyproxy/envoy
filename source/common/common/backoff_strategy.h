@@ -32,10 +32,6 @@ public:
   // BackOffStrategy methods
   uint64_t nextBackOffMs() override;
   void reset() override;
-  void reset(uint64_t base_interval) override {
-    base_interval_ = base_interval;
-    reset();
-  }
 
   /**
    * Checks if a time interval is greater than the maximum time interval configured for a backoff
@@ -71,7 +67,6 @@ public:
   // BackOffStrategy methods
   uint64_t nextBackOffMs() override;
   void reset() override {}
-  void reset(uint64_t min_interval) override { min_interval_ = min_interval; }
   bool isOverTimeLimit(uint64_t) const override { return false; } // no max interval.
 
 private:
@@ -94,7 +89,6 @@ public:
   // BackOffStrategy methods.
   uint64_t nextBackOffMs() override;
   void reset() override {}
-  void reset(uint64_t interval_ms) override { interval_ms_ = interval_ms; }
   bool isOverTimeLimit(uint64_t) const override { return false; } // no max interval.
 
 private:

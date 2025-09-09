@@ -24,13 +24,16 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 
+// Starts a local HTTP mock server with HttpTestServerFactory.start(). Then a request is sent
+// through the following flow:
+//
 //                                               ┌──────────────────┐
 //                                               │   Envoy Proxy    │
 //                                               │ ┌──────────────┐ │
 // ┌────────────────────────┐                  ┌─┼─►listener_proxy│ │
-// │http://api.lyft.com/ping│  ┌──────────────┬┘ │ └──────┬───────┘ │ ┌────────────┐
-// │        Request         ├──►Android Engine│  │        │         │ │api.lyft.com│
-// └────────────────────────┘  └──────────────┘  │ ┌──────▼──────┐  │ └──────▲─────┘
+// │http://localhost:{port}/│  ┌──────────────┬┘ │ └──────┬───────┘ │ ┌────────────-----┐
+// │        Request         ├──►Android Engine│  │        │         │ │Local Mock Server│
+// └────────────────────────┘  └──────────────┘  │ ┌──────▼──────┐  │ └──────▲─────-----┘
 //                                               │ │cluster_proxy│  │        │
 //                                               │ └─────────────┴──┼────────┘
 //                                               │                  │
@@ -66,7 +69,7 @@ class ProxyInfoIntentPerformHTTPRequestUsingProxyTest {
     shadowOf(connectivityManager)
       .setProxyForNetwork(
         connectivityManager.activeNetwork,
-        ProxyInfo.buildDirectProxy("127.0.0.1", httpProxyTestServer.port)
+        ProxyInfo.buildDirectProxy(httpProxyTestServer.ipAddress, httpProxyTestServer.port)
       )
 
     val onEngineRunningLatch = CountDownLatch(1)

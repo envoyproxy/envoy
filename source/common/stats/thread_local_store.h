@@ -60,6 +60,7 @@ public:
   // Stats::Metric
   SymbolTable& symbolTable() final { return symbol_table_; }
   bool used() const override { return used_; }
+  void markUnused() override { used_ = false; }
   bool hidden() const override { return false; }
 
 private:
@@ -116,6 +117,7 @@ public:
   // Stats::Metric
   SymbolTable& symbolTable() override;
   bool used() const override;
+  void markUnused() override;
   bool hidden() const override;
 
   // RefcountInterface
@@ -183,6 +185,8 @@ public:
   void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
   void forEachHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const override;
   void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const override;
+
+  void evictUnused() override;
 
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
@@ -277,7 +281,7 @@ private:
   using CentralCacheEntrySharedPtr = RefcountPtr<CentralCacheEntry>;
 
   struct ScopeImpl : public Scope {
-    ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix);
+    ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix, bool evictable);
     ~ScopeImpl() override;
 
     // Stats::Scope
@@ -290,8 +294,8 @@ private:
                                              Histogram::Unit unit) override;
     TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags) override;
-    ScopeSharedPtr createScope(const std::string& name) override;
-    ScopeSharedPtr scopeFromStatName(StatName name) override;
+    ScopeSharedPtr createScope(const std::string& name, bool evictale) override;
+    ScopeSharedPtr scopeFromStatName(StatName name, bool evictable) override;
     const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
@@ -339,16 +343,20 @@ private:
       return iterateLockHeld(fn);
     }
 
-    bool iterateLockHeld(const IterateFn<Counter>& fn) const {
+    bool iterateLockHeld(const IterateFn<Counter>& fn) const
+        ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
       return iterHelper(fn, centralCacheLockHeld()->counters_);
     }
-    bool iterateLockHeld(const IterateFn<Gauge>& fn) const {
+    bool iterateLockHeld(const IterateFn<Gauge>& fn) const
+        ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
       return iterHelper(fn, centralCacheLockHeld()->gauges_);
     }
-    bool iterateLockHeld(const IterateFn<Histogram>& fn) const {
+    bool iterateLockHeld(const IterateFn<Histogram>& fn) const
+        ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
       return iterHelper(fn, centralCacheLockHeld()->histograms_);
     }
-    bool iterateLockHeld(const IterateFn<TextReadout>& fn) const {
+    bool iterateLockHeld(const IterateFn<TextReadout>& fn) const
+        ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
       return iterHelper(fn, centralCacheLockHeld()->text_readouts_);
     }
     ThreadLocalStoreImpl& store() override { return parent_; }
@@ -421,7 +429,12 @@ private:
     // scope->central_cache_, the analysis system cannot understand that the
     // scope's parent_.lock_ is held, so we assert that here.
     const CentralCacheEntrySharedPtr& centralCacheLockHeld() const
-        ABSL_ASSERT_EXCLUSIVE_LOCK(parent_.lock_) {
+        ABSL_EXCLUSIVE_LOCKS_REQUIRED(parent_.lock_) {
+      return central_cache_;
+    }
+
+    CentralCacheEntrySharedPtr&
+    centralCacheMutableNoThreadAnalysis() const ABSL_NO_THREAD_SAFETY_ANALYSIS {
       return central_cache_;
     }
 
@@ -437,6 +450,7 @@ private:
 
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
+    const bool evictable_{};
 
   private:
     StatNameStorage prefix_;
@@ -464,6 +478,19 @@ private:
   using ScopeImplSharedPtr = std::shared_ptr<ScopeImpl>;
 
   /**
+   * assertLocked exists to help compiler figure out that lock_ and scope->parent_.lock_ is
+   * actually the same lock known under two different names. This function requires lock_ to
+   * be held when it's called and at the same time it is annotated as if it checks in runtime
+   * that scope->parent_.lock_ is held. It does not actually perform any runtime checks, because
+   * those aren't needed since we know that scope->parent_ refers to ThreadLockStoreImpl and
+   * therefore scope->parent_.lock is the same as lock_.
+   */
+  void assertLocked(const ScopeImpl& scope) const ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_)
+      ABSL_ASSERT_EXCLUSIVE_LOCK(scope.parent_.lock_) {
+    UNREFERENCED_PARAMETER(scope);
+  }
+
+  /**
    * Calls fn_lock_held for every scope with, lock_ held. This avoids iterate/destruct
    * races for scopes.
    *
@@ -481,8 +508,11 @@ private:
 
   // The Store versions of iterate cover all the scopes in the store.
   template <class StatFn> bool iterHelper(StatFn fn) const {
-    return iterateScopes(
-        [fn](const ScopeImplSharedPtr& scope) -> bool { return scope->iterateLockHeld(fn); });
+    return iterateScopes([this, fn](const ScopeImplSharedPtr& scope)
+                             ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) -> bool {
+                               assertLocked(*scope);
+                               return scope->iterateLockHeld(fn);
+                             });
   }
 
   std::string getTagsForName(const std::string& name, TagVector& tags) const;

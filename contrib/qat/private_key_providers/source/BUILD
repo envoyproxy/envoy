@@ -32,9 +32,7 @@ envoy_cc_library(
         "qat.h",
         "qat_private_key_provider.h",
     ],
-    external_deps = [
-        "ssl",
-    ],
+    external_deps = ["ssl"],
     deps = [
         ":libqat_wrapper_lib",
         "//envoy/api:api_interface",

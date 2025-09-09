@@ -135,6 +135,9 @@ void resetEnvoyBugCountersForTest();
       ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert), critical,    \
                           "assert failure: {}.{}{}", CONDITION_STR,                                \
                           details.empty() ? "" : " Details: ", details);                           \
+      Envoy::Assert::EnvoyBugStackTrace st;                                                        \
+      st.capture();                                                                                \
+      st.logStackTrace();                                                                          \
       ACTION;                                                                                      \
     }                                                                                              \
   } while (false)

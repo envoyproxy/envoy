@@ -79,10 +79,10 @@ TEST_P(AdminInstanceTest, WriteAddressToFile) {
 TEST_P(AdminInstanceTest, AdminAddress) {
   server_.options_.admin_address_path_ = TestEnvironment::temporaryPath("admin.address");
   AdminImpl admin_address_out_path(cpu_profile_path_, server_, false);
-  std::list<AccessLog::InstanceSharedPtr> access_logs;
+  AccessLog::InstanceSharedPtrVector access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
+      file_info, {}, *Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
   EXPECT_LOG_CONTAINS(
       "info", "admin address:",
@@ -94,10 +94,10 @@ TEST_P(AdminInstanceTest, AdminBadAddressOutPath) {
   server_.options_.admin_address_path_ =
       TestEnvironment::temporaryPath("some/unlikely/bad/path/admin.address");
   AdminImpl admin_bad_address_out_path(cpu_profile_path_, server_, false);
-  std::list<AccessLog::InstanceSharedPtr> access_logs;
+  AccessLog::InstanceSharedPtrVector access_logs;
   Filesystem::FilePathAndType file_info{Filesystem::DestinationType::File, "/dev/null"};
   access_logs.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
-      file_info, {}, Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
+      file_info, {}, *Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(),
       server_.accessLogManager()));
   EXPECT_LOG_CONTAINS(
       "critical",
@@ -142,11 +142,13 @@ TEST_P(AdminInstanceTest, Help) {
   EXPECT_EQ(Http::Code::OK, getCallback("/help", header_map, response));
   const std::string expected = R"EOF(admin commands are:
   /: Admin home page
+  /allocprofiler (POST): enable/disable the allocation profiler (if supported)
+      enable: enable/disable the allocation profiler; One of (y, n)
   /certs: print certs on machine
   /clusters: upstream cluster status
   /config_dump: dump current Envoy configs (experimental)
       resource: The resource to dump
-      mask: The mask to apply. When both resource and mask are specified, the mask is applied to every element in the desired repeated field so that only a subset of fields are returned. The mask is parsed as a ProtobufWkt::FieldMask
+      mask: The mask to apply. When both resource and mask are specified, the mask is applied to every element in the desired repeated field so that only a subset of fields are returned. The mask is parsed as a Protobuf::FieldMask
       name_regex: Dump only the currently loaded configurations whose names match the specified regex. Can be used with both resource and mask query parameters.
       include_eds: Dump currently loaded configuration including EDS. See the response definition for more information
   /contention: dump current Envoy mutex contention stats (if enabled)
@@ -164,7 +166,7 @@ TEST_P(AdminInstanceTest, Help) {
   /help: print out list of admin commands
   /hot_restart_version: print the hot restart compatibility version
   /init_dump: dump current Envoy init manager information (experimental)
-      mask: The desired component to dump unready targets. The mask is parsed as a ProtobufWkt::FieldMask. For example, get the unready targets of all listeners with /init_dump?mask=listener`
+      mask: The desired component to dump unready targets. The mask is parsed as a Protobuf::FieldMask. For example, get the unready targets of all listeners with /init_dump?mask=listener`
   /listeners: print listener info
       format: File format to use; One of (text, json)
   /logging (POST): query/change logging levels
@@ -352,7 +354,7 @@ TEST_P(AdminInstanceTest, Overrides) {
 
   peer.socketFactory().clone();
   peer.socketFactory().closeAllSockets();
-  peer.socketFactory().doFinalPreWorkerInit();
+  ASSERT_TRUE(peer.socketFactory().doFinalPreWorkerInit().ok());
 
   peer.listener().name();
   peer.listener().udpListenerConfig();

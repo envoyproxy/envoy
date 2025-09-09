@@ -178,10 +178,10 @@ public class TestUrlRequestCallback extends UrlRequest.Callback {
     mDone.block();
     if (mThrowableRef.get() != null) {
       if (mThrowableRef.get() instanceof Error) {
-        throw(Error) mThrowableRef.get();
+        throw (Error)mThrowableRef.get();
       }
       if (mThrowableRef.get() instanceof RuntimeException) {
-        throw(RuntimeException) mThrowableRef.get();
+        throw (RuntimeException)mThrowableRef.get();
       }
       throw new RuntimeException(mThrowableRef.get());
     }

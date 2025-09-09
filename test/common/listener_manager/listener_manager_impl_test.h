@@ -279,10 +279,14 @@ protected:
                        const Network::Socket::OptionsSharedPtr& options,
                        ListenerComponentFactory::BindType, const Network::SocketCreationOptions&,
                        uint32_t) -> Network::SocketSharedPtr {
-              EXPECT_NE(options.get(), nullptr);
-              EXPECT_EQ(options->size(), expected_num_options);
-              EXPECT_TRUE(Network::Socket::applyOptions(options, *listener_factory_.socket_,
-                                                        expected_state));
+              if (expected_num_options == 0) {
+                EXPECT_EQ(options.get(), nullptr);
+              } else {
+                EXPECT_NE(options.get(), nullptr);
+                EXPECT_EQ(options->size(), expected_num_options);
+                EXPECT_TRUE(Network::Socket::applyOptions(options, *listener_factory_.socket_,
+                                                          expected_state));
+              }
               return listener_factory_.socket_;
             }))
         .RetiresOnSaturation();
@@ -384,7 +388,7 @@ protected:
     InSequence s;
 
     EXPECT_CALL(*worker_, start(_, _));
-    manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+    ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
     auto socket = std::make_shared<testing::NiceMock<Network::MockListenSocket>>();
 
@@ -433,7 +437,7 @@ protected:
     InSequence s;
 
     EXPECT_CALL(*worker_, start(_, _));
-    manager_->startWorkers(guard_dog_, callback_.AsStdFunction());
+    ASSERT_TRUE(manager_->startWorkers(guard_dog_, callback_.AsStdFunction()).ok());
 
     auto socket = std::make_shared<testing::NiceMock<Network::MockListenSocket>>();
 

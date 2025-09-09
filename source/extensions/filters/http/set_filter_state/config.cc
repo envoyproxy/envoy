@@ -7,6 +7,7 @@
 #include "envoy/formatter/substitution_formatter.h"
 #include "envoy/registry/registry.h"
 
+#include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/server/generic_factory_context.h"
 
@@ -19,7 +20,15 @@ SetFilterState::SetFilterState(const Filters::Common::SetFilterState::ConfigShar
     : config_(config) {}
 
 Http::FilterHeadersStatus SetFilterState::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  config_->updateFilterState({&headers}, decoder_callbacks_->streamInfo());
+  // Apply listener level configuration first.
+  config_.get()->updateFilterState({&headers}, decoder_callbacks_->streamInfo());
+
+  // If configured, apply virtual host and then route level configuration next.
+  auto policies = Http::Utility::getAllPerFilterConfig<Filters::Common::SetFilterState::Config>(
+      decoder_callbacks_);
+  for (auto policy : policies) {
+    policy.get().updateFilterState({&headers}, decoder_callbacks_->streamInfo());
+  }
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -33,6 +42,18 @@ Http::FilterFactoryCb SetFilterStateConfig::createFilterFactoryFromProtoTyped(
     callbacks.addStreamDecoderFilter(
         Http::StreamDecoderFilterSharedPtr{new SetFilterState(filter_config)});
   };
+}
+
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+SetFilterStateConfig::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::set_filter_state::v3::Config& proto_config,
+    Server::Configuration::ServerFactoryContext& context, ProtobufMessage::ValidationVisitor&) {
+
+  Server::GenericFactoryContextImpl generic_context(context, context.messageValidationVisitor());
+
+  return std::make_shared<const Filters::Common::SetFilterState::Config>(
+      proto_config.on_request_headers(), StreamInfo::FilterState::LifeSpan::FilterChain,
+      generic_context);
 }
 
 Http::FilterFactoryCb SetFilterStateConfig::createFilterFactoryFromProtoWithServerContextTyped(

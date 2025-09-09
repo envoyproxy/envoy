@@ -89,13 +89,13 @@ fields can be overridden via runtime settings.
 
 The above configuration can be understood as follows:
 
-* Calculate the request success-rate over a 120s sliding window.
+* Calculate the request success-rate over a 60s sliding window.
 * Do not begin shedding any load until the request success-rate drops below 95% in the sliding
   window.
 * HTTP requests are considered successful if they are 1xx, 2xx, 3xx, or a 404.
 * gRPC requests are considered successful if they are OK or CANCELLED.
-* Requests will never be rejected from this filter if the RPS is lower than 5.
-* Rejection probability will never exceed 80% even if the failure rate is 100%.
+* Requests will never be rejected from this filter if the RPS is lower than 1.
+* Rejection probability will never exceed 95% even if the failure rate is 100%.
 
 Statistics
 ----------

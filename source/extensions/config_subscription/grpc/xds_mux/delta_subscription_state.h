@@ -44,8 +44,7 @@ private:
 
   void setResourceTtl(const envoy::service::discovery::v3::Resource& resource);
   bool isHeartbeatResource(const envoy::service::discovery::v3::Resource& resource) const;
-  void
-  handleGoodResponse(const envoy::service::discovery::v3::DeltaDiscoveryResponse& message) override;
+  void handleGoodResponse(envoy::service::discovery::v3::DeltaDiscoveryResponse& message) override;
   void addResourceStateFromServer(const envoy::service::discovery::v3::Resource& resource);
 
   class ResourceState {

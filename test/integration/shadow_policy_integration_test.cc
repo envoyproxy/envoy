@@ -515,11 +515,9 @@ TEST_P(ShadowPolicyIntegrationTest, MainRequestOverBufferLimit) {
     GTEST_SKIP() << "Not applicable for non-streaming shadows.";
   }
   autonomous_upstream_ = true;
-  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
-    // With deferred processing, a local reply is triggered so the upstream
-    // stream will be incomplete.
-    autonomous_allow_incomplete_streams_ = true;
-  }
+  // A local reply is triggered so the upstream stream will be incomplete.
+  autonomous_allow_incomplete_streams_ = true;
+
   cluster_with_custom_filter_ = 0;
   filter_name_ = "encoder-decoder-buffer-filter";
   initialConfigSetup("cluster_1", "");
@@ -547,13 +545,8 @@ TEST_P(ShadowPolicyIntegrationTest, MainRequestOverBufferLimit) {
 
   EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 1);
   EXPECT_EQ(test_server_->counter("cluster.cluster_1.upstream_cx_total")->value(), 1);
-  if (Runtime::runtimeFeatureEnabled(Runtime::defer_processing_backedup_streams)) {
-    // With deferred processing, the encoder-decoder-buffer-filter will
-    // buffer too much data triggering a local reply.
-    test_server_->waitForCounterEq("http.config_test.downstream_rq_4xx", 1);
-  } else {
-    test_server_->waitForCounterEq("cluster.cluster_1.upstream_rq_completed", 1);
-  }
+  // The encoder-decoder-buffer-filter will buffer too much data triggering a local reply.
+  test_server_->waitForCounterEq("http.config_test.downstream_rq_4xx", 1);
 }
 
 TEST_P(ShadowPolicyIntegrationTest, ShadowRequestOverBufferLimit) {
@@ -605,7 +598,7 @@ TEST_P(ShadowPolicyIntegrationTest, ShadowRequestOverRouteBufferLimit) {
   config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& hcm) {
     hcm.mutable_route_config()
         ->mutable_virtual_hosts(0)
-        ->mutable_per_request_buffer_limit_bytes()
+        ->mutable_request_body_buffer_limit()
         ->set_value(0);
   });
   config_helper_.disableDelayClose();
@@ -663,7 +656,6 @@ TEST_P(ShadowPolicyIntegrationTest, BackedUpConnectionBeforeShadowBegins) {
             ->mutable_match()
             ->set_prefix("/main");
       });
-  config_helper_.addRuntimeOverride(Runtime::defer_processing_backedup_streams, "true");
   initialize();
 
   write_matcher_->setDestinationPort(fake_upstreams_[1]->localAddress()->ip()->port());
@@ -999,6 +991,48 @@ TEST_P(ShadowPolicyIntegrationTest, ShadowedClusterHostHeaderDisabledAppendSuffi
   // Ensure shadowed host header does not have suffix "-shadow".
   EXPECT_EQ(upstream_headers_->Host()->value().getStringView(), "sni.lyft.com");
   EXPECT_EQ(mirror_headers_->Host()->value().getStringView(), "sni.lyft.com");
+}
+
+TEST_P(ShadowPolicyIntegrationTest, ShadowedRequestMetadataLoadbalancing) {
+  initialConfigSetup("cluster_1", "");
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        auto* metadata_match = hcm.mutable_route_config()
+                                   ->mutable_virtual_hosts(0)
+                                   ->mutable_routes(0)
+                                   ->mutable_route()
+                                   ->mutable_metadata_match();
+        TestUtility::loadFromYaml(R"EOF(
+            filterMetadata:
+              envoy.lb:
+                stack: "default"
+        )EOF",
+                                  *metadata_match);
+      });
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto clusters = bootstrap.mutable_static_resources()->mutable_clusters();
+    for (auto& cluster : *clusters) {
+      TestUtility::loadFromYaml(R"EOF(
+            subsetSelectors:
+              - keys:
+                - "stack"
+          )EOF",
+                                *cluster.mutable_lb_subset_config());
+
+      auto lb_endpoint =
+          cluster.mutable_load_assignment()->mutable_endpoints(0)->mutable_lb_endpoints(0);
+
+      TestUtility::loadFromYaml(R"EOF(
+                filterMetadata:
+                  envoy.lb:
+                    stack: "default"
+                )EOF",
+                                *lb_endpoint->mutable_metadata());
+    }
+  });
+  initialize();
+  sendRequestAndValidateResponse();
 }
 
 } // namespace

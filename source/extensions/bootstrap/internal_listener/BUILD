@@ -11,8 +11,10 @@ envoy_extension_package()
 
 envoy_cc_extension(
     name = "config",
-    # for integration tests
-    visibility = ["//visibility:public"],
+    extra_visibility = [
+        "//test/common:__subpackages__",
+        "//test/integration:__subpackages__",
+    ],
     deps = [
         ":client_connection_factory",
         ":internal_listener_registry",

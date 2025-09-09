@@ -15,18 +15,21 @@ namespace Router {
  * DelegatingRoute and override specific methods (e.g. routeEntry) while preserving the rest of the
  * properties/behavior of the base route.
  */
-class DelegatingRoute : public Router::Route {
+template <class Interface> class DelegatingRouteBase : public Interface {
 public:
-  explicit DelegatingRoute(Router::RouteConstSharedPtr route) : base_route_(std::move(route)) {
+  explicit DelegatingRouteBase(Router::RouteConstSharedPtr route) : base_route_(std::move(route)) {
     ASSERT(base_route_ != nullptr);
   }
 
   // Router::Route
-  const Router::DirectResponseEntry* directResponseEntry() const override;
-  const Router::RouteEntry* routeEntry() const override;
-  const Router::Decorator* decorator() const override;
-  const Router::RouteTracing* tracingConfig() const override;
-
+  const Router::DirectResponseEntry* directResponseEntry() const override {
+    return base_route_->directResponseEntry();
+  }
+  const Router::RouteEntry* routeEntry() const override { return base_route_->routeEntry(); }
+  const Router::Decorator* decorator() const override { return base_route_->decorator(); }
+  const Router::RouteTracing* tracingConfig() const override {
+    return base_route_->tracingConfig();
+  }
   const RouteSpecificFilterConfig*
   mostSpecificPerFilterConfig(absl::string_view name) const override {
     return base_route_->mostSpecificPerFilterConfig(name);
@@ -34,7 +37,6 @@ public:
   RouteSpecificFilterConfigs perFilterConfigs(absl::string_view filter_name) const override {
     return base_route_->perFilterConfigs(filter_name);
   }
-
   const envoy::config::core::v3::Metadata& metadata() const override {
     return base_route_->metadata();
   }
@@ -45,39 +47,52 @@ public:
     return base_route_->filterDisabled(name);
   }
   const std::string& routeName() const override { return base_route_->routeName(); }
-  const VirtualHost& virtualHost() const override;
+  const VirtualHostConstSharedPtr& virtualHost() const override {
+    return base_route_->virtualHost();
+  }
 
-private:
+protected:
   const Router::RouteConstSharedPtr base_route_;
 };
 
+using DelegatingRoute = DelegatingRouteBase<Route>;
+
 /**
- * Wrapper class around Router::RouteEntry that delegates all method calls to the
+ * Wrapper class around Router::RouteEntryAndRoute that delegates all method calls to the
  * RouteConstSharedPtr base route it wraps around.
  *
- * Intended to be used with DelegatingRoute when a filter wants to override the routeEntry() method.
+ * Intended to be used when a filter wants to override the routeEntry() method.
  * See example with SetRouteFilter in test/integration/filters.
  */
-class DelegatingRouteEntry : public Router::RouteEntry {
+class DelegatingRouteEntry : public DelegatingRouteBase<RouteEntryAndRoute> {
 public:
-  explicit DelegatingRouteEntry(Router::RouteConstSharedPtr route) : base_route_(std::move(route)) {
-    ASSERT(base_route_ != nullptr);
+  explicit DelegatingRouteEntry(RouteConstSharedPtr route)
+      : DelegatingRouteBase(std::move(route)), base_route_entry_(base_route_->routeEntry()) {
+    ASSERT(base_route_entry_ != nullptr);
+    ASSERT(base_route_->directResponseEntry() == nullptr);
   }
+
+  // Override the routeEntry to return this. By this way, the derived class of this class can
+  // override the methods of Router::RouteEntry directly.
+
+  // Router::Route
+  const Router::RouteEntry* routeEntry() const override { return this; }
 
   // Router::ResponseEntry
   void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+                               const Formatter::HttpFormatterContext& context,
                                const StreamInfo::StreamInfo& stream_info) const override;
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                   bool do_formatting = true) const override;
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
-  const std::string getRequestHostValue(const Http::RequestHeaderMap& headers) const override;
   Http::Code clusterNotFoundResponseCode() const override;
   const CorsPolicy* corsPolicy() const override;
   absl::optional<std::string>
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
+                              const Formatter::HttpFormatterContext& context,
                               const StreamInfo::StreamInfo& stream_info,
                               bool insert_envoy_original_path) const override;
   Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
@@ -91,10 +106,11 @@ public:
   const Router::PathMatcherSharedPtr& pathMatcher() const override;
   const Router::PathRewriterSharedPtr& pathRewriter() const override;
   const InternalRedirectPolicy& internalRedirectPolicy() const override;
-  uint32_t retryShadowBufferLimit() const override;
+  uint64_t requestBodyBufferLimit() const override;
   const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const override;
   std::chrono::milliseconds timeout() const override;
   absl::optional<std::chrono::milliseconds> idleTimeout() const override;
+  absl::optional<std::chrono::milliseconds> flushTimeout() const override;
   bool usingNewTimeouts() const override;
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override;
   absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override;
@@ -114,9 +130,26 @@ public:
   const ConnectConfigOptRef connectConfig() const override;
   const EarlyDataPolicy& earlyDataPolicy() const override;
   const RouteStatsContextOptRef routeStatsContext() const override;
+  void refreshRouteCluster(const Http::RequestHeaderMap& headers,
+                           const StreamInfo::StreamInfo& stream_info) const override;
 
 private:
-  const Router::RouteConstSharedPtr base_route_;
+  const RouteEntry* base_route_entry_{};
+};
+
+/**
+ * A DynamicRouteEntry is a DelegatingRouteEntry that overrides the clusterName() method.
+ * The cluster name is determined by the filter that created this route entry.
+ */
+class DynamicRouteEntry : public DelegatingRouteEntry {
+public:
+  DynamicRouteEntry(RouteConstSharedPtr route, std::string&& cluster_name)
+      : DelegatingRouteEntry(std::move(route)), cluster_name_(std::move(cluster_name)) {}
+
+  const std::string& clusterName() const override { return cluster_name_; }
+
+private:
+  const std::string cluster_name_;
 };
 
 } // namespace Router

@@ -2,10 +2,7 @@ licenses(["notice"])  # Apache 2
 
 cc_library(
     name = "http_parser",
-    srcs = [
-        "http_parser.c",
-        "http_parser.h",
-    ],
+    srcs = ["http_parser.c"],
     hdrs = ["http_parser.h"],
     # This compiler flag is set to an arbtitrarily high number so
     # as to effectively disables the http_parser header limit, as

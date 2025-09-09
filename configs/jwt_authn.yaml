@@ -1,4 +1,4 @@
-# An example config to validate JWT tokens issued by Firebase.
+# An example config to validate JWTs issued by Firebase.
 admin:
   address:
     socket_address:

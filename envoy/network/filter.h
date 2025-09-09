@@ -12,8 +12,11 @@
 
 #include "source/common/protobuf/protobuf.h"
 
+namespace quiche {
+class QuicheSocketAddress;
+} // namespace quiche
+
 namespace quic {
-class QuicSocketAddress;
 class QuicReceivedPacket;
 } // namespace quic
 
@@ -56,7 +59,7 @@ public:
   /**
    * @return Socket the socket the filter is operating on.
    */
-  virtual const Socket& socket() PURE;
+  virtual const ConnectionSocket& socket() PURE;
 };
 
 /**
@@ -84,6 +87,33 @@ public:
    *                   in the filter chain.
    */
   virtual void injectWriteDataToFilterChain(Buffer::Instance& data, bool end_stream) PURE;
+
+  /**
+   * Control the filter close status for write filters.
+   *
+   * When `disabled` is `true`, the connection closure process is paused or delayed by marking the
+   * closure as pending. When `disabled` is `false`, the connection closure process is resumed if it
+   * was previously delayed.
+   *
+   * This method affects the filter's "close status" within the context of the connection closure
+   * process managed by the filter manager:
+   *    - `disableClose(true)` marks the filter as unable to close by delaying the closure process.
+   *    - Calling `disableClose(true)` again has no additional effect, as the closure is already
+   *      marked as pending.
+   *    - `disableClose(false)` mark the filter is ready to be closed. If no further pending
+   * closures exist and there is a latched close action, it will close the connection with the
+   * latched close action.
+   *
+   * Note that this method only takes effect when the connection closure is being managed through
+   * the filter manager.
+   *
+   * @param disabled A boolean flag:
+   *   - `true`: Delays the connection closure process if there is any,
+   *             marking the filter as unable to close.
+   *   - `false`: Resumes the connection closure process if there is any,
+   *              marking the filter as close ready.
+   */
+  virtual void disableClose(bool disabled) PURE;
 };
 
 /**
@@ -175,6 +205,33 @@ public:
    * mode to secure mode.
    */
   virtual bool startUpstreamSecureTransport() PURE;
+
+  /**
+   * Control the filter close status for read filters.
+   *
+   * When `disabled` is `true`, the connection closure process is paused or delayed by marking the
+   * closure as pending. When `disabled` is `false`, the connection closure process is resumed if it
+   * was previously delayed.
+   *
+   * This method affects the filter's "close status" within the context of the connection closure
+   * process managed by the filter manager:
+   *    - `disableClose(true)` marks the filter as unable to close by delaying the closure process.
+   *    - Calling `disableClose(true)` again has no additional effect, as the closure is already
+   *      marked as pending.
+   *    - `disableClose(false)` mark the filter is ready to be closed. If no further pending
+   * closures exist and there is a latched close action, it will close the connection with the
+   * latched close action.
+   *
+   * Note that this method only takes effect when the connection closure is being managed through
+   * the filter manager.
+   *
+   * @param disabled A boolean flag:
+   *   - `true`: Delays the connection closure process if there is any,
+   *             marking the filter as unable to close.
+   *   - `false`: Resumes the connection closure process if there is any,
+   *              marking the filter as close ready.
+   */
+  virtual void disableClose(bool disable) PURE;
 };
 
 /**
@@ -298,7 +355,7 @@ public:
    * @param value the struct to set on the namespace. A merge will be performed with new values for
    * the same key overriding existing.
    */
-  virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
+  virtual void setDynamicMetadata(const std::string& name, const Protobuf::Struct& value) PURE;
 
   /**
    * @param name the namespace used in the metadata in reverse DNS format, for example:
@@ -306,7 +363,7 @@ public:
    * @param value of type protobuf any to set on the namespace. A merge will be performed with new
    * values for the same key overriding existing.
    */
-  virtual void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) PURE;
+  virtual void setDynamicTypedMetadata(const std::string& name, const Protobuf::Any& value) PURE;
 
   /**
    * @return const envoy::config::core::v3::Metadata& the dynamic metadata associated with this
@@ -384,6 +441,12 @@ public:
   virtual FilterStatus onData(Network::ListenerFilterBuffer& buffer) PURE;
 
   /**
+   * Called when the connection is closed. Only the current filter that has stopped filter
+   * chain iteration will get the callback.
+   */
+  virtual void onClose() {};
+
+  /**
    * Return the size of data the filter want to inspect from the connection.
    * The size can be increased after filter need to inspect more data.
    * @return maximum number of bytes of the data consumed by the filter. 0 means filter does not
@@ -450,7 +513,7 @@ public:
    * if the connection socket's destination address were the preferred address.
    */
   virtual bool isCompatibleWithServerPreferredAddress(
-      const quic::QuicSocketAddress& server_preferred_address) const PURE;
+      const quiche::QuicheSocketAddress& server_preferred_address) const PURE;
 
   /**
    * Called after the peer has migrated to a different address. Check if the connection
@@ -464,7 +527,7 @@ public:
    * @param connection the connection just migrated.
    * @return status used by the filter manager to manage further filter iteration.
    */
-  virtual FilterStatus onPeerAddressChanged(const quic::QuicSocketAddress& new_address,
+  virtual FilterStatus onPeerAddressChanged(const quiche::QuicheSocketAddress& new_address,
                                             Connection& connection) PURE;
 
   /**
@@ -494,9 +557,9 @@ public:
                          QuicListenerFilterPtr&& filter) PURE;
 
   virtual bool shouldAdvertiseServerPreferredAddress(
-      const quic::QuicSocketAddress& server_preferred_address) const PURE;
+      const quiche::QuicheSocketAddress& server_preferred_address) const PURE;
 
-  virtual void onPeerAddressChanged(const quic::QuicSocketAddress& new_address,
+  virtual void onPeerAddressChanged(const quiche::QuicheSocketAddress& new_address,
                                     Connection& connection) PURE;
   virtual void onFirstPacketReceived(const quic::QuicReceivedPacket&) PURE;
 };
@@ -549,6 +612,11 @@ public:
    * @return the name of this filter chain.
    */
   virtual absl::string_view name() const PURE;
+
+  /**
+   * @return true if this filter chain configuration was discovered by FCDS.
+   */
+  virtual bool addedViaApi() const PURE;
 };
 
 using FilterChainSharedPtr = std::shared_ptr<FilterChain>;

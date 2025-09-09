@@ -9,6 +9,6 @@ api_proto_package(
         "//envoy/config/core/v3:pkg",
         "//envoy/extensions/access_loggers/grpc/v3:pkg",
         "@com_github_cncf_xds//udpa/annotations:pkg",
-        "@opentelemetry_proto//:common",
+        "@opentelemetry_proto//:common_proto",
     ],
 )

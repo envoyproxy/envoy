@@ -33,11 +33,19 @@ public:
       envoy::config::cluster::v3::Cluster::CustomClusterType cluster_type;
       cluster_type.set_name(cluster_provided_lb_ ? "envoy.clusters.custom_static_with_lb"
                                                  : "envoy.clusters.custom_static");
-      test::integration::clusters::CustomStaticConfig config;
-      config.set_priority(10);
-      config.set_address(Network::Test::getLoopbackAddressString(ipVersion()));
-      config.set_port_value(fake_upstreams_[UpstreamIndex]->localAddress()->ip()->port());
-      cluster_type.mutable_typed_config()->PackFrom(config);
+      if (!cluster_provided_lb_) {
+        test::integration::clusters::CustomStaticConfig1 config;
+        config.set_priority(10);
+        config.set_address(Network::Test::getLoopbackAddressString(ipVersion()));
+        config.set_port_value(fake_upstreams_[UpstreamIndex]->localAddress()->ip()->port());
+        cluster_type.mutable_typed_config()->PackFrom(config);
+      } else {
+        test::integration::clusters::CustomStaticConfig2 config;
+        config.set_priority(10);
+        config.set_address(Network::Test::getLoopbackAddressString(ipVersion()));
+        config.set_port_value(fake_upstreams_[UpstreamIndex]->localAddress()->ip()->port());
+        cluster_type.mutable_typed_config()->PackFrom(config);
+      }
 
       cluster_0->mutable_cluster_type()->CopyFrom(cluster_type);
     });

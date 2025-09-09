@@ -11,6 +11,7 @@
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/config/xds_manager.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/http_server_properties_cache.h"
 #include "test/mocks/http/mocks.h"
@@ -27,6 +28,7 @@
 #include "test/mocks/server/options.h"
 #include "test/mocks/server/overload_manager.h"
 #include "test/mocks/server/server_lifecycle_notifier.h"
+#include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stats/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
@@ -49,6 +51,7 @@ public:
   MOCK_METHOD(bool, flushOnAdmin, (), (const));
   MOCK_METHOD(const Stats::SinkPredicates*, sinkPredicates, (), (const));
   MOCK_METHOD(bool, enableDeferredCreationStats, (), (const));
+  MOCK_METHOD(uint32_t, evictOnFlush, (), (const));
 };
 
 class MockServerFactoryContext : public virtual ServerFactoryContext {
@@ -57,6 +60,7 @@ public:
   ~MockServerFactoryContext() override;
 
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
+  MOCK_METHOD(Config::XdsManager&, xdsManager, ());
   MOCK_METHOD(Http::HttpServerPropertiesCacheManager&, httpServerPropertiesCacheManager, ());
   MOCK_METHOD(Event::Dispatcher&, mainThreadDispatcher, ());
   MOCK_METHOD(const Server::Options&, options, ());
@@ -73,6 +77,8 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
+  MOCK_METHOD(Secret::SecretManager&, secretManager, ());
+  MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
   Http::Context& httpContext() override { return http_context_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Router::Context& routerContext() override { return router_context_; }
@@ -89,6 +95,11 @@ public:
   MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
   MOCK_METHOD(bool, healthCheckFailed, (), (const));
 
+  // Useful for when a test needs to change a static secret, which normally cannot be changed or
+  // re-added after it is set. This creates a new secret manager and deletes the old one.
+  void resetSecretManager();
+
+  testing::NiceMock<Config::MockXdsManager> xds_manager_;
   testing::NiceMock<Upstream::MockClusterManager> cluster_manager_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
   testing::NiceMock<MockDrainManager> drain_manager_;
@@ -116,6 +127,12 @@ public:
   envoy::config::bootstrap::v3::Bootstrap bootstrap_;
   testing::NiceMock<MockOptions> options_;
   Regex::GoogleReEngine regex_engine_;
+
+  // Secret manager.
+  testing::NiceMock<MockConfigTracker> config_tracker_;
+  std::unique_ptr<Secret::SecretManager> secret_manager_;
+  // SSL context manager.
+  testing::NiceMock<Ssl::MockContextManager> ssl_context_manager_;
 };
 
 class MockGenericFactoryContext : public GenericFactoryContext {
@@ -123,15 +140,18 @@ public:
   MockGenericFactoryContext();
   ~MockGenericFactoryContext() override;
 
-  MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, (), (const));
-  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, (), (const));
+  MOCK_METHOD(ServerFactoryContext&, serverFactoryContext, ());
+  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Stats::Scope&, scope, ());
+  MOCK_METHOD(Stats::Scope&, statsScope, ());
   MOCK_METHOD(Init::Manager&, initManager, ());
 
-  NiceMock<MockServerFactoryContext> server_factory_context_;
+  NiceMock<MockServerFactoryContext> server_context_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> store_;
   testing::NiceMock<Init::MockManager> init_manager_;
 };
+
+using MockTransportSocketFactoryContext = MockGenericFactoryContext;
 
 // Stateless mock ServerFactoryContext for cases where it needs to be used concurrently in different
 // threads. Global state in the MockServerFactoryContext causes thread safety issues in this case.
@@ -141,6 +161,7 @@ public:
   ~StatelessMockServerFactoryContext() override = default;
 
   MOCK_METHOD(Upstream::ClusterManager&, clusterManager, ());
+  MOCK_METHOD(Config::XdsManager&, xdsManager, ());
   MOCK_METHOD(Http::HttpServerPropertiesCacheManager&, httpServerPropertiesCacheManager, ());
   MOCK_METHOD(Event::Dispatcher&, mainThreadDispatcher, ());
   MOCK_METHOD(const Server::Options&, options, ());
@@ -172,6 +193,8 @@ public:
   MOCK_METHOD(OverloadManager&, nullOverloadManager, ());
   MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
   MOCK_METHOD(bool, healthCheckFailed, (), (const));
+  MOCK_METHOD(Secret::SecretManager&, secretManager, ());
+  MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
 };
 
 } // namespace Configuration

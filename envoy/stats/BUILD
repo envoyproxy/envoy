@@ -32,13 +32,13 @@ envoy_cc_library(
         "tag_extractor.h",
         "tag_producer.h",
     ],
-    external_deps = ["abseil_inlined_vector"],
     deps = [
         ":refcount_ptr_interface",
         ":tag_interface",
         "//envoy/common:interval_set_interface",
         "//envoy/common:optref_lib",
         "//envoy/common:time_interface",
+        "@com_google_absl//absl/container:inlined_vector",
     ],
 )
 

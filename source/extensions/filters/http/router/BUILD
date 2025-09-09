@@ -15,14 +15,15 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    # This is core Envoy config.
-    visibility = ["//visibility:public"],
+    extra_visibility = [
+        "//test/common:__subpackages__",
+        "//test/integration:__subpackages__",
+    ],
     deps = [
         "//envoy/registry",
         "//source/common/router:router_lib",
         "//source/common/router:shadow_writer_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "//source/extensions/filters/http/on_demand:on_demand_update_lib",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
     ],
 )

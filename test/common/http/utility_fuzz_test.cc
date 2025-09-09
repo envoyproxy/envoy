@@ -73,10 +73,9 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   }
   case test::common::http::UtilityTestCase::kMakeSetCookieValue: {
     const auto& cookie_value = input.make_set_cookie_value();
-    std::chrono::seconds max_age(cookie_value.max_age());
-    Http::CookieAttributeRefVector cookie_attributes;
     Http::Utility::makeSetCookieValue(cookie_value.key(), cookie_value.value(), cookie_value.path(),
-                                      max_age, cookie_value.httponly(), cookie_attributes);
+                                      std::chrono::seconds(cookie_value.max_age()),
+                                      cookie_value.httponly(), {});
     break;
   }
   case test::common::http::UtilityTestCase::kParseAuthorityString: {
@@ -87,7 +86,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   case test::common::http::UtilityTestCase::kInitializeAndValidate: {
     const auto& options = input.initialize_and_validate();
     auto options_or_error = Http2::Utility::initializeAndValidateOptions(options);
-    if (options_or_error.status().ok()) {
+    if (!options_or_error.status().ok()) {
       absl::string_view msg = options_or_error.status().message();
       // initializeAndValidateOptions throws exceptions for 4 different reasons due to malformed
       // settings, so check for them and allow any other exceptions through

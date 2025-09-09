@@ -66,7 +66,7 @@ using RouteConfigProviderManagerSharedPtr = std::shared_ptr<RouteConfigProviderM
 class SrdsFactory : public Envoy::Config::UntypedFactory {
 public:
   // UntypedFactory
-  virtual std::string category() const override { return "envoy.srds_factory"; }
+  std::string category() const override { return "envoy.srds_factory"; }
   virtual std::unique_ptr<Envoy::Config::ConfigProviderManager>
   createScopedRoutesConfigProviderManager(
       Server::Configuration::ServerFactoryContext& factory_context,

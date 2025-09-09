@@ -1,3 +1,5 @@
+#include "envoy/access_log/access_log_config.h"
+
 #include "source/common/protobuf/protobuf.h"
 
 #include "test/integration/http_protocol_integration.h"
@@ -21,9 +23,9 @@ INSTANTIATE_TEST_SUITE_P(Protocols, ListenerTypedMetadataIntegrationTest,
 
 TEST_P(ListenerTypedMetadataIntegrationTest, Hello) {
   // Add some typed metadata to the listener.
-  ProtobufWkt::StringValue value;
+  Protobuf::StringValue value;
   value.set_value("hello world");
-  ProtobufWkt::Any packed_value;
+  Protobuf::Any packed_value;
   packed_value.PackFrom(value);
   config_helper_.addListenerTypedMetadata("test.listener.typed.metadata", packed_value);
 
@@ -52,7 +54,8 @@ class TestAccessLogFactory : public AccessLog::AccessLogInstanceFactory {
 public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message&, AccessLog::FilterPtr&&,
-                          Server::Configuration::FactoryContext& context) override {
+                          Server::Configuration::FactoryContext& context,
+                          std::vector<Formatter::CommandParserPtr>&& = {}) override {
     // Check that expected listener metadata is present
     EXPECT_EQ(1, context.listenerInfo().metadata().typed_filter_metadata().size());
     const auto iter = context.listenerInfo().metadata().typed_filter_metadata().find(
@@ -74,9 +77,9 @@ TEST_P(ListenerTypedMetadataIntegrationTest, ListenerMetadataPlumbingToAccessLog
   Registry::InjectFactory<AccessLog::AccessLogInstanceFactory> factory_register(factory);
 
   // Add some typed metadata to the listener.
-  ProtobufWkt::StringValue value;
+  Protobuf::StringValue value;
   value.set_value("hello world");
-  ProtobufWkt::Any packed_value;
+  Protobuf::Any packed_value;
   packed_value.PackFrom(value);
   config_helper_.addListenerTypedMetadata("test.listener.typed.metadata", packed_value);
 

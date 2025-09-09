@@ -94,6 +94,9 @@ void javaArrayOfByteArrayToStringVector(JniHelper& jni_helper, jobjectArray arra
 /** Converts from Java byte array to C++ vector of bytes. */
 void javaByteArrayToByteVector(JniHelper& jni_helper, jbyteArray array, std::vector<uint8_t>* out);
 
+/** Converts from Java long array to C++ vector of int64_t. */
+void javaLongArrayToInt64Vector(JniHelper& jni_helper, jlongArray array, std::vector<int64_t>* out);
+
 /** Converts from Java byte array to C++ string. */
 void javaByteArrayToString(JniHelper& jni_helper, jbyteArray jbytes, std::string* out);
 

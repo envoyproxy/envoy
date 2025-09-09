@@ -21,48 +21,67 @@ The HTTP filter, using a gRPC/HTTP service, can be configured as follows. You ca
 configuration options at
 :ref:`HTTP filter <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`.
 
+.. _config_http_filters_ext_authz_security_considerations:
+
+Security Considerations
+-----------------------
+
+.. attention::
+
+   **Route Cache Clearing Risk**: When using per-route ExtAuthZ configuration, subsequent filters
+   in the filter chain may clear the route cache, potentially leading to privilege escalation
+   vulnerabilities where requests bypass authorization checks.
+
+   For more information about this security risk, including affected filters and general
+   mitigation strategies, see :ref:`Filter route mutation security considerations
+   <arch_overview_http_filters_route_mutation>`.
+
+   **ExtAuthZ-Specific Considerations**: The security risk is particularly important for ExtAuthZ
+   because it often handles authentication and authorization decisions that directly impact access
+   control. When route cache is cleared after ExtAuthZ has run, a request may be re-routed to
+   endpoints with different authorization requirements, bypassing those checks entirely.
+
+   **Example Vulnerable Configuration**:
+
+   .. code-block:: yaml
+
+      http_filters:
+      - name: envoy.filters.http.ext_authz
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
+          # ... ext_authz config ...
+      - name: envoy.filters.http.lua
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+          inline_code: |
+            function envoy_on_request(request_handle)
+              -- This clears route cache after ext_authz has run
+              request_handle:clearRouteCache()
+              -- Request may now match a different route with different auth requirements
+            end
+
+   In this example, if the initial route had ExtAuthZ disabled but a subsequent route match
+   (after cache clearing) requires authorization, the request will bypass the authorization
+   check entirely.
+
 Configuration Examples
 ----------------------
 
 A sample filter configuration for a gRPC authorization server:
 
-.. code-block:: yaml
+.. literalinclude:: _include/ext-authz-grpc-filter.yaml
+    :language: yaml
+    :lines: 26-35
+    :lineno-start: 26
+    :linenos:
+    :caption: :download:`ext-authz-grpc-filter.yaml <_include/ext-authz-grpc-filter.yaml>`
 
-  http_filters:
-    - name: envoy.filters.http.ext_authz
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
-        grpc_service:
-          envoy_grpc:
-            cluster_name: ext-authz
-
-          # Default is 200ms; override if your server needs e.g. warmup time.
-          timeout: 0.5s
-        include_peer_certificate: true
-
-.. code-block:: yaml
-
-  clusters:
-    - name: ext-authz
-      type: static
-      typed_extension_protocol_options:
-        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-          explicit_http_config:
-            http2_protocol_options: {}
-      load_assignment:
-        cluster_name: ext-authz
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 10003
-
-      # This timeout controls the initial TCP handshake timeout - not the timeout for the
-      # entire request.
-      connect_timeout: 0.25s
+.. literalinclude:: _include/ext-authz-grpc-filter.yaml
+    :language: yaml
+    :lines: 41-56
+    :lineno-start: 41
+    :linenos:
+    :caption: :download:`ext-authz-grpc-filter.yaml <_include/ext-authz-grpc-filter.yaml>`
 
 .. note::
 
@@ -72,19 +91,12 @@ A sample filter configuration for a gRPC authorization server:
 
   A sample configuration is as follows:
 
-  .. code:: yaml
-
-    http_filters:
-      - name: envoy.filters.http.ext_authz
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
-          grpc_service:
-            envoy_grpc:
-              cluster_name: ext-authz
-          with_request_body:
-            max_request_bytes: 1024
-            allow_partial_message: true
-            pack_as_bytes: true
+  .. literalinclude:: _include/ext-authz-grpc-body-filter.yaml
+      :language: yaml
+      :lines: 26-36
+      :lineno-start: 26
+      :linenos:
+      :caption: :download:`ext-authz-grpc-body-filter.yaml <_include/ext-authz-grpc-body-filter.yaml>`
 
   Please note that by default :ref:`check request<envoy_v3_api_msg_service.auth.v3.CheckRequest>`
   carries the HTTP request body as UTF-8 string and it fills the :ref:`body
@@ -98,65 +110,32 @@ A sample filter configuration for a gRPC authorization server:
 
 A sample filter configuration for a raw HTTP authorization server:
 
-.. code-block:: yaml
+.. literalinclude:: _include/ext-authz-http-filter.yaml
+    :language: yaml
+    :lines: 26-36
+    :lineno-start: 26
+    :linenos:
+    :caption: :download:`ext-authz-http-filter.yaml <_include/ext-authz-http-filter.yaml>`
 
-  http_filters:
-    - name: envoy.filters.http.ext_authz
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
-        http_service:
-            server_uri:
-              uri: 127.0.0.1:10003
-              cluster: ext-authz
-              timeout: 0.25s
-              failure_mode_allow: false
-        include_peer_certificate: true
-
-.. code-block:: yaml
-
-  clusters:
-    - name: ext-authz
-      connect_timeout: 0.25s
-      type: logical_dns
-      lb_policy: round_robin
-      load_assignment:
-        cluster_name: ext-authz
-        endpoints:
-        - lb_endpoints:
-          - endpoint:
-              address:
-                socket_address:
-                  address: 127.0.0.1
-                  port_value: 10003
+.. literalinclude:: _include/ext-authz-http-filter.yaml
+    :language: yaml
+    :lines: 41-53
+    :lineno-start: 41
+    :linenos:
+    :caption: :download:`ext-authz-http-filter.yaml <_include/ext-authz-http-filter.yaml>`
 
 Per-Route Configuration
 -----------------------
 
+.. literalinclude:: _include/ext-authz-routes-filter.yaml
+    :language: yaml
+    :lines: 15-38
+    :lineno-start: 15
+    :linenos:
+    :caption: :download:`ext-authz-routes-filter.yaml <_include/ext-authz-routes-filter.yaml>`
+
 A sample virtual host and route filter configuration.
 In this example we add additional context on the virtual host, and disabled the filter for ``/static`` prefixed routes.
-
-.. code-block:: yaml
-
-  route_config:
-    name: local_route
-    virtual_hosts:
-    - name: local_service
-      domains: ["*"]
-      typed_per_filter_config:
-        envoy.filters.http.ext_authz:
-          "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute
-          check_settings:
-            context_extensions:
-              virtual_host: local_service
-      routes:
-      - match: { prefix: "/static" }
-        route: { cluster: some_service }
-        typed_per_filter_config:
-          envoy.filters.http.ext_authz:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthzPerRoute
-            disabled: true
-      - match: { prefix: "/" }
-        route: { cluster: some_service }
 
 Statistics
 ----------
@@ -202,3 +181,10 @@ The fraction of requests for which the filter is enabled can be configured via t
 Tracing
 -------
 The ext_authz span keeps the sampling status of the parent span, i.e. in the tracing backend we will either see both the parent span and the child ext_authz span, or none of them.
+
+Logging
+-------
+When :ref:`emit_filter_state_stats <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.emit_filter_state_stats>` is set to true,
+ext_authz exposes fields ``latency_us``, ``bytesSent`` and ``bytesReceived`` for usage in CEL and logging.
+* ``filter_state["envoy.filters.http.ext_authz"].latency_us)``
+* ``%FILTER_STATE(envoy.filters.http.ext_authz:FIELD:latency_us)%``

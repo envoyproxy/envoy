@@ -16,7 +16,7 @@ build process.
 1. Define a new Bazel repository in [`bazel/repositories.bzl`](repositories.bzl),
    in the `envoy_dependencies()` function.
 2. Reference your new external dependency in some `envoy_cc_library` via the
-   `external_deps` attribute.
+   `deps` attribute.
 3. `bazel test //test/...`
 
 ## External CMake (preferred)
@@ -28,7 +28,7 @@ This is the preferred style of adding dependencies that use CMake for their buil
 2. Add an `envoy_cmake` rule to [`bazel/foreign_cc/BUILD`](foreign_cc/BUILD). This will reference
    the source repository in step 1.
 3. Reference your new external dependency in some `envoy_cc_library` via the name bound in step 1
-   `external_deps` attribute.
+   `deps` attribute.
 4. `bazel test //test/...`
 
 # Adding external dependencies to Envoy (Python)

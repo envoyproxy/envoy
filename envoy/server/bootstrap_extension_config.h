@@ -20,6 +20,11 @@ public:
    * Called when server is done initializing and we have the ServerFactoryContext fully initialized.
    */
   virtual void onServerInitialized() PURE;
+
+  /**
+   * Called when the worker thread is initialized.
+   */
+  virtual void onWorkerThreadInitialized() PURE;
 };
 
 using BootstrapExtensionPtr = std::unique_ptr<BootstrapExtension>;

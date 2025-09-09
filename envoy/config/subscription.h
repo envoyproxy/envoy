@@ -75,11 +75,11 @@ public:
   virtual ~OpaqueResourceDecoder() = default;
 
   /**
-   * @param resource some opaque resource (ProtobufWkt::Any).
+   * @param resource some opaque resource (Protobuf::Any).
    * @return ProtobufTypes::MessagePtr decoded protobuf message in the opaque resource, e.g. the
    *         RouteConfiguration for an Any containing envoy.config.route.v3.RouteConfiguration.
    */
-  virtual ProtobufTypes::MessagePtr decodeResource(const ProtobufWkt::Any& resource) PURE;
+  virtual ProtobufTypes::MessagePtr decodeResource(const Protobuf::Any& resource) PURE;
 
   /**
    * @param resource some opaque resource (Protobuf::Message).
@@ -166,7 +166,7 @@ public:
    *        is accepted. Accepted configurations have their version_info reflected in subsequent
    *        requests.
    */
-  virtual void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+  virtual void onConfigUpdate(const Protobuf::RepeatedPtrField<Protobuf::Any>& resources,
                               const std::string& version_info) PURE;
 
   /**
@@ -191,10 +191,10 @@ public:
    * being updated. Accepted changes have their version_info reflected in subsequent
    * requests.
    */
-  virtual void onConfigUpdate(
-      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
-      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-      const std::string& system_version_info) PURE;
+  virtual void
+  onConfigUpdate(absl::Span<const envoy::service::discovery::v3::Resource* const> added_resources,
+                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                 const std::string& system_version_info) PURE;
 
   /**
    * Called when either the Subscription is unable to fetch a config update or when onConfigUpdate

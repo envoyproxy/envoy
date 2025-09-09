@@ -68,16 +68,8 @@ def dockerhub_envoy_role(
     if part.startswith("envoy"):
         part = part[len("envoy"):]
 
-    # windows images
-    if part == "windows-dev":
-        title = f"envoyproxy/envoy-{part}"
-        full_url = f"https://hub.docker.com/r/envoyproxy/envoy-{part}/tags?name=latest"
-    elif part == "windows":
-        title = f"envoyproxy/envoy-{part}:{_config('docker_image_tag_name')}"
-        full_url = f"https://hub.docker.com/r/envoyproxy/envoy-{part}/tags?name={_config('docker_image_tag_name')}"
-
     # envoy-build-ubuntu images
-    elif part.startswith("build"):
+    if part.startswith("build"):
         parts = part.split("-")
         if len(parts) > 2:
             title = f"envoyproxy/envoy-build-ubuntu:{''.join(parts[2:])}-<build_sha>"
@@ -177,12 +169,10 @@ intersphinx_disabled_reftypes = ['*']
 if 'pre-release' in release_level:
     substitutions = [
         ('|envoy_docker_image|', 'envoy:dev-{}'.format(blob_sha)),
-        ('|envoy_windows_docker_image|', 'envoy-windows-dev:{}'.format(blob_sha)),
         ('|envoy_distroless_docker_image|', 'envoy:distroless-dev-{}'.format(blob_sha))
     ]
 else:
     substitutions = [('|envoy_docker_image|', 'envoy:{}'.format(blob_sha)),
-                     ('|envoy_windows_docker_image|', 'envoy-windows:{}'.format(blob_sha)),
                      ('|envoy_distroless_docker_image|', 'envoy:distroless-{}'.format(blob_sha))]
 
 # Add any paths that contain templates here, relative to this directory.

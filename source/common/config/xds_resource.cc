@@ -27,10 +27,7 @@ std::string encodeAuthority(const std::string& authority) {
 }
 
 std::string encodeIdPath(const std::string& id) {
-  const std::string path =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.xdstp_path_avoid_colon_encoding")
-          ? PercentEncoding::encode(id, "%?#[]")
-          : PercentEncoding::encode(id, "%:?#[]");
+  const std::string path = PercentEncoding::encode(id, "%?#[]");
   return path.empty() ? "" : absl::StrCat("/", path);
 }
 

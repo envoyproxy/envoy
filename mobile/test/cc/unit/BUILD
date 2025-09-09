@@ -36,7 +36,7 @@ envoy_cc_test(
     },
     repository = "@envoy",
     deps = [
-        "//examples/cc/fetch_client:fetch_client_lib",
+        "//library/cc:engine_builder_lib",
         "@envoy_build_config//:extension_registry",
         "@envoy_build_config//:test_extensions",
     ],

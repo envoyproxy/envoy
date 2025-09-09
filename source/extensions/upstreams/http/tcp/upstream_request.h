@@ -5,7 +5,6 @@
 
 #include "envoy/http/codec.h"
 #include "envoy/tcp/conn_pool.h"
-#include "envoy/upstream/thread_local_cluster.h"
 
 #include "source/common/buffer/watermark_buffer.h"
 #include "source/common/common/cleanup.h"
@@ -22,9 +21,9 @@ namespace Tcp {
 
 class TcpConnPool : public Router::GenericConnPool, public Envoy::Tcp::ConnectionPool::Callbacks {
 public:
-  TcpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+  TcpConnPool(Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& thread_local_cluster,
               Upstream::ResourcePriority priority, Upstream::LoadBalancerContext* ctx) {
-    conn_pool_data_ = thread_local_cluster.tcpConnPool(priority, ctx);
+    conn_pool_data_ = thread_local_cluster.tcpConnPool(host, priority, ctx);
   }
   ~TcpConnPool() override {
     ENVOY_BUG(upstream_handle_ == nullptr, "upstream_handle not null");

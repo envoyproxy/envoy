@@ -8,6 +8,7 @@
 #include "quiche/common/capsule.h"
 #include "quiche/common/quiche_buffer_allocator.h"
 #include "quiche/quic/core/http/quic_spdy_stream.h"
+#include "quiche/quic/core/quic_types.h"
 
 namespace Envoy {
 namespace Quic {
@@ -18,10 +19,11 @@ void HttpDatagramHandler::decodeCapsule(const quiche::Capsule& capsule) {
   quiche::QuicheBuffer serialized_capsule = SerializeCapsule(capsule, &capsule_buffer_allocator_);
   Buffer::InstancePtr buffer = std::make_unique<Buffer::OwnedImpl>();
   buffer->add(serialized_capsule.AsStringView());
-  if (!stream_decoder_) {
+  if (stream_decoder_) {
+    stream_decoder_->decodeData(*buffer, stream_.IsDoneReading());
+  } else {
     IS_ENVOY_BUG("HTTP/3 Datagram received before a stream decoder is set.");
   }
-  stream_decoder_->decodeData(*buffer, stream_.IsDoneReading());
 }
 
 void HttpDatagramHandler::OnHttp3Datagram(quic::QuicStreamId stream_id, absl::string_view payload) {
@@ -44,26 +46,27 @@ bool HttpDatagramHandler::OnCapsule(const quiche::Capsule& capsule) {
     stream_.WriteCapsule(capsule, fin_set_);
     return true;
   }
-  quic::MessageStatus status =
+  quic::DatagramStatus status =
       stream_.SendHttp3Datagram(capsule.datagram_capsule().http_datagram_payload);
-  if (status == quic::MessageStatus::MESSAGE_STATUS_SUCCESS) {
+  if (status == quic::DatagramStatus::DATAGRAM_STATUS_SUCCESS) {
     return true;
   }
   // When SendHttp3Datagram cannot send a datagram immediately, it puts it into the queue and
-  // returns MESSAGE_STATUS_BLOCKED.
-  if (status == quic::MessageStatus::MESSAGE_STATUS_BLOCKED) {
+  // returns DATAGRAM_STATUS_BLOCKED.
+  if (status == quic::DatagramStatus::DATAGRAM_STATUS_BLOCKED) {
     ENVOY_LOG(trace, fmt::format("SendHttpH3Datagram failed: status = {}, buffers the Datagram.",
-                                 quic::MessageStatusToString(status)));
+                                 quic::DatagramStatusToString(status)));
     return true;
   }
-  if (status == quic::MessageStatus::MESSAGE_STATUS_TOO_LARGE) {
+  if (status == quic::DatagramStatus::DATAGRAM_STATUS_TOO_LARGE ||
+      status == quic::DatagramStatus::DATAGRAM_STATUS_SETTINGS_NOT_RECEIVED) {
     ENVOY_LOG(warn, fmt::format("SendHttpH3Datagram failed: status = {}, drops the Datagram.",
-                                quic::MessageStatusToString(status)));
+                                quic::DatagramStatusToString(status)));
     return true;
   }
   // Otherwise, returns false and thus resets the corresponding stream.
   ENVOY_LOG(error, fmt::format("SendHttpH3Datagram failed: status = {}, resets the stream.",
-                               quic::MessageStatusToString(status)));
+                               quic::DatagramStatusToString(status)));
   return false;
 }
 

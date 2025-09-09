@@ -79,7 +79,7 @@ final class IdleTimeoutTests: XCTestCase {
     let callbackExpectation =
       self.expectation(description: "Stream idle timeout received by callbacks")
 
-    EnvoyTestServer.startHttp1PlaintextServer()
+    EnvoyTestServer.startHttp1Server()
 
     let engine = EngineBuilder()
       .setLogLevel(.debug)
@@ -95,7 +95,7 @@ final class IdleTimeoutTests: XCTestCase {
 
     let client = engine.streamClient()
 
-    let port = String(EnvoyTestServer.getEnvoyPort())
+    let port = String(EnvoyTestServer.getHttpPort())
     let requestHeaders = RequestHeadersBuilder(
       method: .get, scheme: "http", authority: "localhost:" + port, path: "/"
     )
@@ -119,6 +119,6 @@ final class IdleTimeoutTests: XCTestCase {
     )
 
     engine.terminate()
-    EnvoyTestServer.shutdownTestServer()
+    EnvoyTestServer.shutdownTestHttpServer()
   }
 }

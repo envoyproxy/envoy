@@ -9,7 +9,8 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/server/transport_socket_factory_context.h"
+#include "test/mocks/server/overload_manager.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
@@ -41,7 +42,7 @@ class Http3ConnPoolImplTest : public Event::TestUsingSimulatedTime, public testi
 public:
   Http3ConnPoolImplTest() {
     ON_CALL(context_.server_context_, threadLocal()).WillByDefault(ReturnRef(thread_local_));
-    EXPECT_CALL(context_.context_manager_, createSslClientContext(_, _))
+    EXPECT_CALL(context_.server_context_.ssl_context_manager_, createSslClientContext(_, _))
         .WillRepeatedly(Return(ssl_context_));
     factory_ = *Quic::QuicClientTransportSocketFactory::create(
         std::unique_ptr<Envoy::Ssl::ClientContextConfig>(
@@ -70,7 +71,7 @@ public:
         allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
                          transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
                          makeOptRef<PoolConnectResultCallback>(connect_result_callback_),
-                         quic_info_, {observers_}, happy_eyeballs_);
+                         quic_info_, {observers_}, overload_manager_, happy_eyeballs_);
     EXPECT_EQ(3000, Http3ConnPoolImplPeer::getServerId(*pool_).port());
   }
 
@@ -78,11 +79,13 @@ public:
 
   Upstream::MockHost& mockHost() { return static_cast<Upstream::MockHost&>(*host_); }
 
+  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   Quic::PersistentQuicInfoImpl quic_info_{dispatcher_, 45};
   Upstream::HostSharedPtr host_{new NiceMock<Upstream::MockHost>};
   NiceMock<Random::MockRandomGenerator> random_;
   Upstream::ClusterConnectivityState state_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   Network::Address::InstanceConstSharedPtr test_address_ =
       *Network::Utility::resolveUrl("tcp://127.0.0.1:3000");
   std::shared_ptr<Upstream::HostDescription::AddressVector> address_list_{
@@ -99,7 +102,6 @@ public:
   std::unique_ptr<Http3ConnPoolImpl> pool_;
   MockPoolConnectResultCallback connect_result_callback_;
   std::shared_ptr<Network::MockSocketOption> socket_option_{new Network::MockSocketOption()};
-  testing::NiceMock<ThreadLocal::MockInstance> thread_local_;
   absl::Status creation_status_;
   bool happy_eyeballs_ = false;
 };
@@ -130,10 +132,11 @@ TEST_F(Http3ConnPoolImplTest, FastFailWithoutSecretsLoaded) {
   new Event::MockSchedulableCallback(&dispatcher_);
   Network::ConnectionSocket::OptionsSharedPtr options;
   Network::TransportSocketOptionsConstSharedPtr transport_options;
-  ConnectionPool::InstancePtr pool = allocateConnPool(
-      dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options, transport_options,
-      state_, quic_stat_names_, {}, *store_.rootScope(),
-      makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_, {observers_});
+  ConnectionPool::InstancePtr pool =
+      allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
+                       transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
+                       makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_,
+                       {observers_}, overload_manager_);
 
   EXPECT_EQ(static_cast<Http3ConnPoolImpl*>(pool.get())->instantiateActiveClient(), nullptr);
 }
@@ -157,10 +160,11 @@ TEST_F(Http3ConnPoolImplTest, FailWithSecretsBecomeEmpty) {
   new Event::MockSchedulableCallback(&dispatcher_);
   Network::ConnectionSocket::OptionsSharedPtr options;
   Network::TransportSocketOptionsConstSharedPtr transport_options;
-  ConnectionPool::InstancePtr pool = allocateConnPool(
-      dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options, transport_options,
-      state_, quic_stat_names_, {}, *store_.rootScope(),
-      makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_, {observers_});
+  ConnectionPool::InstancePtr pool =
+      allocateConnPool(dispatcher_, random_, host_, Upstream::ResourcePriority::Default, options,
+                       transport_options, state_, quic_stat_names_, {}, *store_.rootScope(),
+                       makeOptRef<PoolConnectResultCallback>(connect_result_callback_), quic_info_,
+                       {observers_}, overload_manager_);
 
   MockResponseDecoder decoder;
   ConnPoolCallbacks callbacks;
@@ -338,6 +342,17 @@ TEST_F(Http3ConnPoolImplTest, PendingNewStreamWithNetworkChange) {
     cancellable->cancel(Envoy::ConnectionPool::CancelPolicy::Default);
   }));
   clients.front()->onEvent(Network::ConnectionEvent::Connected);
+}
+
+TEST_F(Http3ConnPoolImplTest, MigrationEnabledNoDrain) {
+  quic_info_.migration_config_.migrate_session_on_network_change = true;
+  createNewStream();
+  EXPECT_FALSE(pool_->isIdle());
+  // Draining non-migratable connections should not drain the connection which might be able to
+  // migrate.
+  pool_->drainConnections(
+      Envoy::ConnectionPool::DrainBehavior::DrainExistingNonMigratableConnections);
+  EXPECT_FALSE(pool_->isIdle());
 }
 
 } // namespace Http3

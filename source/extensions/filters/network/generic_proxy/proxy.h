@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/access_log/access_log.h"
 #include "envoy/config/core/v3/extension.pb.h"
 #include "envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.h"
 #include "envoy/extensions/filters/network/generic_proxy/v3/generic_proxy.pb.validate.h"
@@ -63,7 +64,7 @@ public:
                    Rds::RouteConfigProviderSharedPtr route_config_provider,
                    std::vector<NamedFilterFactoryCb> factories, Tracing::TracerSharedPtr tracer,
                    Tracing::ConnectionManagerTracingConfigPtr tracing_config,
-                   std::vector<AccessLogInstanceSharedPtr>&& access_logs,
+                   AccessLog::InstanceSharedPtrVector&& access_logs,
                    const CodeOrFlags& code_or_flags,
                    Envoy::Server::Configuration::FactoryContext& context)
       : stat_prefix_(stat_prefix),
@@ -89,9 +90,7 @@ public:
   }
   GenericFilterStats& stats() override { return stats_; }
   const CodeOrFlags& codeOrFlags() const override { return code_or_flags_; }
-  const std::vector<AccessLogInstanceSharedPtr>& accessLogs() const override {
-    return access_logs_;
-  }
+  const AccessLog::InstanceSharedPtrVector& accessLogs() const override { return access_logs_; }
 
   // FilterChainFactory
   void createFilterChain(FilterChainManager& manager) override {
@@ -118,7 +117,7 @@ private:
 
   Tracing::TracerSharedPtr tracer_;
   Tracing::ConnectionManagerTracingConfigPtr tracing_config_;
-  std::vector<AccessLogInstanceSharedPtr> access_logs_;
+  std::vector<AccessLog::InstanceSharedPtr> access_logs_;
 
   TimeSource& time_source_;
 };
@@ -297,7 +296,7 @@ private:
   // returned by the public tracingConfig() method.
   // Tracing::TracingConfig
   Tracing::OperationName operationName() const override;
-  const Tracing::CustomTagMap* customTags() const override;
+  void modifySpan(Tracing::Span& span) const override;
   bool verbose() const override;
   uint32_t maxPathTagLength() const override;
   bool spawnUpstreamSpan() const override;
@@ -371,6 +370,7 @@ public:
   // Envoy::Network::ReadFilter
   Envoy::Network::FilterStatus onData(Envoy::Buffer::Instance& data, bool end_stream) override;
   Envoy::Network::FilterStatus onNewConnection() override {
+    server_codec_->onConnected();
     return Envoy::Network::FilterStatus::Continue;
   }
   void initializeReadFilterCallbacks(Envoy::Network::ReadFilterCallbacks& callbacks) override {
@@ -443,7 +443,7 @@ private:
 
   bool downstream_connection_closed_{};
 
-  FilterConfigSharedPtr config_{};
+  FilterConfigSharedPtr config_;
   GenericFilterStatsHelper stats_helper_;
 
   const Network::DrainDecision& drain_decision_;

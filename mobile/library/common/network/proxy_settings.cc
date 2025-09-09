@@ -2,15 +2,17 @@
 
 #include <memory>
 
+#include "absl/strings/string_view.h"
+
 namespace Envoy {
 namespace Network {
 
-ProxySettings::ProxySettings(const std::string& host, const uint16_t port)
-    : address_(Envoy::Network::Utility::parseInternetAddressNoThrow(host, port)), hostname_(host),
-      port_(port) {}
+ProxySettings::ProxySettings(absl::string_view host, const uint16_t port)
+    : hostname_(host), port_(port),
+      address_(Envoy::Network::Utility::parseInternetAddressNoThrow(hostname_, port_)) {}
 
 /*static*/
-ProxySettingsConstSharedPtr ProxySettings::parseHostAndPort(const std::string& host,
+ProxySettingsConstSharedPtr ProxySettings::parseHostAndPort(absl::string_view host,
                                                             const uint16_t port) {
   if (host == "" && port == 0) {
     return nullptr;

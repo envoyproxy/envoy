@@ -13,14 +13,13 @@ namespace OAuth2 {
 namespace {
 Secret::GenericSecretConfigProviderSharedPtr
 secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
-                Secret::SecretManager& secret_manager,
-                Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
+                Server::Configuration::ServerFactoryContext& server_context,
                 Init::Manager& init_manager) {
   if (config.has_sds_config()) {
-    return secret_manager.findOrCreateGenericSecretProvider(config.sds_config(), config.name(),
-                                                            transport_socket_factory, init_manager);
+    return server_context.secretManager().findOrCreateGenericSecretProvider(
+        config.sds_config(), config.name(), server_context, init_manager);
   } else {
-    return secret_manager.findStaticGenericSecretProvider(config.name());
+    return server_context.secretManager().findStaticGenericSecretProvider(config.name());
   }
 }
 } // namespace
@@ -28,12 +27,12 @@ secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretCo
 Common::CredentialInjectorSharedPtr
 OAuth2CredentialInjectorFactory::createCredentialInjectorFromProtoTyped(
     const OAuth2& config, const std::string& stats_prefix,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::ServerFactoryContext& context, Init::Manager& init_manager) {
 
   switch (config.flow_type_case()) {
   case envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2::FlowTypeCase::
       kClientCredentials:
-    return createOauth2ClientCredentialInjector(config, stats_prefix, context);
+    return createOauth2ClientCredentialInjector(config, stats_prefix, context, init_manager);
   case envoy::extensions::http::injected_credentials::oauth2::v3::OAuth2::FlowTypeCase::
       FLOW_TYPE_NOT_SET:
     throw EnvoyException("OAuth2 flow type not set");
@@ -44,26 +43,21 @@ OAuth2CredentialInjectorFactory::createCredentialInjectorFromProtoTyped(
 Common::CredentialInjectorSharedPtr
 OAuth2CredentialInjectorFactory::createOauth2ClientCredentialInjector(
     const OAuth2& proto_config, const std::string& stats_prefix,
-    Server::Configuration::FactoryContext& context) {
-  auto& cluster_manager = context.serverFactoryContext().clusterManager();
-  auto& secret_manager = cluster_manager.clusterManagerFactory().secretManager();
-  auto& transport_socket_factory = context.getTransportSocketFactoryContext();
+    Server::Configuration::ServerFactoryContext& context, Init::Manager& init_manager) {
+  auto& cluster_manager = context.clusterManager();
 
   const auto& client_secret_secret = proto_config.client_credentials().client_secret();
 
-  auto client_secret_provider = secretsProvider(client_secret_secret, secret_manager,
-                                                transport_socket_factory, context.initManager());
+  auto client_secret_provider = secretsProvider(client_secret_secret, context, init_manager);
   if (client_secret_provider == nullptr) {
     throw EnvoyException("Invalid oauth2 client secret configuration");
   }
 
   auto secret_reader = std::make_shared<const Common::SDSSecretReader>(
-      std::move(client_secret_provider), context.serverFactoryContext().threadLocal(),
-      context.serverFactoryContext().api());
+      std::move(client_secret_provider), context.threadLocal(), context.api());
   auto token_reader = std::make_shared<const TokenProvider>(
-      secret_reader, context.serverFactoryContext().threadLocal(), cluster_manager, proto_config,
-      context.serverFactoryContext().mainThreadDispatcher(), stats_prefix,
-      context.serverFactoryContext().scope());
+      secret_reader, context.threadLocal(), cluster_manager, proto_config,
+      context.mainThreadDispatcher(), stats_prefix, context.scope());
 
   return std::make_shared<OAuth2ClientCredentialTokenInjector>(token_reader);
 }

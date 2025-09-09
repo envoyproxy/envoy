@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -58,7 +59,7 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 absl::StatusOr<envoy::config::core::v3::Http2ProtocolOptions>
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
                              bool hcm_stream_error_set,
-                             const ProtobufWkt::BoolValue& hcm_stream_error);
+                             const Protobuf::BoolValue& hcm_stream_error);
 } // namespace Utility
 } // namespace Http2
 namespace Http3 {
@@ -67,7 +68,7 @@ namespace Utility {
 envoy::config::core::v3::Http3ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
                              bool hcm_stream_error_set,
-                             const ProtobufWkt::BoolValue& hcm_stream_error);
+                             const Protobuf::BoolValue& hcm_stream_error);
 
 } // namespace Utility
 } // namespace Http3
@@ -148,7 +149,7 @@ public:
    *
    * NOTE: the space character is encoded as %20, NOT as the + character
    */
-  static std::string urlEncodeQueryParameter(absl::string_view value);
+  static std::string urlEncode(absl::string_view value);
 
   /**
    * Exactly the same as above, but returns false when it finds a character that should be %-encoded
@@ -201,8 +202,10 @@ void appendVia(RequestOrResponseHeaderMap& headers, const std::string& via);
  * @param headers headers where authority should be updated.
  * @param hostname hostname that authority should be updated with.
  * @param append_xfh append the original authority to the x-forwarded-host header.
+ * @param keep_old insert the original authority in the x-envoy-original-host header.
  */
-void updateAuthority(RequestHeaderMap& headers, absl::string_view hostname, bool append_xfh);
+void updateAuthority(RequestHeaderMap& headers, absl::string_view hostname, bool append_xfh,
+                     bool keep_old);
 
 /**
  * Creates an SSL (https) redirect path based on the input host and path headers.
@@ -262,7 +265,7 @@ std::string parseSetCookieValue(const HeaderMap& headers, const std::string& key
 
 /**
  * Produce the value for a Set-Cookie header with the given parameters.
- * @param key is the name of the cookie that is being set.
+ * @param name is the name of the cookie that is being set.
  * @param value the value to set the cookie to; this value is trusted.
  * @param path the path for the cookie, or the empty string to not set a path.
  * @param max_age the length of time for which the cookie is valid, or zero
@@ -270,9 +273,16 @@ std::string parseSetCookieValue(const HeaderMap& headers, const std::string& key
  * to create a session cookie.
  * @return std::string a valid Set-Cookie header value string
  */
-std::string makeSetCookieValue(const std::string& key, const std::string& value,
-                               const std::string& path, const std::chrono::seconds max_age,
-                               bool httponly, const Http::CookieAttributeRefVector attributes);
+std::string makeSetCookieValue(absl::string_view name, absl::string_view value,
+                               absl::string_view path, std::chrono::seconds max_age, bool httponly,
+                               absl::Span<const CookieAttribute> attributes);
+
+/**
+ * Remove a particular key value pair from a cookie.
+ * @param headers supplies the headers to remove the cookie pair from.
+ * @param key the key for the particular cookie value to remove.
+ */
+void removeCookieValue(HeaderMap& headers, const std::string& key);
 
 /**
  * Get the response status from the response headers.
@@ -313,6 +323,20 @@ bool isH3UpgradeRequest(const RequestHeaderMap& headers);
  * - Upgrade: websocket
  */
 bool isWebSocketUpgradeRequest(const RequestHeaderMap& headers);
+
+/**
+ * Removes tokens from `Upgrade` header matching one of the matchers. Removes the `Upgrade`
+ * header if result is empty.
+ */
+void removeUpgrade(RequestOrResponseHeaderMap& headers,
+                   const std::vector<Matchers::StringMatcherPtr>& matchers);
+
+/**
+ * Removes `tokens_to_remove` from the `Connection` header, if present and part of a comma separated
+ * set of values. Removes the `Connection` header if it only contains `tokens_to_remove`.
+ */
+void removeConnectionUpgrade(RequestOrResponseHeaderMap& headers,
+                             const StringUtil::CaseUnorderedSet& tokens_to_remove);
 
 struct EncodeFunctions {
   // Function to modify locally generated response headers.
@@ -447,9 +471,22 @@ std::string buildOriginalUri(const Http::RequestHeaderMap& request_headers,
                              absl::optional<uint32_t> max_path_length);
 
 /**
+ * Extract scheme, host and path from a URI. The host may contain a port.
+ * This function doesn't validate if the URI is valid. It only parses the URI with following
+ * format: scheme://host/path.
+ * If parts of the URI are missing, the corresponding output string may be empty.
+ * @param the input URI string
+ * @param the output scheme string
+ * @param the output host string.
+ * @param the output path string.
+ */
+void extractSchemeHostPathFromUri(const absl::string_view& uri, absl::string_view& scheme,
+                                  absl::string_view& host, absl::string_view& path);
+/**
  * Extract host and path from a URI. The host may contain port.
  * This function doesn't validate if the URI is valid. It only parses the URI with following
  * format: scheme://host/path.
+ * If parts of the URI are missing, the corresponding output string may be empty.
  * @param the input URI string
  * @param the output host string.
  * @param the output path string.
@@ -467,8 +504,12 @@ std::string localPathFromFilePath(const absl::string_view& file_path);
 
 /**
  * Prepare headers for a HttpUri.
+ * @param the input URI
+ * @param flag whether the :scheme header shall be generated according to the input URI
+ * @return RequestMessage with headers set according to the input URI
  */
-RequestMessagePtr prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri);
+RequestMessagePtr prepareHeaders(const envoy::config::core::v3::HttpUri& http_uri,
+                                 bool include_scheme = false);
 
 /**
  * Returns string representation of StreamResetReason.
@@ -568,15 +609,15 @@ const ConfigType* resolveMostSpecificPerFilterConfig(const Http::StreamFilterCal
  *
  * @param callbacks The stream filter callbacks to check for route configs.
  *
- * @return The all available per route config. The returned pointers are guaranteed to be non-null
- * and their lifetime is the same as the matched route.
+ * @return all the available per route config in ascending order of specificity (i.e., route table
+ * first, then virtual host, then per route).
  */
 template <class ConfigType>
-absl::InlinedVector<const ConfigType*, 4>
+absl::InlinedVector<std::reference_wrapper<const ConfigType>, 4>
 getAllPerFilterConfig(const Http::StreamFilterCallbacks* callbacks) {
   ASSERT(callbacks != nullptr);
 
-  absl::InlinedVector<const ConfigType*, 4> all_configs;
+  absl::InlinedVector<std::reference_wrapper<const ConfigType>, 4> all_configs;
 
   for (const auto* config : callbacks->perFilterConfigs()) {
     const ConfigType* typed_config = dynamic_cast<const ConfigType*>(config);
@@ -584,7 +625,7 @@ getAllPerFilterConfig(const Http::StreamFilterCallbacks* callbacks) {
       ENVOY_LOG_MISC(debug, "Failed to retrieve the correct type of route specific filter config");
       continue;
     }
-    all_configs.push_back(typed_config);
+    all_configs.push_back(*typed_config);
   }
 
   return all_configs;

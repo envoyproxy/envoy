@@ -6,20 +6,6 @@
 
 namespace Envoy {
 
-TEST(StlHelpersTest, TestPairOutputToStreamOperator) {
-  std::stringstream os;
-  std::pair<int, std::string> v{10, "five"};
-  os << v;
-  EXPECT_EQ("pair(10, five)", os.str());
-}
-
-TEST(StlHelpersTest, TestVectorOutputToStreamOperator) {
-  std::stringstream os;
-  std::vector<int> v{1, 2, 3, 4, 5};
-  os << v;
-  EXPECT_EQ("vector { 1, 2, 3, 4, 5 }", os.str());
-}
-
 TEST(StlHelpersTest, AccumulateToString) {
   std::vector<int> numbers{1, 2, 3, 4};
 

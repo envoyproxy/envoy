@@ -110,7 +110,7 @@ Bytes FetchRecordConverterImpl::renderRecordBatch(
 void FetchRecordConverterImpl::appendRecord(const InboundRecord& record, Bytes& out) const {
 
   Bytes tmp = {};
-  // This is not precise maths, as we could be over-reserving a little due to var-length fields.
+  // This is not precise math, as we could be over-reserving a little due to var-length fields.
   tmp.reserve(sizeof(int8_t) + sizeof(int64_t) + sizeof(int32_t) + record.dataLengthEstimate());
 
   // attributes: int8

@@ -97,7 +97,7 @@ both IPv4 and IPv6 addresses. For clusters which use
 by specifying additional IP addresses for a host using the
 :ref:`additional_addresses <envoy_v3_api_field_config.endpoint.v3.Endpoint.additional_addresses>` field.
 The addresses specified in this field will be appended in a list to the one specified in
-:ref:`address <envoy_v3_api_field_config.endpoint.v3.Endpoint.address>`
+:ref:`address <envoy_v3_api_field_config.endpoint.v3.Endpoint.address>`.
 
 The list of all addresses will be sorted according the the Happy Eyeballs
 specification and a connection will be attempted to the first in the list. If this connection succeeds,
@@ -108,7 +108,7 @@ Eventually an attempt will succeed to one of the addresses in which case that co
 all attempts will fail in which case a connection error will be reported.
 
 HTTP/3 has limited Happy-Eyeballs-like support.
-When using ref:`auto_config <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.auto_config>`
+When using :ref:`auto_config <envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.auto_config>`
 for HTTP/3 with TCP-failover, Envoy will make a best-effort attempt to try two address families. As with TCP
 Happy Eyeballs support, Envoy allows 300ms for the first HTTP/3 attempt to connect. If the connection explicitly
 fails or the 300ms timeout expires, if DNS resolution results in the first two resolved addresses being of

@@ -409,7 +409,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
                      metadata->affinityIteration()->key());
 
     if (!metadata->destination().empty()) {
-      // TRA query get result, and set destintion.
+      // TRA query get result, and set destination.
       host = metadata->destination();
       ENVOY_STREAM_LOG(debug, "has already set destination {} from affinity", *callbacks_, host);
     } else {
@@ -438,8 +438,8 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
       }
     }
 
-    // Already get destintion for current affinity, try to get or create new connection for this
-    // destination. If this destintion is invalid, try next affinity.
+    // Already get destination for current affinity, try to get or create new connection for this
+    // destination. If this destination is invalid, try next affinity.
     if (auto upstream_request = transaction_info->getUpstreamRequest(std::string(host));
         upstream_request != nullptr) {
       // There is action connection, reuse it.

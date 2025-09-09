@@ -41,7 +41,7 @@ public:
     (*struct_.mutable_fields())["inner_key"] = ValueUtil::stringValue("inner_value");
   }
 
-  explicit TestSerializedStructFilterState(const ProtobufWkt::Struct& s) : use_struct_(true) {
+  explicit TestSerializedStructFilterState(const Protobuf::Struct& s) : use_struct_(true) {
     struct_.CopyFrom(s);
   }
 
@@ -51,20 +51,20 @@ public:
 
   ProtobufTypes::MessagePtr serializeAsProto() const override {
     if (use_struct_) {
-      auto s = std::make_unique<ProtobufWkt::Struct>();
+      auto s = std::make_unique<Protobuf::Struct>();
       s->CopyFrom(struct_);
       return s;
     }
 
-    auto d = std::make_unique<ProtobufWkt::Duration>();
+    auto d = std::make_unique<Protobuf::Duration>();
     d->CopyFrom(duration_);
     return d;
   }
 
 private:
   const bool use_struct_{false};
-  ProtobufWkt::Struct struct_;
-  ProtobufWkt::Duration duration_;
+  Protobuf::Struct struct_;
+  Protobuf::Duration duration_;
 };
 
 // Class used to test serializeAsString and serializeAsProto of FilterState
@@ -75,7 +75,7 @@ public:
     return raw_string_ + " By PLAIN";
   }
   ProtobufTypes::MessagePtr serializeAsProto() const override {
-    auto message = std::make_unique<ProtobufWkt::StringValue>();
+    auto message = std::make_unique<Protobuf::StringValue>();
     message->set_value(raw_string_ + " By TYPED");
     return message;
   }
@@ -89,12 +89,12 @@ private:
  * "com.test": {"test_key":"test_value","test_obj":{"inner_key":"inner_value"}}
  */
 void populateMetadataTestData(envoy::config::core::v3::Metadata& metadata) {
-  ProtobufWkt::Struct struct_obj;
+  Protobuf::Struct struct_obj;
   auto& fields_map = *struct_obj.mutable_fields();
   fields_map["test_key"] = ValueUtil::stringValue("test_value");
-  ProtobufWkt::Struct struct_inner;
+  Protobuf::Struct struct_inner;
   (*struct_inner.mutable_fields())["inner_key"] = ValueUtil::stringValue("inner_value");
-  ProtobufWkt::Value val;
+  Protobuf::Value val;
   *val.mutable_struct_value() = struct_inner;
   fields_map["test_obj"] = val;
   (*metadata.mutable_filter_metadata())["com.test"] = struct_obj;
@@ -895,6 +895,8 @@ TEST(SubstitutionFormatterTest, OpenTelemetryFormatterMultiTokenTest) {
 TEST(SubstitutionFormatterTest, CELFormatterTest) {
   {
     NiceMock<Server::Configuration::MockFactoryContext> context;
+    ScopedThreadLocalServerContextSetter server_context_setter(context.server_factory_context_);
+
     StreamInfo::MockStreamInfo stream_info;
     Http::TestRequestHeaderMapImpl request_header{{"some_request_header", "SOME_REQUEST_HEADER"}};
     Http::TestResponseHeaderMapImpl response_header{
@@ -909,13 +911,9 @@ TEST(SubstitutionFormatterTest, CELFormatterTest) {
           - key: "cel_field"
             value:
               string_value: "%CEL(request.headers['some_request_header'])% %CEL(response.headers['some_response_header'])%"
-      formatters:
-        - name: envoy.formatter.cel
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.formatter.cel.v3.Cel
     )EOF",
                               otel_config);
-    auto commands = Formatter::SubstitutionFormatStringUtils::parseFormatters(
+    auto commands = *Formatter::SubstitutionFormatStringUtils::parseFormatters(
         otel_config.formatters(), context);
 
     OpenTelemetryFormatter formatter(otel_config.resource_attributes(), commands);

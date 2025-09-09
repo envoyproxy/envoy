@@ -206,12 +206,13 @@ ProtocolOptionsConfigImpl::createProtocolOptionsConfig(
     const envoy::config::core::v3::HttpProtocolOptions& common_options,
     const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
     bool use_downstream_protocol, bool use_http2,
+    Server::Configuration::ServerFactoryContext& server_context,
     ProtobufMessage::ValidationVisitor& validation_visitor) {
   auto options_or_error = Http2::Utility::initializeAndValidateOptions(http2_options);
   RETURN_IF_NOT_OK_REF(options_or_error.status());
   return std::shared_ptr<ProtocolOptionsConfigImpl>(new ProtocolOptionsConfigImpl(
       http1_settings, options_or_error.value(), common_options, upstream_options,
-      use_downstream_protocol, use_http2, validation_visitor));
+      use_downstream_protocol, use_http2, server_context, validation_visitor));
 }
 
 ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
@@ -221,7 +222,7 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     absl::optional<const envoy::config::core::v3::AlternateProtocolsCacheOptions> cache_options,
     Server::Configuration::ServerFactoryContext& server_context)
     : http1_settings_(Envoy::Http::Http1::parseHttp1Settings(
-          getHttpOptions(options), server_context.messageValidationVisitor())),
+          getHttpOptions(options), server_context, server_context.messageValidationVisitor())),
       http2_options_(std::move(http2_options)), http3_options_(getHttp3Options(options)),
       common_http_protocol_options_(options.common_http_protocol_options()),
       upstream_http_protocol_options_(
@@ -244,8 +245,10 @@ ProtocolOptionsConfigImpl::ProtocolOptionsConfigImpl(
     const envoy::config::core::v3::HttpProtocolOptions& common_options,
     const absl::optional<envoy::config::core::v3::UpstreamHttpProtocolOptions> upstream_options,
     bool use_downstream_protocol, bool use_http2,
+    Server::Configuration::ServerFactoryContext& server_context,
     ProtobufMessage::ValidationVisitor& validation_visitor)
-    : http1_settings_(Envoy::Http::Http1::parseHttp1Settings(http1_settings, validation_visitor)),
+    : http1_settings_(Envoy::Http::Http1::parseHttp1Settings(http1_settings, server_context,
+                                                             validation_visitor)),
       http2_options_(validated_http2_options), common_http_protocol_options_(common_options),
       upstream_http_protocol_options_(upstream_options),
       use_downstream_protocol_(use_downstream_protocol), use_http2_(use_http2) {

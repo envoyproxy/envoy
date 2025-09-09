@@ -27,10 +27,10 @@ envoy_cc_contrib_extension(
 envoy_cc_library(
     name = "router_interface",
     hdrs = ["router.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         "//contrib/sip_proxy/filters/network/source:metadata_lib",
         "//envoy/router:router_interface",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 

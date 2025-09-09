@@ -104,9 +104,9 @@ public:
     setupFilter(plugin_name);
   }
 
-  std::string genSoPath(std::string name) {
+  std::string genSoPath() {
     return TestEnvironment::substitute(
-        "{{ test_rundir }}/contrib/golang/filters/http/test/test_data/" + name + "/filter.so");
+        "{{ test_rundir }}/contrib/golang/filters/http/test/test_data/plugins.so");
   }
 
   void setupDso(std::string id, std::string path, std::string plugin_name) {
@@ -166,7 +166,7 @@ public:
 // request that is headers only.
 TEST_F(GolangHttpFilterTest, ScriptHeadersOnlyRequestHeadersOnly) {
   InSequence s;
-  setup(PASSTHROUGH, genSoPath(PASSTHROUGH), PASSTHROUGH);
+  setup(PASSTHROUGH, genSoPath(), PASSTHROUGH);
 
   Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
@@ -176,7 +176,7 @@ TEST_F(GolangHttpFilterTest, ScriptHeadersOnlyRequestHeadersOnly) {
 // setHeader at wrong stage
 TEST_F(GolangHttpFilterTest, SetHeaderAtWrongStage) {
   InSequence s;
-  setup(PASSTHROUGH, genSoPath(PASSTHROUGH), PASSTHROUGH);
+  setup(PASSTHROUGH, genSoPath(), PASSTHROUGH);
   auto req = new HttpRequestInternal(*filter_);
 
   EXPECT_EQ(CAPINotInGo, filter_->setHeader(req->decodingState(), "foo", "bar", HeaderSet));
@@ -187,7 +187,7 @@ TEST_F(GolangHttpFilterTest, SetHeaderAtWrongStage) {
 // invalid config for routeconfig filter
 TEST_F(GolangHttpFilterTest, InvalidConfigForRouteConfigFilter) {
   InSequence s;
-  EXPECT_THROW_WITH_REGEX(setup(ROUTECONFIG, genSoPath(ROUTECONFIG), ROUTECONFIG), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(setup(ROUTECONFIG, genSoPath(), ROUTECONFIG), EnvoyException,
                           "golang filter failed to parse plugin config");
 }
 

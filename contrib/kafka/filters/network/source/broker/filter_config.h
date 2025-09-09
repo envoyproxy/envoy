@@ -2,6 +2,7 @@
 
 #include <utility>
 
+#include "absl/container/flat_hash_set.h"
 #include "absl/types/optional.h"
 #include "contrib/envoy/extensions/filters/network/kafka_broker/v3/kafka_broker.pb.h"
 #include "contrib/envoy/extensions/filters/network/kafka_broker/v3/kafka_broker.pb.validate.h"
@@ -39,7 +40,9 @@ public:
 
   // Visible for testing.
   BrokerFilterConfig(const std::string& stat_prefix, const bool force_response_rewrite,
-                     const std::vector<RewriteRule>& broker_address_rewrite_rules);
+                     const std::vector<RewriteRule>& broker_address_rewrite_rules,
+                     const absl::flat_hash_set<int16_t>& api_keys_allowed,
+                     const absl::flat_hash_set<int16_t>& api_keys_denied);
 
   /**
    * Returns the prefix for stats.
@@ -56,10 +59,22 @@ public:
    */
   virtual absl::optional<HostAndPort> findBrokerAddressOverride(const uint32_t broker_id) const;
 
+  /**
+   * Returns what API keys are allowed.
+   */
+  virtual absl::flat_hash_set<int16_t> apiKeysAllowed() const;
+
+  /**
+   * Returns what API keys are denied.
+   */
+  virtual absl::flat_hash_set<int16_t> apiKeysDenied() const;
+
 private:
   std::string stat_prefix_;
   bool force_response_rewrite_;
   std::vector<RewriteRule> broker_address_rewrite_rules_;
+  absl::flat_hash_set<int16_t> api_keys_allowed_;
+  absl::flat_hash_set<int16_t> api_keys_denied_;
 };
 
 using BrokerFilterConfigSharedPtr = std::shared_ptr<BrokerFilterConfig>;

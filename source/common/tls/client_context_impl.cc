@@ -60,12 +60,21 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
                                      absl::Status& creation_status)
     : ContextImpl(scope, config, factory_context, nullptr /* additional_init */, creation_status),
       server_name_indication_(config.serverNameIndication()),
+      auto_host_sni_(config.autoHostServerNameIndication()),
       allow_renegotiation_(config.allowRenegotiation()),
       enforce_rsa_key_usage_(config.enforceRsaKeyUsage()),
       max_session_keys_(config.maxSessionKeys()) {
   if (!creation_status.ok()) {
     return;
   }
+
+  // Disallow insecure configuration.
+  if (config.autoSniSanMatch() && config.certificateValidationContext() == nullptr) {
+    creation_status = absl::InvalidArgumentError(
+        "'auto_sni_san_validation' was configured without a validation context");
+    return;
+  }
+
   // This should be guaranteed during configuration ingestion for client contexts.
   ASSERT(tls_contexts_.size() == 1);
   if (!parsed_alpn_protocols_.empty()) {
@@ -90,17 +99,24 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
 }
 
 absl::StatusOr<bssl::UniquePtr<SSL>>
-ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& options) {
-  absl::StatusOr<bssl::UniquePtr<SSL>> ssl_con_or_status(ContextImpl::newSsl(options));
+ClientContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& options,
+                          Upstream::HostDescriptionConstSharedPtr host) {
+  absl::StatusOr<bssl::UniquePtr<SSL>> ssl_con_or_status(ContextImpl::newSsl(options, host));
   if (!ssl_con_or_status.ok()) {
     return ssl_con_or_status;
   }
 
   bssl::UniquePtr<SSL> ssl_con = std::move(ssl_con_or_status.value());
 
-  const std::string server_name_indication = options && options->serverNameOverride().has_value()
-                                                 ? options->serverNameOverride().value()
-                                                 : server_name_indication_;
+  std::string server_name_indication;
+  if (options && options->serverNameOverride().has_value()) {
+    server_name_indication = options->serverNameOverride().value();
+  } else if (auto_host_sni_ && host != nullptr && !host->hostname().empty()) {
+    server_name_indication = host->hostname();
+  } else {
+    server_name_indication = server_name_indication_;
+  }
+
   if (!server_name_indication.empty()) {
     const int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication.c_str());
     if (rc != 1) {

@@ -19,7 +19,7 @@ final class SendDataTests: XCTestCase {
   }
 
   func testSendData() throws {
-    EnvoyTestServer.startHttp1PlaintextServer()
+    EnvoyTestServer.startHttp1Server()
     EnvoyTestServer.setHeadersAndData("x-response-foo", header_value: "aaa", response_body: "data")
 
     // swiftlint:disable:next line_length
@@ -41,7 +41,7 @@ final class SendDataTests: XCTestCase {
 
     let client = engine.streamClient()
 
-    let port = String(EnvoyTestServer.getEnvoyPort())
+    let port = String(EnvoyTestServer.getHttpPort())
     let requestHeaders = RequestHeadersBuilder(method: .get, scheme: "http",
                                                authority: "localhost:" + port, path: "/simple.txt")
       .build()
@@ -67,6 +67,6 @@ final class SendDataTests: XCTestCase {
     XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 10), .completed)
 
     engine.terminate()
-    EnvoyTestServer.shutdownTestServer()
+    EnvoyTestServer.shutdownTestHttpServer()
   }
 }

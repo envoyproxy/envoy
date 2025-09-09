@@ -17,10 +17,48 @@ namespace Extensions {
 namespace HttpFilters {
 namespace HeaderToMetadataFilter {
 
+/**
+ * All stats for the Header-To-Metadata filter. @see stats_macros.h
+ */
+#define ALL_HEADER_TO_METADATA_FILTER_STATS(COUNTER)                                               \
+  COUNTER(request_rules_processed)                                                                 \
+  COUNTER(response_rules_processed)                                                                \
+  COUNTER(request_metadata_added)                                                                  \
+  COUNTER(response_metadata_added)                                                                 \
+  COUNTER(request_header_not_found)                                                                \
+  COUNTER(response_header_not_found)                                                               \
+  COUNTER(base64_decode_failed)                                                                    \
+  COUNTER(header_value_too_long)                                                                   \
+  COUNTER(regex_substitution_failed)
+
+/**
+ * Wrapper struct for header-to-metadata filter stats. @see stats_macros.h
+ */
+struct HeaderToMetadataFilterStats {
+  ALL_HEADER_TO_METADATA_FILTER_STATS(GENERATE_COUNTER_STRUCT)
+};
+
 using ProtoRule = envoy::extensions::filters::http::header_to_metadata::v3::Config::Rule;
 using ValueType = envoy::extensions::filters::http::header_to_metadata::v3::Config::ValueType;
 using ValueEncode = envoy::extensions::filters::http::header_to_metadata::v3::Config::ValueEncode;
 using KeyValuePair = envoy::extensions::filters::http::header_to_metadata::v3::Config::KeyValuePair;
+
+/**
+ * Enum to distinguish between request and response processing for stats collection.
+ */
+enum class HeaderDirection { Request, Response };
+
+/**
+ * Enum of all discrete events for which the filter records statistics.
+ */
+enum class StatsEvent {
+  RulesProcessed,
+  MetadataAdded,
+  HeaderNotFound,
+  Base64DecodeFailed,
+  HeaderValueTooLong,
+  RegexSubstitutionFailed,
+};
 
 // Interface for getting values from a cookie or a header.
 class ValueSelector {
@@ -70,13 +108,15 @@ private:
 
 class Rule {
 public:
-  Rule(const ProtoRule& rule, Regex::Engine& regex_engine);
+  static absl::StatusOr<Rule> create(const ProtoRule& rule, Regex::Engine& regex_engine);
   const ProtoRule& rule() const { return rule_; }
   const Regex::CompiledMatcherPtr& regexRewrite() const { return regex_rewrite_; }
   const std::string& regexSubstitution() const { return regex_rewrite_substitution_; }
   std::shared_ptr<const ValueSelector> selector_;
 
 private:
+  Rule(const ProtoRule& rule, Regex::Engine& regex_engine, absl::Status& creation_status);
+
   const ProtoRule rule_;
   Regex::CompiledMatcherPtr regex_rewrite_{};
   std::string regex_rewrite_substitution_{};
@@ -94,16 +134,28 @@ const uint32_t MAX_HEADER_VALUE_LEN = 8 * 1024;
 class Config : public ::Envoy::Router::RouteSpecificFilterConfig,
                public Logger::Loggable<Logger::Id::config> {
 public:
-  Config(const envoy::extensions::filters::http::header_to_metadata::v3::Config config,
-         Regex::Engine& regex_engine, bool per_route = false);
+  static absl::StatusOr<std::shared_ptr<Config>>
+  create(const envoy::extensions::filters::http::header_to_metadata::v3::Config& config,
+         Regex::Engine& regex_engine, Stats::Scope& scope, bool per_route = false);
 
   const HeaderToMetadataRules& requestRules() const { return request_rules_; }
   const HeaderToMetadataRules& responseRules() const { return response_rules_; }
   bool doResponse() const { return response_set_; }
   bool doRequest() const { return request_set_; }
+  const absl::optional<HeaderToMetadataFilterStats>& stats() const { return stats_; }
+
+  /**
+   * Increment the appropriate statistic for the given event and traffic direction.
+   * No-op if statistics were not configured.
+   */
+  void chargeStat(StatsEvent event, HeaderDirection direction) const;
 
 private:
   using ProtobufRepeatedRule = Protobuf::RepeatedPtrField<ProtoRule>;
+
+  Config(const envoy::extensions::filters::http::header_to_metadata::v3::Config config,
+         Regex::Engine& regex_engine, Stats::Scope& scope, bool per_route,
+         absl::Status& creation_status);
 
   /**
    *  configToVector is a helper function for converting from configuration (protobuf types) into
@@ -113,9 +165,20 @@ private:
    *         metadata
    *  @param vector A vector that will be populated with the configuration data from config
    *  @return true if any configuration data was added to the vector, false otherwise. Can be used
-   *          to validate whether the configuration was empty.
+   *          to validate whether the configuration was empty. If the configuration is invalid, an
+   *          error status will be returned.
    */
-  static bool configToVector(const ProtobufRepeatedRule&, HeaderToMetadataRules&, Regex::Engine&);
+  static absl::StatusOr<bool> configToVector(const ProtobufRepeatedRule&, HeaderToMetadataRules&,
+                                             Regex::Engine&);
+
+  /**
+   * Generate stats for the header-to-metadata filter.
+   * @param stat_prefix the prefix to use for stats.
+   * @param scope the stats scope.
+   * @return HeaderToMetadataFilterStats the generated stats.
+   */
+  static HeaderToMetadataFilterStats generateStats(const std::string& stat_prefix,
+                                                   Stats::Scope& scope);
 
   const std::string& decideNamespace(const std::string& nspace) const;
 
@@ -123,6 +186,8 @@ private:
   HeaderToMetadataRules response_rules_;
   bool response_set_;
   bool request_set_;
+  // Mutable to allow stats charging from const contexts.
+  mutable absl::optional<HeaderToMetadataFilterStats> stats_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
@@ -169,7 +234,7 @@ public:
 private:
   friend class HeaderToMetadataTest;
 
-  using StructMap = std::map<std::string, ProtobufWkt::Struct>;
+  using StructMap = std::map<std::string, Protobuf::Struct>;
 
   const ConfigSharedPtr config_;
   mutable const Config* effective_config_{nullptr};
@@ -185,12 +250,14 @@ private:
    *  @param rules the header-to-metadata mapping set in configuration.
    *  @param callbacks the callback used to fetch the StreamInfo (which is then used to get
    *                   metadata). Callable with both encoder_callbacks_ and decoder_callbacks_.
+   *  @param direction whether processing request or response headers for stats collection.
    */
   void writeHeaderToMetadata(Http::HeaderMap& headers, const HeaderToMetadataRules& rules,
-                             Http::StreamFilterCallbacks& callbacks);
+                             Http::StreamFilterCallbacks& callbacks, HeaderDirection direction);
   bool addMetadata(StructMap&, const std::string&, const std::string&, std::string, ValueType,
-                   ValueEncode) const;
-  void applyKeyValue(std::string&&, const Rule&, const KeyValuePair&, StructMap&);
+                   ValueEncode, HeaderDirection direction) const;
+  void applyKeyValue(std::string&&, const Rule&, const KeyValuePair&, StructMap&,
+                     HeaderDirection direction);
   const std::string& decideNamespace(const std::string& nspace) const;
   const Config* getConfig() const;
 };

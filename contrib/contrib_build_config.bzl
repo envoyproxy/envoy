@@ -14,7 +14,6 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.http.dynamo":                                "//contrib/dynamo/filters/http/source:config",
     "envoy.filters.http.golang":                                "//contrib/golang/filters/http/source:config",
     "envoy.filters.http.language":                              "//contrib/language/filters/http/source:config_lib",
-    "envoy.filters.http.squash":                                "//contrib/squash/filters/http/source:config",
     "envoy.filters.http.sxg":                                   "//contrib/sxg/filters/http/source:config",
 
     #
@@ -35,6 +34,12 @@ CONTRIB_EXTENSIONS = {
 
     "envoy.filters.network.sip_proxy":                          "//contrib/sip_proxy/filters/network/source:config",
     "envoy.filters.sip.router":                                 "//contrib/sip_proxy/filters/network/source/router:config",
+
+    #
+    # Tap sinks
+    #
+
+    "envoy.tap_sinks.udp_sink":                          "//contrib/tap_sinks/udp_sink/source:config",
 
     #
     # Private key providers
@@ -83,4 +88,10 @@ CONTRIB_EXTENSIONS = {
     #
 
     "envoy.router.cluster_specifier_plugin.golang":             "//contrib/golang/router/cluster_specifier/source:config",
+
+    #
+    # http tcp bridge plugin
+    #
+
+    "envoy.upstreams.http.tcp.golang":                          "//contrib/golang/upstreams/http/tcp/source:config",
 }

@@ -22,6 +22,7 @@ envoy_extension_cc_test(
         "envoy.compression.zstd.compressor",
         "envoy.compression.zstd.decompressor",
     ],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/compression/zstd/compressor:config",
         "//source/extensions/compression/zstd/decompressor:config",

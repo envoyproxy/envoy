@@ -1,5 +1,6 @@
 #include <memory>
 
+#include "source/extensions/load_balancing_policies/least_request/config.h"
 #include "source/extensions/load_balancing_policies/least_request/least_request_lb.h"
 
 #include "test/extensions/load_balancing_policies/common/zone_aware_load_balancer_fuzz_base.h"
@@ -95,13 +96,19 @@ DEFINE_PROTO_FUZZER(const test::common::upstream::LeastRequestLoadBalancerTestCa
                                   input.random_bytestring_for_requests());
 
   try {
+    Extensions::LoadBalancingPolices::LeastRequest::TypedLeastRequestLbConfig config(
+        zone_aware_load_balancer_test_case.load_balancer_test_case().common_lb_config(),
+        input.least_request_lb_config());
+    const auto threshold = PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
+        zone_aware_load_balancer_test_case.load_balancer_test_case().common_lb_config(),
+        healthy_panic_threshold, 100, 50);
+
     zone_aware_load_balancer_fuzz.lb_ = std::make_unique<LeastRequestLoadBalancer>(
         zone_aware_load_balancer_fuzz.priority_set_,
         zone_aware_load_balancer_fuzz.local_priority_set_.get(),
         zone_aware_load_balancer_fuzz.stats_, zone_aware_load_balancer_fuzz.runtime_,
-        zone_aware_load_balancer_fuzz.random_,
-        zone_aware_load_balancer_test_case.load_balancer_test_case().common_lb_config(),
-        input.least_request_lb_config(), zone_aware_load_balancer_fuzz.simTime());
+        zone_aware_load_balancer_fuzz.random_, threshold, config.lb_config_,
+        zone_aware_load_balancer_fuzz.simTime());
   } catch (EnvoyException& e) {
     ENVOY_LOG_MISC(debug, "EnvoyException; {}", e.what());
     removeRequestsActiveForStaticHosts(zone_aware_load_balancer_fuzz.priority_set_);

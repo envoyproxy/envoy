@@ -2,7 +2,7 @@
 
 #include <chrono>
 
-#include "source/common/router/config_impl.h"
+#include "source/common/router/delegating_route_impl.h"
 
 namespace Envoy {
 namespace Router {
@@ -44,10 +44,10 @@ ClusterConfig::ClusterConfig(const GolangClusterProto& config)
   }
 }
 
-RouteConstSharedPtr
-GolangClusterSpecifierPlugin::route(RouteConstSharedPtr parent,
-                                    const Http::RequestHeaderMap& header) const {
-  ASSERT(dynamic_cast<const RouteEntryImplBase*>(parent.get()) != nullptr);
+RouteConstSharedPtr GolangClusterSpecifierPlugin::route(RouteEntryAndRouteConstSharedPtr parent,
+                                                        const Http::RequestHeaderMap& header,
+                                                        const StreamInfo::StreamInfo&,
+                                                        uint64_t) const {
   int buffer_len = 256;
   std::string buffer;
   std::string cluster;
@@ -78,8 +78,7 @@ GolangClusterSpecifierPlugin::route(RouteConstSharedPtr parent,
     }
   }
 
-  return std::make_shared<RouteEntryImplBase::DynamicRouteEntry>(
-      dynamic_cast<const RouteEntryImplBase*>(parent.get()), parent, cluster);
+  return std::make_shared<Router::DynamicRouteEntry>(std::move(parent), std::move(cluster));
 }
 
 void GolangClusterSpecifierPlugin::log(absl::string_view& msg) const {

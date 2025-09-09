@@ -2,12 +2,21 @@ diff --git a/BUILD.bazel b/BUILD.bazel
 index 8099642a85..3598661079 100644
 --- a/BUILD.bazel
 +++ b/BUILD.bazel
-@@ -40,7 +40,7 @@ exports_files(["LICENSE"])
-
- config_setting(
-     name = "windows",
--    constraint_values = ["@bazel_tools//platforms:windows"],
-+    constraint_values = ["@platforms//os:windows"],
+@@ -157,17 +157,6 @@
+             "@re2//:re2",
+         ],
+         "//conditions:default": [],
+-    }) + select({
+-        # `gtest-death-test.cc` has `EXPECT_DEATH` that spawns a process,
+-        # expects it to crash and inspects its logs with the given matcher,
+-        # so that's why these libraries are needed.
+-        # Otherwise, builds targeting Fuchsia would fail to compile.
+-        ":fuchsia": [
+-            "@fuchsia_sdk//pkg/fdio",
+-            "@fuchsia_sdk//pkg/syslog",
+-            "@fuchsia_sdk//pkg/zx",
+-        ],
+-        "//conditions:default": [],
+     }),
  )
-
- config_setting(
+ 

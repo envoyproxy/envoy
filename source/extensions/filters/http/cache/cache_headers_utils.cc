@@ -288,9 +288,7 @@ VaryAllowList::VaryAllowList(
     Server::Configuration::CommonFactoryContext& context) {
 
   for (const auto& rule : allow_list) {
-    allow_list_.emplace_back(
-        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            rule, context));
+    allow_list_.emplace_back(std::make_unique<Matchers::StringMatcherImpl>(rule, context));
   }
 }
 

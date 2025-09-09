@@ -56,15 +56,15 @@ By *default* response compression is enabled, but it will be *skipped* when:
 
 - A request does **not** contain ``accept-encoding`` header.
 - A request contains an ``accept-encoding`` header, but it does not contain ``gzip`` or ``\*``.
-- A request contains an ``accept-encoding`` header with ``gzip`` or ``\*```` with the weight ``q=0``. Note
+- A request contains an ``accept-encoding`` header with ``gzip`` or ``\*`` with the weight ``q=0``. Note
   that the ``gzip`` will have a higher weight than ``\*``. For example, if ``accept-encoding``
   is ``gzip;q=0,\*;q=1``, the filter will not compress. But if the header is set to
   ``\*;q=0,gzip;q=1``, the filter will compress.
 - A request whose ``accept-encoding`` header includes any encoding type with a higher
   weight than ``gzip``'s given the corresponding compression filter is present in the chain.
 - A response contains a ``content-encoding`` header.
-- A response contains a ``cache-control```` header whose value includes ``no-transform``.
-- A response contains a ``transfer-encoding```` header whose value includes a known
+- A response contains a ``cache-control`` header whose value includes ``no-transform``.
+- A response contains a ``transfer-encoding`` header whose value includes a known
   compression name.
 - A response does **not** contain a ``content-type`` value that matches one of the selected
   mime-types, which default to:
@@ -81,6 +81,7 @@ By *default* response compression is enabled, but it will be *skipped* when:
 - A response does **not** contain a ``content-length`` or ``transfer-encoding`` headers.
 - Response size is smaller than 30 bytes (only applicable when ``transfer-encoding``
   is not chunked).
+- A response code is on the list of uncompressible response codes, which is empty by default.
 
 Please note that in case the filter is configured to use a compression library extension
 other than gzip it looks for content encoding in the ``accept-encoding`` header provided by
@@ -165,7 +166,7 @@ specific to responses only:
   header_not_valid, Counter, Number of requests sent with a not valid ``accept-encoding`` header (aka ``q=0`` or an unsupported encoding type).
   not_compressed_etag, Counter, Number of requests that were not compressed due to the etag header. ``disable_on_etag_header`` must be turned on for this to happen.
 
-.. attention:
+.. attention::
 
    In case the compressor is not configured to compress responses with the field
    ``response_direction_config`` of the :ref:`Compressor <envoy_v3_api_msg_extensions.filters.http.compressor.v3.Compressor>`

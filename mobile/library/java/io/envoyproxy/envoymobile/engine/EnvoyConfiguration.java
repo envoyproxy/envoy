@@ -1,5 +1,6 @@
 package io.envoyproxy.envoymobile.engine;
 
+import android.util.Pair;
 import java.util.Collections;
 import java.util.List;
 import java.util.ArrayList;
@@ -24,6 +25,8 @@ public class EnvoyConfiguration {
   }
 
   public final int connectTimeoutSeconds;
+  public final boolean disableDnsRefreshOnFailure;
+  public final boolean disableDnsRefreshOnNetworkChange;
   public final int dnsRefreshSeconds;
   public final int dnsFailureRefreshSecondsBase;
   public final int dnsFailureRefreshSecondsMax;
@@ -35,16 +38,13 @@ public class EnvoyConfiguration {
   public final int dnsNumRetries;
   public final boolean enableDrainPostDnsRefresh;
   public final boolean enableHttp3;
-  public final boolean useCares;
-  public final boolean forceV6;
-  public final boolean useGro;
   public final String http3ConnectionOptions;
   public final String http3ClientConnectionOptions;
   public final Map<String, String> quicHints;
   public final List<String> quicCanonicalSuffixes;
   public final boolean enableGzipDecompression;
   public final boolean enableBrotliDecompression;
-  public final boolean enablePortMigration;
+  public final int numTimeoutsToTriggerPortMigration;
   public final boolean enableSocketTagging;
   public final boolean enableInterfaceBinding;
   public final int h2ConnectionKeepaliveIdleIntervalMilliseconds;
@@ -62,13 +62,17 @@ public class EnvoyConfiguration {
   public final Map<String, String> runtimeGuards;
   public final boolean enablePlatformCertificatesValidation;
   public final String upstreamTlsSni;
+  public final int h3ConnectionKeepaliveInitialIntervalMilliseconds;
 
   /**
    * Create a new instance of the configuration.
    *
    * @param connectTimeoutSeconds                         timeout for new network connections to
-   *     hosts in
-   *                                                      the cluster.
+   *     hosts in the cluster.
+   * @param disableDnsRefreshOnFailure                    whether to disable the DNS refresh on
+   *     failure
+   * @param disableDnsRefreshOnNetworkChange              whether to disable the DNS refresh on
+   *     network change
    * @param dnsRefreshSeconds                             default rate in seconds at which to
    *     refresh DNS.
    * @param dnsFailureRefreshSecondsBase                  base rate in seconds to refresh DNS on
@@ -89,10 +93,6 @@ public class EnvoyConfiguration {
    *     DNS refresh.
    * @param enableHttp3                                   whether to enable experimental support for
    *     HTTP/3 (QUIC).
-   * @param useCares                                      whether to use the c_ares library for DNS
-   * @param forceV6                                       whether to map v4 address to v6
-   * @param useGro                                        whether to use UDP GRO on upstream QUIC
-   *     connections, if available.
    * @param http3ConnectionOptions                        connection options to be used in HTTP/3.
    * @param http3ClientConnectionOptions                  client connection options to be used in
    *     HTTP/3.
@@ -104,7 +104,8 @@ public class EnvoyConfiguration {
    *     decompression.
    * @param enableBrotliDecompression                     whether to enable response brotli
    *     decompression.
-   * @param enablePortMigration                           whether to enable quic port migration.
+   * @param numTimeoutsToTriggerPortMigration                 number of timeouts to trigger port
+   *     migration.
    * @param enableSocketTagging                           whether to enable socket tagging.
    * @param enableInterfaceBinding                        whether to allow interface binding.
    * @param h2ConnectionKeepaliveIdleIntervalMilliseconds rate in milliseconds seconds to send h2
@@ -126,16 +127,19 @@ public class EnvoyConfiguration {
    * @param keyValueStores                                platform key-value store implementations.
    * @param enablePlatformCertificatesValidation          whether to use the platform verifier.
    * @param upstreamTlsSni                                the upstream TLS socket SNI override.
+   * @param h3ConnectionKeepaliveInitialIntervalMilliseconds the initial keepalive ping timeout for
+   * HTTP/3.
    */
   public EnvoyConfiguration(
-      int connectTimeoutSeconds, int dnsRefreshSeconds, int dnsFailureRefreshSecondsBase,
-      int dnsFailureRefreshSecondsMax, int dnsQueryTimeoutSeconds, int dnsMinRefreshSeconds,
-      List<String> dnsPreresolveHostnames, boolean enableDNSCache, int dnsCacheSaveIntervalSeconds,
-      int dnsNumRetries, boolean enableDrainPostDnsRefresh, boolean enableHttp3, boolean useCares,
-      boolean forceV6, boolean useGro, String http3ConnectionOptions,
-      String http3ClientConnectionOptions, Map<String, Integer> quicHints,
-      List<String> quicCanonicalSuffixes, boolean enableGzipDecompression,
-      boolean enableBrotliDecompression, boolean enablePortMigration, boolean enableSocketTagging,
+      int connectTimeoutSeconds, boolean disableDnsRefreshOnFailure,
+      boolean disableDnsRefreshOnNetworkChange, int dnsRefreshSeconds,
+      int dnsFailureRefreshSecondsBase, int dnsFailureRefreshSecondsMax, int dnsQueryTimeoutSeconds,
+      int dnsMinRefreshSeconds, List<String> dnsPreresolveHostnames, boolean enableDNSCache,
+      int dnsCacheSaveIntervalSeconds, int dnsNumRetries, boolean enableDrainPostDnsRefresh,
+      boolean enableHttp3, String http3ConnectionOptions, String http3ClientConnectionOptions,
+      Map<String, Integer> quicHints, List<String> quicCanonicalSuffixes,
+      boolean enableGzipDecompression, boolean enableBrotliDecompression,
+      int numTimeoutsToTriggerPortMigration, boolean enableSocketTagging,
       boolean enableInterfaceBinding, int h2ConnectionKeepaliveIdleIntervalMilliseconds,
       int h2ConnectionKeepaliveTimeoutSeconds, int maxConnectionsPerHost,
       int streamIdleTimeoutSeconds, int perTryIdleTimeoutSeconds, String appVersion, String appId,
@@ -144,9 +148,12 @@ public class EnvoyConfiguration {
       List<EnvoyHTTPFilterFactory> httpPlatformFilterFactories,
       Map<String, EnvoyStringAccessor> stringAccessors,
       Map<String, EnvoyKeyValueStore> keyValueStores, Map<String, Boolean> runtimeGuards,
-      boolean enablePlatformCertificatesValidation, String upstreamTlsSni) {
+      boolean enablePlatformCertificatesValidation, String upstreamTlsSni,
+      int h3ConnectionKeepaliveInitialIntervalMilliseconds) {
     JniLibrary.load();
     this.connectTimeoutSeconds = connectTimeoutSeconds;
+    this.disableDnsRefreshOnFailure = disableDnsRefreshOnFailure;
+    this.disableDnsRefreshOnNetworkChange = disableDnsRefreshOnNetworkChange;
     this.dnsRefreshSeconds = dnsRefreshSeconds;
     this.dnsFailureRefreshSecondsBase = dnsFailureRefreshSecondsBase;
     this.dnsFailureRefreshSecondsMax = dnsFailureRefreshSecondsMax;
@@ -158,9 +165,6 @@ public class EnvoyConfiguration {
     this.dnsNumRetries = dnsNumRetries;
     this.enableDrainPostDnsRefresh = enableDrainPostDnsRefresh;
     this.enableHttp3 = enableHttp3;
-    this.useCares = useCares;
-    this.forceV6 = forceV6;
-    this.useGro = useGro;
     this.http3ConnectionOptions = http3ConnectionOptions;
     this.http3ClientConnectionOptions = http3ClientConnectionOptions;
     this.quicHints = new HashMap<>();
@@ -170,7 +174,7 @@ public class EnvoyConfiguration {
     this.quicCanonicalSuffixes = quicCanonicalSuffixes;
     this.enableGzipDecompression = enableGzipDecompression;
     this.enableBrotliDecompression = enableBrotliDecompression;
-    this.enablePortMigration = enablePortMigration;
+    this.numTimeoutsToTriggerPortMigration = numTimeoutsToTriggerPortMigration;
     this.enableSocketTagging = enableSocketTagging;
     this.enableInterfaceBinding = enableInterfaceBinding;
     this.h2ConnectionKeepaliveIdleIntervalMilliseconds =
@@ -202,6 +206,8 @@ public class EnvoyConfiguration {
     }
     this.enablePlatformCertificatesValidation = enablePlatformCertificatesValidation;
     this.upstreamTlsSni = upstreamTlsSni;
+    this.h3ConnectionKeepaliveInitialIntervalMilliseconds =
+        h3ConnectionKeepaliveInitialIntervalMilliseconds;
   }
 
   public long createBootstrap() {
@@ -217,15 +223,16 @@ public class EnvoyConfiguration {
     byte[][] quicSuffixes = JniBridgeUtility.stringsToJniBytes(quicCanonicalSuffixes);
 
     return JniLibrary.createBootstrap(
-        connectTimeoutSeconds, dnsRefreshSeconds, dnsFailureRefreshSecondsBase,
-        dnsFailureRefreshSecondsMax, dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dnsPreresolve,
-        enableDNSCache, dnsCacheSaveIntervalSeconds, dnsNumRetries, enableDrainPostDnsRefresh,
-        enableHttp3, useCares, forceV6, useGro, http3ConnectionOptions,
-        http3ClientConnectionOptions, quicHints, quicSuffixes, enableGzipDecompression,
-        enableBrotliDecompression, enablePortMigration, enableSocketTagging, enableInterfaceBinding,
-        h2ConnectionKeepaliveIdleIntervalMilliseconds, h2ConnectionKeepaliveTimeoutSeconds,
-        maxConnectionsPerHost, streamIdleTimeoutSeconds, perTryIdleTimeoutSeconds, appVersion,
-        appId, enforceTrustChainVerification, filterChain, enablePlatformCertificatesValidation,
-        upstreamTlsSni, runtimeGuards);
+        connectTimeoutSeconds, disableDnsRefreshOnFailure, disableDnsRefreshOnNetworkChange,
+        dnsRefreshSeconds, dnsFailureRefreshSecondsBase, dnsFailureRefreshSecondsMax,
+        dnsQueryTimeoutSeconds, dnsMinRefreshSeconds, dnsPreresolve, enableDNSCache,
+        dnsCacheSaveIntervalSeconds, dnsNumRetries, enableDrainPostDnsRefresh, enableHttp3,
+        http3ConnectionOptions, http3ClientConnectionOptions, quicHints, quicSuffixes,
+        enableGzipDecompression, enableBrotliDecompression, numTimeoutsToTriggerPortMigration,
+        enableSocketTagging, enableInterfaceBinding, h2ConnectionKeepaliveIdleIntervalMilliseconds,
+        h2ConnectionKeepaliveTimeoutSeconds, maxConnectionsPerHost, streamIdleTimeoutSeconds,
+        perTryIdleTimeoutSeconds, appVersion, appId, enforceTrustChainVerification, filterChain,
+        enablePlatformCertificatesValidation, upstreamTlsSni, runtimeGuards,
+        h3ConnectionKeepaliveInitialIntervalMilliseconds);
   }
 }

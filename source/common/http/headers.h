@@ -176,8 +176,11 @@ public:
   const LowerCaseString EnvoyOriginalDstHost{absl::StrCat(prefix(), "-original-dst-host")};
   const LowerCaseString EnvoyOriginalMethod{absl::StrCat(prefix(), "-original-method")};
   const LowerCaseString EnvoyOriginalPath{absl::StrCat(prefix(), "-original-path")};
+  const LowerCaseString EnvoyOriginalHost{absl::StrCat(prefix(), "-original-host")};
   const LowerCaseString EnvoyOverloaded{absl::StrCat(prefix(), "-overloaded")};
   const LowerCaseString EnvoyDropOverload{absl::StrCat(prefix(), "-drop-overload")};
+  const LowerCaseString EnvoyUnconditionalDropOverload{
+      absl::StrCat(prefix(), "-unconditional-drop-overload")};
   const LowerCaseString EnvoyRateLimited{absl::StrCat(prefix(), "-ratelimited")};
   const LowerCaseString EnvoyRetryOn{absl::StrCat(prefix(), "-retry-on")};
   const LowerCaseString EnvoyRetryGrpcOn{absl::StrCat(prefix(), "-retry-grpc-on")};
@@ -236,7 +239,6 @@ public:
   const LowerCaseString Via{"via"};
   const LowerCaseString WWWAuthenticate{"www-authenticate"};
   const LowerCaseString XContentTypeOptions{"x-content-type-options"};
-  const LowerCaseString XSquashDebug{"x-squash-debug"};
   const LowerCaseString EarlyData{"early-data"};
 
   struct {
@@ -285,6 +287,10 @@ public:
   struct {
     const std::string True{"true"};
   } EnvoyDropOverloadValues;
+
+  struct {
+    const std::string True{"true"};
+  } EnvoyUnconditionalDropOverloadValues;
 
   struct {
     const std::string True{"true"};
@@ -350,6 +356,7 @@ public:
 
   struct {
     const std::string EnvoyHealthChecker{"Envoy/HC"};
+    const std::string GoBrowser{"Go-browser"};
   } UserAgentValues;
 
   struct {

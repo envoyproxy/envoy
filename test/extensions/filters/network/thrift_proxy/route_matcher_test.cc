@@ -647,7 +647,7 @@ routes:
         criteria->metadataMatchCriteria();
     EXPECT_EQ(2, mmc.size());
 
-    ProtobufWkt::Value v1, v2;
+    Protobuf::Value v1, v2;
     v1.set_string_value("v1");
     v2.set_string_value("v2");
     HashedValue hv1(v1), hv2(v2);
@@ -703,7 +703,7 @@ routes:
   auto matcher = createMatcher(yaml);
   MessageMetadata metadata;
   metadata.setMethodName("method1");
-  ProtobufWkt::Value v1, v2, v3;
+  Protobuf::Value v1, v2, v3;
   v1.set_string_value("v1");
   v2.set_string_value("v2");
   v3.set_string_value("v3");
@@ -790,7 +790,7 @@ routes:
   auto matcher = createMatcher(yaml);
   MessageMetadata metadata;
   metadata.setMethodName("method1");
-  ProtobufWkt::Value v1, v2, v3;
+  Protobuf::Value v1, v2, v3;
   v1.set_string_value("v1");
   v2.set_string_value("v2");
   v3.set_string_value("v3");
@@ -901,7 +901,7 @@ TEST_F(ThriftRouteMatcherTest, ClusterHeaderMetadataMatch) {
         criteria->metadataMatchCriteria();
     EXPECT_EQ(2, mmc.size());
 
-    ProtobufWkt::Value v1, v2;
+    Protobuf::Value v1, v2;
     v1.set_string_value("v1");
     v2.set_string_value("v2");
     HashedValue hv1(v1), hv2(v2);

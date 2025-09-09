@@ -331,7 +331,7 @@ void verifyP256(uint8_t* ciphertext, uint8_t* secret) {
   bssl::UniquePtr<BIGNUM> key(BN_new());
   BN_bin2bn(p256Key().data(), p256Key().size(), key.get());
 
-  const EC_GROUP* group = EC_group_p256();
+  const EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
   bssl::UniquePtr<EC_POINT> point(EC_POINT_new(group));
   EC_POINT_oct2point(group, point.get(), ciphertext, 65, nullptr);
   bssl::UniquePtr<EC_POINT> result(EC_POINT_new(group));
@@ -418,7 +418,7 @@ static void BM_P256_Computing(benchmark::State& state) {
   uint8_t ciphertext[65];
   uint8_t secret[32];
   for (auto _ : state) { // NOLINT
-    const EC_GROUP* group = EC_group_p256();
+    const EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
     bssl::UniquePtr<BIGNUM> priv_key(BN_new());
     BN_rand_range_ex(priv_key.get(), 1, EC_GROUP_get0_order(group));
     bssl::UniquePtr<EC_POINT> public_key(EC_POINT_new(group));
@@ -446,7 +446,7 @@ BENCHMARK(BM_P256_Computing);
 #ifndef IPP_CRYPTO_DISABLED
 // NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_P256_Computing_CryptoMB(benchmark::State& state) {
-  const EC_GROUP* group = EC_group_p256();
+  const EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_X9_62_prime256v1);
   uint8_t ciphertext[8][65];
   uint8_t secret[8][32];
   for (auto _ : state) { // NOLINT

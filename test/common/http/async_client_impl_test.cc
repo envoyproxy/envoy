@@ -57,6 +57,9 @@ public:
         .WillByDefault(ReturnRef(envoy::config::core::v3::Locality().default_instance()));
     cm_.initializeThreadLocalClusters({"fake_cluster"});
     HttpTestUtility::addDefaultHeaders(headers_);
+    ON_CALL(cm_.thread_local_cluster_, chooseHost(_)).WillByDefault(Invoke([this] {
+      return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
+    }));
   }
 
   virtual void expectSuccess(AsyncClient::Request* sent_request, uint64_t code) {
@@ -162,6 +165,31 @@ TEST_F(AsyncClientImplTest, BasicStream) {
 
   stream->sendHeaders(headers, false);
   stream->sendData(*body, true);
+
+  {
+    // Senseless but improves coverage.
+    Http::StreamDecoderFilterCallbacks* filter_callbacks =
+        dynamic_cast<Http::AsyncStreamImpl*>(stream);
+    filter_callbacks->continueDecoding(); // No-op.
+    Buffer::OwnedImpl buffer;
+    filter_callbacks->injectDecodedDataToFilterChain(buffer, true);   // No-op.
+    filter_callbacks->modifyDecodingBuffer([](Buffer::Instance&) {}); // No-op.
+    filter_callbacks->encodeMetadata(nullptr);                        // No-op.
+    EXPECT_EQ(false, filter_callbacks->recreateStream(nullptr));      // No-op.
+    filter_callbacks->getUpstreamSocketOptions();                     // No-op.
+    filter_callbacks->addUpstreamSocketOptions(nullptr);              // No-op.
+    filter_callbacks->mostSpecificPerFilterConfig();                  // No-op.
+    filter_callbacks->perFilterConfigs();                             // No-op.
+    filter_callbacks->http1StreamEncoderOptions();                    // No-op.
+    filter_callbacks->downstreamCallbacks();                          // No-op.
+    filter_callbacks->upstreamCallbacks();                            // No-op.
+    filter_callbacks->resetIdleTimer();                               // No-op.
+    filter_callbacks->setUpstreamOverrideHost({});                    // No-op.
+    filter_callbacks->filterConfigName();                             // No-op.
+    filter_callbacks->informationalHeaders();                         // No-op.
+    filter_callbacks->responseHeaders();                              // No-op.
+    filter_callbacks->responseTrailers();                             // No-op.
+  }
 
   response_decoder_->decode1xxHeaders(
       ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "100"}}));
@@ -472,6 +500,7 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarking) {
   EXPECT_NE(request, nullptr);
 
   StrictMock<MockSidestreamWatermarkCallbacks> watermark_callbacks;
+
   // Registering a new watermark callback should note that the high watermark has already been hit.
   EXPECT_CALL(watermark_callbacks, onSidestreamAboveHighWatermark());
   request->setWatermarkCallbacks(watermark_callbacks);
@@ -529,7 +558,6 @@ TEST_F(AsyncClientImplTest, OngoingRequestWithWatermarkingAndReset) {
       client_.startRequest(std::move(headers), callbacks_, AsyncClient::RequestOptions());
   EXPECT_NE(request, nullptr);
 
-  // StrictMock<MockStreamDecoderFilterCallbacks> watermark_callbacks;
   StrictMock<MockSidestreamWatermarkCallbacks> watermark_callbacks;
   request->setWatermarkCallbacks(watermark_callbacks);
 
@@ -758,14 +786,14 @@ TEST_F(AsyncClientImplTest, BasicHashPolicy) {
             response_decoder_ = &decoder;
             return nullptr;
           }));
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-      .WillOnce(
-          Invoke([&](Upstream::ResourcePriority, auto, Upstream::LoadBalancerContext* context) {
-            // this is the hash of :path header value "/"
-            // the hash stability across releases is expected, so test the hash value directly here.
-            EXPECT_EQ(16761507700594825962UL, context->computeHashKey().value());
-            return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
-          }));
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority, auto,
+                           Upstream::LoadBalancerContext* context) {
+        // this is the hash of :path header value "/"
+        // the hash stability across releases is expected, so test the hash value directly here.
+        EXPECT_EQ(16761507700594825962UL, context->computeHashKey().value());
+        return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
+      }));
 
   TestRequestHeaderMapImpl copy(message_->headers());
   copy.addCopy("x-envoy-internal", "true");
@@ -804,9 +832,9 @@ TEST_F(AsyncClientImplTest, WithoutMetadata) {
             return nullptr;
           }));
 
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-      .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-                           Upstream::LoadBalancerContext* context) {
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         EXPECT_EQ(context->metadataMatchCriteria(), nullptr);
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
       }));
@@ -848,9 +876,9 @@ TEST_F(AsyncClientImplTest, WithMetadata) {
             return nullptr;
           }));
 
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-      .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-                           Upstream::LoadBalancerContext* context) {
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
         EXPECT_NE(context->metadataMatchCriteria(), nullptr);
         EXPECT_EQ(context->metadataMatchCriteria()->metadataMatchCriteria().at(0)->name(),
                   "fake_test_key");
@@ -905,11 +933,12 @@ TEST_F(AsyncClientImplTest, WithFilterState) {
             return nullptr;
           }));
 
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _))
-      .WillOnce(Invoke([&](Upstream::ResourcePriority, absl::optional<Http::Protocol>,
-                           Upstream::LoadBalancerContext* context) {
-        const StreamInfo::FilterState& filter_state = context->requestStreamInfo()->filterState();
-        const TestStateObject* state = filter_state.getDataReadOnly<TestStateObject>("test-filter");
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
+        StreamInfo::FilterStateSharedPtr filter_state = context->requestStreamInfo()->filterState();
+        const TestStateObject* state =
+            filter_state->getDataReadOnly<TestStateObject>("test-filter");
         EXPECT_NE(state, nullptr);
         EXPECT_EQ(state->value(), "stored-test-state");
         return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
@@ -2175,7 +2204,7 @@ TEST_F(AsyncClientImplTest, RdsGettersTest) {
   auto& path_match_criterion = route_entry->pathMatchCriterion();
   EXPECT_EQ("", path_match_criterion.matcher());
   EXPECT_EQ(Router::PathMatchType::None, path_match_criterion.matchType());
-  const auto& route_config = route->virtualHost().routeConfig();
+  const auto& route_config = route->virtualHost()->routeConfig();
   EXPECT_EQ("", route_config.name());
   EXPECT_EQ(0, route_config.internalOnlyHeaders().size());
   auto cluster_info = filter_callbacks->clusterInfo();
@@ -2209,6 +2238,73 @@ TEST_F(AsyncClientImplTest, ParentStreamInfo) {
   EXPECT_FALSE(stream->streamInfo().parentStreamInfo().has_value());
 }
 
+TEST_F(AsyncClientImplTest, MetadataMatchCriteriaWithNullRoute) {
+  NiceMock<StreamInfo::MockStreamInfo> parent_stream_info;
+  EXPECT_CALL(parent_stream_info, route()).WillRepeatedly(Return(nullptr));
+
+  auto options = AsyncClient::StreamOptions();
+  options.parent_context.stream_info = &parent_stream_info;
+
+  // Start the client - this should not crash
+  AsyncClient::Stream* stream = client_.start(stream_callbacks_, options);
+
+  // Verify the parent stream info was set correctly
+  EXPECT_TRUE(stream->streamInfo().parentStreamInfo().has_value());
+  EXPECT_EQ(stream->streamInfo().parentStreamInfo().ptr(),
+            dynamic_cast<const StreamInfo::StreamInfo*>(&parent_stream_info));
+  EXPECT_NE(stream, nullptr);
+  EXPECT_EQ(stream->streamInfo().route()->routeEntry()->metadataMatchCriteria(), nullptr);
+}
+
+TEST_F(AsyncClientImplTest, MetadataMatchCriteriaWithNullRouteEntry) {
+  NiceMock<StreamInfo::MockStreamInfo> parent_stream_info;
+  const auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(parent_stream_info, route()).WillRepeatedly(Return(route));
+
+  EXPECT_CALL(*route, routeEntry()).WillRepeatedly(Return(nullptr));
+
+  auto options = AsyncClient::StreamOptions();
+  options.parent_context.stream_info = &parent_stream_info;
+
+  // Start the client - this should not crash
+  AsyncClient::Stream* stream = client_.start(stream_callbacks_, options);
+
+  // Verify the parent stream info was set correctly
+  EXPECT_TRUE(stream->streamInfo().parentStreamInfo().has_value());
+  EXPECT_EQ(stream->streamInfo().parentStreamInfo().ptr(),
+            dynamic_cast<const StreamInfo::StreamInfo*>(&parent_stream_info));
+  EXPECT_EQ(stream->streamInfo().route()->routeEntry()->metadataMatchCriteria(), nullptr);
+  EXPECT_NE(stream, nullptr);
+}
+
+TEST_F(AsyncClientImplTest, MetadataMatchCriteriaWithValidRouteEntry) {
+  NiceMock<StreamInfo::MockStreamInfo> parent_stream_info;
+  const auto route = std::make_shared<NiceMock<Router::MockRoute>>();
+  EXPECT_CALL(parent_stream_info, route()).WillRepeatedly(Return(route));
+
+  NiceMock<Router::MockRouteEntry> route_entry;
+  const auto metadata_criteria =
+      std::make_shared<Router::MetadataMatchCriteriaImpl>(Protobuf::Struct());
+  EXPECT_CALL(*route, routeEntry()).WillRepeatedly(Return(&route_entry));
+
+  EXPECT_CALL(route_entry, metadataMatchCriteria()).WillRepeatedly(Return(metadata_criteria.get()));
+
+  auto options = AsyncClient::StreamOptions();
+  options.parent_context.stream_info = &parent_stream_info;
+
+  // Start the client - this should set metadata_matching_criteria
+  AsyncClient::Stream* stream = client_.start(stream_callbacks_, options);
+
+  EXPECT_NE(stream, nullptr);
+
+  // Verify the parent stream info was set correctly
+  EXPECT_TRUE(stream->streamInfo().parentStreamInfo().has_value());
+  EXPECT_EQ(stream->streamInfo().parentStreamInfo().ptr(),
+            dynamic_cast<const StreamInfo::StreamInfo*>(&parent_stream_info));
+  EXPECT_EQ(stream->streamInfo().route()->routeEntry()->metadataMatchCriteria(),
+            metadata_criteria.get());
+}
+
 } // namespace
 
 // Must not be in anonymous namespace for friend to work.
@@ -2221,11 +2317,11 @@ public:
     auto policy_or_error =
         Router::RetryPolicyImpl::create(proto_policy, ProtobufMessage::getNullValidationVisitor(),
                                         factory_context, client_.factory_context_);
-    THROW_IF_STATUS_NOT_OK(policy_or_error, throw);
+    THROW_IF_NOT_OK_REF(policy_or_error.status());
     retry_policy_ = std::move(policy_or_error.value());
     EXPECT_TRUE(retry_policy_.get());
 
-    route_impl_ = std::make_unique<NullRouteImpl>(
+    route_impl_ = *NullRouteImpl::create(
         client_.cluster_->name(), *retry_policy_, regex_engine_, absl::nullopt,
         Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>());
   }
@@ -2259,7 +2355,7 @@ public:
     auto policy_or_error =
         Router::RetryPolicyImpl::create(proto_policy, ProtobufMessage::getNullValidationVisitor(),
                                         factory_context, client_.factory_context_);
-    THROW_IF_STATUS_NOT_OK(policy_or_error, throw);
+    THROW_IF_NOT_OK_REF(policy_or_error.status());
     retry_policy_ = std::move(policy_or_error.value());
     EXPECT_TRUE(retry_policy_.get());
 
@@ -2295,11 +2391,11 @@ TEST_F(AsyncClientImplUnitTest, NullRouteImplInitTest) {
   EXPECT_TRUE(route_entry.upgradeMap().empty());
   EXPECT_EQ(false, route_entry.internalRedirectPolicy().enabled());
   EXPECT_TRUE(route_entry.shadowPolicies().empty());
-  EXPECT_TRUE(route_impl_->virtualHost().rateLimitPolicy().empty());
-  EXPECT_EQ(nullptr, route_impl_->virtualHost().corsPolicy());
-  EXPECT_FALSE(route_impl_->virtualHost().includeAttemptCountInRequest());
-  EXPECT_FALSE(route_impl_->virtualHost().includeAttemptCountInResponse());
-  EXPECT_FALSE(route_impl_->virtualHost().routeConfig().usesVhds());
+  EXPECT_TRUE(route_impl_->virtualHost()->rateLimitPolicy().empty());
+  EXPECT_EQ(nullptr, route_impl_->virtualHost()->corsPolicy());
+  EXPECT_FALSE(route_impl_->virtualHost()->includeAttemptCountInRequest());
+  EXPECT_FALSE(route_impl_->virtualHost()->includeAttemptCountInResponse());
+  EXPECT_FALSE(route_impl_->virtualHost()->routeConfig().usesVhds());
   EXPECT_EQ(nullptr, route_entry.tlsContextMatchCriteria());
 }
 
@@ -2325,6 +2421,24 @@ retry_back_off:
 
   EXPECT_EQ(route_entry.retryPolicy().baseInterval(), std::chrono::milliseconds(10));
   EXPECT_EQ(route_entry.retryPolicy().maxInterval(), std::chrono::seconds(30));
+}
+
+TEST_F(AsyncClientImplUnitTest, AsyncStreamImplInitTestWithInvalidRetryPolicy) {
+  // Set an invalid retry back off.
+  const std::string yaml = R"EOF(
+per_try_timeout: 30s
+num_retries: 10
+retry_on: 5xx,gateway-error,connect-failure,reset
+retry_back_off:
+  base_interval: 10s
+  max_interval: 3s
+)EOF";
+  envoy::config::route::v3::RetryPolicy retry_policy;
+  TestUtility::loadFromYaml(yaml, retry_policy);
+
+  absl::StatusOr<std::unique_ptr<AsyncStreamImpl>> stream_or_error = Http::AsyncStreamImpl::create(
+      client_, stream_callbacks_, AsyncClient::StreamOptions().setRetryPolicy(retry_policy));
+  EXPECT_FALSE(stream_or_error.ok());
 }
 
 TEST_F(AsyncClientImplUnitTest, AsyncStreamImplInitTestWithRetryPolicy) {
@@ -2356,7 +2470,7 @@ TEST_F(AsyncClientImplUnitTest, NullConfig) {
 }
 
 TEST_F(AsyncClientImplUnitTest, NullVirtualHost) {
-  EXPECT_EQ(std::numeric_limits<uint32_t>::max(), vhost_.retryShadowBufferLimit());
+  EXPECT_EQ(std::numeric_limits<uint64_t>::max(), vhost_.requestBodyBufferLimit());
 }
 
 } // namespace Http

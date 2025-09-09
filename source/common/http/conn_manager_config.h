@@ -126,7 +126,7 @@ struct ConnectionManagerTracingStats {
   CONN_MAN_TRACING_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-using TracingConnectionManagerConfig = Tracing::ConnectionManagerTracingConfigImpl;
+using TracingConnectionManagerConfig = Tracing::ConnectionManagerTracingConfig;
 using TracingConnectionManagerConfigPtr = std::unique_ptr<TracingConnectionManagerConfig>;
 
 /**
@@ -190,9 +190,7 @@ public:
  */
 class DefaultInternalAddressConfig : public Http::InternalAddressConfig {
 public:
-  bool isInternalAddress(const Network::Address::Instance& address) const override {
-    return Network::Utility::isInternalAddress(address);
-  }
+  bool isInternalAddress(const Network::Address::Instance&) const override { return false; }
 };
 
 /**
@@ -213,7 +211,7 @@ public:
   /**
    *  @return const std::list<AccessLog::InstanceSharedPtr>& the access logs to write to.
    */
-  virtual const std::list<AccessLog::InstanceSharedPtr>& accessLogs() PURE;
+  virtual const AccessLog::InstanceSharedPtrVector& accessLogs() PURE;
 
   /**
    * @return const absl::optional<std::chrono::milliseconds>& the interval to flush the access logs.
@@ -312,6 +310,12 @@ public:
    *         disabled idle timeout.
    */
   virtual std::chrono::milliseconds streamIdleTimeout() const PURE;
+
+  /**
+   * @return per-stream flush timeout for incoming connection manager connections. Zero indicates a
+   *         disabled idle timeout.
+   */
+  virtual absl::optional<std::chrono::milliseconds> streamFlushTimeout() const PURE;
 
   /**
    * @return request timeout for incoming connection manager connections. Zero indicates
@@ -524,7 +528,7 @@ public:
   /**
    * @return maximum requests for downstream.
    */
-  virtual uint64_t maxRequestsPerConnection() const PURE;
+  virtual uint32_t maxRequestsPerConnection() const PURE;
   /**
    * @return the config describing if/how to write the Proxy-Status HTTP response header.
    * If nullptr, don't write the Proxy-Status HTTP response header.

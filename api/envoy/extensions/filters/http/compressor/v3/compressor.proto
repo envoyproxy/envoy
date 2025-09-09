@@ -67,6 +67,13 @@ message Compressor {
     //    To avoid interfering with other compression filters in the same chain use this option in
     //    the filter closest to the upstream.
     bool remove_accept_encoding_header = 3;
+
+    // Set of response codes for which compression is disabled, e.g. 206 Partial Content should not
+    // be compressed.
+    repeated uint32 uncompressible_response_codes = 4 [(validate.rules).repeated = {
+      unique: true
+      items {uint32 {lt: 600 gte: 200}}
+    }];
   }
 
   // Minimum response length, in bytes, which will trigger compression. The default value is 30.

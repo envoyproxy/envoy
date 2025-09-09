@@ -376,6 +376,19 @@ or :ref:`regex_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.regex_rew
 Envoy will put the original path header in this header. This can be useful for logging and
 debugging.
 
+.. _config_http_filters_router_x-envoy-original-host:
+
+x-envoy-original-host
+^^^^^^^^^^^^^^^^^^^^^
+
+If the route utilizes
+:ref:`host_rewrite_literal <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_literal>`,
+:ref:`auto_host_rewrite <envoy_v3_api_field_config.route.v3.RouteAction.auto_host_rewrite>`,
+:ref:`host_rewrite_header <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_header>`,
+:ref:`host_rewrite_path_regex <envoy_v3_api_field_config.route.v3.RouteAction.host_rewrite_path_regex>`,
+Envoy will put the original host header in this header. This can be useful for logging and
+debugging.
+
 .. _config_http_filters_router_x-envoy-upstream-stream-duration-ms:
 
 x-envoy-upstream-stream-duration-ms

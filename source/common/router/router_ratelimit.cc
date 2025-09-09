@@ -12,8 +12,6 @@
 #include "source/common/common/empty_string.h"
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
-#include "source/common/http/matching/data_impl.h"
-#include "source/common/matcher/matcher.h"
 #include "source/common/protobuf/utility.h"
 
 namespace Envoy {
@@ -39,52 +37,30 @@ bool populateDescriptor(const std::vector<RateLimit::DescriptorProducerPtr>& act
   return result;
 }
 
-class RateLimitDescriptorValidationVisitor
-    : public Matcher::MatchTreeValidationVisitor<Http::HttpMatchingData> {
-public:
-  absl::Status performDataInputValidation(const Matcher::DataInputFactory<Http::HttpMatchingData>&,
-                                          absl::string_view) override {
-    return absl::OkStatus();
-  }
-};
-
-class MatchInputRateLimitDescriptor : public RateLimit::DescriptorProducer {
-public:
-  MatchInputRateLimitDescriptor(const std::string& descriptor_key,
-                                Matcher::DataInputPtr<Http::HttpMatchingData>&& data_input)
-      : descriptor_key_(descriptor_key), data_input_(std::move(data_input)) {}
-
-  // Ratelimit::DescriptorProducer
-  bool populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry, const std::string&,
-                          const Http::RequestHeaderMap& headers,
-                          const StreamInfo::StreamInfo& info) const override {
-    Http::Matching::HttpMatchingDataImpl data(info);
-    data.onRequestHeaders(headers);
-    auto result = data_input_->get(data);
-    if (absl::holds_alternative<absl::monostate>(result.data_)) {
-      return false;
-    }
-    const std::string& str = absl::get<std::string>(result.data_);
-    if (!str.empty()) {
-      descriptor_entry = {descriptor_key_, str};
-    }
-    return true;
-  }
-
-private:
-  const std::string descriptor_key_;
-  Matcher::DataInputPtr<Http::HttpMatchingData> data_input_;
-};
-
 } // namespace
 
-const uint64_t RateLimitPolicyImpl::MAX_STAGE_NUMBER = 10UL;
+// Ratelimit::DescriptorProducer
+bool MatchInputRateLimitDescriptor::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                                                       const std::string&,
+                                                       const Http::RequestHeaderMap& headers,
+                                                       const StreamInfo::StreamInfo& info) const {
+  Http::Matching::HttpMatchingDataImpl data(info);
+  data.onRequestHeaders(headers);
+  auto result = data_input_->get(data);
+  if (!absl::holds_alternative<std::string>(result.data_)) {
+    return false;
+  }
+  if (absl::string_view str = absl::get<std::string>(result.data_); !str.empty()) {
+    descriptor_entry = {descriptor_key_, std::string(str)};
+  }
+  return true;
+}
 
 bool DynamicMetadataRateLimitOverride::populateOverride(
     RateLimit::Descriptor& descriptor, const envoy::config::core::v3::Metadata* metadata) const {
-  const ProtobufWkt::Value& metadata_value =
+  const Protobuf::Value& metadata_value =
       Envoy::Config::Metadata::metadataValue(metadata, metadata_key_);
-  if (metadata_value.kind_case() != ProtobufWkt::Value::kStructValue) {
+  if (metadata_value.kind_case() != Protobuf::Value::kStructValue) {
     return false;
   }
 
@@ -92,9 +68,9 @@ bool DynamicMetadataRateLimitOverride::populateOverride(
   const auto& limit_it = override_value.find("requests_per_unit");
   const auto& unit_it = override_value.find("unit");
   if (limit_it != override_value.end() &&
-      limit_it->second.kind_case() == ProtobufWkt::Value::kNumberValue &&
+      limit_it->second.kind_case() == Protobuf::Value::kNumberValue &&
       unit_it != override_value.end() &&
-      unit_it->second.kind_case() == ProtobufWkt::Value::kStringValue) {
+      unit_it->second.kind_case() == Protobuf::Value::kStringValue) {
     envoy::type::v3::RateLimitUnit unit;
     if (envoy::type::v3::RateLimitUnit_Parse(unit_it->second.string_value(), &unit)) {
       descriptor.limit_.emplace(RateLimit::RateLimitOverride{
@@ -230,6 +206,32 @@ bool MetaDataAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_e
   return skip_if_absent_;
 }
 
+QueryParametersAction::QueryParametersAction(
+    const envoy::config::route::v3::RateLimit::Action::QueryParameters& action)
+    : query_param_name_(action.query_parameter_name()),
+      descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key() : "query_param"),
+      skip_if_absent_(action.skip_if_absent()) {}
+
+bool QueryParametersAction::populateDescriptor(RateLimit::DescriptorEntry& descriptor_entry,
+                                               const std::string&,
+                                               const Http::RequestHeaderMap& headers,
+                                               const StreamInfo::StreamInfo&) const {
+  Http::Utility::QueryParamsMulti query_parameters =
+      Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(headers.getPathValue());
+
+  const absl::optional<std::string> query_param_value =
+      query_parameters.getFirstValue(query_param_name_);
+
+  // If query parameter is not present and ``skip_if_absent`` is ``true``, skip this descriptor.
+  // If ``skip_if_absent`` is ``false``, do not call rate limiting service.
+  if (!query_param_value.has_value()) {
+    return skip_if_absent_;
+  }
+
+  descriptor_entry = {descriptor_key_, query_param_value.value()};
+  return true;
+}
+
 HeaderValueMatchAction::HeaderValueMatchAction(
     const envoy::config::route::v3::RateLimit::Action::HeaderValueMatch& action,
     Server::Configuration::CommonFactoryContext& context)
@@ -256,7 +258,8 @@ QueryParameterValueMatchAction::QueryParameterValueMatchAction(
     : descriptor_value_(action.descriptor_value()),
       descriptor_key_(!action.descriptor_key().empty() ? action.descriptor_key() : "query_match"),
       expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)),
-      action_query_parameters_(buildQueryParameterMatcherVector(action, context)) {}
+      action_query_parameters_(
+          buildQueryParameterMatcherVector(action.query_parameters(), context)) {}
 
 bool QueryParameterValueMatchAction::populateDescriptor(
     RateLimit::DescriptorEntry& descriptor_entry, const std::string&,
@@ -274,10 +277,11 @@ bool QueryParameterValueMatchAction::populateDescriptor(
 
 std::vector<ConfigUtility::QueryParameterMatcherPtr>
 QueryParameterValueMatchAction::buildQueryParameterMatcherVector(
-    const envoy::config::route::v3::RateLimit::Action::QueryParameterValueMatch& action,
+    const Protobuf::RepeatedPtrField<envoy::config::route::v3::QueryParameterMatcher>&
+        query_parameters,
     Server::Configuration::CommonFactoryContext& context) {
   std::vector<ConfigUtility::QueryParameterMatcherPtr> ret;
-  for (const auto& query_parameter : action.query_parameters()) {
+  for (const auto& query_parameter : query_parameters) {
     ret.push_back(std::make_unique<ConfigUtility::QueryParameterMatcher>(query_parameter, context));
   }
   return ret;
@@ -287,7 +291,8 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
     const envoy::config::route::v3::RateLimit& config,
     Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status)
     : disable_key_(config.disable_key()),
-      stage_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stage, 0))) {
+      stage_(static_cast<uint64_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, stage, 0))),
+      apply_on_stream_done_(config.apply_on_stream_done()) {
   for (const auto& action : config.actions()) {
     switch (action.action_specifier_case()) {
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kSourceCluster:
@@ -295,6 +300,9 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kDestinationCluster:
       actions_.emplace_back(new DestinationClusterAction());
+      break;
+    case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kQueryParameters:
+      actions_.emplace_back(new QueryParametersAction(action.query_parameters()));
       break;
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kRequestHeaders:
       actions_.emplace_back(new RequestHeadersAction(action.request_headers()));
@@ -334,15 +342,10 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       }
       auto message = Envoy::Config::Utility::translateAnyToFactoryConfig(
           action.extension().typed_config(), validator, *factory);
-      RateLimit::DescriptorProducerPtr producer =
+      absl::StatusOr<RateLimit::DescriptorProducerPtr> producer_or =
           factory->createDescriptorProducerFromProto(*message, context);
-      if (producer) {
-        actions_.emplace_back(std::move(producer));
-      } else {
-        creation_status = absl::InvalidArgumentError(
-            absl::StrCat("Rate limit descriptor extension failed: ", action.extension().name()));
-        return;
-      }
+      SET_AND_RETURN_IF_NOT_OK(producer_or.status(), creation_status);
+      actions_.emplace_back(std::move(producer_or.value()));
       break;
     }
     case envoy::config::route::v3::RateLimit::Action::ActionSpecifierCase::kMaskedRemoteAddress:
@@ -375,7 +378,7 @@ void RateLimitPolicyEntryImpl::populateDescriptors(std::vector<RateLimit::Descri
                                                    const Http::RequestHeaderMap& headers,
                                                    const StreamInfo::StreamInfo& info) const {
   RateLimit::Descriptor descriptor;
-  bool result =
+  const bool result =
       populateDescriptor(actions_, descriptor.entries_, local_service_cluster, headers, info);
 
   if (limit_override_) {
@@ -392,30 +395,56 @@ void RateLimitPolicyEntryImpl::populateLocalDescriptors(
     const std::string& local_service_cluster, const Http::RequestHeaderMap& headers,
     const StreamInfo::StreamInfo& info) const {
   RateLimit::LocalDescriptor descriptor({});
-  bool result =
+  const bool result =
       populateDescriptor(actions_, descriptor.entries_, local_service_cluster, headers, info);
   if (result) {
     descriptors.emplace_back(descriptor);
   }
 }
 
-RateLimitPolicyImpl::RateLimitPolicyImpl()
-    : rate_limit_entries_reference_(RateLimitPolicyImpl::MAX_STAGE_NUMBER + 1) {}
+namespace {
+// Initializes the ``RateLimitPolicyImpl::rate_limit_entries_`` vector.
+std::vector<RateLimitPolicyEntryImpl> initRateLimitEntries(
+    const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
+    Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status) {
+  std::vector<RateLimitPolicyEntryImpl> entries;
+  entries.reserve(rate_limits.size());
+  for (const auto& rate_limit : rate_limits) {
+    entries.emplace_back(rate_limit, context, creation_status);
+    // If the entry is invalid, the function returns no policy entries, and
+    // changes the creation_status to the error.
+    if (!creation_status.ok()) {
+      return {};
+    }
+  }
+  return entries;
+}
+
+// The maximum stage number supported. This value should match the maximum stage number in
+// Json::Schema::HTTP_RATE_LIMITS_CONFIGURATION_SCHEMA and
+// Json::Schema::RATE_LIMIT_HTTP_FILTER_SCHEMA from common/json/config_schemas.cc.
+static constexpr uint64_t MAX_STAGE_NUMBER = 10UL;
+
+// Initializes the ``RateLimitPolicyImpl::rate_limit_entries_reference_`` vector.
+std::vector<std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>>
+initRateLimitEntriesReference(const std::vector<RateLimitPolicyEntryImpl>& rate_limit_entries) {
+  std::vector<std::vector<std::reference_wrapper<const RateLimitPolicyEntry>>> references(
+      MAX_STAGE_NUMBER + 1);
+  for (const auto& entry : rate_limit_entries) {
+    const uint64_t stage = entry.stage();
+    // The stage value is validated by PGV.
+    ASSERT(stage < references.size());
+    references[stage].emplace_back(std::ref(entry));
+  }
+  return references;
+}
+} // namespace
 
 RateLimitPolicyImpl::RateLimitPolicyImpl(
     const Protobuf::RepeatedPtrField<envoy::config::route::v3::RateLimit>& rate_limits,
     Server::Configuration::CommonFactoryContext& context, absl::Status& creation_status)
-    : RateLimitPolicyImpl() {
-  creation_status = absl::OkStatus();
-  for (const auto& rate_limit : rate_limits) {
-    std::unique_ptr<RateLimitPolicyEntry> rate_limit_policy_entry(
-        new RateLimitPolicyEntryImpl(rate_limit, context, creation_status));
-    uint64_t stage = rate_limit_policy_entry->stage();
-    ASSERT(stage < rate_limit_entries_reference_.size());
-    rate_limit_entries_reference_[stage].emplace_back(*rate_limit_policy_entry);
-    rate_limit_entries_.emplace_back(std::move(rate_limit_policy_entry));
-  }
-}
+    : rate_limit_entries_(initRateLimitEntries(rate_limits, context, creation_status)),
+      rate_limit_entries_reference_(initRateLimitEntriesReference(rate_limit_entries_)) {}
 
 const std::vector<std::reference_wrapper<const Router::RateLimitPolicyEntry>>&
 RateLimitPolicyImpl::getApplicableRateLimit(uint64_t stage) const {

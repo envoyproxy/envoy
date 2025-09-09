@@ -3,11 +3,13 @@
 #include "source/extensions/request_id/uuid/config.h"
 
 #include "test/common/http/xff_extension.h"
+#include "test/extensions/filters/network/common/fuzz/utils/fakes.h"
 
 using testing::AtLeast;
 using testing::InSequence;
 using testing::InvokeWithoutArgs;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Http {
@@ -23,9 +25,7 @@ public:
   const RequestIDExtensionSharedPtr& requestIDExtension() override {
     return parent_.requestIDExtension();
   }
-  const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override {
-    return parent_.accessLogs();
-  }
+  const AccessLog::InstanceSharedPtrVector& accessLogs() override { return parent_.accessLogs(); }
   const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() override {
     return parent_.accessLogFlushInterval();
   }
@@ -60,6 +60,9 @@ public:
   uint32_t maxRequestHeadersCount() const override { return parent_.maxRequestHeadersCount(); }
   std::chrono::milliseconds streamIdleTimeout() const override {
     return parent_.streamIdleTimeout();
+  }
+  absl::optional<std::chrono::milliseconds> streamFlushTimeout() const override {
+    return parent_.streamFlushTimeout();
   }
   std::chrono::milliseconds requestTimeout() const override { return parent_.requestTimeout(); }
   std::chrono::milliseconds requestHeadersTimeout() const override {
@@ -130,7 +133,7 @@ public:
     return parent_.earlyHeaderMutationExtensions();
   }
   bool shouldStripTrailingHostDot() const override { return parent_.shouldStripTrailingHostDot(); }
-  uint64_t maxRequestsPerConnection() const override { return parent_.maxRequestsPerConnection(); }
+  uint32_t maxRequestsPerConnection() const override { return parent_.maxRequestsPerConnection(); }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return parent_.proxyStatusConfig();
   }
@@ -152,7 +155,7 @@ HttpConnectionManagerImplMixin::HttpConnectionManagerImplMixin()
       access_log_path_("dummy_path"),
       access_logs_{AccessLog::InstanceSharedPtr{new Extensions::AccessLoggers::File::FileAccessLog(
           Filesystem::FilePathAndType{Filesystem::DestinationType::File, access_log_path_}, {},
-          Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
+          *Formatter::HttpSubstitutionFormatUtils::defaultSubstitutionFormatter(), log_manager_)}},
       codec_(new NiceMock<MockServerConnection>()),
       stats_({ALL_HTTP_CONN_MAN_STATS(POOL_COUNTER(*fake_stats_.rootScope()),
                                       POOL_GAUGE(*fake_stats_.rootScope()),
@@ -200,6 +203,9 @@ void HttpConnectionManagerImplMixin::setup(const SetupOpts& opts) {
       .WillByDefault([&](auto, auto callback) {
         return filter_callbacks_.connection_.dispatcher_.createTimer(callback).release();
       });
+
+  const Network::ListenerInfo& listener_info = Server::Configuration::FakeListenerInfo();
+  ON_CALL(factory_context_, listenerInfo()).WillByDefault(ReturnRef(listener_info));
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 443));
   filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
@@ -213,7 +219,7 @@ void HttpConnectionManagerImplMixin::setup(const SetupOpts& opts) {
   conn_manager_ = std::make_unique<ConnectionManagerImpl>(
       std::make_shared<ConnectionManagerConfigProxyObject>(*this), drain_close_, random_,
       http_context_, runtime_, local_info_, cluster_manager_, overload_manager_,
-      test_time_.timeSystem());
+      test_time_.timeSystem(), factory_context_.listenerInfo().direction());
 
   conn_manager_->initializeReadFilterCallbacks(filter_callbacks_);
 

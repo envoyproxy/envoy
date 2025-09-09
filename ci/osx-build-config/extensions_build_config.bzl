@@ -31,6 +31,7 @@ EXTENSIONS = {
     "envoy.access_loggers.file": "//source/extensions/access_loggers/file:config",
     "envoy.formatter.cel": "//source/extensions/formatter/cel:config",
     "envoy.filters.network.redis_proxy": "//source/extensions/filters/network/redis_proxy:config",
+    "envoy.filters.http.dynamic_modules": "//source/extensions/filters/http/dynamic_modules:factory_registration",
 }
 WINDOWS_EXTENSIONS = {}
 EXTENSION_CONFIG_VISIBILITY = ["//:extension_config"]

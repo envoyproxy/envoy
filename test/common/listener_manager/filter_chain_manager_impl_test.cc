@@ -47,12 +47,13 @@ namespace Server {
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 public:
   MockFilterChainFactoryBuilder() {
-    ON_CALL(*this, buildFilterChain(_, _))
+    ON_CALL(*this, buildFilterChain(_, _, _))
         .WillByDefault(Return(std::make_shared<Network::MockFilterChain>()));
   }
 
   MOCK_METHOD(absl::StatusOr<Network::DrainableFilterChainSharedPtr>, buildFilterChain,
-              (const envoy::config::listener::v3::FilterChain&, FilterChainFactoryContextCreator&),
+              (const envoy::config::listener::v3::FilterChain&, FilterChainFactoryContextCreator&,
+               bool),
               (const));
 };
 
@@ -198,9 +199,9 @@ TEST_P(FilterChainManagerImplTest, AddSingleFilterChain) {
 
 TEST_P(FilterChainManagerImplTest, FilterChainUseFallbackIfNoFilterChainMatches) {
   // The build helper will build matchable filter chain and then build the default filter chain.
-  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _))
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _))
       .WillOnce(Return(build_out_fallback_filter_chain_));
-  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _))
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _))
       .WillOnce(Return(std::make_shared<Network::MockFilterChain>()))
       .RetiresOnSaturation();
   addSingleFilterChainHelper(filter_chain_template_, &fallback_filter_chain_);
@@ -222,7 +223,7 @@ TEST_P(FilterChainManagerImplTest, LookupFilterChainContextByFilterChainMessage)
     new_filter_chain.mutable_filter_chain_match()->mutable_destination_port()->set_value(10000 + i);
     filter_chain_messages.push_back(std::move(new_filter_chain));
   }
-  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _)).Times(2);
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _)).Times(2);
   EXPECT_TRUE(filter_chain_manager_
                   ->addFilterChains(GetParam() ? &matcher_ : nullptr,
                                     std::vector<const envoy::config::listener::v3::FilterChain*>{
@@ -242,7 +243,7 @@ TEST_P(FilterChainManagerImplTest, DuplicateContextsAreNotBuilt) {
     filter_chain_messages.push_back(std::move(new_filter_chain));
   }
 
-  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _));
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _));
   EXPECT_TRUE(filter_chain_manager_
                   ->addFilterChains(GetParam() ? &matcher_ : nullptr,
                                     std::vector<const envoy::config::listener::v3::FilterChain*>{
@@ -253,7 +254,7 @@ TEST_P(FilterChainManagerImplTest, DuplicateContextsAreNotBuilt) {
                                                   *filter_chain_manager_};
   // The new filter chain manager maintains 3 filter chains, but only 2 filter chain context is
   // built because it reuse the filter chain context in the previous filter chain manager
-  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _)).Times(2);
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _)).Times(2);
   EXPECT_TRUE(new_filter_chain_manager
                   .addFilterChains(GetParam() ? &matcher_ : nullptr,
                                    std::vector<const envoy::config::listener::v3::FilterChain*>{
@@ -261,6 +262,43 @@ TEST_P(FilterChainManagerImplTest, DuplicateContextsAreNotBuilt) {
                                        &filter_chain_messages[2]},
                                    nullptr, filter_chain_factory_builder_, new_filter_chain_manager)
                   .ok());
+}
+
+TEST_P(FilterChainManagerImplTest, UpdateFilterChainsBetweenVersions) {
+  std::vector<envoy::config::listener::v3::FilterChain> filter_chain_messages;
+
+  for (int i = 0; i < 2; i++) {
+    envoy::config::listener::v3::FilterChain new_filter_chain = filter_chain_template_;
+    new_filter_chain.set_name(absl::StrCat("filter_chain_", i));
+    new_filter_chain.mutable_filter_chain_match()->mutable_destination_port()->set_value(10000 + i);
+    filter_chain_messages.push_back(std::move(new_filter_chain));
+  }
+
+  auto filter_chain = std::make_shared<Network::MockFilterChain>();
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _))
+      .WillOnce(Return(filter_chain));
+  EXPECT_TRUE(filter_chain_manager_
+                  ->addFilterChains(GetParam() ? &matcher_ : nullptr,
+                                    std::vector<const envoy::config::listener::v3::FilterChain*>{
+                                        &filter_chain_messages[0]},
+                                    nullptr, filter_chain_factory_builder_, *filter_chain_manager_)
+                  .ok());
+
+  FilterChainManagerImpl new_filter_chain_manager{addresses_, parent_context_, init_manager_,
+                                                  *filter_chain_manager_};
+  EXPECT_CALL(filter_chain_factory_builder_, buildFilterChain(_, _, _));
+  EXPECT_TRUE(new_filter_chain_manager
+                  .addFilterChains(GetParam() ? &matcher_ : nullptr,
+                                   std::vector<const envoy::config::listener::v3::FilterChain*>{
+                                       &filter_chain_messages[1]},
+                                   nullptr, filter_chain_factory_builder_, new_filter_chain_manager)
+                  .ok());
+
+  // The new filter chain manager is based on the previous filter chain manager, but it has a new
+  // filter chain that is not in the previous filter chain manager, so we expect the previous
+  // filter chains to be drained.
+  EXPECT_EQ(filter_chain_manager_->drainingFilterChains().size(), 1);
+  EXPECT_EQ(filter_chain_manager_->drainingFilterChains()[0], filter_chain);
 }
 
 TEST_P(FilterChainManagerImplTest, CreatedFilterChainFactoryContextHasIndependentDrainClose) {
@@ -282,15 +320,15 @@ TEST_P(FilterChainManagerImplTest, CreatedFilterChainFactoryContextHasIndependen
   EXPECT_CALL(mock_server_context, drainManager).WillRepeatedly(ReturnRef(not_a_draining_manager));
   EXPECT_CALL(parent_context_, serverFactoryContext).WillRepeatedly(ReturnRef(mock_server_context));
 
-  EXPECT_FALSE(context0->drainDecision().drainClose());
-  EXPECT_FALSE(context1->drainDecision().drainClose());
+  EXPECT_FALSE(context0->drainDecision().drainClose(Network::DrainDirection::All));
+  EXPECT_FALSE(context1->drainDecision().drainClose(Network::DrainDirection::All));
 
   // Drain filter chain 0
   auto* context_impl_0 = dynamic_cast<PerFilterChainFactoryContextImpl*>(context0.get());
   context_impl_0->startDraining();
 
-  EXPECT_TRUE(context0->drainDecision().drainClose());
-  EXPECT_FALSE(context1->drainDecision().drainClose());
+  EXPECT_TRUE(context0->drainDecision().drainClose(Network::DrainDirection::All));
+  EXPECT_FALSE(context1->drainDecision().drainClose(Network::DrainDirection::All));
 }
 
 TEST_P(FilterChainManagerImplTest, DuplicateFilterChainMatchFails) {

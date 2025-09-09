@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/extensions/common/aws/v3/credential_provider.pb.h"
+
 #include "source/common/common/logger.h"
 #include "source/extensions/common/aws/region_provider.h"
 
@@ -23,11 +25,17 @@ public:
 class AWSCredentialsFileRegionProvider : public RegionProvider,
                                          public Logger::Loggable<Logger::Id::aws> {
 public:
-  AWSCredentialsFileRegionProvider() = default;
+  AWSCredentialsFileRegionProvider(
+      const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider&
+          credential_file_config);
 
   absl::optional<std::string> getRegion() override;
 
   absl::optional<std::string> getRegionSet() override;
+
+private:
+  absl::optional<std::string> credential_file_path_;
+  absl::optional<std::string> profile_;
 };
 
 class AWSConfigFileRegionProvider : public RegionProvider,
@@ -45,7 +53,9 @@ public:
   virtual ~RegionProviderChainFactories() = default;
 
   virtual RegionProviderSharedPtr createEnvironmentRegionProvider() const PURE;
-  virtual RegionProviderSharedPtr createAWSCredentialsFileRegionProvider() const PURE;
+  virtual RegionProviderSharedPtr createAWSCredentialsFileRegionProvider(
+      const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider&
+          credential_file_config) const PURE;
   virtual RegionProviderSharedPtr createAWSConfigFileRegionProvider() const PURE;
 };
 
@@ -57,7 +67,8 @@ class RegionProviderChain : public RegionProvider,
                             public RegionProviderChainFactories,
                             public Logger::Loggable<Logger::Id::aws> {
 public:
-  RegionProviderChain();
+  RegionProviderChain(const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider&
+                          credential_file_config = {});
 
   ~RegionProviderChain() override = default;
 
@@ -72,8 +83,10 @@ public:
   RegionProviderSharedPtr createEnvironmentRegionProvider() const override {
     return std::make_shared<EnvironmentRegionProvider>();
   }
-  RegionProviderSharedPtr createAWSCredentialsFileRegionProvider() const override {
-    return std::make_shared<AWSCredentialsFileRegionProvider>();
+  RegionProviderSharedPtr createAWSCredentialsFileRegionProvider(
+      const envoy::extensions::common::aws::v3::CredentialsFileCredentialProvider&
+          credential_file_config) const override {
+    return std::make_shared<AWSCredentialsFileRegionProvider>(credential_file_config);
   }
   RegionProviderSharedPtr createAWSConfigFileRegionProvider() const override {
     return std::make_shared<AWSConfigFileRegionProvider>();

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <stddef.h>
+#include <cstddef>
 
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"

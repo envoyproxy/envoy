@@ -9,6 +9,7 @@
 #include "envoy/server/fatal_action_config.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/common/notification.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/socket_option_impl.h"
@@ -22,7 +23,8 @@
 #include "test/common/stats/stat_test_utility.h"
 #include "test/config/v2_link_hacks.h"
 #include "test/integration/server.h"
-#include "test/mocks/common.h"
+#include "test/mocks/api/mocks.h"
+#include "test/mocks/config/xds_manager.h"
 #include "test/mocks/server/bootstrap_extension_factory.h"
 #include "test/mocks/server/fatal_action_factory.h"
 #include "test/mocks/server/hot_restart.h"
@@ -36,6 +38,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/test_time.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "absl/synchronization/notification.h"
@@ -160,6 +163,59 @@ TEST(ServerInstanceUtil, flushImportModeUninitializedGauges) {
   InstanceUtil::flushMetricsToSinks(sinks, store, cm, time_system);
 }
 
+TEST(ServerInstanceUtil, RaiseFileLimits) {
+  Api::MockOsSysCalls os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
+  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _))
+      .WillOnce(Invoke([&](int, struct rlimit* rlim) {
+        rlim->rlim_cur = 512;
+        rlim->rlim_max = 1024;
+        return Api::SysCallIntResult{0, 0};
+      }));
+  EXPECT_CALL(os_sys_calls_, setrlimit(RLIMIT_NOFILE, _))
+      .WillOnce(Invoke([&](int, const struct rlimit* rlim) {
+        EXPECT_EQ(1024, rlim->rlim_cur);
+        EXPECT_EQ(1024, rlim->rlim_max);
+        return Api::SysCallIntResult{0, 0};
+      }));
+  InstanceUtil::raiseFileLimits();
+}
+
+TEST(ServerInstanceUtil, RaiseFileLimitsAlreadyMaxed) {
+  Api::MockOsSysCalls os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
+  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _))
+      .WillOnce(Invoke([&](int, struct rlimit* rlim) {
+        rlim->rlim_cur = 1024;
+        rlim->rlim_max = 1024;
+        return Api::SysCallIntResult{0, 0};
+      }));
+  InstanceUtil::raiseFileLimits();
+}
+
+TEST(ServerInstanceUtil, RaiseFileLimitsReadError) {
+  Api::MockOsSysCalls os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
+  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _)).WillOnce(Invoke([&](int, struct rlimit*) {
+    return Api::SysCallIntResult{-1, 0};
+  }));
+  InstanceUtil::raiseFileLimits();
+}
+
+TEST(ServerInstanceUtil, RaiseFileLimitsWriteError) {
+  Api::MockOsSysCalls os_sys_calls_;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls{&os_sys_calls_};
+  EXPECT_CALL(os_sys_calls_, getrlimit(RLIMIT_NOFILE, _))
+      .WillOnce(Invoke([&](int, struct rlimit* rlim) {
+        rlim->rlim_cur = 512;
+        rlim->rlim_max = 1024;
+        return Api::SysCallIntResult{0, 0};
+      }));
+  EXPECT_CALL(os_sys_calls_, setrlimit(RLIMIT_NOFILE, _))
+      .WillOnce(Invoke([&](int, const struct rlimit*) { return Api::SysCallIntResult{-1, 0}; }));
+  InstanceUtil::raiseFileLimits();
+}
+
 class RunHelperTest : public testing::Test {
 public:
   RunHelperTest() {
@@ -175,20 +231,21 @@ public:
     EXPECT_CALL(cm_, setInitializedCb(_)).WillOnce(SaveArg<0>(&cm_init_callback_));
     ON_CALL(server_, shutdown()).WillByDefault(Assign(&shutdown_, true));
 
-    helper_ = std::make_unique<RunHelper>(server_, options_, dispatcher_, cm_, access_log_manager_,
-                                          init_manager_, overload_manager_, null_overload_manager_,
-                                          [this] { start_workers_.ready(); });
+    helper_ = std::make_unique<RunHelper>(
+        server_, options_, dispatcher_, xds_manager_, cm_, access_log_manager_, init_manager_,
+        overload_manager_, null_overload_manager_, mock_workers_start_cb_.AsStdFunction());
   }
 
   NiceMock<MockInstance> server_;
   testing::NiceMock<MockOptions> options_;
   NiceMock<Event::MockDispatcher> dispatcher_;
+  NiceMock<Config::MockXdsManager> xds_manager_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<AccessLog::MockAccessLogManager> access_log_manager_;
   NiceMock<MockOverloadManager> overload_manager_;
   NiceMock<MockOverloadManager> null_overload_manager_;
   Init::ManagerImpl init_manager_{""};
-  ReadyWatcher start_workers_;
+  testing::MockFunction<void()> mock_workers_start_cb_;
   std::unique_ptr<RunHelper> helper_;
   std::function<void()> cm_init_callback_;
 #ifndef WIN32
@@ -201,14 +258,14 @@ public:
 };
 
 TEST_F(RunHelperTest, Normal) {
-  EXPECT_CALL(start_workers_, ready());
+  EXPECT_CALL(mock_workers_start_cb_, Call);
   cm_init_callback_();
 }
 
 // no signals on Windows
 #ifndef WIN32
 TEST_F(RunHelperTest, ShutdownBeforeCmInitialize) {
-  EXPECT_CALL(start_workers_, ready()).Times(0);
+  EXPECT_CALL(mock_workers_start_cb_, Call).Times(0);
   sigterm_->callback_();
   EXPECT_CALL(server_, isShutdown()).WillOnce(Return(shutdown_));
   cm_init_callback_();
@@ -218,7 +275,7 @@ TEST_F(RunHelperTest, ShutdownBeforeCmInitialize) {
 // no signals on Windows
 #ifndef WIN32
 TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
-  EXPECT_CALL(start_workers_, ready()).Times(0);
+  EXPECT_CALL(mock_workers_start_cb_, Call).Times(0);
   Init::ExpectableTargetImpl target;
   init_manager_.add(target);
   EXPECT_CALL(target, initialize());
@@ -365,15 +422,16 @@ private:
 class CustomStatsSinkFactory : public Server::Configuration::StatsSinkFactory {
 public:
   // StatsSinkFactory
-  Stats::SinkPtr createStatsSink(const Protobuf::Message&,
-                                 Server::Configuration::ServerFactoryContext& server) override {
+  absl::StatusOr<Stats::SinkPtr>
+  createStatsSink(const Protobuf::Message&,
+                  Server::Configuration::ServerFactoryContext& server) override {
     return std::make_unique<CustomStatsSink>(server.scope());
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     // Using Struct instead of a custom per-filter empty config proto
     // This is only allowed in tests.
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
 
   std::string name() const override { return "envoy.custom_stats_sink"; }
@@ -531,13 +589,6 @@ TEST_P(ServerInstanceImplTest, ValidateFIPSModeStat) {
 
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
-}
-
-// Validate the the Envoy FIPS compilation flags are consistent with the FIPS
-// mode of the underlying BoringSSL build.
-TEST_P(ServerInstanceImplTest, ValidateFIPSModeConsistency) {
-  bool isFIPS = (FIPS_mode() != 0);
-  EXPECT_EQ(isFIPS, VersionInfo::sslFipsCompliant());
 }
 
 TEST_P(ServerInstanceImplTest, EmptyShutdownLifecycleNotifications) {
@@ -702,18 +753,20 @@ TEST_P(ServerInstanceImplWorkersTest, DrainCloseAfterWorkersStarted) {
   // infinite drainClose spin-loop (mimicing high traffic) is running before we
   // initiate the drain sequence.
   auto drain_thread = Thread::threadFactoryForTest().createThread([&] {
-    bool closed = drain_manager.drainClose();
+    bool closed = drain_manager.drainClose(Network::DrainDirection::All);
     drain_closes_started.Notify();
     while (!closed) {
-      closed = drain_manager.drainClose();
+      closed = drain_manager.drainClose(Network::DrainDirection::All);
     }
   });
   drain_closes_started.WaitForNotification();
 
   // Now that we are starting to try to call drainClose, we'll start the drain sequence, then
   // wait for that to complete.
-  server_->dispatcher().post(
-      [&] { drain_manager.startDrainSequence([&drain_complete]() { drain_complete.Notify(); }); });
+  server_->dispatcher().post([&] {
+    drain_manager.startDrainSequence(Network::DrainDirection::All,
+                                     [&drain_complete]() { drain_complete.Notify(); });
+  });
 
   drain_complete.WaitForNotification();
   drain_thread->join();
@@ -795,6 +848,10 @@ TEST_P(ServerInstanceImplTest, Stats) {
   EXPECT_EQ(2L, TestUtility::findGauge(stats_store_, "server.concurrency")->value());
   EXPECT_EQ(3L, TestUtility::findGauge(stats_store_, "server.hot_restart_epoch")->value());
 
+  ENVOY_NOTIFICATION("name", "stuff");
+  ENVOY_NOTIFICATION("name1", "stuff1");
+  ENVOY_NOTIFICATION("name3", "stuff3");
+  EXPECT_EQ(3L, TestUtility::findCounter(stats_store_, "server.envoy_notifications")->value());
 // The ENVOY_BUG stat works in release mode.
 #if defined(NDEBUG)
   // Test exponential back-off on a fixed line ENVOY_BUG.
@@ -901,6 +958,38 @@ TEST_P(ServerInstanceImplTest, FlushStatsOnAdmin) {
 
   time_system_.advanceTimeWait(std::chrono::seconds(6));
   EXPECT_EQ(1L, counter->value());
+
+  server_->dispatcher().post([&] { server_->shutdown(); });
+  server_thread->join();
+}
+
+TEST_P(ServerInstanceImplTest, EvictStats) {
+  CustomStatsSinkFactory factory;
+  Registry::InjectFactory<Server::Configuration::StatsSinkFactory> registered(factory);
+  auto server_thread =
+      startTestServer("test/server/test_data/server/stats_evict_bootstrap.yaml", true);
+  EXPECT_EQ(2, server_->statsConfig().evictOnFlush());
+  EXPECT_EQ(std::chrono::seconds(5), server_->statsConfig().flushInterval());
+
+  auto counter = TestUtility::findCounter(stats_store_, "stats.flushed");
+
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(1L, counter->value());
+  EXPECT_EQ(0, stats_store_.evictionCount());
+
+  // Eviction applied here: side-effect is that c1 is now marked as unused.
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(2L, counter->value());
+  EXPECT_EQ(1, stats_store_.evictionCount());
+
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(3L, counter->value());
+  EXPECT_EQ(1, stats_store_.evictionCount());
+
+  // Second pass of eviction deletes the counter.
+  time_system_.advanceTimeWait(std::chrono::seconds(6));
+  EXPECT_EQ(4L, counter->value());
+  EXPECT_EQ(2, stats_store_.evictionCount());
 
   server_->dispatcher().post([&] { server_->shutdown(); });
   server_thread->join();
@@ -1201,14 +1290,6 @@ TEST_P(ServerInstanceImplTest, BootstrapClusterManagerInitializationFail) {
                             EnvoyException, "cluster manager: duplicate cluster 'service_google'");
 }
 
-// Regression tests for SdsApi throwing exceptions in initialize().
-TEST_P(ServerInstanceImplTest, BadSdsConfigSource) {
-  EXPECT_THROW_WITH_MESSAGE(
-      initialize("test/server/test_data/server/bad_sds_config_source.yaml"), EnvoyException,
-      "envoy.config.core.v3.ApiConfigSource must have a statically defined non-EDS cluster: "
-      "'sds-grpc' does not exist, was added via api, or is an EDS cluster");
-}
-
 // Test for protoc-gen-validate constraint on invalid timeout entry of a health check config entry.
 TEST_P(ServerInstanceImplTest, BootstrapClusterHealthCheckInvalidTimeout) {
   EXPECT_THROW_WITH_REGEX(
@@ -1364,6 +1445,20 @@ TEST_P(ServerInstanceImplTest, NoOptionsPassed) {
       "non-empty");
 }
 
+TEST_P(ServerInstanceImplTest, ServerContextSingleton) {
+  thread_local_ = std::make_unique<ThreadLocal::InstanceImpl>();
+  init_manager_ = std::make_unique<Init::ManagerImpl>("Server");
+  server_ = std::make_unique<InstanceImpl>(
+      *init_manager_, options_, time_system_, hooks_, restart_, stats_store_, fakelock_,
+      std::make_unique<NiceMock<Random::MockRandomGenerator>>(), *thread_local_,
+      Thread::threadFactoryForTest(), Filesystem::fileSystemForTest(), nullptr);
+
+  EXPECT_EQ(&server_->serverFactoryContext(),
+            Configuration::ServerFactoryContextInstance::getExisting());
+  server_ = nullptr;
+  EXPECT_EQ(nullptr, Configuration::ServerFactoryContextInstance::getExisting());
+}
+
 // Validate that when std::exception is unexpectedly thrown, we exit safely.
 // This is a regression test for when we used to crash.
 TEST_P(ServerInstanceImplTest, StdExceptionThrowInConstructor) {
@@ -1464,6 +1559,7 @@ TEST_P(ServerInstanceImplTest, WithBootstrapExtensions) {
               // call to cluster manager, to make sure it is not nullptr.
               ctx.clusterManager().clusters();
             }));
+            EXPECT_CALL(*mock_extension, onWorkerThreadInitialized());
             return mock_extension;
           }));
 
@@ -1533,7 +1629,7 @@ TEST_P(ServerInstanceImplTest, WithFatalActions) {
   // Inject Unsafe Factory
   NiceMock<Configuration::MockFatalActionFactory> mock_unsafe_factory;
   EXPECT_CALL(mock_unsafe_factory, createEmptyConfigProto()).WillRepeatedly(Invoke([]() {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }));
   EXPECT_CALL(mock_unsafe_factory, name()).WillRepeatedly(Return("envoy_test.fatal_action.unsafe"));
 
@@ -1650,15 +1746,16 @@ private:
 class CallbacksStatsSinkFactory : public Server::Configuration::StatsSinkFactory {
 public:
   // StatsSinkFactory
-  Stats::SinkPtr createStatsSink(const Protobuf::Message&,
-                                 Server::Configuration::ServerFactoryContext& server) override {
+  absl::StatusOr<Stats::SinkPtr>
+  createStatsSink(const Protobuf::Message&,
+                  Server::Configuration::ServerFactoryContext& server) override {
     return std::make_unique<CallbacksStatsSink>(server);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     // Using Struct instead of a custom per-filter empty config proto
     // This is only allowed in tests.
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
 
   std::string name() const override { return "envoy.callbacks_stats_sink"; }
@@ -1724,7 +1821,7 @@ TEST_P(ServerInstanceImplTest, JsonApplicationLog) {
   Envoy::Logger::Registry::setLogLevel(spdlog::level::info);
   MockLogSink sink(Envoy::Logger::Registry::getSink());
   EXPECT_CALL(sink, log(_, _)).WillOnce(Invoke([](auto msg, auto& log) {
-    EXPECT_NO_THROW(Json::Factory::loadFromString(std::string(msg)));
+    EXPECT_TRUE(Json::Factory::loadFromString(std::string(msg)).status().ok());
     EXPECT_THAT(msg, HasSubstr("{\"MessageFromProto\":\"hello\"}"));
     EXPECT_EQ(log.logger_name, "misc");
   }));

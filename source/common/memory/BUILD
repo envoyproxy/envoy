@@ -9,6 +9,13 @@ licenses(["notice"])  # Apache 2
 envoy_package()
 
 envoy_cc_library(
+    name = "aligned_allocator_lib",
+    hdrs = ["aligned_allocator.h"],
+    deps = [
+    ],
+)
+
+envoy_cc_library(
     name = "stats_lib",
     srcs = ["stats.cc"],
     hdrs = ["stats.h"],

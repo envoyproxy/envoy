@@ -16,7 +16,7 @@ using testing::Return;
 using testing::ReturnRef;
 
 MATCHER_P(MapEq, rhs, "") {
-  const Envoy::ProtobufWkt::Struct& obj = arg;
+  const Envoy::Protobuf::Struct& obj = arg;
   EXPECT_TRUE(rhs.size() > 0);
   for (auto const& entry : rhs) {
     EXPECT_EQ(obj.fields().at(entry.first).string_value(), entry.second);
@@ -291,6 +291,29 @@ TEST_P(WasmHttpFilterTest, HeadersStopAndContinue) {
   filter().onDestroy();
 }
 
+TEST_P(WasmHttpFilterTest, HeadersStopAndContinueAllowStopIteration) {
+  if (std::get<1>(GetParam()) == "rust") {
+    // TODO(PiotrSikora): This hand off is not currently possible in the Rust SDK.
+    return;
+  }
+  setAllowOnHeadersStopIteration(true);
+  setupTest("", "headers");
+  setupFilter();
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(request_stream_info_));
+  EXPECT_CALL(filter(),
+              log_(spdlog::level::debug, Eq(absl::string_view("onRequestHeaders 2 headers"))));
+  EXPECT_CALL(filter(), log_(spdlog::level::info, Eq(absl::string_view("header path /"))));
+  EXPECT_CALL(filter(), log_(spdlog::level::warn, Eq(absl::string_view("onDone 2"))));
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}, {"server", "envoy-wasm-pause"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter().decodeHeaders(request_headers, true));
+  root_context_->onTick(0);
+  filter().clearRouteCache();
+  EXPECT_THAT(request_headers.get_("newheader"), Eq("newheadervalue"));
+  EXPECT_THAT(request_headers.get_("server"), Eq("envoy-wasm-continue"));
+  filter().onDestroy();
+}
+
 #if 0
 TEST_P(WasmHttpFilterTest, HeadersStopAndEndStream) {
   if (std::get<1>(GetParam()) == "rust") {
@@ -474,19 +497,28 @@ TEST_P(WasmHttpFilterTest, BodyRequestBufferBody) {
       .WillRepeatedly(Invoke([&bufferedBody](BufferFunction f) { f(bufferedBody); }));
 
   Buffer::OwnedImpl data1("hello");
-  bufferedBody.add(data1);
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello"))));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().decodeData(data1, false));
+  // The first call to decodeData() will not result in the addDecodedData() callback being called
+  // because the filter doesn't yet know if the VM's onRequestBody() will return
+  // StopIterationAndBuffer or Continue. Add the data to the buffer manually for the test.
+  bufferedBody.add(data1);
+
+  // The second call to decodeData() will result in the addDecodedData() callback being called
+  // because the VM's onRequestBody() returned StopIterationAndBuffer.
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _))
+      .WillOnce(Invoke([&bufferedBody](Buffer::Instance& data, bool) { bufferedBody.move(data); }));
 
   Buffer::OwnedImpl data2(" again ");
-  bufferedBody.add(data2);
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello again "))));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().decodeData(data2, false));
 
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _))
+      .WillOnce(Invoke([&bufferedBody](Buffer::Instance& data, bool) { bufferedBody.move(data); }));
+
+  Buffer::OwnedImpl data3("hello");
   EXPECT_CALL(filter(),
               log_(spdlog::level::err, Eq(absl::string_view("onBody hello again hello"))));
-  Buffer::OwnedImpl data3("hello");
-  bufferedBody.add(data3);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter().decodeData(data3, true));
 
   // Verify that the response still works even though we buffered the request.
@@ -499,6 +531,47 @@ TEST_P(WasmHttpFilterTest, BodyRequestBufferBody) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter().encodeData(data1, true));
 
   filter().onDestroy();
+}
+
+TEST_P(WasmHttpFilterTest, BodyRequestBufferBodyAndDestroyFilterInTheAddDecodedDataCallback) {
+  setupTest("body");
+  setupFilter();
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"},
+                                                 {"x-test-operation", "BufferBody"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, false));
+
+  Buffer::OwnedImpl bufferedBody;
+  EXPECT_CALL(decoder_callbacks_, decodingBuffer()).WillRepeatedly(Return(&bufferedBody));
+  EXPECT_CALL(decoder_callbacks_, modifyDecodingBuffer(_))
+      .WillRepeatedly(Invoke([&bufferedBody](BufferFunction f) { f(bufferedBody); }));
+
+  Buffer::OwnedImpl data1("hello");
+  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello"))));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().decodeData(data1, false));
+  // The first call to decodeData() will not result in the addDecodedData() callback being called
+  // because the filter doesn't yet know if the VM's onRequestBody() will return
+  // StopIterationAndBuffer or Continue. Add the data to the buffer manually for the test.
+  bufferedBody.add(data1);
+
+  // The second call to decodeData() will result in the addDecodedData() callback being called
+  // because the VM's onRequestBody() returned StopIterationAndBuffer.
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _))
+      .WillOnce(Invoke([&bufferedBody](Buffer::Instance& data, bool) { bufferedBody.move(data); }));
+
+  Buffer::OwnedImpl data2(" again ");
+  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello again "))));
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().decodeData(data2, false));
+
+  // The addDecodedData() may result in buffer overflow and the local reply will be sent. It may
+  // destroy the filter. We mock the onDestroy() to ensure the filter will not call into the VM
+  // after it is destroyed.
+  EXPECT_CALL(decoder_callbacks_, addDecodedData(_, _))
+      .WillOnce(Invoke([this](Buffer::Instance&, bool) { filter().onDestroy(); }));
+
+  Buffer::OwnedImpl data3("hello");
+  EXPECT_CALL(filter(), log_(_, _)).Times(0);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().decodeData(data3, true));
 }
 
 // Script that prepends and appends to the buffered body.
@@ -633,16 +706,24 @@ TEST_P(WasmHttpFilterTest, BodyResponseBufferThenStreamBody) {
   Buffer::OwnedImpl data1("hello");
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello"))));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().encodeData(data1, false));
+  // The first call to encodeData() will not result in the addEncodedData() callback being called
+  // because the filter doesn't yet know if the VM's onResponseBody() will return
+  // StopIterationAndBuffer or Continue. Add the data to the buffer manually for the test.
   bufferedBody.add(data1);
 
+  // The second call to encodeData() will result in the addEncodedData() callback being called
+  // because the VM's onResponseBody() returned StopIterationAndBuffer.
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
+      .WillOnce(Invoke([&bufferedBody](Buffer::Instance& data, bool) { bufferedBody.move(data); }));
+
   Buffer::OwnedImpl data2(", there, ");
-  bufferedBody.add(data2);
   EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody hello, there, "))));
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter().encodeData(data2, false));
 
-  // Previous callbacks returned "Buffer" so we have buffered so far
+  EXPECT_CALL(encoder_callbacks_, addEncodedData(_, _))
+      .WillOnce(Invoke([&bufferedBody](Buffer::Instance& data, bool) { bufferedBody.move(data); }));
+
   Buffer::OwnedImpl data3("world!");
-  bufferedBody.add(data3);
   EXPECT_CALL(filter(),
               log_(spdlog::level::err, Eq(absl::string_view("onBody hello, there, world!"))));
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter().encodeData(data3, false));
@@ -994,7 +1075,7 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
                        const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
               EXPECT_EQ(service_full_name, "service");
               EXPECT_EQ(method_name, "method");
-              ProtobufWkt::Value value;
+              Protobuf::Value value;
               EXPECT_TRUE(
                   value.ParseFromArray(message->linearize(message->length()), message->length()));
               EXPECT_EQ(value.string_value(), "request");
@@ -1021,7 +1102,7 @@ TEST_P(WasmHttpFilterTest, GrpcCall) {
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter().decodeHeaders(request_headers, false));
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("response");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1117,7 +1198,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallFailure) {
                        const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
               EXPECT_EQ(service_full_name, "service");
               EXPECT_EQ(method_name, "method");
-              ProtobufWkt::Value value;
+              Protobuf::Value value;
               EXPECT_TRUE(
                   value.ParseFromArray(message->linearize(message->length()), message->length()));
               EXPECT_EQ(value.string_value(), "request");
@@ -1159,7 +1240,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallFailure) {
     EXPECT_EQ(filter().grpcCancel(0xFF02), proxy_wasm::WasmResult::NotFound);
     EXPECT_EQ(filter().grpcClose(0xFF02), proxy_wasm::WasmResult::NotFound);
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("response");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1208,7 +1289,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallCancel) {
                        const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
               EXPECT_EQ(service_full_name, "service");
               EXPECT_EQ(method_name, "method");
-              ProtobufWkt::Value value;
+              Protobuf::Value value;
               EXPECT_TRUE(
                   value.ParseFromArray(message->linearize(message->length()), message->length()));
               EXPECT_EQ(value.string_value(), "request");
@@ -1268,7 +1349,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallClose) {
                        const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
               EXPECT_EQ(service_full_name, "service");
               EXPECT_EQ(method_name, "method");
-              ProtobufWkt::Value value;
+              Protobuf::Value value;
               EXPECT_TRUE(
                   value.ParseFromArray(message->linearize(message->length()), message->length()));
               EXPECT_EQ(value.string_value(), "request");
@@ -1328,7 +1409,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallAfterDestroyed) {
                        const Http::AsyncClient::RequestOptions& options) -> Grpc::AsyncRequest* {
               EXPECT_EQ(service_full_name, "service");
               EXPECT_EQ(method_name, "method");
-              ProtobufWkt::Value value;
+              Protobuf::Value value;
               EXPECT_TRUE(
                   value.ParseFromArray(message->linearize(message->length()), message->length()));
               EXPECT_EQ(value.string_value(), "request");
@@ -1367,7 +1448,7 @@ TEST_P(WasmHttpFilterTest, GrpcCallAfterDestroyed) {
       wasm_.reset();
     }
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("response");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1457,7 +1538,7 @@ TEST_P(WasmHttpFilterTest, GrpcStream) {
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter().decodeHeaders(request_headers, false));
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("response");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1518,7 +1599,7 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCloseLocal) {
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter().decodeHeaders(request_headers, false));
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("close");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1578,7 +1659,7 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCloseRemote) {
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter().decodeHeaders(request_headers, false));
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("response");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1628,7 +1709,7 @@ TEST_P(WasmHttpFilterTest, GrpcStreamCancel) {
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter().decodeHeaders(request_headers, false));
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("response");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1685,7 +1766,7 @@ TEST_P(WasmHttpFilterTest, GrpcStreamOpenAtShutdown) {
     EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
               filter().decodeHeaders(request_headers, false));
 
-    ProtobufWkt::Value value;
+    Protobuf::Value value;
     value.set_string_value("response");
     std::string response_string;
     EXPECT_TRUE(value.SerializeToString(&response_string));
@@ -1719,7 +1800,7 @@ TEST_P(WasmHttpFilterTest, Metadata) {
   setupTest("", "metadata");
   setupFilter();
   envoy::config::core::v3::Node node_data;
-  ProtobufWkt::Value node_val;
+  Protobuf::Value node_val;
   node_val.set_string_value("wasm_node_get_value");
   (*node_data.mutable_metadata()->mutable_fields())["wasm_node_get_key"] = node_val;
   (*node_data.mutable_metadata()->mutable_fields())["wasm_node_list_key"] =
@@ -1740,7 +1821,7 @@ TEST_P(WasmHttpFilterTest, Metadata) {
   }
 
   request_stream_info_.metadata_.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
+      Protobuf::MapPair<std::string, Protobuf::Struct>(
           "envoy.filters.http.wasm",
           MessageUtil::keyValueStruct("wasm_request_get_key", "wasm_request_get_value")));
 
@@ -1776,14 +1857,14 @@ TEST_P(WasmHttpFilterTest, Property) {
     return;
   }
   envoy::config::core::v3::Node node_data;
-  ProtobufWkt::Value node_val;
+  Protobuf::Value node_val;
   node_val.set_string_value("sample_data");
   (*node_data.mutable_metadata()->mutable_fields())["istio.io/metadata"] = node_val;
   EXPECT_CALL(local_info_, node()).WillRepeatedly(ReturnRef(node_data));
   setupTest("", "property");
   setupFilter();
   request_stream_info_.metadata_.mutable_filter_metadata()->insert(
-      Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
+      Protobuf::MapPair<std::string, Protobuf::Struct>(
           "envoy.filters.http.wasm",
           MessageUtil::keyValueStruct("wasm_request_get_key", "wasm_request_get_value")));
   EXPECT_CALL(request_stream_info_, responseCode()).WillRepeatedly(Return(403));
@@ -1835,8 +1916,6 @@ TEST_P(WasmHttpFilterTest, ClusterMetadata) {
   }
   setupTest("", "cluster_metadata");
   setupFilter();
-  EXPECT_CALL(filter(),
-              log_(spdlog::level::warn, Eq(absl::string_view("cluster metadata: cluster"))));
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   auto cluster_metadata = std::make_shared<envoy::config::core::v3::Metadata>(
       TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
@@ -1852,14 +1931,8 @@ TEST_P(WasmHttpFilterTest, ClusterMetadata) {
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(request_stream_info_));
   EXPECT_CALL(*cluster, metadata()).WillRepeatedly(ReturnRef(*cluster_metadata));
-  EXPECT_CALL(*host_description, cluster()).WillRepeatedly(ReturnRef(*cluster));
-  request_stream_info_.upstreamInfo()->setUpstreamHost(host_description);
   EXPECT_CALL(request_stream_info_, requestComplete)
       .WillRepeatedly(Return(std::chrono::milliseconds(30)));
-  filter().log({&request_headers}, request_stream_info_);
-
-  // If upstream host is empty, fallback to upstream cluster info for cluster metadata.
-  request_stream_info_.upstreamInfo()->setUpstreamHost(nullptr);
   EXPECT_CALL(request_stream_info_, upstreamClusterInfo()).WillRepeatedly(Return(cluster));
   EXPECT_CALL(filter(),
               log_(spdlog::level::warn, Eq(absl::string_view("cluster metadata: cluster"))));

@@ -13,7 +13,7 @@ namespace Golang {
 
 using GolangClusterProto = envoy::extensions::router::cluster_specifier::golang::v3alpha::Config;
 
-class ClusterConfig : Logger::Loggable<Logger::Id::http> {
+class ClusterConfig : Logger::Loggable<Logger::Id::golang> {
 public:
   ClusterConfig(const GolangClusterProto& config);
   uint64_t getPluginId() { return plugin_id_; };
@@ -24,7 +24,7 @@ private:
   const std::string so_id_;
   const std::string so_path_;
   const std::string default_cluster_;
-  const ProtobufWkt::Any config_;
+  const Protobuf::Any config_;
   uint64_t plugin_id_{0};
   Dso::ClusterSpecifierDsoPtr dynamic_lib_;
 };
@@ -32,12 +32,15 @@ private:
 using ClusterConfigSharedPtr = std::shared_ptr<ClusterConfig>;
 
 class GolangClusterSpecifierPlugin : public ClusterSpecifierPlugin,
-                                     Logger::Loggable<Logger::Id::http> {
+                                     Logger::Loggable<Logger::Id::golang> {
 public:
-  GolangClusterSpecifierPlugin(ClusterConfigSharedPtr config) : config_(config){};
+  GolangClusterSpecifierPlugin(ClusterConfigSharedPtr config) : config_(config) {};
 
-  RouteConstSharedPtr route(RouteConstSharedPtr parent,
-                            const Http::RequestHeaderMap& header) const override;
+  RouteConstSharedPtr route(RouteEntryAndRouteConstSharedPtr parent,
+                            const Http::RequestHeaderMap& header,
+                            const StreamInfo::StreamInfo& stream_info,
+                            uint64_t random) const override;
+
   void log(absl::string_view& msg) const;
 
 private:

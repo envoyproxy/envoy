@@ -34,6 +34,7 @@
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "cert_validator/cert_validator.h"
+#include "openssl/crypto.h"
 #include "openssl/evp.h"
 #include "openssl/hmac.h"
 #include "openssl/pkcs12.h"
@@ -92,8 +93,10 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     return;
   }
 
-  cert_validator_ = cert_validator_factory->createCertValidator(
-      config.certificateValidationContext(), stats_, factory_context_);
+  auto validator_or_error = cert_validator_factory->createCertValidator(
+      config.certificateValidationContext(), stats_, factory_context_, scope);
+  SET_AND_RETURN_IF_NOT_OK(validator_or_error.status(), creation_status);
+  cert_validator_ = std::move(*validator_or_error);
 
   const auto tls_certificates = config.tlsCertificates();
   tls_contexts_.resize(std::max(static_cast<size_t>(1), tls_certificates.size()));
@@ -162,7 +165,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   }
 
   auto verify_mode_or_error = cert_validator_->initializeSslContexts(
-      ssl_contexts, config.capabilities().provides_certificates);
+      ssl_contexts, config.capabilities().provides_certificates, scope);
   SET_AND_RETURN_IF_NOT_OK(verify_mode_or_error.status(), creation_status);
   auto verify_mode = verify_mode_or_error.value();
 
@@ -184,13 +187,15 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     }
   }
 
-#ifdef BORINGSSL_FIPS
-  if (!capabilities_.is_fips_compliant) {
-    creation_status = absl::InvalidArgumentError(
-        "Can't load a FIPS noncompliant custom handshaker while running in FIPS compliant mode.");
-    return;
+  const bool fips_mode = FIPS_mode();
+
+  if (fips_mode) {
+    if (!capabilities_.is_fips_compliant) {
+      creation_status = absl::InvalidArgumentError(
+          "Can't load a FIPS noncompliant custom handshaker while running in FIPS compliant mode.");
+      return;
+    }
   }
-#endif
 
   if (!capabilities_.provides_certificates) {
     for (uint32_t i = 0; i < tls_certificates.size(); ++i) {
@@ -199,7 +204,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       const auto& tls_certificate = tls_certificates[i].get();
       if (!tls_certificate.pkcs12().empty()) {
         creation_status = ctx.loadPkcs12(tls_certificate.pkcs12(), tls_certificate.pkcs12Path(),
-                                         tls_certificate.password());
+                                         tls_certificate.password(), fips_mode);
       } else {
         creation_status = ctx.loadCertificateChain(tls_certificate.certificateChain(),
                                                    tls_certificate.certificateChainPath());
@@ -207,6 +212,13 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       if (!creation_status.ok()) {
         return;
       }
+
+      // Create and set the certificate expiration gauge.
+      Stats::Gauge& expiration_gauge =
+          Extensions::TransportSockets::Tls::createCertificateExpirationGauge(
+              scope, tls_certificate.certificateName());
+      expiration_gauge.set(Utility::getExpirationUnixTime(ctx.cert_chain_.get()).count());
+
       // The must staple extension means the certificate promises to carry
       // with it an OCSP staple. https://tools.ietf.org/html/rfc7633#section-6
       constexpr absl::string_view tls_feature_ext = "1.3.6.1.5.5.7.1.24";
@@ -218,23 +230,24 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
 
       bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
       const int pkey_id = EVP_PKEY_id(public_key.get());
-      ctx.is_ecdsa_ = pkey_id == EVP_PKEY_EC;
       switch (pkey_id) {
       case EVP_PKEY_EC: {
-        // We only support P-256 ECDSA today.
+        // We only support P-256, P-384 or P-521 ECDSA today.
         const EC_KEY* ecdsa_public_key = EVP_PKEY_get0_EC_KEY(public_key.get());
         // Since we checked the key type above, this should be valid.
         ASSERT(ecdsa_public_key != nullptr);
         const EC_GROUP* ecdsa_group = EC_KEY_get0_group(ecdsa_public_key);
+        const int ec_group_curve_name = EC_GROUP_get_curve_name(ecdsa_group);
         if (ecdsa_group == nullptr ||
-            EC_GROUP_get_curve_name(ecdsa_group) != NID_X9_62_prime256v1) {
+            (ec_group_curve_name != NID_X9_62_prime256v1 && ec_group_curve_name != NID_secp384r1 &&
+             ec_group_curve_name != NID_secp521r1)) {
           creation_status = absl::InvalidArgumentError(
-              fmt::format("Failed to load certificate chain from {}, only P-256 "
-                          "ECDSA certificates are supported",
+              fmt::format("Failed to load certificate chain from {}, only P-256, "
+                          "P-384 or P-521 ECDSA certificates are supported",
                           ctx.cert_chain_file_path_));
           return;
         }
-        ctx.is_ecdsa_ = true;
+        ctx.ec_group_curve_name_ = ec_group_curve_name;
       } break;
       case EVP_PKEY_RSA: {
         // We require RSA certificates with 2048-bit or larger keys.
@@ -242,32 +255,32 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         // Since we checked the key type above, this should be valid.
         ASSERT(rsa_public_key != nullptr);
         const unsigned rsa_key_length = RSA_bits(rsa_public_key);
-#ifdef BORINGSSL_FIPS
-        if (rsa_key_length != 2048 && rsa_key_length != 3072 && rsa_key_length != 4096) {
-          creation_status = absl::InvalidArgumentError(
-              fmt::format("Failed to load certificate chain from {}, only RSA certificates with "
-                          "2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode",
-                          ctx.cert_chain_file_path_));
-          return;
+        if (fips_mode) {
+          if (rsa_key_length != 2048 && rsa_key_length != 3072 && rsa_key_length != 4096) {
+            creation_status = absl::InvalidArgumentError(
+                fmt::format("Failed to load certificate chain from {}, only RSA certificates with "
+                            "2048-bit, 3072-bit or 4096-bit keys are supported in FIPS mode",
+                            ctx.cert_chain_file_path_));
+            return;
+          }
+        } else {
+          if (rsa_key_length < 2048) {
+            creation_status = absl::InvalidArgumentError(
+                fmt::format("Failed to load certificate chain from {}, only RSA "
+                            "certificates with 2048-bit or larger keys are supported",
+                            ctx.cert_chain_file_path_));
+            return;
+          }
         }
-#else
-        if (rsa_key_length < 2048) {
-          creation_status = absl::InvalidArgumentError(
-              fmt::format("Failed to load certificate chain from {}, only RSA "
-                          "certificates with 2048-bit or larger keys are supported",
-                          ctx.cert_chain_file_path_));
-          return;
-        }
-#endif
       } break;
-#ifdef BORINGSSL_FIPS
       default:
-        creation_status = absl::InvalidArgumentError(
-            fmt::format("Failed to load certificate chain from {}, only RSA and "
-                        "ECDSA certificates are supported in FIPS mode",
-                        ctx.cert_chain_file_path_));
-        return;
-#endif
+        if (fips_mode) {
+          creation_status = absl::InvalidArgumentError(
+              fmt::format("Failed to load certificate chain from {}, only RSA and "
+                          "ECDSA certificates are supported in FIPS mode",
+                          ctx.cert_chain_file_path_));
+          return;
+        }
       }
 
       Envoy::Ssl::PrivateKeyMethodProviderSharedPtr private_key_method_provider =
@@ -283,19 +296,19 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
               fmt::format("Failed to get BoringSSL private key method from provider"));
           return;
         }
-#ifdef BORINGSSL_FIPS
-        if (!ctx.private_key_method_provider_->checkFips()) {
-          creation_status = absl::InvalidArgumentError(
-              fmt::format("Private key method doesn't support FIPS mode with current parameters"));
-          return;
+        if (fips_mode) {
+          if (!ctx.private_key_method_provider_->checkFips()) {
+            creation_status = absl::InvalidArgumentError(fmt::format(
+                "Private key method doesn't support FIPS mode with current parameters"));
+            return;
+          }
         }
-#endif
         SSL_CTX_set_private_key_method(ctx.ssl_ctx_.get(), private_key_method.get());
       } else if (!tls_certificate.privateKey().empty()) {
         // Load private key.
         creation_status =
             ctx.loadPrivateKey(tls_certificate.privateKey(), tls_certificate.privateKeyPath(),
-                               tls_certificate.password());
+                               tls_certificate.password(), fips_mode);
         if (!creation_status.ok()) {
           return;
         }
@@ -311,7 +324,6 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   parsed_alpn_protocols_ = parseAlpnProtocols(config.alpnProtocols(), creation_status);
   SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
 
-#if BORINGSSL_API_VERSION >= 21
   // Register stat names based on lists reported by BoringSSL.
   std::vector<const char*> list(SSL_get_all_cipher_names(nullptr, 0));
   SSL_get_all_cipher_names(list.data(), list.size());
@@ -328,55 +340,6 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   list.resize(SSL_get_all_version_names(nullptr, 0));
   SSL_get_all_version_names(list.data(), list.size());
   stat_name_set_->rememberBuiltins(list);
-#else
-  // Use the SSL library to iterate over the configured ciphers.
-  //
-  // Note that if a negotiated cipher suite is outside of this set, we'll issue an ENVOY_BUG.
-  for (Ssl::TlsContext& tls_context : tls_contexts_) {
-    for (const SSL_CIPHER* cipher : SSL_CTX_get_ciphers(tls_context.ssl_ctx_.get())) {
-      stat_name_set_->rememberBuiltin(SSL_CIPHER_get_name(cipher));
-    }
-  }
-
-  // Add supported cipher suites from the TLS 1.3 spec:
-  // https://tools.ietf.org/html/rfc8446#appendix-B.4
-  // AES-CCM cipher suites are removed (no BoringSSL support).
-  //
-  // Note that if a negotiated cipher suite is outside of this set, we'll issue an ENVOY_BUG.
-  stat_name_set_->rememberBuiltins(
-      {"TLS_AES_128_GCM_SHA256", "TLS_AES_256_GCM_SHA384", "TLS_CHACHA20_POLY1305_SHA256"});
-
-  // All supported curves. Source:
-  // https://github.com/google/boringssl/blob/3743aafdacff2f7b083615a043a37101f740fa53/ssl/ssl_key_share.cc#L302-L309
-  //
-  // Note that if a negotiated curve is outside of this set, we'll issue an ENVOY_BUG.
-  stat_name_set_->rememberBuiltins({"P-224", "P-256", "P-384", "P-521", "X25519", "CECPQ2"});
-
-  // All supported signature algorithms. Source:
-  // https://github.com/google/boringssl/blob/3743aafdacff2f7b083615a043a37101f740fa53/ssl/ssl_privkey.cc#L436-L453
-  //
-  // Note that if a negotiated algorithm is outside of this set, we'll issue an ENVOY_BUG.
-  stat_name_set_->rememberBuiltins({
-      "rsa_pkcs1_md5_sha1",
-      "rsa_pkcs1_sha1",
-      "rsa_pkcs1_sha256",
-      "rsa_pkcs1_sha384",
-      "rsa_pkcs1_sha512",
-      "ecdsa_sha1",
-      "ecdsa_secp256r1_sha256",
-      "ecdsa_secp384r1_sha384",
-      "ecdsa_secp521r1_sha512",
-      "rsa_pss_rsae_sha256",
-      "rsa_pss_rsae_sha384",
-      "rsa_pss_rsae_sha512",
-      "ed25519",
-  });
-
-  // All supported protocol versions.
-  //
-  // Note that if a negotiated version is outside of this set, we'll issue an ENVOY_BUG.
-  stat_name_set_->rememberBuiltins({"TLSv1", "TLSv1.1", "TLSv1.2", "TLSv1.3"});
-#endif
 
   // As late as possible, run the custom SSL_CTX configuration callback on each
   // SSL_CTX, if set.
@@ -396,6 +359,31 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       SSL_CTX* ctx = context.ssl_ctx_.get();
       ASSERT(ctx != nullptr);
       SSL_CTX_set_keylog_callback(ctx, keylogCallback);
+    }
+  }
+
+  // Compliance policy must be applied last to have a defined behavior.
+  if (const auto policy = config.compliancePolicy(); policy.has_value()) {
+    switch (policy.value()) {
+      using ProtoPolicy = envoy::extensions::transport_sockets::tls::v3::TlsParameters;
+    case ProtoPolicy::FIPS_202205:
+      if (!fips_mode) {
+        ENVOY_LOG(warn, "FIPS conformance policy applied on a non-FIPS build");
+      }
+      for (auto& tls_context : tls_contexts_) {
+        int rc = SSL_CTX_set_compliance_policy(tls_context.ssl_ctx_.get(),
+                                               ssl_compliance_policy_fips_202205);
+        if (rc != 1) {
+          creation_status = absl::InvalidArgumentError(
+              absl::StrCat("Failed to apply FIPS_202205 compliance policy: ",
+                           Utility::getLastCryptoError().value_or("")));
+          return;
+        }
+      }
+      break;
+    default:
+      creation_status = absl::InvalidArgumentError("Unknown compliance policy");
+      return;
     }
   }
 }
@@ -457,7 +445,8 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
 }
 
 absl::StatusOr<bssl::UniquePtr<SSL>>
-ContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& options) {
+ContextImpl::newSsl(const Network::TransportSocketOptionsConstSharedPtr& options,
+                    Upstream::HostDescriptionConstSharedPtr) {
   // We use the first certificate for a new SSL object, later in the
   // SSL_CTX_set_select_certificate_cb() callback following ClientHello, we replace with the
   // selected certificate via SSL_set_SSL_CTX().
@@ -569,18 +558,12 @@ void ContextImpl::logHandshake(SSL* ssl) const {
     stats_.no_certificate_.inc();
   }
 
-#if defined(BORINGSSL_FIPS) && BORINGSSL_API_VERSION >= 18
-#error "Delete preprocessor check below; no longer needed"
-#endif
-
-#if BORINGSSL_API_VERSION >= 18
   // Increment the `was_key_usage_invalid_` stats to indicate the given cert would have triggered an
   // error but is allowed because the enforcement that rsa key usage and tls usage need to be
   // matched has been disabled.
   if (SSL_was_key_usage_invalid(ssl)) {
     stats_.was_key_usage_invalid_.inc();
   }
-#endif // BORINGSSL_API_VERSION
 }
 
 std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMethodProviders() {
@@ -641,9 +624,9 @@ std::vector<Envoy::Ssl::CertificateDetailsPtr> ContextImpl::getCertChainInformat
     auto ocsp_resp = ctx.ocsp_response_.get();
     if (ocsp_resp) {
       auto* ocsp_details = detail->mutable_ocsp_details();
-      ProtobufWkt::Timestamp* valid_from = ocsp_details->mutable_valid_from();
+      Protobuf::Timestamp* valid_from = ocsp_details->mutable_valid_from();
       TimestampUtil::systemClockToTimestamp(ocsp_resp->getThisUpdate(), *valid_from);
-      ProtobufWkt::Timestamp* expiration = ocsp_details->mutable_expiration();
+      Protobuf::Timestamp* expiration = ocsp_details->mutable_expiration();
       TimestampUtil::systemClockToTimestamp(ocsp_resp->getNextUpdate(), *expiration);
     }
     cert_details.push_back(std::move(detail));
@@ -748,7 +731,7 @@ absl::Status TlsContext::loadCertificateChain(const std::string& data,
 }
 
 absl::Status TlsContext::loadPrivateKey(const std::string& data, const std::string& data_path,
-                                        const std::string& password) {
+                                        const std::string& password, bool fips_mode) {
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(data.data()), data.size()));
   RELEASE_ASSERT(bio != nullptr, "");
   bssl::UniquePtr<EVP_PKEY> pkey(
@@ -761,11 +744,11 @@ absl::Status TlsContext::loadPrivateKey(const std::string& data, const std::stri
         Extensions::TransportSockets::Tls::Utility::getLastCryptoError().value_or("unknown")));
   }
 
-  return checkPrivateKey(pkey, data_path);
+  return checkPrivateKey(pkey, data_path, fips_mode);
 }
 
 absl::Status TlsContext::loadPkcs12(const std::string& data, const std::string& data_path,
-                                    const std::string& password) {
+                                    const std::string& password, bool fips_mode) {
   cert_chain_file_path_ = data_path;
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(data.data()), data.size()));
   RELEASE_ASSERT(bio != nullptr, "");
@@ -800,37 +783,34 @@ absl::Status TlsContext::loadPkcs12(const std::string& data, const std::string& 
         Extensions::TransportSockets::Tls::Utility::getLastCryptoError().value_or("unknown")));
   }
 
-  return checkPrivateKey(pkey, data_path);
+  return checkPrivateKey(pkey, data_path, fips_mode);
 }
 
 absl::Status TlsContext::checkPrivateKey(const bssl::UniquePtr<EVP_PKEY>& pkey,
-                                         const std::string& key_path) {
-#ifdef BORINGSSL_FIPS
-  // Verify that private keys are passing FIPS pairwise consistency tests.
-  switch (EVP_PKEY_id(pkey.get())) {
-  case EVP_PKEY_EC: {
-    const EC_KEY* ecdsa_private_key = EVP_PKEY_get0_EC_KEY(pkey.get());
-    if (!EC_KEY_check_fips(ecdsa_private_key)) {
-      return absl::InvalidArgumentError(
-          fmt::format("Failed to load private key from {}, ECDSA key failed "
-                      "pairwise consistency test required in FIPS mode",
-                      key_path));
+                                         const std::string& key_path, bool fips_mode) {
+  if (fips_mode) {
+    // Verify that private keys are passing FIPS pairwise consistency tests.
+    switch (EVP_PKEY_id(pkey.get())) {
+    case EVP_PKEY_EC: {
+      const EC_KEY* ecdsa_private_key = EVP_PKEY_get0_EC_KEY(pkey.get());
+      if (!EC_KEY_check_fips(ecdsa_private_key)) {
+        return absl::InvalidArgumentError(
+            fmt::format("Failed to load private key from {}, ECDSA key failed "
+                        "pairwise consistency test required in FIPS mode",
+                        key_path));
+      }
+    } break;
+    case EVP_PKEY_RSA: {
+      RSA* rsa_private_key = EVP_PKEY_get0_RSA(pkey.get());
+      if (!RSA_check_fips(rsa_private_key)) {
+        return absl::InvalidArgumentError(
+            fmt::format("Failed to load private key from {}, RSA key failed "
+                        "pairwise consistency test required in FIPS mode",
+                        key_path));
+      }
+    } break;
     }
-  } break;
-  case EVP_PKEY_RSA: {
-    RSA* rsa_private_key = EVP_PKEY_get0_RSA(pkey.get());
-    if (!RSA_check_fips(rsa_private_key)) {
-      return absl::InvalidArgumentError(
-          fmt::format("Failed to load private key from {}, RSA key failed "
-                      "pairwise consistency test required in FIPS mode",
-                      key_path));
-    }
-  } break;
   }
-#else
-  UNREFERENCED_PARAMETER(pkey);
-  UNREFERENCED_PARAMETER(key_path);
-#endif
   return absl::OkStatus();
 }
 

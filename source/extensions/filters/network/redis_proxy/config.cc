@@ -6,6 +6,7 @@
 
 #include "source/extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 #include "source/extensions/common/redis/cluster_refresh_manager_impl.h"
+#include "source/extensions/filters/network/common/redis/aws_iam_authenticator_impl.h"
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 #include "source/extensions/filters/network/common/redis/fault_impl.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
@@ -74,13 +75,38 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
 
   Upstreams upstreams;
   for (auto& cluster : unique_clusters) {
+
+    // Create the AWS IAM authenticator if required
+    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+        aws_iam_authenticator;
+    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config;
+    auto cluster_optref = server_context.clusterManager().clusters().getCluster(cluster);
+    if (cluster_optref.has_value()) {
+      // Does our cluster have an AwsIam element available? If so, create a new authenticator for
+      // this connection pool.
+      aws_iam_config = ProtocolOptionsConfigImpl::awsIamConfig(cluster_optref.value().get().info());
+      if (aws_iam_config.has_value()) {
+        if (!ProtocolOptionsConfigImpl::authUsername(cluster_optref.value().get().info(),
+                                                     context.serverFactoryContext().api())
+                 .empty()) {
+          aws_iam_authenticator = Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorFactory::
+              initAwsIamAuthenticator(server_context, aws_iam_config.value());
+        } else {
+          ENVOY_LOG_MISC(warn,
+                         "No auth_username found for cluster {}, AWS IAM Authentication will be "
+                         "disabled for this cluster",
+                         cluster);
+        }
+      }
+    }
+
     Stats::ScopeSharedPtr stats_scope =
         context.scope().createScope(fmt::format("cluster.{}.redis_cluster", cluster));
     auto conn_pool_ptr = std::make_shared<ConnPool::InstanceImpl>(
         cluster, server_context.clusterManager(),
         Common::Redis::Client::ClientFactoryImpl::instance_, server_context.threadLocal(),
         proto_config.settings(), server_context.api(), std::move(stats_scope), redis_command_stats,
-        refresh_manager, filter_config->dns_cache_);
+        refresh_manager, filter_config->dns_cache_, aws_iam_config, aws_iam_authenticator);
     conn_pool_ptr->init();
     upstreams.emplace(cluster, conn_pool_ptr);
   }
@@ -91,10 +117,16 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   auto fault_manager = std::make_unique<Common::Redis::FaultManagerImpl>(
       server_context.api().randomGenerator(), server_context.runtime(), proto_config.faults());
 
+  absl::flat_hash_set<std::string> custom_commands;
+  for (const auto& cmd : proto_config.custom_commands()) {
+    custom_commands.insert(cmd);
+  }
+
   std::shared_ptr<CommandSplitter::Instance> splitter =
       std::make_shared<CommandSplitter::InstanceImpl>(
           std::move(router), context.scope(), filter_config->stat_prefix_,
-          server_context.timeSource(), proto_config.latency_in_micros(), std::move(fault_manager));
+          server_context.timeSource(), proto_config.latency_in_micros(), std::move(fault_manager),
+          std::move(custom_commands));
 
   auto has_external_auth_provider_ = proto_config.has_external_auth_provider();
   auto grpc_service = proto_config.external_auth_provider().grpc_service();
@@ -111,10 +143,12 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
               .clusterManager()
               .grpcAsyncClientManager()
               .factoryForGrpcService(grpc_service, context.scope(), true);
-      THROW_IF_STATUS_NOT_OK(auth_client_factory_or_error, throw);
+      THROW_IF_NOT_OK_REF(auth_client_factory_or_error.status());
 
       auth_client = std::make_unique<ExternalAuth::GrpcExternalAuthClient>(
-          auth_client_factory_or_error.value()->createUncachedRawAsyncClient(),
+          THROW_OR_RETURN_VALUE(
+              auth_client_factory_or_error.value()->createUncachedRawAsyncClient(),
+              Grpc::RawAsyncClientPtr),
           std::chrono::milliseconds(timeout_ms));
     }
 

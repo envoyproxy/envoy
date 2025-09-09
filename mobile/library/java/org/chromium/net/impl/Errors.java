@@ -75,14 +75,11 @@ public class Errors {
    * @return the NetError that the EnvoyMobileError maps to
    */
   public static NetError mapEnvoyMobileErrorToNetError(EnvoyFinalStreamIntel finalStreamIntel) {
-    // if connection fails to be established, check if user is offline
-    long responseFlag = finalStreamIntel.getResponseFlags();
-    if (((responseFlag & EnvoyMobileError.DNS_RESOLUTION_FAILED) != 0 ||
-         (responseFlag & EnvoyMobileError.UPSTREAM_CONNECTION_FAILURE) != 0) &&
-        !AndroidNetworkMonitor.getInstance().isOnline()) {
+    if (!AndroidNetworkMonitor.getInstance().isOnline()) {
       return NetError.ERR_INTERNET_DISCONNECTED;
     }
 
+    long responseFlag = finalStreamIntel.getResponseFlags();
     // This will only map the first matched error to a NetError code.
     for (Map.Entry<Long, NetError> entry : ENVOYMOBILE_ERROR_TO_NET_ERROR.entrySet()) {
       if ((responseFlag & entry.getKey()) != 0) {

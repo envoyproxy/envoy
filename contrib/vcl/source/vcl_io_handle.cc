@@ -625,7 +625,7 @@ absl::optional<int> VclIoHandle::domain() {
   return {AF_INET};
 };
 
-Envoy::Network::Address::InstanceConstSharedPtr VclIoHandle::localAddress() {
+absl::StatusOr<Envoy::Network::Address::InstanceConstSharedPtr> VclIoHandle::localAddress() {
   vppcom_endpt_t ep;
   uint32_t eplen = sizeof(ep);
   uint8_t addr_buf[sizeof(struct sockaddr_in6)];
@@ -636,7 +636,7 @@ Envoy::Network::Address::InstanceConstSharedPtr VclIoHandle::localAddress() {
   return vclEndptToAddress(ep, sh_);
 }
 
-Envoy::Network::Address::InstanceConstSharedPtr VclIoHandle::peerAddress() {
+absl::StatusOr<Envoy::Network::Address::InstanceConstSharedPtr> VclIoHandle::peerAddress() {
   VCL_LOG("grabbing peer address sh {:x}", sh_);
   vppcom_endpt_t ep;
   uint32_t eplen = sizeof(ep);

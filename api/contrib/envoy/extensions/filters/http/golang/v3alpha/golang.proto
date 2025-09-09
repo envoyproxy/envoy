@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.golang.v3alpha;
 
+import "envoy/extensions/transport_sockets/tls/v3/secret.proto";
+
 import "google/protobuf/any.proto";
 
 import "xds/annotations/v3/status.proto";
@@ -21,7 +23,7 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // For an overview of the Golang HTTP filter please see the :ref:`configuration reference documentation <config_http_filters_golang>`.
 // [#extension: envoy.filters.http.golang]
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message Config {
   // The meanings are as follows:
   //
@@ -74,6 +76,13 @@ message Config {
   //
   // [#not-implemented-hide:]
   MergePolicy merge_policy = 5 [(validate.rules).enum = {defined_only: true}];
+
+  // Generic secret list available to the plugin.
+  // Looks into SDS or static bootstrap configuration.
+  //
+  // See :repo:`StreamFilter API <contrib/golang/common/go/api/filter.go>`
+  // for more information about how to access secrets from Go.
+  repeated transport_sockets.tls.v3.SdsSecretConfig generic_secrets = 6;
 }
 
 message RouterPlugin {

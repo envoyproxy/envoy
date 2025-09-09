@@ -44,9 +44,11 @@ public:
     return Upstream::Cluster::InitializePhase::Secondary;
   }
 
+  // Getters that return the values from ClusterImplBase.
+  Runtime::Loader& runtime() const { return runtime_; }
+  Random::RandomGenerator& random() const { return random_; }
+
   Upstream::ClusterManager& cluster_manager_;
-  Runtime::Loader& runtime_;
-  Random::RandomGenerator& random_;
   const ClusterSetConstSharedPtr clusters_;
 
 protected:
@@ -80,7 +82,7 @@ public:
   void onClusterRemoval(const std::string& cluster_name) override;
 
   // Upstream::LoadBalancer
-  Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
+  Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
   Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override;
   absl::optional<Upstream::SelectedPoolAndConnection>
   selectExistingConnection(Upstream::LoadBalancerContext* /*context*/,
@@ -102,7 +104,7 @@ private:
           priority_context_(priority_context) {}
 
     // Upstream::LoadBalancer
-    Upstream::HostConstSharedPtr chooseHost(Upstream::LoadBalancerContext* context) override;
+    Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
     // Preconnecting not yet implemented for extensions.
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
       return nullptr;
@@ -148,7 +150,7 @@ public:
   // Upstream::LoadBalancerFactory
   Upstream::LoadBalancerPtr create(Upstream::LoadBalancerParams) override {
     return std::make_unique<AggregateClusterLoadBalancer>(
-        cluster_.info(), cluster_.cluster_manager_, cluster_.runtime_, cluster_.random_,
+        cluster_.info(), cluster_.cluster_manager_, cluster_.runtime(), cluster_.random(),
         cluster_.clusters_);
   }
 

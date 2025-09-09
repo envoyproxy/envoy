@@ -108,6 +108,19 @@ void ProxyFilter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& ca
 void ProxyFilter::onRespValue(Common::Redis::RespValuePtr&& value) {
   pending_requests_.emplace_back(*this);
   PendingRequest& request = pending_requests_.back();
+
+  // If external authentication is enabled and an AUTH command is ongoing,
+  // we keep the request in the queue and let it be processed when the
+  // authentication response is received.
+  if (external_auth_call_status_ == ExternalAuthCallStatus::Pending) {
+    request.pending_request_value_ = std::move(value);
+    return;
+  }
+
+  processRespValue(std::move(value), request);
+}
+
+void ProxyFilter::processRespValue(Common::Redis::RespValuePtr&& value, PendingRequest& request) {
   CommandSplitter::SplitRequestPtr split =
       splitter_.makeRequest(std::move(value), request, callbacks_->connection().dispatcher(),
                             callbacks_->connection().streamInfo());
@@ -186,20 +199,19 @@ void ProxyFilter::onAuthenticateExternal(CommandSplitter::SplitCallbacks& reques
   external_auth_call_status_ = ExternalAuthCallStatus::Ready;
 
   request.onResponse(std::move(redis_response));
+
+  // Resume processing of pending requests.
+  while (!pending_requests_.empty() && pending_requests_.front().pending_request_value_) {
+    processRespValue(std::move(pending_requests_.front().pending_request_value_),
+                     pending_requests_.front());
+  }
 }
 
 void ProxyFilter::onAuth(PendingRequest& request, const std::string& password) {
   if (config_->external_auth_enabled_) {
-    if (external_auth_call_status_ == ExternalAuthCallStatus::Ready) {
-      auth_client_->authenticateExternal(*this, request, callbacks_->connection().streamInfo(),
-                                         EMPTY_STRING, password);
-      external_auth_call_status_ = ExternalAuthCallStatus::Pending;
-    } else {
-      Common::Redis::RespValuePtr response{new Common::Redis::RespValue()};
-      response->type(Common::Redis::RespType::Error);
-      response->asString() = "ERR an existing authentication request is pending";
-      request.onResponse(std::move(response));
-    }
+    external_auth_call_status_ = ExternalAuthCallStatus::Pending;
+    auth_client_->authenticateExternal(*this, request, callbacks_->connection().streamInfo(),
+                                       EMPTY_STRING, password);
     return;
   }
 
@@ -222,16 +234,9 @@ void ProxyFilter::onAuth(PendingRequest& request, const std::string& password) {
 void ProxyFilter::onAuth(PendingRequest& request, const std::string& username,
                          const std::string& password) {
   if (config_->external_auth_enabled_) {
-    if (external_auth_call_status_ == ExternalAuthCallStatus::Ready) {
-      auth_client_->authenticateExternal(*this, request, callbacks_->connection().streamInfo(),
-                                         username, password);
-      external_auth_call_status_ = ExternalAuthCallStatus::Pending;
-    } else {
-      Common::Redis::RespValuePtr response{new Common::Redis::RespValue()};
-      response->type(Common::Redis::RespType::Error);
-      response->asString() = "ERR an existing authentication request is pending";
-      request.onResponse(std::move(response));
-    }
+    auth_client_->authenticateExternal(*this, request, callbacks_->connection().streamInfo(),
+                                       username, password);
+    external_auth_call_status_ = ExternalAuthCallStatus::Pending;
     return;
   }
 
@@ -289,7 +294,8 @@ void ProxyFilter::onResponse(PendingRequest& request, Common::Redis::RespValuePt
   }
 
   // Check for drain close only if there are no pending responses.
-  if (pending_requests_.empty() && config_->drain_decision_.drainClose() &&
+  if (pending_requests_.empty() &&
+      config_->drain_decision_.drainClose(Network::DrainDirection::All) &&
       config_->runtime_.snapshot().featureEnabled(config_->redis_drain_close_runtime_key_, 100)) {
     config_->stats_.downstream_cx_drain_close_.inc();
     callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);

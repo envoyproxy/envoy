@@ -31,8 +31,8 @@ public:
 
   void SetUp() override {
     std::tie(io_handle_, io_handle_peer_) = IoHandleFactory::createIoHandlePair();
-    local_addr_ = io_handle_->localAddress();
-    remote_addr_ = io_handle_->peerAddress();
+    local_addr_ = *io_handle_->localAddress();
+    remote_addr_ = *io_handle_->peerAddress();
   }
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;

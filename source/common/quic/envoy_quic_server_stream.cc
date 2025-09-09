@@ -4,6 +4,7 @@
 #include <openssl/evp.h>
 
 #include <memory>
+#include <utility>
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
@@ -18,6 +19,7 @@
 #include "quiche/common/http/http_header_block.h"
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"
+#include "quiche/quic/core/quic_types.h"
 #include "quiche_platform_impl/quiche_mem_slice_impl.h"
 
 namespace Envoy {
@@ -44,6 +46,10 @@ EnvoyQuicServerStream::EnvoyQuicServerStream(
   stats_gatherer_ = new QuicStatsGatherer(&filterManagerConnection()->dispatcher().timeSource());
   set_ack_listener(stats_gatherer_);
   RegisterMetadataVisitor(this);
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.validate_http3_pseudo_headers") &&
+      session->allow_extended_connect()) {
+    header_validator().SetAllowExtendedConnect();
+  }
 }
 
 void EnvoyQuicServerStream::encode1xxHeaders(const Http::ResponseHeaderMap& headers) {
@@ -54,7 +60,8 @@ void EnvoyQuicServerStream::encode1xxHeaders(const Http::ResponseHeaderMap& head
 void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "encodeHeaders (end_stream={}) {}.", *this, end_stream, headers);
   if (write_side_closed()) {
-    IS_ENVOY_BUG("encodeHeaders is called on write-closed stream.");
+    IS_ENVOY_BUG(
+        fmt::format("encodeHeaders is called on write-closed stream. {}", quicStreamState()));
     return;
   }
 
@@ -77,8 +84,9 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
-    size_t bytes_sent =
-        WriteHeaders(envoyHeadersToHttp2HeaderBlock(*header_map), end_stream, nullptr);
+    quiche::HttpHeaderBlock header_block = envoyHeadersToHttp2HeaderBlock(*header_map);
+    addDecompressedHeaderBytesSent(header_block);
+    size_t bytes_sent = WriteHeaders(std::move(header_block), end_stream, nullptr);
     stats_gatherer_->addBytesSent(bytes_sent, end_stream);
     ENVOY_BUG(bytes_sent != 0, "Failed to encode headers.");
   }
@@ -92,17 +100,17 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
 }
 
 void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trailers) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_remove_empty_trailers")) {
-    if (trailers.empty()) {
-      ENVOY_STREAM_LOG(debug, "skipping submitting empty trailers", *this);
-      // Instead of submitting empty trailers, we send empty data with end_stream=true instead.
-      Buffer::OwnedImpl empty_buffer;
-      encodeData(empty_buffer, true);
-      return;
-    }
+  if (trailers.empty()) {
+    ENVOY_STREAM_LOG(debug, "skipping submitting empty trailers", *this);
+    // Instead of submitting empty trailers, we send empty data with end_stream=true instead.
+    Buffer::OwnedImpl empty_buffer;
+    encodeData(empty_buffer, true);
+    return;
   }
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
-  encodeTrailersImpl(envoyHeadersToHttp2HeaderBlock(trailers));
+  quiche::HttpHeaderBlock trailer_block = envoyHeadersToHttp2HeaderBlock(trailers);
+  addDecompressedHeaderBytesSent(trailer_block);
+  encodeTrailersImpl(std::move(trailer_block));
 }
 
 void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
@@ -147,6 +155,7 @@ void EnvoyQuicServerStream::switchStreamBlockState() {
 void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
                                                      const quic::QuicHeaderList& header_list) {
   mutableBytesMeter()->addHeaderBytesReceived(frame_len);
+  addDecompressedHeaderBytesReceived(header_list);
   // TODO(danzh) Fix in QUICHE. If the stream has been reset in the call stack,
   // OnInitialHeadersComplete() shouldn't be called.
   if (read_side_closed()) {
@@ -163,7 +172,13 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
 
   ENVOY_STREAM_LOG(debug, "Received headers: {}.", *this, header_list.DebugString());
-  if (fin) {
+  const bool headers_only = fin_received() && highest_received_byte_offset() == NumBytesConsumed();
+  const bool end_stream =
+      fin ||
+      (headers_only && Runtime::runtimeFeatureEnabled("envoy.reloadable_features.quic_signal_"
+                                                      "headers_only_to_http1_backend"));
+  ENVOY_STREAM_LOG(debug, "Headers_only: {}, end_stream: {}.", *this, headers_only, end_stream);
+  if (end_stream) {
     end_stream_decoded_ = true;
   }
   saw_regular_headers_ = false;
@@ -214,7 +229,10 @@ void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   }
 #endif
 
-  request_decoder_->decodeHeaders(std::move(headers), /*end_stream=*/fin);
+  Http::RequestDecoder* decoder = request_decoder_->get().ptr();
+  if (decoder != nullptr) {
+    decoder->decodeHeaders(std::move(headers), /*end_stream=*/end_stream);
+  }
   ConsumeHeaderList();
 }
 
@@ -262,7 +280,10 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
       // A stream error has occurred, stop processing.
       return;
     }
-    request_decoder_->decodeData(*buffer, fin_read_and_no_trailers);
+    Http::RequestDecoder* decoder = request_decoder_->get().ptr();
+    if (decoder != nullptr) {
+      decoder->decodeData(*buffer, fin_read_and_no_trailers);
+    }
   }
 
   if (!sequencer()->IsClosed() || read_side_closed()) {
@@ -279,6 +300,7 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
 void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                                       const quic::QuicHeaderList& header_list) {
   mutableBytesMeter()->addHeaderBytesReceived(frame_len);
+  addDecompressedHeaderBytesReceived(header_list);
   ENVOY_STREAM_LOG(debug, "Received trailers: {}.", *this, received_trailers().DebugString());
   quic::QuicSpdyServerStreamBase::OnTrailingHeadersComplete(fin, frame_len, header_list);
   if (read_side_closed()) {
@@ -314,7 +336,10 @@ void EnvoyQuicServerStream::maybeDecodeTrailers() {
       onStreamError(close_connection_upon_invalid_header_, rst);
       return;
     }
-    request_decoder_->decodeTrailers(std::move(trailers));
+    Http::RequestDecoder* decoder = request_decoder_->get().ptr();
+    if (decoder != nullptr) {
+      decoder->decodeTrailers(std::move(trailers));
+    }
     MarkTrailersConsumed();
   }
 }
@@ -339,9 +364,7 @@ bool EnvoyQuicServerStream::OnStopSending(quic::QuicResetStreamError error) {
     // Treat this as a remote reset, since the stream will be closed in both directions.
     runResetCallbacks(
         quicRstErrorToEnvoyRemoteResetReason(error.internal_code()),
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
-            ? quic::QuicRstStreamErrorCodeToString(error.internal_code())
-            : absl::string_view());
+        absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()), "|FROM_PEER"));
   }
   return true;
 }
@@ -359,9 +382,7 @@ void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame)
     // stream callback.
     runResetCallbacks(
         quicRstErrorToEnvoyRemoteResetReason(frame.error_code),
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
-            ? quic::QuicRstStreamErrorCodeToString(frame.error_code)
-            : absl::string_view());
+        absl::StrCat(quic::QuicRstStreamErrorCodeToString(frame.error_code), "|FROM_PEER"));
   }
 }
 
@@ -374,9 +395,7 @@ void EnvoyQuicServerStream::ResetWithError(quic::QuicResetStreamError error) {
     // Upper layers expect calling resetStream() to immediately raise reset callbacks.
     runResetCallbacks(
         quicRstErrorToEnvoyLocalResetReason(error.internal_code()),
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
-            ? quic::QuicRstStreamErrorCodeToString(error.internal_code())
-            : absl::string_view());
+        absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()), "|FROM_SELF"));
   }
   quic::QuicSpdyServerStreamBase::ResetWithError(error);
 }
@@ -419,6 +438,12 @@ void EnvoyQuicServerStream::OnClose() {
     return;
   }
   clearWatermarkBuffer();
+  if (stats_gatherer_->notify_ack_listener_before_soon_to_be_destroyed()) {
+    // Either stats_gatherer_ will do deferred logging upon receiving the last
+    // ACK, or OnSoonToBeDestroyed() will catch all the cases where the stream
+    // is destroyed without receiving the last ACK.
+    return;
+  }
   if (!stats_gatherer_->loggingDone()) {
     stats_gatherer_->maybeDoDeferredLog(/* record_ack_timing */ false);
   }
@@ -463,6 +488,11 @@ EnvoyQuicServerStream::validateHeader(absl::string_view header_name,
   }
   ASSERT(!header_name.empty());
   if (!Http::HeaderUtility::isPseudoHeader(header_name)) {
+    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_remove_empty_cookie")) {
+      if (header_name == "cookie" && header_value.empty()) {
+        return Http::HeaderUtility::HeaderValidationResult::DROP;
+      }
+    }
     return result;
   }
   static const absl::flat_hash_set<std::string> known_pseudo_headers{":authority", ":protocol",
@@ -486,7 +516,10 @@ void EnvoyQuicServerStream::OnMetadataComplete(size_t /*frame_len*/,
     return;
   }
   if (!header_list.empty()) {
-    request_decoder_->decodeMetadata(metadataMapFromHeaderList(header_list));
+    Http::RequestDecoder* decoder = request_decoder_->get().ptr();
+    if (decoder != nullptr) {
+      decoder->decodeMetadata(metadataMapFromHeaderList(header_list));
+    }
   }
 }
 
@@ -529,13 +562,24 @@ bool EnvoyQuicServerStream::hasPendingData() {
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
 void EnvoyQuicServerStream::useCapsuleProtocol() {
   http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
-  ASSERT(request_decoder_ != nullptr);
-  http_datagram_handler_->setStreamDecoder(request_decoder_);
+  ASSERT(request_decoder_->get().has_value());
+  http_datagram_handler_->setStreamDecoder(request_decoder_->get().ptr());
   RegisterHttp3DatagramVisitor(http_datagram_handler_.get());
 }
 #endif
 
 void EnvoyQuicServerStream::OnInvalidHeaders() { onStreamError(absl::nullopt); }
+
+void EnvoyQuicServerStream::OnSoonToBeDestroyed() {
+  quic::QuicSpdyServerStreamBase::OnSoonToBeDestroyed();
+  if (stats_gatherer_ != nullptr &&
+      stats_gatherer_->notify_ack_listener_before_soon_to_be_destroyed() &&
+      !stats_gatherer_->loggingDone()) {
+    // Catch all the cases where the stream is destroyed without receiving the
+    // last ACK.
+    stats_gatherer_->maybeDoDeferredLog(/* record_ack_timing */ false);
+  }
+}
 
 } // namespace Quic
 } // namespace Envoy

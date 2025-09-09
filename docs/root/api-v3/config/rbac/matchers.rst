@@ -8,3 +8,12 @@ RBAC matchers
   :maxdepth: 2
 
   matchers/upstream/upstream
+
+RBAC principals
+===============
+
+.. toctree::
+  :glob:
+  :maxdepth: 2
+
+  ../../extensions/rbac/principals/mtls_authenticated/v3/mtls_authenticated.proto

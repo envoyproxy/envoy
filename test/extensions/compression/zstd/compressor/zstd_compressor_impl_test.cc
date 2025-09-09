@@ -134,8 +134,9 @@ TEST_F(ZstdCompressorImplTest, IllegalConfig) {
   }
 })EOF";
   TestUtility::loadFromJson(json, zstd);
-  EXPECT_DEATH({ lib_factory.createCompressorFactoryFromProto(zstd, mock_context); },
-               "assert failure: id != 0. Details: Illegal Zstd dictionary");
+  EXPECT_DEATH(
+      { lib_factory.createCompressorFactoryFromProto(zstd, mock_context); },
+      "assert failure: id != 0. Details: Illegal Zstd dictionary");
 }
 
 } // namespace

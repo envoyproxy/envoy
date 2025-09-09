@@ -114,7 +114,7 @@ typed_config:
 
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   stream_info_.upstreamInfo()->setUpstreamHost(
-      Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234", simTime()));
+      Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234"));
   stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::DownstreamConnectionTermination);
 
   log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
@@ -255,7 +255,7 @@ typed_config:
 TEST_F(AccessLogImplTest, UpstreamHost) {
   auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
   stream_info_.upstreamInfo()->setUpstreamHost(
-      Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234", simTime()));
+      Upstream::makeTestHostDescription(cluster, "tcp://10.0.0.5:1234"));
 
   const std::string yaml = R"EOF(
 name: accesslog
@@ -495,7 +495,7 @@ typed_config:
   InstanceSharedPtr log = AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_);
 
   Http::TestRequestHeaderMapImpl header_map{};
-  stream_info_.health_check_request_ = true;
+  stream_info_.healthCheck(true);
   EXPECT_CALL(*file_, write(_)).Times(0);
 
   log->log({&header_map, &response_headers_, &response_trailers_}, stream_info_);
@@ -615,7 +615,7 @@ typed_config:
   {
     EXPECT_CALL(*file_, write(_)).Times(0);
     Http::TestRequestHeaderMapImpl header_map{};
-    stream_info_.health_check_request_ = true;
+    stream_info_.healthCheck(true);
     log->log({&header_map, &response_headers_, &response_trailers_}, stream_info_);
   }
 }
@@ -694,7 +694,7 @@ typed_config:
   {
     EXPECT_CALL(*file_, write(_)).Times(0);
     Http::TestRequestHeaderMapImpl header_map{};
-    stream_info_.health_check_request_ = true;
+    stream_info_.healthCheck(true);
 
     log->log({&header_map, &response_headers_, &response_trailers_}, stream_info_);
   }
@@ -1067,6 +1067,7 @@ filter:
       - DF
       - DO
       - DR
+      - UDO
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null
@@ -1493,7 +1494,7 @@ typed_config:
   )EOF";
 
   TestStreamInfo stream_info(time_source_);
-  ProtobufWkt::Struct metadata_val;
+  Protobuf::Struct metadata_val;
   auto& fields_a = *metadata_val.mutable_fields();
   auto& struct_b = *fields_a["a"].mutable_struct_value();
   auto& fields_b = *struct_b.mutable_fields();
@@ -1529,7 +1530,7 @@ typed_config:
   )EOF";
 
   TestStreamInfo stream_info(time_source_);
-  ProtobufWkt::Struct metadata_val;
+  Protobuf::Struct metadata_val;
   stream_info.setDynamicMetadata("some.namespace", metadata_val);
 
   const InstanceSharedPtr log =
@@ -1576,7 +1577,7 @@ typed_config:
   )EOF";
 
   TestStreamInfo stream_info(time_source_);
-  ProtobufWkt::Struct metadata_val;
+  Protobuf::Struct metadata_val;
   auto& fields_a = *metadata_val.mutable_fields();
   auto& struct_b = *fields_a["a"].mutable_struct_value();
   auto& fields_b = *struct_b.mutable_fields();
@@ -1702,14 +1703,13 @@ public:
     auto factory_config = Config::Utility::translateToFactoryConfig(
         config, context.messageValidationVisitor(), *this);
 
-    ProtobufWkt::Struct struct_config =
-        *dynamic_cast<const ProtobufWkt::Struct*>(factory_config.get());
+    Protobuf::Struct struct_config = *dynamic_cast<const Protobuf::Struct*>(factory_config.get());
     return std::make_unique<SampleExtensionFilter>(
         static_cast<uint32_t>(struct_config.fields().at("rate").number_value()));
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
 
   std::string name() const override { return "sample_extension_filter"; }
@@ -1844,6 +1844,24 @@ typed_config:
 
   EXPECT_THROW_WITH_REGEX(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
                           EnvoyException, "Not able to parse filter expression: .*");
+}
+
+TEST_F(AccessLogImplTest, CelExtensionFilterExpressionUncompilable) {
+  const std::string yaml = R"EOF(
+name: accesslog
+filter:
+  extension_filter:
+    name: cel_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.cel.v3.ExpressionFilter
+      expression: "f()"
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  EXPECT_THROW_WITH_REGEX(AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(yaml), context_),
+                          EnvoyException, "failed to create an expression: .*");
 }
 #endif // USE_CEL_PARSER
 

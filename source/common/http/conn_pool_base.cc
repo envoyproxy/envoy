@@ -46,10 +46,10 @@ HttpConnPoolImplBase::HttpConnPoolImplBase(
     Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
     const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
     Random::RandomGenerator& random_generator, Upstream::ClusterConnectivityState& state,
-    std::vector<Http::Protocol> protocols)
+    std::vector<Http::Protocol> protocols, Server::OverloadManager& overload_manager)
     : Envoy::ConnectionPool::ConnPoolImplBase(
           host, priority, dispatcher, options,
-          wrapTransportSocketOptions(transport_socket_options, protocols), state),
+          wrapTransportSocketOptions(transport_socket_options, protocols), state, overload_manager),
       random_generator_(random_generator) {
   ASSERT(!protocols.empty());
 }
@@ -87,6 +87,10 @@ void HttpConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& clie
   auto& http_context = typedContext<HttpAttachContext>(context);
   Http::ResponseDecoder& response_decoder = *http_context.decoder_;
   Http::ConnectionPool::Callbacks& callbacks = *http_context.callbacks_;
+
+  // Track this request on the connection
+  http_client->request_count_++;
+
   Http::RequestEncoder& new_encoder = http_client->newStreamEncoder(response_decoder);
   callbacks.onPoolReady(new_encoder, client.real_host_description_,
                         http_client->codec_client_->streamInfo(),
@@ -95,7 +99,7 @@ void HttpConnPoolImplBase::onPoolReady(Envoy::ConnectionPool::ActiveClient& clie
 
 // All streams are 2^31. Client streams are half that, minus stream 0. Just to be on the safe
 // side we do 2^29.
-static const uint64_t DEFAULT_MAX_STREAMS = (1 << 29);
+constexpr uint32_t DEFAULT_MAX_STREAMS = 1U << 29;
 
 void MultiplexedActiveClientBase::onGoAway(Http::GoAwayErrorCode) {
   ENVOY_CONN_LOG(debug, "remote goaway", *codec_client_);
@@ -182,7 +186,7 @@ void MultiplexedActiveClientBase::onStreamReset(Http::StreamResetReason reason) 
   }
 }
 
-uint64_t MultiplexedActiveClientBase::maxStreamsPerConnection(uint64_t max_streams_config) {
+uint32_t MultiplexedActiveClientBase::maxStreamsPerConnection(uint32_t max_streams_config) {
   return (max_streams_config != 0) ? max_streams_config : DEFAULT_MAX_STREAMS;
 }
 

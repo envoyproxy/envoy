@@ -2,6 +2,8 @@
 
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/extensions/clusters/dns/v3/dns_cluster.pb.h"
+#include "envoy/extensions/clusters/dns/v3/dns_cluster.pb.validate.h"
 
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/common/upstream/upstream_impl.h"
@@ -18,11 +20,13 @@ public:
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
   static absl::StatusOr<std::unique_ptr<StrictDnsClusterImpl>>
-  create(const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
-         Network::DnsResolverSharedPtr dns_resolver);
+  create(const envoy::config::cluster::v3::Cluster& cluster,
+         const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
+         ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver);
 
 protected:
   StrictDnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
+                       const envoy::extensions::clusters::dns::v3::DnsCluster& dns_cluster,
                        ClusterFactoryContext& context, Network::DnsResolverSharedPtr dns_resolver,
                        absl::Status& creation_status);
 
@@ -76,21 +80,6 @@ private:
   uint32_t overprovisioning_factor_;
   bool weighted_priority_health_;
 };
-
-/**
- * Factory for StrictDnsClusterImpl
- */
-class StrictDnsClusterFactory : public ClusterFactoryImplBase {
-public:
-  StrictDnsClusterFactory() : ClusterFactoryImplBase("envoy.cluster.strict_dns") {}
-
-private:
-  absl::StatusOr<std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>>
-  createClusterImpl(const envoy::config::cluster::v3::Cluster& cluster,
-                    ClusterFactoryContext& context) override;
-};
-
-DECLARE_FACTORY(StrictDnsClusterFactory);
 
 } // namespace Upstream
 } // namespace Envoy

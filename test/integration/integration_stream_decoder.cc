@@ -29,17 +29,21 @@ IntegrationStreamDecoder::~IntegrationStreamDecoder() {
 }
 
 void IntegrationStreamDecoder::waitFor1xxHeaders() {
-  if (!continue_headers_.get()) {
-    waiting_for_continue_headers_ = true;
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
+  if (continue_headers_.get()) {
+    return;
   }
+  waiting_for_continue_headers_ = true;
+  ASSERT_TRUE(waitForWithDispatcherRun([this]() { return continue_headers_.get() != nullptr; },
+                                       "1xx headers", TestUtility::DefaultTimeout));
 }
 
 void IntegrationStreamDecoder::waitForHeaders() {
-  if (!headers_.get()) {
-    waiting_for_headers_ = true;
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
+  if (headers_.get()) {
+    return;
   }
+  waiting_for_headers_ = true;
+  ASSERT_TRUE(waitForWithDispatcherRun([this]() { return headers_.get() != nullptr; }, "headers",
+                                       TestUtility::DefaultTimeout));
 }
 
 void IntegrationStreamDecoder::waitForBodyData(uint64_t size) {
@@ -47,44 +51,61 @@ void IntegrationStreamDecoder::waitForBodyData(uint64_t size) {
   body_data_waiting_length_ = size;
   body_data_waiting_length_ -=
       std::min(body_data_waiting_length_, static_cast<uint64_t>(body_.size()));
-  if (body_data_waiting_length_ > 0) {
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
+  if (body_data_waiting_length_ == 0) {
+    return;
   }
+  ASSERT_TRUE(waitForWithDispatcherRun([this]() { return body_data_waiting_length_ == 0; },
+                                       "body data", TestUtility::DefaultTimeout));
+}
+
+AssertionResult
+IntegrationStreamDecoder::waitForWithDispatcherRun(const std::function<bool()>& condition,
+                                                   absl::string_view description,
+                                                   std::chrono::milliseconds timeout) {
+  Event::TestTimeSystem::RealTimeBound bound(timeout);
+  while (!condition()) {
+    if (!bound.withinBound()) {
+      return AssertionFailure() << "Timed out (" << timeout.count() << "ms) waiting for "
+                                << description << debugState();
+    }
+    dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+    if (condition()) {
+      break;
+    }
+    if (isFinished()) {
+      return AssertionFailure() << "Stream finished while waiting for " << description
+                                << debugState();
+    }
+    // Wait for a moment before running the dispatcher again to avoid spinning.
+    std::this_thread::yield();
+  }
+  return AssertionSuccess();
+}
+
+std::string IntegrationStreamDecoder::debugState() const {
+  return absl::StrCat(
+      "\nIntegrationStreamDecoder state:", "\n  saw_end_stream_=", saw_end_stream_,
+      "\n  saw_reset_=", saw_reset_,
+      "\n  headers_=", headers_ ? fmt::format("{}", *headers_) : "null",
+      "\n  continue_headers_=", continue_headers_ ? fmt::format("{}", *continue_headers_) : "null",
+      "\n  body_=", absl::CEscape(body_),
+      "\n  trailers_=", trailers_ ? fmt::format("{}", *trailers_) : "null");
 }
 
 AssertionResult IntegrationStreamDecoder::waitForEndStream(std::chrono::milliseconds timeout) {
-  bool timer_fired = false;
-  while (!saw_end_stream_) {
-    Event::TimerPtr timer(dispatcher_.createTimer([this, &timer_fired]() -> void {
-      timer_fired = true;
-      dispatcher_.exit();
-    }));
-    timer->enableTimer(timeout);
-    waiting_for_end_stream_ = true;
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
-    if (!saw_end_stream_) {
-      ENVOY_LOG_MISC(warn, "non-end stream event.");
-    }
-    if (timer_fired) {
-      return AssertionFailure() << "Timed out waiting for end stream\n";
-    }
-  }
-  return AssertionSuccess();
+  waiting_for_end_stream_ = true;
+  return waitForWithDispatcherRun([this]() { return saw_end_stream_; }, "end stream", timeout);
 }
 
 AssertionResult IntegrationStreamDecoder::waitForReset(std::chrono::milliseconds timeout) {
-  if (!saw_reset_) {
-    // Set a timer to stop the dispatcher if the timeout has been exceeded.
-    Event::TimerPtr timer(dispatcher_.createTimer([this]() -> void { dispatcher_.exit(); }));
-    timer->enableTimer(timeout);
-    waiting_for_reset_ = true;
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
-    // If the timer has fired, this timed out before a reset was received.
-    if (!timer->enabled()) {
-      return AssertionFailure() << "Timed out waiting for reset.";
-    }
-  }
-  return AssertionSuccess();
+  waiting_for_reset_ = true;
+  return waitForWithDispatcherRun([this]() { return saw_reset_; }, "reset", timeout);
+}
+
+AssertionResult IntegrationStreamDecoder::waitForAnyTermination(std::chrono::milliseconds timeout) {
+  waiting_for_end_stream_ = true;
+  waiting_for_reset_ = true;
+  return waitForWithDispatcherRun([this]() { return isFinished(); }, "any termination", timeout);
 }
 
 void IntegrationStreamDecoder::decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) {
@@ -98,7 +119,7 @@ void IntegrationStreamDecoder::decodeHeaders(Http::ResponseHeaderMapPtr&& header
                                              bool end_stream) {
   saw_end_stream_ = end_stream;
   headers_ = std::move(headers);
-  if ((end_stream && waiting_for_end_stream_) || waiting_for_headers_) {
+  if ((end_stream && (waiting_for_reset_ || waiting_for_end_stream_)) || waiting_for_headers_) {
     dispatcher_.exit();
   }
 }
@@ -107,7 +128,7 @@ void IntegrationStreamDecoder::decodeData(Buffer::Instance& data, bool end_strea
   saw_end_stream_ = end_stream;
   body_ += data.toString();
 
-  if (end_stream && waiting_for_end_stream_) {
+  if (end_stream && (waiting_for_reset_ || waiting_for_end_stream_)) {
     dispatcher_.exit();
   } else if (body_data_waiting_length_ > 0) {
     body_data_waiting_length_ -= std::min(body_data_waiting_length_, data.length());
@@ -120,7 +141,7 @@ void IntegrationStreamDecoder::decodeData(Buffer::Instance& data, bool end_strea
 void IntegrationStreamDecoder::decodeTrailers(Http::ResponseTrailerMapPtr&& trailers) {
   saw_end_stream_ = true;
   trailers_ = std::move(trailers);
-  if (waiting_for_end_stream_) {
+  if (waiting_for_reset_ || waiting_for_end_stream_) {
     dispatcher_.exit();
   }
 }
@@ -137,7 +158,8 @@ void IntegrationStreamDecoder::decodeMetadata(Http::MetadataMapPtr&& metadata_ma
 void IntegrationStreamDecoder::onResetStream(Http::StreamResetReason reason, absl::string_view) {
   saw_reset_ = true;
   reset_reason_ = reason;
-  if (waiting_for_reset_) {
+  if (waiting_for_reset_ || waiting_for_end_stream_ || waiting_for_continue_headers_ ||
+      waiting_for_headers_) {
     dispatcher_.exit();
   }
 }

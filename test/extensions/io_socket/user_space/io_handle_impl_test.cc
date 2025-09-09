@@ -1059,12 +1059,12 @@ TEST_F(IoHandleImplTest, NotifyWritableAfterShutdownWrite) {
 }
 
 TEST_F(IoHandleImplTest, ReturnValidInternalAddress) {
-  const auto& local_address = io_handle_->localAddress();
+  const auto local_address = *io_handle_->localAddress();
   ASSERT_NE(nullptr, local_address);
   ASSERT_EQ(nullptr, local_address->ip());
   ASSERT_EQ(nullptr, local_address->pipe());
   ASSERT_NE(nullptr, local_address->envoyInternalAddress());
-  const auto& remote_address = io_handle_->peerAddress();
+  const auto remote_address = *io_handle_->peerAddress();
   ASSERT_NE(nullptr, remote_address);
   ASSERT_EQ(nullptr, remote_address->ip());
   ASSERT_EQ(nullptr, remote_address->pipe());
@@ -1205,8 +1205,8 @@ public:
 
 TEST_F(IoHandleImplTest, PassthroughState) {
   auto source_metadata = std::make_unique<envoy::config::core::v3::Metadata>();
-  ProtobufWkt::Struct& map = (*source_metadata->mutable_filter_metadata())["envoy.test"];
-  ProtobufWkt::Value val;
+  Protobuf::Struct& map = (*source_metadata->mutable_filter_metadata())["envoy.test"];
+  Protobuf::Value val;
   val.set_string_value("val");
   (*map.mutable_fields())["key"] = val;
   StreamInfo::FilterState::Objects source_filter_state;
@@ -1293,6 +1293,28 @@ TEST_F(IoHandleImplNotImplementedTest, ErrorOnGetOption) {
 TEST_F(IoHandleImplNotImplementedTest, ErrorOnIoctl) {
   EXPECT_THAT(io_handle_->ioctl(0, nullptr, 0, nullptr, 0, nullptr), IsNotSupportedResult());
 }
+
+class TestPassthroughState : public PassthroughStateImpl {};
+
+TEST(IoHandleFactoryTest, UseExistingPassthroughState) {
+  {
+    auto [io_handle, io_handle_peer] =
+        IoHandleFactory::createIoHandlePair(std::make_unique<TestPassthroughState>());
+    EXPECT_NE(std::dynamic_pointer_cast<TestPassthroughState>(io_handle->passthroughState()),
+              nullptr);
+    EXPECT_NE(std::dynamic_pointer_cast<TestPassthroughState>(io_handle_peer->passthroughState()),
+              nullptr);
+  }
+  {
+    auto [io_handle, io_handle_peer] = IoHandleFactory::createBufferLimitedIoHandlePair(
+        1024, std::make_unique<TestPassthroughState>());
+    EXPECT_NE(std::dynamic_pointer_cast<TestPassthroughState>(io_handle->passthroughState()),
+              nullptr);
+    EXPECT_NE(std::dynamic_pointer_cast<TestPassthroughState>(io_handle_peer->passthroughState()),
+              nullptr);
+  }
+}
+
 } // namespace
 } // namespace UserSpace
 } // namespace IoSocket

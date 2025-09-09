@@ -7,8 +7,10 @@
 #include <memory>
 #include <string>
 
+#include "envoy/common/optref.h"
 #include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "absl/numeric/int128.h"
 #include "absl/strings/string_view.h"
@@ -23,6 +25,7 @@ namespace Address {
 
 class Instance;
 using InstanceConstSharedPtr = std::shared_ptr<const Instance>;
+using InstanceConstOptRef = OptRef<const Instance>;
 
 /**
  * Interface for an Ipv4 address.
@@ -96,6 +99,46 @@ public:
    * multicast address.
    */
   virtual bool isUnicastAddress() const PURE;
+
+  /**
+   * Determines whether the address is a link-local address. For IPv6, the prefix is fe80::/10. For
+   * IPv4, the prefix is 169.254.0.0/16.
+   *
+   * See https://datatracker.ietf.org/doc/html/rfc3513#section-2.4 for details.
+   *
+   * @return true if the address is a link-local address, false otherwise.
+   */
+  virtual bool isLinkLocalAddress() const PURE;
+
+  /**
+   * Determines whether the address is a Unique Local Address. Applies to IPv6 addresses only, where
+   * the prefix is fc00::/7.
+   *
+   * See https://datatracker.ietf.org/doc/html/rfc4193 for details.
+   *
+   * @return true if the address is a Unique Local Address, false otherwise.
+   */
+  virtual bool isUniqueLocalAddress() const PURE;
+
+  /**
+   * Determines whether the address is a Site-Local Address. Applies to IPv6 addresses only, where
+   * the prefix is fec0::/10.
+   *
+   * See https://datatracker.ietf.org/doc/html/rfc3513#section-2.4 for details.
+   *
+   * @return true if the address is a Site-Local Address, false otherwise.
+   */
+  virtual bool isSiteLocalAddress() const PURE;
+
+  /**
+   * Determines whether the address is a Teredo address. Applies to IPv6 addresses only, where the
+   * prefix is 2001:0000::/32.
+   *
+   * See https://datatracker.ietf.org/doc/html/rfc4380 for details.
+   *
+   * @return true if the address is a Teredo address, false otherwise.
+   */
+  virtual bool isTeredoAddress() const PURE;
 
   /**
    * @return Ipv4 address data IFF version() == IpVersion::v4, otherwise nullptr.
@@ -236,6 +279,25 @@ public:
    * @return SocketInterface to be used with the address.
    */
   virtual const Network::SocketInterface& socketInterface() const PURE;
+
+  /**
+   * @return filepath of the network namespace for the address.
+   */
+  virtual absl::optional<std::string> networkNamespace() const PURE;
+};
+
+/*
+ * Used to store Instance in filter state.
+ */
+class InstanceAccessor : public Envoy::StreamInfo::FilterState::Object {
+public:
+  InstanceAccessor(InstanceConstSharedPtr ip) : ip_(std::move(ip)) {}
+
+  InstanceConstOptRef getIp() const { return makeOptRefFromPtr<const Instance>(ip_.get()); }
+  InstanceConstSharedPtr getAddress() const { return ip_; }
+
+private:
+  InstanceConstSharedPtr ip_;
 };
 
 } // namespace Address

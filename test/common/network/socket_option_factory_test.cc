@@ -283,6 +283,21 @@ TEST_F(SocketOptionFactoryTest, TestBuildZeroSoLingerOptions) {
   EXPECT_EQ(linger_bstr, option_details->value_);
 }
 
+TEST_F(SocketOptionFactoryTest, TestBuildBindAddressNoPortOptions) {
+  const auto expected_option = ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT;
+  CHECK_OPTION_SUPPORTED(expected_option);
+
+  int value = 1;
+  absl::string_view expected_value{reinterpret_cast<char*>(&value), sizeof(value)};
+  auto socket_options = SocketOptionFactory::buildBindAddressNoPort();
+  auto option_details = socket_options->at(0)->getOptionDetails(
+      socket_mock_, envoy::config::core::v3::SocketOption::STATE_PREBIND);
+  EXPECT_TRUE(option_details.has_value());
+  EXPECT_EQ(expected_option.level(), option_details->name_.level());
+  EXPECT_EQ(expected_option.option(), option_details->name_.option());
+  EXPECT_EQ(expected_value, option_details->value_);
+}
+
 } // namespace
 } // namespace Network
 } // namespace Envoy

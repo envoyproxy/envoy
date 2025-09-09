@@ -49,22 +49,25 @@ SubsetSelector::SubsetSelector(const Protobuf::RepeatedPtrField<std::string>& se
 }
 
 SubsetLoadBalancerConfig::SubsetLoadBalancerConfig(
-    Upstream::LoadBalancerFactoryContext& lb_factory_context,
-    const SubsetLbConfigProto& subset_config, ProtobufMessage::ValidationVisitor& visitor)
-    : subset_info_(std::make_unique<LoadBalancerSubsetInfoImpl>(subset_config)) {
+    Server::Configuration::ServerFactoryContext& factory_context, const SubsetLbConfigProto& config,
+    absl::Status& creation_status)
+    : subset_info_(std::make_unique<LoadBalancerSubsetInfoImpl>(config)) {
   absl::InlinedVector<absl::string_view, 4> missing_policies;
 
-  for (const auto& policy : subset_config.subset_lb_policy().policies()) {
+  for (const auto& policy : config.subset_lb_policy().policies()) {
     auto* factory = Config::Utility::getAndCheckFactory<Upstream::TypedLoadBalancerFactory>(
         policy.typed_extension_config(), /*is_optional=*/true);
 
     if (factory != nullptr) {
       // Load and validate the configuration.
       auto sub_lb_proto_message = factory->createEmptyConfigProto();
-      Config::Utility::translateOpaqueConfig(policy.typed_extension_config().typed_config(),
-                                             visitor, *sub_lb_proto_message);
+      THROW_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+          policy.typed_extension_config().typed_config(),
+          factory_context.messageValidationVisitor(), *sub_lb_proto_message));
 
-      child_lb_config_ = factory->loadConfig(lb_factory_context, *sub_lb_proto_message, visitor);
+      auto lb_config_or_error = factory->loadConfig(factory_context, *sub_lb_proto_message);
+      SET_AND_RETURN_IF_NOT_OK(lb_config_or_error.status(), creation_status);
+      child_lb_config_ = std::move(lb_config_or_error.value());
       child_lb_factory_ = factory;
       break;
     }
@@ -73,23 +76,22 @@ SubsetLoadBalancerConfig::SubsetLoadBalancerConfig(
   }
 
   if (child_lb_factory_ == nullptr) {
-    throw EnvoyException(fmt::format("cluster: didn't find a registered load balancer factory "
-                                     "implementation for subset lb with names from [{}]",
-                                     absl::StrJoin(missing_policies, ", ")));
+    creation_status = absl::InvalidArgumentError(
+        fmt::format("cluster: didn't find a registered load balancer factory implementation for "
+                    "subset lb with names from [{}]",
+                    absl::StrJoin(missing_policies, ", ")));
   }
 }
 
 SubsetLoadBalancerConfig::SubsetLoadBalancerConfig(
-    Upstream::LoadBalancerFactoryContext& lb_factory_context, const ClusterProto& cluster,
-    ProtobufMessage::ValidationVisitor& visitor)
+    Server::Configuration::ServerFactoryContext& factory_context, const ClusterProto& cluster,
+    absl::Status& creation_status)
     : subset_info_(std::make_unique<LoadBalancerSubsetInfoImpl>(cluster.lb_subset_config())) {
   ASSERT(subset_info_->isEnabled());
 
   auto sub_lb_pair = LegacyLbPolicyConfigHelper::getTypedLbConfigFromLegacyProtoWithoutSubset(
-      lb_factory_context, cluster, visitor);
-  if (!sub_lb_pair.ok()) {
-    throw EnvoyException(std::string(sub_lb_pair.status().message()));
-  }
+      factory_context, cluster);
+  SET_AND_RETURN_IF_NOT_OK(sub_lb_pair.status(), creation_status);
 
   child_lb_factory_ = sub_lb_pair->factory;
   ASSERT(child_lb_factory_ != nullptr);

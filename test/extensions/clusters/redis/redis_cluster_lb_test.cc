@@ -58,7 +58,7 @@ public:
     Upstream::LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
     for (auto& assignment : expected_assignments) {
       TestLoadBalancerContext context(assignment.first, read_command, read_policy);
-      auto host = lb->chooseHost(&context);
+      auto host = lb->chooseHost(&context).host;
       EXPECT_FALSE(host == nullptr);
       EXPECT_EQ(hosts[assignment.second]->address()->asString(), host->address()->asString());
     }
@@ -102,14 +102,14 @@ public:
 // Works correctly without any hosts.
 TEST_F(RedisClusterLoadBalancerTest, NoHost) {
   init();
-  EXPECT_EQ(nullptr, lb_->factory()->create(lb_params_)->chooseHost(nullptr));
+  EXPECT_EQ(nullptr, lb_->factory()->create(lb_params_)->chooseHost(nullptr).host);
 };
 
 // Works correctly with empty context
 TEST_F(RedisClusterLoadBalancerTest, NoHash) {
-  Upstream::HostVector hosts{Upstream::makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
-                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:92", simTime())};
+  Upstream::HostVector hosts{Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:91"),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:92")};
 
   ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
       ClusterSlot(0, 1000, hosts[0]->address()),
@@ -124,13 +124,13 @@ TEST_F(RedisClusterLoadBalancerTest, NoHash) {
   init();
   factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
   TestLoadBalancerContext context(absl::nullopt);
-  EXPECT_EQ(nullptr, lb_->factory()->create(lb_params_)->chooseHost(&context));
+  EXPECT_EQ(nullptr, lb_->factory()->create(lb_params_)->chooseHost(&context).host);
 };
 
 TEST_F(RedisClusterLoadBalancerTest, Basic) {
-  Upstream::HostVector hosts{Upstream::makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
-                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:92", simTime())};
+  Upstream::HostVector hosts{Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:91"),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:92")};
 
   ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
       ClusterSlot(0, 1000, hosts[0]->address()),
@@ -152,12 +152,55 @@ TEST_F(RedisClusterLoadBalancerTest, Basic) {
   validateAssignment(hosts, expected_assignments);
 }
 
+TEST_F(RedisClusterLoadBalancerTest, Shard) {
+  Upstream::HostVector hosts{Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:91"),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:92")};
+
+  ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
+      ClusterSlot(0, 1000, hosts[0]->address()),
+      ClusterSlot(1001, 2000, hosts[1]->address()),
+      ClusterSlot(2001, 16383, hosts[2]->address()),
+  });
+  Upstream::HostMap all_hosts{
+      {hosts[0]->address()->asString(), hosts[0]},
+      {hosts[1]->address()->asString(), hosts[1]},
+      {hosts[2]->address()->asString(), hosts[2]},
+  };
+  init();
+  factory_->onClusterSlotUpdate(std::move(slots), all_hosts);
+
+  // A list of (hash: host_index) pair
+  // Simple read command
+  std::vector<NetworkFilters::Common::Redis::RespValue> get_foo(2);
+  get_foo[0].type(NetworkFilters::Common::Redis::RespType::BulkString);
+  get_foo[0].asString() = "get";
+  get_foo[1].type(NetworkFilters::Common::Redis::RespType::BulkString);
+  get_foo[1].asString() = "foo";
+
+  NetworkFilters::Common::Redis::RespValue get_request;
+  get_request.type(NetworkFilters::Common::Redis::RespType::Array);
+  get_request.asArray().swap(get_foo);
+
+  Upstream::LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+  for (uint16_t i = 0; i < 5; i++) {
+    RedisSpecifyShardContextImpl context(i, get_request);
+    auto host = lb->chooseHost(&context).host;
+    if (i < 3) {
+      EXPECT_FALSE(host == nullptr);
+      EXPECT_EQ(hosts[i]->address()->asString(), host->address()->asString());
+    } else {
+      EXPECT_TRUE(host == nullptr);
+    }
+  }
+}
+
 TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesHealthy) {
   Upstream::HostVector hosts{
-      Upstream::makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-      Upstream::makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
-      Upstream::makeTestHost(info_, "tcp://127.0.0.2:90", simTime()),
-      Upstream::makeTestHost(info_, "tcp://127.0.0.2:91", simTime()),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.1:91"),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.2:90"),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.2:91"),
   };
 
   ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
@@ -196,10 +239,10 @@ TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesHealthy) {
 
 TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesUnhealthyPrimary) {
   Upstream::HostVector hosts{
-      Upstream::makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-      Upstream::makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
-      Upstream::makeTestHost(info_, "tcp://127.0.0.2:90", simTime()),
-      Upstream::makeTestHost(info_, "tcp://127.0.0.2:91", simTime()),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.1:91"),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.2:90"),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.2:91"),
   };
 
   ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
@@ -243,10 +286,10 @@ TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesUnhealthyPrimary) {
 
 TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesUnhealthyReplica) {
   Upstream::HostVector hosts{
-      Upstream::makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-      Upstream::makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
-      Upstream::makeTestHost(info_, "tcp://127.0.0.2:90", simTime()),
-      Upstream::makeTestHost(info_, "tcp://127.0.0.2:91", simTime()),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.1:91"),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.2:90"),
+      Upstream::makeTestHost(info_, "tcp://127.0.0.2:91"),
   };
 
   ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
@@ -289,8 +332,8 @@ TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesUnhealthyReplica) {
 }
 
 TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesNoReplica) {
-  Upstream::HostVector hosts{Upstream::makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:91", simTime())};
+  Upstream::HostVector hosts{Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:91")};
 
   ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
       ClusterSlot(0, 2000, hosts[0]->address()),
@@ -316,13 +359,13 @@ TEST_F(RedisClusterLoadBalancerTest, ReadStrategiesNoReplica) {
   Upstream::LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
   TestLoadBalancerContext context(1100, true,
                                   NetworkFilters::Common::Redis::Client::ReadPolicy::Replica);
-  auto host = lb->chooseHost(&context);
+  auto host = lb->chooseHost(&context).host;
   EXPECT_TRUE(host == nullptr);
 }
 
 TEST_F(RedisClusterLoadBalancerTest, ClusterSlotUpdate) {
-  Upstream::HostVector hosts{Upstream::makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:91", simTime())};
+  Upstream::HostVector hosts{Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:91")};
   ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
       ClusterSlot(0, 1000, hosts[0]->address()), ClusterSlot(1001, 16383, hosts[1]->address())});
   Upstream::HostMap all_hosts{{hosts[0]->address()->asString(), hosts[0]},
@@ -352,16 +395,16 @@ TEST_F(RedisClusterLoadBalancerTest, ClusterSlotUpdate) {
 }
 
 TEST_F(RedisClusterLoadBalancerTest, ClusterSlotNoUpdate) {
-  Upstream::HostVector hosts{Upstream::makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
-                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:92", simTime()),
-                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
-                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:92", simTime())};
-  Upstream::HostVector replicas{Upstream::makeTestHost(info_, "tcp://127.0.0.2:90", simTime()),
-                                Upstream::makeTestHost(info_, "tcp://127.0.0.2:91", simTime()),
-                                Upstream::makeTestHost(info_, "tcp://127.0.0.2:90", simTime()),
-                                Upstream::makeTestHost(info_, "tcp://127.0.0.2:91", simTime())};
+  Upstream::HostVector hosts{Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:91"),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:92"),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:90"),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:91"),
+                             Upstream::makeTestHost(info_, "tcp://127.0.0.1:92")};
+  Upstream::HostVector replicas{Upstream::makeTestHost(info_, "tcp://127.0.0.2:90"),
+                                Upstream::makeTestHost(info_, "tcp://127.0.0.2:91"),
+                                Upstream::makeTestHost(info_, "tcp://127.0.0.2:90"),
+                                Upstream::makeTestHost(info_, "tcp://127.0.0.2:91")};
 
   ClusterSlotsPtr slots = std::make_unique<std::vector<ClusterSlot>>(std::vector<ClusterSlot>{
       ClusterSlot(0, 1000, hosts[0]->address()),

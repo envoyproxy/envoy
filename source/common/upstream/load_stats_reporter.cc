@@ -3,6 +3,7 @@
 #include "envoy/service/load_stats/v3/lrs.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/network/utility.h"
 #include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -10,22 +11,26 @@ namespace Upstream {
 
 LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
                                      ClusterManager& cluster_manager, Stats::Scope& scope,
-                                     Grpc::RawAsyncClientPtr async_client,
+                                     Grpc::RawAsyncClientSharedPtr&& async_client,
                                      Event::Dispatcher& dispatcher)
-    : cm_(cluster_manager), stats_{ALL_LOAD_REPORTER_STATS(
-                                POOL_COUNTER_PREFIX(scope, "load_reporter."))},
+    : cm_(cluster_manager),
+      stats_{ALL_LOAD_REPORTER_STATS(POOL_COUNTER_PREFIX(scope, "load_reporter."))},
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.load_stats.v3.LoadReportingService.StreamLoadStats")),
       time_source_(dispatcher.timeSource()) {
   request_.mutable_node()->MergeFrom(local_info.node());
   request_.mutable_node()->add_client_features("envoy.lrs.supports_send_all_clusters");
-  retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
+  retry_timer_ = dispatcher.createTimer([this]() -> void {
+    stats_.retries_.inc();
+    establishNewStream();
+  });
   response_timer_ = dispatcher.createTimer([this]() -> void { sendLoadStatsRequest(); });
   establishNewStream();
 }
 
 void LoadStatsReporter::setRetryTimer() {
+  ENVOY_LOG(info, "Load reporter stats stream/connection will retry in {} ms.", RETRY_DELAY_MS);
   retry_timer_->enableTimer(std::chrono::milliseconds(RETRY_DELAY_MS));
 }
 
@@ -58,15 +63,14 @@ void LoadStatsReporter::sendLoadStatsRequest() {
   // added to the cluster manager. When we get the notification, we record the current time in
   // clusters_ as the start time for the load reporting window for that cluster.
   request_.mutable_cluster_stats()->Clear();
-  auto all_clusters = cm_.clusters();
   for (const auto& cluster_name_and_timestamp : clusters_) {
     const std::string& cluster_name = cluster_name_and_timestamp.first;
-    auto it = all_clusters.active_clusters_.find(cluster_name);
-    if (it == all_clusters.active_clusters_.end()) {
+    OptRef<const Upstream::Cluster> active_cluster = cm_.getActiveCluster(cluster_name);
+    if (!active_cluster.has_value()) {
       ENVOY_LOG(debug, "Cluster {} does not exist", cluster_name);
       continue;
     }
-    auto& cluster = it->second.get();
+    const Upstream::Cluster& cluster = active_cluster.value();
     auto* cluster_stats = request_.add_cluster_stats();
     cluster_stats->set_cluster_name(cluster_name);
     if (const auto& name = cluster.info()->edsServiceName(); !name.empty()) {
@@ -81,43 +85,84 @@ void LoadStatsReporter::sendLoadStatsRequest() {
         uint64_t rq_active = 0;
         uint64_t rq_issued = 0;
         LoadMetricStats::StatMap load_metrics;
+
+        envoy::config::endpoint::v3::UpstreamLocalityStats locality_stats;
+        locality_stats.mutable_locality()->MergeFrom(hosts[0]->locality());
+        locality_stats.set_priority(host_set->priority());
+
         for (const HostSharedPtr& host : hosts) {
           uint64_t host_rq_success = host->stats().rq_success_.latch();
           uint64_t host_rq_error = host->stats().rq_error_.latch();
           uint64_t host_rq_active = host->stats().rq_active_.value();
           uint64_t host_rq_issued = host->stats().rq_total_.latch();
-          rq_success += host_rq_success;
-          rq_error += host_rq_error;
-          rq_active += host_rq_active;
-          rq_issued += host_rq_issued;
-          if (host_rq_success + host_rq_error + host_rq_active != 0) {
+
+          // Check if the host has any load stats updates. If the host has no load stats updates, we
+          // skip it.
+          bool endpoint_has_updates =
+              (host_rq_success + host_rq_error + host_rq_active + host_rq_issued) != 0;
+
+          if (endpoint_has_updates) {
+            rq_success += host_rq_success;
+            rq_error += host_rq_error;
+            rq_active += host_rq_active;
+            rq_issued += host_rq_issued;
+
+            envoy::config::endpoint::v3::UpstreamEndpointStats* upstream_endpoint_stats = nullptr;
+            // Set the upstream endpoint stats if we are reporting endpoint granularity.
+            if (message_ && message_->report_endpoint_granularity()) {
+              upstream_endpoint_stats = locality_stats.add_upstream_endpoint_stats();
+              Network::Utility::addressToProtobufAddress(
+                  *host->address(), *upstream_endpoint_stats->mutable_address());
+              upstream_endpoint_stats->set_total_successful_requests(host_rq_success);
+              upstream_endpoint_stats->set_total_error_requests(host_rq_error);
+              upstream_endpoint_stats->set_total_requests_in_progress(host_rq_active);
+              upstream_endpoint_stats->set_total_issued_requests(host_rq_issued);
+            }
+
             const std::unique_ptr<LoadMetricStats::StatMap> latched_stats =
                 host->loadMetricStats().latch();
             if (latched_stats != nullptr) {
               for (const auto& metric : *latched_stats) {
-                const std::string& name = metric.first;
-                LoadMetricStats::Stat& stat = load_metrics[name];
-                stat.num_requests_with_metric += metric.second.num_requests_with_metric;
-                stat.total_metric_value += metric.second.total_metric_value;
+                const auto& metric_name = metric.first;
+                const auto& metric_value = metric.second;
+
+                // Add the metric to the load metrics map.
+                LoadMetricStats::Stat& stat = load_metrics[metric_name];
+                stat.num_requests_with_metric += metric_value.num_requests_with_metric;
+                stat.total_metric_value += metric_value.total_metric_value;
+
+                // If we are reporting endpoint granularity, add the metric to the upstream endpoint
+                // stats.
+                if (upstream_endpoint_stats != nullptr) {
+                  auto* endpoint_load_metric = upstream_endpoint_stats->add_load_metric_stats();
+                  endpoint_load_metric->set_metric_name(metric_name);
+                  endpoint_load_metric->set_num_requests_finished_with_metric(
+                      metric_value.num_requests_with_metric);
+                  endpoint_load_metric->set_total_metric_value(metric_value.total_metric_value);
+                }
               }
             }
           }
         }
-        if (rq_success + rq_error + rq_active != 0) {
-          auto* locality_stats = cluster_stats->add_upstream_locality_stats();
-          locality_stats->mutable_locality()->MergeFrom(hosts[0]->locality());
-          locality_stats->set_priority(host_set->priority());
-          locality_stats->set_total_successful_requests(rq_success);
-          locality_stats->set_total_error_requests(rq_error);
-          locality_stats->set_total_requests_in_progress(rq_active);
-          locality_stats->set_total_issued_requests(rq_issued);
+
+        bool should_send_locality_stats = rq_success + rq_error + rq_active != 0;
+        if (Runtime::runtimeFeatureEnabled(
+                "envoy.reloadable_features.report_load_with_rq_issued")) {
+          should_send_locality_stats = rq_issued != 0;
+        }
+        if (should_send_locality_stats) {
+          locality_stats.set_total_successful_requests(rq_success);
+          locality_stats.set_total_error_requests(rq_error);
+          locality_stats.set_total_requests_in_progress(rq_active);
+          locality_stats.set_total_issued_requests(rq_issued);
           for (const auto& metric : load_metrics) {
-            auto* load_metric_stats = locality_stats->add_load_metric_stats();
+            auto* load_metric_stats = locality_stats.add_load_metric_stats();
             load_metric_stats->set_metric_name(metric.first);
             load_metric_stats->set_num_requests_finished_with_metric(
                 metric.second.num_requests_with_metric);
             load_metric_stats->set_total_metric_value(metric.second.total_metric_value);
           }
+          cluster_stats->add_upstream_locality_stats()->MergeFrom(locality_stats);
         }
       }
     }
@@ -127,7 +172,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
         cluster.info()->loadReportStats().upstream_rq_drop_overload_.latch();
     if (drop_overload_count > 0) {
       auto* dropped_request = cluster_stats->add_dropped_requests();
-      dropped_request->set_category("drop_overload");
+      dropped_request->set_category(cluster.dropCategory());
       dropped_request->set_dropped_count(drop_overload_count);
     }
 
@@ -142,16 +187,14 @@ void LoadStatsReporter::sendLoadStatsRequest() {
   ENVOY_LOG(trace, "Sending LoadStatsRequest: {}", request_.DebugString());
   stream_->sendMessage(request_, false);
   stats_.responses_.inc();
-  // When the connection is established, the message has not yet been read so we
-  // will not have a load reporting period.
+  // When the connection is established, the message has not yet been read so we will not have a
+  // load reporting period.
   if (message_) {
     startLoadReportPeriod();
   }
 }
 
 void LoadStatsReporter::handleFailure() {
-  ENVOY_LOG(warn, "Load reporter stats stream/connection failure, will retry in {} ms.",
-            RETRY_DELAY_MS);
   stats_.errors_.inc();
   setRetryTimer();
 }
@@ -243,11 +286,17 @@ void LoadStatsReporter::onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& 
 }
 
 void LoadStatsReporter::onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) {
-  ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {}", service_method_.name(), status, message);
   response_timer_->disableTimer();
   stream_ = nullptr;
-  handleFailure();
+  if (status != Grpc::Status::WellKnownGrpcStatus::Ok) {
+    ENVOY_LOG(warn, "{} gRPC config stream closed: {}, {}", service_method_.name(), status,
+              message);
+    handleFailure();
+  } else {
+    ENVOY_LOG(debug, "{} gRPC config stream closed gracefully, {}", service_method_.name(),
+              message);
+    setRetryTimer();
+  }
 }
-
 } // namespace Upstream
 } // namespace Envoy

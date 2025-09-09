@@ -99,6 +99,14 @@ StatsConfigImpl::StatsConfigImpl(const envoy::config::bootstrap::v3::Bootstrap& 
   if (bootstrap.stats_flush_case() == envoy::config::bootstrap::v3::Bootstrap::kStatsFlushOnAdmin) {
     flush_on_admin_ = bootstrap.stats_flush_on_admin();
   }
+
+  const auto evict_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(bootstrap, stats_eviction_interval, 0);
+  if (evict_interval_ms % flush_interval_.count() != 0) {
+    status = absl::InvalidArgumentError(
+        "stats_eviction_interval must be a multiple of stats_flush_interval");
+    return;
+  }
+  evict_on_flush_ = evict_interval_ms / flush_interval_.count();
 }
 
 absl::Status MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
@@ -130,7 +138,9 @@ absl::Status MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap&
   ENVOY_LOG(info, "loading {} cluster(s)", bootstrap.static_resources().clusters().size());
 
   // clusterManagerFromProto() and init() have to be called consecutively.
-  cluster_manager_ = cluster_manager_factory.clusterManagerFromProto(bootstrap);
+  auto manager_or_error = cluster_manager_factory.clusterManagerFromProto(bootstrap);
+  RETURN_IF_NOT_OK_REF(manager_or_error.status());
+  cluster_manager_ = std::move(*manager_or_error);
   status = cluster_manager_->initialize(bootstrap);
   RETURN_IF_NOT_OK(status);
 
@@ -145,12 +155,12 @@ absl::Status MainImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap&
   RETURN_IF_NOT_OK(initializeWatchdogs(bootstrap, server));
   // This has to happen after ClusterManager initialization, as it depends on config from
   // ClusterManager.
-  initializeStatsConfig(bootstrap, server);
-  return absl::OkStatus();
+  return initializeStatsConfig(bootstrap, server);
 }
 
-void MainImpl::initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                                     Instance& server) {
+absl::Status
+MainImpl::initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                Instance& server) {
   ENVOY_LOG(info, "loading stats configuration");
 
   for (const envoy::config::metrics::v3::StatsSink& sink_object : bootstrap.stats_sinks()) {
@@ -159,8 +169,11 @@ void MainImpl::initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstr
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         sink_object, server.messageValidationContext().staticValidationVisitor(), factory);
 
-    stats_config_->addSink(factory.createStatsSink(*message, server.serverFactoryContext()));
+    auto sink = factory.createStatsSink(*message, server.serverFactoryContext());
+    RETURN_IF_NOT_OK_REF(sink.status());
+    stats_config_->addSink(std::move(sink.value()));
   }
+  return absl::OkStatus();
 }
 
 void MainImpl::initializeTracers(const envoy::config::trace::v3::Tracing& configuration,

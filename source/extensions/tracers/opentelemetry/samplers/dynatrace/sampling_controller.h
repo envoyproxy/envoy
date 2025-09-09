@@ -33,7 +33,7 @@ public:
     }
   }
 
-  explicit SamplingState(uint32_t exponent) : exponent_(exponent){};
+  explicit SamplingState(uint32_t exponent) : exponent_(exponent) {};
 
   SamplingState() = default;
 

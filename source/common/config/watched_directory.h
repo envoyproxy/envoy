@@ -10,12 +10,16 @@ namespace Config {
 // Implement the common functionality of envoy::config::core::v3::WatchedDirectory.
 class WatchedDirectory {
 public:
+  static absl::StatusOr<std::unique_ptr<WatchedDirectory>>
+  create(const envoy::config::core::v3::WatchedDirectory& config, Event::Dispatcher& dispatcher);
+
   using Callback = std::function<absl::Status()>;
 
-  WatchedDirectory(const envoy::config::core::v3::WatchedDirectory& config,
-                   Event::Dispatcher& dispatcher);
-
   void setCallback(Callback cb) { cb_ = cb; }
+
+protected:
+  WatchedDirectory(const envoy::config::core::v3::WatchedDirectory& config,
+                   Event::Dispatcher& dispatcher, absl::Status& creation_status);
 
 private:
   std::unique_ptr<Filesystem::Watcher> watcher_;

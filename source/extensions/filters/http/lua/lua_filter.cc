@@ -105,20 +105,25 @@ void parseOptionsFromTable(lua_State* state, int index,
   }
 }
 
-const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
+const Protobuf::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
   if (callbacks->route() == nullptr) {
-    return ProtobufWkt::Struct::default_instance();
+    return Protobuf::Struct::default_instance();
   }
   const auto& metadata = callbacks->route()->metadata();
 
   {
-    const auto& filter_it = metadata.filter_metadata().find("envoy.filters.http.lua");
+    auto filter_it = metadata.filter_metadata().find(callbacks->filterConfigName());
+    if (filter_it != metadata.filter_metadata().end()) {
+      return filter_it->second;
+    }
+    // TODO(wbpcode): deprecate this in favor of the above.
+    filter_it = metadata.filter_metadata().find("envoy.filters.http.lua");
     if (filter_it != metadata.filter_metadata().end()) {
       return filter_it->second;
     }
   }
 
-  return ProtobufWkt::Struct::default_instance();
+  return Protobuf::Struct::default_instance();
 }
 
 // Okay to return non-const reference because this doesn't ever get changed.
@@ -195,16 +200,20 @@ PerLuaCodeSetup::PerLuaCodeSetup(const std::string& lua_code, ThreadLocal::SlotA
   lua_state_.registerType<Filters::Common::Lua::MetadataMapIterator>();
   lua_state_.registerType<Filters::Common::Lua::ConnectionWrapper>();
   lua_state_.registerType<Filters::Common::Lua::SslConnectionWrapper>();
+  lua_state_.registerType<Filters::Common::Lua::ParsedX509NameWrapper>();
   lua_state_.registerType<HeaderMapWrapper>();
   lua_state_.registerType<HeaderMapIterator>();
   lua_state_.registerType<StreamInfoWrapper>();
   lua_state_.registerType<DynamicMetadataMapWrapper>();
   lua_state_.registerType<DynamicMetadataMapIterator>();
+  lua_state_.registerType<FilterStateWrapper>();
   lua_state_.registerType<StreamHandleWrapper>();
   lua_state_.registerType<PublicKeyWrapper>();
   lua_state_.registerType<ConnectionStreamInfoWrapper>();
   lua_state_.registerType<ConnectionDynamicMetadataMapWrapper>();
   lua_state_.registerType<ConnectionDynamicMetadataMapIterator>();
+  lua_state_.registerType<VirtualHostWrapper>();
+  lua_state_.registerType<RouteWrapper>();
 
   const Filters::Common::Lua::InitializerList initializers(
       // EnvoyTimestampResolution "enum".
@@ -279,10 +288,7 @@ Http::FilterDataStatus StreamHandleWrapper::onData(Buffer::Instance& data, bool 
   }
 
   if (state_ == State::HttpCall) {
-    return (Runtime::runtimeFeatureEnabled(
-               "envoy.reloadable_features.lua_flow_control_while_http_call"))
-               ? Http::FilterDataStatus::StopIterationAndWatermark
-               : Http::FilterDataStatus::StopIterationAndBuffer;
+    return Http::FilterDataStatus::StopIterationAndWatermark;
   } else if (state_ == State::WaitForBody) {
     ENVOY_LOG(trace, "buffering body");
     return Http::FilterDataStatus::StopIterationAndBuffer;
@@ -624,6 +630,29 @@ int StreamHandleWrapper::luaMetadata(lua_State* state) {
   return 1;
 }
 
+int StreamHandleWrapper::luaVirtualHost(lua_State* state) {
+  ASSERT(state_ == State::Running);
+  if (virtual_host_wrapper_.get() != nullptr) {
+    virtual_host_wrapper_.pushStack();
+  } else {
+    virtual_host_wrapper_.reset(
+        VirtualHostWrapper::create(state, callbacks_.streamInfo(), callbacks_.filterConfigName()),
+        true);
+  }
+  return 1;
+}
+
+int StreamHandleWrapper::luaRoute(lua_State* state) {
+  ASSERT(state_ == State::Running);
+  if (route_wrapper_.get() != nullptr) {
+    route_wrapper_.pushStack();
+  } else {
+    route_wrapper_.reset(
+        RouteWrapper::create(state, callbacks_.streamInfo(), callbacks_.filterConfigName()), true);
+  }
+  return 1;
+}
+
 int StreamHandleWrapper::luaStreamInfo(lua_State* state) {
   ASSERT(state_ == State::Running);
   if (stream_info_wrapper_.get() != nullptr) {
@@ -654,42 +683,6 @@ int StreamHandleWrapper::luaConnection(lua_State* state) {
         Filters::Common::Lua::ConnectionWrapper::create(state, callbacks_.connection()), true);
   }
   return 1;
-}
-
-int StreamHandleWrapper::luaLogTrace(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
-  filter_.scriptLog(spdlog::level::trace, message);
-  return 0;
-}
-
-int StreamHandleWrapper::luaLogDebug(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
-  filter_.scriptLog(spdlog::level::debug, message);
-  return 0;
-}
-
-int StreamHandleWrapper::luaLogInfo(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
-  filter_.scriptLog(spdlog::level::info, message);
-  return 0;
-}
-
-int StreamHandleWrapper::luaLogWarn(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
-  filter_.scriptLog(spdlog::level::warn, message);
-  return 0;
-}
-
-int StreamHandleWrapper::luaLogErr(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
-  filter_.scriptLog(spdlog::level::err, message);
-  return 0;
-}
-
-int StreamHandleWrapper::luaLogCritical(lua_State* state) {
-  absl::string_view message = Filters::Common::Lua::getStringViewFromLuaString(state, 2);
-  filter_.scriptLog(spdlog::level::critical, message);
-  return 0;
 }
 
 int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
@@ -825,6 +818,8 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
                            Upstream::ClusterManager& cluster_manager, Api::Api& api,
                            Stats::Scope& scope, const std::string& stats_prefix)
     : cluster_manager_(cluster_manager),
+      clear_route_cache_(
+          proto_config.has_clear_route_cache() ? proto_config.clear_route_cache().value() : true),
       stats_(generateStats(stats_prefix, proto_config.stat_prefix(), scope)) {
   if (proto_config.has_default_source_code()) {
     if (!proto_config.inline_code().empty()) {
@@ -853,15 +848,16 @@ FilterConfig::FilterConfig(const envoy::extensions::filters::http::lua::v3::Lua&
 FilterConfigPerRoute::FilterConfigPerRoute(
     const envoy::extensions::filters::http::lua::v3::LuaPerRoute& config,
     Server::Configuration::ServerFactoryContext& context)
-    : main_thread_dispatcher_(context.mainThreadDispatcher()), disabled_(config.disabled()),
-      name_(config.name()) {
+    : disabled_(config.disabled()), name_(config.name()), filter_context_(config.filter_context()) {
   if (disabled_ || !name_.empty()) {
-    return;
+    return; // Filter is disabled or explicit script name is provided.
   }
-  // Read and parse the inline Lua code defined in the route configuration.
-  const std::string code_str = THROW_OR_RETURN_VALUE(
-      Config::DataSource::read(config.source_code(), true, context.api()), std::string);
-  per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(code_str, context.threadLocal());
+  if (config.has_source_code()) {
+    // Read and parse the inline Lua code defined in the route configuration.
+    const std::string code_str = THROW_OR_RETURN_VALUE(
+        Config::DataSource::read(config.source_code(), true, context.api()), std::string);
+    per_lua_code_setup_ptr_ = std::make_unique<PerLuaCodeSetup>(code_str, context.threadLocal());
+  }
 }
 
 void Filter::onDestroy() {
@@ -934,32 +930,46 @@ void Filter::scriptError(const Filters::Common::Lua::LuaException& e) {
   response_stream_wrapper_.reset();
 }
 
-void Filter::scriptLog(spdlog::level::level_enum level, absl::string_view message) {
-  switch (level) {
-  case spdlog::level::trace:
-    ENVOY_LOG(trace, "script log: {}", message);
-    return;
-  case spdlog::level::debug:
-    ENVOY_LOG(debug, "script log: {}", message);
-    return;
-  case spdlog::level::info:
-    ENVOY_LOG(info, "script log: {}", message);
-    return;
-  case spdlog::level::warn:
-    ENVOY_LOG(warn, "script log: {}", message);
-    return;
-  case spdlog::level::err:
-    ENVOY_LOG(error, "script log: {}", message);
-    return;
-  case spdlog::level::critical:
-    ENVOY_LOG(critical, "script log: {}", message);
-    return;
-  case spdlog::level::off:
-    PANIC("unsupported");
-    return;
-  case spdlog::level::n_levels:
-    PANIC("unsupported");
+int StreamHandleWrapper::luaSetUpstreamOverrideHost(lua_State* state) {
+  // Get the host address argument
+  size_t len;
+  const char* host = luaL_checklstring(state, 2, &len);
+
+  // Validate that host is not null and is an IP address
+  if (host == nullptr) {
+    luaL_error(state, "host argument is required");
   }
+  if (!Http::Utility::parseAuthority(host).is_ip_address_) {
+    luaL_error(state, "host is not a valid IP address");
+  }
+
+  // Get the optional strict flag (defaults to false)
+  bool strict = false;
+  if (lua_gettop(state) >= 3) {
+    luaL_checktype(state, 3, LUA_TBOOLEAN);
+    strict = lua_toboolean(state, 3);
+  }
+
+  // Set the upstream override host
+  callbacks_.setUpstreamOverrideHost(std::make_pair(std::string(host, len), strict));
+
+  return 0;
+}
+
+int StreamHandleWrapper::luaClearRouteCache(lua_State*) {
+  callbacks_.clearRouteCache();
+  return 0;
+}
+
+int StreamHandleWrapper::luaFilterContext(lua_State* state) {
+  ASSERT(state_ == State::Running);
+  if (filter_context_wrapper_.get() != nullptr) {
+    filter_context_wrapper_.pushStack();
+  } else {
+    filter_context_wrapper_.reset(
+        Filters::Common::Lua::MetadataMapWrapper::create(state, callbacks_.filterContext()), true);
+  }
+  return 1;
 }
 
 void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
@@ -978,7 +988,7 @@ void Filter::DecoderCallbacks::respond(Http::ResponseHeaderMapPtr&& headers, Buf
                              HttpResponseCodeDetails::get().LuaResponse);
 }
 
-const ProtobufWkt::Struct& Filter::DecoderCallbacks::metadata() const {
+const Protobuf::Struct& Filter::DecoderCallbacks::metadata() const {
   return getMetadata(callbacks_);
 }
 
@@ -989,7 +999,7 @@ void Filter::EncoderCallbacks::respond(Http::ResponseHeaderMapPtr&&, Buffer::Ins
   luaL_error(state, "respond not currently supported in the response path");
 }
 
-const ProtobufWkt::Struct& Filter::EncoderCallbacks::metadata() const {
+const Protobuf::Struct& Filter::EncoderCallbacks::metadata() const {
   return getMetadata(callbacks_);
 }
 

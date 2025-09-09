@@ -6,7 +6,7 @@ import android.net.ConnectivityManager;
 import io.envoyproxy.envoymobile.engine.types.EnvoyEventTracker;
 import io.envoyproxy.envoymobile.engine.types.EnvoyHTTPCallbacks;
 import io.envoyproxy.envoymobile.engine.types.EnvoyLogger;
-import io.envoyproxy.envoymobile.engine.types.EnvoyNetworkType;
+import io.envoyproxy.envoymobile.engine.types.EnvoyConnectionType;
 import io.envoyproxy.envoymobile.engine.types.EnvoyOnEngineRunning;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStringAccessor;
 import io.envoyproxy.envoymobile.engine.types.EnvoyStatus;
@@ -24,13 +24,19 @@ public class AndroidEngineImpl implements EnvoyEngine {
    */
   public AndroidEngineImpl(Context context, EnvoyOnEngineRunning runningCallback,
                            EnvoyLogger logger, EnvoyEventTracker eventTracker,
-                           Boolean enableProxying) {
+                           Boolean enableProxying, Boolean useNetworkChangeEvent,
+                           Boolean disableDnsRefreshOnNetworkChange, Boolean useV2NetworkMonitor) {
     this.context = context;
-    this.envoyEngine = new EnvoyEngineImpl(runningCallback, logger, eventTracker);
+    this.envoyEngine = new EnvoyEngineImpl(runningCallback, logger, eventTracker,
+                                           disableDnsRefreshOnNetworkChange);
     if (ContextUtils.getApplicationContext() == null) {
       ContextUtils.initApplicationContext(context.getApplicationContext());
     }
-    AndroidNetworkMonitor.load(context, envoyEngine);
+    if (useV2NetworkMonitor) {
+      AndroidNetworkMonitorV2.load(context, envoyEngine);
+    } else {
+      AndroidNetworkMonitor.load(context, envoyEngine, useNetworkChangeEvent);
+    }
     if (enableProxying) {
       AndroidProxyMonitor.load(context, envoyEngine);
     }
@@ -48,10 +54,6 @@ public class AndroidEngineImpl implements EnvoyEngine {
 
   @Override
   public EnvoyStatus runWithConfig(EnvoyConfiguration envoyConfiguration, String logLevel) {
-    if (envoyConfiguration.useCares) {
-      JniLibrary.initCares(
-          (ConnectivityManager)context.getSystemService(Context.CONNECTIVITY_SERVICE));
-    }
     return envoyEngine.runWithConfig(envoyConfiguration, logLevel);
   }
 
@@ -86,8 +88,33 @@ public class AndroidEngineImpl implements EnvoyEngine {
   }
 
   @Override
-  public void onDefaultNetworkChanged(EnvoyNetworkType network) {
+  public void onDefaultNetworkChanged(int network) {
     envoyEngine.onDefaultNetworkChanged(network);
+  }
+
+  @Override
+  public void onDefaultNetworkChangeEvent(int network) {
+    envoyEngine.onDefaultNetworkChangeEvent(network);
+  }
+
+  @Override
+  public void onDefaultNetworkChangedV2(EnvoyConnectionType network_type, long net_id) {
+    envoyEngine.onDefaultNetworkChangedV2(network_type, net_id);
+  }
+
+  @Override
+  public void onNetworkDisconnect(long net_id) {
+    envoyEngine.onNetworkDisconnect(net_id);
+  }
+
+  @Override
+  public void onNetworkConnect(EnvoyConnectionType network_type, long net_id) {
+    envoyEngine.onNetworkConnect(network_type, net_id);
+  }
+
+  @Override
+  public void purgeActiveNetworkList(long[] activeNetIds) {
+    envoyEngine.purgeActiveNetworkList(activeNetIds);
   }
 
   @Override

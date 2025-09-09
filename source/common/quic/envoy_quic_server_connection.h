@@ -67,10 +67,10 @@ public:
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   void continueFilterChain(bool /*success*/) override { IS_ENVOY_BUG("Should not be used."); }
   void useOriginalDst(bool /*use_original_dst*/) override { IS_ENVOY_BUG("Should not be used."); }
-  void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override {
+  void setDynamicMetadata(const std::string& name, const Protobuf::Struct& value) override {
     stream_info_.setDynamicMetadata(name, value);
   }
-  void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) override {
+  void setDynamicTypedMetadata(const std::string& name, const Protobuf::Any& value) override {
     stream_info_.setDynamicTypedMetadata(name, value);
   }
   envoy::config::core::v3::Metadata& dynamicMetadata() override {
@@ -157,6 +157,8 @@ protected:
   void OnEffectivePeerMigrationValidated(bool is_migration_linkable) override;
 
 private:
+  // Called when a packet is written to the packet writer.
+  void OnWritePacketDone(size_t packet_size, const quic::WriteResult& result);
   std::unique_ptr<QuicListenerFilterManagerImpl> listener_filter_manager_;
   bool first_packet_received_ = false;
 };

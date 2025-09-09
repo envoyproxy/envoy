@@ -29,7 +29,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // of the ``AttributeContext``. The ``AttributeContext`` is a collection of individual attributes
 // supported by Envoy authorization system.
 // [#comment: The following items are left out of this proto
-// Request.Auth field for jwt tokens
+// Request.Auth field for JWTs
 // Request.Api for api management
 // Origin peer that originated the request
 // Caching Protocol

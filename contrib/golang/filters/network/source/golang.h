@@ -33,13 +33,13 @@ public:
   const std::string& libraryID() const { return library_id_; }
   const std::string& libraryPath() const { return library_path_; }
   const std::string& pluginName() const { return plugin_name_; }
-  const ProtobufWkt::Any& pluginConfig() const { return plugin_config_; }
+  const Protobuf::Any& pluginConfig() const { return plugin_config_; }
 
 private:
   const std::string library_id_;
   const std::string library_path_;
   const std::string plugin_name_;
-  const ProtobufWkt::Any plugin_config_;
+  const Protobuf::Any plugin_config_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -56,8 +56,8 @@ class Filter : public Network::Filter,
 public:
   explicit Filter(Server::Configuration::FactoryContext& context, FilterConfigSharedPtr config,
                   uint64_t config_id, Dso::NetworkFilterDsoPtr dynamic_lib)
-      : context_(context), config_(config),
-        config_id_(config_id), plugin_name_{config->pluginName()}, dynamic_lib_(dynamic_lib) {}
+      : context_(context), config_(config), config_id_(config_id),
+        plugin_name_{config->pluginName()}, dynamic_lib_(dynamic_lib) {}
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;

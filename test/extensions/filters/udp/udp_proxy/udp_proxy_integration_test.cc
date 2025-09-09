@@ -8,6 +8,8 @@
 #include "test/extensions/filters/udp/udp_proxy/session_filters/buffer_filter.pb.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.h"
 #include "test/extensions/filters/udp/udp_proxy/session_filters/drainer_filter.pb.h"
+#include "test/extensions/filters/udp/udp_proxy/session_filters/psc_setter.h"
+#include "test/extensions/filters/udp/udp_proxy/session_filters/psc_setter.pb.h"
 #include "test/integration/integration.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
@@ -49,7 +51,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
 
   std::string name() const override { return "test.udp_listener.reverse"; }
@@ -63,7 +65,8 @@ public:
         registration_(factory_), session_filter_registration_(session_filter_factory_) {}
 
   void setup(uint32_t upstream_count, absl::optional<uint64_t> max_rx_datagram_size = absl::nullopt,
-             const std::string& session_filters_config = "") {
+             const std::string& session_filters_config = "",
+             const std::string& cluster = "cluster_0") {
     FakeUpstreamConfig::UdpConfig config;
     config.max_rx_datagram_size_ = max_rx_datagram_size;
     setUdpFakeUpstream(config);
@@ -104,7 +107,7 @@ public:
           });
     }
 
-    config_helper_.addListenerFilter(R"EOF(
+    const std::string listener_filter_config = fmt::format(R"EOF(
 name: udp_proxy
 typed_config:
   '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.UdpProxyConfig
@@ -115,8 +118,12 @@ typed_config:
         name: route
         typed_config:
           '@type': type.googleapis.com/envoy.extensions.filters.udp.udp_proxy.v3.Route
-          cluster: cluster_0
-)EOF" + max_datagram_config + session_filters_config);
+          cluster: {}
+)EOF",
+                                                           cluster) +
+                                               max_datagram_config + session_filters_config;
+
+    config_helper_.addListenerFilter(listener_filter_config);
 
     BaseIntegrationTest::initialize();
   }
@@ -329,30 +336,6 @@ TEST_P(UdpProxyIntegrationTest, DownstreamDrop) {
   } else {
     test_server_->waitForCounterEq("listener.[__]_0.udp.downstream_rx_datagram_dropped", 1);
   }
-}
-
-// Verify upstream drops are handled correctly with stats.
-TEST_P(UdpProxyIntegrationTest, UpstreamDrop) {
-  if (Runtime::runtimeFeatureEnabled(
-          "envoy.reloadable_features.udp_socket_apply_aggregated_read_limit")) {
-    return;
-  }
-  setup(1);
-  const uint32_t port = lookupPort("listener_0");
-  const auto listener_address = *Network::Utility::resolveUrl(
-      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
-  Network::Test::UdpSyncPeer client(version_);
-
-  client.write("hello", *listener_address);
-  Network::UdpRecvData request_datagram;
-  ASSERT_TRUE(fake_upstreams_[0]->waitForUdpDatagram(request_datagram));
-  EXPECT_EQ("hello", request_datagram.buffer_->toString());
-
-  const uint64_t large_datagram_size =
-      (Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE * Network::NUM_DATAGRAMS_PER_RECEIVE) + 1024;
-  fake_upstreams_[0]->sendUdpDatagram(std::string(large_datagram_size, 'a'),
-                                      request_datagram.addresses_.peer_);
-  test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams_dropped", 1);
 }
 
 // Test with large packet sizes.
@@ -785,6 +768,50 @@ TEST_P(UdpProxyIntegrationTest, TwoBufferingFilters) {
   EXPECT_EQ("response2", response_datagram.buffer_->toString());
   test_server_->waitForCounterEq("cluster.cluster_0.udp.sess_rx_datagrams", 4);
   test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_datagrams", 2);
+}
+
+// Per session cluster setter filter sets non-existent cluster.
+TEST_P(UdpProxyIntegrationTest, PerSessionClusterSetterFilterNoClusterFound) {
+  const std::string session_filters_config = R"EOF(
+  session_filters:
+  - name: foo
+    typed_config:
+      '@type': type.googleapis.com/test.extensions.filters.udp.udp_proxy.session_filters.PerSessionClusterSetterFilterConfig
+      cluster: cluster_1
+)EOF";
+
+  setup(1, absl::nullopt, session_filters_config);
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = *Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+
+  Network::Test::UdpSyncPeer client(version_, Network::DEFAULT_UDP_MAX_DATAGRAM_SIZE);
+  client.write("hello", *listener_address);
+
+  // cluster_1 does not exist, so the session will be closed.
+  test_server_->waitForCounterEq("udp.foo.downstream_sess_no_route", 1);
+  test_server_->waitForCounterEq("udp.foo.downstream_sess_total", 1);
+  test_server_->waitForGaugeEq("udp.foo.downstream_sess_active", 0);
+}
+
+// Basic loopback test with per session cluster setter filter.
+TEST_P(UdpProxyIntegrationTest, PerSessionClusterSetterFilterBasicLoopback) {
+  const std::string session_filters_config = R"EOF(
+  session_filters:
+  - name: foo
+    typed_config:
+      '@type': type.googleapis.com/test.extensions.filters.udp.udp_proxy.session_filters.PerSessionClusterSetterFilterConfig
+      cluster: cluster_0
+)EOF";
+
+  setup(1, absl::nullopt, session_filters_config, "cluster_1");
+  const uint32_t port = lookupPort("listener_0");
+  const auto listener_address = *Network::Utility::resolveUrl(
+      fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
+
+  // Although the default cluster is cluster_1 which does not exist, the per session cluster setter
+  // filter will set the session cluster to cluster_0 .
+  requestResponseWithListenerAddress(*listener_address);
 }
 
 } // namespace

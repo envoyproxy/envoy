@@ -24,4 +24,13 @@ message ProxyProtocolUpstreamTransport {
 
   // The underlying transport socket being wrapped.
   config.core.v3.TransportSocket transport_socket = 2 [(validate.rules).message = {required: true}];
+
+  // If this is set to true, the null addresses are allowed in the PROXY protocol header.
+  // The proxy protocol header encodes the null addresses to AF_UNSPEC.
+  // [#not-implemented-hide:]
+  bool allow_unspecified_address = 3;
+
+  // If true, all the TLVs are encoded in the connection pool key.
+  // [#not-implemented-hide:]
+  bool tlv_as_pool_key = 4;
 }

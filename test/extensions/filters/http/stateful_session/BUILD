@@ -17,6 +17,7 @@ envoy_extension_cc_test(
         "stateful_session_test.cc",
     ],
     extension_names = ["envoy.filters.http.stateful_session"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/stateful_session:config",
         "//source/server:generic_factory_context_lib",
@@ -36,10 +37,12 @@ envoy_extension_cc_test(
         "stateful_session_integration_test.cc",
     ],
     extension_names = ["envoy.filters.http.stateful_session"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/protobuf",
         "//source/extensions/filters/http/stateful_session:config",
         "//source/extensions/http/stateful_session/cookie:config",
+        "//source/extensions/http/stateful_session/envelope:config",
         "//source/extensions/http/stateful_session/header:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
@@ -51,6 +54,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.stateful_session"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/stateful_session:config",
         "//test/mocks/http:stateful_session_mock",

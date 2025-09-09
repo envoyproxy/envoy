@@ -315,11 +315,11 @@ Api::SysCallIntResult IoHandleImpl::setBlocking(bool) { return makeInvalidSyscal
 
 absl::optional<int> IoHandleImpl::domain() { return absl::nullopt; }
 
-Network::Address::InstanceConstSharedPtr IoHandleImpl::localAddress() {
+absl::StatusOr<Network::Address::InstanceConstSharedPtr> IoHandleImpl::localAddress() {
   return IoHandleImpl::getCommonInternalAddress();
 }
 
-Network::Address::InstanceConstSharedPtr IoHandleImpl::peerAddress() {
+absl::StatusOr<Network::Address::InstanceConstSharedPtr> IoHandleImpl::peerAddress() {
   return IoHandleImpl::getCommonInternalAddress();
 }
 
@@ -392,6 +392,41 @@ void PassthroughStateImpl::mergeInto(envoy::config::core::v3::Metadata& metadata
   filter_state_objects_.clear();
   state_ = State::Done;
 }
+
+std::pair<IoHandleImplPtr, IoHandleImplPtr>
+IoHandleFactory::createIoHandlePair(PassthroughStatePtr state) {
+  PassthroughStateSharedPtr shared_state;
+  if (state != nullptr) {
+    shared_state = std::move(state);
+  } else {
+    shared_state = std::make_shared<PassthroughStateImpl>();
+  }
+  auto p = std::pair<IoHandleImplPtr, IoHandleImplPtr>{new IoHandleImpl(shared_state),
+                                                       new IoHandleImpl(shared_state)};
+  p.first->setPeerHandle(p.second.get());
+  p.second->setPeerHandle(p.first.get());
+  return p;
+}
+
+std::pair<IoHandleImplPtr, IoHandleImplPtr>
+IoHandleFactory::createBufferLimitedIoHandlePair(uint32_t buffer_size, PassthroughStatePtr state) {
+  PassthroughStateSharedPtr shared_state;
+  if (state != nullptr) {
+    shared_state = std::move(state);
+  } else {
+    shared_state = std::make_shared<PassthroughStateImpl>();
+  }
+  auto p = std::pair<IoHandleImplPtr, IoHandleImplPtr>{new IoHandleImpl(shared_state),
+                                                       new IoHandleImpl(shared_state)};
+  // This buffer watermark setting emulates the OS socket buffer parameter
+  // `/proc/sys/net/ipv4/tcp_{r,w}mem`.
+  p.first->setWatermarks(buffer_size);
+  p.second->setWatermarks(buffer_size);
+  p.first->setPeerHandle(p.second.get());
+  p.second->setPeerHandle(p.first.get());
+  return p;
+}
+
 } // namespace UserSpace
 } // namespace IoSocket
 } // namespace Extensions

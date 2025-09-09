@@ -12,12 +12,12 @@ diff --git a/BUILD b/BUILD
 index efc3d8e7f..746ad4851 100644
 --- a/BUILD
 +++ b/BUILD
-@@ -24,7 +24,7 @@ config_setting(
+@@ -24,4 +24,4 @@ config_setting(
  # ZLIB configuration
  ################################################################################
 
 -ZLIB_DEPS = ["@zlib//:zlib"]
-+ZLIB_DEPS = ["//external:zlib"]
++ZLIB_DEPS = ["@envoy//bazel/foreign_cc:zlib"]
 
  ################################################################################
  # Protobuf Runtime Library

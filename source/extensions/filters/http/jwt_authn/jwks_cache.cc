@@ -46,7 +46,7 @@ public:
       if (jwt_provider_.remote_jwks().has_cache_duration()) {
         // Use `durationToMilliseconds` as it has stricter max boundary to the `seconds` value to
         // avoid overflow.
-        ProtobufWkt::Duration duration_copy(jwt_provider_.remote_jwks().cache_duration());
+        Protobuf::Duration duration_copy(jwt_provider_.remote_jwks().cache_duration());
         (void)DurationUtil::durationToMilliseconds(duration_copy);
 
         // remote_jwks.duration is used as: now + remote_jwks.duration.
@@ -189,7 +189,7 @@ private:
   ThreadLocal::TypedSlot<ThreadLocalCache> tls_;
   // async fetcher
   JwksAsyncFetcherPtr async_fetcher_;
-  absl::optional<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>> sub_matcher_;
+  absl::optional<Matchers::StringMatcherImpl> sub_matcher_;
   absl::optional<absl::Duration> max_exp_;
 };
 

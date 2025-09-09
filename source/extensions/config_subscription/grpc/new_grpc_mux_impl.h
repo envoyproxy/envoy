@@ -78,6 +78,12 @@ public:
   // TODO(fredlas) remove this from the GrpcMux interface.
   void start() override;
 
+  absl::Status
+  updateMuxSource(Grpc::RawAsyncClientSharedPtr&& primary_async_client,
+                  Grpc::RawAsyncClientSharedPtr&& failover_async_client, Stats::Scope& scope,
+                  BackOffStrategyPtr&& backoff_strategy,
+                  const envoy::config::core::v3::ApiConfigSource& ads_config_source) override;
+
   GrpcStreamInterface<envoy::service::discovery::v3::DeltaDiscoveryRequest,
                       envoy::service::discovery::v3::DeltaDiscoveryResponse>&
   grpcStreamForTest() {
@@ -95,7 +101,7 @@ public:
   struct SubscriptionStuff {
     SubscriptionStuff(const std::string& type_url, const LocalInfo::LocalInfo& local_info,
                       const bool use_namespace_matching, Event::Dispatcher& dispatcher,
-                      CustomConfigValidators& config_validators,
+                      CustomConfigValidators* config_validators,
                       XdsConfigTrackerOptRef xds_config_tracker,
                       EdsResourcesCacheOptRef eds_resources_cache)
         : watch_map_(use_namespace_matching, type_url, config_validators, eds_resources_cache),
@@ -148,12 +154,16 @@ private:
     const SubscriptionOptions options_;
   };
 
+  using SubscriptionsMap = absl::flat_hash_map<std::string, SubscriptionStuffPtr>;
+
   // Helper function to create the grpc_stream_ object.
-  // TODO(adisuissa): this should be removed when envoy.restart_features.xds_failover_support
-  // is deprecated.
   std::unique_ptr<GrpcStreamInterface<envoy::service::discovery::v3::DeltaDiscoveryRequest,
                                       envoy::service::discovery::v3::DeltaDiscoveryResponse>>
-  createGrpcStreamObject(GrpcMuxContext& grpc_mux_context);
+  createGrpcStreamObject(Grpc::RawAsyncClientSharedPtr&& async_client,
+                         Grpc::RawAsyncClientSharedPtr&& failover_async_client,
+                         const Protobuf::MethodDescriptor& service_method, Stats::Scope& scope,
+                         BackOffStrategyPtr&& backoff_strategy,
+                         const RateLimitSettings& rate_limit_settings);
 
   void removeWatch(const std::string& type_url, Watch* watch);
 
@@ -165,7 +175,8 @@ private:
                    const SubscriptionOptions& options);
 
   // Adds a subscription for the type_url to the subscriptions map and order list.
-  void addSubscription(const std::string& type_url, bool use_namespace_matching);
+  SubscriptionsMap::iterator addSubscription(const std::string& type_url,
+                                             bool use_namespace_matching);
 
   void trySendDiscoveryRequests();
 
@@ -190,12 +201,13 @@ private:
   PausableAckQueue pausable_ack_queue_;
 
   // Map key is type_url.
-  absl::flat_hash_map<std::string, SubscriptionStuffPtr> subscriptions_;
+  SubscriptionsMap subscriptions_;
 
   // Determines the order of initial discovery requests. (Assumes that subscriptions are added in
   // the order of Envoy's dependency ordering).
   std::list<std::string> subscription_ordering_;
 
+  Event::Dispatcher& dispatcher_;
   // Multiplexes the stream to the primary and failover sources.
   // TODO(adisuissa): Once envoy.restart_features.xds_failover_support is deprecated,
   // convert from unique_ptr<GrpcStreamInterface> to GrpcMuxFailover directly.
@@ -206,7 +218,6 @@ private:
   const LocalInfo::LocalInfo& local_info_;
   CustomConfigValidatorsPtr config_validators_;
   Common::CallbackHandlePtr dynamic_update_callback_handle_;
-  Event::Dispatcher& dispatcher_;
   XdsConfigTrackerOptRef xds_config_tracker_;
   EdsResourcesCachePtr eds_resources_cache_;
 

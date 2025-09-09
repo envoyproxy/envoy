@@ -19,7 +19,8 @@ TraceSegmentReporter::TraceSegmentReporter(Grpc::AsyncClientFactoryPtr&& factory
                                            Random::RandomGenerator& random_generator,
                                            SkyWalkingTracerStatsSharedPtr stats,
                                            uint32_t delayed_buffer_size, const std::string& token)
-    : tracing_stats_(stats), client_(factory->createUncachedRawAsyncClient()),
+    : tracing_stats_(stats), client_(THROW_OR_RETURN_VALUE(factory->createUncachedRawAsyncClient(),
+                                                           Grpc::RawAsyncClientPtr)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "skywalking.v3.TraceSegmentReportService.collect")),
       random_generator_(random_generator), token_(token),

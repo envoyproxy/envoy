@@ -70,8 +70,8 @@ public:
   // When called from a filter, the dispatcher function must abort without calling the
   // callback if the filter or fragment has been destroyed.
   absl::StatusOr<CancelFunction> toStorage(AsyncFileHandle file, off_t offset,
-                                           std::function<void(std::function<void()>)> dispatch,
-                                           std::function<void(absl::Status)> on_done);
+                                           Event::Dispatcher& dispatcher,
+                                           absl::AnyInvocable<void(absl::Status)> on_done);
 
   // Starts the transition for this fragment from storage to memory.
   //
@@ -79,9 +79,8 @@ public:
   //
   // When called from a filter, the dispatcher function must abort without calling the
   // callback if the filter or fragment has been destroyed.
-  absl::StatusOr<CancelFunction> fromStorage(AsyncFileHandle file,
-                                             std::function<void(std::function<void()>)> dispatch,
-                                             std::function<void(absl::Status)> on_done);
+  absl::StatusOr<CancelFunction> fromStorage(AsyncFileHandle file, Event::Dispatcher& dispatcher,
+                                             absl::AnyInvocable<void(absl::Status)> on_done);
 
   // Moves the buffer from a memory instance to the returned value and resets the fragment to
   // size 0.

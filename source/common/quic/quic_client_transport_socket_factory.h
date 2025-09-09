@@ -64,7 +64,8 @@ protected:
 
 private:
   // The QUIC client transport socket can create TLS sockets for fallback to TCP.
-  std::unique_ptr<Extensions::TransportSockets::Tls::ClientSslSocketFactory> fallback_factory_;
+  std::unique_ptr<Envoy::Extensions::TransportSockets::Tls::ClientSslSocketFactory>
+      fallback_factory_;
   // The storage for thread local quic config.
   ThreadLocal::TypedSlot<ThreadLocalQuicConfig> tls_slot_;
 };

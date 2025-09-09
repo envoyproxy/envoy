@@ -310,7 +310,7 @@ public:
 class RouteConfigUpdateRequesterFactory : public Config::UntypedFactory {
 public:
   // UntypedFactory
-  virtual std::string category() const override { return "envoy.route_config_update_requester"; }
+  std::string category() const override { return "envoy.route_config_update_requester"; }
 
   virtual std::unique_ptr<RouteConfigUpdateRequester>
   createRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider) PURE;
@@ -363,6 +363,19 @@ public:
    * the headers in a way that would affect routing.
    */
   virtual void clearRouteCache() PURE;
+
+  /**
+   * Refresh the target cluster but not the route cache. This is used when we want to change the
+   * target cluster after modifying the request attributes.
+   *
+   * NOTE: this is suggested to replace clearRouteCache() if you only want to determine the target
+   * cluster based on the latest request attributes that have been updated by the filters and do
+   * not want to configure multiple similar routes at the route table.
+   *
+   * NOTE: this depends on the route cluster specifier to support the refreshRouteCluster()
+   * method.
+   */
+  virtual void refreshRouteCluster() PURE;
 
   /**
    * Schedules a request for a RouteConfiguration update from the management server.
@@ -645,6 +658,11 @@ public:
                               absl::string_view details) PURE;
 
   /**
+   * Attempt to send GOAWAY and close the connection, and no filter chain will move forward.
+   */
+  virtual void sendGoAwayAndClose() PURE;
+
+  /**
    * Adds decoded metadata. This function can only be called in
    * StreamDecoderFilter::decodeHeaders/Data/Trailers(). Do not call in
    * StreamDecoderFilter::decodeMetadata().
@@ -748,7 +766,7 @@ public:
    *
    * @param limit supplies the desired buffer limit.
    */
-  virtual void setDecoderBufferLimit(uint32_t limit) PURE;
+  virtual void setDecoderBufferLimit(uint64_t limit) PURE;
 
   /**
    * This routine returns the current buffer limit for decoder filters. Filters should abide by
@@ -757,7 +775,7 @@ public:
    *
    * @return the buffer limit the filter should apply.
    */
-  virtual uint32_t decoderBufferLimit() PURE;
+  virtual uint64_t decoderBufferLimit() PURE;
 
   /**
    * @return the account, if any, used by this stream.

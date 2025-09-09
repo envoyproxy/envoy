@@ -280,8 +280,8 @@ Server::Options& TestEnvironment::getOptions() {
     }
   }
 #else
-  static OptionsImpl* options = new OptionsImpl(
-      argc_, argv_, [](bool) { return "1"; }, spdlog::level::err);
+  static OptionsImpl* options =
+      new OptionsImpl(argc_, argv_, [](bool) { return "1"; }, spdlog::level::err);
 #endif
   return *options;
 }
@@ -418,7 +418,8 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
 
 Json::ObjectSharedPtr TestEnvironment::jsonLoadFromString(const std::string& json,
                                                           Network::Address::IpVersion version) {
-  return Json::Factory::loadFromString(substitute(json, version));
+  return THROW_OR_RETURN_VALUE(Json::Factory::loadFromString(substitute(json, version)),
+                               Json::ObjectSharedPtr);
 }
 
 // This function is not used for Envoy Mobile tests, and ::system() is not supported on iOS.

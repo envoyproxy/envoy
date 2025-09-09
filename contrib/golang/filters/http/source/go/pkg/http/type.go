@@ -32,6 +32,7 @@ const (
 	errFilterDestroyed = "golang filter has been destroyed"
 	errNotInGo         = "not proccessing Go"
 	errInvalidPhase    = "invalid phase, maybe headers/buffer already continued"
+	errInvalidScene    = "invalid scene for this API"
 )
 
 // api.HeaderMap

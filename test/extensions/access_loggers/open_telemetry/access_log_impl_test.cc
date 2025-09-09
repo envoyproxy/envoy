@@ -53,7 +53,7 @@ class MockGrpcAccessLogger : public GrpcAccessLogger {
 public:
   // GrpcAccessLogger
   MOCK_METHOD(void, log, (LogRecord && entry));
-  MOCK_METHOD(void, log, (ProtobufWkt::Empty && entry));
+  MOCK_METHOD(void, log, (Protobuf::Empty && entry));
 };
 
 class MockGrpcAccessLoggerCache : public GrpcAccessLoggerCache {
@@ -84,7 +84,7 @@ public:
           return logger_;
         });
     auto commands =
-        Formatter::SubstitutionFormatStringUtils::parseFormatters(config_.formatters(), context_);
+        *Formatter::SubstitutionFormatStringUtils::parseFormatters(config_.formatters(), context_);
 
     return std::make_unique<AccessLog>(FilterPtr{filter_}, config_, tls_, logger_cache_, commands);
   }

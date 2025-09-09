@@ -36,7 +36,7 @@ can be specified as ``AWS_SIGV4`` or ``AWS_SIGV4A``. If the signing algorithm is
 If ``AWS_SIGV4`` is unspecified, or explicitly specified, the :ref:`signing_algorithm <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.region>` parameter
 is used to define the region to which the sigv4 calculation is addressed to.
 If ``AWS_SIGV4A`` is explicitly specified, the :ref:`signing_algorithm <envoy_v3_api_field_extensions.filters.http.aws_request_signing.v3.AwsRequestSigning.region>` parameter
-is used as a region set. A region set is a single region, or comma seperated list of regions. Regions in a region set can also include wildcards,
+is used as a region set. A region set is a single region, or comma separated list of regions. Regions in a region set can also include wildcards,
 such as ``us-east-*`` or even ``*``. By using ``AWS_SIGV4A`` and wildcarded regions it is possible to simplify the overall envoy configuration for
 multi-region implementations.
 
@@ -58,6 +58,8 @@ the following HTTP header modifications will be made by this extension:
 
 Example configuration
 ---------------------
+
+.. _config_http_filters_aws_request_signing_examples:
 
 Example filter configuration:
 
@@ -86,6 +88,34 @@ An example of configuring this filter to use ``AWS_SIGV4A`` signing with a wildc
     :linenos:
     :caption: :download:`aws-request-signing-filter-sigv4a.yaml <_include/aws-request-signing-filter-sigv4a.yaml>`
 
+An example of using the credential provider configuration to modify the default behaviour of the credential provider chain. In this scenario, we use
+the ``custom_credential_provider_chain`` option to disable the default credential provider chain and use specific settings for the credential file
+credentials provider. These settings include a ``watched_directory``, which configures the filter to reload the credentials file when it changes.
+
+.. literalinclude:: _include/aws-request-signing-filter-credential-provider-config.yaml
+    :language: yaml
+    :lines: 46-56
+    :lineno-start: 46
+    :linenos:
+    :caption: :download:`aws-request-signing-filter-credential-provider-config.yaml <_include/aws-request-signing-filter-credential-provider-config.yaml>`
+
+An example of configuring this filter to use IAM Roles Anywhere to retrieve credentials:
+
+.. literalinclude:: _include/aws-request-signing-filter-iam-roles-anywhere.yaml
+    :language: yaml
+    :lines: 25-44
+    :lineno-start: 25
+    :linenos:
+    :caption: :download:`aws-request-signing-filter-iam-roles-anywhere.yaml <_include/aws-request-signing-filter-iam-roles-anywhere.yaml>`
+
+An example of configuring this filter to use STS AssumeRole to retrieve credentials:
+
+.. literalinclude:: _include/aws-request-signing-filter-assumeroleprovider.yaml
+    :language: yaml
+    :lines: 45-60
+    :lineno-start: 45
+    :linenos:
+    :caption: :download:`aws-request-signing-filter-assumeroleprovider.yaml <_include/aws-request-signing-filter-assumeroleprovider.yaml>`
 
 Configuration as an upstream HTTP filter
 ----------------------------------------

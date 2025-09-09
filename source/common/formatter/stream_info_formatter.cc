@@ -2,7 +2,9 @@
 
 #include "source/common/common/random_generator.h"
 #include "source/common/config/metadata.h"
+#include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
+#include "source/common/json/json_utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/utility.h"
 
@@ -28,16 +30,6 @@ getUpstreamRemoteAddress(const StreamInfo::StreamInfo& stream_info) {
     return nullptr;
   }
 
-  // TODO(wbpcode): remove this after the flag is removed.
-  const bool use_upstream_remote_address = Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.upstream_remote_address_use_connection");
-  if (!use_upstream_remote_address) {
-    if (auto host = opt_ref->upstreamHost(); host != nullptr) {
-      return host->address();
-    }
-    return nullptr;
-  }
-
   if (auto addr = opt_ref->upstreamRemoteAddress(); addr != nullptr) {
     return addr;
   }
@@ -55,46 +47,36 @@ MetadataFormatter::MetadataFormatter(absl::string_view filter_namespace,
 
 absl::optional<std::string>
 MetadataFormatter::formatMetadata(const envoy::config::core::v3::Metadata& metadata) const {
-  ProtobufWkt::Value value = formatMetadataValue(metadata);
-  if (value.kind_case() == ProtobufWkt::Value::kNullValue) {
+  Protobuf::Value value = formatMetadataValue(metadata);
+  if (value.kind_case() == Protobuf::Value::kNullValue) {
     return absl::nullopt;
   }
 
   std::string str;
-  if (value.kind_case() == ProtobufWkt::Value::kStringValue) {
+  str.reserve(256);
+  if (value.kind_case() == Protobuf::Value::kStringValue) {
     str = value.string_value();
   } else {
-#ifdef ENVOY_ENABLE_YAML
-    absl::StatusOr<std::string> json_or_error =
-        MessageUtil::getJsonStringFromMessage(value, false, true);
-    if (json_or_error.ok()) {
-      str = json_or_error.value();
-    } else {
-      str = json_or_error.status().message();
-    }
-#else
-    IS_ENVOY_BUG("Json support compiled out");
-#endif
+    Json::Utility::appendValueToString(value, str);
   }
   SubstitutionFormatUtils::truncate(str, max_length_);
   return str;
 }
 
-ProtobufWkt::Value
+Protobuf::Value
 MetadataFormatter::formatMetadataValue(const envoy::config::core::v3::Metadata& metadata) const {
   if (path_.empty()) {
     const auto filter_it = metadata.filter_metadata().find(filter_namespace_);
     if (filter_it == metadata.filter_metadata().end()) {
       return SubstitutionFormatUtils::unspecifiedValue();
     }
-    ProtobufWkt::Value output;
+    Protobuf::Value output;
     output.mutable_struct_value()->CopyFrom(filter_it->second);
     return output;
   }
 
-  const ProtobufWkt::Value& val =
-      Config::Metadata::metadataValue(&metadata, filter_namespace_, path_);
-  if (val.kind_case() == ProtobufWkt::Value::KindCase::KIND_NOT_SET) {
+  const Protobuf::Value& val = Config::Metadata::metadataValue(&metadata, filter_namespace_, path_);
+  if (val.kind_case() == Protobuf::Value::KindCase::KIND_NOT_SET) {
     return SubstitutionFormatUtils::unspecifiedValue();
   }
 
@@ -107,7 +89,7 @@ MetadataFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
   return (metadata != nullptr) ? formatMetadata(*metadata) : absl::nullopt;
 }
 
-ProtobufWkt::Value MetadataFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) const {
+Protobuf::Value MetadataFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) const {
   auto metadata = get_func_(stream_info);
   return formatMetadataValue((metadata != nullptr) ? *metadata
                                                    : envoy::config::core::v3::Metadata());
@@ -192,7 +174,6 @@ FilterStateFormatter::FilterStateFormatter(absl::string_view key, absl::optional
   if (!field_name.empty()) {
     format_ = FilterStateFormat::Field;
     field_name_ = std::string(field_name);
-    factory_ = Registry::FactoryRegistry<StreamInfo::FilterState::ObjectFactory>::getFactory(key);
   } else if (serialize_as_string) {
     format_ = FilterStateFormat::String;
   } else {
@@ -264,14 +245,7 @@ FilterStateFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
 #endif
   }
   case FilterStateFormat::Field: {
-    if (!factory_) {
-      return absl::nullopt;
-    }
-    const auto reflection = factory_->reflect(state);
-    if (!reflection) {
-      return absl::nullopt;
-    }
-    auto field_value = reflection->getField(field_name_);
+    auto field_value = state->getField(field_name_);
     auto string_value = absl::visit(StringFieldVisitor(), field_value);
     if (!string_value) {
       return absl::nullopt;
@@ -284,8 +258,7 @@ FilterStateFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
   }
 }
 
-ProtobufWkt::Value
-FilterStateFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) const {
+Protobuf::Value FilterStateFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) const {
   const Envoy::StreamInfo::FilterState::Object* state = filterState(stream_info);
   if (!state) {
     return SubstitutionFormatUtils::unspecifiedValue();
@@ -307,7 +280,7 @@ FilterStateFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) con
     }
 
 #ifdef ENVOY_ENABLE_YAML
-    ProtobufWkt::Value val;
+    Protobuf::Value val;
     if (MessageUtil::jsonConvertValue(*proto, val)) {
       return val;
     }
@@ -315,14 +288,7 @@ FilterStateFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) con
     return SubstitutionFormatUtils::unspecifiedValue();
   }
   case FilterStateFormat::Field: {
-    if (!factory_) {
-      return SubstitutionFormatUtils::unspecifiedValue();
-    }
-    const auto reflection = factory_->reflect(state);
-    if (!reflection) {
-      return SubstitutionFormatUtils::unspecifiedValue();
-    }
-    auto field_value = reflection->getField(field_name_);
+    auto field_value = state->getField(field_name_);
     auto string_value = absl::visit(StringFieldVisitor(), field_value);
     if (!string_value) {
       return SubstitutionFormatUtils::unspecifiedValue();
@@ -346,6 +312,30 @@ const absl::flat_hash_map<absl::string_view, CommonDurationFormatter::TimePointG
            const auto downstream_timing = stream_info.downstreamTiming();
            if (downstream_timing.has_value()) {
              return downstream_timing->lastDownstreamRxByteReceived();
+           }
+           return {};
+         }},
+        {UpstreamConnectStart,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto upstream_info = stream_info.upstreamInfo();
+           if (upstream_info.has_value()) {
+             return upstream_info->upstreamTiming().upstream_connect_start_;
+           }
+           return {};
+         }},
+        {UpstreamConnectEnd,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto upstream_info = stream_info.upstreamInfo();
+           if (upstream_info.has_value()) {
+             return upstream_info->upstreamTiming().upstream_connect_complete_;
+           }
+           return {};
+         }},
+        {UpstreamTLSConnectEnd,
+         [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<MonotonicTime> {
+           const auto upstream_info = stream_info.upstreamInfo();
+           if (upstream_info.has_value()) {
+             return upstream_info->upstreamTiming().upstream_handshake_complete_;
            }
            return {};
          }},
@@ -484,7 +474,7 @@ CommonDurationFormatter::format(const StreamInfo::StreamInfo& info) const {
   }
   return fmt::format_int(duration.value()).str();
 }
-ProtobufWkt::Value CommonDurationFormatter::formatValue(const StreamInfo::StreamInfo& info) const {
+Protobuf::Value CommonDurationFormatter::formatValue(const StreamInfo::StreamInfo& info) const {
   auto duration = getDurationCount(info);
   if (!duration.has_value()) {
     return SubstitutionFormatUtils::unspecifiedValue();
@@ -569,8 +559,7 @@ SystemTimeFormatter::format(const StreamInfo::StreamInfo& stream_info) const {
   return date_formatter_.fromTime(time_field.value());
 }
 
-ProtobufWkt::Value
-SystemTimeFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) const {
+Protobuf::Value SystemTimeFormatter::formatValue(const StreamInfo::StreamInfo& stream_info) const {
   return ValueUtil::optionalStringValue(format(stream_info));
 }
 
@@ -592,7 +581,7 @@ EnvironmentFormatter::EnvironmentFormatter(absl::string_view key,
 absl::optional<std::string> EnvironmentFormatter::format(const StreamInfo::StreamInfo&) const {
   return str_.string_value();
 }
-ProtobufWkt::Value EnvironmentFormatter::formatValue(const StreamInfo::StreamInfo&) const {
+Protobuf::Value EnvironmentFormatter::formatValue(const StreamInfo::StreamInfo&) const {
   return str_;
 }
 
@@ -607,7 +596,7 @@ public:
   absl::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override {
     return field_extractor_(stream_info);
   }
-  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
     return ValueUtil::optionalStringValue(field_extractor_(stream_info));
   }
 
@@ -632,7 +621,7 @@ public:
 
     return fmt::format_int(millis.value()).str();
   }
-  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
     const auto millis = extractMillis(stream_info);
     if (!millis) {
       return SubstitutionFormatUtils::unspecifiedValue();
@@ -664,7 +653,7 @@ public:
   absl::optional<std::string> format(const StreamInfo::StreamInfo& stream_info) const override {
     return fmt::format_int(field_extractor_(stream_info)).str();
   }
-  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
     return ValueUtil::numberValue(field_extractor_(stream_info));
   }
 
@@ -706,7 +695,7 @@ public:
 
     return toString(*address);
   }
-  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
     Network::Address::InstanceConstSharedPtr address = field_extractor_(stream_info);
     if (!address) {
       return SubstitutionFormatUtils::unspecifiedValue();
@@ -761,7 +750,7 @@ public:
     return value;
   }
 
-  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
     if (stream_info.downstreamAddressProvider().sslConnection() == nullptr) {
       return SubstitutionFormatUtils::unspecifiedValue();
     }
@@ -799,7 +788,7 @@ public:
     return value;
   }
 
-  ProtobufWkt::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
+  Protobuf::Value formatValue(const StreamInfo::StreamInfo& stream_info) const override {
     if (!stream_info.upstreamInfo() ||
         stream_info.upstreamInfo()->upstreamSslConnection() == nullptr) {
       return SubstitutionFormatUtils::unspecifiedValue();
@@ -929,6 +918,15 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return bytes_meter ? bytes_meter->headerBytesReceived() : 0;
                   });
             }}},
+          {"UPSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) {
+                    const auto& bytes_meter = stream_info.getUpstreamBytesMeter();
+                    return bytes_meter ? bytes_meter->decompressedHeaderBytesReceived() : 0;
+                  });
+            }}},
           {"DOWNSTREAM_WIRE_BYTES_RECEIVED",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, absl::optional<size_t>) {
@@ -945,6 +943,15 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   [](const StreamInfo::StreamInfo& stream_info) {
                     const auto& bytes_meter = stream_info.getDownstreamBytesMeter();
                     return bytes_meter ? bytes_meter->headerBytesReceived() : 0;
+                  });
+            }}},
+          {"DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) {
+                    const auto& bytes_meter = stream_info.getDownstreamBytesMeter();
+                    return bytes_meter ? bytes_meter->decompressedHeaderBytesReceived() : 0;
                   });
             }}},
           {"PROTOCOL",
@@ -975,11 +982,16 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   });
             }}},
           {"RESPONSE_CODE_DETAILS",
-           {CommandSyntaxChecker::COMMAND_ONLY,
-            [](absl::string_view, absl::optional<size_t>) {
+           {CommandSyntaxChecker::PARAMS_OPTIONAL,
+            [](absl::string_view format, absl::optional<size_t>) {
+              bool allow_whitespaces = (format == "ALLOW_WHITESPACES");
               return std::make_unique<StreamInfoStringFormatterProvider>(
-                  [](const StreamInfo::StreamInfo& stream_info) {
-                    return stream_info.responseCodeDetails();
+                  [allow_whitespaces](const StreamInfo::StreamInfo& stream_info) {
+                    if (allow_whitespaces || !stream_info.responseCodeDetails().has_value()) {
+                      return stream_info.responseCodeDetails();
+                    }
+                    return absl::optional<std::string>(StringUtil::replaceAllEmptySpace(
+                        stream_info.responseCodeDetails().value()));
                   });
             }}},
           {"CONNECTION_TERMINATION_DETAILS",
@@ -1016,6 +1028,15 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return bytes_meter ? bytes_meter->headerBytesSent() : 0;
                   });
             }}},
+          {"UPSTREAM_DECOMPRESSED_HEADER_BYTES_SENT",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) {
+                    const auto& bytes_meter = stream_info.getUpstreamBytesMeter();
+                    return bytes_meter ? bytes_meter->decompressedHeaderBytesSent() : 0;
+                  });
+            }}},
           {"DOWNSTREAM_WIRE_BYTES_SENT",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, absl::optional<size_t>) {
@@ -1034,6 +1055,15 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return bytes_meter ? bytes_meter->headerBytesSent() : 0;
                   });
             }}},
+          {"DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_SENT",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoUInt64FormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) {
+                    const auto& bytes_meter = stream_info.getDownstreamBytesMeter();
+                    return bytes_meter ? bytes_meter->decompressedHeaderBytesSent() : 0;
+                  });
+            }}},
           {"DURATION",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, absl::optional<size_t>) {
@@ -1046,6 +1076,14 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
            {CommandSyntaxChecker::PARAMS_REQUIRED,
             [](absl::string_view sub_command, absl::optional<size_t>) {
               return CommonDurationFormatter::create(sub_command);
+            }}},
+          {"CUSTOM_FLAGS",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoStringFormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) {
+                    return std::string(stream_info.customFlags());
+                  });
             }}},
           {"RESPONSE_FLAGS",
            {CommandSyntaxChecker::COMMAND_ONLY,
@@ -1081,6 +1119,28 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                       // If no hostname is available, the main address is used.
                       return host->address()->asString();
                     }
+                    return absl::make_optional<std::string>(std::move(host_name));
+                  });
+            }}},
+          {"UPSTREAM_HOST_NAME_WITHOUT_PORT",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoStringFormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<std::string> {
+                    const auto opt_ref = stream_info.upstreamInfo();
+                    if (!opt_ref.has_value()) {
+                      return absl::nullopt;
+                    }
+                    const auto host = opt_ref->upstreamHost();
+                    if (host == nullptr) {
+                      return absl::nullopt;
+                    }
+                    std::string host_name = host->hostname();
+                    if (host_name.empty()) {
+                      // If no hostname is available, the main address is used.
+                      host_name = host->address()->asString();
+                    }
+                    Envoy::Http::HeaderUtility::stripPortFromHost(host_name);
                     return absl::make_optional<std::string>(std::move(host_name));
                   });
             }}},
@@ -1274,6 +1334,14 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return stream_info.downstreamAddressProvider().localAddress();
                   });
             }}},
+          {"DOWNSTREAM_DIRECT_LOCAL_ADDRESS",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return StreamInfoAddressFormatterProvider::withPort(
+                  [](const StreamInfo::StreamInfo& stream_info) {
+                    return stream_info.downstreamAddressProvider().directLocalAddress();
+                  });
+            }}},
           {"DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, absl::optional<size_t>) {
@@ -1282,12 +1350,28 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return stream_info.downstreamAddressProvider().localAddress();
                   });
             }}},
+          {"DOWNSTREAM_DIRECT_LOCAL_ADDRESS_WITHOUT_PORT",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return StreamInfoAddressFormatterProvider::withoutPort(
+                  [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+                    return stream_info.downstreamAddressProvider().directLocalAddress();
+                  });
+            }}},
           {"DOWNSTREAM_LOCAL_PORT",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, absl::optional<size_t>) {
               return StreamInfoAddressFormatterProvider::justPort(
                   [](const Envoy::StreamInfo::StreamInfo& stream_info) {
                     return stream_info.downstreamAddressProvider().localAddress();
+                  });
+            }}},
+          {"DOWNSTREAM_DIRECT_LOCAL_PORT",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return StreamInfoAddressFormatterProvider::justPort(
+                  [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+                    return stream_info.downstreamAddressProvider().directLocalAddress();
                   });
             }}},
           {"DOWNSTREAM_REMOTE_ADDRESS",
@@ -1353,7 +1437,7 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                   [](const StreamInfo::StreamInfo& stream_info) {
                     absl::optional<std::string> result;
                     if (!stream_info.downstreamAddressProvider().requestedServerName().empty()) {
-                      result = std::string(
+                      result = StringUtil::sanitizeInvalidHostname(
                           stream_info.downstreamAddressProvider().requestedServerName());
                     }
                     return result;
@@ -1444,6 +1528,22 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return absl::StrJoin(connection_info.ipSansPeerCertificate(), ",");
                   });
             }}},
+          {"DOWNSTREAM_PEER_EMAIL_SAN",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
+                  [](const Ssl::ConnectionInfo& connection_info) {
+                    return absl::StrJoin(connection_info.emailSansPeerCertificate(), ",");
+                  });
+            }}},
+          {"DOWNSTREAM_PEER_OTHERNAME_SAN",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
+                  [](const Ssl::ConnectionInfo& connection_info) {
+                    return absl::StrJoin(connection_info.othernameSansPeerCertificate(), ",");
+                  });
+            }}},
           {"DOWNSTREAM_LOCAL_URI_SAN",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, absl::optional<size_t>) {
@@ -1466,6 +1566,22 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
               return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
                   [](const Ssl::ConnectionInfo& connection_info) {
                     return absl::StrJoin(connection_info.ipSansLocalCertificate(), ",");
+                  });
+            }}},
+          {"DOWNSTREAM_LOCAL_EMAIL_SAN",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
+                  [](const Ssl::ConnectionInfo& connection_info) {
+                    return absl::StrJoin(connection_info.emailSansLocalCertificate(), ",");
+                  });
+            }}},
+          {"DOWNSTREAM_LOCAL_OTHERNAME_SAN",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoSslConnectionInfoFormatterProvider>(
+                  [](const Ssl::ConnectionInfo& connection_info) {
+                    return absl::StrJoin(connection_info.othernameSansLocalCertificate(), ",");
                   });
             }}},
           {"DOWNSTREAM_PEER_SUBJECT",
@@ -1647,6 +1763,18 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                     return result;
                   });
             }}},
+          {"TLS_JA4_FINGERPRINT",
+           {CommandSyntaxChecker::COMMAND_ONLY,
+            [](absl::string_view, absl::optional<size_t>) {
+              return std::make_unique<StreamInfoStringFormatterProvider>(
+                  [](const StreamInfo::StreamInfo& stream_info) {
+                    absl::optional<std::string> result;
+                    if (!stream_info.downstreamAddressProvider().ja4Hash().empty()) {
+                      result = std::string(stream_info.downstreamAddressProvider().ja4Hash());
+                    }
+                    return result;
+                  });
+            }}},
           {"UNIQUE_ID",
            {CommandSyntaxChecker::COMMAND_ONLY,
             [](absl::string_view, const absl::optional<size_t>&) {
@@ -1800,13 +1928,13 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
       });
 }
 
-class BuiltInStreamInfoCommandParser : public StreamInfoCommandParser {
+class BuiltInStreamInfoCommandParser : public CommandParser {
 public:
   BuiltInStreamInfoCommandParser() = default;
 
-  // StreamInfoCommandParser
-  StreamInfoFormatterProviderPtr parse(absl::string_view command, absl::string_view sub_command,
-                                       absl::optional<size_t> max_length) const override {
+  // CommandParser
+  FormatterProviderPtr parse(absl::string_view command, absl::string_view sub_command,
+                             absl::optional<size_t> max_length) const override {
 
     auto it = getKnownStreamInfoFormatterProviders().find(command);
 
@@ -1827,13 +1955,11 @@ std::string DefaultBuiltInStreamInfoCommandParserFactory::name() const {
   return "envoy.built_in_formatters.stream_info.default";
 }
 
-StreamInfoCommandParserPtr
-DefaultBuiltInStreamInfoCommandParserFactory::createCommandParser() const {
+CommandParserPtr DefaultBuiltInStreamInfoCommandParserFactory::createCommandParser() const {
   return std::make_unique<BuiltInStreamInfoCommandParser>();
 }
 
-REGISTER_FACTORY(DefaultBuiltInStreamInfoCommandParserFactory,
-                 BuiltInStreamInfoCommandParserFactory);
+REGISTER_FACTORY(DefaultBuiltInStreamInfoCommandParserFactory, BuiltInCommandParserFactory);
 
 } // namespace Formatter
 } // namespace Envoy

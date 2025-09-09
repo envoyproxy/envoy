@@ -8,6 +8,7 @@ void SslIntegrationTestBase::initialize() {
                                   .setRsaCert(server_rsa_cert_)
                                   .setRsaCertOcspStaple(server_rsa_cert_ocsp_staple_)
                                   .setEcdsaCert(server_ecdsa_cert_)
+                                  .setEcdsaCertName(server_ecdsa_cert_name_)
                                   .setEcdsaCertOcspStaple(server_ecdsa_cert_ocsp_staple_)
                                   .setOcspStapleRequired(ocsp_staple_required_)
                                   .setPreferClientCiphers(prefer_client_ciphers_)

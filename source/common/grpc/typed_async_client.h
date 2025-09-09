@@ -40,6 +40,7 @@ public:
   }
   void closeStream() { stream_->closeStream(); }
   void resetStream() { stream_->resetStream(); }
+  void waitForRemoteCloseAndDelete() { stream_->waitForRemoteCloseAndDelete(); }
   bool isAboveWriteBufferHighWatermark() const {
     return stream_->isAboveWriteBufferHighWatermark();
   }
@@ -112,7 +113,8 @@ template <typename Request, typename Response> class AsyncClient /* : public Raw
 public:
   AsyncClient() = default;
   AsyncClient(RawAsyncClientPtr&& client) : client_(std::move(client)) {}
-  AsyncClient(RawAsyncClientSharedPtr client) : client_(client) {}
+  AsyncClient(const RawAsyncClientSharedPtr& client) : client_(client) {}
+  AsyncClient(RawAsyncClientSharedPtr&& client) : client_(std::move(client)) {}
   virtual ~AsyncClient() = default;
 
   virtual AsyncRequest* send(const Protobuf::MethodDescriptor& service_method,

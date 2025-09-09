@@ -111,8 +111,8 @@ private:
       }
     };
 
-    void onAboveWriteBufferHighWatermark() override{};
-    void onBelowWriteBufferLowWatermark() override{};
+    void onAboveWriteBufferHighWatermark() override {};
+    void onBelowWriteBufferLowWatermark() override {};
 
     TestNetworkAsyncTcpFilter& parent_;
   };

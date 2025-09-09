@@ -12,6 +12,7 @@
 #include "google/protobuf/descriptor_database.h"
 #include "google/protobuf/dynamic_message.h"
 #include "google/protobuf/empty.pb.h"
+#include "google/protobuf/extension_set.h"
 #include "google/protobuf/io/coded_stream.h"
 #include "google/protobuf/io/zero_copy_stream.h"
 #include "google/protobuf/io/zero_copy_stream_impl.h"
@@ -64,43 +65,44 @@ namespace Protobuf {
 
 using Closure = ::google::protobuf::Closure;
 
+using ::google::protobuf::Any;                          // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Arena;                        // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::BoolValue;                    // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::BytesValue;                   // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Descriptor;                   // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::DescriptorPool;               // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::DescriptorPoolDatabase;       // NOLINT(misc-unused-using-decls)
-using ::google::protobuf::DynamicCastToGenerated;       // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::Duration;                     // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::DynamicCastMessage;           // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::DynamicMessageFactory;        // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::Empty;                        // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::EnumValueDescriptor;          // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::FieldDescriptor;              // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::FieldMask;                    // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::FileDescriptor;               // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::FileDescriptorProto;          // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::FileDescriptorSet;            // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::ListValue;                    // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Map;                          // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::MapPair;                      // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::MessageFactory;               // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::MethodDescriptor;             // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::NULL_VALUE;                   // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::OneofDescriptor;              // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Reflection;                   // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::RepeatedField;                // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::RepeatedFieldBackInserter;    // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::RepeatedPtrField;             // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::RepeatedPtrFieldBackInserter; // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::StringValue;                  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::Struct;                       // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::TextFormat;                   // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::Timestamp;                    // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::Type;                         // NOLINT(misc-unused-using-decls)
 using ::google::protobuf::UInt32Value;                  // NOLINT(misc-unused-using-decls)
+using ::google::protobuf::Value;                        // NOLINT(misc-unused-using-decls)
 
 using Message = ::google::protobuf::MessageLite;
-
-template <typename T> const T* DynamicCastToGenerated(const Message* from) {
-  return static_cast<const T*>(from);
-}
-
-template <typename T> T* DynamicCastToGenerated(Message* from) {
-  const Message* message_const = from;
-  return const_cast<T*>(DynamicCastToGenerated<T>(message_const));
-}
 
 using ReflectableMessage = std::unique_ptr<::google::protobuf::Message>;
 using uint32 = uint32_t;
@@ -154,10 +156,6 @@ namespace Envoy {
 
 // Allows mapping from google::protobuf::util to other util libraries.
 namespace ProtobufUtil = ::google::protobuf::util;
-
-// Protobuf well-known types (WKT) should be referenced via the ProtobufWkt
-// namespace.
-namespace ProtobufWkt = ::google::protobuf;
 
 // Alternative protobuf implementations might not have the same basic types.
 // Below we provide wrappers to facilitate remapping of the type during import.

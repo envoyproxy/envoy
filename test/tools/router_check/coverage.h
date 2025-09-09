@@ -7,9 +7,9 @@ namespace Envoy {
 class RouteCoverage : Logger::Loggable<Logger::Id::testing> {
 public:
   RouteCoverage(const Envoy::Router::RouteConstSharedPtr route, const std::string route_name)
-      : route_(route), direct_response_entry_(nullptr), route_name_(route_name){};
+      : route_(route), direct_response_entry_(nullptr), route_name_(route_name) {};
   RouteCoverage(const Envoy::Router::DirectResponseEntry* route, const std::string route_name)
-      : route_(nullptr), direct_response_entry_(route), route_name_(route_name){};
+      : route_(nullptr), direct_response_entry_(route), route_name_(route_name) {};
 
   double report();
   void setClusterCovered() { cluster_covered_ = true; }
@@ -41,7 +41,7 @@ private:
 
 class Coverage : Logger::Loggable<Logger::Id::testing> {
 public:
-  Coverage(envoy::config::route::v3::RouteConfiguration config) : route_config_(config){};
+  Coverage(envoy::config::route::v3::RouteConfiguration config) : route_config_(config) {};
   void markClusterCovered(const Envoy::Router::RouteConstSharedPtr route);
   void markVirtualClusterCovered(const Envoy::Router::RouteConstSharedPtr route);
   void markVirtualHostCovered(const Envoy::Router::RouteConstSharedPtr route);

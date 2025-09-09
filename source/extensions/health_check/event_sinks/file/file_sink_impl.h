@@ -16,7 +16,7 @@ public:
       AccessLog::AccessLogManager& log_manager) {
     auto file_or_error = log_manager.createAccessLog(
         Filesystem::FilePathAndType{Filesystem::DestinationType::File, config.event_log_path()});
-    THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+    THROW_IF_NOT_OK_REF(file_or_error.status());
     file_ = file_or_error.value();
   }
 
@@ -31,7 +31,7 @@ public:
   HealthCheckEventFileSinkFactory() = default;
 
   HealthCheckEventSinkPtr
-  createHealthCheckEventSink(const ProtobufWkt::Any& config,
+  createHealthCheckEventSink(const Protobuf::Any& config,
                              Server::Configuration::HealthCheckerFactoryContext& context) override;
 
   std::string name() const override { return "envoy.health_check.event_sink.file"; }

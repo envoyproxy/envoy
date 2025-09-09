@@ -278,27 +278,7 @@ public:
    * @param size number of bytes to copy.
    * @return number of bytes copied (may be a smaller than size, may even be zero).
    */
-  uint64_t prepend(const void* data, uint64_t size) {
-    const uint8_t* src = static_cast<const uint8_t*>(data);
-    uint64_t copy_size;
-    if (dataSize() == 0) {
-      // There is nothing in the slice, so put the data at the very end in case the caller
-      // later tries to prepend anything else in front of it.
-      copy_size = std::min(size, reservableSize());
-      reservable_ = capacity_;
-      data_ = capacity_ - copy_size;
-    } else {
-      if (data_ == 0) {
-        // There is content in the slice, and no space in front of it to write anything.
-        return 0;
-      }
-      // Write into the space in front of the slice's current content.
-      copy_size = std::min(size, data_);
-      data_ -= copy_size;
-    }
-    memcpy(base_ + data_, src + size - copy_size, copy_size); // NOLINT(safe-memcpy)
-    return copy_size;
-  }
+  uint64_t prepend(const void* data, uint64_t size);
 
   /**
    * Describe the in-memory representation of the slice. For use
@@ -719,8 +699,8 @@ public:
   // Does not implement watermarking.
   // TODO(antoniovicente) Implement watermarks by merging the OwnedImpl and WatermarkBuffer
   // implementations. Also, make high-watermark config a constructor argument.
-  void setWatermarks(uint32_t, uint32_t) override { ASSERT(false, "watermarks not implemented."); }
-  uint32_t highWatermark() const override { return 0; }
+  void setWatermarks(uint64_t, uint32_t) override { ASSERT(false, "watermarks not implemented."); }
+  uint64_t highWatermark() const override { return 0; }
   bool highWatermarkTriggered() const override { return false; }
 
   /**

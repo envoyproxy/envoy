@@ -24,11 +24,10 @@ envoy_cc_library(
     name = "extractor_impl",
     srcs = ["extractor_impl.cc"],
     hdrs = ["extractor_impl.h"],
-    external_deps = [
-        "grpc_transcoding",
-    ],
+    external_deps = ["grpc_transcoding"],
     deps = [
         "extractor",
+        "//envoy/common:exception_lib",
         "//source/common/common:minimal_logger_lib",
         "@com_google_absl//absl/status",
         "@com_google_protofieldextraction//:all_libs",
@@ -52,9 +51,7 @@ envoy_cc_library(
     name = "filter",
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
-    external_deps = [
-        "grpc_transcoding",
-    ],
+    external_deps = ["grpc_transcoding"],
     deps = [
         "extractor_impl",
         "filter_config",

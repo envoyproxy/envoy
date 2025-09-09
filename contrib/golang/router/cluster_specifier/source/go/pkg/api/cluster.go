@@ -37,4 +37,7 @@ type RequestHeaderMap interface {
 	// Get value of key
 	// If multiple values associated with this key, first one will be returned.
 	Get(key string) (string, bool)
+
+	// Get all the request headers mapped to their corresponding values.
+	GetAllHeaders() map[string][]string
 }

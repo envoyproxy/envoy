@@ -1,5 +1,6 @@
 #include "test/mocks/server/instance.h"
 
+#include "source/common/secret/secret_manager_impl.h"
 #include "source/common/singleton/manager_impl.h"
 
 #include "gmock/gmock.h"
@@ -31,6 +32,7 @@ MockInstance::MockInstance()
   ON_CALL(*this, api()).WillByDefault(ReturnRef(api_));
   ON_CALL(*this, admin()).WillByDefault(Return(OptRef<Server::Admin>{admin_}));
   ON_CALL(*this, clusterManager()).WillByDefault(ReturnRef(cluster_manager_));
+  ON_CALL(*this, xdsManager()).WillByDefault(ReturnRef(xds_manager_));
   ON_CALL(*this, httpServerPropertiesCacheManager())
       .WillByDefault(ReturnRef(http_server_properties_cache_manager_));
   ON_CALL(*this, sslContextManager()).WillByDefault(ReturnRef(ssl_context_manager_));
@@ -49,12 +51,17 @@ MockInstance::MockInstance()
   ON_CALL(*this, overloadManager()).WillByDefault(ReturnRef(overload_manager_));
   ON_CALL(*this, nullOverloadManager()).WillByDefault(ReturnRef(null_overload_manager_));
   ON_CALL(*this, messageValidationContext()).WillByDefault(ReturnRef(validation_context_));
+  ON_CALL(*this, messageValidationVisitor())
+      .WillByDefault(ReturnRef(validation_context_.static_validation_visitor_));
   ON_CALL(*this, statsConfig()).WillByDefault(ReturnRef(*stats_config_));
   ON_CALL(*this, regexEngine()).WillByDefault(ReturnRef(regex_engine_));
   ON_CALL(*this, serverFactoryContext()).WillByDefault(ReturnRef(*server_factory_context_));
   ON_CALL(*this, transportSocketFactoryContext())
       .WillByDefault(ReturnRef(*transport_socket_factory_context_));
   ON_CALL(*this, enableReusePortDefault()).WillByDefault(Return(true));
+
+  ON_CALL(*server_factory_context_, sslContextManager())
+      .WillByDefault(ReturnRef(ssl_context_manager_));
 }
 
 MockInstance::~MockInstance() = default;

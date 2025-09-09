@@ -150,6 +150,8 @@ MockFilterManagerConnection::MockFilterManagerConnection() {
   ON_CALL(*this, rawWrite(_, _)).WillByDefault(Invoke([](Buffer::Instance& buffer, bool) -> void {
     buffer.drain(buffer.length());
   }));
+
+  ON_CALL(*this, closeConnection(_)).WillByDefault(Invoke([]() -> void {}));
 }
 MockFilterManagerConnection::~MockFilterManagerConnection() = default;
 

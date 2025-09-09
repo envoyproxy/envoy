@@ -2,7 +2,6 @@
 api
 examples/grpc-bridge/script
 mobile
-tools/clang_tools
 tools/dev/src
 .project
 envoy-filter-example

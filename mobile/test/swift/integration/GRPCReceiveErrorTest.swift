@@ -61,7 +61,7 @@ final class GRPCReceiveErrorTests: XCTestCase {
     filterNotCancelled.isInverted = true
     let expectations = [filterReceivedError, filterNotCancelled, callbackReceivedError]
 
-    EnvoyTestServer.startHttp1PlaintextServer()
+    EnvoyTestServer.startHttp1Server()
 
     let engine = EngineBuilder()
       .setLogLevel(.debug)
@@ -86,7 +86,7 @@ final class GRPCReceiveErrorTests: XCTestCase {
 
     let requestHeaders = GRPCRequestHeadersBuilder(
         scheme: "http",
-        authority: "localhost:" + String(EnvoyTestServer.getEnvoyPort()),
+        authority: "localhost:" + String(EnvoyTestServer.getHttpPort()),
         path: "/pb.api.v1.Foo/GetBar")
       .build()
     let message = Data([1, 2, 3, 4, 5])
@@ -114,6 +114,6 @@ final class GRPCReceiveErrorTests: XCTestCase {
     XCTAssertEqual(XCTWaiter.wait(for: expectations, timeout: 10), .completed)
 
     engine.terminate()
-    EnvoyTestServer.shutdownTestServer()
+    EnvoyTestServer.shutdownTestHttpServer()
   }
 }

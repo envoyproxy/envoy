@@ -181,6 +181,7 @@ bool SnapshotImpl::featureEnabled(absl::string_view key,
               "WARNING runtime key '{}': numerator ({}) > denominator ({}), condition always "
               "evaluates to true",
               key, percent.numerator(), denominator_value);
+    return true;
   }
 
   return ProtobufPercentHelper::evaluateFractionalPercent(percent, random_value);
@@ -233,7 +234,7 @@ SnapshotImpl::SnapshotImpl(Random::RandomGenerator& generator, RuntimeStats& sta
   stats.num_keys_.set(values_.size());
 }
 
-void parseFractionValue(SnapshotImpl::Entry& entry, const ProtobufWkt::Struct& value) {
+void parseFractionValue(SnapshotImpl::Entry& entry, const Protobuf::Struct& value) {
   envoy::type::v3::FractionalPercent percent;
   static_assert(envoy::type::v3::FractionalPercent::MILLION ==
                 envoy::type::v3::FractionalPercent::DenominatorType_MAX);
@@ -284,116 +285,41 @@ bool parseEntryDoubleValue(Envoy::Runtime::Snapshot::Entry& entry) {
   return false;
 }
 
-// Handle an awful corner case where we explicitly shove a yaml percent in a proto string
-// value. Basically due to prior parsing logic we have to handle any combination
-// of numerator: #### [denominator Y] with quotes braces etc that could possibly be valid json.
-// E.g. "final_value": "{\"numerator\": 10000, \"denominator\": \"TEN_THOUSAND\"}",
-bool parseEntryFractionalPercentValue(Envoy::Runtime::Snapshot::Entry& entry) {
-  if (!absl::StrContains(entry.raw_string_value_, "numerator")) {
-    return false;
-  }
-
-  const re2::RE2 numerator_re(".*numerator[^\\d]+(\\d+)[^\\d]*");
-
-  std::string match_string;
-  if (!re2::RE2::FullMatch(entry.raw_string_value_.c_str(), numerator_re, &match_string)) {
-    return false;
-  }
-
-  uint32_t numerator;
-  if (!absl::SimpleAtoi(match_string, &numerator)) {
-    return false;
-  }
-  envoy::type::v3::FractionalPercent converted_fractional_percent;
-  converted_fractional_percent.set_numerator(numerator);
-  entry.fractional_percent_value_ = converted_fractional_percent;
-
-  if (!absl::StrContains(entry.raw_string_value_, "denominator")) {
-    return true;
-  }
-  if (absl::StrContains(entry.raw_string_value_, "TEN_THOUSAND")) {
-    entry.fractional_percent_value_->set_denominator(
-        envoy::type::v3::FractionalPercent::TEN_THOUSAND);
-  }
-  if (absl::StrContains(entry.raw_string_value_, "MILLION")) {
-    entry.fractional_percent_value_->set_denominator(envoy::type::v3::FractionalPercent::MILLION);
-  }
-  return true;
-}
-
-// Handle corner cases in non-yaml parsing: mixed case strings aren't parsed as booleans.
-bool parseEntryBooleanValue(Envoy::Runtime::Snapshot::Entry& entry) {
-  absl::string_view stripped = entry.raw_string_value_;
-  stripped = absl::StripAsciiWhitespace(stripped);
-
-  if (absl::EqualsIgnoreCase(stripped, "true")) {
-    entry.bool_value_ = true;
-    return true;
-  } else if (absl::EqualsIgnoreCase(stripped, "false")) {
-    entry.bool_value_ = false;
-    return true;
-  }
-  return false;
-}
-
 void SnapshotImpl::addEntry(Snapshot::EntryMap& values, const std::string& key,
-                            const ProtobufWkt::Value& value, absl::string_view raw_string) {
-  const char* error_message = nullptr;
-  values.emplace(key, SnapshotImpl::createEntry(value, raw_string, error_message));
-  if (error_message != nullptr) {
-    IS_ENVOY_BUG(
-        absl::StrCat(error_message, "\n[ key:", key, ", value: ", value.DebugString(), "]"));
-  }
+                            const Protobuf::Value& value, absl::string_view raw_string) {
+  values.emplace(key, SnapshotImpl::createEntry(value, raw_string));
 }
 
-static const char* kBoolError =
-    "Runtime YAML appears to be setting booleans as strings. Support for this is planned "
-    "to removed in an upcoming release. If you can not fix your YAML and need this to continue "
-    "working "
-    "please ping on https://github.com/envoyproxy/envoy/issues/27434";
-static const char* kFractionError =
-    "Runtime YAML appears to be setting fractions as strings. Support for this is planned "
-    "to removed in an upcoming release. If you can not fix your YAML and need this to continue "
-    "working "
-    "please ping on https://github.com/envoyproxy/envoy/issues/27434";
-
-SnapshotImpl::Entry SnapshotImpl::createEntry(const ProtobufWkt::Value& value,
-                                              absl::string_view raw_string,
-                                              const char*& error_message) {
+SnapshotImpl::Entry SnapshotImpl::createEntry(const Protobuf::Value& value,
+                                              absl::string_view raw_string) {
   Entry entry;
   entry.raw_string_value_ = value.string_value();
   if (!raw_string.empty()) {
     entry.raw_string_value_ = raw_string;
   }
   switch (value.kind_case()) {
-  case ProtobufWkt::Value::kNumberValue:
+  case Protobuf::Value::kNumberValue:
     setNumberValue(entry, value.number_value());
     if (entry.raw_string_value_.empty()) {
       entry.raw_string_value_ = absl::StrCat(value.number_value());
     }
     break;
-  case ProtobufWkt::Value::kBoolValue:
+  case Protobuf::Value::kBoolValue:
     entry.bool_value_ = value.bool_value();
     if (entry.raw_string_value_.empty()) {
-      entry.raw_string_value_ = absl::StrCat(value.bool_value());
+      // Convert boolean to "true"/"false"
+      entry.raw_string_value_ = value.bool_value() ? "true" : "false";
     }
     break;
-  case ProtobufWkt::Value::kStructValue:
+  case Protobuf::Value::kStructValue:
     if (entry.raw_string_value_.empty()) {
       entry.raw_string_value_ = value.struct_value().DebugString();
     }
     parseFractionValue(entry, value.struct_value());
     break;
-  case ProtobufWkt::Value::kStringValue:
+  case Protobuf::Value::kStringValue:
     parseEntryDoubleValue(entry);
-    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reject_invalid_yaml")) {
-      if (parseEntryBooleanValue(entry)) {
-        error_message = kBoolError;
-      }
-      if (parseEntryFractionalPercentValue(entry)) {
-        error_message = kFractionError;
-      }
-    }
+    break;
   default:
     break;
   }
@@ -496,7 +422,7 @@ absl::Status DiskLayer::walkDirectory(const std::string& path, const std::string
   return absl::OkStatus();
 }
 
-ProtoLayer::ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto,
+ProtoLayer::ProtoLayer(absl::string_view name, const Protobuf::Struct& proto,
                        absl::Status& creation_status)
     : OverrideLayerImpl{name} {
   creation_status = absl::OkStatus();
@@ -508,27 +434,27 @@ ProtoLayer::ProtoLayer(absl::string_view name, const ProtobufWkt::Struct& proto,
   }
 }
 
-absl::Status ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& prefix) {
+absl::Status ProtoLayer::walkProtoValue(const Protobuf::Value& v, const std::string& prefix) {
   switch (v.kind_case()) {
-  case ProtobufWkt::Value::KIND_NOT_SET:
-  case ProtobufWkt::Value::kListValue:
-  case ProtobufWkt::Value::kNullValue:
+  case Protobuf::Value::KIND_NOT_SET:
+  case Protobuf::Value::kListValue:
+  case Protobuf::Value::kNullValue:
     return absl::InvalidArgumentError(absl::StrCat("Invalid runtime entry value for ", prefix));
     break;
-  case ProtobufWkt::Value::kStringValue:
+  case Protobuf::Value::kStringValue:
     SnapshotImpl::addEntry(values_, prefix, v, "");
     break;
-  case ProtobufWkt::Value::kNumberValue:
-  case ProtobufWkt::Value::kBoolValue:
-    if (hasRuntimePrefix(prefix) && !isRuntimeFeature(prefix)) {
+  case Protobuf::Value::kNumberValue:
+  case Protobuf::Value::kBoolValue:
+    if (hasRuntimePrefix(prefix) && !isRuntimeFeature(prefix) && !isLegacyRuntimeFeature(prefix)) {
       IS_ENVOY_BUG(absl::StrCat(
           "Using a removed guard ", prefix,
           ". In future version of Envoy this will be treated as invalid configuration"));
     }
     SnapshotImpl::addEntry(values_, prefix, v, "");
     break;
-  case ProtobufWkt::Value::kStructValue: {
-    const ProtobufWkt::Struct& s = v.struct_value();
+  case Protobuf::Value::kStructValue: {
+    const Protobuf::Struct& s = v.struct_value();
     if (s.fields().empty() || s.fields().find("numerator") != s.fields().end() ||
         s.fields().find("denominator") != s.fields().end()) {
       SnapshotImpl::addEntry(values_, prefix, v, "");
@@ -736,7 +662,7 @@ absl::Status LoaderImpl::loadNewSnapshot() {
   return absl::OkStatus();
 }
 
-const Snapshot& LoaderImpl::snapshot() {
+const Snapshot& LoaderImpl::snapshot() const {
   ASSERT(tls_->currentThreadRegistered(),
          "snapshot can only be called from a worker thread or after the main thread is registered");
   return tls_->getTyped<Snapshot>();

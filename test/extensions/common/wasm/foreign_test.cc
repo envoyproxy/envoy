@@ -6,9 +6,13 @@
 #include "source/extensions/common/wasm/ext/set_envoy_filter_state.pb.h"
 #include "source/extensions/common/wasm/wasm.h"
 
+#include "test/extensions/common/wasm/wasm_runtime.h"
+#include "test/mocks/http/mocks.h"
 #include "test/mocks/local_info/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/utility.h"
+#include "test/test_common/wasm_base.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -111,6 +115,34 @@ TEST_F(ForeignTest, ForeignFunctionSetEnvoyFilterTest) {
   EXPECT_EQ(result, WasmResult::Ok);
   EXPECT_TRUE(stream_info->filterState()->hasData<Network::AddressObject>(
       Upstream::OriginalDstClusterFilterStateKey));
+}
+
+class StreamForeignTest : public WasmPluginConfigTestBase<
+                              testing::TestWithParam<std::tuple<std::string, std::string>>> {
+public:
+  StreamForeignTest() = default;
+};
+
+INSTANTIATE_TEST_SUITE_P(PluginConfigRuntimes, StreamForeignTest,
+                         Envoy::Extensions::Common::Wasm::runtime_and_cpp_values,
+                         Envoy::Extensions::Common::Wasm::wasmTestParamsToString);
+
+TEST_P(StreamForeignTest, ForeignFunctionClearRouteCache) {
+  auto [runtime, language] = GetParam();
+
+  auto plugin_config = getWasmPluginConfigForTest(
+      runtime, "test/extensions/common/wasm/test_data/test_context_cpp.wasm",
+      "CommonWasmTestContextCpp", "send local reply twice");
+
+  setUp(plugin_config);
+
+  createStreamContext();
+
+  proxy_wasm::current_context_ = context_.get();
+  auto function = proxy_wasm::getForeignFunction("clear_route_cache");
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+  function(*plugin_config_->wasm(), "", [](size_t size) { return malloc(size); });
 }
 
 } // namespace Wasm

@@ -11,6 +11,7 @@ envoy_package()
 envoy_cc_test(
     name = "shared_pool_test",
     srcs = ["shared_pool_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/event:timer_lib",
         "//source/common/shared_pool:shared_pool_lib",

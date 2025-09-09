@@ -29,7 +29,7 @@ using MockParserSharedPtr = std::shared_ptr<MockParser>;
 
 class MockResponseParserResolver : public ResponseParserResolver {
 public:
-  MockResponseParserResolver() : ResponseParserResolver({}){};
+  MockResponseParserResolver() : ResponseParserResolver({}) {};
   MOCK_METHOD(ResponseParserSharedPtr, createParser, (ResponseContextSharedPtr), (const));
 };
 

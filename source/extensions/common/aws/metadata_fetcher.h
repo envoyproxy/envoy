@@ -1,17 +1,8 @@
 #pragma once
 
-#include <memory>
-#include <string>
-
 #include "envoy/common/pure.h"
 #include "envoy/http/message.h"
 #include "envoy/upstream/cluster_manager.h"
-
-#include "source/common/http/message_impl.h"
-#include "source/extensions/common/aws/utility.h"
-
-#include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {

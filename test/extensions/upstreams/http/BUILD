@@ -17,6 +17,7 @@ envoy_proto_library(
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         ":config_cc_proto",
         "//envoy/http:header_validator_factory_interface",

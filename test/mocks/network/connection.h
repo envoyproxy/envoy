@@ -78,6 +78,7 @@ public:
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));                                \
   MOCK_METHOD(absl::string_view, requestedServerName, (), (const));                                \
   MOCK_METHOD(absl::string_view, ja3Hash, (), (const));                                            \
+  MOCK_METHOD(absl::string_view, ja4Hash, (), (const));                                            \
   MOCK_METHOD(State, state, (), (const));                                                          \
   MOCK_METHOD(bool, connecting, (), (const));                                                      \
   MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));                            \
@@ -96,7 +97,8 @@ public:
               (uint64_t bandwidth_bits_per_sec, std::chrono::microseconds rtt), ());               \
   MOCK_METHOD(absl::optional<uint64_t>, congestionWindowInBytes, (), (const));                     \
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));                                     \
-  MOCK_METHOD(ExecutionContext*, executionContext, (), (const));
+  MOCK_METHOD(bool, setSocketOption, (Network::SocketOptionName, absl::Span<uint8_t>), ());        \
+  MOCK_METHOD(OptRef<const StreamInfo::StreamInfo>, trackedStream, (), (const));
 
 class MockConnection : public Connection, public MockConnectionBase {
 public:
@@ -147,6 +149,7 @@ public:
   MOCK_METHOD(StreamBuffer, getReadBuffer, ());
   MOCK_METHOD(StreamBuffer, getWriteBuffer, ());
   MOCK_METHOD(void, rawWrite, (Buffer::Instance & data, bool end_stream));
+  MOCK_METHOD(void, closeConnection, (ConnectionCloseAction close_action));
 };
 
 } // namespace Network

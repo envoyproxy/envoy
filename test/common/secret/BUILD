@@ -20,6 +20,7 @@ envoy_cc_test(
     data = [
         "//test/common/tls/test_data:certs",
     ],
+    rbe_pool = "6gig",
     deps = [
         ":private_key_provider_proto_cc_proto",
         "//source/common/secret:sds_api_lib",
@@ -28,8 +29,8 @@ envoy_cc_test(
         "//source/common/ssl:tls_certificate_config_impl_lib",
         "//test/mocks/matcher:matcher_mocks",
         "//test/mocks/server:config_tracker_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:instance_mocks",
-        "//test/mocks/server:transport_socket_factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:simulated_time_system_lib",
@@ -47,6 +48,7 @@ envoy_cc_test(
     data = [
         "//test/common/tls/test_data:certs",
     ],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/secret:sds_api_lib",
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
@@ -59,10 +61,11 @@ envoy_cc_test(
         "//test/mocks/init:init_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/secret:secret_mocks",
-        "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:logging_lib",
         "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",

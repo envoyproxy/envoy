@@ -15,7 +15,7 @@ namespace {
 
 class MockSecretReader : public Http::InjectedCredentials::Common::SecretReader {
 public:
-  MockSecretReader(const std::string& secret) : secret_(secret){};
+  MockSecretReader(const std::string& secret) : secret_(secret) {};
   const std::string& credential() const override { return secret_; }
 
 private:
@@ -50,7 +50,7 @@ protected:
   }
 };
 
-std::vector<std::shared_ptr<CredentialInjector>> GetCredentialInjectorImplementations() {
+std::vector<std::shared_ptr<CredentialInjector>> getCredentialInjectorImplementations() {
   std::vector<std::shared_ptr<CredentialInjector>> implementations;
   implementations.push_back(
       std::make_shared<Http::InjectedCredentials::Generic::GenericCredentialInjector>(
@@ -62,7 +62,7 @@ std::vector<std::shared_ptr<CredentialInjector>> GetCredentialInjectorImplementa
 }
 
 INSTANTIATE_TEST_SUITE_P(CredentialInjectorExtensions, CredentialInjectorFilterTest,
-                         ::testing::ValuesIn(GetCredentialInjectorImplementations()));
+                         ::testing::ValuesIn(getCredentialInjectorImplementations()));
 
 TEST_P(CredentialInjectorFilterTest, InjectCredential) {
   this->setup("base64EncodedBasicAuthOrBearerToken");

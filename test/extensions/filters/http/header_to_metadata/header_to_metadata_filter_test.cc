@@ -9,9 +9,11 @@
 #include "source/extensions/filters/http/well_known_names.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/test_common/utility.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -26,7 +28,7 @@ namespace HeaderToMetadataFilter {
 namespace {
 
 MATCHER_P(MapEq, rhs, "") {
-  const ProtobufWkt::Struct& obj = arg;
+  const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
     EXPECT_EQ(obj.fields().at(entry.first).string_value(), entry.second);
@@ -35,7 +37,7 @@ MATCHER_P(MapEq, rhs, "") {
 }
 
 MATCHER_P(MapEqNum, rhs, "") {
-  const ProtobufWkt::Struct& obj = arg;
+  const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
     EXPECT_EQ(obj.fields().at(entry.first).number_value(), entry.second);
@@ -44,7 +46,7 @@ MATCHER_P(MapEqNum, rhs, "") {
 }
 
 MATCHER_P(MapEqValue, rhs, "") {
-  const ProtobufWkt::Struct& obj = arg;
+  const Protobuf::Struct& obj = arg;
   EXPECT_TRUE(!rhs.empty());
   for (auto const& entry : rhs) {
     EXPECT_TRUE(TestUtility::protoEqual(obj.fields().at(entry.first), entry.second));
@@ -70,18 +72,28 @@ request_rules:
       type: STRING
 )EOF";
 
-  void initializeFilter(const std::string& yaml) {
+  absl::Status initializeFilter(const std::string& yaml) {
     envoy::extensions::filters::http::header_to_metadata::v3::Config config;
     TestUtility::loadFromYaml(yaml, config);
-    config_ = std::make_shared<Config>(config, regex_engine_);
+    absl::StatusOr<ConfigSharedPtr> config_or =
+        Config::create(config, regex_engine_, *stats_.rootScope());
+    RETURN_IF_NOT_OK_REF(config_or.status());
+    config_ = std::move(*config_or);
     filter_ = std::make_shared<HeaderToMetadataFilter>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
+    return absl::OkStatus();
+  }
+
+  uint64_t findCounter(const std::string& name) {
+    const auto counter = TestUtility::findCounter(stats_, name);
+    return counter != nullptr ? counter->value() : 0;
   }
 
   const Config* getConfig() { return filter_->getConfig(); }
 
   Regex::GoogleReEngine regex_engine_;
+  Stats::IsolatedStoreImpl stats_;
   ConfigSharedPtr config_;
   std::shared_ptr<HeaderToMetadataFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -93,7 +105,7 @@ request_rules:
  * Basic use-case.
  */
 TEST_F(HeaderToMetadataTest, BasicRequestTest) {
-  initializeFilter(request_config_yaml);
+  EXPECT_TRUE(initializeFilter(request_config_yaml).ok());
   Http::TestRequestHeaderMapImpl incoming_headers{{"X-VERSION", "0xdeadbeef"}};
   const std::map<std::string, std::string> expected = {{"version", "0xdeadbeef"}};
 
@@ -111,7 +123,7 @@ TEST_F(HeaderToMetadataTest, BasicRequestTest) {
 
 // Verify concatenation works.
 TEST_F(HeaderToMetadataTest, BasicRequestDoubleHeadersTest) {
-  initializeFilter(request_config_yaml);
+  EXPECT_TRUE(initializeFilter(request_config_yaml).ok());
   Http::TestRequestHeaderMapImpl incoming_headers{{"X-VERSION", "foo"}, {"X-VERSION", "bar"}};
   const std::map<std::string, std::string> expected = {{"version", "foo,bar"}};
 
@@ -129,16 +141,17 @@ TEST_F(HeaderToMetadataTest, BasicRequestDoubleHeadersTest) {
 
 TEST_F(HeaderToMetadataTest, PerRouteOverride) {
   // Global config is empty.
-  initializeFilter("{}");
+  EXPECT_TRUE(initializeFilter("{}").ok());
   Http::TestRequestHeaderMapImpl incoming_headers{{"X-VERSION", "0xdeadbeef"}};
   const std::map<std::string, std::string> expected = {{"version", "0xdeadbeef"}};
 
   // Setup per route config.
   envoy::extensions::filters::http::header_to_metadata::v3::Config config_proto;
   TestUtility::loadFromYaml(request_config_yaml, config_proto);
-  Config per_route_config(config_proto, regex_engine_, true);
+  ConfigSharedPtr per_route_config =
+      *Config::create(config_proto, regex_engine_, *stats_.rootScope(), true);
   EXPECT_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillOnce(Return(&per_route_config));
+      .WillOnce(Return(per_route_config.get()));
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
@@ -154,16 +167,17 @@ TEST_F(HeaderToMetadataTest, PerRouteOverride) {
 
 TEST_F(HeaderToMetadataTest, ConfigIsCached) {
   // Global config is empty.
-  initializeFilter("{}");
+  EXPECT_TRUE(initializeFilter("{}").ok());
   Http::TestRequestHeaderMapImpl incoming_headers{{"X-VERSION", "0xdeadbeef"}};
   const std::map<std::string, std::string> expected = {{"version", "0xdeadbeef"}};
 
   // Setup per route config.
   envoy::extensions::filters::http::header_to_metadata::v3::Config config_proto;
   TestUtility::loadFromYaml(request_config_yaml, config_proto);
-  Config per_route_config(config_proto, regex_engine_, true);
+  ConfigSharedPtr per_route_config =
+      *Config::create(config_proto, regex_engine_, *stats_.rootScope(), true);
   EXPECT_CALL(*decoder_callbacks_.route_, mostSpecificPerFilterConfig(_))
-      .WillOnce(Return(&per_route_config));
+      .WillOnce(Return(per_route_config.get()));
 
   EXPECT_TRUE(getConfig()->doRequest());
   EXPECT_TRUE(getConfig()->doRequest());
@@ -173,7 +187,7 @@ TEST_F(HeaderToMetadataTest, ConfigIsCached) {
  * X-version not set, the on missing value should be set.
  */
 TEST_F(HeaderToMetadataTest, DefaultEndpointsTest) {
-  initializeFilter(request_config_yaml);
+  EXPECT_TRUE(initializeFilter(request_config_yaml).ok());
   Http::TestRequestHeaderMapImpl incoming_headers{{"X-FOO", "bar"}};
   const std::map<std::string, std::string> expected = {{"default", "true"}};
 
@@ -194,7 +208,7 @@ response_rules:
       type: STRING
     remove: true
 )EOF";
-  initializeFilter(response_config_yaml);
+  EXPECT_TRUE(initializeFilter(response_config_yaml).ok());
   Http::TestResponseHeaderMapImpl incoming_headers{{"x-authenticated", "1"}};
   const std::map<std::string, std::string> expected = {{"auth", "1"}};
   Http::TestResponseHeaderMapImpl empty_headers;
@@ -225,7 +239,7 @@ response_rules:
       key: auth
       type: NUMBER
 )EOF";
-  initializeFilter(response_config_yaml);
+  EXPECT_TRUE(initializeFilter(response_config_yaml).ok());
   Http::TestResponseHeaderMapImpl incoming_headers{{"x-authenticated", "1"}};
   std::map<std::string, int> expected = {{"auth", 1}};
   Http::TestResponseHeaderMapImpl empty_headers;
@@ -248,7 +262,7 @@ response_rules:
       type: STRING
       encode: BASE64
 )EOF";
-  initializeFilter(response_config_yaml);
+  EXPECT_TRUE(initializeFilter(response_config_yaml).ok());
   std::string data = "Non-ascii-characters";
   const auto encoded = Base64::encode(data.c_str(), data.size());
   Http::TestResponseHeaderMapImpl incoming_headers{{"x-authenticated", encoded}};
@@ -273,12 +287,12 @@ response_rules:
       type: PROTOBUF_VALUE
       encode: BASE64
 )EOF";
-  initializeFilter(response_config_yaml);
+  EXPECT_TRUE(initializeFilter(response_config_yaml).ok());
 
-  ProtobufWkt::Value value;
+  Protobuf::Value value;
   auto* s = value.mutable_struct_value();
 
-  ProtobufWkt::Value v;
+  Protobuf::Value v;
   v.set_string_value("blafoo");
   (*s->mutable_fields())["k1"] = v;
   v.set_number_value(2019.07);
@@ -290,7 +304,7 @@ response_rules:
   ASSERT_TRUE(value.SerializeToString(&data));
   const auto encoded = Base64::encode(data.c_str(), data.size());
   Http::TestResponseHeaderMapImpl incoming_headers{{"x-authenticated", encoded}};
-  std::map<std::string, ProtobufWkt::Value> expected = {{"auth", value}};
+  std::map<std::string, Protobuf::Value> expected = {{"auth", value}};
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
   EXPECT_CALL(req_info_,
@@ -310,7 +324,7 @@ response_rules:
       type: PROTOBUF_VALUE
       encode: BASE64
 )EOF";
-  initializeFilter(response_config_yaml);
+  EXPECT_TRUE(initializeFilter(response_config_yaml).ok());
   Http::TestResponseHeaderMapImpl incoming_headers{{"x-authenticated", "invalid"}};
 
   EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
@@ -330,7 +344,7 @@ response_rules:
       type: PROTOBUF_VALUE
       encode: BASE64
 )EOF";
-  initializeFilter(response_config_yaml);
+  EXPECT_TRUE(initializeFilter(response_config_yaml).ok());
   std::string data = "invalid";
   const auto encoded = Base64::encode(data.c_str(), data.size());
   Http::TestResponseHeaderMapImpl incoming_headers{{"x-authenticated", encoded}};
@@ -352,7 +366,7 @@ request_rules:
       key: version
       type: STRING
 )EOF";
-  initializeFilter(config);
+  EXPECT_TRUE(initializeFilter(config).ok());
   Http::TestRequestHeaderMapImpl incoming_headers;
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
@@ -377,7 +391,7 @@ request_rules:
       metadata_namespace: envoy.lb
       type: STRING
 )EOF";
-  initializeFilter(python_yaml);
+  EXPECT_TRUE(initializeFilter(python_yaml).ok());
   Http::TestRequestHeaderMapImpl incoming_headers{
       {"X-VERSION", "v4.0"},
       {"X-PYTHON-VERSION", "3.7"},
@@ -395,7 +409,7 @@ request_rules:
  * No header value.
  */
 TEST_F(HeaderToMetadataTest, EmptyHeaderValue) {
-  initializeFilter(request_config_yaml);
+  EXPECT_TRUE(initializeFilter(request_config_yaml).ok());
   Http::TestRequestHeaderMapImpl incoming_headers{{"X-VERSION", ""}};
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
@@ -407,7 +421,7 @@ TEST_F(HeaderToMetadataTest, EmptyHeaderValue) {
  * Header value too long.
  */
 TEST_F(HeaderToMetadataTest, HeaderValueTooLong) {
-  initializeFilter(request_config_yaml);
+  EXPECT_TRUE(initializeFilter(request_config_yaml).ok());
   auto length = Envoy::Extensions::HttpFilters::HeaderToMetadataFilter::MAX_HEADER_VALUE_LEN + 1;
   Http::TestRequestHeaderMapImpl incoming_headers{{"X-VERSION", std::string(length, 'x')}};
 
@@ -429,7 +443,7 @@ response_rules:
       type: STRING
     remove: true
 )EOF";
-  initializeFilter(response_config_yaml);
+  EXPECT_TRUE(initializeFilter(response_config_yaml).ok());
   Http::TestResponseHeaderMapImpl incoming_headers{{"x-something", "thing"}};
   const std::map<std::string, std::string> expected = {{"something", "else"}};
   Http::TestResponseHeaderMapImpl empty_headers;
@@ -444,19 +458,37 @@ response_rules:
 /**
  * Rules with no on_header{present,missing} fields should be rejected.
  */
-TEST_F(HeaderToMetadataTest, RejectInvalidRule) {
+TEST_F(HeaderToMetadataTest, RejectInvalidRuleOnRequestRules) {
   const std::string config = R"EOF(
 request_rules:
   - header: x-something
 )EOF";
   auto expected = "header to metadata filter: rule for header 'x-something' has neither "
                   "`on_header_present` nor `on_header_missing` set";
-  EXPECT_THROW_WITH_MESSAGE(initializeFilter(config), EnvoyException, expected);
+  auto status = initializeFilter(config);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), expected);
+}
+
+TEST_F(HeaderToMetadataTest, RejectInvalidRuleOnResponseRules) {
+  const std::string config = R"EOF(
+response_rules:
+  - header: x-something
+)EOF";
+  auto expected = "header to metadata filter: rule for header 'x-something' has neither "
+                  "`on_header_present` nor `on_header_missing` set";
+  auto status = initializeFilter(config);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), expected);
 }
 
 TEST_F(HeaderToMetadataTest, PerRouteEmtpyRules) {
   envoy::extensions::filters::http::header_to_metadata::v3::Config config_proto;
-  EXPECT_THROW(std::make_shared<Config>(config_proto, regex_engine_, true), EnvoyException);
+  auto expected = "header_to_metadata_filter: Per filter configs must at "
+                  "least specify either request or response rules";
+  auto create_or = Config::create(config_proto, regex_engine_, *stats_.rootScope(), true);
+  EXPECT_FALSE(create_or.ok());
+  EXPECT_EQ(create_or.status().message(), expected);
 }
 
 /**
@@ -469,7 +501,9 @@ request_rules:
 
 )EOF";
   auto expected = "One of Cookie or Header option needs to be specified";
-  EXPECT_THROW_WITH_MESSAGE(initializeFilter(config), EnvoyException, expected);
+  auto status = initializeFilter(config);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), expected);
 }
 
 /**
@@ -487,8 +521,10 @@ request_rules:
     remove: false
 
 )EOF";
-  auto expected = "Cannot specify both header and cookie";
-  EXPECT_THROW_WITH_MESSAGE(initializeFilter(config), EnvoyException, expected);
+  auto expected = "Cannot specify both header and cookie in the same rule";
+  auto status = initializeFilter(config);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), expected);
 }
 
 /**
@@ -505,7 +541,9 @@ request_rules:
     remove: true
 )EOF";
   auto expected = "Cannot specify remove for cookie";
-  EXPECT_THROW_WITH_MESSAGE(initializeFilter(config), EnvoyException, expected);
+  auto status = initializeFilter(config);
+  EXPECT_FALSE(status.ok());
+  EXPECT_EQ(status.message(), expected);
 }
 
 /**
@@ -520,7 +558,7 @@ request_rules:
       key: version
       type: STRING
 )EOF";
-  initializeFilter(config);
+  EXPECT_TRUE(initializeFilter(config).ok());
   Http::TestRequestHeaderMapImpl headers{{"x-version", ""}};
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
@@ -544,7 +582,7 @@ request_rules:
           regex: "^/(cluster[\\d\\w-]+)/?.*$"
         substitution: "\\1"
 )EOF";
-  initializeFilter(config);
+  EXPECT_TRUE(initializeFilter(config).ok());
 
   // Match with additional path elements.
   {
@@ -600,7 +638,7 @@ request_rules:
       value: some_value
       type: STRING
 )EOF";
-  initializeFilter(config);
+  EXPECT_TRUE(initializeFilter(config).ok());
   Http::TestRequestHeaderMapImpl headers{{"x-version", "19"}};
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
@@ -622,7 +660,7 @@ request_rules:
       value: some_value
       type: STRING
 )EOF";
-  initializeFilter(config);
+  EXPECT_TRUE(initializeFilter(config).ok());
   Http::TestRequestHeaderMapImpl headers{{"x-version", ""}};
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
@@ -651,7 +689,7 @@ request_rules:
       value: some_value
       type: STRING
 )EOF";
-  initializeFilter(config);
+  EXPECT_TRUE(initializeFilter(config).ok());
   Http::TestRequestHeaderMapImpl headers{{"x-version", "foo"}};
 
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(req_info_));
@@ -671,7 +709,7 @@ response_rules:
       type: STRING
     remove: false
 )EOF";
-  initializeFilter(response_config_yaml);
+  EXPECT_TRUE(initializeFilter(response_config_yaml).ok());
   Http::TestResponseHeaderMapImpl incoming_headers{{"cookie", "bar=foo"}};
   const std::map<std::string, std::string> expected = {{"bar", "foo"}};
 
@@ -694,7 +732,7 @@ response_rules:
       type: STRING
     remove: false
 )EOF";
-  initializeFilter(response_config_yaml);
+  EXPECT_TRUE(initializeFilter(response_config_yaml).ok());
   Http::TestResponseHeaderMapImpl incoming_headers{{"cookie", "meh=foo"}};
   const std::map<std::string, std::string> expected = {{"meh", "some_value"}};
 
@@ -717,7 +755,7 @@ request_rules:
       value: some_value
       type: STRING
 )EOF";
-  initializeFilter(config);
+  EXPECT_TRUE(initializeFilter(config).ok());
   Http::TestRequestHeaderMapImpl headers{{"cookie", ""}};
   const std::map<std::string, std::string> expected = {{"foo", "some_value"}};
 
@@ -742,7 +780,7 @@ request_rules:
           regex: "^(cluster[\\d\\w-]+)$"
         substitution: "\\1 matched"
 )EOF";
-  initializeFilter(config);
+  EXPECT_TRUE(initializeFilter(config).ok());
 
   // match.
   {
@@ -763,6 +801,239 @@ request_rules:
     EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
     EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
   }
+}
+
+/**
+ * Test that stats are not collected when stat_prefix is not configured.
+ */
+TEST_F(HeaderToMetadataTest, NoStatsWithoutPrefix) {
+  const std::string config_yaml = R"EOF(
+request_rules:
+  - header: x-version
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: version
+      type: STRING
+)EOF";
+
+  EXPECT_TRUE(initializeFilter(config_yaml).ok());
+  EXPECT_FALSE(getConfig()->stats().has_value());
+}
+
+/**
+ * Test that stats are collected when stat_prefix is configured.
+ */
+TEST_F(HeaderToMetadataTest, StatsCollectedWithPrefix) {
+  const std::string config_yaml = R"EOF(
+stat_prefix: test_prefix
+request_rules:
+  - header: x-version
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: version
+      type: STRING
+)EOF";
+
+  EXPECT_TRUE(initializeFilter(config_yaml).ok());
+  EXPECT_TRUE(getConfig()->stats().has_value());
+}
+
+/**
+ * Test that rules_processed and metadata_added stats are incremented correctly.
+ */
+TEST_F(HeaderToMetadataTest, StatsRulesProcessedAndMetadataAdded) {
+  const std::string config_yaml = R"EOF(
+stat_prefix: test_prefix
+request_rules:
+  - header: x-version
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: version
+      type: STRING
+  - header: x-custom
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: custom
+      type: STRING
+)EOF";
+
+  EXPECT_TRUE(initializeFilter(config_yaml).ok());
+
+  Http::TestRequestHeaderMapImpl headers{{"x-version", "1.0"}, {"x-custom", "test"}};
+  absl::flat_hash_map<std::string, std::string> expected = {{"version", "1.0"}, {"custom", "test"}};
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(req_info_));
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+
+  // Verify stats were collected correctly.
+  EXPECT_EQ(2U, findCounter("http_filter_name.test_prefix.request_rules_processed"));
+  EXPECT_EQ(2U, findCounter("http_filter_name.test_prefix.request_metadata_added"));
+  EXPECT_EQ(0U, findCounter("http_filter_name.test_prefix.response_rules_processed"));
+  EXPECT_EQ(0U, findCounter("http_filter_name.test_prefix.response_metadata_added"));
+}
+
+/**
+ * Test that header_not_found stat is incremented when header is missing.
+ */
+TEST_F(HeaderToMetadataTest, StatsHeaderNotFound) {
+  const std::string config_yaml = R"EOF(
+stat_prefix: test_prefix
+request_rules:
+  - header: x-missing
+    on_header_missing:
+      metadata_namespace: envoy.lb
+      key: default
+      value: 'missing'
+      type: STRING
+)EOF";
+
+  EXPECT_TRUE(initializeFilter(config_yaml).ok());
+
+  Http::TestRequestHeaderMapImpl headers{}; // No headers present.
+  absl::flat_hash_map<std::string, std::string> expected = {{"default", "missing"}};
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(req_info_));
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+
+  // Verify stats were collected correctly.
+  EXPECT_EQ(1U, findCounter("http_filter_name.test_prefix.request_rules_processed"));
+  EXPECT_EQ(1U, findCounter("http_filter_name.test_prefix.request_header_not_found"));
+  EXPECT_EQ(1U, findCounter("http_filter_name.test_prefix.request_metadata_added"));
+}
+
+/**
+ * Test that value_too_long stat is incremented when header value exceeds limit.
+ */
+TEST_F(HeaderToMetadataTest, StatsValueTooLong) {
+  const std::string config_yaml = R"EOF(
+stat_prefix: test_prefix
+request_rules:
+  - header: x-long
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: long_value
+      type: STRING
+)EOF";
+
+  EXPECT_TRUE(initializeFilter(config_yaml).ok());
+
+  // Create a header value that exceeds MAX_HEADER_VALUE_LEN (8KB).
+  std::string long_value(9000, 'a');
+  Http::TestRequestHeaderMapImpl headers{{"x-long", long_value}};
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(req_info_));
+  // No metadata should be set due to value being too long.
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+
+  // Verify stats were collected correctly.
+  EXPECT_EQ(1U, findCounter("http_filter_name.test_prefix.request_rules_processed"));
+  EXPECT_EQ(1U, findCounter("http_filter_name.test_prefix.header_value_too_long"));
+  EXPECT_EQ(
+      0U, findCounter("http_filter_name.test_prefix.request_metadata_added")); // No metadata added.
+}
+
+/**
+ * Test that value_decode_failed stat is incremented when Base64 decode fails.
+ */
+TEST_F(HeaderToMetadataTest, StatsValueDecodeFailed) {
+  const std::string config_yaml = R"EOF(
+stat_prefix: test_prefix
+request_rules:
+  - header: x-encoded
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: decoded_value
+      type: STRING
+      encode: BASE64
+)EOF";
+
+  EXPECT_TRUE(initializeFilter(config_yaml).ok());
+
+  // Invalid Base64 string.
+  Http::TestRequestHeaderMapImpl headers{{"x-encoded", "invalid_base64!@#$"}};
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(req_info_));
+  // No metadata should be set due to decode failure.
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+
+  // Verify stats were collected correctly.
+  EXPECT_EQ(1U, findCounter("http_filter_name.test_prefix.request_rules_processed"));
+  EXPECT_EQ(1U, findCounter("http_filter_name.test_prefix.base64_decode_failed"));
+  EXPECT_EQ(
+      0U, findCounter("http_filter_name.test_prefix.request_metadata_added")); // No metadata added.
+}
+
+/**
+ * Test response rule processing and stats.
+ */
+TEST_F(HeaderToMetadataTest, StatsResponseRules) {
+  const std::string config_yaml = R"EOF(
+stat_prefix: test_prefix
+response_rules:
+  - header: x-response-header
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: response_value
+      type: STRING
+)EOF";
+
+  EXPECT_TRUE(initializeFilter(config_yaml).ok());
+
+  Http::TestResponseHeaderMapImpl headers{{"x-response-header", "response_data"}};
+  absl::flat_hash_map<std::string, std::string> expected = {{"response_value", "response_data"}};
+
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(req_info_));
+  EXPECT_CALL(req_info_, setDynamicMetadata("envoy.lb", MapEq(expected)));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(headers, false));
+
+  // Verify stats were collected correctly.
+  EXPECT_EQ(1U, findCounter("http_filter_name.test_prefix.response_rules_processed"));
+  EXPECT_EQ(1U, findCounter("http_filter_name.test_prefix.response_metadata_added"));
+  EXPECT_EQ(0U, findCounter("http_filter_name.test_prefix.request_rules_processed"));
+  EXPECT_EQ(0U, findCounter("http_filter_name.test_prefix.request_metadata_added"));
+}
+
+/**
+ * Test that regex_substitution_failed stat is incremented when regex results in empty value.
+ */
+TEST_F(HeaderToMetadataTest, StatsRegexSubstitutionFailed) {
+  const std::string config_yaml = R"EOF(
+stat_prefix: test_prefix
+request_rules:
+  - header: x-test
+    on_header_present:
+      metadata_namespace: envoy.lb
+      key: transformed_value
+      type: STRING
+      regex_value_rewrite:
+        pattern:
+          google_re2: {}
+          regex: "^([a-z]+)$"
+        substitution: ""
+)EOF";
+
+  EXPECT_TRUE(initializeFilter(config_yaml).ok());
+
+  // Header value that matches pattern but substitution results in empty string.
+  Http::TestRequestHeaderMapImpl headers{{"x-test", "validinput"}};
+
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(testing::ReturnRef(req_info_));
+  // No metadata should be set due to empty substitution result.
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+
+  // Verify stats were collected correctly.
+  EXPECT_EQ(1U, findCounter("http_filter_name.test_prefix.request_rules_processed"));
+  EXPECT_EQ(1U, findCounter("http_filter_name.test_prefix.regex_substitution_failed"));
+  EXPECT_EQ(
+      0U, findCounter("http_filter_name.test_prefix.request_metadata_added")); // No metadata added.
 }
 
 } // namespace HeaderToMetadataFilter

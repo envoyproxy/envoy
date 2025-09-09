@@ -39,7 +39,7 @@ AccessLog::AccessLog(const std::string& file_name, Envoy::AccessLog::AccessLogMa
     : time_source_(time_source) {
   auto file_or_error = log_manager.createAccessLog(
       Filesystem::FilePathAndType{Filesystem::DestinationType::File, file_name});
-  THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+  THROW_IF_NOT_OK_REF(file_or_error.status());
   file_ = file_or_error.value();
 }
 
@@ -75,7 +75,7 @@ ProxyFilter::ProxyFilter(const std::string& stat_prefix, Stats::Scope& scope,
 ProxyFilter::~ProxyFilter() { ASSERT(!delay_timer_); }
 
 void ProxyFilter::setDynamicMetadata(std::string operation, std::string resource) {
-  ProtobufWkt::Struct metadata(
+  Protobuf::Struct metadata(
       (*read_callbacks_->connection()
             .streamInfo()
             .dynamicMetadata()
@@ -251,7 +251,7 @@ void ProxyFilter::decodeReply(ReplyMessagePtr&& message) {
     break;
   }
 
-  if (active_query_list_.empty() && drain_decision_.drainClose() &&
+  if (active_query_list_.empty() && drain_decision_.drainClose(Network::DrainDirection::All) &&
       runtime_.snapshot().featureEnabled(MongoRuntimeConfig::get().DrainCloseEnabled, 100)) {
     ENVOY_LOG(debug, "drain closing mongo connection");
     stats_.cx_drain_close_.inc();

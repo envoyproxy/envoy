@@ -139,8 +139,8 @@ envoy_cc_contrib_extension(
 envoy_cc_library(
     name = "metadata_lib",
     hdrs = ["metadata.h"],
-    external_deps = ["abseil_optional"],
     deps = [
         "//source/common/http:header_map_lib",
+        "@com_google_absl//absl/types:optional",
     ],
 )

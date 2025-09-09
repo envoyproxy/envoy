@@ -6,10 +6,6 @@ load(
     "envoy_contrib_package",
 )
 load(
-    "//bazel:envoy_internal.bzl",
-    "envoy_external_dep_path",
-)
-load(
     "//contrib:all_contrib_extensions.bzl",
     "envoy_contrib_linux_aarch64_constraints",
     "envoy_contrib_linux_x86_64_constraints",
@@ -21,32 +17,52 @@ envoy_contrib_package()
 
 envoy_cmake(
     name = "hyperscan",
+    build_args = select({
+        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
+        "//bazel:engflow_rbe_x86_64": ["-j"],
+        "//conditions:default": ["-j1"],
+    }),
     build_data = ["@org_boost//:header"],
     cache_entries = {
-        "BOOST_ROOT": "$EXT_BUILD_ROOT/external/org_boost",
+        "BOOST_ROOT": "$$EXT_BUILD_ROOT/external/org_boost",
         "BUILD_AVX512": "on",
         "BUILD_AVX512VBMI": "on",
         "BUILD_EXAMPLES": "off",
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_INSTALL_LIBDIR": "lib",
         "FAT_RUNTIME": "on",
-        "RAGEL": "$$EXT_BUILD_DEPS$$/ragel/bin/ragel",
+        "RAGEL": "$$EXT_BUILD_DEPS/ragel/bin/ragel",
     },
     default_cache_entries = {},
+    exec_properties = select({
+        "//bazel:engflow_rbe_x86_64": {
+            "Pool": "linux_x64_xlarge",
+        },
+        "//conditions:default": {},
+    }),
+    generate_args = [
+        "-G",
+        "Ninja",
+    ],
     lib_source = "@io_hyperscan//:all",
     out_static_libs = ["libhs.a"],
     tags = ["skip_on_windows"],
     target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
     deps = [
-        envoy_external_dep_path("ragel"),
+        "//bazel/foreign_cc:ragel",
     ],
 )
 
 envoy_cmake(
     name = "vectorscan",
+    build_args = select({
+        "//bazel/foreign_cc:parallel_builds_enabled": ["-j1"],
+        "//bazel:engflow_rbe_aarch64": ["-j1"],
+        "//conditions:default": ["-j1"],
+    }),
     build_data = ["@org_boost//:header"],
     cache_entries = {
-        "BOOST_ROOT": "$EXT_BUILD_ROOT/external/org_boost",
+        "BOOST_ROOT": "$$EXT_BUILD_ROOT/external/org_boost",
         #        "BUILD_SVE2_BITPERM": "on",
         #        "BUILD_SVE2": "on",
         #        "BUILD_SVE": "on",
@@ -56,15 +72,25 @@ envoy_cmake(
         "CMAKE_INSTALL_LIBDIR": "lib",
         "FAT_RUNTIME": "off",
         "SQLITE_SKIP_CHECK": "on",
-        "RAGEL": "$$EXT_BUILD_DEPS$$/ragel/bin/ragel",
+        "RAGEL": "$$EXT_BUILD_DEPS/ragel/bin/ragel",
     },
     default_cache_entries = {},
+    exec_properties = select({
+        "//bazel:engflow_rbe_aarch64": {
+            "Pool": "linux_arm64_small",
+        },
+        "//conditions:default": {},
+    }),
+    generate_args = [
+        "-G",
+        "Ninja",
+    ],
     lib_source = "@io_vectorscan//:all",
     out_static_libs = ["libhs.a"],
     tags = ["skip_on_windows"],
     target_compatible_with = envoy_contrib_linux_aarch64_constraints(),
     deps = [
-        envoy_external_dep_path("ragel"),
+        "//bazel/foreign_cc:ragel",
     ],
 )
 

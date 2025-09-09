@@ -63,14 +63,12 @@ class ListenerManagerImpl;
 class ListenSocketFactoryImpl : public Network::ListenSocketFactory,
                                 protected Logger::Loggable<Logger::Id::config> {
 public:
-  ListenSocketFactoryImpl(ListenerComponentFactory& factory,
-                          Network::Address::InstanceConstSharedPtr address,
-                          Network::Socket::Type socket_type,
-                          const Network::Socket::OptionsSharedPtr& options,
-                          const std::string& listener_name, uint32_t tcp_backlog_size,
-                          ListenerComponentFactory::BindType bind_type,
-                          const Network::SocketCreationOptions& creation_options,
-                          uint32_t num_sockets);
+  static absl::StatusOr<std::unique_ptr<ListenSocketFactoryImpl>>
+  create(ListenerComponentFactory& factory, Network::Address::InstanceConstSharedPtr address,
+         Network::Socket::Type socket_type, const Network::Socket::OptionsSharedPtr& options,
+         const std::string& listener_name, uint32_t tcp_backlog_size,
+         ListenerComponentFactory::BindType bind_type,
+         const Network::SocketCreationOptions& creation_options, uint32_t num_sockets);
 
   // Network::ListenSocketFactory
   Network::Socket::Type socketType() const override { return socket_type_; }
@@ -86,14 +84,23 @@ public:
       socket->close();
     }
   }
-  void doFinalPreWorkerInit() override;
+  absl::Status doFinalPreWorkerInit() override;
 
 private:
+  ListenSocketFactoryImpl(ListenerComponentFactory& factory,
+                          Network::Address::InstanceConstSharedPtr address,
+                          Network::Socket::Type socket_type,
+                          const Network::Socket::OptionsSharedPtr& options,
+                          const std::string& listener_name, uint32_t tcp_backlog_size,
+                          ListenerComponentFactory::BindType bind_type,
+                          const Network::SocketCreationOptions& creation_options,
+                          uint32_t num_sockets, absl::Status& creation_status);
+
   ListenSocketFactoryImpl(const ListenSocketFactoryImpl& factory_to_clone);
 
-  Network::SocketSharedPtr createListenSocketAndApplyOptions(ListenerComponentFactory& factory,
-                                                             Network::Socket::Type socket_type,
-                                                             uint32_t worker_index);
+  absl::StatusOr<Network::SocketSharedPtr>
+  createListenSocketAndApplyOptions(ListenerComponentFactory& factory,
+                                    Network::Socket::Type socket_type, uint32_t worker_index);
 
   ListenerComponentFactory& factory_;
   // Initially, its port number might be 0. Once a socket is created, its port
@@ -137,10 +144,11 @@ public:
   Network::DrainDecision& drainDecision() override;
 
   // DrainDecision
-  bool drainClose() const override {
-    return drain_manager_->drainClose() || server_.drainManager().drainClose();
+  bool drainClose(Network::DrainDirection scope) const override {
+    return drain_manager_->drainClose(scope) || server_.drainManager().drainClose(scope);
   }
-  Common::CallbackHandlePtr addOnDrainCloseCb(DrainCloseCb) const override {
+  Common::CallbackHandlePtr addOnDrainCloseCb(Network::DrainDirection,
+                                              DrainCloseCb) const override {
     IS_ENVOY_BUG("Unexpected function call");
     return nullptr;
   }
@@ -172,9 +180,8 @@ public:
   Init::Manager& initManager() override;
   Stats::Scope& scope() override;
   const Network::ListenerInfo& listenerInfo() const override;
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() const override;
-  Configuration::ServerFactoryContext& serverFactoryContext() const override;
-  Configuration::TransportSocketFactoryContext& getTransportSocketFactoryContext() const override;
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
+  Configuration::ServerFactoryContext& serverFactoryContext() override;
 
   Stats::Scope& listenerScope() override;
 
@@ -205,9 +212,10 @@ public:
    * @param hash supplies the hash to use for duplicate checking.
    * @param concurrency is the number of listeners instances to be created.
    */
-  ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
-               ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
-               bool workers_started, uint64_t hash);
+  static absl::StatusOr<std::unique_ptr<ListenerImpl>>
+  create(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
+         ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
+         bool workers_started, uint64_t hash);
   ~ListenerImpl() override;
 
   // TODO(lambdai): Explore using the same ListenerImpl object to execute in place filter chain
@@ -216,7 +224,7 @@ public:
    * Execute in place filter chain update. The filter chain update is less expensive than full
    * listener update because connections may not need to be drained.
    */
-  std::unique_ptr<ListenerImpl>
+  absl::StatusOr<std::unique_ptr<ListenerImpl>>
   newListenerWithFilterChain(const envoy::config::listener::v3::Listener& config,
                              bool workers_started, uint64_t hash);
   /**
@@ -235,22 +243,28 @@ public:
   /**
    * Helper functions to determine whether a listener is blocked for update or remove.
    */
-  bool blockUpdate(uint64_t new_hash) { return new_hash == hash_ || !added_via_api_; }
+  bool blockLdsUpdate(uint64_t new_hash) {
+    // Receiving LDS update with FCDS config will cause full listener update. Therefore,
+    // we should not block the update if FCDS is configured, regardless of the hash.
+    return (!configInternal().has_fcds_config() && new_hash == maybe_stale_hash_) ||
+           !added_via_api_;
+  }
   bool blockRemove() { return !added_via_api_; }
 
   const std::vector<Network::Address::InstanceConstSharedPtr>& addresses() const {
     return addresses_;
   }
-  const envoy::config::listener::v3::Listener& config() const { return config_; }
+  const std::string& configName() const { return configInternal().name(); }
   const std::vector<Network::ListenSocketFactoryPtr>& getSocketFactories() const {
     return socket_factories_;
   }
   void debugLog(const std::string& message);
+  void dumpListenerConfig(Protobuf::Any& dump) const;
   void initialize();
   DrainManager& localDrainManager() const {
     return listener_factory_context_->listener_factory_context_base_->drainManager();
   }
-  void addSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory);
+  absl::Status addSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory);
   void setSocketAndOptions(const Network::SocketSharedPtr& socket);
   const Network::Socket::OptionsSharedPtr& listenSocketOptions(uint32_t address_index) {
     ASSERT(listen_socket_options_list_.size() > address_index);
@@ -262,8 +276,6 @@ public:
                                     const envoy::config::listener::v3::Listener& config,
                                     Network::Socket::Type socket_type);
 
-  // Compare whether two listeners have different socket options.
-  bool socketOptionsEqual(const ListenerImpl& other) const;
   // Check whether a new listener can share sockets with this listener.
   bool hasCompatibleAddress(const ListenerImpl& other) const;
   // Check whether a new listener has duplicated listening address this listener.
@@ -307,9 +319,7 @@ public:
     return *balancer->second;
   }
   ResourceLimit& openConnections() override { return *open_connections_; }
-  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const override {
-    return access_logs_;
-  }
+  const AccessLog::InstanceSharedPtrVector& accessLogs() const override { return access_logs_; }
   uint32_t tcpBacklogSize() const override { return tcp_backlog_size_; }
   uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
     return max_connections_to_accept_per_socket_event_;
@@ -328,7 +338,7 @@ public:
     }
   }
 
-  void cloneSocketFactoryFrom(const ListenerImpl& other);
+  absl::Status cloneSocketFactoryFrom(const ListenerImpl& other);
   void closeAllSockets();
 
   Network::Socket::Type socketType() const { return socket_type_; }
@@ -344,6 +354,9 @@ public:
   SystemTime last_updated_;
 
 private:
+  ListenerImpl(const envoy::config::listener::v3::Listener& config, const std::string& version_info,
+               ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
+               bool workers_started, uint64_t hash, absl::Status& creation_status);
   struct UdpListenerConfigImpl : public Network::UdpListenerConfig {
     UdpListenerConfigImpl(const envoy::config::listener::v3::UdpListenerConfig config)
         : config_(config) {}
@@ -384,33 +397,40 @@ private:
    */
   ListenerImpl(ListenerImpl& origin, const envoy::config::listener::v3::Listener& config,
                const std::string& version_info, ListenerManagerImpl& parent,
-               const std::string& name, bool added_via_api, bool workers_started, uint64_t hash);
+               const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
+               absl::Status& creation_status);
   // Helpers for constructor.
   void buildAccessLog(const envoy::config::listener::v3::Listener& config);
-  void buildInternalListener(const envoy::config::listener::v3::Listener& config);
-  void validateConfig();
+  absl::Status buildInternalListener(const envoy::config::listener::v3::Listener& config);
+  absl::Status validateConfig();
   bool buildUdpListenerWorkerRouter(const Network::Address::Instance& address,
                                     uint32_t concurrency);
-  void buildUdpListenerFactory(const envoy::config::listener::v3::Listener& config,
-                               uint32_t concurrency);
+  absl::Status buildUdpListenerFactory(const envoy::config::listener::v3::Listener& config,
+                                       uint32_t concurrency);
   void buildListenSocketOptions(const envoy::config::listener::v3::Listener& config,
                                 std::vector<std::reference_wrapper<const Protobuf::RepeatedPtrField<
                                     envoy::config::core::v3::SocketOption>>>& address_opts_list);
-  void createListenerFilterFactories(const envoy::config::listener::v3::Listener& config);
-  void validateFilterChains(const envoy::config::listener::v3::Listener& config);
-  void buildFilterChains(const envoy::config::listener::v3::Listener& config);
-  void buildConnectionBalancer(const envoy::config::listener::v3::Listener& config,
-                               const Network::Address::Instance& address);
+  absl::Status createListenerFilterFactories(const envoy::config::listener::v3::Listener& config);
+  absl::Status validateFilterChains(const envoy::config::listener::v3::Listener& config);
+  absl::Status buildFilterChains(const envoy::config::listener::v3::Listener& config);
+  absl::Status buildConnectionBalancer(const envoy::config::listener::v3::Listener& config,
+                                       const Network::Address::Instance& address);
   void buildSocketOptions(const envoy::config::listener::v3::Listener& config);
   void buildOriginalDstListenerFilter(const envoy::config::listener::v3::Listener& config);
   void buildProxyProtocolListenerFilter(const envoy::config::listener::v3::Listener& config);
-  void checkIpv4CompatAddress(const Network::Address::InstanceConstSharedPtr& address,
-                              const envoy::config::core::v3::Address& proto_address);
+  absl::Status checkIpv4CompatAddress(const Network::Address::InstanceConstSharedPtr& address,
+                                      const envoy::config::core::v3::Address& proto_address);
 
   void addListenSocketOptions(Network::Socket::OptionsSharedPtr& options,
                               const Network::Socket::OptionsSharedPtr& append_options) {
     ensureSocketOptions(options);
     Network::Socket::appendOptions(options, append_options);
+  }
+  // configInternal returns the listener config. If FCDS is enabled, the config filter chain
+  // is expected to be partial and only contain filter chains added statically or with LDS.
+  // If FCDS is enabled, avoid using the config object for decisions based on filter chains.
+  const envoy::config::listener::v3::Listener& configInternal() const {
+    return config_maybe_partial_filter_chains_;
   }
 
   ListenerManagerImpl& parent_;
@@ -426,7 +446,11 @@ private:
   const std::string name_;
   const bool added_via_api_;
   const bool workers_started_;
-  const uint64_t hash_;
+  // Note: when FCDS is enabled and filter chains change, the stored hash may become stale.
+  // We deliberately skip recomputing it for performance, since the hash is only used
+  // to decide on in-place LDS updates, and when FCDS is configured, LDS update force a full
+  // listener update anyway.
+  const uint64_t maybe_stale_hash_;
   const uint32_t tcp_backlog_size_;
   const uint32_t max_connections_to_accept_per_socket_event_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
@@ -442,8 +466,11 @@ private:
   Filter::ListenerFilterFactoriesList listener_filter_factories_;
   std::vector<Network::UdpListenerFilterFactoryCb> udp_listener_filter_factories_;
   Filter::QuicListenerFilterFactoriesList quic_listener_filter_factories_;
-  std::vector<AccessLog::InstanceSharedPtr> access_logs_;
-  const envoy::config::listener::v3::Listener config_;
+  AccessLog::InstanceSharedPtrVector access_logs_;
+  // When FCDS is enabled for the listener, config_maybe_partial_filter_chains_ is inconsistent with
+  // the state of filter chains, as these can change during the lifetime of the listener. Keeping
+  // the config object consistent for every FCDS update has significant performance penalty.
+  const envoy::config::listener::v3::Listener config_maybe_partial_filter_chains_;
   const std::string version_info_;
   // Using std::vector instead of hash map for supporting multiple zero port addresses.
   std::vector<Network::Socket::OptionsSharedPtr> listen_socket_options_list_;

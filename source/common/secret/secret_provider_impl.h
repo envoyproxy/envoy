@@ -120,16 +120,22 @@ private:
  **/
 class ThreadLocalGenericSecretProvider {
 public:
-  ThreadLocalGenericSecretProvider(GenericSecretConfigProviderSharedPtr&& provider,
-                                   ThreadLocal::SlotAllocator& tls, Api::Api& api);
+  static absl::StatusOr<std::unique_ptr<ThreadLocalGenericSecretProvider>>
+  create(GenericSecretConfigProviderSharedPtr&& provider, ThreadLocal::SlotAllocator& tls,
+         Api::Api& api);
   const std::string& secret() const;
+
+protected:
+  ThreadLocalGenericSecretProvider(GenericSecretConfigProviderSharedPtr&& provider,
+                                   ThreadLocal::SlotAllocator& tls, Api::Api& api,
+                                   absl::Status& creation_status);
 
 private:
   struct ThreadLocalSecret : public ThreadLocal::ThreadLocalObject {
     explicit ThreadLocalSecret(const std::string& value) : value_(value) {}
     std::string value_;
   };
-  void update();
+  absl::Status update();
   GenericSecretConfigProviderSharedPtr provider_;
   Api::Api& api_;
   ThreadLocal::TypedSlotPtr<ThreadLocalSecret> tls_;

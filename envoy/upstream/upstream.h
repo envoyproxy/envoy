@@ -300,25 +300,6 @@ public:
    * Set true to disable active health check for the host.
    */
   virtual void setDisableActiveHealthCheck(bool disable_active_health_check) PURE;
-
-  /**
-   * Base interface for attaching LbPolicy-specific data to individual hosts.
-   */
-  class HostLbPolicyData {
-  public:
-    virtual ~HostLbPolicyData() = default;
-  };
-  using HostLbPolicyDataPtr = std::shared_ptr<HostLbPolicyData>;
-
-  /* Takes ownership of lb_policy_data and attaches it to the host.
-   * Must be called before the host is used across threads.
-   */
-  virtual void setLbPolicyData(HostLbPolicyDataPtr lb_policy_data) PURE;
-
-  /*
-   * @return a reference to the LbPolicyData attached to the host.
-   */
-  virtual const HostLbPolicyDataPtr& lbPolicyData() const PURE;
 };
 
 using HostConstSharedPtr = std::shared_ptr<const Host>;
@@ -538,24 +519,28 @@ public:
   virtual ~PrioritySet() = default;
 
   /**
-   * Install a callback that will be invoked when any of the HostSets in the PrioritySet changes.
-   * hosts_added and hosts_removed will only be populated when a host is added or completely removed
-   * from the PrioritySet.
-   * This includes when a new HostSet is created.
+   * Install a callback that will be invoked when anything on any host in the PrioritySet is
+   * changed.
+   *
+   * hosts_added and hosts_removed will only be populated when a host is added or
+   * completely removed from the PrioritySet. This includes when a new HostSet is created.
    *
    * @param callback supplies the callback to invoke.
-   * @return Common::CallbackHandlePtr a handle which can be used to unregister the callback.
+   * @return Common::CallbackHandlePtr a handle which unregisters the callback upon its destruction.
    */
   ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
   addMemberUpdateCb(MemberUpdateCb callback) const PURE;
 
   /**
-   * Install a callback that will be invoked when a host set changes. Triggers when any change
-   * happens to the hosts within the host set. If hosts are added/removed from the host set, the
-   * added/removed hosts will be passed to the callback.
+   * Install a callback that will be invoked when a host changes. Triggers when any change
+   * happens to the hosts within that priority, and is invoked once for each priority that has a
+   * change.
+   *
+   * If hosts are added/removed from the host set, the added/removed hosts will be passed to
+   * the callback.
    *
    * @param callback supplies the callback to invoke.
-   * @return Common::CallbackHandlePtr a handle which can be used to unregister the callback.
+   * @return Common::CallbackHandlePtr a handle which unregisters the callback upon its destruction.
    */
   ABSL_MUST_USE_RESULT virtual Common::CallbackHandlePtr
   addPriorityUpdateCb(PriorityUpdateCb callback) const PURE;
@@ -697,7 +682,6 @@ public:
   COUNTER(lb_subsets_selected)                                                                     \
   COUNTER(lb_zone_cluster_too_small)                                                               \
   COUNTER(lb_zone_no_capacity_left)                                                                \
-  COUNTER(lb_zone_number_differs)                                                                  \
   COUNTER(lb_zone_routing_all_directly)                                                            \
   COUNTER(lb_zone_routing_cross_zone)                                                              \
   COUNTER(lb_zone_routing_sampled)                                                                 \
@@ -767,7 +751,8 @@ public:
   GAUGE(upstream_rq_active, Accumulate)                                                            \
   GAUGE(upstream_rq_pending_active, Accumulate)                                                    \
   HISTOGRAM(upstream_cx_connect_ms, Milliseconds)                                                  \
-  HISTOGRAM(upstream_cx_length_ms, Milliseconds)
+  HISTOGRAM(upstream_cx_length_ms, Milliseconds)                                                   \
+  HISTOGRAM(upstream_rq_per_cx, Unspecified)
 
 /**
  * All cluster load report stats. These are only use for EDS load reporting and not sent to the
@@ -809,8 +794,10 @@ public:
  */
 #define ALL_CLUSTER_REQUEST_RESPONSE_SIZE_STATS(COUNTER, GAUGE, HISTOGRAM, TEXT_READOUT, STATNAME) \
   HISTOGRAM(upstream_rq_headers_size, Bytes)                                                       \
+  HISTOGRAM(upstream_rq_headers_count, Unspecified)                                                \
   HISTOGRAM(upstream_rq_body_size, Bytes)                                                          \
   HISTOGRAM(upstream_rs_headers_size, Bytes)                                                       \
+  HISTOGRAM(upstream_rs_headers_count, Unspecified)                                                \
   HISTOGRAM(upstream_rs_body_size, Bytes)
 
 /**
@@ -1056,17 +1043,22 @@ public:
   virtual bool maintenanceMode() const PURE;
 
   /**
-   * @return uint64_t the maximum number of outbound requests that a connection pool will make on
+   * @return uint32_t the maximum number of outbound requests that a connection pool will make on
    *         each upstream connection. This can be used to increase spread if the backends cannot
    *         tolerate imbalance. 0 indicates no maximum.
    */
-  virtual uint64_t maxRequestsPerConnection() const PURE;
+  virtual uint32_t maxRequestsPerConnection() const PURE;
 
   /**
    * @return uint32_t the maximum number of response headers. The default value is 100. Results in a
    * reset if the number of headers exceeds this value.
    */
   virtual uint32_t maxResponseHeadersCount() const PURE;
+
+  /**
+   * @return uint32_t the maximum total size of response headers in KB.
+   */
+  virtual absl::optional<uint16_t> maxResponseHeadersKb() const PURE;
 
   /**
    * @return the human readable name of the cluster.
@@ -1141,7 +1133,7 @@ public:
   virtual bool perEndpointStatsEnabled() const PURE;
 
   /**
-   * @return std::shared_ptr<UpstreamLocalAddressSelector> as upstream local address selector.
+   * @return std::shared_ptr<const UpstreamLocalAddressSelector> as upstream local address selector.
    */
   virtual UpstreamLocalAddressSelectorConstSharedPtr getUpstreamLocalAddressSelector() const PURE;
 
@@ -1291,7 +1283,7 @@ public:
    *        time initialization. E.g., for a dynamic DNS cluster the initialize callback will be
    *        called when initial DNS resolution is complete.
    */
-  virtual void initialize(std::function<void()> callback) PURE;
+  virtual void initialize(std::function<absl::Status()> callback) PURE;
 
   /**
    * @return the phase in which the cluster is initialized at boot. This mechanism is used such that
@@ -1316,9 +1308,19 @@ public:
   virtual UnitFloat dropOverload() const PURE;
 
   /**
+   * @return the cluster drop_category_ configuration.
+   */
+  virtual const std::string& dropCategory() const PURE;
+
+  /**
    * Set up the drop_overload value for the cluster.
    */
   virtual void setDropOverload(UnitFloat drop_overload) PURE;
+
+  /**
+   * Set up the drop_category value for the thread local cluster.
+   */
+  virtual void setDropCategory(absl::string_view drop_category) PURE;
 };
 
 using ClusterSharedPtr = std::shared_ptr<Cluster>;

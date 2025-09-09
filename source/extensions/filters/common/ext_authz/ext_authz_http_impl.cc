@@ -41,12 +41,13 @@ const Response& errorResponse() {
                                             UnsafeHeaderVector{},
                                             UnsafeHeaderVector{},
                                             UnsafeHeaderVector{},
+                                            false,
                                             {{}},
                                             Http::Utility::QueryParamsVector{},
                                             {},
                                             EMPTY_STRING,
                                             Http::Code::Forbidden,
-                                            ProtobufWkt::Struct{}});
+                                            Protobuf::Struct{}});
 }
 
 // SuccessResponse used for creating either DENIED or OK authorization responses.
@@ -133,6 +134,30 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
           Router::HeaderParserPtr)),
       encode_raw_headers_(config.encode_raw_headers()) {}
 
+ClientConfig::ClientConfig(
+    const envoy::extensions::filters::http::ext_authz::v3::HttpService& http_service,
+    bool encode_raw_headers, uint32_t timeout, Server::Configuration::CommonFactoryContext& context)
+    : client_header_matchers_(toClientMatchers(
+          http_service.authorization_response().allowed_client_headers(), context)),
+      client_header_on_success_matchers_(toClientMatchersOnSuccess(
+          http_service.authorization_response().allowed_client_headers_on_success(), context)),
+      to_dynamic_metadata_matchers_(toDynamicMetadataMatchers(
+          http_service.authorization_response().dynamic_metadata_from_headers(), context)),
+      upstream_header_matchers_(toUpstreamMatchers(
+          http_service.authorization_response().allowed_upstream_headers(), context)),
+      upstream_header_to_append_matchers_(toUpstreamMatchers(
+          http_service.authorization_response().allowed_upstream_headers_to_append(), context)),
+      cluster_name_(http_service.server_uri().cluster()), timeout_(timeout),
+      path_prefix_(
+          THROW_OR_RETURN_VALUE(validatePathPrefix(http_service.path_prefix()), std::string)),
+      tracing_name_(fmt::format("async {} egress", http_service.server_uri().cluster())),
+      request_headers_parser_(THROW_OR_RETURN_VALUE(
+          Router::HeaderParser::configure(
+              http_service.authorization_request().headers_to_add(),
+              envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
+          Router::HeaderParserPtr)),
+      encode_raw_headers_(encode_raw_headers) {}
+
 MatcherSharedPtr
 ClientConfig::toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list,
                                         Server::Configuration::CommonFactoryContext& context) {
@@ -160,9 +185,7 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher
   if (matchers.empty()) {
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(Http::Headers::get().Host.get());
-    matchers.push_back(
-        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            matcher, context));
+    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
 
     return std::make_shared<NotHeaderKeyMatcher>(std::move(matchers));
   }
@@ -176,9 +199,7 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher
   for (const auto& key : keys) {
     envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(key.get());
-    matchers.push_back(
-        std::make_unique<Matchers::StringMatcherImpl<envoy::type::matcher::v3::StringMatcher>>(
-            matcher, context));
+    matchers.push_back(std::make_unique<Matchers::StringMatcherImpl>(matcher, context));
   }
 
   return std::make_shared<HeaderKeyMatcher>(std::move(matchers));
@@ -365,12 +386,13 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                                 UnsafeHeaderVector{},
                                 UnsafeHeaderVector{},
                                 UnsafeHeaderVector{},
+                                false,
                                 std::move(headers_to_remove),
                                 Http::Utility::QueryParamsVector{},
                                 {},
                                 EMPTY_STRING,
                                 Http::Code::OK,
-                                ProtobufWkt::Struct{}}};
+                                Protobuf::Struct{}}};
     return std::move(ok.response_);
   }
 
@@ -388,12 +410,13 @@ ResponsePtr RawHttpClientImpl::toResponse(Http::ResponseMessagePtr message) {
                                   UnsafeHeaderVector{},
                                   UnsafeHeaderVector{},
                                   UnsafeHeaderVector{},
+                                  false,
                                   {{}},
                                   Http::Utility::QueryParamsVector{},
                                   {},
                                   message->bodyAsString(),
                                   static_cast<Http::Code>(status_code),
-                                  ProtobufWkt::Struct{}}};
+                                  Protobuf::Struct{}}};
   return std::move(denied.response_);
 }
 

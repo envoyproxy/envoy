@@ -291,7 +291,7 @@ TEST_F(RateLimitFilterTest, OverLimitWithDynamicMetadata) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
 
   Filters::Common::RateLimit::DynamicMetadataPtr dynamic_metadata =
-      std::make_unique<ProtobufWkt::Struct>();
+      std::make_unique<Protobuf::Struct>();
   auto* fields = dynamic_metadata->mutable_fields();
   (*fields)["name"] = ValueUtil::stringValue("my-limit");
   (*fields)["x"] = ValueUtil::numberValue(3);
@@ -299,7 +299,7 @@ TEST_F(RateLimitFilterTest, OverLimitWithDynamicMetadata) {
   EXPECT_CALL(filter_callbacks_.connection_, streamInfo()).WillOnce(ReturnRef(stream_info));
   EXPECT_CALL(stream_info, setDynamicMetadata(_, _))
       .WillOnce(Invoke([&dynamic_metadata](const std::string& ns,
-                                           const ProtobufWkt::Struct& returned_dynamic_metadata) {
+                                           const Protobuf::Struct& returned_dynamic_metadata) {
         EXPECT_EQ(ns, NetworkFilterNames::get().RateLimit);
         EXPECT_TRUE(TestUtility::protoEqual(returned_dynamic_metadata, *dynamic_metadata));
       }));
@@ -493,7 +493,7 @@ public:
   }
 
   NiceMock<Network::MockFilterManagerConnection> connection_;
-  NiceMock<Network::MockListenSocket> socket_;
+  NiceMock<Network::MockConnectionSocket> socket_;
 
   Buffer::OwnedImpl read_buffer_;
   Buffer::OwnedImpl write_buffer_;
@@ -559,7 +559,14 @@ stat_prefix: name
   EXPECT_EQ(manager.initializeReadFilters(), true);
 
   EXPECT_CALL(factory_context.server_factory_context_.cluster_manager_.thread_local_cluster_,
-              tcpConnPool(_, _))
+              chooseHost(_))
+      .WillRepeatedly(Invoke([&] {
+        return Upstream::HostSelectionResponse{
+            factory_context.server_factory_context_.cluster_manager_.thread_local_cluster_.lb_
+                .host_};
+      }));
+  EXPECT_CALL(factory_context.server_factory_context_.cluster_manager_.thread_local_cluster_,
+              tcpConnPool(_, _, _))
       .WillOnce(Return(Upstream::TcpPoolData([]() {}, &conn_pool)));
 
   request_callbacks->complete(Extensions::Filters::Common::RateLimit::LimitStatus::OK, nullptr,

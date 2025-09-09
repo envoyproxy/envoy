@@ -24,7 +24,6 @@
 #include "source/common/http/http1/header_formatter.h"
 #include "source/common/http/http1/legacy_parser_impl.h"
 #include "source/common/http/utility.h"
-#include "source/common/network/common_connection_filter_states.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/fixed_array.h"
@@ -66,7 +65,12 @@ static constexpr uint32_t kMaxOutboundResponses = 2;
 using Http1ResponseCodeDetails = ConstSingleton<Http1ResponseCodeDetailValues>;
 using Http1HeaderTypes = ConstSingleton<Http1HeaderTypesValues>;
 
-const StringUtil::CaseUnorderedSet& caseUnorderdSetContainingUpgradeAndHttp2Settings() {
+const StringUtil::CaseUnorderedSet& caseUnorderedSetContainingUpgrade() {
+  CONSTRUCT_ON_FIRST_USE(StringUtil::CaseUnorderedSet,
+                         Http::Headers::get().ConnectionValues.Upgrade);
+}
+
+const StringUtil::CaseUnorderedSet& caseUnorderedSetContainingUpgradeAndHttp2Settings() {
   CONSTRUCT_ON_FIRST_USE(StringUtil::CaseUnorderedSet,
                          Http::Headers::get().ConnectionValues.Upgrade,
                          Http::Headers::get().ConnectionValues.Http2Settings);
@@ -116,7 +120,10 @@ void StreamEncoderImpl::encodeHeader(absl::string_view key, absl::string_view va
 
   const uint64_t header_size = connection_.buffer().addFragments({key, COLON_SPACE, value, CRLF});
 
+  // There is no header field compression in HTTP/1.1, so the wire representation is the same as the
+  // decompressed representation.
   bytes_meter_->addHeaderBytesSent(header_size);
+  bytes_meter_->addDecompressedHeaderBytesSent(header_size);
 }
 
 void StreamEncoderImpl::encodeFormattedHeader(absl::string_view key, absl::string_view value,
@@ -531,12 +538,8 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       processing_trailers_(false), handling_upgrade_(false), reset_stream_called_(false),
       deferred_end_stream_headers_(false), dispatching_(false), max_headers_kb_(max_headers_kb),
       max_headers_count_(max_headers_count) {
-  if (codec_settings_.use_balsa_parser_) {
-    parser_ = std::make_unique<BalsaParser>(type, this, max_headers_kb_ * 1024, enableTrailers(),
-                                            codec_settings_.allow_custom_methods_);
-  } else {
-    parser_ = std::make_unique<LegacyHttpParserImpl>(type, this);
-  }
+  parser_ = std::make_unique<BalsaParser>(type, this, max_headers_kb_ * 1024, enableTrailers(),
+                                          codec_settings_.allow_custom_methods_);
 }
 
 Status ConnectionImpl::completeCurrentHeader() {
@@ -711,15 +714,14 @@ Envoy::StatusOr<size_t> ConnectionImpl::dispatchSlice(const char* slice, size_t 
   const ParserStatus status = parser_->getStatus();
   if (status != ParserStatus::Ok && status != ParserStatus::Paused) {
     absl::string_view error = Http1ResponseCodeDetails::get().HttpCodecError;
-    if (codec_settings_.use_balsa_parser_) {
-      if (parser_->errorMessage() == "headers size exceeds limit" ||
-          parser_->errorMessage() == "trailers size exceeds limit") {
-        error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
-        error = Http1ResponseCodeDetails::get().HeadersTooLarge;
-      } else if (parser_->errorMessage() == "header value contains invalid chars") {
-        error = Http1ResponseCodeDetails::get().InvalidCharacters;
-      }
+    if (parser_->errorMessage() == "headers size exceeds limit" ||
+        parser_->errorMessage() == "trailers size exceeds limit") {
+      error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
+      error = Http1ResponseCodeDetails::get().HeadersTooLarge;
+    } else if (parser_->errorMessage() == "header value contains invalid chars") {
+      error = Http1ResponseCodeDetails::get().InvalidCharacters;
     }
+
     RETURN_IF_ERROR(sendProtocolError(error));
     // Avoid overwriting the codec_status_ set in the callbacks.
     ASSERT(codec_status_.ok());
@@ -839,6 +841,10 @@ StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
   ENVOY_CONN_LOG(trace, "onHeadersCompleteImpl", connection_);
   RETURN_IF_ERROR(completeCurrentHeader());
 
+  // There is no header field compression in HTTP/1.1, so the wire representation is the same as the
+  // decompressed representation.
+  getBytesMeter().addDecompressedHeaderBytesReceived(getBytesMeter().headerBytesReceived());
+
   if (!parser_->isHttp11()) {
     // This is not necessarily true, but it's good enough since higher layers only care if this is
     // HTTP/1.1 or not.
@@ -847,24 +853,33 @@ StatusOr<CallbackResult> ConnectionImpl::onHeadersCompleteImpl() {
   RequestOrResponseHeaderMap& request_or_response_headers = requestOrResponseHeaders();
   const Http::HeaderValues& header_values = Http::Headers::get();
   if (Utility::isUpgrade(request_or_response_headers) && upgradeAllowed()) {
+    auto upgrade_value = request_or_response_headers.getUpgradeValue();
+    const bool is_h2c = absl::EqualsIgnoreCase(upgrade_value, header_values.UpgradeValues.H2c);
+
     // Ignore h2c upgrade requests until we support them.
     // See https://github.com/envoyproxy/envoy/issues/7161 for details.
-    if (absl::EqualsIgnoreCase(request_or_response_headers.getUpgradeValue(),
-                               header_values.UpgradeValues.H2c)) {
+    // Upgrades are rejected unless ignore_http_11_upgrade is configured.
+    // See https://github.com/envoyproxy/envoy/issues/36305 for details.
+    if (is_h2c) {
       ENVOY_CONN_LOG(trace, "removing unsupported h2c upgrade headers.", connection_);
       request_or_response_headers.removeUpgrade();
-      if (request_or_response_headers.Connection()) {
-        const auto& tokens_to_remove = caseUnorderdSetContainingUpgradeAndHttp2Settings();
-        std::string new_value = StringUtil::removeTokens(
-            request_or_response_headers.getConnectionValue(), ",", tokens_to_remove, ",");
-        if (new_value.empty()) {
-          request_or_response_headers.removeConnection();
-        } else {
-          request_or_response_headers.setConnection(new_value);
-        }
-      }
+      Utility::removeConnectionUpgrade(request_or_response_headers,
+                                       caseUnorderedSetContainingUpgradeAndHttp2Settings());
       request_or_response_headers.remove(header_values.Http2Settings);
-    } else {
+    } else if (codec_settings_.ignore_upgrade_matchers_ != nullptr &&
+               !codec_settings_.ignore_upgrade_matchers_->empty()) {
+      ENVOY_CONN_LOG(trace, "removing ignored upgrade headers.", connection_);
+
+      Utility::removeUpgrade(request_or_response_headers,
+                             *codec_settings_.ignore_upgrade_matchers_);
+
+      if (!request_or_response_headers.Upgrade()) {
+        Utility::removeConnectionUpgrade(request_or_response_headers,
+                                         caseUnorderedSetContainingUpgrade());
+      }
+    }
+
+    if (Utility::isUpgrade(request_or_response_headers)) {
       ENVOY_CONN_LOG(trace, "codec entering upgrade mode.", connection_);
       handling_upgrade_ = true;
     }
@@ -976,8 +991,8 @@ void ConnectionImpl::onResetStreamBase(StreamResetReason reason) {
   onResetStream(reason);
 }
 
-ExecutionContext* ConnectionImpl::executionContext() const {
-  return getConnectionExecutionContext(connection_);
+OptRef<const StreamInfo::StreamInfo> ConnectionImpl::trackedStream() const {
+  return connection_.trackedStream();
 }
 
 void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
@@ -1363,6 +1378,10 @@ Status ServerConnectionImpl::sendProtocolError(absl::string_view details) {
   if (active_request_ == nullptr) {
     RETURN_IF_ERROR(onMessageBeginImpl());
   }
+
+  if (resetStreamCalled()) {
+    return okStatus();
+  }
   ASSERT(active_request_);
 
   active_request_->response_encoder_.setDetails(details);
@@ -1428,9 +1447,11 @@ void ServerConnectionImpl::ActiveRequest::dumpState(std::ostream& os, int indent
 
 ClientConnectionImpl::ClientConnectionImpl(Network::Connection& connection, CodecStats& stats,
                                            ConnectionCallbacks&, const Http1Settings& settings,
+                                           absl::optional<uint16_t> max_response_headers_kb,
                                            const uint32_t max_response_headers_count,
                                            bool passing_through_proxy)
-    : ConnectionImpl(connection, stats, settings, MessageType::Response, MAX_RESPONSE_HEADERS_KB,
+    : ConnectionImpl(connection, stats, settings, MessageType::Response,
+                     max_response_headers_kb.value_or(MAX_RESPONSE_HEADERS_KB),
                      max_response_headers_count),
       owned_output_buffer_(connection.dispatcher().getWatermarkFactory().createBuffer(
           [&]() -> void { this->onBelowLowWatermark(); },

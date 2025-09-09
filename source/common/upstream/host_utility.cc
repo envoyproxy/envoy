@@ -130,49 +130,38 @@ HostUtility::HostStatusSet HostUtility::createOverrideHostStatus(
   return override_host_status;
 }
 
-HostConstSharedPtr HostUtility::selectOverrideHost(const HostMap* host_map, HostStatusSet status,
-                                                   LoadBalancerContext* context) {
+std::pair<HostConstSharedPtr, bool> HostUtility::selectOverrideHost(const HostMap* host_map,
+                                                                    HostStatusSet status,
+                                                                    LoadBalancerContext* context) {
   if (context == nullptr) {
-    return nullptr;
+    return {nullptr, false};
   }
 
   auto override_host = context->overrideHostToSelect();
   if (!override_host.has_value()) {
-    return nullptr;
+    return {nullptr, false};
   }
 
+  const bool strict_mode = override_host.value().second;
+
   if (host_map == nullptr) {
-    return nullptr;
+    return {nullptr, strict_mode};
   }
 
   auto host_iter = host_map->find(override_host.value().first);
 
   // The override host cannot be found in the host map.
   if (host_iter == host_map->end()) {
-    return nullptr;
+    return {nullptr, strict_mode};
   }
 
   HostConstSharedPtr host = host_iter->second;
   ASSERT(host != nullptr);
 
   if (status[static_cast<uint32_t>(host->healthStatus())]) {
-    return host;
+    return {host, strict_mode};
   }
-  return nullptr;
-}
-
-bool HostUtility::allowLBChooseHost(LoadBalancerContext* context) {
-  if (context == nullptr) {
-    return true;
-  }
-
-  auto override_host = context->overrideHostToSelect();
-  if (!override_host.has_value()) {
-    return true;
-  }
-
-  // Return opposite value to "strict" setting.
-  return !override_host.value().second;
+  return {nullptr, strict_mode};
 }
 
 void HostUtility::forEachHostMetric(

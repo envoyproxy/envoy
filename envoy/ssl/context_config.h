@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/handshaker.h"
 #include "envoy/ssl/tls_certificate_config.h"
@@ -117,6 +118,13 @@ public:
    * @return the access log manager object reference
    */
   virtual AccessLog::AccessLogManager& accessLogManager() const PURE;
+
+  /**
+   * @return the compiance policy for the TLS context.
+   */
+  virtual absl::optional<
+      envoy::extensions::transport_sockets::tls::v3::TlsParameters::CompliancePolicy>
+  compliancePolicy() const PURE;
 };
 
 class ClientContextConfig : public virtual ContextConfig {
@@ -126,6 +134,19 @@ public:
    * Otherwise, ""
    */
   virtual const std::string& serverNameIndication() const PURE;
+
+  /**
+   * If true, replaces the SNI for the connection with the hostname of the upstream host, if
+   * the hostname is known.
+   */
+  virtual bool autoHostServerNameIndication() const PURE;
+
+  /**
+   * If true, replace any Subject Alternative Name validations with a validation for a DNS SAN
+   * matching the SNI value sent. Note that the validation will be against the actual requested SNI,
+   * regardless of how it is configured.
+   */
+  virtual bool autoSniSanMatch() const PURE;
 
   /**
    * @return true if server-initiated TLS renegotiation will be allowed.

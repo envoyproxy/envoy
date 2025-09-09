@@ -13,6 +13,7 @@
 #include "absl/container/flat_hash_set.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "absl/types/variant.h"
 #include "xds/type/matcher/v3/matcher.pb.h"
 
 namespace Envoy {
@@ -90,23 +91,22 @@ public:
   }
 };
 
-using ActionPtr = std::unique_ptr<Action>;
-using ActionFactoryCb = std::function<ActionPtr()>;
+using ActionConstSharedPtr = std::shared_ptr<const Action>;
 
 template <class ActionFactoryContext> class ActionFactory : public Config::TypedFactory {
 public:
-  virtual ActionFactoryCb
-  createActionFactoryCb(const Protobuf::Message& config,
-                        ActionFactoryContext& action_factory_context,
-                        ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
+  virtual ActionConstSharedPtr
+  createAction(const Protobuf::Message& config, ActionFactoryContext& action_factory_context,
+               ProtobufMessage::ValidationVisitor& validation_visitor) PURE;
 
   std::string category() const override { return "envoy.matching.action"; }
 };
 
 // On match, we either return the action to perform or another match tree to match against.
 template <class DataType> struct OnMatch {
-  const ActionFactoryCb action_cb_;
+  const ActionConstSharedPtr action_;
   const MatchTreeSharedPtr<DataType> matcher_;
+  bool keep_matching_{};
 };
 template <class DataType> using OnMatchFactoryCb = std::function<OnMatch<DataType>()>;
 
@@ -124,19 +124,42 @@ public:
   createOnMatch(const envoy::config::common::matcher::v3::Matcher::OnMatch&) PURE;
 };
 
-/**
- * State enum for the result of an attempted match.
- */
-enum class MatchState {
-  /**
-   * The match could not be completed, e.g. due to the required data not being available.
-   */
-  UnableToMatch,
-  /**
-   * The match was completed.
-   */
-  MatchComplete,
+// The result of a match. There are three possible results:
+// - The match could not be completed due to lack of data (isInsufficientData() will return true.)
+// - The match was completed, no match found (isNoMatch() will return true.)
+// - The match was completed, match found (isMatch() will return true, action() will return the
+//   ActionConstSharedPtr.)
+struct MatchResult {
+public:
+  MatchResult(ActionConstSharedPtr cb) : result_(std::move(cb)) {}
+  static MatchResult noMatch() { return MatchResult(NoMatch{}); }
+  static MatchResult insufficientData() { return MatchResult(InsufficientData{}); }
+  bool isInsufficientData() const { return absl::holds_alternative<InsufficientData>(result_); }
+  bool isComplete() const { return !isInsufficientData(); }
+  bool isNoMatch() const { return absl::holds_alternative<NoMatch>(result_); }
+  bool isMatch() const { return absl::holds_alternative<ActionConstSharedPtr>(result_); }
+  const ActionConstSharedPtr& action() const {
+    ASSERT(isMatch());
+    return absl::get<ActionConstSharedPtr>(result_);
+  }
+  // Returns the action by move. The caller must ensure that the MatchResult is not used after
+  // this call.
+  ActionConstSharedPtr actionByMove() {
+    ASSERT(isMatch());
+    return absl::get<ActionConstSharedPtr>(std::move(result_));
+  }
+
+private:
+  struct InsufficientData {};
+  struct NoMatch {};
+  using Result = absl::variant<ActionConstSharedPtr, NoMatch, InsufficientData>;
+  Result result_;
+  MatchResult(NoMatch) : result_(NoMatch{}) {}
+  MatchResult(InsufficientData) : result_(InsufficientData{}) {}
 };
+
+// Callback to execute against skipped matches' actions.
+using SkippedMatchCb = std::function<void(const ActionConstSharedPtr&)>;
 
 /**
  * MatchTree provides the interface for performing matches against the data provided by DataType.
@@ -145,22 +168,46 @@ template <class DataType> class MatchTree {
 public:
   virtual ~MatchTree() = default;
 
-  // The result of a match. There are three possible results:
-  // - The match could not be completed (match_state_ == MatchState::UnableToMatch)
-  // - The match was completed, no match found (match_state_ == MatchState::MatchComplete, on_match_
-  // = {})
-  // - The match was complete, match found (match_state_ == MatchState::MatchComplete, on_match_ =
-  // something).
-  struct MatchResult {
-    const MatchState match_state_;
-    const absl::optional<OnMatch<DataType>> on_match_;
-  };
-
   // Attempts to match against the matching data (which should contain all the data requested via
-  // matching requirements). If the match couldn't be completed, {false, {}} will be returned.
-  // If a match result was determined, {true, action} will be returned. If a match result was
-  // determined to be no match, {true, {}} will be returned.
-  virtual MatchResult match(const DataType& matching_data) PURE;
+  // matching requirements).
+  // If the match couldn't be completed, MatchResult::insufficientData() will be returned.
+  // If a match result was determined, an action callback factory will be returned.
+  // If it was determined to be no match, MatchResult::noMatch() will be returned.
+  //
+  // Implementors should call handleRecursionAndSkips() to transform OnMatch values
+  // into MatchResult values, and handle noMatch and insufficientData results as appropriate
+  // for the specific matcher type.
+  virtual MatchResult match(const DataType& matching_data,
+                            SkippedMatchCb skipped_match_cb = nullptr) PURE;
+
+protected:
+  // Internally handle recursion & keep_matching logic in matcher implementations.
+  // This should be called against initial matching & on-no-match results.
+  static inline MatchResult
+  handleRecursionAndSkips(const absl::optional<OnMatch<DataType>>& on_match, const DataType& data,
+                          SkippedMatchCb skipped_match_cb) {
+    if (!on_match.has_value()) {
+      return MatchResult::noMatch();
+    }
+    if (on_match->matcher_) {
+      MatchResult nested_result = on_match->matcher_->match(data, skipped_match_cb);
+      // Parent result's keep_matching skips the nested result.
+      if (on_match->keep_matching_ && nested_result.isMatch()) {
+        if (skipped_match_cb) {
+          skipped_match_cb(nested_result.action());
+        }
+        return MatchResult::noMatch();
+      }
+      return nested_result;
+    }
+    if (on_match->action_ && on_match->keep_matching_) {
+      if (skipped_match_cb) {
+        skipped_match_cb(on_match->action_);
+      }
+      return MatchResult::noMatch();
+    }
+    return MatchResult{on_match->action_};
+  }
 };
 
 template <class DataType> using MatchTreeSharedPtr = std::shared_ptr<MatchTree<DataType>>;

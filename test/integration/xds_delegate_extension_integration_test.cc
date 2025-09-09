@@ -84,7 +84,7 @@ public:
 
   std::string name() const override { return "envoy.config.xds.test_delegate"; };
 
-  Config::XdsResourcesDelegatePtr createXdsResourcesDelegate(const ProtobufWkt::Any&,
+  Config::XdsResourcesDelegatePtr createXdsResourcesDelegate(const Protobuf::Any&,
                                                              ProtobufMessage::ValidationVisitor&,
                                                              Api::Api&,
                                                              Event::Dispatcher&) override {
@@ -176,9 +176,9 @@ public:
     EXPECT_TRUE(response->complete());
     EXPECT_EQ("200", response->headers().getStatusValue());
     Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(response->body());
-    auto entries = loader->getObject("entries");
+    auto entries = loader->getObject("entries").value();
     if (entries->hasObject(key)) {
-      return entries->getObject(key)->getString("final_value");
+      return entries->getObject(key).value()->getString("final_value").value();
     }
     return "";
   }
@@ -209,7 +209,7 @@ TEST_P(XdsDelegateExtensionIntegrationTest, XdsResourcesDelegateOnConfigUpdated)
   acceptXdsConnection();
 
   int current_on_config_updated_count = TestXdsResourcesDelegate::OnConfigUpdatedCount;
-  EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "", {"some_rtds_layer"},
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Runtime, "", {"some_rtds_layer"},
                                       {"some_rtds_layer"}, {}, true));
   auto some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_rtds_layer
@@ -218,7 +218,7 @@ TEST_P(XdsDelegateExtensionIntegrationTest, XdsResourcesDelegateOnConfigUpdated)
       baz: meh
   )EOF");
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-      Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
+      Config::TestTypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "1");
   test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 1);
   int expected_on_config_updated_count = ++current_on_config_updated_count;
   waitforOnConfigUpdatedCount(expected_on_config_updated_count);
@@ -227,15 +227,15 @@ TEST_P(XdsDelegateExtensionIntegrationTest, XdsResourcesDelegateOnConfigUpdated)
   EXPECT_EQ("bar", getRuntimeKey("foo"));
   EXPECT_EQ("meh", getRuntimeKey("baz"));
 
-  EXPECT_TRUE(
-      compareDiscoveryRequest(Config::TypeUrl::get().Runtime, "1", {"some_rtds_layer"}, {}, {}));
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Runtime, "1", {"some_rtds_layer"},
+                                      {}, {}));
   some_rtds_layer = TestUtility::parseYaml<envoy::service::runtime::v3::Runtime>(R"EOF(
     name: some_rtds_layer
     layer:
       baz: saz
   )EOF");
   sendDiscoveryResponse<envoy::service::runtime::v3::Runtime>(
-      Config::TypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "2");
+      Config::TestTypeUrl::get().Runtime, {some_rtds_layer}, {some_rtds_layer}, {}, "2");
   test_server_->waitForCounterGe("runtime.load_success", initial_load_success_ + 2);
   expected_on_config_updated_count = ++current_on_config_updated_count;
   waitforOnConfigUpdatedCount(expected_on_config_updated_count);

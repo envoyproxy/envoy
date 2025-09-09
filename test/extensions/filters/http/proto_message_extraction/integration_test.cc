@@ -20,7 +20,7 @@ using ::apikeys::CreateApiKeyRequest;
 using ::Envoy::Extensions::HttpFilters::GrpcFieldExtraction::checkSerializedData;
 
 void compareJson(const std::string& actual, const std::string& expected) {
-  ProtobufWkt::Value expected_value, actual_value;
+  Protobuf::Value expected_value, actual_value;
   TestUtility::loadFromJson(expected, expected_value);
   TestUtility::loadFromJson(actual, actual_value);
   EXPECT_TRUE(TestUtility::protoEqual(expected_value, actual_value))
@@ -186,8 +186,8 @@ TEST_P(IntegrationTest, Streaming) {
   // Make sure that the body was properly propagated (with no modification).
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(upstream_request_->receivedData());
-  checkSerializedData<CreateApiKeyRequest>(upstream_request_->body(),
-                                           {request1, request2, request3});
+  Buffer::OwnedImpl body = upstream_request_->body();
+  checkSerializedData<CreateApiKeyRequest>(body, {request1, request2, request3});
 
   // Create streaming response and send it.
   ApiKey response1 = makeCreateApiKeyResponse(

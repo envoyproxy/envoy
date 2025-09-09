@@ -5,10 +5,8 @@
 #include "test/test_common/utility.h"
 
 using ::Envoy::Upstream::LoadMetricStats;
-using ::Envoy::Upstream::LoadMetricStatsImpl;
 using ::testing::DoubleEq;
 using ::testing::Field;
-using ::testing::ReturnRef;
 
 namespace Envoy {
 namespace Orca {

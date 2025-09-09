@@ -10,10 +10,9 @@ environment. Recommended extensions and settings are listed in
 
 ## Refresh compilation database
 
-`tools/vscode/refresh_compdb.sh` is a script to refresh compilation database, it may take a while
+`ci/do_ci.sh refresh_compdb` is a script to refresh compilation database, it may take a while
 to generate all dependencies for code completion, such as protobuf generated codes, external dependencies.
-If you changed proto definition, or changed any bazel structure, rerun this to get code completion
-correctly.
+If you changed proto definition, or changed any bazel structure, rerun this using the VSCode tasks to get code completion correctly.
 
 Note that it is recommended to disable VSCode Microsoft C/C++ extension and use `vscode-clangd` instead for
 C/C++ code completion.

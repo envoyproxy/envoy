@@ -25,7 +25,7 @@ public:
   void OnDecoderStreamError(quic::QuicErrorCode, absl::string_view) override{};
 };
 
-static std::string encodeHeaders(const spdy::Http2HeaderBlock& headers) {
+static std::string encodeHeaders(const quiche::HttpHeaderBlock& headers) {
   static Delegate delegate;
   quic::QpackEncoder encoder(&delegate, quic::HuffmanEncoding::kEnabled,
                              quic::CookieCrumbling::kEnabled);
@@ -96,7 +96,7 @@ std::string H3Serializer::serialize(bool unidirectional, uint32_t type, uint32_t
   }
   case H3Frame::kHeaders: {
     const auto& f = h3frame.headers();
-    spdy::Http2HeaderBlock headers;
+    quiche::HttpHeaderBlock headers;
     for (const auto& hdr : f.headers().headers()) {
       headers.AppendValueOrAddHeader(hdr.key(), hdr.value());
     }
@@ -120,7 +120,7 @@ std::string H3Serializer::serialize(bool unidirectional, uint32_t type, uint32_t
   case H3Frame::kPushPromise: {
     const auto& f = h3frame.push_promise();
     uint64_t push_id = f.push_id();
-    spdy::Http2HeaderBlock headers;
+    quiche::HttpHeaderBlock headers;
     for (auto& hdr : f.headers().headers()) {
       headers.AppendValueOrAddHeader(hdr.key(), hdr.value());
     }
@@ -312,8 +312,8 @@ QuicPacketizer::QuicPacketPtr QuicPacketizer::serializePacket(const QuicFrame& f
     auto quic_stop = quic::QuicStopSendingFrame(f.control_frame_id(), f.stream_id(), error_code);
     return serialize(quic::QuicFrame(quic_stop));
   }
-  case QuicFrame::kMessageFrame:
-    return serializeMessageFrame(frame.message_frame());
+  case QuicFrame::kDatagramFrame:
+    return serializeDatagramFrame(frame.datagram_frame());
   case QuicFrame::kNewToken:
     return serializeNewTokenFrame(frame.new_token());
   case QuicFrame::kAckFrequency: {
@@ -404,12 +404,12 @@ QuicPacketizer::serializeNewTokenFrame(const test::common::quic::QuicNewTokenFra
 }
 
 QuicPacketizer::QuicPacketPtr
-QuicPacketizer::serializeMessageFrame(const test::common::quic::QuicMessageFrame& frame) {
+QuicPacketizer::serializeDatagramFrame(const test::common::quic::QuicDatagramFrame& frame) {
   char buffer[1024];
   auto message = frame.data();
   size_t len = std::min(message.size(), sizeof(buffer));
   memcpy(buffer, message.data(), len);
-  auto message_frame = quic::QuicMessageFrame(buffer, len);
+  auto message_frame = quic::QuicDatagramFrame(buffer, len);
   return serialize(quic::QuicFrame(&message_frame));
 }
 

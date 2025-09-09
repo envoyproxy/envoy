@@ -1,6 +1,7 @@
 #pragma once
 
 #include <numeric>
+#include <string>
 
 #include "envoy/api/api.h"
 #include "envoy/common/exception.h"
@@ -17,11 +18,18 @@
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_join.h"
+#include "absl/strings/string_view.h"
 
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, return
 // the default value.
 #define PROTOBUF_GET_WRAPPED_OR_DEFAULT(message, field_name, default_value)                        \
   ((message).has_##field_name() ? (message).field_name().value() : (default_value))
+
+// Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, return
+// absl::nullopt.
+#define PROTOBUF_GET_OPTIONAL_WRAPPED(message, field_name)                                         \
+  ((message).has_##field_name() ? absl::make_optional((message).field_name().value())              \
+                                : absl::nullopt)
 
 // Obtain the value of a wrapped field (e.g. google.protobuf.UInt32Value) if set. Otherwise, throw
 // a EnvoyException.
@@ -249,7 +257,7 @@ public:
   static std::size_t hash(const Protobuf::Message& message);
 
 #ifdef ENVOY_ENABLE_YAML
-  static void loadFromJson(const std::string& json, Protobuf::Message& message,
+  static void loadFromJson(absl::string_view json, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
   /**
    * Return ok only when strict conversion(don't ignore unknown field) succeeds.
@@ -258,9 +266,9 @@ public:
    * Return error status for relaxed conversion and set has_unknown_field to false if relaxed
    * conversion(ignore unknown field) fails.
    */
-  static absl::Status loadFromJsonNoThrow(const std::string& json, Protobuf::Message& message,
+  static absl::Status loadFromJsonNoThrow(absl::string_view json, Protobuf::Message& message,
                                           bool& has_unknown_fileld);
-  static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message);
+  static void loadFromJson(absl::string_view json, Protobuf::Struct& message);
   static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
                            ProtobufMessage::ValidationVisitor& validation_visitor);
 #endif
@@ -272,8 +280,9 @@ public:
   // It has somewhat inconsistent handling of invalid file contents,
   // occasionally failing over to try another type of parsing, or silently
   // failing instead of throwing an exception.
-  static void loadFromFile(const std::string& path, Protobuf::Message& message,
-                           ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
+  static absl::Status loadFromFile(const std::string& path, Protobuf::Message& message,
+                                   ProtobufMessage::ValidationVisitor& validation_visitor,
+                                   Api::Api& api);
 
   /**
    * Checks for use of deprecated fields in message and all sub-messages.
@@ -373,6 +382,12 @@ public:
   }
 
   /**
+   * Utility method to swap between protobuf bytes type using absl::Cord instead of std::string.
+   * Noop for now.
+   */
+  static const std::string& bytesToString(const std::string& bytes) { return bytes; }
+
+  /**
    * Convert from a typed message into a google.protobuf.Any. This should be used
    * instead of the inbuilt PackTo, as PackTo is not available with lite protos.
    *
@@ -381,18 +396,7 @@ public:
    *
    * @throw EnvoyException if the message does not unpack.
    */
-  static void packFrom(ProtobufWkt::Any& any_message, const Protobuf::Message& message);
-
-  /**
-   * Convert from google.protobuf.Any to a typed message. This should be used
-   * instead of the inbuilt UnpackTo as it performs validation of results.
-   *
-   * @param any_message source google.protobuf.Any message.
-   * @param message destination to unpack to.
-   *
-   * @throw EnvoyException if the message does not unpack.
-   */
-  static void unpackToOrThrow(const ProtobufWkt::Any& any_message, Protobuf::Message& message);
+  static void packFrom(Protobuf::Any& any_message, const Protobuf::Message& message);
 
   /**
    * Convert from google.protobuf.Any to a typed message. This should be used
@@ -403,26 +407,26 @@ public:
    *
    * @return absl::Status
    */
-  static absl::Status unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message);
+  static absl::Status unpackTo(const Protobuf::Any& any_message, Protobuf::Message& message);
 
   /**
    * Convert from google.protobuf.Any to bytes as std::string
    * @param any source google.protobuf.Any message.
    *
-   * @return std::string consists of bytes in the input message.
+   * @return std::string consists of bytes in the input message or error status.
    */
-  static std::string anyToBytes(const ProtobufWkt::Any& any) {
-    if (any.Is<ProtobufWkt::StringValue>()) {
-      ProtobufWkt::StringValue s;
-      MessageUtil::unpackToOrThrow(any, s);
+  static absl::StatusOr<std::string> anyToBytes(const Protobuf::Any& any) {
+    if (any.Is<Protobuf::StringValue>()) {
+      Protobuf::StringValue s;
+      RETURN_IF_NOT_OK(MessageUtil::unpackTo(any, s));
       return s.value();
     }
-    if (any.Is<ProtobufWkt::BytesValue>()) {
+    if (any.Is<Protobuf::BytesValue>()) {
       Protobuf::BytesValue b;
-      MessageUtil::unpackToOrThrow(any, b);
-      return b.value();
+      RETURN_IF_NOT_OK(MessageUtil::unpackTo(any, b));
+      return bytesToString(b.value());
     }
-    return any.value();
+    return bytesToString(any.value());
   };
 
   /**
@@ -432,12 +436,11 @@ public:
    * @return MessageType the typed message inside the Any.
    */
   template <class MessageType>
-  static inline void anyConvert(const ProtobufWkt::Any& message, MessageType& typed_message) {
-    unpackToOrThrow(message, typed_message);
+  static inline void anyConvert(const Protobuf::Any& message, MessageType& typed_message) {
+    THROW_IF_NOT_OK(unpackTo(message, typed_message));
   };
 
-  template <class MessageType>
-  static inline MessageType anyConvert(const ProtobufWkt::Any& message) {
+  template <class MessageType> static inline MessageType anyConvert(const Protobuf::Any& message) {
     MessageType typed_message;
     anyConvert(message, typed_message);
     return typed_message;
@@ -451,8 +454,7 @@ public:
    * @throw EnvoyException if the message does not satisfy its type constraints.
    */
   template <class MessageType>
-  static inline void anyConvertAndValidate(const ProtobufWkt::Any& message,
-                                           MessageType& typed_message,
+  static inline void anyConvertAndValidate(const Protobuf::Any& message, MessageType& typed_message,
                                            ProtobufMessage::ValidationVisitor& validation_visitor) {
     anyConvert<MessageType>(message, typed_message);
     validate(typed_message, validation_visitor);
@@ -460,7 +462,7 @@ public:
 
   template <class MessageType>
   static inline MessageType
-  anyConvertAndValidate(const ProtobufWkt::Any& message,
+  anyConvertAndValidate(const Protobuf::Any& message,
                         ProtobufMessage::ValidationVisitor& validation_visitor) {
     MessageType typed_message;
     anyConvertAndValidate<MessageType>(message, typed_message, validation_visitor);
@@ -482,7 +484,6 @@ public:
     const Protobuf::FieldDescriptor* name_field = descriptor->FindFieldByName(field_name);
     const Protobuf::Reflection* reflection = reflectable_message->GetReflection();
     return reflection->GetString(*reflectable_message, name_field);
-    return name_field->name();
   }
 
 #ifdef ENVOY_ENABLE_YAML
@@ -495,12 +496,12 @@ public:
    * @param dest message.
    */
   static void jsonConvert(const Protobuf::Message& source, Protobuf::Message& dest);
-  static void jsonConvert(const Protobuf::Message& source, ProtobufWkt::Struct& dest);
-  static void jsonConvert(const ProtobufWkt::Struct& source,
+  static void jsonConvert(const Protobuf::Message& source, Protobuf::Struct& dest);
+  static void jsonConvert(const Protobuf::Struct& source,
                           ProtobufMessage::ValidationVisitor& validation_visitor,
                           Protobuf::Message& dest);
-  // Convert a message to a ProtobufWkt::Value, return false upon failure.
-  static bool jsonConvertValue(const Protobuf::Message& source, ProtobufWkt::Value& dest);
+  // Convert a message to a Protobuf::Value, return false upon failure.
+  static bool jsonConvertValue(const Protobuf::Message& source, Protobuf::Value& dest);
 
   /**
    * Extract YAML as string from a google.protobuf.Message.
@@ -553,14 +554,14 @@ public:
    * @param key the key to use to set the value
    * @param value the string value to associate with the key
    */
-  static ProtobufWkt::Struct keyValueStruct(const std::string& key, const std::string& value);
+  static Protobuf::Struct keyValueStruct(const std::string& key, const std::string& value);
 
   /**
    * Utility method to create a Struct containing the passed in key/value map.
    *
    * @param fields the key/value pairs to initialize the Struct proto
    */
-  static ProtobufWkt::Struct keyValueStruct(const std::map<std::string, std::string>& fields);
+  static Protobuf::Struct keyValueStruct(const std::map<std::string, std::string>& fields);
 
   /**
    * Utility method to print a human readable string of the code passed in.
@@ -578,10 +579,10 @@ public:
    * traversed recursively to redact their contents.
    *
    * LIMITATION: This works properly for strongly-typed messages, as well as for messages packed in
-   * a `ProtobufWkt::Any` with a `type_url` corresponding to a proto that was compiled into the
-   * Envoy binary. However it does not work for messages encoded as `ProtobufWkt::Struct`, since
+   * a `Protobuf::Any` with a `type_url` corresponding to a proto that was compiled into the
+   * Envoy binary. However it does not work for messages encoded as `Protobuf::Struct`, since
    * structs are missing the "sensitive" annotations that this function expects. Similarly, it fails
-   * for messages encoded as `ProtobufWkt::Any` with a `type_url` that isn't registered with the
+   * for messages encoded as `Protobuf::Any` with a `type_url` that isn't registered with the
    * binary. If you're working with struct-typed messages, including those that might be hiding
    * within strongly-typed messages, please reify them to strongly-typed messages using
    * `MessageUtil::jsonConvert()` before calling `MessageUtil::redact()`.
@@ -589,17 +590,6 @@ public:
    * @param message message to redact.
    */
   static void redact(Protobuf::Message& message);
-
-  /**
-   * Reinterpret a Protobuf message as another Protobuf message by converting to wire format and
-   * back. This only works for messages that can be effectively duck typed this way, e.g. with a
-   * subtype relationship modulo field name.
-   *
-   * @param src source message.
-   * @param dst destination message.
-   * @throw EnvoyException if a conversion error occurs.
-   */
-  static void wireCast(const Protobuf::Message& src, Protobuf::Message& dst);
 
   /**
    * Sanitizes a string to contain only valid UTF-8. Invalid UTF-8 characters will be replaced. If
@@ -617,86 +607,86 @@ public:
 
 class ValueUtil {
 public:
-  static std::size_t hash(const ProtobufWkt::Value& value) { return MessageUtil::hash(value); }
+  static std::size_t hash(const Protobuf::Value& value) { return MessageUtil::hash(value); }
 
 #ifdef ENVOY_ENABLE_YAML
   /**
-   * Load YAML string into ProtobufWkt::Value.
+   * Load YAML string into Protobuf::Value.
    */
-  static ProtobufWkt::Value loadFromYaml(const std::string& yaml);
+  static Protobuf::Value loadFromYaml(const std::string& yaml);
 #endif
 
   /**
-   * Compare two ProtobufWkt::Values for equality.
+   * Compare two Protobuf::Values for equality.
    * @param v1 message of type type.googleapis.com/google.protobuf.Value
    * @param v2 message of type type.googleapis.com/google.protobuf.Value
    * @return true if v1 and v2 are identical
    */
-  static bool equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2);
+  static bool equal(const Protobuf::Value& v1, const Protobuf::Value& v2);
 
   /**
-   * @return wrapped ProtobufWkt::NULL_VALUE.
+   * @return wrapped Protobuf::NULL_VALUE.
    */
-  static const ProtobufWkt::Value& nullValue();
+  static const Protobuf::Value& nullValue();
 
   /**
-   * Wrap std::string into ProtobufWkt::Value string value.
+   * Wrap absl::string_view into Protobuf::Value string value.
    * @param str string to be wrapped.
    * @return wrapped string.
    */
-  static ProtobufWkt::Value stringValue(const std::string& str);
+  static Protobuf::Value stringValue(absl::string_view str);
 
   /**
-   * Wrap optional std::string into ProtobufWkt::Value string value.
-   * If the argument contains a null optional, return ProtobufWkt::NULL_VALUE.
+   * Wrap optional std::string into Protobuf::Value string value.
+   * If the argument contains a null optional, return Protobuf::NULL_VALUE.
    * @param str string to be wrapped.
    * @return wrapped string.
    */
-  static ProtobufWkt::Value optionalStringValue(const absl::optional<std::string>& str);
+  static Protobuf::Value optionalStringValue(const absl::optional<std::string>& str);
 
   /**
-   * Wrap boolean into ProtobufWkt::Value boolean value.
+   * Wrap boolean into Protobuf::Value boolean value.
    * @param str boolean to be wrapped.
    * @return wrapped boolean.
    */
-  static ProtobufWkt::Value boolValue(bool b);
+  static Protobuf::Value boolValue(bool b);
 
   /**
-   * Wrap ProtobufWkt::Struct into ProtobufWkt::Value struct value.
+   * Wrap Protobuf::Struct into Protobuf::Value struct value.
    * @param obj struct to be wrapped.
    * @return wrapped struct.
    */
-  static ProtobufWkt::Value structValue(const ProtobufWkt::Struct& obj);
+  static Protobuf::Value structValue(const Protobuf::Struct& obj);
 
   /**
-   * Wrap number into ProtobufWkt::Value double value.
+   * Wrap number into Protobuf::Value double value.
    * @param num number to be wrapped.
    * @return wrapped number.
    */
-  template <typename T> static ProtobufWkt::Value numberValue(const T num) {
-    ProtobufWkt::Value val;
+  template <typename T> static Protobuf::Value numberValue(const T num) {
+    Protobuf::Value val;
     val.set_number_value(static_cast<double>(num));
     return val;
   }
 
   /**
-   * Wrap a collection of ProtobufWkt::Values into ProtobufWkt::Value list value.
-   * @param values collection of ProtobufWkt::Values to be wrapped.
+   * Wrap a collection of Protobuf::Values into Protobuf::Value list value.
+   * @param values collection of Protobuf::Values to be wrapped.
    * @return wrapped list value.
    */
-  static ProtobufWkt::Value listValue(const std::vector<ProtobufWkt::Value>& values);
+  static Protobuf::Value listValue(const std::vector<Protobuf::Value>& values);
 };
 
 /**
- * HashedValue is a wrapper around ProtobufWkt::Value that computes
+ * HashedValue is a wrapper around Protobuf::Value that computes
  * and stores a hash code for the Value at construction.
  */
 class HashedValue {
 public:
-  HashedValue(const ProtobufWkt::Value& value) : value_(value), hash_(ValueUtil::hash(value)){};
+  HashedValue(const Protobuf::Value& value) : value_(value), hash_(ValueUtil::hash(value)) {};
   HashedValue(const HashedValue& v) = default;
 
-  const ProtobufWkt::Value& value() const { return value_; }
+  const Protobuf::Value& value() const { return value_; }
   std::size_t hash() const { return hash_; }
 
   bool operator==(const HashedValue& rhs) const {
@@ -706,7 +696,7 @@ public:
   bool operator!=(const HashedValue& rhs) const { return !(*this == rhs); }
 
 private:
-  const ProtobufWkt::Value value_;
+  const Protobuf::Value value_;
   const std::size_t hash_;
 };
 
@@ -720,15 +710,14 @@ public:
    * @return duration in milliseconds.
    * @throw EnvoyException when duration is out-of-range.
    */
-  static uint64_t durationToMilliseconds(const ProtobufWkt::Duration& duration);
+  static uint64_t durationToMilliseconds(const Protobuf::Duration& duration);
 
   /**
    * Same as DurationUtil::durationToMilliseconds but does not throw an exception.
    * @param duration protobuf.
    * @return duration in milliseconds or an error status.
    */
-  static absl::StatusOr<uint64_t>
-  durationToMillisecondsNoThrow(const ProtobufWkt::Duration& duration);
+  static absl::StatusOr<uint64_t> durationToMillisecondsNoThrow(const Protobuf::Duration& duration);
 
   /**
    * Same as Protobuf::util::TimeUtil::DurationToSeconds but with extra validation logic.
@@ -737,7 +726,7 @@ public:
    * @return duration in seconds.
    * @throw EnvoyException when duration is out-of-range.
    */
-  static uint64_t durationToSeconds(const ProtobufWkt::Duration& duration);
+  static uint64_t durationToSeconds(const Protobuf::Duration& duration);
 };
 
 class TimestampUtil {
@@ -748,7 +737,7 @@ public:
    * @param timestamp a pointer to the mutable protobuf member to be written into.
    */
   static void systemClockToTimestamp(const SystemTime system_clock_time,
-                                     ProtobufWkt::Timestamp& timestamp);
+                                     Protobuf::Timestamp& timestamp);
 };
 
 class StructUtil {
@@ -767,15 +756,12 @@ public:
    * @param obj the object to update in-place
    * @param with the object to update \p obj with
    */
-  static void update(ProtobufWkt::Struct& obj, const ProtobufWkt::Struct& with);
+  static void update(Protobuf::Struct& obj, const Protobuf::Struct& with);
 };
 
 } // namespace Envoy
 
-namespace std {
-// Inject an implementation of std::hash for Envoy::HashedValue into the std namespace.
-template <> struct hash<Envoy::HashedValue> {
+// Specialize std::hash on Envoy::HashedValue.
+template <> struct std::hash<Envoy::HashedValue> {
   std::size_t operator()(Envoy::HashedValue const& v) const { return v.hash(); }
 };
-
-} // namespace std

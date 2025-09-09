@@ -60,7 +60,7 @@ struct JwtConstValueStruct {
   // The header value prefix for Authorization.
   const std::string BearerPrefix{"Bearer "};
 
-  // The default query parameter name to extract JWT token
+  // The default query parameter name to extract JWT
   const std::string AccessTokenParam{"access_token"};
 };
 using JwtConstValues = ConstSingleton<JwtConstValueStruct>;
@@ -108,17 +108,14 @@ public:
       : JwtLocationBase(token, issuer_checker), param_(param) {}
 
   void removeJwt(Http::RequestHeaderMap& headers) const override {
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.jwt_authn_remove_jwt_from_query_params")) {
-      absl::string_view path = headers.getPathValue();
-      Http::Utility::QueryParamsMulti query_params =
-          Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
+    absl::string_view path = headers.getPathValue();
+    Http::Utility::QueryParamsMulti query_params =
+        Http::Utility::QueryParamsMulti::parseAndDecodeQueryString(path);
 
-      query_params.remove(param_);
+    query_params.remove(param_);
 
-      const auto updated_path = query_params.replaceQueryString(headers.Path()->value());
-      headers.setPath(updated_path);
-    }
+    const auto updated_path = query_params.replaceQueryString(headers.Path()->value());
+    headers.setPath(updated_path);
   }
 
 private:

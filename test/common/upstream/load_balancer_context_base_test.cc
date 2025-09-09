@@ -31,6 +31,7 @@ TEST(LoadBalancerContextBaseTest, LoadBalancerContextBaseTest) {
     EXPECT_EQ(nullptr, context.upstreamSocketOptions());
     EXPECT_EQ(nullptr, context.upstreamTransportSocketOptions());
     EXPECT_EQ(absl::nullopt, context.overrideHostToSelect());
+    context.setHeadersModifier(nullptr);
   }
 }
 

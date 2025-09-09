@@ -7,12 +7,14 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/config/endpoint/v3/endpoint.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/grpc/async_client_manager.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/assert.h"
 #include "source/common/protobuf/utility.h"
 
 #include "absl/status/status.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Config {
@@ -79,7 +81,10 @@ checkApiConfigSourceNames(const envoy::config::core::v3::ApiConfigSource& api_co
                           int max_grpc_services) {
   const bool is_grpc =
       (api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::GRPC ||
-       api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+       api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::DELTA_GRPC ||
+       api_config_source.api_type() == envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC ||
+       api_config_source.api_type() ==
+           envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
 
   if (api_config_source.cluster_names().empty() && api_config_source.grpc_services().empty()) {
     return absl::InvalidArgumentError(
@@ -90,12 +95,12 @@ checkApiConfigSourceNames(const envoy::config::core::v3::ApiConfigSource& api_co
   if (is_grpc) {
     if (!api_config_source.cluster_names().empty()) {
       return absl::InvalidArgumentError(
-          fmt::format("{}::(DELTA_)GRPC must not have a cluster name specified: {}",
+          fmt::format("{}::(AGGREGATED_)(DELTA_)GRPC must not have a cluster name specified: {}",
                       api_config_source.GetTypeName(), api_config_source.DebugString()));
     }
     if (api_config_source.grpc_services_size() > max_grpc_services) {
       return absl::InvalidArgumentError(fmt::format(
-          "{}::(DELTA_)GRPC must have no more than {} gRPC services specified: {}",
+          "{}::(AGGREGATED_)(DELTA_)GRPC must have no more than {} gRPC services specified: {}",
           api_config_source.GetTypeName(), max_grpc_services, api_config_source.DebugString()));
     }
   } else {
@@ -116,7 +121,7 @@ checkApiConfigSourceNames(const envoy::config::core::v3::ApiConfigSource& api_co
 
 absl::Status
 Utility::validateClusterName(const Upstream::ClusterManager::ClusterSet& primary_clusters,
-                             const std::string& cluster_name, const std::string& config_source) {
+                             absl::string_view cluster_name, absl::string_view config_source) {
   const auto& it = primary_clusters.find(cluster_name);
   if (it == primary_clusters.end()) {
     return absl::InvalidArgumentError(
@@ -223,40 +228,74 @@ Utility::parseRateLimitSettings(const envoy::config::core::v3::ApiConfigSource& 
   return rate_limit_settings;
 }
 
-absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSource(
-    Grpc::AsyncClientManager& async_client_manager,
-    const envoy::config::core::v3::ApiConfigSource& api_config_source, Stats::Scope& scope,
-    bool skip_cluster_check, int grpc_service_idx) {
+namespace {
+// Returns true iff the api_type is AGGREGATED_GRPC or AGGREGATED_DELTA_GRPC.
+bool isApiTypeAggregated(const envoy::config::core::v3::ApiConfigSource::ApiType api_type) {
+  return (api_type == envoy::config::core::v3::ApiConfigSource::AGGREGATED_GRPC) ||
+         (api_type == envoy::config::core::v3::ApiConfigSource::AGGREGATED_DELTA_GRPC);
+}
+
+// Returns true iff the api_type is GRPC or DELTA_GRPC.
+bool isApiTypeNonAggregated(const envoy::config::core::v3::ApiConfigSource::ApiType api_type) {
+  return (api_type == envoy::config::core::v3::ApiConfigSource::GRPC) ||
+         (api_type == envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
+}
+} // namespace
+
+absl::StatusOr<Envoy::OptRef<const envoy::config::core::v3::GrpcService>>
+Utility::getGrpcConfigFromApiConfigSource(
+    const envoy::config::core::v3::ApiConfigSource& api_config_source, int grpc_service_idx,
+    bool xdstp_config_source) {
   RETURN_IF_NOT_OK(checkApiConfigSourceNames(
       api_config_source,
       Runtime::runtimeFeatureEnabled("envoy.restart_features.xds_failover_support") ? 2 : 1));
 
-  if (api_config_source.api_type() != envoy::config::core::v3::ApiConfigSource::GRPC &&
-      api_config_source.api_type() != envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
-    return absl::InvalidArgumentError(fmt::format("{} type must be gRPC: {}",
-                                                  api_config_source.GetTypeName(),
-                                                  api_config_source.DebugString()));
+  if (xdstp_config_source) {
+    if (!isApiTypeAggregated(api_config_source.api_type())) {
+      return absl::InvalidArgumentError(fmt::format("{} type must be of aggregated gRPC: {}",
+                                                    api_config_source.GetTypeName(),
+                                                    api_config_source.DebugString()));
+    }
+  } else {
+    if (!isApiTypeNonAggregated(api_config_source.api_type())) {
+      return absl::InvalidArgumentError(fmt::format("{} type must be of non-aggregated gRPC: {}",
+                                                    api_config_source.GetTypeName(),
+                                                    api_config_source.DebugString()));
+    }
   }
 
   if (grpc_service_idx >= api_config_source.grpc_services_size()) {
     // No returned factory in case there's no entry.
-    return nullptr;
+    return absl::nullopt;
   }
 
-  envoy::config::core::v3::GrpcService grpc_service;
-  grpc_service.MergeFrom(api_config_source.grpc_services(grpc_service_idx));
-
-  return async_client_manager.factoryForGrpcService(grpc_service, scope, skip_cluster_check);
+  return Envoy::makeOptRef(api_config_source.grpc_services(grpc_service_idx));
 }
 
-void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
-                                    ProtobufMessage::ValidationVisitor& validation_visitor,
-                                    Protobuf::Message& out_proto) {
-  static const std::string struct_type = ProtobufWkt::Struct::default_instance().GetTypeName();
-  static const std::string typed_struct_type =
-      xds::type::v3::TypedStruct::default_instance().GetTypeName();
-  static const std::string legacy_typed_struct_type =
-      udpa::type::v1::TypedStruct::default_instance().GetTypeName();
+absl::StatusOr<Grpc::AsyncClientFactoryPtr> Utility::factoryForGrpcApiConfigSource(
+    Grpc::AsyncClientManager& async_client_manager,
+    const envoy::config::core::v3::ApiConfigSource& api_config_source, Stats::Scope& scope,
+    bool skip_cluster_check, int grpc_service_idx, bool xdstp_config_source) {
+
+  absl::StatusOr<Envoy::OptRef<const envoy::config::core::v3::GrpcService>> maybe_grpc_service =
+      getGrpcConfigFromApiConfigSource(api_config_source, grpc_service_idx, xdstp_config_source);
+  RETURN_IF_NOT_OK(maybe_grpc_service.status());
+
+  if (!maybe_grpc_service.value().has_value()) {
+    return nullptr;
+  }
+  return async_client_manager.factoryForGrpcService(*maybe_grpc_service.value(), scope,
+                                                    skip_cluster_check);
+}
+
+absl::Status Utility::translateOpaqueConfig(const Protobuf::Any& typed_config,
+                                            ProtobufMessage::ValidationVisitor& validation_visitor,
+                                            Protobuf::Message& out_proto) {
+  static const std::string struct_type(Protobuf::Struct::default_instance().GetTypeName());
+  static const std::string typed_struct_type(
+      xds::type::v3::TypedStruct::default_instance().GetTypeName());
+  static const std::string legacy_typed_struct_type(
+      udpa::type::v1::TypedStruct::default_instance().GetTypeName());
   if (!typed_config.value().empty()) {
     // Unpack methods will only use the fully qualified type name after the last '/'.
     // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
@@ -264,7 +303,7 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
 
     if (type == typed_struct_type) {
       xds::type::v3::TypedStruct typed_struct;
-      MessageUtil::unpackToOrThrow(typed_config, typed_struct);
+      RETURN_IF_NOT_OK(MessageUtil::unpackTo(typed_config, typed_struct));
       // if out_proto is expecting Struct, return directly
       if (out_proto.GetTypeName() == struct_type) {
         out_proto.CheckTypeAndMergeFrom(typed_struct.value());
@@ -279,7 +318,7 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       }
     } else if (type == legacy_typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
-      MessageUtil::unpackToOrThrow(typed_config, typed_struct);
+      RETURN_IF_NOT_OK(MessageUtil::unpackTo(typed_config, typed_struct));
       // if out_proto is expecting Struct, return directly
       if (out_proto.GetTypeName() == struct_type) {
         out_proto.CheckTypeAndMergeFrom(typed_struct.value());
@@ -295,17 +334,18 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       }
     } // out_proto is expecting Struct, unpack directly
     else if (type != struct_type || out_proto.GetTypeName() == struct_type) {
-      MessageUtil::unpackToOrThrow(typed_config, out_proto);
+      RETURN_IF_NOT_OK(MessageUtil::unpackTo(typed_config, out_proto));
     } else {
 #ifdef ENVOY_ENABLE_YAML
-      ProtobufWkt::Struct struct_config;
-      MessageUtil::unpackToOrThrow(typed_config, struct_config);
+      Protobuf::Struct struct_config;
+      RETURN_IF_NOT_OK(MessageUtil::unpackTo(typed_config, struct_config));
       MessageUtil::jsonConvert(struct_config, validation_visitor, out_proto);
 #else
       IS_ENVOY_BUG("Attempting to use JSON structs with JSON compiled out");
 #endif
     }
   }
+  return absl::OkStatus();
 }
 
 absl::StatusOr<JitteredExponentialBackOffStrategyPtr>
@@ -344,6 +384,29 @@ Utility::buildJitteredExponentialBackOffStrategy(
   // use default base interval
   return std::make_unique<JitteredExponentialBackOffStrategy>(
       default_base_interval_ms, default_base_interval_ms * 10, random);
+}
+
+absl::Status Utility::validateTerminalFilters(const std::string& name,
+                                              const std::string& filter_type,
+                                              const std::string& filter_chain_type,
+                                              bool is_terminal_filter,
+                                              bool last_filter_in_current_config) {
+  if (is_terminal_filter && !last_filter_in_current_config) {
+    return absl::InvalidArgumentError(
+        fmt::format("Error: terminal filter named {} of type {} must be the "
+                    "last filter in a {} filter chain.",
+                    name, filter_type, filter_chain_type));
+  } else if (!is_terminal_filter && last_filter_in_current_config) {
+    absl::string_view extra = "";
+    if (filter_chain_type == "router upstream http") {
+      extra = " When upstream_http_filters are specified, they must explicitly end with an "
+              "UpstreamCodec filter.";
+    }
+    return absl::InvalidArgumentError(fmt::format("Error: non-terminal filter named {} of type "
+                                                  "{} is the last filter in a {} filter chain.{}",
+                                                  name, filter_type, filter_chain_type, extra));
+  }
+  return absl::OkStatus();
 }
 
 } // namespace Config

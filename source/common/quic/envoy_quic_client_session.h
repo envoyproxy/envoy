@@ -54,6 +54,10 @@ public:
   // Set up socket and start handshake.
   void connect() override;
 
+  bool setSocketOption(Envoy::Network::SocketOptionName, absl::Span<uint8_t>) override {
+    return false;
+  }
+
   // quic::QuicSession
   void OnConnectionClosed(const quic::QuicConnectionCloseFrame& frame,
                           quic::ConnectionCloseSource source) override;
@@ -75,8 +79,7 @@ public:
 
   // PacketsToReadDelegate
   size_t numPacketsExpectedPerEventLoop() const override {
-    // Do one round of reading per active stream, or to see if there's a new
-    // active stream.
+    // Do one round of reading per active stream, or to see if there's a new active stream.
     return std::max<size_t>(1, GetNumActiveStreams()) * Network::NUM_DATAGRAMS_PER_RECEIVE;
   }
 

@@ -599,6 +599,17 @@ actions:
   EXPECT_TRUE(descriptors_.empty());
 }
 
+TEST_F(ThriftRateLimitPolicyEntryTest, ThrowsOnQueryParameters) {
+  std::string yaml = R"EOF(
+actions:
+  - query_parameters:
+      query_parameter_name: x-parameter-name
+      descriptor_key: my_param
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(initialize(yaml), EnvoyException, "unsupported RateLimit Action 12");
+}
+
 } // namespace
 } // namespace Router
 } // namespace ThriftProxy

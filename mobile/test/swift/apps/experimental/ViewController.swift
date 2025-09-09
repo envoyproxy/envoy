@@ -2,9 +2,9 @@ import Envoy
 import UIKit
 
 private let kCellID = "cell-id"
-private let kRequestAuthority = "api.lyft.com"
+private let kRequestAuthority = "localhost:10000"
 private let kRequestPath = "/ping"
-private let kRequestScheme = "https"
+private let kRequestScheme = "http"
 private let kFilteredHeaders =
   ["server", "filter-demo", "async-filter-demo", "x-envoy-upstream-service-time"]
 
@@ -39,7 +39,6 @@ final class ViewController: UITableViewController {
       .addStringAccessor(name: "demo-accessor", accessor: { return "PlatformString" })
       .addKeyValueStore(name: "demo-kv-store", keyValueStore: UserDefaults.standard)
       .setEventTracker { NSLog("Envoy event emitted: \($0)") }
-      .forceIPv6(true)
       .build()
     self.streamClient = engine.streamClient()
     self.pulseClient = engine.pulseClient()

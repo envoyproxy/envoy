@@ -19,7 +19,7 @@ namespace {
 struct TestFactory : public Envoy::Server::Configuration::NamedHttpFilterConfigFactory {
   std::string name() const override { return "test"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::StringValue>();
+    return std::make_unique<Protobuf::StringValue>();
   }
   absl::StatusOr<Envoy::Http::FilterFactoryCb>
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
@@ -128,8 +128,10 @@ xds_matcher:
   envoy::extensions::common::matching::v3::ExtensionWithMatcherPerRoute config;
   TestUtility::loadFromYamlAndValidate(yaml, config);
   Router::RouteSpecificFilterConfigConstSharedPtr route_config =
-      factory.createRouteSpecificFilterConfig(config, server_factory_context,
-                                              ProtobufMessage::getNullValidationVisitor());
+      factory
+          .createRouteSpecificFilterConfig(config, server_factory_context,
+                                           ProtobufMessage::getNullValidationVisitor())
+          .value();
   EXPECT_TRUE(route_config.get());
 }
 
@@ -291,31 +293,32 @@ xds_matcher:
             "according to allowlist");
 }
 
-struct TestAction : Matcher::ActionBase<ProtobufWkt::StringValue> {};
+struct TestAction : Matcher::ActionBase<Protobuf::StringValue> {};
 
 template <class InputType, class ActionType>
 Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>
 createMatchingTree(const std::string& name, const std::string& value) {
-  auto tree = std::make_shared<Matcher::ExactMapMatcher<Envoy::Http::HttpMatchingData>>(
+  auto tree = *Matcher::ExactMapMatcher<Envoy::Http::HttpMatchingData>::create(
       std::make_unique<InputType>(name), absl::nullopt);
 
   tree->addChild(value, Matcher::OnMatch<Envoy::Http::HttpMatchingData>{
-                            []() { return std::make_unique<ActionType>(); }, nullptr});
+                            std::make_shared<ActionType>(), nullptr, false});
 
   return tree;
 }
 
 Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> createRequestAndResponseMatchingTree() {
-  auto tree = std::make_shared<Matcher::ExactMapMatcher<Envoy::Http::HttpMatchingData>>(
+  auto tree = *Matcher::ExactMapMatcher<Envoy::Http::HttpMatchingData>::create(
       std::make_unique<Envoy::Http::Matching::HttpResponseHeadersDataInput>("match-header"),
       absl::nullopt);
 
   tree->addChild(
       "match",
       Matcher::OnMatch<Envoy::Http::HttpMatchingData>{
-          []() { return std::make_unique<SkipAction>(); },
+          std::make_shared<SkipAction>(),
           createMatchingTree<Envoy::Http::Matching::HttpRequestHeadersDataInput, SkipAction>(
-              "match-header", "match")});
+              "match-header", "match"),
+          false});
 
   return tree;
 }
@@ -365,14 +368,12 @@ TEST(DelegatingFilterTest, MatchTreeSkipActionDecodingHeaders) {
 template <class InputType, class ActionType>
 Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData>
 createMatchTreeWithOnNoMatch(const std::string& name, const std::string& value) {
-  auto tree = std::make_shared<Matcher::ExactMapMatcher<Envoy::Http::HttpMatchingData>>(
-      std::make_unique<InputType>(name),
-      Matcher::OnMatch<Envoy::Http::HttpMatchingData>{
-          []() { return std::make_unique<ActionType>(); }, nullptr});
+  auto tree = *Matcher::ExactMapMatcher<Envoy::Http::HttpMatchingData>::create(
+      std::make_unique<InputType>(name), Matcher::OnMatch<Envoy::Http::HttpMatchingData>{
+                                             std::make_shared<ActionType>(), nullptr, false});
 
   // No action is set on match. i.e., nullptr action factory cb.
-  tree->addChild(
-      value, Matcher::OnMatch<Envoy::Http::HttpMatchingData>{[]() { return nullptr; }, nullptr});
+  tree->addChild(value, Matcher::OnMatch<Envoy::Http::HttpMatchingData>{nullptr, nullptr, false});
   return tree;
 }
 

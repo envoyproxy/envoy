@@ -37,6 +37,7 @@ envoy_cc_library(
         "//source/common/common:scalar_to_byte_vector_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:well_known_names",
+        "//source/common/http:header_utility_lib",
         "//source/common/http/http1:balsa_parser_lib",
         "//source/common/http/http1:legacy_parser_lib",
         "//source/common/network:address_lib",

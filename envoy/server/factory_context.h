@@ -9,6 +9,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/config/xds_manager.h"
 #include "envoy/grpc/context.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/context.h"
@@ -35,6 +36,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/macros.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/singleton/threadsafe_singleton.h"
 
 namespace Envoy {
 
@@ -111,15 +113,20 @@ public:
   virtual Stats::Scope& serverScope() PURE;
 
   /**
-   * @return ThreadLocal::SlotAllocator& the thread local storage engine for the server. This is
+   * @return ThreadLocal::Instance& the thread local storage engine for the server. This is
    *         used to allow runtime lockless updates to configuration, etc. across multiple threads.
    */
-  virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
+  virtual ThreadLocal::Instance& threadLocal() PURE;
 
   /**
    * @return Upstream::ClusterManager& singleton for use by the entire server.
    */
   virtual Upstream::ClusterManager& clusterManager() PURE;
+
+  /**
+   * @return Config::XdsManager& singleton for use by the entire server.
+   */
+  virtual Config::XdsManager& xdsManager() PURE;
 
   /**
    * @return const Http::HttpServerPropertiesCacheManager& instance for use by the entire server.
@@ -217,7 +224,22 @@ public:
    * @return whether external healthchecks are currently failed or not.
    */
   virtual bool healthCheckFailed() const PURE;
+
+  /**
+   * @return Ssl::ContextManager& the SSL context manager.
+   */
+  virtual Ssl::ContextManager& sslContextManager() PURE;
+
+  /**
+   * Return the instance of secret manager.
+   */
+  virtual Secret::SecretManager& secretManager() PURE;
 };
+
+// ServerFactoryContextInstance is a thread local singleton that provides access to the
+// ServerFactoryContext. This will be initialized once the server is created at the start of the
+// main thread and will be available at the main thread for the lifetime of the server.
+using ServerFactoryContextInstance = ThreadLocalInjectableSingleton<ServerFactoryContext>;
 
 /**
  * Generic factory context for multiple scenarios. This context provides a server factory context
@@ -233,12 +255,12 @@ public:
    * @return ServerFactoryContext which lifetime is no shorter than the server and provides
    *         access to the server's resources.
    */
-  virtual ServerFactoryContext& serverFactoryContext() const PURE;
+  virtual ServerFactoryContext& serverFactoryContext() PURE;
 
   /**
    * @return ProtobufMessage::ValidationVisitor& validation visitor for configuration messages.
    */
-  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() const PURE;
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 
   /**
    * @return Init::Manager& the init manager of the server/listener/cluster/etc, depending on the
@@ -251,6 +273,13 @@ public:
    *         backend implementation.
    */
   virtual Stats::Scope& scope() PURE;
+
+  /**
+   * @return Stats::Scope& the stats scope of the server/listener/cluster/etc, depending on the
+   *         backend implementation.
+   * TODO(wbpcode): move all scope() calling to this method.
+   */
+  virtual Stats::Scope& statsScope() { return scope(); }
 };
 
 /**
@@ -266,11 +295,6 @@ public:
    * @return Stats::Scope& the listener's stats scope.
    */
   virtual Stats::Scope& listenerScope() PURE;
-
-  /**
-   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
-   */
-  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
 
   /**
    * @return const Network::DrainDecision& a drain decision that filters can use to determine if
@@ -334,7 +358,7 @@ public:
   /**
    * @return ServerFactoryContext which lifetime is no shorter than the server.
    */
-  virtual ServerFactoryContext& serverFactoryContext() const PURE;
+  virtual ServerFactoryContext& serverFactoryContext() PURE;
 
   /**
    * @return the init manager of the particular context. This can be used for extensions that need

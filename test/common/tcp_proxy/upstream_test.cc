@@ -216,19 +216,6 @@ TEST_P(HttpUpstreamTest, UpstreamTrailersPropagateFinDownstream) {
   upstream_->responseDecoder().decodeTrailers(std::move(trailers));
 }
 
-TEST_P(HttpUpstreamTest, UpstreamTrailersDontPropagateFinDownstreamWhenFeatureDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers",
-        "false"}});
-  setupUpstream();
-  EXPECT_CALL(encoder_.stream_, resetStream(_)).Times(0);
-  upstream_->doneWriting();
-  EXPECT_CALL(callbacks_, onUpstreamData(_, _)).Times(0);
-  Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
-  upstream_->responseDecoder().decodeTrailers(std::move(trailers));
-}
-
 class HttpUpstreamRequestEncoderTest : public testing::TestWithParam<Http::CodecType> {
 public:
   HttpUpstreamRequestEncoderTest() {
@@ -252,7 +239,7 @@ public:
 
   void populateMetadata(envoy::config::core::v3::Metadata& metadata, const std::string& ns,
                         const std::string& key, const std::string& value) {
-    ProtobufWkt::Struct struct_obj;
+    Protobuf::Struct struct_obj;
     auto& fields_map = *struct_obj.mutable_fields();
     fields_map[key] = ValueUtil::stringValue(value);
     (*metadata.mutable_filter_metadata())[ns] = struct_obj;
@@ -504,9 +491,9 @@ public:
 
   void setup() {
     tunnel_config_ = std::make_unique<TunnelingConfigHelperImpl>(scope_, tcp_proxy_, context_);
-    conn_pool_ = std::make_unique<HttpConnPool>(cluster_, &lb_context_, *tunnel_config_, callbacks_,
-                                                decoder_callbacks_, Http::CodecType::HTTP2,
-                                                downstream_stream_info_);
+    conn_pool_ = std::make_unique<HttpConnPool>(nullptr, cluster_, &lb_context_, *tunnel_config_,
+                                                callbacks_, decoder_callbacks_,
+                                                Http::CodecType::HTTP2, downstream_stream_info_);
     upstream_ = std::make_unique<CombinedUpstream>(*conn_pool_, callbacks_, decoder_callbacks_,
                                                    *tunnel_config_, downstream_stream_info_);
     auto mock_conn_pool = std::make_unique<NiceMock<Router::MockGenericConnPool>>();
@@ -670,17 +657,6 @@ TEST_F(CombinedUpstreamTest, UpstreamTrailersMarksDoneReading) {
   this->upstream_->responseDecoder().decodeTrailers(std::move(trailers));
 }
 
-TEST_F(CombinedUpstreamTest, UpstreamTrailersDontPropagateFinDownstreamWhenFeatureDisabled) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues(
-      {{"envoy.reloadable_features.tcp_tunneling_send_downstream_fin_on_upstream_trailers",
-        "false"}});
-  this->setup();
-  upstream_->doneWriting();
-  EXPECT_CALL(callbacks_, onUpstreamData(_, _)).Times(0);
-  Http::ResponseTrailerMapPtr trailers{new Http::TestResponseTrailerMapImpl{{"key", "value"}}};
-  upstream_->responseDecoder().decodeTrailers(std::move(trailers));
-}
 } // namespace
 } // namespace TcpProxy
 } // namespace Envoy

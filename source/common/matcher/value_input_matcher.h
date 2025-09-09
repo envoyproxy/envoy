@@ -7,9 +7,9 @@
 namespace Envoy {
 namespace Matcher {
 
-template <class StringMatcherType>
 class StringInputMatcher : public InputMatcher, Logger::Loggable<Logger::Id::matcher> {
 public:
+  template <class StringMatcherType>
   explicit StringInputMatcher(const StringMatcherType& matcher,
                               Server::Configuration::CommonFactoryContext& context)
       : matcher_(matcher, context) {}
@@ -23,7 +23,7 @@ public:
   }
 
 private:
-  const Matchers::StringMatcherImpl<StringMatcherType> matcher_;
+  const Matchers::StringMatcherImpl matcher_;
 };
 
 } // namespace Matcher

@@ -2,7 +2,6 @@
 
 #include <chrono>
 
-#include "envoy/common/exception.h"
 #include "envoy/config/metrics/v3/metrics_service.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/metrics/v3/metrics_service.pb.h"

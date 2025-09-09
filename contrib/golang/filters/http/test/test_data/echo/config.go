@@ -1,4 +1,4 @@
-package main
+package echo
 
 import (
 	xds "github.com/cncf/xds/go/xds/type/v3"
@@ -53,5 +53,3 @@ func filterFactory(c interface{}, callbacks api.FilterCallbackHandler) api.Strea
 		config:    conf,
 	}
 }
-
-func main() {}

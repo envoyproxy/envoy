@@ -34,9 +34,9 @@ ConfigHelper::HttpModifierFunction setRouteUsingWebsocket() {
 
 void WebsocketIntegrationTest::initialize() { HttpProtocolIntegrationTest::initialize(); }
 
-std::string genSoPath(std::string name) {
+std::string genSoPath() {
   return TestEnvironment::substitute(
-      "{{ test_rundir }}/contrib/golang/filters/http/test/test_data/" + name + "/filter.so");
+      "{{ test_rundir }}/contrib/golang/filters/http/test/test_data/plugins.so");
 }
 
 std::string filterConfig(const std::string& name) {
@@ -54,7 +54,7 @@ typed_config:
      match_path: "/echo"
 )EOF";
 
-  return absl::StrFormat(yaml_fmt, name, genSoPath(name), name);
+  return absl::StrFormat(yaml_fmt, name, genSoPath(), name);
 }
 
 TEST_P(GolangWebsocketIntegrationTest, WebsocketGolangFilterChain) {

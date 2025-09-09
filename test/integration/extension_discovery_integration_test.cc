@@ -276,7 +276,7 @@ public:
   void sendLdsResponse(const std::string& version) {
     envoy::service::discovery::v3::DiscoveryResponse response;
     response.set_version_info(version);
-    response.set_type_url(Config::TypeUrl::get().Listener);
+    response.set_type_url(Config::TestTypeUrl::get().Listener);
     response.add_resources()->PackFrom(listener_config_);
     lds_stream_->sendGrpcMessage(response);
   }
@@ -329,7 +329,7 @@ public:
 
   void sendHttpFilterEcdsResponseWithFullYaml(const std::string& name, const std::string& version,
                                               const std::string& full_yaml) {
-    const auto configuration = TestUtility::parseYaml<ProtobufWkt::Any>(full_yaml);
+    const auto configuration = TestUtility::parseYaml<Protobuf::Any>(full_yaml);
     envoy::config::core::v3::TypedExtensionConfig typed_config;
     typed_config.set_name(name);
     typed_config.mutable_typed_config()->MergeFrom(configuration);
@@ -883,7 +883,7 @@ TEST_P(ExtensionDiscoveryIntegrationTest, ConfigDumpWithTwoSubscriptionTypes) {
   BufferingStreamDecoderPtr response;
   EXPECT_EQ("200", request("admin", "GET", "/config_dump", response));
   EXPECT_EQ("application/json", contentType(response));
-  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body());
+  Json::ObjectSharedPtr json = Json::Factory::loadFromString(response->body()).value();
   size_t index = 0;
   const std::string expected_types[] = {
       "type.googleapis.com/envoy.admin.v3.BootstrapConfigDump",
@@ -895,8 +895,9 @@ TEST_P(ExtensionDiscoveryIntegrationTest, ConfigDumpWithTwoSubscriptionTypes) {
       "type.googleapis.com/envoy.admin.v3.RoutesConfigDump",
       "type.googleapis.com/envoy.admin.v3.SecretsConfigDump"};
 
-  for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs")) {
-    EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type")) == 0);
+  auto array = json->getObjectArray("configs").value();
+  for (const Json::ObjectSharedPtr& obj_ptr : array) {
+    EXPECT_TRUE(expected_types[index].compare(*obj_ptr->getString("@type")) == 0);
     index++;
   }
 

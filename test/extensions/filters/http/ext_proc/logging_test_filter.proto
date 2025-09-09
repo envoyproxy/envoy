@@ -6,4 +6,5 @@ message LoggingTestFilterConfig {
   string logging_id = 1;
   string upstream_cluster_name = 2;
   bool check_received_bytes = 3;
+  string http_rcd = 4;
 }

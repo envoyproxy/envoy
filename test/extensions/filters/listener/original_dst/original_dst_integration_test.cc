@@ -22,6 +22,8 @@ ConfigHelper::ConfigModifierFunction setOriginalDstCluster(int port) {
   return [port](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
     auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster.clear_load_balancing_policy();
+
     cluster.set_type(envoy::config::cluster::v3::Cluster::ORIGINAL_DST);
     cluster.set_lb_policy(envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED);
     cluster.mutable_original_dst_lb_config()->mutable_upstream_port_override()->set_value(port);

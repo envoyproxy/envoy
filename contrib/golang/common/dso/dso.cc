@@ -242,5 +242,66 @@ void NetworkFilterDsoImpl::envoyGoFilterOnSemaDec(void* w) {
   envoy_go_filter_on_sema_dec_(w);
 }
 
+HttpTcpBridgeDsoImpl::HttpTcpBridgeDsoImpl(const std::string dso_name)
+    : HttpTcpBridgeDso(dso_name) {
+  loaded_ &= dlsymInternal<decltype(envoy_go_http_tcp_bridge_on_config_)>(
+      envoy_go_http_tcp_bridge_on_config_, handler_, dso_name, "envoyGoHttpTcpBridgeOnConfig");
+  loaded_ &= dlsymInternal<decltype(envoy_go_http_tcp_bridge_destroy_plugin_config_)>(
+      envoy_go_http_tcp_bridge_destroy_plugin_config_, handler_, dso_name,
+      "envoyGoHttpTcpBridgeDestroyPluginConfig");
+  loaded_ &= dlsymInternal<decltype(envoy_go_http_tcp_bridge_on_encode_header_)>(
+      envoy_go_http_tcp_bridge_on_encode_header_, handler_, dso_name,
+      "envoyGoHttpTcpBridgeOnEncodeHeader");
+  loaded_ &= dlsymInternal<decltype(envoy_go_http_tcp_bridge_on_encode_data_)>(
+      envoy_go_http_tcp_bridge_on_encode_data_, handler_, dso_name,
+      "envoyGoHttpTcpBridgeOnEncodeData");
+  loaded_ &= dlsymInternal<decltype(envoy_go_http_tcp_bridge_on_upstream_data_)>(
+      envoy_go_http_tcp_bridge_on_upstream_data_, handler_, dso_name,
+      "envoyGoHttpTcpBridgeOnUpstreamData");
+  loaded_ &= dlsymInternal<decltype(envoy_go_http_tcp_bridge_on_destroy_)>(
+      envoy_go_http_tcp_bridge_on_destroy_, handler_, dso_name, "envoyGoHttpTcpBridgeOnDestroy");
+}
+
+GoUint64 HttpTcpBridgeDsoImpl::envoyGoHttpTcpBridgeOnConfig(httpConfig* p0) {
+  ASSERT(envoy_go_http_tcp_bridge_on_config_ != nullptr);
+  return envoy_go_http_tcp_bridge_on_config_(p0);
+}
+
+void HttpTcpBridgeDsoImpl::envoyGoHttpTcpBridgeDestroyPluginConfig(GoUint64 p0) {
+  ASSERT(envoy_go_http_tcp_bridge_destroy_plugin_config_ != nullptr);
+  return envoy_go_http_tcp_bridge_destroy_plugin_config_(p0);
+}
+
+GoUint64
+HttpTcpBridgeDsoImpl::envoyGoHttpTcpBridgeOnEncodeHeader(processState* state, GoUint64 end_stream,
+                                                         GoUint64 header_num, GoUint64 header_bytes,
+                                                         GoUint64 buf_ptr, GoUint64 buf_len) {
+  ASSERT(envoy_go_http_tcp_bridge_on_encode_header_ != nullptr);
+  return envoy_go_http_tcp_bridge_on_encode_header_(state, end_stream, header_num, header_bytes,
+                                                    buf_ptr, buf_len);
+}
+
+GoUint64 HttpTcpBridgeDsoImpl::envoyGoHttpTcpBridgeOnEncodeData(processState* state,
+                                                                GoUint64 end_stream,
+                                                                GoUint64 buf_ptr,
+                                                                GoUint64 buf_len) {
+  ASSERT(envoy_go_http_tcp_bridge_on_encode_data_ != nullptr);
+  return envoy_go_http_tcp_bridge_on_encode_data_(state, end_stream, buf_ptr, buf_len);
+}
+
+GoUint64
+HttpTcpBridgeDsoImpl::envoyGoHttpTcpBridgeOnUpstreamData(processState* state, GoUint64 end_stream,
+                                                         GoUint64 header_num, GoUint64 header_bytes,
+                                                         GoUint64 buf_ptr, GoUint64 buf_len) {
+  ASSERT(envoy_go_http_tcp_bridge_on_upstream_data_ != nullptr);
+  return envoy_go_http_tcp_bridge_on_upstream_data_(state, end_stream, header_num, header_bytes,
+                                                    buf_ptr, buf_len);
+}
+
+void HttpTcpBridgeDsoImpl::envoyGoHttpTcpBridgeOnDestroy(httpRequest* p0) {
+  ASSERT(envoy_go_http_tcp_bridge_on_destroy_ != nullptr);
+  envoy_go_http_tcp_bridge_on_destroy_(p0);
+}
+
 } // namespace Dso
 } // namespace Envoy

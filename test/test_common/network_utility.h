@@ -149,6 +149,29 @@ UpstreamTransportSocketFactoryPtr createRawBufferSocketFactory();
 DownstreamTransportSocketFactoryPtr createRawBufferDownstreamSocketFactory();
 
 /**
+ * Creates a sockaddr_storage instance containing an IPv6 socket.
+ * @param ip The IP address as a string.
+ * @param port The port.
+ * @return sockaddr_storage
+ */
+sockaddr_storage getV6SockAddr(const std::string& ip, uint32_t port);
+
+/**
+ * Creates a sockaddr_storage instance containing an IPv4 socket.
+ * @param ip The IP address as a string.
+ * @param port The port.
+ * @return sockaddr_storage
+ */
+sockaddr_storage getV4SockAddr(const std::string& ip, uint32_t port);
+
+/**
+ * Gets the length of the sockaddr_storage instance.
+ * @param ss The sockaddr_storage instance (can be a v4 or v6 instance).
+ * @return socklen_t The size of the sockaddr_storage object.
+ */
+socklen_t getSockAddrLen(const sockaddr_storage& ss);
+
+/**
  * Implementation of Network::FilterChain with empty filter chain, but pluggable transport socket
  * factory.
  */
@@ -171,6 +194,8 @@ public:
   }
 
   absl::string_view name() const override { return "EmptyFilterChain"; }
+
+  bool addedViaApi() const override { return false; }
 
 private:
   const DownstreamTransportSocketFactoryPtr transport_socket_factory_;

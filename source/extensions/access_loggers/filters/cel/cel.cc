@@ -9,23 +9,30 @@ namespace CEL {
 namespace Expr = Envoy::Extensions::Filters::Common::Expr;
 
 CELAccessLogExtensionFilter::CELAccessLogExtensionFilter(
-    const ::Envoy::LocalInfo::LocalInfo& local_info, Expr::BuilderInstanceSharedPtr builder,
-    const google::api::expr::v1alpha1::Expr& input_expr)
-    : local_info_(local_info), builder_(builder), parsed_expr_(input_expr) {
-  compiled_expr_ = Expr::createExpression(builder_->builder(), parsed_expr_);
-}
+    const ::Envoy::LocalInfo::LocalInfo& local_info,
+    Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
+    const cel::expr::Expr& input_expr)
+    : local_info_(local_info), expr_([&]() {
+        auto compiled_expr =
+            Extensions::Filters::Common::Expr::CompiledExpression::Create(builder, input_expr);
+        if (!compiled_expr.ok()) {
+          throw EnvoyException(
+              absl::StrCat("failed to create an expression: ", compiled_expr.status().message()));
+        }
+        return std::move(compiled_expr.value());
+      }()) {}
 
 bool CELAccessLogExtensionFilter::evaluate(const Formatter::HttpFormatterContext& log_context,
                                            const StreamInfo::StreamInfo& stream_info) const {
   Protobuf::Arena arena;
-  auto eval_status = Expr::evaluate(*compiled_expr_, arena, &local_info_, stream_info,
-                                    &log_context.requestHeaders(), &log_context.responseHeaders(),
-                                    &log_context.responseTrailers());
-  if (!eval_status.has_value() || eval_status.value().IsError()) {
+  const auto result =
+      expr_.evaluate(arena, &local_info_, stream_info, &log_context.requestHeaders(),
+                     &log_context.responseHeaders(), &log_context.responseTrailers());
+  if (!result.has_value() || result.value().IsError()) {
     return false;
   }
-  auto result = eval_status.value();
-  return result.IsBool() ? result.BoolOrDie() : false;
+  auto eval_result = result.value();
+  return eval_result.IsBool() ? eval_result.BoolOrDie() : false;
 }
 
 } // namespace CEL

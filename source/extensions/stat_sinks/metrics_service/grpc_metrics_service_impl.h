@@ -47,7 +47,7 @@ public:
   void onReceiveInitialMetadata(Http::ResponseHeaderMapPtr&&) override {}
   void onReceiveMessage(std::unique_ptr<ResponseProto>&&) override {}
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&&) override {}
-  void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override{};
+  void onRemoteClose(Grpc::Status::GrpcStatus, const std::string&) override {};
 
 protected:
   Grpc::AsyncStream<RequestProto> stream_{};

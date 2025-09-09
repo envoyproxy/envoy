@@ -78,8 +78,9 @@ public:
    * workers. For example, the actual listen() call, post listen socket options, etc. This is done
    * so that all error handling can occur on the main thread and the gap between performing these
    * actions and using the socket is minimized.
+   * @return a status indicating if an error occurred.
    */
-  virtual void doFinalPreWorkerInit() PURE;
+  virtual absl::Status doFinalPreWorkerInit() PURE;
 };
 
 /**
@@ -272,9 +273,9 @@ public:
   virtual ResourceLimit& openConnections() PURE;
 
   /**
-   * @return std::vector<AccessLog::InstanceSharedPtr> access logs emitted by the listener.
+   * @return AccessLog::InstanceSharedPtrVector access logs emitted by the listener.
    */
-  virtual const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const PURE;
+  virtual const AccessLog::InstanceSharedPtrVector& accessLogs() const PURE;
 
   /**
    * @return pending connection backlog for TCP listeners.
@@ -358,7 +359,7 @@ struct UdpRecvData {
   Buffer::InstancePtr buffer_;
   MonotonicTime receive_time_;
   uint8_t tos_ = 0;
-  Buffer::RawSlice saved_cmsg_;
+  Buffer::OwnedImpl saved_cmsg_;
 };
 
 /**

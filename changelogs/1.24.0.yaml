@@ -122,7 +122,7 @@ bug_fixes:
     fixed a bug with internal redirects not being performed for drained connections.
 - area: jwt_authn
   change: |
-    fixed a bug where a negative "exp", "iat", or "nbf" integer in JWT token readed as a large positive value.
+    fixed a bug where a negative "exp", "iat", or "nbf" integer in JWTs readed as a large positive value.
 - area: grpc_transcoder
   change: |
     fixed a bug where a request with a wrong binding type is not rejected if the request body is empty.

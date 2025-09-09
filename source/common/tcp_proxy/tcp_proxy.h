@@ -23,6 +23,7 @@
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
+#include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 #include "source/common/formatter/substitution_format_string.h"
@@ -34,6 +35,7 @@
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tcp_proxy/upstream.h"
 #include "source/common/upstream/load_balancer_context_base.h"
+#include "source/common/upstream/od_cds_api_impl.h"
 
 #include "absl/container/node_hash_map.h"
 
@@ -42,6 +44,15 @@ namespace TcpProxy {
 
 constexpr absl::string_view PerConnectionIdleTimeoutMs =
     "envoy.tcp_proxy.per_connection_idle_timeout_ms";
+/**
+ * ReceiveBeforeConnectKey is the key for the receive_before_connect filter state. The
+ * filter state value is a ``StreamInfo::BoolAccessor`` indicating whether the
+ * receive_before_connect functionality should be enabled. Network filters setting this filter
+ * state should return `StopIteration` in their `onNewConnection` and `onData` methods until they
+ * have read the data they need before the upstream connection establishment, and only then allow
+ * the filter chain to proceed to the TCP_PROXY filter.
+ */
+constexpr absl::string_view ReceiveBeforeConnectKey = "envoy.tcp_proxy.receive_before_connect";
 
 /**
  * All tcp proxy stats. @see stats_macros.h
@@ -53,6 +64,7 @@ constexpr absl::string_view PerConnectionIdleTimeoutMs =
   COUNTER(downstream_cx_tx_bytes_total)                                                            \
   COUNTER(downstream_flow_control_paused_reading_total)                                            \
   COUNTER(downstream_flow_control_resumed_reading_total)                                           \
+  COUNTER(early_data_received_count_total)                                                         \
   COUNTER(idle_timeout)                                                                            \
   COUNTER(max_downstream_connection_duration)                                                      \
   COUNTER(upstream_flush_total)                                                                    \
@@ -154,7 +166,7 @@ public:
       const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config_message,
       Server::Configuration::FactoryContext& context);
   std::string host(const StreamInfo::StreamInfo& stream_info) const override;
-  bool usePost() const override { return use_post_; }
+  bool usePost() const override { return !post_path_.empty(); }
   const std::string& postPath() const override { return post_path_; }
   Envoy::Http::HeaderEvaluator& headerEvaluator() const override { return *header_parser_; }
 
@@ -170,7 +182,6 @@ public:
   }
 
 private:
-  const bool use_post_;
   std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
   Formatter::FormatterPtr hostname_fmt_;
   const bool propagate_response_headers_;
@@ -188,13 +199,7 @@ class OnDemandConfig {
 public:
   OnDemandConfig(const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_OnDemand&
                      on_demand_message,
-                 Server::Configuration::FactoryContext& context, Stats::Scope& scope)
-      : odcds_(context.serverFactoryContext().clusterManager().allocateOdCdsApi(
-            on_demand_message.odcds_config(), OptRef<xds::core::v3::ResourceLocator>(),
-            context.messageValidationVisitor())),
-        lookup_timeout_(std::chrono::milliseconds(
-            PROTOBUF_GET_MS_OR_DEFAULT(on_demand_message, timeout, 60000))),
-        stats_(generateStats(scope)) {}
+                 Server::Configuration::FactoryContext& context, Stats::Scope& scope);
   Upstream::OdCdsApiHandle& onDemandCds() const { return *odcds_; }
   std::chrono::milliseconds timeout() const { return lookup_timeout_; }
   const OnDemandStats& stats() const { return stats_; }
@@ -234,22 +239,21 @@ public:
       return access_log_flush_interval_;
     }
     TunnelingConfigHelperOptConstRef tunnelingConfigHelper() {
-      if (tunneling_config_helper_) {
-        return {*tunneling_config_helper_};
-      } else {
-        return {};
-      }
+      return makeOptRefFromPtr<const TunnelingConfigHelper>(tunneling_config_helper_.get());
     }
     OnDemandConfigOptConstRef onDemandConfig() {
-      if (on_demand_config_) {
-        return {*on_demand_config_};
-      } else {
-        return {};
-      }
+      return makeOptRefFromPtr<const OnDemandConfig>(on_demand_config_.get());
+    }
+    const BackOffStrategyPtr& backoffStrategy() const { return backoff_strategy_; };
+    const Network::ProxyProtocolTLVVector& proxyProtocolTLVs() const {
+      return proxy_protocol_tlvs_;
     }
 
   private:
     static TcpProxyStats generateStats(Stats::Scope& scope);
+
+    static Network::ProxyProtocolTLVVector
+    parseTLVs(absl::Span<const envoy::config::core::v3::TlvEntry* const> tlvs);
 
     // Hold a Scope for the lifetime of the configuration because connections in
     // the UpstreamDrainManager can live longer than the listener.
@@ -262,6 +266,8 @@ public:
     absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
     std::unique_ptr<TunnelingConfigHelper> tunneling_config_helper_;
     std::unique_ptr<OnDemandConfig> on_demand_config_;
+    BackOffStrategyPtr backoff_strategy_;
+    Network::ProxyProtocolTLVVector proxy_protocol_tlvs_;
   };
 
   using SharedConfigSharedPtr = std::shared_ptr<SharedConfig>;
@@ -281,7 +287,7 @@ public:
   RouteConstSharedPtr getRegularRouteFromEntries(Network::Connection& connection);
 
   const TcpProxyStats& stats() { return shared_config_->stats(); }
-  const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() { return access_logs_; }
+  const AccessLog::InstanceSharedPtrVector& accessLogs() { return access_logs_; }
   uint32_t maxConnectAttempts() const { return max_connect_attempts_; }
   const absl::optional<std::chrono::milliseconds>& idleTimeout() {
     return shared_config_->idleTimeout();
@@ -316,6 +322,10 @@ public:
   Random::RandomGenerator& randomGenerator() { return random_generator_; }
   bool flushAccessLogOnConnected() const { return shared_config_->flushAccessLogOnConnected(); }
   Regex::Engine& regexEngine() const { return regex_engine_; }
+  const BackOffStrategyPtr& backoffStrategy() const { return shared_config_->backoffStrategy(); };
+  const Network::ProxyProtocolTLVVector& proxyProtocolTLVs() const {
+    return shared_config_->proxyProtocolTLVs();
+  }
 
 private:
   struct SimpleRouteImpl : public Route {
@@ -361,7 +371,7 @@ private:
   RouteConstSharedPtr default_route_;
   std::vector<WeightedClusterEntryConstSharedPtr> weighted_clusters_;
   uint64_t total_cluster_weight_;
-  std::vector<AccessLog::InstanceSharedPtr> access_logs_;
+  AccessLog::InstanceSharedPtrVector access_logs_;
   const uint32_t max_connect_attempts_;
   ThreadLocal::SlotPtr upstream_drain_manager_slot_;
   SharedConfigSharedPtr shared_config_;
@@ -429,7 +439,7 @@ public:
     return &read_callbacks_->connection();
   }
 
-  const StreamInfo::StreamInfo* requestStreamInfo() const override {
+  StreamInfo::StreamInfo* requestStreamInfo() const override {
     return &read_callbacks_->connection().streamInfo();
   }
 
@@ -519,6 +529,7 @@ public:
                         std::function<void(Http::ResponseHeaderMap& headers)>,
                         const absl::optional<Grpc::Status::GrpcStatus>,
                         absl::string_view) override {}
+    void sendGoAwayAndClose() override {}
     void encode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
     Http::ResponseHeaderMapOptRef informationalHeaders() override { return {}; }
     void encodeHeaders(Http::ResponseHeaderMapPtr&&, bool, absl::string_view) override {}
@@ -537,8 +548,8 @@ public:
     }
     void addDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) override {}
     void removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) override {}
-    void setDecoderBufferLimit(uint32_t) override {}
-    uint32_t decoderBufferLimit() override { return 0; }
+    void setDecoderBufferLimit(uint64_t) override {}
+    uint64_t decoderBufferLimit() override { return 0; }
     bool recreateStream(const Http::ResponseHeaderMap*) override { return false; }
     void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
     Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return nullptr; }
@@ -614,6 +625,7 @@ protected:
   void onClusterDiscoveryCompletion(Upstream::ClusterDiscoveryStatus cluster_status);
 
   bool maybeTunnel(Upstream::ThreadLocalCluster& cluster);
+  void onConnectMaxAttempts();
   void onConnectTimeout();
   void onDownstreamEvent(Network::ConnectionEvent event);
   void onUpstreamData(Buffer::Instance& data, bool end_stream);
@@ -627,6 +639,9 @@ protected:
   void resetAccessLogFlushTimer();
   void flushAccessLog(AccessLog::AccessLogType access_log_type);
   void disableAccessLogFlushTimer();
+  void onRetryTimer();
+  void enableRetryTimer();
+  void disableRetryTimer();
 
   const ConfigSharedPtr config_;
   Upstream::ClusterManager& cluster_manager_;
@@ -636,6 +651,7 @@ protected:
   Event::TimerPtr idle_timer_;
   Event::TimerPtr connection_duration_timer_;
   Event::TimerPtr access_log_flush_timer_;
+  Event::TimerPtr retry_timer_;
 
   // A pointer to the on demand cluster lookup when lookup is in flight.
   Upstream::ClusterDiscoveryCallbackHandlePtr cluster_discovery_handle_;
@@ -661,6 +677,14 @@ protected:
   uint32_t connect_attempts_{};
   bool connecting_{};
   bool downstream_closed_{};
+  // Stores the ReceiveBeforeConnect filter state value which can be set by preceding
+  // filters in the filter chain. When the filter state is set, TCP_PROXY doesn't disable
+  // downstream read during initialization. This feature can hence be used by preceding filters
+  // in the filter chain to read data from the downstream connection (for eg: to parse SNI) before
+  // the upstream connection is established.
+  bool receive_before_connect_{false};
+  bool early_data_end_stream_{false};
+  Buffer::OwnedImpl early_data_buffer_{};
   HttpStreamDecoderFilterCallbacks upstream_decoder_filter_callbacks_;
 };
 

@@ -12,9 +12,9 @@ envoy_cc_extension(
     name = "config",
     srcs = ["dns_impl.cc"],
     hdrs = ["dns_impl.h"],
-    external_deps = ["ares"],
     visibility = ["//visibility:public"],
     deps = [
+        "//bazel/foreign_cc:ares",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:file_event_interface",
         "//envoy/network:dns_interface",

@@ -54,7 +54,9 @@ private:
   static const unsigned DEFAULT_MIN_VERSION;
   static const unsigned DEFAULT_MAX_VERSION;
   static const std::string DEFAULT_CIPHER_SUITES;
+  static const std::string DEFAULT_CIPHER_SUITES_FIPS;
   static const std::string DEFAULT_CURVES;
+  static const std::string DEFAULT_CURVES_FIPS;
 
   const bool require_client_certificate_;
   const OcspStaplePolicy ocsp_staple_policy_;

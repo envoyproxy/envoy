@@ -26,7 +26,7 @@ public:
   MOCK_METHOD(void, limit,
               (RequestCallbacks & callbacks, const std::string& domain,
                const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-               Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info,
+               Tracing::Span& parent_span, OptRef<const StreamInfo::StreamInfo> stream_info,
                uint32_t hits_addend));
 };
 

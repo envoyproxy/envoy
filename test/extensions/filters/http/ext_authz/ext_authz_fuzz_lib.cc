@@ -37,6 +37,9 @@ ReusableFilterFactory::newFilter(FilterConfigSharedPtr config,
                                  const envoy::config::core::v3::Metadata& metadata) {
   decoding_buffer_ = std::make_unique<Buffer::OwnedImpl>();
   metadata_ = metadata;
+  decoder_callbacks_.stream_info_.filter_state_ =
+      std::make_shared<StreamInfo::FilterStateImpl>(StreamInfo::FilterState::LifeSpan::FilterChain);
+
   std::unique_ptr<Filter> filter = std::make_unique<Filter>(std::move(config), std::move(client));
   filter->setDecoderFilterCallbacks(decoder_callbacks_);
   filter->setEncoderFilterCallbacks(encoder_callbacks_);

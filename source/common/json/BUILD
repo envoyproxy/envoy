@@ -12,15 +12,13 @@ envoy_cc_library(
     name = "json_internal_lib",
     srcs = ["json_internal.cc"],
     hdrs = ["json_internal.h"],
-    external_deps = [
-        "json",
-    ],
     deps = [
         "//envoy/json:json_object_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "@com_github_nlohmann_json//:json",
     ],
 )
 
@@ -43,7 +41,9 @@ envoy_cc_library(
         ":json_internal_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:thread_lib",
-        "@utf8_range//:utf8_validity",
+        "@com_github_nlohmann_json//:json",
+        "@com_google_absl//absl/strings:str_format",
+        "@com_google_protobuf//third_party/utf8_range:utf8_validity",
     ],
 )
 
@@ -62,7 +62,17 @@ envoy_cc_library(
 envoy_cc_library(
     name = "constants_lib",
     hdrs = ["constants.h"],
-    external_deps = [
-        "abseil_strings",
+    deps = [
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+envoy_cc_library(
+    name = "json_utility_lib",
+    srcs = ["json_utility.cc"],
+    hdrs = ["json_utility.h"],
+    deps = [
+        ":json_streamer_lib",
+        "//source/common/protobuf:utility_lib_header",
     ],
 )

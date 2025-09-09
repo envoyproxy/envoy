@@ -104,6 +104,15 @@ TEST(UtilityTest, TestGetSubject) {
             Utility::getSubjectFromCertificate(*cert));
 }
 
+TEST(UtilityTest, TestParseSubject) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  Envoy::Ssl::ParsedX509NamePtr subject = Utility::parseSubjectFromCertificate(*cert);
+  EXPECT_EQ("Test Server", subject->commonName_);
+  EXPECT_EQ(1, subject->organizationName_.size());
+  EXPECT_EQ("Lyft", subject->organizationName_[0]);
+}
+
 TEST(UtilityTest, TestGetIssuer) {
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
@@ -111,10 +120,40 @@ TEST(UtilityTest, TestGetIssuer) {
             Utility::getIssuerFromCertificate(*cert));
 }
 
+TEST(UtilityTest, TestParseIssuer) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  Envoy::Ssl::ParsedX509NamePtr issuer = Utility::parseIssuerFromCertificate(*cert);
+  EXPECT_EQ("Test CA", issuer->commonName_);
+  EXPECT_EQ(1, issuer->organizationName_.size());
+  EXPECT_EQ("Lyft", issuer->organizationName_[0]);
+}
+
 TEST(UtilityTest, TestGetSerialNumber) {
   bssl::UniquePtr<X509> cert = readCertFromFile(
       TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
   EXPECT_EQ(TEST_SAN_DNS_CERT_SERIAL, Utility::getSerialNumberFromCertificate(*cert));
+}
+
+TEST(UtilityTest, TestExpirationWithUnixTimeWithExpiredCert) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  // Set a known date (2033-05-18 03:33:20 UTC) so that we get fixed output from this test.
+  const time_t known_date_time = 2000000000;
+  Event::SimulatedTimeSystem time_source;
+  time_source.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
+
+  EXPECT_EQ(1787339644, Utility::getExpirationUnixTime(cert.get()).count());
+}
+
+TEST(UtilityTest, TestExpirationWithUnixTimeWithNotExpiredCert) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(
+      TestEnvironment::substitute("{{ test_rundir }}/test/common/tls/test_data/san_dns_cert.pem"));
+  const time_t known_date_time = 0;
+  Event::SimulatedTimeSystem time_source;
+  time_source.setSystemTime(std::chrono::system_clock::from_time_t(known_date_time));
+
+  EXPECT_EQ(1787339644, Utility::getExpirationUnixTime(cert.get()).count());
 }
 
 TEST(UtilityTest, TestDaysUntilExpiration) {
@@ -169,6 +208,33 @@ TEST(UtilityTest, GetLastCryptoError) {
 
   // We consumed the last error, so back to not having an error to get.
   EXPECT_FALSE(Utility::getLastCryptoError().has_value());
+}
+
+TEST(UtilityTest, TestGetCertificateExtensionOids) {
+  const std::string test_data_path = "{{ test_rundir }}/test/common/tls/test_data/";
+  const std::vector<std::pair<std::string, int>> test_set = {
+      {"unittest_cert.pem", 1},
+      {"no_extension_cert.pem", 0},
+      {"extensions_cert.pem", 7},
+  };
+
+  for (const auto& test_case : test_set) {
+    bssl::UniquePtr<X509> cert =
+        readCertFromFile(TestEnvironment::substitute(test_data_path + test_case.first));
+    const auto& extension_oids = Utility::getCertificateExtensionOids(*cert);
+    EXPECT_EQ(test_case.second, extension_oids.size());
+  }
+
+  bssl::UniquePtr<X509> cert =
+      readCertFromFile(TestEnvironment::substitute(test_data_path + "extensions_cert.pem"));
+  // clang-format off
+  std::vector<std::string> expected_oids{
+      "2.5.29.14", "2.5.29.15", "2.5.29.19",
+      "2.5.29.35", "2.5.29.37",
+      "1.2.3.4.5.6.7.8", "1.2.3.4.5.6.7.9"};
+  // clang-format on
+  const auto& extension_oids = Utility::getCertificateExtensionOids(*cert);
+  EXPECT_THAT(extension_oids, testing::UnorderedElementsAreArray(expected_oids));
 }
 
 TEST(UtilityTest, TestGetCertificationExtensionValue) {

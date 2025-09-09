@@ -41,7 +41,7 @@ void Utility::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v3::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
 
-  static_assert(StreamInfo::CoreResponseFlag::LastFlag == 28,
+  static_assert(StreamInfo::CoreResponseFlag::LastFlag == 29,
                 "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(StreamInfo::CoreResponseFlag::FailedLocalHealthCheck)) {
@@ -275,14 +275,7 @@ void Utility::extractCommonAccessLogProperties(
   }
 
   if (stream_info.upstreamInfo().has_value()) {
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdangling-reference"
-#endif
     const auto& upstream_info = stream_info.upstreamInfo().value().get();
-#if defined(__GNUC__) && !defined(__clang__)
-#pragma GCC diagnostic pop
-#endif
     if (upstream_info.upstreamHost() != nullptr) {
       Network::Utility::addressToProtobufAddress(
           *upstream_info.upstreamHost()->address(),
@@ -364,9 +357,9 @@ bool extractFilterStateData(const StreamInfo::FilterState& filter_state, const s
     ProtobufTypes::MessagePtr serialized_proto = state->serializeAsProto();
     if (serialized_proto != nullptr) {
       auto& filter_state_objects = *common_access_log.mutable_filter_state_objects();
-      ProtobufWkt::Any& any = filter_state_objects[key];
-      if (dynamic_cast<ProtobufWkt::Any*>(serialized_proto.get()) != nullptr) {
-        any.Swap(dynamic_cast<ProtobufWkt::Any*>(serialized_proto.get()));
+      Protobuf::Any& any = filter_state_objects[key];
+      if (dynamic_cast<Protobuf::Any*>(serialized_proto.get()) != nullptr) {
+        any.Swap(dynamic_cast<Protobuf::Any*>(serialized_proto.get()));
       } else {
         any.PackFrom(*serialized_proto);
       }

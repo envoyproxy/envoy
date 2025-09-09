@@ -29,8 +29,8 @@ public:
                                         Ssl::CertificateSelectionCallbackPtr cb) override;
 
   // It's only for quic.
-  std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction> findTlsContext(absl::string_view, bool,
-                                                                          bool, bool*) override {
+  std::pair<const Ssl::TlsContext&, Ssl::OcspStapleAction>
+  findTlsContext(absl::string_view, const Ssl::CurveNIDVector&, bool, bool*) override {
     PANIC("unreachable");
   };
 
@@ -55,9 +55,9 @@ public:
     }
 
     std::string mode;
-    const ProtobufWkt::Any* any_config = dynamic_cast<const ProtobufWkt::Any*>(&config);
+    const Protobuf::Any* any_config = dynamic_cast<const Protobuf::Any*>(&config);
     if (any_config) {
-      ProtobufWkt::StringValue string_value;
+      Protobuf::StringValue string_value;
       if (any_config->UnpackTo(&string_value)) {
         mode = string_value.value();
       }
@@ -76,7 +76,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new ProtobufWkt::StringValue()};
+    return ProtobufTypes::MessagePtr{new Protobuf::StringValue()};
   }
 
   std::string name() const override { return "test-tls-context-provider"; };

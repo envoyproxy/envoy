@@ -37,12 +37,13 @@ public:
   /**
    * Create a particular Stats::Sink implementation. If the implementation is unable to produce a
    * Stats::Sink with the provided parameters, it should throw an EnvoyException. The returned
-   * pointer should always be valid.
+   * pointer should always be valid when status is OK.
    * @param config supplies the custom proto configuration for the Stats::Sink
    * @param server supplies the server instance
    */
-  virtual Stats::SinkPtr createStatsSink(const Protobuf::Message& config,
-                                         Server::Configuration::ServerFactoryContext& server) PURE;
+  virtual absl::StatusOr<Stats::SinkPtr>
+  createStatsSink(const Protobuf::Message& config,
+                  Server::Configuration::ServerFactoryContext& server) PURE;
 
   std::string category() const override { return "envoy.stats_sinks"; }
 };
@@ -55,6 +56,7 @@ public:
   const std::list<Stats::SinkPtr>& sinks() const override { return sinks_; }
   std::chrono::milliseconds flushInterval() const override { return flush_interval_; }
   bool flushOnAdmin() const override { return flush_on_admin_; }
+  uint32_t evictOnFlush() const override { return evict_on_flush_; }
 
   void addSink(Stats::SinkPtr sink) { sinks_.emplace_back(std::move(sink)); }
   bool enableDeferredCreationStats() const override {
@@ -66,6 +68,7 @@ private:
   std::chrono::milliseconds flush_interval_;
   bool flush_on_admin_{false};
   const envoy::config::bootstrap::v3::Bootstrap::DeferredStatOptions deferred_stat_options_;
+  uint32_t evict_on_flush_{0};
 };
 
 /**
@@ -145,8 +148,8 @@ private:
   /**
    * Initialize stats configuration.
    */
-  void initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
-                             Instance& server);
+  absl::Status initializeStatsConfig(const envoy::config::bootstrap::v3::Bootstrap& bootstrap,
+                                     Instance& server);
 
   /**
    * Initialize watchdog(s). Call before accessing any watchdog configuration.
@@ -210,11 +213,11 @@ private:
     const std::string& profilePath() const override { return profile_path_; }
     Network::Address::InstanceConstSharedPtr address() override { return address_; }
     Network::Socket::OptionsSharedPtr socketOptions() override { return socket_options_; }
-    std::list<AccessLog::InstanceSharedPtr> accessLogs() const override { return access_logs_; }
+    AccessLog::InstanceSharedPtrVector accessLogs() const override { return access_logs_; }
     bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
 
     std::string profile_path_;
-    std::list<AccessLog::InstanceSharedPtr> access_logs_;
+    AccessLog::InstanceSharedPtrVector access_logs_;
     Network::Address::InstanceConstSharedPtr address_;
     Network::Socket::OptionsSharedPtr socket_options_;
     bool ignore_global_conn_limit_;

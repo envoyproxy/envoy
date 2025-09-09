@@ -19,7 +19,8 @@ namespace Upstream {
 #define ALL_LOAD_REPORTER_STATS(COUNTER)                                                           \
   COUNTER(requests)                                                                                \
   COUNTER(responses)                                                                               \
-  COUNTER(errors)
+  COUNTER(errors)                                                                                  \
+  COUNTER(retries)
 
 /**
  * Struct definition for all load reporter stats. @see stats_macros.h
@@ -33,7 +34,7 @@ class LoadStatsReporter
       Logger::Loggable<Logger::Id::upstream> {
 public:
   LoadStatsReporter(const LocalInfo::LocalInfo& local_info, ClusterManager& cluster_manager,
-                    Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
+                    Stats::Scope& scope, Grpc::RawAsyncClientSharedPtr&& async_client,
                     Event::Dispatcher& dispatcher);
 
   // Grpc::AsyncStreamCallbacks
@@ -43,6 +44,7 @@ public:
       std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse>&& message) override;
   void onReceiveTrailingMetadata(Http::ResponseTrailerMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
+  const LoadReporterStats& getStats() { return stats_; };
 
   // TODO(htuch): Make this configurable or some static.
   const uint32_t RETRY_DELAY_MS = 5000;

@@ -15,7 +15,7 @@ namespace Golang {
 constexpr char CanonicalName[] = "envoy.filters.http.golang";
 
 /**
- * Config registration for the golang extentions  filter. @see
+ * Config registration for the golang extensions  filter. @see
  * NamedHttpFilterConfigFactory.
  */
 class GolangFilterConfig : public Common::FactoryBase<
@@ -32,7 +32,8 @@ private:
       const std::string& stats_prefix,
       Server::Configuration::FactoryContext& factory_context) override;
 
-  Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
+  absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+  createRouteSpecificFilterConfigTyped(
       const envoy::extensions::filters::http::golang::v3alpha::ConfigsPerRoute& proto_config,
       Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor& validator) override;

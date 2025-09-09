@@ -9,6 +9,7 @@ envoy_package()
 envoy_cc_test(
     name = "cluster_manager_test",
     srcs = ["cluster_manager_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//envoy/upstream:resource_manager_interface",
         "//envoy/upstream:upstream_interface",
@@ -49,11 +50,11 @@ envoy_cc_test(
         "//test/config_test:example_configs_test_setup.sh",
     ],
     env = {"EXAMPLE_CONFIGS_TAR_PATH": "envoy/configs/example_configs.tar"},
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/access_loggers/stream:config",
-        "//source/extensions/clusters/logical_dns:logical_dns_cluster_lib",
+        "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/original_dst:original_dst_cluster_lib",
-        "//source/extensions/clusters/strict_dns:strict_dns_cluster_lib",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/listener/original_dst:config",
         "//source/extensions/filters/network/http_connection_manager:config",
@@ -74,6 +75,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "dispatcher_test",
     srcs = ["dispatcher_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/event:libevent_lib",
         "//source/common/stats:isolated_store_lib",
@@ -131,6 +133,7 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "xds_verifier_test",
     srcs = ["xds_verifier_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         ":xds_verifier_lib",
         "//test/config:utility_lib",
@@ -141,6 +144,7 @@ envoy_cc_test_library(
     name = "xds_fuzz_lib",
     srcs = ["xds_fuzz.cc"],
     hdrs = ["xds_fuzz.h"],
+    rbe_pool = "6gig",
     deps = [
         ":xds_fuzz_proto_cc_proto",
         ":xds_verifier_lib",
@@ -161,6 +165,7 @@ envoy_cc_fuzz_test(
     size = "large",
     srcs = ["xds_fuzz_test.cc"],
     corpus = "xds_corpus",
+    rbe_pool = "6gig",
     deps = [
         ":xds_fuzz_lib",
         "//source/common/protobuf:utility_lib",

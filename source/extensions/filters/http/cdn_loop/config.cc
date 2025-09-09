@@ -21,13 +21,14 @@ using ::Envoy::Extensions::HttpFilters::CdnLoop::Parser::parseCdnId;
 using ::Envoy::Extensions::HttpFilters::CdnLoop::Parser::ParseContext;
 using ::Envoy::Extensions::HttpFilters::CdnLoop::Parser::ParsedCdnId;
 
-Http::FilterFactoryCb CdnLoopFilterFactory::createFilterFactoryFromProtoTyped(
+absl::StatusOr<Http::FilterFactoryCb> CdnLoopFilterFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig& config,
     const std::string& /*stats_prefix*/, Server::Configuration::FactoryContext& /*context*/) {
   StatusOr<ParsedCdnId> context = parseCdnId(ParseContext(config.cdn_id()));
   if (!context.ok() || !context->context().atEnd()) {
-    throw EnvoyException(fmt::format("Provided cdn_id \"{}\" is not a valid CDN identifier: {}",
-                                     config.cdn_id(), context.status()));
+    return absl::InvalidArgumentError(
+        fmt::format("Provided cdn_id \"{}\" is not a valid CDN identifier: {}", config.cdn_id(),
+                    context.status().message()));
   }
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(

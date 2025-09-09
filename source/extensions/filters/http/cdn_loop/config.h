@@ -14,13 +14,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace CdnLoop {
 
-class CdnLoopFilterFactory
-    : public Common::FactoryBase<envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig> {
+class CdnLoopFilterFactory : public Common::ExceptionFreeFactoryBase<
+                                 envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig> {
 public:
-  CdnLoopFilterFactory() : FactoryBase("envoy.filters.http.cdn_loop") {}
+  CdnLoopFilterFactory() : ExceptionFreeFactoryBase("envoy.filters.http.cdn_loop") {}
 
 private:
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Http::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::http::cdn_loop::v3::CdnLoopConfig& config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };

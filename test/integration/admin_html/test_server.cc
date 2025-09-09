@@ -1,4 +1,5 @@
 #include "source/common/filesystem/filesystem_impl.h"
+#include "source/common/http/headers.h"
 #include "source/exe/main_common.h"
 #include "source/server/admin/admin_html_util.h"
 
@@ -42,7 +43,7 @@ Http::Code testCallback(Http::ResponseHeaderMap& response_headers, Buffer::Insta
   std::string path = absl::StrCat(prefix, leaf);
   TRY_ASSERT_MAIN_THREAD {
     auto file_or_error = file_system.fileReadToEnd(path);
-    THROW_IF_STATUS_NOT_OK(file_or_error, throw);
+    THROW_IF_NOT_OK_REF(file_or_error.status());
     response.add(file_or_error.value());
   }
   END_TRY

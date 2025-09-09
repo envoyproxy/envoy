@@ -18,7 +18,7 @@ protected:
   XffNumTrustedHopsTest() {
     envoy::extensions::http::original_ip_detection::xff::v3::XffConfig config;
     config.set_xff_num_trusted_hops(1);
-    xff_extension_ = std::make_shared<XffIPDetection>(config);
+    xff_extension_ = *XffIPDetection::create(config);
   }
 
   std::shared_ptr<XffIPDetection> xff_extension_;
@@ -60,7 +60,7 @@ protected:
     cidr3->set_address_prefix("2001:db8:7e57:1::");
     cidr3->mutable_prefix_len()->set_value(64);
     config.mutable_skip_xff_append()->set_value(false);
-    xff_extension_ = std::make_shared<XffIPDetection>(config);
+    xff_extension_ = *XffIPDetection::create(config);
   }
 
   std::shared_ptr<XffIPDetection> xff_extension_;
@@ -146,8 +146,8 @@ TEST(XffInvalidConfigTest, InvalidConfig) {
   cidr->set_address_prefix("192.0.2.0");
   cidr->mutable_prefix_len()->set_value(24);
 
-  EXPECT_THROW_WITH_MESSAGE(std::make_shared<XffIPDetection>(config), EnvoyException,
-                            "Cannot set both xff_num_trusted_hops and xff_trusted_cidrs");
+  EXPECT_EQ(XffIPDetection::create(config).status().message(),
+            "Cannot set both xff_num_trusted_hops and xff_trusted_cidrs");
 }
 
 } // namespace Xff

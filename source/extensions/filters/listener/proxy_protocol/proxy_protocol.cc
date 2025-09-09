@@ -253,9 +253,10 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
 
       cb_->filterState().setData(
           Network::ProxyProtocolFilterState::key(),
-          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
-              socket.connectionInfoProvider().remoteAddress(),
-              socket.connectionInfoProvider().localAddress(), parsed_tlvs_}),
+          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolDataWithVersion{
+              {socket.connectionInfoProvider().remoteAddress(),
+               socket.connectionInfoProvider().localAddress(), parsed_tlvs_},
+              absl::make_optional(header_version_)}),
           StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::Connection);
     } else {
@@ -270,9 +271,10 @@ ReadOrParseState Filter::parseBuffer(Network::ListenerFilterBuffer& buffer) {
                              proxy_protocol_header_.value().extensions_length_));
       cb_->filterState().setData(
           Network::ProxyProtocolFilterState::key(),
-          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
-              proxy_protocol_header_.value().remote_address_,
-              proxy_protocol_header_.value().local_address_, parsed_tlvs_}),
+          std::make_unique<Network::ProxyProtocolFilterState>(Network::ProxyProtocolDataWithVersion{
+              {proxy_protocol_header_.value().remote_address_,
+               proxy_protocol_header_.value().local_address_, parsed_tlvs_},
+              absl::make_optional(header_version_)}),
           StreamInfo::FilterState::StateType::Mutable,
           StreamInfo::FilterState::LifeSpan::Connection);
     }
@@ -378,19 +380,25 @@ bool Filter::parseV2Header(const char* buf) {
         la4.sin_port = v4->dst_port;
         la4.sin_addr.s_addr = v4->dst_addr;
 
-        TRY_NEEDS_AUDIT_ADDRESS {
+        auto remote_address_status =
+            Network::Address::InstanceFactory::createInstancePtr<Network::Address::Ipv4Instance>(
+                &ra4);
+        auto local_address_status =
+            Network::Address::InstanceFactory::createInstancePtr<Network::Address::Ipv4Instance>(
+                &la4);
+        if (!remote_address_status.ok() || !local_address_status.ok()) {
           // TODO(ggreenway): make this work without requiring operating system support for an
           // address family.
-          proxy_protocol_header_.emplace(WireHeader{
-              PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET,
-              hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET, Network::Address::IpVersion::v4,
-              std::make_shared<Network::Address::Ipv4Instance>(&ra4),
-              std::make_shared<Network::Address::Ipv4Instance>(&la4)});
-        }
-        END_TRY CATCH(const EnvoyException& e, {
-          ENVOY_LOG(debug, "Proxy protocol failure: {}", e.what());
+          ENVOY_LOG(debug, "Proxy protocol failure: {}",
+                    !remote_address_status.ok() ? remote_address_status.status()
+                                                : local_address_status.status());
           return false;
-        });
+        }
+
+        proxy_protocol_header_.emplace(
+            WireHeader{PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET,
+                       hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET, Network::Address::IpVersion::v4,
+                       *remote_address_status, *local_address_status});
 
         return true;
       } else if (((proto_family & 0xf0) >> 4) == PROXY_PROTO_V2_AF_INET6) {
@@ -413,19 +421,25 @@ bool Filter::parseV2Header(const char* buf) {
         la6.sin6_port = v6->dst_port;
         safeMemcpy(&(la6.sin6_addr.s6_addr), &(v6->dst_addr));
 
-        TRY_NEEDS_AUDIT_ADDRESS {
-          proxy_protocol_header_.emplace(WireHeader{
-              PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET6,
-              hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET6, Network::Address::IpVersion::v6,
-              std::make_shared<Network::Address::Ipv6Instance>(ra6),
-              std::make_shared<Network::Address::Ipv6Instance>(la6)});
-        }
-        END_TRY CATCH(const EnvoyException& e, {
+        auto remote_address_status =
+            Network::Address::InstanceFactory::createInstancePtr<Network::Address::Ipv6Instance>(
+                ra6);
+        auto local_address_status =
+            Network::Address::InstanceFactory::createInstancePtr<Network::Address::Ipv6Instance>(
+                la6);
+        if (!remote_address_status.ok() || !local_address_status.ok()) {
           // TODO(ggreenway): make this work without requiring operating system support for an
           // address family.
-          ENVOY_LOG(debug, "Proxy protocol failure: {}", e.what());
+          ENVOY_LOG(debug, "Proxy protocol failure: {}",
+                    !remote_address_status.ok() ? remote_address_status.status()
+                                                : local_address_status.status());
           return false;
-        });
+        }
+
+        proxy_protocol_header_.emplace(WireHeader{
+            PROXY_PROTO_V2_HEADER_LEN, hdr_addr_len, PROXY_PROTO_V2_ADDR_LEN_INET6,
+            hdr_addr_len - PROXY_PROTO_V2_ADDR_LEN_INET6, Network::Address::IpVersion::v6,
+            *remote_address_status, *local_address_status});
         return true;
       }
     }
@@ -543,37 +557,30 @@ bool Filter::parseTlvs(const uint8_t* buf, size_t len) {
       std::string metadata_key = key_value_pair->metadata_namespace().empty()
                                      ? "envoy.filters.listener.proxy_protocol"
                                      : key_value_pair->metadata_namespace();
-      if (Runtime::runtimeFeatureEnabled(
-              "envoy.reloadable_features.use_typed_metadata_in_proxy_protocol_listener")) {
-        auto& typed_filter_metadata = (*cb_->dynamicMetadata().mutable_typed_filter_metadata());
+      auto& typed_filter_metadata = (*cb_->dynamicMetadata().mutable_typed_filter_metadata());
 
-        const auto typed_proxy_filter_metadata = typed_filter_metadata.find(metadata_key);
-        envoy::data::core::v3::TlvsMetadata tlvs_metadata;
-        auto status = absl::OkStatus();
-        if (typed_proxy_filter_metadata != typed_filter_metadata.end()) {
-          status = MessageUtil::unpackTo(typed_proxy_filter_metadata->second, tlvs_metadata);
-        }
-        if (!status.ok()) {
-          ENVOY_LOG_PERIODIC(warn, std::chrono::seconds(1),
-                             "proxy_protocol: Failed to unpack typed metadata for TLV type ",
-                             tlv_type);
-        } else {
-          Protobuf::BytesValue tlv_byte_value;
-          tlv_byte_value.set_value(tlv_value.data(), tlv_value.size());
-          tlvs_metadata.mutable_typed_metadata()->insert(
-              {key_value_pair->key(), tlv_byte_value.value()});
-          ProtobufWkt::Any typed_metadata;
-          typed_metadata.PackFrom(tlvs_metadata);
-          cb_->setDynamicTypedMetadata(metadata_key, typed_metadata);
-        }
+      const auto typed_proxy_filter_metadata = typed_filter_metadata.find(metadata_key);
+      envoy::data::core::v3::TlvsMetadata tlvs_metadata;
+      auto status = absl::OkStatus();
+      if (typed_proxy_filter_metadata != typed_filter_metadata.end()) {
+        status = MessageUtil::unpackTo(typed_proxy_filter_metadata->second, tlvs_metadata);
+      }
+      if (!status.ok()) {
+        ENVOY_LOG_PERIODIC(warn, std::chrono::seconds(1),
+                           "proxy_protocol: Failed to unpack typed metadata for TLV type ",
+                           tlv_type);
+      } else {
+        (*tlvs_metadata.mutable_typed_metadata())[key_value_pair->key()] = tlv_value;
+        Protobuf::Any typed_metadata;
+        typed_metadata.PackFrom(tlvs_metadata);
+        cb_->setDynamicTypedMetadata(metadata_key, typed_metadata);
       }
       // Always populate untyped metadata for backwards compatibility.
-      ProtobufWkt::Value metadata_value;
+      Protobuf::Value metadata_value;
       // Sanitize any non utf8 characters.
       auto sanitised_tlv_value = MessageUtil::sanitizeUtf8String(tlv_value);
       metadata_value.set_string_value(sanitised_tlv_value.data(), sanitised_tlv_value.size());
-      ProtobufWkt::Struct metadata(
-          (*cb_->dynamicMetadata().mutable_filter_metadata())[metadata_key]);
+      Protobuf::Struct metadata((*cb_->dynamicMetadata().mutable_filter_metadata())[metadata_key]);
       metadata.mutable_fields()->insert({key_value_pair->key(), metadata_value});
       cb_->setDynamicMetadata(metadata_key, metadata);
     } else {
@@ -598,6 +605,10 @@ ReadOrParseState Filter::readExtensions(Network::ListenerFilterBuffer& buffer) {
   auto raw_slice = buffer.rawSlice();
   // waiting for more data if there is no enough data for extensions.
   if (raw_slice.len_ < (proxy_protocol_header_.value().wholeHeaderLength())) {
+    ENVOY_LOG(
+        trace,
+        "waiting for more data to read extensions. Buffer length: {}, extension header length {}",
+        raw_slice.len_, proxy_protocol_header_.value().wholeHeaderLength());
     return ReadOrParseState::TryAgainLater;
   }
 

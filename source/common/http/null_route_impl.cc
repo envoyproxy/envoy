@@ -12,12 +12,13 @@ const Router::InternalRedirectPolicyImpl RouteEntryImpl::internal_redirect_polic
 const Router::PathMatcherSharedPtr RouteEntryImpl::path_matcher_;
 const Router::PathRewriterSharedPtr RouteEntryImpl::path_rewriter_;
 const std::vector<Router::ShadowPolicyPtr> RouteEntryImpl::shadow_policies_;
-const NullVirtualHost NullRouteImpl::virtual_host_;
+const Router::VirtualHostConstSharedPtr NullRouteImpl::virtual_host_ =
+    std::make_shared<NullVirtualHost>();
 const NullRateLimitPolicy NullVirtualHost::rate_limit_policy_;
 const NullCommonConfig NullVirtualHost::route_configuration_;
 const std::multimap<std::string, std::string> RouteEntryImpl::opaque_config_;
 const NullPathMatchCriterion RouteEntryImpl::path_match_criterion_;
 const RouteEntryImpl::ConnectConfigOptRef RouteEntryImpl::connect_config_nullopt_;
-const std::list<LowerCaseString> NullCommonConfig::internal_only_headers_;
+const std::vector<LowerCaseString> NullCommonConfig::internal_only_headers_;
 } // namespace Http
 } // namespace Envoy

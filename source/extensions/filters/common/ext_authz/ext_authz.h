@@ -88,44 +88,50 @@ struct Response {
   CheckStatus status;
   // A set of HTTP headers returned by the authorization server, that will be optionally appended
   // to the request to the upstream server.
-  UnsafeHeaderVector headers_to_append;
+  UnsafeHeaderVector headers_to_append{};
   // A set of HTTP headers returned by the authorization server, will be optionally set
   // (using "setCopy") to the request to the upstream server.
-  UnsafeHeaderVector headers_to_set;
+  UnsafeHeaderVector headers_to_set{};
   // A set of HTTP headers returned by the authorization server, will be optionally added
   // (using "addCopy") to the request to the upstream server.
-  UnsafeHeaderVector headers_to_add;
+  UnsafeHeaderVector headers_to_add{};
   // A set of HTTP headers returned by the authorization server, will be optionally added
   // (using "addCopy") to the response sent back to the downstream client on OK auth
   // responses.
-  UnsafeHeaderVector response_headers_to_add;
+  UnsafeHeaderVector response_headers_to_add{};
   // A set of HTTP headers returned by the authorization server, will be optionally set (using
   // "setCopy") to the response sent back to the downstream client on OK auth responses.
-  UnsafeHeaderVector response_headers_to_set;
+  UnsafeHeaderVector response_headers_to_set{};
   // A set of HTTP headers returned by the authorization server, will be optionally added
   // (using "addCopy") to the response sent back to the downstream client on OK auth
   // responses only if the headers were not returned from the authz server.
-  UnsafeHeaderVector response_headers_to_add_if_absent;
+  UnsafeHeaderVector response_headers_to_add_if_absent{};
   // A set of HTTP headers returned by the authorization server, will be optionally set (using
   // "setCopy") to the response sent back to the downstream client on OK auth responses
   // only if the headers were returned from the authz server.
-  UnsafeHeaderVector response_headers_to_overwrite_if_exists;
+  UnsafeHeaderVector response_headers_to_overwrite_if_exists{};
+  // Whether the authorization server returned any headers with an invalid append action type.
+  bool saw_invalid_append_actions{false};
   // A set of HTTP headers consumed by the authorization server, will be removed
   // from the request to the upstream server.
-  std::vector<std::string> headers_to_remove;
+  std::vector<std::string> headers_to_remove{};
   // A set of query string parameters to be set (possibly overwritten) on the
   // request to the upstream server.
-  Http::Utility::QueryParamsVector query_parameters_to_set;
+  Http::Utility::QueryParamsVector query_parameters_to_set{};
   // A set of query string parameters to remove from the request to the upstream server.
-  std::vector<std::string> query_parameters_to_remove;
+  std::vector<std::string> query_parameters_to_remove{};
   // Optional http body used only on denied response.
-  std::string body;
+  std::string body{};
   // Optional http status used only on denied response.
   Http::Code status_code{};
 
   // A set of metadata returned by the authorization server, that will be emitted as filter's
   // dynamic metadata that other filters can leverage.
-  ProtobufWkt::Struct dynamic_metadata;
+  Protobuf::Struct dynamic_metadata{};
+
+  // The gRPC status returned by the authorization server when it is making a
+  // gRPC call.
+  absl::optional<Grpc::Status::GrpcStatus> grpc_status{absl::nullopt};
 };
 
 using ResponsePtr = std::unique_ptr<Response>;
@@ -165,6 +171,11 @@ public:
   virtual void check(RequestCallbacks& callback,
                      const envoy::service::auth::v3::CheckRequest& request,
                      Tracing::Span& parent_span, const StreamInfo::StreamInfo& stream_info) PURE;
+
+  /**
+   * Returns streamInfo of the current request if possible. By default just return a nullptr.
+   */
+  virtual StreamInfo::StreamInfo const* streamInfo() const { return nullptr; }
 };
 
 using ClientPtr = std::unique_ptr<Client>;

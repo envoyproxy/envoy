@@ -119,7 +119,7 @@ public:
     envoy::service::auth::v3::CheckRequest request;
     client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
-    ProtobufWkt::Struct expected_dynamic_metadata;
+    Protobuf::Struct expected_dynamic_metadata;
     auto* metadata_fields = expected_dynamic_metadata.mutable_fields();
     (*metadata_fields)["x-metadata-header-0"] = ValueUtil::stringValue("zero");
     (*metadata_fields)["x-metadata-header-1"] = ValueUtil::stringValue("2");
@@ -208,6 +208,37 @@ public:
   Tracing::MockSpan child_span_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 };
+
+// Verify ClientConfig could be built directly from HttpService and that the
+// fields get wired correctly.
+TEST_F(ExtAuthzHttpClientTest, ClientConfigFromHttpService) {
+  envoy::extensions::filters::http::ext_authz::v3::HttpService http_service;
+  http_service.mutable_server_uri()->set_uri("ext_authz:9000");
+  http_service.mutable_server_uri()->set_cluster("ext_authz");
+  http_service.mutable_server_uri()->mutable_timeout()->set_seconds(0);
+  http_service.set_path_prefix("/prefix");
+  // Add one header to add to request to exercise header parser creation.
+  auto* add = http_service.mutable_authorization_request()->add_headers_to_add();
+  add->set_key("x-added");
+  add->set_value("v");
+
+  auto cfg = std::make_shared<ClientConfig>(http_service, /*encode_raw_headers=*/true,
+                                            /*timeout_ms=*/123, factory_context_);
+  EXPECT_EQ(cfg->cluster(), "ext_authz");
+  EXPECT_EQ(cfg->pathPrefix(), "/prefix");
+  EXPECT_EQ(cfg->timeout(), std::chrono::milliseconds{123});
+  EXPECT_TRUE(cfg->encodeRawHeaders());
+}
+
+TEST_F(ExtAuthzHttpClientTest, StreamInfo) {
+  envoy::service::auth::v3::CheckRequest request;
+  client_->check(request_callbacks_, request, parent_span_, stream_info_);
+  EXPECT_EQ(client_->streamInfo(), nullptr);
+  auto check_response = TestCommon::makeMessageResponse(
+      TestCommon::makeHeaderValueOption({{":status", "200", false}}));
+  EXPECT_CALL(request_callbacks_, onComplete_(_));
+  client_->onSuccess(async_request_, std::move(check_response));
+}
 
 // Test HTTP client config default values.
 TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
@@ -569,10 +600,13 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedAndAllowedClientHeaders) {
 TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestError) {
   envoy::service::auth::v3::CheckRequest request;
 
+  auto authz_response = Response{};
+  authz_response.status = CheckStatus::Error;
+
   client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
   EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(authz_response))));
   client_->onFailure(async_request_, Http::AsyncClient::FailureReason::Reset);
 }
 
@@ -582,10 +616,13 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxError) {
       Http::ResponseHeaderMapPtr{new Http::TestResponseHeaderMapImpl{{":status", "503"}}}));
   envoy::service::auth::v3::CheckRequest request;
 
+  auto authz_response = Response{};
+  authz_response.status = CheckStatus::Error;
+
   client_->check(request_callbacks_, request, parent_span_, stream_info_);
 
   EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(authz_response))));
   client_->onSuccess(async_request_, std::move(check_response));
 }
 
@@ -604,10 +641,13 @@ TEST_F(ExtAuthzHttpClientTest, CancelledAuthorizationRequest) {
 TEST_F(ExtAuthzHttpClientTest, NoCluster) {
   InSequence s;
 
+  auto authz_response = Response{};
+  authz_response.status = CheckStatus::Error;
+
   EXPECT_CALL(cm_, getThreadLocalCluster(Eq("ext_authz"))).WillOnce(Return(nullptr));
   EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).Times(0);
   EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(authz_response))));
   client_->check(request_callbacks_, envoy::service::auth::v3::CheckRequest{}, parent_span_,
                  stream_info_);
 }

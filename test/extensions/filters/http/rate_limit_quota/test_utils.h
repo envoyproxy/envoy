@@ -109,6 +109,17 @@ inline constexpr absl::string_view OnNoMatchConfig = R"EOF(
         deny_response_settings:
           grpc_status:
             code: 8
+          http_status:
+            code: 403
+          http_body:
+            value: "Test-rejection-body"
+          response_headers_to_add:
+            header:
+              key: "test-onnomatch-header"
+              value: "test-onnomatch-value"
+        no_assignment_behavior:
+          fallback_rate_limit:
+            blanket_rule: DENY_ALL
         expired_assignment_behavior:
           fallback_rate_limit:
             blanket_rule: ALLOW_ALL

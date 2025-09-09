@@ -1,14 +1,10 @@
 load("@aspect_bazel_lib//lib:jq.bzl", "jq")
 load("@envoy_repo//:path.bzl", "PATH")
-load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
-load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
-load("//bazel:envoy_build_system.bzl", "envoy_package")
+load("@rules_python//python:defs.bzl", "py_binary")
 load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_py_data", "envoy_pytool_binary")
 load("//tools/python:namespace.bzl", "envoy_py_namespace")
 
 licenses(["notice"])  # Apache 2
-
-envoy_package()
 
 envoy_py_namespace()
 
@@ -77,18 +73,6 @@ envoy_py_data(
     src = ":data_srcs",
 )
 
-pkg_files(
-    name = "xformed_files",
-    srcs = ["//tools/protoxform:api_protoxform"],
-    strip_prefix = strip_prefix.from_pkg(),
-)
-
-pkg_tar(
-    name = "xformed",
-    srcs = [":xformed_files"],
-    extension = "tar.gz",
-)
-
 py_binary(
     name = "format_api",
     srcs = ["format_api.py"],
@@ -105,13 +89,11 @@ genrule(
     cmd = """
     $(location :format_api) \
         --outfile=$@ \
-        --xformed=$(location :xformed) \
         --build_file=$(location //tools/type_whisperer:api_build_file) \
         --protoprinted=$(location //tools/protoprint:protoprinted) \
     """,
     tools = [
         ":format_api",
-        ":xformed",
         "//tools/protoprint:protoprinted",
         "//tools/type_whisperer:api_build_file",
     ],

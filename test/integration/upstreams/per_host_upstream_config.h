@@ -30,11 +30,11 @@ void addHeader(Envoy::Http::RequestHeaderMap& header_map, absl::string_view head
                absl::string_view key2) {
   if (auto filter_metadata = metadata.filter_metadata().find(std::string(key1));
       filter_metadata != metadata.filter_metadata().end()) {
-    const ProtobufWkt::Struct& data_struct = filter_metadata->second;
+    const Protobuf::Struct& data_struct = filter_metadata->second;
     const auto& fields = data_struct.fields();
     if (auto iter = fields.find(toStdStringView(key2)); // NOLINT(std::string_view)
         iter != fields.end()) {
-      if (iter->second.kind_case() == ProtobufWkt::Value::kStringValue) {
+      if (iter->second.kind_case() == Protobuf::Value::kStringValue) {
         header_map.setCopy(Envoy::Http::LowerCaseString(std::string(header_name)),
                            iter->second.string_value());
       }
@@ -70,11 +70,12 @@ private:
 
 class PerHostHttpConnPool : public Extensions::Upstreams::Http::Http::HttpConnPool {
 public:
-  PerHostHttpConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
+  PerHostHttpConnPool(Upstream::HostConstSharedPtr host,
+                      Upstream::ThreadLocalCluster& thread_local_cluster,
                       Upstream::ResourcePriority priority,
                       absl::optional<Envoy::Http::Protocol> downstream_protocol,
                       Upstream::LoadBalancerContext* ctx)
-      : HttpConnPool(thread_local_cluster, priority, downstream_protocol, ctx) {}
+      : HttpConnPool(host, thread_local_cluster, priority, downstream_protocol, ctx) {}
 
   void onPoolReady(Envoy::Http::RequestEncoder& callbacks_encoder,
                    Upstream::HostDescriptionConstSharedPtr host, StreamInfo::StreamInfo& info,
@@ -94,23 +95,23 @@ class PerHostGenericConnPoolFactory : public Router::GenericConnPoolFactory {
 public:
   std::string name() const override { return "envoy.filters.connection_pools.http.per_host"; }
   std::string category() const override { return "envoy.upstreams"; }
-  Router::GenericConnPoolPtr
-  createGenericConnPool(Upstream::ThreadLocalCluster& thread_local_cluster,
-                        Router::GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
-                        Upstream::ResourcePriority priority,
-                        absl::optional<Envoy::Http::Protocol> downstream_protocol,
-                        Upstream::LoadBalancerContext* ctx) const override {
+  Router::GenericConnPoolPtr createGenericConnPool(
+      Upstream::HostConstSharedPtr host, Upstream::ThreadLocalCluster& thread_local_cluster,
+      Router::GenericConnPoolFactory::UpstreamProtocol upstream_protocol,
+      Upstream::ResourcePriority priority,
+      absl::optional<Envoy::Http::Protocol> downstream_protocol, Upstream::LoadBalancerContext* ctx,
+      const Protobuf::Message&) const override {
     if (upstream_protocol != UpstreamProtocol::HTTP) {
       // This example factory doesn't support terminating CONNECT/CONNECT-UDP stream.
       return nullptr;
     }
     auto upstream_http_conn_pool = std::make_unique<PerHostHttpConnPool>(
-        thread_local_cluster, priority, downstream_protocol, ctx);
+        host, thread_local_cluster, priority, downstream_protocol, ctx);
     return (upstream_http_conn_pool->valid() ? std::move(upstream_http_conn_pool) : nullptr);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
 };
 

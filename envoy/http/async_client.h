@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <functional>
 #include <memory>
 
 #include "envoy/buffer/buffer.h"
@@ -47,6 +48,18 @@ public:
    * watermarks have gone below.
    */
   virtual void onSidestreamBelowLowWatermark() PURE;
+
+  /**
+    Sidestream subscribes to downstream watermark events on the downstream stream and downstream
+    connection.
+  */
+  virtual void addDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks& callbacks) PURE;
+  /**
+    Sidestream stop subscribing to watermark events on the downstream stream and downstream
+    connection.
+   */
+  virtual void
+  removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks& callbacks) PURE;
 };
 
 /**
@@ -367,6 +380,18 @@ public:
       sampled_ = sampled;
       return *this;
     }
+    StreamOptions& setSidestreamWatermarkCallbacks(SidestreamWatermarkCallbacks* callbacks) {
+      sidestream_watermark_callbacks = callbacks;
+      return *this;
+    }
+    StreamOptions& setOnDeleteCallbacksForTestOnly(std::function<void()> callback) {
+      on_delete_callback_for_test_only = callback;
+      return *this;
+    }
+    StreamOptions& setRemoteCloseTimeout(std::chrono::milliseconds timeout) {
+      remote_close_timeout = timeout;
+      return *this;
+    }
 
     // For gmock test
     bool operator==(const StreamOptions& src) const {
@@ -425,6 +450,17 @@ public:
     std::string child_span_name_{""};
     // Sampling decision for the tracing span. The span is sampled by default.
     absl::optional<bool> sampled_{true};
+    // The pointer to sidestream watermark callbacks. Optional, nullptr by default.
+    Http::SidestreamWatermarkCallbacks* sidestream_watermark_callbacks = nullptr;
+
+    // The amount of tiem to wait for server to half-close its stream after client
+    // has half-closed its stream.
+    // Defaults to 1 second.
+    std::chrono::milliseconds remote_close_timeout{1000};
+
+    // This callback is invoked when AsyncStream object is deleted.
+    // Test only use to validate deferred deletion.
+    std::function<void()> on_delete_callback_for_test_only;
   };
 
   /**

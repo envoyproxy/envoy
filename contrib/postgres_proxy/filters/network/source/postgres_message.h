@@ -394,7 +394,7 @@ public:
 // Terminal template definition for variadic Sequence template.
 template <> class Sequence<> {
 public:
-  Sequence<>() = default;
+  Sequence() = default;
   std::string toString() const { return ""; }
   bool read(const Buffer::Instance&, uint64_t&, uint64_t&) { return true; }
   Message::ValidationResult validate(const Buffer::Instance&, const uint64_t, uint64_t&,

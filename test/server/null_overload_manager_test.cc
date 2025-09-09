@@ -11,9 +11,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
-using testing::AnyNumber;
-using testing::FloatNear;
 using testing::NiceMock;
 using testing::Property;
 
@@ -23,7 +20,7 @@ namespace {
 
 class NullOverloadManagerTest : public testing::Test {
 protected:
-  NullOverloadManagerTest() {}
+  NullOverloadManagerTest() = default;
 
   NiceMock<Event::MockDispatcher> dispatcher_;
   NiceMock<ThreadLocal::MockInstance> thread_local_;

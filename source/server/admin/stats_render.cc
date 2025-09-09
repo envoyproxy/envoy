@@ -156,7 +156,7 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
   switch (histogram_buckets_mode_) {
   case Utility::HistogramBucketsMode::Unset:
   case Utility::HistogramBucketsMode::Summary: {
-    Json::Streamer::MapPtr map = json_->histogram_array_->addMap();
+    Json::BufferStreamer::MapPtr map = json_->histogram_array_->addMap();
     map->addEntries({{"name", name}});
     map->addKey("values");
     populatePercentiles(histogram, *map);
@@ -186,10 +186,10 @@ void StatsJsonRender::generate(Buffer::Instance& response, const std::string& na
   drainIfNeeded(response);
 }
 
-void StatsJsonRender::populateSupportedPercentiles(Json::Streamer::Array& array) {
+void StatsJsonRender::populateSupportedPercentiles(Json::BufferStreamer::Array& array) {
   Stats::HistogramStatisticsImpl empty_statistics;
   std::vector<double> supported = empty_statistics.supportedQuantiles();
-  std::vector<Json::Streamer::Value> views(supported.size());
+  std::vector<Json::BufferStreamer::Value> views(supported.size());
   for (uint32_t i = 0, n = supported.size(); i < n; ++i) {
     views[i] = supported[i] * 100;
   }
@@ -197,8 +197,8 @@ void StatsJsonRender::populateSupportedPercentiles(Json::Streamer::Array& array)
 }
 
 void StatsJsonRender::populatePercentiles(const Stats::ParentHistogram& histogram,
-                                          Json::Streamer::Map& map) {
-  Json::Streamer::ArrayPtr array = map.addArray();
+                                          Json::BufferStreamer::Map& map) {
+  Json::BufferStreamer::ArrayPtr array = map.addArray();
   std::vector<double> totals = histogram.cumulativeStatistics().computedQuantiles(),
                       intervals = histogram.intervalStatistics().computedQuantiles();
   uint32_t min_size = std::min(totals.size(), intervals.size());
@@ -238,7 +238,7 @@ void StatsJsonRender::renderHistogramStart() {
 
 void StatsJsonRender::generateHistogramDetail(const std::string& name,
                                               const Stats::ParentHistogram& histogram,
-                                              Json::Streamer::Map& map) {
+                                              Json::BufferStreamer::Map& map) {
   // Now we produce the stream-able histogram records, without using the json intermediate
   // representation or serializer.
   map.addEntries({{"name", name}});
@@ -251,8 +251,8 @@ void StatsJsonRender::generateHistogramDetail(const std::string& name,
 }
 
 void StatsJsonRender::populateBucketsVerbose(
-    const std::vector<Stats::ParentHistogram::Bucket>& buckets, Json::Streamer::Map& map) {
-  Json::Streamer::ArrayPtr buckets_array = map.addArray();
+    const std::vector<Stats::ParentHistogram::Bucket>& buckets, Json::BufferStreamer::Map& map) {
+  Json::BufferStreamer::ArrayPtr buckets_array = map.addArray();
   for (const Stats::ParentHistogram::Bucket& bucket : buckets) {
     buckets_array->addMap()->addEntries(
         {{"lower_bound", bucket.lower_bound_}, {"width", bucket.width_}, {"count", bucket.count_}});
@@ -281,12 +281,12 @@ void StatsJsonRender::collectBuckets(const std::string& name,
   size_t min_size =
       std::min({interval_buckets.size(), cumulative_buckets.size(), supported_buckets.size()});
 
-  Json::Streamer::MapPtr map = json_->histogram_array_->addMap();
+  Json::BufferStreamer::MapPtr map = json_->histogram_array_->addMap();
   map->addEntries({{"name", name}});
   map->addKey("buckets");
-  Json::Streamer::ArrayPtr buckets = map->addArray();
+  Json::BufferStreamer::ArrayPtr buckets = map->addArray();
   for (uint32_t i = 0; i < min_size; ++i) {
-    Json::Streamer::MapPtr bucket_map = buckets->addMap();
+    Json::BufferStreamer::MapPtr bucket_map = buckets->addMap();
     bucket_map->addEntries({{"upper_bound", supported_buckets[i]},
                             {"interval", interval_buckets[i]},
                             {"cumulative", cumulative_buckets[i]}});

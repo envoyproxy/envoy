@@ -12,7 +12,7 @@ RichKafkaProducer::RichKafkaProducer(Event::Dispatcher& dispatcher,
                                      Thread::ThreadFactory& thread_factory,
                                      const RawKafkaConfig& configuration)
     : RichKafkaProducer(dispatcher, thread_factory, configuration,
-                        LibRdKafkaUtilsImpl::getDefaultInstance()){};
+                        LibRdKafkaUtilsImpl::getDefaultInstance()) {};
 
 RichKafkaProducer::RichKafkaProducer(Event::Dispatcher& dispatcher,
                                      Thread::ThreadFactory& thread_factory,

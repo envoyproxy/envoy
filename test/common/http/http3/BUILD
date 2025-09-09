@@ -12,7 +12,7 @@ envoy_package()
 envoy_cc_test(
     name = "conn_pool_test",
     srcs = envoy_select_enable_http3(["conn_pool_test.cc"]),
-    tags = ["nofips"],
+    rbe_pool = "6gig",
     deps = envoy_select_enable_http3([
         "//source/common/event:dispatcher_lib",
         "//source/common/http/http3:conn_pool_lib",
@@ -26,7 +26,7 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/server:transport_socket_factory_context_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:transport_socket_match_mocks",
     ]),

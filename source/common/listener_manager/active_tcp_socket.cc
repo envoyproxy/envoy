@@ -74,6 +74,7 @@ void ActiveTcpSocket::createListenerFilterBuffer() {
   listener_filter_buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
       socket_->ioHandle(), listener_.dispatcher(),
       [this](bool error) {
+        (*iter_)->onClose();
         socket_->ioHandle().close();
         if (error) {
           listener_.stats_.downstream_listener_filter_error_.inc();
@@ -172,13 +173,11 @@ void ActiveTcpSocket::continueFilterChain(bool success) {
   }
 }
 
-void ActiveTcpSocket::setDynamicMetadata(const std::string& name,
-                                         const ProtobufWkt::Struct& value) {
+void ActiveTcpSocket::setDynamicMetadata(const std::string& name, const Protobuf::Struct& value) {
   stream_info_->setDynamicMetadata(name, value);
 }
 
-void ActiveTcpSocket::setDynamicTypedMetadata(const std::string& name,
-                                              const ProtobufWkt::Any& value) {
+void ActiveTcpSocket::setDynamicTypedMetadata(const std::string& name, const Protobuf::Any& value) {
   stream_info_->setDynamicTypedMetadata(name, value);
 }
 

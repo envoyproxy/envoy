@@ -44,7 +44,7 @@ namespace {
 
 class TestCallbacks : public Envoy::Ssl::PrivateKeyConnectionCallbacks {
 public:
-  void onPrivateKeyMethodComplete() override{
+  void onPrivateKeyMethodComplete() override {
 
   };
 };

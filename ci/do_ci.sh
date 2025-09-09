@@ -13,71 +13,9 @@ CURRENT_SCRIPT_DIR="$(realpath "$(dirname "${BASH_SOURCE[0]}")")"
 # shellcheck source=ci/build_setup.sh
 . "${CURRENT_SCRIPT_DIR}"/build_setup.sh
 
-echo "building using ${NUM_CPUS} CPUs"
 echo "building for ${ENVOY_BUILD_ARCH}"
 
 cd "${SRCDIR}"
-
-# Its better to fetch too little rather than too much, as whatever is
-# actually used is what will be cached.
-# Fetching is mostly for robustness rather than optimization.
-FETCH_TARGETS=(
-    @bazel_tools//tools/jdk:remote_jdk11
-    @envoy_build_tools//...
-    //tools/gsutil
-    //tools/zstd)
-FETCH_BUILD_TARGETS=(
-    //contrib/exe/...
-    //distribution/...
-    //source/exe/...)
-FETCH_GCC_TARGETS=(
-    //source/exe/...)
-# TODO(phlax): add this as a general cache
-#  this fetches a bit too much for some of the targets
-#  but its not really possible to filter their needs so move
-#  to a shared precache
-FETCH_TEST_TARGETS=(
-    @nodejs//...
-    //test/...)
-FETCH_ALL_TEST_TARGETS=(
-    @com_github_google_quiche//:ci_tests
-    "${FETCH_TEST_TARGETS[@]}")
-FETCH_API_TARGETS=(
-    @envoy_api//...
-    //tools/api_proto_plugin/...
-    //tools/protoprint/...
-    //tools/protoxform/...
-    //tools/type_whisperer/...
-    //tools/testdata/protoxform/...)
-FETCH_DOCS_TARGETS+=(
-    //docs/...)
-FETCH_FORMAT_TARGETS+=(
-    //tools/code_format/...)
-FETCH_PROTO_TARGETS=(
-    @com_github_bufbuild_buf//:bin/buf
-    //tools/proto_format/...)
-
-GCS_REDIRECT_PATH="${SYSTEM_PULLREQUEST_PULLREQUESTNUMBER:-${BUILD_SOURCEBRANCHNAME}}"
-
-retry () {
-    local n wait iterations
-    wait="${1}"
-    iterations="${2}"
-    shift 2
-    n=0
-    until [ "$n" -ge "$iterations" ]; do
-        "${@}" \
-            && break
-        n=$((n+1))
-        if [[ "$n" -lt "$iterations" ]]; then
-            sleep "$wait"
-            echo "Retrying ..."
-        else
-            echo "Fetch failed"
-            exit 1
-        fi
-    done
-}
 
 if [[ "${ENVOY_BUILD_ARCH}" == "x86_64" ]]; then
   BUILD_ARCH_DIR="/linux/amd64"
@@ -89,20 +27,23 @@ else
 fi
 
 setup_clang_toolchain() {
+    if [[ -n "${CLANG_TOOLCHAIN_SETUP}" ]]; then
+        return
+    fi
     CONFIG_PARTS=()
     if [[ -n "${ENVOY_RBE}" ]]; then
         CONFIG_PARTS+=("remote")
     fi
-    CONFIG_PARTS+=("clang")
-    ENVOY_STDLIB="${ENVOY_STDLIB:-libc++}"
-    if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
-        CONFIG_PARTS+=("libc++")
+    if [[ "${ENVOY_BUILD_ARCH}" == "aarch64" ]]; then
+        CONFIG_PARTS+=("arm64")
     fi
+    CONFIG_PARTS+=("clang")
+    # We only support clang with libc++ now
     CONFIG="$(IFS=- ; echo "${CONFIG_PARTS[*]}")"
     BAZEL_BUILD_OPTIONS+=("--config=${CONFIG}")
     BAZEL_BUILD_OPTION_LIST="${BAZEL_BUILD_OPTIONS[*]}"
     export BAZEL_BUILD_OPTION_LIST
-    echo "clang toolchain with ${ENVOY_STDLIB} configured: ${CONFIG}"
+    echo "clang toolchain configured: ${CONFIG}"
 }
 
 function collect_build_profile() {
@@ -123,12 +64,15 @@ function bazel_with_collection() {
   declare BAZEL_STATUS="${PIPESTATUS[0]}"
   if [ "${BAZEL_STATUS}" != "0" ]
   then
-    pushd bazel-testlogs
-    failed_logs=$(grep "  /build.*test.log" "${BAZEL_OUTPUT}" | sed -e 's/  \/build.*\/testlogs\/\(.*\)/\1/')
-    while read -r f; do
-      cp --parents -f "$f" "${ENVOY_FAILED_TEST_LOGS}"
-    done <<< "$failed_logs"
-    popd
+    if [ -d bazel-testlogs ]
+    then
+        pushd bazel-testlogs
+        failed_logs=$(grep "  /build.*test.log" "${BAZEL_OUTPUT}" | sed -e 's/  \/build.*\/testlogs\/\(.*\)/\1/')
+        while read -r f; do
+        cp --parents -f "$f" "${ENVOY_FAILED_TEST_LOGS}"
+        done <<< "$failed_logs"
+        popd
+    fi
     exit "${BAZEL_STATUS}"
   fi
   collect_build_profile "$1"
@@ -156,6 +100,8 @@ function cp_binary_for_image_build() {
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/schema_validator_tool
   strip bazel-bin/test/tools/router_check/router_check_tool \
     -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/router_check_tool
+  strip bazel-bin/test/tools/config_load_check/config_load_check_tool \
+    -o "${BASE_TARGET_DIR}"/"${TARGET_DIR}"/config_load_check_tool
 
   # Copy the su-exec utility binary into the image
   cp -f bazel-bin/external/com_github_ncopa_suexec/su-exec "${BASE_TARGET_DIR}"/"${TARGET_DIR}"
@@ -200,9 +146,6 @@ function bazel_binary_build() {
   ENVOY_BIN=$(echo "${BUILD_TARGET}" | sed -e 's#^@\([^/]*\)/#external/\1#;s#^//##;s#:#/#')
   echo "ENVOY_BIN=${ENVOY_BIN}"
 
-  # This is a workaround for https://github.com/bazelbuild/bazel/issues/11834
-  [[ -n "${ENVOY_RBE}" ]] && rm -rf bazel-bin/"${ENVOY_BIN}"*
-
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" "${BUILD_TARGET}" "${CONFIG_ARGS[@]}"
   collect_build_profile "${BINARY_TYPE}"_build
 
@@ -223,9 +166,11 @@ function bazel_binary_build() {
     //test/tools/schema_validator:schema_validator_tool "${CONFIG_ARGS[@]}"
   bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" \
     //test/tools/router_check:router_check_tool "${CONFIG_ARGS[@]}"
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" \
+    //test/tools/config_load_check:config_load_check_tool "${CONFIG_ARGS[@]}"
 
   # Build su-exec utility
-  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" external:su-exec
+  bazel build "${BAZEL_BUILD_OPTIONS[@]}" --remote_download_toplevel -c "${COMPILE_TYPE}" @com_github_ncopa_suexec//:su-exec
   cp_binary_for_image_build "${BINARY_TYPE}" "${COMPILE_TYPE}" "${EXE_NAME}"
 }
 
@@ -238,9 +183,6 @@ function bazel_contrib_binary_build() {
 }
 
 function bazel_envoy_api_build() {
-    # Use libstdc++ because the API booster links to prebuilt libclang*/libLLVM* installed in /opt/llvm/lib,
-    # which is built with libstdc++. Using libstdc++ for whole of the API CI job to avoid unnecessary rebuild.
-    ENVOY_STDLIB="libstdc++"
     setup_clang_toolchain
     export CLANG_TOOLCHAIN_SETUP=1
     export LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config
@@ -265,9 +207,7 @@ function bazel_envoy_api_build() {
 }
 
 function bazel_envoy_api_go_build() {
-    if [[ -z "$CLANG_TOOLCHAIN_SETUP" ]]; then
-        setup_clang_toolchain
-    fi
+    setup_clang_toolchain
     GO_IMPORT_BASE="github.com/envoyproxy/go-control-plane"
     GO_TARGETS=(@envoy_api//...)
     read -r -a GO_PROTOS <<< "$(bazel query "${BAZEL_GLOBAL_OPTIONS[@]}" "kind('go_proto_library', ${GO_TARGETS[*]})" | tr '\n' ' ')"
@@ -351,14 +291,9 @@ case $CI_TARGET in
 
     asan)
         setup_clang_toolchain
-        if [[ -n "$ENVOY_RBE" ]]; then
-            ASAN_CONFIG="--config=rbe-toolchain-asan"
-        else
-            ASAN_CONFIG="--config=clang-asan"
-        fi
         BAZEL_BUILD_OPTIONS+=(
             -c dbg
-            "${ASAN_CONFIG}"
+            "--config=asan"
             "--build_tests_only"
             "--remote_download_minimal")
         echo "bazel ASAN/UBSAN debug build with tests"
@@ -377,7 +312,28 @@ case $CI_TARGET in
         # fi
         ;;
 
-    check_and_fix_proto_format)
+    cache-create)
+        if [[ -z "${ENVOY_CACHE_TARGETS}" ]]; then
+            echo "ENVOY_CACHE_TARGETS not set" >&2
+            exit 1
+        fi
+        if [[ -z "${ENVOY_CACHE_ROOT}" ]]; then
+            echo "ENVOY_CACHE_ROOT not set" >&2
+            exit 1
+        fi
+        BAZEL_BUILD_OPTIONS=()
+        setup_clang_toolchain
+        echo "Fetching cache: ${ENVOY_CACHE_TARGETS}"
+        bazel --output_user_root="${ENVOY_CACHE_ROOT}" \
+              --output_base="${ENVOY_CACHE_ROOT}/base" \
+              aquery "deps(${ENVOY_CACHE_TARGETS})" \
+              --repository_cache="${ENVOY_REPOSITORY_CACHE}" \
+              "${BAZEL_BUILD_OPTIONS[@]}" \
+              "${BAZEL_BUILD_EXTRA_OPTIONS[@]}" \
+              > /dev/null
+        ;;
+
+    format-api|check_and_fix_proto_format)
         setup_clang_toolchain
         echo "Check and fix proto format ..."
         "${ENVOY_SRCDIR}/ci/check_and_fix_format.sh"
@@ -389,22 +345,25 @@ case $CI_TARGET in
         "${ENVOY_SRCDIR}/tools/proto_format/proto_format.sh" check
         ;;
 
-    clang_tidy)
-        # clang-tidy will warn on standard library issues with libc++
-        ENVOY_STDLIB="libstdc++"
+    clang-tidy)
         setup_clang_toolchain
         export CLANG_TIDY_FIX_DIFF="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixed.diff"
         export FIX_YAML="${ENVOY_TEST_TMPDIR}/lint-fixes/clang-tidy-fixes.yaml"
         export CLANG_TIDY_APPLY_FIXES=1
         mkdir -p "${ENVOY_TEST_TMPDIR}/lint-fixes"
-        CLANG_TIDY_TARGETS=(
-            //contrib/...
-            //source/...
-            //test/...
-            @envoy_api//...)
+        if [[ -n "$CLANG_TIDY_TARGETS" ]]; then
+            read -ra CLANG_TIDY_TARGETS <<< "${CLANG_TIDY_TARGETS}"
+        else
+            CLANG_TIDY_TARGETS=(
+                //contrib/...
+                //source/...
+                //test/...
+                @envoy_api//...)
+        fi
+        echo "Running clang-tidy on ${CLANG_TIDY_TARGETS[*]}"
         bazel build \
               "${BAZEL_BUILD_OPTIONS[@]}" \
-              --config clang-tidy \
+              --config=clang-tidy \
               "${CLANG_TIDY_TARGETS[@]}"
         ;;
 
@@ -422,7 +381,6 @@ case $CI_TARGET in
         # This doesn't go into CI but is available for developer convenience.
         echo "bazel with different compiletime options build with tests..."
         TEST_TARGETS=("${TEST_TARGETS[@]/#\/\//@envoy\/\/}")
-        # Building all the dependencies from scratch to link them against libc++.
         echo "Building and testing with wasm=wamr: ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -483,25 +441,6 @@ case $CI_TARGET in
         collect_build_profile coverage
         ;;
 
-    coverage-upload|fuzz_coverage-upload)
-        setup_clang_toolchain
-        if [[ "$CI_TARGET" == "fuzz_coverage-upload" ]]; then
-            TARGET=fuzz_coverage
-        else
-            TARGET=coverage
-        fi
-        GCS_LOCATION=$(
-            bazel run //tools/gcs:upload \
-                  "${GCS_ARTIFACT_BUCKET}" \
-                  "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
-                  "/source/generated/${TARGET}" \
-                  "$TARGET" \
-                  "${GCS_REDIRECT_PATH}")
-        if [[ "${COVERAGE_FAILED}" -eq 1 ]]; then
-            echo "##vso[task.logissue type=error]Coverage failed, check artifact at: ${GCS_LOCATION}"
-        fi
-        ;;
-
     debug)
         setup_clang_toolchain
         echo "Testing ${TEST_TARGETS[*]}"
@@ -538,11 +477,12 @@ case $CI_TARGET in
         # Using todays date as an action_env expires the NIST cache daily, which is the update frequency
         TODAY_DATE=$(date -u -I"date")
         export TODAY_DATE
+        # TODO(phlax): Re-enable cve tests
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
               --//tools/dependency:preload_cve_data \
               --action_env=TODAY_DATE \
               -- -v warn \
-                 -c cves release_dates releases
+                 -c release_dates releases
         # Run dependabot tests
         echo "Check dependabot ..."
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
@@ -626,6 +566,8 @@ case $CI_TARGET in
         fi
         ENVOY_ARCH_DIR="$(dirname "${ENVOY_BUILD_DIR}")"
         ENVOY_TARBALL_DIR="${ENVOY_TARBALL_DIR:-${ENVOY_ARCH_DIR}}"
+        ENVOY_OCI_DIR="${ENVOY_BUILD_DIR}/${ENVOY_OCI_DIR}"
+        export ENVOY_OCI_DIR
         _PLATFORMS=()
         PLATFORM_NAMES=(
             x64:linux/amd64
@@ -651,22 +593,12 @@ case $CI_TARGET in
         fi
         PLATFORMS="$(IFS=, ; echo "${_PLATFORMS[*]}")"
         export DOCKER_PLATFORM="$PLATFORMS"
-        if [[ -z "${DOCKERHUB_PASSWORD}" && "${#_PLATFORMS[@]}" -eq 1 && -z $ENVOY_DOCKER_SAVE_IMAGE ]]; then
-            # if you are not pushing the images and there is only one platform
-            # then load to Docker (ie local build)
+        if [[ -z "$ENVOY_DOCKER_SAVE_IMAGE" ]]; then
+            # if you are not saving the images as OCI then load to Docker (ie local build)
             export DOCKER_LOAD_IMAGES=1
         fi
-        "${ENVOY_SRCDIR}/ci/docker_ci.sh"
-        ;;
-
-    docker-upload)
-        setup_clang_toolchain
-        bazel run //tools/gcs:upload \
-              "${GCS_ARTIFACT_BUCKET}" \
-              "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
-              "${BUILD_DIR}/build_images" \
-              "docker" \
-              "${GCS_REDIRECT_PATH}"
+        echo "BUILDING FOR: ${PLATFORMS}"
+        "${ENVOY_SRCDIR}/distribution/docker/build.sh"
         ;;
 
     dockerhub-publish)
@@ -688,7 +620,7 @@ case $CI_TARGET in
         echo "generating docs..."
         # Build docs.
         [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
-        rm -rf "${DOCS_OUTPUT_DIR}"
+        rm -rf "${DOCS_OUTPUT_DIR:?}"/*
         mkdir -p "${DOCS_OUTPUT_DIR}"
         if [[ -n "${CI_TARGET_BRANCH}" ]] || [[ -n "${SPHINX_QUIET}" ]]; then
             export SPHINX_RUNNER_ARGS="-v warn"
@@ -704,67 +636,6 @@ case $CI_TARGET in
               --//tools/tarball:target=//docs:html \
               //tools/tarball:unpack \
               "$DOCS_OUTPUT_DIR"
-        ;;
-
-    docs-upload)
-        setup_clang_toolchain
-        bazel run //tools/gcs:upload \
-              "${GCS_ARTIFACT_BUCKET}" \
-              "${GCP_SERVICE_ACCOUNT_KEY_PATH}" \
-              /source/generated/docs \
-              docs \
-              "${GCS_REDIRECT_PATH}"
-        ;;
-
-    fetch|fetch-*)
-        case $CI_TARGET in
-            fetch)
-                targets=("${FETCH_TARGETS[@]}")
-                ;;
-            fetch-check_and_fix_proto_format)
-                targets=("${FETCH_PROTO_TARGETS[@]}")
-                ;;
-            fetch-docs)
-                targets=("${FETCH_DOCS_TARGETS[@]}")
-                ;;
-            fetch-format)
-                targets=("${FETCH_FORMAT_TARGETS[@]}")
-                ;;
-            fetch-gcc)
-                targets=("${FETCH_GCC_TARGETS[@]}")
-                ;;
-            fetch-release|fetch-release.test_only)
-                targets=(
-                    "${FETCH_BUILD_TARGETS[@]}"
-                    "${FETCH_ALL_TEST_TARGETS[@]}")
-                ;;
-            fetch-release.server_only)
-                targets=(
-                    "${FETCH_BUILD_TARGETS[@]}")
-                ;;
-            fetch-*coverage)
-                targets=("${FETCH_TEST_TARGETS[@]}")
-                ;;
-            fetch-*san|fetch-compile_time_options)
-                targets=("${FETCH_ALL_TEST_TARGETS[@]}")
-                ;;
-            fetch-api)
-                targets=("${FETCH_API_TARGETS[@]}")
-                ;;
-            *)
-                exit 0
-                ;;
-        esac
-        setup_clang_toolchain
-        FETCH_ARGS=(
-            --noshow_progress
-            --noshow_loading_progress)
-        echo "Fetching ${targets[*]} ..."
-        retry 15 10 bazel \
-              fetch \
-              "${BAZEL_GLOBAL_OPTIONS[@]}" \
-              "${FETCH_ARGS[@]}" \
-              "${targets[@]}"
         ;;
 
     fix_proto_format)
@@ -791,10 +662,6 @@ case $CI_TARGET in
         ;;
 
     gcc)
-        if [[ -n "${ENVOY_STDLIB}" && "${ENVOY_STDLIB}" != "libstdc++" ]]; then
-            echo "gcc toolchain doesn't support ${ENVOY_STDLIB}."
-            exit 1
-        fi
         if [[ -n "${ENVOY_RBE}" ]]; then
             CONFIG_PREFIX="remote-"
         fi
@@ -818,9 +685,9 @@ case $CI_TARGET in
 
     msan)
         setup_clang_toolchain
-        # rbe-toolchain-msan must comes as first to win library link order.
+        # msan must comes as first to win library link order.
         BAZEL_BUILD_OPTIONS=(
-            "--config=rbe-toolchain-msan"
+            "--config=msan"
             "${BAZEL_BUILD_OPTIONS[@]}"
             "-c" "dbg"
             "--build_tests_only"
@@ -924,6 +791,12 @@ case $CI_TARGET in
         cp -a \
            bazel-bin/test/tools/router_check/router_check_tool.stripped \
            "${ENVOY_BINARY_DIR}/router_check_tool"
+        bazel build "${BAZEL_BUILD_OPTIONS[@]}" "${BAZEL_RELEASE_OPTIONS[@]}" \
+              --remote_download_toplevel \
+              //test/tools/config_load_check:config_load_check_tool.stripped
+        cp -a \
+           bazel-bin/test/tools/config_load_check/config_load_check_tool.stripped \
+           "${ENVOY_BINARY_DIR}/config_load_check_tool"
         echo "Release files created in ${ENVOY_BINARY_DIR}"
         ;;
 
@@ -936,7 +809,9 @@ case $CI_TARGET in
     release.signed)
         echo "Signing binary packages..."
         setup_clang_toolchain
-        bazel build "${BAZEL_BUILD_OPTIONS[@]}" //distribution:signed
+        bazel build \
+              "${BAZEL_BUILD_OPTIONS[@]}" \
+              //distribution:signed
         cp -a bazel-bin/distribution/release.signed.tar.zst "${BUILD_DIR}/envoy/"
         ;;
 
@@ -963,7 +838,7 @@ case $CI_TARGET in
         echo "Building and testing envoy tests ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
-             --config=rbe-toolchain-tsan \
+             --config=tsan \
              -c dbg \
              --build_tests_only \
              --remote_download_minimal \
@@ -981,6 +856,11 @@ case $CI_TARGET in
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" \
               //distribution:verify_packages \
               "$PACKAGE_BUILD"
+        ;;
+
+    verify-distroless)
+        docker build -f ci/Dockerfile-distroless-testing -t distroless-testing .
+        docker run --rm distroless-testing
         ;;
 
     verify_examples)
@@ -1027,6 +907,7 @@ case $CI_TARGET in
         ;;
 
     refresh_compdb)
+        setup_clang_toolchain
         # Override the BAZEL_STARTUP_OPTIONS to setting different output directory.
         # So the compdb headers won't be overwritten by another bazel run.
         for i in "${!BAZEL_STARTUP_OPTIONS[@]}"; do

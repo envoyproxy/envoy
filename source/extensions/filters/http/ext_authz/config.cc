@@ -39,7 +39,8 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoWithServ
                 &server_context](Http::FilterChainFactoryCallbacks& callbacks) {
       auto client = std::make_unique<Extensions::Filters::Common::ExtAuthz::RawHttpClientImpl>(
           server_context.clusterManager(), client_config);
-      callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
+      callbacks.addStreamFilter(
+          std::make_shared<Filter>(filter_config, std::move(client), server_context));
     };
   } else {
     // gRPC client.
@@ -54,16 +55,17 @@ Http::FilterFactoryCb ExtAuthzFilterConfig::createFilterFactoryFromProtoWithServ
                                  .grpcAsyncClientManager()
                                  .getOrCreateRawAsyncClientWithHashKey(
                                      config_with_hash_key, server_context.scope(), true);
-      THROW_IF_STATUS_NOT_OK(client_or_error, throw);
+      THROW_IF_NOT_OK_REF(client_or_error.status());
       auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
           client_or_error.value(), std::chrono::milliseconds(timeout_ms));
-      callbacks.addStreamFilter(std::make_shared<Filter>(filter_config, std::move(client)));
+      callbacks.addStreamFilter(
+          std::make_shared<Filter>(filter_config, std::move(client), server_context));
     };
   }
   return callback;
 }
 
-Router::RouteSpecificFilterConfigConstSharedPtr
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 ExtAuthzFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& proto_config,
     Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {

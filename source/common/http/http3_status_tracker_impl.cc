@@ -14,6 +14,8 @@ const int MaxConsecutiveBrokenCount = 17;
 Http3StatusTrackerImpl::Http3StatusTrackerImpl(Event::Dispatcher& dispatcher)
     : expiration_timer_(dispatcher.createTimer([this]() -> void { onExpirationTimeout(); })) {}
 
+bool Http3StatusTrackerImpl::isHttp3Pending() const { return state_ == State::Pending; }
+
 bool Http3StatusTrackerImpl::isHttp3Broken() const { return state_ == State::Broken; }
 
 bool Http3StatusTrackerImpl::isHttp3Confirmed() const { return state_ == State::Confirmed; }
@@ -21,6 +23,8 @@ bool Http3StatusTrackerImpl::isHttp3Confirmed() const { return state_ == State::
 bool Http3StatusTrackerImpl::hasHttp3FailedRecently() const {
   return state_ == State::FailedRecently;
 }
+
+void Http3StatusTrackerImpl::markHttp3Pending() { state_ = State::Pending; }
 
 void Http3StatusTrackerImpl::markHttp3Broken() {
   state_ = State::Broken;

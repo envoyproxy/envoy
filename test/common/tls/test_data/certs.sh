@@ -16,6 +16,73 @@ cleanup() {
     rm ./intermediate_crl_*
 }
 
+
+# $@=<trust domain, CA cert, sequence number> (repeatable for multiple domains and certs per domain)
+generate_spiffe_trust_bundle_mapping() {
+    local trust_domains=()
+
+    # Collecting all trust domain arguments
+    while [[ $# -gt 0 ]]; do
+        trust_domains+=( "$1" "$2" "$3" )
+        shift 3
+    done
+
+    # Use a single redirect for the entire block
+    {
+        echo "{"
+        echo "  \"trust_domains\": {"
+
+        local first_domain=true
+        for (( i=0; i<${#trust_domains[@]}; i+=3 )); do
+            local trust_domain="${trust_domains[i]}"
+            # Quote the array expansion to prevent word splitting
+            local ca_cert_files=( "${trust_domains[i+1]//,/ }" )
+            local sequence_number="${trust_domains[i+2]}"
+
+            if [ "$first_domain" = false ]; then
+                echo "    },"
+            fi
+            first_domain=false
+
+            echo "    \"$trust_domain\": {"
+            echo "      \"sequence_number\": $sequence_number,"
+            echo "      \"keys\": ["
+
+            local first_key=true
+            for ca_cert_file in "${ca_cert_files[@]}"; do
+                # Declare and assign separately
+                local base64_der
+                local modulus
+                base64_der=$(openssl x509 -in "$ca_cert_file" -outform DER | base64 | tr -d '\n\r')
+                modulus=$(openssl x509 -in "$ca_cert_file" -noout -modulus | cut -d'=' -f2 | xxd -r -p | base64 | tr -d "=\n" | tr '/+' '_-')
+
+                if [ "$first_key" = false ]; then
+                    echo ","
+                fi
+                first_key=false
+
+                cat <<EOF
+            {
+              "kty": "RSA",
+              "use": "x509-svid",
+              "x5c": [
+                "$base64_der"
+              ],
+              "n": "$modulus",
+              "e": "AQAB"
+            }
+EOF
+            done
+
+            echo "      ]"
+        done
+
+        echo "    }"
+        echo "  }"
+        echo "}"
+    } > trust_bundles.json
+}
+
 # $1=<CA name> $2=[issuer name]
 generate_ca() {
     local extra_args=()
@@ -77,6 +144,22 @@ generate_x509_cert() {
     openssl x509 -req -days "$days" -in "${1}_cert.csr" -sha256 -CA "${2}_cert.pem" -CAkey \
             "${2}_key.pem" -CAcreateserial -out "${1}_cert.pem" -extensions v3_ca -extfile "${1}_cert.cfg" "${extra_args[@]}"
     generate_info_header "$1"
+}
+
+# $1=<certificate name> $2=<CA name> $3=[days]
+generate_x509_cert_no_extension() {
+    local days
+    days="${3:-${DEFAULT_VALIDITY_DAYS}}"
+    openssl req -new -key "${1}_key.pem" -out "${1}_cert.csr" -config "${1}_cert.cfg" -batch -sha256
+    openssl x509 -req -days "$days" -in "${1}_cert.csr" -sha256 -CA "${2}_cert.pem" -CAkey \
+            "${2}_key.pem" -out "${1}_cert.pem" -extensions v3_req -extfile "${1}_cert.cfg"
+    generate_info_header "$1"
+    # Older OpenSSLs do not correctly generate this certificate. See
+    # https://github.com/openssl/openssl/issues/28397
+    if openssl asn1parse -in "${1}_cert.pem" | grep -F 'cont [ 3 ]' > /dev/null; then
+      echo "ERROR: ${1}_cert.pem was not generated correctly. Use a newer OpenSSL."
+      exit 1
+    fi
 }
 
 # $1=<certificate name> $2=<CA name> $3=[days]
@@ -306,8 +389,20 @@ generate_ecdsa_key selfsigned_ecdsa_p384 secp384r1
 generate_selfsigned_x509_cert selfsigned_ecdsa_p384
 rm -f selfsigned_ecdsa_p384_cert.cfg
 
+# Generate selfsigned_ecdsa_p521_cert.pem.
+cp -f selfsigned_cert.cfg selfsigned_ecdsa_p521_cert.cfg
+generate_ecdsa_key selfsigned_ecdsa_p521 secp521r1
+generate_selfsigned_x509_cert selfsigned_ecdsa_p521
+rm -f selfsigned_ecdsa_p521_cert.cfg
+
 # Generate selfsigned_ecdsa_p384_certkey.p12 with no password.
 openssl pkcs12 -export -out selfsigned_ecdsa_p384_certkey.p12 -inkey selfsigned_ecdsa_p384_key.pem -in selfsigned_ecdsa_p384_cert.pem -keypbe NONE -certpbe NONE -nomaciter -passout pass:
+
+# Generate selfsigned_secp224r1_cert.pem
+cp -f selfsigned_cert.cfg selfsigned_secp224r1_cert.cfg
+generate_ecdsa_key selfsigned_secp224r1 secp224r1
+generate_selfsigned_x509_cert selfsigned_secp224r1
+rm -f selfsigned_secp224r1_cert.cfg
 
 # Generate long_validity_cert.pem as a self-signed, with expiry that exceeds 32bit time_t.
 cp -f selfsigned_cert.cfg long_validity_cert.cfg
@@ -356,6 +451,12 @@ openssl rand 79 > ticket_key_wrong_len
 generate_rsa_key no_subject
 generate_x509_cert_nosubject no_subject ca
 
+# Generate a certificate with no extensions
+# This is skipped for now because OpenSSL cannot generate it correctly.
+# See https://github.com/openssl/openssl/issues/28397.
+# generate_rsa_key no_extension
+# generate_x509_cert_no_extension no_extension ca
+
 # Generate unit test certificate
 generate_rsa_key unittest
 generate_selfsigned_x509_cert unittest
@@ -371,6 +472,8 @@ generate_x509_cert spiffe_san ca
 
 generate_rsa_key non_spiffe_san
 generate_x509_cert non_spiffe_san ca
+
+generate_spiffe_trust_bundle_mapping "example.com" "ca_cert.pem" 12035488 "lyft.com" "ca_cert.pem" 12035489
 
 cp -f spiffe_san_cert.cfg expired_spiffe_san_cert.cfg
 generate_rsa_key expired_spiffe_san

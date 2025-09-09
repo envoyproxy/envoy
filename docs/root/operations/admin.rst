@@ -177,7 +177,7 @@ modify different aspects of the server:
 .. http:get:: /config_dump?mask={}
 
   Specify a subset of fields that you would like to be returned. The mask is parsed as a
-  ``ProtobufWkt::FieldMask`` and applied to each top level dump such as
+  ``Protobuf::FieldMask`` and applied to each top level dump such as
   :ref:`BootstrapConfigDump <envoy_v3_api_msg_admin.v3.BootstrapConfigDump>` and
   :ref:`ClustersConfigDump <envoy_v3_api_msg_admin.v3.ClustersConfigDump>`.
   This behavior changes if both resource and mask query parameters are specified. See
@@ -225,7 +225,7 @@ modify different aspects of the server:
 
   When both resource and mask query parameters are specified, the mask is applied to every element
   in the desired repeated field so that only a subset of fields are returned. The mask is parsed
-  as a ``ProtobufWkt::FieldMask``.
+  as a ``Protobuf::FieldMask``.
 
   For example, get the names of all active dynamic clusters with
   ``/config_dump?resource=dynamic_active_clusters&mask=cluster.name``
@@ -248,6 +248,11 @@ modify different aspects of the server:
 .. http:get:: /heap_dump
 
   Dump current heap profile of Envoy process. The output content is parsable binary by the ``pprof`` tool.
+  Requires compiling with tcmalloc (default).
+
+.. http:post:: /allocprofiler
+
+  Enable or disable the allocation profiler. The output content is parsable binary by the ``pprof`` tool.
   Requires compiling with tcmalloc (default).
 
 .. _operations_admin_interface_healthcheck_fail:
@@ -283,7 +288,7 @@ modify different aspects of the server:
 .. http:get:: /init_dump?mask={}
 
   When mask query parameters is specified, the mask value is the desired component to dump unready targets.
-  The mask is parsed as a ``ProtobufWkt::FieldMask``.
+  The mask is parsed as a ``Protobuf::FieldMask``.
 
   For example, get the unready targets of all listeners with
   ``/init_dump?mask=listener``
@@ -321,10 +326,10 @@ modify different aspects of the server:
 
   .. code-block:: text
 
-    source/server/admin/admin_filter.cc: 0
-    source/common/event/dispatcher_impl.cc: 0
-    source/common/network/tcp_listener_impl.cc: 0
-    source/common/network/udp_listener_impl.cc: 0
+    source/server/admin/admin_filter.cc: trace
+    source/common/event/dispatcher_impl.cc: trace
+    source/common/network/tcp_listener_impl.cc: trace
+    source/common/network/udp_listener_impl.cc: trace
 
   - ``/logging?paths=source/common/event/dispatcher_impl.cc:debug`` will make the level of ``source/common/event/dispatcher_impl.cc`` be debug.
   - ``/logging?admin_filter=info`` will make the level of ``source/server/admin/admin_filter.cc`` be info, and other unmatched loggers will be the default trace.
@@ -358,7 +363,8 @@ modify different aspects of the server:
 
    :ref:`Drains <arch_overview_draining>` all inbound listeners. ``traffic_direction`` field in
    :ref:`Listener <envoy_v3_api_msg_config.listener.v3.Listener>` is used to determine whether a listener
-   is inbound or outbound.
+   is inbound or outbound. May not be effective for network filters like :ref:`Redis <config_network_filters_redis_proxy>`,
+   :ref:`Mongo <config_network_filters_mongo_proxy>`, or :ref:`Thrift <config_network_filters_thrift_proxy>`.
 
    .. http:post:: /drain_listeners?graceful
 

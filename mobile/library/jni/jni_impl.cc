@@ -3,7 +3,6 @@
 
 #include "source/common/protobuf/protobuf.h"
 
-#include "ares.h"
 #include "library/cc/engine_builder.h"
 #include "library/common/api/c_types.h"
 #include "library/common/bridge/utility.h"
@@ -14,6 +13,7 @@
 #include "library/common/types/managed_envoy_headers.h"
 #include "library/jni/android_network_utility.h"
 #include "library/jni/jni_helper.h"
+#include "library/jni/jni_init.h"
 #include "library/jni/jni_utility.h"
 
 using Envoy::Platform::EngineBuilder;
@@ -21,78 +21,12 @@ using Envoy::Platform::EngineBuilder;
 // NOLINT(namespace-envoy)
 
 extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /* reserved */) {
-  Envoy::JNI::JniHelper::initialize(vm);
-  Envoy::JNI::JniUtility::initCache();
-  Envoy::JNI::JniHelper::addToCache(
-      "io/envoyproxy/envoymobile/utilities/AndroidNetworkLibrary",
-      /* methods= */ {},
-      /* static_methods= */
-      {
-          {"isCleartextTrafficPermitted", "(Ljava/lang/String;)Z"},
-          {"tagSocket", "(III)V"},
-          {"verifyServerCertificates",
-           "([[B[B[B)Lio/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult;"},
-          {"addTestRootCertificate", "([B)V"},
-          {"clearTestRootCertificates", "()V"},
-
-      },
-      /* fields= */ {}, /* static_fields= */ {});
-  Envoy::JNI::JniHelper::addToCache("io/envoyproxy/envoymobile/utilities/AndroidCertVerifyResult",
-                                    /* methods= */
-                                    {
-                                        {"isIssuedByKnownRoot", "()Z"},
-                                        {"getStatus", "()I"},
-                                        {"getCertificateChainEncoded", "()[[B"},
-                                    },
-                                    /* static_methods= */ {},
-                                    /* fields= */ {}, /* static_fields= */ {});
-  Envoy::JNI::JniHelper::addToCache("io/envoyproxy/envoymobile/engine/types/EnvoyOnEngineRunning",
-                                    /* methods= */
-                                    {
-                                        {"invokeOnEngineRunning", "()Ljava/lang/Object;"},
-                                    },
-                                    /* static_methods= */ {},
-                                    /* fields= */ {}, /* static_fields= */ {});
-  Envoy::JNI::JniHelper::addToCache("io/envoyproxy/envoymobile/engine/types/EnvoyLogger",
-                                    /* methods= */
-                                    {
-                                        {"log", "(ILjava/lang/String;)V"},
-                                    },
-                                    /* static_methods= */ {},
-                                    /* fields= */ {}, /* static_fields= */ {});
-  Envoy::JNI::JniHelper::addToCache("io/envoyproxy/envoymobile/engine/types/EnvoyEventTracker",
-                                    /* methods= */
-                                    {
-                                        {"track", "(Ljava/util/Map;)V"},
-                                    },
-                                    /* static_methods= */ {},
-                                    /* fields= */ {}, /* static_fields= */ {});
-  Envoy::JNI::JniHelper::addToCache(
-      "io/envoyproxy/envoymobile/engine/types/EnvoyHTTPCallbacks",
-      /* methods= */
-      {
-          {"onHeaders",
-           "(Ljava/util/Map;ZLio/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel;)V"},
-          {"onData",
-           "(Ljava/nio/ByteBuffer;ZLio/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel;)V"},
-          {"onTrailers",
-           "(Ljava/util/Map;Lio/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel;)V"},
-          {"onComplete", "(Lio/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel;Lio/envoyproxy/"
-                         "envoymobile/engine/types/EnvoyFinalStreamIntel;)V"},
-          {"onError",
-           "(ILjava/lang/String;ILio/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel;Lio/"
-           "envoyproxy/envoymobile/engine/types/EnvoyFinalStreamIntel;)V"},
-          {"onCancel", "(Lio/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel;Lio/envoyproxy/"
-                       "envoymobile/engine/types/EnvoyFinalStreamIntel;)V"},
-          {"onSendWindowAvailable", "(Lio/envoyproxy/envoymobile/engine/types/EnvoyStreamIntel;)V"},
-      },
-      /* static_methods= */ {},
-      /* fields= */ {}, /* static_fields= */ {});
+  Envoy::JNI::initialize(vm);
   return Envoy::JNI::JniHelper::getVersion();
 }
 
 extern "C" JNIEXPORT void JNICALL JNI_OnUnload(JavaVM*, void* /* reserved */) {
-  Envoy::JNI::JniHelper::finalize();
+  Envoy::JNI::finalize();
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -102,7 +36,7 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_setLogLevel(JNIEnv* /*env*/, jc
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_initEngine(
     JNIEnv* env, jclass, jobject on_engine_running, jobject envoy_logger,
-    jobject envoy_event_tracker) {
+    jobject envoy_event_tracker, jboolean disable_dns_refresh_on_network_change) {
   //================================================================================================
   // EngineCallbacks
   //================================================================================================
@@ -174,7 +108,9 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibr
   }
 
   return reinterpret_cast<jlong>(
-      new Envoy::InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker)));
+      new Envoy::InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker),
+                                /*network_thread_priority*/ absl::nullopt,
+                                (disable_dns_refresh_on_network_change == JNI_TRUE)));
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_runEngine(
@@ -200,19 +136,6 @@ extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibra
   Envoy::InternalEngine* internal_engine = reinterpret_cast<Envoy::InternalEngine*>(engine_handle);
   internal_engine->terminate();
   delete internal_engine;
-}
-
-extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_initCares(
-    JNIEnv* env, jclass, jobject connectivity_manager) {
-#if defined(__ANDROID_API__)
-  Envoy::JNI::JniHelper jni_helper(env);
-  ares_library_init_jvm(jni_helper.getJavaVm());
-  ares_library_init_android(connectivity_manager);
-#else
-  // For suppressing unused parameters.
-  (void)env;
-  (void)connectivity_manager;
-#endif
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
@@ -1213,25 +1136,29 @@ javaObjectArrayToStringPairVector(Envoy::JNI::JniHelper& jni_helper, jobjectArra
 }
 
 void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_seconds,
-                      jlong dns_refresh_seconds, jlong dns_failure_refresh_seconds_base,
-                      jlong dns_failure_refresh_seconds_max, jlong dns_query_timeout_seconds,
-                      jlong dns_min_refresh_seconds, jobjectArray dns_preresolve_hostnames,
-                      jboolean enable_dns_cache, jlong dns_cache_save_interval_seconds,
-                      jint dns_num_retries, jboolean enable_drain_post_dns_refresh,
-                      jboolean enable_http3, jboolean use_cares, jboolean force_v6,
-                      jboolean use_gro, jstring http3_connection_options,
-                      jstring http3_client_connection_options, jobjectArray quic_hints,
-                      jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
-                      jboolean enable_brotli_decompression, jboolean enable_port_migration,
-                      jboolean enable_socket_tagging, jboolean enable_interface_binding,
+                      jboolean disable_dns_refresh_on_failure,
+                      jboolean disable_dns_refresh_on_network_change, jlong dns_refresh_seconds,
+                      jlong dns_failure_refresh_seconds_base, jlong dns_failure_refresh_seconds_max,
+                      jlong dns_query_timeout_seconds, jlong dns_min_refresh_seconds,
+                      jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
+                      jlong dns_cache_save_interval_seconds, jint dns_num_retries,
+                      jboolean enable_drain_post_dns_refresh, jboolean enable_http3,
+                      jstring http3_connection_options, jstring http3_client_connection_options,
+                      jobjectArray quic_hints, jobjectArray quic_canonical_suffixes,
+                      jboolean enable_gzip_decompression, jboolean enable_brotli_decompression,
+                      jint num_timeouts_to_trigger_port_migration, jboolean enable_socket_tagging,
+                      jboolean enable_interface_binding,
                       jlong h2_connection_keepalive_idle_interval_milliseconds,
                       jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
                       jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds,
                       jstring app_version, jstring app_id, jboolean trust_chain_verification,
                       jobjectArray filter_chain, jboolean enable_platform_certificates_validation,
                       jstring upstream_tls_sni, jobjectArray runtime_guards,
+                      jlong h3_connection_keepalive_initial_interval_milliseconds,
                       Envoy::Platform::EngineBuilder& builder) {
   builder.addConnectTimeoutSeconds((connect_timeout_seconds));
+  builder.setDisableDnsRefreshOnFailure(disable_dns_refresh_on_failure);
+  builder.setDisableDnsRefreshOnNetworkChange(disable_dns_refresh_on_network_change);
   builder.addDnsRefreshSeconds((dns_refresh_seconds));
   builder.addDnsFailureRefreshSeconds((dns_failure_refresh_seconds_base),
                                       (dns_failure_refresh_seconds_max));
@@ -1269,15 +1196,14 @@ void configureBuilder(Envoy::JNI::JniHelper& jni_helper, jlong connect_timeout_s
   for (const std::string& suffix : suffixes) {
     builder.addQuicCanonicalSuffix(suffix);
   }
-  builder.enablePortMigration(enable_port_migration);
-  builder.setUseCares(use_cares == JNI_TRUE);
-  builder.setUseGroIfAvailable(use_gro == JNI_TRUE);
+  builder.setNumTimeoutsToTriggerPortMigration(num_timeouts_to_trigger_port_migration);
   builder.enableInterfaceBinding(enable_interface_binding == JNI_TRUE);
   builder.enableDrainPostDnsRefresh(enable_drain_post_dns_refresh == JNI_TRUE);
   builder.enforceTrustChainVerification(trust_chain_verification == JNI_TRUE);
   builder.enablePlatformCertificatesValidation(enable_platform_certificates_validation == JNI_TRUE);
   builder.setUpstreamTlsSni(Envoy::JNI::javaStringToCppString(jni_helper, upstream_tls_sni));
-  builder.setForceAlwaysUsev6(force_v6 == JNI_TRUE);
+  builder.setKeepAliveInitialIntervalMilliseconds(
+      (h3_connection_keepalive_initial_interval_milliseconds));
 
   auto guards = javaObjectArrayToStringPairVector(jni_helper, runtime_guards);
   for (std::pair<std::string, std::string>& entry : guards) {
@@ -1310,39 +1236,40 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_getNativeFilterConfig(JNIEnv* e
 }
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_createBootstrap(
-    JNIEnv* env, jclass, jlong connect_timeout_seconds, jlong dns_refresh_seconds,
+    JNIEnv* env, jclass, jlong connect_timeout_seconds, jboolean disable_dns_refresh_on_failure,
+    jboolean disable_dns_refresh_on_network_change, jlong dns_refresh_seconds,
     jlong dns_failure_refresh_seconds_base, jlong dns_failure_refresh_seconds_max,
     jlong dns_query_timeout_seconds, jlong dns_min_refresh_seconds,
     jobjectArray dns_preresolve_hostnames, jboolean enable_dns_cache,
     jlong dns_cache_save_interval_seconds, jint dns_num_retries,
-    jboolean enable_drain_post_dns_refresh, jboolean enable_http3, jboolean use_cares,
-    jboolean force_v6, jboolean use_gro, jstring http3_connection_options,
+    jboolean enable_drain_post_dns_refresh, jboolean enable_http3, jstring http3_connection_options,
     jstring http3_client_connection_options, jobjectArray quic_hints,
     jobjectArray quic_canonical_suffixes, jboolean enable_gzip_decompression,
-    jboolean enable_brotli_decompression, jboolean enable_port_migration,
+    jboolean enable_brotli_decompression, jint num_timeouts_to_trigger_port_migration,
     jboolean enable_socket_tagging, jboolean enable_interface_binding,
     jlong h2_connection_keepalive_idle_interval_milliseconds,
     jlong h2_connection_keepalive_timeout_seconds, jlong max_connections_per_host,
     jlong stream_idle_timeout_seconds, jlong per_try_idle_timeout_seconds, jstring app_version,
     jstring app_id, jboolean trust_chain_verification, jobjectArray filter_chain,
     jboolean enable_platform_certificates_validation, jstring upstream_tls_sni,
-    jobjectArray runtime_guards) {
+    jobjectArray runtime_guards, jlong h3_connection_keepalive_initial_interval_milliseconds) {
   Envoy::JNI::JniHelper jni_helper(env);
   Envoy::Platform::EngineBuilder builder;
 
   configureBuilder(
-      jni_helper, connect_timeout_seconds, dns_refresh_seconds, dns_failure_refresh_seconds_base,
+      jni_helper, connect_timeout_seconds, disable_dns_refresh_on_failure,
+      disable_dns_refresh_on_network_change, dns_refresh_seconds, dns_failure_refresh_seconds_base,
       dns_failure_refresh_seconds_max, dns_query_timeout_seconds, dns_min_refresh_seconds,
       dns_preresolve_hostnames, enable_dns_cache, dns_cache_save_interval_seconds, dns_num_retries,
-      enable_drain_post_dns_refresh, enable_http3, use_cares, force_v6, use_gro,
-      http3_connection_options, http3_client_connection_options, quic_hints,
-      quic_canonical_suffixes, enable_gzip_decompression, enable_brotli_decompression,
-      enable_port_migration, enable_socket_tagging, enable_interface_binding,
+      enable_drain_post_dns_refresh, enable_http3, http3_connection_options,
+      http3_client_connection_options, quic_hints, quic_canonical_suffixes,
+      enable_gzip_decompression, enable_brotli_decompression,
+      num_timeouts_to_trigger_port_migration, enable_socket_tagging, enable_interface_binding,
       h2_connection_keepalive_idle_interval_milliseconds, h2_connection_keepalive_timeout_seconds,
       max_connections_per_host, stream_idle_timeout_seconds, per_try_idle_timeout_seconds,
       app_version, app_id, trust_chain_verification, filter_chain,
-      enable_platform_certificates_validation, upstream_tls_sni, runtime_guards, builder);
-
+      enable_platform_certificates_validation, upstream_tls_sni, runtime_guards,
+      h3_connection_keepalive_initial_interval_milliseconds, builder);
   return reinterpret_cast<intptr_t>(builder.generateBootstrap().release());
 }
 
@@ -1367,8 +1294,45 @@ extern "C" JNIEXPORT void JNICALL
 Java_io_envoyproxy_envoymobile_engine_JniLibrary_onDefaultNetworkChanged(JNIEnv*, jclass,
                                                                          jlong engine,
                                                                          jint network_type) {
-  reinterpret_cast<Envoy::InternalEngine*>(engine)->onDefaultNetworkChanged(
-      static_cast<Envoy::NetworkType>(network_type));
+  reinterpret_cast<Envoy::InternalEngine*>(engine)->onDefaultNetworkChanged(network_type);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_onDefaultNetworkChangeEvent(JNIEnv*, jclass,
+                                                                             jlong engine,
+                                                                             jint network_type) {
+  reinterpret_cast<Envoy::InternalEngine*>(engine)->onDefaultNetworkChangeEvent(network_type);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_onDefaultNetworkChangedV2(JNIEnv*, jclass,
+                                                                           jlong engine,
+                                                                           jint connection_type,
+                                                                           jlong net_id) {
+  reinterpret_cast<Envoy::InternalEngine*>(engine)->onDefaultNetworkChangedAndroid(
+      static_cast<Envoy::ConnectionType>(connection_type), net_id);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_onNetworkDisconnect(JNIEnv*, jclass, jlong engine,
+                                                                     jlong net_id) {
+  reinterpret_cast<Envoy::InternalEngine*>(engine)->onNetworkDisconnectAndroid(net_id);
+}
+
+extern "C" JNIEXPORT void JNICALL Java_io_envoyproxy_envoymobile_engine_JniLibrary_onNetworkConnect(
+    JNIEnv*, jclass, jlong engine, jint connection_type, jlong net_id) {
+  reinterpret_cast<Envoy::InternalEngine*>(engine)->onNetworkConnectAndroid(
+      static_cast<Envoy::ConnectionType>(connection_type), net_id);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_purgeActiveNetworkList(JNIEnv* env, jclass,
+                                                                        jlong engine,
+                                                                        jlongArray active_net_ids) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  std::vector<int64_t> active_networks;
+  javaLongArrayToInt64Vector(jni_helper, active_net_ids, &active_networks);
+  reinterpret_cast<Envoy::InternalEngine*>(engine)->purgeActiveNetworkListAndroid(active_networks);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -1432,4 +1396,35 @@ Java_io_envoyproxy_envoymobile_engine_JniLibrary_callClearTestRootCertificateFro
       java_android_network_library_class, "clearTestRootCertificates", "()V");
   jni_helper.callStaticVoidMethod(java_android_network_library_class,
                                   java_clear_test_root_certificates_method_id);
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_callGetDefaultNetworkHandleFromNative(JNIEnv*,
+                                                                                       jclass) {
+  return Envoy::JNI::getDefaultNetworkHandle();
+}
+
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_io_envoyproxy_envoymobile_engine_JniLibrary_callGetAllConnectedNetworksFromNative(JNIEnv* env,
+                                                                                       jclass) {
+  Envoy::JNI::JniHelper jni_helper(env);
+  std::vector<std::pair<int64_t, Envoy::ConnectionType>> networks =
+      Envoy::JNI::getAllConnectedNetworks();
+
+  jclass long_array_class = env->FindClass("[J");
+  jobjectArray result = env->NewObjectArray(networks.size(), long_array_class, nullptr);
+
+  for (size_t i = 0; i < networks.size(); ++i) {
+    jlongArray network_info_array = env->NewLongArray(2);
+    if (network_info_array == nullptr) {
+      return nullptr;
+    }
+    jlong network_info[2];
+    network_info[0] = networks[i].first;
+    network_info[1] = static_cast<jlong>(networks[i].second);
+    env->SetLongArrayRegion(network_info_array, 0, 2, network_info);
+    env->SetObjectArrayElement(result, i, network_info_array);
+    env->DeleteLocalRef(network_info_array);
+  }
+  return result;
 }

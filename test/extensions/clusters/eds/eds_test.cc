@@ -130,9 +130,8 @@ public:
   void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
     server_context_.local_info_.node_.mutable_locality()->set_zone("us-east-1a");
     eds_cluster_ = parseClusterFromV3Yaml(yaml_config);
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               true);
     cluster_ = *EdsClusterImpl::create(eds_cluster_, factory_context);
     EXPECT_EQ(initialize_phase, cluster_->initializePhase());
     eds_callbacks_ = server_context_.cluster_manager_.subscription_factory_.callbacks_;
@@ -141,7 +140,10 @@ public:
   void initialize() {
     EXPECT_CALL(server_context_, timeSource()).WillRepeatedly(testing::ReturnRef(simTime()));
     EXPECT_CALL(*server_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
-    cluster_->initialize([this] { initialized_ = true; });
+    cluster_->initialize([this] {
+      initialized_ = true;
+      return absl::OkStatus();
+    });
   }
 
   void doOnConfigUpdateVerifyNoThrow(
@@ -154,7 +156,6 @@ public:
   NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
   bool initialized_{};
   Stats::TestUtil::TestStore& stats_ = server_context_.store_;
-  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
 
   envoy::config::cluster::v3::Cluster eds_cluster_;
   EdsClusterImplSharedPtr cluster_;
@@ -434,6 +435,77 @@ TEST_F(EdsTest, DualStackEndpoint) {
       hosts[0]->createConnection(dispatcher, options, transport_socket_options);
   // The created connection will be wrapped in a HappyEyeballsConnectionImpl.
   EXPECT_NE(connection, connection_data.connection_.get());
+}
+
+// Verify that non-IP additional addresses are rejected.
+TEST_F(EdsTest, RejectNonIpAdditionalAddresses) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name("fare");
+
+  // Add dual stack endpoint
+  auto* endpoints = cluster_load_assignment.add_endpoints();
+  auto* endpoint = endpoints->add_lb_endpoints();
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address("::1");
+  endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(80);
+  endpoint->mutable_endpoint()
+      ->mutable_additional_addresses()
+      ->Add()
+      ->mutable_address()
+      ->mutable_envoy_internal_address()
+      ->set_server_listener_name("internal_address");
+
+  endpoint->mutable_load_balancing_weight()->set_value(30);
+
+  initialize();
+  const auto decoded_resources =
+      TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
+  try {
+    (void)eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "");
+    FAIL() << "Invalid address was not rejected";
+  } catch (const EnvoyException& e) {
+    EXPECT_STREQ("additional_addresses must be IP addresses.", e.what());
+  }
+}
+
+// Verify that failure to initialize the base class results in an error not a crash.
+// Note that this test is depending on the current implementation of how EDS inherits from
+// `BaseDynamicClusterImpl` and how `BaseDynamicClusterImpl` does error handling to have a
+// failure occur in the base class constructor.
+// This is a regression https://github.com/envoyproxy/envoy/pull/39083.
+TEST_F(EdsTest, RejectBaseClassConstructorFailure) {
+  // Configure an invalid transport socket.
+  eds_cluster_ = parseClusterFromV3Yaml(R"EOF(
+      name: name
+      connect_timeout: 0.25s
+      type: EDS
+      lb_policy: ROUND_ROBIN
+      eds_cluster_config:
+        service_name: fare
+        eds_config:
+          api_config_source:
+            api_type: REST
+            cluster_names:
+            - eds
+            refresh_delay: 1s
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+            # Multiple certs are not allowed in a client context.
+            - certificate_chain: { filename: "invalid-path" }
+              private_key: { filename: "invalid-path" }
+            - certificate_chain: { filename: "invalid-path2" }
+              private_key: { filename: "invalid-path2" }
+ )EOF");
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                             false);
+  auto cluster_or_status = EdsClusterImpl::create(eds_cluster_, factory_context);
+
+  // The most important passing criteria is that the above didn't crash.
+
+  EXPECT_FALSE(cluster_or_status.ok());
 }
 
 // Validate that onConfigUpdate() updates the endpoint metadata.
@@ -2925,9 +2997,8 @@ public:
         .WillRepeatedly(Invoke([](Event::TimerCb) { return new Event::MockTimer(); }));
 
     eds_cluster_ = parseClusterFromV3Yaml(yaml_config);
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               true);
     ON_CALL(server_context_.cluster_manager_, edsResourcesCache())
         .WillByDefault(
             Invoke([this]() -> Config::EdsResourcesCacheOptRef { return eds_resources_cache_; }));
@@ -2938,7 +3009,10 @@ public:
 
   void initialize() {
     EXPECT_CALL(*server_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
-    cluster_pre_->initialize([this] { initialized_ = true; });
+    cluster_pre_->initialize([this] {
+      initialized_ = true;
+      return absl::OkStatus();
+    });
   }
 
   void doOnConfigUpdateVerifyNoThrowPre(
@@ -2966,15 +3040,17 @@ public:
         }))
         .WillRepeatedly(Invoke([](Event::TimerCb) { return new Event::MockTimer(); }));
 
-    Envoy::Upstream::ClusterFactoryContextImpl factory_context(
-        server_context_, server_context_.cluster_manager_, nullptr, ssl_context_manager_, nullptr,
-        false);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               true);
     cluster_post_ = *EdsClusterImpl::create(eds_cluster_, factory_context);
     // EXPECT_EQ(initialize_phase, cluster_post_->initializePhase());
     eds_callbacks_post_ = server_context_.cluster_manager_.subscription_factory_.callbacks_;
 
     EXPECT_CALL(*server_context_.cluster_manager_.subscription_factory_.subscription_, start(_));
-    cluster_post_->initialize([this] { initialized_post_ = true; });
+    cluster_post_->initialize([this] {
+      initialized_post_ = true;
+      return absl::OkStatus();
+    });
   }
 
   // Used for timeout emulation.
@@ -2987,7 +3063,6 @@ public:
   bool initialized_{};
   bool initialized_post_{};
   Stats::TestUtil::TestStore& stats_ = server_context_.store_;
-  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
   envoy::config::cluster::v3::Cluster eds_cluster_;
   NiceMock<Random::MockRandomGenerator> random_;
   // TestScopedRuntime runtime_;
@@ -3277,6 +3352,121 @@ TEST_F(EdsCachedAssignmentTest, CachedAssignmentRemovedOnTimeout) {
   EXPECT_CALL(eds_resources_cache_, removeCallback("fare", _));
 }
 
+// Tests related to xDS-TP based configs EDS subscriptions.
+class XdstpConfigsEdsTest : public testing::Test, public Event::TestUsingSimulatedTime {
+public:
+  XdstpConfigsEdsTest() {
+    // Once envoy.reloadable_features.xdstp_based_config_singleton_subscriptions
+    // is set to true by default, this should be removed.
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.xdstp_based_config_singleton_subscriptions", "true"}});
+    ON_CALL(server_context_.xds_manager_, subscribeToSingletonResource(_, _, _, _, _, _, _))
+        .WillByDefault(Invoke(
+            [this](absl::string_view, OptRef<const envoy::config::core::v3::ConfigSource>,
+                   absl::string_view, Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
+                   Config::OpaqueResourceDecoderSharedPtr,
+                   const Config::SubscriptionOptions&) -> absl::StatusOr<Config::SubscriptionPtr> {
+              auto ret = std::make_unique<NiceMock<Config::MockSubscription>>();
+              subscription_ = ret.get();
+              eds_callbacks_ = &callbacks;
+              return ret;
+            }));
+    ON_CALL(server_context_.xds_manager_, subscriptionFactory())
+        .WillByDefault(ReturnRef(server_context_.cluster_manager_.subscription_factory_));
+    resetCluster();
+  }
+
+  void resetCluster() {
+    resetCluster(R"EOF(
+      name: xdstp://test/envoy.config.endpoint.v3.ClusterLoadAssignment/foo-cluster/baz
+      connect_timeout: 0.25s
+      type: EDS
+      lb_policy: ROUND_ROBIN
+      eds_cluster_config:
+        service_name: xdstp://test/envoy.config.endpoint.v3.ClusterLoadAssignment/foo-cluster/baz
+    )EOF",
+                 Cluster::InitializePhase::Secondary);
+  }
+
+  void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
+    server_context_.local_info_.node_.mutable_locality()->set_zone("us-east-1a");
+    eds_cluster_ = parseClusterFromV3Yaml(yaml_config);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
+    cluster_ = *EdsClusterImpl::create(eds_cluster_, factory_context);
+    EXPECT_EQ(initialize_phase, cluster_->initializePhase());
+  }
+
+  void initialize() {
+    EXPECT_CALL(server_context_, timeSource()).WillRepeatedly(testing::ReturnRef(simTime()));
+    EXPECT_CALL(*subscription_, start(_));
+    cluster_->initialize([this] {
+      initialized_ = true;
+      return absl::OkStatus();
+    });
+  }
+
+  void doOnConfigUpdateVerifyNoThrow(
+      const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
+    const auto decoded_resources =
+        TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
+    EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
+  }
+
+  TestScopedRuntime scoped_runtime_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
+  bool initialized_{};
+  Stats::TestUtil::TestStore& stats_ = server_context_.store_;
+  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
+
+  envoy::config::cluster::v3::Cluster eds_cluster_;
+  EdsClusterImplSharedPtr cluster_;
+  Config::SubscriptionCallbacks* eds_callbacks_{};
+  Config::MockSubscription* subscription_;
+};
+
+// Validate that xDS-TP based config invokes the xds-manager using SotW.
+TEST_F(XdstpConfigsEdsTest, OnConfigUpdateSuccess) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name(
+      "xdstp://test/envoy.config.endpoint.v3.ClusterLoadAssignment/foo-cluster/baz");
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_TRUE(initialized_);
+  EXPECT_EQ(1UL, stats_
+                     .findCounterByString(
+                         "cluster.xdstp_test/envoy.config.endpoint.v3.ClusterLoadAssignment/"
+                         "foo-cluster/baz.update_no_rebuild")
+                     .value()
+                     .get()
+                     .value());
+}
+
+// Validate that xDS-TP based config invokes the xds-manager using delta-xDS.
+TEST_F(XdstpConfigsEdsTest, DeltaOnConfigUpdateSuccess) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name(
+      "xdstp://test/envoy.config.endpoint.v3.ClusterLoadAssignment/foo-cluster/baz");
+  initialize();
+
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
+  auto* resource = resources.Add();
+  resource->mutable_resource()->PackFrom(cluster_load_assignment);
+  resource->set_version("v1");
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+          resources, "cluster_name");
+  EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "v1").ok());
+
+  EXPECT_TRUE(initialized_);
+  EXPECT_EQ(1UL, stats_
+                     .findCounterByString(
+                         "cluster.xdstp_test/envoy.config.endpoint.v3.ClusterLoadAssignment/"
+                         "foo-cluster/baz.update_no_rebuild")
+                     .value()
+                     .get()
+                     .value());
+}
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

@@ -170,6 +170,11 @@ TEST(StringUtil, replaceAllEmptySpace) {
   EXPECT_EQ("1233___789", StringUtil::replaceAllEmptySpace("1233\f\v\n789"));
 }
 
+TEST(StringUtil, hasNewLine) {
+  EXPECT_FALSE(StringUtil::hasNewLine("1234567890"));
+  EXPECT_TRUE(StringUtil::hasNewLine("1\n233"));
+}
+
 TEST(DateUtil, All) {
   EXPECT_FALSE(DateUtil::timePointValid(SystemTime()));
   DangerousDeprecatedTestTime test_time;

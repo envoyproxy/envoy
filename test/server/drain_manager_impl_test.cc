@@ -60,14 +60,17 @@ protected:
       return absl::OkStatus();
     }));
 
-    auto before_handle = drain_manager.addOnDrainCloseCb(cb_before_drain.AsStdFunction());
-    drain_manager.startDrainSequence([] {});
+    auto before_handle = drain_manager.addOnDrainCloseCb(Network::DrainDirection::All,
+                                                         cb_before_drain.AsStdFunction());
+    drain_manager.startDrainSequence(Network::DrainDirection::All, [] {});
 
     server_.api_.time_system_.advanceTimeWait(std::chrono::milliseconds(10));
-    auto after_handle1 = drain_manager.addOnDrainCloseCb(cb_after_drain1.AsStdFunction());
+    auto after_handle1 = drain_manager.addOnDrainCloseCb(Network::DrainDirection::All,
+                                                         cb_after_drain1.AsStdFunction());
 
     server_.api_.time_system_.advanceTimeWait(delay);
-    auto after_handle2 = drain_manager.addOnDrainCloseCb(cb_after_drain2.AsStdFunction());
+    auto after_handle2 = drain_manager.addOnDrainCloseCb(Network::DrainDirection::All,
+                                                         cb_after_drain2.AsStdFunction());
 
     EXPECT_EQ(after_handle1, nullptr);
     EXPECT_EQ(after_handle2, nullptr);
@@ -91,16 +94,17 @@ TEST_F(DrainManagerImplTest, Default) {
 
   // Verify basic drain close.
   EXPECT_CALL(server_, healthCheckFailed()).WillOnce(Return(false));
-  EXPECT_FALSE(drain_manager.drainClose());
+  EXPECT_FALSE(drain_manager.drainClose(Network::DrainDirection::All));
   EXPECT_CALL(server_, healthCheckFailed()).WillOnce(Return(true));
-  EXPECT_TRUE(drain_manager.drainClose());
+  EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
 
   // Test drain sequence.
   Event::MockTimer* drain_timer = new Event::MockTimer(&server_.dispatcher_);
   const auto expected_delay = std::chrono::milliseconds(DrainTimeSeconds * 1000);
   EXPECT_CALL(*drain_timer, enableTimer(expected_delay, nullptr));
   ReadyWatcher drain_complete;
-  drain_manager.startDrainSequence([&drain_complete]() -> void { drain_complete.ready(); });
+  drain_manager.startDrainSequence(Network::DrainDirection::All,
+                                   [&drain_complete]() -> void { drain_complete.ready(); });
   EXPECT_CALL(drain_complete, ready());
   drain_timer->invokeCallback();
 }
@@ -111,7 +115,7 @@ TEST_F(DrainManagerImplTest, ModifyOnly) {
                                  server_.dispatcher());
 
   EXPECT_CALL(server_, healthCheckFailed()).Times(0); // Listener check will short-circuit
-  EXPECT_FALSE(drain_manager.drainClose());
+  EXPECT_FALSE(drain_manager.drainClose(Network::DrainDirection::All));
 }
 
 TEST_P(DrainManagerImplTest, DrainDeadline) {
@@ -125,7 +129,7 @@ TEST_P(DrainManagerImplTest, DrainDeadline) {
                                  server_.dispatcher());
 
   // Ensure drainClose() behaviour is determined by the deadline.
-  drain_manager.startDrainSequence([] {});
+  drain_manager.startDrainSequence(Network::DrainDirection::All, [] {});
   EXPECT_CALL(server_, healthCheckFailed()).WillRepeatedly(Return(false));
   ON_CALL(server_.api_.random_, random()).WillByDefault(Return(DrainTimeSeconds * 2 - 1));
   ON_CALL(server_.options_, drainTime())
@@ -134,28 +138,28 @@ TEST_P(DrainManagerImplTest, DrainDeadline) {
   if (drain_gradually) {
     // random() should be called when elapsed time < drain timeout
     EXPECT_CALL(server_.api_.random_, random()).Times(2);
-    EXPECT_FALSE(drain_manager.drainClose());
+    EXPECT_FALSE(drain_manager.drainClose(Network::DrainDirection::All));
     simTime().advanceTimeWait(std::chrono::seconds(DrainTimeSeconds - 1));
-    EXPECT_FALSE(drain_manager.drainClose());
+    EXPECT_FALSE(drain_manager.drainClose(Network::DrainDirection::All));
     simTime().advanceTimeWait(std::chrono::seconds(1));
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
 
     // Test that this still works if remaining time is negative
     simTime().advanceTimeWait(std::chrono::seconds(1));
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
     simTime().advanceTimeWait(std::chrono::seconds(500));
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
   } else {
     EXPECT_CALL(server_.api_.random_, random()).Times(0);
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
     simTime().advanceTimeWait(std::chrono::seconds(DrainTimeSeconds - 1));
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
     simTime().advanceTimeWait(std::chrono::seconds(1));
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
     simTime().advanceTimeWait(std::chrono::seconds(1));
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
     simTime().advanceTimeWait(std::chrono::seconds(500));
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
   }
 }
 
@@ -171,31 +175,31 @@ TEST_P(DrainManagerImplTest, DrainDeadlineProbability) {
                                  server_.dispatcher());
 
   EXPECT_CALL(server_, healthCheckFailed()).WillOnce(Return(true));
-  EXPECT_TRUE(drain_manager.drainClose());
+  EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
   EXPECT_CALL(server_, healthCheckFailed()).WillRepeatedly(Return(false));
-  EXPECT_FALSE(drain_manager.drainClose());
-  EXPECT_FALSE(drain_manager.draining());
+  EXPECT_FALSE(drain_manager.drainClose(Network::DrainDirection::All));
+  EXPECT_FALSE(drain_manager.draining(Network::DrainDirection::All));
 
-  drain_manager.startDrainSequence([] {});
-  EXPECT_TRUE(drain_manager.draining());
+  drain_manager.startDrainSequence(Network::DrainDirection::All, [] {});
+  EXPECT_TRUE(drain_manager.draining(Network::DrainDirection::All));
 
   if (drain_gradually) {
     // random() should be called when elapsed time < drain timeout
     EXPECT_CALL(server_.api_.random_, random()).Times(2);
     // Current elapsed time is 0
     // drainClose() will return true when elapsed time > (4 % 3 == 1).
-    EXPECT_FALSE(drain_manager.drainClose());
+    EXPECT_FALSE(drain_manager.drainClose(Network::DrainDirection::All));
     simTime().advanceTimeWait(std::chrono::seconds(2));
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
     simTime().advanceTimeWait(std::chrono::seconds(1));
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
   } else {
     EXPECT_CALL(server_.api_.random_, random()).Times(0);
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
     simTime().advanceTimeWait(std::chrono::seconds(2));
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
     simTime().advanceTimeWait(std::chrono::seconds(1));
-    EXPECT_TRUE(drain_manager.drainClose());
+    EXPECT_TRUE(drain_manager.drainClose(Network::DrainDirection::All));
   }
 }
 
@@ -230,12 +234,13 @@ TEST_P(DrainManagerImplTest, OnDrainCallbacks) {
         EXPECT_CALL(cb, Call(std::chrono::milliseconds{0}));
       }
 
-      cb_handles[i] = drain_manager.addOnDrainCloseCb(cb.AsStdFunction());
+      cb_handles[i] =
+          drain_manager.addOnDrainCloseCb(Network::DrainDirection::All, cb.AsStdFunction());
     }
-    drain_manager.startDrainSequence([] {});
+    drain_manager.startDrainSequence(Network::DrainDirection::All, [] {});
   }
 
-  EXPECT_TRUE(drain_manager.draining());
+  EXPECT_TRUE(drain_manager.draining(Network::DrainDirection::All));
 }
 
 INSTANTIATE_TEST_SUITE_P(DrainStrategies, DrainManagerImplTest, testing::Bool());
@@ -266,12 +271,13 @@ TEST_F(DrainManagerImplTest, OnDrainCallbacksManyGradualSteps) {
         return absl::OkStatus();
       }));
 
-      cb_handles[i] = drain_manager.addOnDrainCloseCb(cb.AsStdFunction());
+      cb_handles[i] =
+          drain_manager.addOnDrainCloseCb(Network::DrainDirection::All, cb.AsStdFunction());
     }
-    drain_manager.startDrainSequence([] {});
+    drain_manager.startDrainSequence(Network::DrainDirection::All, [] {});
   }
 
-  EXPECT_TRUE(drain_manager.draining());
+  EXPECT_TRUE(drain_manager.draining(Network::DrainDirection::All));
 }
 
 // Test gradual draining when the number of callbacks does not evenly divide into
@@ -300,13 +306,14 @@ TEST_F(DrainManagerImplTest, OnDrainCallbacksNonEvenlyDividedSteps) {
         return absl::OkStatus();
       }));
 
-      cb_handles[i] = drain_manager.addOnDrainCloseCb(cb.AsStdFunction());
+      cb_handles[i] =
+          drain_manager.addOnDrainCloseCb(Network::DrainDirection::All, cb.AsStdFunction());
     }
 
-    drain_manager.startDrainSequence([] {});
+    drain_manager.startDrainSequence(Network::DrainDirection::All, [] {});
   }
 
-  EXPECT_TRUE(drain_manager.draining());
+  EXPECT_TRUE(drain_manager.draining(Network::DrainDirection::All));
 }
 
 // Validate the expected behavior when a drain-close callback is registered
@@ -341,9 +348,11 @@ TEST_F(DrainManagerImplTest, RegisterCallbackAfterDrainBeginImmediateStrategy) {
     return absl::OkStatus();
   }));
 
-  auto before_handle = drain_manager.addOnDrainCloseCb(cb_before_drain.AsStdFunction());
-  drain_manager.startDrainSequence([] {});
-  auto after_handle = drain_manager.addOnDrainCloseCb(cb_after_drain.AsStdFunction());
+  auto before_handle = drain_manager.addOnDrainCloseCb(Network::DrainDirection::All,
+                                                       cb_before_drain.AsStdFunction());
+  drain_manager.startDrainSequence(Network::DrainDirection::All, [] {});
+  auto after_handle =
+      drain_manager.addOnDrainCloseCb(Network::DrainDirection::All, cb_after_drain.AsStdFunction());
   EXPECT_EQ(after_handle, nullptr);
 }
 
@@ -358,15 +367,15 @@ TEST_F(DrainManagerImplTest, ParentDestructedBeforeChildren) {
   auto child_a = parent->createChildManager(server_.dispatcher());
   auto child_b = parent->createChildManager(server_.dispatcher());
 
-  EXPECT_FALSE(parent->draining());
-  EXPECT_FALSE(child_a->draining());
-  EXPECT_FALSE(child_b->draining());
+  EXPECT_FALSE(parent->draining(Network::DrainDirection::All));
+  EXPECT_FALSE(child_a->draining(Network::DrainDirection::All));
+  EXPECT_FALSE(child_b->draining(Network::DrainDirection::All));
 
   parent.reset();
 
   // parent destruction should not effect drain state
-  EXPECT_FALSE(child_a->draining());
-  EXPECT_FALSE(child_b->draining());
+  EXPECT_FALSE(child_a->draining(Network::DrainDirection::All));
+  EXPECT_FALSE(child_b->draining(Network::DrainDirection::All));
 
   // Further children creation (from existing children) is still possible
   auto child_a1 = child_a->createChildManager(server_.dispatcher());
@@ -386,10 +395,10 @@ TEST_F(DrainManagerImplTest, ParentDestructedBeforeChildren) {
     called += 1;
     return absl::OkStatus();
   }));
-  auto handle_a1 = child_a1->addOnDrainCloseCb(cb_a1.AsStdFunction());
-  auto handle_b1 = child_b1->addOnDrainCloseCb(cb_b1.AsStdFunction());
-  child_a->startDrainSequence([] {});
-  child_b->startDrainSequence([] {});
+  auto handle_a1 = child_a1->addOnDrainCloseCb(Network::DrainDirection::All, cb_a1.AsStdFunction());
+  auto handle_b1 = child_b1->addOnDrainCloseCb(Network::DrainDirection::All, cb_b1.AsStdFunction());
+  child_a->startDrainSequence(Network::DrainDirection::All, [] {});
+  child_b->startDrainSequence(Network::DrainDirection::All, [] {});
   EXPECT_EQ(called, 2);
 
   // It is safe to clean up children
@@ -433,15 +442,15 @@ TEST_F(DrainManagerImplTest, DrainingCascadesThroughAllNodesInTree) {
       return absl::OkStatus();
     }));
   }
-  auto handle_a = a.addOnDrainCloseCb(cbs[0].AsStdFunction());
-  auto handle_b = b->addOnDrainCloseCb(cbs[1].AsStdFunction());
-  auto handle_c = c->addOnDrainCloseCb(cbs[2].AsStdFunction());
-  auto handle_d = d->addOnDrainCloseCb(cbs[3].AsStdFunction());
-  auto handle_e = e->addOnDrainCloseCb(cbs[4].AsStdFunction());
-  auto handle_f = f->addOnDrainCloseCb(cbs[5].AsStdFunction());
-  auto handle_g = g->addOnDrainCloseCb(cbs[6].AsStdFunction());
+  auto handle_a = a.addOnDrainCloseCb(Network::DrainDirection::All, cbs[0].AsStdFunction());
+  auto handle_b = b->addOnDrainCloseCb(Network::DrainDirection::All, cbs[1].AsStdFunction());
+  auto handle_c = c->addOnDrainCloseCb(Network::DrainDirection::All, cbs[2].AsStdFunction());
+  auto handle_d = d->addOnDrainCloseCb(Network::DrainDirection::All, cbs[3].AsStdFunction());
+  auto handle_e = e->addOnDrainCloseCb(Network::DrainDirection::All, cbs[4].AsStdFunction());
+  auto handle_f = f->addOnDrainCloseCb(Network::DrainDirection::All, cbs[5].AsStdFunction());
+  auto handle_g = g->addOnDrainCloseCb(Network::DrainDirection::All, cbs[6].AsStdFunction());
 
-  a.startDrainSequence([] {});
+  a.startDrainSequence(Network::DrainDirection::All, [] {});
   EXPECT_EQ(call_count, 7);
 }
 
@@ -491,12 +500,12 @@ TEST_F(DrainManagerImplTest, DrainingIsIndependentToNeighbors) {
   EXPECT_CALL(cb_f, Call(_)).Times(0);
   EXPECT_CALL(cb_g, Call(_)).Times(0);
 
-  auto handle_d = d->addOnDrainCloseCb(cb_d.AsStdFunction());
-  auto handle_e = e->addOnDrainCloseCb(cb_e.AsStdFunction());
-  auto handle_f = f->addOnDrainCloseCb(cb_f.AsStdFunction());
-  auto handle_g = g->addOnDrainCloseCb(cb_g.AsStdFunction());
+  auto handle_d = d->addOnDrainCloseCb(Network::DrainDirection::All, cb_d.AsStdFunction());
+  auto handle_e = e->addOnDrainCloseCb(Network::DrainDirection::All, cb_e.AsStdFunction());
+  auto handle_f = f->addOnDrainCloseCb(Network::DrainDirection::All, cb_f.AsStdFunction());
+  auto handle_g = g->addOnDrainCloseCb(Network::DrainDirection::All, cb_g.AsStdFunction());
 
-  b->startDrainSequence([] {});
+  b->startDrainSequence(Network::DrainDirection::All, [] {});
   EXPECT_EQ(call_count, 2);
 }
 
@@ -525,12 +534,12 @@ TEST_F(DrainManagerImplTest, DrainOnlyCascadesDownwards) {
     call_count++;
     return absl::OkStatus();
   }));
-  auto handle_a = a.addOnDrainCloseCb(cb_a.AsStdFunction());
-  auto handle_b = b->addOnDrainCloseCb(cb_b.AsStdFunction());
-  auto handle_c = c->addOnDrainCloseCb(cb_c.AsStdFunction());
+  auto handle_a = a.addOnDrainCloseCb(Network::DrainDirection::All, cb_a.AsStdFunction());
+  auto handle_b = b->addOnDrainCloseCb(Network::DrainDirection::All, cb_b.AsStdFunction());
+  auto handle_c = c->addOnDrainCloseCb(Network::DrainDirection::All, cb_c.AsStdFunction());
 
   // drain the middle of the tree
-  b->startDrainSequence([] {});
+  b->startDrainSequence(Network::DrainDirection::All, [] {});
   EXPECT_EQ(call_count, 2);
 }
 
@@ -553,13 +562,13 @@ TEST_F(DrainManagerImplTest, DrainChildExplicitlyAfterParent) {
     call_count++;
     return absl::OkStatus();
   }));
-  auto handle_a = a.addOnDrainCloseCb(cb.AsStdFunction());
-  auto handle_b = b->addOnDrainCloseCb(cb.AsStdFunction());
-  auto handle_c = c->addOnDrainCloseCb(cb.AsStdFunction());
+  auto handle_a = a.addOnDrainCloseCb(Network::DrainDirection::All, cb.AsStdFunction());
+  auto handle_b = b->addOnDrainCloseCb(Network::DrainDirection::All, cb.AsStdFunction());
+  auto handle_c = c->addOnDrainCloseCb(Network::DrainDirection::All, cb.AsStdFunction());
 
   // Drain the parent, then the child
-  a.startDrainSequence([&] {});
-  b->startDrainSequence([&] {});
+  a.startDrainSequence(Network::DrainDirection::All, [&] {});
+  b->startDrainSequence(Network::DrainDirection::All, [&] {});
   EXPECT_EQ(call_count, 3);
 }
 
@@ -582,13 +591,13 @@ TEST_F(DrainManagerImplTest, DrainParentAfterChild) {
     call_count++;
     return absl::OkStatus();
   }));
-  auto handle_a = a.addOnDrainCloseCb(cb.AsStdFunction());
-  auto handle_b = b->addOnDrainCloseCb(cb.AsStdFunction());
-  auto handle_c = c->addOnDrainCloseCb(cb.AsStdFunction());
+  auto handle_a = a.addOnDrainCloseCb(Network::DrainDirection::All, cb.AsStdFunction());
+  auto handle_b = b->addOnDrainCloseCb(Network::DrainDirection::All, cb.AsStdFunction());
+  auto handle_c = c->addOnDrainCloseCb(Network::DrainDirection::All, cb.AsStdFunction());
 
   // Drain the child, then the parent
-  b->startDrainSequence([] {});
-  a.startDrainSequence([] {});
+  b->startDrainSequence(Network::DrainDirection::All, [] {});
+  a.startDrainSequence(Network::DrainDirection::All, [] {});
   EXPECT_EQ(call_count, 3);
 }
 

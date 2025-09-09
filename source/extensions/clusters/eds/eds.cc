@@ -33,8 +33,9 @@ EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
       local_info_(cluster_context.serverFactoryContext().localInfo()),
       eds_resources_cache_(
           Runtime::runtimeFeatureEnabled("envoy.restart_features.use_eds_cache_for_ads")
-              ? cluster_context.clusterManager().edsResourcesCache()
+              ? cluster_context.serverFactoryContext().clusterManager().edsResourcesCache()
               : absl::nullopt) {
+  RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   Event::Dispatcher& dispatcher = cluster_context.serverFactoryContext().mainThreadDispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
@@ -45,11 +46,22 @@ EdsClusterImpl::EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
     initialize_phase_ = InitializePhase::Secondary;
   }
   const auto resource_name = getResourceName();
-  subscription_ = THROW_OR_RETURN_VALUE(
-      cluster_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(), *this,
-          resource_decoder_, {}),
-      Config::SubscriptionPtr);
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.xdstp_based_config_singleton_subscriptions")) {
+    subscription_ = THROW_OR_RETURN_VALUE(
+        cluster_context.serverFactoryContext().xdsManager().subscribeToSingletonResource(
+            edsServiceName(), eds_config, Grpc::Common::typeUrl(resource_name), info_->statsScope(),
+            *this, resource_decoder_, {}),
+        Config::SubscriptionPtr);
+  } else {
+    subscription_ = THROW_OR_RETURN_VALUE(
+        cluster_context.serverFactoryContext()
+            .clusterManager()
+            .subscriptionFactory()
+            .subscriptionFromConfigSource(eds_config, Grpc::Common::typeUrl(resource_name),
+                                          info_->statsScope(), *this, resource_decoder_, {}),
+        Config::SubscriptionPtr);
+  }
 }
 
 EdsClusterImpl::~EdsClusterImpl() {
@@ -160,9 +172,15 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
   if (!lb_endpoint.endpoint().additional_addresses().empty()) {
     address_list.push_back(address);
     for (const auto& additional_address : lb_endpoint.endpoint().additional_addresses()) {
-      address_list.emplace_back(
-          THROW_OR_RETURN_VALUE(parent_.resolveProtoAddress(additional_address.address()),
-                                const Network::Address::InstanceConstSharedPtr));
+      Network::Address::InstanceConstSharedPtr address =
+          returnOrThrow(parent_.resolveProtoAddress(additional_address.address()));
+      address_list.emplace_back(address);
+    }
+    for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
+      // All addresses must by IP addresses.
+      if (!address->ip()) {
+        throwEnvoyExceptionOrPanic("additional_addresses must be IP addresses.");
+      }
     }
   }
 
@@ -173,8 +191,7 @@ void EdsClusterImpl::BatchUpdateHelper::updateLocalityEndpoints(
   }
 
   priority_state_manager.registerHostForPriority(lb_endpoint.endpoint().hostname(), address,
-                                                 address_list, locality_lb_endpoint, lb_endpoint,
-                                                 parent_.time_source_);
+                                                 address_list, locality_lb_endpoint, lb_endpoint);
   all_new_hosts.emplace(address_as_string);
 }
 
@@ -240,10 +257,9 @@ EdsClusterImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& re
 
   // Pause LEDS messages until the EDS config is finished processing.
   Config::ScopedResume maybe_resume_leds;
-  if (transport_factory_context_->clusterManager().adsMux()) {
-    const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
-    maybe_resume_leds = transport_factory_context_->clusterManager().adsMux()->pause(type_url);
-  }
+  const auto type_url = Config::getTypeUrl<envoy::config::endpoint::v3::LbEndpoint>();
+  Config::ScopedResume resume_leds =
+      transport_factory_context_->serverFactoryContext().xdsManager().pause(type_url);
 
   update(cluster_load_assignment);
   // If previously used a cached version, remove the subscription from the cache's

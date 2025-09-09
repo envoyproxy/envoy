@@ -22,6 +22,10 @@ ThreadImplWin32::ThreadImplWin32(std::function<void()> thread_routine, OptionsOp
         return 0;
       },
       this, 0, nullptr));
+  if (options && options.thread_priority_ &&
+      !SetThreadPriority(thread_handle_, *options.thread_priority_)) {
+    ENVOY_LOG_MISC(warn, "Could not set the thread priority to {}", *options.thread_priority_);
+  }
   RELEASE_ASSERT(thread_handle_ != 0, "");
 }
 

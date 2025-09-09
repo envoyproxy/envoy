@@ -18,10 +18,9 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace TcpGrpc {
 
-AccessLog::InstanceSharedPtr
-TcpGrpcAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
-                                                 AccessLog::FilterPtr&& filter,
-                                                 Server::Configuration::FactoryContext& context) {
+AccessLog::InstanceSharedPtr TcpGrpcAccessLogFactory::createAccessLogInstance(
+    const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
+    Server::Configuration::FactoryContext& context, std::vector<Formatter::CommandParserPtr>&&) {
   GrpcCommon::validateProtoDescriptors();
 
   const auto& proto_config = MessageUtil::downcastAndValidate<

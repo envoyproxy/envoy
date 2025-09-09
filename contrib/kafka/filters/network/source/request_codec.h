@@ -52,7 +52,7 @@ public:
    */
   RequestDecoder(const std::vector<RequestCallbackSharedPtr> callbacks)
       : RequestDecoder(InitialParserFactory::getDefaultInstance(),
-                       RequestParserResolver::getDefaultInstance(), callbacks){};
+                       RequestParserResolver::getDefaultInstance(), callbacks) {};
 
   /**
    * Visible for testing.

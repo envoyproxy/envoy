@@ -23,10 +23,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AccessLogIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(AccessLogIntegrationTest, DownstreamDisconnectBeforeHeadersResponseCode) {
-  useAccessLog("RESPONSE_CODE=%RESPONSE_CODE%");
+  useAccessLog("RESPONSE_CODE=%RESPONSE_CODE%;CEL_METHOD=%CEL(request.headers[':method'])%");
   testRouterDownstreamDisconnectBeforeRequestComplete();
   std::string log = waitForAccessLog(access_log_name_);
-  EXPECT_THAT(log, HasSubstr("RESPONSE_CODE=0"));
+  EXPECT_THAT(log, HasSubstr("RESPONSE_CODE=0;CEL_METHOD=GET"));
 }
 
 TEST_P(AccessLogIntegrationTest, ShouldReplaceInvalidUtf8) {
@@ -45,15 +45,14 @@ TEST_P(AccessLogIntegrationTest, ShouldReplaceInvalidUtf8) {
 
         auto* log_format = access_log_config.mutable_log_format();
         auto* json = log_format->mutable_json_format();
-        Envoy::ProtobufWkt::Value v;
+        Envoy::Protobuf::Value v;
         v.set_string_value("%REQ(X-FORWARDED-FOR)%");
         auto fields = json->mutable_fields();
         (*fields)["x_forwarded_for"] = v;
-        log_format->mutable_json_format_options()->set_sort_properties(true);
         access_log_config_to_clobber->mutable_typed_config()->PackFrom(access_log_config);
       });
   testRouterDownstreamDisconnectBeforeRequestComplete();
   const std::string log = waitForAccessLog(access_log_name_);
-  EXPECT_THAT(log, HasSubstr("x_forwarded_for\":\"\xEF\xBF\xBD"));
+  EXPECT_THAT(log, HasSubstr("x_forwarded_for\":\"\\u00ec"));
 }
 } // namespace Envoy

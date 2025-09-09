@@ -29,8 +29,8 @@ public:
                               unsigned long*) override;
   Api::SysCallIntResult setBlocking(bool blocking) override;
   absl::optional<int> domain() override;
-  Address::InstanceConstSharedPtr localAddress() override;
-  Address::InstanceConstSharedPtr peerAddress() override;
+  absl::StatusOr<Address::InstanceConstSharedPtr> localAddress() override;
+  absl::StatusOr<Address::InstanceConstSharedPtr> peerAddress() override;
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override;
   absl::optional<uint64_t> congestionWindowInBytes() const override;
   absl::optional<std::string> interfaceName() override;

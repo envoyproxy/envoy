@@ -48,21 +48,17 @@ namespace {
 
 using ::Envoy::Protobuf::Field;
 using ::Envoy::Protobuf::Map;
+using ::Envoy::Protobuf::Struct;
 using ::Envoy::Protobuf::Type;
+using ::Envoy::Protobuf::Value;
 using ::Envoy::Protobuf::field_extraction::FieldExtractor;
 using ::Envoy::Protobuf::internal::WireFormatLite;
 using ::Envoy::Protobuf::io::CodedInputStream;
 using ::Envoy::Protobuf::io::CodedOutputStream;
 using ::Envoy::Protobuf::io::CordOutputStream;
 using ::Envoy::Protobuf::util::JsonParseOptions;
-using ::Envoy::Protobuf::util::TypeResolver;
-using ::Envoy::Protobuf::util::converter::GetFullTypeWithUrl;
 using ::Envoy::Protobuf::util::converter::JsonObjectWriter;
 using ::Envoy::Protobuf::util::converter::ProtoStreamObjectSource;
-using ::Envoy::ProtobufWkt::Struct;
-using ::Envoy::ProtobufWkt::Value;
-using ::google::grpc::transcoding::TypeHelper;
-using ::proto_processing_lib::proto_scrubber::ProtoScrubber;
 
 std::string kLocationRegionExtractorPattern = R"((?:^|/)(?:locations|regions)/([^/]+))";
 
@@ -128,7 +124,7 @@ void GetMonitoredResourceLabels(absl::string_view label_extractor,
   }
 }
 
-WireFormatLite::WireType GetWireType(const Field& field_desc) {
+WireFormatLite::WireType getWireType(const Field& field_desc) {
   static WireFormatLite::WireType field_kind_to_wire_type[] = {
       static_cast<WireFormatLite::WireType>(-1), // TYPE_UNKNOWN
       WireFormatLite::WIRETYPE_FIXED64,          // TYPE_DOUBLE
@@ -170,7 +166,7 @@ ExtractRepeatedFieldSizeHelper(const FieldExtractor& field_extractor, const std:
     // repeated field or map field.
     uint32_t count = 0, tag = 0;
     if (field->packed()) {
-      const WireFormatLite::WireType field_wire_type = GetWireType(*field);
+      const WireFormatLite::WireType field_wire_type = getWireType(*field);
 
       while ((tag = input_stream->ReadTag()) != 0) {
         if (field->number() != WireFormatLite::GetTagFieldNumber(tag)) {
@@ -322,8 +318,9 @@ absl::StatusOr<std::string> SingularFieldUseLastValue(const std::string first_va
                                                       const Field* field,
                                                       CodedInputStream* input_stream) {
   ASSIGN_OR_RETURN(std::string last_value, FindSingularLastValue(field, input_stream));
-  if (last_value.empty())
+  if (last_value.empty()) {
     return first_value;
+  }
   return last_value;
 }
 
@@ -391,7 +388,7 @@ absl::Status RedactStructRecursively(std::vector<std::string>::const_iterator pa
 }
 
 absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& message,
-                             const Envoy::ProtobufWkt::Type& type,
+                             const Envoy::Protobuf::Type& type,
                              ::Envoy::Protobuf::util::TypeResolver* type_resolver,
                              Struct* message_struct) {
   // Convert from message data to JSON using absl::Cord.
@@ -416,15 +413,15 @@ absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& mess
   }
 
   (*message_struct->mutable_fields())[kTypeProperty].set_string_value(
-      google::protobuf::util::converter::GetFullTypeWithUrl(type.name()));
+      ProtobufUtil::converter::GetFullTypeWithUrl(type.name()));
   return absl::OkStatus();
 }
 
 bool ScrubToStruct(const proto_processing_lib::proto_scrubber::ProtoScrubber* scrubber,
-                   const Envoy::ProtobufWkt::Type& type,
+                   const Envoy::Protobuf::Type& type,
                    const ::google::grpc::transcoding::TypeHelper& type_helper,
                    Protobuf::field_extraction::MessageData* message,
-                   Envoy::ProtobufWkt::Struct* message_struct) {
+                   Envoy::Protobuf::Struct* message_struct) {
   message_struct->Clear();
 
   // When scrubber or message is nullptr, it indicates that there's nothing to

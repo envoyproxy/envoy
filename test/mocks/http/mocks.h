@@ -60,9 +60,9 @@ public:
   MOCK_METHOD(void, encode1xxHeaders, (ResponseHeaderMap&));
   MOCK_METHOD(void, encodeData, (Buffer::Instance&, bool));
   MOCK_METHOD(void, encodeTrailers, (ResponseTrailerMap&));
-  MOCK_METHOD(void, encodeMetadata, (MetadataMapPtr &&));
+  MOCK_METHOD(void, encodeMetadata, (MetadataMapPtr&&));
   MOCK_METHOD(void, chargeStats, (const ResponseHeaderMap&));
-  MOCK_METHOD(void, setRequestTrailers, (RequestTrailerMapPtr &&));
+  MOCK_METHOD(void, setRequestTrailers, (RequestTrailerMapPtr&&));
   MOCK_METHOD(void, setInformationalHeaders_, (ResponseHeaderMap&));
   void setInformationalHeaders(ResponseHeaderMapPtr&& informational_headers) override {
     informational_headers_ = std::move(informational_headers);
@@ -84,9 +84,9 @@ public:
   MOCK_METHOD(ResponseHeaderMapOptRef, responseHeaders, ());
   MOCK_METHOD(ResponseTrailerMapOptRef, responseTrailers, ());
   MOCK_METHOD(void, endStream, ());
+  MOCK_METHOD(void, sendGoAwayAndClose, ());
   MOCK_METHOD(void, onDecoderFilterBelowWriteBufferLowWatermark, ());
   MOCK_METHOD(void, onDecoderFilterAboveWriteBufferHighWatermark, ());
-  MOCK_METHOD(void, upgradeFilterChainCreated, ());
   MOCK_METHOD(void, disarmRequestTimeout, ());
   MOCK_METHOD(void, resetIdleTimer, ());
   MOCK_METHOD(void, recreateStream, (StreamInfo::FilterStateSharedPtr filter_state));
@@ -136,6 +136,15 @@ public:
   MOCK_METHOD(void, onResetStream, (StreamResetReason reason, absl::string_view));
   MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
+};
+
+class MockCodecEventCallbacks : public CodecEventCallbacks {
+public:
+  MockCodecEventCallbacks();
+  ~MockCodecEventCallbacks() override;
+
+  MOCK_METHOD(void, onCodecEncodeComplete, ());
+  MOCK_METHOD(void, onCodecLowLevelReset, ());
 };
 
 class MockServerConnection : public ServerConnection {
@@ -202,8 +211,7 @@ public:
   ~MockFilterChainFactory() override;
 
   // Http::FilterChainFactory
-  bool createFilterChain(FilterChainManager& manager, bool,
-                         const FilterChainOptions&) const override {
+  bool createFilterChain(FilterChainManager& manager, const FilterChainOptions&) const override {
     return createFilterChain(manager);
   }
   MOCK_METHOD(bool, createFilterChain, (FilterChainManager & manager), (const));
@@ -229,6 +237,7 @@ public:
   MOCK_METHOD(void, setRoute, (Router::RouteConstSharedPtr));
   MOCK_METHOD(void, requestRouteConfigUpdate, (Http::RouteConfigUpdatedCallbackSharedPtr));
   MOCK_METHOD(void, clearRouteCache, ());
+  MOCK_METHOD(void, refreshRouteCluster, ());
 
   std::shared_ptr<Router::MockRoute> route_;
 };
@@ -239,6 +248,8 @@ public:
 
   MOCK_METHOD(void, onSidestreamAboveHighWatermark, ());
   MOCK_METHOD(void, onSidestreamBelowLowWatermark, ());
+  MOCK_METHOD(void, addDownstreamWatermarkCallbacks, (DownstreamWatermarkCallbacks&));
+  MOCK_METHOD(void, removeDownstreamWatermarkCallbacks, (DownstreamWatermarkCallbacks&));
 };
 
 class MockStreamDecoderFilterCallbacks : public StreamDecoderFilterCallbacks,
@@ -266,9 +277,10 @@ public:
   MOCK_METHOD(void, onDecoderFilterBelowWriteBufferLowWatermark, ());
   MOCK_METHOD(void, addDownstreamWatermarkCallbacks, (DownstreamWatermarkCallbacks&));
   MOCK_METHOD(void, removeDownstreamWatermarkCallbacks, (DownstreamWatermarkCallbacks&));
-  MOCK_METHOD(void, setDecoderBufferLimit, (uint32_t));
-  MOCK_METHOD(uint32_t, decoderBufferLimit, ());
+  MOCK_METHOD(void, setDecoderBufferLimit, (uint64_t));
+  MOCK_METHOD(uint64_t, decoderBufferLimit, ());
   MOCK_METHOD(bool, recreateStream, (const ResponseHeaderMap* headers));
+  MOCK_METHOD(void, sendGoAwayAndClose, ());
   MOCK_METHOD(void, addUpstreamSocketOptions, (const Network::Socket::OptionsSharedPtr& options));
   MOCK_METHOD(Network::Socket::OptionsSharedPtr, getUpstreamSocketOptions, (), (const));
   MOCK_METHOD(const Router::RouteSpecificFilterConfig*, mostSpecificPerFilterConfig, (), (const));
@@ -331,7 +343,7 @@ public:
   MOCK_METHOD(bool, shouldLoadShed, (), (const));
 
   Buffer::InstancePtr buffer_;
-  std::list<DownstreamWatermarkCallbacks*> callbacks_{};
+  std::list<DownstreamWatermarkCallbacks*> callbacks_;
   testing::NiceMock<MockDownstreamStreamFilterCallbacks> downstream_callbacks_;
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
@@ -383,7 +395,7 @@ public:
   MOCK_METHOD(void, addEncodedData, (Buffer::Instance & data, bool streaming));
   MOCK_METHOD(void, injectEncodedDataToFilterChain, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(ResponseTrailerMap&, addEncodedTrailers, ());
-  MOCK_METHOD(void, addEncodedMetadata, (Http::MetadataMapPtr &&));
+  MOCK_METHOD(void, addEncodedMetadata, (Http::MetadataMapPtr&&));
   MOCK_METHOD(void, continueEncoding, ());
   MOCK_METHOD(const Buffer::Instance*, encodingBuffer, ());
   MOCK_METHOD(void, modifyEncodingBuffer, (std::function<void(Buffer::Instance&)>));
@@ -619,7 +631,7 @@ public:
   }
 
   MOCK_METHOD(const RequestIDExtensionSharedPtr&, requestIDExtension, ());
-  MOCK_METHOD(const std::list<AccessLog::InstanceSharedPtr>&, accessLogs, ());
+  MOCK_METHOD(const AccessLog::InstanceSharedPtrVector&, accessLogs, ());
   MOCK_METHOD(bool, flushAccessLogOnNewRequest, ());
   MOCK_METHOD(bool, flushAccessLogOnTunnelSuccessfullyEstablished, (), (const));
   MOCK_METHOD(const absl::optional<std::chrono::milliseconds>&, accessLogFlushInterval, ());
@@ -640,6 +652,7 @@ public:
   MOCK_METHOD(bool, http1SafeMaxConnectionDuration, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxStreamDuration, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, streamIdleTimeout, (), (const));
+  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, streamFlushTimeout, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, requestTimeout, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, requestHeadersTimeout, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, delayedCloseTimeout, (), (const));
@@ -688,15 +701,22 @@ public:
   const std::vector<Http::EarlyHeaderMutationPtr>& earlyHeaderMutationExtensions() const override {
     return early_header_mutation_extensions_;
   }
-  MOCK_METHOD(uint64_t, maxRequestsPerConnection, (), (const));
+  MOCK_METHOD(uint32_t, maxRequestsPerConnection, (), (const));
   MOCK_METHOD(const HttpConnectionManagerProto::ProxyStatusConfig*, proxyStatusConfig, (), (const));
   MOCK_METHOD(ServerHeaderValidatorPtr, makeHeaderValidator, (Protocol protocol));
   MOCK_METHOD(bool, appendLocalOverload, (), (const));
   MOCK_METHOD(bool, appendXForwardedPort, (), (const));
   MOCK_METHOD(bool, addProxyProtocolConnectionState, (), (const));
 
+  class AllowInternalAddressConfig : public Http::InternalAddressConfig {
+  public:
+    bool isInternalAddress(const Network::Address::Instance& address) const override {
+      return Network::Utility::isInternalAddress(address);
+    }
+  };
+
   std::unique_ptr<Http::InternalAddressConfig> internal_address_config_ =
-      std::make_unique<DefaultInternalAddressConfig>();
+      std::make_unique<AllowInternalAddressConfig>();
   std::vector<Http::EarlyHeaderMutationPtr> early_header_mutation_extensions_;
   absl::optional<std::string> scheme_;
   bool scheme_match_upstream_;
@@ -709,7 +729,7 @@ public:
 
   MOCK_METHOD(const absl::optional<uint32_t>&, maxConcurrentStreams, (), (const));
 
-  absl::optional<uint32_t> max_concurrent_streams_{};
+  absl::optional<uint32_t> max_concurrent_streams_;
 };
 
 } // namespace Http
@@ -780,14 +800,6 @@ private:
   const LowerCaseString key_;
   const testing::Matcher<absl::string_view> matcher_;
 };
-
-// Test that a HeaderMap argument contains exactly one header with the given
-// key, whose value satisfies the given expectation. The expectation can be a
-// matcher, or a string that the value should equal.
-template <typename T, typename K> HeaderValueOfMatcher HeaderValueOf(K key, const T& matcher) {
-  return HeaderValueOfMatcher(LowerCaseString(key),
-                              testing::SafeMatcherCast<absl::string_view>(matcher));
-}
 
 // Tests the provided Envoy HeaderMap for the provided HTTP status code.
 MATCHER_P(HttpStatusIs, expected_code, "") {
@@ -968,16 +980,13 @@ MATCHER_P(HeaderMapEqualRef, rhs, "") {
   return equal;
 }
 
-// Test that a HeaderMapPtr argument includes a given key-value pair, e.g.,
-//  HeaderHasValue("Upgrade", "WebSocket")
-template <typename K, typename V>
-testing::Matcher<const Http::HeaderMap*> HeaderHasValue(K key, V value) {
-  return testing::Pointee(Http::HeaderValueOf(key, value));
-}
-
-// Like HeaderHasValue, but matches against a HeaderMap& argument.
-template <typename K, typename V> Http::HeaderValueOfMatcher HeaderHasValueRef(K key, V value) {
-  return Http::HeaderValueOf(key, value);
+// Test that a HeaderMap& argument includes a given key-value pair, e.g.,
+// ContainsHeader("Upgrade", "WebSocket"). Key is case-insensitive.
+// Value can be a matcher, e.g.
+// ContainsHeader("Upgrade", HasSubstr("Socket"))
+template <typename K, typename V> Http::HeaderValueOfMatcher ContainsHeader(K key, V value) {
+  return Http::HeaderValueOfMatcher(Http::LowerCaseString(key),
+                                    testing::SafeMatcherCast<absl::string_view>(value));
 }
 
 } // namespace Envoy

@@ -1,9 +1,5 @@
 load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
-load(
-    "//bazel:envoy_build_system.bzl",
-    "envoy_package",
-)
 
 licenses(["notice"])  # Apache 2
 
@@ -13,8 +9,6 @@ exports_files([
     "empty_extensions.json",
     "redirects.txt",
 ])
-
-envoy_package()
 
 filegroup(
     name = "configs",
@@ -28,6 +22,7 @@ filegroup(
             "root/operations/_include/traffic_tapping_*.yaml",
             "root/configuration/http/http_filters/_include/checksum_filter.yaml",
             "root/configuration/http/http_filters/_include/dns-cache-circuit-breaker.yaml",
+            "root/configuration/http/http_filters/_include/http-cache-configuration-fs.yaml",
             "root/configuration/other_features/_include/dlb.yaml",
             "root/configuration/other_features/_include/hyperscan_matcher.yaml",
             "root/configuration/other_features/_include/hyperscan_matcher_multiple.yaml",
@@ -46,6 +41,7 @@ filegroup(
             "root/intro/arch_overview/security/_include/ssl.yaml",
         ],
     }),
+    visibility = ["//visibility:public"],
 )
 
 filegroup(
@@ -57,11 +53,13 @@ filegroup(
         "//bazel:windows_x86_64": [],
         "//conditions:default": glob(["root/_configs/go/*.yaml"]),
     }),
+    visibility = ["//visibility:public"],
 )
 
 filegroup(
     name = "proto_examples",
     srcs = glob(["root/**/*.pb"]),
+    visibility = ["//visibility:public"],
 )
 
 genrule(
@@ -267,6 +265,7 @@ genrule(
         "//tools/docs:sphinx_runner",
         "@envoy_api//:v3_proto_set",
     ],
+    visibility = ["//visibility:public"],
 )
 
 # No git stamping, speeds up local dev switching branches
@@ -288,9 +287,11 @@ genrule(
         "//tools/docs:sphinx_runner",
         "@envoy_api//:v3_proto_set",
     ],
+    visibility = ["//visibility:public"],
 )
 
 alias(
     name = "docs",
     actual = ":html_release",
+    visibility = ["//visibility:public"],
 )

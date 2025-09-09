@@ -62,7 +62,7 @@ public:
   ~MockLoader() override;
 
   MOCK_METHOD(absl::Status, initialize, (Upstream::ClusterManager & cm));
-  MOCK_METHOD(const Snapshot&, snapshot, ());
+  MOCK_METHOD(const Snapshot&, snapshot, (), (const));
   MOCK_METHOD(SnapshotConstSharedPtr, threadsafeSnapshot, ());
   MOCK_METHOD(absl::Status, mergeValues, ((const absl::node_hash_map<std::string, std::string>&)));
   MOCK_METHOD(void, startRtdsSubscriptions, (ReadyCallback));

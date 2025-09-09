@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/optref.h"
 #include "envoy/network/socket.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -12,6 +13,7 @@
 
 #include "library/common/engine_types.h"
 #include "library/common/network/envoy_mobile_quic_network_observer_registry_factory.h"
+#include "library/common/network/network_types.h"
 #include "library/common/network/proxy_settings.h"
 #include "library/common/types/c_types.h"
 
@@ -21,11 +23,11 @@
  * remain valid/relevant at time of execution.
  *
  * Currently, there are two primary circumstances this is used:
- * 1. When network type changes, a refreshDNS call will be scheduled on the event dispatcher, along
- * with a configuration key of this type. If network type changes again before that refresh
- * executes, the refresh is now stale, another refresh task will have been queued, and it should no
- * longer execute. The configuration key allows the connectivity_manager to determine if the
- * refreshDNS call is representative of current configuration.
+ * 1. When network type changes, some clean up will be scheduled on the event dispatcher, along
+ * with a configuration key of this type. If network type changes again before that scheduled clean
+ * up executes, another clean up will be scheduled, and the old one should no longer execute. The
+ * configuration key allows the connectivity_manager to determine if the clean up is representative
+ * of current configuration.
  * 2. When a request is configured with a certain set of socket options and begins, it is given a
  * configuration key. The heuristic in reportNetworkUsage relies on characteristics of the
  * request/response to make future decisions about socket options, but needs to be able to correctly
@@ -39,6 +41,9 @@
  * which of several current configurations is relevant.
  */
 typedef uint16_t envoy_netconf_t;
+
+using NetworkHandle = int64_t;
+constexpr NetworkHandle kInvalidNetworkHandle = -1;
 
 namespace Envoy {
 namespace Network {
@@ -60,6 +65,14 @@ enum class SocketMode : int {
   AlternateBoundInterfaceMode = 1,
 };
 
+namespace {
+
+// The number of faults allowed on a previously-successful connection (i.e. able to send and receive
+// L7 bytes) before switching socket mode.
+constexpr unsigned int MaxFaultThreshold = 3;
+
+} // namespace
+
 using DnsCacheManagerSharedPtr = Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr;
 using InterfacePair = std::pair<const std::string, Address::InstanceConstSharedPtr>;
 
@@ -79,8 +92,7 @@ using InterfacePair = std::pair<const std::string, Address::InstanceConstSharedP
  * if that cache is missing either due to alternate configurations, or lifecycle-related timing.
  *
  */
-class ConnectivityManager
-    : public Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks {
+class ConnectivityManager {
 public:
   virtual ~ConnectivityManager() = default;
 
@@ -107,7 +119,7 @@ public:
   /**
    * @returns the current OS default/preferred network class.
    */
-  virtual NetworkType getPreferredNetwork() PURE;
+  virtual int getPreferredNetwork() PURE;
 
   /**
    * @returns the current mode used to determine upstream socket options.
@@ -160,6 +172,7 @@ public:
    * @param configuration_key, key provided by this class representing the current configuration.
    * @param drain_connections, request that connections be drained after next DNS resolution.
    */
+  // TODO(abeyad): Remove the `drain_connections` parameter.
   virtual void refreshDns(envoy_netconf_t configuration_key, bool drain_connections) PURE;
 
   /**
@@ -168,13 +181,10 @@ public:
   virtual void resetConnectivityState() PURE;
 
   /**
-   * @returns the current socket options that should be used for connections.
-   */
-  virtual Socket::OptionsSharedPtr getUpstreamSocketOptions(NetworkType network,
-                                                            SocketMode socket_mode) PURE;
-
-  /**
-   * @param options, upstream connection options to which additional options should be appended.
+   * Add socket options to be applied to the upstream connection which could
+   * potentially affect which network interface the requests will be sent on.
+   * @param options, upstream connection options to which additional options relate to the current
+   * network states should be appended.
    * @returns configuration key to associate with any related calls.
    */
   virtual envoy_netconf_t addUpstreamSocketOptions(Socket::OptionsSharedPtr options) PURE;
@@ -196,6 +206,50 @@ public:
   virtual envoy_netconf_t onNetworkMadeDefault(NetworkType network) PURE;
 };
 
+using ConnectivityManagerSharedPtr = std::shared_ptr<ConnectivityManager>;
+
+// Used when draining hosts upon DNS refreshing is desired.
+class RefreshDnsWithPostDrainHandler
+    : public Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks,
+      public Logger::Loggable<Logger::Id::upstream> {
+public:
+  RefreshDnsWithPostDrainHandler(DnsCacheManagerSharedPtr dns_cache_manager,
+                                 Upstream::ClusterManager& cluster_manager)
+      : dns_cache_manager_(std::move(dns_cache_manager)), cluster_manager_(cluster_manager) {}
+
+  // Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks
+  absl::Status onDnsHostAddOrUpdate(
+      const std::string& /*host*/,
+      const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) override {
+    return absl::OkStatus();
+  }
+  void onDnsHostRemove(const std::string& /*host*/) override {}
+  void onDnsResolutionComplete(const std::string& /*host*/,
+                               const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&,
+                               Network::DnsResolver::ResolutionStatus) override;
+
+  // Refresh DNS and drain all hosts upon completion.
+  // No-op if the default DNS cache in base configuration is not available.
+  void refreshDnsAndDrainHosts();
+
+private:
+  DnsCacheManagerSharedPtr dns_cache_manager_;
+  Upstream::ClusterManager& cluster_manager_;
+  absl::flat_hash_set<std::string> hosts_to_drain_;
+  Extensions::Common::DynamicForwardProxy::DnsCache::AddUpdateCallbacksHandlePtr
+      dns_callbacks_handle_;
+};
+
+using DefaultNetworkChangeCallback = std::function<void(envoy_netconf_t)>;
+
+class NetworkChangeObserver {
+public:
+  virtual ~NetworkChangeObserver() = default;
+  virtual void onNetworkMadeDefault(NetworkHandle network) PURE;
+  virtual void onNetworkDisconnected(NetworkHandle network) PURE;
+  virtual void onNetworkConnected(NetworkHandle network) PURE;
+};
+
 class ConnectivityManagerImpl : public ConnectivityManager,
                                 public Singleton::Instance,
                                 public Logger::Loggable<Logger::Id::upstream> {
@@ -206,26 +260,17 @@ public:
    * @param network, the OS-preferred network.
    * @returns configuration key to associate with any related calls.
    */
-  static envoy_netconf_t setPreferredNetwork(NetworkType network);
+  envoy_netconf_t setPreferredNetwork(int network);
 
   ConnectivityManagerImpl(Upstream::ClusterManager& cluster_manager,
                           DnsCacheManagerSharedPtr dns_cache_manager);
-
-  // Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks
-  void onDnsHostAddOrUpdate(
-      const std::string& /*host*/,
-      const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&) override {}
-  void onDnsHostRemove(const std::string& /*host*/) override {}
-  void onDnsResolutionComplete(const std::string& /*host*/,
-                               const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr&,
-                               Network::DnsResolver::ResolutionStatus) override;
 
   // ConnectivityManager
   std::vector<InterfacePair> enumerateV4Interfaces() override;
   std::vector<InterfacePair> enumerateV6Interfaces() override;
   std::vector<InterfacePair> enumerateInterfaces(unsigned short family, unsigned int select_flags,
                                                  unsigned int reject_flags) override;
-  NetworkType getPreferredNetwork() override;
+  int getPreferredNetwork() override;
   SocketMode getSocketMode() override;
   envoy_netconf_t getConfigurationKey() override;
   Envoy::Network::ProxySettingsConstSharedPtr getProxySettings() override;
@@ -235,41 +280,58 @@ public:
   void setInterfaceBindingEnabled(bool enabled) override;
   void refreshDns(envoy_netconf_t configuration_key, bool drain_connections) override;
   void resetConnectivityState() override;
-  Socket::OptionsSharedPtr getUpstreamSocketOptions(NetworkType network,
-                                                    SocketMode socket_mode) override;
   envoy_netconf_t addUpstreamSocketOptions(Socket::OptionsSharedPtr options) override;
   Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dnsCache() override;
   envoy_netconf_t onNetworkMadeDefault(NetworkType network) override;
 
+  // These interfaces are only used to handle Android network change notifications.
+  void onDefaultNetworkChangedAndroid(ConnectionType connection_type, NetworkHandle net_id);
+  void onNetworkDisconnectAndroid(NetworkHandle net_id);
+  void onNetworkConnectAndroid(ConnectionType connection_type, NetworkHandle net_id);
+  void purgeActiveNetworkListAndroid(const std::vector<NetworkHandle>& active_network_ids);
+  void setDefaultNetworkChangeCallback(DefaultNetworkChangeCallback cb) {
+    default_network_change_callback_ = cb;
+  }
+  void setNetworkChangeObserver(NetworkChangeObserver* observer) { observer_ = observer; }
+
+  // Refresh DNS regardless of configuration key change.
+  void doRefreshDns(envoy_netconf_t configuration_key, bool drain_connections);
+
 private:
-  struct NetworkState {
+  // The states of the current default network picked by the platform.
+  struct DefaultNetworkState {
     // The configuration key is passed through calls dispatched on the run loop to determine if
     // they're still valid/relevant at time of execution.
-    envoy_netconf_t configuration_key_ ABSL_GUARDED_BY(mutex_);
-    NetworkType network_ ABSL_GUARDED_BY(mutex_);
-    uint8_t remaining_faults_ ABSL_GUARDED_BY(mutex_);
-    SocketMode socket_mode_ ABSL_GUARDED_BY(mutex_);
-    Thread::MutexBasicLockable mutex_;
+    envoy_netconf_t configuration_key_;
+    int network_;
+    uint8_t remaining_faults_;
+    SocketMode socket_mode_;
   };
-  Socket::OptionsSharedPtr getAlternateInterfaceSocketOptions(NetworkType network);
-  InterfacePair getActiveAlternateInterface(NetworkType network, unsigned short family);
+  Socket::OptionsSharedPtr getAlternateInterfaceSocketOptions(int network);
+  InterfacePair getActiveAlternateInterface(int network, unsigned short family);
+  Socket::OptionsSharedPtr getUpstreamSocketOptions(int network, SocketMode socket_mode);
+  void setPreferredNetworkNoLock(int network_type) ABSL_EXCLUSIVE_LOCKS_REQUIRED(network_mutex_);
+  void initializeNetworkStates();
 
-  bool enable_drain_post_dns_refresh_{false};
   bool enable_interface_binding_{false};
-  absl::flat_hash_set<std::string> hosts_to_drain_;
-  Extensions::Common::DynamicForwardProxy::DnsCache::AddUpdateCallbacksHandlePtr
-      dns_callbacks_handle_{nullptr};
   Upstream::ClusterManager& cluster_manager_;
   Quic::EnvoyMobileQuicNetworkObserverRegistryFactory quic_observer_registry_factory_;
+  // nullptr if draining hosts after refreshing DNS is disabled via setDrainPostDnsRefreshEnabled().
+  std::unique_ptr<RefreshDnsWithPostDrainHandler> dns_refresh_handler_;
   DnsCacheManagerSharedPtr dns_cache_manager_;
   ProxySettingsConstSharedPtr proxy_settings_;
-  static NetworkState network_state_;
-  // If true, all QUIC connections will respond to network changes.
-  const bool quic_upstream_connection_handle_network_change_{Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.quic_upstream_connection_handle_network_change")};
+  DefaultNetworkState network_state_ ABSL_GUARDED_BY(network_mutex_){
+      1, 0, MaxFaultThreshold, SocketMode::DefaultPreferredNetworkMode};
+  Thread::MutexBasicLockable network_mutex_{};
+  // Below states are only populated on Android platform.
+  NetworkHandle default_network_handle_ ABSL_GUARDED_BY(network_mutex_){kInvalidNetworkHandle};
+  absl::flat_hash_map<NetworkHandle, ConnectionType>
+      connected_networks_ ABSL_GUARDED_BY(network_mutex_);
+  DefaultNetworkChangeCallback default_network_change_callback_;
+  NetworkChangeObserver* observer_{nullptr};
 };
 
-using ConnectivityManagerSharedPtr = std::shared_ptr<ConnectivityManager>;
+using ConnectivityManagerImplSharedPtr = std::shared_ptr<ConnectivityManagerImpl>;
 
 /**
  * Provides access to the singleton ConnectivityManager.
@@ -282,7 +344,7 @@ public:
   /**
    * @returns singleton ConnectivityManager instance.
    */
-  ConnectivityManagerSharedPtr get();
+  ConnectivityManagerImplSharedPtr get();
 
 private:
   Server::GenericFactoryContextImpl context_;

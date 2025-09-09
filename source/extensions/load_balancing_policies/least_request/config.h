@@ -15,25 +15,9 @@ namespace LeastRequest {
 using LeastRequestLbProto =
     envoy::extensions::load_balancing_policies::least_request::v3::LeastRequest;
 using ClusterProto = envoy::config::cluster::v3::Cluster;
-using LegacyLeastRequestLbProto = ClusterProto::LeastRequestLbConfig;
 
-/**
- * Load balancer config that used to wrap the legacy least request config.
- */
-class LegacyLeastRequestLbConfig : public Upstream::LoadBalancerConfig {
-public:
-  LegacyLeastRequestLbConfig(const ClusterProto& cluster);
-
-  OptRef<const LegacyLeastRequestLbProto> lbConfig() const {
-    if (lb_config_.has_value()) {
-      return lb_config_.value();
-    }
-    return {};
-  };
-
-private:
-  absl::optional<LegacyLeastRequestLbProto> lb_config_;
-};
+using CommonLbConfigProto = envoy::config::cluster::v3::Cluster::CommonLbConfig;
+using LegacyLeastRequestLbProto = envoy::config::cluster::v3::Cluster::LeastRequestLbConfig;
 
 /**
  * Load balancer config that used to wrap the least request config.
@@ -41,8 +25,10 @@ private:
 class TypedLeastRequestLbConfig : public Upstream::LoadBalancerConfig {
 public:
   TypedLeastRequestLbConfig(const LeastRequestLbProto& lb_config);
+  TypedLeastRequestLbConfig(const CommonLbConfigProto& common_lb_config,
+                            const LegacyLeastRequestLbProto& lb_config);
 
-  const LeastRequestLbProto lb_config_;
+  LeastRequestLbProto lb_config_;
 };
 
 struct LeastRequestCreator : public Logger::Loggable<Logger::Id::upstream> {
@@ -58,17 +44,18 @@ class Factory : public Common::FactoryBase<LeastRequestLbProto, LeastRequestCrea
 public:
   Factory() : FactoryBase("envoy.load_balancing_policies.least_request") {}
 
-  Upstream::LoadBalancerConfigPtr loadConfig(Upstream::LoadBalancerFactoryContext&,
-                                             const Protobuf::Message& config,
-                                             ProtobufMessage::ValidationVisitor&) override {
-    auto active_or_legacy = Common::ActiveOrLegacy<LeastRequestLbProto, ClusterProto>::get(&config);
-    ASSERT(active_or_legacy.hasLegacy() || active_or_legacy.hasActive());
+  absl::StatusOr<Upstream::LoadBalancerConfigPtr>
+  loadConfig(Server::Configuration::ServerFactoryContext&,
+             const Protobuf::Message& config) override {
+    ASSERT(dynamic_cast<const LeastRequestLbProto*>(&config) != nullptr);
+    const LeastRequestLbProto& typed_config = dynamic_cast<const LeastRequestLbProto&>(config);
+    return Upstream::LoadBalancerConfigPtr{new TypedLeastRequestLbConfig(typed_config)};
+  }
 
-    return active_or_legacy.hasLegacy()
-               ? Upstream::LoadBalancerConfigPtr{new LegacyLeastRequestLbConfig(
-                     *active_or_legacy.legacy())}
-               : Upstream::LoadBalancerConfigPtr{
-                     new TypedLeastRequestLbConfig(*active_or_legacy.active())};
+  absl::StatusOr<Upstream::LoadBalancerConfigPtr>
+  loadLegacy(Server::Configuration::ServerFactoryContext&, const ClusterProto& cluster) override {
+    return Upstream::LoadBalancerConfigPtr{new TypedLeastRequestLbConfig(
+        cluster.common_lb_config(), cluster.least_request_lb_config())};
   }
 };
 

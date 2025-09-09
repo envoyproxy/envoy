@@ -209,8 +209,8 @@ bool DnsFilterEnvoyConfig::loadServerConfig(
     // Data structure is deduced from the file extension. If the data is not read an exception
     // is thrown. If no table can be read, the filter will refer all queries to an external
     // DNS server, if configured, otherwise all queries will be responded to with Name Error.
-    MessageUtil::loadFromFile(datasource.filename(), table,
-                              ProtobufMessage::getNullValidationVisitor(), api_);
+    THROW_IF_NOT_OK(MessageUtil::loadFromFile(datasource.filename(), table,
+                                              ProtobufMessage::getNullValidationVisitor(), api_));
     data_source_loaded = true;
   }
   END_TRY catch (const EnvoyException& e) {
@@ -234,7 +234,7 @@ DnsFilter::DnsFilter(Network::UdpReadFilterCallbacks& callbacks,
     // We cannot retry the resolution if ares returns without a response. The ares context
     // is still dirty and will result in a segfault when it is freed during a subsequent resolve
     // call from here. We will retry resolutions for pending lookups only
-    if (context->resolution_status_ != Network::DnsResolver::ResolutionStatus::Success &&
+    if (context->resolution_status_ != Network::DnsResolver::ResolutionStatus::Completed &&
         !context->in_callback_ && context->retry_ > 0) {
       --context->retry_;
       ENVOY_LOG(debug, "resolving name [{}] via external resolvers [retry {}]", query->name_,

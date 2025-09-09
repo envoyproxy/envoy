@@ -52,9 +52,9 @@ public:
     if (buffer_size_specified_) {
       config.mutable_buffer_size_kb()->set_value(buffer_size_);
     }
-    auto* boostrap_extension = bootstrap.add_bootstrap_extensions();
-    boostrap_extension->mutable_typed_config()->PackFrom(config);
-    boostrap_extension->set_name("envoy.bootstrap.internal_listener");
+    auto* bootstrap_extension = bootstrap.add_bootstrap_extensions();
+    bootstrap_extension->mutable_typed_config()->PackFrom(config);
+    bootstrap_extension->set_name("envoy.bootstrap.internal_listener");
   }
   void initialize() override {
     config_helper_.prependFilter(R"EOF(

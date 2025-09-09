@@ -20,8 +20,10 @@ public:
   // @param was_any_or_top_level supplies whether the message was either the top level message or an
   //                             Any before being unpacked for further recursion. The latter can
   //                             only be achieved by using recurse_into_any.
-  virtual void onMessage(const Protobuf::Message&, absl::Span<const Protobuf::Message* const>,
-                         bool was_any_or_top_level) PURE;
+  // @return a status indicating if the message was validated successfully.
+  virtual absl::Status onMessage(const Protobuf::Message&,
+                                 absl::Span<const Protobuf::Message* const>,
+                                 bool was_any_or_top_level) PURE;
 };
 
 absl::Status traverseMessage(ConstProtoVisitor& visitor, const Protobuf::Message& message,

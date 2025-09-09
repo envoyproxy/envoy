@@ -10,6 +10,7 @@
 #include "source/extensions/filters/network/rbac/rbac_filter.h"
 #include "source/extensions/filters/network/well_known_names.h"
 
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
 
@@ -27,9 +28,19 @@ namespace RBACFilter {
 
 class RoleBasedAccessControlNetworkFilterTest : public testing::Test {
 public:
+  static void SetUpTestSuite() {
+    // Set debug log level to ensure coverage of debug log statements
+    Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+  }
+
+  RoleBasedAccessControlNetworkFilterTest() {
+    // No per-logger log level setting needed
+  }
+
   void
   setupPolicy(bool with_policy = true, bool continuous = false,
-              envoy::config::rbac::v3::RBAC::Action action = envoy::config::rbac::v3::RBAC::ALLOW) {
+              envoy::config::rbac::v3::RBAC::Action action = envoy::config::rbac::v3::RBAC::ALLOW,
+              int64_t delay_deny_duration_ms = 0) {
 
     envoy::extensions::filters::network::rbac::v3::RBAC config;
     config.set_stat_prefix("tcp.");
@@ -58,11 +69,14 @@ public:
       config.set_enforcement_type(envoy::extensions::filters::network::rbac::v3::RBAC::CONTINUOUS);
     }
 
+    if (delay_deny_duration_ms > 0) {
+      (*config.mutable_delay_deny()) =
+          ProtobufUtil::TimeUtil::MillisecondsToDuration(delay_deny_duration_ms);
+    }
+
     config_ = std::make_shared<RoleBasedAccessControlFilterConfig>(
         config, *store_.rootScope(), context_, ProtobufMessage::getStrictValidationVisitor());
-
-    filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
-    filter_->initializeReadFilterCallbacks(callbacks_);
+    initFilter();
   }
 
   void setupMatcher(bool with_matcher = true, bool continuous = false, std::string action = "ALLOW",
@@ -163,12 +177,10 @@ on_no_match:
 
     config_ = std::make_shared<RoleBasedAccessControlFilterConfig>(
         config, *store_.rootScope(), context_, ProtobufMessage::getStrictValidationVisitor());
-
-    filter_ = std::make_unique<RoleBasedAccessControlFilter>(config_);
-    filter_->initializeReadFilterCallbacks(callbacks_);
+    initFilter();
   }
 
-  RoleBasedAccessControlNetworkFilterTest() {
+  void initFilter() {
     EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
     EXPECT_CALL(callbacks_.connection_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
 
@@ -206,18 +218,18 @@ on_no_match:
 
   void setMetadata() {
     ON_CALL(stream_info_, setDynamicMetadata(NetworkFilterNames::get().Rbac, _))
-        .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
+        .WillByDefault(Invoke([this](const std::string&, const Protobuf::Struct& obj) {
           stream_info_.metadata_.mutable_filter_metadata()->insert(
-              Protobuf::MapPair<std::string, ProtobufWkt::Struct>(NetworkFilterNames::get().Rbac,
-                                                                  obj));
+              Protobuf::MapPair<std::string, Protobuf::Struct>(NetworkFilterNames::get().Rbac,
+                                                               obj));
         }));
 
     ON_CALL(stream_info_,
             setDynamicMetadata(
                 Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace, _))
-        .WillByDefault(Invoke([this](const std::string&, const ProtobufWkt::Struct& obj) {
+        .WillByDefault(Invoke([this](const std::string&, const Protobuf::Struct& obj) {
           stream_info_.metadata_.mutable_filter_metadata()->insert(
-              Protobuf::MapPair<std::string, ProtobufWkt::Struct>(
+              Protobuf::MapPair<std::string, Protobuf::Struct>(
                   Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace, obj));
         }));
   }
@@ -345,6 +357,28 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, Denied) {
       filter_meta.fields().at("shadow_rules_prefix_shadow_effective_policy_id").string_value());
   EXPECT_EQ("allowed",
             filter_meta.fields().at("shadow_rules_prefix_shadow_engine_result").string_value());
+}
+
+TEST_F(RoleBasedAccessControlNetworkFilterTest, DelayDenied) {
+  int64_t delay_deny_duration_ms = 500;
+  setupPolicy(true, false, envoy::config::rbac::v3::RBAC::ALLOW, delay_deny_duration_ms);
+  setDestinationPort(789);
+
+  // Only call close() once since the connection is delay denied.
+  EXPECT_CALL(callbacks_.connection_, readDisable(true));
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+
+  Event::MockTimer* delay_timer =
+      new NiceMock<Event::MockTimer>(&callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(delay_deny_duration_ms), _));
+
+  // Call onData() twice, should only increase stats once.
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
+  EXPECT_EQ(0U, config_->stats().allowed_.value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+
+  delay_timer->invokeCallback();
 }
 
 TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherAllowedWithOneTimeEnforcement) {
@@ -559,6 +593,33 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherAllowNoChangeLog) {
   EXPECT_EQ(stream_info_.dynamicMetadata().filter_metadata().end(),
             stream_info_.dynamicMetadata().filter_metadata().find(
                 Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace));
+}
+
+TEST_F(RoleBasedAccessControlNetworkFilterTest, DebugLogLevel) {
+  setupPolicy();
+  setDestinationPort(123);
+  setRequestedServerName("www.cncf.io");
+
+  // Force debug level on
+  Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
+
+  // Mock SSL setup
+  auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
+  std::vector<std::string> uri_sans{"uri-san-value"};
+  std::vector<std::string> dns_sans{"dns-san-value"};
+  static const std::string subject_str = "subject";
+  ON_CALL(*connection_info, uriSanPeerCertificate()).WillByDefault(Return(uri_sans));
+  ON_CALL(*connection_info, dnsSansPeerCertificate()).WillByDefault(Return(dns_sans));
+  ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(subject_str));
+  ON_CALL(callbacks_.connection_, ssl()).WillByDefault(Return(connection_info));
+
+  // Call onData to trigger the debug log code path
+  Buffer::OwnedImpl data("hello");
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
+
+  // Explicitly verify any counters that would be affected by this code path
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().denied_.value());
 }
 
 } // namespace RBACFilter

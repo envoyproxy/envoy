@@ -21,20 +21,12 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
         }
 #endif
 
-        std::vector<Http1ParserImpl> http1_implementations = {Http1ParserImpl::HttpParser};
-        if (downstream_protocol == Http::CodecType::HTTP1 ||
-            upstream_protocol == Http::CodecType::HTTP1) {
-          http1_implementations.push_back(Http1ParserImpl::BalsaParser);
-        }
-
         std::vector<Http2Impl> http2_implementations = {Http2Impl::Nghttp2};
-        std::vector<bool> http2_bool_values = {false};
         if ((!handled_http2_special_cases_downstream &&
              downstream_protocol == Http::CodecType::HTTP2) ||
             (!handled_http2_special_cases_upstream &&
              upstream_protocol == Http::CodecType::HTTP2)) {
           http2_implementations.push_back(Http2Impl::Oghttp2);
-          http2_bool_values.push_back(true);
 
           if (downstream_protocol == Http::CodecType::HTTP2) {
             handled_http2_special_cases_downstream = true;
@@ -50,15 +42,10 @@ std::vector<HttpProtocolTestParams> HttpProtocolIntegrationTest::getProtocolTest
 #else
         use_header_validator_values.push_back(false);
 #endif
-        for (Http1ParserImpl http1_implementation : http1_implementations) {
-          for (Http2Impl http2_implementation : http2_implementations) {
-            for (bool defer_processing : http2_bool_values) {
-              for (bool use_header_validator : use_header_validator_values) {
-                ret.push_back(HttpProtocolTestParams{
-                    ip_version, downstream_protocol, upstream_protocol, http1_implementation,
-                    http2_implementation, defer_processing, use_header_validator});
-              }
-            }
+        for (Http2Impl http2_implementation : http2_implementations) {
+          for (bool use_header_validator : use_header_validator_values) {
+            ret.push_back(HttpProtocolTestParams{ip_version, downstream_protocol, upstream_protocol,
+                                                 http2_implementation, use_header_validator});
           }
         }
       }
@@ -72,10 +59,7 @@ std::string HttpProtocolIntegrationTest::protocolTestParamsToString(
   return absl::StrCat((params.param.version == Network::Address::IpVersion::v4 ? "IPv4_" : "IPv6_"),
                       downstreamToString(params.param.downstream_protocol),
                       upstreamToString(params.param.upstream_protocol),
-                      TestUtility::http1ParserImplToString(params.param.http1_implementation),
                       http2ImplementationToString(params.param.http2_implementation),
-                      params.param.defer_processing_backedup_streams ? "WithDeferredProcessing"
-                                                                     : "NoDeferredProcessing",
                       params.param.use_universal_header_validator ? "Uhv" : "Legacy");
 }
 

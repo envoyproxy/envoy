@@ -391,7 +391,7 @@ public:
 
         envoy::service::discovery::v3::DiscoveryResponse discovery_response;
         discovery_response.set_version_info("1");
-        discovery_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+        discovery_response.set_type_url(Config::TestTypeUrl::get().ClusterLoadAssignment);
 
         auto cluster_load_assignment =
             TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(fmt::format(
@@ -1053,6 +1053,45 @@ TEST_P(HeaderIntegrationTest, TestDynamicHeaders) {
       });
 }
 
+TEST_P(HeaderIntegrationTest, TestResponseHeadersOnlyBeHandledOnce) {
+  initializeFilter(HeaderMode::Append, false);
+  registerTestServerPorts({"http"});
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"},
+      {":path", "/vhost-and-route"},
+      {":scheme", "http"},
+      {":authority", "vhost-headers.com"},
+  });
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  ASSERT_TRUE(response->waitForEndStream());
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    codec_client_->close();
+  }
+
+  EXPECT_FALSE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response->complete());
+
+  Http::TestResponseHeaderMapImpl response_headers{response->headers()};
+  EXPECT_EQ(1, response_headers.get(Http::LowerCaseString("x-route-response")).size());
+  EXPECT_EQ("route", response_headers.get_("x-route-response"));
+  EXPECT_EQ(1, response_headers.get(Http::LowerCaseString("x-vhost-response")).size());
+  EXPECT_EQ("vhost", response_headers.get_("x-vhost-response"));
+}
+
 // Validates that XFF gets properly parsed.
 TEST_P(HeaderIntegrationTest, TestXFFParsing) {
   initializeFilter(HeaderMode::Replace, false);
@@ -1337,78 +1376,6 @@ TEST_P(HeaderIntegrationTest, PathWithEscapedSlashesRedirected) {
                                        {"location", "/private/../%2e\\public"},
                                        {":status", "307"},
                                    });
-}
-
-// Validates legacy TE handling: TE header is forwarded if it contains a supported value
-TEST_P(HeaderIntegrationTest, TestTeHeaderPassthrough) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.sanitize_te", "false");
-  initializeFilter(HeaderMode::Append, false);
-  performRequest(
-      Http::TestRequestHeaderMapImpl{
-          {":method", "GET"},
-          {":path", "/"},
-          {":scheme", "http"},
-          {":authority", "no-headers.com"},
-          {"x-request-foo", "downstram"},
-          {"connection", "te, close"},
-          {"te", "trailers"},
-      },
-      Http::TestRequestHeaderMapImpl{
-          {":authority", "no-headers.com"},
-          {":path", "/"},
-          {":method", "GET"},
-          {"x-request-foo", "downstram"},
-          {"te", "trailers"},
-      },
-      Http::TestResponseHeaderMapImpl{
-          {"server", "envoy"},
-          {"content-length", "0"},
-          {":status", "200"},
-          {"x-return-foo", "upstream"},
-      },
-      Http::TestResponseHeaderMapImpl{
-          {"server", "envoy"},
-          {"x-return-foo", "upstream"},
-          {":status", "200"},
-          {"connection", "close"},
-      });
-}
-
-// Validates legacy TE handling: that TE header stripped if it contains an unsupported value.
-TEST_P(HeaderIntegrationTest, TestTeHeaderSanitized) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.sanitize_te", "false");
-  initializeFilter(HeaderMode::Append, false);
-  performRequest(
-      Http::TestRequestHeaderMapImpl{
-          {":method", "GET"},
-          {":path", "/"},
-          {":scheme", "http"},
-          {":authority", "no-headers.com"},
-          {"x-request-foo", "downstram"},
-          {"connection", "te, mike, sam, will, close"},
-          {"te", "gzip"},
-          {"mike", "foo"},
-          {"sam", "bar"},
-          {"will", "baz"},
-      },
-      Http::TestRequestHeaderMapImpl{
-          {":authority", "no-headers.com"},
-          {":path", "/"},
-          {":method", "GET"},
-          {"x-request-foo", "downstram"},
-      },
-      Http::TestResponseHeaderMapImpl{
-          {"server", "envoy"},
-          {"content-length", "0"},
-          {":status", "200"},
-          {"x-return-foo", "upstream"},
-      },
-      Http::TestResponseHeaderMapImpl{
-          {"server", "envoy"},
-          {"x-return-foo", "upstream"},
-          {":status", "200"},
-          {"connection", "close"},
-      });
 }
 
 using EmptyHeaderIntegrationTest = HttpProtocolIntegrationTest;

@@ -126,7 +126,7 @@ public:
    */
   static absl::Status
   validateClusterName(const Upstream::ClusterManager::ClusterSet& primary_clusters,
-                      const std::string& cluster_name, const std::string& config_source);
+                      absl::string_view cluster_name, absl::string_view config_source);
 
   /**
    * Potentially calls Utility::validateClusterName, if a cluster name can be found.
@@ -237,7 +237,7 @@ public:
    * Get a Factory from the registry with a particular name or return nullptr.
    * @param name string identifier for the particular implementation.
    */
-  template <class Factory> static Factory* getFactoryByName(const std::string& name) {
+  template <class Factory> static Factory* getFactoryByName(absl::string_view name) {
     if (name.empty()) {
       return nullptr;
     }
@@ -298,22 +298,22 @@ public:
    * Get type URL from a typed config.
    * @param typed_config for the extension config.
    */
-  static std::string getFactoryType(const ProtobufWkt::Any& typed_config) {
-    static const std::string typed_struct_type =
-        xds::type::v3::TypedStruct::default_instance().GetTypeName();
-    static const std::string legacy_typed_struct_type =
-        udpa::type::v1::TypedStruct::default_instance().GetTypeName();
+  static std::string getFactoryType(const Protobuf::Any& typed_config) {
+    static const std::string typed_struct_type(
+        xds::type::v3::TypedStruct::default_instance().GetTypeName());
+    static const std::string legacy_typed_struct_type(
+        udpa::type::v1::TypedStruct::default_instance().GetTypeName());
     // Unpack methods will only use the fully qualified type name after the last '/'.
     // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
     auto type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url()));
     if (type == typed_struct_type) {
       xds::type::v3::TypedStruct typed_struct;
-      MessageUtil::unpackToOrThrow(typed_config, typed_struct);
+      THROW_IF_NOT_OK(MessageUtil::unpackTo(typed_config, typed_struct));
       // Not handling nested structs or typed structs in typed structs
       return std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
     } else if (type == legacy_typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
-      MessageUtil::unpackToOrThrow(typed_config, typed_struct);
+      THROW_IF_NOT_OK(MessageUtil::unpackTo(typed_config, typed_struct));
       // Not handling nested structs or typed structs in typed structs
       return std::string(TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
     }
@@ -324,7 +324,7 @@ public:
    * Get a Factory from the registry by type URL.
    * @param typed_config for the extension config.
    */
-  template <class Factory> static Factory* getFactoryByType(const ProtobufWkt::Any& typed_config) {
+  template <class Factory> static Factory* getFactoryByType(const Protobuf::Any& typed_config) {
     if (typed_config.type_url().empty()) {
       return nullptr;
     }
@@ -353,7 +353,8 @@ public:
     // Check that the config type is not google.protobuf.Empty
     RELEASE_ASSERT(config->GetTypeName() != "google.protobuf.Empty", "");
 
-    translateOpaqueConfig(enclosing_message.typed_config(), validation_visitor, *config);
+    THROW_IF_NOT_OK(
+        translateOpaqueConfig(enclosing_message.typed_config(), validation_visitor, *config));
     return config;
   }
 
@@ -366,7 +367,7 @@ public:
    */
   template <class Factory>
   static ProtobufTypes::MessagePtr
-  translateAnyToFactoryConfig(const ProtobufWkt::Any& typed_config,
+  translateAnyToFactoryConfig(const Protobuf::Any& typed_config,
                               ProtobufMessage::ValidationVisitor& validation_visitor,
                               Factory& factory) {
     ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
@@ -377,7 +378,7 @@ public:
     // Check that the config type is not google.protobuf.Empty
     RELEASE_ASSERT(config->GetTypeName() != "google.protobuf.Empty", "");
 
-    translateOpaqueConfig(typed_config, validation_visitor, *config);
+    THROW_IF_NOT_OK(translateOpaqueConfig(typed_config, validation_visitor, *config));
     return config;
   }
 
@@ -387,29 +388,50 @@ public:
   static std::string truncateGrpcStatusMessage(absl::string_view error_message);
 
   /**
+   * Obtain Grpc service config from the api config source.
+   * @param api_config_source envoy::config::core::v3::ApiConfigSource. Must have config type GRPC.
+   * @param grpc_service_idx index of the grpc service in the api_config_source. If there's no entry
+   *                         in the given index, a nullptr factory will be returned.
+   * @param xdstp_config_source whether the config source will be used for xdstp config source.
+   *                            These sources must be of type AGGREGATED_GRPC or
+   *                            AGGREGATED_DELTA_GRPC.
+   * @return OptRef to either const envoy::config::core::v3::GrpcService or nullptr if there's no
+   *         grpc_service in the given index.
+   */
+  static absl::StatusOr<Envoy::OptRef<const envoy::config::core::v3::GrpcService>>
+  getGrpcConfigFromApiConfigSource(
+      const envoy::config::core::v3::ApiConfigSource& api_config_source, int grpc_service_idx,
+      bool xdstp_config_source);
+
+  /**
    * Obtain gRPC async client factory from a envoy::config::core::v3::ApiConfigSource.
    * @param async_client_manager gRPC async client manager.
    * @param api_config_source envoy::config::core::v3::ApiConfigSource. Must have config type GRPC.
    * @param skip_cluster_check whether to skip cluster validation.
    * @param grpc_service_idx index of the grpc service in the api_config_source. If there's no entry
    *                         in the given index, a nullptr factory will be returned.
+   * @param xdstp_config_source whether the config source will be used for xdstp config source.
+   *                            These sources must be of type AGGREGATED_GRPC or
+   *                            AGGREGATED_DELTA_GRPC.
    * @return Grpc::AsyncClientFactoryPtr gRPC async client factory, or nullptr if there's no
-   * grpc_service in the given index.
+   *         grpc_service in the given index.
    */
   static absl::StatusOr<Grpc::AsyncClientFactoryPtr>
   factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
                                 const envoy::config::core::v3::ApiConfigSource& api_config_source,
-                                Stats::Scope& scope, bool skip_cluster_check, int grpc_service_idx);
+                                Stats::Scope& scope, bool skip_cluster_check, int grpc_service_idx,
+                                bool xdstp_config_source);
 
   /**
    * Translate opaque config from google.protobuf.Any to defined proto message.
    * @param typed_config opaque config packed in google.protobuf.Any
    * @param validation_visitor message validation visitor instance.
    * @param out_proto the proto message instantiated by extensions
+   * @return a status indicating if translation was a success
    */
-  static void translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
-                                    ProtobufMessage::ValidationVisitor& validation_visitor,
-                                    Protobuf::Message& out_proto);
+  static absl::Status translateOpaqueConfig(const Protobuf::Any& typed_config,
+                                            ProtobufMessage::ValidationVisitor& validation_visitor,
+                                            Protobuf::Message& out_proto);
 
   /**
    * Verify that any filter designed to be terminal is configured to be terminal, and vice versa.
@@ -424,19 +446,7 @@ public:
                                               const std::string& filter_type,
                                               const std::string& filter_chain_type,
                                               bool is_terminal_filter,
-                                              bool last_filter_in_current_config) {
-    if (is_terminal_filter && !last_filter_in_current_config) {
-      return absl::InvalidArgumentError(
-          fmt::format("Error: terminal filter named {} of type {} must be the "
-                      "last filter in a {} filter chain.",
-                      name, filter_type, filter_chain_type));
-    } else if (!is_terminal_filter && last_filter_in_current_config) {
-      return absl::InvalidArgumentError(fmt::format(
-          "Error: non-terminal filter named {} of type {} is the last filter in a {} filter chain.",
-          name, filter_type, filter_chain_type));
-    }
-    return absl::OkStatus();
-  }
+                                              bool last_filter_in_current_config);
 
   /**
    * Prepares the DNS failure refresh backoff strategy given the cluster configuration.

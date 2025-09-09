@@ -51,8 +51,8 @@ struct RedisClusterStats {
 
 class DoNothingPoolCallbacks : public PoolCallbacks {
 public:
-  void onResponse(Common::Redis::RespValuePtr&&) override{};
-  void onFailure() override{};
+  void onResponse(Common::Redis::RespValuePtr&&) override {};
+  void onFailure() override {};
 };
 
 class InstanceImpl : public Instance, public std::enable_shared_from_this<InstanceImpl> {
@@ -65,11 +65,18 @@ public:
       Api::Api& api, Stats::ScopeSharedPtr&& stats_scope,
       const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
       Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager,
-      const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache);
+      const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
+      absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+      absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+          aws_iam_authenticator);
+  uint16_t shardSize() override;
   // RedisProxy::ConnPool::Instance
   Common::Redis::Client::PoolRequest*
   makeRequest(const std::string& key, RespVariant&& request, PoolCallbacks& callbacks,
               Common::Redis::Client::Transaction& transaction) override;
+  Common::Redis::Client::PoolRequest*
+  makeRequestToShard(uint16_t shard_index, RespVariant&& request, PoolCallbacks& callbacks,
+                     Common::Redis::Client::Transaction& transaction) override;
   /**
    * Makes a redis request based on IP address and TCP port of the upstream host (e.g.,
    * moved/ask cluster redirection). This is now only kept mostly for testing.
@@ -83,7 +90,6 @@ public:
   Common::Redis::Client::PoolRequest*
   makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
                     Common::Redis::Client::ClientCallbacks& callbacks);
-
   void init();
 
   // Allow the unit test to have access to private members.
@@ -147,18 +153,28 @@ private:
   struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject,
                            public Upstream::ClusterUpdateCallbacks,
                            public Logger::Loggable<Logger::Id::redis> {
-    ThreadLocalPool(std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher,
-                    std::string cluster_name,
-                    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache);
+    ThreadLocalPool(
+        std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher,
+        std::string cluster_name,
+        const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
+        absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+        absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+            aws_iam_authenticator);
     ~ThreadLocalPool() override;
     ThreadLocalActiveClientPtr& threadLocalActiveClient(Upstream::HostConstSharedPtr host);
+    uint16_t shardSize();
     Common::Redis::Client::PoolRequest*
     makeRequest(const std::string& key, RespVariant&& request, PoolCallbacks& callbacks,
                 Common::Redis::Client::Transaction& transaction);
     Common::Redis::Client::PoolRequest*
+    makeRequestToHost(Upstream::HostConstSharedPtr& host, RespVariant&& request,
+                      PoolCallbacks& callbacks, Common::Redis::Client::Transaction& transaction);
+    Common::Redis::Client::PoolRequest*
     makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
                       Common::Redis::Client::ClientCallbacks& callbacks);
-
+    Common::Redis::Client::PoolRequest*
+    makeRequestToShard(uint16_t shard_index, RespVariant&& request, PoolCallbacks& callbacks,
+                       Common::Redis::Client::Transaction& transaction);
     void onClusterAddOrUpdateNonVirtual(absl::string_view cluster_name,
                                         Upstream::ThreadLocalClusterCommand& get_cluster);
     void onHostsAdded(const std::vector<Upstream::HostSharedPtr>& hosts_added);
@@ -189,7 +205,6 @@ private:
     std::list<Upstream::HostSharedPtr> created_via_redirect_hosts_;
     std::list<ThreadLocalActiveClientPtr> clients_to_drain_;
     std::list<PendingRequest> pending_requests_;
-
     /* This timer is used to poll the active clients in clients_to_drain_ to determine whether they
      * have been drained (have no active requests) or not. It is only enabled after a client has
      * been added to clients_to_drain_, and is only re-enabled as long as that list is not empty. A
@@ -204,6 +219,9 @@ private:
     Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
     RedisClusterStats redis_cluster_stats_;
     const Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
+    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+        aws_iam_authenticator_;
+    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
   };
 
   const std::string cluster_name_;
@@ -217,6 +235,9 @@ private:
   RedisClusterStats redis_cluster_stats_;
   const Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
   const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dns_cache_{nullptr};
+  absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+      aws_iam_authenticator_;
+  absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config_;
 };
 
 } // namespace ConnPool

@@ -1,4 +1,3 @@
-load("@build_bazel_rules_android//android:rules.bzl", "aar_import")
 load("@build_bazel_rules_apple//apple:apple.bzl", "apple_static_framework_import")
 load(
     "@com_github_buildbuddy_io_rules_xcodeproj//xcodeproj:defs.bzl",
@@ -8,7 +7,8 @@ load(
     "xcodeproj",
 )
 load("@envoy//tools/python:namespace.bzl", "envoy_py_namespace")
-load("@io_bazel_rules_kotlin//kotlin/internal:toolchains.bzl", "define_kt_toolchain")
+load("@rules_android//android:rules.bzl", "aar_import")
+load("@rules_kotlin//kotlin/internal:toolchains.bzl", "define_kt_toolchain")
 load("//bazel:framework_imports_extractor.bzl", "framework_imports_extractor")
 
 licenses(["notice"])  # Apache 2
@@ -123,20 +123,12 @@ xcodeproj(
     scheme_autogeneration_mode = "auto",  # Switch to "all" to generate schemes for all deps
     schemes = [
         xcode_schemes.scheme(
-            name = "Async Await App",
-            launch_action = xcode_schemes.launch_action("//examples/swift/async_await:app"),
-        ),
-        xcode_schemes.scheme(
             name = "Hello World App",
             launch_action = xcode_schemes.launch_action("//examples/swift/hello_world:app"),
         ),
         xcode_schemes.scheme(
             name = "Hello World App (ObjC)",
             launch_action = xcode_schemes.launch_action("//examples/objective-c/hello_world:app"),
-        ),
-        xcode_schemes.scheme(
-            name = "Baseline App",
-            launch_action = xcode_schemes.launch_action("//test/swift/apps/baseline:app"),
         ),
         xcode_schemes.scheme(
             name = "Experimental App",
@@ -168,9 +160,7 @@ xcodeproj(
         top_level_targets(
             labels = [
                 "//examples/objective-c/hello_world:app",
-                "//examples/swift/async_await:app",
                 "//examples/swift/hello_world:app",
-                "//test/swift/apps/baseline:app",
                 "//test/swift/apps/experimental:app",
             ],
             target_environments = [
@@ -185,5 +175,37 @@ xcodeproj(
         "//test/swift/integration:test",
         "//test/swift/stats:test",
         "//test/swift:test",
+    ],
+)
+
+platform(
+    name = "android_armv7",
+    constraint_values = [
+        "@platforms//cpu:armv7",
+        "@platforms//os:android",
+    ],
+)
+
+platform(
+    name = "android_arm64",
+    constraint_values = [
+        "@platforms//cpu:arm64",
+        "@platforms//os:android",
+    ],
+)
+
+platform(
+    name = "android_x86_32",
+    constraint_values = [
+        "@platforms//cpu:x86_32",
+        "@platforms//os:android",
+    ],
+)
+
+platform(
+    name = "android_x86_64",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:android",
     ],
 )

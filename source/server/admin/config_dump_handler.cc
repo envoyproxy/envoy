@@ -95,7 +95,7 @@ bool trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
     if (reflection->HasField(message, any_field)) {
       ASSERT(any_field != nullptr);
       // Unpack to a DynamicMessage.
-      ProtobufWkt::Any any_message;
+      Protobuf::Any any_message;
       any_message.MergeFrom(reflection->GetMessage(message, any_field));
       Protobuf::DynamicMessageFactory dmf;
       const absl::string_view inner_type_name =
@@ -135,13 +135,13 @@ buildNameMatcher(const Http::Utility::QueryParamsMulti& params, Regex::Engine& e
   envoy::type::matcher::v3::RegexMatcher matcher;
   *matcher.mutable_google_re2() = envoy::type::matcher::v3::RegexMatcher::GoogleRE2();
   matcher.set_regex(*name_regex);
-  TRY_ASSERT_MAIN_THREAD
-  return Regex::Utility::parseRegex(matcher, engine);
-  END_TRY
-  catch (EnvoyException& e) {
-    return absl::InvalidArgumentError(
-        absl::StrCat("Error while parsing name_regex from ", *name_regex, ": ", e.what()));
+  auto regex_or_error = Regex::Utility::parseRegex(matcher, engine);
+  if (regex_or_error.status().ok()) {
+    return std::move(*regex_or_error);
   }
+  return absl::InvalidArgumentError(absl::StrCat("Error while parsing name_regex from ",
+                                                 *name_regex, ": ",
+                                                 regex_or_error.status().message()));
 }
 
 } // namespace
@@ -194,8 +194,7 @@ absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addResourc
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
-    auto all_clusters = server_.clusterManager().clusters();
-    if (!all_clusters.active_clusters_.empty()) {
+    if (server_.clusterManager().hasActiveClusters()) {
       callbacks_map.emplace("endpoint", [this](const Matchers::StringMatcher& name_matcher) {
         return dumpEndpointConfigs(name_matcher);
       });
@@ -248,8 +247,7 @@ absl::optional<std::pair<Http::Code, std::string>> ConfigDumpHandler::addAllConf
   Envoy::Server::ConfigTracker::CbsMap callbacks_map = config_tracker_.getCallbacksMap();
   if (include_eds) {
     // TODO(mattklein123): Add ability to see warming clusters in admin output.
-    auto all_clusters = server_.clusterManager().clusters();
-    if (!all_clusters.active_clusters_.empty()) {
+    if (server_.clusterManager().hasActiveClusters()) {
       callbacks_map.emplace("endpoint", [this](const Matchers::StringMatcher& name_matcher) {
         return dumpEndpointConfigs(name_matcher);
       });
@@ -309,7 +307,7 @@ ConfigDumpHandler::dumpEndpointConfigs(const Matchers::StringMatcher& name_match
     float value = cluster.dropOverload().value() * 1000000;
     if (value > 0) {
       auto* drop_overload = policy.add_drop_overloads();
-      drop_overload->set_category("drop_overload");
+      drop_overload->set_category(cluster.dropCategory());
       auto* percent = drop_overload->mutable_drop_percentage();
       percent->set_denominator(envoy::type::v3::FractionalPercent::MILLION);
       percent->set_numerator(uint32_t(value));

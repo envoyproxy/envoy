@@ -63,9 +63,9 @@ Tracer::Tracer(const std::string& collector_cluster, const std::string& collecto
       thread_local_slot_(
           ThreadLocal::TypedSlot<ThreadLocalTracer>::makeUnique(thread_local_slot_allocator)) {
   const bool allow_added_via_api = true;
-  THROW_IF_STATUS_NOT_OK(Config::Utility::checkCluster("envoy.tracers.datadog", collector_cluster,
-                                                       cluster_manager, allow_added_via_api),
-                         throw);
+  THROW_IF_NOT_OK_REF(Config::Utility::checkCluster("envoy.tracers.datadog", collector_cluster,
+                                                    cluster_manager, allow_added_via_api)
+                          .status());
 
   thread_local_slot_->set([&logger = ENVOY_LOGGER(), collector_cluster, collector_reference_host,
                            config, &tracer_stats = tracer_stats_, &cluster_manager,
@@ -107,12 +107,15 @@ Tracing::SpanPtr Tracer::startSpan(const Tracing::Config&, Tracing::TraceContext
   //
   // If Envoy is telling us to keep the trace, then we leave it up to the
   // tracer's internal sampler (which might decide to drop the trace anyway).
-  if (!span.trace_segment().sampling_decision().has_value() && !tracing_decision.traced) {
+  const bool use_local_decision = !span.trace_segment().sampling_decision().has_value();
+  if (use_local_decision && !tracing_decision.traced) {
+    // TODO(wbpcode): use USER_KEEP to indicate that the trace should be kept if the
+    // Envoy is telling us to keep the trace.
     span.trace_segment().override_sampling_priority(
         int(datadog::tracing::SamplingPriority::USER_DROP));
   }
 
-  return std::make_unique<Span>(std::move(span));
+  return std::make_unique<Span>(std::move(span), use_local_decision);
 }
 
 datadog::tracing::Span Tracer::extractOrCreateSpan(datadog::tracing::Tracer& tracer,

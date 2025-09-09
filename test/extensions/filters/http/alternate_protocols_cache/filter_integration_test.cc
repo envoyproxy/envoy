@@ -428,7 +428,7 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
         auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
-        route->mutable_per_request_buffer_limit_bytes()->set_value(4096);
+        route->mutable_request_body_buffer_limit()->set_value(4096);
       });
 
   initialize();
@@ -523,16 +523,17 @@ TEST_P(MixedUpstreamIntegrationTest, BasicRequestAutoWithHttp3) {
   std::string alt_svc;
 
   // Make sure the srtt gets updated to a non-zero value.
-  for (int i = 0; i < 5; ++i) {
+  for (int i = 0; i < 20; ++i) {
     // Make sure that srtt is updated.
     const std::string filename = TestEnvironment::temporaryPath("alt_svc_cache.txt");
     alt_svc = TestEnvironment::readFileToStringForTest(filename);
     if (getSrtt(alt_svc, timeSystem()) != 0) {
       break;
     }
-    timeSystem().advanceTimeWait(std::chrono::milliseconds(10));
+    timeSystem().advanceTimeWait(std::chrono::milliseconds(15));
   }
-  EXPECT_NE(getSrtt(alt_svc, timeSystem()), 0) << alt_svc;
+  EXPECT_EQ(1u, test_server_->counter("cluster.cluster_0.upstream_cx_http3_total")->value());
+  EXPECT_NE(getSrtt(alt_svc, timeSystem()), 0) << "Alt-svc entry :'" << alt_svc << "'";
 }
 
 // Test simultaneous requests using auto-config and a pre-populated HTTP/3 alt-svc entry. The

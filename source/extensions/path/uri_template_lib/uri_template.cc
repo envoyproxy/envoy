@@ -134,7 +134,7 @@ absl::Status isValidRewritePattern(absl::string_view path_template_rewrite) {
 }
 
 absl::Status isValidSharedVariableSet(absl::string_view pattern, absl::string_view capture_regex) {
-  absl::StatusOr<std::string> status = convertPathPatternSyntaxToRegex(capture_regex).value();
+  absl::StatusOr<std::string> status = convertPathPatternSyntaxToRegex(capture_regex);
   if (!status.ok()) {
     return status.status();
   }

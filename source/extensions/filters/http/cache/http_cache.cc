@@ -57,13 +57,7 @@ LookupRequest::LookupRequest(const Http::RequestHeaderMap& request_headers, Syst
 // Unless this API is still alpha, calls to stableHashKey() must always return
 // the same result, or a way must be provided to deal with a complete cache
 // flush.
-size_t stableHashKey(const Key& key) {
-  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.use_fast_protobuf_hash")) {
-    return DeterministicProtoHash::hash(key);
-  } else {
-    return MessageUtil::hash(key);
-  }
-}
+size_t stableHashKey(const Key& key) { return DeterministicProtoHash::hash(key); }
 
 void LookupRequest::initializeRequestCacheControl(const Http::RequestHeaderMap& request_headers) {
   const absl::string_view cache_control =

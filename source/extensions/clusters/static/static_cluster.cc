@@ -11,15 +11,13 @@ StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& 
                                      ClusterFactoryContext& context, absl::Status& creation_status)
     : ClusterImplBase(cluster, context, creation_status) {
   SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
-  priority_state_manager_.reset(new PriorityStateManager(
-      *this, context.serverFactoryContext().localInfo(), nullptr, random_));
+  priority_state_manager_ = std::make_unique<PriorityStateManager>(
+      *this, context.serverFactoryContext().localInfo(), nullptr, random_);
   const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment =
       cluster.load_assignment();
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       cluster_load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
   weighted_priority_health_ = cluster_load_assignment.policy().weighted_priority_health();
-
-  Event::Dispatcher& dispatcher = context.serverFactoryContext().mainThreadDispatcher();
 
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     THROW_IF_NOT_OK(validateEndpointsForZoneAwareRouting(locality_lb_endpoint));
@@ -31,16 +29,22 @@ StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& 
             THROW_OR_RETURN_VALUE(resolveProtoAddress(lb_endpoint.endpoint().address()),
                                   const Network::Address::InstanceConstSharedPtr));
         for (const auto& additional_address : lb_endpoint.endpoint().additional_addresses()) {
-          address_list.emplace_back(
-              THROW_OR_RETURN_VALUE(resolveProtoAddress(additional_address.address()),
-                                    const Network::Address::InstanceConstSharedPtr));
+          Network::Address::InstanceConstSharedPtr address =
+              returnOrThrow(resolveProtoAddress(additional_address.address()));
+          address_list.emplace_back(address);
+        }
+        for (const Network::Address::InstanceConstSharedPtr& address : address_list) {
+          // All addresses must by IP addresses.
+          if (!address->ip()) {
+            throwEnvoyExceptionOrPanic("additional_addresses must be IP addresses.");
+          }
         }
       }
       priority_state_manager_->registerHostForPriority(
           lb_endpoint.endpoint().hostname(),
           THROW_OR_RETURN_VALUE(resolveProtoAddress(lb_endpoint.endpoint().address()),
                                 const Network::Address::InstanceConstSharedPtr),
-          address_list, locality_lb_endpoint, lb_endpoint, dispatcher.timeSource());
+          address_list, locality_lb_endpoint, lb_endpoint);
     }
   }
 }

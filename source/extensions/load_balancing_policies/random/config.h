@@ -13,14 +13,9 @@ namespace LoadBalancingPolices {
 namespace Random {
 
 using RandomLbProto = envoy::extensions::load_balancing_policies::random::v3::Random;
+using ClusterProto = envoy::config::cluster::v3::Cluster;
 
-/**
- * Empty load balancer config that used to represent the config for the random load balancer.
- */
-class EmptyRandomLbConfig : public Upstream::LoadBalancerConfig {
-public:
-  EmptyRandomLbConfig() = default;
-};
+using CommonLbConfigProto = envoy::config::cluster::v3::Cluster::CommonLbConfig;
 
 /**
  * Load balancer config that used to wrap the random config.
@@ -28,8 +23,9 @@ public:
 class TypedRandomLbConfig : public Upstream::LoadBalancerConfig {
 public:
   TypedRandomLbConfig(const RandomLbProto& lb_config);
+  TypedRandomLbConfig(const CommonLbConfigProto& common_lb_config);
 
-  const RandomLbProto lb_config_;
+  RandomLbProto lb_config_;
 };
 
 struct RandomCreator : public Logger::Loggable<Logger::Id::upstream> {
@@ -43,14 +39,17 @@ class Factory : public Common::FactoryBase<RandomLbProto, RandomCreator> {
 public:
   Factory() : FactoryBase("envoy.load_balancing_policies.random") {}
 
-  Upstream::LoadBalancerConfigPtr loadConfig(Upstream::LoadBalancerFactoryContext&,
-                                             const Protobuf::Message& config,
-                                             ProtobufMessage::ValidationVisitor&) override {
-    auto typed_config = dynamic_cast<const RandomLbProto*>(&config);
-    if (typed_config == nullptr) {
-      return std::make_unique<EmptyRandomLbConfig>();
-    }
-    return std::make_unique<TypedRandomLbConfig>(*typed_config);
+  absl::StatusOr<Upstream::LoadBalancerConfigPtr>
+  loadConfig(Server::Configuration::ServerFactoryContext&,
+             const Protobuf::Message& config) override {
+    ASSERT(dynamic_cast<const RandomLbProto*>(&config) != nullptr);
+    const RandomLbProto& typed_config = dynamic_cast<const RandomLbProto&>(config);
+    return Upstream::LoadBalancerConfigPtr{new TypedRandomLbConfig(typed_config)};
+  }
+
+  absl::StatusOr<Upstream::LoadBalancerConfigPtr>
+  loadLegacy(Server::Configuration::ServerFactoryContext&, const ClusterProto& cluster) override {
+    return Upstream::LoadBalancerConfigPtr{new TypedRandomLbConfig(cluster.common_lb_config())};
   }
 };
 

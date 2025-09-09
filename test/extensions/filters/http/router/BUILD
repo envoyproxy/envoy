@@ -15,9 +15,11 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_names = ["envoy.filters.http.router"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/router:config",
         "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
     ],
@@ -31,6 +33,7 @@ envoy_extension_cc_test(
         "//test/config/integration/certs",
     ],
     extension_names = ["envoy.filters.http.router"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/router:config",
         "//test/integration:http_integration_lib",

@@ -9,6 +9,7 @@
 #include "source/common/common/fmt.h"
 #include "source/common/common/logger.h"
 #include "source/common/config/datasource.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "spdlog/spdlog.h"
 
@@ -18,17 +19,13 @@ namespace Ssl {
 static const std::string INLINE_STRING = "<inline>";
 
 CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
+    std::string ca_cert, std::string certificate_revocation_list,
     const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& config,
-    Api::Api& api)
-    : ca_cert_(THROW_OR_RETURN_VALUE(
-          THROW_OR_RETURN_VALUE(Config::DataSource::read(config.trusted_ca(), true, api),
-                                std::string),
-          std::string)),
+    bool auto_sni_san_match, Api::Api& api, const std::string& ca_cert_name)
+    : ca_cert_(ca_cert),
       ca_cert_path_(Config::DataSource::getPath(config.trusted_ca())
                         .value_or(ca_cert_.empty() ? EMPTY_STRING : INLINE_STRING)),
-      certificate_revocation_list_(THROW_OR_RETURN_VALUE(
-          THROW_OR_RETURN_VALUE(Config::DataSource::read(config.crl(), true, api), std::string),
-          std::string)),
+      ca_cert_name_(ca_cert_name), certificate_revocation_list_(certificate_revocation_list),
       certificate_revocation_list_path_(
           Config::DataSource::getPath(config.crl())
               .value_or(certificate_revocation_list_.empty() ? EMPTY_STRING : INLINE_STRING)),
@@ -47,14 +44,24 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
       api_(api), only_verify_leaf_cert_crl_(config.only_verify_leaf_cert_crl()),
       max_verify_depth_(config.has_max_verify_depth()
                             ? absl::optional<uint32_t>(config.max_verify_depth().value())
-                            : absl::nullopt) {}
+                            : absl::nullopt),
+      auto_sni_san_match_(auto_sni_san_match) {}
 
 absl::StatusOr<std::unique_ptr<CertificateValidationContextConfigImpl>>
 CertificateValidationContextConfigImpl::create(
     const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext& context,
-    Api::Api& api) {
+    bool auto_sni_san_match, Api::Api& api, const std::string& name) {
+  bool allow_empty_trusted_ca = !context.has_trusted_ca();
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reject_empty_trusted_ca_file")) {
+    allow_empty_trusted_ca = true;
+  }
+  auto ca_or_error = Config::DataSource::read(context.trusted_ca(), allow_empty_trusted_ca, api);
+  RETURN_IF_NOT_OK_REF(ca_or_error.status());
+  auto list_or_error = Config::DataSource::read(context.crl(), true, api);
+  RETURN_IF_NOT_OK_REF(list_or_error.status());
   auto config = std::unique_ptr<CertificateValidationContextConfigImpl>(
-      new CertificateValidationContextConfigImpl(context, api));
+      new CertificateValidationContextConfigImpl(*ca_or_error, *list_or_error, context,
+                                                 auto_sni_san_match, api, name));
   absl::Status status = config->initialize();
   if (status.ok()) {
     return config;

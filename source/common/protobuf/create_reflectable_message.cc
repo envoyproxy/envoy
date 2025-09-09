@@ -70,7 +70,6 @@ Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& m
 #include "envoy/config/trace/v3/dynamic_ot_descriptor.pb.h"
 #include "envoy/config/trace/v3/http_tracer_descriptor.pb.h"
 #include "envoy/config/trace/v3/lightstep_descriptor.pb.h"
-#include "envoy/config/trace/v3/opencensus_descriptor.pb.h"
 #include "envoy/config/trace/v3/opentelemetry_descriptor.pb.h"
 #include "envoy/config/trace/v3/service_descriptor.pb.h"
 #include "envoy/config/trace/v3/skywalking_descriptor.pb.h"
@@ -250,7 +249,6 @@ std::unique_ptr<TextFormatTranscoder> createTranscoder() {
       protobuf::reflection::envoy_config_trace_v3_dynamic_ot::kFileDescriptorInfo,
       protobuf::reflection::envoy_config_trace_v3_http_tracer::kFileDescriptorInfo,
       protobuf::reflection::envoy_config_trace_v3_lightstep::kFileDescriptorInfo,
-      protobuf::reflection::envoy_config_trace_v3_opencensus::kFileDescriptorInfo,
       protobuf::reflection::envoy_config_trace_v3_opentelemetry::kFileDescriptorInfo,
       protobuf::reflection::envoy_config_trace_v3_service::kFileDescriptorInfo,
       protobuf::reflection::envoy_config_trace_v3_skywalking::kFileDescriptorInfo,
@@ -449,7 +447,8 @@ void loadFileDescriptors(const FileDescriptorInfo& file_descriptor_info) {
 
 Protobuf::ReflectableMessage createReflectableMessage(const Protobuf::Message& message) {
   Protobuf::ReflectableMessage reflectable_message = createDynamicMessage(getTranscoder(), message);
-  ASSERT(reflectable_message, "Unable to create dyanmic message for: " + message.GetTypeName());
+  ASSERT(reflectable_message,
+         absl::StrCat("Unable to create dyanmic message for: ", message.GetTypeName()));
   return reflectable_message;
 }
 

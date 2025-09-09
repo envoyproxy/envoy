@@ -48,8 +48,7 @@ public:
     std::string error;
     if (!succeeded) {
       error = error_details;
-    } else if (!accept_untrusted_ || !Runtime::runtimeFeatureEnabled(
-                                         "envoy.reloadable_features.extend_h3_accept_untrusted")) {
+    } else if (!accept_untrusted_) {
       std::unique_ptr<quic::CertificateView> cert_view =
           quic::CertificateView::ParseSingleCertificate(leaf_cert_);
       succeeded = verifyLeafCertMatchesHostname(*cert_view, hostname_, &error);

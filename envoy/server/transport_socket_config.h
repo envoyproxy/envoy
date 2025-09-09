@@ -22,53 +22,7 @@ namespace Envoy {
 namespace Server {
 namespace Configuration {
 
-/**
- * Context passed to transport socket factory to access server resources.
- */
-class TransportSocketFactoryContext {
-public:
-  virtual ~TransportSocketFactoryContext() = default;
-
-  /**
-   * @return ServerFactoryContext& the server factory context.
-   */
-  virtual ServerFactoryContext& serverFactoryContext() PURE;
-
-  /**
-   * @return Upstream::ClusterManager& singleton for use by the entire server.
-   * TODO(wbpcode): clusterManager() of ServerFactoryContext still be invalid when loading
-   * static cluster. So we need to provide an cluster manager reference here.
-   * This could be removed after https://github.com/envoyproxy/envoy/issues/26653 is resolved.
-   */
-  virtual Upstream::ClusterManager& clusterManager() PURE;
-
-  /**
-   * @return ProtobufMessage::ValidationVisitor& validation visitor for cluster configuration
-   * messages.
-   */
-  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
-
-  /**
-   * @return Ssl::ContextManager& the SSL context manager.
-   */
-  virtual Ssl::ContextManager& sslContextManager() PURE;
-
-  /**
-   * @return Stats::Scope& the transport socket's stats scope.
-   */
-  virtual Stats::Scope& statsScope() PURE;
-
-  /**
-   * Return the instance of secret manager.
-   */
-  virtual Secret::SecretManager& secretManager() PURE;
-
-  /**
-   * @return the init manager of the particular context.
-   */
-  virtual Init::Manager& initManager() PURE;
-};
-
+using TransportSocketFactoryContext = GenericFactoryContext;
 using TransportSocketFactoryContextPtr = std::unique_ptr<TransportSocketFactoryContext>;
 
 class TransportSocketConfigFactory : public Config::TypedFactory {

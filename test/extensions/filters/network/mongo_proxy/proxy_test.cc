@@ -569,7 +569,7 @@ TEST_F(MongoProxyFilterTest, ConcurrentQueryWithDrainClose) {
     message->documents().push_back(Bson::DocumentImpl::create()->addString("hello", "world"));
     ON_CALL(runtime_.snapshot_, featureEnabled("mongo.drain_close_enabled", 100))
         .WillByDefault(Return(true));
-    EXPECT_CALL(drain_decision_, drainClose()).WillOnce(Return(true));
+    EXPECT_CALL(drain_decision_, drainClose(Network::DrainDirection::All)).WillOnce(Return(true));
     drain_timer = new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
     EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(0), _));
     filter_->callbacks_->decodeReply(std::move(message));

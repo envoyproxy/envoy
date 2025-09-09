@@ -17,6 +17,7 @@ envoy_cc_test(
         "//test/common/tls/ocsp/test_data:certs",
     ],
     external_deps = ["ssl"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/filesystem:filesystem_lib",
         "//source/common/tls:utility_lib",
@@ -35,6 +36,7 @@ envoy_cc_test(
         "asn1_utility_test.cc",
     ],
     external_deps = ["ssl"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/tls/ocsp:asn1_utility_lib",
         "//test/common/tls:ssl_test_utils",

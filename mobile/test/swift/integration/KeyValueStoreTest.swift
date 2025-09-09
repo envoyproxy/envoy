@@ -43,7 +43,7 @@ final class KeyValueStoreTests: XCTestCase {
     let testStore = TestKeyValueStore(readExpectation: readExpectation,
                                       saveExpectation: saveExpectation)
 
-    EnvoyTestServer.startHttp1PlaintextServer()
+    EnvoyTestServer.startHttp1Server()
 
     let engine = EngineBuilder()
       .setLogLevel(.debug)
@@ -66,7 +66,7 @@ final class KeyValueStoreTests: XCTestCase {
 
     let requestHeaders = RequestHeadersBuilder(
       method: .get, scheme: "http",
-      authority: "localhost:" + String(EnvoyTestServer.getEnvoyPort()), path: "/simple.txt"
+      authority: "localhost:" + String(EnvoyTestServer.getHttpPort()), path: "/simple.txt"
     )
     .build()
 
@@ -84,6 +84,6 @@ final class KeyValueStoreTests: XCTestCase {
     )
 
     engine.terminate()
-    EnvoyTestServer.shutdownTestServer()
+    EnvoyTestServer.shutdownTestHttpServer()
   }
 }

@@ -38,82 +38,29 @@ enum class BlockerState {
 
 class AsyncFileActionBlockedUntilReleased : public AsyncFileActionWithResult<bool> {
 public:
-  explicit AsyncFileActionBlockedUntilReleased(std::atomic<BlockerState>& state_out)
-      : AsyncFileActionWithResult([this](bool result) { onComplete(result); }),
-        state_out_(state_out) {
-    absl::MutexLock lock(&blocking_mutex_);
-    state_out_.store(BlockerState::Start);
-  }
-  void setState(BlockerState state) ABSL_EXCLUSIVE_LOCKS_REQUIRED(blocking_mutex_) {
-    stage_ = state;
-    state_out_.store(state);
-  }
+  using AsyncFileActionWithResult::AsyncFileActionWithResult;
   bool executeImpl() final {
-    absl::MutexLock lock(&blocking_mutex_);
-    ASSERT(stage_ == BlockerState::Start);
-    setState(BlockerState::BlockingDuringExecution);
-    auto condition = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(blocking_mutex_) {
-      return stage_ == BlockerState::UnblockedExecution;
-    };
-    blocking_mutex_.Await(absl::Condition(&condition));
-    setState(BlockerState::ExecutionFinished);
+    executing_.set_value();
+    bool ret = continue_executing_.get_future().wait_for(std::chrono::seconds(1)) ==
+               std::future_status::ready;
+    return ret;
+  }
+  bool waitUntilExecutionBlocked() {
+    return executing_future_.wait_for(std::chrono::seconds(1)) == std::future_status::ready;
+  }
+  bool isStarted() {
+    return executing_future_.wait_for(std::chrono::milliseconds(1)) == std::future_status::ready;
+  }
+  bool unblockExecution() {
+    continue_executing_.set_value();
     return true;
   }
-  void onComplete(bool result ABSL_ATTRIBUTE_UNUSED) {
-    absl::MutexLock lock(&blocking_mutex_);
-    setState(BlockerState::BlockingDuringCallback);
-    auto condition = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(blocking_mutex_) {
-      return stage_ == BlockerState::UnblockedCallback;
-    };
-    blocking_mutex_.Await(absl::Condition(&condition));
-  }
-  bool waitUntilExecutionBlocked() ABSL_LOCKS_EXCLUDED(blocking_mutex_) {
-    absl::MutexLock lock(&blocking_mutex_);
-    auto condition = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(blocking_mutex_) {
-      return stage_ == BlockerState::BlockingDuringExecution;
-    };
-    return blocking_mutex_.AwaitWithTimeout(absl::Condition(&condition), absl::Seconds(1));
-  }
-  bool waitUntilCallbackBlocked() ABSL_LOCKS_EXCLUDED(blocking_mutex_) {
-    absl::MutexLock lock(&blocking_mutex_);
-    auto condition = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(blocking_mutex_) {
-      return stage_ == BlockerState::BlockingDuringCallback;
-    };
-    return blocking_mutex_.AwaitWithTimeout(absl::Condition(&condition), absl::Seconds(1));
-  }
-  bool unblockExecution() ABSL_LOCKS_EXCLUDED(blocking_mutex_) {
-    absl::MutexLock lock(&blocking_mutex_);
-    if (stage_ != BlockerState::BlockingDuringExecution) {
-      return false;
-    }
-    setState(BlockerState::UnblockedExecution);
-    return true;
-  }
-  bool unblockCallback() ABSL_LOCKS_EXCLUDED(blocking_mutex_) {
-    absl::MutexLock lock(&blocking_mutex_);
-    if (stage_ != BlockerState::BlockingDuringCallback) {
-      return false;
-    }
-    setState(BlockerState::UnblockedCallback);
-    return true;
-  }
-  bool isStarted() ABSL_LOCKS_EXCLUDED(blocking_mutex_) {
-    absl::MutexLock lock(&blocking_mutex_);
-    auto condition = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(blocking_mutex_) {
-      return stage_ != BlockerState::Start;
-    };
-    // Very short timeout because we can be expecting to fail this.
-    return blocking_mutex_.AwaitWithTimeout(absl::Condition(&condition), absl::Milliseconds(30));
-  }
-  bool doWholeFlow() ABSL_LOCKS_EXCLUDED(blocking_mutex_) {
-    return waitUntilExecutionBlocked() && unblockExecution() && waitUntilCallbackBlocked() &&
-           unblockCallback();
-  }
+  bool doWholeFlow() { return waitUntilExecutionBlocked() && unblockExecution(); }
 
 private:
-  absl::Mutex blocking_mutex_;
-  BlockerState stage_ ABSL_GUARDED_BY(blocking_mutex_) = BlockerState::Start;
-  std::atomic<BlockerState>& state_out_;
+  std::promise<void> executing_;
+  std::future<void> executing_future_ = executing_.get_future();
+  std::promise<void> continue_executing_;
 };
 
 class AsyncFileManagerTest : public testing::Test {
@@ -121,6 +68,11 @@ public:
   void SetUp() override {
     singleton_manager_ = std::make_unique<Singleton::ManagerImpl>();
     factory_ = AsyncFileManagerFactory::singleton(singleton_manager_.get());
+  }
+
+  void resolveFileActions() {
+    manager_->waitForIdle();
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
 protected:
@@ -132,14 +84,16 @@ protected:
   std::shared_ptr<AsyncFileManager> manager_;
 
   AsyncFileActionBlockedUntilReleased* blocker_[3];
-  std::atomic<BlockerState> blocker_last_state_[3];
+  std::vector<bool> blocker_callback_result_ = std::vector<bool>(3);
   // returns the cancellation function.
-  std::function<void()> enqueueBlocker(int index) {
-    auto blocker =
-        std::make_shared<AsyncFileActionBlockedUntilReleased>(blocker_last_state_[index]);
+  CancelFunction enqueueBlocker(int index) {
+    auto blocker = std::make_unique<AsyncFileActionBlockedUntilReleased>(
+        [this, index](bool result) { blocker_callback_result_[index] = result; });
     blocker_[index] = blocker.get();
-    return manager_->enqueue(std::move(blocker));
+    return manager_->enqueue(dispatcher_.get(), std::move(blocker));
   }
+  Api::ApiPtr api_ = Api::createApiForTest();
+  Event::DispatcherPtr dispatcher_ = api_->allocateDispatcher("test_thread");
 };
 
 TEST_F(AsyncFileManagerTest, WorksWithThreadPoolSizeZero) {
@@ -151,6 +105,7 @@ TEST_F(AsyncFileManagerTest, WorksWithThreadPoolSizeZero) {
   EXPECT_THAT(manager_->describe(), testing::ContainsRegex("thread_pool_size = [1-9]\\d*"));
   enqueueBlocker(0);
   EXPECT_TRUE(blocker_[0]->doWholeFlow());
+  resolveFileActions();
   factory_.reset();
 }
 
@@ -168,9 +123,9 @@ TEST_F(AsyncFileManagerTest, ThreadsBlockAppropriately) {
   EXPECT_FALSE(blocker_[2]->isStarted());
   ASSERT_TRUE(blocker_[0]->doWholeFlow());
   // When one of the workers finishes, the third action should be able to start.
-  EXPECT_TRUE(blocker_[2]->isStarted());
-  EXPECT_TRUE(blocker_[1]->doWholeFlow());
   EXPECT_TRUE(blocker_[2]->doWholeFlow());
+  EXPECT_TRUE(blocker_[1]->doWholeFlow());
+  resolveFileActions();
   factory_.reset();
 }
 
@@ -184,19 +139,23 @@ public:
     manager_ = factory->getAsyncFileManager(config);
   }
 
-private:
+protected:
   std::unique_ptr<Singleton::ManagerImpl> singleton_manager_;
 };
 
-TEST_F(AsyncFileManagerSingleThreadTest, AbortingDuringExecutionCancelsTheCallback) {
-  auto cancelBlocker0 = enqueueBlocker(0);
+TEST_F(AsyncFileManagerSingleThreadTest, CancellingDuringExecutionCancelsTheCallback) {
+  EXPECT_FALSE(blocker_callback_result_[0]);
+  CancelFunction cancelBlocker0 = enqueueBlocker(0);
+  EXPECT_FALSE(blocker_callback_result_[0]);
   ASSERT_TRUE(blocker_[0]->waitUntilExecutionBlocked());
   enqueueBlocker(1);
   ASSERT_FALSE(blocker_[1]->isStarted());
   cancelBlocker0();
   blocker_[0]->unblockExecution();
   ASSERT_TRUE(blocker_[1]->doWholeFlow());
-  EXPECT_EQ(BlockerState::ExecutionFinished, blocker_last_state_[0].load());
+  resolveFileActions();
+  EXPECT_FALSE(blocker_callback_result_[0]);
+  EXPECT_TRUE(blocker_callback_result_[1]);
 }
 
 TEST_F(AsyncFileManagerSingleThreadTest, AbortingBeforeExecutionCancelsTheExecution) {
@@ -208,66 +167,42 @@ TEST_F(AsyncFileManagerSingleThreadTest, AbortingBeforeExecutionCancelsTheExecut
   // Blocker 1 should never start, having been cancelled before it
   // was popped from the queue. We can't check its internal value because
   // it should also have been deleted, so we can only check its output state.
-  EXPECT_EQ(BlockerState::Start, blocker_last_state_[1].load());
-}
-
-TEST_F(AsyncFileManagerSingleThreadTest, AbortingDuringCallbackBlocksUntilCallbackCompletes) {
-  auto cancel = enqueueBlocker(0);
-  blocker_[0]->waitUntilExecutionBlocked();
-  blocker_[0]->unblockExecution();
-  blocker_[0]->waitUntilCallbackBlocked();
-  std::atomic<bool> delayed_action_occurred;
-  std::thread callback_unblocker([&] {
-    // Using future::wait_for because lint forbids us from sleeping in
-    // real-time, but here we're forcing a race to go a specific way, using
-    // real-time because there's no other practical option here.
-    std::promise<void> pauser;
-    pauser.get_future().wait_for(std::chrono::milliseconds(50));
-    delayed_action_occurred.store(true);
-    blocker_[0]->unblockCallback();
-  });
-  cancel();
-  EXPECT_TRUE(delayed_action_occurred.load());
-  EXPECT_EQ(BlockerState::UnblockedCallback, blocker_last_state_[0].load());
-  callback_unblocker.join();
+  resolveFileActions();
+  EXPECT_TRUE(blocker_callback_result_[0]);
+  EXPECT_FALSE(blocker_callback_result_[1]);
 }
 
 TEST_F(AsyncFileManagerSingleThreadTest, AbortingAfterCallbackHasNoObservableEffect) {
   auto cancel = enqueueBlocker(0);
   EXPECT_TRUE(blocker_[0]->doWholeFlow());
+  resolveFileActions();
   cancel();
-  EXPECT_EQ(BlockerState::UnblockedCallback, blocker_last_state_[0].load());
 }
 
-template <typename T> class WaitForResult {
-public:
-  std::function<void(T)> callback() {
-    return [this](T result) { saveResult(result); };
-  }
-  void saveResult(T result) { result_.set_value(std::move(result)); }
-  T getResult() { return result_.get_future().get(); }
-
-private:
-  std::promise<T> result_;
-};
-
 TEST_F(AsyncFileManagerSingleThreadTest, CreateAnonymousFileWorks) {
-  WaitForResult<absl::StatusOr<AsyncFileHandle>> handle_blocker;
-  manager_->createAnonymousFile(tmpdir_, handle_blocker.callback());
-  AsyncFileHandle handle = handle_blocker.getResult().value();
+  AsyncFileHandle handle;
+  manager_->createAnonymousFile(dispatcher_.get(), tmpdir_, [&](absl::StatusOr<AsyncFileHandle> h) {
+    handle = std::move(h.value());
+  });
+  resolveFileActions();
   // Open a second one, to ensure we get two distinct files
   // (and for coverage, because the second one doesn't use the once_flag path)
-  WaitForResult<absl::StatusOr<AsyncFileHandle>> second_handle_blocker;
-  manager_->createAnonymousFile(tmpdir_, second_handle_blocker.callback());
-  AsyncFileHandle second_handle = second_handle_blocker.getResult().value();
-  WaitForResult<absl::Status> close_blocker;
-  EXPECT_OK(handle->close(close_blocker.callback()));
-  absl::Status status = close_blocker.getResult();
-  EXPECT_OK(status);
-  WaitForResult<absl::Status> second_close_blocker;
-  EXPECT_OK(second_handle->close(second_close_blocker.callback()));
-  status = second_close_blocker.getResult();
-  EXPECT_OK(status);
+  AsyncFileHandle second_handle;
+  manager_->createAnonymousFile(dispatcher_.get(), tmpdir_, [&](absl::StatusOr<AsyncFileHandle> h) {
+    second_handle = std::move(h.value());
+  });
+  resolveFileActions();
+  EXPECT_THAT(handle, testing::NotNull());
+  EXPECT_THAT(second_handle, testing::NotNull());
+  EXPECT_NE(handle, second_handle);
+  absl::Status close_result = absl::InternalError("not set");
+  EXPECT_OK(handle->close(dispatcher_.get(), [&](absl::Status s) { close_result = std::move(s); }));
+  absl::Status second_close_result = absl::InternalError("not set");
+  EXPECT_OK(second_handle->close(dispatcher_.get(),
+                                 [&](absl::Status s) { second_close_result = std::move(s); }));
+  resolveFileActions();
+  EXPECT_OK(close_result);
+  EXPECT_OK(second_close_result);
 }
 
 TEST_F(AsyncFileManagerSingleThreadTest, OpenExistingFileStatAndUnlinkWork) {
@@ -276,47 +211,53 @@ TEST_F(AsyncFileManagerSingleThreadTest, OpenExistingFileStatAndUnlinkWork) {
   Api::OsSysCalls& posix = Api::OsSysCallsSingleton().get();
   auto fd = posix.mkstemp(filename);
   posix.close(fd.return_value_);
-  WaitForResult<absl::StatusOr<AsyncFileHandle>> handle_blocker;
-  manager_->openExistingFile(filename, AsyncFileManager::Mode::ReadWrite,
-                             handle_blocker.callback());
-  AsyncFileHandle handle = handle_blocker.getResult().value();
-  WaitForResult<absl::Status> close_blocker;
-  EXPECT_OK(handle->close(close_blocker.callback()));
-  absl::Status status = close_blocker.getResult();
-  EXPECT_OK(status);
-  WaitForResult<absl::StatusOr<struct stat>> stat_blocker;
-  manager_->stat(filename, stat_blocker.callback());
-  absl::StatusOr<struct stat> stat_result = stat_blocker.getResult();
+  AsyncFileHandle handle;
+  manager_->openExistingFile(
+      dispatcher_.get(), filename, AsyncFileManager::Mode::ReadWrite,
+      [&](absl::StatusOr<AsyncFileHandle> h) { handle = std::move(h.value()); });
+  resolveFileActions();
+  absl::Status close_result;
+  EXPECT_OK(handle->close(dispatcher_.get(), [&](absl::Status s) { close_result = std::move(s); }));
+  EXPECT_OK(close_result);
+  absl::StatusOr<struct stat> stat_result;
+  manager_->stat(dispatcher_.get(), filename,
+                 [&](absl::StatusOr<struct stat> result) { stat_result = std::move(result); });
+  resolveFileActions();
   EXPECT_OK(stat_result);
   EXPECT_EQ(0, stat_result.value().st_size);
-  WaitForResult<absl::Status> unlink_blocker;
-  manager_->unlink(filename, unlink_blocker.callback());
-  status = unlink_blocker.getResult();
-  EXPECT_OK(status);
+  absl::Status unlink_result = absl::InternalError("not set");
+  manager_->unlink(dispatcher_.get(), filename,
+                   [&](absl::Status s) { unlink_result = std::move(s); });
+  resolveFileActions();
+  EXPECT_OK(unlink_result);
+  // Make sure unlink deleted the file.
   struct stat s;
   EXPECT_EQ(-1, stat(filename, &s));
 }
 
 TEST_F(AsyncFileManagerSingleThreadTest, OpenExistingFileFailsForNonexistent) {
-  WaitForResult<absl::StatusOr<AsyncFileHandle>> handle_blocker;
-  manager_->openExistingFile(absl::StrCat(tmpdir_, "/nonexistent_file"),
-                             AsyncFileManager::Mode::ReadWrite, handle_blocker.callback());
-  absl::Status status = handle_blocker.getResult().status();
-  EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kNotFound));
+  absl::StatusOr<AsyncFileHandle> handle_result;
+  manager_->openExistingFile(dispatcher_.get(), absl::StrCat(tmpdir_, "/nonexistent_file"),
+                             AsyncFileManager::Mode::ReadWrite,
+                             [&](absl::StatusOr<AsyncFileHandle> r) { handle_result = r; });
+  resolveFileActions();
+  EXPECT_THAT(handle_result, HasStatusCode(absl::StatusCode::kNotFound));
 }
 
 TEST_F(AsyncFileManagerSingleThreadTest, StatFailsForNonexistent) {
-  WaitForResult<absl::StatusOr<struct stat>> stat_blocker;
-  manager_->stat(absl::StrCat(tmpdir_, "/nonexistent_file"), stat_blocker.callback());
-  absl::StatusOr<struct stat> result = stat_blocker.getResult();
-  EXPECT_THAT(result, HasStatusCode(absl::StatusCode::kNotFound));
+  absl::StatusOr<struct stat> stat_result;
+  manager_->stat(dispatcher_.get(), absl::StrCat(tmpdir_, "/nonexistent_file"),
+                 [&](absl::StatusOr<struct stat> r) { stat_result = std::move(r); });
+  resolveFileActions();
+  EXPECT_THAT(stat_result, HasStatusCode(absl::StatusCode::kNotFound));
 }
 
 TEST_F(AsyncFileManagerSingleThreadTest, UnlinkFailsForNonexistent) {
-  WaitForResult<absl::Status> handle_blocker;
-  manager_->unlink(absl::StrCat(tmpdir_, "/nonexistent_file"), handle_blocker.callback());
-  absl::Status status = handle_blocker.getResult();
-  EXPECT_THAT(status, HasStatusCode(absl::StatusCode::kNotFound));
+  absl::Status unlink_result;
+  manager_->unlink(dispatcher_.get(), absl::StrCat(tmpdir_, "/nonexistent_file"),
+                   [&](absl::Status s) { unlink_result = std::move(s); });
+  resolveFileActions();
+  EXPECT_THAT(unlink_result, HasStatusCode(absl::StatusCode::kNotFound));
 }
 
 } // namespace AsyncFiles

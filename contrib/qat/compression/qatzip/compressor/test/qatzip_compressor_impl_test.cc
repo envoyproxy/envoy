@@ -71,7 +71,7 @@ class QatzipConfigTest
       public ::testing::WithParamInterface<std::tuple<int, std::string, int, int, int>> {};
 
 // These tests should pass even if required hardware or setup steps required for qatzip are missing.
-// Qatzip uses a sofware fallback in this case.
+// Qatzip uses a software fallback in this case.
 INSTANTIATE_TEST_SUITE_P(QatzipConfigTestInstantiation, QatzipConfigTest,
                          // First tuple has all default values.
                          ::testing::Values(std::make_tuple(1, "DEFAULT", 1024, 131072, 4096),

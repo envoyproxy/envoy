@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include "envoy/access_log/access_log_config.h"
+
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/filters/network/generic_proxy/access_log.h"
 #include "source/extensions/filters/network/generic_proxy/interface/codec.h"
@@ -161,6 +163,11 @@ public:
     }
 
     void setCodecCallbacks(ServerCodecCallbacks& callback) override { callback_ = &callback; }
+    void onConnected() override {
+      ASSERT(callback_->connection().has_value());
+      ASSERT(callback_->connection()->state() == Network::Connection::State::Open);
+      ASSERT(!callback_->connection()->connecting());
+    }
     void decode(Buffer::Instance& buffer, bool) override {
       ENVOY_LOG(debug, "FakeServerCodec::decode: {}", buffer.toString());
 
@@ -415,23 +422,23 @@ public:
   createCodecFactory(const Protobuf::Message& config,
                      Envoy::Server::Configuration::ServerFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
   std::set<std::string> configTypes() override { return {"envoy.generic_proxy.codecs.fake.type"}; }
   std::string name() const override { return "envoy.generic_proxy.codecs.fake"; }
 };
 
-class FakeAccessLogExtensionFilter : public AccessLogFilter {
-  bool evaluate(const FormatterContext&, const StreamInfo::StreamInfo&) const override {
+class FakeAccessLogExtensionFilter : public AccessLog::Filter {
+  bool evaluate(const Formatter::Context&, const StreamInfo::StreamInfo&) const override {
     return true;
   }
 };
 
-class FakeAccessLogExtensionFilterFactory : public AccessLogFilterFactory {
+class FakeAccessLogExtensionFilterFactory : public AccessLog::ExtensionFilterFactory {
 public:
   // AccessLogFilterFactory
-  AccessLogFilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter&,
-                                  Server::Configuration::FactoryContext&) override {
+  AccessLog::FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter&,
+                                    Server::Configuration::FactoryContext&) override {
     return std::make_unique<FakeAccessLogExtensionFilter>();
   }
 
@@ -440,7 +447,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Struct>();
+    return std::make_unique<Protobuf::Struct>();
   }
   std::string name() const override { return "envoy.generic_proxy.access_log.fake"; }
 };

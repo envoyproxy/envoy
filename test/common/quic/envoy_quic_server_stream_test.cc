@@ -63,6 +63,7 @@ public:
         response_headers_{{":status", "200"}, {"response-key", "response-value"}},
         response_trailers_{{"trailer-key", "trailer-value"}} {
     EXPECT_CALL(stream_decoder_, accessLogHandlers());
+    setupRequestDecoderMock(stream_decoder_);
     quic_stream_->setRequestDecoder(stream_decoder_);
     quic_stream_->addCallbacks(stream_callbacks_);
     quic_stream_->getStream().setFlushTimeout(std::chrono::milliseconds(30000));
@@ -118,6 +119,16 @@ public:
     }
   }
 
+  void setupRequestDecoderMock(Http::MockRequestDecoder& request_decoder) {
+    EXPECT_CALL(request_decoder, getRequestDecoderHandle())
+        .WillRepeatedly(Invoke([&request_decoder]() {
+          auto handle = std::make_unique<NiceMock<Http::MockRequestDecoderHandle>>();
+          ON_CALL(*handle, get())
+              .WillByDefault(testing::Return(OptRef<Http::RequestDecoder>(request_decoder)));
+          return handle;
+        }));
+  }
+
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
   void setUpCapsuleProtocol(bool close_send_stream, bool close_recv_stream) {
     // Decodes a CONNECT-UDP request.
@@ -128,7 +139,7 @@ public:
           EXPECT_FALSE(capsule_protocol.empty());
           EXPECT_EQ(capsule_protocol[0]->value().getStringView(), "?1");
         }));
-    spdy::Http2HeaderBlock request_headers;
+    quiche::HttpHeaderBlock request_headers;
     request_headers[":authority"] = host_;
     request_headers[":method"] = "CONNECT";
     request_headers[":protocol"] = "connect-udp";
@@ -232,10 +243,10 @@ protected:
   EnvoyQuicServerStream* quic_stream_;
   Http::MockRequestDecoder stream_decoder_;
   Http::MockStreamCallbacks stream_callbacks_;
-  spdy::Http2HeaderBlock spdy_request_headers_;
+  quiche::HttpHeaderBlock spdy_request_headers_;
   Http::TestResponseHeaderMapImpl response_headers_;
   Http::TestResponseTrailerMapImpl response_trailers_;
-  spdy::Http2HeaderBlock spdy_trailers_;
+  quiche::HttpHeaderBlock spdy_trailers_;
   std::string host_{"www.abc.com"};
   std::string request_body_{"Hello world"};
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
@@ -252,7 +263,7 @@ protected:
 };
 
 TEST_F(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
-  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
+  EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/true))
       .WillOnce(Invoke([this](const Http::RequestHeaderMapSharedPtr& headers, bool) {
         EXPECT_EQ(host_, headers->getHostValue());
         EXPECT_EQ("/", headers->getPathValue());
@@ -262,8 +273,7 @@ TEST_F(EnvoyQuicServerStreamTest, GetRequestAndResponse) {
         EXPECT_EQ("a=b; c=d",
                   headers->get(Http::Headers::get().Cookie)[0]->value().getStringView());
       }));
-  EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(""), /*end_stream=*/true));
-  spdy::Http2HeaderBlock spdy_headers;
+  quiche::HttpHeaderBlock spdy_headers;
   spdy_headers[":authority"] = host_;
   spdy_headers[":method"] = "GET";
   spdy_headers[":path"] = "/";
@@ -365,10 +375,13 @@ TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponseWithAccounting) {
   EXPECT_EQ(absl::nullopt, quic_stream_->http1StreamEncoderOptions());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->wireBytesReceived());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->headerBytesReceived());
+  EXPECT_EQ(0, quic_stream_->bytesMeter()->decompressedHeaderBytesReceived());
   size_t offset = receiveRequestHeaders(false);
   // Received header bytes do not include the HTTP/3 frame overhead.
   EXPECT_EQ(quic_stream_->stream_bytes_read() - 2,
             quic_stream_->bytesMeter()->headerBytesReceived());
+  EXPECT_LE(quic_stream_->stream_bytes_read() - 2,
+            quic_stream_->bytesMeter()->decompressedHeaderBytesReceived());
   EXPECT_EQ(quic_stream_->stream_bytes_read(), quic_stream_->bytesMeter()->wireBytesReceived());
   size_t body_size = receiveRequestBody(offset, request_body_, true, request_body_.size() * 2);
   EXPECT_EQ(quic_stream_->stream_bytes_read(), quic_stream_->bytesMeter()->wireBytesReceived());
@@ -379,13 +392,18 @@ TEST_F(EnvoyQuicServerStreamTest, PostRequestAndResponseWithAccounting) {
             quic_stream_->bytesMeter()->wireBytesReceived());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->wireBytesSent());
   EXPECT_EQ(0, quic_stream_->bytesMeter()->headerBytesSent());
+  EXPECT_EQ(0, quic_stream_->bytesMeter()->decompressedHeaderBytesSent());
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
   EXPECT_GE(27, quic_stream_->bytesMeter()->headerBytesSent());
   EXPECT_GE(27, quic_stream_->bytesMeter()->wireBytesSent());
+  EXPECT_GE(quic_stream_->bytesMeter()->decompressedHeaderBytesSent(),
+            quic_stream_->bytesMeter()->headerBytesSent());
 
   quic_stream_->encodeTrailers(response_trailers_);
   EXPECT_GE(52, quic_stream_->bytesMeter()->headerBytesSent());
   EXPECT_GE(52, quic_stream_->bytesMeter()->wireBytesSent());
+  EXPECT_GE(quic_stream_->bytesMeter()->decompressedHeaderBytesSent(),
+            quic_stream_->bytesMeter()->headerBytesSent());
 }
 
 TEST_F(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
@@ -710,7 +728,7 @@ TEST_F(EnvoyQuicServerStreamTest, RequestHeaderTooLarge) {
   EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
   EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
-  spdy::Http2HeaderBlock spdy_headers;
+  quiche::HttpHeaderBlock spdy_headers;
   spdy_headers[":authority"] = host_;
   spdy_headers[":method"] = "POST";
   spdy_headers[":path"] = "/";
@@ -734,7 +752,7 @@ TEST_F(EnvoyQuicServerStreamTest, RequestTrailerTooLarge) {
   EXPECT_CALL(quic_session_, MaybeSendStopSendingFrame(_, _));
   EXPECT_CALL(quic_session_, MaybeSendRstStreamFrame(_, _, _));
   EXPECT_CALL(stream_callbacks_, onResetStream(Http::StreamResetReason::LocalReset, _));
-  spdy::Http2HeaderBlock spdy_trailers;
+  quiche::HttpHeaderBlock spdy_trailers;
   // This header exceeds max header size limit and should cause stream reset.
   spdy_trailers["long_header"] = std::string(16 * 1024 + 1, 'a');
   std::string payload = spdyHeaderToHttp3StreamPayload(spdy_trailers);
@@ -844,7 +862,7 @@ TEST_F(EnvoyQuicServerStreamTest, StatsGathererLogsOnStreamDestruction) {
 
   // Set up QuicStatsGatherer with required access logger, stream info, headers and trailers.
   std::shared_ptr<AccessLog::MockInstance> mock_logger(new NiceMock<AccessLog::MockInstance>());
-  std::list<AccessLog::InstanceSharedPtr> loggers = {mock_logger};
+  AccessLog::InstanceSharedPtrVector loggers = {mock_logger};
   Event::GlobalTimeSystem test_time_;
   Envoy::StreamInfo::StreamInfoImpl stream_info{Http::Protocol::Http2, test_time_.timeSystem(),
                                                 nullptr,
@@ -880,10 +898,10 @@ TEST_F(EnvoyQuicServerStreamTest, MetadataNotSupported) {
 TEST_F(EnvoyQuicServerStreamTest, EncodeCapsule) {
   setUpCapsuleProtocol(false, true);
   Buffer::OwnedImpl buffer(capsule_fragment_);
-  EXPECT_CALL(quic_connection_, SendMessage(_, _, _))
-      .WillOnce([this](quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice> message, bool) {
+  EXPECT_CALL(quic_connection_, SendDatagram(_, _, _))
+      .WillOnce([this](quic::QuicDatagramId, absl::Span<quiche::QuicheMemSlice> message, bool) {
         EXPECT_EQ(message.data()->AsStringView(), datagram_fragment_);
-        return quic::MESSAGE_STATUS_SUCCESS;
+        return quic::DATAGRAM_STATUS_SUCCESS;
       });
   quic_stream_->encodeData(buffer, /*end_stream=*/true);
 }
@@ -891,12 +909,12 @@ TEST_F(EnvoyQuicServerStreamTest, EncodeCapsule) {
 TEST_F(EnvoyQuicServerStreamTest, DecodeHttp3Datagram) {
   setUpCapsuleProtocol(true, false);
   EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(capsule_fragment_), _));
-  quic_session_.OnMessageReceived(datagram_fragment_);
+  quic_session_.OnDatagramReceived(datagram_fragment_);
 }
 #endif
 
 TEST_F(EnvoyQuicServerStreamTest, RegularHeaderBeforePseudoHeader) {
-  spdy::Http2HeaderBlock spdy_headers;
+  quiche::HttpHeaderBlock spdy_headers;
   spdy_headers["foo"] = "bar";
   spdy_headers[":authority"] = host_;
   spdy_headers[":method"] = "GET";

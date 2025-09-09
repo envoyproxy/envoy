@@ -94,7 +94,7 @@ private:
 
 class FakeProactiveResourceMonitor : public ProactiveResourceMonitor {
 public:
-  FakeProactiveResourceMonitor(uint64_t max) : max_(max), current_(0){};
+  FakeProactiveResourceMonitor(uint64_t max) : max_(max), current_(0) {};
 
   bool tryAllocateResource(int64_t increment) override {
     int64_t new_val = (current_ += increment);
@@ -180,7 +180,7 @@ public:
                       const Server::MockOptions& options, absl::Status& creation_status)
       : OverloadManagerImpl(dispatcher, stats_scope, slot_allocator, config, validation_visitor,
                             api, options, creation_status) {
-    THROW_IF_NOT_OK(creation_status);
+    THROW_IF_NOT_OK_REF(creation_status);
     EXPECT_CALL(*this, createScaledRangeTimerManager)
         .Times(AnyNumber())
         .WillRepeatedly(Invoke(this, &TestOverloadManager::createDefaultScaledRangeTimerManager));
@@ -231,11 +231,11 @@ protected:
                                                  options_, creation_status);
   }
 
-  FakeResourceMonitorFactory<Envoy::ProtobufWkt::Struct> factory1_;
-  FakeResourceMonitorFactory<Envoy::ProtobufWkt::Timestamp> factory2_;
-  FakeResourceMonitorFactory<Envoy::ProtobufWkt::Duration> factory3_;
-  FakeResourceMonitorFactory<Envoy::ProtobufWkt::StringValue> factory4_;
-  FakeProactiveResourceMonitorFactory<Envoy::ProtobufWkt::BoolValue> factory5_;
+  FakeResourceMonitorFactory<Envoy::Protobuf::Struct> factory1_;
+  FakeResourceMonitorFactory<Envoy::Protobuf::Timestamp> factory2_;
+  FakeResourceMonitorFactory<Envoy::Protobuf::Duration> factory3_;
+  FakeResourceMonitorFactory<Envoy::Protobuf::StringValue> factory4_;
+  FakeProactiveResourceMonitorFactory<Envoy::Protobuf::BoolValue> factory5_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory1_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory2_;
   Registry::InjectFactory<Configuration::ResourceMonitorFactory> register_factory3_;
@@ -598,6 +598,8 @@ constexpr char kReducedTimeoutsConfig[] = R"YAML(
             min_scale: { value: 10 } # percent
           - timer: TRANSPORT_SOCKET_CONNECT
             min_scale: { value: 40 } # percent
+          - timer: HTTP_DOWNSTREAM_CONNECTION_MAX
+            min_scale: { value: 20 } # percent
       triggers:
         - name: "envoy.resource_monitors.fake_resource1"
           scaled:
@@ -611,6 +613,7 @@ constexpr std::pair<TimerType, Event::ScaledTimerMinimum> kReducedTimeoutsMinimu
      Event::AbsoluteMinimum(std::chrono::seconds(2))},
     {TimerType::HttpDownstreamIdleStreamTimeout, Event::ScaledMinimum(UnitFloat(0.1))},
     {TimerType::TransportSocketConnectTimeout, Event::ScaledMinimum(UnitFloat(0.4))},
+    {TimerType::HttpDownstreamMaxConnectionTimeout, Event::ScaledMinimum(UnitFloat(0.2))},
 };
 TEST_F(OverloadManagerImplTest, CreateScaledTimerManager) {
   auto manager(createOverloadManager(kReducedTimeoutsConfig));

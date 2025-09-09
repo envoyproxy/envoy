@@ -138,6 +138,8 @@ absl::StatusOr<Event::ScaledTimerType> parseTimerType(
     return Event::ScaledTimerType::HttpDownstreamIdleStreamTimeout;
   case Config::TRANSPORT_SOCKET_CONNECT:
     return Event::ScaledTimerType::TransportSocketConnectTimeout;
+  case Config::HTTP_DOWNSTREAM_CONNECTION_MAX:
+    return Event::ScaledTimerType::HttpDownstreamMaxConnectionTimeout;
   default:
     return absl::InvalidArgumentError(
         fmt::format("Unknown timer type {}", static_cast<int>(config_timer_type)));
@@ -145,7 +147,7 @@ absl::StatusOr<Event::ScaledTimerType> parseTimerType(
 }
 
 absl::StatusOr<Event::ScaledTimerTypeMap>
-parseTimerMinimums(const ProtobufWkt::Any& typed_config,
+parseTimerMinimums(const Protobuf::Any& typed_config,
                    ProtobufMessage::ValidationVisitor& validation_visitor) {
   using Config = envoy::config::overload::v3::ScaleTimersOverloadActionConfig;
   const Config action_config =

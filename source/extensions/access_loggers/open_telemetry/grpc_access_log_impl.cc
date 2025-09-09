@@ -116,8 +116,9 @@ GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
   // the main thread if necessary to ensure it does not throw here.
   auto factory_or_error = async_client_manager_.factoryForGrpcService(
       config.common_config().grpc_service(), scope_, true);
-  THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
-  auto client = factory_or_error.value()->createUncachedRawAsyncClient();
+  THROW_IF_NOT_OK_REF(factory_or_error.status());
+  auto client = THROW_OR_RETURN_VALUE(factory_or_error.value()->createUncachedRawAsyncClient(),
+                                      Grpc::RawAsyncClientPtr);
   return std::make_shared<GrpcAccessLoggerImpl>(std::move(client), config, dispatcher, local_info_,
                                                 scope_);
 }

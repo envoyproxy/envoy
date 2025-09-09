@@ -226,8 +226,10 @@ public:
    * Start all workers accepting new connections on all added listeners.
    * @param guard_dog supplies the optional guard dog to use for thread watching.
    * @param callback supplies the callback to complete server initialization.
+   * @return a status indicating if the operation succeeded.
    */
-  virtual void startWorkers(OptRef<GuardDog> guard_dog, std::function<void()> callback) PURE;
+  virtual absl::Status startWorkers(OptRef<GuardDog> guard_dog,
+                                    std::function<void()> callback) PURE;
 
   /**
    * Stop all listeners from accepting new connections without actually removing any of them. This
@@ -255,7 +257,7 @@ public:
    * Inform the listener manager that the update has completed, and informs the listener of any
    * errors handled by the reload source.
    */
-  using FailureStates = std::vector<std::unique_ptr<envoy::admin::v3::UpdateFailureState>>;
+  using FailureStates = std::vector<envoy::admin::v3::UpdateFailureState>;
   virtual void endListenerUpdate(FailureStates&& failure_states) PURE;
 
   // TODO(junr03): once ApiListeners support warming and draining, this function should return a

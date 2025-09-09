@@ -25,27 +25,10 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcJsonTranscoder {
 
-/**
- * VariableBinding specifies a value for a single field in the request message.
- * When transcoding HTTP/REST/JSON to gRPC/proto the request message is
- * constructed using the HTTP body and the variable bindings (specified through
- * request url).
- * See https://github.com/googleapis/googleapis/blob/master/google/api/http.proto
- * for details of variable binding.
- */
-struct VariableBinding {
-  // The location of the field in the protobuf message, where the value
-  // needs to be inserted, e.g. "shelf.theme" would mean the "theme" field
-  // of the nested "shelf" message of the request protobuf message.
-  std::vector<std::string> field_path;
-  // The value to be inserted.
-  std::string value;
-};
-
 struct MethodInfo {
   const Protobuf::MethodDescriptor* descriptor_ = nullptr;
-  std::vector<const ProtobufWkt::Field*> request_body_field_path;
-  std::vector<const ProtobufWkt::Field*> response_body_field_path;
+  std::vector<const Protobuf::Field*> request_body_field_path;
+  std::vector<const Protobuf::Field*> response_body_field_path;
   bool request_type_is_http_body_ = false;
   bool response_type_is_http_body_ = false;
 };
@@ -108,6 +91,10 @@ public:
 
   bool disabled() const { return disabled_; }
 
+  bool isStreamSSEStyleDelimited() const {
+    return response_translate_options_.stream_sse_style_delimited;
+  }
+
   envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       RequestValidationOptions request_validation_options_{};
 
@@ -126,7 +113,7 @@ private:
   void addFileDescriptor(const Protobuf::FileDescriptorProto& file);
   absl::Status resolveField(const Protobuf::Descriptor* descriptor,
                             const std::string& field_path_str,
-                            std::vector<const ProtobufWkt::Field*>* field_path, bool* is_http_body);
+                            std::vector<const Protobuf::Field*>* field_path, bool* is_http_body);
   absl::Status createMethodInfo(const Protobuf::MethodDescriptor* descriptor,
                                 const google::api::HttpRule& http_rule,
                                 MethodInfoSharedPtr& method_info);

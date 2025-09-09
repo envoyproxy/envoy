@@ -1,22 +1,11 @@
 #include "source/extensions/common/aws/utility.h"
 
-#include <cstdint>
-#include <limits>
-
-#include "envoy/upstream/cluster_manager.h"
+#include "envoy/extensions/upstreams/http/v3/http_protocol_options.pb.h"
 
 #include "source/common/common/empty_string.h"
-#include "source/common/common/fmt.h"
-#include "source/common/common/utility.h"
-#include "source/common/json/json_loader.h"
-#include "source/common/protobuf/message_validator_impl.h"
-#include "source/common/protobuf/utility.h"
-
-#include "absl/strings/match.h"
-#include "absl/strings/str_join.h"
-#include "absl/strings/str_split.h"
-#include "curl/curl.h"
-#include "fmt/printf.h"
+#include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
+#include "source/extensions/common/aws/signer_base_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -28,10 +17,7 @@ constexpr absl::string_view QUERY_PARAM_SEPERATOR = "=";
 constexpr absl::string_view QUERY_SEPERATOR = "&";
 constexpr absl::string_view QUERY_SPLITTER = "?";
 constexpr absl::string_view RESERVED_CHARS = "-._~";
-constexpr absl::string_view S3_SERVICE_NAME = "s3";
-constexpr absl::string_view S3_OUTPOSTS_SERVICE_NAME = "s3-outposts";
 constexpr absl::string_view URI_ENCODE = "%{:02X}";
-constexpr absl::string_view URI_DOUBLE_ENCODE = "%25{:02X}";
 
 constexpr char AWS_SHARED_CREDENTIALS_FILE[] = "AWS_SHARED_CREDENTIALS_FILE";
 constexpr char AWS_PROFILE[] = "AWS_PROFILE";
@@ -90,61 +76,107 @@ Utility::canonicalizeHeaders(const Http::RequestHeaderMap& headers,
   return out;
 }
 
-std::string Utility::createCanonicalRequest(
-    absl::string_view service_name, absl::string_view method, absl::string_view path,
-    const std::map<std::string, std::string>& canonical_headers, absl::string_view content_hash) {
-  std::vector<absl::string_view> parts;
-  parts.emplace_back(method);
+std::string
+Utility::createCanonicalRequest(absl::string_view method, absl::string_view path,
+                                const std::map<std::string, std::string>& canonical_headers,
+                                absl::string_view content_hash, bool should_normalize_uri_path,
+                                bool use_double_uri_uncode) {
+
+  std::string canonical_request;
+
+  // Add the method
+  canonical_request = absl::StrCat(method, "\n");
+
   // don't include the query part of the path
   const auto path_part = StringUtil::cropRight(path, QUERY_SPLITTER);
-  const auto canonicalized_path = path_part.empty()
-                                      ? std::string{PATH_SPLITTER}
-                                      : canonicalizePathString(path_part, service_name);
-  parts.emplace_back(canonicalized_path);
+
+  std::string new_path;
+  if (use_double_uri_uncode) {
+    if (should_normalize_uri_path) {
+      new_path = normalizePath(path_part);
+    } else {
+      new_path = path_part;
+    }
+    new_path = uriEncodePath(new_path);
+  } else {
+    if (should_normalize_uri_path) {
+      new_path = normalizePath(path_part);
+    } else {
+      new_path = path_part;
+    }
+  }
+
+  // No path present, so add /
+  if (new_path.empty()) {
+    absl::StrAppend(&canonical_request, PATH_SPLITTER, "\n");
+  } else {
+    // Append path verbatim
+    absl::StrAppend(&canonical_request, new_path, "\n");
+  }
+
   const auto query_part = StringUtil::cropLeft(path, QUERY_SPLITTER);
-  // if query_part == path_part, then there is no query
-  const auto canonicalized_query =
-      query_part == path_part ? EMPTY_STRING : Utility::canonicalizeQueryString(query_part);
-  parts.emplace_back(absl::string_view(canonicalized_query));
+
+  // If query_part == path_part, then we have no query string. Otherwise canonicalize it.
+  if (query_part == path_part) {
+    absl::StrAppend(&canonical_request, "\n");
+  } else {
+    absl::StrAppend(&canonical_request, canonicalizeQueryString(query_part), "\n");
+  }
+
+  // Add headers
   std::vector<std::string> formatted_headers;
   formatted_headers.reserve(canonical_headers.size());
   for (const auto& header : canonical_headers) {
     formatted_headers.emplace_back(fmt::format("{}:{}", header.first, header.second));
-    parts.emplace_back(formatted_headers.back());
+    absl::StrAppend(&canonical_request, formatted_headers.back(), "\n");
   }
-  // need an extra blank space after the canonical headers
-  parts.emplace_back(EMPTY_STRING);
-  const auto signed_headers = Utility::joinCanonicalHeaderNames(canonical_headers);
-  parts.emplace_back(signed_headers);
-  parts.emplace_back(content_hash);
-  return absl::StrJoin(parts, "\n");
+
+  // Add blank space after the canonical headers
+  absl::StrAppend(&canonical_request, "\n");
+
+  // Add the list of signed headers
+  absl::StrAppend(&canonical_request, joinCanonicalHeaderNames(canonical_headers), "\n");
+
+  // Add the content hash
+  absl::StrAppend(&canonical_request, content_hash);
+
+  return canonical_request;
 }
 
 /**
  * Normalizes the path string based on AWS requirements.
  * See step 2 in https://docs.aws.amazon.com/general/latest/gr/sigv4-create-canonical-request.html
  */
-std::string Utility::canonicalizePathString(absl::string_view path_string,
-                                            absl::string_view service_name) {
-  // If service is S3 or outposts, do not normalize but only encode the path
-  if (absl::EqualsIgnoreCase(service_name, S3_SERVICE_NAME) ||
-      absl::EqualsIgnoreCase(service_name, S3_OUTPOSTS_SERVICE_NAME)) {
-    return encodePathSegment(path_string, service_name);
-  }
-  // If service is not S3, normalize and encode the path
-  const auto path_segments = StringUtil::splitToken(path_string, std::string{PATH_SPLITTER});
+std::string Utility::normalizePath(absl::string_view original_path) {
+
+  const auto path_segments = StringUtil::splitToken(original_path, std::string{PATH_SPLITTER});
   std::vector<std::string> path_list;
   path_list.reserve(path_segments.size());
+
+  /* Loop through path segment.
+   *
+   * If segment is blank or . then skip it
+   * If segment is .. then remove the previous path segment
+   * Otherwise append the path segment as normal
+   */
   for (const auto& path_segment : path_segments) {
-    if (path_segment.empty()) {
+    if (path_segment.empty() || path_segment == ".") {
       continue;
+    } else if (path_segment == "..") {
+      if (path_list.empty()) {
+        path_list.emplace_back(PATH_SPLITTER);
+      } else {
+        path_list.pop_back();
+      }
+    } else {
+      path_list.emplace_back(path_segment);
     }
-    path_list.emplace_back(encodePathSegment(path_segment, service_name));
   }
+
   auto canonical_path_string =
       fmt::format("{}{}", PATH_SPLITTER, absl::StrJoin(path_list, PATH_SPLITTER));
   // Handle corner case when path ends with '/'
-  if (absl::EndsWith(path_string, PATH_SPLITTER) && canonical_path_string.size() > 1) {
+  if (absl::EndsWith(original_path, PATH_SPLITTER) && canonical_path_string.size() > 1) {
     canonical_path_string.push_back(PATH_SPLITTER[0]);
   }
   return canonical_path_string;
@@ -154,32 +186,33 @@ bool isReservedChar(const char c) {
   return std::isalnum(c) || RESERVED_CHARS.find(c) != std::string::npos;
 }
 
-void encodeS3Path(std::string& encoded, const char& c) {
-  // Do not encode '/' for S3 and do not double encode
-  if ((c == PATH_SPLITTER[0]) || (c == '%')) {
-    encoded.push_back(c);
+void Utility::encodeCharacter(unsigned char c, std::string& result) {
+  if (isReservedChar(c)) {
+    result.push_back(c);
   } else {
-    absl::StrAppend(&encoded, fmt::format(URI_ENCODE, c));
+    absl::StrAppend(&result, fmt::format(URI_ENCODE, c));
   }
 }
 
-std::string Utility::encodePathSegment(absl::string_view decoded, absl::string_view service_name) {
+std::string Utility::uriEncodePath(absl::string_view original_path) {
+
+  const absl::string_view::size_type query_start = original_path.find_first_of("?#");
+  const absl::string_view path = original_path.substr(0, query_start);
+  const absl::string_view query = absl::ClippedSubstr(original_path, query_start);
+
   std::string encoded;
 
-  for (char c : decoded) {
-    if (isReservedChar(c)) {
-      // Escape unreserved chars from RFC 3986
+  for (unsigned char c : path) {
+    // Do not encode slashes or unreserved chars from RFC 3986
+    if (c == PATH_SPLITTER[0]) {
       encoded.push_back(c);
-    } else if (absl::EqualsIgnoreCase(service_name, S3_SERVICE_NAME) ||
-               absl::EqualsIgnoreCase(service_name, S3_OUTPOSTS_SERVICE_NAME)) {
-      encodeS3Path(encoded, c);
     } else {
-      // TODO: @aws, There is some inconsistency between AWS services if this should be double
-      // encoded or not. We need to parameterize this and expose this in the config. Ref:
-      // https://github.com/aws/aws-sdk-cpp/blob/main/aws-cpp-sdk-core/source/auth/AWSAuthSigner.cpp#L79-L93
-      absl::StrAppend(&encoded, fmt::format(URI_ENCODE, c));
+      encodeCharacter(c, encoded);
     }
   }
+
+  absl::StrAppend(&encoded, query);
+
   return encoded;
 }
 
@@ -201,33 +234,51 @@ std::string Utility::canonicalizeQueryString(absl::string_view query_string) {
       query_list.emplace_back(std::make_pair(param, value));
     }
   }
-  // Sort query params by name and value
-  std::sort(query_list.begin(), query_list.end());
+
   // Encode query params name and value separately
   for (auto& query : query_list) {
-    query = std::make_pair(Utility::encodeQueryParam(query.first),
-                           Utility::encodeQueryParam(query.second));
+    if (query.first != SignatureQueryParameterValues::AmzSecurityToken) {
+      query.first = Utility::encodeQueryComponentPreservingPlus(query.first);
+      query.second = Utility::encodeQueryComponentPreservingPlus(query.second);
+    }
   }
+
+  // Sort query params by name and value after encoding
+  std::sort(query_list.begin(), query_list.end());
+
   return absl::StrJoin(query_list, QUERY_SEPERATOR, absl::PairFormatter(QUERY_PARAM_SEPERATOR));
 }
 
-std::string Utility::encodeQueryParam(absl::string_view decoded) {
-  std::string encoded;
-  for (char c : decoded) {
-    if (isReservedChar(c) || c == '%') {
-      // Escape unreserved chars from RFC 3986
-      encoded.push_back(c);
-    } else if (c == '+') {
-      // Encode '+' as space
-      absl::StrAppend(&encoded, "%20");
-    } else if (c == QUERY_PARAM_SEPERATOR[0]) {
-      // Double encode '='
-      absl::StrAppend(&encoded, fmt::format(URI_DOUBLE_ENCODE, c));
+// Encode query component while preserving original %2B semantics
+// %2B stays as %2B, raw + becomes %20 (space)
+std::string Utility::encodeQueryComponentPreservingPlus(absl::string_view original) {
+  std::string result;
+
+  for (size_t i = 0; i < original.size(); ++i) {
+    if (i + 2 < original.size() && absl::EqualsIgnoreCase(original.substr(i, 3), "%2B")) {
+      // %2B stays as %2B (preserve original encoding)
+      absl::StrAppend(&result, "%2B");
+      i += 2; // Skip the "2B" part
+    } else if (original[i] == '+') {
+      // Raw + becomes %20 (space)
+      absl::StrAppend(&result, "%20");
+    } else if (original[i] == '%' && i + 2 < original.size()) {
+      std::string decoded_seq =
+          Envoy::Http::Utility::PercentEncoding::decode(original.substr(i, 3));
+      if (decoded_seq.size() == 1) {
+        // Valid percent encoding - encode the decoded character
+        encodeCharacter(decoded_seq[0], result);
+        i += 2;
+      } else {
+        // Invalid percent encoding - treat as regular character
+        encodeCharacter(original[i], result);
+      }
     } else {
-      absl::StrAppend(&encoded, fmt::format(URI_ENCODE, c));
+      // Regular character
+      encodeCharacter(original[i], result);
     }
   }
-  return encoded;
+  return result;
 }
 
 std::string
@@ -276,86 +327,39 @@ std::string Utility::getSTSEndpoint(absl::string_view region) {
       single_region == "us-west-1" || single_region == "us-west-2") {
     return fmt::format("sts-fips.{}.amazonaws.com", single_region);
   }
+  ENVOY_LOG(warn,
+            "FIPS Support is enabled, but an STS FIPS endpoint is not available in the configured "
+            "region ({})",
+            region);
 #endif
   return fmt::format("sts.{}.amazonaws.com", single_region);
 }
 
-static size_t curlCallback(char* ptr, size_t, size_t nmemb, void* data) {
-  auto buf = static_cast<std::string*>(data);
-  buf->append(ptr, nmemb);
-  return nmemb;
-}
-
-absl::optional<std::string> Utility::fetchMetadata(Http::RequestMessage& message) {
-  static const size_t MAX_RETRIES = 4;
-  static const std::chrono::milliseconds RETRY_DELAY{1000};
-  static const std::chrono::seconds TIMEOUT{5};
-
-  CURL* const curl = curl_easy_init();
-  if (!curl) {
-    return absl::nullopt;
-  };
-
-  const auto host = message.headers().getHostValue();
-  const auto path = message.headers().getPathValue();
-  const auto method = message.headers().getMethodValue();
-  const auto scheme = message.headers().getSchemeValue();
-
-  const std::string url = fmt::format("{}://{}{}", scheme, host, path);
-  curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-  curl_easy_setopt(curl, CURLOPT_TIMEOUT, TIMEOUT.count());
-  curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
-  curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-
-  std::string buffer;
-  curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buffer);
-  curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curlCallback);
-
-  struct curl_slist* headers = nullptr;
-  message.headers().iterate([&headers](const Http::HeaderEntry& entry) -> Http::HeaderMap::Iterate {
-    // Skip pseudo-headers
-    if (!entry.key().getStringView().empty() && entry.key().getStringView()[0] == ':') {
-      return Http::HeaderMap::Iterate::Continue;
-    }
-    const std::string header =
-        fmt::format("{}: {}", entry.key().getStringView(), entry.value().getStringView());
-    headers = curl_slist_append(headers, header.c_str());
-    return Http::HeaderMap::Iterate::Continue;
-  });
-
-  // This function only support doing PUT(UPLOAD) other than GET(_default_) operation.
-  if (Http::Headers::get().MethodValues.Put == method) {
-    // https://curl.se/libcurl/c/CURLOPT_PUT.html is deprecated
-    // so using https://curl.se/libcurl/c/CURLOPT_UPLOAD.html.
-    curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
-    // To call PUT on HTTP 1.0 we must specify a value for the upload size
-    // since some old EC2's metadata service will be serving on HTTP 1.0.
-    // https://curl.se/libcurl/c/CURLOPT_INFILESIZE.html
-    curl_easy_setopt(curl, CURLOPT_INFILESIZE, 0);
-    // Disabling `Expect: 100-continue` header to get a response
-    // in the first attempt as the put size is zero.
-    // https://everything.curl.dev/http/post/expect100
-    headers = curl_slist_append(headers, "Expect:");
+/**
+ * This function generates an RolesAnywhere Endpoint from a region string.
+ */
+std::string Utility::getRolesAnywhereEndpoint(const std::string& trust_anchor_arn) {
+  std::string region;
+  const std::vector<std::string> arn_split = absl::StrSplit(trust_anchor_arn, ':');
+  if (arn_split.size() < 3) {
+    region = "us-east-1";
+  } else {
+    region = arn_split[3];
   }
-
-  if (headers != nullptr) {
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+#ifdef ENVOY_SSL_FIPS
+  if (region == "us-east-1" || region == "us-east-2" || region == "us-west-1" ||
+      region == "us-west-2" || region == "us-gov-east-1" || region == "us-gov-west-1") {
+    return fmt::format("rolesanywhere-fips.{}.amazonaws.com", region);
+  } else {
+    ENVOY_LOG(warn,
+              "FIPS Support is enabled, but a rolesanywhere FIPS endpoint is not available in the "
+              "configured region ({})",
+              region);
+    return fmt::format("rolesanywhere.{}.amazonaws.com", region);
   }
-
-  for (size_t retry = 0; retry < MAX_RETRIES; retry++) {
-    const CURLcode res = curl_easy_perform(curl);
-    if (res == CURLE_OK) {
-      break;
-    }
-    ENVOY_LOG_MISC(debug, "Could not fetch AWS metadata: {}", curl_easy_strerror(res));
-    buffer.clear();
-    std::this_thread::sleep_for(RETRY_DELAY);
-  }
-
-  curl_easy_cleanup(curl);
-  curl_slist_free_all(headers);
-
-  return buffer.empty() ? absl::nullopt : absl::optional<std::string>(buffer);
+#else
+  return fmt::format("rolesanywhere.{}.amazonaws.com", region);
+#endif
 }
 
 envoy::config::cluster::v3::Cluster Utility::createInternalClusterStatic(
@@ -406,19 +410,38 @@ std::string Utility::getEnvironmentVariableOrDefault(const std::string& variable
   return (value != nullptr) && (value[0] != '\0') ? value : default_value;
 }
 
-bool Utility::resolveProfileElements(const std::string& profile_file,
-                                     const std::string& profile_name,
-                                     absl::flat_hash_map<std::string, std::string>& elements) {
+bool Utility::resolveProfileElementsFromString(
+    const std::string& string_data, const std::string& profile_name,
+    absl::flat_hash_map<std::string, std::string>& elements) {
+  std::unique_ptr<std::istream> stream;
+
+  stream = std::make_unique<std::istringstream>(std::istringstream{string_data});
+  return resolveProfileElementsFromStream(*stream, profile_name, elements);
+}
+
+bool Utility::resolveProfileElementsFromFile(
+    const std::string& profile_file, const std::string& profile_name,
+    absl::flat_hash_map<std::string, std::string>& elements) {
   std::ifstream file(profile_file);
   if (!file.is_open()) {
-    ENVOY_LOG_MISC(debug, "Error opening credentials file {}", profile_file);
+    ENVOY_LOG(debug, "Error opening credentials file {}", profile_file);
     return false;
   }
+  std::unique_ptr<std::istream> stream;
+  stream = std::make_unique<std::ifstream>(std::move(file));
+  return resolveProfileElementsFromStream(*stream, profile_name, elements);
+}
+
+bool Utility::resolveProfileElementsFromStream(
+    std::istream& stream, const std::string& profile_name,
+    absl::flat_hash_map<std::string, std::string>& elements) {
+
   const auto profile_start = absl::StrFormat("[%s]", profile_name);
 
   bool found_profile = false;
   std::string line;
-  while (std::getline(file, line)) {
+
+  while (std::getline(stream, line)) {
     line = std::string(StringUtil::trim(line));
     if (line.empty()) {
       continue;
@@ -456,12 +479,12 @@ std::string Utility::getCredentialFilePath() {
   // environment variable does
   // not exist
 
-  const auto home = Utility::getEnvironmentVariableOrDefault("HOME", "");
+  const auto home = getEnvironmentVariableOrDefault("HOME", "");
   const auto default_credentials_file_path =
       absl::StrCat(home, DEFAULT_AWS_SHARED_CREDENTIALS_FILE);
 
-  return Utility::getEnvironmentVariableOrDefault(AWS_SHARED_CREDENTIALS_FILE,
-                                                  default_credentials_file_path);
+  return getEnvironmentVariableOrDefault(AWS_SHARED_CREDENTIALS_FILE,
+                                         default_credentials_file_path);
 }
 
 std::string Utility::getConfigFilePath() {
@@ -473,15 +496,15 @@ std::string Utility::getConfigFilePath() {
   const auto home = Utility::getEnvironmentVariableOrDefault("HOME", "");
   const auto default_credentials_file_path = absl::StrCat(home, DEFAULT_AWS_CONFIG_FILE);
 
-  return Utility::getEnvironmentVariableOrDefault(AWS_CONFIG_FILE, default_credentials_file_path);
+  return getEnvironmentVariableOrDefault(AWS_CONFIG_FILE, default_credentials_file_path);
 }
 
 std::string Utility::getCredentialProfileName() {
-  return Utility::getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
+  return getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
 }
 
 std::string Utility::getConfigProfileName() {
-  auto profile_name = Utility::getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
+  auto profile_name = getEnvironmentVariableOrDefault(AWS_PROFILE, DEFAULT_AWS_PROFILE);
   if (profile_name == DEFAULT_AWS_PROFILE) {
     return profile_name;
   } else {
@@ -496,7 +519,7 @@ std::string Utility::getStringFromJsonOrDefault(Json::ObjectSharedPtr json_objec
   value_or_error = json_object->getValue(string_value);
   if ((!value_or_error.ok()) || (!absl::holds_alternative<std::string>(value_or_error.value()))) {
 
-    ENVOY_LOG_MISC(error, "Unable to retrieve string value from json: {}", string_value);
+    ENVOY_LOG(error, "Unable to retrieve string value from json: {}", string_value);
     return string_default;
   }
   return absl::get<std::string>(value_or_error.value());
@@ -509,14 +532,14 @@ int64_t Utility::getIntegerFromJsonOrDefault(Json::ObjectSharedPtr json_object,
   value_or_error = json_object->getValue(integer_value);
   if (!value_or_error.ok() || ((!absl::holds_alternative<double>(value_or_error.value())) &&
                                (!absl::holds_alternative<int64_t>(value_or_error.value())))) {
-    ENVOY_LOG_MISC(error, "Unable to retrieve integer value from json: {}", integer_value);
+    ENVOY_LOG(error, "Unable to retrieve integer value from json: {}", integer_value);
     return integer_default;
   }
   auto json_integer = value_or_error.value();
   // Handle double formatted integers IE exponent format such as 1.714449238E9
   if (auto* double_integer = absl::get_if<double>(&json_integer)) {
     if (*double_integer < 0) {
-      ENVOY_LOG_MISC(error, "Integer {} less than 0: {}", integer_value, *double_integer);
+      ENVOY_LOG(error, "Integer {} less than 0: {}", integer_value, *double_integer);
       return integer_default;
     } else {
       return int64_t(*double_integer);
@@ -525,6 +548,34 @@ int64_t Utility::getIntegerFromJsonOrDefault(Json::ObjectSharedPtr json_object,
     // Standard integer
     return absl::get<int64_t>(json_integer);
   }
+}
+
+bool Utility::useDoubleUriEncode(const std::string service_name) {
+  // These services require unmodified (not normalized) URL paths
+  // https://github.com/boto/botocore/blob/66d047b5cdb033e4406e306afc5ab1c3e4785f16/botocore/data/s3control/2018-08-20/endpoint-rule-set-1.json#L368
+  // https://github.com/boto/botocore/blob/66d047b5cdb033e4406e306afc5ab1c3e4785f16/botocore/data/s3/2006-03-01/endpoint-rule-set-1.json#L4347
+  // https://github.com/boto/botocore/blob/66d047b5cdb033e4406e306afc5ab1c3e4785f16/botocore/data/s3/2006-03-01/endpoint-rule-set-1.json#L390
+
+  constexpr absl::string_view S3_SERVICE_NAME = "s3";
+  constexpr absl::string_view S3_OUTPOSTS_SERVICE_NAME = "s3-outposts";
+  constexpr absl::string_view S3_EXPRESS_SERVICE_NAME = "s3-express";
+
+  const std::vector<absl::string_view> do_not_normalize = {
+      S3_SERVICE_NAME, S3_OUTPOSTS_SERVICE_NAME, S3_EXPRESS_SERVICE_NAME};
+
+  for (auto& it : do_not_normalize) {
+    if (absl::EqualsIgnoreCase(service_name, it)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+// Even though these are two separate flags in the AWS SDKs, they are used in conjunction with each
+// other
+bool Utility::shouldNormalizeUriPath(const std::string service) {
+  return Utility::useDoubleUriEncode(service);
 }
 
 } // namespace Aws

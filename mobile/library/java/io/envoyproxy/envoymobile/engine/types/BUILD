@@ -1,5 +1,5 @@
-load("@build_bazel_rules_android//android:rules.bzl", "android_library")
 load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
+load("@rules_android//android:rules.bzl", "android_library")
 
 licenses(["notice"])  # Apache 2
 
@@ -8,6 +8,7 @@ envoy_mobile_package()
 android_library(
     name = "envoy_c_types_lib",
     srcs = [
+        "EnvoyConnectionType.java",
         "EnvoyEventTracker.java",
         "EnvoyFinalStreamIntel.java",
         "EnvoyHTTPCallbacks.java",
@@ -21,6 +22,7 @@ android_library(
         "EnvoyStatus.java",
         "EnvoyStreamIntel.java",
         "EnvoyStringAccessor.java",
+        "NetworkWithType.java",
     ],
     visibility = ["//visibility:public"],
 )

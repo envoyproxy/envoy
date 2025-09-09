@@ -28,19 +28,23 @@ public:
                                               Random::RandomGenerator& random,
                                               TimeSource& time_source) override;
 
-  Upstream::LoadBalancerConfigPtr loadConfig(Upstream::LoadBalancerFactoryContext&,
-                                             const Protobuf::Message& config,
-                                             ProtobufMessage::ValidationVisitor&) override {
-    auto active_or_legacy =
-        Common::ActiveOrLegacy<Upstream::RingHashLbProto, Upstream::ClusterProto>::get(&config);
+  absl::StatusOr<Upstream::LoadBalancerConfigPtr>
+  loadConfig(Server::Configuration::ServerFactoryContext& context,
+             const Protobuf::Message& config) override {
+    ASSERT(dynamic_cast<const RingHashLbProto*>(&config) != nullptr);
+    const RingHashLbProto& typed_proto = dynamic_cast<const RingHashLbProto&>(config);
+    absl::Status creation_status = absl::OkStatus();
+    auto typed_config = std::make_unique<Upstream::TypedRingHashLbConfig>(
+        typed_proto, context.regexEngine(), creation_status);
+    RETURN_IF_NOT_OK_REF(creation_status);
+    return typed_config;
+  }
 
-    ASSERT(active_or_legacy.hasLegacy() || active_or_legacy.hasActive());
-
-    return active_or_legacy.hasLegacy()
-               ? Upstream::LoadBalancerConfigPtr{new Upstream::LegacyRingHashLbConfig(
-                     *active_or_legacy.legacy())}
-               : Upstream::LoadBalancerConfigPtr{
-                     new Upstream::TypedRingHashLbConfig(*active_or_legacy.active())};
+  absl::StatusOr<Upstream::LoadBalancerConfigPtr>
+  loadLegacy(Server::Configuration::ServerFactoryContext&,
+             const Upstream::ClusterProto& cluster) override {
+    return std::make_unique<Upstream::TypedRingHashLbConfig>(cluster.common_lb_config(),
+                                                             cluster.ring_hash_lb_config());
   }
 };
 

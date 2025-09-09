@@ -2,6 +2,7 @@
 
 #include "source/common/api/os_sys_calls_impl.h"
 #include "source/common/network/transport_socket_options_impl.h"
+#include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/quic/client_codec_impl.h"
 #include "source/common/quic/envoy_quic_alarm_factory.h"
 #include "source/common/quic/envoy_quic_client_connection.h"
@@ -11,6 +12,7 @@
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_client_stream.h"
 
 #include "test/common/quic/test_utils.h"
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/http/stream_decoder.h"
@@ -37,6 +39,14 @@ using testing::Return;
 namespace Envoy {
 namespace Quic {
 
+class EnvoyQuicClientConnectionPeer {
+public:
+  static void onFileEvent(EnvoyQuicClientConnection& connection, uint32_t events,
+                          Network::ConnectionSocket& connection_socket) {
+    connection.onFileEvent(events, connection_socket);
+  }
+};
+
 class TestEnvoyQuicClientConnection : public EnvoyQuicClientConnection {
 public:
   TestEnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
@@ -49,7 +59,7 @@ public:
                                 quic::ConnectionIdGeneratorInterface& generator)
       : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, &writer, false,
                                   supported_versions, dispatcher, std::move(connection_socket),
-                                  generator, /*prefer_gro=*/true) {
+                                  generator) {
     SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE,
                  std::make_unique<quic::test::TaggingEncrypter>(quic::ENCRYPTION_FORWARD_SECURE));
     InstallDecrypter(quic::ENCRYPTION_FORWARD_SECURE,
@@ -60,11 +70,11 @@ public:
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
                      Buffer::InstancePtr buffer, MonotonicTime receive_time, uint8_t tos,
-                     Buffer::RawSlice saved_cmsg) override {
+                     Buffer::OwnedImpl saved_cmsg) override {
     last_local_address_ = local_address;
     last_peer_address_ = peer_address;
     EnvoyQuicClientConnection::processPacket(local_address, peer_address, std::move(buffer),
-                                             receive_time, tos, saved_cmsg);
+                                             receive_time, tos, std::move(saved_cmsg));
     ++num_packets_received_;
   }
 
@@ -116,10 +126,9 @@ public:
   }
 
   void SetUp() override {
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.quic_receive_ecn", true);
     quic_connection_ = new TestEnvoyQuicClientConnection(
         quic::test::TestConnectionId(), connection_helper_, alarm_factory_, writer_, quic_version_,
-        *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr, /*prefer_gro=*/true),
+        *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr),
         connection_id_generator_);
 
     OptRef<Http::HttpServerPropertiesCache> cache;
@@ -127,7 +136,7 @@ public:
     envoy_quic_session_ = std::make_unique<EnvoyQuicClientSession>(
         quic_config_, quic_version_,
         std::unique_ptr<TestEnvoyQuicClientConnection>(quic_connection_),
-        quic::QuicServerId("example.com", 443, false), crypto_config_, *dispatcher_,
+        quic::QuicServerId("example.com", 443), crypto_config_, *dispatcher_,
         /*send_buffer_limit*/ 1024 * 1024, crypto_stream_factory_, quic_stat_names_, cache,
         *store_.rootScope(), transport_socket_options_, uts_factory);
 
@@ -636,6 +645,51 @@ TEST_P(EnvoyQuicClientSessionTest, UseSocketAddressCache) {
   EXPECT_EQ(last_peer_address.get(), quic_connection_->getLastPeerAddress().get());
 }
 
+TEST_P(EnvoyQuicClientSessionTest, WriteBlockedAndUnblock) {
+  Api::MockOsSysCalls os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> singleton_injector{&os_sys_calls};
+
+  // Switch to a real writer, and synthesize a write block on it.
+  quic_connection_->SetQuicPacketWriter(
+      new EnvoyQuicPacketWriter(std::make_unique<Network::UdpDefaultWriter>(
+          quic_connection_->connectionSocket()->ioHandle())),
+      true);
+  if (quic_connection_->connectionSocket()->ioHandle().wasConnected()) {
+    EXPECT_CALL(os_sys_calls, send(_, _, _, _))
+        .Times(2)
+        .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
+  } else {
+    EXPECT_CALL(os_sys_calls, sendmsg(_, _, _))
+        .Times(2)
+        .WillOnce(Return(Api::SysCallSizeResult{-1, SOCKET_ERROR_AGAIN}));
+  }
+  // OnCanWrite() would close the connection if the underlying writer is not unblocked.
+  EXPECT_CALL(*quic_connection_, SendConnectionClosePacket(quic::QUIC_INTERNAL_ERROR, _, _))
+      .Times(0);
+  Http::MockResponseDecoder response_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+  EnvoyQuicClientStream& stream = sendGetRequest(response_decoder, stream_callbacks);
+  EXPECT_TRUE(quic_connection_->writer()->IsWriteBlocked());
+
+  // Synthesize a WRITE event.
+  EnvoyQuicClientConnectionPeer::onFileEvent(*quic_connection_, Event::FileReadyType::Write,
+                                             *quic_connection_->connectionSocket());
+  EXPECT_FALSE(quic_connection_->writer()->IsWriteBlocked());
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::LocalReset,
+                                              "QUIC_STREAM_REQUEST_REJECTED|FROM_SELF"));
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_));
+  stream.resetStream(Http::StreamResetReason::LocalReset);
+}
+
+TEST_P(EnvoyQuicClientSessionTest, DisableQpack) {
+  envoy::config::core::v3::Http3ProtocolOptions http3_options;
+  http3_options.set_disable_qpack(true);
+
+  envoy_quic_session_->setHttp3Options(http3_options);
+
+  EXPECT_EQ(envoy_quic_session_->qpack_maximum_dynamic_table_capacity(), 0);
+}
+
 class MockOsSysCallsImpl : public Api::OsSysCallsImpl {
 public:
   MOCK_METHOD(Api::SysCallSizeResult, recvmsg, (os_fd_t socket, msghdr* msg, int flags),
@@ -691,6 +745,14 @@ TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
 
   EXPECT_LOG_CONTAINS("trace", "starting gro recvmsg with max",
                       dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit));
+}
+
+TEST_P(EnvoyQuicClientSessionTest, SetSocketOption) {
+  Network::SocketOptionName sockopt_name;
+  int val = 1;
+  absl::Span<uint8_t> sockopt_val(reinterpret_cast<uint8_t*>(&val), sizeof(val));
+
+  EXPECT_FALSE(envoy_quic_session_->setSocketOption(sockopt_name, sockopt_val));
 }
 
 class EnvoyQuicClientSessionDisallowMmsgTest : public EnvoyQuicClientSessionTest {

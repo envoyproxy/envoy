@@ -41,8 +41,8 @@ public:
   virtual ProtocolPtr createProtocol() PURE;
   virtual Router::Config& routerConfig() PURE;
   virtual bool payloadPassthrough() const PURE;
-  virtual uint64_t maxRequestsPerConnection() const PURE;
-  virtual const std::vector<AccessLog::InstanceSharedPtr>& accessLogs() const PURE;
+  virtual uint32_t maxRequestsPerConnection() const PURE;
+  virtual const AccessLog::InstanceSharedPtrVector& accessLogs() const PURE;
   virtual bool headerKeysPreserveCase() const PURE;
 };
 

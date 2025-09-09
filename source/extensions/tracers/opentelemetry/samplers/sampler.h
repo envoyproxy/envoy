@@ -70,7 +70,8 @@ public:
    * @param links Collection of links that will be associated with the Span to be created.
    * @return SamplingResult @see SamplingResult
    */
-  virtual SamplingResult shouldSample(const absl::optional<SpanContext> parent_context,
+  virtual SamplingResult shouldSample(const StreamInfo::StreamInfo& stream_info,
+                                      const absl::optional<SpanContext> parent_context,
                                       const std::string& trace_id, const std::string& name,
                                       OTelSpanKind spankind,
                                       OptRef<const Tracing::TraceContext> trace_context,

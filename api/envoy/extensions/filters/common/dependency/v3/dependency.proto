@@ -34,10 +34,10 @@ message FilterDependencies {
   // A list of dependencies required on the decode path.
   repeated Dependency decode_required = 1;
 
-  // A list of dependencies provided on the encode path.
+  // A list of dependencies provided on the decode path.
   repeated Dependency decode_provided = 2;
 
-  // A list of dependencies required on the decode path.
+  // A list of dependencies required on the encode path.
   repeated Dependency encode_required = 3;
 
   // A list of dependencies provided on the encode path.

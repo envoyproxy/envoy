@@ -27,8 +27,8 @@ def envoy_pch_library(
         name,
         includes,
         deps,
-        external_deps,
         visibility,
+        external_deps = [],
         testonly = False,
         repository = ""):
     native.cc_library(

@@ -5,3 +5,7 @@ package test.integration.tcp_proxy;
 message InjectDynamicMetadata {
   string key = 1;
 }
+
+message PauseFilterConfig {
+  uint32 data_size_before_continue = 1;
+}

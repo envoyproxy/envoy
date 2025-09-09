@@ -6,6 +6,7 @@ load(
     "envoy_cc_test_library",
     "envoy_package",
     "envoy_proto_library",
+    "envoy_select_enable_http3",
 )
 
 licenses(["notice"])  # Apache 2
@@ -24,6 +25,7 @@ envoy_cc_test(
         "internal_listener.yaml",
         "internal_listener_missing_bootstrap.yaml",
     ],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/bootstrap/internal_listener:config",
         "//source/extensions/filters/network/tcp_proxy:config",
@@ -46,7 +48,8 @@ envoy_cc_test_library(
         "//source/common/init:manager_lib",
         "//source/common/listener_manager:listener_manager_lib",
         "//source/common/tls:server_context_lib",
-        "//source/extensions/common/matcher:trie_matcher_lib",
+        "//source/extensions/api_listeners/default_api_listener:api_listener_lib",
+        "//source/extensions/common/matcher:ip_range_matcher_lib",
         "//test/mocks/init:init_mocks",
         "//test/mocks/matcher:matcher_mocks",
         "//test/mocks/network:network_mocks",
@@ -71,6 +74,8 @@ envoy_cc_test_library(
 envoy_cc_test(
     name = "listener_manager_impl_test",
     srcs = ["listener_manager_impl_test.cc"],
+    rbe_pool = "6gig",
+    shard_count = 5,
     deps = [
         ":listener_manager_impl_test_lib",
         "//source/common/api:os_sys_calls_lib",
@@ -106,12 +111,13 @@ envoy_cc_test(
 # Stand-alone quic test because of FIPS.
 envoy_cc_test(
     name = "listener_manager_impl_quic_only_test",
-    srcs = ["listener_manager_impl_quic_only_test.cc"],
-    tags = ["nofips"],
-    deps = [
+    srcs = envoy_select_enable_http3(["listener_manager_impl_quic_only_test.cc"]),
+    rbe_pool = "6gig",
+    deps = envoy_select_enable_http3([
         ":listener_manager_impl_test_lib",
         "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/filters/http/router:config",
+        "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/matching/network/common:inputs_lib",
         "//source/extensions/quic/server_preferred_address:fixed_server_preferred_address_config_factory_config",
         "//source/extensions/request_id/uuid:config",
@@ -123,13 +129,14 @@ envoy_cc_test(
         "//test/test_common:threadsafe_singleton_injector_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
-    ],
+    ]),
 )
 
 envoy_cc_test(
     name = "filter_chain_manager_impl_test",
     srcs = ["filter_chain_manager_impl_test.cc"],
     data = ["//test/common/tls/test_data:certs"],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/api:os_sys_calls_lib",
         "//source/common/config:metadata_lib",
@@ -165,10 +172,12 @@ envoy_cc_test(
     data = [
         "//test/config/integration/certs",
     ],
+    rbe_pool = "6gig",
     deps = [
         "//source/common/listener_manager:lds_api_lib",
         "//source/common/protobuf:utility_lib",
         "//test/mocks/config:config_mocks",
+        "//test/mocks/config:xds_manager_mocks",
         "//test/mocks/init:init_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/server:listener_manager_mocks",
@@ -184,12 +193,8 @@ envoy_cc_test(
 envoy_cc_benchmark_binary(
     name = "filter_chain_benchmark_test",
     srcs = ["filter_chain_benchmark_test.cc"],
-    external_deps = [
-        "benchmark",
-        "googletest",
-    ],
+    rbe_pool = "6gig",
     deps = [
-        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "//source/common/listener_manager:filter_chain_manager_lib",
         "//test/test_common:environment_lib",
         "//test/mocks/network:network_mocks",
@@ -197,6 +202,9 @@ envoy_cc_benchmark_binary(
         "//test/mocks/stream_info:stream_info_mocks",
         # tranport socket config registration
         "//source/extensions/transport_sockets/tls:config",
+        "@com_github_google_benchmark//:benchmark",
+        "@com_google_googletest//:gtest",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 

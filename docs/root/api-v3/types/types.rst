@@ -29,3 +29,4 @@ Types
   ../type/v3/token_bucket.proto
   ../type/matcher/v3/value.proto
   ../type/matcher/v3/status_code_input.proto
+  ../type/matcher/v3/address.proto

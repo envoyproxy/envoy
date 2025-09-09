@@ -8,8 +8,8 @@ namespace Quic {
 class ServerPreferredAddressConfig : public Quic::EnvoyQuicServerPreferredAddressConfig {
 public:
   struct IpVersionConfig {
-    quic::QuicSocketAddress spa_;
-    quic::QuicIpAddress dnat_;
+    quiche::QuicheSocketAddress spa_;
+    quiche::QuicheIpAddress dnat_;
   };
 
   ServerPreferredAddressConfig(const IpVersionConfig& v4, const IpVersionConfig& v6)

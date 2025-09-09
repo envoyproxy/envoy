@@ -82,6 +82,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_rq_pending_overflow, Counter, Total requests that overflowed connection pool or requests (mainly for HTTP/2 and above) circuit breaking and were failed
   upstream_rq_pending_failure_eject, Counter, Total requests that were failed due to a connection pool connection failure or remote connection termination
   upstream_rq_pending_active, Gauge, Total active requests pending a connection pool connection
+  upstream_rq_per_cx, Histogram, Number of requests handled per upstream connection for all HTTP protocols
   upstream_rq_cancelled, Counter, Total requests cancelled before obtaining a connection pool connection
   upstream_rq_maintenance_mode, Counter, Total requests that resulted in an immediate 503 due to :ref:`maintenance mode<config_http_filters_router_runtime_maintenance_mode>`
   upstream_rq_timeout, Counter, Total requests that timed out waiting for a response
@@ -266,6 +267,15 @@ If TLS is used by the cluster the following statistics are rooted at *cluster.<n
 
 .. include:: ../../../_include/ssl_stats.rst
 
+.. _config_cluster_manager_cluster_stats_certs:
+
+TLS and CA certificates
+-----------------------
+
+TLS and CA certificate statistics are rooted in the ``cluster.<name>.ssl.certificate.<cert_name>.``:
+
+.. include:: ../../../_include/cert_stats.rst
+
 .. _config_cluster_manager_cluster_stats_tcp:
 
 TCP statistics
@@ -320,7 +330,6 @@ the following statistics:
   lb_zone_routing_sampled, Counter, Sending some requests to the same zone
   lb_zone_routing_cross_zone, Counter, Zone aware routing mode but have to send cross zone
   lb_local_cluster_not_ok, Counter, Local host set is not set or it is panic mode for local cluster
-  lb_zone_number_differs, Counter, No zone aware routing because the feature flag is disabled and the number of zones in local and upstream cluster is different
   lb_zone_no_capacity_left, Counter, Total number of times ended with random zone selection due to rounding error
   original_dst_host_invalid, Counter, Total number of invalid hosts passed to original destination load balancer
 
@@ -390,6 +399,8 @@ statistics will be added to *cluster.<name>* and contain the following:
    :widths: 1, 1, 2
 
    upstream_rq_headers_size, Histogram, Request headers size in bytes per upstream
+   upstream_rq_headers_count, Histogram, Request header count per upstream
    upstream_rq_body_size, Histogram, Request body size in bytes per upstream
    upstream_rs_headers_size, Histogram, Response headers size in bytes per upstream
+   upstream_rs_headers_count, Histogram, Response header count per upstream
    upstream_rs_body_size, Histogram, Response body size in bytes per upstream

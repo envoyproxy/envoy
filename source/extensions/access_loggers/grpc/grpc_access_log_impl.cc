@@ -63,10 +63,11 @@ GrpcAccessLoggerImpl::SharedPtr GrpcAccessLoggerCacheImpl::createLogger(
   // the main thread if necessary.
   auto factory_or_error =
       async_client_manager_.factoryForGrpcService(config.grpc_service(), scope_, true);
-  THROW_IF_STATUS_NOT_OK(factory_or_error, throw);
+  THROW_IF_NOT_OK_REF(factory_or_error.status());
   return std::make_shared<GrpcAccessLoggerImpl>(
-      factory_or_error.value()->createUncachedRawAsyncClient(), config, dispatcher, local_info_,
-      scope_);
+      THROW_OR_RETURN_VALUE(factory_or_error.value()->createUncachedRawAsyncClient(),
+                            Grpc::RawAsyncClientPtr),
+      config, dispatcher, local_info_, scope_);
 }
 
 } // namespace GrpcCommon

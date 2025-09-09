@@ -20,7 +20,7 @@ use(
     },
     {
        "owner": "envoyproxy/coverage-shephards",
-       "path": "(test/per_file_coverage.sh)",
+       "path": "(test/coverage.yaml)",
        "github_status_label": "changes to Envoy coverage scripts",
        "auto_assign": True,
     },
@@ -51,6 +51,7 @@ use(
   ],
 )
 use("github.com/envoyproxy/envoy/ci/repokitteh/modules/versionchange.star")
+use("github.com/envoyproxy/envoy/ci/repokitteh/modules/workflows.star")
 
 def _backport():
   github.issue_label('backport/review')

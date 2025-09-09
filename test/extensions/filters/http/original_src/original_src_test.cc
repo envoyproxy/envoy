@@ -10,6 +10,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -233,6 +234,50 @@ TEST_F(OriginalSrcHttpTest, TrailersAndDataNotEndStreamDoNothing) {
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter->decodeData(buffer_, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter->decodeTrailers(trailers_));
 }
+
+TEST_F(OriginalSrcHttpTest, FilterAddsBindAddressNoPortOptionEnabledAndDisabled) {
+  if (!ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT.hasValue()) {
+    // The option isn't supported on this platform. Just skip the test.
+    return;
+  }
+
+  {
+    // Runtime option is enabled by default.
+    auto filter = makeDefaultFilter();
+    Network::Socket::OptionsSharedPtr options;
+    setAddressToReturn("tcp://1.2.3.4:80");
+    EXPECT_CALL(callbacks_, addUpstreamSocketOptions(_)).WillOnce(SaveArg<0>(&options));
+
+    filter->decodeHeaders(headers_, false);
+
+    const auto addr_bind_option =
+        findOptionDetails(*options, ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT,
+                          envoy::config::core::v3::SocketOption::STATE_PREBIND);
+
+    EXPECT_TRUE(addr_bind_option.has_value());
+  }
+
+  {
+    // Runtime option is disabled.
+    TestScopedRuntime scoped_runtime;
+    scoped_runtime.mergeValues(
+        {{"envoy.reloadable_features.original_src_fix_port_exhaustion", "false"}});
+
+    auto filter = makeDefaultFilter();
+    Network::Socket::OptionsSharedPtr options;
+    setAddressToReturn("tcp://1.2.3.4:80");
+    EXPECT_CALL(callbacks_, addUpstreamSocketOptions(_)).WillOnce(SaveArg<0>(&options));
+
+    filter->decodeHeaders(headers_, false);
+
+    const auto addr_bind_option =
+        findOptionDetails(*options, ENVOY_SOCKET_IP_BIND_ADDRESS_NO_PORT,
+                          envoy::config::core::v3::SocketOption::STATE_PREBIND);
+
+    EXPECT_FALSE(addr_bind_option.has_value());
+  }
+}
+
 } // namespace
 } // namespace OriginalSrc
 } // namespace HttpFilters

@@ -27,6 +27,7 @@ envoy_cc_library(
     hdrs = ["access_log_config.h"],
     deps = [
         "//envoy/access_log:access_log_interface",
+        "//envoy/formatter:substitution_formatter_interface",
         "//envoy/server:filter_config_interface",
         "//source/common/protobuf",
     ],

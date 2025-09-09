@@ -44,6 +44,10 @@ public:
 
   absl::string_view ja3Hash() const override;
 
+  void setJA4Hash(absl::string_view ja4_hash) override;
+
+  absl::string_view ja4Hash() const override;
+
   Api::SysCallIntResult getSocketOption(int level, int, void* optval, socklen_t*) const override;
 
   absl::optional<std::chrono::milliseconds> lastRoundTripTime() override;
@@ -54,6 +58,7 @@ private:
   std::string transport_protocol_;
   std::string server_name_;
   std::string ja3_hash_;
+  std::string ja4_hash_;
 };
 
 // TODO: Move over to Fake (name is confusing)

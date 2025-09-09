@@ -27,12 +27,12 @@ using DecodedResourceImplPtr = std::unique_ptr<DecodedResourceImpl>;
 
 class DecodedResourceImpl : public DecodedResource {
 public:
-  static DecodedResourceImplPtr fromResource(OpaqueResourceDecoder& resource_decoder,
-                                             const ProtobufWkt::Any& resource,
-                                             const std::string& version) {
+  static absl::StatusOr<DecodedResourceImplPtr>
+  fromResource(OpaqueResourceDecoder& resource_decoder, const Protobuf::Any& resource,
+               const std::string& version) {
     if (resource.Is<envoy::service::discovery::v3::Resource>()) {
       envoy::service::discovery::v3::Resource r;
-      MessageUtil::unpackToOrThrow(resource, r);
+      RETURN_IF_NOT_OK(MessageUtil::unpackTo(resource, r));
 
       r.set_version(version);
 
@@ -83,8 +83,8 @@ public:
 private:
   DecodedResourceImpl(OpaqueResourceDecoder& resource_decoder, absl::optional<std::string> name,
                       const Protobuf::RepeatedPtrField<std::string>& aliases,
-                      const ProtobufWkt::Any& resource, bool has_resource,
-                      const std::string& version, absl::optional<std::chrono::milliseconds> ttl,
+                      const Protobuf::Any& resource, bool has_resource, const std::string& version,
+                      absl::optional<std::chrono::milliseconds> ttl,
                       const absl::optional<envoy::config::core::v3::Metadata>& metadata)
       : resource_(resource_decoder.decodeResource(resource)), has_resource_(has_resource),
         name_(name ? *name : resource_decoder.resourceName(*resource_)),
@@ -106,12 +106,17 @@ private:
 
 struct DecodedResourcesWrapper {
   DecodedResourcesWrapper() = default;
-  DecodedResourcesWrapper(OpaqueResourceDecoder& resource_decoder,
-                          const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                          const std::string& version) {
+  static absl::StatusOr<std::unique_ptr<DecodedResourcesWrapper>>
+  create(OpaqueResourceDecoder& resource_decoder,
+         const Protobuf::RepeatedPtrField<Protobuf::Any>& resources, const std::string& version) {
+    std::unique_ptr<DecodedResourcesWrapper> ret = std::make_unique<DecodedResourcesWrapper>();
     for (const auto& resource : resources) {
-      pushBack((DecodedResourceImpl::fromResource(resource_decoder, resource, version)));
+      absl::StatusOr<DecodedResourceImplPtr> resource_or_error =
+          DecodedResourceImpl::fromResource(resource_decoder, resource, version);
+      RETURN_IF_NOT_OK_REF(resource_or_error.status());
+      ret->pushBack(std::move(resource_or_error.value()));
     }
+    return ret;
   }
 
   void pushBack(Config::DecodedResourcePtr&& resource) {

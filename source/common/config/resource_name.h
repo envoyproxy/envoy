@@ -12,7 +12,7 @@ namespace Config {
  * Get resource name from api type.
  */
 template <typename Current> std::string getResourceName() {
-  return createReflectableMessage(Current())->GetDescriptor()->full_name();
+  return std::string(createReflectableMessage(Current())->GetDescriptor()->full_name());
 }
 
 /**
