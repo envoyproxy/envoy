@@ -62,6 +62,9 @@ EXTENSIONS = {
     #
 
     "envoy.bootstrap.reverse_tunnel.upstream_socket_interface": "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
+    "envoy.bootstrap.reverse_connection.downstream_reverse_connection_socket_interface": "//source/extensions/bootstrap/reverse_tunnel:reverse_tunnel_initiator_lib",
+    "envoy.bootstrap.reverse_connection_handshake": "//source/extensions/bootstrap/reverse_tunnel:reverse_tunnel_initiator_lib",
+    "envoy.bootstrap.reverse_tunnel.downstream_socket_interface": "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_initiator_lib",
 
     #
     # Health checkers
@@ -489,6 +492,12 @@ EXTENSIONS = {
     "envoy.network.dns_resolver.apple":                "//source/extensions/network/dns_resolver/apple:config",
     # getaddrinfo DNS resolver extension can be used when the system resolver is desired (e.g., Android)
     "envoy.network.dns_resolver.getaddrinfo":          "//source/extensions/network/dns_resolver/getaddrinfo:config",
+
+    #
+    # Address Resolvers
+    #
+
+    "envoy.resolvers.reverse_connection":               "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_resolver_lib",
 
     #
     # Custom matchers
