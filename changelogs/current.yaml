@@ -44,16 +44,9 @@ minor_behavior_changes:
     It was found to favor TCP over QUIC when UDP does not work on IPv6 but works on IPv4.
 - area: mobile
   change: |
-    HTTP/3 alt-svc headers will now be respected from IP-address-based hostnames. This change is
-    guarded by runtime guard ``envoy.reloadable_features.allow_alt_svc_for_ips``.
-- area: http3
-  change: |
-    Make upstream connections respond to default network change on mobile devices. This change is guarded
-    by runtime guard ``envoy.reloadable_features.quic_upstream_connection_handle_network_change``.
-- area: lua
-  change: |
-    When Lua script executes httpCall, backpressure is exercised when receiving body from downstream client. This behavior can be reverted
-    by setting the runtime guard ``envoy.reloadable_features.lua_flow_control_while_http_call`` to false.
+    Explicitly drain connections upon network change events regardless of whether the DNS cache is refreshed or not.
+    This behavior can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.decouple_explicit_drain_pools_and_dns_refresh`` to ``false``.
 - area: http
   change: |
     Added accounting for decompressed HTTP header bytes sent and received. Existing stats only count wire-encoded header bytes.
