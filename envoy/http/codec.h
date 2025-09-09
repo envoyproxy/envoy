@@ -204,6 +204,20 @@ public:
  * TODO(mattklein123): Consider removing the StreamDecoder interface entirely and just duplicating
  * the methods in both the request/response path for simplicity.
  */
+\
+class ResponseDecoder;
+
+class ResponseDecoderHandle {
+public:
+  virtual ~ResponseDecoderHandle() = default;
+
+  /**
+   * @return a reference to the underlying decoder if it is still valid.
+   */
+  virtual OptRef<ResponseDecoder> get() PURE;
+};
+using ResponseDecoderHandlePtr = std::unique_ptr<ResponseDecoderHandle>;
+
 class StreamDecoder {
 public:
   virtual ~StreamDecoder() = default;
