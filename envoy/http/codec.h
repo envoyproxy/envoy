@@ -204,7 +204,6 @@ public:
  * TODO(mattklein123): Consider removing the StreamDecoder interface entirely and just duplicating
  * the methods in both the request/response path for simplicity.
  */
-\
 class ResponseDecoder;
 
 class ResponseDecoderHandle {
@@ -674,14 +673,6 @@ public:
    */
   virtual RequestEncoder& newStream(ResponseDecoder& response_decoder) PURE;
 };
-
-using ClientConnectionPtr = std::unique_ptr<ClientConnection>;
-
-} // namespace Http
-} // namespace Envoy
-der) PURE;
-}
-;
 
 using ClientConnectionPtr = std::unique_ptr<ClientConnection>;
 

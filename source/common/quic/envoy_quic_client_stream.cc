@@ -477,8 +477,3 @@ void EnvoyQuicClientStream::OnInvalidHeaders() {
 
 } // namespace Quic
 } // namespace Envoy
-ntStream::OnInvalidHeaders() { onStreamError(absl::nullopt, quic::QUIC_BAD_APPLICATION_PAYLOAD); }
-
-} // namespace Quic
-} // namespace Envoy
-oy
