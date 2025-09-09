@@ -859,7 +859,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OnDemandIntegrationTest,
 
 // Integration test specifically for the GitHub issue #17891 fix:
 // Verify that VHDS requests with body don't result in 404 responses
-TEST_P(OnDemandIntegrationTest, VhdsWithRequestBodyShouldNotReturn404) {
+TEST_P(OnDemandIntegrationTest, VhdsWithRequestBodySuccess) {
   autonomous_upstream_ = true;
   initialize();
 
@@ -887,7 +887,7 @@ TEST_P(OnDemandIntegrationTest, VhdsWithRequestBodyShouldNotReturn404) {
 }
 
 // Integration test for requests without body (should still work)
-TEST_P(OnDemandIntegrationTest, VhdsWithoutBodyStillWorksCorrectly) {
+TEST_P(OnDemandIntegrationTest, VhdsWithoutBodySuccess) {
   autonomous_upstream_ = true;
   initialize();
 
@@ -927,6 +927,62 @@ TEST_P(OnDemandIntegrationTest, VhdsWithLargeRequestBodyBuffersCorrectly) {
 
   // Verify the entire large body was properly buffered and forwarded
   EXPECT_EQ(large_body, response->body());
+}
+
+// Test that validates a different host-name completely
+// This ensures VHDS discovery works for various hostnames
+TEST_P(OnDemandIntegrationTest, VhdsWithDifferentHostname) {
+  autonomous_upstream_ = true;
+  initialize();
+
+  // Test with a completely different hostname pattern
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/api/v1/data"},
+          {":scheme", "http"},
+          {":authority", fmt::format("api.service.internal:{}", lookupPort("http"))},
+          {"content-type", "application/json"},
+      },
+      R"({"key": "value", "data": "test"})");
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Verify the request body was forwarded correctly
+  EXPECT_EQ(R"({"key": "value", "data": "test"})", response->body());
+}
+
+// Simpler test - body without internal-redirect
+// This test focuses on basic request body handling without redirect complexity
+TEST_P(OnDemandIntegrationTest, VhdsRequestBodyWithoutInternalRedirect) {
+  autonomous_upstream_ = true;
+  initialize();
+
+  // Simple POST request with JSON body, no redirect configuration needed
+  const std::string json_body = R"({"message": "hello world", "id": 42})";
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/simple"},
+          {":scheme", "http"},
+          {":authority", fmt::format("simple.test.com:{}", lookupPort("http"))},
+          {"content-type", "application/json"},
+          {"x-test-header", "simple-test"},
+      },
+      json_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Verify the JSON body was properly handled and forwarded
+  EXPECT_EQ(json_body, response->body());
+
+  // This test ensures that basic POST requests with bodies work correctly
+  // without any internal redirect complexity - addressing the core issue
+  // where request bodies were being lost during VHDS discovery
 }
 
 } // namespace OnDemand
