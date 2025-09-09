@@ -92,7 +92,16 @@ private:
   void useCapsuleProtocol();
 #endif
 
-  Http::ResponseDecoder* response_decoder_{nullptr};
+  Http::ResponseDecoder* getResponseDecoder() {
+    if (response_decoder_) {
+      if (auto decoder = response_decoder_->get(); decoder.has_value()) {
+        return &decoder.value().get();
+      }
+    }
+    return nullptr;
+  }
+
+  Http::ResponseDecoderHandlePtr response_decoder_;
   bool decoded_1xx_{false};
 
   // When an HTTP Upgrade is requested, this contains the protocol upgrade type, e.g. "websocket".

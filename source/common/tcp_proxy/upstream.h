@@ -17,6 +17,7 @@
 #include "source/common/http/codec_client.h"
 #include "source/common/http/hash_policy.h"
 #include "source/common/http/null_route_impl.h"
+#include "source/common/http/response_decoder_impl_base.h"
 #include "source/common/network/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/header_parser.h"

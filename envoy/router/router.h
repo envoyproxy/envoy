@@ -27,6 +27,7 @@
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/retry.h"
 
+#include "source/common/http/response_decoder_impl_base.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 

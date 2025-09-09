@@ -466,7 +466,7 @@ bool EnvoyQuicClientStream::hasPendingData() { return BufferedDataBytes() > 0; }
 // connect-udp".
 void EnvoyQuicClientStream::useCapsuleProtocol() {
   http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
-  http_datagram_handler_->setStreamDecoder(response_decoder_);
+  http_datagram_handler_->setStreamDecoder(getResponseDecoder());
   RegisterHttp3DatagramVisitor(http_datagram_handler_.get());
 }
 #endif
@@ -477,3 +477,8 @@ void EnvoyQuicClientStream::OnInvalidHeaders() {
 
 } // namespace Quic
 } // namespace Envoy
+ntStream::OnInvalidHeaders() { onStreamError(absl::nullopt, quic::QUIC_BAD_APPLICATION_PAYLOAD); }
+
+} // namespace Quic
+} // namespace Envoy
+oy

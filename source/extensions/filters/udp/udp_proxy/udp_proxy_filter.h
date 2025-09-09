@@ -21,6 +21,7 @@
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
+#include "source/common/http/response_decoder_impl_base.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/socket_interface.h"

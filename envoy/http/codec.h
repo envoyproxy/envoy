@@ -304,9 +304,16 @@ public:
    * @param os the ostream to dump state to
    * @param indent_level the depth, for pretty-printing.
    *
+
    * This function is called on Envoy fatal errors so should avoid memory allocation.
    */
   virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
+
+  /**
+   * @return A handle to the response decoder. Caller can check the response decoder's liveness via
+   * the handle.
+   */
+  virtual ResponseDecoderHandlePtr getResponseDecoderHandle() PURE;
 };
 
 /**
@@ -653,6 +660,14 @@ public:
    */
   virtual RequestEncoder& newStream(ResponseDecoder& response_decoder) PURE;
 };
+
+using ClientConnectionPtr = std::unique_ptr<ClientConnection>;
+
+} // namespace Http
+} // namespace Envoy
+der) PURE;
+}
+;
 
 using ClientConnectionPtr = std::unique_ptr<ClientConnection>;
 

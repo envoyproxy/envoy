@@ -2,24 +2,30 @@
 
 #include "envoy/http/codec.h"
 
+#include "source/common/http/response_decoder_impl_base.h"
+
 namespace Envoy {
 namespace Http {
 
 /**
  * Wrapper for ResponseDecoder that just forwards to an "inner" decoder.
  */
-class ResponseDecoderWrapper : public ResponseDecoder {
+class ResponseDecoderWrapper : public ResponseDecoderImplBase {
 public:
   // ResponseDecoder
   void decode1xxHeaders(ResponseHeaderMapPtr&& headers) override {
-    inner_.decode1xxHeaders(std::move(headers));
+    if (auto inner = inner_->get(); inner.has_value()) {
+      inner.value().get().decode1xxHeaders(std::move(headers));
+    }
   }
 
   void decodeHeaders(ResponseHeaderMapPtr&& headers, bool end_stream) override {
     if (end_stream) {
       onPreDecodeComplete();
     }
-    inner_.decodeHeaders(std::move(headers), end_stream);
+    if (auto inner = inner_->get(); inner.has_value()) {
+      inner.value().get().decodeHeaders(std::move(headers), end_stream);
+    }
     if (end_stream) {
       onDecodeComplete();
     }
@@ -29,7 +35,9 @@ public:
     if (end_stream) {
       onPreDecodeComplete();
     }
-    inner_.decodeData(data, end_stream);
+    if (auto inner = inner_->get(); inner.has_value()) {
+      inner.value().get().decodeData(data, end_stream);
+    }
     if (end_stream) {
       onDecodeComplete();
     }
@@ -37,20 +45,26 @@ public:
 
   void decodeTrailers(ResponseTrailerMapPtr&& trailers) override {
     onPreDecodeComplete();
-    inner_.decodeTrailers(std::move(trailers));
+    if (auto inner = inner_->get(); inner.has_value()) {
+      inner.value().get().decodeTrailers(std::move(trailers));
+    }
     onDecodeComplete();
   }
 
   void decodeMetadata(MetadataMapPtr&& metadata_map) override {
-    inner_.decodeMetadata(std::move(metadata_map));
+    if (auto inner = inner_->get(); inner.has_value()) {
+      inner.value().get().decodeMetadata(std::move(metadata_map));
+    }
   }
 
   void dumpState(std::ostream& os, int indent_level) const override {
-    inner_.dumpState(os, indent_level);
+    if (auto inner = inner_->get(); inner.has_value()) {
+      inner.value().get().dumpState(os, indent_level);
+    }
   }
 
 protected:
-  ResponseDecoderWrapper(ResponseDecoder& inner) : inner_(inner) {}
+  ResponseDecoderWrapper(ResponseDecoder& inner) : inner_(inner.getResponseDecoderHandle()) {}
 
   /**
    * Consumers of the wrapper generally want to know when a decode is complete. This is called
@@ -59,7 +73,7 @@ protected:
   virtual void onPreDecodeComplete() PURE;
   virtual void onDecodeComplete() PURE;
 
-  ResponseDecoder& inner_;
+  ResponseDecoderHandlePtr inner_;
 };
 
 /**
