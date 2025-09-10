@@ -58,14 +58,14 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * Request headers: Contains the headers from the original HTTP request.
 // * Request body: If the body is present, the behavior depends on the
 //   body send mode:
-//   * ``BUFFERED`` or ``BUFFERED_PARTIAL``: Entire body is sent to the
-//     external processor in a single message.
-//   * ``STREAMED`` or ``FULL_DUPLEX_STREAMED``: Body will be split across
-//     multiple messages sent to the external processor.
-//   * ``GRPC``: As each gRPC message arrives, it will be sent to the external
-//     processor. There will be exactly one gRPC message in each message
-//     sent to the external processor.
-//   * ``NONE``: Body will not be sent to the external processor.
+//    * ``BUFFERED`` or ``BUFFERED_PARTIAL``: Entire body is sent to the
+//      external processor in a single message.
+//    * ``STREAMED`` or ``FULL_DUPLEX_STREAMED``: Body will be split across
+//      multiple messages sent to the external processor.
+//    * ``GRPC``: As each gRPC message arrives, it will be sent to the external
+//      processor. There will be exactly one gRPC message in each message
+//      sent to the external processor.
+//    * ``NONE``: Body will not be sent to the external processor.
 //
 // * Request trailers: Delivered if they are present and if the trailer mode is set
 //   to ``SEND``.
