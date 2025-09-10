@@ -86,8 +86,6 @@ public:
   MOCK_METHOD(uint32_t, bufferLimit, (), (const));                                                 \
   MOCK_METHOD(bool, aboveHighWatermark, (), (const));                                              \
   MOCK_METHOD(const ConnectionSocketPtr&, getSocket, (), (const));                                 \
-  MOCK_METHOD(void, setSocketReused, (bool value));                                                \
-  MOCK_METHOD(bool, isSocketReused, ());                                                           \
   MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, socketOptions, (), (const));     \
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());                                            \
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));                             \

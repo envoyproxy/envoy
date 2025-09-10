@@ -135,8 +135,6 @@ public:
   void dumpState(std::ostream& os, int indent_level) const override;
 
   const Network::ConnectionSocketPtr& getSocket() const override { PANIC("not implemented"); }
-  void setSocketReused(bool) override {}
-  bool isSocketReused() override { return false; }
 
 private:
   // ConnectionCallbacks which will be set on an ClientConnection which

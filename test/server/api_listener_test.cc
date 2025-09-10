@@ -242,8 +242,6 @@ api_listener:
 
   // Validate methods updated in SyntheticConnection.
   EXPECT_DEATH(connection.getSocket(), "not implemented");
-  connection.setSocketReused(true);
-  EXPECT_FALSE(connection.isSocketReused());
 }
 
 // Exercise SyntheticReadCallbacks unimplemented methods and PANIC behavior for socket().
