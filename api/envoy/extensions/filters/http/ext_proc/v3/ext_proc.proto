@@ -58,7 +58,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // * Request headers: Contains the headers from the original HTTP request.
 // * Request body: If the body is present, the behavior depends on the
 //   body send mode:
-//    * ``BUFFERED`` or ``BUFFERED_PARTIAL``: Entire body is sent to the
+//    * ``BUFFERED`` or ``BUFFERED_PARTIAL``: Body is sent to the
 //      external processor in a single message.
 //    * ``STREAMED`` or ``FULL_DUPLEX_STREAMED``: Body will be split across
 //      multiple messages sent to the external processor.
