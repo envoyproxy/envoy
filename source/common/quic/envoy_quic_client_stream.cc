@@ -482,14 +482,3 @@ void EnvoyQuicClientStream::OnInvalidHeaders() {
 
 } // namespace Quic
 } // namespace Envoy
-p_datagram_handler_->setStreamDecoder(getResponseDecoder());
-  RegisterHttp3DatagramVisitor(http_datagram_handler_.get());
-}
-#endif
-
-void EnvoyQuicClientStream::OnInvalidHeaders() {
-  onStreamError(absl::nullopt, quic::QUIC_BAD_APPLICATION_PAYLOAD);
-}
-
-} // namespace Quic
-} // namespace Envoy
