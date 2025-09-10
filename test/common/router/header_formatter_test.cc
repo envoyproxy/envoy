@@ -431,7 +431,11 @@ TEST(HeaderParserTest, EvaluateHeaderValuesWithNullStreamInfo) {
   EXPECT_FALSE(header_map.has("empty"));
 }
 
-TEST(HeaderParserTest, EvaluateEmptyHeaders) {
+TEST(HeaderParserTest, EvaluateEmptyHeadersWithLegacyFormat) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues(
+      {{"envoy.reloadable_features.remove_legacy_route_formatter", "false"}});
+
   const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
 route:
@@ -441,6 +445,32 @@ request_headers_to_add:
   - header:
       key: "x-key"
       value: "%UPSTREAM_METADATA([\"namespace\", \"key\"])%"
+    append_action: APPEND_IF_EXISTS_OR_ADD
+)EOF";
+
+  HeaderParserPtr req_header_parser =
+      HeaderParser::configure(parseRouteFromV3Yaml(yaml).request_headers_to_add()).value();
+  Http::TestRequestHeaderMapImpl header_map{{":method", "POST"}};
+  std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> host(
+      new NiceMock<Envoy::Upstream::MockHostDescription>());
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  auto metadata = std::make_shared<envoy::config::core::v3::Metadata>();
+  stream_info.upstreamInfo()->setUpstreamHost(host);
+  ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
+  req_header_parser->evaluateHeaders(header_map, stream_info);
+  EXPECT_FALSE(header_map.has("x-key"));
+}
+
+TEST(HeaderParserTest, EvaluateEmptyHeaders) {
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: "www2"
+  prefix_rewrite: "/api/new_endpoint"
+request_headers_to_add:
+  - header:
+      key: "x-key"
+      value: "%UPSTREAM_METADATA(namespace:key)%"
     append_action: APPEND_IF_EXISTS_OR_ADD
 )EOF";
 
@@ -508,7 +538,7 @@ request_headers_to_add:
       value: "%PROTOCOL%%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
   - header:
       key: "x-metadata"
-      value: "%UPSTREAM_METADATA([\"namespace\", \"%key%\"])%"
+      value: "%UPSTREAM_METADATA(namespace:%key%)%"
   - header:
       key: "x-per-request"
       value: "%PER_REQUEST_STATE(testing)%"
