@@ -263,9 +263,6 @@ private:
   // read_disable_count_ == 0 to ensure that read resumption happens when remaining bytes are held
   // in transport socket internal buffers.
   bool transport_wants_read_ : 1;
-  // Used on the responder envoy to mark an active connection accepted by a listener which will
-  // be used as a reverse connection. The socket for such a connection is closed upon draining
-  // of the owning listener.
   bool enable_close_through_filter_manager_ : 1;
 };
 
