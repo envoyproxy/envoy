@@ -19,8 +19,8 @@ public:
                                Server::Configuration::GenericFactoryContext& context) override;
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::http::mcp_sse_stateful_session::envelope::v3alpha::
-                                EnvelopeSessionState>();
+    return std::make_unique<
+        envoy::extensions::http::sse_stateful_session::envelope::v3alpha::EnvelopeSessionState>();
   }
 
   std::string name() const override { return "envoy.http.sse_stateful_session.envelope"; }

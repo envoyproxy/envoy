@@ -10,7 +10,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/utility.h"
 
-#include "contrib/envoy/extensions/http/mcp_sse_stateful_session/envelope/v3alpha/envelope.pb.h"
+#include "contrib/envoy/extensions/http/sse_stateful_session/envelope/v3alpha/envelope.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -21,7 +21,7 @@ namespace Envelope {
 constexpr size_t kDefaultMaxPendingChunkSize = 4096;
 
 using EnvelopeSessionStateProto =
-    envoy::extensions::http::mcp_sse_stateful_session::envelope::v3alpha::EnvelopeSessionState;
+    envoy::extensions::http::sse_stateful_session::envelope::v3alpha::EnvelopeSessionState;
 
 class EnvelopeSessionStateFactory : public Envoy::Http::SseSessionStateFactory,
                                     public Logger::Loggable<Logger::Id::http> {

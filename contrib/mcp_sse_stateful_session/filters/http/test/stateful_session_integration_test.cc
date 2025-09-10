@@ -92,7 +92,7 @@ typed_config:
   sse_session_state:
     name: envoy.http.sse_stateful_session.envelope
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.http.mcp_sse_stateful_session.envelope.v3alpha.EnvelopeSessionState
+      "@type": type.googleapis.com/envoy.extensions.http.sse_stateful_session.envelope.v3alpha.EnvelopeSessionState
       param_name: sessionId
       chunk_end_patterns: ["\r\n\r\n", "\n\n", "\r\r"]
 )EOF";
@@ -123,7 +123,7 @@ mcp_sse_stateful_session:
   sse_session_state:
     name: envoy.http.sse_stateful_session.envelope
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.http.mcp_sse_stateful_session.envelope.v3alpha.EnvelopeSessionState
+      "@type": type.googleapis.com/envoy.extensions.http.sse_stateful_session.envelope.v3alpha.EnvelopeSessionState
       param_name: sessionId
       chunk_end_patterns: ["\r\n\r\n", "\n\n", "\r\r"]
   strict: true

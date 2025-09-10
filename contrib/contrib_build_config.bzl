@@ -100,5 +100,5 @@ CONTRIB_EXTENSIONS = {
     # mcp sse stateful session
     #
 
-    "envoy.http.mcp_sse_stateful_session.envelope":             "//contrib/mcp_sse_stateful_session/http/source:config",
+    "envoy.http.sse_stateful_session.envelope":             "//contrib/mcp_sse_stateful_session/http/source:config",
 }

@@ -147,10 +147,10 @@ envoy.filters.http.mcp_sse_stateful_session:
   type_urls:
   - envoy.extensions.filters.http.mcp_sse_stateful_session.v3alpha.McpSseStatefulSession
   - envoy.extensions.filters.http.mcp_sse_stateful_session.v3alpha.McpSseStatefulSessionPerRoute
-envoy.http.mcp_sse_stateful_session.envelope:
+envoy.http.sse_stateful_session.envelope:
   categories:
-  - envoy.http.mcp_sse_stateful_session
+  - envoy.http.sse_stateful_session
   security_posture: unknown
   status: alpha
   type_urls:
-  - envoy.extensions.http.mcp_sse_stateful_session.envelope.v3alpha.EnvelopeSessionState
+  - envoy.extensions.http.sse_stateful_session.envelope.v3alpha.EnvelopeSessionState

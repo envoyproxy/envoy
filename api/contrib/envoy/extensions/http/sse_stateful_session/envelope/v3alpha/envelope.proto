@@ -1,14 +1,14 @@
 syntax = "proto3";
 
-package envoy.extensions.http.mcp_sse_stateful_session.envelope.v3alpha;
+package envoy.extensions.http.sse_stateful_session.envelope.v3alpha;
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.http.mcp_sse_stateful_session.envelope.v3alpha";
+option java_package = "io.envoyproxy.envoy.extensions.http.sse_stateful_session.envelope.v3alpha";
 option java_outer_classname = "EnvelopeProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/http/mcp_sse_stateful_session/envelope/v3alpha";
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/http/sse_stateful_session/envelope/v3alpha";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Model Context Protocol(MCP) server-side events(SSE) stateful session extension]
@@ -24,7 +24,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // When processing the request from the downstream, Envoy will check if the url query params contain
 // the session context. If the request contains the session context, Envoy will strip the
 // upstream host from the session context.
-// [#extension: envoy.http.mcp_sse_stateful_session.envelope]
+// [#extension: envoy.http.sse_stateful_session.envelope]
 message EnvelopeSessionState {
   // The query parameter name used to track the session state in SSE data streams.
   // If the query parameter specified by this field is present in the SSE data stream,

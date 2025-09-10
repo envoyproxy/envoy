@@ -22,7 +22,7 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:base64_lib",
         "//source/common/http:utility_lib",
-        "@envoy_api//contrib/envoy/extensions/http/mcp_sse_stateful_session/envelope/v3alpha:pkg_cc_proto",
+        "@envoy_api//contrib/envoy/extensions/http/sse_stateful_session/envelope/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -35,6 +35,6 @@ envoy_cc_contrib_extension(
         "//envoy/http:sse_stateful_session_interface",
         "//envoy/registry",
         "//source/common/config:utility_lib",
-        "@envoy_api//contrib/envoy/extensions/http/mcp_sse_stateful_session/envelope/v3alpha:pkg_cc_proto",
+        "@envoy_api//contrib/envoy/extensions/http/sse_stateful_session/envelope/v3alpha:pkg_cc_proto",
     ],
 )

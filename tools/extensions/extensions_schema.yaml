@@ -146,7 +146,7 @@ categories:
 - envoy.tap_sinks.udp_sink
 - envoy.tracers.opentelemetry.resource_detectors
 - envoy.tracers.opentelemetry.samplers
-- envoy.http.mcp_sse_stateful_session
+- envoy.http.sse_stateful_session
 
 status_values:
 - name: stable

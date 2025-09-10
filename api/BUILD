@@ -91,7 +91,7 @@ proto_library(
         "//contrib/envoy/extensions/filters/network/sip_proxy/router/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/network/sip_proxy/tra/v3alpha:pkg",
         "//contrib/envoy/extensions/filters/network/sip_proxy/v3alpha:pkg",
-        "//contrib/envoy/extensions/http/mcp_sse_stateful_session/envelope/v3alpha:pkg",
+        "//contrib/envoy/extensions/http/sse_stateful_session/envelope/v3alpha:pkg",
         "//contrib/envoy/extensions/matching/input_matchers/hyperscan/v3alpha:pkg",
         "//contrib/envoy/extensions/network/connection_balance/dlb/v3alpha:pkg",
         "//contrib/envoy/extensions/private_key_providers/cryptomb/v3alpha:pkg",
