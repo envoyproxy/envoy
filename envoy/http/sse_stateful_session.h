@@ -47,7 +47,7 @@ public:
                                                      Buffer::Instance& data, bool end_stream) PURE;
 
   virtual bool sessionIdFound() const PURE; // only for testing
-  virtual void resetSessionIdFound() PURE; // only for testing
+  virtual void resetSessionIdFound() PURE;  // only for testing
 };
 
 using SseSessionStatePtr = std::unique_ptr<SseSessionState>;
@@ -86,7 +86,7 @@ public:
    */
   virtual SseSessionStateFactorySharedPtr
   createSseSessionStateFactory(const Protobuf::Message& config,
-                            Server::Configuration::GenericFactoryContext& context) PURE;
+                               Server::Configuration::GenericFactoryContext& context) PURE;
 
   std::string category() const override { return "envoy.http.sse_stateful_session"; }
 };
