@@ -147,8 +147,6 @@ public:
                                         std::chrono::microseconds rtt) override;
   absl::optional<uint64_t> congestionWindowInBytes() const override;
   const Network::ConnectionSocketPtr& getSocket() const override { PANIC("not implemented"); }
-  void setSocketReused(bool) override {}
-  bool isSocketReused() override { return false; }
 
   // Network::FilterManagerConnection
   void rawWrite(Buffer::Instance& data, bool end_stream) override;

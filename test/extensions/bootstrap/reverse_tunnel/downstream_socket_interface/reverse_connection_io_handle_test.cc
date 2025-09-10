@@ -5,7 +5,6 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/buffer/buffer_impl.h"
-#include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_handshake.pb.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"

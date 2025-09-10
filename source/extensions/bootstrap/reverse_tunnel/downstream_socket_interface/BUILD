@@ -3,18 +3,11 @@ load(
     "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_extension_package",
-    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
-
-# Proto library for internal handshake messages
-envoy_proto_library(
-    name = "reverse_connection_handshake",
-    srcs = ["reverse_connection_handshake.proto"],
-)
 
 envoy_cc_library(
     name = "reverse_connection_address_lib",
@@ -46,7 +39,6 @@ envoy_cc_library(
     hdrs = ["reverse_tunnel_initiator_extension.h"],
     visibility = ["//visibility:public"],
     deps = [
-        ":reverse_connection_handshake_cc_proto",
         "//envoy/server:bootstrap_extension_config_interface",
         "//envoy/stats:stats_interface",
         "//envoy/thread_local:thread_local_interface",
@@ -72,7 +64,6 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":reverse_connection_address_lib",
-        ":reverse_connection_handshake_cc_proto",
         ":reverse_tunnel_extension_lib",
         "//envoy/api:io_error_interface",
         "//envoy/grpc:async_client_interface",
@@ -85,11 +76,15 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
         "//source/common/grpc:typed_async_client_lib",
+        "//source/common/http:codec_client_lib",
+        "//source/common/http/http1:codec_lib",
+        "//source/common/http/http1:codec_stats_lib",
         "//source/common/network:address_lib",
         "//source/common/network:connection_socket_lib",
         "//source/common/network:default_socket_interface_lib",
         "//source/common/network:filter_lib",
         "//source/common/upstream:load_balancer_context_base_lib",
+        "//source/extensions/bootstrap/reverse_tunnel/common:reverse_connection_utility_lib",
     ],
 )
 

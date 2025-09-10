@@ -5,11 +5,13 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/deferred_deletable.h"
+#include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/http/http1/codec_impl.h"
 #include "source/common/network/filter_impl.h"
 
 namespace Envoy {
@@ -46,7 +48,9 @@ private:
  */
 class RCConnectionWrapper : public Network::ConnectionCallbacks,
                             public Event::DeferredDeletable,
-                            public Logger::Loggable<Logger::Id::main> {
+                            public Logger::Loggable<Logger::Id::main>,
+                            public Http::ResponseDecoder,
+                            public Http::ConnectionCallbacks {
   friend class SimpleConnReadFilterTest;
 
 public:
@@ -71,6 +75,19 @@ public:
   void onEvent(Network::ConnectionEvent event) override;
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
+
+  // Http::ResponseDecoder overrides
+  void decode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
+  void decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool end_stream) override;
+  void decodeData(Buffer::Instance&, bool) override {}
+  void decodeTrailers(Http::ResponseTrailerMapPtr&&) override {}
+  void decodeMetadata(Http::MetadataMapPtr&&) override {}
+  void dumpState(std::ostream&, int) const override {}
+
+  // Http::ConnectionCallbacks overrides
+  void onGoAway(Http::GoAwayErrorCode) override {}
+  void onSettings(Http::ReceivedSettings&) override {}
+  void onMaxStreamsChanged(uint32_t) override {}
 
   /**
    * Initiate the reverse connection handshake (HTTP only).
@@ -131,6 +148,16 @@ private:
   std::string connection_key_;
   bool http_handshake_sent_{false};
   bool handshake_completed_{false};
+
+public:
+  // Dispatch incoming bytes to HTTP/1 codec.
+  void dispatchHttp1(Buffer::Instance& buffer);
+
+private:
+  // HTTP/1 codec used to send request and parse response.
+  std::unique_ptr<Http::Http1::ClientConnectionImpl> http1_client_codec_;
+  // Base interface pointer used to call dispatch via public API.
+  Http::Connection* http1_parse_connection_{nullptr};
 };
 
 } // namespace ReverseConnection

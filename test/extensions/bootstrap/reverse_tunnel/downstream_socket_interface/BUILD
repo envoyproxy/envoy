@@ -21,7 +21,6 @@ envoy_extension_cc_test(
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_address_lib",
-        "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_handshake_cc_proto",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_initiator_lib",
         "//test/mocks/event:event_mocks",
@@ -56,7 +55,6 @@ envoy_cc_test(
     srcs = ["reverse_connection_io_handle_test.cc"],
     deps = [
         "//source/common/buffer:buffer_lib",
-        "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_handshake_cc_proto",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_extension_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_initiator_lib",
@@ -103,7 +101,6 @@ envoy_cc_test(
     srcs = ["rc_connection_wrapper_test.cc"],
     deps = [
         "//source/common/buffer:buffer_lib",
-        "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_handshake_cc_proto",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_extension_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_initiator_lib",

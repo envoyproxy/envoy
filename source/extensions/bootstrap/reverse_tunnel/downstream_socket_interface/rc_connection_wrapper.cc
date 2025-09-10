@@ -5,10 +5,11 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_socket_impl.h"
-#include "source/common/protobuf/utility.h"
-#include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_handshake.pb.h"
+#include "source/extensions/bootstrap/reverse_tunnel/common/reverse_connection_utility.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 
 namespace Envoy {
@@ -26,7 +27,7 @@ RCConnectionWrapper::RCConnectionWrapper(ReverseConnectionIOHandle& parent,
   ENVOY_LOG(debug, "RCConnectionWrapper: Using HTTP handshake for reverse connections");
 }
 
-// RCConnectionWrapper destructor implementation
+// RCConnectionWrapper destructor implementation.
 RCConnectionWrapper::~RCConnectionWrapper() {
   ENVOY_LOG(debug, "RCConnectionWrapper destructor called");
   this->shutdown();
@@ -53,70 +54,18 @@ void RCConnectionWrapper::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-// SimpleConnReadFilter::onData implementation
-Network::FilterStatus SimpleConnReadFilter::onData(Buffer::Instance& buffer, bool) {
+// SimpleConnReadFilter::onData implementation.
+Network::FilterStatus SimpleConnReadFilter::onData(Buffer::Instance& buffer, bool end_stream) {
   if (parent_ == nullptr) {
     return Network::FilterStatus::StopIteration;
   }
 
-  // Cast parent_ back to RCConnectionWrapper
+  // Cast parent_ back to RCConnectionWrapper.
   RCConnectionWrapper* wrapper = static_cast<RCConnectionWrapper*>(parent_);
 
-  const std::string data = buffer.toString();
-
-  // Look for HTTP response status line first (supports both HTTP/1.1 and HTTP/2)
-  if (data.find("HTTP/1.1 200 OK") != std::string::npos ||
-      data.find("HTTP/2 200") != std::string::npos) {
-    ENVOY_LOG(debug, "Received HTTP 200 OK response");
-
-    // Find the end of headers (double CRLF)
-    size_t headers_end = data.find("\r\n\r\n");
-    if (headers_end != std::string::npos) {
-      // Extract the response body (after headers)
-      std::string response_body = data.substr(headers_end + 4);
-
-      if (!response_body.empty()) {
-        // Try to parse the protobuf response
-        envoy::extensions::bootstrap::reverse_tunnel::ReverseConnHandshakeRet ret;
-        if (ret.ParseFromString(response_body)) {
-          ENVOY_LOG(debug, "Successfully parsed protobuf response: {}", ret.DebugString());
-
-          // Check if the status is ACCEPTED
-          if (ret.status() ==
-              envoy::extensions::bootstrap::reverse_tunnel::ReverseConnHandshakeRet::ACCEPTED) {
-            ENVOY_LOG(debug, "SimpleConnReadFilter: Reverse connection accepted by cloud side");
-            wrapper->onHandshakeSuccess();
-            return Network::FilterStatus::StopIteration;
-          } else {
-            ENVOY_LOG(error, "SimpleConnReadFilter: Reverse connection rejected: {}",
-                      ret.status_message());
-            wrapper->onHandshakeFailure(ret.status_message());
-            return Network::FilterStatus::StopIteration;
-          }
-        } else {
-          ENVOY_LOG(error, "Could not parse protobuf response - invalid response format");
-          wrapper->onHandshakeFailure(
-              "Invalid response format - expected ReverseConnHandshakeRet protobuf");
-          return Network::FilterStatus::StopIteration;
-        }
-      } else {
-        ENVOY_LOG(debug, "Response body is empty, waiting for more data");
-        return Network::FilterStatus::Continue;
-      }
-    } else {
-      ENVOY_LOG(debug, "HTTP headers not complete yet, waiting for more data");
-      return Network::FilterStatus::Continue;
-    }
-  } else if (data.find("HTTP/1.1 ") != std::string::npos ||
-             data.find("HTTP/2 ") != std::string::npos) {
-    // Found HTTP response but not 200 OK - this is an error
-    ENVOY_LOG(error, "Received non-200 HTTP response: {}", data.substr(0, 100));
-    wrapper->onHandshakeFailure("HTTP handshake failed with non-200 response");
-    return Network::FilterStatus::StopIteration;
-  } else {
-    ENVOY_LOG(debug, "Waiting for HTTP response, received {} bytes", data.length());
-    return Network::FilterStatus::Continue;
-  }
+  wrapper->dispatchHttp1(buffer);
+  UNREFERENCED_PARAMETER(end_stream);
+  return Network::FilterStatus::StopIteration;
 }
 
 std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
@@ -128,26 +77,26 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
   connection_->addConnectionCallbacks(*this);
   connection_->connect();
 
-  // Use HTTP handshake
+  // Use HTTP handshake.
   ENVOY_LOG(debug,
             "RCConnectionWrapper: connection: {}, sending reverse connection creation "
             "request through HTTP",
             connection_->id());
 
-  // Add read filter to handle HTTP response
+  // Create HTTP/1 codec to parse the response.
+  Http::Http1Settings http1_settings = host_->cluster().http1Settings();
+  http1_client_codec_ = std::make_unique<Http::Http1::ClientConnectionImpl>(
+      *connection_, host_->cluster().http1CodecStats(), *this, http1_settings,
+      host_->cluster().maxResponseHeadersKb(), host_->cluster().maxResponseHeadersCount());
+  http1_parse_connection_ = http1_client_codec_.get();
+
+  // Add a tiny read filter to feed bytes into the codec for response parsing.
   connection_->addReadFilter(Network::ReadFilterSharedPtr{new SimpleConnReadFilter(this)});
 
-  // Use HTTP handshake logic
-  envoy::extensions::bootstrap::reverse_tunnel::ReverseConnHandshakeArg arg;
-  arg.set_tenant_uuid(src_tenant_id);
-  arg.set_cluster_uuid(src_cluster_id);
-  arg.set_node_uuid(src_node_id);
-  ENVOY_LOG(debug,
-            "RCConnectionWrapper: Creating protobuf with tenant='{}', cluster='{}', node='{}'",
-            src_tenant_id, src_cluster_id, src_node_id);
-  std::string body = arg.SerializeAsString(); // NOLINT(protobuf-use-MessageUtil-hash)
-  ENVOY_LOG(debug, "RCConnectionWrapper: Serialized protobuf body length: {}, debug: '{}'",
-            body.length(), arg.DebugString());
+  // Build HTTP handshake headers with identifiers.
+  absl::string_view tenant_id = src_tenant_id;
+  absl::string_view cluster_id = src_cluster_id;
+  absl::string_view node_id = src_node_id;
   std::string host_value;
   const auto& remote_address = connection_->connectionInfoProvider().remoteAddress();
   // This is used when reverse connections need to be established through a HTTP proxy.
@@ -170,20 +119,52 @@ std::string RCConnectionWrapper::connect(const std::string& src_tenant_id,
               "using address as host header",
               connection_->id());
   }
-  // Build HTTP request with protobuf body.
-  Buffer::OwnedImpl reverse_connection_request(
-      fmt::format("POST /reverse_connections/request HTTP/1.1\r\n"
-                  "Host: {}\r\n"
-                  "Accept: */*\r\n"
-                  "Content-length: {}\r\n"
-                  "\r\n{}",
-                  host_value, body.length(), body));
-  ENVOY_LOG(debug, "RCConnectionWrapper: connection: {}, writing request to connection: {}",
-            connection_->id(), reverse_connection_request.toString());
-  // Send reverse connection request over TCP connection.
-  connection_->write(reverse_connection_request, false);
+  const Http::LowerCaseString& node_hdr =
+      ::Envoy::Extensions::Bootstrap::ReverseConnection::reverseTunnelNodeIdHeader();
+  const Http::LowerCaseString& cluster_hdr =
+      ::Envoy::Extensions::Bootstrap::ReverseConnection::reverseTunnelClusterIdHeader();
+  const Http::LowerCaseString& tenant_hdr =
+      ::Envoy::Extensions::Bootstrap::ReverseConnection::reverseTunnelTenantIdHeader();
+
+  auto headers = Http::createHeaderMap<Http::RequestHeaderMapImpl>({
+      {Http::Headers::get().Method, Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Path, "/reverse_connections/request"},
+      {Http::Headers::get().Host, host_value},
+  });
+  headers->addCopy(node_hdr, std::string(node_id));
+  headers->addCopy(cluster_hdr, std::string(cluster_id));
+  headers->addCopy(tenant_hdr, std::string(tenant_id));
+  headers->setContentLength(0);
+
+  // Encode via HTTP/1 codec.
+  Http::RequestEncoder& request_encoder = http1_client_codec_->newStream(*this);
+  const Http::Status encode_status = request_encoder.encodeHeaders(*headers, true);
+  if (!encode_status.ok()) {
+    ENVOY_LOG(error, "RCConnectionWrapper: encodeHeaders failed: {}", encode_status.message());
+    onHandshakeFailure("HTTP handshake encode failed");
+  }
 
   return connection_->connectionInfoProvider().localAddress()->asString();
+}
+
+void RCConnectionWrapper::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bool) {
+  const uint64_t status = Http::Utility::getResponseStatus(*headers);
+  if (status == 200) {
+    ENVOY_LOG(debug, "Received HTTP 200 OK response");
+    onHandshakeSuccess();
+  } else {
+    ENVOY_LOG(error, "Received non-200 HTTP response: {}", status);
+    onHandshakeFailure("HTTP handshake failed with non-200 response");
+  }
+}
+
+void RCConnectionWrapper::dispatchHttp1(Buffer::Instance& buffer) {
+  if (http1_parse_connection_ != nullptr) {
+    const Http::Status status = http1_parse_connection_->dispatch(buffer);
+    if (!status.ok()) {
+      ENVOY_LOG(debug, "RCConnectionWrapper: HTTP/1 codec dispatch error: {}", status.message());
+    }
+  }
 }
 
 void RCConnectionWrapper::onHandshakeSuccess() {

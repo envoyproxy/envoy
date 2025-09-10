@@ -4584,20 +4584,6 @@ TEST_P(ClientConnectionWithCustomRawBufferSocketTest, TransportSocketCallbacks) 
   disconnect(false);
 }
 
-TEST_P(ConnectionImplTest, TestSocketReuseFlagDefaultState) {
-  setUpBasicConnection();
-  connect();
-
-  // Test that socket reuse flag defaults to false.
-  EXPECT_FALSE(client_connection_->isSocketReused());
-
-  // Test that setting to false works when already false.
-  client_connection_->setSocketReused(false);
-  EXPECT_FALSE(client_connection_->isSocketReused());
-
-  disconnect(true);
-}
-
 TEST_P(ConnectionImplTest, TestConstSocketAccess) {
   setUpBasicConnection();
   connect();

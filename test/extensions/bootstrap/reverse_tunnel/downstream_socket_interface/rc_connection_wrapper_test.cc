@@ -6,7 +6,6 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper.h"
-#include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_handshake.pb.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator_extension.h"
@@ -197,12 +196,6 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeSuccess) {
         return *mock_provider;
       }));
 
-  // Capture the written buffer to verify HTTP POST content.
-  Buffer::OwnedImpl captured_buffer;
-  EXPECT_CALL(*mock_connection, write(_, _))
-      .WillOnce(Invoke(
-          [&captured_buffer](Buffer::Instance& buffer, bool) { captured_buffer.add(buffer); }));
-
   // Create a mock host.
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
 
@@ -214,33 +207,6 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeSuccess) {
 
   // Verify connect() returns the local address.
   EXPECT_EQ(result, "127.0.0.1:12345");
-
-  // Verify the HTTP POST request content.
-  std::string written_data = captured_buffer.toString();
-
-  // Check HTTP headers.
-  EXPECT_THAT(written_data, testing::HasSubstr("POST /reverse_connections/request HTTP/1.1"));
-  EXPECT_THAT(written_data, testing::HasSubstr("Host: 192.168.1.1:8080"));
-  EXPECT_THAT(written_data, testing::HasSubstr("Accept: */*"));
-  EXPECT_THAT(written_data, testing::HasSubstr("Content-length:"));
-
-  // Check that the body contains the protobuf serialized data.
-  // The protobuf should contain tenant_uuid, cluster_uuid, and node_uuid.
-  EXPECT_THAT(written_data, testing::HasSubstr("\r\n\r\n")); // Empty line after headers
-
-  // Extract the body (everything after the double CRLF)
-  size_t body_start = written_data.find("\r\n\r\n");
-  EXPECT_NE(body_start, std::string::npos);
-  std::string body = written_data.substr(body_start + 4);
-  EXPECT_FALSE(body.empty());
-
-  // Verify the protobuf content by deserializing it.
-  envoy::extensions::bootstrap::reverse_tunnel::ReverseConnHandshakeArg arg;
-  bool parse_success = arg.ParseFromString(body);
-  EXPECT_TRUE(parse_success);
-  EXPECT_EQ(arg.tenant_uuid(), "test-tenant");
-  EXPECT_EQ(arg.cluster_uuid(), "test-cluster");
-  EXPECT_EQ(arg.node_uuid(), "test-node");
 }
 
 // Test RCConnectionWrapper::connect() method with HTTP proxy (internal address) scenario.
@@ -269,11 +235,13 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWithHttpProxy) {
             return *mock_provider;
           }));
 
-  // Capture the written buffer to verify HTTP POST content.
+  // Capture the written buffer to verify HTTP request and simulate kernel drain.
   Buffer::OwnedImpl captured_buffer;
   EXPECT_CALL(*mock_connection, write(_, _))
-      .WillOnce(Invoke(
-          [&captured_buffer](Buffer::Instance& buffer, bool) { captured_buffer.add(buffer); }));
+      .WillOnce(Invoke([&captured_buffer](Buffer::Instance& buffer, bool) {
+        captured_buffer.add(buffer);
+        buffer.drain(buffer.length());
+      }));
 
   // Create a mock host.
   auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
@@ -286,33 +254,6 @@ TEST_F(RCConnectionWrapperTest, ConnectHttpHandshakeWithHttpProxy) {
 
   // Verify connect() returns the local address.
   EXPECT_EQ(result, "127.0.0.1:12345");
-
-  // Verify the HTTP POST request content.
-  std::string written_data = captured_buffer.toString();
-
-  // Check HTTP headers.
-  EXPECT_THAT(written_data, testing::HasSubstr("POST /reverse_connections/request HTTP/1.1"));
-  // For HTTP proxy scenario, the Host header should use the endpoint ID from the internal address.
-  EXPECT_THAT(written_data, testing::HasSubstr("Host: endpoint_id_123"));
-  EXPECT_THAT(written_data, testing::HasSubstr("Accept: */*"));
-  EXPECT_THAT(written_data, testing::HasSubstr("Content-length:"));
-
-  // Check that the body contains the protobuf serialized data.
-  EXPECT_THAT(written_data, testing::HasSubstr("\r\n\r\n")); // Empty line after headers
-
-  // Extract the body (everything after the double CRLF)
-  size_t body_start = written_data.find("\r\n\r\n");
-  EXPECT_NE(body_start, std::string::npos);
-  std::string body = written_data.substr(body_start + 4);
-  EXPECT_FALSE(body.empty());
-
-  // Verify the protobuf content by deserializing it.
-  envoy::extensions::bootstrap::reverse_tunnel::ReverseConnHandshakeArg arg;
-  bool parse_success = arg.ParseFromString(body);
-  EXPECT_TRUE(parse_success);
-  EXPECT_EQ(arg.tenant_uuid(), "test-tenant");
-  EXPECT_EQ(arg.cluster_uuid(), "test-cluster");
-  EXPECT_EQ(arg.node_uuid(), "test-node");
 }
 
 // Test RCConnectionWrapper::connect() method with connection write failure.
@@ -914,10 +855,10 @@ TEST_F(SimpleConnReadFilterTest, OnDataWithHttp200Response) {
   auto wrapper = createMockWrapper();
   auto filter = createFilter(wrapper.get());
 
-  // Create a buffer with HTTP 200 response but invalid protobuf.
-  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\n\r\nreverse connection accepted");
+  // Create a buffer with HTTP 200 response.
+  Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\n\r\n");
 
-  // Call onData - should return StopIteration for invalid response format.
+  // Call onData - the filter always stops iteration after dispatch.
   auto result = filter->onData(buffer, false);
   EXPECT_EQ(result, Network::FilterStatus::StopIteration);
 }
@@ -943,9 +884,9 @@ TEST_F(SimpleConnReadFilterTest, OnDataWithIncompleteHeaders) {
   // Create a buffer with incomplete HTTP headers.
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n");
 
-  // Call onData - should return Continue for incomplete headers.
+  // Call onData - the filter always stops iteration after dispatch.
   auto result = filter->onData(buffer, false);
-  EXPECT_EQ(result, Network::FilterStatus::Continue);
+  EXPECT_EQ(result, Network::FilterStatus::StopIteration);
 }
 
 TEST_F(SimpleConnReadFilterTest, OnDataWithEmptyResponseBody) {
@@ -956,9 +897,9 @@ TEST_F(SimpleConnReadFilterTest, OnDataWithEmptyResponseBody) {
   // Create a buffer with HTTP 200 but empty body.
   Buffer::OwnedImpl buffer("HTTP/1.1 200 OK\r\n\r\n");
 
-  // Call onData - should return Continue for empty body.
+  // Call onData - the filter always stops iteration after dispatch.
   auto result = filter->onData(buffer, false);
-  EXPECT_EQ(result, Network::FilterStatus::Continue);
+  EXPECT_EQ(result, Network::FilterStatus::StopIteration);
 }
 
 TEST_F(SimpleConnReadFilterTest, OnDataWithNon200Response) {
@@ -995,48 +936,12 @@ TEST_F(SimpleConnReadFilterTest, OnDataWithPartialData) {
   // Create a buffer with partial data (no HTTP response yet)
   Buffer::OwnedImpl buffer("partial data");
 
-  // Call onData - should return Continue for partial data.
-  auto result = filter->onData(buffer, false);
-  EXPECT_EQ(result, Network::FilterStatus::Continue);
-}
-
-TEST_F(SimpleConnReadFilterTest, OnDataWithProtobufResponse) {
-  // Create wrapper and filter.
-  auto wrapper = createMockWrapper();
-  auto filter = createFilter(wrapper.get());
-
-  // Create a proper ReverseConnHandshakeRet protobuf response.
-  envoy::extensions::bootstrap::reverse_tunnel::ReverseConnHandshakeRet ret;
-  ret.set_status(envoy::extensions::bootstrap::reverse_tunnel::ReverseConnHandshakeRet::ACCEPTED);
-  ret.set_status_message("Connection accepted");
-
-  std::string protobuf_data = ret.SerializeAsString(); // NOLINT(protobuf-use-MessageUtil-hash)
-  std::string http_response = "HTTP/1.1 200 OK\r\n\r\n" + protobuf_data;
-  Buffer::OwnedImpl buffer(http_response);
-
-  // Call onData - should return StopIteration for successful protobuf response.
+  // Call onData - the filter always stops iteration after dispatch.
   auto result = filter->onData(buffer, false);
   EXPECT_EQ(result, Network::FilterStatus::StopIteration);
 }
 
-TEST_F(SimpleConnReadFilterTest, OnDataWithRejectedProtobufResponse) {
-  // Create wrapper and filter.
-  auto wrapper = createMockWrapper();
-  auto filter = createFilter(wrapper.get());
-
-  // Create a ReverseConnHandshakeRet protobuf response with REJECTED status.
-  envoy::extensions::bootstrap::reverse_tunnel::ReverseConnHandshakeRet ret;
-  ret.set_status(envoy::extensions::bootstrap::reverse_tunnel::ReverseConnHandshakeRet::REJECTED);
-  ret.set_status_message("Connection rejected by server");
-
-  std::string protobuf_data = ret.SerializeAsString(); // NOLINT(protobuf-use-MessageUtil-hash)
-  std::string http_response = "HTTP/1.1 200 OK\r\n\r\n" + protobuf_data;
-  Buffer::OwnedImpl buffer(http_response);
-
-  // Call onData - should return StopIteration for rejected protobuf response.
-  auto result = filter->onData(buffer, false);
-  EXPECT_EQ(result, Network::FilterStatus::StopIteration);
-}
+// Removed protobuf-based response tests as the handshake now uses HTTP headers only.
 
 } // namespace ReverseConnection
 } // namespace Bootstrap

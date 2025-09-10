@@ -329,15 +329,6 @@ api_listener:
 
   // Test getSocket() - should PANIC for SyntheticConnection
   EXPECT_DEATH(connection.getSocket(), "not implemented");
-
-  // Test setSocketReused() - should be a no-op for SyntheticConnection
-  EXPECT_NO_THROW(connection.setSocketReused(true));
-  EXPECT_NO_THROW(connection.setSocketReused(false));
-
-  // Test isSocketReused() - should always return false for SyntheticConnection
-  EXPECT_FALSE(connection.isSocketReused());
-  connection.setSocketReused(true);
-  EXPECT_FALSE(connection.isSocketReused()); // Should still return false
 }
 
 // Verify base address access and drain decision behavior.
