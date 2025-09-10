@@ -337,24 +337,23 @@ TEST_P(HttpUpstreamRequestEncoderTest, RequestIdGeneratedWhenEnabled) {
   this->upstream_->setRequestEncoder(this->encoder_, false);
 }
 
-TEST_P(HttpUpstreamRequestEncoderTest, RequestIdStoredInFilterStateWhenEnabled) {
+MATCHER(HasNonEmptyTunnelRequestId, "Struct has non-empty tunnel_request_id") {
+  const Protobuf::Struct& st = arg;
+  const auto& fields = st.fields();
+  auto it = fields.find("tunnel_request_id");
+  return it != fields.end() && !it->second.string_value().empty();
+}
+
+TEST_P(HttpUpstreamRequestEncoderTest, RequestIdStoredInDynamicMetadataWhenEnabled) {
   envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension reqid_ext;
   envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig uuid_cfg;
   reqid_ext.mutable_typed_config()->PackFrom(uuid_cfg);
   *this->tcp_proxy_.mutable_tunneling_config()->mutable_request_id_extension() = reqid_ext;
   this->setupUpstream();
+  EXPECT_CALL(this->downstream_stream_info_,
+              setDynamicMetadata("envoy.filters.network.tcp_proxy", HasNonEmptyTunnelRequestId()));
   EXPECT_CALL(this->encoder_, encodeHeaders(_, false)).WillOnce(Return(Http::okStatus()));
   this->upstream_->setRequestEncoder(this->encoder_, false);
-  auto fs = this->downstream_stream_info_.filterState();
-  auto* obj = fs->getDataReadOnlyGeneric("envoy.tcp_proxy.tunnel_request_id");
-  EXPECT_NE(obj, nullptr);
-  if (obj != nullptr) {
-    auto val = obj->serializeAsString();
-    EXPECT_TRUE(val.has_value());
-    if (val.has_value()) {
-      EXPECT_FALSE(val->empty());
-    }
-  }
 }
 
 TEST_P(HttpUpstreamRequestEncoderTest, RequestEncoderConnectWithCustomPath) {

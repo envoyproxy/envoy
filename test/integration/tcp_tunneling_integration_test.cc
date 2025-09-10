@@ -843,12 +843,12 @@ public:
           proxy_config.mutable_tunneling_config()->mutable_request_id_extension()->CopyFrom(
               request_id_extension);
 
-          // Add a file access log to capture the filter state request id before packing.
+          // Add a file access log to capture the dynamic metadata request id before packing.
           tunnel_access_log_path_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
           envoy::extensions::access_loggers::file::v3::FileAccessLog fal;
           fal.set_path(tunnel_access_log_path_);
           fal.mutable_log_format()->mutable_text_format_source()->set_inline_string(
-              "%FILTER_STATE(envoy.tcp_proxy.tunnel_request_id:PLAIN)%\n");
+              "%DYNAMIC_METADATA(envoy.filters.network.tcp_proxy:tunnel_request_id)%\n");
           proxy_config.add_access_log()->mutable_typed_config()->PackFrom(fal);
 
           auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();

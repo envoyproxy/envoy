@@ -129,14 +129,13 @@ void HttpUpstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool
     // traffic could be anything - HTTPS, MySQL, Postgres, etc.
     config_.requestIDExtension()->set(*headers, /*edge_request=*/true,
                                       /*keep_external_id=*/false);
-    // Also store the request ID in filter state to allow TCP access logs to format it.
+    // Also store the request ID in dynamic metadata to allow TCP access logs to format it.
     const auto rid = headers->getRequestIdValue();
     if (!rid.empty()) {
-      downstream_info_.filterState()->setData(
-          "envoy.tcp_proxy.tunnel_request_id",
-          std::make_shared<Router::StringAccessorImpl>(std::string(rid)),
-          StreamInfo::FilterState::StateType::ReadOnly,
-          StreamInfo::FilterState::LifeSpan::Connection);
+      Protobuf::Struct md;
+      auto& fields = *md.mutable_fields();
+      fields["tunnel_request_id"].mutable_string_value()->assign(rid.data(), rid.size());
+      downstream_info_.setDynamicMetadata("envoy.filters.network.tcp_proxy", md);
     }
   }
 
@@ -447,11 +446,11 @@ CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
                                       /*keep_external_id=*/false);
     const auto rid = downstream_headers_->getRequestIdValue();
     if (!rid.empty()) {
-      downstream_info_.filterState()->setData(
-          "envoy.tcp_proxy.tunnel_request_id",
-          std::make_shared<Router::StringAccessorImpl>(std::string(rid)),
-          StreamInfo::FilterState::StateType::ReadOnly,
-          StreamInfo::FilterState::LifeSpan::Connection);
+      Protobuf::Struct md;
+      auto& fields = *md.mutable_fields();
+      // Avoid extra temporaries by writing directly into the protobuf string value.
+      fields["tunnel_request_id"].mutable_string_value()->assign(rid.data(), rid.size());
+      downstream_info_.setDynamicMetadata("envoy.filters.network.tcp_proxy", md);
     }
   }
 
