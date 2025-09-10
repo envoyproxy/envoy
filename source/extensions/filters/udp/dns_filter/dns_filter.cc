@@ -175,8 +175,22 @@ DnsFilterEnvoyConfig::DnsFilterEnvoyConfig(
         client_config, resolver_timeout, DEFAULT_RESOLVER_TIMEOUT.count()));
     max_pending_lookups_ = client_config.max_pending_lookups();
   } else {
-    // In case client_config doesn't exist, create default DNS resolver factory and save it.
-    dns_resolver_factory_ = &Network::createDefaultDnsResolverFactory(typed_dns_resolver_config_);
+    // In case client_config doesn't exist, use the bootstrap DNS resolver if it is configured.
+    if (context.serverFactoryContext().bootstrap().has_typed_dns_resolver_config() &&
+        !context.serverFactoryContext()
+             .bootstrap()
+             .typed_dns_resolver_config()
+             .typed_config()
+             .type_url()
+             .empty()) {
+      typed_dns_resolver_config_.MergeFrom(
+          context.serverFactoryContext().bootstrap().typed_dns_resolver_config());
+      dns_resolver_factory_ =
+          &Network::createDnsResolverFactoryFromTypedConfig(typed_dns_resolver_config_);
+    } else {
+      // Otherwise create default DNS resolver factory and save it.
+      dns_resolver_factory_ = &Network::createDefaultDnsResolverFactory(typed_dns_resolver_config_);
+    }
     max_pending_lookups_ = 0;
   }
 }

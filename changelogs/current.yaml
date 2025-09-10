@@ -61,6 +61,11 @@ minor_behavior_changes:
     If :ref:`failure_mode_allow <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.failure_mode_allow>` is true,
     save the gRPC failure status code returned from the ext_proc server in the filter state.
     Previously, all fail-open cases would return ``call_status`` ``Grpc::Status::Aborted``.
+- area: dns_filter
+  change: |
+    Honor the default DNS resolver configuration in the bootstrap config
+    :ref:`typed_dns_resolver_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.typed_dns_resolver_config>` if the
+    :ref:`client_config <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.client_config>` is empty.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -321,6 +326,23 @@ new_features:
     extract trace information from W3C trace headers when B3 headers are not present (downstream),
     and inject both B3 and W3C trace headers for upstream requests to maximize compatibility.
     The default value ``USE_B3`` maintains backward compatibility with B3-only behavior.
+- area: tracing
+  change: |
+    Enhanced Zipkin tracer with advanced collector configuration via
+    :ref:`collector_service <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_service>`
+    using HttpService. New features include:
+
+    1. **Custom HTTP Headers**: Add headers to collector requests for custom metadata, service identification,
+       and collector-specific routing.
+
+    2. **Full URI Parsing**: The ``uri`` field now supports both path-only (``/api/v2/spans``) and
+       full URI formats (``https://zipkin-collector.example.com/api/v2/spans``). When using full URIs,
+       Envoy automatically extracts hostname and path components - hostname sets the HTTP ``Host`` header,
+       and path sets the request path. Path-only URIs fallback to using cluster name as hostname.
+
+    When configured, collector_service takes precedence over legacy configuration fields (collector_cluster,
+    collector_endpoint, collector_hostname), which will be deprecated in a future release. Legacy configuration
+    does not support custom headers or URI parsing.
 - area: composite
   change: |
     Allow composite filter to be configured to insert a filter into the filter chain outside of the decode headers lifecycle phase.
