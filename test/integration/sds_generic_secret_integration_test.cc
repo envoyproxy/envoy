@@ -134,7 +134,7 @@ public:
     generic_secret->mutable_secret()->set_inline_string("DUMMY_AES_128_KEY");
     envoy::service::discovery::v3::DiscoveryResponse discovery_response;
     discovery_response.set_version_info("0");
-    discovery_response.set_type_url(Config::TypeUrl::get().Secret);
+    discovery_response.set_type_url(Config::TestTypeUrl::get().Secret);
     discovery_response.add_resources()->PackFrom(secret);
     xds_stream_->sendGrpcMessage(discovery_response);
   }

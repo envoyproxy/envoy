@@ -12,6 +12,7 @@
 #include "test/integration/http_integration.h"
 #include "test/integration/ssl_utility.h"
 #include "test/test_common/registry.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 using testing::HasSubstr;
@@ -104,11 +105,15 @@ public:
 
   void initialize() override { initializeWithArgs(); }
 
-  void initializeWithArgs(uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024,
-                          const std::string& override_auto_sni_header = "",
-                          absl::string_view typed_dns_resolver_config = typed_dns_resolver_config_,
-                          bool use_sub_cluster = false, double dns_query_timeout = 5,
-                          bool disable_dns_refresh_on_failure = false) {
+  void initializeWithArgs(
+      uint64_t max_hosts = 1024, uint32_t max_pending_requests = 1024,
+      const std::string& override_auto_sni_header = "",
+      absl::string_view typed_dns_resolver_config = typed_dns_resolver_config_,
+      bool use_sub_cluster = false, double dns_query_timeout = 5,
+      bool disable_dns_refresh_on_failure = false,
+      bool allow_dynamic_host_from_filter_state = false,
+      const absl::optional<std::string>& prepend_custom_filter_config_yaml = absl::nullopt,
+      bool use_dfp_even_when_cluster_resolves_hosts = false) {
     const std::string filter_use_sub_cluster = R"EOF(
 name: dynamic_forward_proxy
 typed_config:
@@ -131,16 +136,45 @@ typed_config:
     disable_dns_refresh_on_failure: {}
     dns_cache_circuit_breaker:
       max_pending_requests: {}{}{}
+  {}
 )EOF",
         Network::Test::ipVersionToDnsFamily(GetParam()), max_hosts, host_ttl_, dns_query_timeout,
         disable_dns_refresh_on_failure, max_pending_requests, key_value_config_,
-        typed_dns_resolver_config);
-    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts")) {
-      config_helper_.prependFilter(use_sub_cluster ? filter_use_sub_cluster : filter_use_dns_cache);
-    } else if (use_sub_cluster) {
-      config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_cluster_resolves_hosts",
-                                        "false");
-      config_helper_.prependFilter(filter_use_sub_cluster);
+        typed_dns_resolver_config,
+        allow_dynamic_host_from_filter_state ? "allow_dynamic_host_from_filter_state: true" : "");
+    const std::string stream_info_filter_config_str = fmt::format(R"EOF(
+name: stream-info-to-headers-filter
+)EOF");
+
+    if (prepend_custom_filter_config_yaml.has_value()) {
+      // Prepend DFP filter.
+      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts") ||
+          use_dfp_even_when_cluster_resolves_hosts) {
+        config_helper_.prependFilter(use_sub_cluster ? filter_use_sub_cluster
+                                                     : filter_use_dns_cache);
+      } else if (use_sub_cluster) {
+        config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_cluster_resolves_hosts",
+                                          "false");
+        config_helper_.prependFilter(filter_use_sub_cluster);
+      }
+
+      // Prepend the custom_filter from the parameter.
+      config_helper_.prependFilter(prepend_custom_filter_config_yaml.value());
+
+      // Prepend stream_info_filter.
+      config_helper_.prependFilter(stream_info_filter_config_str);
+    } else {
+      if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.dfp_cluster_resolves_hosts") ||
+          use_dfp_even_when_cluster_resolves_hosts) {
+        config_helper_.prependFilter(use_sub_cluster ? filter_use_sub_cluster
+                                                     : filter_use_dns_cache);
+      } else if (use_sub_cluster) {
+        config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_cluster_resolves_hosts",
+                                          "false");
+        config_helper_.prependFilter(filter_use_sub_cluster);
+      }
+
+      config_helper_.prependFilter(stream_info_filter_config_str);
     }
 
     config_helper_.prependFilter(fmt::format(R"EOF(
@@ -1247,6 +1281,8 @@ TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndTestHappyEyeballs) {
 
 #if defined(ENVOY_ENABLE_QUIC)
 TEST_P(ProxyFilterIntegrationTest, UseCacheFileAndHttp3) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http3_happy_eyeballs", "true"}});
   upstream_cert_name_ = ""; // Force standard TLS
   dns_hostname_ = "sni.lyft.com";
   autonomous_upstream_ = true;
@@ -1485,68 +1521,6 @@ TEST_P(ProxyFilterIntegrationTest, SubClusterReloadCluster) {
   test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
 }
 
-// Verify that we expire sub clusters and not remove on CDS.
-TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveViaTTLAndDFPUpdateWithoutAvoidCDSRemoval) {
-  const std::string cluster_yaml = R"EOF(
-    name: fake_cluster
-    connect_timeout: 0.250s
-    type: STATIC
-    lb_policy: ROUND_ROBIN
-    load_assignment:
-      cluster_name: fake_cluster
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 11001
-  )EOF";
-  auto cluster = Upstream::parseClusterFromV3Yaml(cluster_yaml);
-  // make runtime guard false
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update", "false");
-  initializeWithArgs(1024, 1024, "", typed_dns_resolver_config_, true);
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  const Http::TestRequestHeaderMapImpl request_headers{
-      {":method", "POST"},
-      {":path", "/test/long/url"},
-      {":scheme", "http"},
-      {":authority",
-       fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port())}};
-
-  auto response =
-      sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
-  checkSimpleRequestSuccess(1024, 1024, response.get());
-  // one more cluster
-  test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
-  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 0);
-  cleanupUpstreamAndDownstream();
-
-  // Sub cluster expected to be removed after ttl
-  // > 5m
-  simTime().advanceTimeWait(std::chrono::milliseconds(300001));
-  test_server_->waitForCounterEq("cluster_manager.cluster_added", 2);
-  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
-
-  codec_client_ = makeHttpConnection(lookupPort("http"));
-  response = sendRequestAndWaitForResponse(request_headers, 1024, default_response_headers_, 1024);
-  checkSimpleRequestSuccess(1024, 1024, response.get());
-
-  // sub cluster added again
-  test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
-  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 1);
-  cleanupUpstreamAndDownstream();
-
-  // Make update to DFP cluster
-  cluster_.mutable_circuit_breakers()->add_thresholds()->mutable_max_connections()->set_value(100);
-  cds_helper_.setCds({cluster_});
-
-  // sub cluster removed due to dfp cluster update
-  test_server_->waitForCounterEq("cluster_manager.cluster_added", 3);
-  test_server_->waitForCounterEq("cluster_manager.cluster_removed", 2);
-}
-
 // Verify that we expire sub clusters.
 TEST_P(ProxyFilterWithSimtimeIntegrationTest, RemoveSubClusterViaTTL) {
   initializeWithArgs(1024, 1024, "", typed_dns_resolver_config_, true);
@@ -1625,8 +1599,6 @@ TEST_P(ProxyFilterIntegrationTest, SubClusterWithIpHost) {
 
 // Verify that no DFP clusters are removed when CDS Reload is triggered.
 TEST_P(ProxyFilterIntegrationTest, CDSReloadNotRemoveDFPCluster) {
-  config_helper_.addRuntimeOverride(
-      "envoy.reloadable_features.avoid_dfp_cluster_removal_on_cds_update", "true");
   const std::string cluster_yaml = R"EOF(
     name: fake_cluster
     connect_timeout: 0.250s
@@ -1706,6 +1678,32 @@ TEST_P(ProxyFilterIntegrationTest, ResetStreamDuringDnsLookup) {
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("504", response->headers().getStatusValue());
+}
+
+// This test validates that processing of DNS resolutions on worker threads is handled correctly.
+// The test uses specific scenario where DFP filter AND async resolution in DFP cluster are enabled.
+// Normally DFP filter is not needed, however this configuration can occur as the
+// envoy.reloadable_features.dfp_cluster_resolves_hosts flag is now enabled by default. The test
+// also requires the Host header to be modified between DFP and Router filters to trigger abnormal
+// behavior in the DNS resolution processing loop.
+TEST_P(ProxyFilterIntegrationTest, DoubleResolution) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.dfp_cluster_resolves_hosts", "true");
+  config_helper_.addRuntimeOverride(
+      "envoy.reloadable_features.skip_dns_lookup_for_proxied_requests", "true");
+  upstream_tls_ = false;
+  autonomous_upstream_ = true;
+  // Add DFP filter even if async DNS resolution is enabled.
+  config_helper_.prependFilter("{ name: modify-host-filter }");
+  initializeWithArgs(1024, 1024, "", typed_dns_resolver_config_, false, 5, false, false,
+                     absl::nullopt, true);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  // The host modification filter sets a non-existing host which should result in a 503.
+  EXPECT_EQ("503", response->headers().getStatusValue());
 }
 
 } // namespace

@@ -269,9 +269,9 @@ void JsonTranscoderConfig::addBuiltinSymbolDescriptor(const std::string& symbol_
 
 Status JsonTranscoderConfig::resolveField(const Protobuf::Descriptor* descriptor,
                                           const std::string& field_path_str,
-                                          std::vector<const ProtobufWkt::Field*>* field_path,
+                                          std::vector<const Protobuf::Field*>* field_path,
                                           bool* is_http_body) {
-  const ProtobufWkt::Type* message_type =
+  const Protobuf::Type* message_type =
       type_helper_->Info()->GetTypeByTypeUrl(Grpc::Common::typeUrl(descriptor->full_name()));
   if (message_type == nullptr) {
     return {StatusCode::kNotFound,
@@ -287,7 +287,7 @@ Status JsonTranscoderConfig::resolveField(const Protobuf::Descriptor* descriptor
   if (field_path->empty()) {
     *is_http_body = descriptor->full_name() == google::api::HttpBody::descriptor()->full_name();
   } else {
-    const ProtobufWkt::Type* body_type =
+    const Protobuf::Type* body_type =
         type_helper_->Info()->GetTypeByTypeUrl(field_path->back()->type_url());
     *is_http_body = body_type != nullptr &&
                     body_type->name() == google::api::HttpBody::descriptor()->full_name();
@@ -667,6 +667,11 @@ void JsonTranscoderFilter::setDecoderFilterCallbacks(
 
 Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                               bool end_stream) {
+  if (error_ || !transcoder_) {
+    ENVOY_STREAM_LOG(debug, "Response headers is passed through", *encoder_callbacks_);
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   if (!Grpc::Common::isGrpcResponseHeaders(headers, end_stream)) {
     ENVOY_STREAM_LOG(
         debug,
@@ -674,10 +679,6 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
         "without transcoding.",
         *encoder_callbacks_);
     error_ = true;
-  }
-
-  if (error_ || !transcoder_) {
-    ENVOY_STREAM_LOG(debug, "Response headers is passed through", *encoder_callbacks_);
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -960,7 +961,7 @@ bool JsonTranscoderFilter::buildResponseFromHttpBodyOutput(
         encoder_callbacks_->resetStream();
         return true;
       }
-      const auto& body = http_body.data();
+      const auto& body = MessageUtil::bytesToString(http_body.data());
 
       data.add(body);
 

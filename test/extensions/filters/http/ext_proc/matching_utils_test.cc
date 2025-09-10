@@ -21,64 +21,62 @@ using ::Envoy::Http::TestRequestTrailerMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
 using ::Envoy::Http::TestResponseTrailerMapImpl;
 
-class ExpressionManagerTest : public testing::Test {
-public:
-  void initialize() { builder_ = Envoy::Extensions::Filters::Common::Expr::getBuilder(context_); }
+#ifdef USE_CEL_PARSER
 
-  std::shared_ptr<Filters::Common::Expr::BuilderInstance> builder_;
+class ExpressionManagerTest : public testing::Test {
+protected:
+  ExpressionManagerTest() {
+    auto builder = Filters::Common::Expr::getBuilder(context_);
+    Protobuf::RepeatedPtrField<std::string> request_matchers;
+    Protobuf::RepeatedPtrField<std::string> response_matchers;
+    expression_manager_ = std::make_unique<ExpressionManager>(builder, context_.local_info_,
+                                                              request_matchers, response_matchers);
+  }
+
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
-  testing::NiceMock<StreamInfo::MockStreamInfo> stream_info_;
-  testing::NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  TestRequestHeaderMapImpl request_headers_;
-  TestResponseHeaderMapImpl response_headers_;
-  TestRequestTrailerMapImpl request_trailers_;
-  TestResponseTrailerMapImpl response_trailers_;
-  Protobuf::RepeatedPtrField<std::string> req_matchers_;
-  Protobuf::RepeatedPtrField<std::string> resp_matchers_;
+  std::unique_ptr<ExpressionManager> expression_manager_;
 };
 
-#if defined(USE_CEL_PARSER)
-TEST_F(ExpressionManagerTest, DuplicateAttributesIgnored) {
-  initialize();
-  req_matchers_.Add("request.path");
-  req_matchers_.Add("request.method");
-  req_matchers_.Add("request.method");
-  req_matchers_.Add("request.path");
-  const auto expr_mgr = ExpressionManager(builder_, local_info_, req_matchers_, resp_matchers_);
-
-  request_headers_.setMethod("GET");
-  request_headers_.setPath("/foo");
-  const auto activation_ptr = Filters::Common::Expr::createActivation(
-      &expr_mgr.localInfo(), stream_info_, &request_headers_, &response_headers_,
-      &response_trailers_);
-
-  auto result = expr_mgr.evaluateRequestAttributes(*activation_ptr);
-  EXPECT_EQ(2, result.fields_size());
-  EXPECT_NE(result.fields().end(), result.fields().find("request.path"));
-  EXPECT_NE(result.fields().end(), result.fields().find("request.method"));
+TEST_F(ExpressionManagerTest, SimpleExpression) {
+  EXPECT_FALSE(expression_manager_->hasRequestExpr());
+  EXPECT_FALSE(expression_manager_->hasResponseExpr());
 }
 
-TEST_F(ExpressionManagerTest, UnparsableExpressionThrowsException) {
-  initialize();
-  req_matchers_.Add("++");
-  EXPECT_THROW_WITH_REGEX(ExpressionManager(builder_, local_info_, req_matchers_, resp_matchers_),
-                          EnvoyException, "Unable to parse descriptor expression.*");
+TEST_F(ExpressionManagerTest, InvalidExpression) {
+  Protobuf::RepeatedPtrField<std::string> request_matchers;
+  request_matchers.Add("undefined_func()");
+  auto builder = Filters::Common::Expr::getBuilder(context_);
+  EXPECT_THROW(
+      { ExpressionManager test_manager(builder, context_.local_info_, request_matchers, {}); },
+      EnvoyException);
 }
 
-TEST_F(ExpressionManagerTest, EmptyExpressionReturnsEmptyStruct) {
-  initialize();
-  const auto expr_mgr = ExpressionManager(builder_, local_info_, req_matchers_, resp_matchers_);
+TEST_F(ExpressionManagerTest, ComplexExpressionWithSourceInfo) {
+  // Create a complex expression that would test source info handling
+  Protobuf::RepeatedPtrField<std::string> request_matchers;
+  request_matchers.Add("request.headers.contains('x-test') && "
+                       "request.headers['x-test'].startsWith('value')");
 
-  request_headers_ = TestRequestHeaderMapImpl();
-  request_headers_.setMethod("GET");
-  request_headers_.setPath("/foo");
-  const auto activation_ptr = Filters::Common::Expr::createActivation(
-      &expr_mgr.localInfo(), stream_info_, &request_headers_, &response_headers_,
-      &response_trailers_);
-
-  EXPECT_EQ(0, expr_mgr.evaluateRequestAttributes(*activation_ptr).fields_size());
+  // This should create successfully without throwing
+  auto builder = Filters::Common::Expr::getBuilder(context_);
+  ExpressionManager test_manager(builder, context_.local_info_, request_matchers, {});
+  EXPECT_TRUE(test_manager.hasRequestExpr());
 }
-#endif
+
+#else
+
+TEST(ExpressionManagerTest, CelUnavailableTest) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  auto builder = Filters::Common::Expr::getBuilder(context);
+  Protobuf::RepeatedPtrField<std::string> request_matchers;
+  request_matchers.Add("true");
+
+  // When CEL is not available, this should log a warning but not throw
+  ExpressionManager manager(builder, context.local_info_, request_matchers, {});
+  EXPECT_FALSE(manager.hasRequestExpr());
+}
+
+#endif // USE_CEL_PARSER
 
 } // namespace
 } // namespace ExternalProcessing

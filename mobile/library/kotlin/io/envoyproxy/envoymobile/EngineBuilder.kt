@@ -21,7 +21,8 @@ open class EngineBuilder() {
     EnvoyEngineImpl(
       onEngineRunning,
       { level, msg -> logger?.let { it(LogLevel.from(level), msg) } },
-      eventTracker
+      eventTracker,
+      disableDnsRefreshOnNetworkChange
     )
   }
   private var logLevel = LogLevel.INFO

@@ -57,6 +57,7 @@ public:
    * @param stream_info holds additional information about the request.
    */
   virtual void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+                                       const Formatter::HttpFormatterContext& context,
                                        const StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**
@@ -309,6 +310,8 @@ public:
    */
   virtual std::chrono::milliseconds resetMaxInterval() const PURE;
 };
+
+using RetryPolicyConstSharedPtr = std::shared_ptr<const RetryPolicy>;
 
 /**
  * RetryStatus whether request should be retried or not.
@@ -677,14 +680,20 @@ public:
   virtual bool includeIsTimeoutRetryHeader() const PURE;
 
   /**
-   * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
-   *         This is an upper bound so does not necessarily reflect the bytes which will be buffered
-   *         as other limits may apply.
-   *         If a per route limit exists, it takes precedence over this configuration.
-   *         Unlike some other buffer limits, 0 here indicates buffering should not be performed
-   *         rather than no limit applies.
+   * @return uint64_t the maximum bytes which should be buffered for request bodies. This enables
+   *         buffering larger request bodies beyond the connection buffer limit for use cases
+   *         with large payloads, shadowing, or retries.
+   *
+   *         This method consolidates the functionality of the previous
+   *         per_request_buffer_limit_bytes and request_body_buffer_limit fields. It supports both
+   *         legacy configurations using per_request_buffer_limit_bytes and new configurations using
+   *         request_body_buffer_limit.
+   *
+   *         If neither is set, falls back to connection buffer limits. Unlike some other buffer
+   *         limits, 0 here indicates buffering should not be performed rather than no limit
+   * applies.
    */
-  virtual uint32_t retryShadowBufferLimit() const PURE;
+  virtual uint64_t requestBodyBufferLimit() const PURE;
 
   /**
    * This is a helper to get the route's per-filter config if it exists, up along the config
@@ -784,12 +793,12 @@ public:
    * Creates a new MetadataMatchCriteria, merging existing
    * metadata criteria with the provided criteria. The result criteria is the
    * combination of both sets of criteria, with those from the metadata_matches
-   * ProtobufWkt::Struct taking precedence.
+   * Protobuf::Struct taking precedence.
    * @param metadata_matches supplies the new criteria.
    * @return MetadataMatchCriteriaConstPtr the result criteria.
    */
   virtual MetadataMatchCriteriaConstPtr
-  mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const PURE;
+  mergeMatchCriteria(const Protobuf::Struct& metadata_matches) const PURE;
 
   /**
    * Creates a new MetadataMatchCriteria with criteria vector reduced to given names
@@ -935,6 +944,7 @@ public:
    *        or x-envoy-original-host header if host rewritten.
    */
   virtual void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
+                                      const Formatter::HttpFormatterContext& context,
                                       const StreamInfo::StreamInfo& stream_info,
                                       bool keep_original_host_or_path) const PURE;
 
@@ -995,13 +1005,20 @@ public:
   virtual const PathRewriterSharedPtr& pathRewriter() const PURE;
 
   /**
-   * @return uint32_t any route cap on bytes which should be buffered for shadowing or retries.
-   *         This is an upper bound so does not necessarily reflect the bytes which will be buffered
-   *         as other limits may apply.
-   *         Unlike some other buffer limits, 0 here indicates buffering should not be performed
-   *         rather than no limit applies.
+   * @return uint64_t the maximum bytes which should be buffered for request bodies. This enables
+   *         buffering larger request bodies beyond the connection buffer limit for use cases
+   *         with large payloads, shadowing, or retries.
+   *
+   *         This method consolidates the functionality of the previous
+   *         per_request_buffer_limit_bytes and request_body_buffer_limit fields. It supports both
+   *         legacy configurations using per_request_buffer_limit_bytes and new configurations using
+   *         request_body_buffer_limit.
+   *
+   *         If neither is set, falls back to connection buffer limits. Unlike some other buffer
+   *         limits, 0 here indicates buffering should not be performed rather than no limit
+   * applies.
    */
-  virtual uint32_t retryShadowBufferLimit() const PURE;
+  virtual uint64_t requestBodyBufferLimit() const PURE;
 
   /**
    * @return const std::vector<ShadowPolicy>& the shadow policies for the route. The vector is empty
@@ -1019,6 +1036,12 @@ public:
    *         disabled idle timeout, while nullopt indicates deference to the global timeout.
    */
   virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
+
+  /**
+   * @return optional<std::chrono::milliseconds> the route's flush timeout. Zero indicates a
+   *         disabled idle timeout, while nullopt indicates deference to the global timeout.
+   */
+  virtual absl::optional<std::chrono::milliseconds> flushTimeout() const PURE;
 
   /**
    * @return true if new style max_stream_duration config should be used over the old style.

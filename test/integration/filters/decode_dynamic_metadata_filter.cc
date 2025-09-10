@@ -16,13 +16,13 @@ public:
       for (auto const& [k, v] : kvs.fields()) {
         std::string value;
         switch (v.kind_case()) {
-        case ProtobufWkt::Value::kNumberValue:
+        case Protobuf::Value::kNumberValue:
           value = fmt::format("{:g}", v.number_value());
           break;
-        case ProtobufWkt::Value::kStringValue:
+        case Protobuf::Value::kStringValue:
           value = v.string_value();
           break;
-        case ProtobufWkt::Value::kBoolValue:
+        case Protobuf::Value::kBoolValue:
           value = v.bool_value() ? "true" : "false";
           break;
         default:

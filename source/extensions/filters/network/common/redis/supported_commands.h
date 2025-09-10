@@ -23,14 +23,14 @@ struct SupportedCommands {
         absl::flat_hash_set<std::string>, "append", "bf.add", "bf.card", "bf.exists", "bf.info",
         "bf.insert", "bf.loadchunk", "bf.madd", "bf.mexists", "bf.reserve", "bf.scandump",
         "bitcount", "bitfield", "bitpos", "decr", "decrby", "dump", "expire", "expireat", "geoadd",
-        "geodist", "geohash", "geopos", "georadius_ro", "georadiusbymember_ro", "get", "getbit",
-        "getdel", "getrange", "getset", "hdel", "hexists", "hget", "hgetall", "hincrby",
-        "hincrbyfloat", "hkeys", "hlen", "hmget", "hmset", "hscan", "hset", "hsetnx", "hstrlen",
-        "hvals", "incr", "incrby", "incrbyfloat", "lindex", "linsert", "llen", "lmove", "lpop",
-        "lpush", "lpushx", "lrange", "lrem", "lset", "ltrim", "persist", "pexpire", "pexpireat",
-        "pfadd", "pfcount", "psetex", "pttl", "publish", "restore", "rpop", "rpush", "rpushx",
-        "sadd", "scard", "set", "setbit", "setex", "setnx", "setrange", "sismember", "smembers",
-        "spop", "srandmember", "srem", "sscan", "strlen", "ttl", "type", "xack", "xadd",
+        "geodist", "geohash", "geopos", "georadius_ro", "georadiusbymember_ro", "geosearch", "get",
+        "getbit", "getdel", "getex", "getrange", "getset", "hdel", "hexists", "hget", "hgetall",
+        "hincrby", "hincrbyfloat", "hkeys", "hlen", "hmget", "hmset", "hscan", "hset", "hsetnx",
+        "hstrlen", "hvals", "incr", "incrby", "incrbyfloat", "lindex", "linsert", "llen", "lmove",
+        "lpop", "lpush", "lpushx", "lrange", "lrem", "lset", "ltrim", "persist", "pexpire",
+        "pexpireat", "pfadd", "pfcount", "psetex", "pttl", "publish", "restore", "rpop", "rpush",
+        "rpushx", "sadd", "scard", "set", "setbit", "setex", "setnx", "setrange", "sismember",
+        "smembers", "spop", "srandmember", "srem", "sscan", "strlen", "ttl", "type", "xack", "xadd",
         "xautoclaim", "xclaim", "xdel", "xlen", "xpending", "xrange", "xrevrange", "xtrim", "zadd",
         "zcard", "zcount", "zincrby", "zlexcount", "zpopmin", "zpopmax", "zrange", "zrangebylex",
         "zrangebyscore", "zrank", "zrem", "zremrangebylex", "zremrangebyrank", "zremrangebyscore",
@@ -121,6 +121,11 @@ struct SupportedCommands {
    * @return info command
    */
   static const std::string& info() { CONSTRUCT_ON_FIRST_USE(std::string, "info"); }
+
+  /**
+   * @return role command
+   */
+  static const std::string& role() { CONSTRUCT_ON_FIRST_USE(std::string, "role"); }
 
   /**
    * @return commands which alters the state of redis

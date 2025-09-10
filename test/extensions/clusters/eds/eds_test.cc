@@ -3352,6 +3352,121 @@ TEST_F(EdsCachedAssignmentTest, CachedAssignmentRemovedOnTimeout) {
   EXPECT_CALL(eds_resources_cache_, removeCallback("fare", _));
 }
 
+// Tests related to xDS-TP based configs EDS subscriptions.
+class XdstpConfigsEdsTest : public testing::Test, public Event::TestUsingSimulatedTime {
+public:
+  XdstpConfigsEdsTest() {
+    // Once envoy.reloadable_features.xdstp_based_config_singleton_subscriptions
+    // is set to true by default, this should be removed.
+    scoped_runtime_.mergeValues(
+        {{"envoy.reloadable_features.xdstp_based_config_singleton_subscriptions", "true"}});
+    ON_CALL(server_context_.xds_manager_, subscribeToSingletonResource(_, _, _, _, _, _, _))
+        .WillByDefault(Invoke(
+            [this](absl::string_view, OptRef<const envoy::config::core::v3::ConfigSource>,
+                   absl::string_view, Stats::Scope&, Config::SubscriptionCallbacks& callbacks,
+                   Config::OpaqueResourceDecoderSharedPtr,
+                   const Config::SubscriptionOptions&) -> absl::StatusOr<Config::SubscriptionPtr> {
+              auto ret = std::make_unique<NiceMock<Config::MockSubscription>>();
+              subscription_ = ret.get();
+              eds_callbacks_ = &callbacks;
+              return ret;
+            }));
+    ON_CALL(server_context_.xds_manager_, subscriptionFactory())
+        .WillByDefault(ReturnRef(server_context_.cluster_manager_.subscription_factory_));
+    resetCluster();
+  }
+
+  void resetCluster() {
+    resetCluster(R"EOF(
+      name: xdstp://test/envoy.config.endpoint.v3.ClusterLoadAssignment/foo-cluster/baz
+      connect_timeout: 0.25s
+      type: EDS
+      lb_policy: ROUND_ROBIN
+      eds_cluster_config:
+        service_name: xdstp://test/envoy.config.endpoint.v3.ClusterLoadAssignment/foo-cluster/baz
+    )EOF",
+                 Cluster::InitializePhase::Secondary);
+  }
+
+  void resetCluster(const std::string& yaml_config, Cluster::InitializePhase initialize_phase) {
+    server_context_.local_info_.node_.mutable_locality()->set_zone("us-east-1a");
+    eds_cluster_ = parseClusterFromV3Yaml(yaml_config);
+    Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context_, nullptr, nullptr,
+                                                               false);
+    cluster_ = *EdsClusterImpl::create(eds_cluster_, factory_context);
+    EXPECT_EQ(initialize_phase, cluster_->initializePhase());
+  }
+
+  void initialize() {
+    EXPECT_CALL(server_context_, timeSource()).WillRepeatedly(testing::ReturnRef(simTime()));
+    EXPECT_CALL(*subscription_, start(_));
+    cluster_->initialize([this] {
+      initialized_ = true;
+      return absl::OkStatus();
+    });
+  }
+
+  void doOnConfigUpdateVerifyNoThrow(
+      const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
+    const auto decoded_resources =
+        TestUtility::decodeResources({cluster_load_assignment}, "cluster_name");
+    EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, "").ok());
+  }
+
+  TestScopedRuntime scoped_runtime_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context_;
+  bool initialized_{};
+  Stats::TestUtil::TestStore& stats_ = server_context_.store_;
+  NiceMock<Ssl::MockContextManager> ssl_context_manager_;
+
+  envoy::config::cluster::v3::Cluster eds_cluster_;
+  EdsClusterImplSharedPtr cluster_;
+  Config::SubscriptionCallbacks* eds_callbacks_{};
+  Config::MockSubscription* subscription_;
+};
+
+// Validate that xDS-TP based config invokes the xds-manager using SotW.
+TEST_F(XdstpConfigsEdsTest, OnConfigUpdateSuccess) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name(
+      "xdstp://test/envoy.config.endpoint.v3.ClusterLoadAssignment/foo-cluster/baz");
+  initialize();
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+  EXPECT_TRUE(initialized_);
+  EXPECT_EQ(1UL, stats_
+                     .findCounterByString(
+                         "cluster.xdstp_test/envoy.config.endpoint.v3.ClusterLoadAssignment/"
+                         "foo-cluster/baz.update_no_rebuild")
+                     .value()
+                     .get()
+                     .value());
+}
+
+// Validate that xDS-TP based config invokes the xds-manager using delta-xDS.
+TEST_F(XdstpConfigsEdsTest, DeltaOnConfigUpdateSuccess) {
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
+  cluster_load_assignment.set_cluster_name(
+      "xdstp://test/envoy.config.endpoint.v3.ClusterLoadAssignment/foo-cluster/baz");
+  initialize();
+
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
+  auto* resource = resources.Add();
+  resource->mutable_resource()->PackFrom(cluster_load_assignment);
+  resource->set_version("v1");
+  const auto decoded_resources =
+      TestUtility::decodeResources<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+          resources, "cluster_name");
+  EXPECT_TRUE(eds_callbacks_->onConfigUpdate(decoded_resources.refvec_, {}, "v1").ok());
+
+  EXPECT_TRUE(initialized_);
+  EXPECT_EQ(1UL, stats_
+                     .findCounterByString(
+                         "cluster.xdstp_test/envoy.config.endpoint.v3.ClusterLoadAssignment/"
+                         "foo-cluster/baz.update_no_rebuild")
+                     .value()
+                     .get()
+                     .value());
+}
 } // namespace
 } // namespace Upstream
 } // namespace Envoy

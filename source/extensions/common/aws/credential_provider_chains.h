@@ -48,6 +48,12 @@ public:
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer, absl::string_view cluster_name) PURE;
 
+  virtual CredentialsProviderSharedPtr createAssumeRoleCredentialsProvider(
+      Server::Configuration::ServerFactoryContext& context,
+      AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
+      const envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider& assume_role_config)
+      PURE;
+
   virtual CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
       AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
@@ -112,6 +118,10 @@ public:
   defaultCredentialsProviderChain(Server::Configuration::ServerFactoryContext& context,
                                   absl::string_view region);
 
+  // Where credential providers use async functionality, subscribe to credential notifications for
+  // these providers
+  void setupSubscriptions();
+
 private:
   CredentialsProviderSharedPtr createEnvironmentCredentialsProvider() const override {
     return std::make_shared<EnvironmentCredentialsProvider>();
@@ -144,6 +154,12 @@ private:
       AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
       const envoy::extensions::common::aws::v3::AssumeRoleWithWebIdentityCredentialProvider&
           web_identity_config) override;
+
+  CredentialsProviderSharedPtr createAssumeRoleCredentialsProvider(
+      Server::Configuration::ServerFactoryContext& context,
+      AwsClusterManagerPtr aws_cluster_manager, absl::string_view region,
+      const envoy::extensions::common::aws::v3::AssumeRoleCredentialProvider& assume_role_config)
+      override;
 
   CredentialsProviderSharedPtr createIAMRolesAnywhereCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,

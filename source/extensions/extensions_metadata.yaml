@@ -75,6 +75,20 @@ envoy.bootstrap.wasm:
   status: alpha
   type_urls:
   - envoy.extensions.wasm.v3.WasmService
+envoy.bootstrap.reverse_tunnel.downstream_socket_interface:
+  categories:
+  - envoy.bootstrap
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface
+envoy.bootstrap.reverse_tunnel.upstream_socket_interface:
+  categories:
+  - envoy.bootstrap
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface
 envoy.extensions.http.cache.file_system_http_cache:
   categories:
   - envoy.http.cache
@@ -270,7 +284,7 @@ envoy.filters.http.buffer:
 envoy.filters.http.cache:
   categories:
   - envoy.filters.http
-  security_posture: robust_to_untrusted_downstream_and_upstream
+  security_posture: unknown
   status: wip
   type_urls:
   - envoy.extensions.filters.http.cache.v3.CacheConfig
@@ -512,7 +526,7 @@ envoy.filters.http.oauth2:
   categories:
   - envoy.filters.http
   security_posture: robust_to_untrusted_downstream
-  status: alpha
+  status: stable
   type_urls:
   - envoy.extensions.filters.http.oauth2.v3.OAuth2
 envoy.filters.http.on_demand:
@@ -1514,6 +1528,11 @@ envoy.network.dns_resolver.getaddrinfo:
   status: stable
   type_urls:
   - envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
+envoy.resolvers.reverse_connection:
+  categories:
+  - envoy.resolvers
+  security_posture: unknown
+  status: wip
 envoy.rbac.matchers.upstream_ip_port:
   categories:
   - envoy.rbac.matchers
@@ -1708,7 +1727,7 @@ envoy.matching.custom_matchers.domain_matcher:
   status: alpha
   type_urls:
   - xds.type.matcher.v3.ServerNameMatcher
-envoy.matching.custom_matchers.trie_matcher:
+envoy.matching.custom_matchers.ip_range_matcher:
   categories:
   - envoy.matching.http.custom_matchers
   - envoy.matching.network.custom_matchers

@@ -32,6 +32,7 @@
 #include "source/common/router/header_parser.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
 #include "source/common/router/per_filter_config.h"
+#include "source/common/router/retry_policy_impl.h"
 #include "source/common/router/router_ratelimit.h"
 #include "source/common/router/tls_context_match_criteria_impl.h"
 #include "source/common/stats/symbol_table.h"
@@ -90,7 +91,7 @@ using RouteEntryImplBaseConstSharedPtr = std::shared_ptr<const RouteEntryImplBas
 class SslRedirector : public DirectResponseEntry {
 public:
   // Router::DirectResponseEntry
-  void finalizeResponseHeaders(Http::ResponseHeaderMap&,
+  void finalizeResponseHeaders(Http::ResponseHeaderMap&, const Formatter::HttpFormatterContext&,
                                const StreamInfo::StreamInfo&) const override {}
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&,
                                                   bool) const override {
@@ -275,7 +276,16 @@ public:
     }
     return absl::nullopt;
   }
-  uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
+  uint64_t requestBodyBufferLimit() const override {
+    // Return the new field if set, otherwise return the legacy field.
+    if (request_body_buffer_limit_ != std::numeric_limits<uint64_t>::max()) {
+      return request_body_buffer_limit_;
+    }
+    if (per_request_buffer_limit_ != std::numeric_limits<uint32_t>::max()) {
+      return static_cast<uint64_t>(per_request_buffer_limit_);
+    }
+    return std::numeric_limits<uint64_t>::max();
+  }
 
   RouteSpecificFilterConfigs perFilterConfigs(absl::string_view) const override;
   const envoy::config::core::v3::Metadata& metadata() const override;
@@ -348,7 +358,8 @@ private:
   std::unique_ptr<const CatchAllVirtualCluster> virtual_cluster_catch_all_;
   RouteMetadataPackPtr metadata_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
-  uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
+  uint32_t per_request_buffer_limit_{std::numeric_limits<uint32_t>::max()};
+  uint64_t request_body_buffer_limit_{std::numeric_limits<uint64_t>::max()};
   const bool include_attempt_count_in_request_ : 1;
   const bool include_attempt_count_in_response_ : 1;
   const bool include_is_timeout_retry_header_ : 1;
@@ -390,80 +401,6 @@ private:
 };
 
 using VirtualHostImplSharedPtr = std::shared_ptr<VirtualHostImpl>;
-
-/**
- * Implementation of RetryPolicy that reads from the proto route or virtual host config.
- */
-class RetryPolicyImpl : public RetryPolicy {
-
-public:
-  static absl::StatusOr<std::unique_ptr<RetryPolicyImpl>>
-  create(const envoy::config::route::v3::RetryPolicy& retry_policy,
-         ProtobufMessage::ValidationVisitor& validation_visitor,
-         Upstream::RetryExtensionFactoryContext& factory_context,
-         Server::Configuration::CommonFactoryContext& common_context);
-  RetryPolicyImpl() = default;
-
-  // Router::RetryPolicy
-  std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
-  std::chrono::milliseconds perTryIdleTimeout() const override { return per_try_idle_timeout_; }
-  uint32_t numRetries() const override { return num_retries_; }
-  uint32_t retryOn() const override { return retry_on_; }
-  std::vector<Upstream::RetryHostPredicateSharedPtr> retryHostPredicates() const override;
-  Upstream::RetryPrioritySharedPtr retryPriority() const override;
-  absl::Span<const Upstream::RetryOptionsPredicateConstSharedPtr>
-  retryOptionsPredicates() const override {
-    return retry_options_predicates_;
-  }
-  uint32_t hostSelectionMaxAttempts() const override { return host_selection_attempts_; }
-  const std::vector<uint32_t>& retriableStatusCodes() const override {
-    return retriable_status_codes_;
-  }
-  const std::vector<Http::HeaderMatcherSharedPtr>& retriableHeaders() const override {
-    return retriable_headers_;
-  }
-  const std::vector<Http::HeaderMatcherSharedPtr>& retriableRequestHeaders() const override {
-    return retriable_request_headers_;
-  }
-  absl::optional<std::chrono::milliseconds> baseInterval() const override { return base_interval_; }
-  absl::optional<std::chrono::milliseconds> maxInterval() const override { return max_interval_; }
-  const std::vector<ResetHeaderParserSharedPtr>& resetHeaders() const override {
-    return reset_headers_;
-  }
-  std::chrono::milliseconds resetMaxInterval() const override { return reset_max_interval_; }
-
-private:
-  RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
-                  ProtobufMessage::ValidationVisitor& validation_visitor,
-                  Upstream::RetryExtensionFactoryContext& factory_context,
-                  Server::Configuration::CommonFactoryContext& common_context,
-                  absl::Status& creation_status);
-  std::chrono::milliseconds per_try_timeout_{0};
-  std::chrono::milliseconds per_try_idle_timeout_{0};
-  // We set the number of retries to 1 by default (i.e. when no route or vhost level retry policy is
-  // set) so that when retries get enabled through the x-envoy-retry-on header we default to 1
-  // retry.
-  uint32_t num_retries_{1};
-  uint32_t retry_on_{};
-  // Each pair contains the name and config proto to be used to create the RetryHostPredicates
-  // that should be used when with this policy.
-  std::vector<std::pair<Upstream::RetryHostPredicateFactory&, ProtobufTypes::MessagePtr>>
-      retry_host_predicate_configs_;
-  // Name and config proto to use to create the RetryPriority to use with this policy. Default
-  // initialized when no RetryPriority should be used.
-  std::pair<Upstream::RetryPriorityFactory*, ProtobufTypes::MessagePtr> retry_priority_config_;
-  uint32_t host_selection_attempts_{1};
-  std::vector<uint32_t> retriable_status_codes_;
-  std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
-  std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
-  absl::optional<std::chrono::milliseconds> base_interval_;
-  absl::optional<std::chrono::milliseconds> max_interval_;
-  std::vector<ResetHeaderParserSharedPtr> reset_headers_;
-  std::chrono::milliseconds reset_max_interval_{300000};
-  ProtobufMessage::ValidationVisitor* validation_visitor_{};
-  std::vector<Upstream::RetryOptionsPredicateConstSharedPtr> retry_options_predicates_;
-};
-using DefaultRetryPolicy = ConstSingleton<RetryPolicyImpl>;
 
 /**
  * Implementation of ShadowPolicy that reads from the proto route config.
@@ -619,6 +556,7 @@ class RouteEntryImplBase : public RouteEntryAndRoute,
                            public Matchable,
                            public DirectResponseEntry,
                            public PathMatchCriterion,
+                           public Matcher::ActionBase<envoy::config::route::v3::Route>,
                            public std::enable_shared_from_this<RouteEntryImplBase>,
                            Logger::Loggable<Logger::Id::router> {
 protected:
@@ -666,11 +604,13 @@ public:
     return HeaderParser::defaultParser();
   }
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
+                              const Formatter::HttpFormatterContext& context,
                               const StreamInfo::StreamInfo& stream_info,
                               bool keep_original_host_or_path) const override;
   Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                  bool do_formatting = true) const override;
   void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+                               const Formatter::HttpFormatterContext& context,
                                const StreamInfo::StreamInfo& stream_info) const override;
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                   bool do_formatting = true) const override;
@@ -712,7 +652,16 @@ public:
   const PathMatcherSharedPtr& pathMatcher() const override { return path_matcher_; }
   const PathRewriterSharedPtr& pathRewriter() const override { return path_rewriter_; }
 
-  uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
+  uint64_t requestBodyBufferLimit() const override {
+    // Return the new field if set, otherwise return the legacy field.
+    if (request_body_buffer_limit_ != std::numeric_limits<uint64_t>::max()) {
+      return request_body_buffer_limit_;
+    }
+    if (per_request_buffer_limit_ != std::numeric_limits<uint32_t>::max()) {
+      return static_cast<uint64_t>(per_request_buffer_limit_);
+    }
+    return std::numeric_limits<uint64_t>::max();
+  }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const override { return shadow_policies_; }
   std::chrono::milliseconds timeout() const override { return timeout_; }
   bool usingNewTimeouts() const override { return using_new_timeouts_; }
@@ -727,12 +676,16 @@ public:
     GrpcTimeoutHeaderMax,
     GrpcTimeoutHeaderOffset,
     MaxGrpcTimeout,
-    GrpcTimeoutOffset
+    GrpcTimeoutOffset,
+    FlushTimeout,
   };
-  using OptionalTimeouts = PackedStruct<std::chrono::milliseconds, 6, OptionalTimeoutNames>;
+  using OptionalTimeouts = PackedStruct<std::chrono::milliseconds, 7, OptionalTimeoutNames>;
 
   absl::optional<std::chrono::milliseconds> idleTimeout() const override {
     return getOptionalTimeout<OptionalTimeoutNames::IdleTimeout>();
+  }
+  absl::optional<std::chrono::milliseconds> flushTimeout() const override {
+    return getOptionalTimeout<OptionalTimeoutNames::FlushTimeout>();
   }
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
     return getOptionalTimeout<OptionalTimeoutNames::MaxStreamDuration>();
@@ -846,26 +799,24 @@ private:
   };
 
   /**
-   * Returns a vector of request header parsers which applied or will apply header transformations
+   * Returns an array of request header parsers which applied or will apply header transformations
    * to the request in this route.
    * @param specificity_ascend specifies whether the returned parsers will be sorted from least
    *        specific to most specific (global connection manager level header parser, virtual host
    *        level header parser and finally route-level parser.) or the reverse.
-   * @return a vector of request header parsers.
+   * @return an array of request header parsers.
    */
-  absl::InlinedVector<const HeaderParser*, 3>
-  getRequestHeaderParsers(bool specificity_ascend) const;
+  std::array<const HeaderParser*, 3> getRequestHeaderParsers(bool specificity_ascend) const;
 
   /**
-   * Returns a vector of response header parsers which applied or will apply header transformations
+   * Returns an array of response header parsers which applied or will apply header transformations
    * to the response in this route.
    * @param specificity_ascend specifies whether the returned parsers will be sorted from least
    *        specific to most specific (global connection manager level header parser, virtual host
    *        level header parser and finally route-level parser.) or the reverse.
-   * @return a vector of request header parsers.
+   * @return an array of request header parsers.
    */
-  absl::InlinedVector<const HeaderParser*, 3>
-  getResponseHeaderParsers(bool specificity_ascend) const;
+  std::array<const HeaderParser*, 3> getResponseHeaderParsers(bool specificity_ascend) const;
 
   std::unique_ptr<const RuntimeData>
   loadRuntimeData(const envoy::config::route::v3::RouteMatch& route);
@@ -889,7 +840,7 @@ private:
   buildRetryPolicy(RetryPolicyConstOptRef vhost_retry_policy,
                    const envoy::config::route::v3::RouteAction& route_config,
                    ProtobufMessage::ValidationVisitor& validation_visitor,
-                   Server::Configuration::ServerFactoryContext& factory_context) const;
+                   Server::Configuration::CommonFactoryContext& factory_context) const;
 
   absl::StatusOr<std::unique_ptr<InternalRedirectPolicyImpl>>
   buildInternalRedirectPolicy(const envoy::config::route::v3::RouteAction& route_config,
@@ -965,7 +916,8 @@ private:
   EarlyDataPolicyPtr early_data_policy_;
 
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
-  uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
+  uint32_t per_request_buffer_limit_{std::numeric_limits<uint32_t>::max()};
+  uint64_t request_body_buffer_limit_{std::numeric_limits<uint64_t>::max()};
   const absl::optional<Http::Code> direct_response_code_;
   const Http::Code cluster_not_found_response_code_;
   const Upstream::ResourcePriority priority_;
@@ -1193,9 +1145,9 @@ private:
 // Registered factory for RouteMatchAction.
 class RouteMatchActionFactory : public Matcher::ActionFactory<RouteActionContext> {
 public:
-  Matcher::ActionFactoryCb
-  createActionFactoryCb(const Protobuf::Message& config, RouteActionContext& context,
-                        ProtobufMessage::ValidationVisitor& validation_visitor) override;
+  Matcher::ActionConstSharedPtr
+  createAction(const Protobuf::Message& config, RouteActionContext& context,
+               ProtobufMessage::ValidationVisitor& validation_visitor) override;
   std::string name() const override { return "route"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::config::route::v3::Route>();
@@ -1219,9 +1171,9 @@ private:
 // Registered factory for RouteListMatchAction.
 class RouteListMatchActionFactory : public Matcher::ActionFactory<RouteActionContext> {
 public:
-  Matcher::ActionFactoryCb
-  createActionFactoryCb(const Protobuf::Message& config, RouteActionContext& context,
-                        ProtobufMessage::ValidationVisitor& validation_visitor) override;
+  Matcher::ActionConstSharedPtr
+  createAction(const Protobuf::Message& config, RouteActionContext& context,
+               ProtobufMessage::ValidationVisitor& validation_visitor) override;
   std::string name() const override { return "route_match_action"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::config::route::v3::RouteList>();

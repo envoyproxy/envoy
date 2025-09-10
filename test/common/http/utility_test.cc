@@ -709,7 +709,7 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
                   .value());
 
   // If the HCM value is present it will take precedence over the old value.
-  ProtobufWkt::BoolValue hcm_value;
+  Protobuf::BoolValue hcm_value;
   hcm_value.set_value(false);
   EXPECT_FALSE(Envoy::Http2::Utility::initializeAndValidateOptions(http2_options, true, hcm_value)
                    .value()
@@ -732,7 +732,7 @@ TEST(HttpUtility, ValidateStreamErrorsWithHcm) {
 
 TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
   envoy::config::core::v3::Http1ProtocolOptions http1_options;
-  ProtobufWkt::BoolValue hcm_value;
+  Protobuf::BoolValue hcm_value;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
 
@@ -770,55 +770,9 @@ TEST(HttpUtility, ValidateStreamErrorConfigurationForHttp1) {
           .stream_error_on_invalid_http_message_);
 }
 
-TEST(HttpUtility, UseBalsaParser) {
-  envoy::config::core::v3::Http1ProtocolOptions http1_options;
-  ProtobufWkt::BoolValue hcm_value;
-  NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
-
-  // If Http1ProtocolOptions::use_balsa_parser has no value set, then behavior is controlled by the
-  // runtime flag.
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "true"}});
-  EXPECT_TRUE(
-      Http1::parseHttp1Settings(http1_options, context, validation_visitor, hcm_value, false)
-          .use_balsa_parser_);
-
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "false"}});
-  EXPECT_FALSE(
-      Http1::parseHttp1Settings(http1_options, context, validation_visitor, hcm_value, false)
-          .use_balsa_parser_);
-
-  // Enable Balsa using Http1ProtocolOptions::use_balsa_parser. Runtime flag is ignored.
-  http1_options.mutable_use_balsa_parser()->set_value(true);
-
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "true"}});
-  EXPECT_TRUE(
-      Http1::parseHttp1Settings(http1_options, context, validation_visitor, hcm_value, false)
-          .use_balsa_parser_);
-
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "false"}});
-  EXPECT_TRUE(
-      Http1::parseHttp1Settings(http1_options, context, validation_visitor, hcm_value, false)
-          .use_balsa_parser_);
-
-  // Disable Balsa using Http1ProtocolOptions::use_balsa_parser. Runtime flag is ignored.
-  http1_options.mutable_use_balsa_parser()->set_value(false);
-
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "true"}});
-  EXPECT_FALSE(
-      Http1::parseHttp1Settings(http1_options, context, validation_visitor, hcm_value, false)
-          .use_balsa_parser_);
-
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.http1_use_balsa_parser", "false"}});
-  EXPECT_FALSE(
-      Http1::parseHttp1Settings(http1_options, context, validation_visitor, hcm_value, false)
-          .use_balsa_parser_);
-}
-
 TEST(HttpUtility, AllowCustomMethods) {
   envoy::config::core::v3::Http1ProtocolOptions http1_options;
-  ProtobufWkt::BoolValue hcm_value;
+  Protobuf::BoolValue hcm_value;
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
 

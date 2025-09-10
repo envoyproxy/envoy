@@ -19,6 +19,7 @@
 #include "quiche/common/http/http_header_block.h"
 #include "quiche/quic/core/http/quic_header_list.h"
 #include "quiche/quic/core/quic_session.h"
+#include "quiche/quic/core/quic_types.h"
 #include "quiche_platform_impl/quiche_mem_slice_impl.h"
 
 namespace Envoy {
@@ -59,7 +60,8 @@ void EnvoyQuicServerStream::encode1xxHeaders(const Http::ResponseHeaderMap& head
 void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers, bool end_stream) {
   ENVOY_STREAM_LOG(debug, "encodeHeaders (end_stream={}) {}.", *this, end_stream, headers);
   if (write_side_closed()) {
-    IS_ENVOY_BUG("encodeHeaders is called on write-closed stream.");
+    IS_ENVOY_BUG(
+        fmt::format("encodeHeaders is called on write-closed stream. {}", quicStreamState()));
     return;
   }
 
@@ -82,8 +84,9 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
   SendBufferMonitor::ScopedWatermarkBufferUpdater updater(this, this);
   {
     IncrementalBytesSentTracker tracker(*this, *mutableBytesMeter(), true);
-    size_t bytes_sent =
-        WriteHeaders(envoyHeadersToHttp2HeaderBlock(*header_map), end_stream, nullptr);
+    quiche::HttpHeaderBlock header_block = envoyHeadersToHttp2HeaderBlock(*header_map);
+    addDecompressedHeaderBytesSent(header_block);
+    size_t bytes_sent = WriteHeaders(std::move(header_block), end_stream, nullptr);
     stats_gatherer_->addBytesSent(bytes_sent, end_stream);
     ENVOY_BUG(bytes_sent != 0, "Failed to encode headers.");
   }
@@ -97,17 +100,17 @@ void EnvoyQuicServerStream::encodeHeaders(const Http::ResponseHeaderMap& headers
 }
 
 void EnvoyQuicServerStream::encodeTrailers(const Http::ResponseTrailerMap& trailers) {
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_remove_empty_trailers")) {
-    if (trailers.empty()) {
-      ENVOY_STREAM_LOG(debug, "skipping submitting empty trailers", *this);
-      // Instead of submitting empty trailers, we send empty data with end_stream=true instead.
-      Buffer::OwnedImpl empty_buffer;
-      encodeData(empty_buffer, true);
-      return;
-    }
+  if (trailers.empty()) {
+    ENVOY_STREAM_LOG(debug, "skipping submitting empty trailers", *this);
+    // Instead of submitting empty trailers, we send empty data with end_stream=true instead.
+    Buffer::OwnedImpl empty_buffer;
+    encodeData(empty_buffer, true);
+    return;
   }
   ENVOY_STREAM_LOG(debug, "encodeTrailers: {}.", *this, trailers);
-  encodeTrailersImpl(envoyHeadersToHttp2HeaderBlock(trailers));
+  quiche::HttpHeaderBlock trailer_block = envoyHeadersToHttp2HeaderBlock(trailers);
+  addDecompressedHeaderBytesSent(trailer_block);
+  encodeTrailersImpl(std::move(trailer_block));
 }
 
 void EnvoyQuicServerStream::resetStream(Http::StreamResetReason reason) {
@@ -152,6 +155,7 @@ void EnvoyQuicServerStream::switchStreamBlockState() {
 void EnvoyQuicServerStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
                                                      const quic::QuicHeaderList& header_list) {
   mutableBytesMeter()->addHeaderBytesReceived(frame_len);
+  addDecompressedHeaderBytesReceived(header_list);
   // TODO(danzh) Fix in QUICHE. If the stream has been reset in the call stack,
   // OnInitialHeadersComplete() shouldn't be called.
   if (read_side_closed()) {
@@ -296,6 +300,7 @@ void EnvoyQuicServerStream::OnBodyAvailable() {
 void EnvoyQuicServerStream::OnTrailingHeadersComplete(bool fin, size_t frame_len,
                                                       const quic::QuicHeaderList& header_list) {
   mutableBytesMeter()->addHeaderBytesReceived(frame_len);
+  addDecompressedHeaderBytesReceived(header_list);
   ENVOY_STREAM_LOG(debug, "Received trailers: {}.", *this, received_trailers().DebugString());
   quic::QuicSpdyServerStreamBase::OnTrailingHeadersComplete(fin, frame_len, header_list);
   if (read_side_closed()) {
@@ -359,10 +364,7 @@ bool EnvoyQuicServerStream::OnStopSending(quic::QuicResetStreamError error) {
     // Treat this as a remote reset, since the stream will be closed in both directions.
     runResetCallbacks(
         quicRstErrorToEnvoyRemoteResetReason(error.internal_code()),
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
-            ? absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()),
-                           "|FROM_PEER")
-            : absl::string_view());
+        absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()), "|FROM_PEER"));
   }
   return true;
 }
@@ -380,9 +382,7 @@ void EnvoyQuicServerStream::OnStreamReset(const quic::QuicRstStreamFrame& frame)
     // stream callback.
     runResetCallbacks(
         quicRstErrorToEnvoyRemoteResetReason(frame.error_code),
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
-            ? absl::StrCat(quic::QuicRstStreamErrorCodeToString(frame.error_code), "|FROM_PEER")
-            : absl::string_view());
+        absl::StrCat(quic::QuicRstStreamErrorCodeToString(frame.error_code), "|FROM_PEER"));
   }
 }
 
@@ -395,10 +395,7 @@ void EnvoyQuicServerStream::ResetWithError(quic::QuicResetStreamError error) {
     // Upper layers expect calling resetStream() to immediately raise reset callbacks.
     runResetCallbacks(
         quicRstErrorToEnvoyLocalResetReason(error.internal_code()),
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")
-            ? absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()),
-                           "|FROM_SELF")
-            : absl::string_view());
+        absl::StrCat(quic::QuicRstStreamErrorCodeToString(error.internal_code()), "|FROM_SELF"));
   }
   quic::QuicSpdyServerStreamBase::ResetWithError(error);
 }

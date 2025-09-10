@@ -157,6 +157,7 @@ public:
           ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
               CookieConfig_SameSite_DISABLED,
       int csrf_token_expires_in = 0, int code_verifier_token_expires_in = 0) {
+
     envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
     endpoint->set_cluster("auth.example.com");
@@ -386,15 +387,6 @@ generic_secret:
   EXPECT_TRUE(client_callback->onConfigUpdate(decoded_resources_client_recheck.refvec_, "").ok());
   EXPECT_EQ(secret_reader.clientSecret(), "client_test_recheck");
   EXPECT_EQ(secret_reader.hmacSecret(), "token_test");
-}
-// Verifies that we fail constructing the filter if the configured cluster doesn't exist.
-TEST_F(OAuth2Test, InvalidCluster) {
-  ON_CALL(factory_context_.server_factory_context_.cluster_manager_, clusters())
-      .WillByDefault(Return(Upstream::ClusterManager::ClusterInfoMaps()));
-
-  EXPECT_THROW_WITH_MESSAGE(init(), EnvoyException,
-                            "OAuth2 filter: unknown cluster 'auth.example.com' in config. Please "
-                            "specify which cluster to direct OAuth requests to.");
 }
 
 // Verifies that we fail constructing the filter if the authorization endpoint isn't a valid URL.
@@ -2123,6 +2115,8 @@ TEST_F(DisabledIdTokenTests, SetCookieIgnoresIdTokenWhenDisabledAccessToken) {
 // *not* set the IdToken request header that's forwarded, the response headers that are returned,
 // and should produce an HMAC that does not consider the id-token.
 TEST_F(DisabledIdTokenTests, SetCookieIgnoresIdTokenWhenDisabledRefreshToken) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.oauth2_cleanup_cookies", "false"}});
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -2206,6 +2200,9 @@ TEST_F(DisabledTokenTests, SetCookieIgnoresTokensWhenAllTokensAreDisabled1) {
 // *not* set the IdToken request header that's forwarded, the response headers that are returned,
 // and should produce an HMAC that does not consider the id-token.
 TEST_F(DisabledTokenTests, SetCookieIgnoresTokensWhenAllTokensAreDisabled2) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.oauth2_cleanup_cookies", "false"}});
+
   EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
             filter_->decodeHeaders(request_headers_, false));
 
@@ -3104,11 +3101,15 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessToken) {
   EXPECT_THAT(response_headers, HeaderMapEqualRef(&expected_response_headers));
 
   auto cookies = Http::Utility::parseCookies(request_headers);
-  EXPECT_EQ(cookies.at("OauthHMAC"), "UzbL/bzvWEP8oaoPDfQrD0zu6zC6m0yBOowKx1Mdr6o=");
-  EXPECT_EQ(cookies.at("OauthExpires"), "10");
   EXPECT_EQ(cookies.at("BearerToken"), "access_code");
   EXPECT_EQ(cookies.at("IdToken"), "some-id-token");
-  EXPECT_EQ(cookies.at("RefreshToken"), "some-refresh-token");
+
+  // OAuth flow cookies should be removed before forwarding the request
+  EXPECT_EQ(cookies.contains("OauthHMAC"), false);
+  EXPECT_EQ(cookies.contains("OauthExpires"), false);
+  EXPECT_EQ(cookies.contains("RefreshToken"), false);
+  EXPECT_EQ(cookies.contains("OauthNonce"), false);
+  EXPECT_EQ(cookies.contains("CodeVerifier"), false);
 }
 
 // When a refresh flow succeeds, but a new refresh token isn't received from the OAuth server, the
@@ -3176,11 +3177,15 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenNoNewRefreshToken) 
   EXPECT_THAT(response_headers, HeaderMapEqualRef(&expected_response_headers));
 
   auto cookies = Http::Utility::parseCookies(request_headers);
-  EXPECT_EQ(cookies.at("OauthHMAC"), "xQCNvPMLwq3rF1dB/mSwyVz7kcIZai8pD8rS5SNLgRU=");
-  EXPECT_EQ(cookies.at("OauthExpires"), "10");
   EXPECT_EQ(cookies.at("BearerToken"), "access_code");
   EXPECT_EQ(cookies.at("IdToken"), "some-id-token");
-  EXPECT_EQ(cookies.at("RefreshToken"), "legit_refresh_token");
+
+  // OAuth flow cookies should be removed before forwarding the request
+  EXPECT_EQ(cookies.contains("OauthHMAC"), false);
+  EXPECT_EQ(cookies.contains("OauthExpires"), false);
+  EXPECT_EQ(cookies.contains("RefreshToken"), false);
+  EXPECT_EQ(cookies.contains("OauthNonce"), false);
+  EXPECT_EQ(cookies.contains("CodeVerifier"), false);
 }
 
 TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
@@ -3262,11 +3267,15 @@ TEST_F(OAuth2Test, OAuthTestSetCookiesAfterRefreshAccessTokenWithBasicAuth) {
 
   // Test the request headers are updated with the new tokens.
   auto cookies = Http::Utility::parseCookies(request_headers);
-  EXPECT_EQ(cookies.at("OauthHMAC"), "OYnODPsSGabEpZ2LAiPxyjAFgN/7/5Xg24G7jUoUbyI=");
-  EXPECT_EQ(cookies.at("OauthExpires"), "10");
   EXPECT_EQ(cookies.at("BearerToken"), "accessToken");
   EXPECT_EQ(cookies.at("IdToken"), "idToken");
-  EXPECT_EQ(cookies.at("RefreshToken"), "refreshToken");
+
+  // OAuth flow cookies should be removed before forwarding the request
+  EXPECT_EQ(cookies.contains("OauthHMAC"), false);
+  EXPECT_EQ(cookies.contains("OauthExpires"), false);
+  EXPECT_EQ(cookies.contains("RefreshToken"), false);
+  EXPECT_EQ(cookies.contains("OauthNonce"), false);
+  EXPECT_EQ(cookies.contains("CodeVerifier"), false);
 }
 
 // Test all cookies with STRICT SameSite
@@ -3625,7 +3634,13 @@ TEST_F(OAuth2Test, CookiesDecryptedBeforeForwarding) {
   auto cookies = Http::Utility::parseCookies(request_headers);
   EXPECT_EQ(cookies.at("BearerToken"), "access_code");
   EXPECT_EQ(cookies.at("IdToken"), "some-id-token");
-  EXPECT_EQ(cookies.at("RefreshToken"), "some-refresh-token");
+
+  // OAuth flow cookies should be removed before forwarding the request
+  EXPECT_EQ(cookies.contains("OauthHMAC"), false);
+  EXPECT_EQ(cookies.contains("OauthExpires"), false);
+  EXPECT_EQ(cookies.contains("RefreshToken"), false);
+  EXPECT_EQ(cookies.contains("OauthNonce"), false);
+  EXPECT_EQ(cookies.contains("CodeVerifier"), false);
 }
 
 // Ensure that the token cookies are decrypted before forwarding the request
@@ -3665,7 +3680,147 @@ TEST_F(OAuth2Test, CookiesDecryptedBeforeForwardingWithEncryptionDisabled) {
   auto cookies = Http::Utility::parseCookies(request_headers);
   EXPECT_EQ(cookies.at("BearerToken"), "access_code");
   EXPECT_EQ(cookies.at("IdToken"), "some-id-token");
+
+  // OAuth flow cookies should be removed before forwarding the request
+  EXPECT_EQ(cookies.contains("OauthHMAC"), false);
+  EXPECT_EQ(cookies.contains("OauthExpires"), false);
+  EXPECT_EQ(cookies.contains("RefreshToken"), false);
+  EXPECT_EQ(cookies.contains("OauthNonce"), false);
+  EXPECT_EQ(cookies.contains("CodeVerifier"), false);
+}
+
+// Ensure that the token cookies are decrypted before forwarding the request
+TEST_F(OAuth2Test, CookiesDecryptedBeforeForwardingWithCleanupOAuthCookiesDisabled) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.oauth2_cleanup_cookies", "false"}});
+
+  // Initialize with use_refresh_token set to false
+  init(getConfig(true /* forward_bearer_token */));
+
+  // Set SystemTime to a fixed point so we get consistent HMAC encodings between test runs.
+  test_time_.setSystemTime(SystemTime(std::chrono::seconds(0)));
+
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/original_path?var1=1&var2=2"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+      {Http::Headers::get().Cookie.get(), "OauthHMAC=4TKyxPV/F7yyvr0XgJ2bkWFOc8t4IOFen1k29b84MAQ="},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=1600"},
+      {Http::Headers::get().Cookie.get(), "BearerToken=" + TEST_ENCRYPTED_ACCESS_TOKEN},
+      {Http::Headers::get().Cookie.get(), "IdToken=" + TEST_ENCRYPTED_ID_TOKEN},
+      {Http::Headers::get().Cookie.get(), "RefreshToken=" + TEST_ENCRYPTED_REFRESH_TOKEN},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=" + TEST_CSRF_TOKEN},
+  };
+
+  // cookie-validation mocking
+  EXPECT_CALL(*validator_, setParams(_, _));
+  EXPECT_CALL(*validator_, isValid()).WillOnce(Return(true));
+
+  // return reference mocking
+  std::string access_token{"access_code"};
+  EXPECT_CALL(*validator_, token()).WillRepeatedly(ReturnRef(access_token));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+
+  // Expect the request headers to be updated with the decrypted tokens
+  auto cookies = Http::Utility::parseCookies(request_headers);
+  EXPECT_EQ(cookies.at("BearerToken"), "access_code");
+  EXPECT_EQ(cookies.at("IdToken"), "some-id-token");
   EXPECT_EQ(cookies.at("RefreshToken"), "some-refresh-token");
+}
+
+// Verifies that requests matching the pass_through_matcher configuration are not modified by the
+// filter. The request headers and cookies remain unchanged, and only the oauth_passthrough metric
+// is incremented. This ensures correct behavior when the filter is configured to skip processing
+// for specific requests.
+TEST_F(OAuth2Test, RequestIsUnchangedWhenPassThroughMatcherMatches) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Options},
+      {Http::Headers::get().Cookie.get(), "OauthHMAC=some_oauth_hmac_value"},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=some_oauth_expires_value"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken=some_refresh_token_value"},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=some_oauth_nonce_value"},
+      {Http::Headers::get().Cookie.get(), "CodeVerifier=some_code_verifier_value"}};
+
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Options},
+      {Http::Headers::get().Cookie.get(), "OauthHMAC=some_oauth_hmac_value"},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=some_oauth_expires_value"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken=some_refresh_token_value"},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=some_oauth_nonce_value"},
+      {Http::Headers::get().Cookie.get(), "CodeVerifier=some_code_verifier_value"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(request_headers, expected_headers);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_failure").value(), 0);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_passthrough").value(), 1);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 0);
+}
+
+// Verify cookie prefixes "__Secure-" and "__Host-" cause addition of the "Secure" attribute at
+// signout.
+TEST_F(OAuth2Test, SecureAttributeAddedForSecureCookiePrefixesOnSignout) {
+  auto make_config =
+      [&](absl::string_view prefix) -> envoy::extensions::filters::http::oauth2::v3::OAuth2Config {
+    envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+    auto* endpoint = p.mutable_token_endpoint();
+    endpoint->set_cluster("auth.example.com");
+    endpoint->set_uri("auth.example.com/_oauth");
+    p.set_authorization_endpoint("https://auth2.example.com/oauth/authorize/");
+    p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+    p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+    auto* credentials = p.mutable_credentials();
+    credentials->set_client_id(TEST_CLIENT_ID);
+    credentials->mutable_token_secret()->set_name("secret");
+    credentials->mutable_hmac_secret()->set_name("hmac");
+    auto* cookie_names = credentials->mutable_cookie_names();
+    cookie_names->set_oauth_hmac(absl::StrCat(prefix, "OauthHMAC"));
+    cookie_names->set_bearer_token(absl::StrCat(prefix, "BearerToken"));
+    cookie_names->set_id_token(absl::StrCat(prefix, "IdToken"));
+    cookie_names->set_refresh_token(absl::StrCat(prefix, "RefreshToken"));
+    cookie_names->set_oauth_nonce(absl::StrCat(prefix, "OauthNonce"));
+    cookie_names->set_code_verifier(absl::StrCat(prefix, "CodeVerifier"));
+
+    auto* matcher = p.add_pass_through_matcher();
+    matcher->set_name(":method");
+    matcher->mutable_string_match()->set_exact("OPTIONS");
+
+    return p;
+  };
+
+  auto run_test_with_prefix = [&](absl::string_view prefix, bool expect_secure) {
+    auto p = make_config(prefix);
+    auto secret_reader = std::make_shared<MockSecretReader>();
+    init(std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_, secret_reader,
+                                        scope_, "test."));
+
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
+        .WillOnce(Invoke([&](Http::ResponseHeaderMap& passed_headers, bool) {
+          EXPECT_EQ(passed_headers.get(Http::Headers::get().SetCookie).size(), 6);
+          const auto& cookie_str =
+              passed_headers.get(Http::Headers::get().SetCookie)[0]->value().getStringView();
+          if (expect_secure) {
+            EXPECT_THAT(cookie_str, testing::HasSubstr("; Secure"));
+          } else {
+            EXPECT_THAT(cookie_str, testing::Not(testing::HasSubstr("; Secure")));
+          }
+        }));
+    auto request_headers = Http::TestRequestHeaderMapImpl{
+        {Http::Headers::get().Host.get(), "traffic.example.com"},
+        {Http::Headers::get().Path.get(), "/_signout"},
+        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+    };
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(request_headers, false));
+  };
+
+  run_test_with_prefix("__Secure-", true);
+  run_test_with_prefix("__Host-", true);
+  run_test_with_prefix("", false);
 }
 
 } // namespace Oauth2

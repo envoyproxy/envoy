@@ -79,6 +79,36 @@ TraceContextHandler::get(const TraceContext& trace_context) const {
   }
 }
 
+TraceContextHandler::GetAllResult
+TraceContextHandler::getAll(const TraceContext& trace_context) const {
+  auto header_map = trace_context.requestHeaders();
+  if (!header_map.has_value()) {
+    if (const auto value = trace_context.get(key_); value.has_value()) {
+      return {value.value()};
+    }
+    return {};
+  }
+
+  if (handle_.has_value()) {
+    auto* entry = header_map->getInline(handle_.value());
+    if (entry == nullptr) {
+      return {};
+    }
+    return {entry->value().getStringView()};
+  } else {
+    auto results = header_map->get(key_);
+    if (results.empty()) {
+      return {};
+    }
+    GetAllResult all_values;
+    all_values.reserve(results.size());
+    for (size_t i = 0; i < results.size(); ++i) {
+      all_values.push_back(results[i]->value().getStringView());
+    }
+    return all_values;
+  }
+}
+
 void TraceContextHandler::remove(TraceContext& trace_context) const {
   auto header_map = trace_context.requestHeaders();
   if (!header_map.has_value()) {

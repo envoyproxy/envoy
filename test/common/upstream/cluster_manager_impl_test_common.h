@@ -83,16 +83,9 @@ public:
 
   Event::SimulatedTimeSystem time_system_;
   NiceMock<TestClusterManagerFactory> factory_;
-  NiceMock<Config::MockXdsManager> xds_manager_;
   std::unique_ptr<TestClusterManagerImpl> cluster_manager_;
-  AccessLog::MockAccessLogManager log_manager_;
-  NiceMock<Server::MockAdmin> admin_;
   MockLocalClusterUpdate local_cluster_update_;
   MockLocalHostsRemoved local_hosts_removed_;
-  Http::ContextImpl http_context_;
-  Grpc::ContextImpl grpc_context_;
-  Router::ContextImpl router_context_;
-  NiceMock<Server::MockInstance> server_;
   NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
   Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
 };

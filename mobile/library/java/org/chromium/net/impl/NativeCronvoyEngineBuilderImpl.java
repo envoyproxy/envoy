@@ -69,6 +69,7 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   private String mUpstreamTlsSni = "";
   private int mH3ConnectionKeepaliveInitialIntervalMilliseconds = 0;
   private boolean mUseNetworkChangeEvent = false;
+  private boolean mUseV2NetworkMonitor = false;
 
   private final Map<String, Boolean> mRuntimeGuards = new HashMap<>();
 
@@ -133,6 +134,11 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
   public NativeCronvoyEngineBuilderImpl
   setDisableDnsRefreshOnNetworkChange(boolean disableDnsRefreshOnNetworkChange) {
     mDisableDnsRefreshOnNetworkChange = disableDnsRefreshOnNetworkChange;
+    return this;
+  }
+
+  public NativeCronvoyEngineBuilderImpl setUseV2NetworkMonitor(boolean useV2NetworkMonitor) {
+    mUseV2NetworkMonitor = useV2NetworkMonitor;
     return this;
   }
 
@@ -265,9 +271,9 @@ public class NativeCronvoyEngineBuilderImpl extends CronvoyEngineBuilderImpl {
 
   EnvoyEngine createEngine(EnvoyOnEngineRunning onEngineRunning, EnvoyLogger envoyLogger,
                            String logLevel) {
-    AndroidEngineImpl engine =
-        new AndroidEngineImpl(getContext(), onEngineRunning, envoyLogger, mEnvoyEventTracker,
-                              mEnableProxying, mUseNetworkChangeEvent);
+    AndroidEngineImpl engine = new AndroidEngineImpl(
+        getContext(), onEngineRunning, envoyLogger, mEnvoyEventTracker, mEnableProxying,
+        mUseNetworkChangeEvent, mDisableDnsRefreshOnNetworkChange, mUseV2NetworkMonitor);
     engine.runWithConfig(createEnvoyConfiguration(), logLevel);
     return engine;
   }

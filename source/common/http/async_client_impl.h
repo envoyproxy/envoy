@@ -230,10 +230,10 @@ private:
   void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void sendGoAwayAndClose() override {}
 
-  void setDecoderBufferLimit(uint32_t) override {
+  void setDecoderBufferLimit(uint64_t) override {
     IS_ENVOY_BUG("decoder buffer limits should not be overridden on async streams.");
   }
-  uint32_t decoderBufferLimit() override { return buffer_limit_.value_or(0); }
+  uint64_t decoderBufferLimit() override { return buffer_limit_.value_or(0); }
   bool recreateStream(const ResponseHeaderMap*) override { return false; }
   const ScopeTrackedObject& scope() override { return *this; }
   void restoreContextOnContinue(ScopeTrackedObjectStack& tracked_object_stack) override {
@@ -278,14 +278,14 @@ private:
   Tracing::NullSpan active_span_;
   const Tracing::Config& tracing_config_;
   const LocalReply::LocalReply& local_reply_;
-  const std::unique_ptr<const Router::RetryPolicy> retry_policy_;
+  Router::RetryPolicyConstSharedPtr retry_policy_;
   std::shared_ptr<NullRouteImpl> route_;
   uint32_t high_watermark_calls_{};
   bool local_closed_{};
   bool remote_closed_{};
   Buffer::InstancePtr buffered_body_;
   Buffer::BufferMemoryAccountSharedPtr account_{nullptr};
-  absl::optional<uint32_t> buffer_limit_{absl::nullopt};
+  absl::optional<uint64_t> buffer_limit_{absl::nullopt};
   RequestHeaderMap* request_headers_{};
   RequestTrailerMap* request_trailers_{};
   bool encoded_response_headers_{};

@@ -701,7 +701,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, AutoRetrySafeRequestUponTooEarlyRespo
   waitForNextUpstreamRequest(0);
   // If the request already has Early-Data header, no additional Early-Data header should be added
   // and the header should be forwarded as is.
-  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "1"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader(Http::Headers::get().EarlyData, "1"));
   upstream_request_->encodeHeaders(too_early_response_headers, true);
   ASSERT_TRUE(response2->waitForEndStream());
   // 425 response should be forwarded back to the client.
@@ -862,7 +862,7 @@ class QuicFailHandshakeCryptoServerStreamFactory
     : public Quic::EnvoyQuicCryptoServerStreamFactoryInterface {
 public:
   Envoy::ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+    return ProtobufTypes::MessagePtr{new Envoy::Protobuf::Struct()};
   }
   std::string name() const override { return "envoy.quic.crypto_stream.server.fail_handshake"; }
 
@@ -901,7 +901,7 @@ TEST_P(MultiplexedUpstreamIntegrationTest, UpstreamDisconnectDuringEarlyData) {
   envoy::config::listener::v3::QuicProtocolOptions options;
   auto* crypto_stream_config = options.mutable_crypto_stream_config();
   crypto_stream_config->set_name("envoy.quic.crypto_stream.server.fail_handshake");
-  crypto_stream_config->mutable_typed_config()->PackFrom(ProtobufWkt::Struct());
+  crypto_stream_config->mutable_typed_config()->PackFrom(Protobuf::Struct());
   mergeOptions(options);
 
   initialize();

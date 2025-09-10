@@ -108,7 +108,7 @@ TEST_F(KeyValueStoreXdsDelegateTest, SaveAndRetrieve) {
   )EOF");
   const auto saved_resources =
       TestUtility::decodeResources({runtime_resource_1, runtime_resource_2});
-  const XdsConfigSourceId source_id{authority_1, Config::TypeUrl::get().Runtime};
+  const XdsConfigSourceId source_id{authority_1, Config::TestTypeUrl::get().Runtime};
   // Save xDS resources.
   xds_delegate_->onConfigUpdated(source_id, saved_resources.refvec_);
 
@@ -146,9 +146,9 @@ TEST_F(KeyValueStoreXdsDelegateTest, MultipleAuthoritiesAndTypes) {
   const auto authority_2_runtime_resources = TestUtility::decodeResources({runtime_resource_2});
   const auto authority_2_cluster_resources = TestUtility::decodeResources({cluster_resource_1});
 
-  const XdsConfigSourceId source_id_1{authority_1, Config::TypeUrl::get().Runtime};
-  const XdsConfigSourceId source_id_2_runtime{authority_2, Config::TypeUrl::get().Runtime};
-  const XdsConfigSourceId source_id_2_cluster{authority_2, Config::TypeUrl::get().Cluster};
+  const XdsConfigSourceId source_id_1{authority_1, Config::TestTypeUrl::get().Runtime};
+  const XdsConfigSourceId source_id_2_runtime{authority_2, Config::TestTypeUrl::get().Runtime};
+  const XdsConfigSourceId source_id_2_cluster{authority_2, Config::TestTypeUrl::get().Cluster};
 
   // Save xDS resources.
   xds_delegate_->onConfigUpdated(source_id_1, authority_1_runtime_resources.refvec_);
@@ -184,7 +184,7 @@ TEST_F(KeyValueStoreXdsDelegateTest, UpdatedSotwResources) {
       abc: xyz
   )EOF");
 
-  const XdsConfigSourceId source_id{authority_1, Config::TypeUrl::get().Runtime};
+  const XdsConfigSourceId source_id{authority_1, Config::TestTypeUrl::get().Runtime};
 
   // Save xDS resources.
   const auto saved_resources =
@@ -232,7 +232,7 @@ TEST_F(KeyValueStoreXdsDelegateTest, Wildcard) {
   )EOF");
   const auto saved_resources =
       TestUtility::decodeResources({runtime_resource_1, runtime_resource_2});
-  const XdsConfigSourceId source_id{authority_1, Config::TypeUrl::get().Runtime};
+  const XdsConfigSourceId source_id{authority_1, Config::TestTypeUrl::get().Runtime};
   // Save xDS resources.
   xds_delegate_->onConfigUpdated(source_id, saved_resources.refvec_);
 
@@ -257,7 +257,7 @@ TEST_F(KeyValueStoreXdsDelegateTest, ResourceNotFound) {
       baz: meh
   )EOF");
   const auto saved_resources = TestUtility::decodeResources({runtime_resource_1});
-  const XdsConfigSourceId source_id{authority_1, Config::TypeUrl::get().Runtime};
+  const XdsConfigSourceId source_id{authority_1, Config::TestTypeUrl::get().Runtime};
   // Save xDS resources.
   xds_delegate_->onConfigUpdated(source_id, saved_resources.refvec_);
 
@@ -309,7 +309,7 @@ TEST_F(KeyValueStoreXdsDelegateTest, ResourcesWithTTL) {
       resources, /*version=*/"1");
 
   // Save xDS resources.
-  const XdsConfigSourceId source_id{authority_1, Config::TypeUrl::get().Runtime};
+  const XdsConfigSourceId source_id{authority_1, Config::TestTypeUrl::get().Runtime};
   xds_delegate_->onConfigUpdated(source_id, decoded_resources.refvec_);
 
   // TTL hasn't expired, so we should have all three xDS resources.

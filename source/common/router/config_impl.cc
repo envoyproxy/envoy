@@ -44,13 +44,10 @@
 #include "source/common/router/context_impl.h"
 #include "source/common/router/header_cluster_specifier.h"
 #include "source/common/router/matcher_visitor.h"
-#include "source/common/router/reset_header_parser.h"
-#include "source/common/router/retry_state_impl.h"
 #include "source/common/router/weighted_cluster_specifier.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/tracing/custom_tag_impl.h"
 #include "source/common/tracing/http_tracer_impl.h"
-#include "source/common/upstream/retry_factory.h"
 #include "source/extensions/early_data/default_early_data_policy.h"
 #include "source/extensions/matching/network/common/inputs.h"
 #include "source/extensions/path/match/uri_template/uri_template_match.h"
@@ -127,11 +124,11 @@ namespace {
 
 constexpr uint32_t DEFAULT_MAX_DIRECT_RESPONSE_BODY_SIZE_BYTES = 4096;
 
-// Returns a vector of header parsers, sorted by specificity. The `specificity_ascend` parameter
+// Returns an array of header parsers, sorted by specificity. The `specificity_ascend` parameter
 // specifies whether the returned parsers will be sorted from least specific to most specific
 // (global connection manager level header parser, virtual host level header parser and finally
 // route-level parser.) or the reverse.
-absl::InlinedVector<const HeaderParser*, 3>
+std::array<const HeaderParser*, 3>
 getHeaderParsers(const HeaderParser* global_route_config_header_parser,
                  const HeaderParser* vhost_header_parser, const HeaderParser* route_header_parser,
                  bool specificity_ascend) {
@@ -216,128 +213,6 @@ HedgePolicyImpl::HedgePolicyImpl(const envoy::config::route::v3::HedgePolicy& he
       hedge_on_per_try_timeout_(hedge_policy.hedge_on_per_try_timeout()) {}
 
 HedgePolicyImpl::HedgePolicyImpl() : initial_requests_(1), hedge_on_per_try_timeout_(false) {}
-
-absl::StatusOr<std::unique_ptr<RetryPolicyImpl>>
-RetryPolicyImpl::create(const envoy::config::route::v3::RetryPolicy& retry_policy,
-                        ProtobufMessage::ValidationVisitor& validation_visitor,
-                        Upstream::RetryExtensionFactoryContext& factory_context,
-                        Server::Configuration::CommonFactoryContext& common_context) {
-  absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<RetryPolicyImpl>(new RetryPolicyImpl(
-      retry_policy, validation_visitor, factory_context, common_context, creation_status));
-  RETURN_IF_NOT_OK(creation_status);
-  return ret;
-}
-RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
-                                 ProtobufMessage::ValidationVisitor& validation_visitor,
-                                 Upstream::RetryExtensionFactoryContext& factory_context,
-                                 Server::Configuration::CommonFactoryContext& common_context,
-                                 absl::Status& creation_status)
-    : retriable_headers_(Http::HeaderUtility::buildHeaderMatcherVector(
-          retry_policy.retriable_headers(), common_context)),
-      retriable_request_headers_(Http::HeaderUtility::buildHeaderMatcherVector(
-          retry_policy.retriable_request_headers(), common_context)),
-      validation_visitor_(&validation_visitor) {
-  per_try_timeout_ =
-      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_timeout, 0));
-  per_try_idle_timeout_ =
-      std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(retry_policy, per_try_idle_timeout, 0));
-  num_retries_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy, num_retries, 1);
-  retry_on_ = RetryStateImpl::parseRetryOn(retry_policy.retry_on()).first;
-  retry_on_ |= RetryStateImpl::parseRetryGrpcOn(retry_policy.retry_on()).first;
-
-  for (const auto& host_predicate : retry_policy.retry_host_predicate()) {
-    auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
-        host_predicate);
-    auto config = Envoy::Config::Utility::translateToFactoryConfig(host_predicate,
-                                                                   validation_visitor, factory);
-    retry_host_predicate_configs_.emplace_back(factory, std::move(config));
-  }
-
-  const auto& retry_priority = retry_policy.retry_priority();
-  if (!retry_priority.name().empty()) {
-    auto& factory =
-        Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(retry_priority);
-    retry_priority_config_ =
-        std::make_pair(&factory, Envoy::Config::Utility::translateToFactoryConfig(
-                                     retry_priority, validation_visitor, factory));
-  }
-
-  for (const auto& options_predicate : retry_policy.retry_options_predicates()) {
-    auto& factory =
-        Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryOptionsPredicateFactory>(
-            options_predicate);
-    retry_options_predicates_.emplace_back(
-        factory.createOptionsPredicate(*Envoy::Config::Utility::translateToFactoryConfig(
-                                           options_predicate, validation_visitor, factory),
-                                       factory_context));
-  }
-
-  auto host_selection_attempts = retry_policy.host_selection_retry_max_attempts();
-  if (host_selection_attempts) {
-    host_selection_attempts_ = host_selection_attempts;
-  }
-
-  for (auto code : retry_policy.retriable_status_codes()) {
-    retriable_status_codes_.emplace_back(code);
-  }
-
-  if (retry_policy.has_retry_back_off()) {
-    base_interval_ = std::chrono::milliseconds(
-        PROTOBUF_GET_MS_REQUIRED(retry_policy.retry_back_off(), base_interval));
-    if ((*base_interval_).count() < 1) {
-      base_interval_ = std::chrono::milliseconds(1);
-    }
-
-    max_interval_ = PROTOBUF_GET_OPTIONAL_MS(retry_policy.retry_back_off(), max_interval);
-    if (max_interval_) {
-      // Apply the same rounding to max interval in case both are set to sub-millisecond values.
-      if ((*max_interval_).count() < 1) {
-        max_interval_ = std::chrono::milliseconds(1);
-      }
-
-      if ((*max_interval_).count() < (*base_interval_).count()) {
-        creation_status = absl::InvalidArgumentError(
-            "retry_policy.max_interval must greater than or equal to the base_interval");
-        return;
-      }
-    }
-  }
-
-  if (retry_policy.has_rate_limited_retry_back_off()) {
-    reset_headers_ = ResetHeaderParserImpl::buildResetHeaderParserVector(
-        retry_policy.rate_limited_retry_back_off().reset_headers());
-
-    absl::optional<std::chrono::milliseconds> reset_max_interval =
-        PROTOBUF_GET_OPTIONAL_MS(retry_policy.rate_limited_retry_back_off(), max_interval);
-    if (reset_max_interval.has_value()) {
-      std::chrono::milliseconds max_interval = reset_max_interval.value();
-      if (max_interval.count() < 1) {
-        max_interval = std::chrono::milliseconds(1);
-      }
-      reset_max_interval_ = max_interval;
-    }
-  }
-}
-
-std::vector<Upstream::RetryHostPredicateSharedPtr> RetryPolicyImpl::retryHostPredicates() const {
-  std::vector<Upstream::RetryHostPredicateSharedPtr> predicates;
-  predicates.reserve(retry_host_predicate_configs_.size());
-  for (const auto& config : retry_host_predicate_configs_) {
-    predicates.emplace_back(config.first.createHostPredicate(*config.second, num_retries_));
-  }
-
-  return predicates;
-}
-
-Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
-  if (retry_priority_config_.first == nullptr) {
-    return nullptr;
-  }
-
-  return retry_priority_config_.first->createRetryPriority(*retry_priority_config_.second,
-                                                           *validation_visitor_, num_retries_);
-}
 
 absl::StatusOr<std::unique_ptr<InternalRedirectPolicyImpl>> InternalRedirectPolicyImpl::create(
     const envoy::config::route::v3::InternalRedirectPolicy& policy_config,
@@ -449,15 +324,8 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config, absl::Stat
   // If trace sampling is not explicitly configured in shadow_policy, we pass null optional to
   // inherit the parent's sampling decision. This prevents oversampling when runtime sampling is
   // disabled.
-  if (config.has_trace_sampled()) {
-    trace_sampled_ = config.trace_sampled().value();
-  } else {
-    // If the shadow policy does not specify trace_sampled, we will inherit the parent's sampling
-    // decision.
-    const bool user_parent_sampling_decision = Runtime::runtimeFeatureEnabled(
-        "envoy.reloadable_features.shadow_policy_inherit_trace_sampling");
-    trace_sampled_ = user_parent_sampling_decision ? absl::nullopt : absl::make_optional(true);
-  }
+  trace_sampled_ = config.has_trace_sampled() ? absl::optional<bool>(config.trace_sampled().value())
+                                              : absl::nullopt;
 }
 
 DecoratorImpl::DecoratorImpl(const envoy::config::route::v3::Decorator& decorator)
@@ -571,8 +439,10 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       opaque_config_(parseOpaqueConfig(route)), decorator_(parseDecorator(route)),
       route_tracing_(parseRouteTracing(route)), route_name_(route.name()),
       time_source_(factory_context.mainThreadDispatcher().timeSource()),
-      retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-          route, per_request_buffer_limit_bytes, vhost->retryShadowBufferLimit())),
+      per_request_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          route, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
+      request_body_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route, request_body_buffer_limit,
+                                                                 vhost->requestBodyBufferLimit())),
       direct_response_code_(ConfigUtility::parseDirectResponseCode(route)),
       cluster_not_found_response_code_(ConfigUtility::parseClusterNotFoundResponseCode(
           route.route().cluster_not_found_response_code())),
@@ -582,6 +452,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
       using_new_timeouts_(route.route().has_max_stream_duration()),
       match_grpc_(route.match().has_grpc()),
       case_sensitive_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.match(), case_sensitive, true)) {
+
   auto config_or_error =
       PerFilterConfigs::create(route.typed_per_filter_config(), factory_context, validator);
   SET_AND_RETURN_IF_NOT_OK(config_or_error.status(), creation_status);
@@ -914,12 +785,13 @@ void RouteEntryImplBase::finalizeHostHeader(Http::RequestHeaderMap& headers,
 }
 
 void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
+                                                const Formatter::HttpFormatterContext& context,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 bool keep_original_host_or_path) const {
   for (const HeaderParser* header_parser : getRequestHeaderParsers(
            /*specificity_ascend=*/vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
-    header_parser->evaluateHeaders(headers, stream_info);
+    header_parser->evaluateHeaders(headers, context, stream_info);
   }
 
   // Restore the port if this was a CONNECT request.
@@ -944,12 +816,12 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
 }
 
 void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+                                                 const Formatter::HttpFormatterContext& context,
                                                  const StreamInfo::StreamInfo& stream_info) const {
   for (const HeaderParser* header_parser : getResponseHeaderParsers(
            /*specificity_ascend=*/vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
-    header_parser->evaluateHeaders(headers, {stream_info.getRequestHeaders(), &headers},
-                                   stream_info);
+    header_parser->evaluateHeaders(headers, context, stream_info);
   }
 }
 
@@ -977,14 +849,14 @@ RouteEntryImplBase::requestHeaderTransforms(const StreamInfo::StreamInfo& stream
   return transforms;
 }
 
-absl::InlinedVector<const HeaderParser*, 3>
+std::array<const HeaderParser*, 3>
 RouteEntryImplBase::getRequestHeaderParsers(bool specificity_ascend) const {
   return getHeaderParsers(&vhost_->globalRouteConfig().requestHeaderParser(),
                           &vhost_->requestHeaderParser(), &requestHeaderParser(),
                           specificity_ascend);
 }
 
-absl::InlinedVector<const HeaderParser*, 3>
+std::array<const HeaderParser*, 3>
 RouteEntryImplBase::getResponseHeaderParsers(bool specificity_ascend) const {
   return getHeaderParsers(&vhost_->globalRouteConfig().responseHeaderParser(),
                           &vhost_->responseHeaderParser(), &responseHeaderParser(),
@@ -1116,7 +988,7 @@ RouteEntryImplBase::parseOpaqueConfig(const envoy::config::route::v3::Route& rou
       return ret;
     }
     for (const auto& it : filter_metadata->second.fields()) {
-      if (it.second.kind_case() == ProtobufWkt::Value::kStringValue) {
+      if (it.second.kind_case() == Protobuf::Value::kStringValue) {
         ret.emplace(it.first, it.second.string_value());
       }
     }
@@ -1145,19 +1017,16 @@ absl::StatusOr<std::unique_ptr<RetryPolicyImpl>> RouteEntryImplBase::buildRetryP
     RetryPolicyConstOptRef vhost_retry_policy,
     const envoy::config::route::v3::RouteAction& route_config,
     ProtobufMessage::ValidationVisitor& validation_visitor,
-    Server::Configuration::ServerFactoryContext& factory_context) const {
-  Upstream::RetryExtensionFactoryContextImpl retry_factory_context(
-      factory_context.singletonManager());
+    Server::Configuration::CommonFactoryContext& factory_context) const {
   // Route specific policy wins, if available.
   if (route_config.has_retry_policy()) {
     return RetryPolicyImpl::create(route_config.retry_policy(), validation_visitor,
-                                   retry_factory_context, factory_context);
+                                   factory_context);
   }
 
   // If not, we fallback to the virtual host policy if there is one.
   if (vhost_retry_policy.has_value()) {
-    return RetryPolicyImpl::create(*vhost_retry_policy, validation_visitor, retry_factory_context,
-                                   factory_context);
+    return RetryPolicyImpl::create(*vhost_retry_policy, validation_visitor, factory_context);
   }
 
   // Otherwise, an empty policy will do.
@@ -1192,6 +1061,7 @@ RouteEntryImplBase::OptionalTimeouts RouteEntryImplBase::buildOptionalTimeouts(
   // Calculate how many values are actually set, to initialize `OptionalTimeouts` packed_struct,
   // avoiding memory re-allocation on each set() call.
   int num_timeouts_set = route.has_idle_timeout() ? 1 : 0;
+  num_timeouts_set += route.has_flush_timeout() ? 1 : 0;
   num_timeouts_set += route.has_max_grpc_timeout() ? 1 : 0;
   num_timeouts_set += route.has_grpc_timeout_offset() ? 1 : 0;
   if (route.has_max_stream_duration()) {
@@ -1203,6 +1073,10 @@ RouteEntryImplBase::OptionalTimeouts RouteEntryImplBase::buildOptionalTimeouts(
   if (route.has_idle_timeout()) {
     timeouts.set<OptionalTimeoutNames::IdleTimeout>(
         std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(route, idle_timeout)));
+  }
+  if (route.has_flush_timeout()) {
+    timeouts.set<OptionalTimeoutNames::FlushTimeout>(
+        std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(route, flush_timeout)));
   }
   if (route.has_max_grpc_timeout()) {
     timeouts.set<OptionalTimeoutNames::MaxGrpcTimeout>(
@@ -1563,11 +1437,14 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
           THROW_OR_RETURN_VALUE(PerFilterConfigs::create(virtual_host.typed_per_filter_config(),
                                                          factory_context, validator),
                                 std::unique_ptr<PerFilterConfigs>)),
-      retry_shadow_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+      per_request_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           virtual_host, per_request_buffer_limit_bytes, std::numeric_limits<uint32_t>::max())),
+      request_body_buffer_limit_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          virtual_host, request_body_buffer_limit, std::numeric_limits<uint64_t>::max())),
       include_attempt_count_in_request_(virtual_host.include_request_attempt_count()),
       include_attempt_count_in_response_(virtual_host.include_attempt_count_in_response()),
       include_is_timeout_retry_header_(virtual_host.include_is_timeout_retry_header()) {
+
   if (!virtual_host.request_headers_to_add().empty() ||
       !virtual_host.request_headers_to_remove().empty()) {
     request_headers_parser_ =
@@ -1825,14 +1702,13 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const RouteCallback& cb
         Matcher::evaluateMatch<Http::HttpMatchingData>(*matcher_, data);
 
     if (match_result.isMatch()) {
-      const Matcher::ActionPtr result = match_result.action();
+      const auto result = match_result.actionByMove();
       if (result->typeUrl() == RouteMatchAction::staticTypeUrl()) {
-        const RouteMatchAction& route_action = result->getTyped<RouteMatchAction>();
-
-        return getRouteFromRoutes(cb, headers, stream_info, random_value, {route_action.route()});
+        return getRouteFromRoutes(
+            cb, headers, stream_info, random_value,
+            {std::dynamic_pointer_cast<const RouteEntryImplBase>(std::move(result))});
       } else if (result->typeUrl() == RouteListMatchAction::staticTypeUrl()) {
         const RouteListMatchAction& action = result->getTyped<RouteListMatchAction>();
-
         return getRouteFromRoutes(cb, headers, stream_info, random_value, action.routes());
       }
       PANIC("Action in router matcher should be Route or RouteList");
@@ -2140,9 +2016,9 @@ const Envoy::Config::TypedMetadata& NullConfigImpl::typedMetadata() const {
   return DefaultRouteMetadataPack::get().typed_metadata_;
 }
 
-Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(
-    const Protobuf::Message& config, RouteActionContext& context,
-    ProtobufMessage::ValidationVisitor& validation_visitor) {
+Matcher::ActionConstSharedPtr
+RouteMatchActionFactory::createAction(const Protobuf::Message& config, RouteActionContext& context,
+                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
   const auto& route_config =
       MessageUtil::downcastAndValidate<const envoy::config::route::v3::Route&>(config,
                                                                                validation_visitor);
@@ -2150,14 +2026,14 @@ Matcher::ActionFactoryCb RouteMatchActionFactory::createActionFactoryCb(
       RouteCreator::createAndValidateRoute(route_config, context.vhost, context.factory_context,
                                            validation_visitor, false),
       RouteEntryImplBaseConstSharedPtr);
-
-  return [route]() { return std::make_unique<RouteMatchAction>(route); };
+  return route;
 }
 REGISTER_FACTORY(RouteMatchActionFactory, Matcher::ActionFactory<RouteActionContext>);
 
-Matcher::ActionFactoryCb RouteListMatchActionFactory::createActionFactoryCb(
-    const Protobuf::Message& config, RouteActionContext& context,
-    ProtobufMessage::ValidationVisitor& validation_visitor) {
+Matcher::ActionConstSharedPtr
+RouteListMatchActionFactory::createAction(const Protobuf::Message& config,
+                                          RouteActionContext& context,
+                                          ProtobufMessage::ValidationVisitor& validation_visitor) {
   const auto& route_config =
       MessageUtil::downcastAndValidate<const envoy::config::route::v3::RouteList&>(
           config, validation_visitor);
@@ -2169,7 +2045,7 @@ Matcher::ActionFactoryCb RouteListMatchActionFactory::createActionFactoryCb(
                                              validation_visitor, false),
         RouteEntryImplBaseConstSharedPtr));
   }
-  return [routes]() { return std::make_unique<RouteListMatchAction>(routes); };
+  return std::make_shared<RouteListMatchAction>(std::move(routes));
 }
 REGISTER_FACTORY(RouteListMatchActionFactory, Matcher::ActionFactory<RouteActionContext>);
 

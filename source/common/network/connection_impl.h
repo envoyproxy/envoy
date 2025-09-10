@@ -62,6 +62,8 @@ public:
   void removeReadFilter(ReadFilterSharedPtr filter) override;
   bool initializeReadFilters() override;
 
+  const ConnectionSocketPtr& getSocket() const override { return socket_; }
+
   // Network::Connection
   void addBytesSentCallback(BytesSentCb cb) override;
   void enableHalfClose(bool enabled) override;
@@ -91,7 +93,7 @@ public:
   absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override {
     // SSL info may be overwritten by a filter in the provider.
-    return socket_->connectionInfoProvider().sslConnection();
+    return (socket_ != nullptr) ? socket_->connectionInfoProvider().sslConnection() : nullptr;
   }
   State state() const override;
   bool connecting() const override {

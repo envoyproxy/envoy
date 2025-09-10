@@ -1,9 +1,11 @@
 #include "source/extensions/transport_sockets/tls/cert_validator/spiffe/spiffe_validator.h"
+#include "spiffe_validator.h"
 
 #include <openssl/safestack.h>
 
 #include <cstdint>
 
+#include "envoy/common/exception.h"
 #include "envoy/extensions/transport_sockets/tls/v3/common.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3/tls_spiffe_validator_config.pb.h"
 #include "envoy/network/transport_socket.h"
@@ -24,6 +26,8 @@
 #include "source/common/tls/stats.h"
 #include "source/common/tls/utility.h"
 
+#include "absl/status/status.h"
+#include "absl/status/statusor.h"
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
 
@@ -129,10 +133,10 @@ SPIFFEValidator::parseTrustBundles(const std::string& trust_bundle_mapping_str) 
   return spiffe_data;
 }
 
-void SPIFFEValidator::initializeCertificateRefresh(
+absl::Status SPIFFEValidator::initializeCertificateRefresh(
     Server::Configuration::CommonFactoryContext& context) {
   file_watcher_ = context.mainThreadDispatcher().createFilesystemWatcher();
-  THROW_IF_NOT_OK(file_watcher_->addWatch(
+  RETURN_IF_NOT_OK(file_watcher_->addWatch(
       trust_bundle_file_name_, Filesystem::Watcher::Events::Modified, [this](uint32_t) {
         ENVOY_LOG(info, "Updating SPIFFE bundle map from file '{}'", trust_bundle_file_name_);
 
@@ -153,20 +157,22 @@ void SPIFFEValidator::initializeCertificateRefresh(
         }
         return absl::OkStatus();
       }));
+  return absl::OkStatus();
 }
 
 SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextConfig* config,
                                  SslStats& stats,
                                  Server::Configuration::CommonFactoryContext& context,
-                                 Stats::Scope& scope)
+                                 Stats::Scope& scope, absl::Status& creation_status)
     : api_(config->api()), stats_(stats), time_source_(context.timeSource()) {
   ASSERT(config != nullptr);
   allow_expired_certificate_ = config->allowExpiredCertificate();
 
   SPIFFEConfig message;
-  THROW_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
-      config->customValidatorConfig().value().typed_config(),
-      ProtobufMessage::getStrictValidationVisitor(), message));
+  SET_AND_RETURN_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
+                               config->customValidatorConfig().value().typed_config(),
+                               ProtobufMessage::getStrictValidationVisitor(), message),
+                           creation_status);
 
   if (!config->subjectAltNameMatchers().empty()) {
     for (const auto& matcher : config->subjectAltNameMatchers()) {
@@ -183,11 +189,12 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
 
   // If a trust bundle map is provided, use that...
   if (message.has_trust_bundles()) {
-    std::string trust_bundles_str = THROW_OR_RETURN_VALUE(
-        Config::DataSource::read(message.trust_bundles(), false, config->api()), std::string);
-    auto parse_result = parseTrustBundles(trust_bundles_str);
+    absl::StatusOr<std::string> trust_bundles_str =
+        Config::DataSource::read(message.trust_bundles(), false, config->api());
+    SET_AND_RETURN_IF_NOT_OK(trust_bundles_str.status(), creation_status);
+    auto parse_result = parseTrustBundles(*trust_bundles_str);
 
-    THROW_IF_NOT_OK_REF(parse_result.status());
+    SET_AND_RETURN_IF_NOT_OK(parse_result.status(), creation_status);
 
     spiffe_data_ = *parse_result;
 
@@ -197,7 +204,7 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
       tls_ = ThreadLocal::TypedSlot<ThreadLocalSpiffeState>::makeUnique(context.threadLocal());
       tls_->set([](Event::Dispatcher&) { return std::make_shared<ThreadLocalSpiffeState>(); });
       updateSpiffeData(spiffe_data_);
-      initializeCertificateRefresh(context);
+      SET_AND_RETURN_IF_NOT_OK(initializeCertificateRefresh(context), creation_status);
     }
 
     initializeCertExpirationStats(scope, config->caCertName());
@@ -210,19 +217,21 @@ SPIFFEValidator::SPIFFEValidator(const Envoy::Ssl::CertificateValidationContextC
   for (auto& domain : message.trust_domains()) {
     if (spiffe_data_->trust_bundle_stores_.find(domain.name()) !=
         spiffe_data_->trust_bundle_stores_.end()) {
-      throw EnvoyException(absl::StrCat(
+      creation_status = absl::InvalidArgumentError(absl::StrCat(
           "Multiple trust bundles are given for one trust domain for ", domain.name()));
+      return;
     }
 
-    auto cert = THROW_OR_RETURN_VALUE(
-        Config::DataSource::read(domain.trust_bundle(), true, config->api()), std::string);
-    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(cert.data()), cert.size()));
+    auto cert = Config::DataSource::read(domain.trust_bundle(), true, config->api());
+    SET_AND_RETURN_IF_NOT_OK(cert.status(), creation_status);
+    bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(const_cast<char*>(cert->data()), cert->size()));
     RELEASE_ASSERT(bio != nullptr, "");
     bssl::UniquePtr<STACK_OF(X509_INFO)> list(
         PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
     if (list == nullptr || sk_X509_INFO_num(list.get()) == 0) {
-      throw EnvoyException(
+      creation_status = absl::InvalidArgumentError(
           absl::StrCat("Failed to load trusted CA certificate for ", domain.name()));
+      return;
     }
 
     auto store = X509StorePtr(X509_STORE_new());
@@ -495,7 +504,11 @@ public:
   createCertValidator(const Envoy::Ssl::CertificateValidationContextConfig* config, SslStats& stats,
                       Server::Configuration::CommonFactoryContext& context,
                       Stats::Scope& scope) override {
-    return std::make_unique<SPIFFEValidator>(config, stats, context, scope);
+    absl::Status creation_status = absl::OkStatus();
+    auto validator =
+        std::make_unique<SPIFFEValidator>(config, stats, context, scope, creation_status);
+    RETURN_IF_NOT_OK(creation_status);
+    return validator;
   }
 
   std::string name() const override { return "envoy.tls.cert_validator.spiffe"; }

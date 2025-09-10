@@ -355,7 +355,7 @@ public:
    * @param value the struct to set on the namespace. A merge will be performed with new values for
    * the same key overriding existing.
    */
-  virtual void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) PURE;
+  virtual void setDynamicMetadata(const std::string& name, const Protobuf::Struct& value) PURE;
 
   /**
    * @param name the namespace used in the metadata in reverse DNS format, for example:
@@ -363,7 +363,7 @@ public:
    * @param value of type protobuf any to set on the namespace. A merge will be performed with new
    * values for the same key overriding existing.
    */
-  virtual void setDynamicTypedMetadata(const std::string& name, const ProtobufWkt::Any& value) PURE;
+  virtual void setDynamicTypedMetadata(const std::string& name, const Protobuf::Any& value) PURE;
 
   /**
    * @return const envoy::config::core::v3::Metadata& the dynamic metadata associated with this
@@ -439,6 +439,12 @@ public:
    * @return status used by the filter manager to manage further filter iteration.
    */
   virtual FilterStatus onData(Network::ListenerFilterBuffer& buffer) PURE;
+
+  /**
+   * Called when the connection is closed. Only the current filter that has stopped filter
+   * chain iteration will get the callback.
+   */
+  virtual void onClose() {};
 
   /**
    * Return the size of data the filter want to inspect from the connection.

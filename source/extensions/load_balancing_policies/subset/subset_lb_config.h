@@ -73,10 +73,10 @@ public:
   metadataFallbackPolicy() const PURE;
 
   /**
-   * @return ProtobufWkt::Struct the struct describing the metadata for a
+   * @return Protobuf::Struct the struct describing the metadata for a
    *         host to be included in the default subset.
    */
-  virtual const ProtobufWkt::Struct& defaultSubset() const PURE;
+  virtual const Protobuf::Struct& defaultSubset() const PURE;
 
   /*
    * @return const std:vector<std:set<std::string>>& a vector of
@@ -181,7 +181,7 @@ public:
   MetadataFallbackPolicy metadataFallbackPolicy() const override {
     return metadata_fallback_policy_;
   }
-  const ProtobufWkt::Struct& defaultSubset() const override { return default_subset_; }
+  const Protobuf::Struct& defaultSubset() const override { return default_subset_; }
   const std::vector<SubsetSelectorPtr>& subsetSelectors() const override {
     return subset_selectors_;
   }
@@ -192,7 +192,7 @@ public:
   bool allowRedundantKeys() const override { return allow_redundant_keys_; }
 
 private:
-  const ProtobufWkt::Struct default_subset_;
+  const Protobuf::Struct default_subset_;
   std::vector<SubsetSelectorPtr> subset_selectors_;
   // Keep small members (bools and enums) at the end of class, to reduce alignment overhead.
   const FallbackPolicy fallback_policy_;

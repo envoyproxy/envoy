@@ -58,6 +58,13 @@ EXTENSIONS = {
     "envoy.bootstrap.wasm":                             "//source/extensions/bootstrap/wasm:config",
 
     #
+    # Reverse Connection
+    #
+
+    "envoy.bootstrap.reverse_tunnel.downstream_socket_interface": "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_initiator_lib",
+    "envoy.bootstrap.reverse_tunnel.upstream_socket_interface": "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
+
+    #
     # Health checkers
     #
 
@@ -485,10 +492,16 @@ EXTENSIONS = {
     "envoy.network.dns_resolver.getaddrinfo":          "//source/extensions/network/dns_resolver/getaddrinfo:config",
 
     #
+    # Address Resolvers
+    #
+
+    "envoy.resolvers.reverse_connection":               "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_resolver_lib",
+
+    #
     # Custom matchers
     #
 
-    "envoy.matching.custom_matchers.trie_matcher":     "//source/extensions/common/matcher:trie_matcher_lib",
+    "envoy.matching.custom_matchers.ip_range_matcher":     "//source/extensions/common/matcher:ip_range_matcher_lib",
     "envoy.matching.custom_matchers.domain_matcher":   "//source/extensions/common/matcher:domain_matcher_lib",
 
     #

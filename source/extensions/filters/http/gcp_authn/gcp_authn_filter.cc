@@ -6,6 +6,7 @@
 #include "source/common/common/enum_to_int.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_replace.h"
 
@@ -75,11 +76,7 @@ Http::FilterHeadersStatus GcpAuthnFilter::decodeHeaders(Http::RequestHeaderMap& 
     // So, we add the audience from the config to the final url by substituting the `[AUDIENCE]`
     // with real audience string from the config.
 
-    std::string final_url = absl::StrReplaceAll(
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.gcp_authn_use_fixed_url")
-            ? UrlString
-            : filter_config_->http_uri().uri(),
-        {{"[AUDIENCE]", audience_str_}});
+    std::string final_url = absl::StrReplaceAll(UrlString, {{"[AUDIENCE]", audience_str_}});
     client_->fetchToken(*this, buildRequest(final_url));
     initiating_call_ = false;
   } else {
