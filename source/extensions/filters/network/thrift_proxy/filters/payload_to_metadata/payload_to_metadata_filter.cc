@@ -67,23 +67,7 @@ Rule::Rule(const ProtoRule& rule, uint16_t rule_id, PayloadExtractor::TrieShared
     PANIC_DUE_TO_CORRUPT_ENUM;
   }
 
-  const FieldSelector* field_selector = &rule_.field_selector();
-  PayloadExtractor::TrieSharedPtr node = root;
-  while (true) {
-    int16_t id = static_cast<int16_t>(field_selector->id());
-    if (node->children_.find(id) == node->children_.end()) {
-      node->children_[id] = std::make_shared<PayloadExtractor::Trie>(node);
-    }
-    node = node->children_[id];
-    node->name_ = field_selector->name();
-    if (!field_selector->has_child()) {
-      break;
-    }
-
-    field_selector = &field_selector->child();
-  }
-
-  node->rule_ids_.push_back(rule_id_);
+  root->insert<FieldSelector>(&rule_.field_selector(), rule_id_);
 }
 
 bool Rule::matches(const ThriftProxy::MessageMetadata& metadata) const {

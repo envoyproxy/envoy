@@ -17,11 +17,36 @@ namespace PayloadExtractor {
 using namespace Envoy::Extensions::NetworkFilters;
 using namespace Envoy::Extensions::NetworkFilters::ThriftProxy;
 
-struct Trie;
+class Trie;
 using TrieSharedPtr = std::shared_ptr<Trie>;
 
-struct Trie {
+class Trie : public std::enable_shared_from_this<Trie> {
+public:
   Trie(TrieSharedPtr parent = nullptr) : parent_(parent) {}
+
+  // Insert a new field selector into the trie
+  template <typename FieldSelector> void insert(const FieldSelector* field_selector, uint16_t rule_id) {
+    PayloadExtractor::TrieSharedPtr node = shared_from_this();
+    while (true) {
+      int16_t id = static_cast<int16_t>(field_selector->id());
+      if (node->children_.find(id) == node->children_.end()) {
+        node->children_[id] = std::make_shared<PayloadExtractor::Trie>(node);
+      }
+      node = node->children_[id];
+      node->name_ = field_selector->name();
+      if (!field_selector->has_child()) {
+        break;
+      }
+
+      field_selector = &field_selector->child();
+    }
+
+    node->rule_ids_.push_back(rule_id);
+  }
+
+private:
+  // TODO(JuniorHsu): remove this friend declaration
+  friend class TrieMatchHandler;
   std::string name_;
   std::weak_ptr<Trie> parent_;
   // Field ID to payload node
