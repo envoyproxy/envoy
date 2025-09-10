@@ -14,8 +14,8 @@
 #include "source/common/upstream/cluster_update_tracker.h"
 #include "source/extensions/tracers/zipkin/span_buffer.h"
 #include "source/extensions/tracers/zipkin/tracer.h"
+#include "source/extensions/tracers/zipkin/tracer_interface.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
-#include "tracer_interface.h"
 
 namespace Envoy {
 namespace Extensions {
