@@ -26,6 +26,7 @@
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_impl.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
 #include "test/common/http/http2/http2_frame.h"
 #include "test/common/upstream/utility.h"
@@ -163,6 +164,11 @@ TEST_P(ProtocolIntegrationTest, LogicalDns) {
     auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
     cluster.set_type(envoy::config::cluster::v3::Cluster::LOGICAL_DNS);
     cluster.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::ALL);
+    auto* typed_dns_resolver_config = cluster.mutable_typed_dns_resolver_config();
+    typed_dns_resolver_config->set_name("envoy.network.dns_resolver.getaddrinfo");
+    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+        getaddrinfo_config;
+    typed_dns_resolver_config->mutable_typed_config()->PackFrom(getaddrinfo_config);
   });
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -185,6 +191,11 @@ TEST_P(ProtocolIntegrationTest, StrictDns) {
     auto& cluster = *bootstrap.mutable_static_resources()->mutable_clusters(0);
     cluster.set_type(envoy::config::cluster::v3::Cluster::STRICT_DNS);
     cluster.set_dns_lookup_family(envoy::config::cluster::v3::Cluster::ALL);
+    auto* typed_dns_resolver_config = cluster.mutable_typed_dns_resolver_config();
+    typed_dns_resolver_config->set_name("envoy.network.dns_resolver.getaddrinfo");
+    envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+        getaddrinfo_config;
+    typed_dns_resolver_config->mutable_typed_config()->PackFrom(getaddrinfo_config);
   });
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
