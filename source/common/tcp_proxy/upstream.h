@@ -231,7 +231,7 @@ protected:
   std::unique_ptr<Http::RequestHeaderMapImpl> downstream_headers_;
 
 private:
-class DecoderShim : public Http::ResponseDecoderImplBase {
+  class DecoderShim : public Http::ResponseDecoderImplBase {
   public:
     DecoderShim(HttpUpstream& parent) : parent_(parent) {}
     void decode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}

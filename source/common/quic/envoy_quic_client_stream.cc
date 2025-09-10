@@ -205,7 +205,6 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   // represented as their HTTP/1 forms, regardless of the HTTP version used.
   // Therefore, these need to be transformed into their HTTP/1 form.
 
-
   // In UHV mode the :status header at this point can be malformed, as it is validated
   // later on in the response_decoder_.decodeHeaders() call.
   // Account for this here.
@@ -241,7 +240,7 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   } else if (!is_special_1xx) {
     if (auto* decoder = getResponseDecoder()) {
       decoder->decodeHeaders(std::move(headers),
-                                     /*end_stream=*/fin);
+                             /*end_stream=*/fin);
     } else {
       ENVOY_STREAM_LOG(error, "response_decoder_ is null, dropping headers.", *this);
     }
@@ -318,7 +317,11 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
       // A stream error has occurred, stop processing.
       return;
     }
-    response_decoder_->decodeData(*buffer, fin_read_and_no_trailers);
+    if (auto* decoder = getResponseDecoder()) {
+      decoder->decodeData(*buffer, fin_read_and_no_trailers);
+    } else {
+      ENVOY_STREAM_LOG(error, "response_decoder_ is null, dropping data.", *this);
+    }
   }
 
   if (!sequencer()->IsClosed() || read_side_closed()) {
