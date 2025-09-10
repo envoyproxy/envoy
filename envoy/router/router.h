@@ -1491,7 +1491,7 @@ public:
  * An API for the interactions the upstream stream needs to have with the downstream stream
  * and/or router components
  */
-class UpstreamToDownstream : public Http::ResponseDecoder, public Http::StreamCallbacks {
+class UpstreamToDownstream : public Http::ResponseDecoderImplBase, public Http::StreamCallbacks {
 public:
   /**
    * @return return the route for the downstream stream.

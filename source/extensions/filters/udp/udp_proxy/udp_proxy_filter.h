@@ -312,7 +312,7 @@ public:
   }
 
 private:
-  class ResponseDecoder : public Http::ResponseDecoder {
+  class ResponseDecoder : public Http::ResponseDecoderImplBase {
   public:
     ResponseDecoder(HttpUpstreamImpl& parent) : parent_(parent) {}
 

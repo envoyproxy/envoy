@@ -432,10 +432,15 @@ void EnvoyQuicClientStream::OnMetadataComplete(size_t /*frame_len*/,
                                                const quic::QuicHeaderList& header_list) {
   if (mustRejectMetadata(header_list.uncompressed_header_bytes())) {
     onStreamError(true, quic::QUIC_HEADERS_TOO_LARGE);
+
     return;
   }
   if (!header_list.empty()) {
-    response_decoder_->decodeMetadata(metadataMapFromHeaderList(header_list));
+    if (auto* decoder = getResponseDecoder()) {
+      decoder->decodeMetadata(metadataMapFromHeaderList(header_list));
+    } else {
+      ENVOY_STREAM_LOG(error, "response_decoder_ is null, dropping metadata.", *this);
+    }
   }
 }
 
@@ -467,6 +472,17 @@ bool EnvoyQuicClientStream::hasPendingData() { return BufferedDataBytes() > 0; }
 void EnvoyQuicClientStream::useCapsuleProtocol() {
   http_datagram_handler_ = std::make_unique<HttpDatagramHandler>(*this);
   http_datagram_handler_->setStreamDecoder(getResponseDecoder());
+  RegisterHttp3DatagramVisitor(http_datagram_handler_.get());
+}
+#endif
+
+void EnvoyQuicClientStream::OnInvalidHeaders() {
+  onStreamError(absl::nullopt, quic::QUIC_BAD_APPLICATION_PAYLOAD);
+}
+
+} // namespace Quic
+} // namespace Envoy
+p_datagram_handler_->setStreamDecoder(getResponseDecoder());
   RegisterHttp3DatagramVisitor(http_datagram_handler_.get());
 }
 #endif

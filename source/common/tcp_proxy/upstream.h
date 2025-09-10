@@ -231,8 +231,7 @@ protected:
   std::unique_ptr<Http::RequestHeaderMapImpl> downstream_headers_;
 
 private:
-  Upstream::ClusterInfoConstSharedPtr cluster_;
-  class DecoderShim : public Http::ResponseDecoder {
+class DecoderShim : public Http::ResponseDecoderImplBase {
   public:
     DecoderShim(HttpUpstream& parent) : parent_(parent) {}
     void decode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
@@ -352,7 +351,7 @@ protected:
 
 private:
   Http::StreamDecoderFilterCallbacks& decoder_filter_callbacks_;
-  class DecoderShim : public Http::ResponseDecoder {
+  class DecoderShim : public Http::ResponseDecoderImplBase {
   public:
     DecoderShim(CombinedUpstream& parent) : parent_(parent) {}
     // Http::ResponseDecoder
