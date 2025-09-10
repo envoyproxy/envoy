@@ -21,9 +21,11 @@ message CelExpressionConfig {
   //
   // .. attention::
   //
-  //   This option is disabled by default for security reasons. Enabling it will allow
-  //   CEL expressions to convert arbitrary values to strings, which may impact request
-  //   processing performance and could potentially be leveraged in security exploits.
+  //   This option is disabled by default to avoid unbounded memory allocation.
+  //   CEL evaluation cost is typically bounded by the expression size, but converting
+  //   arbitrary values (e.g., large messages, lists, or maps) to strings may allocate
+  //   memory proportional to input data size, which can be unbounded and lead to
+  //   memory exhaustion.
   bool enable_string_conversion = 1;
 
   // Enable string concatenation for CEL expressions. When enabled, CEL expressions
@@ -31,9 +33,10 @@ message CelExpressionConfig {
   //
   // .. attention::
   //
-  //   This option is disabled by default for security reasons. Enabling it allows
-  //   CEL expressions to dynamically construct strings, which may impact performance
-  //   and memory usage.
+  //   This option is disabled by default to avoid unbounded memory allocation.
+  //   While CEL normally bounds evaluation by expression size, enabling string
+  //   concatenation allows building outputs whose size depends on input data,
+  //   potentially causing large intermediate allocations and memory exhaustion.
   bool enable_string_concat = 2;
 
   // Enable string manipulation functions for CEL expressions. When enabled, CEL
@@ -49,8 +52,10 @@ message CelExpressionConfig {
   //
   // .. attention::
   //
-  //   This option is disabled by default for security reasons. Enabling these functions
-  //   allows complex string manipulations in CEL expressions, which may impact performance
-  //   and could potentially be exploited for request smuggling or header manipulation attacks.
+  //   This option is disabled by default to avoid unbounded memory allocation.
+  //   Although CEL generally bounds evaluation by expression size, functions such as
+  //   ``replace``, ``split``, ``lowerAscii()``, and ``upperAscii()`` can allocate memory
+  //   proportional to input data size. Under adversarial inputs this can lead to
+  //   unbounded allocations and memory exhaustion.
   bool enable_string_functions = 3;
 }
