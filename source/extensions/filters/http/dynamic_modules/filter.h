@@ -164,6 +164,8 @@ public:
   sendHttpCallout(uint32_t callout_id, absl::string_view cluster_name,
                   Http::RequestMessagePtr&& message, uint64_t timeout_milliseconds);
 
+  const DynamicModuleHttpFilterConfig& getFilterConfig() const { return *config_; }
+
 private:
   /**
    * This is a helper function to get the `this` pointer as a void pointer which is passed to the
