@@ -27,8 +27,7 @@ EnvoyQuicServerConnection::EnvoyQuicServerConnection(
     const quic::QuicConnectionId& server_connection_id,
     quic::QuicSocketAddress initial_self_address, quic::QuicSocketAddress initial_peer_address,
     quic::QuicConnectionHelperInterface& helper, quic::QuicAlarmFactory& alarm_factory,
-    quic::QuicPacketWriter* writer,
-    const quic::ParsedQuicVersionVector& supported_versions,
+    quic::QuicPacketWriter* writer, const quic::ParsedQuicVersionVector& supported_versions,
     Network::ConnectionSocketPtr connection_socket, quic::ConnectionIdGeneratorInterface& generator,
     std::unique_ptr<QuicListenerFilterManagerImpl> listener_filter_manager)
     : quic::QuicConnection(
