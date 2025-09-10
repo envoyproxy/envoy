@@ -311,6 +311,8 @@ public:
   virtual std::chrono::milliseconds resetMaxInterval() const PURE;
 };
 
+using RetryPolicyConstSharedPtr = std::shared_ptr<const RetryPolicy>;
+
 /**
  * RetryStatus whether request should be retried or not.
  */
