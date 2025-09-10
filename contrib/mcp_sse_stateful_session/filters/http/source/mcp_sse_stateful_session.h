@@ -33,8 +33,7 @@ public:
   McpSseStatefulSessionConfig(const ProtoConfig& config,
                               Server::Configuration::GenericFactoryContext& context);
 
-  Envoy::Http::SseSessionStatePtr
-  createSessionState(Envoy::Http::RequestHeaderMap& headers) const {
+  Envoy::Http::SseSessionStatePtr createSessionState(Envoy::Http::RequestHeaderMap& headers) const {
     if (factory_ == nullptr) {
       ENVOY_LOG(error, "McpSseStatefulSessionConfig::createSessionState: factory_ is nullptr");
       return nullptr;

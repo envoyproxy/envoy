@@ -45,8 +45,7 @@ mcp_sse_stateful_session: {}
 
 TEST(StatefulSessionFactoryConfigTest, SimpleConfigTest) {
   testing::NiceMock<Envoy::Http::MockSseSessionStateFactoryConfig> config_factory;
-  Registry::InjectFactory<Envoy::Http::SseSessionStateFactoryConfig> registration(
-      config_factory);
+  Registry::InjectFactory<Envoy::Http::SseSessionStateFactoryConfig> registration(config_factory);
 
   ProtoConfig proto_config;
   PerRouteProtoConfig proto_route_config;

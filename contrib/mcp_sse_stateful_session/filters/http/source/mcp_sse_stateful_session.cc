@@ -31,8 +31,9 @@ McpSseStatefulSessionConfig::McpSseStatefulSessionConfig(
     return;
   }
 
-  auto& factory = Envoy::Config::Utility::getAndCheckFactoryByName<
-      Envoy::Http::SseSessionStateFactoryConfig>(config.sse_session_state().name());
+  auto& factory =
+      Envoy::Config::Utility::getAndCheckFactoryByName<Envoy::Http::SseSessionStateFactoryConfig>(
+          config.sse_session_state().name());
 
   auto typed_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
       config.sse_session_state().typed_config(), context.messageValidationVisitor(), factory);

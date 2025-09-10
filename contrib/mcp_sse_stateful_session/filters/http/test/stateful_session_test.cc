@@ -25,8 +25,7 @@ class StatefulSessionTest : public testing::Test {
 public:
   void initialize(absl::string_view config, absl::string_view route_config = "") {
     Envoy::Http::MockSseSessionStateFactoryConfig config_factory;
-    Registry::InjectFactory<Envoy::Http::SseSessionStateFactoryConfig> registration(
-        config_factory);
+    Registry::InjectFactory<Envoy::Http::SseSessionStateFactoryConfig> registration(config_factory);
 
     factory_ = std::make_shared<NiceMock<Envoy::Http::MockSseSessionStateFactory>>();
     EXPECT_CALL(config_factory, createSseSessionStateFactory(_, _)).WillOnce(Return(factory_));
