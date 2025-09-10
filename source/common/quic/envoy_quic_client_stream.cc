@@ -36,6 +36,10 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
   RegisterMetadataVisitor(this);
 }
 
+void EnvoyQuicClientStream::setResponseDecoder(Http::ResponseDecoder& decoder) {
+  response_decoder_ = decoder.getResponseDecoderHandle();
+}
+
 Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
                                                   bool end_stream) {
   ENVOY_STREAM_LOG(debug, "encodeHeaders: (end_stream={}) {}.", *this, end_stream, headers);
@@ -201,13 +205,18 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   // represented as their HTTP/1 forms, regardless of the HTTP version used.
   // Therefore, these need to be transformed into their HTTP/1 form.
 
+
   // In UHV mode the :status header at this point can be malformed, as it is validated
   // later on in the response_decoder_.decodeHeaders() call.
   // Account for this here.
   if (!optional_status.has_value()) {
     // In case the status is invalid or missing, the response_decoder_.decodeHeaders() will fail the
     // request
-    response_decoder_->decodeHeaders(std::move(headers), fin);
+    if (auto* decoder = getResponseDecoder()) {
+      decoder->decodeHeaders(std::move(headers), fin);
+    } else {
+      ENVOY_STREAM_LOG(error, "response_decoder_ is null, dropping headers.", *this);
+    }
     ConsumeHeaderList();
     return;
   }
@@ -224,10 +233,18 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (is_special_1xx && !decoded_1xx_) {
     // This is 100 Continue, only decode it once to support Expect:100-Continue header.
     decoded_1xx_ = true;
-    response_decoder_->decode1xxHeaders(std::move(headers));
+    if (auto* decoder = getResponseDecoder()) {
+      decoder->decode1xxHeaders(std::move(headers));
+    } else {
+      ENVOY_STREAM_LOG(error, "response_decoder_ is null, dropping 1xx headers.", *this);
+    }
   } else if (!is_special_1xx) {
-    response_decoder_->decodeHeaders(std::move(headers),
+    if (auto* decoder = getResponseDecoder()) {
+      decoder->decodeHeaders(std::move(headers),
                                      /*end_stream=*/fin);
+    } else {
+      ENVOY_STREAM_LOG(error, "response_decoder_ is null, dropping headers.", *this);
+    }
     if (status == enumToInt(Http::Code::NotModified)) {
       got_304_response_ = true;
     }
@@ -348,7 +365,11 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
       onStreamError(close_connection_upon_invalid_header_, transform_rst);
       return;
     }
-    response_decoder_->decodeTrailers(std::move(trailers));
+    if (auto* decoder = getResponseDecoder()) {
+      decoder->decodeTrailers(std::move(trailers));
+    } else {
+      ENVOY_STREAM_LOG(error, "response_decoder_ is null, dropping trailers.", *this);
+    }
     MarkTrailersConsumed();
   }
 }

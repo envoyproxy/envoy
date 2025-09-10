@@ -25,7 +25,7 @@ public:
                         quic::StreamType type, Http::Http3::CodecStats& stats,
                         const envoy::config::core::v3::Http3ProtocolOptions& http3_options);
 
-  void setResponseDecoder(Http::ResponseDecoder& decoder) { response_decoder_ = decoder.getResponseDecoderHandle(); }
+  void setResponseDecoder(Http::ResponseDecoder& decoder);
 
   // Http::StreamEncoder
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
