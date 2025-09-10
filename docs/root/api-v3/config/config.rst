@@ -28,7 +28,7 @@ Extensions
   http/header_validators
   http/original_ip_detection
   http/stateful_session
-  http/mcp_sse_stateful_session
+  http/sse_stateful_session
   injected_credentials/injected_credentials
   geoip_provider/geoip_provider
   trace/trace
