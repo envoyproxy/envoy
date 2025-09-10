@@ -7,9 +7,6 @@
 #include <memory>
 #include <string>
 
-#include "absl/numeric/int128.h"
-#include "absl/strings/str_cat.h"
-#include "absl/strings/string_view.h"
 #include "envoy/api/os_sys_calls_common.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/stream_reset_handler.h"
@@ -18,6 +15,22 @@
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/socket.h"
 #include "envoy/network/socket_interface.h"
+
+#include "source/common/api/os_sys_calls_impl.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/http_option_limits.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/connection_socket_impl.h"
+#include "source/common/network/socket_option_factory.h"
+#include "source/common/protobuf/utility.h"
+#include "source/common/quic/quic_io_handle_wrapper.h"
+#include "source/common/runtime/runtime_features.h"
+
+#include "absl/numeric/int128.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "openssl/crypto.h"
 #include "openssl/ec.h"
 #include "openssl/ec_key.h"
@@ -35,17 +48,6 @@
 #include "quiche/quic/core/quic_time.h"
 #include "quiche/quic/core/quic_types.h"
 #include "quiche/quic/platform/api/quic_socket_address.h"
-#include "source/common/api/os_sys_calls_impl.h"
-#include "source/common/common/assert.h"
-#include "source/common/common/logger.h"
-#include "source/common/common/utility.h"
-#include "source/common/http/http_option_limits.h"
-#include "source/common/network/address_impl.h"
-#include "source/common/network/connection_socket_impl.h"
-#include "source/common/network/socket_option_factory.h"
-#include "source/common/protobuf/utility.h"
-#include "source/common/quic/quic_io_handle_wrapper.h"
-#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Quic {
