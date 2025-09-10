@@ -14,9 +14,9 @@ namespace McpSseStatefulSession {
 
 namespace {
 
-class EmptySessionStateFactory : public Envoy::Http::McpSseSessionStateFactory {
+class EmptySessionStateFactory : public Envoy::Http::SseSessionStateFactory {
 public:
-  Envoy::Http::McpSseSessionStatePtr create(Envoy::Http::RequestHeaderMap&) const override {
+  Envoy::Http::SseSessionStatePtr create(Envoy::Http::RequestHeaderMap&) const override {
     return nullptr;
   }
 };
@@ -26,18 +26,18 @@ public:
 McpSseStatefulSessionConfig::McpSseStatefulSessionConfig(
     const ProtoConfig& config, Server::Configuration::GenericFactoryContext& context)
     : strict_(config.strict()) {
-  if (!config.has_session_state()) {
+  if (!config.has_sse_session_state()) {
     factory_ = std::make_shared<EmptySessionStateFactory>();
     return;
   }
 
   auto& factory = Envoy::Config::Utility::getAndCheckFactoryByName<
-      Envoy::Http::McpSseSessionStateFactoryConfig>(config.session_state().name());
+      Envoy::Http::SseSessionStateFactoryConfig>(config.sse_session_state().name());
 
   auto typed_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
-      config.session_state().typed_config(), context.messageValidationVisitor(), factory);
+      config.sse_session_state().typed_config(), context.messageValidationVisitor(), factory);
 
-  factory_ = factory.createSessionStateFactory(*typed_config, context);
+  factory_ = factory.createSseSessionStateFactory(*typed_config, context);
 }
 
 PerRouteMcpSseStatefulSession::PerRouteMcpSseStatefulSession(

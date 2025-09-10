@@ -13,6 +13,6 @@ envoy_cc_mock(
     srcs = ["mcp_sse_stateful_session.cc"],
     hdrs = ["mcp_sse_stateful_session.h"],
     deps = [
-        "//envoy/http:mcp_sse_stateful_session_interface",
+        "//envoy/http:sse_stateful_session_interface",
     ],
 )

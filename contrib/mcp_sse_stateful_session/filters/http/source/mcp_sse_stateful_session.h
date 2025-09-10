@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/http/mcp_sse_stateful_session.h"
+#include "envoy/http/sse_stateful_session.h"
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/buffer/buffer_impl.h"
@@ -33,7 +33,7 @@ public:
   McpSseStatefulSessionConfig(const ProtoConfig& config,
                               Server::Configuration::GenericFactoryContext& context);
 
-  Envoy::Http::McpSseSessionStatePtr
+  Envoy::Http::SseSessionStatePtr
   createSessionState(Envoy::Http::RequestHeaderMap& headers) const {
     if (factory_ == nullptr) {
       ENVOY_LOG(error, "McpSseStatefulSessionConfig::createSessionState: factory_ is nullptr");
@@ -45,7 +45,7 @@ public:
   bool isStrict() const { return strict_; }
 
 private:
-  Envoy::Http::McpSseSessionStateFactorySharedPtr factory_;
+  Envoy::Http::SseSessionStateFactorySharedPtr factory_;
   bool strict_{false};
 };
 using McpSseStatefulSessionConfigSharedPtr = std::shared_ptr<McpSseStatefulSessionConfig>;
@@ -79,10 +79,10 @@ public:
 
   Envoy::Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
 
-  Envoy::Http::McpSseSessionStatePtr& sessionStateForTest() { return session_state_; }
+  Envoy::Http::SseSessionStatePtr& sessionStateForTest() { return session_state_; }
 
 private:
-  Envoy::Http::McpSseSessionStatePtr session_state_;
+  Envoy::Http::SseSessionStatePtr session_state_;
   McpSseStatefulSessionConfigSharedPtr config_;
 };
 

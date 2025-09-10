@@ -2,7 +2,7 @@
 #include <cstdint>
 
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
-#include "envoy/http/mcp_sse_stateful_session.h"
+#include "envoy/http/sse_stateful_session.h"
 
 #include "source/common/common/base64.h"
 #include "source/common/http/utility.h"
@@ -89,8 +89,8 @@ static const std::string STATEFUL_SESSION_FILTER =
 name: envoy.filters.http.mcp_sse_stateful_session
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_sse_stateful_session.v3alpha.McpSseStatefulSession
-  session_state:
-    name: envoy.http.mcp_sse_stateful_session.envelope
+  sse_session_state:
+    name: envoy.http.sse_stateful_session.envelope
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.http.mcp_sse_stateful_session.envelope.v3alpha.EnvelopeSessionState
       param_name: sessionId
@@ -120,8 +120,8 @@ static const std::string OVERRIDE_STATEFUL_SESSION =
     R"EOF(
 "@type": type.googleapis.com/envoy.extensions.filters.http.mcp_sse_stateful_session.v3alpha.McpSseStatefulSessionPerRoute
 mcp_sse_stateful_session:
-  session_state:
-    name: envoy.http.mcp_sse_stateful_session.envelope
+  sse_session_state:
+    name: envoy.http.sse_stateful_session.envelope
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.http.mcp_sse_stateful_session.envelope.v3alpha.EnvelopeSessionState
       param_name: sessionId

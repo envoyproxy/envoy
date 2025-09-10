@@ -14,9 +14,9 @@ namespace Http {
  * Independent interface for session state that supports data processing.
  * This is completely independent of the main Envoy stateful session interface.
  */
-class McpSseSessionState {
+class SseSessionState {
 public:
-  virtual ~McpSseSessionState() = default;
+  virtual ~SseSessionState() = default;
 
   /**
    * Get address of upstream host that the current session stuck on.
@@ -46,52 +46,52 @@ public:
   virtual Envoy::Http::FilterDataStatus onUpdateData(absl::string_view host_address,
                                                      Buffer::Instance& data, bool end_stream) PURE;
 
-  virtual bool sessionIdFound() const PURE;
+  virtual bool sessionIdFound() const PURE; // only for testing
   virtual void resetSessionIdFound() PURE; // only for testing
 };
 
-using McpSseSessionStatePtr = std::unique_ptr<McpSseSessionState>;
+using SseSessionStatePtr = std::unique_ptr<SseSessionState>;
 
 /**
  * Independent interface for creating session state from request headers.
  */
-class McpSseSessionStateFactory {
+class SseSessionStateFactory {
 public:
-  virtual ~McpSseSessionStateFactory() = default;
+  virtual ~SseSessionStateFactory() = default;
 
   /**
    * Create session state from request headers.
    *
    * @param headers request headers.
    */
-  virtual McpSseSessionStatePtr create(Envoy::Http::RequestHeaderMap& headers) const PURE;
+  virtual SseSessionStatePtr create(Envoy::Http::RequestHeaderMap& headers) const PURE;
 };
 
-using McpSseSessionStateFactorySharedPtr = std::shared_ptr<McpSseSessionStateFactory>;
+using SseSessionStateFactorySharedPtr = std::shared_ptr<SseSessionStateFactory>;
 
 /*
  * Extension configuration for session state factory.
  */
-class McpSseSessionStateFactoryConfig : public Envoy::Config::TypedFactory {
+class SseSessionStateFactoryConfig : public Envoy::Config::TypedFactory {
 public:
-  ~McpSseSessionStateFactoryConfig() override = default;
+  ~SseSessionStateFactoryConfig() override = default;
 
   /**
-   * Creates a particular session state factory implementation.
+   * Creates a particular SseSessionStateFactory implementation.
    *
    * @param config supplies the configuration for the session state factory extension.
    * @param context supplies the factory context. Please don't store the reference to
    * the context as it is only valid during the call.
-   * @return SessionStateFactorySharedPtr the session state factory.
+   * @return SseSessionStateFactorySharedPtr the session state factory.
    */
-  virtual McpSseSessionStateFactorySharedPtr
-  createSessionStateFactory(const Protobuf::Message& config,
+  virtual SseSessionStateFactorySharedPtr
+  createSseSessionStateFactory(const Protobuf::Message& config,
                             Server::Configuration::GenericFactoryContext& context) PURE;
 
-  std::string category() const override { return "envoy.http.mcp_sse_stateful_session"; }
+  std::string category() const override { return "envoy.http.sse_stateful_session"; }
 };
 
-using McpSseSessionStateFactoryConfigPtr = std::unique_ptr<McpSseSessionStateFactoryConfig>;
+using SseSessionStateFactoryConfigPtr = std::unique_ptr<SseSessionStateFactoryConfig>;
 
 } // namespace Http
 } // namespace Envoy

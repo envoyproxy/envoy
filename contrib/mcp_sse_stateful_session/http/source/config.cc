@@ -8,11 +8,11 @@
 namespace Envoy {
 namespace Extensions {
 namespace Http {
-namespace McpSseSessionState {
+namespace SseSessionState {
 namespace Envelope {
 
-Envoy::Http::McpSseSessionStateFactorySharedPtr
-EnvelopeSessionStateFactoryConfig::createSessionStateFactory(
+Envoy::Http::SseSessionStateFactorySharedPtr
+EnvelopeSessionStateFactoryConfig::createSseSessionStateFactory(
     const Protobuf::Message& config, Server::Configuration::GenericFactoryContext& context) {
   const auto& proto_config =
       MessageUtil::downcastAndValidate<const envoy::extensions::http::mcp_sse_stateful_session::
@@ -21,10 +21,10 @@ EnvelopeSessionStateFactoryConfig::createSessionStateFactory(
   return std::make_shared<EnvelopeSessionStateFactory>(proto_config);
 }
 
-REGISTER_FACTORY(EnvelopeSessionStateFactoryConfig, Envoy::Http::McpSseSessionStateFactoryConfig);
+REGISTER_FACTORY(EnvelopeSessionStateFactoryConfig, Envoy::Http::SseSessionStateFactoryConfig);
 
 } // namespace Envelope
-} // namespace McpSseSessionState
+} // namespace SseSessionState
 } // namespace Http
 } // namespace Extensions
 } // namespace Envoy

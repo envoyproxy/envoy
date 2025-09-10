@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "envoy/http/filter.h"
-#include "envoy/http/mcp_sse_stateful_session.h"
+#include "envoy/http/sse_stateful_session.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/base64.h"
@@ -15,18 +15,20 @@
 namespace Envoy {
 namespace Extensions {
 namespace Http {
-namespace McpSseSessionState {
+namespace SseSessionState {
 namespace Envelope {
+
+constexpr size_t kDefaultMaxPendingChunkSize = 4096;
 
 using EnvelopeSessionStateProto =
     envoy::extensions::http::mcp_sse_stateful_session::envelope::v3alpha::EnvelopeSessionState;
 
-class EnvelopeSessionStateFactory : public Envoy::Http::McpSseSessionStateFactory,
+class EnvelopeSessionStateFactory : public Envoy::Http::SseSessionStateFactory,
                                     public Logger::Loggable<Logger::Id::http> {
   friend class SessionStateImpl;
 
 public:
-  class SessionStateImpl : public Envoy::Http::McpSseSessionState {
+  class SessionStateImpl : public Envoy::Http::SseSessionState {
   public:
     SessionStateImpl(absl::optional<std::string> address,
                      const EnvelopeSessionStateFactory& factory)
@@ -57,7 +59,7 @@ public:
 
   EnvelopeSessionStateFactory(const EnvelopeSessionStateProto& config);
 
-  Envoy::Http::McpSseSessionStatePtr create(Envoy::Http::RequestHeaderMap& headers) const override {
+  Envoy::Http::SseSessionStatePtr create(Envoy::Http::RequestHeaderMap& headers) const override {
     absl::optional<std::string> address = parseAddress(headers);
     return std::make_unique<SessionStateImpl>(address, *this);
   }
@@ -66,12 +68,12 @@ private:
   absl::optional<std::string> parseAddress(Envoy::Http::RequestHeaderMap& headers) const;
   const std::string param_name_;
   const std::vector<std::string> chunk_end_patterns_;
-  const size_t max_pending_chunk_size_{4096};
+  const size_t max_pending_chunk_size_{kDefaultMaxPendingChunkSize};
   static constexpr char SEPARATOR = '.'; // separate session ID and host address
 };
 
 } // namespace Envelope
-} // namespace McpSseSessionState
+} // namespace SseSessionState
 } // namespace Http
 } // namespace Extensions
 } // namespace Envoy

@@ -22,8 +22,8 @@ message McpSseStatefulSession {
   // Specifies the implementation of session state. This session state is used to store and retrieve the address of the
   // upstream host assigned to the session.
   //
-  // [#extension-category: envoy.http.mcp_sse_stateful_session]
-  config.core.v3.TypedExtensionConfig session_state = 1;
+  // [#extension-category: envoy.http.sse_stateful_session]
+  config.core.v3.TypedExtensionConfig sse_session_state = 1;
 
   // Determines whether the HTTP request must be strictly routed to the requested destination. When set to ``true``,
   // if the requested destination is unavailable, Envoy will return a 503 status code. The default value is ``false``,

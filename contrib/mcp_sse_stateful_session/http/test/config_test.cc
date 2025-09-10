@@ -7,14 +7,14 @@
 namespace Envoy {
 namespace Extensions {
 namespace Http {
-namespace McpSseSessionState {
+namespace SseSessionState {
 namespace Envelope {
 namespace {
 
 TEST(EnvelopeSessionStateFactoryConfigTest, BasicSse) {
   auto* factory =
-      Registry::FactoryRegistry<Envoy::Http::McpSseSessionStateFactoryConfig>::getFactory(
-          "envoy.http.mcp_sse_stateful_session.envelope");
+      Registry::FactoryRegistry<Envoy::Http::SseSessionStateFactoryConfig>::getFactory(
+          "envoy.http.sse_stateful_session.envelope");
   ASSERT_NE(factory, nullptr);
 
   EnvelopeSessionStateProto proto_config;
@@ -25,12 +25,12 @@ TEST(EnvelopeSessionStateFactoryConfigTest, BasicSse) {
   TestUtility::loadFromYaml(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_NE(factory->createSessionStateFactory(proto_config, context), nullptr);
+  EXPECT_NE(factory->createSseSessionStateFactory(proto_config, context), nullptr);
 }
 
 } // namespace
 } // namespace Envelope
-} // namespace McpSseSessionState
+} // namespace SseSessionState
 } // namespace Http
 } // namespace Extensions
 } // namespace Envoy

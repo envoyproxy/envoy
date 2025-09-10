@@ -18,7 +18,7 @@ envoy_cc_library(
         "envelope.h",
     ],
     deps = [
-        "//envoy/http:mcp_sse_stateful_session_interface",
+        "//envoy/http:sse_stateful_session_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:base64_lib",
         "//source/common/http:utility_lib",
@@ -32,7 +32,7 @@ envoy_cc_contrib_extension(
     hdrs = ["config.h"],
     deps = [
         ":envelope_lib",
-        "//envoy/http:mcp_sse_stateful_session_interface",
+        "//envoy/http:sse_stateful_session_interface",
         "//envoy/registry",
         "//source/common/config:utility_lib",
         "@envoy_api//contrib/envoy/extensions/http/mcp_sse_stateful_session/envelope/v3alpha:pkg_cc_proto",

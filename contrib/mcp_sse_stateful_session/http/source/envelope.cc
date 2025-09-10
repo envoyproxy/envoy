@@ -5,7 +5,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace Http {
-namespace McpSseSessionState {
+namespace SseSessionState {
 namespace Envelope {
 
 void EnvelopeSessionStateFactory::SessionStateImpl::onUpdateHeader(
@@ -199,7 +199,7 @@ EnvelopeSessionStateFactory::parseAddress(Envoy::Http::RequestHeaderMap& headers
 }
 
 } // namespace Envelope
-} // namespace McpSseSessionState
+} // namespace SseSessionState
 } // namespace Http
 } // namespace Extensions
 } // namespace Envoy

@@ -6,7 +6,7 @@
 namespace Envoy {
 namespace Extensions {
 namespace Http {
-namespace McpSseSessionState {
+namespace SseSessionState {
 namespace Envelope {
 namespace {
 
@@ -376,7 +376,7 @@ TEST(EnvelopeSessionStateFactoryTest, EnvelopeSessionStateTestCustomizedChunkEnd
 
 } // namespace
 } // namespace Envelope
-} // namespace McpSseSessionState
+} // namespace SseSessionState
 } // namespace Http
 } // namespace Extensions
 } // namespace Envoy

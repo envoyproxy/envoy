@@ -16,8 +16,8 @@ namespace McpSseStatefulSession {
 namespace {
 
 constexpr absl::string_view ConfigYaml = R"EOF(
-session_state:
-  name: "envoy.http.mcp_sse_stateful_session.mock"
+sse_session_state:
+  name: "envoy.http.sse_stateful_session.mock"
   typed_config: {}
 )EOF";
 
@@ -27,14 +27,14 @@ disabled: true
 
 constexpr absl::string_view RouteConfigYaml = R"EOF(
 mcp_sse_stateful_session:
-  session_state:
-    name: "envoy.http.mcp_sse_stateful_session.mock"
+  sse_session_state:
+    name: "envoy.http.sse_stateful_session.mock"
     typed_config: {}
 )EOF";
 
 constexpr absl::string_view NotExistYaml = R"EOF(
 mcp_sse_stateful_session:
-  session_state:
+  sse_session_state:
     name: "envoy.http.mcp_sse_stateful_session.not_exist"
     typed_config: {}
 )EOF";
@@ -44,8 +44,8 @@ mcp_sse_stateful_session: {}
 )EOF";
 
 TEST(StatefulSessionFactoryConfigTest, SimpleConfigTest) {
-  testing::NiceMock<Envoy::Http::MockSessionStateFactoryConfig> config_factory;
-  Registry::InjectFactory<Envoy::Http::McpSseSessionStateFactoryConfig> registration(
+  testing::NiceMock<Envoy::Http::MockSseSessionStateFactoryConfig> config_factory;
+  Registry::InjectFactory<Envoy::Http::SseSessionStateFactoryConfig> registration(
       config_factory);
 
   ProtoConfig proto_config;

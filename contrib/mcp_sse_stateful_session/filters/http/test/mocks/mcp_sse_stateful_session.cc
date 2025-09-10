@@ -6,15 +6,15 @@ using testing::Return;
 namespace Envoy {
 namespace Http {
 
-MockSessionStateFactory::MockSessionStateFactory() {
+MockSseSessionStateFactory::MockSseSessionStateFactory() {
   ON_CALL(*this, create(_))
       .WillByDefault(
-          Return(testing::ByMove(std::make_unique<testing::NiceMock<MockSessionState>>())));
+          Return(testing::ByMove(std::make_unique<testing::NiceMock<MockSseSessionState>>())));
 }
 
-MockSessionStateFactoryConfig::MockSessionStateFactoryConfig() {
-  ON_CALL(*this, createSessionStateFactory(_, _))
-      .WillByDefault(Return(std::make_shared<testing::NiceMock<MockSessionStateFactory>>()));
+MockSseSessionStateFactoryConfig::MockSseSessionStateFactoryConfig() {
+  ON_CALL(*this, createSseSessionStateFactory(_, _))
+      .WillByDefault(Return(std::make_shared<testing::NiceMock<MockSseSessionStateFactory>>()));
 }
 
 } // namespace Http

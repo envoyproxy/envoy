@@ -276,8 +276,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "mcp_sse_stateful_session_interface",
-    hdrs = ["mcp_sse_stateful_session.h"],
+    name = "sse_stateful_session_interface",
+    hdrs = ["sse_stateful_session.h"],
     deps = [
         "//envoy/config:typed_config_interface",
         "//envoy/server:factory_context_interface",

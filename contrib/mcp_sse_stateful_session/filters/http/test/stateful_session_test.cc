@@ -24,12 +24,12 @@ namespace {
 class StatefulSessionTest : public testing::Test {
 public:
   void initialize(absl::string_view config, absl::string_view route_config = "") {
-    Envoy::Http::MockSessionStateFactoryConfig config_factory;
-    Registry::InjectFactory<Envoy::Http::McpSseSessionStateFactoryConfig> registration(
+    Envoy::Http::MockSseSessionStateFactoryConfig config_factory;
+    Registry::InjectFactory<Envoy::Http::SseSessionStateFactoryConfig> registration(
         config_factory);
 
-    factory_ = std::make_shared<NiceMock<Envoy::Http::MockSessionStateFactory>>();
-    EXPECT_CALL(config_factory, createSessionStateFactory(_, _)).WillOnce(Return(factory_));
+    factory_ = std::make_shared<NiceMock<Envoy::Http::MockSseSessionStateFactory>>();
+    EXPECT_CALL(config_factory, createSseSessionStateFactory(_, _)).WillOnce(Return(factory_));
 
     ASSERT(!config.empty());
     ProtoConfig proto_config;
@@ -47,8 +47,8 @@ public:
       TestUtility::loadFromYaml(std::string(route_config), proto_route_config);
 
       if (proto_route_config.has_mcp_sse_stateful_session()) {
-        route_factory_ = std::make_shared<NiceMock<Envoy::Http::MockSessionStateFactory>>();
-        EXPECT_CALL(config_factory, createSessionStateFactory(_, _))
+        route_factory_ = std::make_shared<NiceMock<Envoy::Http::MockSseSessionStateFactory>>();
+        EXPECT_CALL(config_factory, createSseSessionStateFactory(_, _))
             .WillOnce(Return(route_factory_));
       }
 
@@ -65,8 +65,8 @@ public:
   NiceMock<Envoy::Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Envoy::Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
 
-  std::shared_ptr<NiceMock<Envoy::Http::MockSessionStateFactory>> factory_;
-  std::shared_ptr<NiceMock<Envoy::Http::MockSessionStateFactory>> route_factory_;
+  std::shared_ptr<NiceMock<Envoy::Http::MockSseSessionStateFactory>> factory_;
+  std::shared_ptr<NiceMock<Envoy::Http::MockSseSessionStateFactory>> route_factory_;
 
   McpSseStatefulSessionConfigSharedPtr config_;
   PerRouteMcpSseStatefulSessionConfigSharedPtr route_config_;
@@ -75,8 +75,8 @@ public:
 };
 
 constexpr absl::string_view ConfigYaml = R"EOF(
-session_state:
-  name: "envoy.http.mcp_sse_stateful_session.mock"
+sse_session_state:
+  name: "envoy.http.sse_stateful_session.mock"
   typed_config: {}
 )EOF";
 
@@ -86,8 +86,8 @@ disabled: true
 
 constexpr absl::string_view RouteConfigYaml = R"EOF(
 mcp_sse_stateful_session:
-  session_state:
-    name: "envoy.http.mcp_sse_stateful_session.mock"
+  sse_session_state:
+    name: "envoy.http.sse_stateful_session.mock"
     typed_config: {}
 )EOF";
 
@@ -101,7 +101,7 @@ TEST_F(StatefulSessionTest, NormalSessionStateTest) {
   Buffer::OwnedImpl data_buffer;
   data_buffer.add("data: http://example.com?sessionId=abcdefg\n\n");
 
-  auto session_state = std::make_unique<NiceMock<Envoy::Http::MockSessionState>>();
+  auto session_state = std::make_unique<NiceMock<Envoy::Http::MockSseSessionState>>();
   auto raw_session_state = session_state.get();
 
   EXPECT_CALL(*factory_, create(_)).WillOnce(Return(testing::ByMove(std::move(session_state))));
@@ -147,7 +147,7 @@ TEST_F(StatefulSessionTest, SessionStateOverrideByRoute) {
       {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};
   Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
 
-  auto session_state = std::make_unique<NiceMock<Envoy::Http::MockSessionState>>();
+  auto session_state = std::make_unique<NiceMock<Envoy::Http::MockSseSessionState>>();
   auto raw_session_state = session_state.get();
 
   Buffer::OwnedImpl data_buffer;
@@ -180,7 +180,7 @@ TEST_F(StatefulSessionTest, SessionStateHasNoUpstreamAddress) {
       {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};
   Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
 
-  auto session_state = std::make_unique<NiceMock<Envoy::Http::MockSessionState>>();
+  auto session_state = std::make_unique<NiceMock<Envoy::Http::MockSseSessionState>>();
   auto raw_session_state = session_state.get();
 
   Buffer::OwnedImpl data_buffer;
@@ -208,7 +208,7 @@ TEST_F(StatefulSessionTest, NoUpstreamHost) {
       {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};
   Envoy::Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
 
-  auto session_state = std::make_unique<NiceMock<Envoy::Http::MockSessionState>>();
+  auto session_state = std::make_unique<NiceMock<Envoy::Http::MockSseSessionState>>();
   auto raw_session_state = session_state.get();
 
   Buffer::OwnedImpl data_buffer;
