@@ -93,7 +93,7 @@ public:
   absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
   Ssl::ConnectionInfoConstSharedPtr ssl() const override {
     // SSL info may be overwritten by a filter in the provider.
-    return socket_->connectionInfoProvider().sslConnection();
+    return (socket_ != nullptr) ? socket_->connectionInfoProvider().sslConnection() : nullptr;
   }
   State state() const override;
   bool connecting() const override {
