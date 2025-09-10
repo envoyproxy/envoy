@@ -290,6 +290,47 @@ api_listener:
   EXPECT_DEATH(read_callbacks.socket(), "not implemented");
 }
 
+// Test the new socket management methods added to Network::Connection interface
+TEST_F(ApiListenerTest, SyntheticConnectionSocketMethods) {
+  const std::string yaml = R"EOF(
+name: test_api_listener
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+api_listener:
+  api_listener:
+    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+    stat_prefix: hcm
+    route_config:
+      name: api_router
+      virtual_hosts:
+        - name: api
+          domains:
+            - "*"
+          routes:
+            - match:
+                prefix: "/"
+              route:
+                cluster: dynamic_forward_proxy_cluster
+  )EOF";
+
+  const envoy::config::listener::v3::Listener config = parseListenerFromV3Yaml(yaml);
+  server_.server_factory_context_->cluster_manager_.initializeClusters(
+      {"dynamic_forward_proxy_cluster"}, {});
+  HttpApiListenerFactory factory;
+  auto http_api_listener = factory.create(config, server_, config.name()).value();
+
+  auto api_listener = http_api_listener->createHttpApiListener(server_.dispatcher());
+  ASSERT_NE(api_listener, nullptr);
+  auto& connection = dynamic_cast<HttpApiListener::ApiListenerWrapper*>(api_listener.get())
+                         ->readCallbacks()
+                         .connection();
+
+  // Test getSocket() - should PANIC for SyntheticConnection
+  EXPECT_DEATH(connection.getSocket(), "not implemented");
+}
+
 // Verify base address access and drain decision behavior.
 TEST_F(ApiListenerTest, NewStreamHandleReturnsDecoderHandle) {
   const std::string yaml = R"EOF(
