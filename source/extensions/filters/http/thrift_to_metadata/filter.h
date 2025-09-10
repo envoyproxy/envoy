@@ -62,6 +62,8 @@ public:
                                                const ThriftDecoderHandler& handler) const {
     return protobuf_value_extracter_(metadata, handler);
   }
+  ThriftMetadataToProtobufValue getValueExtractorFromField(
+      envoy::extensions::filters::http::thrift_to_metadata::v3::Field field) const;
 
 private:
   const ProtoRule rule_;

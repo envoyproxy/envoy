@@ -21,11 +21,20 @@ Rule::Rule(const ProtoRule& rule) : rule_(rule) {
         "thrift to metadata filter: cannot specify on_missing rule with empty value");
   }
 
-  switch (rule_.field()) {
+  if (rule_.has_field_selector()) {
+    std::cout << "XXX FieldSelector is not yet supported in thrift_to_metadata filter" << std::endl;
+  } else {
+    protobuf_value_extracter_ = getValueExtractorFromField(rule_.field());
+  }
+}
+
+ThriftMetadataToProtobufValue Rule::getValueExtractorFromField(
+    envoy::extensions::filters::http::thrift_to_metadata::v3::Field field) const {
+  switch (field) {
     PANIC_ON_PROTO_ENUM_SENTINEL_VALUES;
   case envoy::extensions::filters::http::thrift_to_metadata::v3::METHOD_NAME:
-    protobuf_value_extracter_ = [](MessageMetadataSharedPtr metadata,
-                                   const ThriftDecoderHandler&) -> absl::optional<Protobuf::Value> {
+    return [](MessageMetadataSharedPtr metadata,
+              const ThriftDecoderHandler&) -> absl::optional<Protobuf::Value> {
       if (!metadata->hasMethodName()) {
         return absl::nullopt;
       }
@@ -33,28 +42,23 @@ Rule::Rule(const ProtoRule& rule) : rule_(rule) {
       value.set_string_value(metadata->methodName());
       return value;
     };
-    break;
   case envoy::extensions::filters::http::thrift_to_metadata::v3::PROTOCOL:
-    protobuf_value_extracter_ =
-        [](MessageMetadataSharedPtr,
-           const ThriftDecoderHandler& handler) -> absl::optional<Protobuf::Value> {
+    return [](MessageMetadataSharedPtr,
+              const ThriftDecoderHandler& handler) -> absl::optional<Protobuf::Value> {
       Protobuf::Value value;
       value.set_string_value(handler.protocolName());
       return value;
     };
-    break;
   case envoy::extensions::filters::http::thrift_to_metadata::v3::TRANSPORT:
-    protobuf_value_extracter_ =
-        [](MessageMetadataSharedPtr,
-           const ThriftDecoderHandler& handler) -> absl::optional<Protobuf::Value> {
+    return [](MessageMetadataSharedPtr,
+              const ThriftDecoderHandler& handler) -> absl::optional<Protobuf::Value> {
       Protobuf::Value value;
       value.set_string_value(handler.transportName());
       return value;
     };
-    break;
   case envoy::extensions::filters::http::thrift_to_metadata::v3::HEADER_FLAGS:
-    protobuf_value_extracter_ = [](MessageMetadataSharedPtr metadata,
-                                   const ThriftDecoderHandler&) -> absl::optional<Protobuf::Value> {
+    return [](MessageMetadataSharedPtr metadata,
+              const ThriftDecoderHandler&) -> absl::optional<Protobuf::Value> {
       if (!metadata->hasHeaderFlags()) {
         return absl::nullopt;
       }
@@ -62,10 +66,9 @@ Rule::Rule(const ProtoRule& rule) : rule_(rule) {
       value.set_number_value(metadata->headerFlags());
       return value;
     };
-    break;
   case envoy::extensions::filters::http::thrift_to_metadata::v3::SEQUENCE_ID:
-    protobuf_value_extracter_ = [](MessageMetadataSharedPtr metadata,
-                                   const ThriftDecoderHandler&) -> absl::optional<Protobuf::Value> {
+    return [](MessageMetadataSharedPtr metadata,
+              const ThriftDecoderHandler&) -> absl::optional<Protobuf::Value> {
       if (!metadata->hasSequenceId()) {
         return absl::nullopt;
       }
@@ -73,10 +76,9 @@ Rule::Rule(const ProtoRule& rule) : rule_(rule) {
       value.set_number_value(metadata->sequenceId());
       return value;
     };
-    break;
   case envoy::extensions::filters::http::thrift_to_metadata::v3::MESSAGE_TYPE:
-    protobuf_value_extracter_ = [](MessageMetadataSharedPtr metadata,
-                                   const ThriftDecoderHandler&) -> absl::optional<Protobuf::Value> {
+    return [](MessageMetadataSharedPtr metadata,
+              const ThriftDecoderHandler&) -> absl::optional<Protobuf::Value> {
       if (!metadata->hasMessageType()) {
         return absl::nullopt;
       }
@@ -84,10 +86,9 @@ Rule::Rule(const ProtoRule& rule) : rule_(rule) {
       value.set_string_value(MessageTypeNames::get().fromType(metadata->messageType()));
       return value;
     };
-    break;
   case envoy::extensions::filters::http::thrift_to_metadata::v3::REPLY_TYPE:
-    protobuf_value_extracter_ = [](MessageMetadataSharedPtr metadata,
-                                   const ThriftDecoderHandler&) -> absl::optional<Protobuf::Value> {
+    return [](MessageMetadataSharedPtr metadata,
+              const ThriftDecoderHandler&) -> absl::optional<Protobuf::Value> {
       if (!metadata->hasReplyType()) {
         return absl::nullopt;
       }
@@ -95,7 +96,6 @@ Rule::Rule(const ProtoRule& rule) : rule_(rule) {
       value.set_string_value(ReplyTypeNames::get().fromType(metadata->replyType()));
       return value;
     };
-    break;
   }
 }
 
