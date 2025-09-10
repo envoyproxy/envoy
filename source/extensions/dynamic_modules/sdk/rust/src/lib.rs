@@ -369,20 +369,78 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
 /// An opaque object that represents the underlying Envoy Http filter config. This has one to one
 /// mapping with the Envoy Http filter config object as well as [`HttpFilterConfig`] object.
 pub trait EnvoyHttpFilterConfig {
-  // TODO: add methods like defining metrics, filter metadata, etc.
+  /// Define a new counter scoped to this filter config with the given name.
+  fn define_counter(&mut self, name: &str) -> EnvoyCounterId;
+
+  /// Define a new gauge scoped to this filter config with the given name.
+  fn define_gauge(&mut self, name: &str) -> EnvoyGaugeId;
+
+  /// Define a new histogram scoped to this filter config with the given name.
+  fn define_histogram(&mut self, name: &str) -> EnvoyHistogramId;
 }
 
 pub struct EnvoyHttpFilterConfigImpl {
   raw_ptr: abi::envoy_dynamic_module_type_http_filter_config_envoy_ptr,
 }
 
-impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {}
+impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
+  fn define_counter(&mut self, name: &str) -> EnvoyCounterId {
+    let name_ptr = name.as_ptr();
+    let name_size = name.len();
+    let id = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_define_counter(
+        self.raw_ptr,
+        name_ptr as *const _ as *mut _,
+        name_size,
+      )
+    };
+    EnvoyCounterId(id)
+  }
+
+  fn define_gauge(&mut self, name: &str) -> EnvoyGaugeId {
+    let name_ptr = name.as_ptr();
+    let name_size = name.len();
+    let id = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_define_gauge(
+        self.raw_ptr,
+        name_ptr as *const _ as *mut _,
+        name_size,
+      )
+    };
+    EnvoyGaugeId(id)
+  }
+
+  fn define_histogram(&mut self, name: &str) -> EnvoyHistogramId {
+    let name_ptr = name.as_ptr();
+    let name_size = name.len();
+    let id = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_define_histogram(
+        self.raw_ptr,
+        name_ptr as *const _ as *mut _,
+        name_size,
+      )
+    };
+    EnvoyHistogramId(id)
+  }
+}
+
+/// The identifier for an EnvoyCounter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EnvoyCounterId(usize);
+
+/// The identifier for an EnvoyGauge.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EnvoyGaugeId(usize);
+
+/// The identifier for an EnvoyHistogram.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EnvoyHistogramId(usize);
 
 /// An opaque object that represents the underlying Envoy Http filter. This has one to one
 /// mapping with the Envoy Http filter object as well as [`HttpFilter`] object per HTTP stream.
 ///
 /// The Envoy filter object is inherently not thread-safe, and it is always recommended to
-/// access it from the same thread as the one that [`HttpFilter`] even hooks are called.
+/// access it from the same thread as the one that [`HttpFilter`] event hooks are called.
 #[automock]
 #[allow(clippy::needless_lifetimes)] // Explicit lifetime specifiers are needed for mockall.
 pub trait EnvoyHttpFilter {
@@ -779,6 +837,21 @@ pub trait EnvoyHttpFilter {
   /// }
   /// ```
   fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterScheduler>;
+
+  /// Increment the counter with the given id.
+  fn increment_counter(&self, id: EnvoyCounterId, value: u64);
+
+  /// Increase the gauge with the given id.
+  fn increase_gauge(&self, id: EnvoyGaugeId, value: u64);
+
+  /// Decrease the gauge with the given id.
+  fn decrease_gauge(&self, id: EnvoyGaugeId, value: u64);
+
+  /// Set the value of the gauge with the given id.
+  fn set_gauge(&self, id: EnvoyGaugeId, value: u64);
+
+  /// Record a value in the histogram with the given id.
+  fn record_histogram_value(&self, id: EnvoyHistogramId, value: u64);
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -1332,6 +1405,45 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
       })
     }
   }
+
+  fn increment_counter(&self, id: EnvoyCounterId, value: u64) {
+    let EnvoyCounterId(id) = id;
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_increment_counter(self.raw_ptr, id, value);
+    }
+  }
+
+  fn increase_gauge(&self, id: EnvoyGaugeId, value: u64) {
+    let EnvoyGaugeId(id) = id;
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_increase_gauge(self.raw_ptr, id, value);
+    }
+  }
+
+  fn decrease_gauge(&self, id: EnvoyGaugeId, value: u64) {
+    let EnvoyGaugeId(id) = id;
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_decrease_gauge(self.raw_ptr, id, value);
+    }
+  }
+
+  fn set_gauge(&self, id: EnvoyGaugeId, value: u64) {
+    let EnvoyGaugeId(id) = id;
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_set_gauge(self.raw_ptr, id, value);
+    }
+  }
+
+  fn record_histogram_value(&self, id: EnvoyHistogramId, value: u64) {
+    let EnvoyHistogramId(id) = id;
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_record_histogram_value(
+        self.raw_ptr,
+        id,
+        value,
+      );
+    }
+  }
 }
 
 impl EnvoyHttpFilterImpl {
@@ -1468,7 +1580,7 @@ impl EnvoyHttpFilterImpl {
 /// This represents a thin thread-safe object that can be used to schedule a generic event to the
 /// Envoy HTTP filter on the work thread.
 ///
-/// For eaxmple, this can be used to offload some blocking work from the HTTP filter processing
+/// For example, this can be used to offload some blocking work from the HTTP filter processing
 /// thread to a module-managed thread, and then schedule an event to continue
 /// processing the request.
 ///

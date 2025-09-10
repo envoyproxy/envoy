@@ -1536,8 +1536,9 @@ ClusterManagerImpl::allocateOdCdsApi(OdCdsCreationFunction creation_function,
   // TODO(krnowak): Instead of creating a new handle every time, store the handles internally and
   // return an already existing one if the config or locator matches. Note that this may need a
   // way to clean up the unused handles, so we can close the unnecessary connections.
-  auto odcds_or_error = creation_function(odcds_config, odcds_resources_locator, xds_manager_,
-                                          *this, *this, *stats_.rootScope(), validation_visitor);
+  auto odcds_or_error =
+      creation_function(odcds_config, odcds_resources_locator, xds_manager_, *this, *this,
+                        *stats_.rootScope(), validation_visitor, context_);
   RETURN_IF_NOT_OK_REF(odcds_or_error.status());
   return OdCdsApiHandleImpl::create(*this, std::move(*odcds_or_error));
 }
