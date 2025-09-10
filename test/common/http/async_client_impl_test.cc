@@ -2312,11 +2312,8 @@ class AsyncClientImplUnitTest : public AsyncClientImplTest {
 public:
   AsyncClientImplUnitTest() {
     envoy::config::route::v3::RetryPolicy proto_policy;
-    Upstream::RetryExtensionFactoryContextImpl factory_context(
-        client_.factory_context_.singletonManager());
-    auto policy_or_error =
-        Router::RetryPolicyImpl::create(proto_policy, ProtobufMessage::getNullValidationVisitor(),
-                                        factory_context, client_.factory_context_);
+    auto policy_or_error = Router::RetryPolicyImpl::create(
+        proto_policy, ProtobufMessage::getNullValidationVisitor(), client_.factory_context_);
     THROW_IF_NOT_OK_REF(policy_or_error.status());
     retry_policy_ = std::move(policy_or_error.value());
     EXPECT_TRUE(retry_policy_.get());
@@ -2326,7 +2323,7 @@ public:
         Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>());
   }
 
-  std::unique_ptr<Router::RetryPolicyImpl> retry_policy_;
+  std::shared_ptr<Router::RetryPolicyImpl> retry_policy_;
   Regex::GoogleReEngine regex_engine_;
   std::unique_ptr<NullRouteImpl> route_impl_;
   std::unique_ptr<Http::AsyncStreamImpl> stream_ = std::move(
@@ -2350,18 +2347,15 @@ public:
     envoy::config::route::v3::RetryPolicy proto_policy;
 
     TestUtility::loadFromYaml(yaml_config, proto_policy);
-    Upstream::RetryExtensionFactoryContextImpl factory_context(
-        client_.factory_context_.singletonManager());
-    auto policy_or_error =
-        Router::RetryPolicyImpl::create(proto_policy, ProtobufMessage::getNullValidationVisitor(),
-                                        factory_context, client_.factory_context_);
+    auto policy_or_error = Router::RetryPolicyImpl::create(
+        proto_policy, ProtobufMessage::getNullValidationVisitor(), client_.factory_context_);
     THROW_IF_NOT_OK_REF(policy_or_error.status());
     retry_policy_ = std::move(policy_or_error.value());
     EXPECT_TRUE(retry_policy_.get());
 
     stream_ = std::move(
         Http::AsyncStreamImpl::create(client_, stream_callbacks_,
-                                      AsyncClient::StreamOptions().setRetryPolicy(*retry_policy_))
+                                      AsyncClient::StreamOptions().setRetryPolicy(retry_policy_))
             .value());
   }
 
