@@ -66,6 +66,11 @@ minor_behavior_changes:
     If :ref:`failure_mode_allow <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.failure_mode_allow>` is true,
     save the gRPC failure status code returned from the ext_proc server in the filter state.
     Previously, all fail-open cases would return ``call_status`` ``Grpc::Status::Aborted``.
+- area: dns_filter
+  change: |
+    Honor the default DNS resolver configuration in the bootstrap config
+    :ref:`typed_dns_resolver_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.typed_dns_resolver_config>` if the
+    :ref:`client_config <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.client_config>` is empty.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -124,6 +129,9 @@ bug_fixes:
   change: |
     Fixed a use-after-free (UAF) in DNS cache that can occur when the ``Host`` header is modified between the Dynamic
     Forwarding Proxy and Router filters.
+- area: release
+  change: |
+    Fix distroless image to ensure nonroot.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
