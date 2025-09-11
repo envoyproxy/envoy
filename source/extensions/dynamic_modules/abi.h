@@ -171,6 +171,7 @@ typedef struct {
   envoy_dynamic_module_type_buffer_module_ptr ptr;
   size_t length;
 } envoy_dynamic_module_type_module_buffer;
+
 /**
  * envoy_dynamic_module_type_module_http_header represents a key-value pair of an HTTP header owned
  * by the module.
@@ -810,7 +811,7 @@ size_t envoy_dynamic_module_callback_http_filter_config_define_counter(
 size_t envoy_dynamic_module_callback_http_filter_config_define_counter_vec(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length,
-    envoy_dynamic_module_type_module_str* label_names, size_t label_names_length);
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length);
 
 /**
  * envoy_dynamic_module_callback_http_filter_increment_counter is called by the module to increment
@@ -837,7 +838,7 @@ void envoy_dynamic_module_callback_http_filter_increment_counter(
  */
 void envoy_dynamic_module_callback_http_filter_increment_counter_vec(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
-    envoy_dynamic_module_type_module_str* label_values, size_t label_values_length, uint64_t value);
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length, uint64_t value);
 
 /**
  * envoy_dynamic_module_callback_http_filter_config_define_gauge is called by the module during
@@ -873,7 +874,7 @@ size_t envoy_dynamic_module_callback_http_filter_config_define_gauge(
 size_t envoy_dynamic_module_callback_http_filter_config_define_gauge_vec(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length,
-    envoy_dynamic_module_type_module_str* label_names, size_t label_names_length);
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length);
 
 /**
  * envoy_dynamic_module_callback_http_filter_increase_gauge is called by the module to increase the
@@ -900,7 +901,7 @@ void envoy_dynamic_module_callback_http_filter_increase_gauge(
  */
 void envoy_dynamic_module_callback_http_filter_increase_gauge_vec(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
-    envoy_dynamic_module_type_module_str* label_values, size_t label_values_length, uint64_t value);
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length, uint64_t value);
 
 /**
  * envoy_dynamic_module_callback_http_filter_decrease_gauge is called by the module to decrease the
@@ -927,7 +928,7 @@ void envoy_dynamic_module_callback_http_filter_decrease_gauge(
  */
 void envoy_dynamic_module_callback_http_filter_decrease_gauge_vec(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
-    envoy_dynamic_module_type_module_str* label_values, size_t label_values_length, uint64_t value);
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length, uint64_t value);
 
 /**
  * envoy_dynamic_module_callback_http_filter_set_gauge is called by the module to set the value
@@ -954,7 +955,7 @@ void envoy_dynamic_module_callback_http_filter_set_gauge(
  */
 void envoy_dynamic_module_callback_http_filter_set_gauge_vec(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
-    envoy_dynamic_module_type_module_str* label_values, size_t label_values_length, uint64_t value);
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length, uint64_t value);
 
 /**
  * envoy_dynamic_module_callback_http_filter_config_define_histogram is called by the module during
@@ -990,7 +991,7 @@ size_t envoy_dynamic_module_callback_http_filter_config_define_histogram(
 size_t envoy_dynamic_module_callback_http_filter_config_define_histogram_vec(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length,
-    envoy_dynamic_module_type_module_str* label_names, size_t label_names_length);
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length);
 
 /**
  * envoy_dynamic_module_callback_http_filter_record_histogram_value is called by the module to
@@ -1019,7 +1020,7 @@ void envoy_dynamic_module_callback_http_filter_record_histogram_value(
  */
 void envoy_dynamic_module_callback_http_filter_record_histogram_value_vec(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
-    envoy_dynamic_module_type_module_str* label_values, size_t label_values_length, uint64_t value);
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length, uint64_t value);
 
 // ---------------------- HTTP Header/Trailer callbacks ------------------------
 

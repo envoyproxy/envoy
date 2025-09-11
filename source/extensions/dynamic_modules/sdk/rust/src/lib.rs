@@ -3,8 +3,6 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
-pub mod abi_str;
-pub use abi_str::ModuleStr;
 pub mod buffer;
 pub use buffer::{EnvoyBuffer, EnvoyMutBuffer};
 use mockall::predicate::*;
@@ -375,19 +373,19 @@ pub trait EnvoyHttpFilterConfig {
   fn define_counter(&mut self, name: &str) -> EnvoyCounterId;
 
   // Define a new counter vec scoped to this filter config with the given name.
-  fn define_counter_vec(&mut self, name: &str, labels: &[ModuleStr<'_>]) -> EnvoyCounterId;
+  fn define_counter_vec(&mut self, name: &str, labels: &[&str]) -> EnvoyCounterId;
 
   /// Define a new gauge scoped to this filter config with the given name.
   fn define_gauge(&mut self, name: &str) -> EnvoyGaugeId;
 
   /// Define a new gauge vec scoped to this filter config with the given name.
-  fn define_gauge_vec(&mut self, name: &str, labels: &[ModuleStr<'_>]) -> EnvoyGaugeId;
+  fn define_gauge_vec(&mut self, name: &str, labels: &[&str]) -> EnvoyGaugeId;
 
   /// Define a new histogram scoped to this filter config with the given name.
   fn define_histogram(&mut self, name: &str) -> EnvoyHistogramId;
 
   /// Define a new histogram vec scoped to this filter config with the given name.
-  fn define_histogram_vec(&mut self, name: &str, labels: &[ModuleStr<'_>]) -> EnvoyHistogramId;
+  fn define_histogram_vec(&mut self, name: &str, labels: &[&str]) -> EnvoyHistogramId;
 }
 
 pub struct EnvoyHttpFilterConfigImpl {
@@ -408,7 +406,7 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
     EnvoyCounterId(id)
   }
 
-  fn define_counter_vec(&mut self, name: &str, labels: &[ModuleStr<'_>]) -> EnvoyCounterId {
+  fn define_counter_vec(&mut self, name: &str, labels: &[&str]) -> EnvoyCounterId {
     let name_ptr = name.as_ptr();
     let name_size = name.len();
     let labels_ptr = labels.as_ptr();
@@ -438,7 +436,7 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
     EnvoyGaugeId(id)
   }
 
-  fn define_gauge_vec(&mut self, name: &str, labels: &[ModuleStr<'_>]) -> EnvoyGaugeId {
+  fn define_gauge_vec(&mut self, name: &str, labels: &[&str]) -> EnvoyGaugeId {
     let name_ptr = name.as_ptr();
     let name_size = name.len();
     let labels_ptr = labels.as_ptr();
@@ -468,7 +466,7 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
     EnvoyHistogramId(id)
   }
 
-  fn define_histogram_vec(&mut self, name: &str, labels: &[ModuleStr<'_>]) -> EnvoyHistogramId {
+  fn define_histogram_vec(&mut self, name: &str, labels: &[&str]) -> EnvoyHistogramId {
     let name_ptr = name.as_ptr();
     let name_size = name.len();
     let labels_ptr = labels.as_ptr();
@@ -904,36 +902,31 @@ pub trait EnvoyHttpFilter {
   fn increment_counter(&self, id: EnvoyCounterId, value: u64);
 
   /// Increment the counter vec with the given id.
-  fn increment_counter_vec<'a>(&self, id: EnvoyCounterId, labels: &[ModuleStr<'a>], value: u64);
+  fn increment_counter_vec<'a>(&self, id: EnvoyCounterId, labels: &[&'a str], value: u64);
 
   /// Increase the gauge with the given id.
   fn increase_gauge(&self, id: EnvoyGaugeId, value: u64);
 
   /// Increase the gauge vec with the given id.
-  fn increase_gauge_vec<'a>(&self, id: EnvoyGaugeId, labels: &[ModuleStr<'a>], value: u64);
+  fn increase_gauge_vec<'a>(&self, id: EnvoyGaugeId, labels: &[&'a str], value: u64);
 
   /// Decrease the gauge with the given id.
   fn decrease_gauge(&self, id: EnvoyGaugeId, value: u64);
 
   /// Decrease the gauge vec with the given id.
-  fn decrease_gauge_vec<'a>(&self, id: EnvoyGaugeId, labels: &[ModuleStr<'a>], value: u64);
+  fn decrease_gauge_vec<'a>(&self, id: EnvoyGaugeId, labels: &[&'a str], value: u64);
 
   /// Set the value of the gauge with the given id.
   fn set_gauge(&self, id: EnvoyGaugeId, value: u64);
 
   /// Set the value of the gauge vec with the given id.
-  fn set_gauge_vec<'a>(&self, id: EnvoyGaugeId, labels: &[ModuleStr<'a>], value: u64);
+  fn set_gauge_vec<'a>(&self, id: EnvoyGaugeId, labels: &[&'a str], value: u64);
 
   /// Record a value in the histogram with the given id.
   fn record_histogram_value(&self, id: EnvoyHistogramId, value: u64);
 
   /// Record a value in the histogram vec with the given id.
-  fn record_histogram_value_vec<'a>(
-    &self,
-    id: EnvoyHistogramId,
-    labels: &[ModuleStr<'a>],
-    value: u64,
-  );
+  fn record_histogram_value_vec<'a>(&self, id: EnvoyHistogramId, labels: &[&'a str], value: u64);
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -1495,7 +1488,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn increment_counter_vec(&self, id: EnvoyCounterId, labels: &[ModuleStr<'_>], value: u64) {
+  fn increment_counter_vec(&self, id: EnvoyCounterId, labels: &[&str], value: u64) {
     let EnvoyCounterId(id) = id;
     unsafe {
       abi::envoy_dynamic_module_callback_http_filter_increment_counter_vec(
@@ -1515,7 +1508,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn increase_gauge_vec(&self, id: EnvoyGaugeId, labels: &[ModuleStr<'_>], value: u64) {
+  fn increase_gauge_vec(&self, id: EnvoyGaugeId, labels: &[&str], value: u64) {
     let EnvoyGaugeId(id) = id;
     unsafe {
       abi::envoy_dynamic_module_callback_http_filter_increase_gauge_vec(
@@ -1535,7 +1528,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn decrease_gauge_vec(&self, id: EnvoyGaugeId, labels: &[ModuleStr<'_>], value: u64) {
+  fn decrease_gauge_vec(&self, id: EnvoyGaugeId, labels: &[&str], value: u64) {
     let EnvoyGaugeId(id) = id;
     unsafe {
       abi::envoy_dynamic_module_callback_http_filter_decrease_gauge_vec(
@@ -1555,7 +1548,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn set_gauge_vec(&self, id: EnvoyGaugeId, labels: &[ModuleStr<'_>], value: u64) {
+  fn set_gauge_vec(&self, id: EnvoyGaugeId, labels: &[&str], value: u64) {
     let EnvoyGaugeId(id) = id;
     unsafe {
       abi::envoy_dynamic_module_callback_http_filter_set_gauge_vec(
@@ -1579,7 +1572,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn record_histogram_value_vec(&self, id: EnvoyHistogramId, labels: &[ModuleStr<'_>], value: u64) {
+  fn record_histogram_value_vec(&self, id: EnvoyHistogramId, labels: &[&str], value: u64) {
     let EnvoyHistogramId(id) = id;
     unsafe {
       abi::envoy_dynamic_module_callback_http_filter_record_histogram_value_vec(

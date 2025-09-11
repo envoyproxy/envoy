@@ -1120,7 +1120,7 @@ TEST(ABIImpl, Stats) {
 
   const std::string counter_vec_name{"some_counter_vec"};
   const std::string counter_vec_label_name{"some_label"};
-  std::vector<envoy_dynamic_module_type_module_str> counter_vec_labels = {
+  std::vector<envoy_dynamic_module_type_module_buffer> counter_vec_labels = {
       {const_cast<char*>(counter_vec_label_name.data()), counter_vec_label_name.size()},
   };
   size_t counter_vec_id = envoy_dynamic_module_callback_http_filter_config_define_counter_vec(
@@ -1128,7 +1128,7 @@ TEST(ABIImpl, Stats) {
       counter_vec_labels.data(), counter_vec_labels.size());
 
   const std::string counter_vec_label_value{"some_value"};
-  std::vector<envoy_dynamic_module_type_module_str> counter_vec_labels_values = {
+  std::vector<envoy_dynamic_module_type_module_buffer> counter_vec_labels_values = {
       {const_cast<char*>(counter_vec_label_value.data()), counter_vec_label_value.size()},
   };
   envoy_dynamic_module_callback_http_filter_increment_counter_vec(
@@ -1164,7 +1164,7 @@ TEST(ABIImpl, Stats) {
 
   const std::string gauge_vec_name{"some_gauge_vec"};
   const std::string gauge_vec_label_name{"some_label"};
-  std::vector<envoy_dynamic_module_type_module_str> gauge_vec_labels = {
+  std::vector<envoy_dynamic_module_type_module_buffer> gauge_vec_labels = {
       {const_cast<char*>(gauge_vec_label_name.data()), gauge_vec_label_name.size()},
   };
   size_t gauge_vec_id = envoy_dynamic_module_callback_http_filter_config_define_gauge_vec(
@@ -1172,7 +1172,7 @@ TEST(ABIImpl, Stats) {
       gauge_vec_labels.data(), gauge_vec_labels.size());
 
   const std::string gauge_vec_label_value{"some_value"};
-  std::vector<envoy_dynamic_module_type_module_str> gauge_vec_labels_values = {
+  std::vector<envoy_dynamic_module_type_module_buffer> gauge_vec_labels_values = {
       {const_cast<char*>(gauge_vec_label_value.data()), gauge_vec_label_value.size()},
   };
   envoy_dynamic_module_callback_http_filter_increase_gauge_vec(
@@ -1207,7 +1207,7 @@ TEST(ABIImpl, Stats) {
 
   const std::string histogram_vec_name{"some_histogram_vec"};
   const std::string histogram_vec_label_name{"some_label"};
-  std::vector<envoy_dynamic_module_type_module_str> histogram_vec_labels = {
+  std::vector<envoy_dynamic_module_type_module_buffer> histogram_vec_labels = {
       {const_cast<char*>(histogram_vec_label_name.data()), histogram_vec_label_name.size()},
   };
   size_t histogram_vec_id = envoy_dynamic_module_callback_http_filter_config_define_histogram_vec(
@@ -1215,7 +1215,7 @@ TEST(ABIImpl, Stats) {
       histogram_vec_labels.data(), histogram_vec_labels.size());
 
   const std::string histogram_vec_label_value{"some_value"};
-  std::vector<envoy_dynamic_module_type_module_str> histogram_vec_labels_values = {
+  std::vector<envoy_dynamic_module_type_module_buffer> histogram_vec_labels_values = {
       {const_cast<char*>(histogram_vec_label_value.data()), histogram_vec_label_value.size()},
   };
   envoy_dynamic_module_callback_http_filter_record_histogram_value_vec(

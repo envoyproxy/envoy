@@ -11,7 +11,7 @@ namespace HttpFilters {
 static absl::optional<Stats::StatNameTagVector>
 buildTagsForModuleMetric(DynamicModuleHttpFilter& filter,
                          const DynamicModuleHttpFilterConfig::ModuleMetricHandle& metric,
-                         envoy_dynamic_module_type_module_str* label_values,
+                         envoy_dynamic_module_type_module_buffer* label_values,
                          size_t label_values_length) {
 
   auto label_names = metric.getLabelNames();

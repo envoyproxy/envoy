@@ -81,7 +81,7 @@ size_t envoy_dynamic_module_callback_http_filter_config_define_counter(
 size_t envoy_dynamic_module_callback_http_filter_config_define_counter_vec(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length,
-    envoy_dynamic_module_type_module_str* label_names, size_t label_names_length) {
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length) {
   auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
   ASSERT(!filter_config->stat_creation_frozen_);
   absl::string_view name_view(name, name_length);
@@ -112,7 +112,7 @@ void envoy_dynamic_module_callback_http_filter_increment_counter(
 
 void envoy_dynamic_module_callback_http_filter_increment_counter_vec(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
-    envoy_dynamic_module_type_module_str* label_values, size_t label_values_length,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
     uint64_t value) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto& counter = filter->getFilterConfig().getCounterById(id);
@@ -130,7 +130,7 @@ size_t envoy_dynamic_module_callback_http_filter_config_define_gauge(
 size_t envoy_dynamic_module_callback_http_filter_config_define_gauge_vec(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length,
-    envoy_dynamic_module_type_module_str* label_names, size_t label_names_length) {
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length) {
   auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
   ASSERT(!filter_config->stat_creation_frozen_);
   absl::string_view name_view(name, name_length);
@@ -163,7 +163,7 @@ void envoy_dynamic_module_callback_http_filter_increase_gauge(
 
 void envoy_dynamic_module_callback_http_filter_increase_gauge_vec(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
-    envoy_dynamic_module_type_module_str* label_values, size_t label_values_length,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
     uint64_t value) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto& gauge = filter->getFilterConfig().getGaugeById(id);
@@ -179,7 +179,7 @@ void envoy_dynamic_module_callback_http_filter_decrease_gauge(
 
 void envoy_dynamic_module_callback_http_filter_decrease_gauge_vec(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
-    envoy_dynamic_module_type_module_str* label_values, size_t label_values_length,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
     uint64_t value) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto& gauge = filter->getFilterConfig().getGaugeById(id);
@@ -194,7 +194,7 @@ void envoy_dynamic_module_callback_http_filter_set_gauge(
 
 void envoy_dynamic_module_callback_http_filter_set_gauge_vec(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
-    envoy_dynamic_module_type_module_str* label_values, size_t label_values_length,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
     uint64_t value) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto& gauge = filter->getFilterConfig().getGaugeById(id);
@@ -212,7 +212,7 @@ size_t envoy_dynamic_module_callback_http_filter_config_define_histogram(
 size_t envoy_dynamic_module_callback_http_filter_config_define_histogram_vec(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length,
-    envoy_dynamic_module_type_module_str* label_names, size_t label_names_length) {
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length) {
   auto filter_config = static_cast<DynamicModuleHttpFilterConfig*>(filter_config_envoy_ptr);
   ASSERT(!filter_config->stat_creation_frozen_);
   absl::string_view name_view(name, name_length);
@@ -245,7 +245,7 @@ void envoy_dynamic_module_callback_http_filter_record_histogram_value(
 
 void envoy_dynamic_module_callback_http_filter_record_histogram_value_vec(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
-    envoy_dynamic_module_type_module_str* label_values, size_t label_values_length,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
     uint64_t value) {
   auto filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
   auto& hist = filter->getFilterConfig().getHistogramById(id);
