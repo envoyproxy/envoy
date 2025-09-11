@@ -33,6 +33,8 @@ public:
     auto& initial_metadata_entry = *config.mutable_initial_metadata()->Add();
     initial_metadata_entry.set_key("downstream-local-address");
     initial_metadata_entry.set_value("%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%");
+    config.mutable_retry_policy()->mutable_num_retries()->set_value(3);
+    *config.mutable_retry_policy()->mutable_retry_on() = "5xx";
 
     grpc_client_ = *AsyncClientImpl::create(config, context_);
     cm_.initializeThreadLocalClusters({"test_cluster"});
@@ -57,6 +59,64 @@ TEST_F(EnvoyAsyncClientImplTest, ThreadSafe) {
                        "isThreadSafe");
   });
   thread->join();
+}
+
+TEST_F(EnvoyAsyncClientImplTest, ParsedRetryPolicyWillBeUsed) {
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  StreamInfo::StreamInfoImpl stream_info{context_.time_system_, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream;
+  ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
+
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions& opts) {
+            http_callbacks = &callbacks;
+            EXPECT_NE(opts.parsed_retry_policy, nullptr);
+            EXPECT_EQ(opts.parsed_retry_policy->numRetries(), 3);
+            return &http_stream;
+          }));
+
+  EXPECT_CALL(http_stream, sendHeaders(_, _))
+      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
+TEST_F(EnvoyAsyncClientImplTest, ParsedRetryPolicyWillBeOverrideByCallerOptions) {
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  StreamInfo::StreamInfoImpl stream_info{context_.time_system_, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream;
+  ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
+
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions& opts) {
+            http_callbacks = &callbacks;
+            EXPECT_EQ(opts.parsed_retry_policy, nullptr);
+            EXPECT_TRUE(opts.retry_policy.has_value());
+            EXPECT_EQ(opts.retry_policy->num_retries().value(), 5);
+            return &http_stream;
+          }));
+
+  envoy::config::route::v3::RetryPolicy caller_retry_policy;
+  caller_retry_policy.mutable_num_retries()->set_value(5);
+  *caller_retry_policy.mutable_retry_on() = "5xx";
+
+  EXPECT_CALL(http_stream, sendHeaders(_, _))
+      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks,
+                          Http::AsyncClient::StreamOptions().setRetryPolicy(caller_retry_policy));
+  EXPECT_EQ(grpc_stream, nullptr);
 }
 
 // Validates that the host header is the cluster name in grpc config.
