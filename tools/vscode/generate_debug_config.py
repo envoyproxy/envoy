@@ -41,14 +41,14 @@ def binary_path(bazel_bin, target):
 def build_binary_with_debug_info(target, config=None):
     build_args = ["bazel", *BAZEL_STARTUP_OPTIONS, "build"]
     info_args = []
-    
+
     if config:
         build_args.extend([f"--config={config}"])
         info_args.extend([f"--config={config}"])
-    
+
     build_args.extend(["-c", "dbg", target])
     build_args.extend(BAZEL_OPTIONS)
-    
+
     subprocess.check_call(build_args)
 
     bazel_bin = bazel_info("bazel-bin", info_args + ["-c", "dbg"])
@@ -159,7 +159,7 @@ if __name__ == "__main__":
     parser.add_argument('--debugger', default="gdb", help="debugger type, one of [gdb, lldb]")
     parser.add_argument('--args', default='', help="command line arguments if target binary")
     parser.add_argument(
-        '--config', 
+        '--config',
         default=None,
         help="bazel build config (e.g., clang, gcc). Auto-detected if not specified")
     parser.add_argument(
@@ -182,4 +182,3 @@ if __name__ == "__main__":
     add_to_launch_json(
         args.target, debug_binary, workspace, execution_root, args.args, args.debugger,
         args.overwrite)
-
