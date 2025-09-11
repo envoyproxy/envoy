@@ -1,5 +1,7 @@
+#include <unistd.h>
+
 #include "source/common/network/utility.h"
-#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_connection_io_handle.h"
 
 #include "test/mocks/network/mocks.h"
 
@@ -16,9 +18,9 @@ namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
-class TestUpstreamReverseConnectionIOHandle : public testing::Test {
+class UpstreamReverseConnectionIOHandleTest : public testing::Test {
 protected:
-  TestUpstreamReverseConnectionIOHandle() {
+  UpstreamReverseConnectionIOHandleTest() {
     mock_socket_ = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
 
     auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
@@ -37,7 +39,7 @@ protected:
   std::unique_ptr<UpstreamReverseConnectionIOHandle> io_handle_;
 };
 
-TEST_F(TestUpstreamReverseConnectionIOHandle, ConnectReturnsSuccess) {
+TEST_F(UpstreamReverseConnectionIOHandleTest, ConnectReturnsSuccess) {
   auto address = Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 8080);
 
   auto result = io_handle_->connect(address);
@@ -46,48 +48,22 @@ TEST_F(TestUpstreamReverseConnectionIOHandle, ConnectReturnsSuccess) {
   EXPECT_EQ(result.errno_, 0);
 }
 
-TEST_F(TestUpstreamReverseConnectionIOHandle, CloseCleansUpSocket) {
+TEST_F(UpstreamReverseConnectionIOHandleTest, CloseCleansUpSocket) {
   auto result = io_handle_->close();
 
   EXPECT_EQ(result.err_, nullptr);
 }
 
-TEST_F(TestUpstreamReverseConnectionIOHandle, GetSocketReturnsConstReference) {
+TEST_F(UpstreamReverseConnectionIOHandleTest, GetSocketReturnsConstReference) {
   const auto& socket = io_handle_->getSocket();
 
   EXPECT_NE(&socket, nullptr);
 }
 
-class UpstreamReverseConnectionIOHandleTest : public testing::Test {
-protected:
-  void SetUp() override {
-    auto socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
-
-    auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
-    EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(Return(123));
-    EXPECT_CALL(*socket, ioHandle()).WillRepeatedly(ReturnRef(*mock_io_handle));
-
-    socket->io_handle_ = std::move(mock_io_handle);
-
-    handle_ =
-        std::make_unique<UpstreamReverseConnectionIOHandle>(std::move(socket), "test-cluster");
-  }
-
-  std::unique_ptr<UpstreamReverseConnectionIOHandle> handle_;
-};
-
-TEST_F(UpstreamReverseConnectionIOHandleTest, ConnectReturnsSuccess) {
-  auto address = Network::Utility::parseInternetAddressNoThrow("127.0.0.1", 8080);
-
-  auto result = handle_->connect(address);
-
+TEST_F(UpstreamReverseConnectionIOHandleTest, ShutdownIgnoredWhenOwned) {
+  auto result = io_handle_->shutdown(SHUT_RDWR);
   EXPECT_EQ(result.return_value_, 0);
   EXPECT_EQ(result.errno_, 0);
-}
-
-TEST_F(UpstreamReverseConnectionIOHandleTest, GetSocketReturnsValidReference) {
-  const auto& socket = handle_->getSocket();
-  EXPECT_NE(&socket, nullptr);
 }
 
 } // namespace ReverseConnection

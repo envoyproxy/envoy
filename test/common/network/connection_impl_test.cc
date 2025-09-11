@@ -4584,6 +4584,21 @@ TEST_P(ClientConnectionWithCustomRawBufferSocketTest, TransportSocketCallbacks) 
   disconnect(false);
 }
 
+TEST_P(ConnectionImplTest, TestConstSocketAccess) {
+  setUpBasicConnection();
+  connect();
+
+  // Test const access to socket.
+  const Network::Connection& const_connection = *client_connection_;
+  const auto& socket_ref = const_connection.getSocket();
+  EXPECT_NE(socket_ref, nullptr);
+
+  // Verify that const and non-const getSocket return the same socket.
+  EXPECT_EQ(&socket_ref, &client_connection_->getSocket());
+
+  disconnect(true);
+}
+
 } // namespace
 } // namespace Network
 } // namespace Envoy

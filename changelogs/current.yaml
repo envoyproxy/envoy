@@ -124,6 +124,9 @@ bug_fixes:
   change: |
     Fixed a use-after-free (UAF) in DNS cache that can occur when the ``Host`` header is modified between the Dynamic
     Forwarding Proxy and Router filters.
+- area: release
+  change: |
+    Fix distroless image to ensure nonroot.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
