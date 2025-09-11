@@ -668,7 +668,7 @@ impl std::io::Read for BodyReader<'_> {
       let slice = self.data[self.vec_idx].as_slice();
       let remaining = slice.len() - self.buf_idx;
       let to_copy = std::cmp::min(remaining, buf.len() - n);
-      buf[n .. n + to_copy].copy_from_slice(&slice[self.buf_idx .. self.buf_idx + to_copy]);
+      buf[n..n + to_copy].copy_from_slice(&slice[self.buf_idx..self.buf_idx + to_copy]);
       n += to_copy;
       self.buf_idx += to_copy;
       if self.buf_idx >= slice.len() {
@@ -757,7 +757,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for BodyCallbacksFilter {
     let mut reader = BodyReader::new(body);
     let mut buf = vec![0; 1024];
     let n = std::io::Read::read(&mut reader, &mut buf).unwrap();
-    self.request_body.extend_from_slice(&buf[.. n]);
+    self.request_body.extend_from_slice(&buf[..n]);
     // Drop the reader and try writing to the writer.
     drop(reader);
 
