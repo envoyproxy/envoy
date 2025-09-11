@@ -17,7 +17,7 @@ public:
                                  Http::ResponseHeaderMapPtr headers, bool end_stream) PURE;
   virtual void onBodyInserted(AdjustedByteRange range, bool end_stream) PURE;
   virtual void onTrailersInserted(Http::ResponseTrailerMapPtr trailers) PURE;
-  virtual void onInsertFailed() PURE;
+  virtual void onInsertFailed(absl::Status status) PURE;
   virtual ~CacheProgressReceiver() = default;
 };
 

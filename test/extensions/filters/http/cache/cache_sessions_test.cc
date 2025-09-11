@@ -612,7 +612,7 @@ TEST_F(CacheSessionsTest, CacheInsertFailurePassesThroughLookupsAndWillLookupAga
   Mock::VerifyAndClearExpectations(mock_http_cache_);
   EXPECT_CALL(*mock_http_cache_, touch(KeyHasPath("/a"), _));
   EXPECT_CALL(*mock_http_cache_, evict(_, KeyHasPath("/a")));
-  progress->onInsertFailed();
+  progress->onInsertFailed(absl::InternalError("test error"));
   pumpDispatcher();
   ASSERT_THAT(result1->http_source_, NotNull());
   ASSERT_THAT(result2->http_source_, NotNull());
@@ -653,7 +653,7 @@ TEST_F(CacheSessionsTest, CacheInsertFailurePassesThroughLookupsAndWillLookupAga
   pumpDispatcher();
   Mock::VerifyAndClearExpectations(mock_http_cache_);
   EXPECT_CALL(*mock_http_cache_, evict(_, KeyHasPath("/a")));
-  progress->onInsertFailed();
+  progress->onInsertFailed(absl::InternalError("test error"));
   pumpDispatcher();
   ASSERT_THAT(result3->http_source_, NotNull());
   // Should be yet another upstream request for the new pass-through.
@@ -702,7 +702,7 @@ TEST_F(CacheSessionsTest, CacheInsertFailureResetsStreamingContexts) {
   result2->http_source_->getTrailers(trailers_callback.AsStdFunction());
   EXPECT_CALL(body_callback, Call(IsNull(), EndStream::Reset));
   EXPECT_CALL(trailers_callback, Call(IsNull(), EndStream::Reset));
-  progress->onInsertFailed();
+  progress->onInsertFailed(absl::InternalError("test error"));
   pumpDispatcher();
 }
 

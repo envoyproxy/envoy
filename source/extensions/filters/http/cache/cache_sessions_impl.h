@@ -51,7 +51,7 @@ public:
                          bool end_stream) override;
   void onBodyInserted(AdjustedByteRange range, bool end_stream) override;
   void onTrailersInserted(Http::ResponseTrailerMapPtr trailers) override;
-  void onInsertFailed() override;
+  void onInsertFailed(absl::Status status) override;
 
   void getLookupResult(ActiveLookupRequestPtr lookup,
                        ActiveLookupResultCallback&& lookup_result_callback)

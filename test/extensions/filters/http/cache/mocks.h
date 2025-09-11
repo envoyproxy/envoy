@@ -114,7 +114,7 @@ public:
               (CacheReaderPtr cache_reader, Http::ResponseHeaderMapPtr headers, bool end_stream));
   MOCK_METHOD(void, onBodyInserted, (AdjustedByteRange range, bool end_stream));
   MOCK_METHOD(void, onTrailersInserted, (Http::ResponseTrailerMapPtr trailers));
-  MOCK_METHOD(void, onInsertFailed, ());
+  MOCK_METHOD(void, onInsertFailed, (absl::Status));
 };
 
 class MockHttpCacheFactory : public HttpCacheFactory {

@@ -425,7 +425,7 @@ TEST_P(HttpCacheImplementationTest, UpstreamResetWhileExpectingBodyShouldBeInser
   Mock::VerifyAndClearExpectations(mock_progress_receiver.get());
   ASSERT_THAT(cache_reader, NotNull());
   ASSERT_THAT(get_body_1, NotNull());
-  EXPECT_CALL(*mock_progress_receiver, onInsertFailed());
+  EXPECT_CALL(*mock_progress_receiver, onInsertFailed);
   get_body_1(nullptr, EndStream::Reset);
   pumpDispatcher();
   Mock::VerifyAndClearExpectations(mock_progress_receiver.get());
@@ -485,7 +485,7 @@ TEST_P(HttpCacheImplementationTest, UpstreamResetWhileExpectingTrailersShouldBeI
   pumpDispatcher();
   Mock::VerifyAndClearExpectations(mock_progress_receiver.get());
   ASSERT_THAT(get_trailers, NotNull());
-  EXPECT_CALL(*mock_progress_receiver, onInsertFailed());
+  EXPECT_CALL(*mock_progress_receiver, onInsertFailed);
   get_trailers(nullptr, EndStream::Reset);
   pumpDispatcher();
 }

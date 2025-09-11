@@ -66,7 +66,7 @@ InsertContext::InsertContext(std::shared_ptr<SimpleHttpCache::Entry> entry,
 void InsertContext::onBody(AdjustedByteRange range, Buffer::InstancePtr buffer,
                            EndStream end_stream) {
   if (end_stream == EndStream::Reset) {
-    progress_receiver_->onInsertFailed();
+    progress_receiver_->onInsertFailed(absl::UnavailableError("upstream reset"));
     delete this;
     return;
   }
@@ -98,7 +98,7 @@ void InsertContext::onBody(AdjustedByteRange range, Buffer::InstancePtr buffer,
 
 void InsertContext::onTrailers(Http::ResponseTrailerMapPtr trailers, EndStream end_stream) {
   if (end_stream == EndStream::Reset) {
-    progress_receiver_->onInsertFailed();
+    progress_receiver_->onInsertFailed(absl::UnavailableError("upstream reset during trailers"));
   } else {
     entry_->setTrailers(std::move(trailers));
     progress_receiver_->onTrailersInserted(entry_->copyTrailers());

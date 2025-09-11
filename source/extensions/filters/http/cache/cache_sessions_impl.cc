@@ -315,9 +315,9 @@ void CacheSession::sendTrailersTo(TrailerSubscriber& subscriber) {
       });
 }
 
-void CacheSession::onInsertFailed() {
+void CacheSession::onInsertFailed(absl::Status status) {
   absl::MutexLock lock(&mu_);
-  ENVOY_LOG(error, "cache insert failed");
+  ENVOY_LOG(error, "cache insert failed: {}", status);
   onCacheError();
 }
 
