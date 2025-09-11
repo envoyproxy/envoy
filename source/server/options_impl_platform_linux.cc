@@ -10,6 +10,7 @@
 
 #include "source/common/api/os_sys_calls_impl_linux.h"
 #include "source/common/filesystem/filesystem_impl.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/server/cgroup_cpu_util.h"
 #include "source/server/options_impl_platform.h"
 
@@ -46,9 +47,12 @@ uint32_t OptionsImplPlatform::getCpuCount() {
   // Step 2: Get CPU affinity count (respects taskset, cpuset, etc.)
   uint32_t affinity_count = OptionsImplPlatformLinux::getCpuAffinityCount(hw_threads);
 
-  // Step 3: Get cgroup CPU limit with hierarchy scanning
-  Filesystem::InstanceImpl fs;
-  uint32_t cgroup_limit = CgroupCpuUtil::getCpuLimit(fs, hw_threads);
+  // Step 3: Get cgroup CPU limit with hierarchy scanning (enabled by default)
+  uint32_t cgroup_limit = hw_threads; // Fallback to hw_threads if cgroup detection fails
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_cgroup_cpu_detection")) {
+    Filesystem::InstanceImpl fs;
+    cgroup_limit = CgroupCpuUtil::getCpuLimit(fs, hw_threads);
+  }
 
   // Step 4: Take minimum of all constraints for container-aware CPU detection
   uint32_t effective_count = std::min({hw_threads, affinity_count, cgroup_limit});
