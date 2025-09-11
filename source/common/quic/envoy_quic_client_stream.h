@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/quic/envoy_quic_stream.h"
+#include "source/common/runtime/runtime_features.h"
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
 #include "source/common/quic/http_datagram_handler.h"
@@ -92,16 +93,10 @@ private:
   void useCapsuleProtocol();
 #endif
 
-  Http::ResponseDecoder* getResponseDecoder() {
-    if (response_decoder_) {
-      if (auto decoder = response_decoder_->get(); decoder.has_value()) {
-        return &decoder.value().get();
-      }
-    }
-    return nullptr;
-  }
+  Http::ResponseDecoder* getResponseDecoder();
 
-  Http::ResponseDecoderHandlePtr response_decoder_;
+  Http::ResponseDecoderHandlePtr response_decoder_handle_;
+  Http::ResponseDecoder* response_decoder_{nullptr};
   bool decoded_1xx_{false};
 
   // When an HTTP Upgrade is requested, this contains the protocol upgrade type, e.g. "websocket".

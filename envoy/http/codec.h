@@ -198,12 +198,6 @@ public:
                                        StreamInfo::StreamInfo& stream_info) PURE;
 };
 
-/**
- * Decodes an HTTP stream. These are callbacks fired into a sink. This interface contains methods
- * common to both the request and response path.
- * TODO(mattklein123): Consider removing the StreamDecoder interface entirely and just duplicating
- * the methods in both the request/response path for simplicity.
- */
 class ResponseDecoder;
 
 class ResponseDecoderHandle {
@@ -217,6 +211,12 @@ public:
 };
 using ResponseDecoderHandlePtr = std::unique_ptr<ResponseDecoderHandle>;
 
+/**
+ * Decodes an HTTP stream. These are callbacks fired into a sink. This interface contains methods
+ * common to both the request and response path.
+ * TODO(mattklein123): Consider removing the StreamDecoder interface entirely and just duplicating
+ * the methods in both the request/response path for simplicity.
+ */
 class StreamDecoder {
 public:
   virtual ~StreamDecoder() = default;

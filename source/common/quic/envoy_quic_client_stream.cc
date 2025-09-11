@@ -37,7 +37,8 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
 }
 
 void EnvoyQuicClientStream::setResponseDecoder(Http::ResponseDecoder& decoder) {
-  response_decoder_ = decoder.getResponseDecoderHandle();
+  response_decoder_handle_ = decoder.getResponseDecoderHandle();
+  response_decoder_ = &decoder;
 }
 
 Http::Status EnvoyQuicClientStream::encodeHeaders(const Http::RequestHeaderMap& headers,
@@ -211,10 +212,13 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (!optional_status.has_value()) {
     // In case the status is invalid or missing, the response_decoder_.decodeHeaders() will fail the
     // request
-    if (auto* decoder = getResponseDecoder()) {
+    if (Http::ResponseDecoder* decoder = getResponseDecoder()) {
       decoder->decodeHeaders(std::move(headers), fin);
     } else {
-      ENVOY_STREAM_LOG(error, "response_decoder_ is null, dropping headers.", *this);
+      IS_ENVOY_BUG("Wrapped decoder use after free detected.");
+      RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
+                         "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
+                     "Wrapped decoder use after free detected.");
     }
     ConsumeHeaderList();
     return;
@@ -232,17 +236,23 @@ void EnvoyQuicClientStream::OnInitialHeadersComplete(bool fin, size_t frame_len,
   if (is_special_1xx && !decoded_1xx_) {
     // This is 100 Continue, only decode it once to support Expect:100-Continue header.
     decoded_1xx_ = true;
-    if (auto* decoder = getResponseDecoder()) {
+    if (Http::ResponseDecoder* decoder = getResponseDecoder()) {
       decoder->decode1xxHeaders(std::move(headers));
     } else {
-      ENVOY_STREAM_LOG(error, "response_decoder_ is null, dropping 1xx headers.", *this);
+      IS_ENVOY_BUG("Wrapped decoder use after free detected.");
+      RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
+                         "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
+                     "Wrapped decoder use after free detected.");
     }
   } else if (!is_special_1xx) {
-    if (auto* decoder = getResponseDecoder()) {
+    if (Http::ResponseDecoder* decoder = getResponseDecoder()) {
       decoder->decodeHeaders(std::move(headers),
                              /*end_stream=*/fin);
     } else {
-      ENVOY_STREAM_LOG(error, "response_decoder_ is null, dropping headers.", *this);
+      IS_ENVOY_BUG("Wrapped decoder use after free detected.");
+      RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
+                         "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
+                     "Wrapped decoder use after free detected.");
     }
     if (status == enumToInt(Http::Code::NotModified)) {
       got_304_response_ = true;
@@ -317,10 +327,13 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
       // A stream error has occurred, stop processing.
       return;
     }
-    if (auto* decoder = getResponseDecoder()) {
+    if (Http::ResponseDecoder* decoder = getResponseDecoder()) {
       decoder->decodeData(*buffer, fin_read_and_no_trailers);
     } else {
-      ENVOY_STREAM_LOG(error, "response_decoder_ is null, dropping data.", *this);
+      IS_ENVOY_BUG("Wrapped decoder use after free detected.");
+      RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
+                         "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
+                     "Wrapped decoder use after free detected.");
     }
   }
 
@@ -368,10 +381,13 @@ void EnvoyQuicClientStream::maybeDecodeTrailers() {
       onStreamError(close_connection_upon_invalid_header_, transform_rst);
       return;
     }
-    if (auto* decoder = getResponseDecoder()) {
+    if (Http::ResponseDecoder* decoder = getResponseDecoder()) {
       decoder->decodeTrailers(std::move(trailers));
     } else {
-      ENVOY_STREAM_LOG(error, "response_decoder_ is null, dropping trailers.", *this);
+      IS_ENVOY_BUG("Wrapped decoder use after free detected.");
+      RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
+                         "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
+                     "Wrapped decoder use after free detected.");
     }
     MarkTrailersConsumed();
   }
@@ -460,10 +476,13 @@ void EnvoyQuicClientStream::OnMetadataComplete(size_t /*frame_len*/,
     return;
   }
   if (!header_list.empty()) {
-    if (auto* decoder = getResponseDecoder()) {
+    if (Http::ResponseDecoder* decoder = getResponseDecoder()) {
       decoder->decodeMetadata(metadataMapFromHeaderList(header_list));
     } else {
-      ENVOY_STREAM_LOG(error, "response_decoder_ is null, dropping metadata.", *this);
+      IS_ENVOY_BUG("response_decoder_ use after free detected.");
+      RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
+                         "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
+                     "response_decoder_ use after free detected.");
     }
   }
 }
@@ -502,6 +521,19 @@ void EnvoyQuicClientStream::useCapsuleProtocol() {
 
 void EnvoyQuicClientStream::OnInvalidHeaders() {
   onStreamError(absl::nullopt, quic::QUIC_BAD_APPLICATION_PAYLOAD);
+}
+
+Http::ResponseDecoder* EnvoyQuicClientStream::getResponseDecoder() {
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_response_decoder_handle")) {
+    return response_decoder_;
+  }
+  if (response_decoder_handle_) {
+    if (OptRef<Http::ResponseDecoder> decoder = response_decoder_handle_->get();
+        decoder.has_value()) {
+      return &decoder.value().get();
+    }
+  }
+  return nullptr;
 }
 
 } // namespace Quic

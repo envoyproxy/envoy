@@ -3,6 +3,7 @@
 #include "envoy/http/codec.h"
 
 #include "source/common/http/response_decoder_impl_base.h"
+#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Http {
@@ -14,8 +15,13 @@ class ResponseDecoderWrapper : public ResponseDecoderImplBase {
 public:
   // ResponseDecoder
   void decode1xxHeaders(ResponseHeaderMapPtr&& headers) override {
-    if (auto inner = inner_->get(); inner.has_value()) {
-      inner.value().get().decode1xxHeaders(std::move(headers));
+    if (Http::ResponseDecoder* inner = getInnerDecoder()) {
+      inner->decode1xxHeaders(std::move(headers));
+    } else {
+      IS_ENVOY_BUG("Wrapped decoder use after free detected.");
+      RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
+                         "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
+                     "Wrapped decoder use after free detected.");
     }
   }
 
@@ -23,8 +29,13 @@ public:
     if (end_stream) {
       onPreDecodeComplete();
     }
-    if (auto inner = inner_->get(); inner.has_value()) {
-      inner.value().get().decodeHeaders(std::move(headers), end_stream);
+    if (Http::ResponseDecoder* inner = getInnerDecoder()) {
+      inner->decodeHeaders(std::move(headers), end_stream);
+    } else {
+      IS_ENVOY_BUG("Wrapped decoder use after free detected.");
+      RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
+                         "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
+                     "Wrapped decoder use after free detected.");
     }
     if (end_stream) {
       onDecodeComplete();
@@ -35,8 +46,13 @@ public:
     if (end_stream) {
       onPreDecodeComplete();
     }
-    if (auto inner = inner_->get(); inner.has_value()) {
-      inner.value().get().decodeData(data, end_stream);
+    if (Http::ResponseDecoder* inner = getInnerDecoder()) {
+      inner->decodeData(data, end_stream);
+    } else {
+      IS_ENVOY_BUG("Wrapped decoder use after free detected.");
+      RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
+                         "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
+                     "Wrapped decoder use after free detected.");
     }
     if (end_stream) {
       onDecodeComplete();
@@ -45,26 +61,42 @@ public:
 
   void decodeTrailers(ResponseTrailerMapPtr&& trailers) override {
     onPreDecodeComplete();
-    if (auto inner = inner_->get(); inner.has_value()) {
-      inner.value().get().decodeTrailers(std::move(trailers));
+    if (Http::ResponseDecoder* inner = getInnerDecoder()) {
+      inner->decodeTrailers(std::move(trailers));
+    } else {
+      IS_ENVOY_BUG("Wrapped decoder use after free detected.");
+      RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
+                         "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
+                     "Wrapped decoder use after free detected.");
     }
     onDecodeComplete();
   }
 
   void decodeMetadata(MetadataMapPtr&& metadata_map) override {
-    if (auto inner = inner_->get(); inner.has_value()) {
-      inner.value().get().decodeMetadata(std::move(metadata_map));
+    if (Http::ResponseDecoder* inner = getInnerDecoder()) {
+      inner->decodeMetadata(std::move(metadata_map));
+    } else {
+      IS_ENVOY_BUG("Wrapped decoder use after free detected.");
+      RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
+                         "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
+                     "Wrapped decoder use after free detected.");
     }
   }
 
   void dumpState(std::ostream& os, int indent_level) const override {
-    if (auto inner = inner_->get(); inner.has_value()) {
-      inner.value().get().dumpState(os, indent_level);
+    if (Http::ResponseDecoder* inner = getInnerDecoder()) {
+      inner->dumpState(os, indent_level);
+    } else {
+      IS_ENVOY_BUG("Wrapped decoder use after free detected.");
+      RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
+                         "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
+                     "Wrapped decoder use after free detected.");
     }
   }
 
 protected:
-  ResponseDecoderWrapper(ResponseDecoder& inner) : inner_(inner.getResponseDecoderHandle()) {}
+  ResponseDecoderWrapper(ResponseDecoder& inner)
+      : inner_handle_(inner.getResponseDecoderHandle()), inner_(&inner) {}
 
   /**
    * Consumers of the wrapper generally want to know when a decode is complete. This is called
@@ -73,7 +105,21 @@ protected:
   virtual void onPreDecodeComplete() PURE;
   virtual void onDecodeComplete() PURE;
 
-  ResponseDecoderHandlePtr inner_;
+private:
+  Http::ResponseDecoder* getInnerDecoder() const {
+    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_response_decoder_handle")) {
+      return inner_;
+    }
+    if (inner_handle_) {
+      if (OptRef<ResponseDecoder> inner = inner_handle_->get(); inner.has_value()) {
+        return &inner.value().get();
+      }
+    }
+    return nullptr;
+  }
+
+  ResponseDecoderHandlePtr inner_handle_;
+  Http::ResponseDecoder* inner_ = nullptr;
 };
 
 /**
