@@ -108,9 +108,9 @@ protected:
         std::make_shared<ThreadLocalBucketsCache>(std::make_shared<BucketsCache>());
     buckets_tls_->set([initial_tl_buckets_cache](Unused) { return initial_tl_buckets_cache; });
 
-    mock_stream_client->expectClientCreation();
+    mock_stream_client->expectClientCreationWithFactory();
     global_client_ = std::make_unique<GlobalRateLimitClientImpl>(
-        mock_stream_client->config_with_hash_key_, mock_stream_client->context_, mock_domain_,
+        mock_stream_client->grpc_service_, mock_stream_client->context_, mock_domain_,
         reporting_interval_, *buckets_tls_, *mock_stream_client->dispatcher_);
     // Set callbacks to handle asynchronous timing.
     auto callbacks = std::make_unique<GlobalClientCallbacks>();
@@ -118,6 +118,11 @@ protected:
     global_client_->setCallbacks(std::move(callbacks));
 
     unordered_differencer_.set_repeated_field_comparison(MessageDifferencer::AS_SET);
+  }
+
+  void TearDown() override {
+    // Normally called by TlsStore destructor as part of filter factory cb deletion.
+    mock_stream_client->dispatcher_->deferredDelete(std::move(global_client_));
   }
 
   std::unique_ptr<RateLimitTestClient> mock_stream_client = nullptr;

@@ -67,7 +67,7 @@ public:
 
   // Get an existing TLS store by index, or create one if not found.
   static std::shared_ptr<TlsStore>
-  getTlsStore(Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+  getTlsStore(const envoy::config::core::v3::GrpcService& rlqs_service,
               Server::Configuration::FactoryContext& context, absl::string_view target_address,
               absl::string_view domain);
 

@@ -1,12 +1,35 @@
 #pragma once
 
+#include "envoy/event/dispatcher.h"
+
+#include "test/integration/fake_upstream.h"
+
 #include "absl/strings/string_view.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 namespace {
+
+// Used for integration testing, not for mocks.
+class IntegrationTestHelpers {
+public:
+  // This handles clients that immediately fail their first connection attempt.
+  static void WaitForRlqsStream(Event::Dispatcher& dispatcher, FakeUpstream& upstream,
+                                FakeHttpConnectionPtr& connection, FakeStreamPtr& stream) {
+    while (true) {
+      ASSERT_TRUE(upstream.waitForHttpConnection(dispatcher, connection));
+      auto result =
+          connection->waitForNewStream(dispatcher, stream, std::chrono::milliseconds(1000));
+      if (result) {
+        return;
+      }
+      ASSERT_FALSE(upstream.assertPendingConnectionsEmpty());
+    }
+  }
+};
 
 inline constexpr absl::string_view ValidMatcherConfig = R"EOF(
   matcher_list:

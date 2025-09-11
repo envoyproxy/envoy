@@ -97,6 +97,10 @@ envoy_extension_cc_test_library(
     hdrs = ["test_utils.h"],
     extension_names = ["envoy.filters.http.rate_limit_quota"],
     tags = ["skip_on_windows"],
+    deps = [
+        "//envoy/event:dispatcher_interface",
+        "//test/integration:fake_upstream_lib",
+    ],
 )
 
 envoy_extension_cc_test(

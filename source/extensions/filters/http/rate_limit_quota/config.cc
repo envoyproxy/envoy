@@ -51,26 +51,31 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
   }
 
   // Get the rlqs_server destination from the cluster manager.
-  absl::StatusOr<Grpc::RawAsyncClientSharedPtr> rlqs_stream_client =
+  absl::StatusOr<Grpc::AsyncClientFactoryPtr> rlqs_stream_client_factory =
       context.serverFactoryContext()
           .clusterManager()
           .grpcAsyncClientManager()
-          .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true);
+          .factoryForGrpcService(config->rlqs_server(), context.scope(), true);
+  if (!rlqs_stream_client_factory.ok()) {
+    throw EnvoyException(std::string(rlqs_stream_client_factory.status().message()));
+  }
+  absl::StatusOr<Grpc::RawAsyncClientPtr> rlqs_stream_client =
+      (*rlqs_stream_client_factory)->createUncachedRawAsyncClient();
   if (!rlqs_stream_client.ok()) {
     throw EnvoyException(std::string(rlqs_stream_client.status().message()));
   }
 
   // Get the TLS store from the global map, or create one if it doesn't exist.
   std::shared_ptr<TlsStore> tls_store = GlobalTlsStores::getTlsStore(
-      config_with_hash_key, context, (*rlqs_stream_client)->destination(), filter_config.domain());
+      config->rlqs_server(), context, (*rlqs_stream_client)->destination(), filter_config.domain());
 
-  return [&, config = std::move(config), config_with_hash_key, tls_store = std::move(tls_store),
+  return [&, config = std::move(config), tls_store = std::move(tls_store),
           matcher = std::move(matcher)](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     std::unique_ptr<RateLimitClient> local_client =
         createLocalRateLimitClient(tls_store->global_client.get(), tls_store->buckets_tls);
 
-    callbacks.addStreamFilter(std::make_shared<RateLimitQuotaFilter>(
-        config, context, std::move(local_client), config_with_hash_key, matcher));
+    callbacks.addStreamFilter(
+        std::make_shared<RateLimitQuotaFilter>(config, context, std::move(local_client), matcher));
   };
 }
 

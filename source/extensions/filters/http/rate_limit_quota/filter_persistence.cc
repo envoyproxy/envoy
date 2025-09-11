@@ -24,7 +24,7 @@ using TlsStore = GlobalTlsStores::TlsStore;
 
 // Helper to initialize a new TLS store based on a rate_limit_quota config's
 // settings.
-std::shared_ptr<TlsStore> initTlsStore(Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+std::shared_ptr<TlsStore> initTlsStore(const envoy::config::core::v3::GrpcService& rlqs_service,
                                        Server::Configuration::FactoryContext& context,
                                        absl::string_view target_address, absl::string_view domain) {
   // Quota bucket & global client TLS objects are created with the config and
@@ -46,7 +46,7 @@ std::shared_ptr<TlsStore> initTlsStore(Grpc::GrpcServiceConfigWithHashKey& confi
   // Create the global client resource to be shared via TLS to all worker
   // threads (accessed through a filter-specific LocalRateLimitClient).
   std::unique_ptr<GlobalRateLimitClientImpl> tl_global_client = createGlobalRateLimitClientImpl(
-      context, domain, reporting_interval, tls_store->buckets_tls, config_with_hash_key);
+      context, domain, reporting_interval, tls_store->buckets_tls, rlqs_service);
   tls_store->global_client = std::move(tl_global_client);
 
   return tls_store;
@@ -55,7 +55,7 @@ std::shared_ptr<TlsStore> initTlsStore(Grpc::GrpcServiceConfigWithHashKey& confi
 // References a statically shared map. This is not thread-safe so it should
 // only be called during RLQS filter factory creation on the main thread.
 std::shared_ptr<TlsStore>
-GlobalTlsStores::getTlsStore(Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+GlobalTlsStores::getTlsStore(const envoy::config::core::v3::GrpcService& rlqs_service,
                              Server::Configuration::FactoryContext& context,
                              absl::string_view target_address, absl::string_view domain) {
   TlsStoreIndex index = std::make_pair(std::string(target_address), std::string(domain));
@@ -69,7 +69,7 @@ GlobalTlsStores::getTlsStore(Grpc::GrpcServiceConfigWithHashKey& config_with_has
   ENVOY_LOG(debug, "Creating a new cache & RLQS client for target ({}) and domain ({}).",
             index.first, index.second);
   std::shared_ptr<TlsStore> tls_store =
-      initTlsStore(config_with_hash_key, context, index.first, index.second);
+      initTlsStore(rlqs_service, context, index.first, index.second);
   // Save weak_ptr as an unowned reference.
   stores()[index] = tls_store;
   return tls_store;
