@@ -44,8 +44,11 @@ HttpPerRequestTapperPtr HttpTapConfigImpl::createPerRequestTapper(
 
 void HttpPerRequestTapperImpl::streamRequestHeaders() {
   TapCommon::TraceWrapperPtr trace = makeTraceSegment();
-  request_headers_->iterate(fillHeaderList(
-      trace->mutable_http_streamed_trace_segment()->mutable_request_headers()->mutable_headers()));
+  if (request_headers_ != nullptr) {
+    request_headers_->iterate(fillHeaderList(trace->mutable_http_streamed_trace_segment()
+                                                 ->mutable_request_headers()
+                                                 ->mutable_headers()));
+  }
   sink_handle_->submitTrace(std::move(trace));
 }
 
