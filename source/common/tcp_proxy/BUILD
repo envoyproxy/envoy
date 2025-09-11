@@ -34,7 +34,6 @@ envoy_cc_library(
         "//source/common/router:header_parser_lib",
         "//source/common/router:router_lib",
         "//source/common/router:shadow_writer_lib",
-        "//source/common/router:string_accessor_lib",
     ],
 )
 

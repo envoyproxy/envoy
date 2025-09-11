@@ -159,8 +159,6 @@ private:
   const Http::ResponseTrailerMapPtr response_trailers_;
 };
 
-// Returns the filter state key under which the generated tunnel request ID is stored.
-const std::string& TunnelRequestIdKey();
 class Config;
 class TunnelingConfigHelperImpl : public TunnelingConfigHelper,
                                   protected Logger::Loggable<Logger::Id::filter> {

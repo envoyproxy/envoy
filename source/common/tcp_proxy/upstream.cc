@@ -10,7 +10,6 @@
 #include "source/common/http/null_route_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/router/string_accessor_impl.h"
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
@@ -18,6 +17,29 @@ namespace TcpProxy {
 
 using TunnelingConfig =
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
+
+// Constants for tunnel request ID metadata.
+constexpr absl::string_view TunnelRequestIdMetadataNamespace = "envoy.filters.network.tcp_proxy";
+constexpr absl::string_view TunnelRequestIdMetadataKey = "tunnel_request_id";
+
+// Helper function to generate and store request ID in dynamic metadata.
+void generateAndStoreRequestId(const TunnelingConfigHelper& config, Http::RequestHeaderMap& headers,
+                               StreamInfo::StreamInfo& downstream_info) {
+  if (config.requestIDExtension() != nullptr) {
+    // For tunneling requests there is no way to get the external request ID as the incoming
+    // traffic could be anything - HTTPS, MySQL, Postgres, etc.
+    config.requestIDExtension()->set(headers, /*edge_request=*/true,
+                                     /*keep_external_id=*/false);
+    // Also store the request ID in dynamic metadata to allow TCP access logs to format it.
+    const auto rid = headers.getRequestIdValue();
+    if (!rid.empty()) {
+      Protobuf::Struct md;
+      auto& fields = *md.mutable_fields();
+      fields[TunnelRequestIdMetadataKey].mutable_string_value()->assign(rid.data(), rid.size());
+      downstream_info.setDynamicMetadata(std::string(TunnelRequestIdMetadataNamespace), md);
+    }
+  }
+}
 
 TcpUpstream::TcpUpstream(Tcp::ConnectionPool::ConnectionDataPtr&& data,
                          Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks)
@@ -124,20 +146,7 @@ void HttpUpstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool
 
   // Optionally generate a request ID before evaluating configured headers so
   // it is available to header formatters.
-  if (config_.requestIDExtension() != nullptr) {
-    // For tunneling requests there is no way to get the external request ID as the incoming
-    // traffic could be anything - HTTPS, MySQL, Postgres, etc.
-    config_.requestIDExtension()->set(*headers, /*edge_request=*/true,
-                                      /*keep_external_id=*/false);
-    // Also store the request ID in dynamic metadata to allow TCP access logs to format it.
-    const auto rid = headers->getRequestIdValue();
-    if (!rid.empty()) {
-      Protobuf::Struct md;
-      auto& fields = *md.mutable_fields();
-      fields["tunnel_request_id"].mutable_string_value()->assign(rid.data(), rid.size());
-      downstream_info_.setDynamicMetadata("envoy.filters.network.tcp_proxy", md);
-    }
-  }
+  generateAndStoreRequestId(config_, *headers, downstream_info_);
 
   config_.headerEvaluator().evaluateHeaders(*headers, {downstream_info_.getRequestHeaders()},
                                             downstream_info_);
@@ -441,18 +450,7 @@ CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
     downstream_headers_->addReference(Http::Headers::get().Path, config_.postPath());
   }
 
-  if (config_.requestIDExtension() != nullptr) {
-    config_.requestIDExtension()->set(*downstream_headers_, /*edge_request=*/true,
-                                      /*keep_external_id=*/false);
-    const auto rid = downstream_headers_->getRequestIdValue();
-    if (!rid.empty()) {
-      Protobuf::Struct md;
-      auto& fields = *md.mutable_fields();
-      // Avoid extra temporaries by writing directly into the protobuf string value.
-      fields["tunnel_request_id"].mutable_string_value()->assign(rid.data(), rid.size());
-      downstream_info_.setDynamicMetadata("envoy.filters.network.tcp_proxy", md);
-    }
-  }
+  generateAndStoreRequestId(config_, *downstream_headers_, downstream_info_);
 
   config_.headerEvaluator().evaluateHeaders(
       *downstream_headers_, {downstream_info_.getRequestHeaders()}, downstream_info_);

@@ -753,10 +753,6 @@ const std::string& TunnelResponseTrailers::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.propagate_response_trailers");
 }
 
-const std::string& TunnelRequestIdKey() {
-  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.tunnel_request_id");
-}
-
 TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
     Stats::Scope& stats_scope,
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config_message,
