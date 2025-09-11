@@ -129,7 +129,7 @@ message TcpProxy {
     // ``tunnel_request_id`` to allow emission from TCP proxy access logs via the
     // ``%DYNAMIC_METADATA(envoy.filters.network.tcp_proxy:tunnel_request_id)%`` formatter.
     // [#extension-category: envoy.request_id]
-    http_connection_manager.v3.RequestIDExtension request_id_extension = 8;
+    http_connection_manager.v3.RequestIDExtension request_id_extension = 7;
   }
 
   message OnDemand {
