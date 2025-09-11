@@ -634,8 +634,6 @@ def _com_google_googletest():
 def _com_google_absl():
     external_http_archive(
         name = "com_google_absl",
-        patches = ["@envoy//bazel:abseil.patch"],
-        patch_args = ["-p1"],
         repo_mapping = {"@googletest": "@com_google_googletest"},
     )
 
