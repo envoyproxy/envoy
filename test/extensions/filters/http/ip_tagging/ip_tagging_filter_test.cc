@@ -965,10 +965,10 @@ ip_tags:
   // Handle the events if any.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_, "prefix.ip_tagging.ip_tags_reload_success", 1UL,
-                                            time_system_));
+  EXPECT_TRUE(
+      TestUtility::waitForCounterEq(stats_, "ip_tagging_reload.reload_success", 1UL, time_system_));
 
-  EXPECT_EQ(stats_.counterFromString("prefix.ip_tagging.ip_tags_reload_error").value(), 0);
+  EXPECT_EQ(stats_.counterFromString("ip_tagging_reload.reload_error").value(), 0);
 
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
@@ -1065,8 +1065,8 @@ ip_tags
   time_system_.advanceTimeAsyncImpl(std::chrono::seconds(6));
   // Handle the events if any.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
-  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_, "prefix.ip_tagging.ip_tags_reload_error", 1UL,
-                                            time_system_));
+  EXPECT_TRUE(
+      TestUtility::waitForCounterEq(stats_, "ip_tagging_reload.reload_error", 1UL, time_system_));
 
   filter_callbacks_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       remote_address);
@@ -1182,8 +1182,8 @@ ip_tags:
   // Handle the events if any.
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  EXPECT_TRUE(TestUtility::waitForCounterEq(stats_, "prefix.ip_tagging.ip_tags_reload_success", 1UL,
-                                            time_system_));
+  EXPECT_TRUE(
+      TestUtility::waitForCounterEq(stats_, "ip_tagging_reload.reload_success", 1UL, time_system_));
 
   IpTaggingFilterPeer::synchronizer(filter_).signal(sync_point_name);
   t0.join();

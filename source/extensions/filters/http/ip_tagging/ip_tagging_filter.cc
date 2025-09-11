@@ -15,21 +15,25 @@ namespace HttpFilters {
 namespace IpTagging {
 
 IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tags_datasource,
-                               IpTagsLoader& tags_loader, uint64_t ip_tags_refresh_interval_ms,
-                               IpTagsReloadSuccessCb reload_success_cb,
-                               IpTagsReloadErrorCb reload_error_cb,
+                               uint64_t ip_tags_refresh_interval_ms,
                                Event::Dispatcher& main_dispatcher, Api::Api& api,
-                               ThreadLocal::SlotAllocator& tls, Singleton::InstanceSharedPtr owner,
-                               absl::Status& creation_status)
-    : ip_tags_path_(ip_tags_datasource.filename()), tags_loader_(tags_loader),
+                               ProtobufMessage::ValidationVisitor& validation_visitor,
+                               ThreadLocal::SlotAllocator& tls, Stats::Scope& scope,
+                               Singleton::InstanceSharedPtr owner, absl::Status& creation_status)
+    : ip_tags_path_(ip_tags_datasource.filename()), scope_(scope.createScope("ip_tagging_reload.")),
+      stat_name_set_(scope.symbolTable().makeSet("IpTaggingReload")),
+      stats_prefix_(stat_name_set_->add("ip_tagging_reload")),
+      unknown_tag_(stat_name_set_->add("unknown_tag.hit")), tags_loader_(api, validation_visitor),
       time_source_(api.timeSource()),
       ip_tags_refresh_interval_ms_(std::chrono::milliseconds(ip_tags_refresh_interval_ms)),
       needs_refresh_(ip_tags_refresh_interval_ms_ > std::chrono::milliseconds(0) &&
                              ip_tags_datasource.has_watched_directory()
                          ? true
                          : false),
-      reload_success_cb_(reload_success_cb), reload_error_cb_(reload_error_cb), owner_(owner) {
+      owner_(owner) {
   RETURN_ONLY_IF_NOT_OK_REF(creation_status);
+  stat_name_set_->rememberBuiltin("reload_success");
+  stat_name_set_->rememberBuiltin("reload_error");
   if (ip_tags_datasource.filename().empty()) {
     creation_status = absl::InvalidArgumentError("Cannot load tags from empty file path.");
     return;
@@ -44,18 +48,23 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
     auto new_tags_or_error = tags_loader_.refreshTags();
     if (new_tags_or_error.status().ok()) {
       updateIpTags(new_tags_or_error.value());
-      reload_success_cb_();
+      incIpTagsReloadSuccess();
     } else {
       ENVOY_LOG(debug, "Failed to reload ip tags, using old data: {}",
                 new_tags_or_error.status().message());
-      reload_error_cb_();
+      incIpTagsReloadError();
     }
     ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
   });
   ip_tags_reload_timer_->enableTimer(ip_tags_refresh_interval_ms_);
 }
 
-IpTagsProvider::~IpTagsProvider() { ENVOY_LOG(debug, "Shutting down ip tags provider"); };
+IpTagsProvider::~IpTagsProvider() {
+  if (ip_tags_reload_timer_) {
+    ip_tags_reload_timer_->disableTimer();
+  }
+  ENVOY_LOG(debug, "Shutting down ip tags provider");
+};
 
 LcTrieSharedPtr IpTagsProvider::ipTags() ABSL_LOCKS_EXCLUDED(ip_tags_mutex_) {
   absl::ReaderMutexLock lock(&ip_tags_mutex_);
@@ -67,11 +76,17 @@ void IpTagsProvider::updateIpTags(LcTrieSharedPtr new_tags) ABSL_LOCKS_EXCLUDED(
   tags_ = new_tags;
 }
 
+void IpTagsProvider::incCounter(Stats::StatName name) {
+  Stats::SymbolTable::StoragePtr storage = scope_->symbolTable().join({name});
+  scope_->counterFromStatName(Stats::StatName(storage.get())).inc();
+}
+
 absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCreateProvider(
-    const envoy::config::core::v3::DataSource& ip_tags_datasource, IpTagsLoader& tags_loader,
-    uint64_t ip_tags_refresh_interval_ms, IpTagsReloadSuccessCb reload_success_cb,
-    IpTagsReloadErrorCb reload_error_cb, Api::Api& api, ThreadLocal::SlotAllocator& tls,
-    Event::Dispatcher& main_dispatcher, std::shared_ptr<IpTagsRegistrySingleton> singleton) {
+    const envoy::config::core::v3::DataSource& ip_tags_datasource,
+    uint64_t ip_tags_refresh_interval_ms, Api::Api& api,
+    ProtobufMessage::ValidationVisitor& validation_visitor, ThreadLocal::SlotAllocator& tls,
+    Event::Dispatcher& main_dispatcher, Stats::Scope& scope,
+    std::shared_ptr<IpTagsRegistrySingleton> singleton) {
   std::shared_ptr<IpTagsProvider> ip_tags_provider;
   absl::Status creation_status = absl::OkStatus();
   const uint64_t key = std::hash<std::string>()(ip_tags_datasource.filename());
@@ -82,14 +97,14 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
       ip_tags_provider = provider;
     } else {
       ip_tags_provider = std::make_shared<IpTagsProvider>(
-          ip_tags_datasource, tags_loader, ip_tags_refresh_interval_ms, reload_success_cb,
-          reload_error_cb, main_dispatcher, api, tls, singleton, creation_status);
+          ip_tags_datasource, ip_tags_refresh_interval_ms, main_dispatcher, api, validation_visitor,
+          tls, scope, singleton, creation_status);
       ip_tags_registry_[key] = ip_tags_provider;
     }
   } else {
     ip_tags_provider = std::make_shared<IpTagsProvider>(
-        ip_tags_datasource, tags_loader, ip_tags_refresh_interval_ms, reload_success_cb,
-        reload_error_cb, main_dispatcher, api, tls, singleton, creation_status);
+        ip_tags_datasource, ip_tags_refresh_interval_ms, main_dispatcher, api, validation_visitor,
+        tls, scope, singleton, creation_status);
     ip_tags_registry_[key] = ip_tags_provider;
   }
   if (!creation_status.ok()) {
@@ -98,9 +113,8 @@ absl::StatusOr<std::shared_ptr<IpTagsProvider>> IpTagsRegistrySingleton::getOrCr
   return ip_tags_provider;
 }
 
-IpTagsLoader::IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor,
-                           Stats::StatNameSetPtr& stat_name_set)
-    : api_(api), validation_visitor_(validation_visitor), stat_name_set_(stat_name_set) {}
+IpTagsLoader::IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor)
+    : api_(api), validation_visitor_(validation_visitor) {}
 
 absl::StatusOr<LcTrieSharedPtr>
 IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_datasource,
@@ -169,7 +183,6 @@ absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::parseIpTagsAsProto(
       }
     }
     tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
-    stat_name_set_->rememberBuiltin(absl::StrCat(ip_tag.ip_tag_name(), ".hit"));
   }
   return std::make_shared<Network::LcTrie::LcTrie<std::string>>(tag_data);
 }
@@ -207,13 +220,8 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
       ip_tags_registry_(singleton_manager.getTyped<IpTagsRegistrySingleton>(
           SINGLETON_MANAGER_REGISTERED_NAME(ip_tags_registry),
           [] { return std::make_shared<IpTagsRegistrySingleton>(); })),
-      tags_loader_(api, validation_visitor, stat_name_set_) {
+      tags_loader_(api, validation_visitor) {
 
-  // Once loading IP tags from a file system is supported, the restriction on the size
-  // of the set should be removed and observability into what tags are loaded needs
-  // to be implemented.
-  // TODO(ccaraman): Remove size check once file system support is implemented.
-  // Work is tracked by issue https://github.com/envoyproxy/envoy/issues/2695.
   if (config.ip_tags().empty() && !config.has_ip_tags_file_provider()) {
     creation_status = absl::InvalidArgumentError(
         "HTTP IP Tagging Filter requires either ip_tags or ip_tags_file_provider to be specified.");
@@ -239,14 +247,11 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
           "ip_tags_file_provider requires a valid ip_tags_datasource to be configured.");
       return;
     }
-    stat_name_set_->rememberBuiltin("ip_tags_reload_success");
-    stat_name_set_->rememberBuiltin("ip_tags_reload_error");
     auto ip_tags_refresh_interval_ms =
         PROTOBUF_GET_MS_OR_DEFAULT(config.ip_tags_file_provider(), ip_tags_refresh_rate, 0);
     auto provider_or_error = ip_tags_registry_->getOrCreateProvider(
-        config.ip_tags_file_provider().ip_tags_datasource(), tags_loader_,
-        ip_tags_refresh_interval_ms, [this]() { incIpTagsReloadSuccess(); },
-        [this]() { incIpTagsReloadError(); }, api, tls, dispatcher, ip_tags_registry_);
+        config.ip_tags_file_provider().ip_tags_datasource(), ip_tags_refresh_interval_ms, api,
+        validation_visitor, tls, dispatcher, scope, ip_tags_registry_);
     if (provider_or_error.status().ok()) {
       provider_ = provider_or_error.value();
     } else {

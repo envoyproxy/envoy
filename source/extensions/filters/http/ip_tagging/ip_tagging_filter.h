@@ -34,8 +34,7 @@ using LcTrieSharedPtr = std::shared_ptr<Network::LcTrie::LcTrie<std::string>>;
  */
 class IpTagsLoader : public Logger::Loggable<Logger::Id::ip_tagging> {
 public:
-  IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor,
-               Stats::StatNameSetPtr& stat_name_set);
+  IpTagsLoader(Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor);
 
   /**
    * Loads file based ip tags from a data source and parses them into a trie structure.
@@ -71,7 +70,6 @@ private:
   Envoy::Config::DataSource::DataSourceProviderPtr data_source_provider_;
   std::string ip_tags_path_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
-  Stats::StatNameSetPtr& stat_name_set_;
 };
 
 using IpTagsReloadSuccessCb = std::function<void()>;
@@ -84,9 +82,9 @@ using IpTagsReloadErrorCb = std::function<void()>;
 class IpTagsProvider : public Logger::Loggable<Logger::Id::ip_tagging> {
 public:
   IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tags_datasource,
-                 IpTagsLoader& tags_loader, uint64_t ip_tags_refresh_interval_ms,
-                 IpTagsReloadSuccessCb reload_success_cb, IpTagsReloadErrorCb reload_error_cb,
-                 Event::Dispatcher& main_dispatcher, Api::Api& api, ThreadLocal::SlotAllocator& tls,
+                 uint64_t ip_tags_refresh_interval_ms, Event::Dispatcher& main_dispatcher,
+                 Api::Api& api, ProtobufMessage::ValidationVisitor& validation_visitor,
+                 ThreadLocal::SlotAllocator& tls, Stats::Scope& scope,
                  Singleton::InstanceSharedPtr owner, absl::Status& creation_status);
 
   ~IpTagsProvider();
@@ -98,15 +96,26 @@ public:
    */
   LcTrieSharedPtr ipTags() ABSL_LOCKS_EXCLUDED(ip_tags_mutex_);
 
+  void incIpTagsReloadSuccess() {
+    incCounter(stat_name_set_->getBuiltin("reload_success", unknown_tag_));
+  }
+  void incIpTagsReloadError() {
+    incCounter(stat_name_set_->getBuiltin("reload_error", unknown_tag_));
+  }
+
 private:
+  void incCounter(Stats::StatName name);
+
   const std::string ip_tags_path_;
-  IpTagsLoader& tags_loader_;
+  Stats::ScopeSharedPtr scope_;
+  Stats::StatNameSetPtr stat_name_set_;
+  const Stats::StatName stats_prefix_;
+  const Stats::StatName unknown_tag_;
+  IpTagsLoader tags_loader_;
   TimeSource& time_source_;
   MonotonicTime last_reloaded_time_;
   const std::chrono::milliseconds ip_tags_refresh_interval_ms_;
   const bool needs_refresh_;
-  IpTagsReloadSuccessCb reload_success_cb_;
-  IpTagsReloadErrorCb reload_error_cb_;
   mutable absl::Mutex ip_tags_mutex_;
   LcTrieSharedPtr tags_ ABSL_GUARDED_BY(ip_tags_mutex_);
   Event::TimerPtr ip_tags_reload_timer_;
@@ -127,11 +136,12 @@ class IpTagsRegistrySingleton : public Envoy::Singleton::Instance {
 public:
   IpTagsRegistrySingleton() {}
 
-  absl::StatusOr<std::shared_ptr<IpTagsProvider>> getOrCreateProvider(
-      const envoy::config::core::v3::DataSource& ip_tags_datasource, IpTagsLoader& tags_loader,
-      uint64_t ip_tags_refresh_interval_ms, IpTagsReloadSuccessCb reload_success_cb,
-      IpTagsReloadErrorCb reload_error_cb, Api::Api& api, ThreadLocal::SlotAllocator& tls,
-      Event::Dispatcher& main_dispatcher, std::shared_ptr<IpTagsRegistrySingleton> singleton);
+  absl::StatusOr<std::shared_ptr<IpTagsProvider>>
+  getOrCreateProvider(const envoy::config::core::v3::DataSource& ip_tags_datasource,
+                      uint64_t ip_tags_refresh_interval_ms, Api::Api& api,
+                      ProtobufMessage::ValidationVisitor& validation_visitor,
+                      ThreadLocal::SlotAllocator& tls, Event::Dispatcher& main_dispatcher,
+                      Stats::Scope& scope, std::shared_ptr<IpTagsRegistrySingleton> singleton);
 
 private:
   absl::Mutex mu_;
@@ -180,14 +190,12 @@ public:
   HeaderAction ipTagHeaderAction() const { return ip_tag_header_action_; }
 
   void incHit(absl::string_view tag) {
+    const Stats::StatName tag_counter =
+        stat_name_set_->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_);
+    if (tag_counter == unknown_tag_) {
+      stat_name_set_->rememberBuiltin(absl::StrCat(tag, ".hit"));
+    }
     incCounter(stat_name_set_->getBuiltin(absl::StrCat(tag, ".hit"), unknown_tag_));
-  }
-
-  void incIpTagsReloadSuccess() {
-    incCounter(stat_name_set_->getBuiltin("ip_tags_reload_success", unknown_tag_));
-  }
-  void incIpTagsReloadError() {
-    incCounter(stat_name_set_->getBuiltin("ip_tags_reload_error", unknown_tag_));
   }
 
   void incNoHit() { incCounter(no_hit_); }
