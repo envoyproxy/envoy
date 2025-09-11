@@ -121,7 +121,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 
 ConnectionImpl::~ConnectionImpl() {
   ASSERT(!socket_->isOpen() && delayed_close_timer_ == nullptr,
-         "ConnectionImpl destroyed with open socket and/or active timer.");
+         "ConnectionImpl destroyed with open socket and/or active timer");
 
   // In general we assume that owning code has called close() previously to the destructor being
   // run. This generally must be done so that callbacks run in the correct context (vs. deferred
