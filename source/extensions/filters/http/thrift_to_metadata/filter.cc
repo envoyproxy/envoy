@@ -11,7 +11,8 @@ namespace Extensions {
 namespace HttpFilters {
 namespace ThriftToMetadata {
 
-Rule::Rule(const ProtoRule& rule) : rule_(rule) {
+Rule::Rule(const ProtoRule& rule, uint16_t rule_id, PayloadExtractor::TrieSharedPtr root)
+    : rule_(rule), rule_id_(rule_id) {
   if (!rule_.has_on_present() && !rule_.has_on_missing()) {
     throw EnvoyException("thrift to metadata filter: neither `on_present` nor `on_missing` set");
   }
@@ -22,10 +23,24 @@ Rule::Rule(const ProtoRule& rule) : rule_(rule) {
   }
 
   if (rule_.has_field_selector()) {
-    std::cout << "XXX FieldSelector is not yet supported in thrift_to_metadata filter" << std::endl;
+    root->insert<envoy::extensions::filters::http::thrift_to_metadata::v3::FieldSelector>(
+        &rule_.field_selector(), rule_id);
   } else {
     protobuf_value_extracter_ = getValueExtractorFromField(rule_.field());
   }
+}
+
+bool Rule::matches(const MessageMetadata& metadata) const {
+  if (method_name_.empty()) {
+    return true;
+  }
+
+  const std::string& metadata_method_name = metadata.hasMethodName() ? metadata.methodName() : "";
+  const auto func_pos = metadata_method_name.find(':');
+  if (func_pos != std::string::npos) {
+    return metadata_method_name.substr(func_pos + 1) == method_name_;
+  }
+  return metadata_method_name == method_name_;
 }
 
 ThriftMetadataToProtobufValue Rule::getValueExtractorFromField(
@@ -106,6 +121,7 @@ FilterConfig::FilterConfig(
           POOL_COUNTER_PREFIX(scope, "thrift_to_metadata.rq"))},
       respstats_{ALL_THRIFT_TO_METADATA_FILTER_STATS(
           POOL_COUNTER_PREFIX(scope, "thrift_to_metadata.resp"))},
+      trie_root_(std::make_shared<PayloadExtractor::Trie>()),
       request_rules_(generateRules(proto_config.request_rules())),
       response_rules_(generateRules(proto_config.response_rules())),
       transport_(ProtoUtils::getTransportType(proto_config.transport())),
@@ -279,12 +295,59 @@ FilterStatus Filter::messageBegin(MessageMetadataSharedPtr metadata) {
     processMetadata(metadata, config_->requestRules(), rq_handler_, *decoder_callbacks_,
                     config_->rqstats(), request_processing_finished_);
   } else {
+    matched_field_selector_rule_ids_.clear();
     processMetadata(metadata, config_->responseRules(), resp_handler_, *encoder_callbacks_,
                     config_->respstats(), response_processing_finished_);
   }
+  return matched_field_selector_rule_ids_.empty() ? FilterStatus::StopIteration
+                                                  : FilterStatus::Continue;
+}
 
-  // We don't need to process the rest of the message.
+FilterStatus Filter::passthroughData(Buffer::Instance& data) {
+  UNREFERENCED_PARAMETER(data);
   return FilterStatus::StopIteration;
+}
+
+void Filter::handleOnPresent(std::string&& value, const std::vector<uint16_t>& rule_ids) {
+  UNREFERENCED_PARAMETER(value);
+  UNREFERENCED_PARAMETER(rule_ids);
+  // for (uint16_t rule_id : rule_ids) {
+  //   if (matched_field_selector_rule_ids_.find(rule_id) == matched_field_selector_rule_ids_.end())
+  //   {
+  //     ENVOY_LOG(trace, "rule_id {} is not matched.", rule_id);
+  //     continue;
+  //   }
+  //   ENVOY_LOG(trace, "handleOnPresent rule_id {}", rule_id);
+
+  //   matched_field_selector_rule_ids_.erase(rule_id);
+  //   ASSERT(rule_id < config_->requestRules().size());
+  //   const Rule& rule = config_->requestRules()[rule_id];
+  //   if (!value.empty() && rule.rule().has_on_present()) {
+  //     // We can *not* always std::move(value) here since we need `value` if multiple rules are
+  //     // matched. Optimize the most common usage, which is one rule per payload field.
+  //     if (rule_ids.size() == 1) {
+  //       applyKeyValue(std::move(value), rule, rule.rule().on_present());
+  //       break;
+  //     } else {
+  //       applyKeyValue(value, rule, rule.rule().on_present());
+  //     }
+  //   }
+  // }
+}
+
+void Filter::handleOnMissing() {
+  // ENVOY_LOG(trace, "{} rules missing", matched_field_selector_rule_ids_.size());
+
+  // for (uint16_t rule_id : matched_field_selector_rule_ids_) {
+  //   ENVOY_LOG(trace, "handling on_missing rule_id {}", rule_id);
+
+  //   ASSERT(rule_id < config_->requestRules().size());
+  //   const Rule& rule = config_->requestRules()[rule_id];
+  //   if (!rule.rule().has_on_missing()) {
+  //     continue;
+  //   }
+  //   applyKeyValue("", rule, rule.rule().on_missing());
+  // }
 }
 
 void Filter::processMetadata(MessageMetadataSharedPtr metadata, const Rules& rules,
@@ -293,6 +356,13 @@ void Filter::processMetadata(MessageMetadataSharedPtr metadata, const Rules& rul
                              ThriftToMetadataStats& stats, bool& processing_finished_flag) {
   StructMap struct_map;
   for (const auto& rule : rules) {
+    if (!rule.shouldExtractMetadata()) {
+      if (rule.matches(*metadata)) {
+        ENVOY_LOG(trace, "rule_id {} is matched", rule.ruleId());
+        matched_field_selector_rule_ids_.insert(rule.ruleId());
+      }
+      continue;
+    }
     absl::optional<Protobuf::Value> val_opt = rule.extractValue(metadata, *handler);
 
     if (val_opt.has_value()) {
@@ -300,6 +370,10 @@ void Filter::processMetadata(MessageMetadataSharedPtr metadata, const Rules& rul
     } else {
       handleOnMissing(rule, struct_map);
     }
+  }
+  if (!matched_field_selector_rule_ids_.empty()) {
+    // Continue to extract thrift payload.
+    return;
   }
   stats.success_.inc();
   finalizeDynamicMetadata(filter_callback, struct_map, processing_finished_flag);

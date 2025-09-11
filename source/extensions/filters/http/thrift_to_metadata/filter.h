@@ -17,6 +17,7 @@
 #include "source/extensions/filters/network/thrift_proxy/binary_protocol_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/compact_protocol_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/decoder.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata/payload_extractor.h"
 #include "source/extensions/filters/network/thrift_proxy/framed_transport_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/header_transport_impl.h"
 #include "source/extensions/filters/network/thrift_proxy/passthrough_decoder_event_handler.h"
@@ -56,8 +57,13 @@ using ThriftMetadataToProtobufValue = std::function<absl::optional<Protobuf::Val
 
 class Rule {
 public:
-  Rule(const ProtoRule& rule);
+  Rule(const ProtoRule& rule, uint16_t rule_id, PayloadExtractor::TrieSharedPtr root);
+
   const ProtoRule& rule() const { return rule_; }
+  uint16_t ruleId() const { return rule_id_; }
+  bool matches(const MessageMetadata& metadata) const;
+
+  bool shouldExtractMetadata() const { return static_cast<bool>(protobuf_value_extracter_); }
   absl::optional<Protobuf::Value> extractValue(MessageMetadataSharedPtr metadata,
                                                const ThriftDecoderHandler& handler) const {
     return protobuf_value_extracter_(metadata, handler);
@@ -67,6 +73,8 @@ public:
 
 private:
   const ProtoRule rule_;
+  const uint16_t rule_id_;
+  std::string method_name_{};
   ThriftMetadataToProtobufValue protobuf_value_extracter_{};
 };
 
@@ -135,8 +143,8 @@ private:
   using ProtobufRepeatedRule = Protobuf::RepeatedPtrField<ProtoRule>;
   Rules generateRules(const ProtobufRepeatedRule& proto_rules) const {
     Rules rules;
-    for (const auto& rule : proto_rules) {
-      rules.emplace_back(rule);
+    for (const auto& proto_rule : proto_rules) {
+      rules.emplace_back(proto_rule, rules.size(), trie_root_);
     }
     return rules;
   }
@@ -164,6 +172,7 @@ private:
 
   ThriftToMetadataStats rqstats_;
   ThriftToMetadataStats respstats_;
+  PayloadExtractor::TrieSharedPtr trie_root_;
   const Rules request_rules_;
   const Rules response_rules_;
   const TransportType transport_;
@@ -177,6 +186,7 @@ private:
  */
 class Filter : public Http::PassThroughFilter,
                public PassThroughDecoderEventHandler,
+               public PayloadExtractor::MetadataHandler,
                Logger::Loggable<Logger::Id::filter> {
 public:
   Filter(std::shared_ptr<FilterConfig> config) : config_(config) {};
@@ -191,6 +201,11 @@ public:
 
   // PassThroughDecoderEventHandler
   FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
+  FilterStatus passthroughData(Buffer::Instance& data) override;
+
+  // PayloadExtractor::MetadataHandler
+  void handleOnPresent(std::string&& value, const std::vector<uint16_t>& rule_ids) override;
+  void handleOnMissing() override;
 
 private:
   // Return false if the decoder throws an exception.
@@ -217,6 +232,7 @@ private:
   ThriftDecoderHandlerPtr resp_handler_;
   Buffer::OwnedImpl rq_buffer_;
   Buffer::OwnedImpl resp_buffer_;
+  absl::flat_hash_set<uint16_t> matched_field_selector_rule_ids_;
 };
 
 } // namespace ThriftToMetadata

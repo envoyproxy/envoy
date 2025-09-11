@@ -25,7 +25,8 @@ public:
   Trie(TrieSharedPtr parent = nullptr) : parent_(parent) {}
 
   // Insert a new field selector into the trie
-  template <typename FieldSelector> void insert(const FieldSelector* field_selector, uint16_t rule_id) {
+  template <typename FieldSelector>
+  void insert(const FieldSelector* field_selector, uint16_t rule_id) {
     PayloadExtractor::TrieSharedPtr node = shared_from_this();
     while (true) {
       int16_t id = static_cast<int16_t>(field_selector->id());
