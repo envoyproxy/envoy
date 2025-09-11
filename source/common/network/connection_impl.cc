@@ -148,7 +148,7 @@ bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initialize
 
 void ConnectionImpl::close(ConnectionCloseType type) {
   if (!socket_->isOpen()) {
-    ENVOY_CONN_LOG_EVENT(debug, "connection_closing", "Not closing conn, socket is not open.",
+    ENVOY_CONN_LOG_EVENT(debug, "connection_closing", "Not closing conn, socket is not open",
                          *this);
     return;
   }
