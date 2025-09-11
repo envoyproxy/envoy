@@ -88,11 +88,6 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
       sink.log(msg_view, msg);
     }
   };
-  auto* tls_sink = tlsDelegate();
-  if (tls_sink != nullptr) {
-    log_to_sink(*tls_sink);
-    return;
-  }
 
   // Hold the sink mutex while performing the actual logging. This prevents the sink from being
   // swapped during an individual log event.
@@ -125,32 +120,12 @@ DelegatingLogSinkSharedPtr DelegatingLogSink::init() {
 }
 
 void DelegatingLogSink::flush() {
-  auto* tls_sink = tlsDelegate();
-  if (tls_sink != nullptr) {
-    tls_sink->flush();
-    return;
-  }
   absl::ReaderMutexLock lock(&sink_mutex_);
   sink_->flush();
 }
 
-SinkDelegate** DelegatingLogSink::tlsSink() {
-  static thread_local SinkDelegate* tls_sink = nullptr;
-
-  return &tls_sink;
-}
-
-void DelegatingLogSink::setTlsDelegate(SinkDelegate* sink) { *tlsSink() = sink; }
-
-SinkDelegate* DelegatingLogSink::tlsDelegate() { return *tlsSink(); }
-
 void DelegatingLogSink::logWithStableName(absl::string_view stable_name, absl::string_view level,
                                           absl::string_view component, absl::string_view message) {
-  auto tls_sink = tlsDelegate();
-  if (tls_sink != nullptr) {
-    tls_sink->logWithStableName(stable_name, level, component, message);
-    return;
-  }
   absl::ReaderMutexLock sink_lock(&sink_mutex_);
   sink_->logWithStableName(stable_name, level, component, message);
 }

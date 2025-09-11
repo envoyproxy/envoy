@@ -156,7 +156,7 @@ public:
 protected:
   // Swap the current *global* log sink delegate for this one. This should be called by the
   // derived class constructor immediately before returning. This is required to match
-  // restoreTlsDelegate(), otherwise it's possible for the previous delegate to get set in the base
+  // restoreDelegate(), otherwise it's possible for the previous delegate to get set in the base
   // class constructor, the derived class constructor throws, and cleanup becomes broken.
   void setDelegate();
 
@@ -252,9 +252,6 @@ private:
     absl::ReaderMutexLock lock(&sink_mutex_);
     return sink_;
   }
-  SinkDelegate** tlsSink();
-  void setTlsDelegate(SinkDelegate* sink);
-  SinkDelegate* tlsDelegate();
 
   SinkDelegate* sink_ ABSL_GUARDED_BY(sink_mutex_){nullptr};
   absl::Mutex sink_mutex_;
