@@ -93,7 +93,9 @@ bool Rule::matches(const ThriftProxy::MessageMetadata& metadata) const {
 PayloadToMetadataFilter::PayloadToMetadataFilter(const ConfigSharedPtr config) : config_(config) {}
 
 void PayloadToMetadataFilter::handleOnPresent(std::string&& value,
-                                              const std::vector<uint16_t>& rule_ids) {
+                                              const std::vector<uint16_t>& rule_ids,
+                                              bool is_request) {
+  ASSERT(is_request); // Currently we only support request rules.
   for (uint16_t rule_id : rule_ids) {
     if (matched_rule_ids_.find(rule_id) == matched_rule_ids_.end()) {
       ENVOY_LOG(trace, "rule_id {} is not matched.", rule_id);
@@ -117,7 +119,9 @@ void PayloadToMetadataFilter::handleOnPresent(std::string&& value,
   }
 }
 
-void PayloadToMetadataFilter::handleOnMissing() {
+void PayloadToMetadataFilter::handleComplete(bool is_request) {
+  ASSERT(is_request); // Currently we only support request rules.
+
   ENVOY_LOG(trace, "{} rules missing", matched_rule_ids_.size());
 
   for (uint16_t rule_id : matched_rule_ids_) {
@@ -255,7 +259,7 @@ FilterStatus PayloadToMetadataFilter::passthroughData(Buffer::Instance& data) {
       IS_ENVOY_BUG(fmt::format("decoding error, error_message: {}, payload: {}", e.what(),
                                getHexRepresentation(data)));
       if (!handler.isComplete()) {
-        handleOnMissing();
+        handleComplete(true);
       }
     });
     finalizeDynamicMetadata();

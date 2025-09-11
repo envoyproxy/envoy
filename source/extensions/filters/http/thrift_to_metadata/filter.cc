@@ -121,9 +121,10 @@ FilterConfig::FilterConfig(
           POOL_COUNTER_PREFIX(scope, "thrift_to_metadata.rq"))},
       respstats_{ALL_THRIFT_TO_METADATA_FILTER_STATS(
           POOL_COUNTER_PREFIX(scope, "thrift_to_metadata.resp"))},
-      trie_root_(std::make_shared<PayloadExtractor::Trie>()),
-      request_rules_(generateRules(proto_config.request_rules())),
-      response_rules_(generateRules(proto_config.response_rules())),
+      rq_trie_root_(std::make_shared<PayloadExtractor::Trie>()),
+      resp_trie_root_(std::make_shared<PayloadExtractor::Trie>()),
+      request_rules_(generateRules(proto_config.request_rules(), rq_trie_root_)),
+      response_rules_(generateRules(proto_config.response_rules(), resp_trie_root_)),
       transport_(ProtoUtils::getTransportType(proto_config.transport())),
       protocol_(ProtoUtils::getProtocolType(proto_config.protocol())),
       allow_content_types_(generateAllowContentTypes(proto_config.allow_content_types())),
@@ -162,8 +163,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     config_->rqstats().no_body_.inc();
     return Http::FilterHeadersStatus::Continue;
   }
-
-  rq_handler_ = config_->createThriftDecoderHandler(*this, true);
+  rq_trie_handler_ =
+      std::make_unique<PayloadExtractor::TrieMatchHandler>(*this, config_->rqTrieRoot());
+  rq_handler_ = config_->createThriftDecoderHandler(*rq_trie_handler_, true);
   return Http::FilterHeadersStatus::StopIteration;
 }
 
@@ -172,7 +174,8 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
     return Http::FilterDataStatus::Continue;
   }
 
-  // Set ``request_processing_finished_`` once we get enough data to trigger messageBegin.
+  // Set ``request_processing_finished_`` once we get enough data to trigger messageBegin
+  // if there are no field selector rules.
   if (!processData(data, rq_buffer_, rq_handler_, *decoder_callbacks_)) {
     handleAllOnMissing(config_->requestRules(), *decoder_callbacks_, request_processing_finished_);
     config_->rqstats().invalid_thrift_body_.inc();
@@ -224,7 +227,9 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     return Http::FilterHeadersStatus::Continue;
   }
 
-  resp_handler_ = config_->createThriftDecoderHandler(*this, false);
+  resp_trie_handler_ =
+      std::make_unique<PayloadExtractor::TrieMatchHandler>(*this, config_->respTrieRoot());
+  resp_handler_ = config_->createThriftDecoderHandler(*resp_trie_handler_, false);
   return Http::FilterHeadersStatus::StopIteration;
 }
 
@@ -233,7 +238,8 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& data, bool end_strea
     return Http::FilterDataStatus::Continue;
   }
 
-  // Set ``response_processing_finished_`` once we get enough data to trigger messageBegin.
+  // Set ``response_processing_finished_`` once we get enough data to trigger messageBegin
+  // if there are no field selector rules.
   if (!processData(data, resp_buffer_, resp_handler_, *encoder_callbacks_)) {
     handleAllOnMissing(config_->responseRules(), *encoder_callbacks_,
                        response_processing_finished_);
@@ -275,11 +281,13 @@ bool Filter::processData(Buffer::Instance& incoming_data, Buffer::Instance& buff
   buffer.add(incoming_data);
   bool underflow = false;
   TRY_NEEDS_AUDIT {
-    // handler triggers messageBegin if we get enough data.
+    // handler triggers messageBegin and other events if we get enough data.
+    // And trie handler will call back via MetadataHandler interface.
     handler->onData(buffer, underflow);
     return true;
   }
   END_TRY catch (const AppException& ex) {
+    // DecodeComplete will treat all rules as missing.
     ENVOY_LOG(error, "thrift application error: {}", ex.what());
   }
   catch (const EnvoyException& ex) {
@@ -288,7 +296,8 @@ bool Filter::processData(Buffer::Instance& incoming_data, Buffer::Instance& buff
   return false;
 }
 
-FilterStatus Filter::messageBegin(MessageMetadataSharedPtr metadata) {
+// PayloadExtractor::MetadataHandler
+FilterStatus Filter::handleThriftMetadata(MessageMetadataSharedPtr metadata) {
   ENVOY_LOG(trace, "thrift to metadata filter: get messageBegin event. is_request: {}",
             metadata->isRequest());
   if (metadata->isRequest()) {
@@ -307,53 +316,53 @@ FilterStatus Filter::messageBegin(MessageMetadataSharedPtr metadata) {
                                                   : FilterStatus::Continue;
 }
 
-FilterStatus Filter::passthroughData(Buffer::Instance& data) {
-  UNREFERENCED_PARAMETER(data);
-  return FilterStatus::StopIteration;
+// PayloadExtractor::MetadataHandler
+// TODO: thrift_proxy/payload_to_metadata filter uses ValueType to determine the type of value.
+// However, this filter aims on use the original type of value in thrift payload. We may need to
+// revisit this if any use case requires type conversion.
+void Filter::handleOnPresent(std::string&& value, const std::vector<uint16_t>& rule_ids,
+                             bool is_request) {
+  for (uint16_t rule_id : rule_ids) {
+    if (matched_field_selector_rule_ids_.find(rule_id) == matched_field_selector_rule_ids_.end()) {
+      ENVOY_LOG(trace, "rule_id {} is not matched.", rule_id);
+      continue;
+    }
+    ENVOY_LOG(trace, "handleOnPresent rule_id {}", rule_id);
+
+    matched_field_selector_rule_ids_.erase(rule_id);
+
+    auto& rules = is_request ? config_->requestRules() : config_->responseRules();
+    ASSERT(rule_id < rules.size());
+    const Rule& rule = rules[rule_id];
+    if (!value.empty()) {
+      Protobuf::Value val;
+      val.set_string_value(std::move(value));
+      handleOnPresent(std::move(val), rule);
+    }
+  }
 }
 
 // PayloadExtractor::MetadataHandler
-void Filter::handleOnPresent(std::string&& value, const std::vector<uint16_t>& rule_ids) {
-  UNREFERENCED_PARAMETER(value);
-  UNREFERENCED_PARAMETER(rule_ids);
-  // for (uint16_t rule_id : rule_ids) {
-  //   if (matched_field_selector_rule_ids_.find(rule_id) == matched_field_selector_rule_ids_.end())
-  //   {
-  //     ENVOY_LOG(trace, "rule_id {} is not matched.", rule_id);
-  //     continue;
-  //   }
-  //   ENVOY_LOG(trace, "handleOnPresent rule_id {}", rule_id);
+void Filter::handleComplete(bool is_request) {
+  ENVOY_LOG(trace, "{} rules missing for field selector", matched_field_selector_rule_ids_.size());
 
-  //   matched_field_selector_rule_ids_.erase(rule_id);
-  //   ASSERT(rule_id < config_->requestRules().size());
-  //   const Rule& rule = config_->requestRules()[rule_id];
-  //   if (!value.empty() && rule.rule().has_on_present()) {
-  //     // We can *not* always std::move(value) here since we need `value` if multiple rules are
-  //     // matched. Optimize the most common usage, which is one rule per payload field.
-  //     if (rule_ids.size() == 1) {
-  //       applyKeyValue(std::move(value), rule, rule.rule().on_present());
-  //       break;
-  //     } else {
-  //       applyKeyValue(value, rule, rule.rule().on_present());
-  //     }
-  //   }
-  // }
-}
+  for (uint16_t rule_id : matched_field_selector_rule_ids_) {
+    ENVOY_LOG(trace, "handling on_missing rule_id {}", rule_id);
 
-// PayloadExtractor::MetadataHandler
-void Filter::handleOnMissing() {
-  // ENVOY_LOG(trace, "{} rules missing", matched_field_selector_rule_ids_.size());
+    auto& rules = is_request ? config_->requestRules() : config_->responseRules();
+    ASSERT(rule_id < rules.size());
+    const Rule& rule = rules[rule_id];
+    handleOnMissing(rule);
+  }
 
-  // for (uint16_t rule_id : matched_field_selector_rule_ids_) {
-  //   ENVOY_LOG(trace, "handling on_missing rule_id {}", rule_id);
-
-  //   ASSERT(rule_id < config_->requestRules().size());
-  //   const Rule& rule = config_->requestRules()[rule_id];
-  //   if (!rule.rule().has_on_missing()) {
-  //     continue;
-  //   }
-  //   applyKeyValue("", rule, rule.rule().on_missing());
-  // }
+  ENVOY_LOG(trace, "finalize dynamic metadata. is_request: {}", is_request);
+  if (is_request) {
+    config_->rqstats().success_.inc();
+    finalizeDynamicMetadata(*decoder_callbacks_, request_processing_finished_);
+  } else {
+    config_->respstats().success_.inc();
+    finalizeDynamicMetadata(*encoder_callbacks_, response_processing_finished_);
+  }
 }
 
 void Filter::processMetadata(MessageMetadataSharedPtr metadata, const Rules& rules,
@@ -380,6 +389,11 @@ void Filter::processMetadata(MessageMetadataSharedPtr metadata, const Rules& rul
     // Continue to extract thrift payload.
     return;
   }
+
+  // If there's no field selector rule, we'll let decoder stop iteration so
+  // that we don't need to buffer the entire payload.
+  // handleComplete won't be called because messageEnd won't be triggered.
+  // Hence, we can safely finalize the dynamic metadata here.
   stats.success_.inc();
   finalizeDynamicMetadata(filter_callback, processing_finished_flag);
 }

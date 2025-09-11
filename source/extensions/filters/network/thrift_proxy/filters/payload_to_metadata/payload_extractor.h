@@ -58,17 +58,21 @@ private:
 class MetadataHandler {
 public:
   virtual ~MetadataHandler() = default;
-  virtual void handleOnPresent(std::string&& value, const std::vector<uint16_t>& rule_ids) PURE;
-  virtual void handleOnMissing() PURE;
+  virtual FilterStatus handleThriftMetadata(MessageMetadataSharedPtr metadata) PURE;
+  virtual void handleOnPresent(std::string&& value, const std::vector<uint16_t>& rule_ids,
+                               bool is_request) PURE;
+  virtual void handleComplete(bool is_request) PURE;
 };
 
 class TrieMatchHandler : public DecoderCallbacks,
                          public PassThroughDecoderEventHandler,
                          protected Logger::Loggable<Envoy::Logger::Id::thrift> {
 public:
-  TrieMatchHandler(MetadataHandler& parent, TrieSharedPtr root) : parent_(parent), node_(root) {}
+  TrieMatchHandler(MetadataHandler& parent, TrieSharedPtr root, bool is_request = true)
+      : parent_(parent), node_(root), is_request_(is_request) {}
 
   // DecoderEventHandler
+  FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override;
   FilterStatus messageEnd() override;
   FilterStatus structBegin(absl::string_view) override;
   FilterStatus structEnd() override;
@@ -90,6 +94,12 @@ public:
   FilterStatus listEnd() override { return handleContainerEnd(); }
   FilterStatus setBegin(FieldType&, uint32_t&) override { return handleContainerBegin(); }
   FilterStatus setEnd() override { return handleContainerEnd(); }
+
+  ThriftProxy::FilterStatus passthroughData(Buffer::Instance&) override {
+    std::cout << "passthroughData" << std::endl;
+    return ThriftProxy::FilterStatus::Continue;
+  }
+
 
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler() override { return *this; }
@@ -118,10 +128,13 @@ private:
 
   MetadataHandler& parent_;
   TrieSharedPtr node_;
+  bool is_request_{true};
   bool complete_{false};
   std::vector<int16_t> field_ids_;
   int16_t steps_{0};
 };
+
+using TrieMatchHandlerPtr = std::unique_ptr<TrieMatchHandler>;
 
 } // namespace PayloadExtractor
 } // namespace Extensions

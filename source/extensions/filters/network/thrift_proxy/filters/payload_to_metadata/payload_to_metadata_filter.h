@@ -83,8 +83,13 @@ public:
   FilterStatus passthroughData(Buffer::Instance& data) override;
 
   // PayloadExtractor::MetadataHandler
-  void handleOnPresent(std::string&& value, const std::vector<uint16_t>& rule_ids) override;
-  void handleOnMissing() override;
+  // We handled messageBegin already so no need to do anything here.
+  FilterStatus handleThriftMetadata(MessageMetadataSharedPtr) override {
+    return FilterStatus::Continue;
+  }
+  void handleOnPresent(std::string&& value, const std::vector<uint16_t>& rule_ids,
+                       bool is_request) override;
+  void handleComplete(bool is_request) override;
 
 private:
   static ProtocolPtr createProtocol(ProtocolType protocol) {

@@ -15,11 +15,16 @@ namespace PayloadExtractor {
 
 using namespace Envoy::Extensions::NetworkFilters;
 
+FilterStatus TrieMatchHandler::messageBegin(MessageMetadataSharedPtr metadata) {
+  ENVOY_LOG(trace, "TrieMatchHandler messageBegin");
+  return parent_.handleThriftMetadata(metadata);
+}
+
 FilterStatus TrieMatchHandler::messageEnd() {
   ASSERT(steps_ == 0);
   ENVOY_LOG(trace, "TrieMatchHandler messageEnd");
-  parent_.handleOnMissing();
   complete_ = true;
+  parent_.handleComplete(is_request_);
   return FilterStatus::Continue;
 }
 
@@ -86,7 +91,7 @@ FilterStatus TrieMatchHandler::handleString(std::string value) {
       !node_->children_[field_ids_.back()]->rule_ids_.empty()) {
     auto on_present_node = node_->children_[field_ids_.back()];
     ENVOY_LOG(trace, "name: {}", on_present_node->name_);
-    parent_.handleOnPresent(std::move(value), on_present_node->rule_ids_);
+    parent_.handleOnPresent(std::move(value), on_present_node->rule_ids_, is_request_);
   }
   return FilterStatus::Continue;
 }
