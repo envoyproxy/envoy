@@ -28,7 +28,10 @@ const absl::flat_hash_set<std::string>& supportedKeys() {
 // grouped together by an equals (`=`) sign. The keys are case-insensitive, the values are
 // case-sensitive. If  `,`, `;` or `=` appear in a value, the value should be double-quoted.
 // Double-quotes in the value should be replaced by backslash-double-quote (`\"`).
-// Only need to find the first value with the key, so scan the header left-to-right.
+//
+// There maybe multiple XFCC elements and the oldest/leftest one with the key will be used by
+// default because Envoy assumes the oldest XFCC element come from the original client certificate.
+// So scan the header left-to-right.
 
 // Handles a single key/value pair within an XFCC element.
 absl::optional<std::string> parseKeyValuePair(absl::string_view pair, absl::string_view target) {
@@ -48,7 +51,7 @@ absl::optional<std::string> parseKeyValuePair(absl::string_view pair, absl::stri
   }
 
   // Unescape double quotes.
-  // Note: this only handle escaped double quotes, not other escape sequences.
+  // Note: this only handles escaped double quotes, not other escape sequences.
   std::string unescaped;
   for (size_t i = 0; i < raw_value.size(); ++i) {
     if (raw_value[i] == '\\' && i + 1 < raw_value.size() && raw_value[i + 1] == '"') {
@@ -68,24 +71,25 @@ absl::optional<std::string> parseElementForKey(absl::string_view element,
   // Scan key-value pairs in this element (by semicolon not in quotes).
   bool in_quotes = false;
   size_t start = 0;
-  for (size_t i = 0; i <= element.size(); ++i) {
-    // Switch quote state if we encounter a quote character.
-    if (element[i] == '"') {
-      if (i == 0 || element[i - 1] != '\\') {
-        in_quotes = !in_quotes;
-      }
-      continue;
-    }
-
-    // For other characters, if in quotes, do nothing because it is part of one value.
-    // If not in quotes, check for end of key/value pair.
-    if (!in_quotes) {
-      if (i == element.size() || element[i] == ';') {
+  const size_t element_size = element.size();
+  for (size_t i = 0; i <= element_size; ++i) {
+    // Check for end of key-value pair.
+    if (i == element_size || element[i] == ';') {
+      // If not in quotes then we found the end of a key-value pair.
+      if (!in_quotes) {
         auto value = parseKeyValuePair(element.substr(start, i - start), target);
         if (value.has_value()) {
           return value;
         }
         start = i + 1;
+      }
+      continue;
+    }
+
+    // Switch quote state if we encounter a quote character.
+    if (element[i] == '"') {
+      if (i == 0 || element[i - 1] != '\\') {
+        in_quotes = !in_quotes;
       }
     }
   }
@@ -108,24 +112,25 @@ absl::StatusOr<std::string> parseValueFromXfccByKey(const Http::RequestHeaderMap
   // Scan elements in the XFCC header (by comma not in quotes).
   bool in_quotes = false;
   size_t start = 0;
-  for (size_t i = 0; i <= value.size(); ++i) {
-    // Switch quote state if we encounter a quote character.
-    if (value[i] == '"') {
-      if (i == 0 || value[i - 1] != '\\') {
-        in_quotes = !in_quotes;
-      }
-      continue;
-    }
-
-    // For other characters, if in quotes, do nothing because it is part of one value.
-    // If not in quotes, check for end of element.
-    if (!in_quotes) {
-      if (i == value.size() || value[i] == ',') {
+  const size_t value_size = value.size();
+  for (size_t i = 0; i <= value_size; ++i) {
+    // Check for end of element.
+    if (i == value_size || value[i] == ',') {
+      // If not in quotes then we found the end of an element.
+      if (!in_quotes) {
         auto result = parseElementForKey(value.substr(start, i - start), target);
         if (result.has_value()) {
           return result.value();
         }
         start = i + 1;
+      }
+      continue;
+    }
+
+    // Switch quote state if we encounter a quote character.
+    if (value[i] == '"') {
+      if (i == 0 || value[i - 1] != '\\') {
+        in_quotes = !in_quotes;
       }
     }
   }
