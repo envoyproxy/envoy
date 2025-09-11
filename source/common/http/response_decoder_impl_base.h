@@ -28,7 +28,7 @@ class ResponseDecoderImplBase : public ResponseDecoder {
 public:
   ResponseDecoderImplBase() : live_trackable_(std::make_shared<bool>(true)) {}
 
-  ResponseDecoderHandlePtr getResponseDecoderHandle() override {
+  ResponseDecoderHandlePtr createResponseDecoderHandle() override {
     return std::make_unique<ResponseDecoderHandleImpl>(live_trackable_, *this);
   }
 

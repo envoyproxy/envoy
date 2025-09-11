@@ -200,6 +200,10 @@ public:
 
 class ResponseDecoder;
 
+/**
+ * A handle to a ResponseDecoder. This handle can be used to check if the underlying decoder is still
+ * valid and to get a reference to it.
+ */
 class ResponseDecoderHandle {
 public:
   virtual ~ResponseDecoderHandle() = default;
@@ -326,7 +330,7 @@ public:
    * @return A handle to the response decoder. Caller can check the response decoder's liveness via
    * the handle.
    */
-  virtual ResponseDecoderHandlePtr getResponseDecoderHandle() PURE;
+  virtual ResponseDecoderHandlePtr createResponseDecoderHandle() PURE;
 };
 
 /**

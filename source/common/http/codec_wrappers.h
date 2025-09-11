@@ -78,7 +78,7 @@ public:
 
 protected:
   ResponseDecoderWrapper(ResponseDecoder& inner)
-      : inner_handle_(inner.getResponseDecoderHandle()), inner_(&inner) {}
+      : inner_handle_(inner.createResponseDecoderHandle()), inner_(&inner) {}
 
   /**
    * Consumers of the wrapper generally want to know when a decode is complete. This is called

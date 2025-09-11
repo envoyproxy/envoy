@@ -37,7 +37,7 @@ EnvoyQuicClientStream::EnvoyQuicClientStream(
 }
 
 void EnvoyQuicClientStream::setResponseDecoder(Http::ResponseDecoder& decoder) {
-  response_decoder_handle_ = decoder.getResponseDecoderHandle();
+  response_decoder_handle_ = decoder.createResponseDecoderHandle();
   response_decoder_ = &decoder;
 }
 
