@@ -49,7 +49,7 @@ parseHttpHeaderFormatter(const envoy::config::core::v3::HeaderValue& header_valu
     return Envoy::Formatter::FormatterImpl::create(final_header_value, true);
   }
 
-  // Let the substitution formatter parse the final_header_value.
+  // Let the substitution formatter parse the header_value.
   return Envoy::Formatter::FormatterImpl::create(header_value.value(), true);
 }
 
