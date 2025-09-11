@@ -296,9 +296,13 @@ FilterStatus Filter::messageBegin(MessageMetadataSharedPtr metadata) {
                     config_->rqstats(), request_processing_finished_);
   } else {
     matched_field_selector_rule_ids_.clear();
+    struct_map_.clear();
     processMetadata(metadata, config_->responseRules(), resp_handler_, *encoder_callbacks_,
                     config_->respstats(), response_processing_finished_);
   }
+
+  // processMetadata matches method name for field selector rules, and
+  // continue to extract thrift payload if any field selector rule is matched.
   return matched_field_selector_rule_ids_.empty() ? FilterStatus::StopIteration
                                                   : FilterStatus::Continue;
 }
@@ -308,6 +312,7 @@ FilterStatus Filter::passthroughData(Buffer::Instance& data) {
   return FilterStatus::StopIteration;
 }
 
+// PayloadExtractor::MetadataHandler
 void Filter::handleOnPresent(std::string&& value, const std::vector<uint16_t>& rule_ids) {
   UNREFERENCED_PARAMETER(value);
   UNREFERENCED_PARAMETER(rule_ids);
@@ -335,6 +340,7 @@ void Filter::handleOnPresent(std::string&& value, const std::vector<uint16_t>& r
   // }
 }
 
+// PayloadExtractor::MetadataHandler
 void Filter::handleOnMissing() {
   // ENVOY_LOG(trace, "{} rules missing", matched_field_selector_rule_ids_.size());
 
@@ -354,7 +360,6 @@ void Filter::processMetadata(MessageMetadataSharedPtr metadata, const Rules& rul
                              ThriftDecoderHandlerPtr& handler,
                              Http::StreamFilterCallbacks& filter_callback,
                              ThriftToMetadataStats& stats, bool& processing_finished_flag) {
-  StructMap struct_map;
   for (const auto& rule : rules) {
     if (!rule.shouldExtractMetadata()) {
       if (rule.matches(*metadata)) {
@@ -366,9 +371,9 @@ void Filter::processMetadata(MessageMetadataSharedPtr metadata, const Rules& rul
     absl::optional<Protobuf::Value> val_opt = rule.extractValue(metadata, *handler);
 
     if (val_opt.has_value()) {
-      handleOnPresent(std::move(val_opt).value(), rule, struct_map);
+      handleOnPresent(std::move(val_opt).value(), rule);
     } else {
-      handleOnMissing(rule, struct_map);
+      handleOnMissing(rule);
     }
   }
   if (!matched_field_selector_rule_ids_.empty()) {
@@ -376,52 +381,50 @@ void Filter::processMetadata(MessageMetadataSharedPtr metadata, const Rules& rul
     return;
   }
   stats.success_.inc();
-  finalizeDynamicMetadata(filter_callback, struct_map, processing_finished_flag);
+  finalizeDynamicMetadata(filter_callback, processing_finished_flag);
 }
 
-void Filter::handleOnPresent(Protobuf::Value&& value, const Rule& rule, StructMap& struct_map) {
+void Filter::handleOnPresent(Protobuf::Value&& value, const Rule& rule) {
   if (!rule.rule().has_on_present()) {
     return;
   }
 
   const auto& on_present_keyval = rule.rule().on_present();
   applyKeyValue(on_present_keyval.has_value() ? on_present_keyval.value() : std::move(value),
-                on_present_keyval, struct_map);
+                on_present_keyval);
 }
 
-void Filter::handleOnMissing(const Rule& rule, StructMap& struct_map) {
+void Filter::handleOnMissing(const Rule& rule) {
   if (rule.rule().has_on_missing()) {
-    applyKeyValue(rule.rule().on_missing().value(), rule.rule().on_missing(), struct_map);
+    applyKeyValue(rule.rule().on_missing().value(), rule.rule().on_missing());
   }
 }
 
 void Filter::handleAllOnMissing(const Rules& rules, Http::StreamFilterCallbacks& filter_callback,
                                 bool& processing_finished_flag) {
-  StructMap struct_map;
   for (const auto& rule : rules) {
-    handleOnMissing(rule, struct_map);
+    handleOnMissing(rule);
   }
-  finalizeDynamicMetadata(filter_callback, struct_map, processing_finished_flag);
+  finalizeDynamicMetadata(filter_callback, processing_finished_flag);
 }
 
-void Filter::applyKeyValue(Protobuf::Value value, const KeyValuePair& keyval,
-                           StructMap& struct_map) {
+void Filter::applyKeyValue(Protobuf::Value value, const KeyValuePair& keyval) {
   const auto& metadata_namespace = decideNamespace(keyval.metadata_namespace());
   const auto& key = keyval.key();
 
   ENVOY_LOG(trace, "add metadata namespace:{} key:{}", metadata_namespace, key);
 
-  auto& struct_proto = struct_map[metadata_namespace];
+  auto& struct_proto = struct_map_[metadata_namespace];
   (*struct_proto.mutable_fields())[key] = std::move(value);
 }
 
 void Filter::finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callback,
-                                     const StructMap& struct_map, bool& processing_finished_flag) {
+                                     bool& processing_finished_flag) {
   ASSERT(!processing_finished_flag);
   processing_finished_flag = true;
 
-  if (!struct_map.empty()) {
-    for (auto const& entry : struct_map) {
+  if (!struct_map_.empty()) {
+    for (auto const& entry : struct_map_) {
       filter_callback.streamInfo().setDynamicMetadata(entry.first, entry.second);
     }
   }

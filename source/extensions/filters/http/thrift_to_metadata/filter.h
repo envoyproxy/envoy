@@ -215,14 +215,14 @@ private:
                        ThriftDecoderHandlerPtr& handler,
                        Http::StreamFilterCallbacks& filter_callback, ThriftToMetadataStats& stats,
                        bool& processing_finished_flag);
-  void handleOnPresent(Protobuf::Value&& value, const Rule& rule, StructMap& struct_map);
+  void handleOnPresent(Protobuf::Value&& value, const Rule& rule);
 
-  void handleOnMissing(const Rule& rule, StructMap& struct_map);
+  void handleOnMissing(const Rule& rule);
   void handleAllOnMissing(const Rules& rules, Http::StreamFilterCallbacks& filter_callback,
                           bool& processing_finished_flag);
-  void applyKeyValue(Protobuf::Value value, const KeyValuePair& keyval, StructMap& struct_map);
+  void applyKeyValue(Protobuf::Value value, const KeyValuePair& keyval);
   void finalizeDynamicMetadata(Http::StreamFilterCallbacks& filter_callback,
-                               const StructMap& struct_map, bool& processing_finished_flag);
+                               bool& processing_finished_flag);
   const std::string& decideNamespace(const std::string& nspace) const;
 
   std::shared_ptr<FilterConfig> config_;
@@ -233,6 +233,7 @@ private:
   Buffer::OwnedImpl rq_buffer_;
   Buffer::OwnedImpl resp_buffer_;
   absl::flat_hash_set<uint16_t> matched_field_selector_rule_ids_;
+  StructMap struct_map_;
 };
 
 } // namespace ThriftToMetadata
