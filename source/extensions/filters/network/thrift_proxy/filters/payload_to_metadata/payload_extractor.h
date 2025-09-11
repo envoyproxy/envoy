@@ -100,7 +100,6 @@ public:
     return ThriftProxy::FilterStatus::Continue;
   }
 
-
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler() override { return *this; }
   bool passthroughEnabled() const override { return false; }
