@@ -165,13 +165,12 @@ typedef struct {
 } envoy_dynamic_module_type_envoy_buffer;
 
 /**
- * envoy_dynamic_module_type_module_str represents a string owned by the module.
+ * envoy_dynamic_module_type_module_buffer represents a buffer owned by the module.
  */
 typedef struct {
-  char* ptr;
+  envoy_dynamic_module_type_buffer_module_ptr ptr;
   size_t length;
-} envoy_dynamic_module_type_module_str;
-
+} envoy_dynamic_module_type_module_buffer;
 /**
  * envoy_dynamic_module_type_module_http_header represents a key-value pair of an HTTP header owned
  * by the module.
