@@ -18,10 +18,7 @@ public:
     if (Http::ResponseDecoder* inner = getInnerDecoder()) {
       inner->decode1xxHeaders(std::move(headers));
     } else {
-      IS_ENVOY_BUG("Wrapped decoder use after free detected.");
-      RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
-                         "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
-                     "Wrapped decoder use after free detected.");
+      onInnerDecoderDead();
     }
   }
 
@@ -32,10 +29,7 @@ public:
     if (Http::ResponseDecoder* inner = getInnerDecoder()) {
       inner->decodeHeaders(std::move(headers), end_stream);
     } else {
-      IS_ENVOY_BUG("Wrapped decoder use after free detected.");
-      RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
-                         "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
-                     "Wrapped decoder use after free detected.");
+      onInnerDecoderDead();
     }
     if (end_stream) {
       onDecodeComplete();
@@ -49,10 +43,7 @@ public:
     if (Http::ResponseDecoder* inner = getInnerDecoder()) {
       inner->decodeData(data, end_stream);
     } else {
-      IS_ENVOY_BUG("Wrapped decoder use after free detected.");
-      RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
-                         "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
-                     "Wrapped decoder use after free detected.");
+      onInnerDecoderDead();
     }
     if (end_stream) {
       onDecodeComplete();
@@ -64,10 +55,7 @@ public:
     if (Http::ResponseDecoder* inner = getInnerDecoder()) {
       inner->decodeTrailers(std::move(trailers));
     } else {
-      IS_ENVOY_BUG("Wrapped decoder use after free detected.");
-      RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
-                         "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
-                     "Wrapped decoder use after free detected.");
+      onInnerDecoderDead();
     }
     onDecodeComplete();
   }
@@ -76,10 +64,7 @@ public:
     if (Http::ResponseDecoder* inner = getInnerDecoder()) {
       inner->decodeMetadata(std::move(metadata_map));
     } else {
-      IS_ENVOY_BUG("Wrapped decoder use after free detected.");
-      RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
-                         "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
-                     "Wrapped decoder use after free detected.");
+      onInnerDecoderDead();
     }
   }
 
@@ -87,10 +72,7 @@ public:
     if (Http::ResponseDecoder* inner = getInnerDecoder()) {
       inner->dumpState(os, indent_level);
     } else {
-      IS_ENVOY_BUG("Wrapped decoder use after free detected.");
-      RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
-                         "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
-                     "Wrapped decoder use after free detected.");
+      onInnerDecoderDead();
     }
   }
 
@@ -105,6 +87,9 @@ protected:
   virtual void onPreDecodeComplete() PURE;
   virtual void onDecodeComplete() PURE;
 
+  ResponseDecoderHandlePtr inner_handle_;
+  Http::ResponseDecoder* inner_ = nullptr;
+
 private:
   Http::ResponseDecoder* getInnerDecoder() const {
     if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_response_decoder_handle")) {
@@ -118,8 +103,13 @@ private:
     return nullptr;
   }
 
-  ResponseDecoderHandlePtr inner_handle_;
-  Http::ResponseDecoder* inner_ = nullptr;
+  void onInnerDecoderDead() const {
+    const std::string error_msg = "Wrapped decoder use after free detected.";
+    IS_ENVOY_BUG(error_msg);
+    RELEASE_ASSERT(!Runtime::runtimeFeatureEnabled(
+                       "envoy.reloadable_features.abort_when_accessing_dead_decoder"),
+                   error_msg);
+  }
 };
 
 /**

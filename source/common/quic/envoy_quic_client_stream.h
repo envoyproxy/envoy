@@ -95,6 +95,8 @@ private:
 
   Http::ResponseDecoder* getResponseDecoder();
 
+  void onResponseDecoderDead() const;
+
   Http::ResponseDecoderHandlePtr response_decoder_handle_;
   Http::ResponseDecoder* response_decoder_{nullptr};
   bool decoded_1xx_{false};
