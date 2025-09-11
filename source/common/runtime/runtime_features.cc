@@ -69,7 +69,6 @@ RUNTIME_GUARD(envoy_reloadable_features_quic_signal_headers_only_to_http1_backen
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_reads_fixed_number_packets);
 RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_socket_use_address_cache_for_read);
 RUNTIME_GUARD(envoy_reloadable_features_reject_empty_trusted_ca_file);
-RUNTIME_GUARD(envoy_reloadable_features_remove_legacy_route_formatter);
 RUNTIME_GUARD(envoy_reloadable_features_report_load_with_rq_issued);
 RUNTIME_GUARD(envoy_reloadable_features_router_filter_resetall_on_local_reply);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
@@ -162,6 +161,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiplexed_upstream_half_cl
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_ext_proc_graceful_grpc_close);
 
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_no_ai_flags);
+
+// Flag to remove legacy route formatter support in header parser
+// Flip to true after two release periods.
+RUNTIME_GUARD(envoy_reloadable_features_remove_legacy_route_formatter);
 
 // TODO(grnmeira):
 // Enables the new DNS implementation, a merged implementation of

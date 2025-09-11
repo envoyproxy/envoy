@@ -489,6 +489,8 @@ envoy_cc_test(
         "//source/common/stream_info:filter_state_lib",
         "//test/common/stream_info:test_int_accessor_lib",
         "//test/mocks/api:api_mocks",
+                "//test/mocks/server:server_factory_context_mocks",
+
         "//test/mocks/http:http_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",

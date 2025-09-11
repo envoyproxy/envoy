@@ -20,6 +20,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/host.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
@@ -239,6 +240,10 @@ TEST(HeaderParserTest, TestParse) {
 }
 
 TEST(HeaderParser, TestMetadataTranslator) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ScopedThreadLocalServerContextSetter setter(context);
+  EXPECT_CALL(context.runtime_loader_, countDeprecatedFeatureUse()).Times(testing::AtLeast(1));
+
   struct TestCase {
     std::string input_;
     std::string expected_output_;
@@ -278,6 +283,10 @@ TEST(HeaderParser, TestMetadataTranslatorExceptions) {
 }
 
 TEST(HeaderParser, TestPerFilterStateTranslator) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  ScopedThreadLocalServerContextSetter setter(context);
+  EXPECT_CALL(context.runtime_loader_, countDeprecatedFeatureUse()).Times(testing::AtLeast(1));
+
   struct TestCase {
     std::string input_;
     std::string expected_output_;
