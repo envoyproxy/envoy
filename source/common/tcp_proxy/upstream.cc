@@ -19,8 +19,13 @@ using TunnelingConfig =
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
 
 // Constants for tunnel request ID metadata.
-constexpr absl::string_view TunnelRequestIdMetadataNamespace = "envoy.filters.network.tcp_proxy";
-constexpr absl::string_view TunnelRequestIdMetadataKey = "tunnel_request_id";
+const std::string& tunnelRequestIdMetadataNamespace() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.filters.network.tcp_proxy");
+}
+
+const std::string& tunnelRequestIdMetadataKey() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "tunnel_request_id");
+}
 
 // Helper function to generate and store request ID in dynamic metadata.
 void generateAndStoreRequestId(const TunnelingConfigHelper& config, Http::RequestHeaderMap& headers,
@@ -35,8 +40,8 @@ void generateAndStoreRequestId(const TunnelingConfigHelper& config, Http::Reques
     if (!rid.empty()) {
       Protobuf::Struct md;
       auto& fields = *md.mutable_fields();
-      fields[TunnelRequestIdMetadataKey].mutable_string_value()->assign(rid.data(), rid.size());
-      downstream_info.setDynamicMetadata(std::string(TunnelRequestIdMetadataNamespace), md);
+      fields[tunnelRequestIdMetadataKey()].mutable_string_value()->assign(rid.data(), rid.size());
+      downstream_info.setDynamicMetadata(tunnelRequestIdMetadataNamespace(), md);
     }
   }
 }
