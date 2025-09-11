@@ -454,9 +454,11 @@ bool CacheFilter::onBody(Buffer::InstancePtr&& body, EndStream end_stream_enum) 
 void CacheFilter::onAboveWriteBufferHighWatermark() { downstream_watermarked_++; }
 
 void CacheFilter::onBelowWriteBufferLowWatermark() {
-  RELEASE_ASSERT(downstream_watermarked_ > 0,
-                 "low watermark without corresponding high watermark should not happen");
-  downstream_watermarked_--;
+  if (downstream_watermarked_ == 0) {
+    IS_ENVOY_BUG("low watermark not preceded by high watermark should not happen");
+  } else {
+    downstream_watermarked_--;
+  }
   if (downstream_watermarked_ == 0 && get_body_on_unblocked_) {
     get_body_on_unblocked_ = false;
     getBody();
