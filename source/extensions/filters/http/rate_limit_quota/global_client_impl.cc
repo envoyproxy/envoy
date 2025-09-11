@@ -38,12 +38,6 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RateLimitQuota {
 
-Grpc::RawAsyncClientSharedPtr
-getOrThrow(absl::StatusOr<Grpc::RawAsyncClientSharedPtr> client_or_error) {
-  THROW_IF_NOT_OK_REF(client_or_error.status());
-  return client_or_error.value();
-}
-
 using BucketAction = RateLimitQuotaResponse::BucketAction;
 using envoy::type::v3::RateLimitStrategy;
 
