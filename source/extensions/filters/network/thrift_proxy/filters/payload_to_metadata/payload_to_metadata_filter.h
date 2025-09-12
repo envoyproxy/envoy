@@ -9,8 +9,8 @@
 #include "source/common/common/logger.h"
 #include "source/common/common/matchers.h"
 #include "source/extensions/filters/network/thrift_proxy/decoder.h"
-#include "source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata/payload_extractor.h"
 #include "source/extensions/filters/network/thrift_proxy/filters/pass_through_filter.h"
+#include "source/extensions/filters/network/thrift_proxy/filters/payload_to_metadata/payload_extractor.h"
 
 #include "absl/strings/string_view.h"
 

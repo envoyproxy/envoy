@@ -12,7 +12,7 @@ namespace HttpFilters {
 namespace ThriftToMetadata {
 
 Rule::Rule(const ProtoRule& rule, uint16_t rule_id, PayloadExtractor::TrieSharedPtr root)
-    : rule_(rule), rule_id_(rule_id) {
+    : rule_(rule), rule_id_(rule_id), method_name_(rule.method_name()) {
   if (!rule_.has_on_present() && !rule_.has_on_missing()) {
     throw EnvoyException("thrift to metadata filter: neither `on_present` nor `on_missing` set");
   }
@@ -228,9 +228,10 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     return Http::FilterHeadersStatus::Continue;
   }
 
-  resp_trie_handler_ =
-      std::make_unique<PayloadExtractor::TrieMatchHandler>(*this, config_->respTrieRoot());
-  resp_handler_ = config_->createThriftDecoderHandler(*resp_trie_handler_, false);
+  const bool is_request = false;
+  resp_trie_handler_ = std::make_unique<PayloadExtractor::TrieMatchHandler>(
+      *this, config_->respTrieRoot(), is_request);
+  resp_handler_ = config_->createThriftDecoderHandler(*resp_trie_handler_, is_request);
   return Http::FilterHeadersStatus::StopIteration;
 }
 
@@ -288,7 +289,7 @@ bool Filter::processData(Buffer::Instance& incoming_data, Buffer::Instance& buff
     return true;
   }
   END_TRY catch (const AppException& ex) {
-    // DecodeComplete will treat all rules as missing.
+    // decodeComplete/encodeComplete will treat all rules as missing.
     ENVOY_LOG(error, "thrift application error: {}", ex.what());
   }
   catch (const EnvoyException& ex) {
@@ -331,7 +332,6 @@ void Filter::handleOnPresent(std::string&& value, const std::vector<uint16_t>& r
     ENVOY_LOG(trace, "handleOnPresent rule_id {}", rule_id);
 
     matched_field_selector_rule_ids_.erase(rule_id);
-
     auto& rules = is_request ? config_->requestRules() : config_->responseRules();
     ASSERT(rule_id < rules.size());
     const Rule& rule = rules[rule_id];

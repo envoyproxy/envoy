@@ -188,6 +188,7 @@ response_rules:
     FieldType field_type_struct = FieldType::Struct;
     FieldType field_type_stop = FieldType::Stop;
     if (message_type == MessageType::Reply || message_type == MessageType::Exception) {
+      ASSERT_TRUE(reply_type.has_value());
       if (reply_type.value() == ReplyType::Success) {
         field_id = 0;
         protocol_converter->fieldBegin("", field_type_string, field_id);
@@ -245,7 +246,7 @@ response_rules:
   envoy::config::core::v3::Metadata dynamic_metadata_;
   std::shared_ptr<FilterConfig> config_;
   std::shared_ptr<Filter> filter_;
-  const std::string method_name_{"foo"};
+  const std::string method_name_{"service:foo"};
   Http::TestRequestHeaderMapImpl request_headers_{
       {":path", "/Service"}, {":method", "POST"}, {"Content-Type", "application/x-thrift"}};
   Http::TestResponseHeaderMapImpl response_headers_{{":status", "200"},
@@ -337,6 +338,39 @@ request_rules:
   EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.invalid_thrift_body"), 0);
 }
 
+TEST_P(FilterTest, CallRequestSuccessWithStringPayloadWithMethodName) {
+  const auto [transport_type, protocol_type] = GetParam();
+  MessageType message_type = MessageType::Call;
+  initializeFilter(R"EOF(
+request_rules:
+- field_selector:
+    id: 2
+    name: second_field
+  on_present:
+    metadata_namespace: envoy.lb
+    key: second_field
+  on_missing:
+    metadata_namespace: envoy.lb
+    key: second_field
+    value: "unknown"
+  method_name: foo
+)EOF");
+  const std::map<std::string, std::string>& expected_metadata = {{"second_field", "string_value"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected_metadata)));
+
+  Buffer::OwnedImpl buffer;
+  writeMessage(buffer, transport_type, protocol_type, message_type);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.invalid_thrift_body"), 0);
+}
+
 TEST_P(FilterTest, CallRequestSuccessWithStringPayloadMissing) {
   const auto [transport_type, protocol_type] = GetParam();
   MessageType message_type = MessageType::Call;
@@ -367,6 +401,173 @@ request_rules:
   EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.mismatched_content_type"), 0);
   EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.no_body"), 0);
   EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.invalid_thrift_body"), 0);
+}
+
+TEST_P(FilterTest, CallRequestSuccessWithStringPayloadWithUnMatchedMethodName) {
+  const auto [transport_type, protocol_type] = GetParam();
+  MessageType message_type = MessageType::Call;
+  initializeFilter(R"EOF(
+request_rules:
+- field_selector:
+    id: 2
+    name: second_field
+  on_present:
+    metadata_namespace: envoy.lb
+    key: second_field
+  on_missing:
+    metadata_namespace: envoy.lb
+    key: second_field
+    value: "unknown"
+  method_name: unmatched_method_name
+)EOF");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata(_, _)).Times(0);
+
+  Buffer::OwnedImpl buffer;
+  writeMessage(buffer, transport_type, protocol_type, message_type);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.invalid_thrift_body"), 0);
+}
+
+TEST_P(FilterTest, CallResponseSuccessWithStringPayload) {
+  const auto [transport_type, protocol_type] = GetParam();
+  MessageType message_type = MessageType::Reply;
+  NetworkFilters::ThriftProxy::ReplyType reply_type = ReplyType::Success;
+  initializeFilter(R"EOF(
+response_rules:
+- field_selector:
+    id: 2
+    name: second_field
+  on_present:
+    metadata_namespace: envoy.lb
+    key: second_field
+  on_missing:
+    metadata_namespace: envoy.lb
+    key: second_field
+    value: "unknown"
+)EOF");
+  const std::map<std::string, std::string>& expected_metadata = {{"second_field", "string_value"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers_, false));
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected_metadata)));
+
+  Buffer::OwnedImpl buffer;
+  writeMessage(buffer, transport_type, protocol_type, message_type, reply_type);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(buffer, true));
+
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.success"), 1);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.no_body"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.invalid_thrift_body"), 0);
+}
+
+TEST_P(FilterTest, CallResponseSuccessWithStringPayloadWithMethodName) {
+  const auto [transport_type, protocol_type] = GetParam();
+  MessageType message_type = MessageType::Reply;
+  NetworkFilters::ThriftProxy::ReplyType reply_type = ReplyType::Success;
+  initializeFilter(R"EOF(
+response_rules:
+- field_selector:
+    id: 2
+    name: second_field
+  on_present:
+    metadata_namespace: envoy.lb
+    key: second_field
+  on_missing:
+    metadata_namespace: envoy.lb
+    key: second_field
+    value: "unknown"
+  method_name: foo
+)EOF");
+  const std::map<std::string, std::string>& expected_metadata = {{"second_field", "string_value"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers_, false));
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected_metadata)));
+
+  Buffer::OwnedImpl buffer;
+  writeMessage(buffer, transport_type, protocol_type, message_type, reply_type);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(buffer, true));
+
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.success"), 1);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.no_body"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.invalid_thrift_body"), 0);
+}
+
+TEST_P(FilterTest, CallResponseSuccessWithStringPayloadMissing) {
+  const auto [transport_type, protocol_type] = GetParam();
+  MessageType message_type = MessageType::Reply;
+  NetworkFilters::ThriftProxy::ReplyType reply_type = ReplyType::Success;
+  initializeFilter(R"EOF(
+response_rules:
+- field_selector:
+    id: 999
+    name: non_existent_field
+  on_present:
+    metadata_namespace: envoy.lb
+    key: non_existent_field
+  on_missing:
+    metadata_namespace: envoy.lb
+    key: non_existent_field
+    value: "unknown"
+)EOF");
+  const std::map<std::string, std::string>& expected_metadata = {{"non_existent_field", "unknown"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers_, false));
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected_metadata)));
+
+  Buffer::OwnedImpl buffer;
+  writeMessage(buffer, transport_type, protocol_type, message_type, reply_type);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(buffer, true));
+
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.success"), 1);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.no_body"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.invalid_thrift_body"), 0);
+}
+
+TEST_P(FilterTest, CallResponseSuccessWithStringPayloadWithUnMatchedMethodName) {
+  const auto [transport_type, protocol_type] = GetParam();
+  MessageType message_type = MessageType::Reply;
+  NetworkFilters::ThriftProxy::ReplyType reply_type = ReplyType::Success;
+  initializeFilter(R"EOF(
+response_rules:
+- field_selector:
+    id: 2
+    name: second_field
+  on_present:
+    metadata_namespace: envoy.lb
+    key: second_field
+  on_missing:
+    metadata_namespace: envoy.lb
+    key: second_field
+    value: "unknown"
+  method_name: unmatched_method_name
+)EOF");
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->encodeHeaders(response_headers_, false));
+  EXPECT_CALL(encoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata(_, _)).Times(0);
+
+  Buffer::OwnedImpl buffer;
+  writeMessage(buffer, transport_type, protocol_type, message_type, reply_type);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(buffer, true));
+
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.success"), 1);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.no_body"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.invalid_thrift_body"), 0);
 }
 
 TEST_P(FilterTest, OnewayRequestSuccess) {
