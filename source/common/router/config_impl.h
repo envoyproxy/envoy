@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/common/matcher/v3/matcher.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/route/v3/route_components.pb.h"
@@ -1255,6 +1256,12 @@ public:
 
 DECLARE_FACTORY(RouteListMatchActionFactory);
 
+// Helper structure to keep the matcher and substitution together.
+struct SimplificationRule {
+  const Regex::CompiledMatcherPtr matcher;
+  const std::string substitution;
+};
+
 /**
  * Wraps the route configuration which matches an incoming request headers to a backend cluster.
  * This is split out mainly to help with unit testing.
@@ -1303,6 +1310,8 @@ private:
 
   VirtualHostImplSharedPtr default_virtual_host_;
   const bool ignore_port_in_host_matching_{false};
+
+  std::vector<std::unique_ptr<SimplificationRule>> host_simplification_rules_;
 };
 
 /**

@@ -2495,6 +2495,62 @@ virtual_hosts:
   }
 }
 
+// Tests that host_simplification_rules mutate/simplify the host used
+// for picking the virtualhost when matching
+TEST_F(RouteMatcherTest, HostSimplificationRules) {
+  const std::string yaml = R"EOF(
+host_simplification_rules:
+- pattern:
+    regex: "^(foo[.])([^.]+)([.]example[.]org)$"
+  substitution: \1bar\3
+virtual_hosts:
+- name: local_service
+  domains: ["foo.bar.example.org"]
+  routes:
+  - match:
+      prefix: ""
+    name: "business-specific-route"
+    route:
+      cluster: local_service_grpc
+- name: catchall_host
+  domains:
+  - "*"
+  routes:
+  - match:
+      prefix: ""
+    name: "default-route"
+    route:
+      cluster: default_catch_all_service
+  )EOF";
+  auto route_configuration = parseRouteConfigurationFromYaml(yaml);
+
+  factory_context_.cluster_manager_.initializeClusters(
+      {"local_service_grpc", "default_catch_all_service"}, {});
+  {
+    TestConfigImpl config(route_configuration, factory_context_, true, creation_status_);
+    // First, the trivial, no substitution needed, but should happen anyway:
+    EXPECT_EQ(config.route(genHeaders("foo.bar.example.org", "/foo", "GET"), 0)->routeName(),
+              "business-specific-route");
+    // Matches, but requires the substitution to happen:
+    EXPECT_EQ(config.route(genHeaders("foo.baz.example.org", "/foo", "GET"), 0)->routeName(),
+              "business-specific-route");
+    // Matches, require substitution, longer replaceable section
+    EXPECT_EQ(
+        config.route(genHeaders("foo.barbazquxfoobang.example.org", "/foo", "GET"), 0)->routeName(),
+        "business-specific-route");
+    // Shouldn't match, but has a related substring:
+    EXPECT_EQ(config.route(genHeaders("qux.foo.baz.example.org", "/foo", "GET"), 0)->routeName(),
+              "default-route");
+    // Shouldn't match (trivial)
+    EXPECT_EQ(config.route(genHeaders("12.34.56.78:1234", "/foo", "GET"), 0)->routeName(),
+              "default-route");
+    EXPECT_EQ(config.route(genHeaders("www.foo.com:8090", "/foo", "GET"), 0)->routeName(),
+              "default-route");
+    EXPECT_EQ(config.route(genHeaders("[12:34:56:7890::]:8090", "/foo", "GET"), 0)->routeName(),
+              "default-route");
+  }
+}
+
 TEST_F(RouteMatcherTest, Priority) {
   const std::string yaml = R"EOF(
 virtual_hosts:
