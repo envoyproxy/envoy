@@ -91,12 +91,12 @@ public:
   public:
     virtual ~ModuleMetricHandle() = default;
 
-    virtual StatNameVecConstOptRef getLabelNames() const { return StatNameVecConstOptRef(); };
+    virtual StatNameVecConstOptRef getLabelNames() const { return {}; };
   };
 
   class ModuleCounterHandle : public ModuleMetricHandle {
   public:
-    virtual ~ModuleCounterHandle() = default;
+    ~ModuleCounterHandle() override = default;
 
     // Increment the counter by the given amount.
     virtual void add(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
