@@ -62,7 +62,7 @@ class GlobalRateLimitClientImpl : public Grpc::AsyncStreamCallbacks<
 public:
   // Note: rlqs_client is owned directly to ensure that it does not outlive the
   // GlobalRateLimitClientImpl (as the impl provides stream callbacks).
-  GlobalRateLimitClientImpl(const envoy::config::core::v3::GrpcService& rlqs_service,
+  GlobalRateLimitClientImpl(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                             Server::Configuration::FactoryContext& context,
                             absl::string_view domain_name,
                             std::chrono::milliseconds send_reports_interval,
@@ -163,7 +163,6 @@ private:
   std::string domain_name_;
   // Client is stored as the bare object since GrpcAsyncClient already takes ownership of the given
   // raw AsyncClientPtr.
-  Grpc::AsyncClientFactoryPtr async_client_factory_ = nullptr;
   GrpcAsyncClient async_client_;
   Grpc::AsyncStream<RateLimitQuotaUsageReports> stream_{};
 
@@ -194,10 +193,11 @@ createGlobalRateLimitClientImpl(Server::Configuration::FactoryContext& context,
                                 absl::string_view domain_name,
                                 std::chrono::milliseconds send_reports_interval,
                                 ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_tls,
-                                const envoy::config::core::v3::GrpcService& rlqs_service) {
+                                const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key) {
   Envoy::Event::Dispatcher& main_dispatcher = context.serverFactoryContext().mainThreadDispatcher();
-  return std::make_unique<GlobalRateLimitClientImpl>(
-      rlqs_service, context, domain_name, send_reports_interval, buckets_tls, main_dispatcher);
+  return std::make_unique<GlobalRateLimitClientImpl>(config_with_hash_key, context, domain_name,
+                                                     send_reports_interval, buckets_tls,
+                                                     main_dispatcher);
 }
 
 } // namespace RateLimitQuota

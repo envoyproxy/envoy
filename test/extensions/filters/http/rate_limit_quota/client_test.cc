@@ -110,7 +110,7 @@ protected:
 
     mock_stream_client->expectClientCreationWithFactory();
     global_client_ = std::make_unique<GlobalRateLimitClientImpl>(
-        mock_stream_client->grpc_service_, mock_stream_client->context_, mock_domain_,
+        mock_stream_client->config_with_hash_key_, mock_stream_client->context_, mock_domain_,
         reporting_interval_, *buckets_tls_, *mock_stream_client->dispatcher_);
     // Set callbacks to handle asynchronous timing.
     auto callbacks = std::make_unique<GlobalClientCallbacks>();

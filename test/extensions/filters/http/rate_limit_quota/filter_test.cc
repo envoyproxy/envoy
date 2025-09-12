@@ -108,10 +108,13 @@ public:
 
   void createFilter(bool set_callback = true) {
     filter_config_ = std::make_shared<FilterConfig>(config_);
+    Grpc::GrpcServiceConfigWithHashKey config_with_hash_key =
+        Grpc::GrpcServiceConfigWithHashKey(filter_config_->rlqs_server());
 
     mock_local_client_ = new MockRateLimitClient();
-    filter_ = std::make_unique<RateLimitQuotaFilter>(
-        filter_config_, context_, absl::WrapUnique(mock_local_client_), match_tree_);
+    filter_ = std::make_unique<RateLimitQuotaFilter>(filter_config_, context_,
+                                                     absl::WrapUnique(mock_local_client_),
+                                                     config_with_hash_key, match_tree_);
     if (set_callback) {
       filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     }

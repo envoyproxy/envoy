@@ -70,6 +70,7 @@ class RateLimitTestClient {
 public:
   RateLimitTestClient() {
     grpc_service_.mutable_envoy_grpc()->set_cluster_name("rate_limit_quota");
+    config_with_hash_key_ = Grpc::GrpcServiceConfigWithHashKey(grpc_service_);
   }
 
   void expectClientReset() {
@@ -213,6 +214,7 @@ public:
 
   NiceMock<MockFactoryContext> context_;
 
+  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   envoy::config::core::v3::GrpcService grpc_service_;
   std::shared_ptr<MockAsyncClientWithReset> owned_async_client_ = nullptr;
   MockAsyncClientWithReset* async_client_ = nullptr;

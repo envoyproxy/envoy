@@ -51,9 +51,10 @@ public:
   RateLimitQuotaFilter(FilterConfigConstSharedPtr config,
                        Server::Configuration::FactoryContext& factory_context,
                        std::unique_ptr<RateLimitClient> local_client,
+                       Grpc::GrpcServiceConfigWithHashKey config_with_hash_key,
                        Matcher::MatchTreeSharedPtr<Http::HttpMatchingData> matcher)
-      : config_(std::move(config)), factory_context_(factory_context), matcher_(matcher),
-        client_(std::move(local_client)),
+      : config_(std::move(config)), config_with_hash_key_(config_with_hash_key),
+        factory_context_(factory_context), matcher_(matcher), client_(std::move(local_client)),
         time_source_(factory_context.serverFactoryContext().mainThreadDispatcher().timeSource()) {}
 
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap&, bool end_stream) override;
@@ -78,6 +79,7 @@ private:
   bool shouldAllowRequest(const CachedBucket& cached_bucket);
 
   FilterConfigConstSharedPtr config_;
+  Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   Server::Configuration::FactoryContext& factory_context_;
   Http::StreamDecoderFilterCallbacks* callbacks_ = nullptr;
   RateLimitQuotaValidationVisitor visitor_ = {};

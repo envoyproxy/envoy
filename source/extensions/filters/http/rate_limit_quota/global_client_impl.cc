@@ -42,7 +42,7 @@ using BucketAction = RateLimitQuotaResponse::BucketAction;
 using envoy::type::v3::RateLimitStrategy;
 
 GlobalRateLimitClientImpl::GlobalRateLimitClientImpl(
-    const envoy::config::core::v3::GrpcService& rlqs_service,
+    const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
     Server::Configuration::FactoryContext& context, absl::string_view domain_name,
     std::chrono::milliseconds send_reports_interval,
     Envoy::ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_tls,
@@ -57,14 +57,13 @@ GlobalRateLimitClientImpl::GlobalRateLimitClientImpl(
       context.serverFactoryContext()
           .clusterManager()
           .grpcAsyncClientManager()
-          .factoryForGrpcService(rlqs_service, context.scope(), true);
+          .factoryForGrpcService(config_with_hash_key.config(), context.scope(), true);
   if (!rlqs_stream_client_factory.ok()) {
     throw EnvoyException(std::string(rlqs_stream_client_factory.status().message()));
   }
-  async_client_factory_ = std::move(*rlqs_stream_client_factory);
 
   absl::StatusOr<Grpc::RawAsyncClientPtr> rlqs_stream_client =
-      async_client_factory_->createUncachedRawAsyncClient();
+      (*rlqs_stream_client_factory)->createUncachedRawAsyncClient();
   if (!rlqs_stream_client.ok()) {
     throw EnvoyException(std::string(rlqs_stream_client.status().message()));
   }

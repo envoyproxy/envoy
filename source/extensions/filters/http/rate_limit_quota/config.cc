@@ -56,15 +56,15 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
 
   // Get the TLS store from the global map, or create one if it doesn't exist.
   std::shared_ptr<TlsStore> tls_store = GlobalTlsStores::getTlsStore(
-      config->rlqs_server(), context, rlqs_server_target, filter_config.domain());
+      config_with_hash_key, context, rlqs_server_target, filter_config.domain());
 
-  return [&, config = std::move(config), tls_store = std::move(tls_store),
+  return [&, config = std::move(config), config_with_hash_key, tls_store = std::move(tls_store),
           matcher = std::move(matcher)](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     std::unique_ptr<RateLimitClient> local_client =
         createLocalRateLimitClient(tls_store->global_client.get(), tls_store->buckets_tls);
 
-    callbacks.addStreamFilter(
-        std::make_shared<RateLimitQuotaFilter>(config, context, std::move(local_client), matcher));
+    callbacks.addStreamFilter(std::make_shared<RateLimitQuotaFilter>(
+        config, context, std::move(local_client), config_with_hash_key, matcher));
   };
 }
 
