@@ -193,7 +193,8 @@ def envoy_dependencies(skip_targets = []):
     _simdutf()
     _intel_ittapi()
     _com_github_google_quiche()
-    _com_googlesource_googleurl()
+    # Temporarily disabled due to rules_android Bazel 8 compatibility issues
+    # _com_googlesource_googleurl()
     _io_hyperscan()
     _io_vectorscan()
     _io_opentelemetry_api_cpp()
@@ -508,19 +509,23 @@ def _com_google_cel_cpp():
     external_http_archive(
         name = "com_google_cel_cpp",
         patch_args = ["-p1"],
-        patches = ["@envoy//bazel/foreign_cc:cel-cpp.patch"],
+        patches = [
+            "@envoy//bazel/foreign_cc:cel-cpp.patch",
+            "@envoy//bazel/foreign_cc:cel-cpp-build.patch",
+            "@envoy//bazel/foreign_cc:cel-cpp-antlr-wrapper.patch",
+        ],
     )
 
     # Load required dependencies that cel-cpp expects.
     external_http_archive("com_google_cel_spec")
 
-    # cel-cpp references ``@antlr4-cpp-runtime//:antlr4-cpp-runtime`` but it internally
-    # defines ``antlr4_runtimes`` with a cpp target.
+    # cel-cpp references ``@antlr4-cpp-runtime//:antlr4-cpp-runtime``
     # We are creating a repository alias to avoid duplicating the ANTLR4 dependency.
-    native.new_local_repository(
-        name = "antlr4-cpp-runtime",
-        path = ".",
-        build_file_content = """
+    if "antlr4-cpp-runtime" not in native.existing_rules():
+        native.new_local_repository(
+            name = "antlr4-cpp-runtime",
+            path = ".",
+            build_file_content = """
 package(default_visibility = ["//visibility:public"])
 
 # Alias to cel-cpp's embedded ANTLR4 runtime.
@@ -793,10 +798,51 @@ def _intel_ittapi():
     )
 
 def _com_github_google_quiche():
+    # Use external_http_archive with build_file_content for Bazel 8 compatibility
     external_http_archive(
         name = "com_github_google_quiche",
-        patch_cmds = ["find quiche/ -type f -name \"*.bazel\" -delete"],
-        build_file = "@envoy//bazel/external:quiche.BUILD",
+        patch_cmds = [
+            "find . -name '*.bazel' -delete || true",
+            "find . -name 'BUILD' -delete || true",
+            "find . -name 'BUILD.*' -delete || true",
+            "find . -name 'WORKSPACE' -delete || true",
+            "find . -name 'MODULE.bazel' -delete || true",
+        ],
+        build_file_content = """
+load("@envoy//bazel:envoy_build_system.bzl", "envoy_cc_library")
+load("@envoy//bazel/external:quiche.bzl", "quiche_copts")
+
+licenses(["notice"])
+
+envoy_cc_library(
+    name = "http2_adapter_http2_protocol",
+    srcs = ["quiche/http2/adapter/http2_protocol.cc"],
+    hdrs = ["quiche/http2/adapter/http2_protocol.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = ["@com_google_absl//absl/strings"],
+)
+
+envoy_cc_library(
+    name = "quiche_common_platform_export",
+    srcs = ["quiche/common/platform/api/quiche_export.cc"],
+    hdrs = ["quiche/common/platform/api/quiche_export.h"],
+    copts = quiche_copts,
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+)
+
+envoy_cc_library(
+    name = "quiche_common_platform",
+    srcs = glob(["quiche/common/platform/default/*.cc"]),
+    hdrs = glob(["quiche/common/platform/default/*.h"]),
+    copts = quiche_copts,
+    repository = "@envoy",
+    visibility = ["//visibility:public"],
+    deps = [":quiche_common_platform_export"],
+)
+""",
     )
 
 def _com_googlesource_googleurl():
