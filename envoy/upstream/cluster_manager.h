@@ -520,12 +520,15 @@ public:
    * @param validation_visitor
    * @return OdCdsApiHandlePtr the ODCDS handle.
    */
-
+  // TODO(adisuissa): once the xDS-TP config-sources are fully supported, the
+  // `odcds_config` parameter should become optional, and the comment above
+  // should be updated.
   using OdCdsCreationFunction = std::function<absl::StatusOr<std::shared_ptr<OdCdsApi>>(
       const envoy::config::core::v3::ConfigSource& odcds_config,
       OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
       Config::XdsManager& xds_manager, ClusterManager& cm, MissingClusterNotifier& notifier,
-      Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor)>;
+      Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
+      Server::Configuration::ServerFactoryContext& server_factory_context)>;
 
   virtual absl::StatusOr<OdCdsApiHandlePtr>
   allocateOdCdsApi(OdCdsCreationFunction creation_function,

@@ -121,7 +121,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 
 ConnectionImpl::~ConnectionImpl() {
   ASSERT(!socket_->isOpen() && delayed_close_timer_ == nullptr,
-         "ConnectionImpl was unexpectedly torn down without being closed.");
+         "ConnectionImpl destroyed with open socket and/or active timer");
 
   // In general we assume that owning code has called close() previously to the destructor being
   // run. This generally must be done so that callbacks run in the correct context (vs. deferred
@@ -148,6 +148,8 @@ bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initialize
 
 void ConnectionImpl::close(ConnectionCloseType type) {
   if (!socket_->isOpen()) {
+    ENVOY_CONN_LOG_EVENT(debug, "connection_closing", "Not closing conn, socket is not open",
+                         *this);
     return;
   }
 
@@ -302,6 +304,7 @@ void ConnectionImpl::closeThroughFilterManager(ConnectionCloseAction close_actio
 
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   if (!socket_->isOpen()) {
+    ENVOY_CONN_LOG(trace, "closeSocket: socket is not open, returning", *this);
     return;
   }
 
@@ -925,8 +928,6 @@ bool ConnectionImpl::setSocketOption(Network::SocketOptionName name, absl::Span<
   Api::SysCallIntResult result =
       SocketOptionImpl::setSocketOption(*socket_, name, value.data(), value.size());
   if (result.return_value_ != 0) {
-    ENVOY_LOG(warn, "Setting option on socket failed, errno: {}, message: {}", result.errno_,
-              errorDetails(result.errno_));
     return false;
   }
 
