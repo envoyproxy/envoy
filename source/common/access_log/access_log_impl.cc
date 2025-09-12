@@ -292,7 +292,8 @@ bool LogTypeFilter::evaluate(const Formatter::HttpFormatterContext& context,
 
 MetadataFilter::MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& filter_config,
                                Server::Configuration::CommonFactoryContext& context)
-    : default_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_config, match_if_key_not_found, true)),
+    : present_matcher_(true),
+      default_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_config, match_if_key_not_found, true)),
       filter_(filter_config.matcher().filter()) {
 
   if (filter_config.has_matcher()) {
@@ -306,11 +307,6 @@ MetadataFilter::MetadataFilter(const envoy::config::accesslog::v3::MetadataFilte
     const auto& val = matcher_config.value();
     value_matcher_ = Matchers::ValueMatcher::create(val, context);
   }
-
-  // Matches if the value is present in dynamic metadata
-  auto present_val = envoy::type::matcher::v3::ValueMatcher();
-  present_val.set_present_match(true);
-  present_matcher_ = Matchers::ValueMatcher::create(present_val, context);
 }
 
 bool MetadataFilter::evaluate(const Formatter::HttpFormatterContext&,
@@ -319,7 +315,7 @@ bool MetadataFilter::evaluate(const Formatter::HttpFormatterContext&,
       Envoy::Config::Metadata::metadataValue(&info.dynamicMetadata(), filter_, path_);
   // If the key corresponds to a set value in dynamic metadata, return true if the value matches the
   // the configured 'MetadataMatcher' value and false otherwise
-  if (present_matcher_->match(value)) {
+  if (present_matcher_.match(value)) {
     return value_matcher_ && value_matcher_->match(value);
   }
 
