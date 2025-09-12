@@ -3623,9 +3623,8 @@ http_filters:
     "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
-      "cluster_min_healthy_percentages contains a NaN value");
+  EXPECT_THROW_WITH_MESSAGE(createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+                            "cluster_min_healthy_percentages contains a NaN value");
 }
 
 class HcmUtilityTest : public testing::Test {
