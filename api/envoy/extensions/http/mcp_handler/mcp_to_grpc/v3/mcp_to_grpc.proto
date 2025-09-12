@@ -1,0 +1,71 @@
+syntax = "proto3";
+ 
+package envoy.extensions.http.mcp_handler.mcp_to_grpc.v3;
+ 
+import "validate/validate.proto";
+import "udpa/annotations/versioning.proto";
+ 
+option java_package = "io.envoyproxy.envoy.extensions.http.mcp_handler.mcp_to_grpc.v3";
+option java_outer_classname = "McpProxyProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/mcp_handler/mcp_to_grpc/v3;mcp_to_grpcv3";
+ 
+// MCP to grpc-json handler configuration
+//use with json_grpc_transcoder together
+message McpToGrpc {
+  oneof descriptor_set {
+    option (validate.required) = true;
+ 
+    // Supplies the filename of the proto descriptor set (.pb) for the gRPC services.
+    string proto_descriptor = 1;
+ 
+    // Supplies the binary content of the proto descriptor set for the gRPC services.
+    bytes proto_descriptor_bin = 2;
+  }
+ 
+  // A list of fully qualified service names (e.g. "helloworld.Greeter") to expose as tools.
+  repeated string services = 3;
+ 
+  // Whether the tools/list include output schema
+  // If set true, the grpc service MUST return structured content
+  // client should validate the response matches output schema
+  // https://modelcontextprotocol.io/specification/2025-06-18/server/tools#structured-content
+  bool include_output_schema = 4;
+ 
+  // Control options for response JSON. These options are passed directly to
+  // `JsonPrintOptions <https://developers.google.com/protocol-buffers/docs/reference/cpp/
+  // google.protobuf.util.json_util#JsonPrintOptions>`_.
+  PrintOptions print_options = 5;
+ 
+  message PrintOptions {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder.PrintOptions";
+ 
+    // Whether to add spaces, line breaks and indentation to make the JSON
+    // output easy to read. Defaults to false.
+    bool add_whitespace = 1;
+ 
+    // Whether to always print primitive fields. By default primitive
+    // fields with default values will be omitted in JSON output. For
+    // example, an int32 field set to 0 will be omitted. Setting this flag to
+    // true will override the default behavior and print primitive fields
+    // regardless of their values. Defaults to false.
+    bool always_print_primitive_fields = 2;
+ 
+    // Whether to always print enums as ints. By default they are rendered
+    // as strings. Defaults to false.
+    bool always_print_enums_as_ints = 3;
+ 
+    // Whether to preserve proto field names. By default protobuf will
+    // generate JSON field names using the ``json_name`` option, or lower camel case,
+    // in that order. Setting this flag will preserve the original field names. Defaults to false.
+    bool preserve_proto_field_names = 4;
+ 
+    // If true, return all streams as newline-delimited JSON messages instead of as a comma-separated array
+    bool stream_newline_delimited = 5;
+  }
+ 
+  // Proto enum values are supposed to be in upper cases when used in JSON.
+  // Set this to true if your JSON request uses non uppercase enum values.
+  bool case_insensitive_enum_parsing = 6;
+}
