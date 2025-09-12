@@ -389,5 +389,9 @@ new_features:
     Added a new metric ``db_build_epoch`` to track the build timestamp of the MaxMind geolocation database files.
     This can be used to monitor the freshness of the databases currently in use by the filter.
     See `MaxMind DB build_epoch <https://maxmind.github.io/MaxMind-DB/#build_epoch>`_ for more details.
+- area: tcp_proxy
+  change: |
+    Added ``max_downstream_connection_duration_jitter_percentage`` to allow adding a jitter to the max downstream connection duration.
+    This can be used to avoid thundering herd problems with many clients being disconnected and possibly reconnecting at the same time.
 
 deprecated:
