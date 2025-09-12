@@ -119,6 +119,8 @@ message ProcessingMode {
     // <envoy_v3_api_field_service.ext_proc.v3.ProcessingRequest.response_body>`.
     // If the ext_proc server modifies the body, that modified body will
     // be used to replace the gRPC message in the stream.
+    // In this mode, the client will send body and trailers to the server as
+    // they arrive.
     GRPC = 5;
   }
 
