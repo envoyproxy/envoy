@@ -117,8 +117,12 @@ message ProcessingMode {
     // <envoy_v3_api_field_service.ext_proc.v3.ProcessingRequest.request_body>`
     // or :ref:`response_body
     // <envoy_v3_api_field_service.ext_proc.v3.ProcessingRequest.response_body>`.
-    // If the ext_proc server modifies the body, that modified body will
-    // be used to replace the gRPC message in the stream.
+    // The ext_proc server will stream back individual gRPC messages in the
+    // :ref:`StreamedBodyResponse <envoy_v3_api_msg_service.ext_proc.v3.StreamedBodyResponse>`
+    // field, but the number of messages sent by the ext_proc server
+    // does not need to equal the number of messages sent by the data
+    // plane.  This allows the ext_proc server to change the number of
+    // messages sent on the stream.
     // In this mode, the client will send body and trailers to the server as
     // they arrive.
     GRPC = 5;
