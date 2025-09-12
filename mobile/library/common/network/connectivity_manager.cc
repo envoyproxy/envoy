@@ -83,6 +83,7 @@ ConnectivityManagerImpl::ConnectivityManagerImpl(Upstream::ClusterManager& clust
                                                  DnsCacheManagerSharedPtr dns_cache_manager)
     : cluster_manager_(cluster_manager), dns_cache_manager_(dns_cache_manager) {
   initializeNetworkStates();
+    cluster_manager_.createNetworkObserverRegistries(quic_observer_registry_factory_);
 }
 
 envoy_netconf_t ConnectivityManagerImpl::setPreferredNetwork(int network) {
@@ -529,8 +530,13 @@ void ConnectivityManagerImpl::onDefaultNetworkChangedAndroid(ConnectionType conn
     if (default_network_change_callback_ != nullptr) {
       default_network_change_callback_(current_configuration_key);
     }
+  for (std::reference_wrapper<Quic::EnvoyMobileQuicNetworkObserverRegistry> registry :
+       quic_observer_registry_factory_.getCreatedObserverRegistries()) {
+    registry.get().onNetworkMadeDefault();
+  }
     if (observer_ != nullptr) {
       observer_->onNetworkMadeDefault(net_id);
+
     }
   }
 }

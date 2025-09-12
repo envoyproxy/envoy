@@ -256,6 +256,7 @@ public:
         /*send_buffer_limit=*/2 * Http2::Utility::OptionsLimits::MIN_INITIAL_STREAM_WINDOW_SIZE,
         persistent_info.crypto_stream_factory_, quic_stat_names_, cache, *stats_store_.rootScope(),
         nullptr, *transport_socket_factory_);
+    session->registerNetworkObserver(registry_);
     return session;
   }
 
@@ -491,6 +492,7 @@ protected:
   quic::DeterministicConnectionIdGenerator connection_id_generator_{
       quic::kQuicDefaultConnectionIdLength};
   std::string client_alpn_;
+  TestNetworkObserverRegistry registry_;
 };
 
 class QuicHttpIntegrationTest : public QuicHttpIntegrationTestBase,
