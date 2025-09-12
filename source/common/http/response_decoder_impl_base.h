@@ -32,7 +32,7 @@ public:
     return std::make_unique<ResponseDecoderHandleImpl>(live_trackable_, *this);
   }
 
-protected:
+private:
   std::shared_ptr<bool> live_trackable_;
 };
 
