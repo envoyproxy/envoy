@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package envoy.extensions.load_balancing_policies.peak_ewma.v3alpha;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.load_balancing_policies.peak_ewma.v3alpha";
+option java_outer_classname = "PeakEwmaProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/contrib/envoy/extensions/load_balancing_policies/peak_ewma/v3alpha";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Peak EWMA Load Balancer Configuration]
+// Configuration for the Peak EWMA (Exponentially Weighted Moving Average) load balancing policy.
+//
+// This policy implements a latency-aware variant of the Power of Two Choices (P2C) algorithm.
+// It selects the best host from two randomly chosen candidates based on a cost function:
+// `Cost = RTT_peak_ewma * (active_requests + 1)`.
+//
+// The Peak EWMA algorithm is designed to:
+// - Automatically route traffic away from slow or overloaded hosts
+// - Adapt to changing host performance without manual configuration
+// - Provide low-latency request routing with O(1) host selection complexity
+// - Work effectively in heterogeneous environments with varying host capabilities
+//
+// RTT measurements are automatically collected from HTTP request timing and used to update
+// the EWMA for each host. This provides real-time performance feedback for routing decisions.
+//
+// Important: This load balancer only considers latency and load when selecting hosts. It does
+// not handle host health or error responses - these should be managed by Envoy's health checking
+// and outlier detection systems. Peak EWMA operates on the pool of healthy hosts as determined
+// by these other systems.
+//
+// [#extension: envoy.load_balancing_policies.peak_ewma]
+// [#next-free-field: 6]
+message PeakEwma {
+  option (xds.annotations.v3.message_status).work_in_progress = true;
+
+  // The decay time for the RTT EWMA calculation. This specifies the time window over which
+  // latency observations are considered relevant. After this duration, older measurements
+  // have exponentially decayed to half their original weight.
+  //
+  // The Peak EWMA algorithm uses this to calculate the EWMA time constant (tau):
+  // `tau = decay_time_nanos`, and the EWMA reaches its half-life after `tau * ln(2)`.
+  //
+  // This parameter is more intuitive than a raw smoothing factor as it directly relates
+  // to the time duration over which you want to observe latency trends.
+  //
+  // If not specified, defaults to 10 seconds (following Finagle's default).
+  google.protobuf.Duration decay_time = 1;
+
+  // The interval at which EWMA data is aggregated from worker threads to the main thread.
+  // This controls the frequency of cross-thread synchronization for the per-thread aggregation model.
+  //
+  // A shorter interval provides more up-to-date cross-worker information but increases
+  // synchronization overhead. A longer interval reduces overhead but may cause workers
+  // to operate with staler information about other workers' latency observations.
+  //
+  // If not specified, defaults to 100 milliseconds.
+  google.protobuf.Duration aggregation_interval = 2;
+
+  // Maximum RTT samples to buffer per host per worker thread before overwriting oldest samples.
+  // This bounds memory usage while allowing burst traffic handling.
+  //
+  // Buffer capacity formula: max_samples_per_host / aggregation_interval = RPS capacity per host per worker
+  // Memory formula: max_samples_per_host × num_hosts × num_workers × 16 bytes
+  // Memory usage per worker = max_samples_per_host × num_hosts × 16 bytes
+  //
+  // If not specified, defaults to 1,000 samples per host per worker.
+  google.protobuf.UInt32Value max_samples_per_host = 3;
+
+  // Default RTT value to use for hosts that don't have measured RTT yet.
+  // This provides a baseline for cost calculations until actual measurements are available.
+  //
+  // This value is critical for initial load balancing decisions when hosts first join
+  // the cluster or when RTT measurements are temporarily unavailable. It should reflect
+  // the expected baseline latency for your environment:
+  //
+  // If not specified, defaults to 10 milliseconds.
+  google.protobuf.Duration default_rtt = 4;
+
+  // Penalty cost assigned to hosts that cannot provide valid cost calculations.
+  // This is used when a host has no RTT measurements or is unhealthy, ensuring
+  // the Power of Two Choices algorithm will prefer hosts with known performance.
+  //
+  // You probably should not change this value.
+  //
+  // The penalty should be significantly higher than any realistic RTT-based cost
+  // to ensure hosts with unknown performance are strongly deprioritized while
+  // still allowing them to receive traffic if no better alternatives exist.
+  //
+  // If not specified, defaults to 1,000,000.0 (1 million).
+  google.protobuf.DoubleValue penalty_value = 5;
+}
