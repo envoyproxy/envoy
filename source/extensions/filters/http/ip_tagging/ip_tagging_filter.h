@@ -41,7 +41,6 @@ public:
    * @param ip_tags_datasource file based data source to load ip tags from.
    * @param dispatcher The dispatcher for the thread used by a data source provider.
    * @param tls The thread local slot allocator used by a data source provider.
-   * @param creation_status This status will be populated with error if loading fails.
    * @return Valid LcTrieSharedPtr if loading succeeded or error status otherwise.
    */
   absl::StatusOr<LcTrieSharedPtr>
@@ -58,7 +57,6 @@ public:
   /**
    * Parses ip tags in a proto format into a trie structure.
    * @param ip_tags Collection of ip tags in proto format.
-   * @param creation_status This status will be populated with error if parsing fails.
    * @return Valid LcTrieSharedPtr if parsing succeeded or error status otherwise.
    */
   absl::StatusOr<LcTrieSharedPtr>
