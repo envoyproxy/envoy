@@ -1256,7 +1256,7 @@ protected:
     for (uint32_t s = 0; s < NumScopes; ++s) {
       Stats::ScopeSharedPtr scope = store_->rootScope()->scopeFromStatName(scope_names_[s]);
       {
-        absl::MutexLock lock(&scope_mutexes_[s]);
+        absl::MutexLock lock(scope_mutexes_[s]);
         scopes_[s] = scope;
       }
       for (Stats::StatName counter_name : counter_names_) {

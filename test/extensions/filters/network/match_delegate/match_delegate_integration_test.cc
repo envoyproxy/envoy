@@ -26,13 +26,13 @@ class CountingFilter : public Network::Filter {
 public:
   // Read filter methods
   Network::FilterStatus onData(Buffer::Instance& data, bool) override {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     data_bytes_ += data.length();
     return Network::FilterStatus::Continue;
   }
 
   Network::FilterStatus onNewConnection() override {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     connection_count_++;
     return Network::FilterStatus::Continue;
   }
@@ -43,7 +43,7 @@ public:
 
   // Write filter methods
   Network::FilterStatus onWrite(Buffer::Instance& data, bool) override {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     write_bytes_ += data.length();
     return Network::FilterStatus::Continue;
   }
@@ -54,23 +54,23 @@ public:
 
   // Thread-safe getters for counter values
   static uint32_t getConnectionCount() {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     return connection_count_;
   }
 
   static uint64_t getDataBytes() {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     return data_bytes_;
   }
 
   static uint64_t getWriteBytes() {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     return write_bytes_;
   }
 
   // Reset all counters
   static void resetCounters() {
-    absl::MutexLock lock(&mutex_);
+    absl::MutexLock lock(mutex_);
     connection_count_ = 0;
     data_bytes_ = 0;
     write_bytes_ = 0;
