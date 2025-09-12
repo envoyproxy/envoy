@@ -145,8 +145,7 @@ void cleanHealthCheckConfig(Protobuf::Message* message) {
       *Envoy::Protobuf::DynamicCastMessage<
           envoy::extensions::filters::http::health_check::v3::HealthCheck>(message);
   for (const auto& item : config.cluster_min_healthy_percentages()) {
-    if (std::isnan(item.second.value()) || item.second.value() < 0.0 ||
-        item.second.value() > 100.0) {
+    if (!(item.second.value() >= 0.0 && item.second.value() <= 100.0)) {
       throw EnvoyException("cluster_min_healthy_percentages has invalid value");
     }
   }
