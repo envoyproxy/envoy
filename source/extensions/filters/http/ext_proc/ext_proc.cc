@@ -15,6 +15,7 @@
 #include "source/extensions/filters/http/ext_proc/http_client/http_client_impl.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
+#include "source/extensions/filters/http/ext_proc/processing_request_modifier.h"
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
@@ -254,6 +255,7 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       expression_manager_(builder, context.localInfo(), config.request_attributes(),
                           config.response_attributes()),
       immediate_mutation_checker_(context.regexEngine()),
+      processing_request_modifier_(createProcessingRequestModifier(config, builder, context)),
       on_processing_response_factory_cb_(
           createOnProcessingResponseCb(config, context, stats_prefix)),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()),
@@ -545,8 +547,18 @@ void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callb
   watermark_callbacks_.setEncoderFilterCallbacks(&callbacks);
 }
 
-void Filter::sendRequest(ProcessingRequest&& req, bool end_stream) {
+void Filter::sendRequest(ProcessorState& state, ProcessingRequest&& req, bool end_stream) {
   // Calling the client send function to send the request.
+  if (config_->processingRequestModifier()) {
+    ProcessingRequestModifier::Params params = {
+        .traffic_direction = state.trafficDirection(),
+        .stream_info = state.callbacks()->streamInfo(),
+        .request_headers = state.requestHeaders(),
+        .response_headers = state.responseHeaders(),
+        .response_trailers = state.responseTrailers(),
+    };
+    config_->processingRequestModifier()->run(params, req);
+  }
   client_->sendRequest(std::move(req), end_stream, filter_callbacks_->streamId(), this, stream_);
 }
 
@@ -721,7 +733,7 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::HeadersCallback);
   ENVOY_STREAM_LOG(debug, "Sending headers message", *decoder_callbacks_);
-  sendRequest(std::move(req), false);
+  sendRequest(state, std::move(req), false);
   stats_.stream_msgs_sent_.inc();
   state.setPaused(true);
   return FilterHeadersStatus::StopIteration;
@@ -1012,7 +1024,7 @@ Filter::sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers
   ProcessingRequest req =
       buildHeaderRequest(state, headers, end_stream, /*observability_mode=*/true);
   ENVOY_STREAM_LOG(debug, "Sending headers message in observability mode", *decoder_callbacks_);
-  sendRequest(std::move(req), false);
+  sendRequest(state, std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 
   return FilterHeadersStatus::Continue;
@@ -1037,7 +1049,7 @@ Http::FilterDataStatus Filter::sendDataInObservabilityMode(Buffer::Instance& dat
     // Set up the the body chunk and send.
     auto req = setupBodyChunk(state, data, end_stream);
     req.set_observability_mode(true);
-    sendRequest(std::move(req), false);
+    sendRequest(state, std::move(req), false);
     stats_.stream_msgs_sent_.inc();
     ENVOY_STREAM_LOG(debug, "Sending body message in ObservabilityMode", *decoder_callbacks_);
   } else if (state.bodyMode() != ProcessingMode::NONE) {
@@ -1239,7 +1251,7 @@ void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState 
                            ProcessingRequest& req) {
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              new_state);
-  sendRequest(std::move(req), false);
+  sendRequest(state, std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 }
 
@@ -1271,7 +1283,7 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   }
   encodeProtocolConfig(req);
 
-  sendRequest(std::move(req), false);
+  sendRequest(state, std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 }
 
@@ -1922,6 +1934,25 @@ std::function<std::unique_ptr<OnProcessingResponse>()> FilterConfig::createOnPro
     return factory.createOnProcessingResponse(*shared_on_processing_response_config, context,
                                               stats_prefix);
   };
+}
+
+std::unique_ptr<ProcessingRequestModifier> FilterConfig::createProcessingRequestModifier(
+    const ExternalProcessor& config,
+    Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
+    Server::Configuration::CommonFactoryContext& context) {
+  if (!config.has_processing_request_modifier()) {
+    return nullptr;
+  }
+  auto& factory = Envoy::Config::Utility::getAndCheckFactory<ProcessingRequestModifierFactory>(
+      config.processing_request_modifier());
+  auto processing_request_modifier_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
+      config.processing_request_modifier().typed_config(), context.messageValidationVisitor(),
+      factory);
+  if (processing_request_modifier_config == nullptr) {
+    return nullptr;
+  }
+  return factory.createProcessingRequestModifier(*processing_request_modifier_config, builder,
+                                                 context);
 }
 
 std::unique_ptr<OnProcessingResponse> FilterConfig::createOnProcessingResponse() const {

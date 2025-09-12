@@ -22,6 +22,7 @@
 #include "test/common/http/common.h"
 #include "test/common/http/conn_manager_impl_test_base.h"
 #include "test/extensions/filters/http/ext_proc/mock_server.h"
+#include "test/extensions/filters/http/ext_proc/test_processing_request_modifier.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -818,6 +819,107 @@ TEST_F(HttpFilterTest, PostAndChangeHeaders) {
   EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(2, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+TEST_F(HttpFilterTest, SendAttributes) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  request_attributes: ["request.path"]
+  response_attributes: ["response.code"]
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  // The important part of this test is to check the contents of "last_request_"
+  // which is captured when the filter sends the request to the mock client.
+  // The response from the processor doesn't matter here.
+  EXPECT_TRUE(last_request_.has_request_headers());
+  EXPECT_GT(last_request_.attributes_size(), 0);
+  const auto& req_attributes = last_request_.attributes();
+  EXPECT_EQ(1, req_attributes.size());
+  EXPECT_TRUE(req_attributes.contains("envoy.filters.http.ext_proc"));
+  const auto& req_filter_attributes = req_attributes.at("envoy.filters.http.ext_proc");
+  EXPECT_EQ(1, req_filter_attributes.fields_size());
+  EXPECT_TRUE(req_filter_attributes.fields().contains("request.path"));
+  EXPECT_EQ("/", req_filter_attributes.fields().at("request.path").string_value());
+  processRequestHeaders(false, absl::nullopt);
+
+  // Let the rest of the request play out
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_CALL(stream_info_, responseCode()).WillRepeatedly(Return(200));
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+
+  EXPECT_TRUE(last_request_.has_response_headers());
+  EXPECT_GT(last_request_.attributes_size(), 0);
+  const auto& resp_attributes = last_request_.attributes();
+  EXPECT_EQ(1, resp_attributes.size());
+  EXPECT_TRUE(resp_attributes.contains("envoy.filters.http.ext_proc"));
+  const auto& resp_filter_attributes = resp_attributes.at("envoy.filters.http.ext_proc");
+  EXPECT_EQ(1, resp_filter_attributes.fields_size());
+  EXPECT_TRUE(resp_filter_attributes.fields().contains("response.code"));
+  EXPECT_EQ(200, resp_filter_attributes.fields().at("response.code").number_value());
+  processResponseHeaders(false, absl::nullopt);
+
+  Buffer::OwnedImpl resp_data("bar");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, CustomProcessingRequestModifier) {
+  TestProcessingRequestModifierFactory factory;
+  Registry::InjectFactory<ProcessingRequestModifierFactory> registration(factory);
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_request_modifier:
+    name: "test_processing_request_modifier"
+    typed_config:
+      "@type": type.googleapis.com/envoy.test.extensions.filters.http.ext_proc.v3.TestProcessingRequestModifierConfig
+      mapped_request_attributes:
+        "remapped.path": "request.path"
+        "remapped.uri": "request.path"
+        "remapped.method": "request.method"
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  // Check that our custom attribute builder was used
+  EXPECT_TRUE(last_request_.has_request_headers());
+  const auto& attributes = last_request_.attributes();
+  EXPECT_EQ(1, attributes.size());
+  EXPECT_TRUE(attributes.contains("envoy.filters.http.ext_proc"));
+  const auto& filter_attributes = attributes.at("envoy.filters.http.ext_proc");
+  EXPECT_EQ(3, filter_attributes.fields_size());
+  EXPECT_TRUE(filter_attributes.fields().contains("remapped.path"));
+  EXPECT_EQ("/", filter_attributes.fields().at("remapped.path").string_value());
+  EXPECT_TRUE(filter_attributes.fields().contains("remapped.uri"));
+  EXPECT_EQ("/", filter_attributes.fields().at("remapped.uri").string_value());
+  EXPECT_TRUE(filter_attributes.fields().contains("remapped.method"));
+  EXPECT_EQ("POST", filter_attributes.fields().at("remapped.method").string_value());
+
+  processRequestHeaders(false, absl::nullopt);
+
+  // Let the rest of the request play out
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+
+  Buffer::OwnedImpl resp_data_2("bar");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data_2, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  filter_->onDestroy();
 }
 
 // Using the default configuration, test the filter with a processor that

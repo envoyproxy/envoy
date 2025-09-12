@@ -43,6 +43,7 @@ envoy_extension_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         ":mock_server_lib",
+        ":test_processing_request_modifier_lib",
         ":utils_lib",
         "//envoy/http:filter_interface",
         "//envoy/network:filter_interface",
@@ -68,6 +69,26 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/http/ext_proc/response_processors/save_processing_response/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "test_processing_request_modifier_proto",
+    srcs = ["test_processing_request_modifier.proto"],
+)
+
+envoy_extension_cc_test_library(
+    name = "test_processing_request_modifier_lib",
+    srcs = ["test_processing_request_modifier.cc"],
+    hdrs = ["test_processing_request_modifier.h"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    deps = [
+        ":test_processing_request_modifier_proto_cc_proto",
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/common/expr:evaluator_lib",
+        "//source/extensions/filters/http/ext_proc:matching_utils_lib",
+        "//source/extensions/filters/http/ext_proc:processing_request_modifier_interface",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )

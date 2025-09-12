@@ -342,6 +342,16 @@ message ExternalProcessor {
   // Since ``request_header_mode`` is not applicable in any way, it's ignored in comparison.
   repeated ProcessingMode allowed_override_modes = 22;
 
+  // Decorator to introduce custom logic that runs after the ``ProcessingRequest`` is constructed, but
+  // before it is sent to the External Processor. The ``ProcessingRequest`` may be modified.
+  //
+  // .. note::
+  //   Processing request modifiers are currently in alpha.
+  //
+  // [#extension-category: envoy.http.ext_proc.processing_request_modifiers]
+  config.core.v3.TypedExtensionConfig processing_request_modifier = 24
+      [(xds.annotations.v3.field_status).work_in_progress = true];
+
   // Decorator to introduce custom logic that runs after a message received from
   // the External Processor is processed, but before continuing filter chain iteration.
   //
