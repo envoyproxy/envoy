@@ -400,6 +400,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/source/extensions/listener_managers/validation_listener_manager @adisuissa @ggreenway
 /*/source/extensions/config_subscription/ @adisuissa @UNOWNED
 /*/source/extensions/config_subscription/grpc @adisuissa @UNOWNED
+/*/extensions/propagators @UNOWNED @UNOWNED
 
 # URL Pattern Match and Rewrite Library
 /*/extensions/path/uri_template_lib @wbpcode @yanjunxiang-google

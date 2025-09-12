@@ -1,3 +1,4 @@
+#include "source/extensions/propagators/w3c/tracecontext/tracecontext_propagator.h"
 #include "source/extensions/tracers/fluentd/config.h"
 #include "source/extensions/tracers/fluentd/fluentd_tracer_impl.h"
 
@@ -17,6 +18,8 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace Fluentd {
+
+using W3cConstants = Envoy::Extensions::Propagators::W3c::W3cConstants;
 
 // Tests adapted from OpenTelemetry tracer extension @alexanderellis @yanavlasov
 class FluentdTracerIntegrationTest : public testing::Test {
@@ -82,8 +85,8 @@ TEST_F(FluentdTracerIntegrationTest, Span) {
   const std::vector<std::string> v = {version, trace_id_hex, Hex::uint64ToHex(parent_span_id),
                                       trace_flags};
   const std::string parent_trace_header = absl::StrJoin(v, "-");
-  trace_context.set(FluentdConstants::get().TRACE_PARENT.key(), parent_trace_header);
-  trace_context.set(FluentdConstants::get().TRACE_STATE.key(), "test=foo");
+  trace_context.set(W3cConstants::get().TRACE_PARENT.key(), parent_trace_header);
+  trace_context.set(W3cConstants::get().TRACE_STATE.key(), "test=foo");
 
   // Mock the random call for generating span ID so we can check it later.
   const uint64_t new_span_id = 3;
@@ -129,8 +132,8 @@ TEST_F(FluentdTracerIntegrationTest, ParseSpanContextFromHeadersTest) {
   const std::vector<std::string> v = {version, trace_id_hex, Hex::uint64ToHex(parent_span_id),
                                       trace_flags};
   const std::string parent_trace_header = absl::StrJoin(v, "-");
-  trace_context.set(FluentdConstants::get().TRACE_PARENT.key(), parent_trace_header);
-  trace_context.set(FluentdConstants::get().TRACE_STATE.key(), "test=foo");
+  trace_context.set(W3cConstants::get().TRACE_PARENT.key(), parent_trace_header);
+  trace_context.set(W3cConstants::get().TRACE_STATE.key(), "test=foo");
 
   // Mock the random call for generating span ID so we can check it later.
   const uint64_t new_span_id = 3;
@@ -148,18 +151,18 @@ TEST_F(FluentdTracerIntegrationTest, ParseSpanContextFromHeadersTest) {
   EXPECT_EQ(false, span->useLocalDecision());
 
   // Remove headers, then inject context into header from the span.
-  trace_context.remove(FluentdConstants::get().TRACE_PARENT.key());
-  trace_context.remove(FluentdConstants::get().TRACE_STATE.key());
+  trace_context.remove(W3cConstants::get().TRACE_PARENT.key());
+  trace_context.remove(W3cConstants::get().TRACE_STATE.key());
   span->injectContext(trace_context, Tracing::UpstreamContext());
 
   // Check the headers
-  auto sampled_entry = trace_context.get(FluentdConstants::get().TRACE_PARENT.key());
+  auto sampled_entry = trace_context.get(W3cConstants::get().TRACE_PARENT.key());
   EXPECT_TRUE(sampled_entry.has_value());
   EXPECT_EQ(
       sampled_entry.value(),
       absl::StrJoin({version, trace_id_hex, Hex::uint64ToHex(new_span_id), trace_flags}, "-"));
 
-  auto sampled_tracestate_entry = trace_context.get(FluentdConstants::get().TRACE_STATE.key());
+  auto sampled_tracestate_entry = trace_context.get(W3cConstants::get().TRACE_STATE.key());
   EXPECT_TRUE(sampled_tracestate_entry.has_value());
   EXPECT_EQ(sampled_tracestate_entry.value(), "test=foo");
 }
@@ -194,11 +197,11 @@ TEST_F(FluentdTracerIntegrationTest, GenerateSpanContextWithoutHeadersTest) {
   EXPECT_EQ(true, span->useLocalDecision());
 
   // Remove headers, then inject context into header from the span.
-  trace_context.remove(FluentdConstants::get().TRACE_PARENT.key());
+  trace_context.remove(W3cConstants::get().TRACE_PARENT.key());
   span->injectContext(trace_context, Tracing::UpstreamContext());
 
   // Check the headers
-  auto sampled_entry = trace_context.get(FluentdConstants::get().TRACE_PARENT.key());
+  auto sampled_entry = trace_context.get(W3cConstants::get().TRACE_PARENT.key());
   EXPECT_TRUE(sampled_entry.has_value());
   EXPECT_EQ(sampled_entry.value(), "00-00000000000000010000000000000002-0000000000000003-01");
 }
@@ -209,7 +212,7 @@ TEST_F(FluentdTracerIntegrationTest, NullSpanWithPropagationHeaderError) {
   // Add an invalid OTLP header to the trace context.
   Tracing::TestTraceContextImpl trace_context{
       {":authority", "test.com"}, {":path", "/"}, {":method", "GET"}};
-  trace_context.set(FluentdConstants::get().TRACE_PARENT.key(), "invalid00-0000000000000003-01");
+  trace_context.set(W3cConstants::get().TRACE_PARENT.key(), "invalid00-0000000000000003-01");
 
   Tracing::SpanPtr span = driver_->startSpan(mock_tracing_config_, trace_context, stream_info_,
                                              operation_name_, {Tracing::Reason::Sampling, true});
