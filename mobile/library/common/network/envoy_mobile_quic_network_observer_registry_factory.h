@@ -15,6 +15,9 @@ public:
   // Called when the default network has changed to notify each registered observer.
   void onNetworkMadeDefault(NetworkHandle network);
 
+  // Called when a new network is connected to notify each registered observer.
+  void onNetworkConnected(NetworkHandle network);
+
 private:
   Event::Dispatcher& dispatcher_;
 };

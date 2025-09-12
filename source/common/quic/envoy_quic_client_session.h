@@ -94,6 +94,9 @@ public:
 
   void onNetworkMadeDefault();
 
+  // Called when a new network is connected.
+  void onNetworkConnected(NetworkHandle network);
+
   // Register this session to the given registry for receiving network change events.
   void registerNetworkObserver(EnvoyQuicNetworkObserverRegistry& registry);
 

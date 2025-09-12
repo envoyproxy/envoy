@@ -22,7 +22,8 @@ public:
   operator=(const QuicNetworkConnectivityObserverImpl&) = delete;
 
   // QuicNetworkConnectivityObserver
-  void onNetworkChanged(NetworkHandle network) override;
+  void onNetworkMadeDefault(NetworkHandle network) override;
+  void onNetworkConnected(NetworkHandle network) override;
 
 private:
   EnvoyQuicClientSession& session_;

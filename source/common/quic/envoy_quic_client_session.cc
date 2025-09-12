@@ -179,6 +179,10 @@ void EnvoyQuicClientSession::onNetworkMadeDefault() {
   }
 }
 
+void EnvoyQuicClientSession::onNetworkConnected(NetworkHandle /*network*/) {
+  // TODO(danzh): Implement logic for network connected event.
+}
+
 void EnvoyQuicClientSession::OnRstStream(const quic::QuicRstStreamFrame& frame) {
   QuicSpdyClientSession::OnRstStream(frame);
   incrementSentQuicResetStreamErrorStats(frame.error(),
