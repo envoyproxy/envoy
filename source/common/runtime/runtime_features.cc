@@ -170,6 +170,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_no_ai_flags);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
 // Force a local reply from upstream envoy for reverse connections.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_reverse_conn_force_local_reply);
+// Adds status header for compressor filter.
+// Change alters order of evaluating conditions within the filter.
+// Flip to true after prod testing
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_compressor_add_status_header);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
