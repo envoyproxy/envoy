@@ -604,7 +604,7 @@ private:
                        PrioritySet::UpdateHostsParams&& update_hosts_params,
                        LocalityWeightsConstSharedPtr locality_weights,
                        const HostVector& hosts_added, const HostVector& hosts_removed,
-                       uint64_t seed, absl::optional<bool> weighted_priority_health,
+                       absl::optional<bool> weighted_priority_health,
                        absl::optional<uint32_t> overprovisioning_factor,
                        HostMapConstSharedPtr cross_priority_host_map);
 
