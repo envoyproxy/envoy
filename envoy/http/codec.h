@@ -201,8 +201,8 @@ public:
 class ResponseDecoder;
 
 /**
- * A handle to a ResponseDecoder. This handle can be used to check if the underlying decoder is still
- * valid and to get a reference to it.
+ * A handle to a ResponseDecoder. This handle can be used to check if the underlying decoder is
+ * still valid and to get a reference to it.
  */
 class ResponseDecoderHandle {
 public:
