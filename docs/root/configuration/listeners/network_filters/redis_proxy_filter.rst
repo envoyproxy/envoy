@@ -103,6 +103,7 @@ Example configuration:
    :language: yaml
    :lines: 19-34
    :linenos:
+   :lineno-start: 19
    :caption: :download:`redis-fault-injection.yaml <_include/redis-fault-injection.yaml>`
 
 This creates two faults- an error, applying only to GET commands at 10%, and a delay, applying to all
