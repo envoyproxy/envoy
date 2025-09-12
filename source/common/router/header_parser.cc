@@ -13,6 +13,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_replace.h"
@@ -38,14 +39,18 @@ parseHttpHeaderFormatter(const envoy::config::core::v3::HeaderValue& header_valu
     return absl::InvalidArgumentError(":-prefixed or host headers may not be modified");
   }
 
-  // UPSTREAM_METADATA and DYNAMIC_METADATA must be translated from JSON ["a", "b"] format to colon
-  // format (a:b)
-  std::string final_header_value = HeaderParser::translateMetadataFormat(header_value.value());
-  // Change PER_REQUEST_STATE to FILTER_STATE.
-  final_header_value = HeaderParser::translatePerRequestState(final_header_value);
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.remove_legacy_route_formatter")) {
+    // UPSTREAM_METADATA and DYNAMIC_METADATA must be translated from JSON ["a", "b"] format to
+    // colon format (a:b)
+    std::string final_header_value = HeaderParser::translateMetadataFormat(header_value.value());
+    // Change PER_REQUEST_STATE to FILTER_STATE.
+    final_header_value = HeaderParser::translatePerRequestState(final_header_value);
+    // Let the substitution formatter parse the final_header_value.
+    return Envoy::Formatter::FormatterImpl::create(final_header_value, true);
+  }
 
-  // Let the substitution formatter parse the final_header_value.
-  return Envoy::Formatter::FormatterImpl::create(final_header_value, true);
+  // Let the substitution formatter parse the header_value.
+  return Envoy::Formatter::FormatterImpl::create(header_value.value(), true);
 }
 
 } // namespace

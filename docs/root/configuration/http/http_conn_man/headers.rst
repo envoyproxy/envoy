@@ -702,7 +702,7 @@ headers are modified before the request is sent upstream and the response is not
 
 .. attention::
 
-  The following legacy header formatters are still supported, but will be deprecated in the future.
+  The following legacy header formatters are deprecated and will be removed soon.
   The equivalent information can be accessed using indicated substitutes.
 
   ``%DYNAMIC_METADATA(["namespace", "key", ...])%``
