@@ -53,7 +53,6 @@ envoy_cc_extension(
 envoy_cc_library(
     name = "abi_impl",
     srcs = ["abi_impl.cc"],
-    hdrs = [],
     deps = [
         ":filter_lib",
         "//source/common/http:utility_lib",

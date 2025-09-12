@@ -33,13 +33,13 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
         .define_gauge("magic_number")
         .expect("failed to define gauge"),
       test_counter_vec: envoy_filter_config
-        .define_counter_vec("test_counter_vec", &["test_label".into()])
+        .define_counter_vec("test_counter_vec", &["test_label"])
         .expect("failed to define counter vec"),
       test_gauge_vec: envoy_filter_config
-        .define_gauge_vec("test_gauge_vec", &["test_label".into()])
+        .define_gauge_vec("test_gauge_vec", &["test_label"])
         .expect("failed to define gauge vec"),
       test_histogram_vec: envoy_filter_config
-        .define_histogram_vec("test_histogram_vec", &["test_label".into()])
+        .define_histogram_vec("test_histogram_vec", &["test_label"])
         .expect("failed to define histogram vec"),
     })),
     "header_callbacks" => Some(Box::new(HeaderCallbacksFilterConfig {})),
@@ -78,22 +78,22 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StatsCallbacksFilterConfig 
       .set_gauge(self.magic_number, 42)
       .expect("failed to set gauge");
     envoy_filter
-      .increment_counter_vec(self.test_counter_vec, &["increment".into()], 1)
+      .increment_counter_vec(self.test_counter_vec, &["increment"], 1)
       .expect("failed to increment counter vec");
     envoy_filter
-      .increase_gauge_vec(self.test_gauge_vec, &["increase".into()], 1)
+      .increase_gauge_vec(self.test_gauge_vec, &["increase"], 1)
       .expect("failed to increase gauge vec");
     envoy_filter
-      .increase_gauge_vec(self.test_gauge_vec, &["decrease".into()], 10)
+      .increase_gauge_vec(self.test_gauge_vec, &["decrease"], 10)
       .expect("failed to increase gauge vec");
     envoy_filter
-      .decrease_gauge_vec(self.test_gauge_vec, &["decrease".into()], 8)
+      .decrease_gauge_vec(self.test_gauge_vec, &["decrease"], 8)
       .expect("failed to decrease gauge vec");
     envoy_filter
-      .set_gauge_vec(self.test_gauge_vec, &["set".into()], 9001)
+      .set_gauge_vec(self.test_gauge_vec, &["set"], 9001)
       .expect("failed to set gauge vec");
     envoy_filter
-      .record_histogram_value_vec(self.test_histogram_vec, &["record".into()], 1)
+      .record_histogram_value_vec(self.test_histogram_vec, &["record"], 1)
       .expect("failed to record histogram value vec");
     // Copy the stats handles onto the filter so that we can observe stats while
     // handling requests.

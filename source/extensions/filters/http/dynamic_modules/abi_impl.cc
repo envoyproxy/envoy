@@ -146,7 +146,7 @@ envoy_dynamic_module_callback_http_filter_increment_counter_vec(
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
   if (label_values_length != counter->getLabelNames().size()) {
-    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
+    return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
   auto tags = buildTagsForModuleMetric(*filter, counter->getLabelNames(), label_values,
                                        label_values_length);
@@ -251,9 +251,6 @@ envoy_dynamic_module_callback_http_filter_decrease_gauge_vec(
   }
   auto tags =
       buildTagsForModuleMetric(*filter, gauge->getLabelNames(), label_values, label_values_length);
-  if (!gauge.has_value()) {
-    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
-  }
   gauge->decrease(*filter->getFilterConfig().stats_scope_, tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
@@ -283,9 +280,6 @@ envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filt
   }
   auto tags =
       buildTagsForModuleMetric(*filter, gauge->getLabelNames(), label_values, label_values_length);
-  if (!gauge.has_value()) {
-    return envoy_dynamic_module_type_metrics_result_MetricNotFound;
-  }
   gauge->set(*filter->getFilterConfig().stats_scope_, tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
