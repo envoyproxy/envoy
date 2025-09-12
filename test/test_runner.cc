@@ -81,16 +81,17 @@ int TestRunner::runTests(int argc, char** argv) {
   // We hold on to process_wide to provide RAII cleanup of process-wide
   // state.
   ProcessWide process_wide(false);
+
+  // Use the recommended, but not default, "threadsafe" style for the Death Tests.
+  // See: https://github.com/google/googletest/commit/84ec2e0365d791e4ebc7ec249f09078fb5ab6caa
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
+
   // Add a test-listener so we can call a hook where we can do a quiescence
   // check after each method. See
   // https://github.com/google/googletest/blob/master/googletest/docs/advanced.md
   // for details.
   ::testing::TestEventListeners& listeners = ::testing::UnitTest::GetInstance()->listeners();
   listeners.Append(new TestListener);
-
-  // Use the recommended, but not default, "threadsafe" style for the Death Tests.
-  // See: https://github.com/google/googletest/commit/84ec2e0365d791e4ebc7ec249f09078fb5ab6caa
-  ::testing::FLAGS_gtest_death_test_style = "threadsafe";
 
   // Set gtest properties
   // (https://github.com/google/googletest/blob/master/googletest/docs/advanced.md#logging-additional-information),

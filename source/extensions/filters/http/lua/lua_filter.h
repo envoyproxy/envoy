@@ -91,10 +91,10 @@ public:
                        lua_State* state) PURE;
 
   /**
-   * @return const ProtobufWkt::Struct& the value of metadata inside the lua filter scope of current
+   * @return const Protobuf::Struct& the value of metadata inside the lua filter scope of current
    * route entry.
    */
-  virtual const ProtobufWkt::Struct& metadata() const PURE;
+  virtual const Protobuf::Struct& metadata() const PURE;
 
   /**
    * @return StreamInfo::StreamInfo& the current stream info handle. This handle is mutable to
@@ -122,6 +122,18 @@ public:
    * Clear the route cache explicitly.
    */
   virtual void clearRouteCache() PURE;
+
+  /**
+   * @return const Protobuf::Struct& the filter context from the most specific filter config
+   * from the route or virtual host. Empty struct will be returned if no route or virtual host is
+   * found.
+   */
+  virtual const Protobuf::Struct& filterContext() const PURE;
+
+  /**
+   * @return absl::string_view the value of filter config name.
+   */
+  virtual const absl::string_view filterConfigName() const PURE;
 };
 
 class Filter;
@@ -194,7 +206,10 @@ public:
             {"timestampString", static_luaTimestampString},
             {"connectionStreamInfo", static_luaConnectionStreamInfo},
             {"setUpstreamOverrideHost", static_luaSetUpstreamOverrideHost},
-            {"clearRouteCache", static_luaClearRouteCache}};
+            {"clearRouteCache", static_luaClearRouteCache},
+            {"filterContext", static_luaFilterContext},
+            {"virtualHost", static_luaVirtualHost},
+            {"route", static_luaRoute}};
   }
 
 private:
@@ -326,6 +341,21 @@ private:
    */
   DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaClearRouteCache);
 
+  /**
+   * Get the filter context.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaFilterContext);
+
+  /**
+   * @return a handle to the virtual host.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaVirtualHost);
+
+  /**
+   * @return a handle to the route.
+   */
+  DECLARE_LUA_FUNCTION(StreamHandleWrapper, luaRoute);
+
   enum Timestamp::Resolution getTimestampResolution(absl::string_view unit_parameter);
 
   int doHttpCall(lua_State* state, const HttpCallOptions& options);
@@ -345,10 +375,13 @@ private:
     body_wrapper_.reset();
     trailers_wrapper_.reset();
     metadata_wrapper_.reset();
+    filter_context_wrapper_.reset();
     stream_info_wrapper_.reset();
     connection_wrapper_.reset();
     public_key_wrapper_.reset();
     connection_stream_info_wrapper_.reset();
+    virtual_host_wrapper_.reset();
+    route_wrapper_.reset();
   }
 
   // Http::AsyncClient::Callbacks
@@ -372,10 +405,14 @@ private:
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::BufferWrapper> body_wrapper_;
   Filters::Common::Lua::LuaDeathRef<HeaderMapWrapper> trailers_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper> metadata_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::MetadataMapWrapper>
+      filter_context_wrapper_;
   Filters::Common::Lua::LuaDeathRef<StreamInfoWrapper> stream_info_wrapper_;
   Filters::Common::Lua::LuaDeathRef<ConnectionStreamInfoWrapper> connection_stream_info_wrapper_;
   Filters::Common::Lua::LuaDeathRef<Filters::Common::Lua::ConnectionWrapper> connection_wrapper_;
   Filters::Common::Lua::LuaDeathRef<PublicKeyWrapper> public_key_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<VirtualHostWrapper> virtual_host_wrapper_;
+  Filters::Common::Lua::LuaDeathRef<RouteWrapper> route_wrapper_;
   State state_{State::Running};
   std::function<void()> yield_callback_;
   Http::AsyncClient::Request* http_request_{};
@@ -446,42 +483,16 @@ public:
                        Server::Configuration::ServerFactoryContext& context);
 
   bool disabled() const { return disabled_; }
-  const std::string& name() const { return name_; }
+  absl::string_view name() const { return name_; }
   PerLuaCodeSetup* perLuaCodeSetup() const { return per_lua_code_setup_ptr_.get(); }
+  const Protobuf::Struct& filterContext() const { return filter_context_; }
 
 private:
   const bool disabled_;
   const std::string name_;
   PerLuaCodeSetupPtr per_lua_code_setup_ptr_;
+  const Protobuf::Struct filter_context_;
 };
-
-namespace {
-
-PerLuaCodeSetup* getPerLuaCodeSetup(const FilterConfig* filter_config,
-                                    Http::StreamFilterCallbacks* callbacks) {
-  const FilterConfigPerRoute* config_per_route = nullptr;
-  if (callbacks && callbacks->route()) {
-    config_per_route =
-        Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(callbacks);
-  }
-
-  if (config_per_route != nullptr) {
-    if (config_per_route->disabled()) {
-      return nullptr;
-    }
-    if (!config_per_route->name().empty()) {
-      ASSERT(filter_config);
-      return filter_config->perLuaCodeSetup(config_per_route->name());
-    }
-    return config_per_route->perLuaCodeSetup();
-  }
-  ASSERT(filter_config);
-  return filter_config->perLuaCodeSetup();
-}
-
-} // namespace
-
-// TODO(mattklein123): Filter stats.
 
 /**
  * The HTTP Lua filter. Allows scripts to run in both the request an response flow.
@@ -500,7 +511,7 @@ public:
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers,
                                           bool end_stream) override {
-    PerLuaCodeSetup* setup = getPerLuaCodeSetup(config_.get(), decoder_callbacks_.callbacks_);
+    PerLuaCodeSetup* setup = getPerLuaCodeSetup();
     const int function_ref = setup ? setup->requestFunctionRef() : LUA_REFNIL;
     return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_, function_ref,
                      setup, headers, end_stream);
@@ -521,7 +532,7 @@ public:
   }
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override {
-    PerLuaCodeSetup* setup = getPerLuaCodeSetup(config_.get(), decoder_callbacks_.callbacks_);
+    PerLuaCodeSetup* setup = getPerLuaCodeSetup();
     const int function_ref = setup ? setup->responseFunctionRef() : LUA_REFNIL;
     return doHeaders(response_stream_wrapper_, response_coroutine_, encoder_callbacks_,
                      function_ref, setup, headers, end_stream);
@@ -560,7 +571,7 @@ private:
     void respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                  lua_State* state) override;
 
-    const ProtobufWkt::Struct& metadata() const override;
+    const Protobuf::Struct& metadata() const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override {
       return callbacks_->connection().ptr();
@@ -573,6 +584,10 @@ private:
       if (auto cb = callbacks_->downstreamCallbacks(); cb.has_value()) {
         cb->clearRouteCache();
       }
+    }
+    const Protobuf::Struct& filterContext() const override { return parent_.filterContext(); }
+    const absl::string_view filterConfigName() const override {
+      return callbacks_->filterConfigName();
     }
 
     Filter& parent_;
@@ -592,7 +607,7 @@ private:
     void respond(Http::ResponseHeaderMapPtr&& headers, Buffer::Instance* body,
                  lua_State* state) override;
 
-    const ProtobufWkt::Struct& metadata() const override;
+    const Protobuf::Struct& metadata() const override;
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override {
       return callbacks_->connection().ptr();
@@ -602,12 +617,45 @@ private:
       UNREFERENCED_PARAMETER(host_and_strict);
     }
     void clearRouteCache() override {}
+    const Protobuf::Struct& filterContext() const override { return parent_.filterContext(); }
+    const absl::string_view filterConfigName() const override {
+      return callbacks_->filterConfigName();
+    }
 
     Filter& parent_;
     Http::StreamEncoderFilterCallbacks* callbacks_{};
   };
 
   using StreamHandleRef = Filters::Common::Lua::LuaDeathRef<StreamHandleWrapper>;
+
+  PerLuaCodeSetup* getPerLuaCodeSetup() {
+    if (decoder_callbacks_.callbacks_ != nullptr) {
+      per_route_config_ = Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
+          decoder_callbacks_.callbacks_);
+    }
+
+    if (per_route_config_ != nullptr) {
+      // The filter is disabled by the route configuration explicitly.
+      if (per_route_config_->disabled()) {
+        return nullptr;
+      }
+      // The filter should execute the script specified by the script name if exist.
+      if (!per_route_config_->name().empty()) {
+        return config_->perLuaCodeSetup(per_route_config_->name());
+      }
+      // The filter should execute the script specified by the inline code if exist.
+      if (auto inline_code = per_route_config_->perLuaCodeSetup(); inline_code != nullptr) {
+        return inline_code;
+      }
+    }
+
+    return config_->perLuaCodeSetup();
+  }
+
+  const Protobuf::Struct& filterContext() const {
+    return per_route_config_ == nullptr ? Protobuf::Struct::default_instance()
+                                        : per_route_config_->filterContext();
+  }
 
   Http::FilterHeadersStatus doHeaders(StreamHandleRef& handle,
                                       Filters::Common::Lua::CoroutinePtr& coroutine,
@@ -618,11 +666,8 @@ private:
   Http::FilterTrailersStatus doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers);
 
   FilterConfigConstSharedPtr config_;
-  DecoderCallbacks decoder_callbacks_{*this};
-  EncoderCallbacks encoder_callbacks_{*this};
-  StreamHandleRef request_stream_wrapper_;
-  StreamHandleRef response_stream_wrapper_;
-  bool destroyed_{};
+  const FilterConfigPerRoute* per_route_config_{};
+
   TimeSource& time_source_;
   LuaFilterStats stats_;
 
@@ -640,6 +685,12 @@ private:
   // seems like a safer fix for now.
   Filters::Common::Lua::CoroutinePtr request_coroutine_;
   Filters::Common::Lua::CoroutinePtr response_coroutine_;
+
+  DecoderCallbacks decoder_callbacks_{*this};
+  EncoderCallbacks encoder_callbacks_{*this};
+  StreamHandleRef request_stream_wrapper_;
+  StreamHandleRef response_stream_wrapper_;
+  bool destroyed_{};
 };
 
 } // namespace Lua

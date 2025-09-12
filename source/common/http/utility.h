@@ -59,7 +59,7 @@ initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions
 absl::StatusOr<envoy::config::core::v3::Http2ProtocolOptions>
 initializeAndValidateOptions(const envoy::config::core::v3::Http2ProtocolOptions& options,
                              bool hcm_stream_error_set,
-                             const ProtobufWkt::BoolValue& hcm_stream_error);
+                             const Protobuf::BoolValue& hcm_stream_error);
 } // namespace Utility
 } // namespace Http2
 namespace Http3 {
@@ -68,7 +68,7 @@ namespace Utility {
 envoy::config::core::v3::Http3ProtocolOptions
 initializeAndValidateOptions(const envoy::config::core::v3::Http3ProtocolOptions& options,
                              bool hcm_stream_error_set,
-                             const ProtobufWkt::BoolValue& hcm_stream_error);
+                             const Protobuf::BoolValue& hcm_stream_error);
 
 } // namespace Utility
 } // namespace Http3
@@ -202,8 +202,10 @@ void appendVia(RequestOrResponseHeaderMap& headers, const std::string& via);
  * @param headers headers where authority should be updated.
  * @param hostname hostname that authority should be updated with.
  * @param append_xfh append the original authority to the x-forwarded-host header.
+ * @param keep_old insert the original authority in the x-envoy-original-host header.
  */
-void updateAuthority(RequestHeaderMap& headers, absl::string_view hostname, bool append_xfh);
+void updateAuthority(RequestHeaderMap& headers, absl::string_view hostname, bool append_xfh,
+                     bool keep_old);
 
 /**
  * Creates an SSL (https) redirect path based on the input host and path headers.
@@ -263,7 +265,7 @@ std::string parseSetCookieValue(const HeaderMap& headers, const std::string& key
 
 /**
  * Produce the value for a Set-Cookie header with the given parameters.
- * @param key is the name of the cookie that is being set.
+ * @param name is the name of the cookie that is being set.
  * @param value the value to set the cookie to; this value is trusted.
  * @param path the path for the cookie, or the empty string to not set a path.
  * @param max_age the length of time for which the cookie is valid, or zero
@@ -271,9 +273,16 @@ std::string parseSetCookieValue(const HeaderMap& headers, const std::string& key
  * to create a session cookie.
  * @return std::string a valid Set-Cookie header value string
  */
-std::string makeSetCookieValue(const std::string& key, const std::string& value,
-                               const std::string& path, const std::chrono::seconds max_age,
-                               bool httponly, const Http::CookieAttributeRefVector attributes);
+std::string makeSetCookieValue(absl::string_view name, absl::string_view value,
+                               absl::string_view path, std::chrono::seconds max_age, bool httponly,
+                               absl::Span<const CookieAttribute> attributes);
+
+/**
+ * Remove a particular key value pair from a cookie.
+ * @param headers supplies the headers to remove the cookie pair from.
+ * @param key the key for the particular cookie value to remove.
+ */
+void removeCookieValue(HeaderMap& headers, const std::string& key);
 
 /**
  * Get the response status from the response headers.
@@ -600,8 +609,8 @@ const ConfigType* resolveMostSpecificPerFilterConfig(const Http::StreamFilterCal
  *
  * @param callbacks The stream filter callbacks to check for route configs.
  *
- * @return The all available per route config. The returned pointers are guaranteed to be non-null
- * and their lifetime is the same as the matched route.
+ * @return all the available per route config in ascending order of specificity (i.e., route table
+ * first, then virtual host, then per route).
  */
 template <class ConfigType>
 absl::InlinedVector<std::reference_wrapper<const ConfigType>, 4>

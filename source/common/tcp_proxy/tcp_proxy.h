@@ -166,7 +166,7 @@ public:
       const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config_message,
       Server::Configuration::FactoryContext& context);
   std::string host(const StreamInfo::StreamInfo& stream_info) const override;
-  bool usePost() const override { return use_post_; }
+  bool usePost() const override { return !post_path_.empty(); }
   const std::string& postPath() const override { return post_path_; }
   Envoy::Http::HeaderEvaluator& headerEvaluator() const override { return *header_parser_; }
 
@@ -182,7 +182,6 @@ public:
   }
 
 private:
-  const bool use_post_;
   std::unique_ptr<Envoy::Router::HeaderParser> header_parser_;
   Formatter::FormatterPtr hostname_fmt_;
   const bool propagate_response_headers_;
@@ -240,18 +239,10 @@ public:
       return access_log_flush_interval_;
     }
     TunnelingConfigHelperOptConstRef tunnelingConfigHelper() {
-      if (tunneling_config_helper_) {
-        return {*tunneling_config_helper_};
-      } else {
-        return {};
-      }
+      return makeOptRefFromPtr<const TunnelingConfigHelper>(tunneling_config_helper_.get());
     }
     OnDemandConfigOptConstRef onDemandConfig() {
-      if (on_demand_config_) {
-        return {*on_demand_config_};
-      } else {
-        return {};
-      }
+      return makeOptRefFromPtr<const OnDemandConfig>(on_demand_config_.get());
     }
     const BackOffStrategyPtr& backoffStrategy() const { return backoff_strategy_; };
     const Network::ProxyProtocolTLVVector& proxyProtocolTLVs() const {
@@ -557,8 +548,8 @@ public:
     }
     void addDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) override {}
     void removeDownstreamWatermarkCallbacks(Http::DownstreamWatermarkCallbacks&) override {}
-    void setDecoderBufferLimit(uint32_t) override {}
-    uint32_t decoderBufferLimit() override { return 0; }
+    void setDecoderBufferLimit(uint64_t) override {}
+    uint64_t decoderBufferLimit() override { return 0; }
     bool recreateStream(const Http::ResponseHeaderMap*) override { return false; }
     void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
     Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return nullptr; }

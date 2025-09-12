@@ -12,15 +12,28 @@ namespace Tap {
 TapSocket::TapSocket(
     SocketTapConfigSharedPtr config,
     const envoy::extensions::transport_sockets::tap::v3::SocketTapConfig& socket_tap_config,
-    Network::TransportSocketPtr&& transport_socket)
+    Stats::Scope& stats_scope, Network::TransportSocketPtr&& transport_socket)
     : PassthroughSocket(std::move(transport_socket)), config_(config),
-      socket_tap_config_(socket_tap_config) {}
+      socket_tap_config_(socket_tap_config),
+      stats_(generateStats(stats_scope, socket_tap_config.stats_prefix())) {}
+
+TransportTapStats TapSocket::generateStats(Stats::Scope& stats_scope, const std::string& prefix) {
+  std::string final_prefix;
+  if (prefix.empty()) {
+    final_prefix = fmt::format("transport.tap.");
+  } else {
+    final_prefix = fmt::format("transport.tap.{}.", prefix);
+  }
+  TransportTapStats stats{ALL_TRANSPORT_TAP_STATS(POOL_COUNTER_PREFIX(stats_scope, final_prefix))};
+  return stats;
+}
 
 void TapSocket::setTransportSocketCallbacks(Network::TransportSocketCallbacks& callbacks) {
   ASSERT(!tapper_);
   transport_socket_->setTransportSocketCallbacks(callbacks);
-  tapper_ = config_ ? config_->createPerSocketTapper(socket_tap_config_, callbacks.connection())
-                    : nullptr;
+  tapper_ = config_
+                ? config_->createPerSocketTapper(socket_tap_config_, stats_, callbacks.connection())
+                : nullptr;
 }
 
 void TapSocket::closeSocket(Network::ConnectionEvent event) {
@@ -54,18 +67,18 @@ TapSocketFactory::TapSocketFactory(
     const envoy::extensions::transport_sockets::tap::v3::Tap& proto_config,
     Common::Tap::TapConfigFactoryPtr&& config_factory, OptRef<Server::Admin> admin,
     Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
-    Event::Dispatcher& main_thread_dispatcher,
+    Event::Dispatcher& main_thread_dispatcher, Stats::Scope& scope,
     Network::UpstreamTransportSocketFactoryPtr&& transport_socket_factory)
     : ExtensionConfigBase(proto_config.common_config(), std::move(config_factory), admin,
                           singleton_manager, tls, main_thread_dispatcher),
       PassthroughFactory(std::move(transport_socket_factory)),
-      ts_tap_config_(proto_config.socket_tap_config()) {}
+      ts_tap_config_(proto_config.socket_tap_config()), stats_scope_(scope) {}
 
 Network::TransportSocketPtr
 TapSocketFactory::createTransportSocket(Network::TransportSocketOptionsConstSharedPtr options,
                                         Upstream::HostDescriptionConstSharedPtr host) const {
   return std::make_unique<TapSocket>(
-      currentConfigHelper<SocketTapConfig>(), ts_tap_config_,
+      currentConfigHelper<SocketTapConfig>(), ts_tap_config_, stats_scope_,
       transport_socket_factory_->createTransportSocket(options, host));
 }
 
@@ -73,15 +86,16 @@ DownstreamTapSocketFactory::DownstreamTapSocketFactory(
     const envoy::extensions::transport_sockets::tap::v3::Tap& proto_config,
     Common::Tap::TapConfigFactoryPtr&& config_factory, OptRef<Server::Admin> admin,
     Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
-    Event::Dispatcher& main_thread_dispatcher,
+    Event::Dispatcher& main_thread_dispatcher, Stats::Scope& scope,
     Network::DownstreamTransportSocketFactoryPtr&& transport_socket_factory)
     : ExtensionConfigBase(proto_config.common_config(), std::move(config_factory), admin,
                           singleton_manager, tls, main_thread_dispatcher),
       DownstreamPassthroughFactory(std::move(transport_socket_factory)),
-      ds_ts_tap_config_(proto_config.socket_tap_config()) {}
+      ds_ts_tap_config_(proto_config.socket_tap_config()), stats_scope_(scope) {}
 
 Network::TransportSocketPtr DownstreamTapSocketFactory::createDownstreamTransportSocket() const {
   return std::make_unique<TapSocket>(currentConfigHelper<SocketTapConfig>(), ds_ts_tap_config_,
+                                     stats_scope_,
                                      transport_socket_factory_->createDownstreamTransportSocket());
 }
 

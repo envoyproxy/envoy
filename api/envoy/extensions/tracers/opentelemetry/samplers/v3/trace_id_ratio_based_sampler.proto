@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package envoy.extensions.tracers.opentelemetry.samplers.v3;
+
+import "envoy/type/v3/percent.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.tracers.opentelemetry.samplers.v3";
+option java_outer_classname = "TraceIdRatioBasedSamplerProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/tracers/opentelemetry/samplers/v3;samplersv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Trace Id Ratio Based Sampler config]
+// Configuration for the "TraceIdRatioBased" Sampler extension.
+// The sampler follows the "TraceIdRatioBased" implementation from the OpenTelemetry
+// SDK specification.
+//
+// See:
+// `TraceIdRatioBased sampler specification <https://opentelemetry.io/docs/specs/otel/trace/sdk/#traceidratiobased>`_
+// [#extension: envoy.tracers.opentelemetry.samplers.trace_id_ratio_based]
+
+message TraceIdRatioBasedSamplerConfig {
+  // If the given trace_id falls into a given percentage of all possible
+  // trace_id values, ShouldSample will return RECORD_AND_SAMPLE.
+  // required
+  // [#extension-category: envoy.tracers.opentelemetry.samplers]
+  type.v3.FractionalPercent sampling_percentage = 1;
+}

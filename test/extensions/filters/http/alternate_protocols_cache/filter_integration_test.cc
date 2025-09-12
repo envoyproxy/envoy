@@ -428,7 +428,7 @@ TEST_P(FilterIntegrationTest, H3PostHandshakeFailoverToTcp) {
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
         auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
-        route->mutable_per_request_buffer_limit_bytes()->set_value(4096);
+        route->mutable_request_body_buffer_limit()->set_value(4096);
       });
 
   initialize();
@@ -523,7 +523,7 @@ TEST_P(MixedUpstreamIntegrationTest, BasicRequestAutoWithHttp3) {
   std::string alt_svc;
 
   // Make sure the srtt gets updated to a non-zero value.
-  for (int i = 0; i < 5; ++i) {
+  for (int i = 0; i < 20; ++i) {
     // Make sure that srtt is updated.
     const std::string filename = TestEnvironment::temporaryPath("alt_svc_cache.txt");
     alt_svc = TestEnvironment::readFileToStringForTest(filename);

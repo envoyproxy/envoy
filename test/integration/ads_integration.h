@@ -41,6 +41,7 @@ class AdsIntegrationTest : public AdsDeltaSotwIntegrationSubStateParamTest,
                            public HttpIntegrationTest {
 public:
   AdsIntegrationTest();
+  AdsIntegrationTest(const std::string& config);
 
   void TearDown() override;
 
@@ -84,6 +85,9 @@ public:
   envoy::admin::v3::ClustersConfigDump getClustersConfigDump();
   envoy::admin::v3::ListenersConfigDump getListenersConfigDump();
   envoy::admin::v3::RoutesConfigDump getRoutesConfigDump();
+
+private:
+  void commonInitialize();
 };
 
 // When old delta subscription state goes away, we could replace this macro back with

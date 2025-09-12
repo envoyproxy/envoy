@@ -636,6 +636,7 @@ public:
   const sockaddr* sockAddr() const override { return instance_.sockAddr(); }
   socklen_t sockAddrLen() const override { return instance_.sockAddrLen(); }
   absl::string_view addressType() const override { PANIC("not implemented"); }
+  absl::optional<std::string> networkNamespace() const override { return absl::nullopt; }
 
   Address::Type type() const override { return instance_.type(); }
   const SocketInterface& socketInterface() const override {
@@ -725,6 +726,11 @@ public:
     cares.set_filter_unroutable_families(filterUnroutableFamilies());
     cares.set_allocated_udp_max_queries(udpMaxQueries());
     cares.set_rotate_nameservers(setRotateNameservers());
+
+    // Set EDNS0 configuration if specified
+    if (getEdns0MaxPayloadSize() > 0) {
+      cares.mutable_edns0_max_payload_size()->set_value(getEdns0MaxPayloadSize());
+    }
 
     // Copy over the dns_resolver_options_.
     cares.mutable_dns_resolver_options()->MergeFrom(dns_resolver_options);
@@ -974,7 +980,8 @@ protected:
   virtual bool setResolverInConstructor() const { return false; }
   virtual bool filterUnroutableFamilies() const { return false; }
   virtual bool setRotateNameservers() const { return false; }
-  virtual ProtobufWkt::UInt32Value* udpMaxQueries() const { return nullptr; }
+  virtual Protobuf::UInt32Value* udpMaxQueries() const { return nullptr; }
+  virtual uint32_t getEdns0MaxPayloadSize() const { return 0; }
   Stats::TestUtil::TestStore stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<TestDnsServer> server_;
@@ -2197,10 +2204,10 @@ TEST_F(DnsImplConstructor, VerifyCustomTimeoutAndTries) {
       dns_resolvers);
   envoy::extensions::network::dns_resolver::cares::v3::CaresDnsResolverConfig cares;
   cares.add_resolvers()->MergeFrom(dns_resolvers);
-  auto query_timeout_seconds = std::make_unique<ProtobufWkt::UInt64Value>();
+  auto query_timeout_seconds = std::make_unique<Protobuf::UInt64Value>();
   query_timeout_seconds->set_value(9);
   cares.set_allocated_query_timeout_seconds(query_timeout_seconds.release());
-  auto query_tries = std::make_unique<ProtobufWkt::UInt32Value>();
+  auto query_tries = std::make_unique<Protobuf::UInt32Value>();
   query_tries->set_value(7);
   cares.set_allocated_query_tries(query_tries.release());
   Network::Utility::addressToProtobufAddress(
@@ -2242,10 +2249,10 @@ TEST_F(DnsImplConstructor, VerifyCustomTimeoutAndTries) {
 class DnsImplAresFlagsForMaxUdpQueriesinTest : public DnsImplTest {
 protected:
   bool tcpOnly() const override { return false; }
-  ProtobufWkt::UInt32Value* udpMaxQueries() const override {
-    auto udp_max_queries = std::make_unique<ProtobufWkt::UInt32Value>();
+  Protobuf::UInt32Value* udpMaxQueries() const override {
+    auto udp_max_queries = std::make_unique<Protobuf::UInt32Value>();
     udp_max_queries->set_value(100);
-    return dynamic_cast<ProtobufWkt::UInt32Value*>(udp_max_queries.release());
+    return dynamic_cast<Protobuf::UInt32Value*>(udp_max_queries.release());
   }
 };
 
@@ -2310,6 +2317,35 @@ TEST_P(DnsImplAresFlagsForNoNameserverRotationTest, NameserverRotationDisabled) 
   EXPECT_TRUE((optmask & ARES_OPT_NOROTATE) == ARES_OPT_NOROTATE);
   EXPECT_NE(nullptr,
             resolveWithUnreferencedParameters("some.good.domain", DnsLookupFamily::Auto, true));
+  ares_destroy_options(&opts);
+}
+
+// EDNS0 configuration test
+
+class DnsImplEdns0Test : public DnsImplTest {
+protected:
+  bool tcpOnly() const override { return false; }
+  uint32_t getEdns0MaxPayloadSize() const override { return 4096; }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplEdns0Test,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Test: Verify EDNS0 configuration is applied to c-ares options
+// Note: EDNS0 is only relevant for UDP DNS queries.
+// The DNS tests in this file use TCP-only mode to avoid instability and flakiness from UDP.
+// Therefore, this test only verifies that the EDNS0 configuration flag is set in c-ares,
+// not its functional behavior.
+TEST_P(DnsImplEdns0Test, Edns0ConfigurationApplied) {
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
+
+  // Verify EDNS0 payload size flag is set and value is correct
+  EXPECT_TRUE((optmask & ARES_OPT_EDNSPSZ) == ARES_OPT_EDNSPSZ);
+  EXPECT_EQ(opts.ednspsz, 4096);
+
   ares_destroy_options(&opts);
 }
 

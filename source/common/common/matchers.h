@@ -36,7 +36,7 @@ public:
   /**
    * Check whether the value is matched to the matcher.
    */
-  virtual bool match(const ProtobufWkt::Value& value) const PURE;
+  virtual bool match(const Protobuf::Value& value) const PURE;
 
   /**
    * Create the matcher object.
@@ -50,14 +50,14 @@ public:
   /**
    * Check whether the value is NULL.
    */
-  bool match(const ProtobufWkt::Value& value) const override;
+  bool match(const Protobuf::Value& value) const override;
 };
 
 class BoolMatcher : public ValueMatcher {
 public:
   BoolMatcher(bool matcher) : matcher_(matcher) {}
 
-  bool match(const ProtobufWkt::Value& value) const override;
+  bool match(const Protobuf::Value& value) const override;
 
 private:
   const bool matcher_;
@@ -67,7 +67,7 @@ class PresentMatcher : public ValueMatcher {
 public:
   PresentMatcher(bool matcher) : matcher_(matcher) {}
 
-  bool match(const ProtobufWkt::Value& value) const override;
+  bool match(const Protobuf::Value& value) const override;
 
 private:
   const bool matcher_;
@@ -77,7 +77,7 @@ class DoubleMatcher : public ValueMatcher {
 public:
   DoubleMatcher(const envoy::type::matcher::v3::DoubleMatcher& matcher) : matcher_(matcher) {}
 
-  bool match(const ProtobufWkt::Value& value) const override;
+  bool match(const Protobuf::Value& value) const override;
 
 private:
   const envoy::type::matcher::v3::DoubleMatcher matcher_;
@@ -85,6 +85,9 @@ private:
 
 class UniversalStringMatcher : public StringMatcher {
 public:
+  // To avoid hiding other implementations of match.
+  using StringMatcher::match;
+
   bool match(absl::string_view) const override { return true; }
 };
 
@@ -98,7 +101,7 @@ public:
       : exact_(exact), ignore_case_(ignore_case) {}
 
   // StringMatcher
-  bool match(const absl::string_view value, OptRef<const StringMatcher::Context>) const {
+  bool match(absl::string_view value, OptRef<const StringMatcher::Context>) const {
     return ignore_case_ ? absl::EqualsIgnoreCase(value, exact_) : value == exact_;
   }
 
@@ -116,7 +119,7 @@ public:
       : prefix_(prefix), ignore_case_(ignore_case) {}
 
   // StringMatcher
-  bool match(const absl::string_view value, OptRef<const StringMatcher::Context>) const {
+  bool match(absl::string_view value, OptRef<const StringMatcher::Context>) const {
     return ignore_case_ ? absl::StartsWithIgnoreCase(value, prefix_)
                         : absl::StartsWith(value, prefix_);
   }
@@ -136,7 +139,7 @@ public:
       : suffix_(suffix), ignore_case_(ignore_case) {}
 
   // StringMatcher
-  bool match(const absl::string_view value, OptRef<const StringMatcher::Context>) const {
+  bool match(absl::string_view value, OptRef<const StringMatcher::Context>) const {
     return ignore_case_ ? absl::EndsWithIgnoreCase(value, suffix_) : absl::EndsWith(value, suffix_);
   }
 
@@ -161,7 +164,7 @@ public:
   RegexStringMatcher(RegexStringMatcher&& other) noexcept { regex_ = std::move(other.regex_); }
 
   // StringMatcher
-  bool match(const absl::string_view value, OptRef<const StringMatcher::Context>) const {
+  bool match(absl::string_view value, OptRef<const StringMatcher::Context>) const {
     return regex_->match(value);
   }
 
@@ -179,7 +182,7 @@ public:
         ignore_case_(ignore_case) {}
 
   // StringMatcher
-  bool match(const absl::string_view value, OptRef<const StringMatcher::Context>) const {
+  bool match(absl::string_view value, OptRef<const StringMatcher::Context>) const {
     return ignore_case_ ? absl::StrContains(absl::AsciiStrToLower(value), contents_)
                         : absl::StrContains(value, contents_);
   }
@@ -206,7 +209,7 @@ public:
       : custom_(getExtensionStringMatcher(custom, context)) {}
 
   // StringMatcher
-  bool match(const absl::string_view value, OptRef<const StringMatcher::Context> context) const {
+  bool match(absl::string_view value, OptRef<const StringMatcher::Context> context) const {
     if (context) {
       return custom_->match(value, context.ref());
     }
@@ -240,14 +243,14 @@ public:
   }
 
   // StringMatcher
-  bool match(const absl::string_view value) const override { return doMatch(value, absl::nullopt); }
-  bool match(const absl::string_view value, const StringMatcher::Context& context) const override {
+  bool match(absl::string_view value) const override { return doMatch(value, absl::nullopt); }
+  bool match(absl::string_view value, const StringMatcher::Context& context) const override {
     return doMatch(value, makeOptRef(context));
   }
 
   // ValueMatcher
-  bool match(const ProtobufWkt::Value& value) const override {
-    if (value.kind_case() != ProtobufWkt::Value::kStringValue) {
+  bool match(const Protobuf::Value& value) const override {
+    if (value.kind_case() != Protobuf::Value::kStringValue) {
       return false;
     }
 
@@ -317,7 +320,7 @@ private:
     }
   }
 
-  bool doMatch(const absl::string_view value, OptRef<const StringMatcher::Context> context) const {
+  bool doMatch(absl::string_view value, OptRef<const StringMatcher::Context> context) const {
     // Implementing polymorphism for match(absl::string_value) on the different
     // types that can be in the matcher_ variant.
     auto call_match = [value, context](const auto& obj) -> bool {
@@ -344,7 +347,7 @@ public:
   ListMatcher(const envoy::type::matcher::v3::ListMatcher& matcher,
               Server::Configuration::CommonFactoryContext& context);
 
-  bool match(const ProtobufWkt::Value& value) const override;
+  bool match(const Protobuf::Value& value) const override;
 
 private:
   ValueMatcherConstSharedPtr oneof_value_matcher_;
@@ -355,7 +358,7 @@ public:
   OrMatcher(const envoy::type::matcher::v3::OrMatcher& matcher,
             Server::Configuration::CommonFactoryContext& context);
 
-  bool match(const ProtobufWkt::Value& value) const override;
+  bool match(const Protobuf::Value& value) const override;
 
 private:
   std::vector<ValueMatcherConstSharedPtr> or_matchers_;
@@ -411,6 +414,9 @@ public:
               Server::Configuration::CommonFactoryContext& context)
       : matcher_(matcher, context) {}
 
+  // To avoid hiding other implementations of match.
+  using StringMatcher::match;
+
   static PathMatcherConstSharedPtr
   createExact(const std::string& exact, bool ignore_case,
               Server::Configuration::CommonFactoryContext& context);
@@ -421,7 +427,7 @@ public:
   createSafeRegex(const envoy::type::matcher::v3::RegexMatcher& regex_matcher,
                   Server::Configuration::CommonFactoryContext& context);
 
-  bool match(const absl::string_view path) const override;
+  bool match(absl::string_view path) const override;
   const std::string& stringRepresentation() const { return matcher_.stringRepresentation(); }
 
 private:

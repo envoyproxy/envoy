@@ -37,6 +37,8 @@ filter_config:
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
+  Api::ApiPtr api = Api::createApiForTest();
+  EXPECT_CALL(context.server_factory_context_, api()).WillRepeatedly(testing::ReturnRef(*api));
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
@@ -66,6 +68,8 @@ filter_name: foo
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
+  Api::ApiPtr api = Api::createApiForTest();
+  EXPECT_CALL(context.server_factory_context_, api()).WillRepeatedly(testing::ReturnRef(*api));
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
@@ -98,6 +102,8 @@ filter_config:
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
+  Api::ApiPtr api = Api::createApiForTest();
+  EXPECT_CALL(context.server_factory_context_, api()).WillRepeatedly(testing::ReturnRef(*api));
 
   Envoy::Server::Configuration::DynamicModuleConfigFactory factory;
   auto result = factory.createFilterFactoryFromProto(proto_config, "", context);
@@ -174,6 +180,63 @@ filter_config:
     EXPECT_THAT(
         result.status().message(),
         testing::HasSubstr(fmt::format("Failed to resolve symbol {}", missing_symbol_name)));
+  }
+
+  auto symbol_err = [](const std::string& symbol) {
+    return fmt::format("Failed to resolve symbol {}", symbol);
+  };
+
+  // Test case for per-route config when module fails to load entirely.
+  {
+    const std::string yaml = R"EOF(
+dynamic_module_config:
+    name: non-existent-module
+per_route_config_name: foo
+filter_config:
+    "@type": "type.googleapis.com/google.protobuf.StringValue"
+    value: "bar"
+)EOF";
+    envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilterPerRoute proto_config;
+    TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+    auto result = factory.createRouteSpecificFilterConfig(
+        proto_config, context, ProtobufMessage::getNullValidationVisitor());
+    EXPECT_FALSE(result.ok());
+    EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to load dynamic module:"));
+  }
+
+  std::vector<std::pair<std::string, std::string>> per_route_test_cases = {
+      {"no_http_filter_per_route_config_new",
+       symbol_err("envoy_dynamic_module_on_http_filter_per_route_config_new")},
+      {"no_http_filter_per_route_config_destroy",
+       symbol_err("envoy_dynamic_module_on_http_filter_per_route_config_destroy")},
+      {"http_filter_per_route_config_new_fail", "Failed to initialize per-route dynamic module"},
+  };
+
+  for (const auto& test_case : per_route_test_cases) {
+    const std::string& module_name = test_case.first;
+    const std::string& expected_error = test_case.second;
+
+    const std::string yaml = fmt::format(R"EOF(
+dynamic_module_config:
+    name: {}
+per_route_config_name: foo
+filter_config:
+    "@type": "type.googleapis.com/google.protobuf.StringValue"
+    value: "bar"
+)EOF",
+                                         module_name);
+    envoy::extensions::filters::http::dynamic_modules::v3::DynamicModuleFilterPerRoute proto_config;
+    TestUtility::loadFromYamlAndValidate(yaml, proto_config);
+    NiceMock<Server::Configuration::MockServerFactoryContext> context;
+
+    auto result = factory.createRouteSpecificFilterConfig(
+        proto_config, context, ProtobufMessage::getNullValidationVisitor());
+    EXPECT_FALSE(result.ok());
+    EXPECT_EQ(result.status().code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_THAT(result.status().message(), testing::HasSubstr(expected_error));
   }
 }
 

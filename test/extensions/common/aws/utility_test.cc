@@ -2,7 +2,6 @@
 
 #include "source/extensions/common/aws/utility.h"
 
-#include "test/extensions/common/aws/mocks.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
@@ -185,13 +184,21 @@ TEST(UtilityTest, MinimalCanonicalRequest) {
   const auto request = Utility::createCanonicalRequest(
       "GET", "", headers, "content-hash", Utility::shouldNormalizeUriPath("vpc-lattice-svcs"),
       Utility::useDoubleUriEncode("vpc-lattice-svcs"));
-  EXPECT_EQ(R"(GET
-/
+  EXPECT_EQ("GET\n/\n\n\n\ncontent-hash", request);
+}
 
+TEST(UtilityTest, CanonicalRequestNoPathDontNormalizeURI) {
+  std::map<std::string, std::string> headers;
+  const auto request =
+      Utility::createCanonicalRequest("GET", "", headers, "content-hash", false, false);
+  EXPECT_EQ("GET\n/\n\n\n\ncontent-hash", request);
+}
 
-
-content-hash)",
-            request);
+TEST(UtilityTest, CanonicalRequestNoPathNormalizeURI) {
+  std::map<std::string, std::string> headers;
+  const auto request =
+      Utility::createCanonicalRequest("GET", "", headers, "content-hash", true, false);
+  EXPECT_EQ("GET\n/\n\n\n\ncontent-hash", request);
 }
 
 TEST(UtilityTest, CanonicalRequestWithQueryString) {
@@ -199,13 +206,7 @@ TEST(UtilityTest, CanonicalRequestWithQueryString) {
   const auto request = Utility::createCanonicalRequest(
       "GET", "?query", headers, "content-hash", Utility::shouldNormalizeUriPath("vpc-lattice-svcs"),
       Utility::useDoubleUriEncode("vpc-lattice-svcs"));
-  EXPECT_EQ(R"(GET
-/
-query=
-
-
-content-hash)",
-            request);
+  EXPECT_EQ("GET\n/\nquery=\n\n\ncontent-hash", request);
 }
 
 TEST(UtilityTest, CanonicalRequestWithHeaders) {
@@ -217,16 +218,10 @@ TEST(UtilityTest, CanonicalRequestWithHeaders) {
   const auto request = Utility::createCanonicalRequest(
       "GET", "", headers, "content-hash", Utility::shouldNormalizeUriPath("vpc-lattice-svcs"),
       Utility::useDoubleUriEncode("vpc-lattice-svcs"));
-  EXPECT_EQ(R"(GET
-/
-
-header1:value1
-header2:value2
-header3:value3
-
-header1;header2;header3
-content-hash)",
-            request);
+  EXPECT_EQ(
+      "GET\n/"
+      "\n\nheader1:value1\nheader2:value2\nheader3:value3\n\nheader1;header2;header3\ncontent-hash",
+      request);
 }
 
 TEST(UtilityTest, normalizePathReturnSlash) {
@@ -328,6 +323,12 @@ TEST(UtilityTest, CanonicalizeQueryStringWithPlus) {
   EXPECT_EQ("a=1%202", canonical_query);
 }
 
+TEST(UtilityTest, CanonicalizeQueryStringWithPlusEncoded) {
+  const absl::string_view query = "a=1%2B2";
+  const auto canonical_query = Utility::canonicalizeQueryString(query);
+  EXPECT_EQ("a=1%2B2", canonical_query);
+}
+
 TEST(UtilityTest, CanonicalizeQueryStringWithTilde) {
   const absl::string_view query = "a=1%7E~2";
   const auto canonical_query = Utility::canonicalizeQueryString(query);
@@ -336,13 +337,13 @@ TEST(UtilityTest, CanonicalizeQueryStringWithTilde) {
 
 TEST(UtilityTest, EncodeQuerySegment) {
   const absl::string_view query = "^!@/-_~.";
-  const auto encoded_query = Utility::encodeQueryComponent(query);
+  const auto encoded_query = Utility::encodeQueryComponentPreservingPlus(query);
   EXPECT_EQ("%5E%21%40%2F-_~.", encoded_query);
 }
 
 TEST(UtilityTest, EncodeQuerySegmentReserved) {
   const absl::string_view query = "?=&";
-  const auto encoded_query = Utility::encodeQueryComponent(query);
+  const auto encoded_query = Utility::encodeQueryComponentPreservingPlus(query);
   EXPECT_EQ("%3F%3D%26", encoded_query);
 }
 
@@ -358,7 +359,7 @@ TEST(UtilityTest, CanonicalizationFuzzTest) {
         fuzz.push_back(k);
         Utility::uriEncodePath(fuzz);
         Utility::normalizePath(fuzz);
-        Utility::encodeQueryComponent(fuzz);
+        Utility::encodeQueryComponentPreservingPlus(fuzz);
         Utility::canonicalizeQueryString(fuzz);
         fuzz.pop_back();
       }
@@ -558,6 +559,29 @@ TEST(UtilityTest, CheckNormalization) {
   service = "lambda";
   should_normalize = Utility::shouldNormalizeUriPath(service);
   EXPECT_TRUE(should_normalize);
+}
+
+TEST(UtilityTest, RolesAnywhereEndpoint) {
+  std::string arn = "junkarn";
+#ifdef ENVOY_SSL_FIPS
+  EXPECT_EQ("rolesanywhere-fips.us-east-1.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+#else
+  EXPECT_EQ("rolesanywhere.us-east-1.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+#endif
+  arn = "arn:aws:rolesanywhere:ap-southeast-2:012345678901:trust-anchor/"
+        "8d105284-f0a7-4939-a7e6-8df768ea535f";
+#ifdef ENVOY_SSL_FIPS
+  EXPECT_EQ("rolesanywhere.ap-southeast-2.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+#else
+  EXPECT_EQ("rolesanywhere.ap-southeast-2.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+
+#endif
+  arn = "arn:aws:rolesanywhere:eu-west-1:randomjunk";
+#ifdef ENVOY_SSL_FIPS
+  EXPECT_EQ("rolesanywhere.eu-west-1.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+#else
+  EXPECT_EQ("rolesanywhere.eu-west-1.amazonaws.com", Utility::getRolesAnywhereEndpoint(arn));
+#endif
 }
 
 } // namespace

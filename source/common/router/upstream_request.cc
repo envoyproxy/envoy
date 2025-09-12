@@ -673,7 +673,8 @@ void UpstreamRequest::onPoolReady(std::unique_ptr<GenericUpstream>&& upstream,
   const auto* route_entry = route().routeEntry();
   if (route_entry->autoHostRewrite() && !host->hostname().empty()) {
     Http::Utility::updateAuthority(*parent_.downstreamHeaders(), host->hostname(),
-                                   route_entry->appendXfh());
+                                   route_entry->appendXfh(),
+                                   !parent_.config().suppress_envoy_headers_);
   }
 
   stream_info_.setRequestHeaders(*parent_.downstreamHeaders());
@@ -796,12 +797,7 @@ void UpstreamRequestFilterManagerCallbacks::resetStream(
   // which should force reset the stream, and a codec driven reset, which should
   // tell the router the stream reset, and let the router make the decision to
   // send a local reply, or retry the stream.
-  bool is_codec_error;
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.report_stream_reset_error_code")) {
-    is_codec_error = absl::StrContains(transport_failure_reason, "codec_error");
-  } else {
-    is_codec_error = transport_failure_reason == "codec_error";
-  }
+  bool is_codec_error = absl::StrContains(transport_failure_reason, "codec_error");
   if (reset_reason == Http::StreamResetReason::LocalReset && !is_codec_error) {
     upstream_request_.parent_.callbacks()->resetStream();
     return;

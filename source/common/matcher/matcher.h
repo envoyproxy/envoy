@@ -36,29 +36,11 @@ public:
   }
 };
 
-struct MaybeMatchResult {
-  const ActionFactoryCb result_;
-  const MatchState match_state_;
-};
-
 // TODO(snowp): Make this a class that tracks the progress to speed up subsequent traversals.
 template <class DataType>
-static inline MaybeMatchResult evaluateMatch(MatchTree<DataType>& match_tree,
-                                             const DataType& data) {
-  const auto result = match_tree.match(data);
-  if (result.match_state_ == MatchState::UnableToMatch) {
-    return MaybeMatchResult{nullptr, MatchState::UnableToMatch};
-  }
-
-  if (!result.on_match_) {
-    return {nullptr, MatchState::MatchComplete};
-  }
-
-  if (result.on_match_->matcher_) {
-    return evaluateMatch(*result.on_match_->matcher_, data);
-  }
-
-  return MaybeMatchResult{result.on_match_->action_cb_, MatchState::MatchComplete};
+static inline MatchResult evaluateMatch(MatchTree<DataType>& match_tree, const DataType& data,
+                                        SkippedMatchCb skipped_match_cb = nullptr) {
+  return match_tree.match(data, skipped_match_cb);
 }
 
 template <class DataType> using FieldMatcherFactoryCb = std::function<FieldMatcherPtr<DataType>()>;
@@ -73,8 +55,8 @@ public:
   explicit AnyMatcher(absl::optional<OnMatch<DataType>> on_no_match)
       : on_no_match_(std::move(on_no_match)) {}
 
-  typename MatchTree<DataType>::MatchResult match(const DataType&) override {
-    return {MatchState::MatchComplete, on_no_match_};
+  MatchResult match(const DataType& data, SkippedMatchCb skipped_match_cb = nullptr) override {
+    return MatchTree<DataType>::handleRecursionAndSkips(on_no_match_, data, skipped_match_cb);
   }
   const absl::optional<OnMatch<DataType>> on_no_match_;
 };
@@ -153,6 +135,7 @@ public:
                    Server::Configuration::ServerFactoryContext& factory_context,
                    MatchTreeValidationVisitor<DataType>& validation_visitor)
       : action_factory_context_(context), server_factory_context_(factory_context),
+        on_match_validation_visitor_(validation_visitor),
         match_input_factory_(factory_context.messageValidationVisitor(), validation_visitor) {}
 
   // TODO(snowp): Remove this type parameter once we only have one Matcher proto.
@@ -324,9 +307,15 @@ private:
 
   template <class OnMatchType>
   absl::optional<OnMatchFactoryCb<DataType>> createOnMatchBase(const OnMatchType& on_match) {
+    on_match_validation_visitor_.validateOnMatch(on_match);
+    if (const std::vector<absl::Status>& errors = on_match_validation_visitor_.errors();
+        !errors.empty()) {
+      return []() -> OnMatch<DataType> { return OnMatch<DataType>{}; };
+    }
     if (on_match.has_matcher()) {
-      return [matcher_factory = std::move(create(on_match.matcher()))]() {
-        return OnMatch<DataType>{{}, matcher_factory()};
+      return [matcher_factory = std::move(create(on_match.matcher())),
+              keep_matching = on_match.keep_matching()]() {
+        return OnMatch<DataType>{{}, matcher_factory(), keep_matching};
       };
     } else if (on_match.has_action()) {
       auto& factory = Config::Utility::getAndCheckFactory<ActionFactory<ActionFactoryContext>>(
@@ -335,9 +324,11 @@ private:
           on_match.action().typed_config(), server_factory_context_.messageValidationVisitor(),
           factory);
 
-      auto action_factory = factory.createActionFactoryCb(
-          *message, action_factory_context_, server_factory_context_.messageValidationVisitor());
-      return [action_factory] { return OnMatch<DataType>{action_factory, {}}; };
+      auto action = factory.createAction(*message, action_factory_context_,
+                                         server_factory_context_.messageValidationVisitor());
+      return [action, keep_matching = on_match.keep_matching()] {
+        return OnMatch<DataType>{action, {}, keep_matching};
+      };
     }
 
     return absl::nullopt;
@@ -367,6 +358,7 @@ private:
   const std::string stats_prefix_;
   ActionFactoryContext& action_factory_context_;
   Server::Configuration::ServerFactoryContext& server_factory_context_;
+  MatchTreeValidationVisitor<DataType>& on_match_validation_visitor_;
   MatchInputFactory<DataType> match_input_factory_;
 };
 } // namespace Matcher

@@ -229,6 +229,8 @@ JsonTranscoderConfig::JsonTranscoderConfig(
   response_translate_options_.json_print_options.preserve_proto_field_names =
       print_config.preserve_proto_field_names();
   response_translate_options_.stream_newline_delimited = print_config.stream_newline_delimited();
+  response_translate_options_.stream_sse_style_delimited =
+      print_config.stream_sse_style_delimited();
 
   match_incoming_request_route_ = proto_config.match_incoming_request_route();
   ignore_unknown_query_parameters_ = proto_config.ignore_unknown_query_parameters();
@@ -267,9 +269,9 @@ void JsonTranscoderConfig::addBuiltinSymbolDescriptor(const std::string& symbol_
 
 Status JsonTranscoderConfig::resolveField(const Protobuf::Descriptor* descriptor,
                                           const std::string& field_path_str,
-                                          std::vector<const ProtobufWkt::Field*>* field_path,
+                                          std::vector<const Protobuf::Field*>* field_path,
                                           bool* is_http_body) {
-  const ProtobufWkt::Type* message_type =
+  const Protobuf::Type* message_type =
       type_helper_->Info()->GetTypeByTypeUrl(Grpc::Common::typeUrl(descriptor->full_name()));
   if (message_type == nullptr) {
     return {StatusCode::kNotFound,
@@ -285,7 +287,7 @@ Status JsonTranscoderConfig::resolveField(const Protobuf::Descriptor* descriptor
   if (field_path->empty()) {
     *is_http_body = descriptor->full_name() == google::api::HttpBody::descriptor()->full_name();
   } else {
-    const ProtobufWkt::Type* body_type =
+    const Protobuf::Type* body_type =
         type_helper_->Info()->GetTypeByTypeUrl(field_path->back()->type_url());
     *is_http_body = body_type != nullptr &&
                     body_type->name() == google::api::HttpBody::descriptor()->full_name();
@@ -665,6 +667,11 @@ void JsonTranscoderFilter::setDecoderFilterCallbacks(
 
 Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                               bool end_stream) {
+  if (error_ || !transcoder_) {
+    ENVOY_STREAM_LOG(debug, "Response headers is passed through", *encoder_callbacks_);
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   if (!Grpc::Common::isGrpcResponseHeaders(headers, end_stream)) {
     ENVOY_STREAM_LOG(
         debug,
@@ -672,10 +679,6 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
         "without transcoding.",
         *encoder_callbacks_);
     error_ = true;
-  }
-
-  if (error_ || !transcoder_) {
-    ENVOY_STREAM_LOG(debug, "Response headers is passed through", *encoder_callbacks_);
     return Http::FilterHeadersStatus::Continue;
   }
 
@@ -683,9 +686,11 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
 
   if (end_stream) {
     if (method_->descriptor_->server_streaming()) {
-      // When there is no body in a streaming response, a empty JSON array is
-      // returned by default. Set the content type correctly.
-      headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+      if (per_route_config_->isStreamSSEStyleDelimited()) {
+        headers.setContentType(Http::Headers::get().ContentTypeValues.TextEventStream);
+      } else {
+        headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+      }
     }
 
     // In gRPC wire protocol, headers frame with end_stream is a trailers-only response.
@@ -695,7 +700,11 @@ Http::FilterHeadersStatus JsonTranscoderFilter::encodeHeaders(Http::ResponseHead
     return Http::FilterHeadersStatus::Continue;
   }
 
-  headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+  if (per_route_config_->isStreamSSEStyleDelimited()) {
+    headers.setContentType(Http::Headers::get().ContentTypeValues.TextEventStream);
+  } else {
+    headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+  }
 
   // In case of HttpBody in response - content type is unknown at this moment.
   // So "Continue" only for regular streaming use case and StopIteration for
@@ -952,7 +961,7 @@ bool JsonTranscoderFilter::buildResponseFromHttpBodyOutput(
         encoder_callbacks_->resetStream();
         return true;
       }
-      const auto& body = http_body.data();
+      const auto& body = MessageUtil::bytesToString(http_body.data());
 
       data.add(body);
 

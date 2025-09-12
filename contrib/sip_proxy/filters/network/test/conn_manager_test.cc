@@ -78,8 +78,6 @@ public:
       config_->custom_filter_ = custom_filter_;
     }
 
-    EXPECT_CALL(context_, getTransportSocketFactoryContext())
-        .WillRepeatedly(testing::ReturnRef(factory_context_));
     EXPECT_CALL(factory_context_.server_context_, localInfo())
         .WillRepeatedly(testing::ReturnRef(local_info_));
     ON_CALL(random_, random()).WillByDefault(Return(42));

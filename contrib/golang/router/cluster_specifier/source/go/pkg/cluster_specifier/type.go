@@ -32,3 +32,7 @@ func (h *httpHeaderMap) Get(key string) (string, bool) {
 	found := cAPI.HttpGetHeader(h.headerPtr, &key, &value)
 	return value, found
 }
+
+func (h *httpHeaderMap) GetAllHeaders() map[string][]string {
+	return cAPI.HttpGetAllHeaders(h.headerPtr)
+}

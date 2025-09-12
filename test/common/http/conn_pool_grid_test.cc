@@ -14,6 +14,7 @@
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/network/connection.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -151,6 +152,7 @@ public:
   void setDestroying() { destroying_ = true; }
   std::vector<ConnectionPool::Callbacks*> callbacks_;
   NiceMock<Envoy::ConnectionPool::MockCancellable>* cancel_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   bool immediate_success_{};
   bool immediate_failure_{};
   bool second_pool_immediate_success_{};
@@ -188,12 +190,13 @@ public:
         cluster_, host_impl_hostname_, *Network::Utility::resolveUrl("tcp://127.0.0.1:9000"),
         nullptr, nullptr, 1, envoy::config::core::v3::Locality(),
         envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
-        envoy::config::core::v3::UNKNOWN, simTime(), address_list_));
+        envoy::config::core::v3::UNKNOWN, address_list_));
 
     grid_ = std::make_unique<ConnectivityGridForTest>(
         dispatcher_, random_, host_, Upstream::ResourcePriority::Default, socket_options_,
         transport_socket_options_, state_, simTime(), alternate_protocols_, options_,
-        quic_stat_names_, *store_.rootScope(), *quic_connection_persistent_info_, registry_);
+        quic_stat_names_, *store_.rootScope(), *quic_connection_persistent_info_, registry_,
+        overload_manager_);
     grid_->cancel_ = &cancel_;
     grid_->info_ = &info_;
     grid_->encoder_ = &encoder_;
@@ -233,6 +236,7 @@ public:
   NiceMock<Envoy::ConnectionPool::MockCancellable> cancel_;
   std::shared_ptr<Upstream::HostImpl> host_;
   Upstream::HostDescriptionImpl::AddressVector address_list_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
 
   NiceMock<ConnPoolCallbacks> callbacks_;
   NiceMock<MockResponseDecoder> decoder_;
@@ -314,6 +318,9 @@ TEST_F(ConnectivityGridTest, ImmediateSuccess) {
 
 // Test the first pool failing and the second connecting.
 TEST_F(ConnectivityGridTest, DoubleFailureThenSuccessSerial) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http3_happy_eyeballs", "true"}});
+
   initialize();
   addHttp3AlternateProtocol();
   EXPECT_EQ(grid_->http3Pool(), nullptr);
@@ -349,6 +356,9 @@ TEST_F(ConnectivityGridTest, DoubleFailureThenSuccessSerial) {
 // Test HTTP/3 attempting to use the alternate pool immediately if it's connected and TCP not
 // delayed.
 TEST_F(ConnectivityGridTest, ThreeParallelConnections) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http3_happy_eyeballs", "true"}});
+
   initialize();
   grid_->alternate_immediate_ = false;
   addHttp3AlternateProtocol();
@@ -516,13 +526,15 @@ TEST_F(ConnectivityGridTest, ParallelConnectionsNoTcpDelayQuicFailsTcpSucceeds) 
                                          "reason", host_));
   // HTTP/3 is still not marked broken yet.
   EXPECT_FALSE(grid_->isHttp3Broken());
-  // Also force the alternate QUIC to fail.
-  EXPECT_LOG_CONTAINS(
-      "trace", "alternate pool failed to create connection to host 'hostname'",
-      grid_->callbacks(2)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
-                                         "reason", host_));
-  // HTTP/3 is still not marked broken yet.
-  EXPECT_FALSE(grid_->isHttp3Broken());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_happy_eyeballs")) {
+    // Also force the alternate QUIC to fail.
+    EXPECT_LOG_CONTAINS(
+        "trace", "alternate pool failed to create connection to host 'hostname'",
+        grid_->callbacks(2)->onPoolFailure(
+            ConnectionPool::PoolFailureReason::LocalConnectionFailure, "reason", host_));
+    // HTTP/3 is still not marked broken yet.
+    EXPECT_FALSE(grid_->isHttp3Broken());
+  }
 
   // TCP succeeds.
   EXPECT_LOG_CONTAINS("trace", "http2 pool successfully connected to host 'hostname'",
@@ -576,13 +588,15 @@ TEST_F(ConnectivityGridTest, ParallelConnectionsNoTcpDelayTcpAndQuicFail) {
                                          "reason", host_));
   // HTTP/3 is still not marked broken yet.
   EXPECT_FALSE(grid_->isHttp3Broken());
-  // Also force the alternate QUIC to fail.
-  EXPECT_LOG_CONTAINS(
-      "trace", "alternate pool failed to create connection to host 'hostname'",
-      grid_->callbacks(2)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
-                                         "reason", host_));
-  // HTTP/3 is still not marked broken yet.
-  EXPECT_FALSE(grid_->isHttp3Broken());
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_happy_eyeballs")) {
+    // Also force the alternate QUIC to fail.
+    EXPECT_LOG_CONTAINS(
+        "trace", "alternate pool failed to create connection to host 'hostname'",
+        grid_->callbacks(2)->onPoolFailure(
+            ConnectionPool::PoolFailureReason::LocalConnectionFailure, "reason", host_));
+    // HTTP/3 is still not marked broken yet.
+    EXPECT_FALSE(grid_->isHttp3Broken());
+  }
 
   // Force TCP to fail.
   EXPECT_LOG_CONTAINS(
@@ -661,6 +675,9 @@ TEST_F(ConnectivityGridTest, ParallelConnectionsNoTcpDelayTcpFailsQuicSucceeds) 
 
 // Same test as above but with the H3 alternate pool succeeding inline no TCP is attempted.
 TEST_F(ConnectivityGridTest, ParallelH3NoTcp) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http3_happy_eyeballs", "true"}});
+
   initialize();
   grid_->alternate_immediate_ = false;
   addHttp3AlternateProtocol();
@@ -693,6 +710,9 @@ TEST_F(ConnectivityGridTest, ParallelH3NoTcp) {
 
 // Test all three connections in parallel, H3 failing and TCP connecting.
 TEST_F(ConnectivityGridTest, ParallelConnectionsTcpConnects) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http3_happy_eyeballs", "true"}});
+
   initialize();
   grid_->alternate_immediate_ = false;
   addHttp3AlternateProtocol();
@@ -739,6 +759,9 @@ TEST_F(ConnectivityGridTest, ParallelConnectionsTcpConnects) {
 
 // Test all three connections in parallel, TCP fails and H3 connecting.
 TEST_F(ConnectivityGridTest, ParallelConnectionsTcpFailsFirst) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http3_happy_eyeballs", "true"}});
+
   initialize();
   grid_->alternate_immediate_ = false;
   addHttp3AlternateProtocol();
@@ -783,11 +806,14 @@ TEST_F(ConnectivityGridTest, ParallelConnectionsTcpFailsFirst) {
   EXPECT_FALSE(grid_->isHttp3Broken());
   // Only the previous TCP failure details will be appended.
   EXPECT_EQ(callbacks_.transport_failure_reason_,
-            "handshake timeout2 (with earlier TCP attempt failure reason 1, TCP failure details)");
+            "handshake timeout2 (with earlier attempt failure reason 1, TCP: TCP failure details)");
 }
 
 // Test the first pool failing inline but http/3 happy eyeballs succeeding inline
 TEST_F(ConnectivityGridTest, H3HappyEyeballsMeansNoH2Pool) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http3_happy_eyeballs", "true"}});
+
   // The alternate H3 pool will succeed inline.
   initialize();
   grid_->alternate_failure_ = false;
@@ -807,6 +833,9 @@ TEST_F(ConnectivityGridTest, H3HappyEyeballsMeansNoH2Pool) {
 
 // Test both connections happening in parallel and the second connecting.
 TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelH2Connects) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http3_happy_eyeballs", "true"}});
+
   initialize();
   addHttp3AlternateProtocol();
   EXPECT_EQ(grid_->http3Pool(), nullptr);
@@ -843,6 +872,9 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelH2Connects) {
 
 // Test both connections happening in parallel and the second connecting.
 TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelH2ConnectsNoHE) {
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http3_happy_eyeballs", "true"}});
+
   address_list_ = {*Network::Utility::resolveUrl("tcp://127.0.0.1:9000"),
                    *Network::Utility::resolveUrl("tcp://127.0.0.1:9001")};
   initialize();
@@ -921,13 +953,17 @@ TEST_F(ConnectivityGridTest, TimeoutThenSuccessParallelFirstConnects) {
   // Kick off the second and third connections.
   failover_timer->invokeCallback();
   EXPECT_NE(grid_->http2Pool(), nullptr);
-  EXPECT_NE(grid_->alternate(), nullptr);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_happy_eyeballs")) {
+    EXPECT_NE(grid_->alternate(), nullptr);
+  }
 
   // onPoolFailure should not be passed up the first time. Instead the grid
   // should wait on the other pools
-  EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
-  grid_->callbacks(2)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
-                                     "reason", host_);
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_happy_eyeballs")) {
+    EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
+    grid_->callbacks(2)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                       "reason", host_);
+  }
 
   EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
   grid_->callbacks(1)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
@@ -1011,7 +1047,47 @@ TEST_F(ConnectivityGridTest, TcpFailsFollowedByH3Failure) {
   EXPECT_FALSE(grid_->isHttp3Broken());
   EXPECT_TRUE(alternate_protocols_->findAlternatives(origin_).has_value());
   EXPECT_EQ(callbacks_.transport_failure_reason_,
-            "handshake time out (with earlier TCP attempt failure reason 1, network unreachable)");
+            "handshake time out (with earlier attempt failure reason 1, TCP: network unreachable)");
+}
+
+// Tests one HTTP/2 pool and one HTTP/3 pool connecting and both fail with HTTP/3 failing first.
+TEST_F(ConnectivityGridTest, H3FailsFirstFollowedByTcpFailure) {
+  initialize();
+  addHttp3AlternateProtocol();
+  EXPECT_EQ(grid_->http3Pool(), nullptr);
+
+  // This timer will be returned and armed as the grid creates the wrapper's
+  // failover timer.
+  Event::MockTimer* failover_timer = new NiceMock<MockTimer>(&dispatcher_);
+
+  grid_->newStream(decoder_, callbacks_, {/*can_send_early_data_=*/false, /*can_use_http3_=*/true});
+  EXPECT_NE(grid_->http3Pool(), nullptr);
+  EXPECT_TRUE(failover_timer->enabled_);
+
+  // Kick off the second connection.
+  failover_timer->invokeCallback();
+  EXPECT_NE(grid_->http2Pool(), nullptr);
+
+  // HTTP/3 pool fails first. Failure shouldn't be propagated to the original caller, but instead
+  // wait for the HTTP/2 pool to finish.
+  EXPECT_NE(grid_->callbacks(0), nullptr);
+  EXPECT_CALL(callbacks_.pool_failure_, ready()).Times(0);
+  grid_->callbacks(0)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                     "network unreachable", host_);
+  EXPECT_FALSE(grid_->isHttp3Broken());
+
+  // HTTP/2 pool fails.
+  EXPECT_NE(grid_->callbacks(1), nullptr);
+  EXPECT_CALL(callbacks_.pool_failure_, ready());
+  grid_->callbacks(1)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                     "handshake time out", host_);
+
+  // HTTP/3 shouldn't be marked broken as TCP also failed.
+  EXPECT_FALSE(grid_->isHttp3Broken());
+  EXPECT_TRUE(alternate_protocols_->findAlternatives(origin_).has_value());
+  EXPECT_EQ(
+      callbacks_.transport_failure_reason_,
+      "handshake time out (with earlier attempt failure reason 1, QUIC: network unreachable)");
 }
 
 // Test both connections happening in parallel and the second connecting before
@@ -1549,23 +1625,29 @@ TEST_F(ConnectivityGridTest, Http3FailedRecentlyThenFailsAgain) {
   EXPECT_TRUE(ConnectivityGridForTest::hasHttp3FailedRecently(*grid_));
   // Getting onPoolFailure() from Http3 pool later should mark H3 broken.
 
-  grid_->createHttp3AlternatePool();
-  EXPECT_CALL(*grid_->alternate(), newStream)
-      .WillOnce(Invoke(
-          [&](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
-              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
-            grid_->callbacks_.push_back(&callbacks);
-            return grid_->cancel_;
-          }));
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_happy_eyeballs")) {
+    grid_->createHttp3AlternatePool();
+    EXPECT_CALL(*grid_->alternate(), newStream)
+        .WillOnce(Invoke(
+            [&](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
+                const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+              grid_->callbacks_.push_back(&callbacks);
+              return grid_->cancel_;
+            }));
+  }
   grid_->callbacks(0)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
                                      "reason", host_);
-  // Because the alternate pool is outstanding H3 is not broken.
-  EXPECT_FALSE(grid_->isHttp3Broken());
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_happy_eyeballs")) {
+    EXPECT_TRUE(grid_->isHttp3Broken());
+  } else {
+    // Because the alternate pool is outstanding H3 is not broken.
+    EXPECT_FALSE(grid_->isHttp3Broken());
 
-  // When H3 alternate connects, there should not be a second up call.
-  EXPECT_CALL(callbacks_.pool_ready_, ready()).Times(0);
-  grid_->callbacks(2)->onPoolReady(encoder_, host_, info_, absl::nullopt);
-  EXPECT_FALSE(grid_->isHttp3Broken());
+    // When H3 alternate connects, there should not be a second up call.
+    EXPECT_CALL(callbacks_.pool_ready_, ready()).Times(0);
+    grid_->callbacks(2)->onPoolReady(encoder_, host_, info_, absl::nullopt);
+    EXPECT_FALSE(grid_->isHttp3Broken());
+  }
 }
 
 // Same as above only the alternate pool connects after TCP.
@@ -1592,15 +1674,17 @@ TEST_F(ConnectivityGridTest, Http3FailedRecentlyThenTCPThenAlternate) {
   EXPECT_TRUE(ConnectivityGridForTest::hasHttp3FailedRecently(*grid_));
   // Getting onPoolFailure() from Http3 pool later should mark H3 broken.
 
-  grid_->createHttp3AlternatePool();
-  EXPECT_CALL(*grid_->alternate(), newStream)
-      .WillOnce(Invoke(
-          [&](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
-              const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
-            callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
-                                    "reason", host_);
-            return nullptr;
-          }));
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http3_happy_eyeballs")) {
+    grid_->createHttp3AlternatePool();
+    EXPECT_CALL(*grid_->alternate(), newStream)
+        .WillOnce(Invoke(
+            [&](Http::ResponseDecoder&, ConnectionPool::Callbacks& callbacks,
+                const ConnectionPool::Instance::StreamOptions&) -> ConnectionPool::Cancellable* {
+              callbacks.onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
+                                      "reason", host_);
+              return nullptr;
+            }));
+  }
   grid_->callbacks(0)->onPoolFailure(ConnectionPool::PoolFailureReason::LocalConnectionFailure,
                                      "reason", host_);
   EXPECT_TRUE(grid_->isHttp3Broken());
@@ -1649,10 +1733,10 @@ TEST_F(ConnectivityGridTest, RealGrid) {
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
   ConnectivityGrid grid(
-      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000"),
       Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
       simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
-      *quic_connection_persistent_info_, {});
+      *quic_connection_persistent_info_, {}, overload_manager_);
   EXPECT_EQ("connection grid", grid.protocolDescription());
   EXPECT_FALSE(grid.hasActiveConnections());
 
@@ -1689,10 +1773,10 @@ TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
           Return(Upstream::TransportSocketMatcher::MatchData(*factory, matcher.stats_, "test")));
 
   ConnectivityGrid grid(
-      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000", simTime()),
+      dispatcher_, random_, Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000"),
       Upstream::ResourcePriority::Default, socket_options_, transport_socket_options_, state_,
       simTime(), alternate_protocols_, options_, quic_stat_names_, *store_.rootScope(),
-      *quic_connection_persistent_info_, {});
+      *quic_connection_persistent_info_, {}, overload_manager_);
 
   // Create the HTTP/3 pool.
   auto pool = ConnectivityGridForTest::forceGetOrCreateHttp3Pool(grid);

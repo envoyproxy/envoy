@@ -12,7 +12,7 @@ set -e
 export HOMEBREW_NO_AUTO_UPDATE=1
 RETRY_ATTEMPTS=10
 RETRY_INTERVAL=3
-XCODE_VERSION=15.3
+XCODE_VERSION=16.1
 
 function retry () {
     local returns=1 i=1
@@ -48,7 +48,7 @@ brew cleanup --prune=all
 # Remove broken symlinks.
 brew cleanup --prune-prefix
 
-DEPS="automake cmake coreutils libtool ninja"
+DEPS="automake coreutils libtool"
 for DEP in ${DEPS}
 do
     install "${DEP}"

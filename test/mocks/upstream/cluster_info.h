@@ -18,6 +18,7 @@
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/http3/codec_stats.h"
 #include "source/common/upstream/upstream_impl.h"
+#include "source/extensions/load_balancing_policies/round_robin/round_robin_lb.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/stats/mocks.h"
@@ -70,7 +71,7 @@ public:
               (const));
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<ProtobufWkt::Empty>();
+    return std::make_unique<Protobuf::Empty>();
   }
 
   std::string name() const override { return "mock.upstream.local.address.selector"; }
@@ -129,7 +130,7 @@ public:
   MOCK_METHOD(bool, maintenanceMode, (), (const));
   MOCK_METHOD(uint32_t, maxResponseHeadersCount, (), (const));
   MOCK_METHOD(absl::optional<uint16_t>, maxResponseHeadersKb, (), (const));
-  MOCK_METHOD(uint64_t, maxRequestsPerConnection, (), (const));
+  MOCK_METHOD(uint32_t, maxRequestsPerConnection, (), (const));
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(const std::string&, observabilityName, (), (const));
   MOCK_METHOD(ResourceManager&, resourceManager, (ResourcePriority priority), (const));
@@ -186,7 +187,7 @@ public:
   envoy::config::core::v3::Http3ProtocolOptions http3_options_;
   envoy::config::core::v3::HttpProtocolOptions common_http_protocol_options_;
   ProtocolOptionsConfigConstSharedPtr extension_protocol_options_;
-  uint64_t max_requests_per_connection_{};
+  uint32_t max_requests_per_connection_{};
   uint32_t max_response_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   ClusterTrafficStatNames traffic_stat_names_;
@@ -223,6 +224,9 @@ public:
   Upstream::TypedLoadBalancerFactory* lb_factory_ =
       Config::Utility::getFactoryByName<Upstream::TypedLoadBalancerFactory>(
           "envoy.load_balancing_policies.round_robin");
+  Upstream::LoadBalancerConfigPtr typed_lb_config_ =
+      std::make_unique<Upstream::TypedRoundRobinLbConfig>(
+          envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin());
   std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> upstream_config_;
   Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   envoy::config::cluster::v3::Cluster::CommonLbConfig lb_config_;

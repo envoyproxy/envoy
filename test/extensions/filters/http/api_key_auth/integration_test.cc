@@ -26,12 +26,18 @@ typed_config:
     client: user2
   key_sources:
   - header: "Authorization"
+  forwarding:
+    header: "x-client-id"
+    hide_credentials: false
 )EOF";
 
 const std::string ApiKeyAuthScopeConfig =
     R"EOF(
 allowed_clients:
 - user1
+forwarding:
+  header: "x-client-header"
+  hide_credentials: true
 )EOF";
 
 class ApiKeyAuthIntegrationTest : public HttpProtocolIntegrationTest {

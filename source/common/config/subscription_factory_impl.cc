@@ -29,7 +29,6 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionFromConfigS
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) {
   RETURN_IF_NOT_OK(Config::Utility::checkLocalInfo(type_url, local_info_));
-  SubscriptionStats stats = Utility::generateStats(scope);
 
   std::string subscription_type = "";
   ConfigSubscriptionFactory::SubscriptionData data{local_info_,
@@ -47,7 +46,8 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionFromConfigS
                                                    resource_decoder,
                                                    options,
                                                    absl::nullopt,
-                                                   stats};
+                                                   Utility::generateStats(scope),
+                                                   cm_.adsMux()};
 
   switch (config.config_source_specifier_case()) {
   case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath: {
@@ -129,12 +129,45 @@ absl::StatusOr<SubscriptionPtr> createFromFactory(ConfigSubscriptionFactory::Sub
   return factory->create(data);
 }
 
+absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::subscriptionOverAdsGrpcMux(
+    GrpcMuxSharedPtr& ads_grpc_mux, const envoy::config::core::v3::ConfigSource& config,
+    absl::string_view type_url, Stats::Scope& scope, SubscriptionCallbacks& callbacks,
+    OpaqueResourceDecoderSharedPtr resource_decoder, const SubscriptionOptions& options) {
+  RETURN_IF_NOT_OK(Config::Utility::checkLocalInfo(type_url, local_info_));
+
+  ConfigSubscriptionFactory::SubscriptionData data{local_info_,
+                                                   dispatcher_,
+                                                   cm_,
+                                                   validation_visitor_,
+                                                   api_,
+                                                   server_,
+                                                   xds_resources_delegate_,
+                                                   xds_config_tracker_,
+                                                   config,
+                                                   type_url,
+                                                   scope,
+                                                   callbacks,
+                                                   resource_decoder,
+                                                   options,
+                                                   absl::nullopt,
+                                                   Utility::generateStats(scope),
+                                                   ads_grpc_mux};
+  static constexpr absl::string_view subscription_type = "envoy.config_subscription.ads";
+  ConfigSubscriptionFactory* factory =
+      Registry::FactoryRegistry<ConfigSubscriptionFactory>::getFactory(subscription_type);
+  if (factory == nullptr) {
+    return absl::InvalidArgumentError(fmt::format(
+        "Didn't find a registered config subscription factory implementation for name: '{}'",
+        subscription_type));
+  }
+  return factory->create(data);
+}
+
 absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::collectionSubscriptionFromUrl(
     const xds::core::v3::ResourceLocator& collection_locator,
     const envoy::config::core::v3::ConfigSource& config, absl::string_view resource_type,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks,
     OpaqueResourceDecoderSharedPtr resource_decoder) {
-  SubscriptionStats stats = Utility::generateStats(scope);
   SubscriptionOptions options;
   envoy::config::core::v3::ConfigSource factory_config = config;
   ConfigSubscriptionFactory::SubscriptionData data{local_info_,
@@ -152,7 +185,8 @@ absl::StatusOr<SubscriptionPtr> SubscriptionFactoryImpl::collectionSubscriptionF
                                                    resource_decoder,
                                                    options,
                                                    {collection_locator},
-                                                   stats};
+                                                   Utility::generateStats(scope),
+                                                   cm_.adsMux()};
   switch (collection_locator.scheme()) {
   case xds::core::v3::ResourceLocator::FILE: {
     const std::string path = Http::Utility::localPathFromFilePath(collection_locator.id());

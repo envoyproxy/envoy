@@ -61,6 +61,9 @@ public:
   std::chrono::milliseconds streamIdleTimeout() const override {
     return parent_.streamIdleTimeout();
   }
+  absl::optional<std::chrono::milliseconds> streamFlushTimeout() const override {
+    return parent_.streamFlushTimeout();
+  }
   std::chrono::milliseconds requestTimeout() const override { return parent_.requestTimeout(); }
   std::chrono::milliseconds requestHeadersTimeout() const override {
     return parent_.requestHeadersTimeout();
@@ -130,7 +133,7 @@ public:
     return parent_.earlyHeaderMutationExtensions();
   }
   bool shouldStripTrailingHostDot() const override { return parent_.shouldStripTrailingHostDot(); }
-  uint64_t maxRequestsPerConnection() const override { return parent_.maxRequestsPerConnection(); }
+  uint32_t maxRequestsPerConnection() const override { return parent_.maxRequestsPerConnection(); }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return parent_.proxyStatusConfig();
   }

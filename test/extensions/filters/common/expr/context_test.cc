@@ -841,7 +841,7 @@ TEST(Context, ConnectionAttributes) {
 
 TEST(Context, FilterStateAttributes) {
   StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
-  ProtobufWkt::Arena arena;
+  Protobuf::Arena arena;
   FilterStateWrapper wrapper(arena, filter_state);
   auto status_or = wrapper.ListKeys(&arena);
   EXPECT_EQ(status_or.status().message(), "ListKeys() is not implemented");
@@ -874,7 +874,7 @@ TEST(Context, FilterStateAttributes) {
                               "type.googleapis.com/google.protobuf.DoubleValue",
                               StreamInfo::FilterState::LifeSpan::FilterChain);
   auto cel_state = std::make_shared<CelState>(prototype);
-  ProtobufWkt::DoubleValue v;
+  Protobuf::DoubleValue v;
   v.set_value(1.0);
   cel_state->setValue(v.SerializeAsString());
   EXPECT_TRUE(cel_state->serializeAsString().has_value());
@@ -926,10 +926,14 @@ TEST(Context, XDSAttributes) {
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> upstream_host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   auto host_metadata = std::make_shared<const envoy::config::core::v3::Metadata>();
+  auto locality_metadata = std::make_shared<const envoy::config::core::v3::Metadata>();
   EXPECT_CALL(*upstream_host, metadata()).WillRepeatedly(Return(host_metadata));
+  EXPECT_CALL(*upstream_host, localityMetadata()).WillRepeatedly(Return(locality_metadata));
   info.upstreamInfo()->setUpstreamHost(upstream_host);
   std::shared_ptr<NiceMock<Router::MockRoute>> route{new NiceMock<Router::MockRoute>()};
   EXPECT_CALL(info, route()).WillRepeatedly(Return(route));
+  info.virtual_host_ = route->virtual_host_;
+
   const std::string chain_name = "fake_filter_chain_name";
 
   auto filter_chain_info = std::make_shared<NiceMock<Network::MockFilterChainInfo>>();
@@ -980,13 +984,19 @@ TEST(Context, XDSAttributes) {
     const auto value = wrapper[CelValue::CreateStringView(VirtualHostMetadata)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsMessage());
-    EXPECT_EQ(&route->virtual_host_.metadata_, value.value().MessageOrDie());
+    EXPECT_EQ(&route->virtual_host_->metadata_, value.value().MessageOrDie());
   }
   {
     const auto value = wrapper[CelValue::CreateStringView(UpstreamHostMetadata)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsMessage());
     EXPECT_EQ(host_metadata.get(), value.value().MessageOrDie());
+  }
+  {
+    const auto value = wrapper[CelValue::CreateStringView(UpstreamHostLocalityMetadata)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsMessage());
+    EXPECT_EQ(locality_metadata.get(), value.value().MessageOrDie());
   }
   {
     const auto value = wrapper[CelValue::CreateStringView(FilterChainName)];

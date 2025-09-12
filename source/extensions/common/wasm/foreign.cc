@@ -138,14 +138,15 @@ RegisterForeignFunction registerClearRouteCacheForeignFunction(
 class ExpressionFactory : public Logger::Loggable<Logger::Id::wasm> {
 protected:
   struct ExpressionData {
-    google::api::expr::v1alpha1::ParsedExpr parsed_expr_;
+    cel::expr::ParsedExpr parsed_expr_;
     Filters::Common::Expr::ExpressionPtr compiled_expr_;
   };
 
   class ExpressionContext : public StorageObject {
   public:
     friend class ExpressionFactory;
-    ExpressionContext(Filters::Common::Expr::BuilderPtr builder) : builder_(std::move(builder)) {}
+    ExpressionContext(Filters::Common::Expr::BuilderConstPtr builder)
+        : builder_(std::move(builder)) {}
     uint32_t createToken() {
       uint32_t token = next_expr_token_++;
       for (;;) {
@@ -159,10 +160,10 @@ protected:
     bool hasExpression(uint32_t token) { return expr_.contains(token); }
     ExpressionData& getExpression(uint32_t token) { return expr_[token]; }
     void deleteExpression(uint32_t token) { expr_.erase(token); }
-    Filters::Common::Expr::Builder* builder() { return builder_.get(); }
+    const Filters::Common::Expr::Builder* builder() const { return builder_.get(); }
 
   private:
-    Filters::Common::Expr::BuilderPtr builder_{};
+    const Filters::Common::Expr::BuilderConstPtr builder_{};
     uint32_t next_expr_token_ = 0;
     absl::flat_hash_map<uint32_t, ExpressionData> expr_;
   };
@@ -203,9 +204,13 @@ public:
       auto token = expr_context.createToken();
       auto& handler = expr_context.getExpression(token);
 
-      handler.parsed_expr_ = parse_status.value();
+      const auto& parsed_expr = parse_status.value();
+      handler.parsed_expr_ = parsed_expr;
+
+      std::vector<absl::Status> warnings;
       auto cel_expression_status = expr_context.builder()->CreateExpression(
-          &handler.parsed_expr_.expr(), &handler.parsed_expr_.source_info());
+          &handler.parsed_expr_.expr(), &handler.parsed_expr_.source_info(), &warnings);
+
       if (!cel_expression_status.ok()) {
         ENVOY_LOG(info, "expr_create compile error: {}", cel_expression_status.status().message());
         expr_context.deleteExpression(token);
@@ -213,6 +218,7 @@ public:
       }
 
       handler.compiled_expr_ = std::move(cel_expression_status.value());
+
       auto result = reinterpret_cast<uint32_t*>(alloc_result(sizeof(uint32_t)));
       *result = token;
       return WasmResult::Ok;

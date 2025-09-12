@@ -16,7 +16,10 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/hex.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/tls/utility.h"
+#include "source/extensions/filters/listener/tls_inspector/ja4_fingerprint.h"
 
+#include "absl/strings/ascii.h"
 #include "absl/strings/str_format.h"
 #include "absl/strings/str_join.h"
 #include "openssl/md5.h"
@@ -54,6 +57,8 @@ Config::Config(
       ssl_ctx_(SSL_CTX_new(TLS_with_buffers_method())),
       enable_ja3_fingerprinting_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, enable_ja3_fingerprinting, false)),
+      enable_ja4_fingerprinting_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, enable_ja4_fingerprinting, false)),
       max_client_hello_size_(max_client_hello_size),
       initial_read_buffer_size_(
           std::min(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, initial_read_buffer_size,
@@ -72,6 +77,7 @@ Config::Config(
       ssl_ctx_.get(), [](const SSL_CLIENT_HELLO* client_hello) -> ssl_select_cert_result_t {
         Filter* filter = static_cast<Filter*>(SSL_get_app_data(client_hello->ssl));
         filter->createJA3Hash(client_hello);
+        filter->createJA4Hash(client_hello);
 
         const uint8_t* data;
         size_t len;
@@ -169,6 +175,13 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
   return Network::FilterStatus::StopIteration;
 }
 
+void Filter::setDynamicMetadata(absl::string_view failure_reason) {
+  Protobuf::Struct metadata;
+  auto& fields = *metadata.mutable_fields();
+  fields[failureReasonKey()].set_string_value(failure_reason);
+  cb_->setDynamicMetadata(dynamicMetadataKey(), metadata);
+}
+
 ParseState Filter::parseClientHello(const void* data, size_t len,
                                     uint64_t bytes_already_processed) {
   // Ownership remains here though we pass a reference to it in `SSL_set0_rbio()`.
@@ -188,15 +201,16 @@ ParseState Filter::parseClientHello(const void* data, size_t len,
   ParseState state = [this, ret]() {
     switch (SSL_get_error(ssl_.get(), ret)) {
     case SSL_ERROR_WANT_READ:
-      if (read_ == maxConfigReadBytes()) {
+      if (read_ >= maxConfigReadBytes()) {
         // We've hit the specified size limit. This is an unreasonably large ClientHello;
         // indicate failure.
         config_->stats().client_hello_too_large_.inc();
+        setDynamicMetadata(failureReasonClientHelloTooLarge());
         return ParseState::Error;
       }
-      if (read_ == requested_read_bytes_) {
+      if (read_ >= requested_read_bytes_) {
         // Double requested bytes up to the maximum configured.
-        requested_read_bytes_ = std::min<uint32_t>(2 * requested_read_bytes_, maxConfigReadBytes());
+        requested_read_bytes_ = std::min<uint32_t>(2 * read_, maxConfigReadBytes());
       }
       return ParseState::Continue;
     case SSL_ERROR_SSL:
@@ -209,7 +223,18 @@ ParseState Filter::parseClientHello(const void* data, size_t len,
         }
         cb_->socket().setDetectedTransportProtocol("tls");
       } else {
+        if (read_ >= maxConfigReadBytes()) {
+          // We've hit the specified size limit. This is an unreasonably large ClientHello;
+          // indicate failure.
+          config_->stats().client_hello_too_large_.inc();
+          setDynamicMetadata(failureReasonClientHelloTooLarge());
+          return ParseState::Error;
+        }
         config_->stats().tls_not_found_.inc();
+        setDynamicMetadata(failureReasonClientHelloNotDetected());
+        ENVOY_LOG(
+            debug, "tls inspector: parseClientHello failed: {}",
+            Extensions::TransportSockets::Tls::Utility::getLastCryptoError().value_or("unknown"));
       }
       return ParseState::Done;
     default:
@@ -226,16 +251,6 @@ ParseState Filter::parseClientHello(const void* data, size_t len,
   return state;
 }
 
-// Google GREASE values (https://datatracker.ietf.org/doc/html/rfc8701)
-static constexpr std::array<uint16_t, 16> GREASE = {
-    0x0a0a, 0x1a1a, 0x2a2a, 0x3a3a, 0x4a4a, 0x5a5a, 0x6a6a, 0x7a7a,
-    0x8a8a, 0x9a9a, 0xaaaa, 0xbaba, 0xcaca, 0xdada, 0xeaea, 0xfafa,
-};
-
-bool isNotGrease(uint16_t id) {
-  return std::find(GREASE.begin(), GREASE.end(), id) == GREASE.end();
-}
-
 void writeCipherSuites(const SSL_CLIENT_HELLO* ssl_client_hello, std::string& fingerprint) {
   CBS cipher_suites;
   CBS_init(&cipher_suites, ssl_client_hello->cipher_suites, ssl_client_hello->cipher_suites_len);
@@ -245,7 +260,7 @@ void writeCipherSuites(const SSL_CLIENT_HELLO* ssl_client_hello, std::string& fi
   while (write_cipher && CBS_len(&cipher_suites) > 0) {
     uint16_t id;
     write_cipher = CBS_get_u16(&cipher_suites, &id);
-    if (write_cipher && isNotGrease(id)) {
+    if (write_cipher && JA4Fingerprinter::isNotGrease(id)) {
       if (!first) {
         absl::StrAppend(&fingerprint, "-");
       }
@@ -267,7 +282,7 @@ void writeExtensions(const SSL_CLIENT_HELLO* ssl_client_hello, std::string& fing
 
     write_extension =
         (CBS_get_u16(&extensions, &id) && CBS_get_u16_length_prefixed(&extensions, &extension));
-    if (write_extension && isNotGrease(id)) {
+    if (write_extension && JA4Fingerprinter::isNotGrease(id)) {
       if (!first) {
         absl::StrAppend(&fingerprint, "-");
       }
@@ -352,6 +367,32 @@ void Filter::createJA3Hash(const SSL_CLIENT_HELLO* ssl_client_hello) {
 
     cb_->socket().setJA3Hash(md5);
   }
+}
+
+void Filter::createJA4Hash(const SSL_CLIENT_HELLO* ssl_client_hello) {
+  if (!config_->enableJA4Fingerprinting()) {
+    return;
+  }
+
+  std::string fingerprint = JA4Fingerprinter::create(ssl_client_hello);
+  ENVOY_LOG(trace, "tls:createJA4Hash(), fingerprint: {}", fingerprint);
+  cb_->socket().setJA4Hash(fingerprint);
+}
+
+const std::string& Filter::dynamicMetadataKey() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.filters.listener.tls_inspector");
+}
+
+const std::string& Filter::failureReasonKey() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "failure_reason");
+}
+
+const std::string& Filter::failureReasonClientHelloTooLarge() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "ClientHelloTooLarge");
+}
+
+const std::string& Filter::failureReasonClientHelloNotDetected() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "ClientHelloNotDetected");
 }
 
 } // namespace TlsInspector

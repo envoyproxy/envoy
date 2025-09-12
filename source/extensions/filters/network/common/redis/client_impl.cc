@@ -2,6 +2,10 @@
 
 #include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 
+#include "source/extensions/filters/network/common/redis/aws_iam_authenticator_impl.h"
+
+#include "client.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -12,6 +16,15 @@ namespace {
 // null_pool_callbacks is used for requests that must be filtered and not redirected such as
 // "asking".
 Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
+
+// Custom authentication callback handler for AWS IAM authentication
+class AuthCallbackHandler : public DoNothingPoolCallbacks {
+  void onResponse(Common::Redis::RespValuePtr&& resp) override {
+    ENVOY_LOG_MISC(debug, "AWS IAM Authentication Response: {}", resp->toString());
+  }
+};
+
+AuthCallbackHandler auth_callbacks;
 } // namespace
 
 ConfigImpl::ConfigImpl(
@@ -59,33 +72,67 @@ ConfigImpl::ConfigImpl(
   }
 }
 
-ClientPtr ClientImpl::create(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                             EncoderPtr&& encoder, DecoderFactory& decoder_factory,
-                             const ConfigSharedPtr& config,
-                             const RedisCommandStatsSharedPtr& redis_command_stats,
-                             Stats::Scope& scope, bool is_transaction_client) {
-  auto client =
-      std::make_unique<ClientImpl>(host, dispatcher, std::move(encoder), decoder_factory, config,
-                                   redis_command_stats, scope, is_transaction_client);
+ClientPtr ClientImpl::create(
+    Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
+    DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
+    const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
+    bool is_transaction_client, const std::string& auth_username,
+    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+        aws_iam_authenticator) {
+
+  auto client = std::make_unique<ClientImpl>(
+      host, dispatcher, std::move(encoder), decoder_factory, config, redis_command_stats, scope,
+      is_transaction_client, aws_iam_config, aws_iam_authenticator);
   client->connection_ = host->createConnection(dispatcher, nullptr, nullptr).connection_;
   client->connection_->addConnectionCallbacks(*client);
   client->connection_->addReadFilter(Network::ReadFilterSharedPtr{new UpstreamReadFilter(*client)});
   client->connection_->connect();
   client->connection_->noDelay(true);
+
+  // The presence of a valid auth_username is checked during filter initialization
+  if (aws_iam_authenticator.has_value() && aws_iam_config.has_value()) {
+    client->sendAwsIamAuth(auth_username, aws_iam_config.value());
+  }
+
   return client;
 }
 
-ClientImpl::ClientImpl(Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher,
-                       EncoderPtr&& encoder, DecoderFactory& decoder_factory,
-                       const ConfigSharedPtr& config,
-                       const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
-                       bool is_transaction_client)
+void ClientImpl::sendAwsIamAuth(
+    const std::string& auth_username,
+    const envoy::extensions::filters::network::redis_proxy::v3::AwsIam& aws_iam_config) {
+  queueRequests(true);
+  auto add_auth = [this, auth_username, &aws_iam_config]() {
+    const auto auth_password =
+        aws_iam_authenticator_.value()->getAuthToken(auth_username, aws_iam_config);
+    Envoy::Extensions::NetworkFilters::Common::Redis::Utility::AuthRequest auth_request(
+        auth_username, auth_password);
+    makeRequestImmediate(auth_request, auth_callbacks);
+    queueRequests(false);
+  };
+
+  if (aws_iam_authenticator_.value()->addCallbackIfCredentialsPending(
+          [add_auth]() { add_auth(); }) == false) {
+    add_auth();
+  }
+}
+
+ClientImpl::ClientImpl(
+    Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, EncoderPtr&& encoder,
+    DecoderFactory& decoder_factory, const ConfigSharedPtr& config,
+    const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
+    bool is_transaction_client,
+    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+        aws_iam_authenticator)
     : host_(host), encoder_(std::move(encoder)), decoder_(decoder_factory.create(*this)),
       config_(config),
       connect_or_op_timer_(dispatcher.createTimer([this]() { onConnectOrOpTimeout(); })),
       flush_timer_(dispatcher.createTimer([this]() { flushBufferAndResetTimer(); })),
       time_source_(dispatcher.timeSource()), redis_command_stats_(redis_command_stats),
-      scope_(scope), is_transaction_client_(is_transaction_client) {
+      scope_(scope), is_transaction_client_(is_transaction_client), aws_iam_config_(aws_iam_config),
+      aws_iam_authenticator_(aws_iam_authenticator) {
+
   Upstream::ClusterTrafficStats& traffic_stats = *host->cluster().trafficStats();
   traffic_stats.upstream_cx_total_.inc();
   host->stats().cx_total_.inc();
@@ -128,11 +175,15 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
   pending_requests_.emplace_back(*this, callbacks, command);
   encoder_->encode(request, encoder_buffer_);
 
-  // If buffer is full, flush. If the buffer was empty before the request, start the timer.
-  if (encoder_buffer_.length() >= config_->maxBufferSizeBeforeFlush()) {
-    flushBufferAndResetTimer();
-  } else if (empty_buffer) {
-    flush_timer_->enableTimer(std::chrono::milliseconds(config_->bufferFlushTimeoutInMs()));
+  // If we have enabled queuing (to pause AUTH while credentials are being used), don't flush our
+  // buffers
+  if (!queue_enabled_) {
+    // If buffer is full, flush. If the buffer was empty before the request, start the timer.
+    if (encoder_buffer_.length() >= config_->maxBufferSizeBeforeFlush()) {
+      flushBufferAndResetTimer();
+    } else if (empty_buffer) {
+      flush_timer_->enableTimer(std::chrono::milliseconds(config_->bufferFlushTimeoutInMs()));
+    }
   }
 
   // Only boost the op timeout if:
@@ -145,6 +196,30 @@ PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& 
     connect_or_op_timer_->enableTimer(config_->opTimeout());
   }
 
+  return &pending_requests_.back();
+}
+
+PoolRequest* ClientImpl::makeRequestImmediate(const RespValue& request,
+                                              ClientCallbacks& callbacks) {
+  ASSERT(connection_->state() == Network::Connection::State::Open);
+
+  Stats::StatName command;
+  if (config_->enableCommandStats()) {
+    // Only lowercase command and get StatName if we enable command stats
+    command = redis_command_stats_->getCommandFromRequest(request);
+    redis_command_stats_->updateStatsTotal(scope_, command);
+  } else {
+    // If disabled, we use a placeholder stat name "unused" that is not used
+    command = redis_command_stats_->getUnusedStatName();
+  }
+  Buffer::OwnedImpl immediate_buffer;
+  pending_requests_.emplace_back(*this, callbacks, command);
+  encoder_->encode(request, immediate_buffer);
+  connection_->write(immediate_buffer, false);
+  // Flush buffer if we've queued up any requests while waiting for authentication credentials
+  if (encoder_buffer_.length()) {
+    flushBufferAndResetTimer();
+  }
   return &pending_requests_.back();
 }
 
@@ -310,15 +385,22 @@ void ClientImpl::initialize(const std::string& auth_username, const std::string&
 
 ClientFactoryImpl ClientFactoryImpl::instance_;
 
-ClientPtr ClientFactoryImpl::create(Upstream::HostConstSharedPtr host,
-                                    Event::Dispatcher& dispatcher, const ConfigSharedPtr& config,
-                                    const RedisCommandStatsSharedPtr& redis_command_stats,
-                                    Stats::Scope& scope, const std::string& auth_username,
-                                    const std::string& auth_password, bool is_transaction_client) {
+ClientPtr ClientFactoryImpl::create(
+    Upstream::HostConstSharedPtr host, Event::Dispatcher& dispatcher, const ConfigSharedPtr& config,
+    const RedisCommandStatsSharedPtr& redis_command_stats, Stats::Scope& scope,
+    const std::string& auth_username, const std::string& auth_password, bool is_transaction_client,
+    absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
+    absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
+        aws_iam_authenticator) {
+
   ClientPtr client =
       ClientImpl::create(host, dispatcher, EncoderPtr{new EncoderImpl()}, decoder_factory_, config,
-                         redis_command_stats, scope, is_transaction_client);
-  client->initialize(auth_username, auth_password);
+                         redis_command_stats, scope, is_transaction_client, auth_username,
+                         aws_iam_config, aws_iam_authenticator);
+
+  if (!aws_iam_authenticator.has_value()) {
+    client->initialize(auth_username, auth_password);
+  }
   return client;
 }
 

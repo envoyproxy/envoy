@@ -1,23 +1,24 @@
 #include "source/extensions/common/aws/metadata_credentials_provider_base.h"
 
+#include "envoy/server/factory_context.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Aws {
 
 MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
-    Api::Api& api, Server::Configuration::ServerFactoryContext& context,
-    AwsClusterManagerOptRef aws_cluster_manager, absl::string_view cluster_name,
-    CreateMetadataFetcherCb create_metadata_fetcher_cb,
+    Server::Configuration::ServerFactoryContext& context, AwsClusterManagerPtr aws_cluster_manager,
+    absl::string_view cluster_name, CreateMetadataFetcherCb create_metadata_fetcher_cb,
     MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
     std::chrono::seconds initialization_timer)
-    : api_(api), context_(context), create_metadata_fetcher_cb_(create_metadata_fetcher_cb),
+    : context_(context), create_metadata_fetcher_cb_(create_metadata_fetcher_cb),
       cluster_name_(cluster_name), cache_duration_(getCacheDuration()),
       refresh_state_(refresh_state), initialization_timer_(initialization_timer),
       aws_cluster_manager_(aws_cluster_manager) {
 
   // Set up metadata credentials statistics
-  scope_ = api.rootScope().createScope(
+  scope_ = context_.api().rootScope().createScope(
       fmt::format("aws.metadata_credentials_provider.{}.", cluster_name_));
   stats_ = std::make_shared<MetadataCredentialsProviderStats>(MetadataCredentialsProviderStats{
       ALL_METADATACREDENTIALSPROVIDER_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))});
@@ -33,10 +34,17 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
 void MetadataCredentialsProviderBase::onClusterAddOrUpdate() {
   ENVOY_LOG(debug, "Received callback from aws cluster manager for cluster {}", cluster_name_);
   if (!cache_duration_timer_) {
-    cache_duration_timer_ = context_.mainThreadDispatcher().createTimer([this]() -> void {
-      stats_->credential_refreshes_performed_.inc();
-      refresh();
-    });
+    std::weak_ptr<MetadataCredentialsProviderStats> weak_stats = stats_;
+    std::weak_ptr<MetadataCredentialsProviderBase> weak_self = shared_from_this();
+    cache_duration_timer_ =
+        context_.mainThreadDispatcher().createTimer([weak_stats, weak_self]() -> void {
+          if (auto stats = weak_stats.lock()) {
+            stats->credential_refreshes_performed_.inc();
+          }
+          if (auto self = weak_self.lock()) {
+            self->refresh();
+          }
+        });
   }
   if (!cache_duration_timer_->enabled()) {
     cache_duration_timer_->enableTimer(std::chrono::milliseconds(1));
@@ -51,23 +59,18 @@ void MetadataCredentialsProviderBase::credentialsRetrievalError() {
   handleFetchDone();
 }
 
-// Async provider uses its own refresh mechanism. Calling refreshIfNeeded() here is not thread safe.
 bool MetadataCredentialsProviderBase::credentialsPending() { return credentials_pending_; }
 
-// Async provider uses its own refresh mechanism. Calling refreshIfNeeded() here is not thread safe.
 Credentials MetadataCredentialsProviderBase::getCredentials() {
-
-  if (tls_slot_) {
-    return *(*tls_slot_)->credentials_.get();
-  } else {
-    return Credentials();
-  }
+  return *(*tls_slot_)->credentials_.get();
 }
 
+// getCacheDuration will return a duration between 3566 and 3595 seconds, IE close to 1 hour with
+// jitter.
 std::chrono::seconds MetadataCredentialsProviderBase::getCacheDuration() {
-  return std::chrono::seconds(
-      REFRESH_INTERVAL -
-      REFRESH_GRACE_PERIOD /*TODO: Add jitter from context.api().randomGenerator()*/);
+  const auto jitter =
+      std::chrono::seconds(context_.api().randomGenerator().random() % MAX_CACHE_JITTER.count());
+  return std::chrono::seconds(REFRESH_INTERVAL - REFRESH_GRACE_PERIOD - jitter);
 }
 
 void MetadataCredentialsProviderBase::handleFetchDone() {
@@ -87,7 +90,7 @@ void MetadataCredentialsProviderBase::handleFetchDone() {
       }
     } else {
       // If our returned token had an expiration time, use that to set the cache duration
-      const auto now = api_.timeSource().systemTime();
+      const auto now = context_.api().timeSource().systemTime();
       if (expiration_time_.has_value() && (expiration_time_.value() > now)) {
         cache_duration_ =
             std::chrono::duration_cast<std::chrono::seconds>(expiration_time_.value() - now);
@@ -120,21 +123,24 @@ void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
         /* Notify waiting signers on completion of credential setting above */
         [this]() {
           credentials_pending_.store(false);
-          std::list<CredentialSubscriberCallbacks*> subscribers_copy;
+          std::list<std::weak_ptr<CredentialSubscriberCallbacks>> subscribers_copy;
           {
             Thread::LockGuard guard(mu_);
             subscribers_copy = credentials_subscribers_;
           }
-          for (auto& cb : subscribers_copy) {
-            ENVOY_LOG(debug, "Notifying subscriber of credential update");
-            cb->onCredentialUpdate();
+          for (auto& weak_cb : subscribers_copy) {
+            if (auto cb = weak_cb.lock()) {
+              ENVOY_LOG(debug, "Notifying subscriber of credential update");
+              cb->onCredentialUpdate();
+            }
           }
         });
   }
 }
 
 CredentialSubscriberCallbacksHandlePtr
-MetadataCredentialsProviderBase::subscribeToCredentialUpdates(CredentialSubscriberCallbacks& cs) {
+MetadataCredentialsProviderBase::subscribeToCredentialUpdates(
+    CredentialSubscriberCallbacksSharedPtr cs) {
   Thread::LockGuard guard(mu_);
   return std::make_unique<CredentialSubscriberCallbacksHandle>(cs, credentials_subscribers_);
 }

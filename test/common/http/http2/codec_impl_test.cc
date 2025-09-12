@@ -248,7 +248,7 @@ public:
     server_wrapper_ = std::make_unique<ConnectionWrapper>(server_.get());
     createHeaderValidator();
     request_encoder_ = &client_->newStream(response_decoder_);
-    setupDefaultConnectionMocks();
+    setupDefaultMocks();
     driveToCompletion();
 
     EXPECT_CALL(server_callbacks_, newStream(_, _))
@@ -267,7 +267,16 @@ public:
         .WillByDefault(Return(true));
   }
 
-  void setupDefaultConnectionMocks() {
+  void setupRequestDecoderMock(MockRequestDecoder& request_decoder) {
+    EXPECT_CALL(request_decoder, getRequestDecoderHandle())
+        .WillRepeatedly(Invoke([&request_decoder]() {
+          auto handle = std::make_unique<NiceMock<MockRequestDecoderHandle>>();
+          ON_CALL(*handle, get()).WillByDefault(Return(OptRef<RequestDecoder>(request_decoder)));
+          return handle;
+        }));
+  }
+
+  void setupDefaultMocks() {
     ON_CALL(client_connection_, write(_, _))
         .WillByDefault(Invoke([&](Buffer::Instance& data, bool) -> void {
           if (corrupt_metadata_frame_) {
@@ -280,6 +289,7 @@ public:
             [&](Buffer::Instance& data, bool) -> void { client_wrapper_->buffer_.add(data); }));
     // Set to the small read size (reads are suggested to be 16k aligned).
     ON_CALL(server_connection_, bufferLimit()).WillByDefault(Return(16 * 1024));
+    setupRequestDecoderMock(request_decoder_);
   }
 
   void http2OptionsFromTuple(envoy::config::core::v3::Http2ProtocolOptions& options,
@@ -559,6 +569,12 @@ protected:
 TEST_P(Http2CodecImplTest, SimpleRequestResponse) {
   initialize();
 
+  const StreamInfo::BytesMeterSharedPtr send_meter = request_encoder_->getStream().bytesMeter();
+  EXPECT_EQ(send_meter->headerBytesSent(), 0);
+  EXPECT_EQ(send_meter->decompressedHeaderBytesSent(), 0);
+  EXPECT_EQ(send_meter->headerBytesReceived(), 0);
+  EXPECT_EQ(send_meter->decompressedHeaderBytesReceived(), 0);
+
   InSequence s;
   TestRequestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
@@ -568,6 +584,10 @@ TEST_P(Http2CodecImplTest, SimpleRequestResponse) {
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
 
+  // Verify BytesMeter send-side metrics.
+  EXPECT_GT(send_meter->headerBytesSent(), 0);
+  EXPECT_GE(send_meter->decompressedHeaderBytesSent(), send_meter->headerBytesSent());
+
   // Queue request body.
   Buffer::OwnedImpl request_body(std::string(1024, 'a'));
   request_encoder_->encodeData(request_body, true);
@@ -575,6 +595,11 @@ TEST_P(Http2CodecImplTest, SimpleRequestResponse) {
   // Flush request body.
   EXPECT_CALL(request_decoder_, decodeData(_, true)).Times(AtLeast(1));
   driveToCompletion();
+
+  // Verify BytesMeter receive-side metrics.
+  EXPECT_GT(response_encoder_->getStream().bytesMeter()->headerBytesReceived(), 0);
+  EXPECT_GE(response_encoder_->getStream().bytesMeter()->decompressedHeaderBytesReceived(),
+            response_encoder_->getStream().bytesMeter()->headerBytesReceived());
 
   TestResponseHeaderMapImpl response_headers{{":status", "200"}};
 
@@ -1895,6 +1920,7 @@ TEST_P(Http2CodecImplFlowControlTest, TestFlowControlInPendingSendData) {
   StreamEncoder* response_encoder2;
   MockStreamCallbacks server_stream_callbacks2;
   MockRequestDecoder request_decoder2;
+  setupRequestDecoderMock(request_decoder2);
   // When the server stream is created it should check the status of the
   // underlying connection. Pretend it is overrun.
   EXPECT_CALL(server_connection_, aboveHighWatermark()).WillOnce(Return(true));
@@ -2505,7 +2531,7 @@ TEST_P(Http2CodecImplStreamLimitTest, MaxClientStreams) {
       server_http2_options_, random_, max_request_headers_kb_, max_request_headers_count_,
       headers_with_underscores_action_);
   server_wrapper_ = std::make_unique<ConnectionWrapper>(server_.get());
-  setupDefaultConnectionMocks();
+  setupDefaultMocks();
   driveToCompletion();
   for (int i = 0; i < 101; ++i) {
     request_encoder_ = &client_->newStream(response_decoder_);
@@ -3450,16 +3476,6 @@ TEST_P(Http2CodecImplTest, MetadataFlood) {
   EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
 }
 
-TEST_P(Http2CodecImplTest, PriorityFlood) {
-  expect_buffered_data_on_teardown_ = true;
-  priorityFlood();
-  driveToCompletion();
-  // The PRIORITY flood is detected by the server codec.
-  EXPECT_FALSE(server_wrapper_->status_.ok());
-  EXPECT_TRUE(isBufferFloodError(server_wrapper_->status_));
-  EXPECT_EQ(server_wrapper_->status_.message(), "Too many PRIORITY frames");
-}
-
 TEST_P(Http2CodecImplTest, PriorityFloodOverride) {
   max_inbound_priority_frames_per_stream_ = 2147483647;
 
@@ -4303,13 +4319,39 @@ TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointCanCauseServerToSendGoAway
   EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
 }
 
-TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointIsOnlyConsultedOncePerDispatch) {
+TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointSendGoAwayAndClose) {
+  expect_buffered_data_on_teardown_ = true;
+
+  initialize();
+  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(server_->server_go_away_and_close_on_dispatch, shouldShedLoad())
+      .WillOnce(Return(true));
+  EXPECT_CALL(client_callbacks_, onGoAway(_));
+
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(0);
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, true).ok());
+
+  driveToCompletion();
+
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
+}
+
+TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointsAreOnlyConsultedOncePerDispatch) {
   initialize();
 
-  int times_shed_load_invoked = 0;
+  int times_shed_load_goaway_invoked = 0;
   EXPECT_CALL(server_->server_go_away_on_dispatch, shouldShedLoad())
-      .WillRepeatedly(Invoke([&times_shed_load_invoked]() {
-        ++times_shed_load_invoked;
+      .WillRepeatedly(Invoke([&times_shed_load_goaway_invoked]() {
+        ++times_shed_load_goaway_invoked;
+        return false;
+      }));
+  int times_shed_load_goaway_and_close_invoked = 0;
+  EXPECT_CALL(server_->server_go_away_and_close_on_dispatch, shouldShedLoad())
+      .WillRepeatedly(Invoke([&times_shed_load_goaway_and_close_invoked]() {
+        ++times_shed_load_goaway_and_close_invoked;
         return false;
       }));
 
@@ -4337,7 +4379,8 @@ TEST_P(Http2CodecImplTest, ServerDispatchLoadShedPointIsOnlyConsultedOncePerDisp
   // All the newly created streams are queued in the connection buffer.
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, true)).Times(num_streams_to_create);
   driveToCompletion();
-  EXPECT_EQ(1, times_shed_load_invoked);
+  EXPECT_EQ(1, times_shed_load_goaway_invoked);
+  EXPECT_EQ(1, times_shed_load_goaway_and_close_invoked);
   EXPECT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
 }
 
@@ -4361,6 +4404,7 @@ TEST_P(Http2CodecImplTest, CheckHeaderPaddedWhitespaceValidation) {
   MockStreamCallbacks server_stream_callbacks;
   MockRequestDecoder request_decoder;
 
+  setupRequestDecoderMock(request_decoder);
   EXPECT_CALL(server_callbacks_, newStream(_, _))
       .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
         response_encoder = &encoder;
@@ -4447,6 +4491,8 @@ TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {
 
   scoped_runtime_.mergeValues({{"envoy.reloadable_features.validate_upstream_headers", "false"}});
   stream_error_on_invalid_http_messaging_ = true;
+
+  setupRequestDecoderMock(request_decoder_);
   initialize();
 
 #ifdef ENVOY_ENABLE_UHV
@@ -4481,6 +4527,7 @@ TEST_P(Http2CodecImplTest, CheckHeaderValueValidation) {
     MockStreamCallbacks server_stream_callbacks;
     MockRequestDecoder request_decoder;
 
+    setupRequestDecoderMock(request_decoder);
     EXPECT_CALL(server_callbacks_, newStream(_, _))
         .WillOnce(Invoke([&](ResponseEncoder& encoder, bool) -> RequestDecoder& {
           response_encoder = &encoder;
@@ -4601,7 +4648,7 @@ protected:
         server_http2_options_, random_, max_request_headers_kb_, max_request_headers_count_,
         headers_with_underscores_action_);
     server_wrapper_ = std::make_unique<ConnectionWrapper>(server_.get());
-    setupDefaultConnectionMocks();
+    setupDefaultMocks();
     driveToCompletion();
   }
 

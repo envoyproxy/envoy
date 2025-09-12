@@ -1,5 +1,10 @@
 #include "source/extensions/common/aws/signer_base_impl.h"
 
+#include "source/common/common/hex.h"
+#include "source/common/crypto/utility.h"
+#include "source/common/http/utility.h"
+#include "source/extensions/common/aws/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -188,11 +193,11 @@ void SignerBaseImpl::createQueryParams(Envoy::Http::Utility::QueryParamsMulti& q
   }
   // X-Amz-Credential
   query_params.add(SignatureQueryParameterValues::AmzCredential,
-                   Utility::encodeQueryComponent(credential));
+                   Utility::encodeQueryComponentPreservingPlus(credential));
   // X-Amz-SignedHeaders
-  query_params.add(
-      SignatureQueryParameterValues::AmzSignedHeaders,
-      Utility::encodeQueryComponent(Utility::joinCanonicalHeaderNames(signed_headers)));
+  query_params.add(SignatureQueryParameterValues::AmzSignedHeaders,
+                   Utility::encodeQueryComponentPreservingPlus(
+                       Utility::joinCanonicalHeaderNames(signed_headers)));
 }
 
 } // namespace Aws

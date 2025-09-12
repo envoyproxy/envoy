@@ -20,12 +20,10 @@ build --features=debug_prefix_map_pwd_is_dot
 build --features=swift.cacheable_swiftmodules
 build --features=swift.debug_prefix_map
 build --host_force_python=PY3
-build --macos_minimum_os=13.3
-build --ios_minimum_os=16.3
-build --ios_simulator_version=17.4
+build --macos_minimum_os=14.5
+build --ios_simulator_version=18.1
 build --verbose_failures
 build --workspace_status_command=../bazel/get_workspace_status
-build --xcode_version=15.3
 build --use_top_level_targets_for_symlinks
 build --experimental_repository_downloader_retries=2
 build --define=google_grpc=disabled
@@ -41,8 +39,6 @@ build --swiftcopt=-wmo
 # https://github.com/bazelbuild/rules_jvm_external/issues/445
 build --repo_env=JAVA_HOME=../bazel_tools/jdk
 build --define disable_known_issue_asserts=true
-# Temporarily set to C++17 because Android NDK does not fully support C++20 yet.
-build --cxxopt=-std=c++17 --host_cxxopt=-std=c++17
 # Unset per_object_debug_info. Causes failures on Android Linux release builds.
 build --features=-per_object_debug_info
 # Suppress deprecated declaration warnings due to extensive transitive noise from protobuf.
@@ -72,6 +68,8 @@ build:ios --define=envoy_full_protos=enabled
 
 # Default flags for builds targeting Android
 build:android --define=logger=android
+build:android --java_language_version=8
+build:android --tool_java_language_version=8
 
 # Default flags for Android debug builds
 build:mobile-dbg-android --config=mobile-dbg-common
@@ -85,18 +83,20 @@ build:mobile-dbg-ios --config=ios
 build:mobile-test-android --define=static_extension_registration=disabled
 build:mobile-android --android_crosstool_top=@androidndk//:toolchain
 build:mobile-android --noincompatible_enable_android_toolchain_resolution
+build:mobile-android --java_language_version=8
+build:mobile-android --tool_java_language_version=8
 
 # Default flags for iOS tests.
 build:mobile-test-ios --config=ios
 
 # Clang ASAN.
-build:mobile-clang-asan --config=clang-asan-common
+build:mobile-clang-asan --config=asan --config=clang
 
 # Clang TSAN.
-build:mobile-clang-tsan --config=clang-tsan
+build:mobile-clang-tsan --config=tsan --config=clang
 
 # Clang MSAN.
-build:mobile-clang-msan --config=clang-msan
+build:mobile-clang-msan --config=msan --config=clang
 
 # Exclude debug info from the release binary since it makes it too large to fit
 # into a zip file. This shouldn't affect crash reports.
@@ -192,7 +192,7 @@ test:mobile-remote-ci-linux-asan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 #############################################################################
 # mobile-remote-ci-linux-tsan: These options are Linux-only using Clang and ThreadSanitizer
 #############################################################################
-build:mobile-remote-ci-linux-tsan --config=clang-tsan
+build:mobile-remote-ci-linux-tsan --config=mobile-clang-tsan
 build:mobile-remote-ci-linux-tsan --config=mobile-remote-ci-linux-clang
 build:mobile-remote-ci-linux-tsan --config=remote-ci
 build:mobile-remote-ci-linux-tsan --build_tests_only
@@ -213,6 +213,7 @@ build:mobile-ci-linux-coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:mobile-ci-linux-coverage --test_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:mobile-ci-linux-coverage --repo_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:mobile-ci-linux-coverage --build_tests_only
+build:mobile-ci-linux-coverage --@envoy//tools/coverage:config=@envoy_mobile//test:coverage_config
 
 #############################################################################
 # mobile-remote-ci-linux-coverage: These options are Linux-only using Clang and LLVM coverage
@@ -260,6 +261,7 @@ test:mobile-remote-ci-core --action_env=LD_LIBRARY_PATH
 
 build:mobile-remote-ci-macos-ios --config=mobile-remote-ci-macos
 build:mobile-remote-ci-macos-ios --config=mobile-test-ios
+build:mobile-remote-ci-macos-ios --strategy=ProcessAndSign=sandboxed,local
 
 build:mobile-remote-ci-macos-ios-swift --config=mobile-remote-ci-macos-ios
 test:mobile-remote-ci-macos-ios-swift --build_tests_only

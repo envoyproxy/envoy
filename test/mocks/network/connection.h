@@ -78,12 +78,14 @@ public:
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));                                \
   MOCK_METHOD(absl::string_view, requestedServerName, (), (const));                                \
   MOCK_METHOD(absl::string_view, ja3Hash, (), (const));                                            \
+  MOCK_METHOD(absl::string_view, ja4Hash, (), (const));                                            \
   MOCK_METHOD(State, state, (), (const));                                                          \
   MOCK_METHOD(bool, connecting, (), (const));                                                      \
   MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));                            \
   MOCK_METHOD(void, setBufferLimits, (uint32_t limit));                                            \
   MOCK_METHOD(uint32_t, bufferLimit, (), (const));                                                 \
   MOCK_METHOD(bool, aboveHighWatermark, (), (const));                                              \
+  MOCK_METHOD(const ConnectionSocketPtr&, getSocket, (), (const));                                 \
   MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, socketOptions, (), (const));     \
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());                                            \
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));                             \
@@ -96,6 +98,7 @@ public:
               (uint64_t bandwidth_bits_per_sec, std::chrono::microseconds rtt), ());               \
   MOCK_METHOD(absl::optional<uint64_t>, congestionWindowInBytes, (), (const));                     \
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));                                     \
+  MOCK_METHOD(bool, setSocketOption, (Network::SocketOptionName, absl::Span<uint8_t>), ());        \
   MOCK_METHOD(OptRef<const StreamInfo::StreamInfo>, trackedStream, (), (const));
 
 class MockConnection : public Connection, public MockConnectionBase {

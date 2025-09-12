@@ -15,6 +15,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/transport_socket_match.h"
 #include "test/test_common/printers.h"
@@ -45,7 +46,8 @@ public:
                    Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
                    const Network::TransportSocketOptionsConstSharedPtr& transport_socket_options,
-                   Envoy::Upstream::ClusterConnectivityState& state)
+                   Envoy::Upstream::ClusterConnectivityState& state,
+                   Server::OverloadManager& overload_manager)
       : FixedHttpConnPoolImpl(
             std::move(host), std::move(priority), dispatcher, options, transport_socket_options,
             random_generator, state,
@@ -53,7 +55,7 @@ public:
               return std::make_unique<ActiveClient>(*pool, absl::nullopt);
             },
             [](Upstream::Host::CreateConnectionData&, HttpConnPoolImplBase*) { return nullptr; },
-            std::vector<Protocol>{Protocol::Http2}) {}
+            std::vector<Protocol>{Protocol::Http2}, overload_manager, absl::nullopt, nullptr) {}
 
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override {
     // We expect to own the connection, but already have it, so just release it to prevent it from
@@ -82,7 +84,7 @@ public:
         upstream_ready_cb_(new NiceMock<Event::MockSchedulableCallback>(&dispatcher_)),
         pool_(std::make_unique<TestConnPoolImpl>(dispatcher_, random_, host_,
                                                  Upstream::ResourcePriority::Default, nullptr,
-                                                 nullptr, state_)) {
+                                                 nullptr, state_, overload_manager_)) {
     // Default connections to 1024 because the tests shouldn't be relying on the
     // connection resource limit for most tests.
     cluster_->resetResourceManager(1024, 1024, 1024, 1, 1);
@@ -138,8 +140,7 @@ public:
       test_client.codec_client_ = new CodecClientForTest(
           CodecType::HTTP1, std::move(connection), test_client.codec_,
           [this](CodecClient*) -> void { onClientDestroy(); },
-          Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()),
-          *test_client.client_dispatcher_);
+          Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), *test_client.client_dispatcher_);
       if (buffer_limits) {
         EXPECT_CALL(*cluster_, perConnectionBufferLimitBytes())
             .Times(num_clients)
@@ -217,8 +218,9 @@ public:
   Api::ApiPtr api_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
-  Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80", simTime())};
+  Upstream::HostSharedPtr host_{Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80")};
   NiceMock<Event::MockSchedulableCallback>* upstream_ready_cb_;
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   std::unique_ptr<TestConnPoolImpl> pool_;
   std::vector<TestCodecClient> test_clients_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -345,10 +347,11 @@ TEST_F(Http2ConnPoolImplTest, VerifyAlpnFallback) {
 
   // Recreate the conn pool so that the host re-evaluates the transport socket match, arriving at
   // our test transport socket factory.
-  host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80", simTime());
+  host_ = Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:80");
   new NiceMock<Event::MockSchedulableCallback>(&dispatcher_);
-  pool_ = std::make_unique<TestConnPoolImpl>(
-      dispatcher_, random_, host_, Upstream::ResourcePriority::Default, nullptr, nullptr, state_);
+  pool_ = std::make_unique<TestConnPoolImpl>(dispatcher_, random_, host_,
+                                             Upstream::ResourcePriority::Default, nullptr, nullptr,
+                                             state_, overload_manager_);
 
   // This requires some careful set up of expectations ordering: the call to createTransportSocket
   // happens before all the connection set up but after the test client is created (due to some)
@@ -967,6 +970,8 @@ TEST_F(Http2ConnPoolImplTest, VerifyConnectionTimingStats) {
   r1.inner_decoder_->decodeHeaders(
       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}}, true);
 
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), _));
   EXPECT_CALL(cluster_->stats_store_,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
   test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
@@ -1805,6 +1810,97 @@ TEST_F(Http2ConnPoolImplTest, TestUnusedCapacity) {
   CHECK_STATE(0 /*active*/, 0 /*pending*/, 0 /*capacity*/);
 }
 
+TEST_F(Http2ConnPoolImplTest, TestNegativeUnusedCapacity) {
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(4);
+
+  expectClientsCreate(2);
+  ActiveTestRequest r1(*this, 0, false);
+  CHECK_STATE(0 /*active*/, 1 /*pending*/, 4 /*capacity*/);
+  expectClientConnect(0, r1);
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, 3 /*capacity*/);
+
+  ActiveTestRequest r2(*this, 0, true);
+  ActiveTestRequest r3(*this, 0, true);
+  CHECK_STATE(3 /*active*/, 0 /*pending*/, 1 /*capacity*/);
+
+  // Settings frame results in negative unused capacity.
+  NiceMock<MockReceivedSettings> settings;
+  settings.max_concurrent_streams_ = 1;
+  test_clients_[0].codec_client_->onSettings(settings);
+  CHECK_STATE(3 /*active*/, 0 /*pending*/, -2 /*capacity*/);
+
+  completeRequest(r1);
+  CHECK_STATE(2 /*active*/, 0 /*pending*/, -1 /*capacity*/);
+
+  // With negative capacity, verify that a new request creates a new connection.
+  ActiveTestRequest r4(*this, 1, false);
+  CHECK_STATE(2 /*active*/, 1 /*pending*/, 3 /*capacity*/);
+  expectClientConnect(1, r4);
+  CHECK_STATE(3 /*active*/, 0 /*pending*/, 2 /*capacity*/);
+
+  completeRequest(r2);
+  CHECK_STATE(2 /*active*/, 0 /*pending*/, 3 /*capacity*/);
+
+  completeRequest(r3);
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, 4 /*capacity*/);
+
+  completeRequest(r4);
+  CHECK_STATE(0 /*active*/, 0 /*pending*/, 5 /*capacity*/);
+
+  // Clean up with an outstanding stream.
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
+  closeAllClients();
+  CHECK_STATE(0 /*active*/, 0 /*pending*/, 0 /*capacity*/);
+}
+
+TEST_F(Http2ConnPoolImplTest, TestDrainingNegativeUnusedCapacity) {
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(4);
+
+  expectClientsCreate(2);
+  ActiveTestRequest r1(*this, 0, false);
+  CHECK_STATE(0 /*active*/, 1 /*pending*/, 4 /*capacity*/);
+  expectClientConnect(0, r1);
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, 3 /*capacity*/);
+
+  ActiveTestRequest r2(*this, 0, true);
+  ActiveTestRequest r3(*this, 0, true);
+  CHECK_STATE(3 /*active*/, 0 /*pending*/, 1 /*capacity*/);
+
+  // Settings frame results in negative unused capacity.
+  NiceMock<MockReceivedSettings> settings;
+  settings.max_concurrent_streams_ = 2;
+  test_clients_[0].codec_client_->onSettings(settings);
+  CHECK_STATE(3 /*active*/, 0 /*pending*/, -1 /*capacity*/);
+
+  // Clean up with an outstanding stream.
+  pool_->drainConnections(Envoy::ConnectionPool::DrainBehavior::DrainExistingConnections);
+
+  completeRequest(r1);
+  CHECK_STATE(2 /*active*/, 0 /*pending*/, 0 /*capacity*/);
+
+  // With negative capacity, verify that a new request creates a new connection.
+  ActiveTestRequest r4(*this, 1, false);
+  CHECK_STATE(2 /*active*/, 1 /*pending*/, 4 /*capacity*/);
+  expectClientConnect(1, r4);
+  CHECK_STATE(3 /*active*/, 0 /*pending*/, 3 /*capacity*/);
+
+  // Completing this request does NOT add more capacity because the connection is
+  // draining, and that connection's capacity is no longer negative.
+  completeRequest(r2);
+  CHECK_STATE(2 /*active*/, 0 /*pending*/, 3 /*capacity*/);
+
+  // After r3 completes, the draining connection should close.
+  EXPECT_CALL(*this, onClientDestroy());
+  completeRequest(r3);
+  dispatcher_.clearDeferredDeleteList();
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, 3 /*capacity*/);
+
+  completeRequest(r4);
+  CHECK_STATE(0 /*active*/, 0 /*pending*/, 4 /*capacity*/);
+
+  closeClient(1);
+}
+
 TEST_F(Http2ConnPoolImplTest, TestStateWithMultiplexing) {
   cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(2);
   cluster_->max_requests_per_connection_ = 4;
@@ -1890,6 +1986,105 @@ TEST_F(InitialStreamsLimitTest, InitialStreamsLimitRespectMaxRequests) {
       .Times(AnyNumber())
       .WillRepeatedly(Return(100));
   EXPECT_EQ(100, ActiveClient::calculateInitialStreamsLimit(cache_, origin_, mock_host_));
+}
+
+// Verifies the upstream_rq_per_cx histogram correctly tracks multiple concurrent HTTP/2 streams on
+// the same connection.
+TEST_F(Http2ConnPoolImplTest, RequestTrackingMultipleStreams) {
+  // Allow multiple concurrent streams on a single connection
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(5);
+
+  // Set up expectations for all histograms that will be emitted on connection close
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
+  // Use _ to capture any value and let the test show us what it actually is
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), _));
+
+  InSequence s;
+
+  // Create first request - this will create a new connection
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  expectClientConnect(0, r1);
+
+  // Create second and third requests - these should reuse the same connection due to multiplexing
+  ActiveTestRequest r2(*this, 0, true); // expect_connected=true means reuse connection
+  ActiveTestRequest r3(*this, 0, true); // expect_connected=true means reuse connection
+
+  // Complete all requests
+  completeRequest(r1);
+  completeRequest(r2);
+  completeRequest(r3);
+
+  // Close the connection to trigger metrics emission
+  // Set expectation first, then raise the event
+  EXPECT_CALL(*this, onClientDestroy());
+  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+// Verify request tracking for HTTP/2 with 5 concurrent streams.
+TEST_F(Http2ConnPoolImplTest, RequestTrackingFiveStreams) {
+  // Allow multiple concurrent streams on a single connection
+  cluster_->http2_options_.mutable_max_concurrent_streams()->set_value(10);
+
+  // Set up expectations for all histograms that will be emitted on connection close
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
+  // Test with 5 requests to see if it correctly tracks all of them
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), 5));
+
+  InSequence s;
+
+  // Create first request - this will create a new connection
+  expectClientCreate();
+  ActiveTestRequest r1(*this, 0, false);
+  expectClientConnect(0, r1);
+
+  // Create 4 more requests - these should reuse the same connection due to HTTP/2 multiplexing
+  ActiveTestRequest r2(*this, 0, true);
+  ActiveTestRequest r3(*this, 0, true);
+  ActiveTestRequest r4(*this, 0, true);
+  ActiveTestRequest r5(*this, 0, true);
+
+  // Complete all requests
+  completeRequest(r1);
+  completeRequest(r2);
+  completeRequest(r3);
+  completeRequest(r4);
+  completeRequest(r5);
+
+  // Close the connection to trigger metrics emission
+  EXPECT_CALL(*this, onClientDestroy());
+  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+// Test that failed connections don't record upstream_rq_per_cx metric
+TEST_F(Http2ConnPoolImplTest, RequestTrackingConnectionFailureNoMetric) {
+  // Create a request that will trigger connection creation
+  expectClientCreate();
+  ActiveTestRequest r(*this, 0, false);
+
+  // DO NOT call expectClientConnect - let the connection fail before handshake completion
+  // This should not record any upstream_rq_per_cx metric due to hasHandshakeCompleted() check
+
+  EXPECT_CALL(r.callbacks_.pool_failure_, ready());
+
+  // Close/fail the connection BEFORE it becomes ready (before handshake completion)
+  EXPECT_CALL(*this, onClientDestroy());
+  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+
+  // Verify the connection failure was recorded
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_destroy_remote_.value());
 }
 
 } // namespace Http2

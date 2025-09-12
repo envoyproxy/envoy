@@ -59,7 +59,7 @@ public:
                                 quic::ConnectionIdGeneratorInterface& generator)
       : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, &writer, false,
                                   supported_versions, dispatcher, std::move(connection_socket),
-                                  generator, /*prefer_gro=*/true) {
+                                  generator) {
     SetEncrypter(quic::ENCRYPTION_FORWARD_SECURE,
                  std::make_unique<quic::test::TaggingEncrypter>(quic::ENCRYPTION_FORWARD_SECURE));
     InstallDecrypter(quic::ENCRYPTION_FORWARD_SECURE,
@@ -128,7 +128,7 @@ public:
   void SetUp() override {
     quic_connection_ = new TestEnvoyQuicClientConnection(
         quic::test::TestConnectionId(), connection_helper_, alarm_factory_, writer_, quic_version_,
-        *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr, /*prefer_gro=*/true),
+        *dispatcher_, createConnectionSocket(peer_addr_, self_addr_, nullptr),
         connection_id_generator_);
 
     OptRef<Http::HttpServerPropertiesCache> cache;
@@ -745,6 +745,14 @@ TEST_P(EnvoyQuicClientSessionTest, UsesUdpGro) {
 
   EXPECT_LOG_CONTAINS("trace", "starting gro recvmsg with max",
                       dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit));
+}
+
+TEST_P(EnvoyQuicClientSessionTest, SetSocketOption) {
+  Network::SocketOptionName sockopt_name;
+  int val = 1;
+  absl::Span<uint8_t> sockopt_val(reinterpret_cast<uint8_t*>(&val), sizeof(val));
+
+  EXPECT_FALSE(envoy_quic_session_->setSocketOption(sockopt_name, sockopt_val));
 }
 
 class EnvoyQuicClientSessionDisallowMmsgTest : public EnvoyQuicClientSessionTest {

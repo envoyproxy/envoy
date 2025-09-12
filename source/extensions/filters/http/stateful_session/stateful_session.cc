@@ -16,7 +16,7 @@ namespace {
 
 class EmptySessionStateFactory : public Envoy::Http::SessionStateFactory {
 public:
-  Envoy::Http::SessionStatePtr create(const Envoy::Http::RequestHeaderMap&) const override {
+  Envoy::Http::SessionStatePtr create(Envoy::Http::RequestHeaderMap&) const override {
     return nullptr;
   }
 };
@@ -59,7 +59,7 @@ Http::FilterHeadersStatus StatefulSession::decodeHeaders(Http::RequestHeaderMap&
     if (route_config->disabled()) {
       return Http::FilterHeadersStatus::Continue;
     }
-    config = route_config->statefuleSessionConfig();
+    config = route_config->statefulSessionConfig();
   }
   session_state_ = config->createSessionState(headers);
   if (session_state_ == nullptr) {
@@ -82,7 +82,7 @@ Http::FilterHeadersStatus StatefulSession::encodeHeaders(Http::ResponseHeaderMap
       upstream_info != nullptr) {
     auto host = upstream_info->upstreamHost();
     if (host != nullptr) {
-      session_state_->onUpdate(*host, headers);
+      session_state_->onUpdate(host->address()->asStringView(), headers);
     }
   }
 

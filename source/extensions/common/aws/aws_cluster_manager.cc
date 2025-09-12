@@ -1,5 +1,9 @@
 #include "source/extensions/common/aws/aws_cluster_manager.h"
 
+#include "envoy/server/factory_context.h"
+
+#include "source/extensions/common/aws/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {

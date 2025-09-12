@@ -32,7 +32,6 @@ envoy_cc_library(
         "//source/common/common:cleanup_lib",
         "//source/common/init:target_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -66,6 +65,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/crypto:utility_lib",
         "//source/common/http:message_lib",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
     ],
 )
 
@@ -94,9 +94,12 @@ envoy_cc_library(
         "//source/extensions/common/aws:credentials_provider_base_lib",
         "//source/extensions/common/aws:metadata_fetcher_lib",
         "//source/extensions/common/aws:utility_lib",
+        "//source/extensions/common/aws/credential_providers:assume_role_credentials_provider_lib",
         "//source/extensions/common/aws/credential_providers:container_credentials_provider_lib",
         "//source/extensions/common/aws/credential_providers:credentials_file_credentials_provider_lib",
         "//source/extensions/common/aws/credential_providers:environment_credentials_provider_lib",
+        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_credentials_provider_lib",
+        "//source/extensions/common/aws/credential_providers:iam_roles_anywhere_x509_credentials_provider_lib",
         "//source/extensions/common/aws/credential_providers:instance_profile_credentials_provider_lib",
         "//source/extensions/common/aws/credential_providers:webidentity_credentials_provider_lib",
         "@envoy_api//envoy/extensions/common/aws/v3:pkg_cc_proto",
@@ -117,7 +120,6 @@ envoy_cc_library(
         "//source/common/http:message_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib_header",
-        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 

@@ -48,12 +48,12 @@ public:
       quic::QuicPacketWriter& writer, quic::QuicSocketAddress self_address,
       quic::QuicSocketAddress peer_address, const quic::ParsedQuicVersionVector& supported_versions,
       Network::Socket& listen_socket, quic::ConnectionIdGeneratorInterface& generator)
-      : EnvoyQuicServerConnection(
-            quic::test::TestConnectionId(), self_address, peer_address, helper, alarm_factory,
-            &writer, /*owns_writer=*/false, supported_versions,
-            createServerConnectionSocket(listen_socket.ioHandle(), self_address, peer_address,
-                                         "example.com", "h3-29"),
-            generator, nullptr) {}
+      : EnvoyQuicServerConnection(quic::test::TestConnectionId(), self_address, peer_address,
+                                  helper, alarm_factory, &writer, supported_versions,
+                                  createServerConnectionSocket(listen_socket.ioHandle(),
+                                                               self_address, peer_address,
+                                                               "example.com", "h3-29"),
+                                  generator, nullptr) {}
 
   Network::Connection::ConnectionStats& connectionStats() const {
     return QuicNetworkConnection::connectionStats();
@@ -62,8 +62,8 @@ public:
   MOCK_METHOD(void, SendConnectionClosePacket,
               (quic::QuicErrorCode, quic::QuicIetfTransportErrorCodes, const std::string&));
   MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame));
-  MOCK_METHOD(quic::MessageStatus, SendMessage,
-              (quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice>, bool));
+  MOCK_METHOD(quic::DatagramStatus, SendDatagram,
+              (quic::QuicDatagramId, absl::Span<quiche::QuicheMemSlice>, bool));
   MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 };
 
@@ -79,10 +79,10 @@ public:
                                 quic::ConnectionIdGeneratorInterface& generator)
       : EnvoyQuicClientConnection(server_connection_id, helper, alarm_factory, writer, owns_writer,
                                   supported_versions, dispatcher, std::move(connection_socket),
-                                  generator, /*prefer_gro=*/true) {}
+                                  generator) {}
 
-  MOCK_METHOD(quic::MessageStatus, SendMessage,
-              (quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice>, bool));
+  MOCK_METHOD(quic::DatagramStatus, SendDatagram,
+              (quic::QuicDatagramId, absl::Span<quiche::QuicheMemSlice>, bool));
 };
 
 class TestQuicCryptoStream : public quic::test::MockQuicCryptoStream {

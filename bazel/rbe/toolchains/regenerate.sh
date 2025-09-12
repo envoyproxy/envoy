@@ -42,7 +42,7 @@ mkdir -p "${RBE_AUTOCONF_ROOT}/toolchains/configs/${OS_FAMILY}"
 
 case "${OS_FAMILY}" in
   linux)
-    TOOLCHAIN_LIST=(clang clang_libcxx gcc)
+    TOOLCHAIN_LIST=(clang gcc)
     BAZELRC_LATEST="${RBE_AUTOCONF_ROOT}/toolchains/linux.latest.bazelrc"
     ;;
 esac

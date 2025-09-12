@@ -15,12 +15,9 @@
 #include "source/common/common/cleanup.h"
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/enum_to_int.h"
-#include "source/common/common/fmt.h"
-#include "source/common/common/safe_memcpy.h"
 #include "source/common/common/scope_tracker.h"
 #include "source/common/common/utility.h"
 #include "source/common/http/codes.h"
-#include "source/common/http/exception.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/http2/codec_stats.h"
@@ -28,7 +25,6 @@
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/cleanup/cleanup.h"
-#include "absl/container/fixed_array.h"
 #include "quiche/common/quiche_endian.h"
 #include "quiche/http2/adapter/nghttp2_adapter.h"
 #include "quiche/http2/adapter/oghttp2_adapter.h"
@@ -262,6 +258,9 @@ void ConnectionImpl::ServerStreamImpl::encode1xxHeaders(const ResponseHeaderMap&
 
 void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, bool end_stream) {
   local_end_stream_ = end_stream;
+
+  bytes_meter_->addDecompressedHeaderBytesSent(headers.byteSize());
+
   submitHeaders(headers, end_stream);
   if (parent_.sendPendingFramesAndHandleError()) {
     // Intended to check through coverage that this error case is tested
@@ -332,6 +331,9 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
   parent_.updateActiveStreamsOnEncode(*this);
   ASSERT(!local_end_stream_);
   local_end_stream_ = true;
+
+  bytes_meter_->addDecompressedHeaderBytesSent(trailers.byteSize());
+
   if (pending_send_data_->length() > 0) {
     // In this case we want trailers to come after we release all pending body data that is
     // waiting on window updates. We need to save the trailers so that we can emit them later.
@@ -498,6 +500,7 @@ void ConnectionImpl::StreamImpl::decodeData() {
         stream_manager_.decodeAsChunks() &&
         pending_recv_data_->length() > stream_manager_.defer_processing_segment_size_;
 
+    StreamDecoder* stream_decoder = decoder();
     if (decode_data_in_chunk) {
       Buffer::OwnedImpl chunk_buffer;
       // TODO(kbaichoo): Consider implementing an approximate move for chunking.
@@ -508,7 +511,9 @@ void ConnectionImpl::StreamImpl::decodeData() {
       stream_manager_.body_buffered_ = true;
       ASSERT(pending_recv_data_->length() > 0);
 
-      decoder().decodeData(chunk_buffer, sendEndStream());
+      if (stream_decoder) {
+        stream_decoder->decodeData(chunk_buffer, sendEndStream());
+      }
       already_drained_data = true;
 
       if (!buffersOverrun()) {
@@ -516,7 +521,9 @@ void ConnectionImpl::StreamImpl::decodeData() {
       }
     } else {
       // Send the entire buffer through.
-      decoder().decodeData(*pending_recv_data_, sendEndStream());
+      if (stream_decoder) {
+        stream_decoder->decodeData(*pending_recv_data_, sendEndStream());
+      }
     }
   }
 
@@ -597,7 +604,11 @@ void ConnectionImpl::ServerStreamImpl::decodeHeaders() {
     Http::Utility::transformUpgradeRequestFromH2toH1(*headers);
   }
 #endif
-  request_decoder_->decodeHeaders(std::move(headers), sendEndStream());
+  RequestDecoder* request_decoder = request_decoder_handle_->get().ptr();
+  ENVOY_BUG(request_decoder != nullptr, "Missing request_decoder_");
+  if (request_decoder) {
+    request_decoder->decodeHeaders(std::move(headers), sendEndStream());
+  }
 }
 
 void ConnectionImpl::ServerStreamImpl::decodeTrailers() {
@@ -608,8 +619,12 @@ void ConnectionImpl::ServerStreamImpl::decodeTrailers() {
   // Consume any buffered trailers.
   stream_manager_.trailers_buffered_ = false;
 
-  request_decoder_->decodeTrailers(
-      std::move(absl::get<RequestTrailerMapPtr>(headers_or_trailers_)));
+  RequestDecoder* request_decoder = request_decoder_handle_->get().ptr();
+  ENVOY_BUG(request_decoder != nullptr, "Missing request_decoder_");
+  if (request_decoder) {
+    request_decoder->decodeTrailers(
+        std::move(absl::get<RequestTrailerMapPtr>(headers_or_trailers_)));
+  }
 }
 
 void ConnectionImpl::StreamImpl::pendingSendBufferHighWatermark() {
@@ -827,7 +842,10 @@ void ConnectionImpl::StreamImpl::onMetadataDecoded(MetadataMapPtr&& metadata_map
     ENVOY_CONN_LOG(debug, "decode metadata called with empty map, skipping", parent_.connection_);
     parent_.stats_.metadata_empty_frames_.inc();
   } else {
-    decoder().decodeMetadata(std::move(metadata_map_ptr));
+    StreamDecoder* stream_decoder = decoder();
+    if (stream_decoder) {
+      stream_decoder->decodeMetadata(std::move(metadata_map_ptr));
+    }
   }
 }
 
@@ -1216,7 +1234,7 @@ int ConnectionImpl::onFrameSend(int32_t stream_id, size_t length, uint8_t type, 
       // teardown. As part of the work to remove exceptions we should aim to clean up all of this
       // error handling logic and only handle this type of case at the end of dispatch.
       for (auto& stream : active_streams_) {
-        stream->disarmStreamIdleTimer();
+        stream->disarmStreamFlushTimer();
       }
       return ERR_CALLBACK_FAILURE;
     }
@@ -1504,6 +1522,8 @@ int ConnectionImpl::saveHeader(int32_t stream_id, HeaderString&& name, HeaderStr
     stats_.headers_cb_no_stream_.inc();
     return 0;
   }
+
+  stream->bytes_meter_->addDecompressedHeaderBytesReceived(name.size() + value.size());
 
   // TODO(10646): Switch to use HeaderUtility::checkHeaderNameForUnderscores().
   auto should_return = checkHeaderNameForUnderscores(name.getStringView());
@@ -2198,10 +2218,16 @@ ServerConnectionImpl::ServerConnectionImpl(
                      max_request_headers_count),
       callbacks_(callbacks), headers_with_underscores_action_(headers_with_underscores_action),
       should_send_go_away_on_dispatch_(overload_manager.getLoadShedPoint(
-          Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch)) {
+          Server::LoadShedPointName::get().H2ServerGoAwayOnDispatch)),
+      should_send_go_away_and_close_on_dispatch_(overload_manager.getLoadShedPoint(
+          Server::LoadShedPointName::get().H2ServerGoAwayAndCloseOnDispatch)) {
   ENVOY_LOG_ONCE_IF(trace, should_send_go_away_on_dispatch_ == nullptr,
                     "LoadShedPoint envoy.load_shed_points.http2_server_go_away_on_dispatch is not "
                     "found. Is it configured?");
+  ENVOY_LOG_ONCE_IF(
+      trace, should_send_go_away_and_close_on_dispatch_ == nullptr,
+      "LoadShedPoint envoy.load_shed_points.http2_server_go_away_and_close_on_dispatch is not "
+      "found. Is it configured?");
   Http2Options h2_options(http2_options, max_request_headers_kb);
 
   auto direct_visitor = std::make_unique<Http2Visitor>(this);
@@ -2267,6 +2293,13 @@ int ServerConnectionImpl::onHeader(int32_t stream_id, HeaderString&& name, Heade
 Http::Status ServerConnectionImpl::dispatch(Buffer::Instance& data) {
   // Make sure downstream outbound queue was not flooded by the upstream frames.
   RETURN_IF_ERROR(protocol_constraints_.checkOutboundFrameLimits());
+  if (should_send_go_away_and_close_on_dispatch_ != nullptr &&
+      should_send_go_away_and_close_on_dispatch_->shouldShedLoad()) {
+    ConnectionImpl::goAway();
+    sent_go_away_on_dispatch_ = true;
+    return envoyOverloadError(
+        "Load shed point http2_server_go_away_and_close_on_dispatch triggered");
+  }
   if (should_send_go_away_on_dispatch_ != nullptr && !sent_go_away_on_dispatch_ &&
       should_send_go_away_on_dispatch_->shouldShedLoad()) {
     ConnectionImpl::goAway();

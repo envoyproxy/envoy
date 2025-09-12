@@ -51,7 +51,7 @@ jobs:
     name: "[${{ inputs.arch }}] Prime Bazel cache"
     if: ${{ ! fromJSON(inputs.caches).bazel[inputs.arch] }}
     steps:
-    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.16
+    - uses: envoyproxy/toolshed/gh-actions/github/checkout@actions-v0.3.24
       id: checkout-target
       name: Checkout Envoy repository (target branch)
       with:
@@ -59,14 +59,14 @@ jobs:
         config: |
           fetch-depth: 1
 
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.16
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.24
       id: appauth
       name: Appauth (mutex lock)
       with:
         app_id: ${{ secrets.app-id }}
         key: ${{ secrets.app-key }}
 
-    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.16
+    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.24
       name: Setup GCP
       with:
         key: ${{ secrets.gcs-cache-key }}
@@ -76,7 +76,7 @@ jobs:
         sudo mkdir /build
         sudo chown runner:docker /build
         echo "GITHUB_TOKEN=${{ github.token }}" >> $GITHUB_ENV
-    - uses: envoyproxy/toolshed/gh-actions/cache/prime@actions-v0.3.16
+    - uses: envoyproxy/toolshed/gh-actions/cache/prime@actions-v0.3.24
       id: bazel-cache
       name: Prime Bazel cache
       with:
@@ -89,15 +89,12 @@ jobs:
           cd /source
           git clone "$GITHUB_WORKSPACE" .
 
-          echo "Fetching: ${{ inputs.targets }}"
+          export BAZEL_BUILD_EXTRA_OPTIONS="--config=ci ${{ inputs.bazel-extra }}"
+          export ENVOY_CACHE_ROOT=/build/bazel_root
+          export ENVOY_CACHE_TARGETS=$(echo "${{ inputs.targets }}" | sed 's/ / + /g')
           # ironically the repository_cache is just about the only thing you dont want to cache
-          bazel --output_user_root=/build/bazel_root \
-                --output_base=/build/bazel_root/base \
-                aquery "deps(${{ inputs.targets }})" \
-                --config=ci \
-                --repository_cache=/tmp/cache \
-                ${{ inputs.bazel-extra }} \
-                > /dev/null
+          export ENVOY_REPOSITORY_CACHE=/tmp/cache
+          ./ci/do_ci.sh cache-create
         gcs-bucket: ${{ inputs.gcs-cache-bucket }}
         key: ${{ fromJSON(inputs.request).config.ci.cache.bazel }}-${{ inputs.arch }}
         lock-token: ${{ steps.appauth.outputs.token }}

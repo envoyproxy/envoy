@@ -2,9 +2,15 @@
 # lower case and title case (e.g. HTTP will accept http and Http). Entries in all lower case
 # will accept title case (e.g. lyft matches Lyft). Prefixes (e.g., un-) or suffixes (e.g. -ing)
 # are allowed for any otherwise correctly spelled word.
+
+addrlen
+itr
+STREQ
+htonl
 ABI
 ACK
 ACL
+ACCEPTOR
 AES
 AJAX
 AllMuxes
@@ -37,6 +43,8 @@ Millicores
 NID
 NIST
 NORMALISATION
+Radix
+SQLSTATE
 bm
 BSON
 BPF
@@ -46,6 +54,7 @@ CIO
 cbegin
 cend
 constness
+cstr
 deadcode
 DFP
 Dynatrace
@@ -90,6 +99,7 @@ ETB
 ETX
 FS
 FIXME
+decrypted
 gperf
 HEXDIG
 HEXDIGIT
@@ -111,6 +121,7 @@ STX
 SkyWalking
 TIDs
 Timedout
+ULA
 WRSQ
 WASI
 ceil
@@ -623,6 +634,7 @@ cacert
 cacheable
 cacheability
 callee
+callout
 callsite
 callsites
 callstack
@@ -774,6 +786,8 @@ enqueues
 enum
 enums
 environ
+eu
+euprod
 epoll
 errno
 etag
@@ -805,6 +819,7 @@ fdstat
 filename
 filenames
 fileno
+filepath
 filesystem
 firefox
 fixdate
@@ -998,6 +1013,7 @@ metaprogramming
 metatable
 microbenchmarks
 midp
+migratable
 milli
 mimics
 misconfiguration
@@ -1042,6 +1058,7 @@ netblocks
 netfilter
 netlink
 netmask
+netns
 NLB
 NLMSG
 nonblocking
@@ -1067,6 +1084,7 @@ oneof
 oneway
 oob
 opcode
+openid
 openssl
 opentracing
 optimizations
@@ -1103,6 +1121,7 @@ pcall
 pcap
 pchar
 pclose
+pdf
 performant
 pfctl
 pipelined
@@ -1175,6 +1194,8 @@ querydetails
 quiesce
 quitquitquit
 qvalue
+radix
+radixtree
 rapidjson
 ratelimit
 ratelimited
@@ -1202,6 +1223,7 @@ redis
 redispatch
 redistributions
 reentrant
+reentrants
 refactor
 refactored
 refcount
@@ -1230,6 +1252,7 @@ reperform
 repicked
 replayable
 repo
+representable
 reproducibility
 requirepass
 reselecting
@@ -1301,6 +1324,7 @@ sigactions
 sigaltstack
 siginfo
 signalstack
+signout
 sigv
 sigv4
 sigv4a
@@ -1403,6 +1427,7 @@ templating
 templatize
 templatized
 templatizing
+teredo
 testability
 testcase
 testcases

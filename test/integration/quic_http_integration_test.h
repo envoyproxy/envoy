@@ -66,8 +66,7 @@ public:
                                 bool validation_failure_on_path_response,
                                 quic::ConnectionIdGeneratorInterface& generator)
       : EnvoyQuicClientConnection(server_connection_id, initial_peer_address, helper, alarm_factory,
-                                  supported_versions, local_addr, dispatcher, options, generator,
-                                  /*prefer_gro=*/true),
+                                  supported_versions, local_addr, dispatcher, options, generator),
         dispatcher_(dispatcher),
         validation_failure_on_path_response_(validation_failure_on_path_response) {}
 
@@ -288,8 +287,7 @@ public:
       cluster->http3_options_.set_disable_qpack(*disable_qpack);
     }
     Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
-        cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)),
-        timeSystem())};
+        cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
     // This call may fail in QUICHE because of INVALID_VERSION. QUIC connection doesn't support
     // in-connection version negotiation.
     auto codec = std::make_unique<IntegrationCodecClient>(*dispatcher_, random_, std::move(conn),

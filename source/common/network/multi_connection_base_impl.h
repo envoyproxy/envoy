@@ -101,6 +101,7 @@ public:
 
   // Simple getters which always delegate to the first connection in connections_.
   bool isHalfCloseEnabled() const override;
+  bool setSocketOption(Network::SocketOptionName name, absl::Span<uint8_t> value) override;
   std::string nextProtocol() const override;
   // Note, this might change before connect finishes.
   ConnectionInfoSetter& connectionInfoSetter() override;
@@ -132,6 +133,8 @@ public:
   bool aboveHighWatermark() const override;
   void hashKey(std::vector<uint8_t>& hash_key) const override;
   void dumpState(std::ostream& os, int indent_level) const override;
+
+  const Network::ConnectionSocketPtr& getSocket() const override { PANIC("not implemented"); }
 
 private:
   // ConnectionCallbacks which will be set on an ClientConnection which

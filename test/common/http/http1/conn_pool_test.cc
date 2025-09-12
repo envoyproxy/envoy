@@ -20,6 +20,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/overload_manager.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/transport_socket_match.h"
 #include "test/test_common/printers.h"
@@ -60,9 +61,10 @@ public:
   ConnPoolImplForTest(Event::MockDispatcher& dispatcher,
                       Upstream::ClusterInfoConstSharedPtr cluster,
                       Random::RandomGenerator& random_generator,
-                      Event::MockSchedulableCallback* upstream_ready_cb)
+                      Event::MockSchedulableCallback* upstream_ready_cb,
+                      Server::OverloadManager& overload_manager)
       : FixedHttpConnPoolImpl(
-            Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", dispatcher.timeSource()),
+            Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"),
             Upstream::ResourcePriority::Default, dispatcher, nullptr, nullptr, random_generator,
             state_,
             [](HttpConnPoolImplBase* pool) {
@@ -71,7 +73,7 @@ public:
             [](Upstream::Host::CreateConnectionData&, HttpConnPoolImplBase*) {
               return nullptr; // Not used: createCodecClient overloaded.
             },
-            std::vector<Protocol>{Protocol::Http11}),
+            std::vector<Protocol>{Protocol::Http11}, overload_manager, absl::nullopt, nullptr),
         api_(Api::createApiForTest()), mock_dispatcher_(dispatcher),
         mock_upstream_ready_cb_(upstream_ready_cb) {}
 
@@ -119,8 +121,7 @@ public:
             }
           }
         },
-        Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000", simTime()),
-        *test_client.client_dispatcher_);
+        Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), *test_client.client_dispatcher_);
     EXPECT_CALL(*test_client.connect_timer_, enableTimer(_, _));
     EXPECT_CALL(mock_dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(test_client.connection_));
@@ -151,7 +152,7 @@ public:
   Http1ConnPoolImplTest()
       : upstream_ready_cb_(new Event::MockSchedulableCallback(&dispatcher_)),
         conn_pool_(std::make_unique<ConnPoolImplForTest>(dispatcher_, cluster_, random_,
-                                                         upstream_ready_cb_)) {}
+                                                         upstream_ready_cb_, overload_manager_)) {}
 
   ~Http1ConnPoolImplTest() override {
     EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
@@ -160,6 +161,7 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   Event::MockSchedulableCallback* upstream_ready_cb_;
   std::unique_ptr<ConnPoolImplForTest> conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -283,6 +285,8 @@ TEST_F(Http1ConnPoolImplTest, VerifyTimingStats) {
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
   EXPECT_CALL(cluster_->stats_store_,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), _));
 
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
   r1.startRequest();
@@ -316,8 +320,8 @@ TEST_F(Http1ConnPoolImplTest, VerifyAlpnFallback) {
   // our test transport socket factory.
   // Recreate this to refresh expectation that the callback is scheduled and saved.
   new Event::MockSchedulableCallback(&dispatcher_);
-  conn_pool_ =
-      std::make_unique<ConnPoolImplForTest>(dispatcher_, cluster_, random_, upstream_ready_cb_);
+  conn_pool_ = std::make_unique<ConnPoolImplForTest>(dispatcher_, cluster_, random_,
+                                                     upstream_ready_cb_, overload_manager_);
   NiceMock<MockResponseDecoder> outer_decoder;
   ConnPoolCallbacks callbacks;
   conn_pool_->expectClientCreate(Protocol::Http11);
@@ -516,6 +520,8 @@ TEST_F(Http1ConnPoolImplTest, MeasureConnectTime) {
 
   // Cleanup, cause the connections to go away.
   while (!conn_pool_->test_clients_.empty()) {
+    EXPECT_CALL(cluster_->stats_store_,
+                deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), _));
     EXPECT_CALL(
         cluster_->stats_store_,
         deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
@@ -1117,7 +1123,7 @@ public:
   Http1ConnPoolDestructImplTest()
       : upstream_ready_cb_(new MockDestructSchedulableCallback(&dispatcher_)),
         conn_pool_(std::make_unique<ConnPoolImplForTest>(dispatcher_, cluster_, random_,
-                                                         upstream_ready_cb_)) {}
+                                                         upstream_ready_cb_, overload_manager_)) {}
 
   ~Http1ConnPoolDestructImplTest() override {
     EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
@@ -1126,6 +1132,7 @@ public:
   NiceMock<Random::MockRandomGenerator> random_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<Upstream::MockClusterInfo> cluster_{new NiceMock<Upstream::MockClusterInfo>()};
+  NiceMock<Server::MockOverloadManager> overload_manager_;
   MockDestructSchedulableCallback* upstream_ready_cb_;
   std::unique_ptr<ConnPoolImplForTest> conn_pool_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -1182,6 +1189,152 @@ TEST_F(Http1ConnPoolDestructImplTest, CbAfterConnPoolDestroyed) {
         deferring_delete = false;
       }));
   dispatcher_.clearDeferredDeleteList();
+}
+
+// Verifies that the upstream_rq_per_cx histogram is emitted correctly.
+TEST_F(Http1ConnPoolImplTest, RequestTrackingMetric) {
+  // Set up expectations for all histograms that will be emitted on connection close
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), 3));
+
+  // Create connection and make 3 requests to test request counting
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
+  r1.startRequest();
+  conn_pool_->expectEnableUpstreamReady();
+  r1.completeResponse(false); // Keep connection alive
+
+  // Second request on same connection (HTTP/1.1 keep-alive)
+  ActiveTestRequest r2(*this, 0, ActiveTestRequest::Type::Immediate);
+  r2.startRequest();
+  conn_pool_->expectEnableUpstreamReady();
+  r2.completeResponse(false); // Keep connection alive
+
+  // Third request on same connection
+  ActiveTestRequest r3(*this, 0, ActiveTestRequest::Type::Immediate);
+  r3.startRequest();
+  conn_pool_->expectEnableUpstreamReady();
+  r3.completeResponse(false);
+
+  // Explicitly close connection to trigger metrics
+  EXPECT_CALL(*conn_pool_, onClientDestroy());
+  conn_pool_->expectAndRunUpstreamReady();
+  conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+// Verifies that the upstream_rq_per_cx histogram is emitted correctly for multiple connections.
+TEST_F(Http1ConnPoolImplTest, RequestTrackingMultipleConnections) {
+  // Set up expectations for histograms from first connection
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), 2));
+
+  // Create first connection and handle 2 requests
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
+  r1.startRequest();
+  conn_pool_->expectEnableUpstreamReady();
+  r1.completeResponse(false); // Keep connection alive
+
+  ActiveTestRequest r2(*this, 0, ActiveTestRequest::Type::Immediate);
+  r2.startRequest();
+  conn_pool_->expectEnableUpstreamReady();
+  r2.completeResponse(false); // Keep connection alive
+
+  // Close first connection
+  EXPECT_CALL(*conn_pool_, onClientDestroy());
+  conn_pool_->expectAndRunUpstreamReady();
+  conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+
+  // Set up expectations for histograms from second connection
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), 1));
+
+  // Create second connection and handle 1 request
+  ActiveTestRequest r3(*this, 0, ActiveTestRequest::Type::CreateConnection);
+  r3.startRequest();
+  conn_pool_->expectEnableUpstreamReady();
+  r3.completeResponse(false);
+
+  // Close second connection
+  EXPECT_CALL(*conn_pool_, onClientDestroy());
+  conn_pool_->expectAndRunUpstreamReady();
+  conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+// Test request tracking with single request per connection.
+TEST_F(Http1ConnPoolImplTest, RequestTrackingSingleRequest) {
+  // Set up expectations for all histograms that will be emitted on connection close
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), 1));
+
+  // Create connection and send request
+  ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
+  r1.startRequest();
+
+  // Complete response but keep connection open
+  conn_pool_->expectEnableUpstreamReady();
+  r1.completeResponse(false);
+
+  // Explicitly close connection to trigger metrics
+  EXPECT_CALL(*conn_pool_, onClientDestroy());
+  conn_pool_->expectAndRunUpstreamReady();
+  conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  dispatcher_.clearDeferredDeleteList();
+}
+
+// Test that upstream_rq_per_cx metric is NOT recorded for failed connections
+TEST_F(Http1ConnPoolImplTest, RequestTrackingConnectionFailureNoMetric) {
+  // This test verifies that failed connections don't record our specific metric
+  // We'll allow other histograms but specifically check that upstream_rq_per_cx is never called
+
+  // Allow any other histogram calls
+  EXPECT_CALL(cluster_->stats_store_, deliverHistogramToSinks(_, _)).Times(testing::AnyNumber());
+
+  // But specifically ensure upstream_rq_per_cx is NEVER called
+  EXPECT_CALL(cluster_->stats_store_,
+              deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_rq_per_cx"), _))
+      .Times(0);
+
+  InSequence s;
+
+  // Request should kick off a new connection
+  NiceMock<MockResponseDecoder> outer_decoder;
+  ConnPoolCallbacks callbacks;
+  conn_pool_->expectClientCreate();
+  Http::ConnectionPool::Cancellable* handle =
+      conn_pool_->newStream(outer_decoder, callbacks, {false, true});
+  EXPECT_NE(nullptr, handle);
+
+  // Simulate connection failure before handshake completion
+  EXPECT_CALL(*conn_pool_->test_clients_[0].connect_timer_, disableTimer());
+  EXPECT_CALL(callbacks.pool_failure_, ready());
+  conn_pool_->test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_CALL(*conn_pool_, onClientDestroy());
+  dispatcher_.clearDeferredDeleteList();
+
+  // Verify that the connection failure stats are incremented
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_cx_connect_fail_.value());
+  EXPECT_EQ(1U, cluster_->traffic_stats_->upstream_rq_pending_failure_eject_.value());
+
+  // The key validation: our specific metric should never have been called
+  // (This is verified by the EXPECT_CALL with Times(0) above)
 }
 
 } // namespace

@@ -133,6 +133,15 @@ public:
   AccessLogType accessLogType() const;
 
   /**
+   * Set or overwrite the active span.
+   * @param active_span supplies the active span.
+   */
+  HttpFormatterContext& setActiveSpan(const Tracing::Span& active_span) {
+    active_span_ = &active_span;
+    return *this;
+  }
+
+  /**
    * @return const Tracing::Span& the active span.
    */
   const Tracing::Span& activeSpan() const;
@@ -163,7 +172,7 @@ private:
   const Http::RequestHeaderMap* request_headers_{};
   const Http::ResponseHeaderMap* response_headers_{};
   const Http::ResponseTrailerMap* response_trailers_{};
-  absl::string_view local_reply_body_{};
+  absl::string_view local_reply_body_;
   AccessLogType log_type_{AccessLogType::NotSet};
   const Tracing::Span* active_span_ = nullptr;
   OptRef<const Extension> extension_;

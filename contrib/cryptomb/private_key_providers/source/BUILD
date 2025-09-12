@@ -16,6 +16,11 @@ envoy_contrib_package()
 
 envoy_cmake(
     name = "ipp-crypto",
+    build_args = select({
+        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
+        "//bazel:engflow_rbe_x86_64": ["-j"],
+        "//conditions:default": ["-j1"],
+    }),
     cache_entries = {
         "BORINGSSL": "on",
         "DYNAMIC_LIB": "off",
@@ -23,6 +28,16 @@ envoy_cmake(
     },
     defines = [
         "OPENSSL_USE_STATIC_LIBS=TRUE",
+    ],
+    exec_properties = select({
+        "//bazel:engflow_rbe_x86_64": {
+            "Pool": "linux_x64_large",
+        },
+        "//conditions:default": {},
+    }),
+    generate_args = [
+        "-G",
+        "Ninja",
     ],
     lib_source = "@com_github_intel_ipp_crypto_crypto_mb//:all",
     out_static_libs = ["libcrypto_mb.a"],

@@ -13,6 +13,7 @@
 #include "test/common/upstream/utility.h"
 #include "test/mocks/common.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/mocks/upstream/host_set.h"
@@ -63,16 +64,16 @@ public:
 
   void init(bool locality_weighted_balancing = false) {
     if (locality_weighted_balancing) {
-      common_config_.mutable_locality_weighted_lb_config();
+      config_.mutable_locality_weighted_lb_config();
     }
 
+    absl::Status creation_status;
+    TypedRingHashLbConfig typed_config(config_, context_.regex_engine_, creation_status);
+    ASSERT(creation_status.ok());
+
     lb_ = std::make_unique<RingHashLoadBalancer>(
-        priority_set_, stats_, *stats_store_.rootScope(), runtime_, random_,
-        config_.has_value()
-            ? makeOptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>(
-                  config_.value())
-            : absl::nullopt,
-        common_config_);
+        priority_set_, stats_, *stats_store_.rootScope(), context_.runtime_loader_,
+        context_.api_.random_, 50, typed_config.lb_config_, typed_config.hash_policy_);
     EXPECT_TRUE(lb_->initialize().ok());
   }
 
@@ -92,10 +93,8 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   ClusterLbStatNames stat_names_;
   ClusterLbStats stats_;
-  absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> config_;
-  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<Random::MockRandomGenerator> random_;
+  envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash config_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
   std::unique_ptr<RingHashLoadBalancer> lb_;
 };
 
@@ -107,12 +106,13 @@ INSTANTIATE_TEST_SUITE_P(RingHashPrimaryOrFailover, RingHashLoadBalancerTest,
 INSTANTIATE_TEST_SUITE_P(RingHashPrimaryOrFailover, RingHashFailoverTest, ::testing::Values(true));
 
 TEST_P(RingHashLoadBalancerTest, ChooseHostBeforeInit) {
-  lb_ = std::make_unique<RingHashLoadBalancer>(
-      priority_set_, stats_, *stats_store_.rootScope(), runtime_, random_,
-      config_.has_value()
-          ? makeOptRef<const envoy::config::cluster::v3::Cluster::RingHashLbConfig>(config_.value())
-          : absl::nullopt,
-      common_config_);
+  absl::Status creation_status;
+  TypedRingHashLbConfig typed_config(config_, context_.regex_engine_, creation_status);
+  ASSERT(creation_status.ok());
+
+  lb_ = std::make_unique<RingHashLoadBalancer>(priority_set_, stats_, *stats_store_.rootScope(),
+                                               context_.runtime_loader_, context_.api_.random_, 50,
+                                               typed_config.lb_config_, typed_config.hash_policy_);
   EXPECT_EQ(nullptr, lb_->factory()->create(lb_params_)->chooseHost(nullptr).host);
 }
 
@@ -155,25 +155,22 @@ TEST_P(RingHashLoadBalancerTest, LbDestructedBeforeFactory) {
 
 // Given minimum_ring_size > maximum_ring_size, expect an exception.
 TEST_P(RingHashLoadBalancerTest, BadRingSizeBounds) {
-  config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
-  config_.value().mutable_minimum_ring_size()->set_value(20);
-  config_.value().mutable_maximum_ring_size()->set_value(10);
+
+  config_.mutable_minimum_ring_size()->set_value(20);
+  config_.mutable_maximum_ring_size()->set_value(10);
   EXPECT_THROW_WITH_MESSAGE(init(), EnvoyException,
                             "ring hash: minimum_ring_size (20) > maximum_ring_size (10)");
 }
 
 TEST_P(RingHashLoadBalancerTest, Basic) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:94", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:95", simTime())};
+  hostSet().hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
+      makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93"),
+      makeTestHost(info_, "tcp://127.0.0.1:94"), makeTestHost(info_, "tcp://127.0.0.1:95")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
-  config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
-  config_.value().mutable_minimum_ring_size()->set_value(12);
+  config_.mutable_minimum_ring_size()->set_value(12);
 
   init();
   EXPECT_EQ("ring_hash_lb.size", lb_->stats().size_.name());
@@ -217,7 +214,7 @@ TEST_P(RingHashLoadBalancerTest, Basic) {
     EXPECT_EQ(hostSet().hosts_[3], lb->chooseHost(&context).host);
   }
   {
-    EXPECT_CALL(random_, random()).WillOnce(Return(16117243373044804880UL));
+    EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(16117243373044804880UL));
     EXPECT_EQ(hostSet().hosts_[0], lb->chooseHost(nullptr).host);
   }
   EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
@@ -234,12 +231,11 @@ TEST_P(RingHashLoadBalancerTest, Basic) {
 
 // Ensure if all the hosts with priority 0 unhealthy, the next priority hosts are used.
 TEST_P(RingHashFailoverTest, BasicFailover) {
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime())};
-  failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82", simTime())};
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80")};
+  failover_host_set_.healthy_hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:82")};
   failover_host_set_.hosts_ = failover_host_set_.healthy_hosts_;
 
-  config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
-  config_.value().mutable_minimum_ring_size()->set_value(12);
+  config_.mutable_minimum_ring_size()->set_value(12);
   init();
   EXPECT_EQ(12, lb_->stats().size_.value());
   EXPECT_EQ(12, lb_->stats().min_hashes_per_host_.value());
@@ -261,32 +257,29 @@ TEST_P(RingHashFailoverTest, BasicFailover) {
   EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb->chooseHost(nullptr).host);
 
   // Set up so P=0 gets 70% of the load, and P=1 gets 30%.
-  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
+  host_set_.hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
+                      makeTestHost(info_, "tcp://127.0.0.1:81")};
   host_set_.healthy_hosts_ = {host_set_.hosts_[0]};
   host_set_.runCallbacks({}, {});
   lb = lb_->factory()->create(lb_params_);
-  EXPECT_CALL(random_, random()).WillOnce(Return(69));
+  EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(69));
   EXPECT_EQ(host_set_.healthy_hosts_[0], lb->chooseHost(nullptr).host);
-  EXPECT_CALL(random_, random()).WillOnce(Return(71));
+  EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(71));
   EXPECT_EQ(failover_host_set_.healthy_hosts_[0], lb->chooseHost(nullptr).host);
 }
 
 // Expect reasonable results with Murmur2 hash.
 TEST_P(RingHashLoadBalancerTest, BasicWithMurmur2) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:82", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:83", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:84", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:85", simTime())};
+  hostSet().hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:80"), makeTestHost(info_, "tcp://127.0.0.1:81"),
+      makeTestHost(info_, "tcp://127.0.0.1:82"), makeTestHost(info_, "tcp://127.0.0.1:83"),
+      makeTestHost(info_, "tcp://127.0.0.1:84"), makeTestHost(info_, "tcp://127.0.0.1:85")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
-  config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
-  config_.value().set_hash_function(
-      envoy::config::cluster::v3::Cluster::RingHashLbConfig::MURMUR_HASH_2);
-  config_.value().mutable_minimum_ring_size()->set_value(12);
+  config_.set_hash_function(
+      envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash::MURMUR_HASH_2);
+  config_.mutable_minimum_ring_size()->set_value(12);
   init();
   EXPECT_EQ(12, lb_->stats().size_.value());
   EXPECT_EQ(2, lb_->stats().min_hashes_per_host_.value());
@@ -323,28 +316,96 @@ TEST_P(RingHashLoadBalancerTest, BasicWithMurmur2) {
     EXPECT_EQ(hostSet().hosts_[3], lb->chooseHost(&context).host);
   }
   {
-    EXPECT_CALL(random_, random()).WillOnce(Return(10150910876324007730UL));
+    EXPECT_CALL(context_.api_.random_, random()).WillOnce(Return(10150910876324007730UL));
     EXPECT_EQ(hostSet().hosts_[2], lb->chooseHost(nullptr).host);
   }
   EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
 }
 
-// Expect reasonable results with hostname.
-TEST_P(RingHashLoadBalancerTest, BasicWithHostname) {
-  hostSet().hosts_ = {makeTestHost(info_, "90", "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "91", "tcp://127.0.0.1:91", simTime()),
-                      makeTestHost(info_, "92", "tcp://127.0.0.1:92", simTime()),
-                      makeTestHost(info_, "93", "tcp://127.0.0.1:93", simTime()),
-                      makeTestHost(info_, "94", "tcp://127.0.0.1:94", simTime()),
-                      makeTestHost(info_, "95", "tcp://127.0.0.1:95", simTime())};
+// Test bounded load. This test only ensures that the
+// hash balancer factory won't break the normal load balancer process.
+TEST_P(RingHashLoadBalancerTest, BasicWithDoundedLoad) {
+  hostSet().hosts_ = {makeTestHost(info_, "90", "tcp://127.0.0.1:90"),
+                      makeTestHost(info_, "91", "tcp://127.0.0.1:91"),
+                      makeTestHost(info_, "92", "tcp://127.0.0.1:92"),
+                      makeTestHost(info_, "93", "tcp://127.0.0.1:93"),
+                      makeTestHost(info_, "94", "tcp://127.0.0.1:94"),
+                      makeTestHost(info_, "95", "tcp://127.0.0.1:95")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
-  config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
-  config_.value().mutable_minimum_ring_size()->set_value(12);
+  config_.mutable_minimum_ring_size()->set_value(12);
+  config_.mutable_consistent_hashing_lb_config()->set_use_hostname_for_hashing(true);
+  config_.mutable_consistent_hashing_lb_config()->mutable_hash_balance_factor()->set_value(200);
 
-  common_config_ = envoy::config::cluster::v3::Cluster::CommonLbConfig();
-  common_config_.mutable_consistent_hashing_lb_config()->set_use_hostname_for_hashing(true);
+  init();
+
+  EXPECT_EQ("ring_hash_lb.size", lb_->stats().size_.name());
+  EXPECT_EQ("ring_hash_lb.min_hashes_per_host", lb_->stats().min_hashes_per_host_.name());
+  EXPECT_EQ("ring_hash_lb.max_hashes_per_host", lb_->stats().max_hashes_per_host_.name());
+  EXPECT_EQ(12, lb_->stats().size_.value());
+  EXPECT_EQ(2, lb_->stats().min_hashes_per_host_.value());
+  EXPECT_EQ(2, lb_->stats().max_hashes_per_host_.value());
+
+  // hash ring:
+  // host | position
+  // ---------------------------
+  // 95 | 1975508444536362413
+  // 95 | 2376063919839173711
+  // 93 | 2386806903309390596
+  // 94 | 6749904478991551885
+  // 93 | 6803900775736438537
+  // 92 | 7225015537174310577
+  // 90 | 8787465352164086522
+  // 92 | 11282020843382717940
+  // 91 | 13723418369486627818
+  // 90 | 13776502110861797421
+  // 91 | 14338313586354474791
+  // 94 | 15364271037087512980
+
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+  {
+    TestLoadBalancerContext context(0);
+    EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context).host);
+  }
+  {
+    TestLoadBalancerContext context(std::numeric_limits<uint64_t>::max());
+    EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context).host);
+  }
+  {
+    TestLoadBalancerContext context(7225015537174310577);
+    EXPECT_EQ(hostSet().hosts_[2], lb->chooseHost(&context).host);
+  }
+  {
+    TestLoadBalancerContext context(6803900775736438537);
+    EXPECT_EQ(hostSet().hosts_[3], lb->chooseHost(&context).host);
+  }
+  { EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(nullptr).host); }
+  EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
+
+  hostSet().healthy_hosts_.clear();
+  hostSet().runCallbacks({}, {});
+  lb = lb_->factory()->create(lb_params_);
+  {
+    TestLoadBalancerContext context(0);
+    EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context).host);
+  }
+  EXPECT_EQ(1UL, stats_.lb_healthy_panic_.value());
+}
+
+// Expect reasonable results with hostname.
+TEST_P(RingHashLoadBalancerTest, BasicWithHostname) {
+  hostSet().hosts_ = {makeTestHost(info_, "90", "tcp://127.0.0.1:90"),
+                      makeTestHost(info_, "91", "tcp://127.0.0.1:91"),
+                      makeTestHost(info_, "92", "tcp://127.0.0.1:92"),
+                      makeTestHost(info_, "93", "tcp://127.0.0.1:93"),
+                      makeTestHost(info_, "94", "tcp://127.0.0.1:94"),
+                      makeTestHost(info_, "95", "tcp://127.0.0.1:95")};
+  hostSet().healthy_hosts_ = hostSet().hosts_;
+  hostSet().runCallbacks({}, {});
+
+  config_.mutable_minimum_ring_size()->set_value(12);
+  config_.mutable_consistent_hashing_lb_config()->set_use_hostname_for_hashing(true);
 
   init();
 
@@ -403,20 +464,17 @@ TEST_P(RingHashLoadBalancerTest, BasicWithHostname) {
 
 // Expect reasonable results with metadata hash_key.
 TEST_P(RingHashLoadBalancerTest, BasicWithMetadataHashKey) {
-  hostSet().hosts_ = {makeTestHostWithHashKey(info_, "90", "tcp://127.0.0.1:90", simTime()),
-                      makeTestHostWithHashKey(info_, "91", "tcp://127.0.0.1:91", simTime()),
-                      makeTestHostWithHashKey(info_, "92", "tcp://127.0.0.1:92", simTime()),
-                      makeTestHostWithHashKey(info_, "93", "tcp://127.0.0.1:93", simTime()),
-                      makeTestHostWithHashKey(info_, "94", "tcp://127.0.0.1:94", simTime()),
-                      makeTestHostWithHashKey(info_, "95", "tcp://127.0.0.1:95", simTime())};
+  hostSet().hosts_ = {makeTestHostWithHashKey(info_, "90", "tcp://127.0.0.1:90"),
+                      makeTestHostWithHashKey(info_, "91", "tcp://127.0.0.1:91"),
+                      makeTestHostWithHashKey(info_, "92", "tcp://127.0.0.1:92"),
+                      makeTestHostWithHashKey(info_, "93", "tcp://127.0.0.1:93"),
+                      makeTestHostWithHashKey(info_, "94", "tcp://127.0.0.1:94"),
+                      makeTestHostWithHashKey(info_, "95", "tcp://127.0.0.1:95")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
-  config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
-  config_.value().mutable_minimum_ring_size()->set_value(12);
-
-  common_config_ = envoy::config::cluster::v3::Cluster::CommonLbConfig();
-  common_config_.mutable_consistent_hashing_lb_config()->set_use_hostname_for_hashing(true);
+  config_.mutable_minimum_ring_size()->set_value(12);
+  config_.mutable_consistent_hashing_lb_config()->set_use_hostname_for_hashing(true);
 
   init();
 
@@ -473,19 +531,122 @@ TEST_P(RingHashLoadBalancerTest, BasicWithMetadataHashKey) {
   EXPECT_EQ(1UL, stats_.lb_healthy_panic_.value());
 }
 
-// Test the same ring as Basic but exercise retry host predicate behavior.
-TEST_P(RingHashLoadBalancerTest, BasicWithRetryHostPredicate) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:94", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:95", simTime())};
+TEST_P(RingHashLoadBalancerTest, RingHashLbWithHashPolicy) {
+  hostSet().hosts_ = {makeTestHostWithHashKey(info_, "90", "tcp://127.0.0.1:90"),
+                      makeTestHostWithHashKey(info_, "91", "tcp://127.0.0.1:91"),
+                      makeTestHostWithHashKey(info_, "92", "tcp://127.0.0.1:92"),
+                      makeTestHostWithHashKey(info_, "93", "tcp://127.0.0.1:93"),
+                      makeTestHostWithHashKey(info_, "94", "tcp://127.0.0.1:94"),
+                      makeTestHostWithHashKey(info_, "95", "tcp://127.0.0.1:95")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
-  config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
-  config_.value().mutable_minimum_ring_size()->set_value(12);
+  config_.mutable_minimum_ring_size()->set_value(12);
+  config_.mutable_consistent_hashing_lb_config()->set_use_hostname_for_hashing(true);
+  auto* hash_policy = config_.mutable_consistent_hashing_lb_config()->add_hash_policy();
+  *hash_policy->mutable_cookie()->mutable_name() = "test-cookie-name";
+  *hash_policy->mutable_cookie()->mutable_path() = "/test/path";
+  hash_policy->mutable_cookie()->mutable_ttl()->set_seconds(1000);
+
+  init();
+
+  EXPECT_EQ("ring_hash_lb.size", lb_->stats().size_.name());
+  EXPECT_EQ("ring_hash_lb.min_hashes_per_host", lb_->stats().min_hashes_per_host_.name());
+  EXPECT_EQ("ring_hash_lb.max_hashes_per_host", lb_->stats().max_hashes_per_host_.name());
+  EXPECT_EQ(12, lb_->stats().size_.value());
+  EXPECT_EQ(2, lb_->stats().min_hashes_per_host_.value());
+  EXPECT_EQ(2, lb_->stats().max_hashes_per_host_.value());
+
+  LoadBalancerPtr lb = lb_->factory()->create(lb_params_);
+
+  {
+    // Cookie exists.
+    Http::TestRequestHeaderMapImpl request_headers{{"cookie", "test-cookie-name=1234567890"}};
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+    NiceMock<Upstream::MockLoadBalancerContext> context;
+    EXPECT_CALL(context, downstreamHeaders()).Times(2).WillRepeatedly(Return(&request_headers));
+    EXPECT_CALL(context, requestStreamInfo()).Times(2).WillRepeatedly(Return(&stream_info));
+
+    EXPECT_CALL(context_.api_.random_, random()).Times(0);
+
+    auto host_1 = lb->chooseHost(&context);
+    auto host_2 = lb->chooseHost(&context);
+    EXPECT_EQ(host_1.host, host_2.host);
+  }
+
+  {
+    // Cookie not exists and no stream info is provided.
+    Http::TestRequestHeaderMapImpl request_headers{};
+
+    NiceMock<Upstream::MockLoadBalancerContext> context;
+    EXPECT_CALL(context, downstreamHeaders()).Times(2).WillRepeatedly(Return(&request_headers));
+
+    // No hash is generated and random will be used.
+    EXPECT_CALL(context_.api_.random_, random()).Times(2);
+    auto host_1 = lb->chooseHost(&context);
+    auto host_2 = lb->chooseHost(&context);
+  }
+
+  {
+    // Cookie not exists and no valid addresses.
+    Http::TestRequestHeaderMapImpl request_headers{};
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    stream_info.downstream_connection_info_provider_->setRemoteAddress(nullptr);
+    stream_info.downstream_connection_info_provider_->setLocalAddress(nullptr);
+
+    NiceMock<Upstream::MockLoadBalancerContext> context;
+    EXPECT_CALL(context, downstreamHeaders()).Times(2).WillRepeatedly(Return(&request_headers));
+    EXPECT_CALL(context, requestStreamInfo()).Times(4).WillRepeatedly(Return(&stream_info));
+
+    // No hash is generated and random will be used.
+    EXPECT_CALL(context_.api_.random_, random()).Times(2);
+    auto host_1 = lb->chooseHost(&context);
+    auto host_2 = lb->chooseHost(&context);
+  }
+
+  {
+    // Cookie not exists and has valid addresses.
+    Http::TestRequestHeaderMapImpl request_headers{};
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+
+    NiceMock<Upstream::MockLoadBalancerContext> context;
+    EXPECT_CALL(context, downstreamHeaders()).Times(2).WillRepeatedly(Return(&request_headers));
+    EXPECT_CALL(context, requestStreamInfo()).Times(4).WillRepeatedly(Return(&stream_info));
+
+    const std::string address_values =
+        stream_info.downstream_connection_info_provider_->remoteAddress()->asString() +
+        stream_info.downstream_connection_info_provider_->localAddress()->asString();
+    std::string new_cookie_value = Hex::uint64ToHex(HashUtil::xxHash64(address_values));
+
+    EXPECT_CALL(context, setHeadersModifier(_))
+        .WillRepeatedly(
+            testing::Invoke([&](std::function<void(Http::ResponseHeaderMap&)> modifier) {
+              Http::TestResponseHeaderMapImpl response;
+              modifier(response);
+              // Cookie is set.
+              EXPECT_TRUE(absl::StrContains(response.get_(Http::Headers::get().SetCookie),
+                                            new_cookie_value));
+            }));
+
+    // Hash is generated and random will not be used.
+    EXPECT_CALL(context_.api_.random_, random()).Times(0);
+    auto host_1 = lb->chooseHost(&context);
+    auto host_2 = lb->chooseHost(&context);
+    EXPECT_EQ(host_1.host, host_2.host);
+  }
+}
+
+// Test the same ring as Basic but exercise retry host predicate behavior.
+TEST_P(RingHashLoadBalancerTest, BasicWithRetryHostPredicate) {
+  hostSet().hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
+      makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93"),
+      makeTestHost(info_, "tcp://127.0.0.1:94"), makeTestHost(info_, "tcp://127.0.0.1:95")};
+  hostSet().healthy_hosts_ = hostSet().hosts_;
+  hostSet().runCallbacks({}, {});
+
+  config_.mutable_minimum_ring_size()->set_value(12);
 
   init();
   EXPECT_EQ("ring_hash_lb.size", lb_->stats().size_.name());
@@ -542,13 +703,12 @@ TEST_P(RingHashLoadBalancerTest, BasicWithRetryHostPredicate) {
 
 // Given 2 hosts and a minimum ring size of 3, expect 2 hashes per host and a ring size of 4.
 TEST_P(RingHashLoadBalancerTest, UnevenHosts) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:81", simTime())};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),
+                      makeTestHost(info_, "tcp://127.0.0.1:81")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
-  config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
-  config_.value().mutable_minimum_ring_size()->set_value(3);
+  config_.mutable_minimum_ring_size()->set_value(3);
   init();
   EXPECT_EQ(4, lb_->stats().size_.value());
   EXPECT_EQ(2, lb_->stats().min_hashes_per_host_.value());
@@ -568,8 +728,8 @@ TEST_P(RingHashLoadBalancerTest, UnevenHosts) {
     EXPECT_EQ(hostSet().hosts_[0], lb->chooseHost(&context).host);
   }
 
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:82", simTime())};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:81"),
+                      makeTestHost(info_, "tcp://127.0.0.1:82")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
@@ -591,16 +751,16 @@ TEST_P(RingHashLoadBalancerTest, UnevenHosts) {
 // Given hosts with weights 1, 2 and 3, and a ring size of exactly 6, expect the correct number of
 // hashes for each host.
 TEST_P(RingHashLoadBalancerTest, HostWeightedTinyRing) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), 2),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), 3)};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", 2),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", 3)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
   // enforce a ring size of exactly six entries
-  config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
-  config_.value().mutable_minimum_ring_size()->set_value(6);
-  config_.value().mutable_maximum_ring_size()->set_value(6);
+
+  config_.mutable_minimum_ring_size()->set_value(6);
+  config_.mutable_maximum_ring_size()->set_value(6);
   init();
   EXPECT_EQ(6, lb_->stats().size_.value());
   EXPECT_EQ(1, lb_->stats().min_hashes_per_host_.value());
@@ -620,14 +780,13 @@ TEST_P(RingHashLoadBalancerTest, HostWeightedTinyRing) {
 // Given hosts with weights 1, 2 and 3, and a sufficiently large ring, expect that requests will
 // distribute to the hosts with approximately the right proportion.
 TEST_P(RingHashLoadBalancerTest, HostWeightedLargeRing) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), 2),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), 3)};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", 2),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", 3)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
-  config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
-  config_.value().mutable_minimum_ring_size()->set_value(6144);
+  config_.mutable_minimum_ring_size()->set_value(6144);
   init();
   EXPECT_EQ(6144, lb_->stats().size_.value());
   EXPECT_EQ(1024, lb_->stats().min_hashes_per_host_.value());
@@ -654,8 +813,8 @@ TEST_P(RingHashLoadBalancerTest, ZeroLocalityWeights) {
   envoy::config::core::v3::Locality zone_b;
   zone_b.set_zone("B");
 
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_b)};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", zone_b)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ =
       makeHostsPerLocality({{hostSet().hosts_[0]}, {hostSet().hosts_[1]}});
@@ -679,10 +838,10 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedTinyRing) {
   envoy::config::core::v3::Locality zone_d;
   zone_d.set_zone("D");
 
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_b),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), zone_c),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime(), zone_d)};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", zone_b),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", zone_c),
+                      makeTestHost(info_, "tcp://127.0.0.1:93", zone_d)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ = makeHostsPerLocality(
       {{hostSet().hosts_[0]}, {hostSet().hosts_[1]}, {hostSet().hosts_[2]}, {hostSet().hosts_[3]}});
@@ -691,9 +850,9 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedTinyRing) {
   hostSet().runCallbacks({}, {});
 
   // enforce a ring size of exactly six entries
-  config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
-  config_.value().mutable_minimum_ring_size()->set_value(6);
-  config_.value().mutable_maximum_ring_size()->set_value(6);
+
+  config_.mutable_minimum_ring_size()->set_value(6);
+  config_.mutable_maximum_ring_size()->set_value(6);
   init(true);
   EXPECT_EQ(6, lb_->stats().size_.value());
   EXPECT_EQ(1, lb_->stats().min_hashes_per_host_.value());
@@ -723,10 +882,10 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedLargeRing) {
   envoy::config::core::v3::Locality zone_d;
   zone_d.set_zone("D");
 
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_b),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), zone_c),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime(), zone_d)};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", zone_a),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", zone_b),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", zone_c),
+                      makeTestHost(info_, "tcp://127.0.0.1:93", zone_d)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ = makeHostsPerLocality(
       {{hostSet().hosts_[0]}, {hostSet().hosts_[1]}, {hostSet().hosts_[2]}, {hostSet().hosts_[3]}});
@@ -734,8 +893,7 @@ TEST_P(RingHashLoadBalancerTest, LocalityWeightedLargeRing) {
   hostSet().locality_weights_ = makeLocalityWeights({1, 2, 3, 0});
   hostSet().runCallbacks({}, {});
 
-  config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
-  config_.value().mutable_minimum_ring_size()->set_value(6144);
+  config_.mutable_minimum_ring_size()->set_value(6144);
   init(true);
   EXPECT_EQ(6144, lb_->stats().size_.value());
   EXPECT_EQ(1024, lb_->stats().min_hashes_per_host_.value());
@@ -765,10 +923,10 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedTinyRing) {
 
   // :90 and :91 have a 1:2 ratio within the first locality, :92 and :93 have a 1:2 ratio within the
   // second locality, and the two localities have a 1:2 ratio overall.
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a, 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_a, 2),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), zone_b, 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime(), zone_b, 2)};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", zone_a, 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", zone_a, 2),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", zone_b, 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:93", zone_b, 2)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ = makeHostsPerLocality(
       {{hostSet().hosts_[0], hostSet().hosts_[1]}, {hostSet().hosts_[2], hostSet().hosts_[3]}});
@@ -777,9 +935,9 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedTinyRing) {
   hostSet().runCallbacks({}, {});
 
   // enforce a ring size of exactly 9 entries
-  config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
-  config_.value().mutable_minimum_ring_size()->set_value(9);
-  config_.value().mutable_maximum_ring_size()->set_value(9);
+
+  config_.mutable_minimum_ring_size()->set_value(9);
+  config_.mutable_maximum_ring_size()->set_value(9);
   init(true);
   EXPECT_EQ(9, lb_->stats().size_.value());
   EXPECT_EQ(1, lb_->stats().min_hashes_per_host_.value());
@@ -808,10 +966,10 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedLargeRing) {
 
   // :90 and :91 have a 1:2 ratio within the first locality, :92 and :93 have a 1:2 ratio within the
   // second locality, and the two localities have a 1:2 ratio overall.
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime(), zone_a, 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime(), zone_a, 2),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime(), zone_b, 1),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime(), zone_b, 2)};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", zone_a, 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:91", zone_a, 2),
+                      makeTestHost(info_, "tcp://127.0.0.1:92", zone_b, 1),
+                      makeTestHost(info_, "tcp://127.0.0.1:93", zone_b, 2)};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().hosts_per_locality_ = makeHostsPerLocality(
       {{hostSet().hosts_[0], hostSet().hosts_[1]}, {hostSet().hosts_[2], hostSet().hosts_[3]}});
@@ -819,8 +977,7 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedLargeRing) {
   hostSet().locality_weights_ = makeLocalityWeights({1, 2});
   hostSet().runCallbacks({}, {});
 
-  config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
-  config_.value().mutable_minimum_ring_size()->set_value(9216);
+  config_.mutable_minimum_ring_size()->set_value(9216);
   init(true);
   EXPECT_EQ(9216, lb_->stats().size_.value());
   EXPECT_EQ(1024, lb_->stats().min_hashes_per_host_.value());
@@ -844,16 +1001,14 @@ TEST_P(RingHashLoadBalancerTest, HostAndLocalityWeightedLargeRing) {
 // Given 4 hosts and a ring size of exactly 2, expect that 2 hosts will be present in the ring and
 // the other 2 hosts will be absent.
 TEST_P(RingHashLoadBalancerTest, SmallFractionalScale) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:92", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:93", simTime())};
+  hostSet().hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
+      makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
-  config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
-  config_.value().mutable_minimum_ring_size()->set_value(2);
-  config_.value().mutable_maximum_ring_size()->set_value(2);
+  config_.mutable_minimum_ring_size()->set_value(2);
+  config_.mutable_maximum_ring_size()->set_value(2);
   init();
   EXPECT_EQ(2, lb_->stats().size_.value());
   EXPECT_EQ(0, lb_->stats().min_hashes_per_host_.value());
@@ -886,14 +1041,13 @@ TEST_P(RingHashLoadBalancerTest, SmallFractionalScale) {
 // Given 2 hosts and a ring size of exactly 1023, expect that one host will have 511 entries and the
 // other will have 512.
 TEST_P(RingHashLoadBalancerTest, LargeFractionalScale) {
-  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90", simTime()),
-                      makeTestHost(info_, "tcp://127.0.0.1:91", simTime())};
+  hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:90"),
+                      makeTestHost(info_, "tcp://127.0.0.1:91")};
   hostSet().healthy_hosts_ = hostSet().hosts_;
   hostSet().runCallbacks({}, {});
 
-  config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
-  config_.value().mutable_minimum_ring_size()->set_value(1023);
-  config_.value().mutable_maximum_ring_size()->set_value(1023);
+  config_.mutable_minimum_ring_size()->set_value(1023);
+  config_.mutable_maximum_ring_size()->set_value(1023);
   init();
   EXPECT_EQ(1023, lb_->stats().size_.value());
   EXPECT_EQ(511, lb_->stats().min_hashes_per_host_.value());
@@ -924,7 +1078,7 @@ TEST_P(RingHashLoadBalancerTest, LopsidedWeightSmallScale) {
   HostVector heavy_but_sparse, light_but_dense;
   for (uint32_t i = 0; i < 1024; ++i) {
     auto host_locality = i == 0 ? zone_a : zone_b;
-    auto host(makeTestHost(info_, fmt::format("tcp://127.0.0.1:{}", i), simTime(), host_locality));
+    auto host(makeTestHost(info_, fmt::format("tcp://127.0.0.1:{}", i), host_locality));
     hostSet().hosts_.push_back(host);
     (i == 0 ? heavy_but_sparse : light_but_dense).push_back(host);
   }
@@ -934,9 +1088,8 @@ TEST_P(RingHashLoadBalancerTest, LopsidedWeightSmallScale) {
   hostSet().locality_weights_ = makeLocalityWeights({127, 1});
   hostSet().runCallbacks({}, {});
 
-  config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
-  config_.value().mutable_minimum_ring_size()->set_value(1024);
-  config_.value().mutable_maximum_ring_size()->set_value(1024);
+  config_.mutable_minimum_ring_size()->set_value(1024);
+  config_.mutable_maximum_ring_size()->set_value(1024);
   init(true);
   EXPECT_EQ(1024, lb_->stats().size_.value());
   EXPECT_EQ(0, lb_->stats().min_hashes_per_host_.value());
@@ -954,6 +1107,47 @@ TEST_P(RingHashLoadBalancerTest, LopsidedWeightSmallScale) {
   for (const auto& entry : expected) {
     TestLoadBalancerContext context(entry.first);
     EXPECT_EQ(hostSet().hosts_[entry.second], lb->chooseHost(&context).host);
+  }
+}
+
+TEST(TypedRingHashLbConfigTest, TypedRingHashLbConfigTest) {
+  {
+    envoy::config::cluster::v3::Cluster::RingHashLbConfig legacy;
+    envoy::config::cluster::v3::Cluster::CommonLbConfig common;
+    TypedRingHashLbConfig typed_config(common, legacy);
+
+    EXPECT_FALSE(typed_config.lb_config_.has_locality_weighted_lb_config());
+    EXPECT_FALSE(typed_config.lb_config_.has_consistent_hashing_lb_config());
+    EXPECT_FALSE(typed_config.lb_config_.has_maximum_ring_size());
+    EXPECT_FALSE(typed_config.lb_config_.has_minimum_ring_size());
+  }
+
+  {
+    envoy::config::cluster::v3::Cluster::RingHashLbConfig legacy;
+    envoy::config::cluster::v3::Cluster::CommonLbConfig common;
+
+    common.mutable_locality_weighted_lb_config();
+    common.mutable_consistent_hashing_lb_config()->set_use_hostname_for_hashing(true);
+    common.mutable_consistent_hashing_lb_config()->mutable_hash_balance_factor()->set_value(233);
+
+    legacy.mutable_minimum_ring_size()->set_value(12);
+    legacy.mutable_maximum_ring_size()->set_value(24);
+    legacy.set_hash_function(envoy::config::cluster::v3::Cluster::RingHashLbConfig::MURMUR_HASH_2);
+
+    TypedRingHashLbConfig typed_config(common, legacy);
+
+    EXPECT_TRUE(typed_config.lb_config_.has_locality_weighted_lb_config());
+    EXPECT_TRUE(typed_config.lb_config_.has_consistent_hashing_lb_config());
+    EXPECT_TRUE(typed_config.lb_config_.consistent_hashing_lb_config().use_hostname_for_hashing());
+    EXPECT_EQ(233,
+              typed_config.lb_config_.consistent_hashing_lb_config().hash_balance_factor().value());
+    EXPECT_TRUE(typed_config.lb_config_.has_maximum_ring_size());
+    EXPECT_TRUE(typed_config.lb_config_.has_minimum_ring_size());
+    EXPECT_EQ(12, typed_config.lb_config_.minimum_ring_size().value());
+    EXPECT_EQ(24, typed_config.lb_config_.maximum_ring_size().value());
+
+    EXPECT_EQ(envoy::extensions::load_balancing_policies::ring_hash::v3::RingHash::MURMUR_HASH_2,
+              typed_config.lb_config_.hash_function());
   }
 }
 

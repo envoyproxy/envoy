@@ -141,7 +141,7 @@ public:
 class MockCodecEventCallbacks : public CodecEventCallbacks {
 public:
   MockCodecEventCallbacks();
-  ~MockCodecEventCallbacks();
+  ~MockCodecEventCallbacks() override;
 
   MOCK_METHOD(void, onCodecEncodeComplete, ());
   MOCK_METHOD(void, onCodecLowLevelReset, ());
@@ -237,6 +237,7 @@ public:
   MOCK_METHOD(void, setRoute, (Router::RouteConstSharedPtr));
   MOCK_METHOD(void, requestRouteConfigUpdate, (Http::RouteConfigUpdatedCallbackSharedPtr));
   MOCK_METHOD(void, clearRouteCache, ());
+  MOCK_METHOD(void, refreshRouteCluster, ());
 
   std::shared_ptr<Router::MockRoute> route_;
 };
@@ -276,8 +277,8 @@ public:
   MOCK_METHOD(void, onDecoderFilterBelowWriteBufferLowWatermark, ());
   MOCK_METHOD(void, addDownstreamWatermarkCallbacks, (DownstreamWatermarkCallbacks&));
   MOCK_METHOD(void, removeDownstreamWatermarkCallbacks, (DownstreamWatermarkCallbacks&));
-  MOCK_METHOD(void, setDecoderBufferLimit, (uint32_t));
-  MOCK_METHOD(uint32_t, decoderBufferLimit, ());
+  MOCK_METHOD(void, setDecoderBufferLimit, (uint64_t));
+  MOCK_METHOD(uint64_t, decoderBufferLimit, ());
   MOCK_METHOD(bool, recreateStream, (const ResponseHeaderMap* headers));
   MOCK_METHOD(void, sendGoAwayAndClose, ());
   MOCK_METHOD(void, addUpstreamSocketOptions, (const Network::Socket::OptionsSharedPtr& options));
@@ -342,7 +343,7 @@ public:
   MOCK_METHOD(bool, shouldLoadShed, (), (const));
 
   Buffer::InstancePtr buffer_;
-  std::list<DownstreamWatermarkCallbacks*> callbacks_{};
+  std::list<DownstreamWatermarkCallbacks*> callbacks_;
   testing::NiceMock<MockDownstreamStreamFilterCallbacks> downstream_callbacks_;
   testing::NiceMock<Tracing::MockSpan> active_span_;
   testing::NiceMock<Tracing::MockConfig> tracing_config_;
@@ -651,6 +652,7 @@ public:
   MOCK_METHOD(bool, http1SafeMaxConnectionDuration, (), (const));
   MOCK_METHOD(absl::optional<std::chrono::milliseconds>, maxStreamDuration, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, streamIdleTimeout, (), (const));
+  MOCK_METHOD(absl::optional<std::chrono::milliseconds>, streamFlushTimeout, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, requestTimeout, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, requestHeadersTimeout, (), (const));
   MOCK_METHOD(std::chrono::milliseconds, delayedCloseTimeout, (), (const));
@@ -699,7 +701,7 @@ public:
   const std::vector<Http::EarlyHeaderMutationPtr>& earlyHeaderMutationExtensions() const override {
     return early_header_mutation_extensions_;
   }
-  MOCK_METHOD(uint64_t, maxRequestsPerConnection, (), (const));
+  MOCK_METHOD(uint32_t, maxRequestsPerConnection, (), (const));
   MOCK_METHOD(const HttpConnectionManagerProto::ProxyStatusConfig*, proxyStatusConfig, (), (const));
   MOCK_METHOD(ServerHeaderValidatorPtr, makeHeaderValidator, (Protocol protocol));
   MOCK_METHOD(bool, appendLocalOverload, (), (const));
@@ -727,7 +729,7 @@ public:
 
   MOCK_METHOD(const absl::optional<uint32_t>&, maxConcurrentStreams, (), (const));
 
-  absl::optional<uint32_t> max_concurrent_streams_{};
+  absl::optional<uint32_t> max_concurrent_streams_;
 };
 
 } // namespace Http
@@ -798,14 +800,6 @@ private:
   const LowerCaseString key_;
   const testing::Matcher<absl::string_view> matcher_;
 };
-
-// Test that a HeaderMap argument contains exactly one header with the given
-// key, whose value satisfies the given expectation. The expectation can be a
-// matcher, or a string that the value should equal.
-template <typename T, typename K> HeaderValueOfMatcher HeaderValueOf(K key, const T& matcher) {
-  return HeaderValueOfMatcher(LowerCaseString(key),
-                              testing::SafeMatcherCast<absl::string_view>(matcher));
-}
 
 // Tests the provided Envoy HeaderMap for the provided HTTP status code.
 MATCHER_P(HttpStatusIs, expected_code, "") {
@@ -986,16 +980,13 @@ MATCHER_P(HeaderMapEqualRef, rhs, "") {
   return equal;
 }
 
-// Test that a HeaderMapPtr argument includes a given key-value pair, e.g.,
-//  HeaderHasValue("Upgrade", "WebSocket")
-template <typename K, typename V>
-testing::Matcher<const Http::HeaderMap*> HeaderHasValue(K key, V value) {
-  return testing::Pointee(Http::HeaderValueOf(key, value));
-}
-
-// Like HeaderHasValue, but matches against a HeaderMap& argument.
-template <typename K, typename V> Http::HeaderValueOfMatcher HeaderHasValueRef(K key, V value) {
-  return Http::HeaderValueOf(key, value);
+// Test that a HeaderMap& argument includes a given key-value pair, e.g.,
+// ContainsHeader("Upgrade", "WebSocket"). Key is case-insensitive.
+// Value can be a matcher, e.g.
+// ContainsHeader("Upgrade", HasSubstr("Socket"))
+template <typename K, typename V> Http::HeaderValueOfMatcher ContainsHeader(K key, V value) {
+  return Http::HeaderValueOfMatcher(Http::LowerCaseString(key),
+                                    testing::SafeMatcherCast<absl::string_view>(value));
 }
 
 } // namespace Envoy

@@ -391,7 +391,7 @@ public:
 
         envoy::service::discovery::v3::DiscoveryResponse discovery_response;
         discovery_response.set_version_info("1");
-        discovery_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+        discovery_response.set_type_url(Config::TestTypeUrl::get().ClusterLoadAssignment);
 
         auto cluster_load_assignment =
             TestUtility::parseYaml<envoy::config::endpoint::v3::ClusterLoadAssignment>(fmt::format(
@@ -1051,6 +1051,45 @@ TEST_P(HeaderIntegrationTest, TestDynamicHeaders) {
           {"x-routeconfig-dynamic", "metadata-value"},
           {":status", "200"},
       });
+}
+
+TEST_P(HeaderIntegrationTest, TestResponseHeadersOnlyBeHandledOnce) {
+  initializeFilter(HeaderMode::Append, false);
+  registerTestServerPorts({"http"});
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  auto encoder_decoder = codec_client_->startRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "POST"},
+      {":path", "/vhost-and-route"},
+      {":scheme", "http"},
+      {":authority", "vhost-headers.com"},
+  });
+  auto response = std::move(encoder_decoder.second);
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  ASSERT_TRUE(response->waitForEndStream());
+
+  if (downstream_protocol_ == Http::CodecType::HTTP1) {
+    ASSERT_TRUE(codec_client_->waitForDisconnect());
+  } else {
+    codec_client_->close();
+  }
+
+  EXPECT_FALSE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+
+  EXPECT_TRUE(response->complete());
+
+  Http::TestResponseHeaderMapImpl response_headers{response->headers()};
+  EXPECT_EQ(1, response_headers.get(Http::LowerCaseString("x-route-response")).size());
+  EXPECT_EQ("route", response_headers.get_("x-route-response"));
+  EXPECT_EQ(1, response_headers.get(Http::LowerCaseString("x-vhost-response")).size());
+  EXPECT_EQ("vhost", response_headers.get_("x-vhost-response"));
 }
 
 // Validates that XFF gets properly parsed.

@@ -295,7 +295,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       listener_tag_(parent_.factory_->nextListenerTag()), name_(name),
-      added_via_api_(added_via_api), workers_started_(workers_started), hash_(hash),
+      added_via_api_(added_via_api), workers_started_(workers_started), maybe_stale_hash_(hash),
       tcp_backlog_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
       max_connections_to_accept_per_socket_event_(
@@ -310,7 +310,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                             [this]() { dynamic_init_manager_->initialize(local_init_watcher_); }),
       dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(
           fmt::format("Listener-local-init-manager {} {}", name, hash))),
-      config_(config), version_info_(version_info),
+      config_maybe_partial_filter_chains_(config), version_info_(version_info),
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()),
@@ -433,7 +433,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       listener_tag_(origin.listener_tag_), name_(name), added_via_api_(added_via_api),
-      workers_started_(workers_started), hash_(hash),
+      workers_started_(workers_started), maybe_stale_hash_(hash),
       tcp_backlog_size_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, tcp_backlog_size, ENVOY_TCP_BACKLOG_SIZE)),
       max_connections_to_accept_per_socket_event_(
@@ -448,7 +448,7 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       listener_init_target_("", nullptr),
       dynamic_init_manager_(std::make_unique<Init::ManagerImpl>(
           fmt::format("Listener-local-init-manager {} {}", name, hash))),
-      config_(config), version_info_(version_info),
+      config_maybe_partial_filter_chains_(config), version_info_(version_info),
       listen_socket_options_list_(origin.listen_socket_options_list_),
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
@@ -877,7 +877,7 @@ void ListenerImpl::buildOriginalDstListenerFilter(
             "envoy.filters.listener.original_dst");
 
     Network::ListenerFilterFactoryCb callback = factory.createListenerFilterFactoryFromProto(
-        Envoy::ProtobufWkt::Empty(), nullptr, *listener_factory_context_);
+        Envoy::Protobuf::Empty(), nullptr, *listener_factory_context_);
     auto* cfg_provider_manager = parent_.factory_->getTcpListenerConfigProviderManager();
     auto filter_config_provider = cfg_provider_manager->createStaticFilterConfigProvider(
         callback, "envoy.filters.listener.original_dst");
@@ -929,10 +929,6 @@ ProtobufMessage::ValidationVisitor& PerListenerFactoryContextImpl::messageValida
 Configuration::ServerFactoryContext& PerListenerFactoryContextImpl::serverFactoryContext() {
   return listener_factory_context_base_->serverFactoryContext();
 }
-Configuration::TransportSocketFactoryContext&
-PerListenerFactoryContextImpl::getTransportSocketFactoryContext() const {
-  return listener_factory_context_base_->getTransportSocketFactoryContext();
-}
 Stats::Scope& PerListenerFactoryContextImpl::listenerScope() {
   return listener_factory_context_base_->listenerScope();
 }
@@ -978,9 +974,14 @@ bool ListenerImpl::createQuicListenerFilterChain(Network::QuicListenerFilterMana
   return false;
 }
 
+void ListenerImpl::dumpListenerConfig(Protobuf::Any& dump) const {
+  dump.PackFrom(config_maybe_partial_filter_chains_);
+}
+
 void ListenerImpl::debugLog(const std::string& message) {
   UNREFERENCED_PARAMETER(message);
-  ENVOY_LOG(debug, "{}: name={}, hash={}, tag={}, address={}", message, name_, hash_, listener_tag_,
+  ENVOY_LOG(debug, "{}: name={}, original_hash={}, tag={}, address={}", message, name_,
+            maybe_stale_hash_, listener_tag_,
             absl::StrJoin(addresses_, ",", Network::AddressStrFormatter()));
 }
 
@@ -1008,7 +1009,7 @@ ListenerImpl::~ListenerImpl() {
 Init::Manager& ListenerImpl::initManager() { return *dynamic_init_manager_; }
 
 absl::Status ListenerImpl::addSocketFactory(Network::ListenSocketFactoryPtr&& socket_factory) {
-  RETURN_IF_NOT_OK(buildConnectionBalancer(config(), *socket_factory->localAddress()));
+  RETURN_IF_NOT_OK(buildConnectionBalancer(configInternal(), *socket_factory->localAddress()));
   if (buildUdpListenerWorkerRouter(*socket_factory->localAddress(),
                                    parent_.server_.options().concurrency())) {
     parent_.server_.hotRestart().registerUdpForwardingListener(socket_factory->localAddress(),
@@ -1026,6 +1027,12 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
     return false;
   }
 
+  // If FCDS is used, LDS updates will cause full listener update. It's expected that if FCDS is
+  // used, dynamic filter chain updates will be applied using FCDS rather than LDS.
+  if (configInternal().has_fcds_config()) {
+    return false;
+  }
+
   // Full listener update currently rejects tcp listener having 0 filter chain.
   // In place filter chain update could survive under zero filter chain but we should keep the
   // same behavior for now. This also guards the below filter chain access.
@@ -1034,11 +1041,11 @@ bool ListenerImpl::supportUpdateFilterChain(const envoy::config::listener::v3::L
   }
 
   // See buildProxyProtocolListenerFilter().
-  if (usesProxyProto(config()) ^ usesProxyProto(new_config)) {
+  if (usesProxyProto(configInternal()) ^ usesProxyProto(new_config)) {
     return false;
   }
 
-  if (ListenerMessageUtil::filterChainOnlyChange(config(), new_config)) {
+  if (ListenerMessageUtil::filterChainOnlyChange(configInternal(), new_config)) {
     // We need to calculate the reuse port's default value then ensure whether it is changed or not.
     // Since reuse port's default value isn't the YAML bool field default value. When
     // `enable_reuse_port` is specified, `ListenerMessageUtil::filterChainOnlyChange` use the YAML
@@ -1065,14 +1072,10 @@ ListenerImpl::newListenerWithFilterChain(const envoy::config::listener::v3::List
 
 void ListenerImpl::diffFilterChain(const ListenerImpl& another_listener,
                                    std::function<void(Network::DrainableFilterChain&)> callback) {
-  for (const auto& message_and_filter_chain : filter_chain_manager_->filterChainsByMessage()) {
-    if (another_listener.filter_chain_manager_->filterChainsByMessage().find(
-            message_and_filter_chain.first) ==
-        another_listener.filter_chain_manager_->filterChainsByMessage().end()) {
-      // The filter chain exists in `this` listener but not in the listener passed in.
-      callback(*message_and_filter_chain.second);
-    }
+  for (const auto& draining_filter_chain : filter_chain_manager_->drainingFilterChains()) {
+    callback(*draining_filter_chain);
   }
+
   // Filter chain manager maintains an optional default filter chain besides the filter chains
   // indexed by message.
   if (auto eq = MessageUtil();
@@ -1151,7 +1154,7 @@ bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
   }
 
   // Third, check if the listener has the same socket options.
-  return ListenerMessageUtil::socketOptionsEqual(config(), other.config());
+  return ListenerMessageUtil::socketOptionsEqual(configInternal(), other.configInternal());
 }
 
 bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
@@ -1159,15 +1162,17 @@ bool ListenerImpl::hasDuplicatedAddress(const ListenerImpl& other) const {
     return false;
   }
   // For listeners that do not bind or listeners that do not bind to port 0 we must check to make
-  // sure we are not duplicating the address. This avoids ambiguity about which non-binding
-  // listener is used or even worse for the binding to port != 0 and reuse port case multiple
-  // different listeners receiving connections destined for the same port.
+  // sure we are not duplicating the address in the same network namespace. This avoids ambiguity
+  // about which non-binding listener is used or even worse for the binding to port != 0 and reuse
+  // port case multiple different listeners receiving connections destined for the same port.
   for (auto& other_addr : other.addresses()) {
     if (other_addr->ip() == nullptr ||
         (other_addr->ip() != nullptr && (other_addr->ip()->port() != 0 || !bindToPort()))) {
       if (find_if(addresses_.begin(), addresses_.end(),
                   [&other_addr](const Network::Address::InstanceConstSharedPtr& addr) {
-                    return *other_addr == *addr;
+                    const bool same_netns =
+                        addr->networkNamespace() == other_addr->networkNamespace();
+                    return same_netns && *other_addr == *addr;
                   }) != addresses_.end()) {
         return true;
       }

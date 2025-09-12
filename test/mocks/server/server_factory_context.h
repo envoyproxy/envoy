@@ -51,6 +51,7 @@ public:
   MOCK_METHOD(bool, flushOnAdmin, (), (const));
   MOCK_METHOD(const Stats::SinkPredicates*, sinkPredicates, (), (const));
   MOCK_METHOD(bool, enableDeferredCreationStats, (), (const));
+  MOCK_METHOD(uint32_t, evictOnFlush, (), (const));
 };
 
 class MockServerFactoryContext : public virtual ServerFactoryContext {
@@ -76,8 +77,6 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
-  MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (),
-              (const, override));
   MOCK_METHOD(Secret::SecretManager&, secretManager, ());
   MOCK_METHOD(Ssl::ContextManager&, sslContextManager, ());
   Http::Context& httpContext() override { return http_context_; }
@@ -179,8 +178,6 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationContext&, messageValidationContext, ());
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
   MOCK_METHOD(Api::Api&, api, ());
-  MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (),
-              (const, override));
   MOCK_METHOD(Http::Context&, httpContext, ());
   MOCK_METHOD(Grpc::Context&, grpcContext, ());
   MOCK_METHOD(Router::Context&, routerContext, ());

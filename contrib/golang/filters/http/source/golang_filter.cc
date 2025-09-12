@@ -595,7 +595,7 @@ CAPIStatus Filter::injectData(ProcessorState& state, absl::string_view data) {
     if (!weak_ptr.expired() && !hasDestroyed()) {
       ENVOY_LOG(debug, "golang filter inject data to filter chain, length: {}",
                 data_to_write->length());
-      state.injectDataToFilterChain(*data_to_write.get(), false);
+      state.injectDataToFilterChain(*data_to_write, false);
     } else {
       ENVOY_LOG(debug, "golang filter has gone or destroyed in injectData event");
     }
@@ -970,6 +970,55 @@ CAPIStatus Filter::removeTrailer(ProcessorState& state, absl::string_view key) {
   return CAPIStatus::CAPIOK;
 }
 
+CAPIStatus Filter::setUpstreamOverrideHost(ProcessorState& state, absl::string_view host,
+                                           bool strict) {
+  Thread::LockGuard lock(mutex_);
+  if (has_destroyed_) {
+    ENVOY_LOG(debug, "golang filter has been destroyed");
+    return CAPIStatus::CAPIFilterIsDestroy;
+  }
+
+  if (!state.isProcessingInGo()) {
+    ENVOY_LOG(debug, "golang filter is not processing Go");
+    return CAPIStatus::CAPINotInGo;
+  }
+  auto* s = dynamic_cast<DecodingProcessorState*>(&state);
+  if (s == nullptr) {
+    ENVOY_LOG(debug,
+              "golang filter invoking cgo api setUpstreamOverrideHost at invalid state: {}, "
+              "which must be DecodingProcessorState",
+              __func__);
+    return CAPIStatus::CAPIInvalidPhase;
+  }
+
+  if (!Http::Utility::parseAuthority(host).is_ip_address_) {
+    ENVOY_LOG(debug, "host is not a valid IP address");
+    return CAPIStatus::CAPIInvalidIPAddress;
+  }
+
+  if (state.isThreadSafe()) {
+    // it's safe to write header in the safe thread.
+    s->setUpstreamOverrideHost(std::make_pair(std::string(host), strict));
+  } else {
+    // should deep copy the string_view before post to dispatcher callback.
+    auto host_str = std::string(host);
+
+    auto weak_ptr = weak_from_this();
+    // dispatch a callback to write header in the envoy safe thread, to make the write operation
+    // safety. otherwise, there might be race between reading in the envoy worker thread and writing
+    // in the Go thread.
+    state.getDispatcher().post([this, s, weak_ptr, host_str] {
+      if (!weak_ptr.expired() && !hasDestroyed()) {
+        s->setUpstreamOverrideHost(std::make_pair(std::string(host_str), false));
+      } else {
+        ENVOY_LOG(debug, "golang filter has gone or destroyed in setUpstreamOverrideHost");
+      }
+    });
+  }
+
+  return CAPIStatus::CAPIOK;
+}
+
 CAPIStatus Filter::clearRouteCache(bool refresh) {
   Thread::LockGuard lock(mutex_);
   if (has_destroyed_) {
@@ -1176,8 +1225,8 @@ CAPIStatus Filter::setDynamicMetadata(std::string filter_name, std::string key,
 
 void Filter::setDynamicMetadataInternal(std::string filter_name, std::string key,
                                         const absl::string_view& buf) {
-  ProtobufWkt::Struct value;
-  ProtobufWkt::Value v;
+  Protobuf::Struct value;
+  Protobuf::Value v;
   v.ParseFromArray(buf.data(), buf.length());
 
   (*value.mutable_fields())[key] = v;
@@ -1784,14 +1833,13 @@ uint64_t RoutePluginConfig::getMergedConfigId(uint64_t parent_id) {
 namespace {
 Secret::GenericSecretConfigProviderSharedPtr
 secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
-                Secret::SecretManager& secret_manager,
-                Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
+                Server::Configuration::ServerFactoryContext& server_context,
                 Init::Manager& init_manager) {
   if (config.has_sds_config()) {
-    return secret_manager.findOrCreateGenericSecretProvider(config.sds_config(), config.name(),
-                                                            transport_socket_factory, init_manager);
+    return server_context.secretManager().findOrCreateGenericSecretProvider(
+        config.sds_config(), config.name(), server_context, init_manager);
   } else {
-    return secret_manager.findStaticGenericSecretProvider(config.name());
+    return server_context.secretManager().findStaticGenericSecretProvider(config.name());
   }
 }
 } // namespace
@@ -1800,19 +1848,16 @@ SecretReader::SecretReader(
     const envoy::extensions::filters::http::golang::v3alpha::Config& proto_config,
     Server::Configuration::FactoryContext& context) {
   if (proto_config.generic_secrets_size() > 0) {
-    auto& secret_manager =
-        context.serverFactoryContext().clusterManager().clusterManagerFactory().secretManager();
-    auto& transport_socket_factory = context.getTransportSocketFactoryContext();
+    auto& server_context = context.serverFactoryContext();
     auto& init_manager = context.initManager();
-    auto& tls = context.serverFactoryContext().threadLocal();
-    auto& api = context.serverFactoryContext().api();
+    auto& tls = server_context.threadLocal();
+    auto& api = server_context.api();
     for (auto& secret : proto_config.generic_secrets()) {
       // Check here to avoid creating unecessary sds provider
       if (secrets_.contains(secret.name())) {
         throw EnvoyException(absl::StrCat("duplicate secret ", secret.name()));
       }
-      auto secret_provider =
-          secretsProvider(secret, secret_manager, transport_socket_factory, init_manager);
+      auto secret_provider = secretsProvider(secret, server_context, init_manager);
       if (secret_provider == nullptr) {
         throw EnvoyException(absl::StrCat("no secret provider found for ", secret.name()));
       }

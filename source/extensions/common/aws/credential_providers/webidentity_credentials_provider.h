@@ -11,9 +11,6 @@ namespace Aws {
 
 constexpr char WEB_IDENTITY_RESPONSE_ELEMENT[] = "AssumeRoleWithWebIdentityResponse";
 constexpr char WEB_IDENTITY_RESULT_ELEMENT[] = "AssumeRoleWithWebIdentityResult";
-constexpr char CREDENTIALS[] = "Credentials";
-constexpr char WEB_IDENTITY_EXPIRATION[] = "Expiration";
-constexpr char SESSION_TOKEN[] = "SessionToken";
 constexpr char AWS_WEB_IDENTITY_TOKEN_FILE[] = "AWS_WEB_IDENTITY_TOKEN_FILE";
 constexpr char AWS_ROLE_ARN[] = "AWS_ROLE_ARN";
 constexpr char STS_TOKEN_CLUSTER[] = "sts_token_service_internal";
@@ -30,7 +27,7 @@ public:
   // not used, and vice versa.
   WebIdentityCredentialsProvider(
       Server::Configuration::ServerFactoryContext& context,
-      AwsClusterManagerOptRef aws_cluster_manager, absl::string_view cluster_name,
+      AwsClusterManagerPtr aws_cluster_manager, absl::string_view cluster_name,
       CreateMetadataFetcherCb create_metadata_fetcher_cb,
       MetadataFetcher::MetadataReceiver::RefreshState refresh_state,
       std::chrono::seconds initialization_timer,
@@ -48,9 +45,6 @@ private:
   const std::string role_arn_;
   const std::string role_session_name_;
 
-  // This is required because of the base class handling non-async case, which can never be used for
-  // web identity provider
-  bool needsRefresh() override { return true; };
   void refresh() override;
   void extractCredentials(const std::string&& credential_document_value);
 };

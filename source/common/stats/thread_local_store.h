@@ -34,7 +34,8 @@ namespace Stats {
 class ThreadLocalHistogramImpl : public HistogramImplHelper {
 public:
   ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit, StatName tag_extracted_name,
-                           const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table);
+                           const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table,
+                           absl::optional<uint32_t> bins);
   ~ThreadLocalHistogramImpl() override;
 
   void merge(histogram_t* target);
@@ -60,15 +61,16 @@ public:
   // Stats::Metric
   SymbolTable& symbolTable() final { return symbol_table_; }
   bool used() const override { return used_; }
+  void markUnused() override { used_ = false; }
   bool hidden() const override { return false; }
 
 private:
-  Histogram::Unit unit_;
+  const Histogram::Unit unit_;
   uint64_t otherHistogramIndex() const { return 1 - current_active_; }
   uint64_t current_active_{0};
   histogram_t* histograms_[2];
   std::atomic<bool> used_;
-  std::thread::id created_thread_id_;
+  const std::thread::id created_thread_id_;
   SymbolTable& symbol_table_;
 };
 
@@ -83,7 +85,8 @@ class ParentHistogramImpl : public MetricImpl<ParentHistogram> {
 public:
   ParentHistogramImpl(StatName name, Histogram::Unit unit, ThreadLocalStoreImpl& parent,
                       StatName tag_extracted_name, const StatNameTagVector& stat_name_tags,
-                      ConstSupportedBuckets& supported_buckets, uint64_t id);
+                      ConstSupportedBuckets& supported_buckets, absl::optional<uint32_t> bins,
+                      uint64_t id);
   ~ParentHistogramImpl() override;
 
   void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
@@ -116,6 +119,7 @@ public:
   // Stats::Metric
   SymbolTable& symbolTable() override;
   bool used() const override;
+  void markUnused() override;
   bool hidden() const override;
 
   // RefcountInterface
@@ -126,13 +130,15 @@ public:
   // Indicates that the ThreadLocalStore is shutting down, so no need to clear its histogram_set_.
   void setShuttingDown(bool shutting_down) { shutting_down_ = shutting_down; }
   bool shuttingDown() const { return shutting_down_; }
+  absl::optional<uint32_t> bins() const { return bins_; }
 
 private:
   bool usedLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
   static std::vector<Stats::ParentHistogram::Bucket>
   detailedlBucketsHelper(const histogram_t& histogram);
 
-  Histogram::Unit unit_;
+  const Histogram::Unit unit_;
+  const absl::optional<uint32_t> bins_;
   ThreadLocalStoreImpl& thread_local_store_;
   histogram_t* interval_histogram_;
   histogram_t* cumulative_histogram_;
@@ -183,6 +189,8 @@ public:
   void forEachTextReadout(SizeFn f_size, StatFn<TextReadout> f_stat) const override;
   void forEachHistogram(SizeFn f_size, StatFn<ParentHistogram> f_stat) const override;
   void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const override;
+
+  void evictUnused() override;
 
   // Stats::StoreRoot
   void addSink(Sink& sink) override { timer_sinks_.push_back(sink); }
@@ -277,7 +285,7 @@ private:
   using CentralCacheEntrySharedPtr = RefcountPtr<CentralCacheEntry>;
 
   struct ScopeImpl : public Scope {
-    ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix);
+    ScopeImpl(ThreadLocalStoreImpl& parent, StatName prefix, bool evictable);
     ~ScopeImpl() override;
 
     // Stats::Scope
@@ -290,8 +298,8 @@ private:
                                              Histogram::Unit unit) override;
     TextReadout& textReadoutFromStatNameWithTags(const StatName& name,
                                                  StatNameTagVectorOptConstRef tags) override;
-    ScopeSharedPtr createScope(const std::string& name) override;
-    ScopeSharedPtr scopeFromStatName(StatName name) override;
+    ScopeSharedPtr createScope(const std::string& name, bool evictale) override;
+    ScopeSharedPtr scopeFromStatName(StatName name, bool evictable) override;
     const SymbolTable& constSymbolTable() const final { return parent_.constSymbolTable(); }
     SymbolTable& symbolTable() final { return parent_.symbolTable(); }
 
@@ -429,6 +437,11 @@ private:
       return central_cache_;
     }
 
+    CentralCacheEntrySharedPtr&
+    centralCacheMutableNoThreadAnalysis() const ABSL_NO_THREAD_SAFETY_ANALYSIS {
+      return central_cache_;
+    }
+
     // Returns the central cache, bypassing thread analysis.
     //
     // This is used only when passing references to maps held in the central
@@ -441,6 +454,7 @@ private:
 
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
+    const bool evictable_{};
 
   private:
     StatNameStorage prefix_;

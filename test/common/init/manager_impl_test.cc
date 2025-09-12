@@ -188,6 +188,67 @@ TEST(InitManagerImplTest, UnavailableWatcher) {
   t.ready();
 }
 
+TEST(InitManagerImplTest, TargetReadyBeforeInitialization) {
+  InSequence s;
+
+  ManagerImpl m("test");
+  expectUninitialized(m);
+
+  ExpectableTargetImpl t("t");
+  t.ready();
+  m.add(t);
+
+  ExpectableWatcherImpl w;
+  w.expectReady();
+  m.initialize(w);
+  expectInitialized(m);
+}
+
+TEST(InitManagerImplTest, OneTargetReadyBeforeInitialization) {
+  InSequence s;
+
+  ManagerImpl m("test");
+  expectUninitialized(m);
+
+  ExpectableTargetImpl t1("t1");
+  ExpectableTargetImpl t2("t2");
+  t1.ready();
+  m.add(t1);
+  m.add(t2);
+
+  ExpectableWatcherImpl w;
+  t2.expectInitialize();
+  w.expectReady();
+  m.initialize(w);
+  expectInitializing(m);
+  t2.ready();
+  expectInitialized(m);
+}
+
+TEST(InitManagerImplTest, UpdateWatcherWhenInitializing) {
+  InSequence s;
+
+  ManagerImpl m("test");
+  expectUninitialized(m);
+
+  ExpectableTargetImpl t1("t1");
+  m.add(t1);
+
+  ExpectableWatcherImpl w1;
+  ExpectableWatcherImpl w2;
+
+  // first watcher should not be called
+  w1.expectReady().Times(0);
+
+  // initialization should complete immediately
+  t1.expectInitialize();
+  w2.expectReady();
+  m.initialize(w1);
+  m.updateWatcher(w2);
+  t1.ready();
+  expectInitialized(m);
+}
+
 } // namespace
 } // namespace Init
 } // namespace Envoy

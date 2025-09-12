@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <iostream>
 
 namespace Envoy {
 
@@ -101,6 +102,17 @@ double AtomicTokenBucketImpl::remainingTokens() const {
 
 double AtomicTokenBucketImpl::timeNowInSeconds() const {
   return std::chrono::duration<double>(time_source_.monotonicTime().time_since_epoch()).count();
+}
+
+std::chrono::milliseconds AtomicTokenBucketImpl::nextTokenAvailable() const {
+  // If there are tokens available, return immediately.
+  const double remaining_tokens = remainingTokens();
+  if (remaining_tokens >= 1) {
+    return std::chrono::milliseconds(0);
+  }
+  // Calculate time since the last fill.
+  return std::chrono::milliseconds(
+      static_cast<uint64_t>(((1 - remaining_tokens) / fill_rate_) * 1000));
 }
 
 } // namespace Envoy

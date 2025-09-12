@@ -21,6 +21,7 @@
 #include "library/common/bridge/utility.h"
 #include "library/common/http/header_utility.h"
 #include "library/common/internal_engine.h"
+#include "library/common/network/network_types.h"
 #include "library/common/network/proxy_settings.h"
 #include "library/common/types/c_types.h"
 
@@ -101,6 +102,14 @@ public:
       builder_.addKeyValueStore("reserved.platform_store", test_key_value_store_);
       builder_.enableDnsCache(true, /* save_interval_seconds */ 1);
     }
+
+    // Initialize the connectivity manager with a WIFI default network and another network with
+    // unknown type.
+    std::vector<std::pair<int64_t, ConnectionType>> connected_networks{
+        {1, ConnectionType::CONNECTION_WIFI}, {2, ConnectionType::CONNECTION_UNKNOWN}};
+    EXPECT_CALL(helper_handle_->mock_helper(), getDefaultNetworkHandle()).WillOnce(Return(1));
+    EXPECT_CALL(helper_handle_->mock_helper(), getAllConnectedNetworks())
+        .WillOnce(Return(connected_networks));
 
     BaseClientIntegrationTest::initialize();
 
@@ -253,17 +262,6 @@ TEST_P(ClientIntegrationTest, Basic) {
   }
 }
 
-#if not defined(__APPLE__)
-TEST_P(ClientIntegrationTest, BasicWithCares) {
-  builder_.setUseCares(true);
-  initialize();
-  basicTest();
-  if (upstreamProtocol() == Http::CodecType::HTTP1) {
-    ASSERT_EQ(cc_.on_complete_received_byte_count_, 67);
-  }
-}
-#endif
-
 // TODO(fredyw): Disable this until we support treating no DNS record as a failure in the Apple
 // resolver.
 #if not defined(__APPLE__)
@@ -370,6 +368,35 @@ TEST_P(ClientIntegrationTest, HandleNetworkChangeEvents) {
   handled_network_changes[current_change_event].WaitForNotification();
   EXPECT_TRUE(found_force_dns_refresh);
   EXPECT_EQ(4, current_change_event);
+}
+
+TEST_P(ClientIntegrationTest, HandleNetworkChangeEventsAndroid) {
+  absl::Notification found_force_dns_refresh;
+  std::atomic<bool> handled_network_change{false};
+  auto logger = std::make_unique<EnvoyLogger>();
+  logger->on_log_ = [&](Logger::Logger::Levels, const std::string& msg) {
+    if (msg.find("Default network state has been changed. Current net configuration key") !=
+        std::string::npos) {
+      handled_network_change = true;
+    }
+    if (msg.find("beginning DNS cache force refresh") != std::string::npos) {
+      found_force_dns_refresh.Notify();
+    }
+  };
+  builder_.setLogger(std::move(logger));
+  builder_.setDisableDnsRefreshOnNetworkChange(false);
+
+  initialize();
+
+  // A new WIFI network appears and becomes the default network. Even though
+  // the test is initialized with a WIFI network, this should still have triggred
+  // a network change event as it has a different network handle.
+  internalEngine()->onNetworkConnectAndroid(ConnectionType::CONNECTION_WIFI, 123);
+  internalEngine()->onDefaultNetworkChangedAndroid(ConnectionType::CONNECTION_WIFI, 123);
+  // The HTTP status reset and DNS refresh should have been posted to the network thread and to be
+  // handled there.
+  found_force_dns_refresh.WaitForNotification();
+  EXPECT_TRUE(handled_network_change);
 }
 
 TEST_P(ClientIntegrationTest, LargeResponse) {

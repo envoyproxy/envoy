@@ -14,17 +14,70 @@ fn init() -> bool {
 /// This implements the [`envoy_proxy_dynamic_modules_rust_sdk::NewHttpFilterConfigFunction`]
 /// signature.
 fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
-  _envoy_filter_config: &mut EC,
+  envoy_filter_config: &mut EC,
   name: &str,
   _config: &[u8],
-) -> Option<Box<dyn HttpFilterConfig<EC, EHF>>> {
+) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
   match name {
+    "stats_callbacks" => Some(Box::new(StatsCallbacksFilterConfig {
+      streams_total: envoy_filter_config.define_counter("streams_total"),
+      concurrent_streams: envoy_filter_config.define_gauge("concurrent_streams"),
+      ones: envoy_filter_config.define_histogram("ones"),
+      magic_number: envoy_filter_config.define_gauge("magic_number"),
+    })),
     "header_callbacks" => Some(Box::new(HeaderCallbacksFilterConfig {})),
     "send_response" => Some(Box::new(SendResponseFilterConfig {})),
     "dynamic_metadata_callbacks" => Some(Box::new(DynamicMetadataCallbacksFilterConfig {})),
     "filter_state_callbacks" => Some(Box::new(FilterStateCallbacksFilterConfig {})),
     "body_callbacks" => Some(Box::new(BodyCallbacksFilterConfig {})),
+    "config_init_failure" => None,
     _ => panic!("Unknown filter name: {}", name),
+  }
+}
+
+/// An HTTP filter configuration that implements
+/// [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilterConfig`] to test the stats
+/// related callbacks.
+struct StatsCallbacksFilterConfig {
+  streams_total: EnvoyCounterId,
+  concurrent_streams: EnvoyGaugeId,
+  magic_number: EnvoyGaugeId,
+  // It's full of 1s.
+  ones: EnvoyHistogramId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StatsCallbacksFilterConfig {
+  fn new_http_filter(&mut self, envoy_filter: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    envoy_filter.increment_counter(self.streams_total, 1);
+    envoy_filter.increase_gauge(self.concurrent_streams, 1);
+    envoy_filter.set_gauge(self.magic_number, 42);
+    // Copy the stats handles onto the filter so that we can observe stats while
+    // handling requests.
+    Box::new(StatsCallbacksFilter {
+      concurrent_streams: self.concurrent_streams,
+      ones: self.ones,
+    })
+  }
+}
+
+/// An HTTP filter that implements [`envoy_proxy_dynamic_modules_rust_sdk::HttpFilter`].
+struct StatsCallbacksFilter {
+  concurrent_streams: EnvoyGaugeId,
+  ones: EnvoyHistogramId,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    envoy_filter.record_histogram_value(self.ones, 1);
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+
+  fn on_stream_complete(&mut self, envoy_filter: &mut EHF) {
+    envoy_filter.decrease_gauge(self.concurrent_streams, 1);
   }
 }
 
@@ -33,10 +86,8 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
 /// related callbacks.
 struct HeaderCallbacksFilterConfig {}
 
-impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
-  for HeaderCallbacksFilterConfig
-{
-  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for HeaderCallbacksFilterConfig {
+  fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(HeaderCallbacksFilter {})
   }
 }
@@ -88,9 +139,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
     assert_eq!(all_headers[3].0.as_slice(), b"new");
     assert_eq!(all_headers[3].1.as_slice(), b"value");
 
-    let downstrean_port =
+    let downstream_port =
       envoy_filter.get_attribute_int(abi::envoy_dynamic_module_type_attribute_id::SourcePort);
-    assert_eq!(downstrean_port, Some(1234));
+    assert_eq!(downstream_port, Some(1234));
     let downstream_addr =
       envoy_filter.get_attribute_string(abi::envoy_dynamic_module_type_attribute_id::SourceAddress);
     assert!(downstream_addr.is_some());
@@ -254,10 +305,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for HeaderCallbacksFilter {
 /// callback
 struct SendResponseFilterConfig {}
 
-impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
-  for SendResponseFilterConfig
-{
-  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for SendResponseFilterConfig {
+  fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(SendResponseFilter {})
   }
 }
@@ -289,10 +338,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for SendResponseFilter {
 /// callbacks.
 struct DynamicMetadataCallbacksFilterConfig {}
 
-impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
-  for DynamicMetadataCallbacksFilterConfig
-{
-  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for DynamicMetadataCallbacksFilterConfig {
+  fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(DynamicMetadataCallbacksFilter {})
   }
 }
@@ -307,15 +354,48 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
     // No namespace.
-    let no_namespace = envoy_filter.get_dynamic_metadata_number("no_namespace", "key");
+    let no_namespace = envoy_filter.get_metadata_number(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "no_namespace",
+      "key",
+    );
     assert!(no_namespace.is_none());
     // Set a number.
     envoy_filter.set_dynamic_metadata_number("ns_req_header", "key", 123f64);
-    let ns_req_header = envoy_filter.get_dynamic_metadata_number("ns_req_header", "key");
+    let ns_req_header = envoy_filter.get_metadata_number(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_req_header",
+      "key",
+    );
     assert_eq!(ns_req_header, Some(123f64));
     // Try getting a number as string.
-    let ns_req_header = envoy_filter.get_dynamic_metadata_string("ns_req_header", "key");
+    let ns_req_header = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_req_header",
+      "key",
+    );
     assert!(ns_req_header.is_none());
+
+    // Try getting metadata from rotuer cluster and host.
+    let metadata = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::Route,
+      "metadata",
+      "route_key",
+    );
+    assert_eq!(metadata.unwrap().as_slice(), b"route");
+    let metadata = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::Cluster,
+      "metadata",
+      "cluster_key",
+    );
+    assert_eq!(metadata.unwrap().as_slice(), b"cluster");
+    let metadata = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::Host,
+      "metadata",
+      "host_key",
+    );
+    assert_eq!(metadata.unwrap().as_slice(), b"host");
+
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 
@@ -325,15 +405,27 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_body_status {
     // No namespace.
-    let no_namespace = envoy_filter.get_dynamic_metadata_string("no_namespace", "key");
+    let no_namespace = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "no_namespace",
+      "key",
+    );
     assert!(no_namespace.is_none());
     // Set a string.
     envoy_filter.set_dynamic_metadata_string("ns_req_body", "key", "value");
-    let ns_req_body = envoy_filter.get_dynamic_metadata_string("ns_req_body", "key");
+    let ns_req_body = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_req_body",
+      "key",
+    );
     assert!(ns_req_body.is_some());
     assert_eq!(ns_req_body.unwrap().as_slice(), b"value");
     // Try getting a string as number.
-    let ns_req_body = envoy_filter.get_dynamic_metadata_number("ns_req_body", "key");
+    let ns_req_body = envoy_filter.get_metadata_number(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_req_body",
+      "key",
+    );
     assert!(ns_req_body.is_none());
     abi::envoy_dynamic_module_type_on_http_filter_request_body_status::Continue
   }
@@ -344,14 +436,26 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
     // No namespace.
-    let no_namespace = envoy_filter.get_dynamic_metadata_string("no_namespace", "key");
+    let no_namespace = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "no_namespace",
+      "key",
+    );
     assert!(no_namespace.is_none());
     // Set a number.
     envoy_filter.set_dynamic_metadata_number("ns_res_header", "key", 123f64);
-    let ns_res_header = envoy_filter.get_dynamic_metadata_number("ns_res_header", "key");
+    let ns_res_header = envoy_filter.get_metadata_number(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_res_header",
+      "key",
+    );
     assert_eq!(ns_res_header, Some(123f64));
     // Try getting a number as string.
-    let ns_res_header = envoy_filter.get_dynamic_metadata_string("ns_res_header", "key");
+    let ns_res_header = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_res_header",
+      "key",
+    );
     assert!(ns_res_header.is_none());
     abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
@@ -362,14 +466,26 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_body_status {
     // No namespace.
-    let no_namespace = envoy_filter.get_dynamic_metadata_string("no_namespace", "key");
+    let no_namespace = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "no_namespace",
+      "key",
+    );
     assert!(no_namespace.is_none());
     // Set a string.
     envoy_filter.set_dynamic_metadata_string("ns_res_body", "key", "value");
-    let ns_res_body = envoy_filter.get_dynamic_metadata_string("ns_res_body", "key");
+    let ns_res_body = envoy_filter.get_metadata_string(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_res_body",
+      "key",
+    );
     assert!(ns_res_body.is_some());
     // Try getting a string as number.
-    let ns_res_body = envoy_filter.get_dynamic_metadata_number("ns_res_body", "key");
+    let ns_res_body = envoy_filter.get_metadata_number(
+      abi::envoy_dynamic_module_type_metadata_source::Dynamic,
+      "ns_res_body",
+      "key",
+    );
     assert!(ns_res_body.is_none());
     abi::envoy_dynamic_module_type_on_http_filter_response_body_status::Continue
   }
@@ -380,10 +496,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for DynamicMetadataCallbacksFilter {
 /// callbacks.
 struct FilterStateCallbacksFilterConfig {}
 
-impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
-  for FilterStateCallbacksFilterConfig
-{
-  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for FilterStateCallbacksFilterConfig {
+  fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(FilterStateCallbacksFilter {})
   }
 }
@@ -489,10 +603,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FilterStateCallbacksFilter {
 /// to test the body related callbacks.
 struct BodyCallbacksFilterConfig {}
 
-impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
-  for BodyCallbacksFilterConfig
-{
-  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for BodyCallbacksFilterConfig {
+  fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(BodyCallbacksFilter::default())
   }
 }

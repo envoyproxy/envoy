@@ -3,7 +3,7 @@ adisuissa:
   opsgenie: Adi
   slack: UT17EMMTP
 agrawroh:
-  first-pass: true
+  maintainer: true
   slack: U025KC9D7T5
 antoniovleonti:
   first-pass: true
@@ -15,13 +15,14 @@ botengyao:
 daixiang0:
   first-pass: true
   slack: U020CJG6UU8
+danzh2010:
+  maintainer: true
+  slack: UDR2MA31P
 ggreenway:
   maintainer: true
   opsgenie: Greg
   slack: U78MBV869
 jmarantz:
-  maintainer: true
-  opsgenie: Joshua
   slack: U80HPLBPG
 KBaichoo:
   maintainer: true
@@ -31,6 +32,10 @@ keith:
   maintainer: true
   opsgenie: Keith
   slack: UGS5P90CF
+krinkinmu:
+  maintainer: true
+  opsgenie: Mike
+  slack: U07KZ4B0H5J
 kyessenov:
   opsgenie: kuat
   slack: U7KTRAA8M
@@ -44,14 +49,15 @@ mattklein123:
   slack: U5CALEVSL
 mathetake:
   maintainer: true
-  opsgenie: Mathetake
+  opsgenie: mathetake
   slack: UG9TD2FSB
 nezdolik:
   maintainer: true
   opsgenie: Kateryna
   slack: UDYUWRL13
 paul-r-gall:
-  first-pass: true
+  opsgenie: Paul
+  maintainer: true
   slack: U0246MUEE9F
 phlax:
   maintainer: true
@@ -70,7 +76,7 @@ silverstar194:
   slack: U03LNPC8JN9
 tonya11en:
   maintainer: true
-  opsgenie: Tony
+  opsgenie: tony
   slack: U989BG2CW
 tyxia:
   maintainer: true

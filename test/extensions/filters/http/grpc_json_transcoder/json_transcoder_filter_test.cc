@@ -592,6 +592,47 @@ TEST_F(GrpcJsonTranscoderFilterTest, NoTranscoding) {
   EXPECT_EQ(expected_response_trailers, response_trailers);
 }
 
+TEST_F(GrpcJsonTranscoderFilterTest, NoTranscodingWithStreamedRequest) {
+  // It should not be an error to pass-through a non-transcoded request/response when
+  // the downstream sends more data after the upstream headers have been sent.
+  // This is a bit of an odd thing to test for specifically, but there was a bug here
+  // that caused debug builds to assert, so this is an anti-regression test.
+  Http::TestRequestHeaderMapImpl request_headers{{"content-type", "application/grpc"},
+                                                 {":method", "POST"},
+                                                 {":path", "/grpc.service/UnknownGrpcMethod"}};
+
+  Http::TestRequestHeaderMapImpl expected_request_headers{
+      {"content-type", "application/grpc"},
+      {":method", "POST"},
+      {":path", "/grpc.service/UnknownGrpcMethod"}};
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache()).Times(0);
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.decodeHeaders(request_headers, false));
+  EXPECT_EQ(expected_request_headers, request_headers);
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_.decodeMetadata(metadata_map));
+
+  // Not grpc response.
+  Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/json"},
+                                                   {":status", "200"}};
+
+  Http::TestResponseHeaderMapImpl expected_response_headers{{"content-type", "application/json"},
+                                                            {":status", "200"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_.encodeHeaders(response_headers, false));
+  EXPECT_EQ(expected_response_headers, response_headers);
+
+  // decodeData after pass-through encodeHeaders should not provoke an ASSERT.
+  Buffer::OwnedImpl request_data{"{}"};
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.decodeData(request_data, true));
+  EXPECT_EQ(2, request_data.length());
+
+  Buffer::OwnedImpl response_data{"{}"};
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_.encodeData(response_data, true));
+  EXPECT_EQ(2, response_data.length());
+}
+
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryPost) {
   Http::TestRequestHeaderMapImpl request_headers{
       {"content-type", "application/json"}, {":method", "POST"}, {":path", "/shelf"}};
@@ -1256,6 +1297,42 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBody) {
   }
 }
 
+TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamSSE) {
+  envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder proto_config =
+      bookstoreProtoConfig();
+  proto_config.mutable_print_options()->set_stream_newline_delimited(true);
+  proto_config.mutable_print_options()->set_stream_sse_style_delimited(true);
+
+  auto config = std::make_shared<JsonTranscoderConfig>(proto_config, *api_);
+  auto filter = JsonTranscoderFilter(config, stats_);
+  filter.setDecoderFilterCallbacks(decoder_callbacks_);
+  filter.setEncoderFilterCallbacks(encoder_callbacks_);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/shelves/1/books"}};
+
+  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, clearRouteCache());
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.decodeHeaders(request_headers, false));
+  EXPECT_EQ("application/grpc", request_headers.get_("content-type"));
+  EXPECT_EQ("/shelves/1/books", request_headers.get_("x-envoy-original-path"));
+  EXPECT_EQ("GET", request_headers.get_("x-envoy-original-method"));
+  EXPECT_EQ("/bookstore.Bookstore/ListBooks", request_headers.get_(":path"));
+  EXPECT_EQ("trailers", request_headers.get_("te"));
+
+  Http::TestResponseHeaderMapImpl response_headers{{"content-type", "application/grpc"},
+                                                   {":status", "200"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter.encodeHeaders(response_headers, false));
+  EXPECT_EQ("text/event-stream", response_headers.get_("content-type"));
+
+  for (const auto& title : std::vector<std::string>{"book1", "book2", "book3"}) {
+    bookstore::Book book;
+    book.set_title(title);
+    auto response_data = Grpc::Common::serializeToGrpcFrame(book);
+    EXPECT_EQ(Http::FilterDataStatus::Continue, filter.encodeData(*response_data, false));
+    EXPECT_EQ(response_data->toString(), absl::StrFormat("data: {\"title\":\"%s\"}\n\n", title));
+  }
+}
+
 // Streaming requests with HTTP bodies do not internally buffer any data.
 // The configured buffer limits will not apply.
 TEST_F(GrpcJsonTranscoderFilterTest, TranscodingStreamPostWithHttpBodyNoBuffer) {
@@ -1454,7 +1531,7 @@ bookstore::EchoStructReqResp createDeepStruct(int level) {
   auto* field_map = msg.mutable_content()->mutable_fields();
   for (int i = 0; i < level; ++i) {
     (*field_map)["level"] = ValueUtil::numberValue(i);
-    Envoy::ProtobufWkt::Struct s;
+    Envoy::Protobuf::Struct s;
     (*field_map)["struct"] = ValueUtil::structValue(s);
     field_map = (*field_map)["struct"].mutable_struct_value()->mutable_fields();
   }

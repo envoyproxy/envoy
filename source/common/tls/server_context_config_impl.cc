@@ -44,8 +44,8 @@ Secret::TlsSessionTicketKeysConfigProviderSharedPtr getTlsSessionTicketKeysConfi
       return factory_context.serverFactoryContext()
           .secretManager()
           .findOrCreateTlsSessionTicketKeysContextProvider(
-              sds_secret_config.sds_config(), sds_secret_config.name(), factory_context,
-              factory_context.initManager());
+              sds_secret_config.sds_config(), sds_secret_config.name(),
+              factory_context.serverFactoryContext(), factory_context.initManager());
     } else {
       // Load static secret.
       auto secret_provider =
@@ -180,7 +180,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
 
   auto factory =
       TlsCertificateSelectorConfigFactoryImpl::getDefaultTlsCertificateSelectorConfigFactory();
-  const ProtobufWkt::Any any;
+  const Protobuf::Any any;
   tls_certificate_selector_factory_ = factory->createTlsCertificateSelectorFactory(
       any, factory_context.serverFactoryContext(), ProtobufMessage::getNullValidationVisitor(),
       creation_status, for_quic);

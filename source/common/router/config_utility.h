@@ -93,5 +93,7 @@ public:
       const envoy::config::route::v3::RouteAction::ClusterNotFoundResponseCode& code);
 };
 
+void mergeTransforms(Http::HeaderTransforms& dest, const Http::HeaderTransforms& src);
+
 } // namespace Router
 } // namespace Envoy

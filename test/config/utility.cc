@@ -213,8 +213,9 @@ typed_config:
 )EOF";
 }
 
-std::string ConfigHelper::tlsInspectorFilter(bool enable_ja3_fingerprinting) {
-  if (!enable_ja3_fingerprinting) {
+std::string ConfigHelper::tlsInspectorFilter(bool enable_ja3_fingerprinting,
+                                             bool enable_ja4_fingerprinting) {
+  if (!enable_ja3_fingerprinting && !enable_ja4_fingerprinting) {
     return R"EOF(
 name: "envoy.filters.listener.tls_inspector"
 typed_config:
@@ -227,6 +228,7 @@ name: "envoy.filters.listener.tls_inspector"
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.filters.listener.tls_inspector.v3.TlsInspector
   enable_ja3_fingerprinting: true
+  enable_ja4_fingerprinting: true
 )EOF";
 }
 
@@ -337,29 +339,6 @@ name: health_check
 typed_config:
     "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
     pass_through_mode: false
-)EOF";
-}
-
-std::string ConfigHelper::defaultSquashFilter() {
-  return R"EOF(
-name: squash
-typed_config:
-  "@type": type.googleapis.com/envoy.extensions.filters.http.squash.v3.Squash
-  cluster: squash
-  attachment_template:
-    spec:
-      attachment:
-        env: "{{ SQUASH_ENV_TEST }}"
-      match_request: true
-  attachment_timeout:
-    seconds: 1
-    nanos: 0
-  attachment_poll_period:
-    seconds: 2
-    nanos: 0
-  request_timeout:
-    seconds: 1
-    nanos: 0
 )EOF";
 }
 
@@ -672,7 +651,8 @@ envoy::config::listener::v3::Listener ConfigHelper::buildListener(const std::str
 }
 
 envoy::config::route::v3::RouteConfiguration
-ConfigHelper::buildRouteConfig(const std::string& name, const std::string& cluster) {
+ConfigHelper::buildRouteConfig(const std::string& name, const std::string& cluster,
+                               bool header_mutations) {
   API_NO_BOOST(envoy::config::route::v3::RouteConfiguration) route;
 #ifdef ENVOY_ENABLE_YAML
   TestUtility::loadFromYaml(fmt::format(R"EOF(
@@ -686,10 +666,31 @@ ConfigHelper::buildRouteConfig(const std::string& name, const std::string& clust
     )EOF",
                                         name, cluster),
                             route);
+
+  if (header_mutations) {
+    auto* route_entry = route.mutable_virtual_hosts(0)->mutable_routes(0);
+    auto* header1 = route_entry->add_request_headers_to_add();
+    *header1->mutable_header()->mutable_key() = "test-metadata";
+    *header1->mutable_header()->mutable_value() = "%METADATA(ROUTE:com.test.my_filter)%";
+
+    auto* header2 = route_entry->add_response_headers_to_add();
+    *header2->mutable_header()->mutable_key() = "test-cel";
+    *header2->mutable_header()->mutable_value() = "%CEL(request.headers['some-header'])%";
+
+    auto* header3 = route_entry->add_response_headers_to_add();
+    *header3->mutable_header()->mutable_key() = "test-other-command";
+    *header3->mutable_header()->mutable_value() = "%START_TIME%";
+
+    auto* header4 = route_entry->add_response_headers_to_add();
+    *header4->mutable_header()->mutable_key() = "test-plain";
+    *header4->mutable_header()->mutable_value() = "plain";
+  }
+
   return route;
 #else
   UNREFERENCED_PARAMETER(name);
   UNREFERENCED_PARAMETER(cluster);
+  UNREFERENCED_PARAMETER(header_mutations);
   PANIC("YAML support compiled out");
 #endif
 }
@@ -772,7 +773,7 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version,
   }
 }
 
-void ConfigHelper::addListenerTypedMetadata(absl::string_view key, ProtobufWkt::Any& packed_value) {
+void ConfigHelper::addListenerTypedMetadata(absl::string_view key, Protobuf::Any& packed_value) {
   RELEASE_ASSERT(!finalized_, "");
   auto* static_resources = bootstrap_.mutable_static_resources();
   ASSERT_TRUE(static_resources->listeners_size() > 0);
@@ -785,7 +786,7 @@ void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
                                             absl::string_view cluster_name) {
 #ifdef ENVOY_ENABLE_YAML
   RELEASE_ASSERT(!finalized_, "");
-  ProtobufWkt::Struct cluster_metadata;
+  Protobuf::Struct cluster_metadata;
   TestUtility::loadFromYaml(std::string(metadata_yaml), cluster_metadata);
 
   auto* static_resources = bootstrap_.mutable_static_resources();
@@ -795,7 +796,7 @@ void ConfigHelper::addClusterFilterMetadata(absl::string_view metadata_yaml,
       continue;
     }
     for (const auto& kvp : cluster_metadata.fields()) {
-      ASSERT_TRUE(kvp.second.kind_case() == ProtobufWkt::Value::KindCase::kStructValue);
+      ASSERT_TRUE(kvp.second.kind_case() == Protobuf::Value::KindCase::kStructValue);
       cluster->mutable_metadata()->mutable_filter_metadata()->insert(
           {kvp.first, kvp.second.struct_value()});
     }
@@ -1210,7 +1211,7 @@ void ConfigHelper::disableDelayClose() {
              hcm) { hcm.mutable_delayed_close_timeout()->set_nanos(0); });
 }
 
-void ConfigHelper::setDownstreamMaxRequestsPerConnection(uint64_t max_requests_per_connection) {
+void ConfigHelper::setDownstreamMaxRequestsPerConnection(uint32_t max_requests_per_connection) {
   addConfigModifier(
       [max_requests_per_connection](
           envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
@@ -1727,7 +1728,7 @@ void ConfigHelper::setLds(absl::string_view version_info) {
   envoy::service::discovery::v3::DiscoveryResponse lds;
   lds.set_version_info(std::string(version_info));
   for (auto& listener : bootstrap_.static_resources().listeners()) {
-    ProtobufWkt::Any* resource = lds.add_resources();
+    Protobuf::Any* resource = lds.add_resources();
     resource->PackFrom(listener);
   }
 
@@ -1822,7 +1823,7 @@ void CdsHelper::setCds(const std::vector<envoy::config::cluster::v3::Cluster>& c
   // Write to file the DiscoveryResponse and trigger inotify watch.
   envoy::service::discovery::v3::DiscoveryResponse cds_response;
   cds_response.set_version_info(std::to_string(cds_version_++));
-  cds_response.set_type_url(Config::TypeUrl::get().Cluster);
+  cds_response.set_type_url(Config::TestTypeUrl::get().Cluster);
   for (const auto& cluster : clusters) {
     cds_response.add_resources()->PackFrom(cluster);
   }
@@ -1844,7 +1845,7 @@ void EdsHelper::setEds(const std::vector<envoy::config::endpoint::v3::ClusterLoa
   // Write to file the DiscoveryResponse and trigger inotify watch.
   envoy::service::discovery::v3::DiscoveryResponse eds_response;
   eds_response.set_version_info(std::to_string(eds_version_++));
-  eds_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
+  eds_response.set_type_url(Config::TestTypeUrl::get().ClusterLoadAssignment);
   for (const auto& cluster_load_assignment : cluster_load_assignments) {
     eds_response.add_resources()->PackFrom(cluster_load_assignment);
   }

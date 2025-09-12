@@ -25,14 +25,13 @@ namespace Oauth2 {
 namespace {
 Secret::GenericSecretConfigProviderSharedPtr
 secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
-                Secret::SecretManager& secret_manager,
-                Server::Configuration::TransportSocketFactoryContext& transport_socket_factory,
+                Server::Configuration::ServerFactoryContext& server_context,
                 Init::Manager& init_manager) {
   if (config.has_sds_config()) {
-    return secret_manager.findOrCreateGenericSecretProvider(config.sds_config(), config.name(),
-                                                            transport_socket_factory, init_manager);
+    return server_context.secretManager().findOrCreateGenericSecretProvider(
+        config.sds_config(), config.name(), server_context, init_manager);
   } else {
-    return secret_manager.findStaticGenericSecretProvider(config.name());
+    return server_context.secretManager().findStaticGenericSecretProvider(config.name());
   }
 }
 } // namespace
@@ -50,16 +49,16 @@ absl::StatusOr<Http::FilterFactoryCb> OAuth2Config::createFilterFactoryFromProto
   const auto& client_secret = credentials.token_secret();
   const auto& hmac_secret = credentials.hmac_secret();
 
+  auto& server_context = context.serverFactoryContext();
   auto& cluster_manager = context.serverFactoryContext().clusterManager();
-  auto& secret_manager = cluster_manager.clusterManagerFactory().secretManager();
-  auto& transport_socket_factory = context.getTransportSocketFactoryContext();
-  auto secret_provider_client_secret = secretsProvider(
-      client_secret, secret_manager, transport_socket_factory, context.initManager());
+
+  auto secret_provider_client_secret =
+      secretsProvider(client_secret, server_context, context.initManager());
   if (secret_provider_client_secret == nullptr) {
     return absl::InvalidArgumentError("invalid token secret configuration");
   }
   auto secret_provider_hmac_secret =
-      secretsProvider(hmac_secret, secret_manager, transport_socket_factory, context.initManager());
+      secretsProvider(hmac_secret, server_context, context.initManager());
   if (secret_provider_hmac_secret == nullptr) {
     return absl::InvalidArgumentError("invalid HMAC secret configuration");
   }

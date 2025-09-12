@@ -170,7 +170,7 @@ private:
   }
 
   // TODO(kuochunghsu): extract the metadata handling logic form header/payload to metadata filters.
-  using StructMap = std::map<std::string, ProtobufWkt::Struct>;
+  using StructMap = std::map<std::string, Protobuf::Struct>;
   bool addMetadata(const std::string&, const std::string&, std::string, ValueType);
   void applyKeyValue(std::string, const Rule&, const KeyValuePair&);
   const std::string& decideNamespace(const std::string& nspace) const;

@@ -188,12 +188,15 @@ public:
             // Verify that the number of received byte that is tracked in the stream info equals to
             // the length of reply response buffer.
             auto upstream_meter = this->grpc_stream_->streamInfo().getUpstreamBytesMeter();
-            uint64_t total_bytes_rev = upstream_meter->wireBytesReceived();
-            uint64_t header_bytes_rev = upstream_meter->headerBytesReceived();
+            uint64_t total_bytes_recv = upstream_meter->wireBytesReceived();
+            uint64_t header_bytes_recv = upstream_meter->headerBytesReceived();
+            uint64_t decompressed_header_bytes_recv =
+                upstream_meter->decompressedHeaderBytesReceived();
             // In HTTP2 codec, H2_FRAME_HEADER_SIZE is always included in bytes meter so we need to
             // account for it in the check here as well.
-            EXPECT_EQ(total_bytes_rev - header_bytes_rev,
+            EXPECT_EQ(total_bytes_recv - header_bytes_recv,
                       recv_buf->length() + Http::Http2::H2_FRAME_HEADER_SIZE);
+            EXPECT_GE(decompressed_header_bytes_recv, header_bytes_recv);
           }
           response_received_ = true;
           dispatcher_helper_.exitDispatcherIfNeeded();
@@ -206,7 +209,9 @@ public:
     if (grpc_status == Status::WellKnownGrpcStatus::InvalidCode) {
       EXPECT_CALL(*this, onRemoteClose(_, _)).WillExitIfNeeded();
     } else if (grpc_status > Status::WellKnownGrpcStatus::MaximumKnown) {
-      EXPECT_CALL(*this, onRemoteClose(Status::WellKnownGrpcStatus::InvalidCode, _))
+      EXPECT_CALL(*this, onRemoteClose(testing::AnyOf(Status::WellKnownGrpcStatus::InvalidCode,
+                                                      Status::WellKnownGrpcStatus::Unknown),
+                                       _))
           .WillExitIfNeeded();
     } else {
       EXPECT_CALL(*this, onRemoteClose(grpc_status, _)).WillExitIfNeeded();
@@ -389,9 +394,9 @@ public:
     EXPECT_CALL(*mock_host_, cluster())
         .WillRepeatedly(ReturnRef(*cm_.thread_local_cluster_.cluster_.info_));
     EXPECT_CALL(*mock_host_description_, locality()).WillRepeatedly(ReturnRef(host_locality_));
-    http_conn_pool_ = Http::Http2::allocateConnPool(*dispatcher_, api_->randomGenerator(),
-                                                    host_ptr_, Upstream::ResourcePriority::Default,
-                                                    nullptr, nullptr, state_);
+    http_conn_pool_ = Http::Http2::allocateConnPool(
+        *dispatcher_, api_->randomGenerator(), host_ptr_, Upstream::ResourcePriority::Default,
+        nullptr, nullptr, state_, server_factory_context_.overloadManager());
     EXPECT_CALL(cm_.thread_local_cluster_, chooseHost(_)).WillRepeatedly(Invoke([this] {
       return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
     }));

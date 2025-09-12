@@ -13,23 +13,13 @@ platform(
 )
 
 platform(
-    name = "rbe_linux_clang_libcxx_platform",
+    name = "rbe_linux_arm64_clang_platform",
     exec_properties = create_rbe_exec_properties_dict(
         docker_add_capabilities = "SYS_PTRACE,NET_RAW,NET_ADMIN",
         docker_network = "standard",
         docker_privileged = True,
     ),
-    parents = ["//bazel/rbe/toolchains/configs/linux/clang_libcxx/config:platform"],
-)
-
-platform(
-    name = "rbe_linux_arm64_clang_libcxx_platform",
-    exec_properties = create_rbe_exec_properties_dict(
-        docker_add_capabilities = "SYS_PTRACE,NET_RAW,NET_ADMIN",
-        docker_network = "standard",
-        docker_privileged = True,
-    ),
-    parents = ["//bazel/rbe/toolchains/configs/linux/clang_libcxx/config:platform-arm64"],
+    parents = ["//bazel/rbe/toolchains/configs/linux/clang/config:platform-arm64"],
 )
 
 platform(

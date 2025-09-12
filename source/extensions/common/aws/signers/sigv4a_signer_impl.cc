@@ -1,5 +1,10 @@
 #include "source/extensions/common/aws/signers/sigv4a_signer_impl.h"
 
+#include "source/common/common/hex.h"
+#include "source/common/crypto/utility.h"
+#include "source/extensions/common/aws/signers/sigv4a_common.h"
+#include "source/extensions/common/aws/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -40,9 +45,9 @@ void SigV4ASignerImpl::addRegionHeader(Http::RequestHeaderMap& headers,
 
 void SigV4ASignerImpl::addRegionQueryParam(Envoy::Http::Utility::QueryParamsMulti& query_params,
                                            const absl::string_view override_region) const {
-  query_params.add(
-      SignatureQueryParameterValues::AmzRegionSet,
-      Utility::encodeQueryComponent(override_region.empty() ? getRegion() : override_region));
+  query_params.add(SignatureQueryParameterValues::AmzRegionSet,
+                   Utility::encodeQueryComponentPreservingPlus(
+                       override_region.empty() ? getRegion() : override_region));
 }
 
 std::string SigV4ASignerImpl::createSignature(

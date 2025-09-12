@@ -27,13 +27,11 @@ public:
   MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
 
   // Server::Configuration::FactoryContext
-  MOCK_METHOD(TransportSocketFactoryContext&, getTransportSocketFactoryContext, (), (const));
   MOCK_METHOD(const Network::DrainDecision&, drainDecision, ());
   MOCK_METHOD(Stats::Scope&, listenerScope, ());
   MOCK_METHOD(const Network::ListenerInfo&, listenerInfo, (), (const));
 
   testing::NiceMock<MockServerFactoryContext> server_factory_context_;
-  testing::NiceMock<MockTransportSocketFactoryContext> transport_socket_factory_context_;
   testing::NiceMock<Init::MockManager> init_manager_;
   testing::NiceMock<Stats::MockIsolatedStatsStore> store_;
   Stats::Scope& scope_{*store_.rootScope()};

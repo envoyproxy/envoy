@@ -5,6 +5,7 @@
 
 #include "envoy/common/optref.h"
 #include "envoy/http/persistent_quic_info.h"
+#include "envoy/server/overload/overload_manager.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/http/codec_client.h"
@@ -150,12 +151,24 @@ public:
                     OptRef<PoolConnectResultCallback> connect_callback,
                     Http::PersistentQuicInfo& quic_info,
                     OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry,
-                    bool attempt_happy_eyeballs = false);
+                    Server::OverloadManager& overload_manager, bool attempt_happy_eyeballs = false);
 
   ~Http3ConnPoolImpl() override;
   ConnectionPool::Cancellable* newStream(Http::ResponseDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks,
                                          const Instance::StreamOptions& options) override;
+
+  void drainConnections(Envoy::ConnectionPool::DrainBehavior drain_behavior) override {
+    if (drain_behavior ==
+            Envoy::ConnectionPool::DrainBehavior::DrainExistingNonMigratableConnections &&
+        quic_info_.migration_config_.migrate_session_on_network_change) {
+      // If connection migration is enabled, don't drain existing connections.
+      // Each connection will observe network change signals and decide whether
+      // to migrate or drain.
+      return;
+    }
+    FixedHttpConnPoolImpl::drainConnections(drain_behavior);
+  }
 
   // For HTTP/3 the base connection pool does not track stream capacity, rather
   // the HTTP3 active client does.
@@ -200,7 +213,7 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
                  OptRef<PoolConnectResultCallback> connect_callback,
                  Http::PersistentQuicInfo& quic_info,
                  OptRef<Quic::EnvoyQuicNetworkObserverRegistry> network_observer_registry,
-                 bool attempt_happy_eyeballs = false);
+                 Server::OverloadManager& overload_manager, bool attempt_happy_eyeballs = false);
 
 } // namespace Http3
 } // namespace Http

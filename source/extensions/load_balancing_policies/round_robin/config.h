@@ -6,6 +6,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/load_balancing_policies/common/factory_base.h"
+#include "source/extensions/load_balancing_policies/round_robin/round_robin_lb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -14,35 +15,6 @@ namespace RoundRobin {
 
 using RoundRobinLbProto = envoy::extensions::load_balancing_policies::round_robin::v3::RoundRobin;
 using ClusterProto = envoy::config::cluster::v3::Cluster;
-using LegacyRoundRobinLbProto = ClusterProto::RoundRobinLbConfig;
-
-/**
- * Load balancer config that used to wrap the legacy proto config.
- */
-class LegacyRoundRobinLbConfig : public Upstream::LoadBalancerConfig {
-public:
-  LegacyRoundRobinLbConfig(const ClusterProto& cluster);
-
-  OptRef<const LegacyRoundRobinLbProto> lbConfig() const {
-    if (lb_config_.has_value()) {
-      return lb_config_.value();
-    }
-    return {};
-  };
-
-private:
-  absl::optional<LegacyRoundRobinLbProto> lb_config_;
-};
-
-/**
- * Load balancer config that used to wrap the proto config.
- */
-class TypedRoundRobinLbConfig : public Upstream::LoadBalancerConfig {
-public:
-  TypedRoundRobinLbConfig(const RoundRobinLbProto& lb_config);
-
-  const RoundRobinLbProto lb_config_;
-};
 
 struct RoundRobinCreator : public Logger::Loggable<Logger::Id::upstream> {
   Upstream::LoadBalancerPtr operator()(Upstream::LoadBalancerParams params,
@@ -62,13 +34,13 @@ public:
              const Protobuf::Message& config) override {
     ASSERT(dynamic_cast<const RoundRobinLbProto*>(&config) != nullptr);
     const RoundRobinLbProto& typed_config = dynamic_cast<const RoundRobinLbProto&>(config);
-    // TODO(wbocode): to merge the legacy and typed config and related constructors into one.
-    return Upstream::LoadBalancerConfigPtr{new TypedRoundRobinLbConfig(typed_config)};
+    return Upstream::LoadBalancerConfigPtr{new Upstream::TypedRoundRobinLbConfig(typed_config)};
   }
 
   absl::StatusOr<Upstream::LoadBalancerConfigPtr>
   loadLegacy(Server::Configuration::ServerFactoryContext&, const ClusterProto& cluster) override {
-    return Upstream::LoadBalancerConfigPtr{new LegacyRoundRobinLbConfig(cluster)};
+    return Upstream::LoadBalancerConfigPtr{new Upstream::TypedRoundRobinLbConfig(
+        cluster.common_lb_config(), cluster.round_robin_lb_config())};
   }
 };
 

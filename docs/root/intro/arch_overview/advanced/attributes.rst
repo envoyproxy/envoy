@@ -201,6 +201,7 @@ following attributes:
    xds.virtual_host_name, string, Virtual host name.
    xds.virtual_host_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Virtual host metadata
    xds.upstream_host_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream host metadata
+   xds.upstream_host_locality_metadata, :ref:`Metadata<envoy_v3_api_msg_config.core.v3.metadata>`, Upstream host locality metadata
    xds.filter_chain_name, string, Listener filter chain name
 
 

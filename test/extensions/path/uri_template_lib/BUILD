@@ -31,6 +31,7 @@ envoy_cc_test(
     deps = [
         "//source/extensions/path/uri_template_lib:uri_template_internal_cc",
         "//test/test_common:status_utility_lib",
+        "//test/test_common:test_runtime_lib",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
         "@com_google_absl//absl/strings",

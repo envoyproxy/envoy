@@ -43,8 +43,6 @@ public:
   Upstream::ClusterLbStats stats_{stat_names_, stats_scope_};
   NiceMock<Runtime::MockLoader> runtime_;
   Random::RandomGeneratorImpl random_;
-  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
-  envoy::config::cluster::v3::Cluster::RoundRobinLbConfig round_robin_lb_config_;
   std::shared_ptr<Upstream::MockClusterInfo> info_{new NiceMock<Upstream::MockClusterInfo>()};
 };
 
@@ -52,6 +50,17 @@ class TestLoadBalancerContext : public Upstream::LoadBalancerContextBase {
 public:
   // Upstream::LoadBalancerContext
   absl::optional<uint64_t> computeHashKey() override { return hash_key_; }
+
+  absl::optional<uint64_t> hash_key_;
+};
+
+class TestHashPolicy : public Http::HashPolicy {
+public:
+  absl::optional<uint64_t> generateHash(OptRef<const Http::RequestHeaderMap>,
+                                        OptRef<const StreamInfo::StreamInfo>,
+                                        AddCookieCallback) const override {
+    return hash_key_;
+  }
 
   absl::optional<uint64_t> hash_key_;
 };

@@ -129,7 +129,7 @@ Supported commands
 At the protocol level, pipelines are supported.
 Use pipelining wherever possible for the best performance.
 
-At the command level, Envoy only supports commands that can be reliably hashed to a server. AUTH, PING and ECHO
+At the command level, Envoy only supports commands that can be reliably hashed to a server. AUTH, PING, ECHO and INFO
 are the only exceptions. AUTH is processed locally by Envoy if a downstream password has been configured,
 and no other commands will be processed until authentication is successful when a password has been
 configured. If an external authentication provider is set, Envoy will instead send the authentication arguments
@@ -176,6 +176,7 @@ For details on each command's usage see the official
   GEOPOS, Geo
   GEORADIUS_RO, Geo
   GEORADIUSBYMEMBER_RO, Geo
+  GEOSEARCH, Geo
   HDEL, Hash
   HEXISTS, Hash
   HGET, Hash
@@ -217,6 +218,7 @@ For details on each command's usage see the official
   SPOP, Set
   SRANDMEMBER, Set
   SREM, Set
+  SCAN, Generic
   SSCAN, Set
   WATCH, String
   UNWATCH, String
@@ -250,11 +252,14 @@ For details on each command's usage see the official
   GET, String
   GETBIT, String
   GETDEL, String
+  GETEX, String
   GETRANGE, String
   GETSET, String
   INCR, String
   INCRBY, String
   INCRBYFLOAT, String
+  INFO, Server
+  ROLE, Server
   MGET, String
   MSET, String
   PSETEX, String
@@ -318,6 +323,7 @@ Envoy can also generate its own errors in response to the client.
   ERR <external-message>, "The authentication command failed on the external auth provider."
   "ERR Client sent AUTH, but no password is set", "An authentication command was received, but no
   downstream authentication password or external authentication provider have been configured."
+  ERR invalid cursor, "The iteration command failed due to an invalid or unrecognized cursor."
 
 
 In the case of MGET, each individual key that cannot be fetched will generate an error response.

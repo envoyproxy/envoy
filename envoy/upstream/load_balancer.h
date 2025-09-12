@@ -166,6 +166,15 @@ public:
    * @param details gives optional details about the resolution success/failure.
    */
   virtual void onAsyncHostSelection(HostConstSharedPtr&& host, std::string&& details) PURE;
+
+  /**
+   * Called by the load balancer to set the headers modifier that will be used to modify the
+   * response headers before sending them downstream.
+   * NOTE: this should be called only once per request, no matter how many times the retrying
+   * happens.
+   * @param modifier supplies the function that will modify the response headers.
+   */
+  virtual void setHeadersModifier(std::function<void(Http::ResponseHeaderMap&)> modifier) PURE;
 };
 
 /**

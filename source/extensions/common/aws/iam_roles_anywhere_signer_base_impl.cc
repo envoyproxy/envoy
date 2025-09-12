@@ -1,4 +1,11 @@
-#include "source/extensions/common/aws/iam_roles_anywhere_signer_base.h"
+#include "source/extensions/common/aws/iam_roles_anywhere_signer_base_impl.h"
+
+#include "envoy/http/query_params.h"
+
+#include "source/common/common/hex.h"
+#include "source/common/crypto/utility.h"
+#include "source/common/http/headers.h"
+#include "source/extensions/common/aws/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -91,11 +98,15 @@ absl::Status IAMRolesAnywhereSignerBaseImpl::sign(Http::RequestHeaderMap& header
   ENVOY_LOG(debug, "String to sign:\n{}", string_to_sign);
 
   // Phase 3: Create a signature
-  std::string signature = createSignature(x509_credentials, string_to_sign);
+  auto signature = createSignature(x509_credentials, string_to_sign);
+  if (!signature.ok()) {
+    return absl::Status{absl::StatusCode::kInvalidArgument, signature.status().message()};
+  }
+
   // Phase 4: Sign request
 
-  std::string authorization_header =
-      createAuthorizationHeader(x509_credentials, credential_scope, canonical_headers, signature);
+  std::string authorization_header = createAuthorizationHeader(
+      x509_credentials, credential_scope, canonical_headers, signature.value());
 
   headers.setCopy(Http::CustomHeaders::get().Authorization, authorization_header);
 
@@ -107,8 +118,8 @@ absl::Status IAMRolesAnywhereSignerBaseImpl::sign(Http::RequestHeaderMap& header
   return absl::OkStatus();
 }
 
-void IAMRolesAnywhereSignerBaseImpl::addRequiredCertHeaders(Http::RequestHeaderMap& headers,
-                                                            X509Credentials x509_credentials) {
+void IAMRolesAnywhereSignerBaseImpl::addRequiredCertHeaders(
+    Http::RequestHeaderMap& headers, const X509Credentials& x509_credentials) {
   headers.setCopy(IAMRolesAnywhereSignatureHeaders::get().X509,
                   x509_credentials.certificateDerB64().value());
   if (x509_credentials.certificateChainDerB64().has_value()) {
@@ -127,7 +138,7 @@ void IAMRolesAnywhereSignerBaseImpl::addRequiredHeaders(Http::RequestHeaderMap& 
 }
 
 std::string IAMRolesAnywhereSignerBaseImpl::createAuthorizationCredential(
-    const X509Credentials x509_credentials, absl::string_view credential_scope) const {
+    const X509Credentials& x509_credentials, absl::string_view credential_scope) const {
   return fmt::format(IAMRolesAnywhereSignatureConstants::AuthorizationCredentialFormat,
                      x509_credentials.certificateSerial().value(), credential_scope);
 }

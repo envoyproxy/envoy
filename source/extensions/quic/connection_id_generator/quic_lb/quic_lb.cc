@@ -2,6 +2,7 @@
 
 #include "envoy/server/transport_socket_config.h"
 
+#include "source/common/common/base64.h"
 #include "source/common/config/datasource.h"
 #include "source/common/network/socket_option_impl.h"
 #include "source/common/quic/envoy_quic_utils.h"
@@ -125,17 +126,15 @@ QuicLbConnectionIdGenerator::ThreadLocalData::updateKeyAndVersion(absl::string_v
 
 namespace {
 
-Secret::GenericSecretConfigProviderSharedPtr secretsProvider(
-    const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
-    Server::Configuration::TransportSocketFactoryContext& transport_socket_factory_context,
-    Init::Manager& init_manager) {
-  Secret::SecretManager& secret_manager =
-      transport_socket_factory_context.serverFactoryContext().secretManager();
+Secret::GenericSecretConfigProviderSharedPtr
+secretsProvider(const envoy::extensions::transport_sockets::tls::v3::SdsSecretConfig& config,
+                Server::Configuration::ServerFactoryContext& server_context,
+                Init::Manager& init_manager) {
   if (config.has_sds_config()) {
-    return secret_manager.findOrCreateGenericSecretProvider(
-        config.sds_config(), config.name(), transport_socket_factory_context, init_manager);
+    return server_context.secretManager().findOrCreateGenericSecretProvider(
+        config.sds_config(), config.name(), server_context, init_manager);
   } else {
-    return secret_manager.findStaticGenericSecretProvider(config.name());
+    return server_context.secretManager().findStaticGenericSecretProvider(config.name());
   }
 }
 
@@ -211,6 +210,10 @@ Factory::create(const envoy::extensions::quic::connection_id_generator::quic_lb:
 
   std::string server_id = server_id_or_result.value();
 
+  if (config.server_id_base64_encoded()) {
+    server_id = Base64::decodeWithoutPadding(server_id);
+  }
+
   if (config.expected_server_id_length() > 0 &&
       config.expected_server_id_length() != server_id.size()) {
     return absl::InvalidArgumentError(
@@ -254,9 +257,8 @@ Factory::create(const envoy::extensions::quic::connection_id_generator::quic_lb:
         return result.value();
       });
 
-  ret->secrets_provider_ =
-      secretsProvider(config.encryption_parameters(), context.getTransportSocketFactoryContext(),
-                      context.initManager());
+  ret->secrets_provider_ = secretsProvider(config.encryption_parameters(),
+                                           context.serverFactoryContext(), context.initManager());
   if (ret->secrets_provider_ == nullptr) {
     return absl::InvalidArgumentError("invalid encryption_parameters config");
   }

@@ -71,6 +71,8 @@ public:
                      Filesystem::Instance& file_system,
                      const ProcessContextOptRef& process_context = absl::nullopt);
 
+  ~ValidationInstance() override;
+
   // Server::Instance
   void run() override { PANIC("not implemented"); }
   OptRef<Admin> admin() override {
@@ -120,6 +122,9 @@ public:
   void flushStats() override {}
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
+  }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return validation_context_.staticValidationVisitor();
   }
   bool enableReusePortDefault() override { return true; }
 

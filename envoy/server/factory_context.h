@@ -113,10 +113,10 @@ public:
   virtual Stats::Scope& serverScope() PURE;
 
   /**
-   * @return ThreadLocal::SlotAllocator& the thread local storage engine for the server. This is
+   * @return ThreadLocal::Instance& the thread local storage engine for the server. This is
    *         used to allow runtime lockless updates to configuration, etc. across multiple threads.
    */
-  virtual ThreadLocal::SlotAllocator& threadLocal() PURE;
+  virtual ThreadLocal::Instance& threadLocal() PURE;
 
   /**
    * @return Upstream::ClusterManager& singleton for use by the entire server.
@@ -183,11 +183,6 @@ public:
    * process context. Will be unset when running in validation mode.
    */
   virtual ProcessContextOptRef processContext() PURE;
-
-  /**
-   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
-   */
-  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
 
   /**
    * @return the init manager of the cluster. This can be used for extensions that need
@@ -300,11 +295,6 @@ public:
    * @return Stats::Scope& the listener's stats scope.
    */
   virtual Stats::Scope& listenerScope() PURE;
-
-  /**
-   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
-   */
-  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
 
   /**
    * @return const Network::DrainDecision& a drain decision that filters can use to determine if

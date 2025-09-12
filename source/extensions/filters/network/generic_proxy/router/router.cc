@@ -92,9 +92,7 @@ void UpstreamRequest::resetStream(StreamResetReason reason, absl::string_view re
   if (span_ != nullptr) {
     span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
     span_->setTag(Tracing::Tags::get().ErrorReason, resetReasonToViewAndFlag(reason).view);
-    TraceContextBridge trace_context{*parent_.request_stream_};
-    Tracing::TracerUtility::finalizeSpan(*span_, trace_context, stream_info_,
-                                         tracing_config_.value().get(), true);
+    Tracing::TracerUtility::finalizeSpan(*span_, stream_info_, tracing_config_.value().get(), true);
   }
 
   // Notify the parent filter that the upstream request has been reset.
@@ -110,9 +108,7 @@ void UpstreamRequest::clearStream(bool close_connection) {
             close_connection);
 
   if (span_ != nullptr) {
-    TraceContextBridge trace_context{*parent_.request_stream_};
-    Tracing::TracerUtility::finalizeSpan(*span_, trace_context, stream_info_,
-                                         tracing_config_.value().get(), true);
+    Tracing::TracerUtility::finalizeSpan(*span_, stream_info_, tracing_config_.value().get(), true);
   }
 
   generic_upstream_->removeUpstreamRequest(stream_id_);
@@ -243,6 +239,13 @@ void UpstreamRequest::onDecodingSuccess(ResponseHeaderFramePtr response_header_f
   } else {
     // Codec does not provide the start time and use the current time as the start time.
     upstream_info_->upstreamTiming().onFirstUpstreamRxByteReceived(parent_.time_source_);
+  }
+
+  if (!response_header_frame->status().ok()) {
+    if (span_ != nullptr) {
+      span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+      span_->setTag(Tracing::Tags::get().ErrorReason, "upstream_failure");
+    }
   }
 
   if (response_header_frame->frameFlags().endStream()) {

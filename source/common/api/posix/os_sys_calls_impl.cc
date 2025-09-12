@@ -419,5 +419,15 @@ SysCallIntResult OsSysCallsImpl::getaddrinfo(const char* node, const char* servi
 
 void OsSysCallsImpl::freeaddrinfo(addrinfo* res) { ::freeaddrinfo(res); }
 
+SysCallIntResult OsSysCallsImpl::getrlimit(int resource, struct rlimit* rlim) {
+  const int rc = ::getrlimit(resource, rlim);
+  return {rc, errno};
+}
+
+SysCallIntResult OsSysCallsImpl::setrlimit(int resource, const struct rlimit* rlim) {
+  const int rc = ::setrlimit(resource, rlim);
+  return {rc, errno};
+}
+
 } // namespace Api
 } // namespace Envoy

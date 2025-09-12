@@ -10,9 +10,12 @@
 #include "source/common/common/matchers.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/network/cidr_range.h"
+#include "source/common/network/lc_trie.h"
 #include "source/extensions/filters/common/expr/evaluator.h"
 #include "source/extensions/filters/common/rbac/matcher_interface.h"
 #include "source/extensions/path/match/uri_template/uri_template_match.h"
+
+#include "cel/expr/syntax.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -47,7 +50,7 @@ public:
                const StreamInfo::StreamInfo&) const override;
 
 private:
-  std::vector<MatcherConstSharedPtr> matchers_;
+  std::vector<MatcherConstPtr> matchers_;
 };
 
 /**
@@ -73,7 +76,7 @@ public:
                const StreamInfo::StreamInfo&) const override;
 
 private:
-  std::vector<MatcherConstSharedPtr> matchers_;
+  std::vector<MatcherConstPtr> matchers_;
 };
 
 class NotMatcher : public Matcher {
@@ -90,7 +93,7 @@ public:
                const StreamInfo::StreamInfo&) const override;
 
 private:
-  MatcherConstSharedPtr matcher_;
+  MatcherConstPtr matcher_;
 };
 
 /**
@@ -111,23 +114,35 @@ private:
 };
 
 /**
- * Perform a match against an IP CIDR range. This rule can be applied to connection remote,
+ * Perform a match against IP CIDR ranges. This rule can be applied to connection remote,
  * downstream local address, downstream direct remote address or downstream remote address.
+ * Uses LC Trie algorithm for optimal O(log n) performance in IP address range matching.
  */
 class IPMatcher : public Matcher {
 public:
   enum Type { ConnectionRemote = 0, DownstreamLocal, DownstreamDirectRemote, DownstreamRemote };
 
-  IPMatcher(const envoy::config::core::v3::CidrRange& range, Type type)
-      : range_(THROW_OR_RETURN_VALUE(Network::Address::CidrRange::create(range),
-                                     Network::Address::CidrRange)),
-        type_(type) {}
+  // Single IP range constructor.
+  static absl::StatusOr<std::unique_ptr<IPMatcher>>
+  create(const envoy::config::core::v3::CidrRange& range, Type type);
+
+  // Multiple IP ranges constructor.
+  static absl::StatusOr<std::unique_ptr<IPMatcher>>
+  create(const Protobuf::RepeatedPtrField<envoy::config::core::v3::CidrRange>& ranges, Type type);
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo& info) const override;
 
 private:
-  const Network::Address::CidrRange range_;
+  // Private constructor for LC Trie-based matcher.
+  IPMatcher(std::unique_ptr<Network::LcTrie::LcTrie<bool>> trie, Type type);
+
+  // Helper method to extract IP address based on type, returning a reference to avoid copies.
+  const Network::Address::InstanceConstSharedPtr&
+  extractIpAddress(const Network::Connection& connection, const StreamInfo::StreamInfo& info) const;
+
+  std::unique_ptr<Network::LcTrie::LcTrie<bool>> trie_;
+
   const Type type_;
 };
 
@@ -183,15 +198,23 @@ private:
  */
 class PolicyMatcher : public Matcher, NonCopyable {
 public:
-  PolicyMatcher(const envoy::config::rbac::v3::Policy& policy, Expr::Builder* builder,
+  PolicyMatcher(const envoy::config::rbac::v3::Policy& policy,
+                Expr::BuilderInstanceSharedPtr& builder,
                 ProtobufMessage::ValidationVisitor& validation_visitor,
                 Server::Configuration::CommonFactoryContext& context)
       : permissions_(policy.permissions(), validation_visitor, context),
-        principals_(policy.principals(), context), condition_(policy.condition()) {
-    if (policy.has_condition()) {
-      expr_ = Expr::createExpression(*builder, condition_);
-    }
-  }
+        principals_(policy.principals(), context),
+        expr_([&]() -> absl::optional<Expr::CompiledExpression> {
+          if (policy.has_condition()) {
+            auto compiled = Expr::CompiledExpression::Create(builder, policy.condition());
+            if (!compiled.ok()) {
+              throw Expr::CelException(
+                  absl::StrCat("failed to create an expression: ", compiled.status().message()));
+            }
+            return std::move(compiled.value());
+          }
+          return {};
+        }()) {}
 
   bool matches(const Network::Connection& connection, const Envoy::Http::RequestHeaderMap& headers,
                const StreamInfo::StreamInfo&) const override;
@@ -199,8 +222,7 @@ public:
 private:
   const OrMatcher permissions_;
   const OrMatcher principals_;
-  const google::api::expr::v1alpha1::Expr condition_;
-  Expr::ExpressionPtr expr_;
+  const absl::optional<Expr::CompiledExpression> expr_;
 };
 
 class MetadataMatcher : public Matcher {

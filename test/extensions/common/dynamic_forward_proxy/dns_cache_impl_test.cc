@@ -1784,7 +1784,21 @@ TEST_F(DnsCacheImplTest, SetIpVersionToRemoveWithDnsPreresolveHostnames) {
 }
 
 // DNS cache manager config tests.
-TEST(DnsCacheManagerImplTest, LoadViaConfig) {
+class DnsCacheManagerImplTest : public testing::Test {
+public:
+  DnsCacheManagerImplTest()
+      : registered_dns_factory_(dns_resolver_factory_),
+        dns_resolver_(new Network::MockDnsResolver()) {
+    EXPECT_CALL(dns_resolver_factory_, createDnsResolver(_, _, _))
+        .WillRepeatedly(Return(dns_resolver_));
+  }
+
+  NiceMock<Network::MockDnsResolverFactory> dns_resolver_factory_;
+  Registry::InjectFactory<Network::DnsResolverFactory> registered_dns_factory_;
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver_;
+};
+
+TEST_F(DnsCacheManagerImplTest, LoadViaConfig) {
   NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   DnsCacheManagerImpl cache_manager(context);
 
@@ -1811,7 +1825,7 @@ TEST(DnsCacheManagerImplTest, LoadViaConfig) {
             "config specified DNS cache 'foo' with different settings");
 }
 
-TEST(DnsCacheManagerImplTest, LookupByName) {
+TEST_F(DnsCacheManagerImplTest, LookupByName) {
   NiceMock<Server::Configuration::MockGenericFactoryContext> context;
   DnsCacheManagerImpl cache_manager(context);
 
@@ -1826,6 +1840,21 @@ TEST(DnsCacheManagerImplTest, LookupByName) {
   auto cache2 = cache_manager.lookUpCacheByName("foo");
   EXPECT_NE(cache2, nullptr);
   EXPECT_EQ(cache1, cache2);
+}
+
+// Make sure the cache manager can handle the context going out of scope.
+TEST_F(DnsCacheManagerImplTest, TestLifetime) {
+  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
+  std::unique_ptr<DnsCacheManagerImpl> cache_manager;
+
+  {
+    Server::GenericFactoryContextImpl scoped_context(context);
+    cache_manager = std::make_unique<DnsCacheManagerImpl>(scoped_context);
+  }
+  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config1;
+  config1.set_name("foo");
+
+  EXPECT_TRUE(cache_manager->getCache(config1).value() != nullptr);
 }
 
 TEST(DnsCacheConfigOptionsTest, EmtpyDnsResolutionConfig) {
@@ -2183,21 +2212,6 @@ TEST_F(DnsCacheImplTest, CacheLoad) {
     ASSERT_NE(absl::nullopt, result.host_info_);
     EXPECT_EQ(2, result.host_info_.value()->addressList(/*filtered=*/false).size());
   }
-}
-
-// Make sure the cache manager can handle the context going out of scope.
-TEST(DnsCacheManagerImplTest, TestLifetime) {
-  NiceMock<Server::Configuration::MockGenericFactoryContext> context;
-  std::unique_ptr<DnsCacheManagerImpl> cache_manager;
-
-  {
-    Server::GenericFactoryContextImpl scoped_context(context);
-    cache_manager = std::make_unique<DnsCacheManagerImpl>(scoped_context);
-  }
-  envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig config1;
-  config1.set_name("foo");
-
-  EXPECT_TRUE(cache_manager->getCache(config1).value() != nullptr);
 }
 
 TEST(NoramlizeHost, NormalizeHost) {

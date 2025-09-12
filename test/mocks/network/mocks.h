@@ -119,6 +119,8 @@ public:
   MOCK_METHOD(absl::string_view, requestedServerName, (), (const));
   MOCK_METHOD(void, setJA3Hash, (absl::string_view));
   MOCK_METHOD(absl::string_view, ja3Hash, (), (const));
+  MOCK_METHOD(void, setJA4Hash, (absl::string_view ja4_hash), (override));
+  MOCK_METHOD(absl::string_view, ja4Hash, (), (const, override));
   MOCK_METHOD(void, addOption_, (const Socket::OptionConstSharedPtr&));
   MOCK_METHOD(void, addOptions_, (const Socket::OptionsSharedPtr&));
   MOCK_METHOD(const Network::ConnectionSocket::OptionsSharedPtr&, options, (), (const));
@@ -271,6 +273,7 @@ public:
   MOCK_METHOD(void, destroy_, ());
   MOCK_METHOD(Network::FilterStatus, onAccept, (ListenerFilterCallbacks&));
   MOCK_METHOD(Network::FilterStatus, onData, (Network::ListenerFilterBuffer&));
+  MOCK_METHOD(void, onClose, ());
 
   size_t listener_filter_max_read_bytes_{0};
 };
@@ -332,6 +335,7 @@ public:
   MOCK_METHOD(const NetworkFilterFactoriesList&, networkFilterFactories, (), (const));
   MOCK_METHOD(void, startDraining, ());
   MOCK_METHOD(absl::string_view, name, (), (const));
+  MOCK_METHOD(bool, addedViaApi, (), (const));
 };
 
 class MockFilterChainInfo : public FilterChainInfo {
@@ -432,8 +436,8 @@ public:
   MOCK_METHOD(ConnectionSocket&, socket, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
   MOCK_METHOD(void, continueFilterChain, (bool));
-  MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const ProtobufWkt::Struct&));
-  MOCK_METHOD(void, setDynamicTypedMetadata, (const std::string&, const ProtobufWkt::Any& value));
+  MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const Protobuf::Struct&));
+  MOCK_METHOD(void, setDynamicTypedMetadata, (const std::string&, const Protobuf::Any& value));
   MOCK_METHOD(envoy::config::core::v3::Metadata&, dynamicMetadata, ());
   MOCK_METHOD(const envoy::config::core::v3::Metadata&, dynamicMetadata, (), (const));
   MOCK_METHOD(StreamInfo::FilterState&, filterState, (), ());
@@ -584,6 +588,10 @@ public:
   MOCK_METHOD(const std::string&, addressAsString, (), (const));
   MOCK_METHOD(bool, isAnyAddress, (), (const));
   MOCK_METHOD(bool, isUnicastAddress, (), (const));
+  MOCK_METHOD(bool, isLinkLocalAddress, (), (const));
+  MOCK_METHOD(bool, isUniqueLocalAddress, (), (const));
+  MOCK_METHOD(bool, isSiteLocalAddress, (), (const));
+  MOCK_METHOD(bool, isTeredoAddress, (), (const));
   MOCK_METHOD(const Address::Ipv4*, ipv4, (), (const));
   MOCK_METHOD(const Address::Ipv6*, ipv6, (), (const));
   MOCK_METHOD(uint32_t, port, (), (const));
@@ -610,6 +618,7 @@ public:
   MOCK_METHOD(const sockaddr*, sockAddr, (), (const));
   MOCK_METHOD(socklen_t, sockAddrLen, (), (const));
   MOCK_METHOD(absl::string_view, addressType, (), (const));
+  MOCK_METHOD(absl::optional<std::string>, networkNamespace, (), (const));
 
   const std::string& asString() const override { return physical_; }
   absl::string_view asStringView() const override { return physical_; }

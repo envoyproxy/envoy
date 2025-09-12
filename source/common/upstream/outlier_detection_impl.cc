@@ -144,7 +144,7 @@ void DetectorHostMonitorImpl::putResultNoLocalExternalSplit(Result result,
 // are treated separately. Local origin errors have separate counters and
 // separate success rate monitor.
 void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
-                                                              absl::optional<uint64_t>) {
+                                                              absl::optional<uint64_t> code) {
   switch (result) {
   // SUCCESS is used to report success for connection level. Server may still respond with
   // error, but connection to server was OK.
@@ -156,17 +156,17 @@ void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
   case Result::LocalOriginConnectFailed:
     return localOriginFailure();
   // EXT_ORIGIN_REQUEST_FAILED is used when connection to server was successful, but transaction on
-  // server level failed. Since it it similar to HTTP 5xx, map it to 5xx handler.
+  // server level failed. Since it it similar to HTTP 5xx, map it to 5xx if HTTP code is not
+  // provided.
   case Result::ExtOriginRequestFailed:
     // map it to http code and call http handler.
-    return putHttpResponseCode(enumToInt(Http::Code::ServiceUnavailable));
-  // EXT_ORIGIN_REQUEST_SUCCESS is used to report that transaction with non-http server was
+    putHttpResponseCode(code.value_or(enumToInt(Http::Code::ServiceUnavailable)));
+    break;
+  // EXT_ORIGIN_REQUEST_SUCCESS is used to report that transaction with upstream server was
   // completed successfully. This means that connection and server level transactions were
-  // successful. Map it to http code 200 OK and indicate that there was no errors on connection
-  // level.
+  // successful. Map it to http code 200 OK if HTTP code is not provided.
   case Result::ExtOriginRequestSuccess:
-    putHttpResponseCode(enumToInt(Http::Code::OK));
-    localOriginNoFailure();
+    putHttpResponseCode(code.value_or(enumToInt(Http::Code::OK)));
     break;
   }
 }

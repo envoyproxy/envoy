@@ -34,14 +34,14 @@ namespace Upstream {
 namespace {
 
 static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
-                                 const std::string& url, TimeSource& time_source,
-                                 uint32_t weight = 1, const std::string& zone = "") {
+                                 const std::string& url, uint32_t weight = 1,
+                                 const std::string& zone = "") {
   envoy::config::core::v3::Locality locality;
   locality.set_zone(zone);
   return HostSharedPtr{*HostImpl::create(
       cluster, "", *Network::Utility::resolveUrl(url), nullptr, nullptr, weight, locality,
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig::default_instance(), 0,
-      envoy::config::core::v3::UNKNOWN, time_source)};
+      envoy::config::core::v3::UNKNOWN)};
 }
 
 // Defines parameters for LeastRequestLoadBalancerWeightTest cases.
@@ -79,14 +79,13 @@ void leastRequestLBWeightTest(LRLBTestParams params) {
   ASSERT_LT(tolerance_pct, 100);
   ASSERT_GE(tolerance_pct, 0);
 
-  NiceMock<MockTimeSystem> time_source_;
   HostVector hosts;
   absl::node_hash_map<HostConstSharedPtr, uint64_t> host_hits;
   std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
   for (uint64_t i = 0; i < params.num_hosts; i++) {
     const bool should_weight = i < params.num_subset_hosts;
     auto hostPtr = makeTestHost(info, fmt::format("tcp://10.0.{}.{}:6379", i / 256, i % 256),
-                                time_source_, should_weight ? params.weight : 1);
+                                should_weight ? params.weight : 1);
     host_hits[hostPtr] = 0;
     hosts.push_back(hostPtr);
     if (should_weight) {
@@ -109,11 +108,9 @@ void leastRequestLBWeightTest(LRLBTestParams params) {
   ClusterLbStats lb_stats{stat_names, *stats_store.rootScope()};
   NiceMock<Runtime::MockLoader> runtime;
   auto time_source = std::make_unique<NiceMock<MockTimeSystem>>();
-  envoy::config::cluster::v3::Cluster::LeastRequestLbConfig least_request_lb_config;
-  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config;
-  LeastRequestLoadBalancer lb_{
-      priority_set, nullptr, lb_stats, runtime, random, common_config, least_request_lb_config,
-      *time_source};
+
+  LeastRequestLoadBalancer lb_{priority_set, nullptr, lb_stats, runtime,
+                               random,       50,      {},       *time_source};
 
   for (uint64_t i = 0; i < num_requests; i++) {
     host_hits[lb_.chooseHost(nullptr).host]++;
@@ -202,6 +199,8 @@ public:
         .WillByDefault(Return(50U));
     ON_CALL(runtime_.snapshot_, featureEnabled("upstream.zone_routing.enabled", 100))
         .WillByDefault(Return(true));
+    ON_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.force_local_zone.min_size", 0))
+        .WillByDefault(Return(0));
     ON_CALL(runtime_.snapshot_, getInteger("upstream.zone_routing.min_cluster_size", 6))
         .WillByDefault(Return(6));
   }
@@ -218,8 +217,7 @@ public:
            std::vector<uint32_t> healthy_destination_cluster) {
     local_priority_set_ = new PrioritySetImpl;
     // TODO(mattklein123): make load balancer per originating cluster host.
-    RandomLoadBalancer lb(priority_set_, local_priority_set_, stats_, runtime_, random_,
-                          common_config_);
+    RandomLoadBalancer lb(priority_set_, local_priority_set_, stats_, runtime_, random_, 50, {});
 
     HostsPerLocalitySharedPtr upstream_per_zone_hosts =
         generateHostsPerZone(healthy_destination_cluster);
@@ -296,7 +294,7 @@ public:
       const std::string zone = std::to_string(i);
       for (uint32_t j = 0; j < hosts[i]; ++j) {
         const std::string url = fmt::format("tcp://host.{}.{}:80", i, j);
-        ret->push_back(newTestHost(info_, url, time_source_, 1, zone));
+        ret->push_back(newTestHost(info_, url, 1, zone));
       }
     }
 
@@ -315,7 +313,7 @@ public:
 
       for (uint32_t j = 0; j < hosts[i]; ++j) {
         const std::string url = fmt::format("tcp://host.{}.{}:80", i, j);
-        zone_hosts.push_back(newTestHost(info_, url, time_source_, 1, zone));
+        zone_hosts.push_back(newTestHost(info_, url, 1, zone));
       }
 
       ret.push_back(std::move(zone_hosts));
@@ -332,12 +330,10 @@ public:
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<MockTimeSystem> time_source_;
   Random::RandomGeneratorImpl random_;
   Stats::IsolatedStoreImpl stats_store_;
   ClusterLbStatNames stat_names_;
   ClusterLbStats stats_;
-  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
 };
 
 TEST_F(DISABLED_SimulationTest, StrictlyEqualDistribution) {

@@ -82,7 +82,6 @@ envoy_quiche_platform_impl_cc_library(
         "quiche_bug_tracker_impl.h",
         "quiche_logging_impl.h",
     ],
-    tags = ["nofips"],
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
@@ -91,7 +90,6 @@ envoy_quiche_platform_impl_cc_library(
 
 envoy_quiche_platform_impl_cc_library(
     name = "quic_base_impl_lib",
-    tags = ["nofips"],
     deps = [
         ":quiche_flags_impl_lib",
         "//source/common/common:assert_lib",
@@ -111,7 +109,6 @@ envoy_quiche_platform_impl_cc_library(
     hdrs = [
         "quiche_iovec_impl.h",
     ],
-    tags = ["nofips"],
     deps = [
         "//envoy/common:base_includes",
     ],
@@ -122,7 +119,6 @@ envoy_quiche_platform_impl_cc_library(
     hdrs = [
         "quiche_stack_trace_impl.h",
     ],
-    tags = ["nofips"],
     deps = [
         "//source/server:backtrace_lib",
         "@com_github_google_quiche//:quiche_common_platform_export",
@@ -151,13 +147,11 @@ envoy_quiche_platform_impl_cc_library(
 envoy_quiche_platform_impl_cc_library(
     name = "quiche_lower_case_string_impl_lib",
     hdrs = ["quiche_lower_case_string_impl.h"],
-    tags = ["nofips"],
     deps = ["//envoy/http:header_map_interface"],
 )
 
 envoy_quiche_platform_impl_cc_library(
     name = "quiche_export_impl_lib",
     hdrs = ["quiche_export_impl.h"],
-    tags = ["nofips"],
     deps = ["@com_google_absl//absl/base"],
 )

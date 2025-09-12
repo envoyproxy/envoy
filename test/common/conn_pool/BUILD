@@ -17,6 +17,7 @@ envoy_cc_test(
         "//source/common/event:dispatcher_lib",
         "//test/common/upstream:utility_lib",
         "//test/mocks/event:event_mocks",
+        "//test/mocks/server:overload_manager_mocks",
         "//test/mocks/upstream:cluster_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
     ],

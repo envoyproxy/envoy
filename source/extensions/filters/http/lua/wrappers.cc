@@ -1,8 +1,11 @@
 #include "source/extensions/filters/http/lua/wrappers.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/extensions/filters/common/lua/protobuf_converter.h"
 #include "source/extensions/filters/common/lua/wrappers.h"
 #include "source/extensions/http/header_formatters/preserve_case/preserve_case_formatter.h"
 
@@ -170,6 +173,22 @@ int StreamInfoWrapper::luaDynamicMetadata(lua_State* state) {
   return 1;
 }
 
+int StreamInfoWrapper::luaDynamicTypedMetadata(lua_State* state) {
+  // Get the typed metadata from the stream's metadata
+  const auto& typed_metadata = stream_info_.dynamicMetadata().typed_filter_metadata();
+  return Filters::Common::Lua::ProtobufConverterUtils::processDynamicTypedMetadataFromLuaCall(
+      state, typed_metadata);
+}
+
+int StreamInfoWrapper::luaFilterState(lua_State* state) {
+  if (filter_state_wrapper_.get() != nullptr) {
+    filter_state_wrapper_.pushStack();
+  } else {
+    filter_state_wrapper_.reset(FilterStateWrapper::create(state, *this), true);
+  }
+  return 1;
+}
+
 int ConnectionStreamInfoWrapper::luaConnectionDynamicMetadata(lua_State* state) {
   if (connection_dynamic_metadata_wrapper_.get() != nullptr) {
     connection_dynamic_metadata_wrapper_.pushStack();
@@ -193,6 +212,13 @@ int StreamInfoWrapper::luaDownstreamSslConnection(lua_State* state) {
     lua_pushnil(state);
   }
   return 1;
+}
+
+int ConnectionStreamInfoWrapper::luaConnectionDynamicTypedMetadata(lua_State* state) {
+  // Get the typed metadata from the connection's metadata
+  const auto& typed_metadata = connection_stream_info_.dynamicMetadata().typed_filter_metadata();
+  return Filters::Common::Lua::ProtobufConverterUtils::processDynamicTypedMetadataFromLuaCall(
+      state, typed_metadata);
 }
 
 int StreamInfoWrapper::luaDownstreamLocalAddress(lua_State* state) {
@@ -311,7 +337,7 @@ int DynamicMetadataMapWrapper::luaSet(lua_State* state) {
   // so push a copy of the 3rd arg ("value") to the top.
   lua_pushvalue(state, 4);
 
-  ProtobufWkt::Struct value;
+  Protobuf::Struct value;
   (*value.mutable_fields())[key] = Filters::Common::Lua::MetadataMapHelper::loadValue(state);
   streamInfo().setDynamicMetadata(filter_name, value);
 
@@ -359,6 +385,114 @@ int PublicKeyWrapper::luaGet(lua_State* state) {
     lua_pushnil(state);
   } else {
     lua_pushlstring(state, public_key_.data(), public_key_.size());
+  }
+  return 1;
+}
+
+StreamInfo::StreamInfo& FilterStateWrapper::streamInfo() { return parent_.stream_info_; }
+
+int FilterStateWrapper::luaGet(lua_State* state) {
+  const char* object_name = luaL_checkstring(state, 2);
+  const StreamInfo::FilterStateSharedPtr filter_state = streamInfo().filterState();
+
+  // Check if filter state exists.
+  if (filter_state == nullptr) {
+    return 0; // Return nil if filter state is null.
+  }
+
+  // Get the filter state object by name.
+  const StreamInfo::FilterState::Object* object = filter_state->getDataReadOnlyGeneric(object_name);
+  if (object == nullptr) {
+    return 0; // Return nil if object not found.
+  }
+
+  // Check if there's an optional third parameter for field access.
+  if (lua_gettop(state) >= 3 && !lua_isnil(state, 3)) {
+    const char* field_name = luaL_checkstring(state, 3);
+    if (object->hasFieldSupport()) {
+      auto field_value = object->getField(field_name);
+
+      // Convert the field value to the appropriate Lua type.
+      if (absl::holds_alternative<absl::string_view>(field_value)) {
+        const auto& str_value = absl::get<absl::string_view>(field_value);
+        lua_pushlstring(state, str_value.data(), str_value.size());
+        return 1;
+      }
+
+      if (absl::holds_alternative<int64_t>(field_value)) {
+        lua_pushnumber(state, absl::get<int64_t>(field_value));
+        return 1;
+      }
+
+      // Return nil if field is not found.
+      return 0;
+    }
+
+    // Object doesn't support field access, return nil.
+    return 0;
+  }
+
+  absl::optional<std::string> string_value = object->serializeAsString();
+  if (string_value.has_value()) {
+    const std::string& value = string_value.value();
+
+    // Return the filter state value as a string.
+    lua_pushlstring(state, value.data(), value.size());
+    return 1;
+  }
+
+  // If string serialization is not supported, return nil.
+  return 0;
+}
+
+const Protobuf::Struct& VirtualHostWrapper::getMetadata() const {
+  const auto& virtual_host = stream_info_.virtualHost();
+  if (virtual_host == nullptr) {
+    return Protobuf::Struct::default_instance();
+  }
+
+  const auto& metadata = virtual_host->metadata();
+  auto filter_it = metadata.filter_metadata().find(filter_config_name_);
+
+  if (filter_it != metadata.filter_metadata().end()) {
+    return filter_it->second;
+  }
+
+  return Protobuf::Struct::default_instance();
+}
+
+int VirtualHostWrapper::luaMetadata(lua_State* state) {
+  if (metadata_wrapper_.get() != nullptr) {
+    metadata_wrapper_.pushStack();
+  } else {
+    metadata_wrapper_.reset(Filters::Common::Lua::MetadataMapWrapper::create(state, getMetadata()),
+                            true);
+  }
+  return 1;
+}
+
+const Protobuf::Struct& RouteWrapper::getMetadata() const {
+  const auto& route = stream_info_.route();
+  if (route == nullptr) {
+    return Protobuf::Struct::default_instance();
+  }
+
+  const auto& metadata = route->metadata();
+  auto filter_it = metadata.filter_metadata().find(filter_config_name_);
+
+  if (filter_it != metadata.filter_metadata().end()) {
+    return filter_it->second;
+  }
+
+  return Protobuf::Struct::default_instance();
+}
+
+int RouteWrapper::luaMetadata(lua_State* state) {
+  if (metadata_wrapper_.get() != nullptr) {
+    metadata_wrapper_.pushStack();
+  } else {
+    metadata_wrapper_.reset(Filters::Common::Lua::MetadataMapWrapper::create(state, getMetadata()),
+                            true);
   }
   return 1;
 }

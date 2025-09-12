@@ -10,8 +10,7 @@ namespace Envoy {
 
 namespace Server {
 namespace Configuration {
-class GenericFactoryContext;
-using TransportSocketFactoryContext = GenericFactoryContext;
+class ServerFactoryContext;
 } // namespace Configuration
 } // namespace Server
 
@@ -106,10 +105,11 @@ public:
    * secret provider.
    * @return TlsCertificateConfigProviderSharedPtr the dynamic TLS secret provider.
    */
-  virtual TlsCertificateConfigProviderSharedPtr findOrCreateTlsCertificateProvider(
-      const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
-      Init::Manager& init_manager) PURE;
+  virtual TlsCertificateConfigProviderSharedPtr
+  findOrCreateTlsCertificateProvider(const envoy::config::core::v3::ConfigSource& config_source,
+                                     const std::string& config_name,
+                                     Server::Configuration::ServerFactoryContext& server_context,
+                                     Init::Manager& init_manager) PURE;
 
   /**
    * Finds and returns a dynamic secret provider associated to SDS config. Create
@@ -125,7 +125,7 @@ public:
   virtual CertificateValidationContextConfigProviderSharedPtr
   findOrCreateCertificateValidationContextProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      Server::Configuration::ServerFactoryContext& server_context,
       Init::Manager& init_manager) PURE;
 
   /**
@@ -142,7 +142,7 @@ public:
   virtual TlsSessionTicketKeysConfigProviderSharedPtr
   findOrCreateTlsSessionTicketKeysContextProvider(
       const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
+      Server::Configuration::ServerFactoryContext& server_context,
       Init::Manager& init_manager) PURE;
 
   /**
@@ -155,10 +155,11 @@ public:
    * secret provider.
    * @return GenericSecretConfigProviderSharedPtr the dynamic generic secret provider.
    */
-  virtual GenericSecretConfigProviderSharedPtr findOrCreateGenericSecretProvider(
-      const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
-      Server::Configuration::TransportSocketFactoryContext& secret_provider_context,
-      Init::Manager& init_manager) PURE;
+  virtual GenericSecretConfigProviderSharedPtr
+  findOrCreateGenericSecretProvider(const envoy::config::core::v3::ConfigSource& config_source,
+                                    const std::string& config_name,
+                                    Server::Configuration::ServerFactoryContext& server_context,
+                                    Init::Manager& init_manager) PURE;
 };
 
 using SecretManagerPtr = std::unique_ptr<SecretManager>;

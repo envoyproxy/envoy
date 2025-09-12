@@ -65,14 +65,26 @@ ValidationInstance::ValidationInstance(
       grpc_context_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
       router_context_(stats_store_.symbolTable()), time_system_(time_system),
       server_contexts_(*this), quic_stat_names_(stats_store_.symbolTable()) {
+
+  // Register the server factory context on the main thread.
+  Configuration::ServerFactoryContextInstance::initialize(&server_contexts_);
+
   TRY_ASSERT_MAIN_THREAD { initialize(options, local_address, component_factory); }
   END_TRY
   catch (const EnvoyException& e) {
     ENVOY_LOG(critical, "error initializing configuration '{}': {}", options.configPath(),
               e.what());
     shutdown();
+
+    // Clear the server factory context on the main thread.
+    Configuration::ServerFactoryContextInstance::clear();
     throw;
   }
+}
+
+ValidationInstance::~ValidationInstance() {
+  // Clear the server factory context on the main thread.
+  Configuration::ServerFactoryContextInstance::clear();
 }
 
 void ValidationInstance::initialize(const Options& options,
@@ -145,13 +157,12 @@ void ValidationInstance::initialize(const Options& options,
           serverFactoryContext(), messageValidationContext().staticValidationVisitor(),
           thread_local_);
 
-  xds_manager_ = std::make_unique<Config::XdsManagerImpl>(*dispatcher_, *api_, *local_info_,
-                                                          validation_context_, *this);
+  xds_manager_ = std::make_unique<Config::XdsManagerImpl>(*dispatcher_, *api_, stats_store_,
+                                                          *local_info_, validation_context_, *this);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
-      server_contexts_, stats(), threadLocal(), http_context_,
-      [this]() -> Network::DnsResolverSharedPtr { return this->dnsResolver(); },
-      sslContextManager(), *secret_manager_, quic_stat_names_, *this);
+      server_contexts_, [this]() -> Network::DnsResolverSharedPtr { return this->dnsResolver(); },
+      quic_stat_names_);
   THROW_IF_NOT_OK(config_.initialize(bootstrap_, *this, *cluster_manager_factory_));
   THROW_IF_NOT_OK(runtime().initialize(clusterManager()));
   clusterManager().setInitializedCb([this]() -> void { init_manager_.initialize(init_watcher_); });

@@ -831,7 +831,7 @@ void ConnectionManager::ActiveRpc::recordResponseAccessLog(
 
 void ConnectionManager::ActiveRpc::recordResponseAccessLog(const std::string& message_type,
                                                            const std::string& reply_type) {
-  ProtobufWkt::Struct stats_obj;
+  Protobuf::Struct stats_obj;
   auto& fields_map = *stats_obj.mutable_fields();
   auto& response_fields_map = *fields_map["response"].mutable_struct_value()->mutable_fields();
 
@@ -880,18 +880,26 @@ FilterStatus ConnectionManager::ActiveRpc::messageBegin(MessageMetadataSharedPtr
       metadata->hasFrameSize() ? static_cast<int32_t>(metadata->frameSize()) : -1;
 
   if (error.has_value()) {
-    parent_.stats_.request_internal_error_.inc();
-    std::ostringstream oss;
-    parent_.read_callbacks_->connection().dumpState(oss, 0);
-    ENVOY_STREAM_LOG(error,
-                     "Catch exception: {}. Request seq_id: {}, method: {}, frame size: {}, cluster "
-                     "name: {}, downstream connection state {}, headers:\n{}",
-                     *this, error.value(), metadata_->sequenceId(), method, frame_size,
-                     cluster_name, oss.str(), metadata->requestHeaders());
+    // If downstream connection is closing, we won't be able to proxy and expect this exception.
+    // In this case, just propagate the error and do *not* increase the internal error counter.
+    if (parent_.read_callbacks_->connection().state() == Network::Connection::State::Closing) {
+      ENVOY_CONN_LOG(debug, "thrift: downstream connection closing, not proxying",
+                     parent_.read_callbacks_->connection());
+    } else {
+      parent_.stats_.request_internal_error_.inc();
+      std::ostringstream oss;
+      parent_.read_callbacks_->connection().dumpState(oss, 0);
+      ENVOY_STREAM_LOG(
+          error,
+          "Catch exception: {}. Request seq_id: {}, method: {}, frame size: {}, cluster "
+          "name: {}, downstream connection state {}, headers:\n{}",
+          *this, error.value(), metadata_->sequenceId(), method, frame_size, cluster_name,
+          oss.str(), metadata->requestHeaders());
+    }
     throw EnvoyException(error.value());
   }
 
-  ProtobufWkt::Struct stats_obj;
+  Protobuf::Struct stats_obj;
   auto& fields_map = *stats_obj.mutable_fields();
   fields_map["cluster"] = ValueUtil::stringValue(cluster_name);
   fields_map["method"] = ValueUtil::stringValue(method);

@@ -54,7 +54,7 @@ GlobalRateLimitClientImpl::GlobalRateLimitClientImpl(
     Envoy::ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_tls,
     Envoy::Event::Dispatcher& main_dispatcher)
     : domain_name_(domain_name),
-      aync_client_(getOrThrow(
+      async_client_(getOrThrow(
           context.serverFactoryContext()
               .clusterManager()
               .grpcAsyncClientManager()
@@ -62,6 +62,8 @@ GlobalRateLimitClientImpl::GlobalRateLimitClientImpl(
       buckets_tls_(buckets_tls), send_reports_interval_(send_reports_interval),
       time_source_(context.serverFactoryContext().mainThreadDispatcher().timeSource()),
       main_dispatcher_(main_dispatcher) {}
+
+void GlobalRateLimitClientImpl::deleteIsPending() { async_client_.reset(); }
 
 void getUsageFromBucket(const CachedBucket& cached_bucket, TimeSource& time_source,
                         BucketQuotaUsage& usage) {
@@ -251,7 +253,6 @@ createTokenBucketFromAction(const RateLimitStrategy& strategy, TimeSource& time_
                                 ? max_tokens * (existing_token_bucket->remainingTokens() /
                                                 existing_token_bucket->maxTokens())
                                 : max_tokens;
-
   return std::make_shared<AtomicTokenBucketImpl>(max_tokens, time_source, fill_rate_per_sec,
                                                  initial_tokens);
 }
@@ -378,10 +379,10 @@ bool GlobalRateLimitClientImpl::startStreamImpl() {
   // Starts stream if it has not been opened yet.
   if (stream_ == nullptr) {
     ENVOY_LOG(debug, "Trying to start the new gRPC stream");
-    stream_ = aync_client_.start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-                                     "envoy.service.rate_limit_quota.v3.RateLimitQuotaService."
-                                     "StreamRateLimitQuotas"),
-                                 *this, Http::AsyncClient::RequestOptions());
+    stream_ = async_client_.start(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+                                      "envoy.service.rate_limit_quota.v3.RateLimitQuotaService."
+                                      "StreamRateLimitQuotas"),
+                                  *this, Http::AsyncClient::RequestOptions());
   }
   // Returns error status if start failed (i.e., stream_ is nullptr).
   return (stream_ != nullptr);

@@ -250,6 +250,7 @@ public:
     return *stream_info_;
   }
   AccessLog::InstanceSharedPtrVector accessLogHandlers() override { return access_log_handlers_; }
+  Http::RequestDecoderHandlePtr getRequestDecoderHandle() override;
 
   // Http::StreamCallbacks
   void onResetStream(Http::StreamResetReason reason,
@@ -300,6 +301,15 @@ protected:
   FakeHttpConnection& parent_;
 
 private:
+  class FakeStreamRequestDecoderHandle : public Http::RequestDecoderHandle {
+  public:
+    explicit FakeStreamRequestDecoderHandle(FakeStream& stream) : stream_(stream) {}
+    OptRef<RequestDecoder> get() override { return stream_; }
+
+  private:
+    FakeStream& stream_;
+  };
+
   Http::ResponseEncoder& encoder_;
   // See the comment for headers_ above that explains why we need both headers_ and
   // client_headers_.

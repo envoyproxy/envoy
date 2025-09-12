@@ -9,8 +9,10 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "source/common/common/logger.h"
+#include "source/extensions/filters/listener/tls_inspector/ja4_fingerprint.h"
 
 #include "openssl/ssl.h"
+#include "openssl/ssl3.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -45,6 +47,7 @@ enum class ParseState {
   // Parser reports unrecoverable error.
   Error
 };
+
 /**
  * Global configuration for TLS inspector.
  */
@@ -57,10 +60,14 @@ public:
   const TlsInspectorStats& stats() const { return stats_; }
   bssl::UniquePtr<SSL> newSsl();
   bool enableJA3Fingerprinting() const { return enable_ja3_fingerprinting_; }
+  bool enableJA4Fingerprinting() const { return enable_ja4_fingerprinting_; }
   uint32_t maxClientHelloSize() const { return max_client_hello_size_; }
   uint32_t initialReadBufferSize() const { return initial_read_buffer_size_; }
 
-  static constexpr size_t TLS_MAX_CLIENT_HELLO = 64 * 1024;
+  // This is the maximum size of a ClientHello that boring ssl will accept.
+  // Here is the check in boring ssl:
+  // https://github.com/google/boringssl/blob/56383dabf472100181226cd14249f04c69a0c10b/ssl/tls_record.cc#L133
+  static constexpr size_t TLS_MAX_CLIENT_HELLO = SSL3_RT_MAX_PLAIN_LENGTH;
   static const unsigned TLS_MIN_SUPPORTED_VERSION;
   static const unsigned TLS_MAX_SUPPORTED_VERSION;
 
@@ -68,6 +75,7 @@ private:
   TlsInspectorStats stats_;
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
   const bool enable_ja3_fingerprinting_;
+  const bool enable_ja4_fingerprinting_;
   const uint32_t max_client_hello_size_;
   const uint32_t initial_read_buffer_size_;
 };
@@ -86,13 +94,20 @@ public:
   Network::FilterStatus onData(Network::ListenerFilterBuffer& buffer) override;
   size_t maxReadBytes() const override { return requested_read_bytes_; }
 
+  static const std::string& dynamicMetadataKey();
+  static const std::string& failureReasonKey();
+  static const std::string& failureReasonClientHelloTooLarge();
+  static const std::string& failureReasonClientHelloNotDetected();
+
 private:
   ParseState parseClientHello(const void* data, size_t len, uint64_t bytes_already_processed);
   ParseState onRead();
   void onALPN(const unsigned char* data, unsigned int len);
   void onServername(absl::string_view name);
   void createJA3Hash(const SSL_CLIENT_HELLO* ssl_client_hello);
+  void createJA4Hash(const SSL_CLIENT_HELLO* ssl_client_hello);
   uint32_t maxConfigReadBytes() const { return config_->maxClientHelloSize(); }
+  void setDynamicMetadata(absl::string_view failure_reason);
 
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_{};

@@ -86,11 +86,11 @@ TEST_F(MutationUtilsTest, TestApplyMutations) {
   s->mutable_header()->set_key("x-replace-this");
   s->mutable_header()->set_raw_value("no");
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key(":status");
   s->mutable_header()->set_raw_value("418");
-  // Default of "append" is "false" and mutations
-  // are applied in order.
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key("x-replace-this");
   s->mutable_header()->set_raw_value("nope");
   // Incomplete structures should be ignored
@@ -107,30 +107,38 @@ TEST_F(MutationUtilsTest, TestApplyMutations) {
   // Attempts to set method, host, authority, and x-envoy headers
   // should be ignored until we explicitly allow them.
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key("host");
   s->mutable_header()->set_raw_value("invalid:123");
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key("Host");
   s->mutable_header()->set_raw_value("invalid:456");
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key(":authority");
   s->mutable_header()->set_raw_value("invalid:789");
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key(":method");
   s->mutable_header()->set_raw_value("PATCH");
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key(":scheme");
   s->mutable_header()->set_raw_value("http");
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key("X-Envoy-StrangeThing");
   s->mutable_header()->set_raw_value("Yes");
 
   // Attempts to set the status header out of range should
   // also be ignored.
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key(":status");
   s->mutable_header()->set_raw_value("This is not even an integer");
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key(":status");
   s->mutable_header()->set_raw_value("100");
 
@@ -169,6 +177,7 @@ TEST_F(MutationUtilsTest, TestNonAppendableHeaders) {
   s->mutable_header()->set_key(":path");
   s->mutable_header()->set_raw_value("/foo");
   s = mutation.add_set_headers();
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key(":status");
   s->mutable_header()->set_raw_value("400");
   // These two should be ignored since we ignore attempts
@@ -207,6 +216,7 @@ TEST_F(MutationUtilsTest, TestSetHeaderWithInvalidCharacter) {
   envoy::service::ext_proc::v3::HeaderMutation mutation;
   auto* s = mutation.add_set_headers();
   // Test header key contains invalid character.
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key("x-append-this\n");
   s->mutable_header()->set_raw_value("value");
   EXPECT_CALL(rejections, inc());
@@ -216,6 +226,7 @@ TEST_F(MutationUtilsTest, TestSetHeaderWithInvalidCharacter) {
   mutation.Clear();
   s = mutation.add_set_headers();
   // Test header value contains invalid character.
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key("x-append-this");
   s->mutable_header()->set_raw_value("value\r");
   EXPECT_CALL(rejections, inc());
@@ -236,6 +247,7 @@ TEST_F(MutationUtilsTest, TestSetHeaderWithContentLength) {
   envoy::service::ext_proc::v3::HeaderMutation mutation;
   auto* s = mutation.add_set_headers();
   // Test header key contains content_length.
+  s->mutable_append()->set_value(false);
   s->mutable_header()->set_key("content-length");
   s->mutable_header()->set_raw_value("10");
 

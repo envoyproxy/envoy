@@ -41,6 +41,12 @@ cc_library(
 
 envoy_cmake(
     name = "build",
+    build_args = select({
+        "//bazel/foreign_cc:parallel_builds_enabled": ["-j"],
+        "//bazel:engflow_rbe_x86_64": ["-j"],
+        "//bazel:engflow_rbe_aarch64": ["-j1"],
+        "//conditions:default": ["-j1"],
+    }),
     build_data = [requirement("ply")],
     cache_entries = {
         "CMAKE_BUILD_TYPE": "Release",
@@ -56,6 +62,19 @@ envoy_cmake(
     env = {
         "PLYPATHS": "$(locations %s)" % requirement("ply"),
     },
+    exec_properties = select({
+        "//bazel:engflow_rbe_x86_64": {
+            "Pool": "linux_x64_large",
+        },
+        "//bazel:engflow_rbe_aarch64": {
+            "Pool": "linux_arm64_small",
+        },
+        "//conditions:default": {},
+    }),
+    generate_args = [
+        "-G",
+        "Ninja",
+    ],
     lib_source = "@com_github_fdio_vpp_vcl//:all",
     linkopts = ["-Wno-unused-variable"],
     out_static_libs = [

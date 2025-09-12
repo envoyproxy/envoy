@@ -30,6 +30,13 @@ public:
     ASSERT(reinterpret_cast<uintptr_t>(value_.data()) % alignof(void*) == 0);
   }
 
+  SocketOptionImpl(Network::SocketOptionName optname, absl::string_view value,
+                   absl::optional<Network::Socket::Type> socket_type = absl::nullopt)
+      : in_state_(absl::nullopt), optname_(optname), value_(value.begin(), value.end()),
+        socket_type_(socket_type) {
+    ASSERT(reinterpret_cast<uintptr_t>(value_.data()) % alignof(void*) == 0);
+  }
+
   // Socket::Option
   bool setOption(Socket& socket,
                  envoy::config::core::v3::SocketOption::SocketState state) const override;
@@ -61,7 +68,9 @@ public:
                                                const void* value, size_t size);
 
 private:
-  const envoy::config::core::v3::SocketOption::SocketState in_state_;
+  // The state this option expects the socket to be in when it is applied. If the state is not set,
+  // then this option will be applied in any state.
+  absl::optional<const envoy::config::core::v3::SocketOption::SocketState> in_state_;
   const Network::SocketOptionName optname_;
   // The vector's data() is used by the setsockopt syscall, which needs to be int-size-aligned on
   // some platforms, the AlignedAllocator here makes it pointer-size-aligned, which satisfies the

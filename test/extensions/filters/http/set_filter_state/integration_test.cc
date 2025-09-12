@@ -1,5 +1,7 @@
 #include <memory>
 
+#include "envoy/network/address.h"
+
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/router/string_accessor_impl.h"
 #include "source/extensions/filters/http/set_filter_state/config.h"
@@ -168,6 +170,23 @@ TEST_F(SetMetadataIntegrationTest, RouteLevel) {
   ASSERT_NE(nullptr, route);
   // Only set on route
   EXPECT_EQ(route->serializeAsString(), "route");
+}
+
+TEST_F(SetMetadataIntegrationTest, FromHeaderIpAddress) {
+  headers_ = Http::TestRequestHeaderMapImpl{{"client-ip", "127.0.0.1"}};
+  const std::string yaml_config = R"EOF(
+  on_request_headers:
+  - object_key: envoy.client.ip
+    factory_key: envoy.network.ip
+    format_string:
+      text_format_source:
+        inline_string: "%REQ(client-ip)%"
+  )EOF";
+  runFilter(yaml_config);
+  const auto* ip_address =
+      info_.filterState()->getDataReadOnly<Network::Address::InstanceAccessor>("envoy.client.ip");
+  ASSERT_NE(nullptr, ip_address);
+  EXPECT_EQ(ip_address->serializeAsString(), "127.0.0.1:0");
 }
 
 } // namespace SetFilterState

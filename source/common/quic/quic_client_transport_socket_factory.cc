@@ -89,10 +89,6 @@ std::shared_ptr<quic::QuicCryptoClientConfig> QuicClientTransportSocketFactory::
         std::make_unique<Quic::EnvoyQuicProofVerifier>(std::move(context), accept_untrusted),
         std::make_unique<quic::QuicClientSessionCache>());
 
-    if (Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.quic_disable_client_early_data")) {
-      tls_config.crypto_config_->ssl_config().early_data_enabled = false;
-    }
     CertCompression::registerSslContext(tls_config.crypto_config_->ssl_ctx());
   }
   // Return the latest crypto config.

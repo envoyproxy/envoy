@@ -126,7 +126,7 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   // Send a complete request on the second connection.
   auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
-  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "1"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader(Http::Headers::get().EarlyData, "1"));
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response2->waitForEndStream());
   // Ensure 0-RTT was used by second connection.
@@ -157,7 +157,7 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
                                          /*wait_for_1rtt_key*/ false);
   auto response3 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest(0);
-  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "1"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader(Http::Headers::get().EarlyData, "1"));
   upstream_request_->encodeHeaders(too_early_response_headers, true);
   ASSERT_TRUE(response3->waitForEndStream());
   // This is downstream sending early data, so the 425 response should be forwarded back to the
@@ -177,7 +177,7 @@ TEST_P(QuicHttpIntegrationTest, ZeroRtt) {
   waitForNextUpstreamRequest(0);
   // If the request already has Early-Data header, no additional Early-Data header should be added
   // and the header should be forwarded as is.
-  EXPECT_THAT(upstream_request_->headers(), HeaderValueOf(Http::Headers::get().EarlyData, "2"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader(Http::Headers::get().EarlyData, "2"));
   upstream_request_->encodeHeaders(too_early_response_headers, true);
   ASSERT_TRUE(response4->waitForEndStream());
   // 425 response should be forwarded back to the client.
@@ -214,45 +214,6 @@ TEST_P(QuicHttpIntegrationTest, EarlyDataDisabled) {
       static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
   EXPECT_TRUE(quic_session->IsResumption());
   EXPECT_FALSE(quic_session->EarlyDataAccepted());
-  // Close the second connection.
-  codec_client_->close();
-}
-
-// Envoy Mobile does not have listeners, so the above test is not applicable.
-// This test ensures that a mobile client can connect when early data is disabled on the QUICHE
-// layer.
-TEST_P(QuicHttpIntegrationTest, ClientEarlyDataDisabled) {
-  config_helper_.addRuntimeOverride("envoy.reloadable_features.quic_disable_client_early_data",
-                                    "true");
-  // Make sure all connections use the same PersistentQuicInfoImpl.
-  concurrency_ = 1;
-  initialize();
-  // Start the first connection.
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  EXPECT_EQ(transport_socket_factory_->clientContextConfig()->serverNameIndication(),
-            codec_client_->connection()->requestedServerName());
-  // Send a complete request on the first connection.
-  auto response1 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest(0);
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response1->waitForEndStream());
-  // Close the first connection.
-  codec_client_->close();
-
-  // Start a second connection.
-  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
-  // Send a complete request on the second connection.
-  auto response2 = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest(0);
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response2->waitForEndStream());
-  // Ensure the 2nd connection is using resumption ticket but doesn't accept early data.
-  EnvoyQuicClientSession* quic_session =
-      static_cast<EnvoyQuicClientSession*>(codec_client_->connection());
-  EXPECT_TRUE(quic_session->IsResumption());
-  EXPECT_FALSE(quic_session->EarlyDataAccepted());
-  EXPECT_TRUE(upstream_request_->headers().get(Http::Headers::get().EarlyData).empty());
-
   // Close the second connection.
   codec_client_->close();
 }
@@ -348,7 +309,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   Network::Address::InstanceConstSharedPtr local_addr =
       Network::Test::getCanonicalLoopbackAddress(version_);
   quic_connection_->switchConnectionSocket(
-      createConnectionSocket(server_addr_, local_addr, nullptr, /*prefer_gro=*/true));
+      createConnectionSocket(server_addr_, local_addr, nullptr));
   EXPECT_NE(old_port, local_addr->ip()->port());
   // Send the rest data.
   codec_client_->sendData(*request_encoder_, 1024u, true);
@@ -379,7 +340,7 @@ TEST_P(QuicHttpIntegrationTest, PortMigration) {
   auto options = std::make_shared<Network::Socket::Options>();
   options->push_back(option);
   quic_connection_->switchConnectionSocket(
-      createConnectionSocket(server_addr_, local_addr, options, /*prefer_gro=*/true));
+      createConnectionSocket(server_addr_, local_addr, options));
   EXPECT_TRUE(codec_client_->disconnected());
   cleanupUpstreamAndDownstream();
 }
@@ -546,6 +507,24 @@ TEST_P(QuicHttpIntegrationTest, ResetRequestWithoutAuthorityHeader) {
 
   ASSERT_TRUE(response->waitForReset());
   ASSERT_FALSE(response->complete());
+  codec_client_->close();
+}
+
+// Test to ensure code coverage of the flag codepath.
+TEST_P(QuicHttpIntegrationTest, DoNotValidatePseudoHeaders) {
+  config_helper_.addRuntimeOverride("envoy.restart_features.validate_http3_pseudo_headers",
+                                    "false");
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  EXPECT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
   codec_client_->close();
 }
 
@@ -1006,7 +985,8 @@ TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithQuicReset) {
   EXPECT_EQ(/* request headers */ metrics.at(19), metrics.at(20));
 }
 
-TEST_P(QuicHttpIntegrationTest, DeferredLoggingWithEnvoyReset) {
+// TODO(RyanTheOptimist): Re-enable after figuring out how to cause this reset.
+TEST_P(QuicHttpIntegrationTest, DISABLED_DeferredLoggingWithEnvoyReset) {
   config_helper_.addRuntimeOverride(
       "envoy.reloadable_features.FLAGS_envoy_quiche_reloadable_flag_quic_act_upon_invalid_header",
       "false");
@@ -1231,7 +1211,7 @@ TEST_P(QuicHttpIntegrationTest, DisableQpack) {
   auto response = codec_client_->makeHeaderOnlyRequest(headers);
   waitForNextUpstreamRequest(0);
   // Cookie crumbling is disabled along with QPACK.
-  EXPECT_THAT(upstream_request_->headers(), HeaderHasValueRef("cookie", "x;y"));
+  EXPECT_THAT(upstream_request_->headers(), ContainsHeader("cookie", "x;y"));
   upstream_request_->encodeHeaders(default_response_headers_, true);
   ASSERT_TRUE(response->waitForEndStream());
   codec_client_->close();

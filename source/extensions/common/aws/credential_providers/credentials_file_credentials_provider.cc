@@ -1,5 +1,9 @@
 #include "source/extensions/common/aws/credential_providers/credentials_file_credentials_provider.h"
 
+#include "envoy/server/factory_context.h"
+
+#include "source/extensions/common/aws/utility.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -65,7 +69,7 @@ void CredentialsFileCredentialsProvider::refresh() {
   }
   ENVOY_LOG(debug, "Credentials file path = {}, profile name = {}", credential_file_path, profile);
 
-  extractCredentials(credential_file_data.data(), profile);
+  extractCredentials(credential_file_data, profile);
 }
 
 void CredentialsFileCredentialsProvider::extractCredentials(absl::string_view credentials_string,

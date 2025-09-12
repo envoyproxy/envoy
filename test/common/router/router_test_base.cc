@@ -17,11 +17,11 @@ RouterTestBase::RouterTestBase(bool start_child_span, bool suppress_envoy_header
     : pool_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
       router_context_(stats_store_.symbolTable()), shadow_writer_(new MockShadowWriter()),
       config_(std::make_shared<FilterConfig>(
-          factory_context_, pool_.add("test"), factory_context_.local_info_,
-          *stats_store_.rootScope(), cm_, runtime_, random_, ShadowWriterPtr{shadow_writer_}, true,
-          start_child_span, suppress_envoy_headers, false, suppress_grpc_request_failure_code_stats,
-          flush_upstream_log_on_upstream_stream, std::move(strict_headers_to_check),
-          test_time_.timeSystem(), http_context_, router_context_)),
+          factory_context_, pool_.add("test"), *stats_store_.rootScope(), cm_, runtime_, random_,
+          ShadowWriterPtr{shadow_writer_}, true, start_child_span, suppress_envoy_headers, false,
+          suppress_grpc_request_failure_code_stats, flush_upstream_log_on_upstream_stream,
+          std::move(strict_headers_to_check), test_time_.timeSystem(), http_context_,
+          router_context_)),
       router_(std::make_unique<RouterTestFilter>(config_, config_->default_stats_)) {
   router_->setDecoderFilterCallbacks(callbacks_);
   upstream_locality_.set_zone("to_az");
@@ -88,8 +88,8 @@ AssertionResult RouterTestBase::verifyHostUpstreamStats(uint64_t success, uint64
 }
 
 void RouterTestBase::verifyMetadataMatchCriteriaFromRequest(bool route_entry_has_match) {
-  ProtobufWkt::Struct request_struct, route_struct;
-  ProtobufWkt::Value val;
+  Protobuf::Struct request_struct, route_struct;
+  Protobuf::Value val;
 
   // Populate metadata like StreamInfo.setDynamicMetadata() would.
   auto& fields_map = *request_struct.mutable_fields();
@@ -177,9 +177,9 @@ void RouterTestBase::verifyAttemptCountInRequestBasic(bool set_include_attempt_c
   router_->onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
   EXPECT_EQ(0U,
-            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
   EXPECT_EQ(0U,
-            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
 }
 
 void RouterTestBase::verifyAttemptCountInResponseBasic(bool set_include_attempt_count_in_response,
@@ -203,7 +203,7 @@ void RouterTestBase::verifyAttemptCountInResponseBasic(bool set_include_attempt_
   }
 
   EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putHttpResponseCode(200));
+              putResult(_, absl::optional<uint64_t>(200)));
   EXPECT_CALL(callbacks_, encodeHeaders_(_, true))
       .WillOnce(Invoke([expected_count](Http::ResponseHeaderMap& headers, bool) {
         EXPECT_EQ(expected_count, atoi(std::string(headers.getEnvoyAttemptCountValue()).c_str()));
@@ -212,7 +212,7 @@ void RouterTestBase::verifyAttemptCountInResponseBasic(bool set_include_attempt_
   response_decoder->decodeHeaders(std::move(response_headers), true);
   EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
   EXPECT_EQ(1U,
-            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
+            callbacks_.route_->virtual_host_->virtual_cluster_.stats().upstream_rq_total_.value());
 }
 
 void RouterTestBase::sendRequest(bool end_stream) {
@@ -271,127 +271,6 @@ void RouterTestBase::enableHedgeOnPerTryTimeout() {
   callbacks_.route_->route_entry_.hedge_policy_.additional_request_chance_.set_numerator(0);
   callbacks_.route_->route_entry_.hedge_policy_.additional_request_chance_.set_denominator(
       envoy::type::v3::FractionalPercent::HUNDRED);
-}
-
-// Validate that the cluster is appended to the response when configured.
-void RouterTestBase::testAppendCluster(absl::optional<Http::LowerCaseString> cluster_header_name) {
-  auto debug_config = std::make_unique<DebugConfig>(
-      /* append_cluster */ true,
-      /* cluster_header */ cluster_header_name,
-      /* append_upstream_host */ false,
-      /* hostname_header */ absl::nullopt,
-      /* host_address_header */ absl::nullopt,
-      /* do_not_forward */ false,
-      /* not_forwarded_header */ absl::nullopt);
-  callbacks_.streamInfo().filterState()->setData(DebugConfig::key(), std::move(debug_config),
-                                                 StreamInfo::FilterState::StateType::ReadOnly,
-                                                 StreamInfo::FilterState::LifeSpan::FilterChain);
-
-  NiceMock<Http::MockRequestEncoder> encoder;
-  Http::ResponseDecoder* response_decoder = nullptr;
-  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
-
-  expectResponseTimerCreate();
-
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_->decodeHeaders(headers, true);
-  EXPECT_EQ(1U,
-            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
-
-  Http::ResponseHeaderMapPtr response_headers(
-      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putHttpResponseCode(200));
-  EXPECT_CALL(callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&cluster_header_name](Http::HeaderMap& headers, bool) {
-        const auto cluster_header =
-            headers.get(cluster_header_name.value_or(Http::Headers::get().EnvoyCluster));
-        EXPECT_FALSE(cluster_header.empty());
-        EXPECT_EQ("fake_cluster", cluster_header[0]->value().getStringView());
-      }));
-  ASSERT(response_decoder);
-  response_decoder->decodeHeaders(std::move(response_headers), true);
-  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
-}
-
-// Validate that the upstream hostname and address are appended to the response when configured.
-void RouterTestBase::testAppendUpstreamHost(
-    absl::optional<Http::LowerCaseString> hostname_header_name,
-    absl::optional<Http::LowerCaseString> host_address_header_name) {
-  auto debug_config = std::make_unique<DebugConfig>(
-      /* append_cluster */ false,
-      /* cluster_header */ absl::nullopt,
-      /* append_upstream_host */ true,
-      /* hostname_header */ hostname_header_name,
-      /* host_address_header */ host_address_header_name,
-      /* do_not_forward */ false,
-      /* not_forwarded_header */ absl::nullopt);
-  callbacks_.streamInfo().filterState()->setData(DebugConfig::key(), std::move(debug_config),
-                                                 StreamInfo::FilterState::StateType::ReadOnly,
-                                                 StreamInfo::FilterState::LifeSpan::FilterChain);
-  cm_.thread_local_cluster_.conn_pool_.host_->hostname_ = "scooby.doo";
-
-  NiceMock<Http::MockRequestEncoder> encoder;
-  Http::ResponseDecoder* response_decoder = nullptr;
-  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
-
-  expectResponseTimerCreate();
-
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_->decodeHeaders(headers, true);
-  EXPECT_EQ(1U,
-            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
-
-  Http::ResponseHeaderMapPtr response_headers(
-      new Http::TestResponseHeaderMapImpl{{":status", "200"}});
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_.host_->outlier_detector_,
-              putHttpResponseCode(200));
-  EXPECT_CALL(callbacks_, encodeHeaders_(_, true))
-      .WillOnce(Invoke([&hostname_header_name, &host_address_header_name](Http::HeaderMap& headers,
-                                                                          bool) {
-        const auto hostname_header =
-            headers.get(hostname_header_name.value_or(Http::Headers::get().EnvoyUpstreamHostname));
-        EXPECT_FALSE(hostname_header.empty());
-        EXPECT_EQ("scooby.doo", hostname_header[0]->value().getStringView());
-
-        const auto host_address_header = headers.get(
-            host_address_header_name.value_or(Http::Headers::get().EnvoyUpstreamHostAddress));
-        EXPECT_FALSE(host_address_header.empty());
-        EXPECT_EQ("10.0.0.5:9211", host_address_header[0]->value().getStringView());
-      }));
-  ASSERT(response_decoder);
-  response_decoder->decodeHeaders(std::move(response_headers), true);
-  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
-}
-
-// Validate that the request is not forwarded upstream when configured.
-void RouterTestBase::testDoNotForward(
-    absl::optional<Http::LowerCaseString> not_forwarded_header_name) {
-  auto debug_config = std::make_unique<DebugConfig>(
-      /* append_cluster */ false,
-      /* cluster_header */ absl::nullopt,
-      /* append_upstream_host */ false,
-      /* hostname_header */ absl::nullopt,
-      /* host_address_header */ absl::nullopt,
-      /* do_not_forward */ true,
-      /* not_forwarded_header */ not_forwarded_header_name);
-  callbacks_.streamInfo().filterState()->setData(DebugConfig::key(), std::move(debug_config),
-                                                 StreamInfo::FilterState::StateType::ReadOnly,
-                                                 StreamInfo::FilterState::LifeSpan::FilterChain);
-
-  Http::TestResponseHeaderMapImpl response_headers{
-      {":status", "204"},
-      {not_forwarded_header_name.value_or(Http::Headers::get().EnvoyNotForwarded).get(), "true"}};
-  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), true));
-
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_->decodeHeaders(headers, true);
-  EXPECT_EQ(0U,
-            callbacks_.route_->virtual_host_.virtual_cluster_.stats().upstream_rq_total_.value());
-  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
 }
 
 void RouterTestBase::expectNewStreamWithImmediateEncoder(Http::RequestEncoder& encoder,

@@ -14,8 +14,10 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/fil
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Header mutation filter configuration]
+// Mutate HTTP headers and trailers in requests and responses.
 // [#extension: envoy.filters.http.header_mutation]
 
+// [#next-free-field: 6]
 message Mutations {
   // The request mutations are applied before the request is forwarded to the upstream cluster.
   repeated config.common.mutation_rules.v3.HeaderMutation request_mutations = 1;
@@ -26,6 +28,12 @@ message Mutations {
 
   // The response mutations are applied before the response is sent to the downstream client.
   repeated config.common.mutation_rules.v3.HeaderMutation response_mutations = 2;
+
+  // The response trailer mutations are applied before the response is sent to the downstream client.
+  repeated config.common.mutation_rules.v3.HeaderMutation response_trailers_mutations = 4;
+
+  // The request trailer mutations are applied before the request is sent to the upstream cluster.
+  repeated config.common.mutation_rules.v3.HeaderMutation request_trailers_mutations = 5;
 }
 
 // Per route configuration for the header mutation filter.

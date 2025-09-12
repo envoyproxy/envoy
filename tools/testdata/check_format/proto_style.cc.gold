@@ -1,12 +1,12 @@
 namespace Envoy {
 
-ProtobufWkt::Any any;
-ProtobufWkt::Empty empty;
-ProtobufWkt::ListValue list_value;
-ProtobufWkt::Value value = ProtobufWkt::NULL_VALUE;
-ProtobufWkt::StringValue stringvalue;
-ProtobufWkt::Struct struct;
-ProtobufWkt::Value value;
+Protobuf::Any any;
+Protobuf::Empty empty;
+Protobuf::ListValue list_value;
+Protobuf::Value value = Protobuf::NULL_VALUE;
+Protobuf::StringValue stringvalue;
+Protobuf::Struct struct;
+Protobuf::Value value;
 Protobuf::MapPair mappair;
 Protobuf::Map map;
 Protobuf::MapPair mappair;

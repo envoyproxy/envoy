@@ -50,6 +50,16 @@ Mutations::Mutations(const MutationsProto& config, absl::Status& creation_status
   SET_AND_RETURN_IF_NOT_OK(response_mutations_or_error.status(), creation_status);
   response_mutations_ = std::move(response_mutations_or_error.value());
 
+  auto response_trailers_mutations_or_error =
+      HeaderMutations::create(config.response_trailers_mutations());
+  SET_AND_RETURN_IF_NOT_OK(response_trailers_mutations_or_error.status(), creation_status);
+  response_trailers_mutations_ = std::move(response_trailers_mutations_or_error.value());
+
+  auto request_trailers_mutations_or_error =
+      HeaderMutations::create(config.request_trailers_mutations());
+  SET_AND_RETURN_IF_NOT_OK(request_trailers_mutations_or_error.status(), creation_status);
+  request_trailers_mutations_ = std::move(request_trailers_mutations_or_error.value());
+
   query_query_parameter_mutations_.reserve(config.query_parameter_mutations_size());
   for (const auto& mutation : config.query_parameter_mutations()) {
     if (mutation.has_append()) {
@@ -110,6 +120,18 @@ void Mutations::mutateResponseHeaders(Http::ResponseHeaderMap& headers,
   response_mutations_->evaluateHeaders(headers, context, stream_info);
 }
 
+void Mutations::mutateResponseTrailers(Http::ResponseTrailerMap& trailers,
+                                       const Formatter::HttpFormatterContext& context,
+                                       const StreamInfo::StreamInfo& stream_info) const {
+  response_trailers_mutations_->evaluateHeaders(trailers, context, stream_info);
+}
+
+void Mutations::mutateRequestTrailers(Http::RequestTrailerMap& trailers,
+                                      const Formatter::HttpFormatterContext& context,
+                                      const StreamInfo::StreamInfo& stream_info) const {
+  request_trailers_mutations_->evaluateHeaders(trailers, context, stream_info);
+}
+
 PerRouteHeaderMutation::PerRouteHeaderMutation(const PerRouteProtoConfig& config,
                                                absl::Status& creation_status)
     : mutations_(config.mutations(), creation_status) {}
@@ -145,7 +167,8 @@ void HeaderMutation::maybeInitializeRouteConfigs(Http::StreamFilterCallbacks* ca
 }
 
 Http::FilterHeadersStatus HeaderMutation::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  Formatter::HttpFormatterContext context{&headers};
+  const Formatter::HttpFormatterContext context{&headers, {}, {},
+                                                {},       {}, &decoder_callbacks_->activeSpan()};
   config_->mutations().mutateRequestHeaders(headers, context, decoder_callbacks_->streamInfo());
 
   maybeInitializeRouteConfigs(decoder_callbacks_);
@@ -159,7 +182,9 @@ Http::FilterHeadersStatus HeaderMutation::decodeHeaders(Http::RequestHeaderMap& 
 }
 
 Http::FilterHeadersStatus HeaderMutation::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
-  Formatter::HttpFormatterContext context{encoder_callbacks_->requestHeaders().ptr(), &headers};
+  Formatter::HttpFormatterContext context{
+      encoder_callbacks_->requestHeaders().ptr(), &headers, {}, {}, {},
+      &encoder_callbacks_->activeSpan()};
   config_->mutations().mutateResponseHeaders(headers, context, encoder_callbacks_->streamInfo());
 
   // Note if the filter before this one has send local reply then the decodeHeaders() will not be
@@ -173,6 +198,41 @@ Http::FilterHeadersStatus HeaderMutation::encodeHeaders(Http::ResponseHeaderMap&
   }
 
   return Http::FilterHeadersStatus::Continue;
+}
+
+Http::FilterTrailersStatus HeaderMutation::encodeTrailers(Http::ResponseTrailerMap& trailers) {
+  Formatter::HttpFormatterContext context{encoder_callbacks_->requestHeaders().ptr(),
+                                          encoder_callbacks_->responseHeaders().ptr(),
+                                          &trailers,
+                                          {},
+                                          {},
+                                          &encoder_callbacks_->activeSpan()};
+  config_->mutations().mutateResponseTrailers(trailers, context, encoder_callbacks_->streamInfo());
+
+  maybeInitializeRouteConfigs(encoder_callbacks_);
+
+  for (const PerRouteHeaderMutation& route_config : route_configs_) {
+    route_config.mutations().mutateResponseTrailers(trailers, context,
+                                                    encoder_callbacks_->streamInfo());
+  }
+  return Http::FilterTrailersStatus::Continue;
+}
+
+Http::FilterTrailersStatus HeaderMutation::decodeTrailers(Http::RequestTrailerMap& trailers) {
+  // TODO(davinci26): if `HttpFormatterContext` supports request trailers we can also pass the
+  // trailers to the context so we can support substitutions from other trailers.
+  Formatter::HttpFormatterContext context{
+      decoder_callbacks_->requestHeaders().ptr(), {}, {}, {}, {},
+      &decoder_callbacks_->activeSpan()};
+  config_->mutations().mutateRequestTrailers(trailers, context, decoder_callbacks_->streamInfo());
+
+  maybeInitializeRouteConfigs(decoder_callbacks_);
+
+  for (const PerRouteHeaderMutation& route_config : route_configs_) {
+    route_config.mutations().mutateRequestTrailers(trailers, context,
+                                                   decoder_callbacks_->streamInfo());
+  }
+  return Http::FilterTrailersStatus::Continue;
 }
 
 } // namespace HeaderMutation

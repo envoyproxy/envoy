@@ -4,7 +4,6 @@
 
 #include "test/mocks/server/server_factory_context.h"
 
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::NiceMock;

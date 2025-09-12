@@ -137,7 +137,6 @@ public:
     }
 
     const HttpProtocolTestParams& protocol_test_params = std::get<0>(GetParam());
-    setupHttp1ImplOverrides(protocol_test_params.http1_implementation);
     setupHttp2ImplOverrides(protocol_test_params.http2_implementation);
 
     setServerBufferFactory(buffer_factory_);
@@ -479,7 +478,6 @@ public:
       buffer_factory_ = std::make_shared<Buffer::TrackedWatermarkBufferFactory>();
     }
     const HttpProtocolTestParams& protocol_test_params = std::get<0>(GetParam());
-    setupHttp1ImplOverrides(protocol_test_params.http1_implementation);
     setupHttp2ImplOverrides(protocol_test_params.http2_implementation);
     setServerBufferFactory(buffer_factory_);
     setUpstreamProtocol(protocol_test_params.upstream_protocol);
@@ -1600,7 +1598,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanDumpCrashInformationWhenProces
   initialize();
 
   EXPECT_DEATH(testCrashDumpWhenProcessingBufferedData(),
-               "Crashing as request body over 1000!.*"
+               "(?s)Crashing as request body over 1000!.*"
                "ActiveStream.*Http2::ConnectionImpl.*Dumping current stream.*"
                "ConnectionImpl::StreamImpl.*ConnectionImpl");
 }
@@ -1610,7 +1608,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
   config_helper_.setBufferLimits(1000, 1000);
   initialize();
   EXPECT_DEATH(testCrashDumpWhenProcessingBufferedDataOfDeferredCloseStream(),
-               "Crashing as response body over 1000!.*"
+               "(?s)Crashing as response body over 1000!.*"
                "ActiveStream.*Http2::ConnectionImpl.*Dumping 1 Active Streams.*"
                "ConnectionImpl::StreamImpl.*ConnectionImpl");
 }

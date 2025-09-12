@@ -138,7 +138,7 @@ public:
   class InterfaceMatcher {
   public:
     InterfaceMatcher(const std::string& interface_name);
-    bool match(const absl::string_view interface) const { return impl_(interface); }
+    bool match(absl::string_view interface) const { return impl_(interface); }
 
   private:
     std::function<bool(const absl::string_view)> impl_;

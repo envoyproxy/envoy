@@ -152,6 +152,9 @@ public:
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return {}; }
+  absl::optional<std::chrono::milliseconds> streamFlushTimeout() const override {
+    return std::nullopt;
+  }
   std::chrono::milliseconds requestTimeout() const override { return {}; }
   std::chrono::milliseconds requestHeadersTimeout() const override { return {}; }
   std::chrono::milliseconds delayedCloseTimeout() const override { return {}; }
@@ -220,7 +223,7 @@ public:
   void closeSocket() override;
   void addListenerToHandler(Network::ConnectionHandler* handler) override;
 
-  uint64_t maxRequestsPerConnection() const override { return 0; }
+  uint32_t maxRequestsPerConnection() const override { return 0; }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
@@ -440,6 +443,8 @@ private:
     }
 
     absl::string_view name() const override { return "admin"; }
+
+    bool addedViaApi() const override { return false; }
 
   private:
     const Network::RawBufferSocketFactory transport_socket_factory_;

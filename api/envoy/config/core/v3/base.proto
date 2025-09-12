@@ -266,7 +266,7 @@ message RuntimeUInt32 {
   uint32 default_value = 2;
 
   // Runtime key to get value for comparison. This value is used if defined.
-  string runtime_key = 3 [(validate.rules).string = {min_len: 1}];
+  string runtime_key = 3;
 }
 
 // Runtime derived percentage with a default when not specified.
@@ -275,7 +275,7 @@ message RuntimePercent {
   type.v3.Percent default_value = 1;
 
   // Runtime key to get value for comparison. This value is used if defined.
-  string runtime_key = 2 [(validate.rules).string = {min_len: 1}];
+  string runtime_key = 2;
 }
 
 // Runtime derived double with a default when not specified.
@@ -286,7 +286,7 @@ message RuntimeDouble {
   double default_value = 1;
 
   // Runtime key to get value for comparison. This value is used if defined.
-  string runtime_key = 2 [(validate.rules).string = {min_len: 1}];
+  string runtime_key = 2;
 }
 
 // Runtime derived bool with a default when not specified.
@@ -300,7 +300,7 @@ message RuntimeFeatureFlag {
   // Runtime key to get value for comparison. This value is used if defined. The boolean value must
   // be represented via its
   // `canonical JSON encoding <https://developers.google.com/protocol-buffers/docs/proto3#json>`_.
-  string runtime_key = 2 [(validate.rules).string = {min_len: 1}];
+  string runtime_key = 2;
 }
 
 // Please use :ref:`KeyValuePair <envoy_api_msg_config.core.v3.KeyValuePair>` instead.

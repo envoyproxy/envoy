@@ -76,6 +76,10 @@ void FakeStream::decodeMetadata(Http::MetadataMapPtr&& metadata_map_ptr) {
   }
 }
 
+Http::RequestDecoderHandlePtr FakeStream::getRequestDecoderHandle() {
+  return std::make_unique<FakeStreamRequestDecoderHandle>(*this);
+}
+
 void FakeStream::postToConnectionThread(std::function<void()> cb) {
   parent_.postToConnectionThread(cb);
 }
@@ -403,8 +407,6 @@ FakeHttpConnection::FakeHttpConnection(
   ASSERT(max_request_headers_count != 0);
   if (type == Http::CodecType::HTTP1) {
     Http::Http1Settings http1_settings;
-    http1_settings.use_balsa_parser_ =
-        Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http1_use_balsa_parser");
     // For the purpose of testing, we always have the upstream encode the trailers if any
     http1_settings.enable_trailers_ = true;
     Http::Http1::CodecStats& stats = fake_upstream.http1CodecStats();

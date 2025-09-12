@@ -184,6 +184,9 @@ public:
     return http1_safe_max_connection_duration_;
   }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
+  absl::optional<std::chrono::milliseconds> streamFlushTimeout() const override {
+    return stream_flush_timeout_;
+  }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
   std::chrono::milliseconds requestHeadersTimeout() const override {
     return request_headers_timeout_;
@@ -255,7 +258,7 @@ public:
     return early_header_mutation_extensions_;
   }
 
-  uint64_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
+  uint32_t maxRequestsPerConnection() const override { return max_requests_per_connection_; }
   const HttpConnectionManagerProto::ProxyStatusConfig* proxyStatusConfig() const override {
     return proxy_status_config_.get();
   }
@@ -330,6 +333,7 @@ private:
   const bool http1_safe_max_connection_duration_;
   absl::optional<std::chrono::milliseconds> max_stream_duration_;
   std::chrono::milliseconds stream_idle_timeout_;
+  absl::optional<std::chrono::milliseconds> stream_flush_timeout_;
   std::chrono::milliseconds request_timeout_;
   std::chrono::milliseconds request_headers_timeout_;
   Router::RouteConfigProviderSharedPtr route_config_provider_;

@@ -7,8 +7,10 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/matchers.h"
+#include "envoy/common/optref.h"
 #include "envoy/common/pure.h"
 #include "envoy/grpc/status.h"
+#include "envoy/http/codec_runtime_overrides.h"
 #include "envoy/http/header_formatter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/metadata_interface.h"
@@ -36,22 +38,19 @@ namespace Http3 {
 struct CodecStats;
 }
 
-// Legacy default value of 60K is safely under both codec default limits.
-static constexpr uint32_t DEFAULT_MAX_REQUEST_HEADERS_KB = 60;
-// Default maximum number of headers.
-static constexpr uint32_t DEFAULT_MAX_HEADERS_COUNT = 100;
-
-const char MaxRequestHeadersCountOverrideKey[] =
-    "envoy.reloadable_features.max_request_headers_count";
-const char MaxResponseHeadersCountOverrideKey[] =
-    "envoy.reloadable_features.max_response_headers_count";
-const char MaxRequestHeadersSizeOverrideKey[] =
-    "envoy.reloadable_features.max_request_headers_size_kb";
-const char MaxResponseHeadersSizeOverrideKey[] =
-    "envoy.reloadable_features.max_response_headers_size_kb";
-
 class Stream;
 class RequestDecoder;
+
+class RequestDecoderHandle {
+public:
+  virtual ~RequestDecoderHandle() = default;
+
+  /**
+   * @return a reference to the underlying decoder if it is still valid.
+   */
+  virtual OptRef<RequestDecoder> get() PURE;
+};
+using RequestDecoderHandlePtr = std::unique_ptr<RequestDecoderHandle>;
 
 /**
  * Error codes used to convey the reason for a GOAWAY.
@@ -264,6 +263,12 @@ public:
    * @return List of shared pointers to access loggers for this stream.
    */
   virtual AccessLog::InstanceSharedPtrVector accessLogHandlers() PURE;
+
+  /**
+   * @return A handle to the request decoder. Caller can check the request decoder's liveness via
+   * the handle.
+   */
+  virtual RequestDecoderHandlePtr getRequestDecoderHandle() PURE;
 };
 
 /**
@@ -530,10 +535,6 @@ struct Http1Settings {
 
   // If true, Envoy will send a fully qualified URL in the firstline of the request.
   bool send_fully_qualified_url_{false};
-
-  // If true, BalsaParser is used for HTTP/1 parsing; if false, http-parser is
-  // used. See issue #21245.
-  bool use_balsa_parser_{false};
 
   // If true, any non-empty method composed of valid characters is accepted.
   // If false, only methods from a hard-coded list of known methods are accepted.
