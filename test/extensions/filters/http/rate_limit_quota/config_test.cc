@@ -57,7 +57,7 @@ TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithCorrectProto) {
   // Handle the global client's creation by expecting the underlying async grpc
   // client creation. getOrThrow fails otherwise.
   auto mock_stream_client = std::make_unique<RateLimitTestClient>();
-  mock_stream_client->expectClientCreation();
+  mock_stream_client->expectClientCreationWithFactory();
 
   RateLimitQuotaFilterFactory factory;
   std::string stats_prefix = "test";
@@ -145,7 +145,7 @@ TEST(RateLimitQuotaFilterConfigTest, RateLimitQuotaFilterWithInvalidGrpcClient) 
   TestUtility::loadFromYaml(filter_config_yaml, filter_config);
 
   auto mock_stream_client = std::make_unique<RateLimitTestClient>();
-  mock_stream_client->failClientCreation();
+  mock_stream_client->failClientCreationWithFactory();
 
   RateLimitQuotaFilterFactory factory;
   std::string stats_prefix = "test";
