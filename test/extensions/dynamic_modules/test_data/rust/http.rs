@@ -50,9 +50,9 @@ struct StatsCallbacksFilterConfig {
   magic_number: EnvoyGaugeId,
   // It's full of 1s.
   ones: EnvoyHistogramId,
-  test_counter_vec: EnvoyCounterId,
-  test_gauge_vec: EnvoyGaugeId,
-  test_histogram_vec: EnvoyHistogramId,
+  test_counter_vec: EnvoyCounterVecId,
+  test_gauge_vec: EnvoyGaugeVecId,
+  test_histogram_vec: EnvoyHistogramVecId,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StatsCallbacksFilterConfig {
