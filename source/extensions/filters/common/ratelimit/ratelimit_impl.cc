@@ -53,6 +53,7 @@ void GrpcClientImpl::createRequest(envoy::service::ratelimit::v3::RateLimitReque
           new_descriptor->mutable_limit();
       new_limit->set_requests_per_unit(descriptor.limit_.value().requests_per_unit_);
       new_limit->set_unit(descriptor.limit_.value().unit_);
+      new_limit->set_unit_multiplier(descriptor.limit_.value().unit_multiplier_);
     }
     if (descriptor.hits_addend_.has_value()) {
       new_descriptor->mutable_hits_addend()->set_value(descriptor.hits_addend_.value());
