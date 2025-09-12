@@ -87,7 +87,6 @@ GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
       scope_(scope.createScope(fmt::format("grpc.{}.", config.google_grpc().stat_prefix()))),
       config_(config), factory_context_(context), stat_names_(stat_names) {
 #ifndef ENVOY_GOOGLE_GRPC
-  UNREFERENCED_PARAMETER(tls_);
   UNREFERENCED_PARAMETER(google_tls_slot_);
   UNREFERENCED_PARAMETER(scope_);
   UNREFERENCED_PARAMETER(config_);
