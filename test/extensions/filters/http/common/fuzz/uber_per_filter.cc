@@ -143,7 +143,7 @@ void cleanFileSystemBufferConfig(Protobuf::Message* message) {
 void cleanHealthCheckConfig(Protobuf::Message* message) {
   envoy::extensions::filters::http::health_check::v3::HealthCheck& config =
       *Envoy::Protobuf::DynamicCastMessage<
-      envoy::extensions::filters::http::health_check::v3::HealthCheck>(message);
+          envoy::extensions::filters::http::health_check::v3::HealthCheck>(message);
   for (const auto& item : config.cluster_min_healthy_percentages()) {
     if (std::isnan(item.second.value()) || item.second.value() < 0.0 ||
         item.second.value() > 100.0) {
