@@ -274,9 +274,8 @@ message ExternalProcessor {
   // without pausing on filter chain iteration. It is "Send and Go" mode that can be used
   // by external processor to observe the request's data and status. In this mode:
   //
-  // 1. Only ``STREAMED`` and ``GRPC`` body processing modes are supported and any other body
-  // processing modes will be ignored. ``NONE`` mode (i.e., skip body processing) will still
-  // work as expected.
+  // 1. Only ``STREAMED``, ``GRPC``, and ``NONE`` body processing modes are supported; for any
+  // other body processing mode, the body will not be sent.
   //
   // 2. External processor should not send back processing response, as any responses will be ignored.
   // This also means that
