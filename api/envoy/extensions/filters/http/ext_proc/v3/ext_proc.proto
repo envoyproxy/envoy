@@ -213,8 +213,9 @@ message ExternalProcessor {
   // response, it will reset this timer, and will stop processing and return
   // an error (subject to the processing mode) if the timer expires before a
   // matching response is received. There is no timeout when the filter is
-  // running in observability mode. Zero is a valid config which means the
-  // timer will be triggered immediately. If not configured, default is 200
+  // running in observability mode or when the body send mode is
+  // ``FULL_DUPLEX_STREAMED`` or ``GRPC``. Zero is a valid config which means
+  // the timer will be triggered immediately. If not configured, default is 200
   // milliseconds.
   google.protobuf.Duration message_timeout = 7 [(validate.rules).duration = {
     lte {seconds: 3600}
@@ -320,7 +321,7 @@ message ExternalProcessor {
   google.protobuf.Duration deferred_close_timeout = 19;
 
   // Send body to the side stream server once it arrives without waiting for the header response from that server.
-  // It only works for ``STREAMED`` and ``GRPC`` body processing modes. For any other body
+  // It only works for ``STREAMED`` body processing mode. For any other body
   // processing modes, it is ignored.
   // The server has two options upon receiving a header request:
   //
