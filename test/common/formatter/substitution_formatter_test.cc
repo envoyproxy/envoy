@@ -1146,6 +1146,22 @@ TEST(SubstitutionFormatterTest, streamInfoFormatter) {
   }
 
   {
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    const std::string format = "%END_TIME(%Y/%m/%d)%|%END_TIME(%s)%|%END_TIME(bad_format)%|"
+                               "%END_TIME%|%END_TIME(%f.%1f.%2f.%3f)%";
+
+    time_system.setMonotonicTime(MonotonicTime(std::chrono::milliseconds(100)));
+    time_t expected_time_in_epoch = 1522280158 - 100000;
+    SystemTime time = std::chrono::system_clock::from_time_t(expected_time_in_epoch);
+    EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
+    FormatterPtr formatter = *FormatterImpl::create(format, false);
+
+    EXPECT_EQ(fmt::format("2018/03/28|{}|bad_format|2018-03-28T23:35:58.000Z|000000000.0.00.000",
+                          expected_time_in_epoch + 100000),
+              formatter->formatWithContext(formatter_context, stream_info));
+  }
+
+  {
     StreamInfoFormatter upstream_connection_pool_callback_duration_format(
         "UPSTREAM_CONNECTION_POOL_READY_DURATION");
     EXPECT_CALL(time_system, monotonicTime)
