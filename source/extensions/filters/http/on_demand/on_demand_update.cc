@@ -195,9 +195,11 @@ const OnDemandFilterConfig* OnDemandRouteUpdate::getConfig() {
 }
 
 Http::FilterDataStatus OnDemandRouteUpdate::decodeData(Buffer::Instance&, bool) {
-  return filter_iteration_state_ == Http::FilterHeadersStatus::StopIteration
-             ? Http::FilterDataStatus::StopIterationAndWatermark
-             : Http::FilterDataStatus::Continue;
+  if (filter_iteration_state_ == Http::FilterHeadersStatus::StopIteration) {
+    has_body_data_ = true;
+    return Http::FilterDataStatus::StopIterationAndWatermark;
+  }
+  return Http::FilterDataStatus::Continue;
 }
 
 Http::FilterTrailersStatus OnDemandRouteUpdate::decodeTrailers(Http::RequestTrailerMap&) {
@@ -228,11 +230,36 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
     return;
   }
 
-  if (route_exists &&                  // route can be resolved after an on-demand
-                                       // VHDS update
-      !callbacks_->decodingBuffer() && // Redirects with body not yet supported.
-      callbacks_->recreateStream(/*headers=*/nullptr)) {
-    return;
+  if (route_exists) {
+    // IMPORTANT: Two different processing paths based on request body presence
+    //
+    // The choice between continueDecoding() and recreateStream() is critical for correctness:
+    //
+    // Path 1: continueDecoding() - Used when request has body data
+    //   - Preserves already-buffered request body during VHDS discovery
+    //   - Continues processing with current stream to avoid losing buffered content
+    //   - Essential for POST/PUT requests with payloads (fixes GitHub issue #17891)
+    //
+    // Path 2: recreateStream() - Used when request has no body data
+    //   - Provides cleaner restart by recreating the entire request processing pipeline
+    //   - More efficient for GET requests and other body-less requests
+    //   - Ensures fresh state without unnecessary buffered data overhead
+    //
+    // This dual approach ensures both correctness (no data loss) and efficiency
+    // (optimal processing path based on request characteristics).
+
+    if (has_body_data_) {
+      // If we have body data, we cannot recreate the stream as it would lose the buffered body.
+      // Instead, we continue processing with the current stream which has the body already
+      // buffered.
+      callbacks_->continueDecoding();
+      return;
+    }
+
+    // For requests without body data, we can still use stream recreation for cleaner restart
+    if (callbacks_->recreateStream(/*headers=*/nullptr)) {
+      return;
+    }
   }
 
   // route cannot be resolved after an on-demand VHDS update or
@@ -244,11 +271,24 @@ void OnDemandRouteUpdate::onClusterDiscoveryCompletion(
     Upstream::ClusterDiscoveryStatus cluster_status) {
   filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
   cluster_discovery_handle_.reset();
-  if (cluster_status == Upstream::ClusterDiscoveryStatus::Available &&
-      !callbacks_->decodingBuffer()) { // Redirects with body not yet supported.
+  if (cluster_status == Upstream::ClusterDiscoveryStatus::Available) {
+    callbacks_->downstreamCallbacks()->clearRouteCache();
+
+    // IMPORTANT: Same dual-path logic as in onRouteConfigUpdateCompletion()
+    // See detailed explanation above - this ensures body data preservation
+    // while optimizing processing for body-less requests during cluster discovery.
+
+    if (has_body_data_) {
+      // If we have body data, we cannot recreate the stream as it would lose the buffered body.
+      // Instead, we continue processing with the current stream which has the body already
+      // buffered.
+      callbacks_->continueDecoding();
+      return;
+    }
+
+    // For requests without body data, we can still use stream recreation for cleaner restart
     const Http::ResponseHeaderMap* headers = nullptr;
     if (callbacks_->recreateStream(headers)) {
-      callbacks_->downstreamCallbacks()->clearRouteCache();
       return;
     }
   }

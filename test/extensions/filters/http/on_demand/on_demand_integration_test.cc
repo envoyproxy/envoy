@@ -761,5 +761,231 @@ TEST_P(OnDemandVhdsIntegrationTest, AttemptAddingDuplicateDomainNames) {
   cleanupUpstreamAndDownstream();
 }
 
+// Test that on-demand VHDS works correctly with internal redirects for requests with body
+TEST_P(OnDemandVhdsIntegrationTest, OnDemandVhdsWithInternalRedirectAndRequestBody) {
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
+  cleanupUpstreamAndDownstream();
+  ASSERT_TRUE(codec_client_->waitForDisconnect());
+
+  // Create a virtual host configuration that supports internal redirects
+  const std::string vhost_with_redirect = R"EOF(
+name: my_route/vhost_redirect
+domains:
+- vhost.redirect
+routes:
+- match:
+    prefix: "/"
+  name: redirect_route
+  route:
+    cluster: my_service
+    internal_redirect_policy: {}
+)EOF";
+
+  // Make a POST request with body to an unknown domain that will trigger VHDS
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "POST"},      {":path", "/"},
+      {":scheme", "http"},      {":authority", "vhost.redirect"},
+      {"content-length", "12"}, {"x-lyft-user-id", "123"}};
+  const std::string request_body = "test_payload";
+
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeRequestWithBody(request_headers, request_body);
+
+  // Expect VHDS request for the unknown domain
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TestTypeUrl::get().VirtualHost,
+                                           {vhdsRequestResourceName("vhost.redirect")}, {},
+                                           vhds_stream_.get()));
+
+  // Send VHDS response with the virtual host that supports redirects
+  auto vhost_config =
+      TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(vhost_with_redirect);
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
+      Config::TestTypeUrl::get().VirtualHost, {vhost_config}, {}, "2", vhds_stream_.get(),
+      {"my_route/vhost.redirect"});
+
+  // Wait for the first upstream request (original request)
+  waitForNextUpstreamRequest(1);
+  EXPECT_EQ(request_body, upstream_request_->body().toString());
+  EXPECT_EQ("vhost.redirect", upstream_request_->headers().getHostValue());
+
+  // Respond with a redirect to the same host but different path
+  Http::TestResponseHeaderMapImpl redirect_response{
+      {":status", "302"},
+      {"content-length", "0"},
+      {"location", "http://vhost.redirect/redirected/path"},
+      {"test-header", "redirect-value"}};
+  upstream_request_->encodeHeaders(redirect_response, true);
+
+  // Wait for the second upstream request (after redirect)
+  waitForNextUpstreamRequest(1);
+  EXPECT_EQ(request_body, upstream_request_->body().toString());
+  EXPECT_EQ("vhost.redirect", upstream_request_->headers().getHostValue());
+  EXPECT_EQ("/redirected/path", upstream_request_->headers().getPathValue());
+  ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
+  EXPECT_EQ("http://vhost.redirect/", upstream_request_->headers().getEnvoyOriginalUrlValue());
+
+  // Send final response
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  // Verify the response
+  response->waitForHeaders();
+  ASSERT_TRUE(response->waitForEndStream());
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Verify internal redirect succeeded
+  EXPECT_EQ(1,
+            test_server_->counter("cluster.my_service.upstream_internal_redirect_succeeded_total")
+                ->value());
+  // 302 was never returned downstream
+  EXPECT_EQ(0, test_server_->counter("http.config_test.downstream_rq_3xx")->value());
+  // We expect 2 total 2xx responses: one from initial test + one from our VHDS redirect test
+  EXPECT_EQ(2, test_server_->counter("http.config_test.downstream_rq_2xx")->value());
+
+  cleanupUpstreamAndDownstream();
+}
+
 } // namespace
+
+namespace Extensions {
+namespace HttpFilters {
+namespace OnDemand {
+
+using OnDemandIntegrationTest = VhdsIntegrationTest;
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsAndGrpcTypes, OnDemandIntegrationTest,
+                         DELTA_SOTW_GRPC_CLIENT_INTEGRATION_PARAMS);
+
+// Integration test specifically for the GitHub issue #17891 fix:
+// Verify that VHDS requests with body don't result in 404 responses
+TEST_P(OnDemandIntegrationTest, VhdsWithRequestBodySuccess) {
+  autonomous_upstream_ = true;
+  initialize();
+
+  // Send a POST request with body to trigger VHDS discovery
+  const std::string request_body = "test request body data";
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/test"},
+          {":scheme", "http"},
+          {":authority", fmt::format("vhds.example.com:{}", lookupPort("http"))},
+      },
+      request_body);
+
+  // Wait for the response - this should NOT be a 404
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+
+  // Before the fix, this would be "404" due to route being nullptr
+  // After the fix, this should be "200" from the upstream
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Verify the upstream received the full request body
+  EXPECT_EQ(request_body, response->body());
+}
+
+// Integration test for requests without body (should still work)
+TEST_P(OnDemandIntegrationTest, VhdsWithoutBodySuccess) {
+  autonomous_upstream_ = true;
+  initialize();
+
+  // Send a GET request without body
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestRequestHeaderMapImpl{
+      {":method", "GET"},
+      {":path", "/test"},
+      {":scheme", "http"},
+      {":authority", fmt::format("vhds.example.com:{}", lookupPort("http"))},
+  });
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Integration test for large request bodies to ensure proper buffering
+TEST_P(OnDemandIntegrationTest, VhdsWithLargeRequestBodyBuffersCorrectly) {
+  autonomous_upstream_ = true;
+  initialize();
+
+  // Create a large request body to test buffering behavior
+  std::string large_body(10000, 'x'); // 10KB of 'x' characters
+
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/test"},
+          {":scheme", "http"},
+          {":authority", fmt::format("vhds.example.com:{}", lookupPort("http"))},
+      },
+      large_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Verify the entire large body was properly buffered and forwarded
+  EXPECT_EQ(large_body, response->body());
+}
+
+// Test that validates a different host-name completely
+// This ensures VHDS discovery works for various hostnames
+TEST_P(OnDemandIntegrationTest, VhdsWithDifferentHostname) {
+  autonomous_upstream_ = true;
+  initialize();
+
+  // Test with a completely different hostname pattern
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/api/v1/data"},
+          {":scheme", "http"},
+          {":authority", fmt::format("api.service.internal:{}", lookupPort("http"))},
+          {"content-type", "application/json"},
+      },
+      R"({"key": "value", "data": "test"})");
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Verify the request body was forwarded correctly
+  EXPECT_EQ(R"({"key": "value", "data": "test"})", response->body());
+}
+
+// Simpler test - body without internal-redirect
+// This test focuses on basic request body handling without redirect complexity
+TEST_P(OnDemandIntegrationTest, VhdsRequestBodyWithoutInternalRedirect) {
+  autonomous_upstream_ = true;
+  initialize();
+
+  // Simple POST request with JSON body, no redirect configuration needed
+  const std::string json_body = R"({"message": "hello world", "id": 42})";
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{
+          {":method", "POST"},
+          {":path", "/simple"},
+          {":scheme", "http"},
+          {":authority", fmt::format("simple.test.com:{}", lookupPort("http"))},
+          {"content-type", "application/json"},
+          {"x-test-header", "simple-test"},
+      },
+      json_body);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+
+  // Verify the JSON body was properly handled and forwarded
+  EXPECT_EQ(json_body, response->body());
+
+  // This test ensures that basic POST requests with bodies work correctly
+  // without any internal redirect complexity - addressing the core issue
+  // where request bodies were being lost during VHDS discovery
+}
+
+} // namespace OnDemand
+} // namespace HttpFilters
+} // namespace Extensions
 } // namespace Envoy
