@@ -118,6 +118,7 @@ As noted in the :ref:`architecture overview <arch_overview_redis>`, when Envoy s
    :language: yaml
    :lines: 11-23
    :linenos:
+   :lineno-start: 11
    :caption: :download:`redis-dns-lookups.yaml <_include/redis-dns-lookups.yaml>`
 
 
@@ -142,4 +143,5 @@ an AWS IAM Policy containing the Action `memorydb:Connect`, and that policy must
    :language: yaml
    :lines: 8-41
    :linenos:
+   :lineno-start: 8
    :caption: :download:`redis-aws-iam-auth.yaml <_include/redis-aws-iam-auth.yaml>`
