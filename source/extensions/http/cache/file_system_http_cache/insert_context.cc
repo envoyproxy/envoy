@@ -60,8 +60,9 @@ void FileInsertContext::createFile(AsyncFileManager& file_manager) {
   file_manager.createAnonymousFile(
       &dispatcher_, cache_path, [this](absl::StatusOr<AsyncFileHandle> open_result) -> void {
         if (!open_result.ok()) {
-          return fail(absl::Status(open_result.status().code(),
-                                   fmt::format("create file failed: {}", open_result.message())));
+          return fail(
+              absl::Status(open_result.status().code(),
+                           fmt::format("create file failed: {}", open_result.status().message())));
         }
         file_handle_ = std::move(open_result.value());
         dupFile();
@@ -72,8 +73,9 @@ void FileInsertContext::dupFile() {
   auto queued =
       file_handle_->duplicate(&dispatcher_, [this](absl::StatusOr<AsyncFileHandle> dup_result) {
         if (!dup_result.ok()) {
-          return fail(absl::Status(dup_result.status().code(),
-                                   fmt::format("duplicate file failed: {}", dup_result.message())));
+          return fail(
+              absl::Status(dup_result.status().code(), fmt::format("duplicate file failed: {}",
+                                                                   dup_result.status().message())));
         }
         bool end_stream = source_ == nullptr;
         progress_receiver_->onHeadersInserted(
@@ -90,10 +92,14 @@ void FileInsertContext::writeEmptyHeaderBlock() {
   // Write an empty header block.
   auto queued = file_handle_->write(
       &dispatcher_, unset_header, 0, [this](absl::StatusOr<size_t> write_result) {
-        if (!write_result.ok() || write_result.value() != CacheFileFixedBlock::size()) {
-          return fail(
-              absl::Status(write_result.status().code(),
-                           fmt::format("write to file failed: {}", write_result.message())));
+        if (!write_result.ok()) {
+          return fail(absl::Status(
+              write_result.status().code(),
+              fmt::format("write to file failed: {}", write_result.status().message())));
+        } else if (write_result.value() != CacheFileFixedBlock::size()) {
+          return fail(absl::UnavailableError(
+              fmt::format("write to file failed; wrote {} bytes instead of {}",
+                          write_result.value(), CacheFileFixedBlock::size())));
         }
         if (source_) {
           getBody();
@@ -132,10 +138,13 @@ void FileInsertContext::onBody(Buffer::InstancePtr buf, bool end_stream) {
   auto queued = file_handle_->write(
       &dispatcher_, *buf, header_block_.offsetToBody() + header_block_.bodySize(),
       [this, len, end_stream](absl::StatusOr<size_t> write_result) {
-        if (!write_result.ok() || write_result.value() != len) {
-          return fail(
-              absl::Status(write_result.status().code(),
-                           fmt::format("write to file failed: {}", write_result.message())));
+        if (!write_result.ok()) {
+          return fail(absl::Status(
+              write_result.status().code(),
+              fmt::format("write to file failed: {}", write_result.status().message())));
+        } else if (write_result.value() != len) {
+          return fail(absl::UnavailableError(fmt::format(
+              "write to file failed: wrote {} bytes instead of {}", write_result.value(), len)));
         }
         progress_receiver_->onBodyInserted(
             AdjustedByteRange(header_block_.bodySize(), header_block_.bodySize() + len),
