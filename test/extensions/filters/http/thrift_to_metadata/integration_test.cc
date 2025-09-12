@@ -91,7 +91,7 @@ public:
     metadata->setSequenceId(1234);
 
     protocol_converter->messageBegin(metadata);
-    protocol_converter->structBegin("");
+    protocol_converter->structBegin("wrapper");
     int16_t field_id = 0;
     FieldType field_type_string = FieldType::String;
     FieldType field_type_struct = FieldType::Struct;
@@ -119,7 +119,7 @@ public:
       }
     }
     field_id = 0;
-    protocol_converter->fieldBegin("", field_type_stop, field_id);
+    protocol_converter->fieldBegin("", field_type_stop, field_id); // wrapper stop field
     protocol_converter->structEnd();
     protocol_converter->messageEnd();
 

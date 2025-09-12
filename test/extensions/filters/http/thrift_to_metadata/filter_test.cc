@@ -39,7 +39,7 @@ MATCHER_P(MapNumEq, rhs, "") {
   }
   return true;
 }
-// class FilterTest : public testing::Test {
+
 class FilterTest : public testing::TestWithParam<std::tuple<TransportType, ProtocolType>> {
 public:
   FilterTest() = default;
@@ -209,8 +209,20 @@ response_rules:
         protocol_converter->fieldEnd();
       }
     }
+    field_id = 1;
+    FieldType field_type_i64 = FieldType::I64;
+    protocol_converter->fieldBegin("first_field", field_type_i64, field_id);
+    int64_t i64_value = 1;
+    protocol_converter->int64Value(i64_value);
+    protocol_converter->fieldEnd();
+    field_id = 2;
+    protocol_converter->fieldBegin("second_field", field_type_string, field_id);
+    std::string string_value = "string_value";
+    protocol_converter->stringValue(string_value);
+    protocol_converter->fieldEnd();
+
     field_id = 0;
-    protocol_converter->fieldBegin("", field_type_stop, field_id);
+    protocol_converter->fieldBegin("", field_type_stop, field_id); // wrapper stop field
     protocol_converter->structEnd();
     protocol_converter->messageEnd();
 
@@ -282,6 +294,70 @@ request_rules:
             filter_->decodeHeaders(request_headers_, false));
   EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
   EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapNumEq(expected_metadata)));
+
+  Buffer::OwnedImpl buffer;
+  writeMessage(buffer, transport_type, protocol_type, message_type);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.invalid_thrift_body"), 0);
+}
+
+TEST_P(FilterTest, CallRequestSuccessWithStringPayload) {
+  const auto [transport_type, protocol_type] = GetParam();
+  MessageType message_type = MessageType::Call;
+  initializeFilter(R"EOF(
+request_rules:
+- field_selector:
+    id: 2
+    name: second_field
+  on_present:
+    metadata_namespace: envoy.lb
+    key: second_field
+  on_missing:
+    metadata_namespace: envoy.lb
+    key: second_field
+    value: "unknown"
+)EOF");
+  const std::map<std::string, std::string>& expected_metadata = {{"second_field", "string_value"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected_metadata)));
+
+  Buffer::OwnedImpl buffer;
+  writeMessage(buffer, transport_type, protocol_type, message_type);
+  EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
+
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.success"), 1);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.mismatched_content_type"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.no_body"), 0);
+  EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.invalid_thrift_body"), 0);
+}
+
+TEST_P(FilterTest, CallRequestSuccessWithStringPayloadMissing) {
+  const auto [transport_type, protocol_type] = GetParam();
+  MessageType message_type = MessageType::Call;
+  initializeFilter(R"EOF(
+request_rules:
+- field_selector:
+    id: 999
+    name: non_existent_field
+  on_present:
+    metadata_namespace: envoy.lb
+    key: non_existent_field
+  on_missing:
+    metadata_namespace: envoy.lb
+    key: non_existent_field
+    value: "unknown"
+)EOF");
+  const std::map<std::string, std::string>& expected_metadata = {{"non_existent_field", "unknown"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+            filter_->decodeHeaders(request_headers_, false));
+  EXPECT_CALL(decoder_callbacks_, streamInfo()).WillRepeatedly(ReturnRef(stream_info_));
+  EXPECT_CALL(stream_info_, setDynamicMetadata("envoy.lb", MapEq(expected_metadata)));
 
   Buffer::OwnedImpl buffer;
   writeMessage(buffer, transport_type, protocol_type, message_type);
@@ -419,7 +495,7 @@ TEST_P(FilterTest, IncompleteRequest) {
   writeMessage(whole_message, transport_type, protocol_type, message_type);
   Buffer::OwnedImpl buffer;
   // incomplete message
-  buffer.move(whole_message, whole_message.length() / 2);
+  buffer.move(whole_message, 2);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(buffer, true));
 
   EXPECT_EQ(getCounterValue("thrift_to_metadata.rq.success"), 0);
@@ -450,7 +526,7 @@ TEST_P(FilterTest, IncompleteResponse) {
   writeMessage(whole_message, transport_type, protocol_type, message_type, ReplyType::Success);
   Buffer::OwnedImpl buffer;
   // incomplete message
-  buffer.move(whole_message, whole_message.length() / 2);
+  buffer.move(whole_message, 2);
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->encodeData(buffer, true));
 
   EXPECT_EQ(getCounterValue("thrift_to_metadata.resp.success"), 0);
@@ -479,7 +555,7 @@ TEST_P(FilterTest, IncompleteRequestWithTrailer) {
   writeMessage(whole_message, transport_type, protocol_type, message_type);
   Buffer::OwnedImpl buffer;
   // incomplete message
-  buffer.move(whole_message, whole_message.length() / 2);
+  buffer.move(whole_message, 2);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer, false));
 
   Http::TestRequestTrailerMapImpl trailers{{"some", "trailer"}};
@@ -513,7 +589,7 @@ TEST_P(FilterTest, IncompleteRequestWithEarlyComplete) {
   writeMessage(whole_message, transport_type, protocol_type, message_type);
   Buffer::OwnedImpl buffer;
   // incomplete message
-  buffer.move(whole_message, whole_message.length() / 2);
+  buffer.move(whole_message, 2);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer, false));
 
   filter_->decodeComplete();
@@ -546,7 +622,7 @@ TEST_P(FilterTest, IncompleteResponseWithTrailer) {
   writeMessage(whole_message, transport_type, protocol_type, message_type, ReplyType::Success);
   Buffer::OwnedImpl buffer;
   // incomplete message
-  buffer.move(whole_message, whole_message.length() / 2);
+  buffer.move(whole_message, 2);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(buffer, false));
 
   Http::TestResponseTrailerMapImpl trailers{{"some", "trailer"}};
@@ -581,7 +657,7 @@ TEST_P(FilterTest, IncompleteResponseEarlyComplete) {
   writeMessage(whole_message, transport_type, protocol_type, message_type, ReplyType::Success);
   Buffer::OwnedImpl buffer;
   // incomplete message
-  buffer.move(whole_message, whole_message.length() / 2);
+  buffer.move(whole_message, 2);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(buffer, false));
 
   filter_->encodeComplete();
@@ -691,7 +767,7 @@ TEST_P(FilterTest, DecodeTwoDataStreams) {
   writeMessage(whole_message, transport_type, protocol_type, message_type);
 
   Buffer::OwnedImpl buffer;
-  buffer.move(whole_message, whole_message.length() / 2);
+  buffer.move(whole_message, 2);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->decodeData(buffer, false));
 
   buffer.drain(buffer.length());
@@ -726,7 +802,7 @@ TEST_P(FilterTest, EncodeTwoDataStreams) {
   writeMessage(whole_message, transport_type, protocol_type, message_type, ReplyType::Success);
 
   Buffer::OwnedImpl buffer;
-  buffer.move(whole_message, whole_message.length() / 2);
+  buffer.move(whole_message, 2);
   EXPECT_EQ(Http::FilterDataStatus::StopIterationAndBuffer, filter_->encodeData(buffer, false));
 
   buffer.drain(buffer.length());
