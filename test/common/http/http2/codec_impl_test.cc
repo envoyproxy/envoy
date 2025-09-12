@@ -1140,7 +1140,7 @@ TEST_P(Http2CodecImplTest, TrailingHeadersLargeClientBody) {
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
   EXPECT_CALL(request_decoder_, decodeData(_, false)).Times(AtLeast(1));
-  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+  Buffer::OwnedImpl body(std::string(1024 * 512, 'a'));
   request_encoder_->encodeData(body, false);
   request_encoder_->encodeTrailers(TestRequestTrailerMapImpl{{"trailing", "header"}});
   // Only drive the client so we can make sure we don't get any window updates.
@@ -1470,7 +1470,7 @@ TEST_P(Http2CodecImplTest, DumpsStreamlessConnectionWithoutAllocatingMemory) {
       ostream.contents(),
       HasSubstr(
           "max_headers_kb_: 60, max_headers_count_: 100, "
-          "per_stream_buffer_limit_: 268435456, allow_metadata_: 0, "
+          "per_stream_buffer_limit_: 16777216, allow_metadata_: 0, "
           "stream_error_on_invalid_http_messaging_: 0, is_outbound_flood_monitored_control_frame_: "
           "0, dispatching_: 0, raised_goaway_: 0, "
           "pending_deferred_reset_streams_.size(): 0\n"
@@ -3778,7 +3778,7 @@ TEST_P(Http2CodecImplTest, ShouldWaitForDeferredBodyToProcessBeforeProcessingTra
 
   // Force the stream to buffer data at the receiving codec.
   server_->getStream(1)->readDisable(true);
-  const uint32_t request_body_size = 1024 * 1024;
+  const uint32_t request_body_size = 1024 * 512;
   Buffer::OwnedImpl body(std::string(request_body_size, 'a'));
   request_encoder_->encodeData(body, false);
   driveToCompletion();
@@ -3834,7 +3834,7 @@ TEST_P(Http2CodecImplTest, ShouldBufferDeferredBodyNoEndstream) {
 
   // Force the stream to buffer data at the receiving codec.
   server_->getStream(1)->readDisable(true);
-  Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
+  Buffer::OwnedImpl body(std::string(1024 * 512, 'a'));
   request_encoder_->encodeData(body, false);
   driveToCompletion();
 
@@ -3854,6 +3854,9 @@ TEST_P(Http2CodecImplTest, ShouldBufferDeferredBodyNoEndstream) {
     EXPECT_CALL(request_decoder_, decodeData(_, false));
     process_buffered_data_callback->invokeCallback();
   }
+
+  // Dispatch potential frames from server, for example, the window update frames.
+  driveToCompletion();
 }
 
 TEST_P(Http2CodecImplTest, ShouldBufferDeferredBodyWithEndStream) {
@@ -3990,7 +3993,7 @@ TEST_P(Http2CodecImplTest,
   EXPECT_FALSE(process_buffered_data_callback->enabled_);
 
   server_->getStream(1)->readDisable(true);
-  const uint32_t request_body_size = 1024 * 1024;
+  const uint32_t request_body_size = 1024 * 512;
   Buffer::OwnedImpl body(std::string(request_body_size, 'a'));
   request_encoder_->encodeData(body, false);
   driveToCompletion();

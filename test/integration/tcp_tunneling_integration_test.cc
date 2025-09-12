@@ -1909,6 +1909,12 @@ TEST_P(TcpTunnelingIntegrationTest, TcpProxyUpstreamFlush) {
   // Use a very large size to make sure it is larger than the kernel socket read buffer.
   const uint32_t size = 50 * 1024 * 1024;
   config_helper_.setBufferLimits(size, size);
+
+  // Ensure this HTTP2 flow control window is enough.
+  if (upstreamProtocol() == Http::CodecType::HTTP2) {
+    config_helper_.setUpstreamHttp2WindowSize(size, size);
+  }
+
   initialize();
 
   setUpConnection(fake_upstream_connection_);
