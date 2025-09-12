@@ -337,8 +337,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v3::Boots
         });
   }
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-      *this, context.threadLocal(), context, context.grpcContext().statNames(),
-      bootstrap.grpc_async_client_manager_config());
+      bootstrap.grpc_async_client_manager_config(), context, context.grpcContext().statNames());
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
