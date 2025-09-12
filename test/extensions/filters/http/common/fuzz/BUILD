@@ -60,7 +60,6 @@ envoy_cc_test_library(
         "@envoy_api//envoy/extensions/filters/http/file_system_buffer/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/grpc_json_reverse_transcoder/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/grpc_json_transcoder/v3:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/health_check/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/tap/v3:pkg_cc_proto",
     ],

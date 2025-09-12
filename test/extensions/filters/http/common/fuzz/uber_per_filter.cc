@@ -1,7 +1,6 @@
 #include "envoy/extensions/filters/http/file_system_buffer/v3/file_system_buffer.pb.h"
 #include "envoy/extensions/filters/http/grpc_json_reverse_transcoder/v3/transcoder.pb.h"
 #include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
-#include "envoy/extensions/filters/http/health_check/v3/health_check.pb.h"
 #include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/extensions/filters/http/tap/v3/tap.pb.h"
 
@@ -140,17 +139,6 @@ void cleanFileSystemBufferConfig(Protobuf::Message* message) {
   }
 }
 
-void cleanHealthCheckConfig(Protobuf::Message* message) {
-  envoy::extensions::filters::http::health_check::v3::HealthCheck& config =
-      *Envoy::Protobuf::DynamicCastMessage<
-          envoy::extensions::filters::http::health_check::v3::HealthCheck>(message);
-  for (const auto& item : config.cluster_min_healthy_percentages()) {
-    if (!(item.second.value() >= 0.0 && item.second.value() <= 100.0)) {
-      throw EnvoyException("cluster_min_healthy_percentages has invalid value");
-    }
-  }
-}
-
 void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
                                          Protobuf::Message* message) {
   // Map filter name to clean-up function.
@@ -166,8 +154,6 @@ void UberFilterFuzzer::cleanFuzzedConfig(absl::string_view filter_name,
   } else if (filter_name == "envoy.filters.http.file_system_buffer") {
     // Limit the number of threads to create to kMaxAsyncFileManagerThreadCount
     cleanFileSystemBufferConfig(message);
-  } else if (filter_name == "envoy.filters.http.health_check") {
-    cleanHealthCheckConfig(message);
   }
 }
 
