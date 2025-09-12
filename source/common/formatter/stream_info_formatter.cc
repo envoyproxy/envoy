@@ -1820,6 +1820,21 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
                       }),
                   true);
             }}},
+          {"END_TIME",
+           {CommandSyntaxChecker::PARAMS_OPTIONAL,
+            [](absl::string_view format, absl::optional<size_t>) {
+              return std::make_unique<SystemTimeFormatter>(
+                  format,
+                  std::make_unique<SystemTimeFormatter::TimeFieldExtractor>(
+                      [](const StreamInfo::StreamInfo& stream_info) -> absl::optional<SystemTime> {
+                        if (stream_info.currentDuration().has_value()) {
+                          return stream_info.startTime() +
+                                 std::chrono::duration_cast<std::chrono::system_clock::duration>(
+                                     stream_info.currentDuration().value());
+                        }
+                        return absl::nullopt;
+                      }));
+            }}},
           {"EMIT_TIME",
            {CommandSyntaxChecker::PARAMS_OPTIONAL,
             [](absl::string_view format, absl::optional<size_t>) {

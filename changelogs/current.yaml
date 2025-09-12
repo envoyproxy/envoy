@@ -384,5 +384,9 @@ new_features:
     Added a new metric ``db_build_epoch`` to track the build timestamp of the MaxMind geolocation database files.
     This can be used to monitor the freshness of the databases currently in use by the filter.
     See `MaxMind DB build_epoch <https://maxmind.github.io/MaxMind-DB/#build_epoch>`_ for more details.
+- area: access_log
+  change: |
+    Added :ref:`%END_TIME% <config_access_log_format_end_time>` to access log format to log the end time of the request.
+    The end time point precision can be configured in this new command.
 
 deprecated:
