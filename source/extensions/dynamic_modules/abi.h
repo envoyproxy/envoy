@@ -467,6 +467,10 @@ typedef enum {
 
 /**
  * envoy_dynamic_module_type_metrics_result represents the result of the metrics operation.
+ * Success means the operation was successful.
+ * MetricNotFound means the metric was not found. This is usually an indication that a handle was
+ * improperly initialized or stored. InvalidLabels means the labels are invalid. Frozen means a
+ * metric was attempted to be created when the stats creation is frozen.
  */
 typedef enum {
   envoy_dynamic_module_type_metrics_result_Success,
