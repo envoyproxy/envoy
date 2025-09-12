@@ -420,9 +420,11 @@ message HeaderMutation {
   repeated string remove_headers = 2;
 }
 
-// The body response message corresponding to FULL_DUPLEX_STREAMED body mode.
+// The body response message corresponding to ``FULL_DUPLEX_STREAMED`` or ``GRPC`` body modes.
 message StreamedBodyResponse {
-  // The body response chunk that will be passed to the upstream/downstream by the data plane.
+  // In ``FULL_DUPLEX_STREAMED`` body send mode, contains the body response chunk that will be
+  // passed to the upstream/downstream by the data plane. In ``GRPC`` body send mode, contains
+  // a serialized gRPC message to be passed to the upstream/downstream by the data plane.
   bytes body = 1;
 
   // The server sets this flag to true if it has received a body request with
@@ -438,7 +440,7 @@ message BodyMutation {
     // The entire body to replace.
     // Should only be used when the corresponding ``BodySendMode`` in the
     // :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
-    // is not set to ``FULL_DUPLEX_STREAMED``.
+    // is not set to ``FULL_DUPLEX_STREAMED`` or ``GRPC``.
     bytes body = 1;
 
     // Clear the corresponding body chunk.
@@ -450,7 +452,7 @@ message BodyMutation {
 
     // Must be used when the corresponding ``BodySendMode`` in the
     // :ref:`processing_mode <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_mode>`
-    // is set to ``FULL_DUPLEX_STREAMED``.
+    // is set to ``FULL_DUPLEX_STREAMED`` or ``GRPC``.
     StreamedBodyResponse streamed_response = 3
         [(xds.annotations.v3.field_status).work_in_progress = true];
   }
