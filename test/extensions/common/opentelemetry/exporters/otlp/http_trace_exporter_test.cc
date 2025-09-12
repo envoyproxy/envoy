@@ -2,7 +2,7 @@
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
 #include "source/common/version/version.h"
-#include "source/extensions/tracers/opentelemetry/http_trace_exporter.h"
+#include "source/extensions/common/opentelemetry/exporters/otlp/http_trace_exporter.h"
 
 #include "test/mocks/common.h"
 #include "test/mocks/grpc/mocks.h"
@@ -16,8 +16,10 @@
 
 namespace Envoy {
 namespace Extensions {
-namespace Tracers {
+namespace Common {
 namespace OpenTelemetry {
+namespace Exporters {
+namespace OTLP {
 
 using testing::_;
 using testing::Invoke;
@@ -145,7 +147,9 @@ TEST_F(OpenTelemetryHttpTraceExporterTest, UnsuccessfulLogWithoutThreadLocalClus
   EXPECT_FALSE(trace_exporter_->log(export_trace_service_request));
 }
 
+} // namespace OTLP
+} // namespace Exporters
 } // namespace OpenTelemetry
-} // namespace Tracers
+} // namespace Common
 } // namespace Extensions
 } // namespace Envoy

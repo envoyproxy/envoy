@@ -47,6 +47,7 @@ envoy_extension_cc_test(
     extension_names = ["envoy.tracers.opentelemetry.resource_detectors.static_config"],
     rbe_pool = "6gig",
     deps = [
+        "//source/extensions/common/opentelemetry/exporters/otlp:trace_exporter_lib",
         "//source/extensions/tracers/opentelemetry:config",
         "//source/extensions/tracers/opentelemetry/resource_detectors/static:config",
         "//test/integration:http_integration_lib",

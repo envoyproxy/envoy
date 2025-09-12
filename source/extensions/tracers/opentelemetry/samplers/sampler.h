@@ -10,7 +10,8 @@
 #include "envoy/server/tracer_config.h"
 #include "envoy/tracing/trace_context.h"
 
-#include "source/extensions/tracers/opentelemetry/otlp_utils.h"
+#include "source/extensions/common/opentelemetry/sdk/common/types.h"
+#include "source/extensions/common/opentelemetry/sdk/trace/types.h"
 
 #include "absl/types/optional.h"
 
@@ -35,7 +36,8 @@ struct SamplingResult {
   /// @see Decision
   Decision decision;
   // A set of span Attributes that will also be added to the Span. Can be nullptr.
-  std::unique_ptr<const OtelAttributes> attributes;
+  std::unique_ptr<const Envoy::Extensions::Common::OpenTelemetry::Sdk::Common::OTelAttributes>
+      attributes;
   // A Tracestate that will be associated with the Span. If the sampler
   // returns an empty Tracestate here, the Tracestate will be cleared, so samplers SHOULD normally
   // return the passed-in Tracestate if they do not intend to change it
@@ -70,12 +72,13 @@ public:
    * @param links Collection of links that will be associated with the Span to be created.
    * @return SamplingResult @see SamplingResult
    */
-  virtual SamplingResult shouldSample(const StreamInfo::StreamInfo& stream_info,
-                                      const absl::optional<SpanContext> parent_context,
-                                      const std::string& trace_id, const std::string& name,
-                                      OTelSpanKind spankind,
-                                      OptRef<const Tracing::TraceContext> trace_context,
-                                      const std::vector<SpanContext>& links) PURE;
+  virtual SamplingResult
+  shouldSample(const StreamInfo::StreamInfo& stream_info,
+               const absl::optional<SpanContext> parent_context, const std::string& trace_id,
+               const std::string& name,
+               Envoy::Extensions::Common::OpenTelemetry::Sdk::Trace::OTelSpanKind spankind,
+               OptRef<const Tracing::TraceContext> trace_context,
+               const std::vector<SpanContext>& links) PURE;
 
   /**
    * @brief Returns a sampler description or name.
