@@ -42,7 +42,6 @@
  */
 typedef uint16_t envoy_netconf_t;
 
-using NetworkHandle = int64_t;
 constexpr NetworkHandle kInvalidNetworkHandle = -1;
 
 namespace Envoy {
@@ -197,13 +196,6 @@ public:
    * @returns the default DNS cache set up in base configuration or nullptr.
    */
   virtual Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dnsCache() PURE;
-
-  /**
-   * Called when the OS changes the preferred network.
-   * @param network, the OS-preferred network.
-   * @returns configuration key of the latest snapshot of network configuration state.
-   */
-  virtual envoy_netconf_t onNetworkMadeDefault(NetworkType network) PURE;
 };
 
 using ConnectivityManagerSharedPtr = std::shared_ptr<ConnectivityManager>;
@@ -282,7 +274,6 @@ public:
   void resetConnectivityState() override;
   envoy_netconf_t addUpstreamSocketOptions(Socket::OptionsSharedPtr options) override;
   Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr dnsCache() override;
-  envoy_netconf_t onNetworkMadeDefault(NetworkType network) override;
 
   // These interfaces are only used to handle Android network change notifications.
   void onDefaultNetworkChangedAndroid(ConnectionType connection_type, NetworkHandle net_id);

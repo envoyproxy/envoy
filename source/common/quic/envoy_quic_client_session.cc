@@ -10,6 +10,7 @@
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/quic_network_connectivity_observer_impl.h"
 
 namespace Envoy {
 namespace Quic {
@@ -169,15 +170,13 @@ void EnvoyQuicClientSession::OnHttp3GoAway(uint64_t stream_id) {
 
 void EnvoyQuicClientSession::onNetworkMadeDefault() {
   if (!HasActiveRequestStreams()) {
-     CloseConnectionWithDetails(quic::QUIC_CONNECTION_MIGRATION_NO_MIGRATABLE_STREAMS,
-                                        "net_error");
-     return;
+    CloseConnectionWithDetails(quic::QUIC_CONNECTION_MIGRATION_NO_MIGRATABLE_STREAMS, "net_error");
+    return;
   }
   // Treat it as if a GOAWAY is received. The callback will drain this connection.
-   if (http_connection_callbacks_ != nullptr) {
+  if (http_connection_callbacks_ != nullptr) {
     http_connection_callbacks_->onGoAway(Http::GoAwayErrorCode::NoError);
   }
-
 }
 
 void EnvoyQuicClientSession::OnRstStream(const quic::QuicRstStreamFrame& frame) {
@@ -324,7 +323,7 @@ std::vector<std::string> EnvoyQuicClientSession::GetAlpnsToOffer() const {
 
 void EnvoyQuicClientSession::registerNetworkObserver(EnvoyQuicNetworkObserverRegistry& registry) {
   if (network_connectivity_observer_ == nullptr) {
-    network_connectivity_observer_ = std::make_unique<QuicNetworkConnectivityObserver>(*this);
+    network_connectivity_observer_ = std::make_unique<QuicNetworkConnectivityObserverImpl>(*this);
   }
   registry.registerObserver(*network_connectivity_observer_);
   registry_ = makeOptRef(registry);

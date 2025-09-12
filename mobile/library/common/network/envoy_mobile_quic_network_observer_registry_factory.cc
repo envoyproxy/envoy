@@ -1,15 +1,14 @@
 #include "library/common/network/envoy_mobile_quic_network_observer_registry_factory.h"
 
+#include "envoy_mobile_quic_network_observer_registry_factory.h"
 #include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Quic {
 
-void EnvoyMobileQuicNetworkObserverRegistry::onNetworkMadeDefault() {
+void EnvoyMobileQuicNetworkObserverRegistry::onNetworkMadeDefault(NetworkHandle network) {
   ENVOY_LOG_MISC(trace, "Default network changed.");
   ASSERT(dispatcher_.isThreadSafe());
-  ASSERT(Runtime::runtimeFeatureEnabled(
-      "envoy.reloadable_features.quic_upstream_connection_handle_network_change"));
   // Retain the existing observers in a list and iterate on the list as new
   // connections might be created and registered during iteration.
   std::vector<QuicNetworkConnectivityObserver*> existing_observers;
@@ -18,7 +17,7 @@ void EnvoyMobileQuicNetworkObserverRegistry::onNetworkMadeDefault() {
     existing_observers.push_back(observer);
   }
   for (QuicNetworkConnectivityObserver* observer : existing_observers) {
-    observer->onNetworkChanged();
+    observer->onNetworkMadeDefault(network);
   }
 }
 

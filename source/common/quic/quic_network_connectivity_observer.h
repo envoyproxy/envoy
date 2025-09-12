@@ -2,26 +2,17 @@
 
 #include <memory>
 
-#include "source/common/common/logger.h"
+using NetworkHandle = int64_t;
 
 namespace Envoy {
 namespace Quic {
 
-class EnvoyQuicClientSession;
-
-// TODO(danzh) deprecate this class once QUICHE has its own more detailed network observer.
-class QuicNetworkConnectivityObserver : protected Logger::Loggable<Logger::Id::connection> {
+class QuicNetworkConnectivityObserver {
 public:
-  // session must outlive this object.
-  explicit QuicNetworkConnectivityObserver(EnvoyQuicClientSession& session);
-  QuicNetworkConnectivityObserver(const QuicNetworkConnectivityObserver&) = delete;
-  QuicNetworkConnectivityObserver& operator=(const QuicNetworkConnectivityObserver&) = delete;
+  virtual ~QuicNetworkConnectivityObserver() = default;
 
   // Called when the device switches to a different network.
-  void onNetworkChanged();
-
-private:
-  EnvoyQuicClientSession& session_;
+  virtual void onNetworkChanged(NetworkHandle network) PURE;
 };
 
 using QuicNetworkConnectivityObserverPtr = std::unique_ptr<QuicNetworkConnectivityObserver>;

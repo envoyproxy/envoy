@@ -92,7 +92,6 @@ public:
   void OnServerPreferredAddressAvailable(
       const quic::QuicSocketAddress& server_preferred_address) override;
 
-
   void onNetworkMadeDefault();
 
   // Register this session to the given registry for receiving network change events.

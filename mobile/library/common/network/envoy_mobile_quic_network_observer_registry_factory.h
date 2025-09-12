@@ -13,7 +13,7 @@ public:
       : dispatcher_(dispatcher) {}
 
   // Called when the default network has changed to notify each registered observer.
-  void onNetworkMadeDefault();
+  void onNetworkMadeDefault(NetworkHandle network);
 
 private:
   Event::Dispatcher& dispatcher_;

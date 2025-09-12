@@ -28,8 +28,7 @@ namespace Http3 {
 
 class ActiveClient : public MultiplexedActiveClientBase {
 public:
-  ActiveClient(Http::HttpConnPoolImplBase& parent,
-               Upstream::Host::CreateConnectionData& data,
+  ActiveClient(Http::HttpConnPoolImplBase& parent, Upstream::Host::CreateConnectionData& data,
                Quic::EnvoyQuicClientSession& session);
 
   ~ActiveClient() override {

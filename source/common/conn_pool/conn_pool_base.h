@@ -123,7 +123,8 @@ public:
 
   // Whether the failure is universal or not.
   // Called by the connection pool upon connection close during handshake to
-  // infer if other connecting attempts will also fail for the same reason or not and decide whether to early fail all pending requests.
+  // infer if other connecting attempts will also fail for the same reason or not and decide whether
+  // to early fail all pending requests.
   virtual bool isConnectionErrorTransient() const { return false; }
 
   ConnPoolImplBase& parent_;

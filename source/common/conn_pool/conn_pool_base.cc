@@ -577,20 +577,22 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       host_->cluster().trafficStats()->upstream_cx_connect_fail_.inc();
       host_->stats().cx_connect_fail_.inc();
 
-      // If this is a connection close event caused by recoverable error, e.g. network change, do not regard it as pool failure and keep any existing pending streams waiting for newer connections.
+      // If this is a connection close event caused by recoverable error, e.g. network change, do
+      // not regard it as pool failure and keep any existing pending streams waiting for newer
+      // connections.
       if (!client.isConnectionErrorTransient()) {
-      onConnectFailed(client);
-      // Purge pending streams only if this client doesn't contribute to the local connecting
-      // stream capacity. In other words, the rest clients  would be able to handle all the
-      // pending stream once they are connected.
-      ConnectionPool::PoolFailureReason reason;
-      if (client.timed_out_) {
-        reason = ConnectionPool::PoolFailureReason::Timeout;
-      } else if (event == Network::ConnectionEvent::RemoteClose) {
-        reason = ConnectionPool::PoolFailureReason::RemoteConnectionFailure;
-      } else {
-        reason = ConnectionPool::PoolFailureReason::LocalConnectionFailure;
-      }
+        onConnectFailed(client);
+        // Purge pending streams only if this client doesn't contribute to the local connecting
+        // stream capacity. In other words, the rest clients  would be able to handle all the
+        // pending stream once they are connected.
+        ConnectionPool::PoolFailureReason reason;
+        if (client.timed_out_) {
+          reason = ConnectionPool::PoolFailureReason::Timeout;
+        } else if (event == Network::ConnectionEvent::RemoteClose) {
+          reason = ConnectionPool::PoolFailureReason::RemoteConnectionFailure;
+        } else {
+          reason = ConnectionPool::PoolFailureReason::LocalConnectionFailure;
+        }
 
         // Raw connect failures should never happen under normal circumstances. If we have an
         // upstream that is behaving badly, streams can get stuck here in the pending state. If we

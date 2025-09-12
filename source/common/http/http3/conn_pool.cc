@@ -1,9 +1,9 @@
+#include "conn_pool.h"
 #include "source/common/http/http3/conn_pool.h"
 
 #include <cstdint>
 #include <memory>
 
-#include "conn_pool.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/overload/overload_manager.h"
 
@@ -220,13 +220,14 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
 
 bool ActiveClient::isConnectionErrorTransient() const {
   // These errors will likely no apply to following new connections.
-  static std::list<quic::QuicErrorCode> transient_errors {
-    quic::QUIC_NO_ERROR,
-    quic::QUIC_CONNECTION_MIGRATION_HANDSHAKE_UNCONFIRMED,
-    quic::QUIC_CONNECTION_MIGRATION_NON_MIGRATABLE_STREAM,
-    quic::QUIC_CONNECTION_MIGRATION_DISABLED_BY_CONFIG,
+  static std::list<quic::QuicErrorCode> transient_errors{
+      quic::QUIC_NO_ERROR,
+      quic::QUIC_CONNECTION_MIGRATION_HANDSHAKE_UNCONFIRMED,
+      quic::QUIC_CONNECTION_MIGRATION_NON_MIGRATABLE_STREAM,
+      quic::QUIC_CONNECTION_MIGRATION_DISABLED_BY_CONFIG,
   };
-  return std::find(transient_errors.begin(), transient_errors.end(), session_.error()) != transient_errors.end();
+  return std::find(transient_errors.begin(), transient_errors.end(), session_.error()) !=
+         transient_errors.end();
 }
 
 } // namespace Http3
