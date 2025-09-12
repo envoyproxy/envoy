@@ -15,13 +15,19 @@ namespace Envoy {
 using Envoy::Protobuf::Any;
 using Envoy::Protobuf::MapPair;
 
-class CompressorIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
-                                  public Event::SimulatedTimeSystem,
-                                  public HttpIntegrationTest {
+class CompressorIntegrationTest
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+      public Event::SimulatedTimeSystem,
+      public HttpIntegrationTest {
 public:
-  CompressorIntegrationTest() : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+  CompressorIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
 
-  void SetUp() override { decompressor_.init(window_bits); }
+  void SetUp() override {
+    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.compressor_add_status_header",
+                                  std::get<1>(GetParam()));
+    decompressor_.init(window_bits);
+  }
   void TearDown() override { cleanupUpstreamAndDownstream(); }
 
   void initializeFilter(const std::string& config) {
@@ -156,9 +162,13 @@ public:
       *stats_store_.rootScope(), "test", 4096, 100};
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, CompressorIntegrationTest,
-                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                         TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, CompressorIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()), testing::Bool()),
+    [](const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
+      return fmt::format("{}_{}", TestUtility::ipVersionToString(std::get<0>(params.param)),
+                         std::get<1>(params.param) ? "WithStatusHeader" : "NoStatusHeader");
+    });
 
 /**
  * Exercises gzip compression with default configuration.
@@ -491,6 +501,163 @@ TEST_P(CompressorIntegrationTest, PerRouteEnable) {
                           Http::TestResponseHeaderMapImpl{{":status", "200"},
                                                           {"content-length", "40"},
                                                           {"content-type", "text/xml"}});
+}
+
+/**
+ * Test suite for cases where the envoy.reloadable_features.compressor_add_status_header flag is
+ * explicitly set to true.
+ */
+class CompressorIntegrationTestWithStatusHeader : public CompressorIntegrationTest {};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersions, CompressorIntegrationTestWithStatusHeader,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::Values(true)),
+    [](const testing::TestParamInfo<std::tuple<Network::Address::IpVersion, bool>>& params) {
+      return fmt::format("{}_{}", TestUtility::ipVersionToString(std::get<0>(params.param)),
+                         "WithStatusHeader");
+    });
+
+/**
+ * Exercises filter when upstream responds with content length below the default threshold.
+ */
+TEST_P(CompressorIntegrationTestWithStatusHeader, EnvoyCompressionStatusContentLengthTooSmall) {
+  initializeFilter(default_config);
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"accept-encoding", "deflate, gzip"}};
+
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"}, {"content-length", "10"}, {"content-type", "application/json"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 10);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  ASSERT_TRUE(response->headers().get(Http::CustomHeaders::get().ContentEncoding).empty());
+  EXPECT_EQ(10U, response->body().size());
+  EXPECT_EQ("gzip;ContentLengthTooSmall", response->headers()
+                                              .get(Http::Headers::get().EnvoyCompressionStatus)[0]
+                                              ->value()
+                                              .getStringView());
+}
+
+/**
+ * Exercises filter when upstream responds with restricted content-type value.
+ */
+TEST_P(CompressorIntegrationTestWithStatusHeader, EnvoyCompressionStatusContentTypeNotAllowed) {
+  initializeFilter(full_config);
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"accept-encoding", "deflate, gzip"}};
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"}, {"content-length", "128"}, {"content-type", "application/xml"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 128);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  ASSERT_TRUE(response->headers().get(Http::CustomHeaders::get().ContentEncoding).empty());
+  EXPECT_EQ(128U, response->body().size());
+  EXPECT_EQ("gzip;ContentTypeNotAllowed", response->headers()
+                                              .get(Http::Headers::get().EnvoyCompressionStatus)[0]
+                                              ->value()
+                                              .getStringView());
+}
+
+/**
+ * Exercises filter when upstream responds with an ETag header and disable_on_etag_header is true.
+ */
+TEST_P(CompressorIntegrationTestWithStatusHeader, EnvoyCompressionStatusEtagNotAllowed) {
+  initializeFilter(full_config);
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"accept-encoding", "deflate, gzip"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"content-length", "128"},
+                                                   {"etag", "12345"},
+                                                   {"content-type", "application/json"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 128);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  ASSERT_TRUE(response->headers().get(Http::CustomHeaders::get().ContentEncoding).empty());
+  EXPECT_EQ(128U, response->body().size());
+  EXPECT_EQ("gzip;EtagNotAllowed", response->headers()
+                                       .get(Http::Headers::get().EnvoyCompressionStatus)[0]
+                                       ->value()
+                                       .getStringView());
+}
+
+/**
+ * Exercises filter when upstream responds with restricted response code value.
+ */
+TEST_P(CompressorIntegrationTestWithStatusHeader, EnvoyCompressionStatusStatusCodeNotAllowed) {
+  initializeFilter(full_config);
+  Http::TestRequestHeaderMapImpl request_headers{
+      {":method", "GET"},     {":path", "/test/long/url"},          {":scheme", "http"},
+      {":authority", "host"}, {"accept-encoding", "deflate, gzip"}, {"range", "bytes=100-227"}};
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "206"},
+                                                   {"content-length", "128"},
+                                                   {"content-range", "bytes=100-227/567"},
+                                                   {"content-type", "application/json"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 128);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("206", response->headers().getStatusValue());
+  ASSERT_TRUE(response->headers().get(Http::CustomHeaders::get().ContentEncoding).empty());
+  EXPECT_EQ(128U, response->body().size());
+  EXPECT_EQ("gzip;StatusCodeNotAllowed", response->headers()
+                                             .get(Http::Headers::get().EnvoyCompressionStatus)[0]
+                                             ->value()
+                                             .getStringView());
+}
+
+/**
+ * Exercises gzip compression with full configuration and checks for the EnvoyCompressionStatus
+ * header.
+ */
+TEST_P(CompressorIntegrationTestWithStatusHeader, EnvoyCompressionStatusCompressed) {
+  initializeFilter(full_config);
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test/long/url"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "host"},
+                                                 {"accept-encoding", "deflate, gzip"}};
+  Http::TestResponseHeaderMapImpl response_headers{
+      {":status", "200"}, {"content-length", "4400"}, {"content-type", "application/json"}};
+
+  auto response = sendRequestAndWaitForResponse(request_headers, 0, response_headers, 4400);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(0U, upstream_request_->bodyLength());
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  EXPECT_EQ("gzip", response->headers()
+                        .get(Http::CustomHeaders::get().ContentEncoding)[0]
+                        ->value()
+                        .getStringView());
+  EXPECT_EQ("gzip;Compressed;OriginalLength=4400",
+            response->headers()
+                .get(Http::Headers::get().EnvoyCompressionStatus)[0]
+                ->value()
+                .getStringView());
 }
 
 } // namespace Envoy

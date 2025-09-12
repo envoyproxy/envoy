@@ -201,16 +201,29 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override;
 
 private:
+  Http::FilterHeadersStatus
+  encodeHeadersWithStatusHeader(Http::ResponseHeaderMap& headers, bool end_stream,
+                                const CompressorFilterConfig::ResponseDirectionConfig& config,
+                                const CompressorPerRouteFilterConfig* per_route_config);
   bool compressionEnabled(const CompressorFilterConfig::ResponseDirectionConfig& config,
                           const CompressorPerRouteFilterConfig* per_route_config) const;
   bool removeAcceptEncodingHeader(const CompressorFilterConfig::ResponseDirectionConfig& config,
                                   const CompressorPerRouteFilterConfig* per_route_config) const;
   bool hasCacheControlNoTransform(Http::ResponseHeaderMap& headers) const;
   bool isAcceptEncodingAllowed(bool maybe_compress, const Http::ResponseHeaderMap& headers) const;
+  bool isAcceptEncodingAllowed(const Http::ResponseHeaderMap& headers) const;
+  bool checkIsEtagAllowedLogResponseStats(Http::ResponseHeaderMap& headers) const;
   bool isEtagAllowed(Http::ResponseHeaderMap& headers) const;
   bool isTransferEncodingAllowed(Http::RequestOrResponseHeaderMap& headers) const;
 
   void sanitizeEtagHeader(Http::ResponseHeaderMap& headers);
+  std::string getEnvoyCompressionStatusHeaderValue(
+      absl::string_view encoding_type, absl::string_view status_to_set,
+      absl::optional<absl::string_view> original_length = std::nullopt);
+  void insertEnvoyCompressionStatusHeader(
+      Http::ResponseHeaderMap& headers, absl::string_view encoding_type,
+      absl::string_view status_to_set,
+      absl::optional<absl::string_view> original_length = std::nullopt);
   void insertVaryHeader(Http::ResponseHeaderMap& headers);
 
   class EncodingDecision : public StreamInfo::FilterState::Object {
