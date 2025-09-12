@@ -11,6 +11,16 @@ licenses(["notice"])  # Apache 2
 
 envoy_extension_package()
 
+envoy_cc_library(
+    name = "span_context_lib",
+    hdrs = [
+        "span_context.h",
+    ],
+    deps = [
+        "@com_google_absl//absl/strings",
+    ],
+)
+
 envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
@@ -31,7 +41,6 @@ envoy_cc_library(
     ],
     hdrs = [
         "opentelemetry_tracer_impl.h",
-        "span_context.h",
         "span_context_extractor.h",
         "tracer.h",
     ],
@@ -41,10 +50,12 @@ envoy_cc_library(
         "-DHAVE_ABSEIL",
     ],
     deps = [
+        ":span_context_lib",
         ":trace_exporter",
         "//envoy/thread_local:thread_local_interface",
         "//source/common/config:utility_lib",
         "//source/common/tracing:http_tracer_lib",
+        "//source/extensions/propagators/opentelemetry:propagator_lib",
         "//source/extensions/tracers/common:factory_base_lib",
         "//source/extensions/tracers/opentelemetry/resource_detectors:resource_detector_lib",
         "//source/extensions/tracers/opentelemetry/samplers:sampler_lib",
