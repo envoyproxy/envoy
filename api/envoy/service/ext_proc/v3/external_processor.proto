@@ -269,8 +269,8 @@ message HttpBody {
   // The contents of the body in the HTTP request/response. Note that in
   // streaming mode multiple ``HttpBody`` messages may be sent.
   //
-  // In GRPC mode, a separate ``HttpBody`` message will be sent for each
-  // message in the gRPC stream.
+  // In ``GRPC`` body send mode, a separate ``HttpBody`` message will be
+  // sent for each message in the gRPC stream.
   bytes body = 1;
 
   // If ``true``, this will be the last ``HttpBody`` message that will be sent and no
@@ -335,7 +335,7 @@ message CommonResponse {
     // In other words, this response makes it possible to turn an HTTP GET
     // into a POST, PUT, or PATCH.
     //
-    // Not supported if the body processing mode is GRPC.
+    // Not supported if the body send mode is ``GRPC``.
     CONTINUE_AND_REPLACE = 1;
   }
 
