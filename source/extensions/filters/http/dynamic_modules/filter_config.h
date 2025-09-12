@@ -194,13 +194,17 @@ public:
     return id;
   }
 
-  const ModuleCounterHandle& getCounterById(size_t id) const {
-    ASSERT(id < counters_.size());
+  OptRef<const ModuleCounterHandle> getCounterById(size_t id) const {
+    if (id >= counters_.size()) {
+      return {};
+    }
     return counters_[id];
   }
 
-  const ModuleCounterVecHandle& getCounterVecById(size_t id) const {
-    ASSERT(id < counter_vecs_.size());
+  OptRef<const ModuleCounterVecHandle> getCounterVecById(size_t id) const {
+    if (id >= counter_vecs_.size()) {
+      return {};
+    }
     return counter_vecs_[id];
   }
 
@@ -216,13 +220,17 @@ public:
     return id;
   }
 
-  const ModuleGaugeHandle& getGaugeById(size_t id) const {
-    ASSERT(id < gauges_.size());
+  OptRef<const ModuleGaugeHandle> getGaugeById(size_t id) const {
+    if (id >= gauges_.size()) {
+      return {};
+    }
     return gauges_[id];
   }
 
-  const ModuleGaugeVecHandle& getGaugeVecById(size_t id) const {
-    ASSERT(id < gauge_vecs_.size());
+  OptRef<const ModuleGaugeVecHandle> getGaugeVecById(size_t id) const {
+    if (id >= gauge_vecs_.size()) {
+      return {};
+    }
     return gauge_vecs_[id];
   }
 
@@ -232,8 +240,10 @@ public:
     return id;
   }
 
-  const ModuleHistogramHandle& getHistogramById(size_t id) const {
-    ASSERT(id < hists_.size());
+  OptRef<const ModuleHistogramHandle> getHistogramById(size_t id) const {
+    if (id >= hists_.size()) {
+      return {};
+    }
     return hists_[id];
   }
 
@@ -243,8 +253,10 @@ public:
     return id;
   }
 
-  const ModuleHistogramVecHandle& getHistogramVecById(size_t id) const {
-    ASSERT(id < hist_vecs_.size());
+  OptRef<const ModuleHistogramVecHandle> getHistogramVecById(size_t id) const {
+    if (id >= hist_vecs_.size()) {
+      return {};
+    }
     return hist_vecs_[id];
   }
 
