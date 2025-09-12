@@ -132,7 +132,18 @@ envoy_cc_library(
 envoy_cc_library(
     name = "codec_wrappers_lib",
     hdrs = ["codec_wrappers.h"],
-    deps = ["//envoy/http:codec_interface"],
+    deps = [
+        ":response_decoder_impl_base",
+        "//envoy/http:codec_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "response_decoder_impl_base",
+    hdrs = ["response_decoder_impl_base.h"],
+    deps = [
+        "//envoy/http:codec_interface",
+    ],
 )
 
 envoy_cc_library(

@@ -21,6 +21,7 @@
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
+#include "source/common/http/response_decoder_impl_base.h"
 #include "source/common/http/utility.h"
 #include "source/common/network/socket_impl.h"
 #include "source/common/network/socket_interface.h"
@@ -311,7 +312,7 @@ public:
   }
 
 private:
-  class ResponseDecoder : public Http::ResponseDecoder {
+  class ResponseDecoder : public Http::ResponseDecoderImplBase {
   public:
     ResponseDecoder(HttpUpstreamImpl& parent) : parent_(parent) {}
 
