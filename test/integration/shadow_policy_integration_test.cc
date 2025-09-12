@@ -106,6 +106,34 @@ public:
   std::unique_ptr<Http::TestRequestHeaderMapImpl> mirror_headers_;
   TestScopedRuntime scoped_runtime_;
 };
+// Enable router COW via typed extension protocol options and validate a mirrored request with body
+// succeeds.
+TEST_P(ShadowPolicyIntegrationTest, MirrorWithCowEnabled) {
+  initialConfigSetup("cluster_1", "");
+  // Enable COW via typed extension protocol options.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() >= 1, "");
+    auto* cluster0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto& options =
+        (*cluster0->mutable_typed_extension_protocol_options())["envoy.filters.http.router"];
+    envoy::extensions::filters::http::router::v3::RouterClusterConfig config;
+    config.set_enable_copy_on_write(true);
+    options.PackFrom(config);
+  });
+
+  initialize();
+
+  // Issue a header-only request (fixtures may auto-add body in filters depending on filter_name_).
+  sendRequestAndValidateResponse();
+}
+
+// Verify that the behavior stays normal when COW is disabled (no protocol options configured).
+TEST_P(ShadowPolicyIntegrationTest, MirrorWithCowDisabledControl) {
+  initialConfigSetup("cluster_1", "");
+  // COW is disabled by default as there are no typed extension protocol options configured.
+  initialize();
+  sendRequestAndValidateResponse();
+}
 
 INSTANTIATE_TEST_SUITE_P(
     IpVersionsAndStreaming, ShadowPolicyIntegrationTest,
