@@ -26,6 +26,18 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "stat_match_input_lib",
+    srcs = ["stat_match_input.cc"],
+    hdrs = ["stat_match_input.h"],
+    deps = [
+        ":stats_matcher_lib",
+        "//envoy/registry",
+        "//envoy/stats:stats_interface",
+        "@envoy_api//envoy/extensions/matching/common_inputs/stats/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "custom_stat_namespaces_lib",
     srcs = ["custom_stat_namespaces_impl.cc"],
     hdrs = ["custom_stat_namespaces_impl.h"],

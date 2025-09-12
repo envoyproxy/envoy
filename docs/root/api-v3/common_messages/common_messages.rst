@@ -13,6 +13,7 @@ Common messages
   ../extensions/filters/common/matcher/action/v3/skip_action.proto
   ../extensions/matching/common_inputs/network/v3/network_inputs.proto
   ../extensions/common/ratelimit/v3/ratelimit.proto
+  ../extensions/matching/common_inputs/stats/v3/stats.proto
   ../extensions/matching/common_inputs/ssl/v3/ssl_inputs.proto
   ../config/core/v3/config_source.proto
   ../extensions/matching/input_matchers/consistent_hashing/v3/consistent_hashing.proto
