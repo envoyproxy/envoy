@@ -199,7 +199,7 @@ absl::Status
 MessageUtil::loadFromYamlNoThrow(const std::string& yaml, Protobuf::Message& message,
                                  ProtobufMessage::ValidationVisitor& validation_visitor) {
   absl::Status load_status = absl::OkStatus();
-  ProtobufWkt::Value value;
+  Protobuf::Value value;
   TRY_NEEDS_AUDIT { value = parseYamlNode(YAML::Load(yaml)); }
   END_TRY
   catch (YAML::ParserException& e) {
@@ -217,8 +217,8 @@ MessageUtil::loadFromYamlNoThrow(const std::string& yaml, Protobuf::Message& mes
     load_status =
         absl::InvalidArgumentError(fmt::format("Unexpected YAML exception: {}", e.what()));
   }
-  if (value.kind_case() == ProtobufWkt::Value::kStructValue ||
-      value.kind_case() == ProtobufWkt::Value::kListValue) {
+  if (value.kind_case() == Protobuf::Value::kStructValue ||
+      value.kind_case() == Protobuf::Value::kListValue) {
     load_status = jsonConvertInternalNoThrow(value, validation_visitor, message);
   } else {
     load_status =
