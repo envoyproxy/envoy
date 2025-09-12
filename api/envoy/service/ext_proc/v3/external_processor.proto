@@ -430,6 +430,10 @@ message StreamedBodyResponse {
   // The server sets this flag to true if it has received a body request with
   // :ref:`end_of_stream <envoy_v3_api_field_service.ext_proc.v3.HttpBody.end_of_stream>` set to true,
   // and this is the last chunk of body responses.
+  // Note that in ``GRPC`` body send mode, this allows the ext_proc
+  // server to tell the data plane to send a half close after a client
+  // message, which will result in discarding any other messages sent by
+  // the client application.
   bool end_of_stream = 2;
 }
 
