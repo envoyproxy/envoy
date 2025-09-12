@@ -107,6 +107,8 @@ public:
   class ModuleCounterHandleImpl : public ModuleCounterHandle {
   public:
     ModuleCounterHandleImpl(Stats::Counter& counter) : counter_(counter) {}
+
+    // ModuleCounterHandle
     void add(Stats::Scope&, Stats::StatNameTagVectorOptConstRef tags,
              uint64_t amount) const override {
       ASSERT(!tags.has_value());
@@ -123,12 +125,11 @@ public:
         : name_(name), label_names_(label_names) {}
 
     // ModuleMetricHandle
-    virtual StatNameVecConstOptRef getLabelNames() const override {
-      return StatNameVecConstOptRef(label_names_);
-    }
+    StatNameVecConstOptRef getLabelNames() const override { return (label_names_); }
 
-    virtual void add(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
-                     uint64_t amount) const override {
+    // ModuleCounterHandle
+    void add(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
+             uint64_t amount) const override {
       ASSERT(tags.has_value());
       Stats::Utility::counterFromElements(scope, {name_}, tags).add(amount);
     }
@@ -140,7 +141,7 @@ public:
 
   class ModuleGaugeHandle : public ModuleMetricHandle {
   public:
-    virtual ~ModuleGaugeHandle() = default;
+    ~ModuleGaugeHandle() override = default;
 
     // Increase the gauge by the given amount.
     virtual void increase(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
@@ -159,18 +160,20 @@ public:
   class ModuleGaugeHandleImpl : public ModuleGaugeHandle {
   public:
     ModuleGaugeHandleImpl(Stats::Gauge& gauge) : gauge_(gauge) {}
-    virtual void increase(Stats::Scope&, Stats::StatNameTagVectorOptConstRef tags,
-                          uint64_t amount) const override {
+
+    // ModuleGaugeHandle
+    void increase(Stats::Scope&, Stats::StatNameTagVectorOptConstRef tags,
+                  uint64_t amount) const override {
       ASSERT(!tags.has_value());
       gauge_.add(amount);
     }
-    virtual void decrease(Stats::Scope&, Stats::StatNameTagVectorOptConstRef tags,
-                          uint64_t amount) const override {
+    void decrease(Stats::Scope&, Stats::StatNameTagVectorOptConstRef tags,
+                  uint64_t amount) const override {
       ASSERT(!tags.has_value());
       gauge_.sub(amount);
     }
-    virtual void set(Stats::Scope&, Stats::StatNameTagVectorOptConstRef tags,
-                     uint64_t amount) const override {
+    void set(Stats::Scope&, Stats::StatNameTagVectorOptConstRef tags,
+             uint64_t amount) const override {
       ASSERT(!tags.has_value());
       gauge_.set(amount);
     }
@@ -186,22 +189,21 @@ public:
         : name_(name), label_names_(label_names), import_mode_(import_mode) {}
 
     // ModuleMetricHandle
-    virtual StatNameVecConstOptRef getLabelNames() const override {
-      return StatNameVecConstOptRef(label_names_);
-    }
+    StatNameVecConstOptRef getLabelNames() const override { return (label_names_); }
 
-    virtual void increase(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
-                          uint64_t amount) const override {
+    // ModuleGaugeHandle
+    void increase(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
+                  uint64_t amount) const override {
       ASSERT(tags.has_value());
       Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).add(amount);
     }
-    virtual void decrease(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
-                          uint64_t amount) const override {
+    void decrease(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
+                  uint64_t amount) const override {
       ASSERT(tags.has_value());
       Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).sub(amount);
     }
-    virtual void set(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
-                     uint64_t amount) const override {
+    void set(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
+             uint64_t amount) const override {
       ASSERT(tags.has_value());
       Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).set(amount);
     }
@@ -214,7 +216,7 @@ public:
 
   class ModuleHistogramHandle : public ModuleMetricHandle {
   public:
-    virtual ~ModuleHistogramHandle() = default;
+    ~ModuleHistogramHandle() override = default;
 
     // Record the given value.
     virtual void recordValue(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
@@ -225,8 +227,10 @@ public:
   class ModuleHistogramHandleImpl : public ModuleHistogramHandle {
   public:
     ModuleHistogramHandleImpl(Stats::Histogram& histogram) : histogram_(histogram) {}
-    virtual void recordValue(Stats::Scope&, Stats::StatNameTagVectorOptConstRef tags,
-                             uint64_t value) const override {
+
+    // ModuleHistogramHandle
+    void recordValue(Stats::Scope&, Stats::StatNameTagVectorOptConstRef tags,
+                     uint64_t value) const override {
       ASSERT(!tags.has_value());
       histogram_.recordValue(value);
     }
@@ -242,12 +246,11 @@ public:
         : name_(name), label_names_(label_names), unit_(unit) {}
 
     // ModuleMetricHandle
-    virtual StatNameVecConstOptRef getLabelNames() const override {
-      return StatNameVecConstOptRef(label_names_);
-    }
+    StatNameVecConstOptRef getLabelNames() const override { return (label_names_); }
 
-    virtual void recordValue(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
-                             uint64_t value) const override {
+    // ModuleHistogramHandle
+    void recordValue(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
+                     uint64_t value) const override {
       ASSERT(tags.has_value());
       Stats::Utility::histogramFromElements(scope, {name_}, unit_, tags).recordValue(value);
     }
