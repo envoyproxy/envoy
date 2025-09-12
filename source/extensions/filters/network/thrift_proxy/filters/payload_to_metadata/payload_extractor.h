@@ -95,11 +95,6 @@ public:
   FilterStatus setBegin(FieldType&, uint32_t&) override { return handleContainerBegin(); }
   FilterStatus setEnd() override { return handleContainerEnd(); }
 
-  ThriftProxy::FilterStatus passthroughData(Buffer::Instance&) override {
-    std::cout << "passthroughData" << std::endl;
-    return ThriftProxy::FilterStatus::Continue;
-  }
-
   // DecoderCallbacks
   DecoderEventHandler& newDecoderEventHandler() override { return *this; }
   bool passthroughEnabled() const override { return false; }

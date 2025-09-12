@@ -112,6 +112,7 @@ ThriftMetadataToProtobufValue Rule::getValueExtractorFromField(
       return value;
     };
   }
+  PANIC("not reached");
 }
 
 FilterConfig::FilterConfig(
