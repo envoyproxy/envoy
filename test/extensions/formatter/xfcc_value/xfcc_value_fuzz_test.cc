@@ -20,7 +20,7 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   auto formatter = parser.parse("XFCC_VALUE", "uri", absl::nullopt);
 
   Http::TestRequestHeaderMapImpl request_headers{};
-  request_headers.setForwardedClientCert(fmt::format("{},{}", sv, "URI=abc;DNS=example.com"));
+  request_headers.setForwardedClientCert(sv);
   StreamInfo::MockStreamInfo stream_info;
 
   formatter->formatValueWithContext({&request_headers}, stream_info);

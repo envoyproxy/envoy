@@ -40,7 +40,7 @@ absl::optional<std::string> parseKeyValuePair(absl::string_view pair, absl::stri
   std::pair<absl::string_view, absl::string_view> key_value =
       absl::StrSplit(pair, absl::MaxSplits('=', 1));
   absl::string_view raw_key = absl::StripAsciiWhitespace(key_value.first);
-  if (!absl::EndsWithIgnoreCase(raw_key, target)) {
+  if (!absl::EqualsIgnoreCase(raw_key, target)) {
     return absl::nullopt;
   }
 
@@ -50,9 +50,15 @@ absl::optional<std::string> parseKeyValuePair(absl::string_view pair, absl::stri
     raw_value = raw_value.substr(1, raw_value.size() - 2);
   }
 
+  // Quick path to avoid handle unescaping if not needed.
+  if (raw_value.find('\\') == absl::string_view::npos) {
+    return std::string(raw_value);
+  }
+
   // Unescape double quotes.
   // Note: this only handles escaped double quotes, not other escape sequences.
   std::string unescaped;
+  unescaped.reserve(raw_value.size());
   for (size_t i = 0; i < raw_value.size(); ++i) {
     if (raw_value[i] == '\\' && i + 1 < raw_value.size() && raw_value[i + 1] == '"') {
       unescaped.push_back('"');
