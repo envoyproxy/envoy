@@ -12,6 +12,13 @@ envoy.access_loggers.extension_filters.cel:
   status: alpha
   type_urls:
   - envoy.extensions.access_loggers.filters.cel.v3.ExpressionFilter
+envoy.access_loggers.extension_filters.local_ratelimit:
+  categories:
+  - envoy.access_loggers.extension_filters
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.access_loggers.filters.local_ratelimit.v3.LocalRateLimitFilter
 envoy.access_loggers.fluentd:
   categories:
   - envoy.access_loggers
