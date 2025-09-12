@@ -439,11 +439,14 @@ getLastNonTrustedAddressFromXFF(const Http::RequestHeaderMap& request_headers,
  * @param request_headers supplies the request headers.
  * @param num_to_skip specifies the number of addresses at the end of the XFF header
  *        to ignore when identifying the "last" address.
+ * @param use_remote_address when true and num_to_skip > 0, reduces num_to_skip by 1
+ *        to account for the current connection being appended to XFF.
  * @return GetLastAddressFromXffInfo information about the last address in the XFF header.
  *         @see GetLastAddressFromXffInfo for more information.
  */
 GetLastAddressFromXffInfo getLastAddressFromXFF(const Http::RequestHeaderMap& request_headers,
-                                                uint32_t num_to_skip = 0);
+                                                uint32_t num_to_skip = 0,
+                                                bool use_remote_address = false);
 
 /**
  * Remove any headers nominated by the Connection header

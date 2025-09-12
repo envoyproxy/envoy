@@ -20,6 +20,7 @@
 #include "source/common/runtime/runtime_features.h"
 #include "source/common/stream_info/utility.h"
 #include "source/common/tracing/http_tracer_impl.h"
+#include "source/extensions/http/original_ip_detection/xff/xff.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
@@ -127,25 +128,55 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
   Network::Address::InstanceConstSharedPtr final_remote_address;
   bool allow_trusted_address_checks = false;
   const uint32_t xff_num_trusted_hops = config.xffNumTrustedHops();
+  const bool skip_xff_append = config.skipXffAppend();
 
   if (config.useRemoteAddress()) {
     allow_trusted_address_checks = request_headers.ForwardedFor() == nullptr;
-    // If there are any trusted proxies in front of this Envoy instance (as indicated by
-    // the xff_num_trusted_hops configuration option), get the trusted client address
-    // from the XFF before we append to XFF.
-    if (xff_num_trusted_hops > 0) {
-      final_remote_address =
-          Utility::getLastAddressFromXFF(request_headers, xff_num_trusted_hops - 1).address_;
+
+    // Build a list of extensions to use, including configured extensions and a dynamic XFF
+    // extension if xff_num_trusted_hops is configured.
+    std::vector<std::shared_ptr<OriginalIPDetection>> extensions_to_use;
+    for (const auto& extension : config.originalIpDetectionExtensions()) {
+      extensions_to_use.push_back(extension);
     }
-    // If there aren't any trusted proxies in front of this Envoy instance, or there
-    // are but they didn't populate XFF properly, the trusted client address is the
-    // source address of the immediate downstream's connection to us.
+    if (xff_num_trusted_hops > 0) {
+      auto dynamic_xff_extension =
+          std::make_shared<Extensions::Http::OriginalIPDetection::Xff::XffIPDetection>(
+              xff_num_trusted_hops, skip_xff_append);
+      extensions_to_use.push_back(dynamic_xff_extension);
+    }
+
+    // Try original IP detection extensions
+    if (!extensions_to_use.empty()) {
+      OriginalIPDetectionParams params = {
+          request_headers, connection.connectionInfoProvider().remoteAddress(), true};
+
+      for (const auto& detection_extension : extensions_to_use) {
+        const auto result = detection_extension->detect(params);
+
+        if (result.reject_options.has_value()) {
+          return {nullptr, result.reject_options};
+        }
+
+        if (result.detected_remote_address) {
+          final_remote_address = result.detected_remote_address;
+          allow_trusted_address_checks = result.allow_trusted_address_checks;
+          break;
+        }
+      }
+    }
+
+    // If no extensions detected an address, use the direct connection address as fallback
     if (final_remote_address == nullptr) {
       final_remote_address = connection.connectionInfoProvider().remoteAddress();
     }
-    if (!config.skipXffAppend()) {
+
+    // In useRemoteAddress=true mode, always append XFF to record this hop (unless globally
+    // disabled) This preserves the original behavior where XFF was always appended
+    if (!skip_xff_append) {
       appendXff(request_headers, connection, config);
     }
+
     // If the prior hop is not a trusted proxy, overwrite any
     // x-forwarded-proto/x-forwarded-port value it set as untrusted. Alternately if no
     // x-forwarded-proto/x-forwarded-port header exists, add one if configured.
@@ -168,22 +199,28 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     //
     // If we find one, it will be used as the downstream address for logging. It may or may not be
     // used for determining internal/external status (see below).
-    OriginalIPDetectionParams params = {request_headers,
-                                        connection.connectionInfoProvider().remoteAddress()};
-    for (const auto& detection_extension : config.originalIpDetectionExtensions()) {
-      const auto result = detection_extension->detect(params);
+    const auto& extensions = config.originalIpDetectionExtensions();
+    if (!extensions.empty()) {
+      OriginalIPDetectionParams params = {
+          request_headers, connection.connectionInfoProvider().remoteAddress(), false};
 
-      if (result.reject_options.has_value()) {
-        return {nullptr, result.reject_options};
-      }
-      if (!result.skip_xff_append) {
-        appendXff(request_headers, connection, config);
-      }
+      for (const auto& detection_extension : extensions) {
+        const auto result = detection_extension->detect(params);
 
-      if (result.detected_remote_address) {
-        final_remote_address = result.detected_remote_address;
-        allow_trusted_address_checks = result.allow_trusted_address_checks;
-        break;
+        if (result.reject_options.has_value()) {
+          return {nullptr, result.reject_options};
+        }
+
+        // In useRemoteAddress=false mode, let extensions handle their own XFF appending
+        if (!result.skip_xff_append) {
+          appendXff(request_headers, connection, config);
+        }
+
+        if (result.detected_remote_address) {
+          final_remote_address = result.detected_remote_address;
+          allow_trusted_address_checks = result.allow_trusted_address_checks;
+          break;
+        }
       }
     }
   }
