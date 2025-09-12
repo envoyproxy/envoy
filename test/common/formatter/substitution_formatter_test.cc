@@ -4169,7 +4169,6 @@ TEST(SubstitutionFormatterTest, FilterStateSpeciferTest) {
   const std::string expected_json_map = R"EOF(
     {
       "test_key_plain": "test_value By PLAIN",
-      "test_per_request_state": "test_value By PLAIN",
       "test_key_typed": "test_value By TYPED",
       "test_key_field": "test_value",
       "upstream_test_key_plain": "test_value By PLAIN",
@@ -4181,7 +4180,6 @@ TEST(SubstitutionFormatterTest, FilterStateSpeciferTest) {
   Protobuf::Struct key_mapping;
   TestUtility::loadFromYaml(R"EOF(
     test_key_plain: '%FILTER_STATE(test_key:PLAIN)%'
-    test_per_request_state: '%PER_REQUEST_STATE(test_key)%'
     test_key_typed: '%FILTER_STATE(test_key:TYPED)%'
     test_key_field: '%FILTER_STATE(test_key:FIELD:test_field)%'
     upstream_test_key_plain: '%UPSTREAM_FILTER_STATE(test_key:PLAIN)%'

@@ -1,10 +1,11 @@
 #include <regex>
 #include <string>
 
+#include "envoy/server/factory_context.h"
+
 #include "source/common/common/assert.h"
 #include "source/common/json/json_loader.h"
 #include "source/common/router/header_parser.h"
-#include "envoy/server/factory_context.h"
 
 #include "absl/strings/str_replace.h"
 #include "re2/re2.h"

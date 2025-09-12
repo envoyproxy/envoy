@@ -56,9 +56,9 @@ minor_behavior_changes:
 - area: formatter
   change: |
     Deprecated legacy header formatter support for ``%DYNAMIC_METADATA(["namespace", "key", ...])%``
-    and ``%UPSTREAM_METADATA(["namespace", "key", ...])%``. Please use
-    ``%DYNAMIC_METADATA(namespace:key:...])%`` and ``%UPSTREAM_METADATA(namespace:key:...])%``
-    as alternatives.
+    , ``%UPSTREAM_METADATA(["namespace", "key", ...])%`` and ``%PER_REQUEST_STATE(key)%``. Please use
+    ``%DYNAMIC_METADATA(namespace:key:...])%``, ``%UPSTREAM_METADATA(namespace:key:...])%``
+    and ``%FILTER_STATE(key:PLAIN)%`` as alternatives.
     This change is guarded by the runtime flag
     ``envoy.reloadable_features.remove_legacy_route_formatter`` and default to ``false`` for now
     and will be flipped to ``true`` after two release periods.

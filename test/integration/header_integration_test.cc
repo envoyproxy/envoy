@@ -1389,24 +1389,24 @@ TEST_P(EmptyHeaderIntegrationTest, AllProtocolsPassEmptyHeaders) {
   *vhost.add_request_headers_to_add() = TestUtility::parseYaml<HeaderValueOption>(R"EOF(
     header:
       key: "x-ds-add-empty"
-      value: "%PER_REQUEST_STATE(does.not.exist)%"
+      value: "%FILTER_STATE(does.not.exist:PLAIN)%"
     keep_empty_value: true
   )EOF");
   *vhost.add_request_headers_to_add() = TestUtility::parseYaml<HeaderValueOption>(R"EOF(
     header:
       key: "x-ds-no-add-empty"
-      value: "%PER_REQUEST_STATE(does.not.exist)%"
+      value: "%FILTER_STATE(does.not.exist:PLAIN)%"
   )EOF");
   *vhost.add_response_headers_to_add() = TestUtility::parseYaml<HeaderValueOption>(R"EOF(
     header:
       key: "x-us-add-empty"
-      value: "%PER_REQUEST_STATE(does.not.exist)%"
+      value: "%FILTER_STATE(does.not.exist:PLAIN)%"
     keep_empty_value: true
   )EOF");
   *vhost.add_response_headers_to_add() = TestUtility::parseYaml<HeaderValueOption>(R"EOF(
     header:
       key: "x-us-no-add-empty"
-      value: "%PER_REQUEST_STATE(does.not.exist)%"
+      value: "%FILTER_STATE(does.not.exist:PLAIN)%"
   )EOF");
 
   config_helper_.addVirtualHost(vhost);

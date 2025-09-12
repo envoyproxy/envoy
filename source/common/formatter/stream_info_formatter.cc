@@ -1880,13 +1880,6 @@ const StreamInfoFormatterProviderLookupTable& getKnownStreamInfoFormatterProvide
             [](absl::string_view format, absl::optional<size_t> max_length) {
               return FilterStateFormatter::create(format, max_length, true);
             }}},
-          {"PER_REQUEST_STATE",
-           {CommandSyntaxChecker::PARAMS_REQUIRED,
-            [](absl::string_view format, absl::optional<size_t>) {
-              // PER_REQUEST_STATE(KEY) == FILTER_STATE(KEY:PLAIN)
-              // Mainly for backward compatibility.
-              return std::make_unique<FilterStateFormatter>(format, absl::nullopt, true);
-            }}},
           {"DOWNSTREAM_PEER_CERT_V_START",
            {CommandSyntaxChecker::PARAMS_OPTIONAL,
             [](absl::string_view format, absl::optional<size_t>) {
