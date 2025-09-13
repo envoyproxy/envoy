@@ -12,6 +12,7 @@ use mockall::*;
 #[path = "./lib_test.rs"]
 mod mod_test;
 
+use crate::abi::envoy_dynamic_module_type_metrics_result;
 use std::any::Any;
 use std::sync::OnceLock;
 
@@ -370,13 +371,43 @@ pub trait HttpFilter<EHF: EnvoyHttpFilter> {
 /// mapping with the Envoy Http filter config object as well as [`HttpFilterConfig`] object.
 pub trait EnvoyHttpFilterConfig {
   /// Define a new counter scoped to this filter config with the given name.
-  fn define_counter(&mut self, name: &str) -> EnvoyCounterId;
+  fn define_counter(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyCounterId, envoy_dynamic_module_type_metrics_result>;
+
+  // Define a new counter vec scoped to this filter config with the given name.
+  fn define_counter_vec(
+    &mut self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<EnvoyCounterVecId, envoy_dynamic_module_type_metrics_result>;
 
   /// Define a new gauge scoped to this filter config with the given name.
-  fn define_gauge(&mut self, name: &str) -> EnvoyGaugeId;
+  fn define_gauge(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyGaugeId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new gauge vec scoped to this filter config with the given name.
+  fn define_gauge_vec(
+    &mut self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<EnvoyGaugeVecId, envoy_dynamic_module_type_metrics_result>;
 
   /// Define a new histogram scoped to this filter config with the given name.
-  fn define_histogram(&mut self, name: &str) -> EnvoyHistogramId;
+  fn define_histogram(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyHistogramId, envoy_dynamic_module_type_metrics_result>;
+
+  /// Define a new histogram vec scoped to this filter config with the given name.
+  fn define_histogram_vec(
+    &mut self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<EnvoyHistogramVecId, envoy_dynamic_module_type_metrics_result>;
 }
 
 pub struct EnvoyHttpFilterConfigImpl {
@@ -384,43 +415,127 @@ pub struct EnvoyHttpFilterConfigImpl {
 }
 
 impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
-  fn define_counter(&mut self, name: &str) -> EnvoyCounterId {
+  fn define_counter(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyCounterId, envoy_dynamic_module_type_metrics_result> {
     let name_ptr = name.as_ptr();
     let name_size = name.len();
-    let id = unsafe {
+    let mut id: usize = 0;
+    Result::from(unsafe {
       abi::envoy_dynamic_module_callback_http_filter_config_define_counter(
         self.raw_ptr,
         name_ptr as *const _ as *mut _,
         name_size,
+        &mut id,
       )
-    };
-    EnvoyCounterId(id)
+    })?;
+    Ok(EnvoyCounterId(id))
   }
 
-  fn define_gauge(&mut self, name: &str) -> EnvoyGaugeId {
+  fn define_counter_vec(
+    &mut self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<EnvoyCounterVecId, envoy_dynamic_module_type_metrics_result> {
     let name_ptr = name.as_ptr();
     let name_size = name.len();
-    let id = unsafe {
+    let labels_ptr = labels.as_ptr();
+    let labels_size = labels.len();
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_define_counter_vec(
+        self.raw_ptr,
+        name_ptr as *const _ as *mut _,
+        name_size,
+        labels_ptr as *const _ as *mut _,
+        labels_size,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyCounterVecId(id))
+  }
+
+  fn define_gauge(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyGaugeId, envoy_dynamic_module_type_metrics_result> {
+    let name_ptr = name.as_ptr();
+    let name_size = name.len();
+    let mut id: usize = 0;
+    Result::from(unsafe {
       abi::envoy_dynamic_module_callback_http_filter_config_define_gauge(
         self.raw_ptr,
         name_ptr as *const _ as *mut _,
         name_size,
+        &mut id,
       )
-    };
-    EnvoyGaugeId(id)
+    })?;
+    Ok(EnvoyGaugeId(id))
   }
 
-  fn define_histogram(&mut self, name: &str) -> EnvoyHistogramId {
+  fn define_gauge_vec(
+    &mut self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<EnvoyGaugeVecId, envoy_dynamic_module_type_metrics_result> {
     let name_ptr = name.as_ptr();
     let name_size = name.len();
-    let id = unsafe {
+    let labels_ptr = labels.as_ptr();
+    let labels_size = labels.len();
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_define_gauge_vec(
+        self.raw_ptr,
+        name_ptr as *const _ as *mut _,
+        name_size,
+        labels_ptr as *const _ as *mut _,
+        labels_size,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyGaugeVecId(id))
+  }
+
+  fn define_histogram(
+    &mut self,
+    name: &str,
+  ) -> Result<EnvoyHistogramId, envoy_dynamic_module_type_metrics_result> {
+    let name_ptr = name.as_ptr();
+    let name_size = name.len();
+    let mut id: usize = 0;
+    Result::from(unsafe {
       abi::envoy_dynamic_module_callback_http_filter_config_define_histogram(
         self.raw_ptr,
         name_ptr as *const _ as *mut _,
         name_size,
+        &mut id,
       )
-    };
-    EnvoyHistogramId(id)
+    })?;
+    Ok(EnvoyHistogramId(id))
+  }
+
+  fn define_histogram_vec(
+    &mut self,
+    name: &str,
+    labels: &[&str],
+  ) -> Result<EnvoyHistogramVecId, envoy_dynamic_module_type_metrics_result> {
+    let name_ptr = name.as_ptr();
+    let name_size = name.len();
+    let labels_ptr = labels.as_ptr();
+    let labels_size = labels.len();
+    let mut id: usize = 0;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_config_define_histogram_vec(
+        self.raw_ptr,
+        name_ptr as *const _ as *mut _,
+        name_size,
+        labels_ptr as *const _ as *mut _,
+        labels_size,
+        &mut id,
+      )
+    })?;
+    Ok(EnvoyHistogramVecId(id))
   }
 }
 
@@ -428,13 +543,25 @@ impl EnvoyHttpFilterConfig for EnvoyHttpFilterConfigImpl {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct EnvoyCounterId(usize);
 
+/// The identifier for an EnvoyCounterVec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EnvoyCounterVecId(usize);
+
 /// The identifier for an EnvoyGauge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct EnvoyGaugeId(usize);
 
+/// The identifier for an EnvoyGaugeVec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EnvoyGaugeVecId(usize);
+
 /// The identifier for an EnvoyHistogram.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct EnvoyHistogramId(usize);
+
+/// The identifier for an EnvoyHistogramVec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EnvoyHistogramVecId(usize);
 
 /// An opaque object that represents the underlying Envoy Http filter. This has one to one
 /// mapping with the Envoy Http filter object as well as [`HttpFilter`] object per HTTP stream.
@@ -839,19 +966,79 @@ pub trait EnvoyHttpFilter {
   fn new_scheduler(&self) -> Box<dyn EnvoyHttpFilterScheduler>;
 
   /// Increment the counter with the given id.
-  fn increment_counter(&self, id: EnvoyCounterId, value: u64);
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increment the counter vec with the given id.
+  fn increment_counter_vec<'a>(
+    &self,
+    id: EnvoyCounterVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
   /// Increase the gauge with the given id.
-  fn increase_gauge(&self, id: EnvoyGaugeId, value: u64);
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Increase the gauge vec with the given id.
+  fn increase_gauge_vec<'a>(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
   /// Decrease the gauge with the given id.
-  fn decrease_gauge(&self, id: EnvoyGaugeId, value: u64);
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Decrease the gauge vec with the given id.
+  fn decrease_gauge_vec<'a>(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
   /// Set the value of the gauge with the given id.
-  fn set_gauge(&self, id: EnvoyGaugeId, value: u64);
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Set the value of the gauge vec with the given id.
+  fn set_gauge_vec<'a>(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 
   /// Record a value in the histogram with the given id.
-  fn record_histogram_value(&self, id: EnvoyHistogramId, value: u64);
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
+
+  /// Record a value in the histogram vec with the given id.
+  fn record_histogram_value_vec<'a>(
+    &self,
+    id: EnvoyHistogramVecId,
+    labels: &[&'a str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result>;
 }
 
 /// This implements the [`EnvoyHttpFilter`] trait with the given raw pointer to the Envoy HTTP
@@ -1406,43 +1593,190 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn increment_counter(&self, id: EnvoyCounterId, value: u64) {
+  fn increment_counter(
+    &self,
+    id: EnvoyCounterId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
     let EnvoyCounterId(id) = id;
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_filter_increment_counter(self.raw_ptr, id, value);
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_increment_counter(self.raw_ptr, id, value)
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
     }
   }
 
-  fn increase_gauge(&self, id: EnvoyGaugeId, value: u64) {
-    let EnvoyGaugeId(id) = id;
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_filter_increase_gauge(self.raw_ptr, id, value);
-    }
-  }
-
-  fn decrease_gauge(&self, id: EnvoyGaugeId, value: u64) {
-    let EnvoyGaugeId(id) = id;
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_filter_decrease_gauge(self.raw_ptr, id, value);
-    }
-  }
-
-  fn set_gauge(&self, id: EnvoyGaugeId, value: u64) {
-    let EnvoyGaugeId(id) = id;
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_filter_set_gauge(self.raw_ptr, id, value);
-    }
-  }
-
-  fn record_histogram_value(&self, id: EnvoyHistogramId, value: u64) {
-    let EnvoyHistogramId(id) = id;
-    unsafe {
-      abi::envoy_dynamic_module_callback_http_filter_record_histogram_value(
+  fn increment_counter_vec(
+    &self,
+    id: EnvoyCounterVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyCounterVecId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_increment_counter_vec(
         self.raw_ptr,
         id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
         value,
-      );
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
     }
+  }
+
+  fn increase_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_increase_gauge(self.raw_ptr, id, value)
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn increase_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_increase_gauge_vec(
+        self.raw_ptr,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn decrease_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_decrease_gauge(self.raw_ptr, id, value)
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn decrease_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_decrease_gauge_vec(
+        self.raw_ptr,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn set_gauge(
+    &self,
+    id: EnvoyGaugeId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeId(id) = id;
+    let res =
+      unsafe { abi::envoy_dynamic_module_callback_http_filter_set_gauge(self.raw_ptr, id, value) };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn set_gauge_vec(
+    &self,
+    id: EnvoyGaugeVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyGaugeVecId(id) = id;
+    let res = unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_set_gauge_vec(
+        self.raw_ptr,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    };
+    if res == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(res)
+    }
+  }
+
+  fn record_histogram_value(
+    &self,
+    id: EnvoyHistogramId,
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyHistogramId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_record_histogram_value(self.raw_ptr, id, value)
+    })?;
+    Ok(())
+  }
+
+  fn record_histogram_value_vec(
+    &self,
+    id: EnvoyHistogramVecId,
+    labels: &[&str],
+    value: u64,
+  ) -> Result<(), envoy_dynamic_module_type_metrics_result> {
+    let EnvoyHistogramVecId(id) = id;
+    Result::from(unsafe {
+      abi::envoy_dynamic_module_callback_http_filter_record_histogram_value_vec(
+        self.raw_ptr,
+        id,
+        labels.as_ptr() as *const _ as *mut _,
+        labels.len(),
+        value,
+      )
+    })?;
+    Ok(())
   }
 }
 
@@ -1909,4 +2243,16 @@ unsafe extern "C" fn envoy_dynamic_module_on_http_filter_scheduled(
   let filter = filter_ptr as *mut *mut dyn HttpFilter<EnvoyHttpFilterImpl>;
   let filter = &mut **filter;
   filter.on_scheduled(&mut EnvoyHttpFilterImpl::new(envoy_ptr), event_id);
+}
+
+impl From<envoy_dynamic_module_type_metrics_result>
+  for Result<(), envoy_dynamic_module_type_metrics_result>
+{
+  fn from(result: envoy_dynamic_module_type_metrics_result) -> Self {
+    if result == envoy_dynamic_module_type_metrics_result::Success {
+      Ok(())
+    } else {
+      Err(result)
+    }
+  }
 }

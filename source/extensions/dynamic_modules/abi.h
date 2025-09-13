@@ -165,6 +165,14 @@ typedef struct {
 } envoy_dynamic_module_type_envoy_buffer;
 
 /**
+ * envoy_dynamic_module_type_module_buffer represents a buffer owned by the module.
+ */
+typedef struct {
+  envoy_dynamic_module_type_buffer_module_ptr ptr;
+  size_t length;
+} envoy_dynamic_module_type_module_buffer;
+
+/**
  * envoy_dynamic_module_type_module_http_header represents a key-value pair of an HTTP header owned
  * by the module.
  */
@@ -456,6 +464,20 @@ typedef enum {
   envoy_dynamic_module_type_http_callout_result_Reset,
   envoy_dynamic_module_type_http_callout_result_ExceedResponseBufferLimit,
 } envoy_dynamic_module_type_http_callout_result;
+
+/**
+ * envoy_dynamic_module_type_metrics_result represents the result of the metrics operation.
+ * Success means the operation was successful.
+ * MetricNotFound means the metric was not found. This is usually an indication that a handle was
+ * improperly initialized or stored. InvalidLabels means the labels are invalid. Frozen means a
+ * metric was attempted to be created when the stats creation is frozen.
+ */
+typedef enum {
+  envoy_dynamic_module_type_metrics_result_Success,
+  envoy_dynamic_module_type_metrics_result_MetricNotFound,
+  envoy_dynamic_module_type_metrics_result_InvalidLabels,
+  envoy_dynamic_module_type_metrics_result_Frozen,
+} envoy_dynamic_module_type_metrics_result;
 
 // -----------------------------------------------------------------------------
 // ------------------------------- Event Hooks ---------------------------------
@@ -777,13 +799,38 @@ bool envoy_dynamic_module_callback_log_enabled(envoy_dynamic_module_type_log_lev
  * counter will be defined.
  * @param name is the name of the counter to be defined.
  * @param name_length is the length of the name.
- * @return an opaque ID that represents a unique metric. This can be passed to
- * envoy_dynamic_module_callback_http_filter_increment_counter together with filter_envoy_ptr
- * created from filter_config_envoy_ptr.
+ * @param counter_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_http_filter_increment_counter together with
+ * filter_envoy_ptr created from filter_config_envoy_ptr.
+ * @return the result of the operation.
  */
-size_t envoy_dynamic_module_callback_http_filter_config_define_counter(
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_define_counter(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length);
+    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length, size_t* counter_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_define_counter_vec is called by the module
+ * during initialization to create a template for generating Stats::Counters with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig in which the
+ * counter will be defined.
+ * @param name is the name of the counter to be defined.
+ * @param name_length is the length of the name.
+ * @param label_names is the labels of the counter to be defined.
+ * @param label_names_length is the length of the label_names.
+ * @param counter_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_http_filter_increment_counter together with
+ * filter_envoy_ptr created from filter_config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_define_counter_vec(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* counter_id_ptr);
 
 /**
  * envoy_dynamic_module_callback_http_filter_increment_counter is called by the module to increment
@@ -793,9 +840,29 @@ size_t envoy_dynamic_module_callback_http_filter_config_define_counter(
  * @param id is the ID of the counter previously defined using the config that created
  * filter_envoy_ptr
  * @param value is the value to increment the counter by.
+ * @return the result of the operation.
  */
-void envoy_dynamic_module_callback_http_filter_increment_counter(
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_increment_counter(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_increment_counter_vec is called by the module to
+ * increment a previously defined counter vec.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param id is the ID of the counter previously defined using the config that created
+ * filter_envoy_ptr
+ * @param label_values is the values of the labels to be incremented.
+ * @param label_values_length is the length of the label_values.
+ * @param value is the value to increment the counter by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_increment_counter_vec(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
 
 /**
  * envoy_dynamic_module_callback_http_filter_config_define_gauge is called by the module during
@@ -805,13 +872,37 @@ void envoy_dynamic_module_callback_http_filter_increment_counter(
  * gauge will be defined.
  * @param name is the name of the gauge to be defined.
  * @param name_length is the length of the name.
- * @return an opaque ID that represents a unique metric. This can be passed to
- * envoy_dynamic_module_callback_http_filter_increment_gauge together with filter_envoy_ptr created
- * from filter_config_envoy_ptr.
+ * @param gauge_id_ptr where the opaque ID that represents a unique metric will be stored. This can
+ * be passed to envoy_dynamic_module_callback_http_filter_increment_gauge together with
+ * filter_envoy_ptr created from filter_config_envoy_ptr.
  */
-size_t envoy_dynamic_module_callback_http_filter_config_define_gauge(
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_define_gauge(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length);
+    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length, size_t* gauge_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_define_gauge_vec is called by the module during
+ * initialization to create a template for generating Stats::Gauges with the given name and labels
+ * during the lifecycle of the module.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig in which the
+ * gauge will be defined.
+ * @param name is the name of the gauge to be defined.
+ * @param name_length is the length of the name.
+ * @param label_names is the labels of the gauge to be defined.
+ * @param label_names_length is the length of the label_names.
+ * @param gauge_id_ptr where the opaque ID that represents a unique metric will be stored. This can
+ * be passed to envoy_dynamic_module_callback_http_filter_increment_gauge together with
+ * filter_envoy_ptr created from filter_config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_define_gauge_vec(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* gauge_id_ptr);
 
 /**
  * envoy_dynamic_module_callback_http_filter_increase_gauge is called by the module to increase the
@@ -821,9 +912,28 @@ size_t envoy_dynamic_module_callback_http_filter_config_define_gauge(
  * @param id is the ID of the gauge previously defined using the config that created
  * filter_envoy_ptr
  * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
  */
-void envoy_dynamic_module_callback_http_filter_increase_gauge(
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filter_increase_gauge(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_increase_gauge_vec is called by the module to increase
+ * the value of a previously defined gauge vec.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param id is the ID of the gauge previously defined using the config that created
+ * filter_envoy_ptr
+ * @param label_values is the values of the labels to be increased.
+ * @param label_values_length is the length of the label_values.
+ * @param value is the value to increase the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_increase_gauge_vec(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
 
 /**
  * envoy_dynamic_module_callback_http_filter_decrease_gauge is called by the module to decrease the
@@ -833,9 +943,28 @@ void envoy_dynamic_module_callback_http_filter_increase_gauge(
  * @param id is the ID of the gauge previously defined using the config that created
  * filter_envoy_ptr
  * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
  */
-void envoy_dynamic_module_callback_http_filter_decrease_gauge(
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filter_decrease_gauge(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_decrease_gauge_vec is called by the module to decrease
+ * the value of a previously defined gauge vec.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param id is the ID of the gauge previously defined using the config that created
+ * filter_envoy_ptr
+ * @param label_values is the values of the labels to be decreased.
+ * @param label_values_length is the length of the label_values.
+ * @param value is the value to decrease the gauge by.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_decrease_gauge_vec(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
 
 /**
  * envoy_dynamic_module_callback_http_filter_set_gauge is called by the module to set the value
@@ -845,9 +974,27 @@ void envoy_dynamic_module_callback_http_filter_decrease_gauge(
  * @param id is the ID of the gauge previously defined using the config that created
  * filter_envoy_ptr
  * @param value is the value to set the gauge to.
+ * @return the result of the operation.
  */
-void envoy_dynamic_module_callback_http_filter_set_gauge(
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filter_set_gauge(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_set_gauge_vec is called by the module to set the value
+ * of a previously defined gauge vec.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object.
+ * @param id is the ID of the gauge previously defined using the config that created
+ * filter_envoy_ptr
+ * @param label_values is the values of the labels to be set.
+ * @param label_values_length is the length of the label_values.
+ * @param value is the value to set the gauge to.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result envoy_dynamic_module_callback_http_filter_set_gauge_vec(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
 
 /**
  * envoy_dynamic_module_callback_http_filter_config_define_histogram is called by the module during
@@ -857,13 +1004,38 @@ void envoy_dynamic_module_callback_http_filter_set_gauge(
  * histogram will be defined.
  * @param name is the name of the histogram to be defined.
  * @param name_length is the length of the name.
- * @return an opaque ID that represents a unique metric. This can be passed to
- * envoy_dynamic_module_callback_http_filter_increment_gauge together with filter_envoy_ptr created
- * from filter_config_envoy_ptr.
+ * @param histogram_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_http_filter_increment_gauge together with
+ * filter_envoy_ptr created from filter_config_envoy_ptr.
+ * @return the result of the operation.
  */
-size_t envoy_dynamic_module_callback_http_filter_config_define_histogram(
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_define_histogram(
     envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
-    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length);
+    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length, size_t* histogram_id_ptr);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_config_define_histogram is called by the module during
+ * initialization to create a template for generating Stats::Histograms with the given name and
+ * labels during the lifecycle of the module.
+ *
+ * @param filter_config_envoy_ptr is the pointer to the DynamicModuleHttpFilterConfig in which the
+ * histogram will be defined.
+ * @param name is the name of the histogram to be defined.
+ * @param name_length is the length of the name.
+ * @param label_names is the labels of the histogram to be defined.
+ * @param label_names_length is the length of the label_names.
+ * @param histogram_id_ptr where the opaque ID that represents a unique metric will be stored. This
+ * can be passed to envoy_dynamic_module_callback_http_filter_increment_gauge together with
+ * filter_envoy_ptr created from filter_config_envoy_ptr.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_config_define_histogram_vec(
+    envoy_dynamic_module_type_http_filter_config_envoy_ptr filter_config_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr name, size_t name_length,
+    envoy_dynamic_module_type_module_buffer* label_names, size_t label_names_length,
+    size_t* histogram_id_ptr);
 
 /**
  * envoy_dynamic_module_callback_http_filter_record_histogram_value is called by the module to
@@ -874,9 +1046,30 @@ size_t envoy_dynamic_module_callback_http_filter_config_define_histogram(
  * @param id is the ID of the histogram previously defined using the config that created
  * filter_envoy_ptr
  * @param value is the value to record in the histogram.
+ * @return the result of the operation.
  */
-void envoy_dynamic_module_callback_http_filter_record_histogram_value(
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_record_histogram_value(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id, uint64_t value);
+
+/**
+ * envoy_dynamic_module_callback_http_filter_record_histogram_value is called by the module to
+ * record a value in a previously defined histogram vec.
+ *
+ * @param histogram_envoy_ptr is a pointer to a histogram previously defined using
+ * envoy_dynamic_module_callback_http_define_histogram.
+ * @param id is the ID of the histogram previously defined using the config that created
+ * filter_envoy_ptr
+ * @param label_values is the values of the labels to be recorded.
+ * @param label_values_length is the length of the label_values.
+ * @param value is the value to record in the histogram.
+ * @return the result of the operation.
+ */
+envoy_dynamic_module_type_metrics_result
+envoy_dynamic_module_callback_http_filter_record_histogram_value_vec(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t id,
+    envoy_dynamic_module_type_module_buffer* label_values, size_t label_values_length,
+    uint64_t value);
 
 // ---------------------- HTTP Header/Trailer callbacks ------------------------
 
