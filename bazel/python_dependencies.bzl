@@ -1,8 +1,19 @@
+# DEPRECATED: This file is no longer used for bzlmod builds.
+# Python dependencies are now handled by upstream rules_python extensions in MODULE.bazel.
+# 
+# For bzlmod builds:
+# - pip dependencies are handled by @rules_python//python/extensions:pip.bzl
+# - python toolchains are handled by @rules_python//python/extensions:python.bzl
+#
+# This file is preserved for WORKSPACE-only builds and will be removed once
+# full bzlmod migration is complete.
+
 load("@com_google_protobuf//bazel:system_python.bzl", "system_python")
 load("@envoy_toolshed//:packages.bzl", "load_packages")
 load("@rules_python//python:pip.bzl", "pip_parse")
 
 def envoy_python_dependencies():
+    """DEPRECATED: Use upstream rules_python extensions in bzlmod instead."""
     # TODO(phlax): rename base_pip3 -> pip3 and remove this
     load_packages()
     pip_parse(

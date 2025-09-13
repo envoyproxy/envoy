@@ -66,7 +66,7 @@ jobs:
         - name: Inject bazel version
           shell: bash
           run: |
-            echo "7.1.2" > .bazelversion
+            echo "7.6.1" > .bazelversion
       target: mobile-coverage
       timeout-minutes: 120
       upload-name: coverage.tar.gz

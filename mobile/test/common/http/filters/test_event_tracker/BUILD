@@ -24,12 +24,12 @@ envoy_cc_library(
     repository = "@envoy",
     deps = [
         "filter_cc_proto",
-        "//library/common:engine_types_lib",
-        "//library/common/api:c_types",
-        "//library/common/api:external_api_lib",
-        "//library/common/bridge:utility_lib",
         "@envoy//source/common/common:assert_lib",
         "@envoy//source/extensions/filters/http/common:pass_through_filter_lib",
+        "@envoy_mobile//library/common:engine_types_lib",
+        "@envoy_mobile//library/common/api:c_types",
+        "@envoy_mobile//library/common/api:external_api_lib",
+        "@envoy_mobile//library/common/bridge:utility_lib",
     ],
 )
 
