@@ -395,6 +395,30 @@ TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternal) {
   EXPECT_EQ("https", headers.getSchemeValue());
 }
 
+// Verify preserved forwarded proto when internal.
+// This uses XFF extension for the exact same test as above.
+TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternalViaExtension) {
+  TestScopedRuntime scoped_runtime;
+  detection_extensions_.clear();
+  detection_extensions_.push_back(getXFFExtension(1, true, true, false));
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12"));
+  TestRequestHeaderMapImpl headers{{"x-forwarded-proto", "https"}};
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("https", headers.getForwardedProtoValue());
+  // Given :scheme was not set, it will be set to X-Forwarded-Proto
+  EXPECT_EQ("https", headers.getSchemeValue());
+
+  // Make sure if x-forwarded-proto changes it doesn't cause problems.
+  headers.setForwardedProto("ftp");
+  EXPECT_EQ("https", headers.getSchemeValue());
+}
+
 TEST_F(ConnectionManagerUtilityTest, OverwriteForwardedProtoWhenExternal) {
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
@@ -419,6 +443,27 @@ TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternalButSetSch
   connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
       std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
+  TestRequestHeaderMapImpl headers{{"x-forwarded-proto", "foo"}};
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("foo", headers.getForwardedProtoValue());
+  // Given :scheme was not set, but X-Forwarded-Proto is not a valid scheme,
+  // scheme will be set based on encryption level.
+  EXPECT_EQ("http", headers.getSchemeValue());
+}
+
+// Verify preserved forwarded proto when internal but set scheme.
+// This uses XFF extension for the exact same test as above.
+TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternalButSetSchemeViaExtension) {
+  TestScopedRuntime scoped_runtime;
+  detection_extensions_.clear();
+  detection_extensions_.push_back(getXFFExtension(1, true, true, false));
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12"));
   TestRequestHeaderMapImpl headers{{"x-forwarded-proto", "foo"}};
 
   callMutateRequestHeaders(headers, Protocol::Http2);
@@ -500,6 +545,23 @@ TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWithXFFTrustedHops) {
       std::make_shared<Network::Address::Ipv4Instance>("203.0.113.128"));
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
+  TestRequestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
+  EXPECT_EQ((MutateRequestRet{"198.51.100.1:0", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ(headers.EnvoyExternalAddress()->value(), "198.51.100.1");
+}
+
+// Verify that we trust Nth address from XFF when using remote address with xff_num_trusted_hops.
+// This uses XFF extension for the exact same test as above.
+TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressWithXFFTrustedHopsViaExtension) {
+  detection_extensions_.clear();
+  detection_extensions_.push_back(getXFFExtension(1, true, true, false));
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+  
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("203.0.113.128"));
   TestRequestHeaderMapImpl headers{{"x-forwarded-for", "198.51.100.1"}};
   EXPECT_EQ((MutateRequestRet{"198.51.100.1:0", false, Tracing::Reason::NotTraceable}),
             callMutateRequestHeaders(headers, Protocol::Http2));
@@ -2536,6 +2598,24 @@ TEST_F(ConnectionManagerUtilityTest, PreserveXForwardedPortFromTrustedHop) {
   EXPECT_EQ("80", headers.getForwardedPortValue());
 }
 
+// Verify preserved x-forwarded-port header from trusted hop.
+// This uses XFF extension for the exact same test as above.
+TEST_F(ConnectionManagerUtilityTest, PreserveXForwardedPortFromTrustedHopViaExtension) {
+  detection_extensions_.clear();
+  detection_extensions_.push_back(getXFFExtension(1, true, true, false)); // disable port handling
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1)); // Set to match extension
+  ON_CALL(config_, appendXForwardedPort()).WillByDefault(Return(true)); // Let HCM handle port
+
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
+  TestRequestHeaderMapImpl headers{{"x-forwarded-port", "80"}};
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("80", headers.getForwardedPortValue());
+}
+
 // Verify when append_x_forwarded_port is turned on, the x-forwarded-port header from untrusted hop
 // will be overwritten.
 TEST_F(ConnectionManagerUtilityTest, OverwriteXForwardedPortFromUntrustedHop) {
@@ -2548,6 +2628,46 @@ TEST_F(ConnectionManagerUtilityTest, OverwriteXForwardedPortFromUntrustedHop) {
 
   callMutateRequestHeaders(headers, Protocol::Http2);
   EXPECT_EQ("8080", headers.getForwardedPortValue());
+}
+
+// Verify overwrite x-forwarded-port header from untrusted hop.
+// This uses XFF extension for the exact same test as above.
+TEST_F(ConnectionManagerUtilityTest, OverwriteXForwardedPortFromUntrustedHopViaExtension) {
+  detection_extensions_.clear();
+  detection_extensions_.push_back(getXFFExtension(0, true, true, true)); // enable port handling
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+  ON_CALL(config_, appendXForwardedPort()).WillByDefault(Return(false)); // Extension handles port
+
+  connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 8080));
+  TestRequestHeaderMapImpl headers{{"x-forwarded-port", "80"}};
+
+  callMutateRequestHeaders(headers, Protocol::Http2);
+  EXPECT_EQ("8080", headers.getForwardedPortValue());
+}
+
+// Verify use_remote_address=true with trusted CIDRs using XFF extension.
+// This demonstrates enhanced functionality not available in legacy HCM.
+TEST_F(ConnectionManagerUtilityTest, UseRemoteAddressTrueWithTrustedCIDRsViaExtension) {
+  std::vector<Network::Address::CidrRange> cidrs = {
+      Network::Address::CidrRange::create("198.51.100.0", 24).value(),
+  };
+  detection_extensions_.clear();
+  detection_extensions_.push_back(getXFFExtension(cidrs, false, true, false)); // CIDR + use_remote_address=true
+  ON_CALL(config_, originalIpDetectionExtensions()).WillByDefault(ReturnRef(detection_extensions_));
+  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(false));
+  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(0));
+
+  connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      std::make_shared<Network::Address::Ipv4Instance>("198.51.100.10")); // Trusted CIDR
+  TestRequestHeaderMapImpl headers{{"x-forwarded-for", "203.0.113.1, 10.0.0.1"}};
+  
+  EXPECT_EQ((MutateRequestRet{"10.0.0.1:0", false, Tracing::Reason::NotTraceable}),
+            callMutateRequestHeaders(headers, Protocol::Http2));
+  EXPECT_EQ(headers.EnvoyExternalAddress()->value(), "10.0.0.1");
+  EXPECT_EQ(headers.getForwardedForValue(), "203.0.113.1, 10.0.0.1,198.51.100.10");
 }
 
 // Verify when append_x_forwarded_port is not turned on, the x-forwarded-port header from untrusted
