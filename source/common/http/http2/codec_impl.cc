@@ -261,10 +261,9 @@ void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, boo
 
   bytes_meter_->addDecompressedHeaderBytesSent(headers.byteSize());
 
-  // submitHeaders(headers, end_stream);
   std::vector<http2::adapter::Header> built_headers = buildHeaders(headers);
   submitHeaders(std::move(built_headers), end_stream);
-  
+
   if (parent_.sendPendingFramesAndHandleError()) {
     // Intended to check through coverage that this error case is tested
     return;
@@ -666,7 +665,8 @@ void ConnectionImpl::StreamImpl::submitTrailers(const HeaderMap& trailers) {
   parent_.adapter_->SubmitTrailer(stream_id_, final_headers);
 }
 
-void ConnectionImpl::ClientStreamImpl::submitHeaders(std::vector<http2::adapter::Header> headers, bool end_stream) {
+void ConnectionImpl::ClientStreamImpl::submitHeaders(std::vector<http2::adapter::Header> headers,
+                                                     bool end_stream) {
   ASSERT(stream_id_ == -1);
   stream_id_ = parent_.adapter_->SubmitRequest(std::move(headers), end_stream, base());
   ASSERT(stream_id_ > 0);
@@ -686,7 +686,8 @@ void ConnectionImpl::ClientStreamImpl::advanceHeadersState() {
   headers_state_ = HeadersState::Headers;
 }
 
-void ConnectionImpl::ServerStreamImpl::submitHeaders(std::vector<http2::adapter::Header> headers, bool end_stream) {
+void ConnectionImpl::ServerStreamImpl::submitHeaders(std::vector<http2::adapter::Header> headers,
+                                                     bool end_stream) {
   ASSERT(stream_id_ != -1);
   parent_.adapter_->SubmitResponse(stream_id_, std::move(headers), end_stream);
 }
