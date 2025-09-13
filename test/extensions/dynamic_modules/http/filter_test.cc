@@ -147,12 +147,28 @@ TEST(DynamicModulesTest, StatsCallbacks) {
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks;
   filter->setEncoderFilterCallbacks(encoder_callbacks);
 
-  std::initializer_list<std::pair<std::string, std::string>> headers = {};
+  std::initializer_list<std::pair<std::string, std::string>> headers = {{"header", "header_value"}};
   Http::TestRequestHeaderMapImpl request_headers{headers};
   Http::TestRequestTrailerMapImpl request_trailers{headers};
   Http::TestResponseHeaderMapImpl response_headers{headers};
   Http::TestResponseTrailerMapImpl response_trailers{headers};
+  EXPECT_CALL(decoder_callbacks, requestHeaders())
+      .WillRepeatedly(testing::Return(makeOptRef<RequestHeaderMap>(request_headers)));
+
   EXPECT_EQ(FilterHeadersStatus::Continue, filter->decodeHeaders(request_headers, false));
+  Stats::CounterOptConstRef counter_vec_header = stats_store.findCounterByString(
+      "dynamicmodulescustom.test_counter_vec.test_label.header_value");
+  EXPECT_EQ(counter_vec_header->get().value(), 1);
+  Stats::GaugeOptConstRef gauge_vec_header =
+      stats_store.findGaugeByString("dynamicmodulescustom.test_gauge_vec.test_label.header_value");
+  EXPECT_EQ(gauge_vec_header->get().value(), 1);
+  Stats::HistogramOptConstRef histogram_vec_header = stats_store.findHistogramByString(
+      "dynamicmodulescustom.test_histogram_vec.test_label.header_value");
+  EXPECT_TRUE(histogram_vec_header.has_value());
+  EXPECT_EQ(stats_store.histogramValues(
+                "dynamicmodulescustom.test_histogram_vec.test_label.header_value", false),
+            (std::vector<uint64_t>{1}));
+
   EXPECT_EQ(FilterTrailersStatus::Continue, filter->decodeTrailers(request_trailers));
   EXPECT_EQ(FilterHeadersStatus::Continue, filter->encodeHeaders(response_headers, false));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter->encodeTrailers(response_trailers));
@@ -166,7 +182,18 @@ TEST(DynamicModulesTest, StatsCallbacks) {
   EXPECT_EQ(gauge->get().value(), 0);
   EXPECT_EQ(stats_store.histogramValues("dynamicmodulescustom.ones", false),
             (std::vector<uint64_t>{1}));
-
+  Stats::CounterOptConstRef counter_vec_local_var =
+      stats_store.findCounterByString("dynamicmodulescustom.test_counter_vec.test_label.local_var");
+  EXPECT_EQ(counter_vec_local_var->get().value(), 1);
+  Stats::GaugeOptConstRef gauge_vec_local_var =
+      stats_store.findGaugeByString("dynamicmodulescustom.test_gauge_vec.test_label.local_var");
+  EXPECT_EQ(gauge_vec_local_var->get().value(), 1);
+  Stats::HistogramOptConstRef histogram_vec_local_var = stats_store.findHistogramByString(
+      "dynamicmodulescustom.test_histogram_vec.test_label.local_var");
+  EXPECT_TRUE(histogram_vec_local_var.has_value());
+  EXPECT_EQ(stats_store.histogramValues(
+                "dynamicmodulescustom.test_histogram_vec.test_label.local_var", false),
+            (std::vector<uint64_t>{1}));
   filter->onDestroy();
 }
 

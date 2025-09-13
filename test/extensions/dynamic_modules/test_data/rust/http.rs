@@ -100,6 +100,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StatsCallbacksFilterConfig 
     Box::new(StatsCallbacksFilter {
       concurrent_streams: self.concurrent_streams,
       ones: self.ones,
+      test_counter_vec: self.test_counter_vec,
+      test_gauge_vec: self.test_gauge_vec,
+      test_histogram_vec: self.test_histogram_vec,
     })
   }
 }
@@ -108,6 +111,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StatsCallbacksFilterConfig 
 struct StatsCallbacksFilter {
   concurrent_streams: EnvoyGaugeId,
   ones: EnvoyHistogramId,
+  test_counter_vec: EnvoyCounterVecId,
+  test_gauge_vec: EnvoyGaugeVecId,
+  test_histogram_vec: EnvoyHistogramVecId,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
@@ -119,6 +125,19 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
     envoy_filter
       .record_histogram_value(self.ones, 1)
       .expect("failed to record histogram value");
+
+    let header = envoy_filter.get_request_header_value("header").unwrap();
+    let header = std::str::from_utf8(header.as_slice()).unwrap();
+    envoy_filter
+      .increment_counter_vec(self.test_counter_vec, &[header], 1)
+      .expect("failed to increment counter vec");
+    envoy_filter
+      .increase_gauge_vec(self.test_gauge_vec, &[header], 1)
+      .expect("failed to increase gauge vec");
+    envoy_filter
+      .record_histogram_value_vec(self.test_histogram_vec, &[header], 1)
+      .expect("failed to record histogram value vec");
+
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 
@@ -126,6 +145,17 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
     envoy_filter
       .decrease_gauge(self.concurrent_streams, 1)
       .expect("failed to decrease gauge");
+
+    let local_var = "local_var".to_owned();
+    envoy_filter
+      .increment_counter_vec(self.test_counter_vec, &[&local_var], 1)
+      .expect("failed to increment counter vec");
+    envoy_filter
+      .increase_gauge_vec(self.test_gauge_vec, &[&local_var], 1)
+      .expect("failed to increase gauge vec");
+    envoy_filter
+      .record_histogram_value_vec(self.test_histogram_vec, &[&local_var], 1)
+      .expect("failed to record histogram value vec");
   }
 }
 
