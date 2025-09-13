@@ -1266,6 +1266,75 @@ TEST(ABIImpl, Stats) {
   EXPECT_EQ(stats_store.histogramValues(
                 "dynamicmodulescustom.some_histogram_vec.some_label.some_value", false),
             (std::vector<uint64_t>{10, 42}));
+
+  // test using invalid stat id
+  size_t invalid_stat_id = 9999;
+  result =
+      envoy_dynamic_module_callback_http_filter_increment_counter(&filter, invalid_stat_id, 10);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  result = envoy_dynamic_module_callback_http_filter_increment_counter_vec(
+      &filter, invalid_stat_id, counter_vec_labels_values.data(), counter_vec_labels_values.size(),
+      10);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  result = envoy_dynamic_module_callback_http_filter_increase_gauge(&filter, invalid_stat_id, 10);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  result = envoy_dynamic_module_callback_http_filter_decrease_gauge(&filter, invalid_stat_id, 10);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  result = envoy_dynamic_module_callback_http_filter_set_gauge(&filter, invalid_stat_id, 10);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  result = envoy_dynamic_module_callback_http_filter_increase_gauge_vec(
+      &filter, invalid_stat_id, gauge_vec_labels_values.data(), gauge_vec_labels_values.size(), 10);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  result = envoy_dynamic_module_callback_http_filter_decrease_gauge_vec(
+      &filter, invalid_stat_id, gauge_vec_labels_values.data(), gauge_vec_labels_values.size(), 10);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  result = envoy_dynamic_module_callback_http_filter_set_gauge_vec(
+      &filter, invalid_stat_id, gauge_vec_labels_values.data(), gauge_vec_labels_values.size(), 10);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  result = envoy_dynamic_module_callback_http_filter_record_histogram_value(&filter,
+                                                                            invalid_stat_id, 10);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+  result = envoy_dynamic_module_callback_http_filter_record_histogram_value_vec(
+      &filter, invalid_stat_id, histogram_vec_labels_values.data(),
+      histogram_vec_labels_values.size(), 10);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_MetricNotFound);
+
+  // test using invalid labels
+  result = envoy_dynamic_module_callback_http_filter_increment_counter_vec(&filter, counter_vec_id,
+                                                                           {}, 0, 10);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_InvalidLabels);
+  result = envoy_dynamic_module_callback_http_filter_increase_gauge_vec(&filter, gauge_vec_id, {},
+                                                                        0, 10);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_InvalidLabels);
+  result = envoy_dynamic_module_callback_http_filter_record_histogram_value_vec(
+      &filter, histogram_vec_id, {}, 0, 10);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_InvalidLabels);
+
+  // test stat creation after freezing
+  filter_config->stat_creation_frozen_ = true;
+  result = envoy_dynamic_module_callback_http_filter_config_define_counter(
+      filter_config.get(), const_cast<char*>(counter_name.data()), counter_name.size(),
+      &counter_id);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Frozen);
+  result = envoy_dynamic_module_callback_http_filter_config_define_counter_vec(
+      filter_config.get(), const_cast<char*>(counter_vec_name.data()), counter_vec_name.size(),
+      counter_vec_labels.data(), counter_vec_labels.size(), &counter_vec_id);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Frozen);
+  result = envoy_dynamic_module_callback_http_filter_config_define_gauge(
+      filter_config.get(), const_cast<char*>(gauge_name.data()), gauge_name.size(), &gauge_id);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Frozen);
+  result = envoy_dynamic_module_callback_http_filter_config_define_gauge_vec(
+      filter_config.get(), const_cast<char*>(gauge_vec_name.data()), gauge_vec_name.size(),
+      gauge_vec_labels.data(), gauge_vec_labels.size(), &gauge_vec_id);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Frozen);
+  result = envoy_dynamic_module_callback_http_filter_config_define_histogram(
+      filter_config.get(), const_cast<char*>(histogram_name.data()), histogram_name.size(),
+      &histogram_id);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Frozen);
+  result = envoy_dynamic_module_callback_http_filter_config_define_histogram_vec(
+      filter_config.get(), const_cast<char*>(histogram_vec_name.data()), histogram_vec_name.size(),
+      histogram_vec_labels.data(), histogram_vec_labels.size(), &histogram_vec_id);
+  EXPECT_EQ(result, envoy_dynamic_module_type_metrics_result_Frozen);
 }
 
 } // namespace HttpFilters

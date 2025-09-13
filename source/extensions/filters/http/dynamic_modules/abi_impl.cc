@@ -348,11 +348,11 @@ envoy_dynamic_module_callback_http_filter_record_histogram_value_vec(
   if (!hist.has_value()) {
     return envoy_dynamic_module_type_metrics_result_MetricNotFound;
   }
-  auto tags =
-      buildTagsForModuleMetric(*filter, hist->getLabelNames(), label_values, label_values_length);
   if (label_values_length != hist->getLabelNames().size()) {
     return envoy_dynamic_module_type_metrics_result_InvalidLabels;
   }
+  auto tags =
+      buildTagsForModuleMetric(*filter, hist->getLabelNames(), label_values, label_values_length);
   hist->recordValue(*filter->getFilterConfig().stats_scope_, tags, value);
   return envoy_dynamic_module_type_metrics_result_Success;
 }
