@@ -198,10 +198,13 @@ public:
 
 using ResetHeaderParserSharedPtr = std::shared_ptr<ResetHeaderParser>;
 
+class RetryPolicy;
+using RetryPolicyConstSharedPtr = std::shared_ptr<const RetryPolicy>;
+
 /**
  * Route level retry policy.
  */
-class RetryPolicy {
+class RetryPolicy : public std::enable_shared_from_this<RetryPolicy> {
 public:
   // clang-format off
   static constexpr uint32_t RETRY_ON_5XX                                = 0x1;
@@ -309,6 +312,11 @@ public:
    * back-off interval parsed from response headers.
    */
   virtual std::chrono::milliseconds resetMaxInterval() const PURE;
+
+  /**
+   * @return RetryPolicyConstSharedPtr a shared pointer to this instance.
+   */
+  RetryPolicyConstSharedPtr getConstShared() const { return shared_from_this(); }
 };
 
 /**

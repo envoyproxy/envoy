@@ -1,12 +1,14 @@
 // Note: this should be run with --compilation_mode=opt, and would benefit from a
 // quiescent system with disabled cstate power management.
 
+#include <sys/types.h>
+
 #include <cstddef>
 #include <cstdint>
 #include <random>
-#include <sys/types.h>
 
 #include "source/common/common/assert.h"
+
 #include "benchmark/benchmark.h"
 
 namespace Envoy {
