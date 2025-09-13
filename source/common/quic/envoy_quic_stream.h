@@ -239,6 +239,8 @@ protected:
     return received_metadata_bytes_ > 1 << 20;
   }
 
+  std::string quicStreamState();
+
   http2::adapter::HeaderValidator& header_validator() { return header_validator_; }
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS

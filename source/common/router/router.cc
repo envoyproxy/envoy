@@ -450,8 +450,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       modify_headers_from_upstream_lb_(headers);
     }
 
-    route_entry_->finalizeResponseHeaders(headers, callbacks_->streamInfo());
-
     if (attempt_count_ == 0 || !route_entry_->includeAttemptCountInResponse()) {
       return;
     }
@@ -487,11 +485,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     direct_response->rewritePathHeader(headers, !config_->suppress_envoy_headers_);
     callbacks_->sendLocalReply(
         direct_response->responseCode(), direct_response->responseBody(),
-        [this, direct_response,
-         &request_headers = headers](Http::ResponseHeaderMap& response_headers) -> void {
+        [this, direct_response](Http::ResponseHeaderMap& response_headers) -> void {
           std::string new_uri;
-          if (request_headers.Path()) {
-            new_uri = direct_response->newUri(request_headers);
+          ASSERT(downstream_headers_ != nullptr);
+          if (downstream_headers_->Path()) {
+            new_uri = direct_response->newUri(*downstream_headers_);
           }
           // See https://tools.ietf.org/html/rfc7231#section-7.1.2.
           const auto add_location =
@@ -500,7 +498,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           if (!new_uri.empty() && add_location) {
             response_headers.addReferenceKey(Http::Headers::get().Location, new_uri);
           }
-          direct_response->finalizeResponseHeaders(response_headers, callbacks_->streamInfo());
+          const Formatter::HttpFormatterContext formatter_context(
+              downstream_headers_, &response_headers, {}, {}, {}, &callbacks_->activeSpan());
+          direct_response->finalizeResponseHeaders(response_headers, formatter_context,
+                                                   callbacks_->streamInfo());
         },
         absl::nullopt, StreamInfo::ResponseCodeDetails::get().DirectResponse);
     return Http::FilterHeadersStatus::StopIteration;
@@ -585,12 +586,24 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  // If large request buffering is enabled and its size is more than current buffer limit, update
+  // the buffer limit to a new larger value.
+  uint64_t effective_buffer_limit = calculateEffectiveBufferLimit();
+  if (effective_buffer_limit != std::numeric_limits<uint64_t>::max() &&
+      effective_buffer_limit > callbacks_->decoderBufferLimit()) {
+    ENVOY_STREAM_LOG(debug, "Setting new filter manager buffer limit: {}", *callbacks_,
+                     effective_buffer_limit);
+    callbacks_->setDecoderBufferLimit(effective_buffer_limit);
+  }
+
   // Increment the attempt count from 0 to 1 at the first upstream request.
   attempt_count_++;
   callbacks_->streamInfo().setAttemptCount(attempt_count_);
 
   // Finalize the request headers before the host selection.
-  route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
+  const Formatter::HttpFormatterContext formatter_context(&headers, {}, {}, {}, {},
+                                                          &callbacks_->activeSpan());
+  route_entry_->finalizeRequestHeaders(headers, formatter_context, callbacks_->streamInfo(),
                                        !config_->suppress_envoy_headers_);
 
   // Fetch a connection pool for the upstream cluster.
@@ -1781,6 +1794,9 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
   // Modify response headers after we have set the final upstream info because we may need to
   // modify the headers based on the upstream host.
+  const Formatter::HttpFormatterContext formatter_context(downstream_headers_, headers.get(), {},
+                                                          {}, {}, &callbacks_->activeSpan());
+  route_entry_->finalizeResponseHeaders(*headers, formatter_context, callbacks_->streamInfo());
   modify_headers_(*headers);
 
   if (end_stream) {

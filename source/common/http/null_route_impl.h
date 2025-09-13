@@ -134,13 +134,13 @@ protected:
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap&) const override {
     return {};
   }
-  void finalizeRequestHeaders(Http::RequestHeaderMap&, const StreamInfo::StreamInfo&,
-                              bool) const override {}
+  void finalizeRequestHeaders(Http::RequestHeaderMap&, const Formatter::HttpFormatterContext&,
+                              const StreamInfo::StreamInfo&, bool) const override {}
   Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo&,
                                                  bool) const override {
     return {};
   }
-  void finalizeResponseHeaders(Http::ResponseHeaderMap&,
+  void finalizeResponseHeaders(Http::ResponseHeaderMap&, const Formatter::HttpFormatterContext&,
                                const StreamInfo::StreamInfo&) const override {}
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&,
                                                   bool) const override {
@@ -174,6 +174,7 @@ protected:
   }
   bool usingNewTimeouts() const override { return false; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return absl::nullopt; }
+  absl::optional<std::chrono::milliseconds> flushTimeout() const override { return absl::nullopt; }
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
     return absl::nullopt;
   }

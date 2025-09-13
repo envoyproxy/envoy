@@ -25,7 +25,7 @@ namespace Expr = Envoy::Extensions::Filters::Common::Expr;
 class CELSampler : public Sampler, Logger::Loggable<Logger::Id::tracing> {
 public:
   CELSampler(const ::Envoy::LocalInfo::LocalInfo& local_info,
-             Expr::BuilderInstanceSharedPtr builder, const cel::expr::Expr& expr);
+             Expr::BuilderInstanceSharedConstPtr builder, const xds::type::v3::CelExpression& expr);
 
   SamplingResult shouldSample(const StreamInfo::StreamInfo& stream_info,
                               const absl::optional<SpanContext> parent_context,
@@ -38,9 +38,7 @@ public:
 
 private:
   const ::Envoy::LocalInfo::LocalInfo& local_info_;
-  Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder_;
-  const cel::expr::Expr parsed_expr_;
-  Extensions::Filters::Common::Expr::ExpressionPtr compiled_expr_;
+  const Extensions::Filters::Common::Expr::CompiledExpression compiled_expr_;
 };
 
 } // namespace OpenTelemetry

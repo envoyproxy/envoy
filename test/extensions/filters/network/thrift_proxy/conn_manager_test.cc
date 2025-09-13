@@ -1433,6 +1433,37 @@ TEST_F(ThriftConnectionManagerTest, BadFunctionCallExceptionHandling) {
   EXPECT_EQ(access_log_data_, "");
 }
 
+TEST_F(ThriftConnectionManagerTest,
+       BadFunctionCallExceptionHandlingWithClosingDownstreamConnection) {
+  initializeFilter();
+
+  writeFramedBinaryMessage(buffer_, MessageType::Oneway, 0x0F);
+
+  ThriftFilters::DecoderFilterCallbacks* callbacks{};
+  EXPECT_CALL(*decoder_filter_, setDecoderFilterCallbacks(_))
+      .WillOnce(
+          Invoke([&](ThriftFilters::DecoderFilterCallbacks& cb) -> void { callbacks = &cb; }));
+  EXPECT_CALL(*decoder_filter_, messageBegin(_))
+      .WillOnce(Invoke([&](MessageMetadataSharedPtr) -> FilterStatus {
+        // mock that downstream connection is closing
+        filter_callbacks_.connection_.state_ = Network::Connection::State::Closing;
+
+        std::function<int()> func;
+        func(); // throw bad_function_call
+        return FilterStatus::Continue;
+      }));
+
+  // A local exception is sent by error handling.
+  EXPECT_CALL(*decoder_filter_, onLocalReply(_, _));
+  EXPECT_EQ(filter_->onData(buffer_, false), Network::FilterStatus::StopIteration);
+
+  EXPECT_EQ(1U, store_.counter("test.request_decoding_error").value());
+  // Won't increase this counter as it's expected.
+  EXPECT_EQ(0U, store_.counter("test.request_internal_error").value());
+
+  EXPECT_EQ(access_log_data_, "");
+}
+
 // Tests that a request is routed and a non-thrift response is handled.
 TEST_F(ThriftConnectionManagerTest, RequestAndGarbageResponse) {
   initializeFilter();

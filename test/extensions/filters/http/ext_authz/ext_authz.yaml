@@ -43,6 +43,10 @@ static_resources:
   - name: local_service
     connect_timeout: 30s
     type: STRICT_DNS
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
     lb_policy: ROUND_ROBIN
     load_assignment:
       cluster_name: local_service
@@ -55,6 +59,10 @@ static_resources:
                 port_value: 8080
   - name: ext_authz-service
     type: STRICT_DNS
+    typed_dns_resolver_config:
+      name: envoy.network.dns_resolver.getaddrinfo
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
     lb_policy: ROUND_ROBIN
     typed_extension_protocol_options:
       envoy.extensions.upstreams.http.v3.HttpProtocolOptions:

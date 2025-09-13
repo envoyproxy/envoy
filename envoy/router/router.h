@@ -57,6 +57,7 @@ public:
    * @param stream_info holds additional information about the request.
    */
   virtual void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+                                       const Formatter::HttpFormatterContext& context,
                                        const StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**
@@ -941,6 +942,7 @@ public:
    *        or x-envoy-original-host header if host rewritten.
    */
   virtual void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
+                                      const Formatter::HttpFormatterContext& context,
                                       const StreamInfo::StreamInfo& stream_info,
                                       bool keep_original_host_or_path) const PURE;
 
@@ -1032,6 +1034,12 @@ public:
    *         disabled idle timeout, while nullopt indicates deference to the global timeout.
    */
   virtual absl::optional<std::chrono::milliseconds> idleTimeout() const PURE;
+
+  /**
+   * @return optional<std::chrono::milliseconds> the route's flush timeout. Zero indicates a
+   *         disabled idle timeout, while nullopt indicates deference to the global timeout.
+   */
+  virtual absl::optional<std::chrono::milliseconds> flushTimeout() const PURE;
 
   /**
    * @return true if new style max_stream_duration config should be used over the old style.
