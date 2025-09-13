@@ -787,47 +787,41 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
     self.method = Some(method.to_owned());
 
     // Record histogram value to provided value in header
-    let header_val = std::str::from_utf8(
-      envoy_filter
-        .get_request_header_value(self.header_to_count.as_str())
+    if let Some(header_val) = envoy_filter.get_request_header_value(self.header_to_count.as_str()) {
+      let header_val = std::str::from_utf8(header_val.as_slice())
         .unwrap()
-        .as_slice(),
-    )
-    .unwrap()
-    .parse()
-    .unwrap();
-    envoy_filter
-      .record_histogram_value(self.requests_header_values, header_val)
-      .unwrap();
-    envoy_filter
-      .record_histogram_value_vec(
-        self.entrypoint_header_values,
-        &["on_request_headers", method],
-        header_val,
-      )
-      .unwrap();
+        .parse()
+        .unwrap();
+      envoy_filter
+        .record_histogram_value(self.requests_header_values, header_val)
+        .unwrap();
+      envoy_filter
+        .record_histogram_value_vec(
+          self.entrypoint_header_values,
+          &["on_request_headers", method],
+          header_val,
+        )
+        .unwrap();
+    }
 
 
     // Set gauges to provided value in header
-    let header_val = std::str::from_utf8(
-      envoy_filter
-        .get_request_header_value(self.header_to_set.as_str())
+    if let Some(header_val) = envoy_filter.get_request_header_value(self.header_to_set.as_str()) {
+      let header_val = std::str::from_utf8(header_val.as_slice())
         .unwrap()
-        .as_slice(),
-    )
-    .unwrap()
-    .parse()
-    .unwrap();
-    envoy_filter
-      .set_gauge(self.requests_set_value, header_val)
-      .unwrap();
-    envoy_filter
-      .set_gauge_vec(
-        self.entrypoint_set_value,
-        &["on_request_headers", method],
-        header_val,
-      )
-      .unwrap();
+        .parse()
+        .unwrap();
+      envoy_filter
+        .set_gauge(self.requests_set_value, header_val)
+        .unwrap();
+      envoy_filter
+        .set_gauge_vec(
+          self.entrypoint_set_value,
+          &["on_request_headers", method],
+          header_val,
+        )
+        .unwrap();
+    }
 
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
@@ -863,40 +857,35 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
       .unwrap();
 
     // Record histogram value to provided value in header
-    let header_val = std::str::from_utf8(
-      envoy_filter
-        .get_response_header_value(self.header_to_count.as_str())
+    if let Some(header_val) = envoy_filter.get_response_header_value(self.header_to_count.as_str())
+    {
+      let header_val = std::str::from_utf8(header_val.as_slice())
         .unwrap()
-        .as_slice(),
-    )
-    .unwrap()
-    .parse()
-    .unwrap();
-    envoy_filter
-      .record_histogram_value_vec(
-        self.entrypoint_header_values,
-        &["on_response_headers", self.method.as_ref().unwrap()],
-        header_val,
-      )
-      .unwrap();
+        .parse()
+        .unwrap();
+      envoy_filter
+        .record_histogram_value_vec(
+          self.entrypoint_header_values,
+          &["on_response_headers", self.method.as_ref().unwrap()],
+          header_val,
+        )
+        .unwrap();
+    }
 
     // Set gauges to provided value in header
-    let header_val = std::str::from_utf8(
-      envoy_filter
-        .get_response_header_value(self.header_to_set.as_str())
+    if let Some(header_val) = envoy_filter.get_response_header_value(self.header_to_set.as_str()) {
+      let header_val = std::str::from_utf8(header_val.as_slice())
         .unwrap()
-        .as_slice(),
-    )
-    .unwrap()
-    .parse()
-    .unwrap();
-    envoy_filter
-      .set_gauge_vec(
-        self.entrypoint_set_value,
-        &["on_response_headers", self.method.as_ref().unwrap()],
-        header_val,
-      )
-      .unwrap();
+        .parse()
+        .unwrap();
+      envoy_filter
+        .set_gauge_vec(
+          self.entrypoint_set_value,
+          &["on_response_headers", self.method.as_ref().unwrap()],
+          header_val,
+        )
+        .unwrap();
+    }
 
     abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
   }
