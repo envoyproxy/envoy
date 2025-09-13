@@ -314,7 +314,7 @@ protected:
     virtual HeadersState headersState() const PURE;
     void saveHeader(HeaderString&& name, HeaderString&& value);
     void encodeHeadersBase(const HeaderMap& headers, bool end_stream);
-    virtual void submitHeaders(const HeaderMap& headers, bool end_stream) PURE;
+    virtual void submitHeaders(std::vector<http2::adapter::Header> headers, bool end_stream) PURE;
     void encodeTrailersBase(const HeaderMap& headers);
     void submitTrailers(const HeaderMap& trailers);
     // Returns true if the stream should defer the local reset stream until after the next call to
@@ -514,7 +514,7 @@ protected:
       return nullptr;
     }
     // StreamImpl
-    void submitHeaders(const HeaderMap& headers, bool end_stream) override;
+    void submitHeaders(std::vector<http2::adapter::Header> headers, bool end_stream) override;
     Status onBeginHeaders() override;
     void advanceHeadersState() override;
     HeadersState headersState() const override { return headers_state_; }
@@ -574,7 +574,7 @@ protected:
 
     // StreamImpl
     void destroy() override;
-    void submitHeaders(const HeaderMap& headers, bool end_stream) override;
+    void submitHeaders(std::vector<http2::adapter::Header> headers, bool end_stream) override;
     Status onBeginHeaders() override;
     void advanceHeadersState() override;
     HeadersState headersState() const override { return headers_state_; }
