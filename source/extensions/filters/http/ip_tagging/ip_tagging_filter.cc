@@ -34,10 +34,6 @@ IpTagsProvider::IpTagsProvider(const envoy::config::core::v3::DataSource& ip_tag
   RETURN_ONLY_IF_NOT_OK_REF(creation_status);
   stat_name_set_->rememberBuiltin("reload_success");
   stat_name_set_->rememberBuiltin("reload_error");
-  if (ip_tags_datasource.filename().empty()) {
-    creation_status = absl::InvalidArgumentError("Cannot load tags from empty file path.");
-    return;
-  }
   auto tags_or_error = tags_loader_.loadTags(ip_tags_datasource, main_dispatcher, tls);
   creation_status = tags_or_error.status();
   if (tags_or_error.status().ok()) {

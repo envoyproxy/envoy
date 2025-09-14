@@ -100,8 +100,6 @@ DynamicData::~DynamicData() {
 
 const std::string& DynamicData::data() const {
   const auto thread_local_data = slot_->get();
-  ENVOY_LOG_TO_LOGGER(Logger::Registry::getLog(Logger::Id::config), warn,
-                      "TLS data in DataSourceProvider retrieved");
   return thread_local_data.has_value() ? *thread_local_data->data_ : EMPTY_STRING;
 }
 

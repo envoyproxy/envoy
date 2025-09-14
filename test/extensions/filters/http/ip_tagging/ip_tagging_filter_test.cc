@@ -376,7 +376,8 @@ ip_tags_file_provider:
   ip_tags_datasource:
     filename:
 )EOF";
-  initializeFilter(config_yaml, "INVALID_ARGUMENT: Cannot load tags from empty file path.");
+  initializeFilter(config_yaml,
+                   "INVALID_ARGUMENT: Cannot load tags from empty filename in datasource.");
 }
 
 TEST_F(IpTaggingFilterTest, UnsupportedFormatForIpTagsFile) {
