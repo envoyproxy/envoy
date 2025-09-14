@@ -234,8 +234,8 @@ The script now supports automatic compiler configuration detection and manual ov
   ```bash
   # Force use of clang configuration
   tools/vscode/generate_debug_config.py //source/exe:envoy-static --args "-c envoy.yaml" --config clang
-  
-  # Force use of gcc configuration  
+
+  # Force use of gcc configuration
   tools/vscode/generate_debug_config.py //source/exe:envoy-static --args "-c envoy.yaml" --config gcc
   ```
 
@@ -243,7 +243,7 @@ The script now supports automatic compiler configuration detection and manual ov
   ```bash
   # Use LLDB debugger instead of GDB (recommended for macOS)
   tools/vscode/generate_debug_config.py //source/exe:envoy-static --args "-c envoy.yaml" --debugger lldb
-  
+
   # Overwrite existing configuration completely
   tools/vscode/generate_debug_config.py //source/exe:envoy-static --args "-c envoy.yaml" --overwrite
   ```
@@ -345,3 +345,4 @@ Try accessing different admin endpoints from your local machine.
   ![Cluster Endpoints](./images/cluster-endpoints.png)
   ![Config Dump](./images/config-dump.png)
   ![Stats Endpoints](./images/stats-endpoints.png)
+
