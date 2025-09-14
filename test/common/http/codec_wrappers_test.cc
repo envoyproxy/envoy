@@ -10,20 +10,18 @@ namespace Http {
 
 class MockResponseDecoderWrapper : public ResponseDecoderWrapper {
 public:
-  MockResponseDecoderWrapper() : ResponseDecoderWrapper(inner_decoder_) {}
-  MockResponseDecoder& innerEncoder() { return inner_decoder_; }
+  explicit MockResponseDecoderWrapper(MockResponseDecoder& inner_decoder)
+      : ResponseDecoderWrapper(inner_decoder) {}
   void onDecodeComplete() override {}
   void onPreDecodeComplete() override {}
-
-private:
-  MockResponseDecoder inner_decoder_;
 };
 
 TEST(MockResponseDecoderWrapper, dumpState) {
-  MockResponseDecoderWrapper wrapper;
+  MockResponseDecoder inner_decoder;
+  MockResponseDecoderWrapper wrapper(inner_decoder);
 
   std::stringstream os;
-  EXPECT_CALL(wrapper.innerEncoder(), dumpState(_, _));
+  EXPECT_CALL(inner_decoder, dumpState(_, _));
   wrapper.dumpState(os, 0);
 }
 
