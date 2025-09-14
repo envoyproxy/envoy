@@ -345,4 +345,3 @@ Try accessing different admin endpoints from your local machine.
   ![Cluster Endpoints](./images/cluster-endpoints.png)
   ![Config Dump](./images/config-dump.png)
   ![Stats Endpoints](./images/stats-endpoints.png)
-
