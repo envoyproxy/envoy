@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.access_loggers.filters.local_ratelimit.v3;
 
-import "envoy/type/v3/token_bucket.proto";
+import "envoy/config/core/v3/config_source.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -16,13 +16,11 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: LocalRateLimitFilter]
 // [#extension: envoy.access_loggers.extension_filters.local_ratelimit]
 
-// Filters for rate limiting the access logs using token buckets, which are looked up by ``key_prefix`` plus the hash of the ``token_bucket`` in the singleton map.
-// Using the same ``key_prefix`` and the same ``token_bucket`` will incur a shared token bucket.
+// Filters for rate limiting the access logs using token buckets. It relies on ``envoy.type.v3.TokenBucketConfig`` for token bucket sharing within process.
 message LocalRateLimitFilter {
-  // The prefix of the key used to find the token bucket in the singleton map.`
-  string key_prefix = 1;
+  // Specify the `name` field of the ``envoy.type.v3.TokenBucketConfig`` for lookup.
+  string resource_name = 1 [(validate.rules).string = {min_len: 1}];
 
-  // The token bucket configuration to use for rate limiting
-  // access logs.
-  type.v3.TokenBucket token_bucket = 2 [(validate.rules).message = {required: true}];
+  // The configuration source for the ``envoy.type.v3.TokenBucketConfig``.
+  config.core.v3.ConfigSource config_source = 2 [(validate.rules).message = {required: true}];
 }

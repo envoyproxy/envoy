@@ -13,6 +13,7 @@
 
 #include "source/common/common/thread_synchronizer.h"
 #include "source/common/common/token_bucket_impl.h"
+#include "source/common/config/subscription_base.h"
 #include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -165,40 +166,115 @@ private:
   const bool always_consume_default_token_bucket_{};
 };
 
-class LocalRateLimiterMapSingleton;
-using LocalRateLimiterMapSingletonSharedPtr = std::shared_ptr<LocalRateLimiterMapSingleton>;
-class LocalRateLimiterMapSingleton : public Singleton::Instance {
+class RateLimiterProviderSingleton;
+using RateLimiterProviderSingletonSharedPtr = std::shared_ptr<RateLimiterProviderSingleton>;
+class RateLimiterProviderSingleton : public Singleton::Instance {
 public:
-  // The first element is the `key_prefix` field in LocalRateLimitFilter config and the second
-  // element is the hash of the `token_bucket` field in LocalRateLimitFilter config.
-  using RateLimiterKey = std::pair<std::string, std::size_t>;
-  struct RateLimiter {
+  class RateLimiterWrapper {
+  public:
+    RateLimiterWrapper(RateLimiterProviderSingletonSharedPtr provider, std::string key,
+                       std::shared_ptr<LocalRateLimiterImpl> limiter,
+                       size_t token_bucket_config_hash)
+        : provider_(std::move(provider)), name_(std::move(key)), limiter_(std::move(limiter)),
+          token_bucket_config_hash_(token_bucket_config_hash) {}
+
+    const std::string& getKey() const { return name_; }
+    std::shared_ptr<LocalRateLimiterImpl> getLimiter() const { return limiter_; }
+    void setLimiter(std::shared_ptr<LocalRateLimiterImpl> limiter) {
+      limiter_ = std::move(limiter);
+    }
+    size_t getTokenBucketConfigHash() const { return token_bucket_config_hash_; }
+
+  private:
     // The `map_` holds the ownership of this singleton by shared
-    // pointer, as the rate limiter map singleton isn't pinned and is shared among all the
-    // access log rate limit filters.
-    LocalRateLimiterMapSingletonSharedPtr map_;
+    // pointer, as the rate limiter map singleton isn't pinned and is
+    // shared among all the access log rate limit filters.
+    RateLimiterProviderSingletonSharedPtr provider_;
 
-    // The key for `limiter_` in `map_`.
-    RateLimiterKey key_;
+    // The name for `limiter_` in `provider_->limiters_`.
+    std::string name_;
 
-    // The `limiter_` holds the ownership of the rate limiter(with the underlying
-    // token bucket) by shared pointer, as it is shared by all the access log rate limit
-    // filters using the same key.
+    // The `limiter_` holds the ownership of the rate limiter(with the
+    // underlying token bucket) by shared pointer. Access loggers using the same
+    // `resource_name` of token bucket will share the same rate limiter.
     std::shared_ptr<LocalRateLimiterImpl> limiter_;
 
-    ~RateLimiter();
+    // The hash of the token bucket config used by the rate limiter.
+    size_t token_bucket_config_hash_;
+  };
+  using RateLimiterPtr = std::unique_ptr<RateLimiterWrapper>;
+
+  using SetRateLimiterCb = std::function<void(std::shared_ptr<LocalRateLimiterImpl>)>;
+  static RateLimiterPtr getRateLimiter(Server::Configuration::FactoryContext& factory_context,
+                                       absl::string_view key,
+                                       const envoy::config::core::v3::ConfigSource& config_source,
+                                       SetRateLimiterCb callback);
+
+  RateLimiterProviderSingleton(Server::Configuration::ServerFactoryContext& factory_context,
+                               const envoy::config::core::v3::ConfigSource& config_source)
+      : factory_context_(factory_context), config_source_(config_source),
+        scope_(factory_context.scope().createScope("local_ratelimit")), subscription_(*this) {
+    subscription_.start();
+  }
+
+  class RatelimiterSubscription : Config::SubscriptionBase<envoy::type::v3::TokenBucketConfig> {
+  public:
+    explicit RatelimiterSubscription(RateLimiterProviderSingleton& parent);
+
+    void start() { subscription_->start({}); }
+
+    ~RatelimiterSubscription() override = default;
+
+  private:
+    // Handles the addition or update of rate limiters based on new resources.
+    // The logic is
+    // 1. If the new token bucket config name is found in the `limiters_` and
+    // the config is different, update the config in the `limiters_` and
+    // reset the `limiter_` for future usage.
+    // 2. If the new token bucket config name has setters callbacks,
+    //    - if there is a alive limiter, return that limiter.
+    //    - if there is no alive limiter, create a new limiter and return it
+    //    to the callbacks.
+    void handleAddedResources(const std::vector<Config::DecodedResourceRef>& added_resources);
+
+    // Handles the removal of rate limiters based on removed resources.
+    // The logic is
+    // 1. If the removed token bucket config name is found in the `limiters_`
+    // and there is alive rate limiter, remove the rate limiter from the
+    // `limiters_` for future usage. Please note the limiters are held by
+    // access log and they will be destroyed when the access log is destroyed.
+    // 2. If the removed token bucket config name is not found in the
+    // `limiters_`, no op.
+    void handleRemovedResources(const Protobuf::RepeatedPtrField<std::string>& removed_resources);
+
+    // Config::SubscriptionCallbacks
+    absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
+                                const std::string&) override;
+
+    absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& added_resources,
+                                const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                                const std::string&) override;
+
+    void onConfigUpdateFailed(Config::ConfigUpdateFailureReason, const EnvoyException*) override {
+      // Do nothing - feature is automatically disabled.
+    }
+
+    RateLimiterProviderSingleton& parent_;
+    Config::SubscriptionPtr subscription_;
   };
 
-  static RateLimiter getRateLimiter(
-      Singleton::Manager& manager, absl::string_view key,
-      const envoy::type::v3::TokenBucket& token_bucket, Event::Dispatcher& dispatcher,
-      const Protobuf::RepeatedPtrField<
-          envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
-      bool always_consume_default_token_bucket, ShareProviderSharedPtr shared_provider,
-      const uint32_t lru_size);
+  struct RateLimiterRef {
+    envoy::type::v3::TokenBucketConfig config_;
+    std::size_t token_bucket_config_hash_;
+    std::weak_ptr<LocalRateLimiterImpl> limiter_;
+  };
 
-private:
-  absl::flat_hash_map<RateLimiterKey, std::weak_ptr<LocalRateLimiterImpl>> limiter_map_;
+  Server::Configuration::ServerFactoryContext& factory_context_;
+  const envoy::config::core::v3::ConfigSource config_source_;
+  Stats::ScopeSharedPtr scope_;
+  absl::flat_hash_map<std::string, RateLimiterRef> limiters_;
+  absl::flat_hash_map<std::string, std::vector<SetRateLimiterCb>> setter_cbs_;
+  RatelimiterSubscription subscription_;
 };
 
 } // namespace LocalRateLimit

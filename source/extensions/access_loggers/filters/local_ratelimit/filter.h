@@ -1,7 +1,9 @@
 #pragma once
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/extensions/access_loggers/filters/local_ratelimit/v3/local_ratelimit.pb.h"
 
+#include "source/common/init/target_impl.h"
 #include "source/extensions/filters/common/local_ratelimit/local_ratelimit_impl.h"
 
 namespace Envoy {
@@ -12,18 +14,25 @@ namespace LocalRateLimit {
 
 class LocalRateLimitFilter : public AccessLog::Filter {
 public:
-  LocalRateLimitFilter(Envoy::Extensions::Filters::Common::LocalRateLimit::
-                           LocalRateLimiterMapSingleton::RateLimiter&& rate_limiter)
-      : rate_limiter_(std::move(rate_limiter)) {}
+  LocalRateLimitFilter(
+      Server::Configuration::FactoryContext& context,
+      const envoy::extensions::access_loggers::filters::local_ratelimit::v3::LocalRateLimitFilter&
+          config);
 
   bool evaluate(const Formatter::HttpFormatterContext&,
-                const StreamInfo::StreamInfo&) const override {
-    return rate_limiter_.limiter_->requestAllowed({}).allowed;
-  }
+                const StreamInfo::StreamInfo&) const override;
+
+  void init();
 
 private:
-  mutable Envoy::Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterMapSingleton::
-      RateLimiter rate_limiter_;
+  void initializeRateLimiter();
+
+  Server::Configuration::FactoryContext& context_;
+  const envoy::extensions::access_loggers::filters::local_ratelimit::v3::LocalRateLimitFilter
+      config_;
+  mutable Envoy::Extensions::Filters::Common::LocalRateLimit::RateLimiterProviderSingleton::
+      RateLimiterPtr rate_limiter_;
+  mutable std::unique_ptr<Init::TargetImpl> init_target_;
 };
 
 } // namespace LocalRateLimit

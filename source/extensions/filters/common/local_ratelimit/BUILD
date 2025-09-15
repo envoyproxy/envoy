@@ -18,6 +18,8 @@ envoy_cc_library(
         "//envoy/ratelimit:ratelimit_interface",
         "//source/common/common:thread_synchronizer_lib",
         "//source/common/common:token_bucket_impl_lib",
+        "//source/common/config:subscription_base_interface",
+        "//source/common/grpc:common_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/extensions/common/ratelimit/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",

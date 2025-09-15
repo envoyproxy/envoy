@@ -21,14 +21,13 @@ AccessLog::FilterPtr LocalRateLimitFilterFactory::createFilter(
       const envoy::extensions::access_loggers::filters::local_ratelimit::v3::LocalRateLimitFilter&>(
       *factory_config);
 
-  auto rate_limiter =
-      Envoy::Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterMapSingleton::
-          getRateLimiter(context.serverFactoryContext().singletonManager(),
-                         local_ratelimit_config.key_prefix(), local_ratelimit_config.token_bucket(),
-                         context.serverFactoryContext().mainThreadDispatcher(), {},
-                         /*always_consume_default_token_bucket=*/false,
-                         /*shared_provider=*/nullptr, /*lru_size=*/0);
-  return std::make_unique<LocalRateLimitFilter>(std::move(rate_limiter));
+  // the filter should be created and then call init() which
+  // - let xds agent to subscribe the token bucket config
+  // - let xds agent to call the callback to update the token bucket and then
+  // finish the initialization
+  auto filter = std::make_unique<LocalRateLimitFilter>(context, local_ratelimit_config);
+  filter->init();
+  return filter;
 }
 
 ProtobufTypes::MessagePtr LocalRateLimitFilterFactory::createEmptyConfigProto() {
