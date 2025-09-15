@@ -10,7 +10,7 @@ MockFile::MockFile() = default;
 MockFile::~MockFile() = default;
 
 Api::IoCallBoolResult MockFile::open(FlagSet flag) {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
 
   Api::IoCallBoolResult result = open_(flag);
   is_open_ = result.return_value_;
@@ -20,7 +20,7 @@ Api::IoCallBoolResult MockFile::open(FlagSet flag) {
 }
 
 Api::IoCallSizeResult MockFile::write(absl::string_view buffer) {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   if (!is_open_) {
     return {-1, Api::IoErrorPtr(nullptr, [](Api::IoError*) { PANIC("reached unexpected code"); })};
   }
@@ -32,7 +32,7 @@ Api::IoCallSizeResult MockFile::write(absl::string_view buffer) {
 }
 
 Api::IoCallSizeResult MockFile::pread(void* buf, uint64_t count, uint64_t offset) {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   if (!is_open_) {
     return {-1, Api::IoErrorPtr(nullptr, [](Api::IoError*) { PANIC("reached unexpected code"); })};
   }
@@ -44,7 +44,7 @@ Api::IoCallSizeResult MockFile::pread(void* buf, uint64_t count, uint64_t offset
 }
 
 Api::IoCallSizeResult MockFile::pwrite(const void* buf, uint64_t count, uint64_t offset) {
-  absl::MutexLock lock(&mutex_);
+  absl::MutexLock lock(mutex_);
   if (!is_open_) {
     return {-1, Api::IoErrorPtr(nullptr, [](Api::IoError*) { PANIC("reached unexpected code"); })};
   }
