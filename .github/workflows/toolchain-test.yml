@@ -16,6 +16,7 @@ concurrency:
 jobs:
   toolchain-test:
     runs-on: ubuntu-22.04
+    if: github.repository == 'envoyproxy/envoy'
     strategy:
       fail-fast: false
       matrix:

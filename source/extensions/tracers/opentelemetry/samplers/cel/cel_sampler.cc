@@ -13,10 +13,16 @@ namespace Tracers {
 namespace OpenTelemetry {
 
 CELSampler::CELSampler(const ::Envoy::LocalInfo::LocalInfo& local_info,
-                       Expr::BuilderInstanceSharedPtr builder, const cel::expr::Expr& expr)
-    : local_info_(local_info), builder_(builder), parsed_expr_(expr) {
-  compiled_expr_ = Expr::createExpression(builder_->builder(), parsed_expr_);
-}
+                       Expr::BuilderInstanceSharedConstPtr builder,
+                       const xds::type::v3::CelExpression& expr)
+    : local_info_(local_info), compiled_expr_([&]() {
+        auto compiled_expr = Expr::CompiledExpression::Create(builder, expr);
+        if (!compiled_expr.ok()) {
+          throw EnvoyException(
+              absl::StrCat("failed to create an expression: ", compiled_expr.status().message()));
+        }
+        return std::move(compiled_expr.value());
+      }()) {}
 
 SamplingResult CELSampler::shouldSample(const StreamInfo::StreamInfo& stream_info,
                                         const absl::optional<SpanContext> parent_context,
@@ -31,8 +37,8 @@ SamplingResult CELSampler::shouldSample(const StreamInfo::StreamInfo& stream_inf
     request_headers = trace_context->requestHeaders().ptr();
   }
 
-  auto eval_status = Expr::evaluate(
-      *compiled_expr_, arena, &local_info_, stream_info, request_headers /* request_headers */,
+  auto eval_status = compiled_expr_.evaluate(
+      arena, &local_info_, stream_info, request_headers /* request_headers */,
       nullptr /* response_headers */, nullptr /* response_trailers */);
   SamplingResult result;
   if (!eval_status.has_value() || eval_status.value().IsError()) {

@@ -12,6 +12,7 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "matching/data_impl.h"
 
@@ -42,6 +43,16 @@ void recordLatestDataFilter(typename Filters::Iterator current_filter,
   // though filter M > N was the filter that inserted data into the buffer.
   if (current_filter != filters.begin() && latest_filter == std::prev(current_filter)->get()) {
     latest_filter = current_filter->get();
+  }
+}
+
+void finalizeHeaders(FilterManagerCallbacks& callbacks, StreamInfo::StreamInfo& stream_info,
+                     ResponseHeaderMap& headers) {
+  const Router::RouteConstSharedPtr& route = stream_info.route();
+  if (route != nullptr && route->routeEntry() != nullptr) {
+    const Formatter::HttpFormatterContext formatter_context{
+        callbacks.requestHeaders().ptr(), &headers, {}, {}, {}, &callbacks.activeSpan()};
+    route->routeEntry()->finalizeResponseHeaders(headers, formatter_context, stream_info);
   }
 }
 
@@ -1021,10 +1032,16 @@ void DownstreamFilterManager::sendLocalReply(
       // route refreshment in the response filter chain.
       cb->route(nullptr);
     }
-
-    // We only prepare a local reply to execute later if we're actively
-    // invoking filters to avoid re-entrant in filters.
-    if (state_.filter_call_state_ & FilterCallState::IsDecodingMask) {
+    // We only prepare a local reply to execute later if we're actively invoking filters to avoid
+    // re-entrant in filters.
+    //
+    // For reverse connections (where upstream initiates the connection to downstream), we need to
+    // send local replies immediately rather than queuing them. This ensures proper handling of the
+    // reversed connection flow and prevents potential issues with connection state and filter chain
+    // processing.
+    if (!Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.reverse_conn_force_local_reply") &&
+        (state_.filter_call_state_ & FilterCallState::IsDecodingMask)) {
       prepareLocalReplyViaFilterChain(is_grpc_request, code, body, modify_headers, is_head_request,
                                       grpc_status, details);
     } else {
@@ -1070,9 +1087,7 @@ void DownstreamFilterManager::prepareLocalReplyViaFilterChain(
   prepared_local_reply_ = Utility::prepareLocalReply(
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route() && streamInfo().route()->routeEntry()) {
-              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
-            }
+            finalizeHeaders(filter_manager_callbacks_, streamInfo(), headers);
             if (modify_headers) {
               modify_headers(headers);
             }
@@ -1121,9 +1136,7 @@ void DownstreamFilterManager::sendLocalReplyViaFilterChain(
       state_.destroyed_,
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route() && streamInfo().route()->routeEntry()) {
-              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
-            }
+            finalizeHeaders(filter_manager_callbacks_, streamInfo(), headers);
             if (modify_headers) {
               modify_headers(headers);
             }
@@ -1154,9 +1167,7 @@ void DownstreamFilterManager::sendDirectLocalReply(
       state_.destroyed_,
       Utility::EncodeFunctions{
           [this, modify_headers](ResponseHeaderMap& headers) -> void {
-            if (streamInfo().route() && streamInfo().route()->routeEntry()) {
-              streamInfo().route()->routeEntry()->finalizeResponseHeaders(headers, streamInfo());
-            }
+            finalizeHeaders(filter_manager_callbacks_, streamInfo(), headers);
             if (modify_headers) {
               modify_headers(headers);
             }
@@ -1633,7 +1644,7 @@ void FilterManager::callLowWatermarkCallbacks() {
   }
 }
 
-void FilterManager::setBufferLimit(uint32_t new_limit) {
+void FilterManager::setBufferLimit(uint64_t new_limit) {
   ENVOY_STREAM_LOG(debug, "setting buffer limit to {}", *this, new_limit);
   buffer_limit_ = new_limit;
   if (buffered_request_data_) {
@@ -1748,11 +1759,11 @@ void ActiveStreamDecoderFilter::removeDownstreamWatermarkCallbacks(
   parent_.watermark_callbacks_.remove(&watermark_callbacks);
 }
 
-void ActiveStreamDecoderFilter::setDecoderBufferLimit(uint32_t limit) {
+void ActiveStreamDecoderFilter::setDecoderBufferLimit(uint64_t limit) {
   parent_.setBufferLimit(limit);
 }
 
-uint32_t ActiveStreamDecoderFilter::decoderBufferLimit() { return parent_.buffer_limit_; }
+uint64_t ActiveStreamDecoderFilter::decoderBufferLimit() { return parent_.buffer_limit_; }
 
 bool ActiveStreamDecoderFilter::recreateStream(const ResponseHeaderMap* headers) {
   // Because the filter's and the HCM view of if the stream has a body and if

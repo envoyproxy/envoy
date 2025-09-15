@@ -1073,15 +1073,16 @@ void ClusterManagerImpl::drainConnections(const std::string& cluster,
   });
 }
 
-void ClusterManagerImpl::drainConnections(DrainConnectionsHostPredicate predicate) {
+void ClusterManagerImpl::drainConnections(DrainConnectionsHostPredicate predicate,
+                                          ConnectionPool::DrainBehavior drain_behavior) {
   ENVOY_LOG_EVENT(debug, "drain_connections_call_for_all_clusters",
                   "drainConnections called for all clusters");
-  tls_.runOnAllThreads([predicate](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
-    for (const auto& cluster_entry : cluster_manager->thread_local_clusters_) {
-      cluster_entry.second->drainConnPools(predicate,
-                                           ConnectionPool::DrainBehavior::DrainExistingConnections);
-    }
-  });
+  tls_.runOnAllThreads(
+      [predicate, drain_behavior](OptRef<ThreadLocalClusterManagerImpl> cluster_manager) {
+        for (const auto& cluster_entry : cluster_manager->thread_local_clusters_) {
+          cluster_entry.second->drainConnPools(predicate, drain_behavior);
+        }
+      });
 }
 
 absl::Status ClusterManagerImpl::checkActiveStaticCluster(const std::string& cluster) {
@@ -1535,8 +1536,9 @@ ClusterManagerImpl::allocateOdCdsApi(OdCdsCreationFunction creation_function,
   // TODO(krnowak): Instead of creating a new handle every time, store the handles internally and
   // return an already existing one if the config or locator matches. Note that this may need a
   // way to clean up the unused handles, so we can close the unnecessary connections.
-  auto odcds_or_error = creation_function(odcds_config, odcds_resources_locator, xds_manager_,
-                                          *this, *this, *stats_.rootScope(), validation_visitor);
+  auto odcds_or_error =
+      creation_function(odcds_config, odcds_resources_locator, xds_manager_, *this, *this,
+                        *stats_.rootScope(), validation_visitor, context_);
   RETURN_IF_NOT_OK_REF(odcds_or_error.status());
   return OdCdsApiHandleImpl::create(*this, std::move(*odcds_or_error));
 }

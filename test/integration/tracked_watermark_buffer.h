@@ -20,7 +20,7 @@ class TrackedWatermarkBuffer : public Buffer::WatermarkBuffer {
 public:
   TrackedWatermarkBuffer(
       std::function<void(uint64_t current_size)> update_size,
-      std::function<void(uint32_t watermark)> update_high_watermark,
+      std::function<void(uint64_t watermark)> update_high_watermark,
       std::function<void(TrackedWatermarkBuffer*)> on_delete,
       std::function<void(BufferMemoryAccountSharedPtr&, TrackedWatermarkBuffer*)> on_bind,
       std::function<void()> below_low_watermark, std::function<void()> above_high_watermark,
@@ -30,7 +30,7 @@ public:
         on_delete_(on_delete), on_bind_(on_bind) {}
   ~TrackedWatermarkBuffer() override { on_delete_(this); }
 
-  void setWatermarks(uint32_t watermark, uint32_t overload) override {
+  void setWatermarks(uint64_t watermark, uint32_t overload) override {
     update_high_watermark_(watermark);
     WatermarkBuffer::setWatermarks(watermark, overload);
   }
@@ -53,7 +53,7 @@ protected:
 
 private:
   std::function<void(uint64_t current_size)> update_size_;
-  std::function<void(uint32_t)> update_high_watermark_;
+  std::function<void(uint64_t)> update_high_watermark_;
   std::function<void(TrackedWatermarkBuffer*)> on_delete_;
   std::function<void(BufferMemoryAccountSharedPtr&, TrackedWatermarkBuffer*)> on_bind_;
 };
@@ -85,7 +85,7 @@ public:
   uint64_t sumMaxBufferSizes() const;
   // Get lower and upper bound on buffer high watermarks. A watermark of 0 indicates that watermark
   // functionality is disabled.
-  std::pair<uint32_t, uint32_t> highWatermarkRange() const;
+  std::pair<uint64_t, uint64_t> highWatermarkRange() const;
 
   // Number of accounts created.
   uint64_t numAccountsCreated() const;
@@ -152,7 +152,7 @@ private:
   void checkIfExpectedBalancesMet() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   struct BufferInfo {
-    uint32_t watermark_ = 0;
+    uint64_t watermark_ = 0;
     uint64_t current_size_ = 0;
     uint64_t max_size_ = 0;
   };
