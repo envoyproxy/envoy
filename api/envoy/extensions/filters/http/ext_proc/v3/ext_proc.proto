@@ -347,8 +347,6 @@ message ExternalProcessor {
   //
   // .. note::
   //   Processing request modifiers are currently in alpha.
-  //
-  // [#extension-category: envoy.http.ext_proc.processing_request_modifiers]
   config.core.v3.TypedExtensionConfig processing_request_modifier = 24
       [(xds.annotations.v3.field_status).work_in_progress = true];
 
