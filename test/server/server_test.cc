@@ -24,7 +24,6 @@
 #include "test/config/v2_link_hacks.h"
 #include "test/integration/server.h"
 #include "test/mocks/api/mocks.h"
-#include "test/mocks/common.h"
 #include "test/mocks/config/xds_manager.h"
 #include "test/mocks/server/bootstrap_extension_factory.h"
 #include "test/mocks/server/fatal_action_factory.h"
@@ -234,7 +233,7 @@ public:
 
     helper_ = std::make_unique<RunHelper>(
         server_, options_, dispatcher_, xds_manager_, cm_, access_log_manager_, init_manager_,
-        overload_manager_, null_overload_manager_, [this] { start_workers_.ready(); });
+        overload_manager_, null_overload_manager_, mock_workers_start_cb_.AsStdFunction());
   }
 
   NiceMock<MockInstance> server_;
@@ -246,7 +245,7 @@ public:
   NiceMock<MockOverloadManager> overload_manager_;
   NiceMock<MockOverloadManager> null_overload_manager_;
   Init::ManagerImpl init_manager_{""};
-  ReadyWatcher start_workers_;
+  testing::MockFunction<void()> mock_workers_start_cb_;
   std::unique_ptr<RunHelper> helper_;
   std::function<void()> cm_init_callback_;
 #ifndef WIN32
@@ -259,14 +258,14 @@ public:
 };
 
 TEST_F(RunHelperTest, Normal) {
-  EXPECT_CALL(start_workers_, ready());
+  EXPECT_CALL(mock_workers_start_cb_, Call);
   cm_init_callback_();
 }
 
 // no signals on Windows
 #ifndef WIN32
 TEST_F(RunHelperTest, ShutdownBeforeCmInitialize) {
-  EXPECT_CALL(start_workers_, ready()).Times(0);
+  EXPECT_CALL(mock_workers_start_cb_, Call).Times(0);
   sigterm_->callback_();
   EXPECT_CALL(server_, isShutdown()).WillOnce(Return(shutdown_));
   cm_init_callback_();
@@ -276,7 +275,7 @@ TEST_F(RunHelperTest, ShutdownBeforeCmInitialize) {
 // no signals on Windows
 #ifndef WIN32
 TEST_F(RunHelperTest, ShutdownBeforeInitManagerInit) {
-  EXPECT_CALL(start_workers_, ready()).Times(0);
+  EXPECT_CALL(mock_workers_start_cb_, Call).Times(0);
   Init::ExpectableTargetImpl target;
   init_manager_.add(target);
   EXPECT_CALL(target, initialize());

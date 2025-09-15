@@ -6,6 +6,7 @@
 #include "source/common/config/xds_resource.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/utility.h"
+#include "source/common/runtime/runtime_features.h"
 #include "source/common/upstream/od_cds_api_impl.h"
 #include "source/extensions/filters/http/well_known_names.h"
 
@@ -58,20 +59,37 @@ DecodeHeadersBehaviorPtr createDecodeHeadersBehavior(
   if (!odcds_config.has_value()) {
     return DecodeHeadersBehavior::rds();
   }
-  Upstream::OdCdsApiHandlePtr odcds;
-  if (odcds_config->resources_locator().empty()) {
-    odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create,
-                                                      odcds_config->source(), absl::nullopt,
-                                                      validation_visitor),
-                                  Upstream::OdCdsApiHandlePtr);
-  } else {
-    auto locator = THROW_OR_RETURN_VALUE(
-        Config::XdsResourceIdentifier::decodeUrl(odcds_config->resources_locator()),
-        xds::core::v3::ResourceLocator);
-    odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create,
-                                                      odcds_config->source(), locator,
-                                                      validation_visitor),
-                                  Upstream::OdCdsApiHandlePtr);
+  Upstream::OdCdsApiHandlePtr odcds = nullptr;
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.xdstp_based_config_singleton_subscriptions")) {
+    // For xDS-TP based configs, both the odcds_config->source and
+    // odcds_config->resources_locator must be empty.
+    if (!odcds_config->has_source() && odcds_config->resources_locator().empty()) {
+      odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::XdstpOdCdsApiImpl::create,
+                                                        odcds_config->source(), absl::nullopt,
+                                                        validation_visitor),
+                                    Upstream::OdCdsApiHandlePtr);
+    }
+  }
+  // TODO(adisuissa): change "if (odcds == nullptr)" to "else" (and further
+  // merge the else with the "if (odcds_config->resources_locator().empty())")
+  // once the "envoy.reloadable_features.xdstp_based_config_singleton_subscriptions"
+  // runtime flag is deprecated.
+  if (odcds == nullptr) {
+    if (odcds_config->resources_locator().empty()) {
+      odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create,
+                                                        odcds_config->source(), absl::nullopt,
+                                                        validation_visitor),
+                                    Upstream::OdCdsApiHandlePtr);
+    } else {
+      auto locator = THROW_OR_RETURN_VALUE(
+          Config::XdsResourceIdentifier::decodeUrl(odcds_config->resources_locator()),
+          xds::core::v3::ResourceLocator);
+      odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create,
+                                                        odcds_config->source(), locator,
+                                                        validation_visitor),
+                                    Upstream::OdCdsApiHandlePtr);
+    }
   }
   // If changing the default timeout, please update the documentation in on_demand.proto too.
   auto timeout =

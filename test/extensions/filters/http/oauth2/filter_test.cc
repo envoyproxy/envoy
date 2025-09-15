@@ -157,6 +157,7 @@ public:
           ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
               CookieConfig_SameSite_DISABLED,
       int csrf_token_expires_in = 0, int code_verifier_token_expires_in = 0) {
+
     envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
     auto* endpoint = p.mutable_token_endpoint();
     endpoint->set_cluster("auth.example.com");
@@ -386,15 +387,6 @@ generic_secret:
   EXPECT_TRUE(client_callback->onConfigUpdate(decoded_resources_client_recheck.refvec_, "").ok());
   EXPECT_EQ(secret_reader.clientSecret(), "client_test_recheck");
   EXPECT_EQ(secret_reader.hmacSecret(), "token_test");
-}
-// Verifies that we fail constructing the filter if the configured cluster doesn't exist.
-TEST_F(OAuth2Test, InvalidCluster) {
-  ON_CALL(factory_context_.server_factory_context_.cluster_manager_, clusters())
-      .WillByDefault(Return(Upstream::ClusterManager::ClusterInfoMaps()));
-
-  EXPECT_THROW_WITH_MESSAGE(init(), EnvoyException,
-                            "OAuth2 filter: unknown cluster 'auth.example.com' in config. Please "
-                            "specify which cluster to direct OAuth requests to.");
 }
 
 // Verifies that we fail constructing the filter if the authorization endpoint isn't a valid URL.
@@ -3735,6 +3727,100 @@ TEST_F(OAuth2Test, CookiesDecryptedBeforeForwardingWithCleanupOAuthCookiesDisabl
   EXPECT_EQ(cookies.at("BearerToken"), "access_code");
   EXPECT_EQ(cookies.at("IdToken"), "some-id-token");
   EXPECT_EQ(cookies.at("RefreshToken"), "some-refresh-token");
+}
+
+// Verifies that requests matching the pass_through_matcher configuration are not modified by the
+// filter. The request headers and cookies remain unchanged, and only the oauth_passthrough metric
+// is incremented. This ensures correct behavior when the filter is configured to skip processing
+// for specific requests.
+TEST_F(OAuth2Test, RequestIsUnchangedWhenPassThroughMatcherMatches) {
+  Http::TestRequestHeaderMapImpl request_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Options},
+      {Http::Headers::get().Cookie.get(), "OauthHMAC=some_oauth_hmac_value"},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=some_oauth_expires_value"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken=some_refresh_token_value"},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=some_oauth_nonce_value"},
+      {Http::Headers::get().Cookie.get(), "CodeVerifier=some_code_verifier_value"}};
+
+  Http::TestRequestHeaderMapImpl expected_headers{
+      {Http::Headers::get().Host.get(), "traffic.example.com"},
+      {Http::Headers::get().Path.get(), "/anypath"},
+      {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Options},
+      {Http::Headers::get().Cookie.get(), "OauthHMAC=some_oauth_hmac_value"},
+      {Http::Headers::get().Cookie.get(), "OauthExpires=some_oauth_expires_value"},
+      {Http::Headers::get().Cookie.get(), "RefreshToken=some_refresh_token_value"},
+      {Http::Headers::get().Cookie.get(), "OauthNonce=some_oauth_nonce_value"},
+      {Http::Headers::get().Cookie.get(), "CodeVerifier=some_code_verifier_value"}};
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+  EXPECT_EQ(request_headers, expected_headers);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_failure").value(), 0);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_passthrough").value(), 1);
+  EXPECT_EQ(scope_.counterFromString("test.my_prefix.oauth_success").value(), 0);
+}
+
+// Verify cookie prefixes "__Secure-" and "__Host-" cause addition of the "Secure" attribute at
+// signout.
+TEST_F(OAuth2Test, SecureAttributeAddedForSecureCookiePrefixesOnSignout) {
+  auto make_config =
+      [&](absl::string_view prefix) -> envoy::extensions::filters::http::oauth2::v3::OAuth2Config {
+    envoy::extensions::filters::http::oauth2::v3::OAuth2Config p;
+    auto* endpoint = p.mutable_token_endpoint();
+    endpoint->set_cluster("auth.example.com");
+    endpoint->set_uri("auth.example.com/_oauth");
+    p.set_authorization_endpoint("https://auth2.example.com/oauth/authorize/");
+    p.mutable_signout_path()->mutable_path()->set_exact("/_signout");
+    p.mutable_redirect_path_matcher()->mutable_path()->set_exact(TEST_CALLBACK);
+    auto* credentials = p.mutable_credentials();
+    credentials->set_client_id(TEST_CLIENT_ID);
+    credentials->mutable_token_secret()->set_name("secret");
+    credentials->mutable_hmac_secret()->set_name("hmac");
+    auto* cookie_names = credentials->mutable_cookie_names();
+    cookie_names->set_oauth_hmac(absl::StrCat(prefix, "OauthHMAC"));
+    cookie_names->set_bearer_token(absl::StrCat(prefix, "BearerToken"));
+    cookie_names->set_id_token(absl::StrCat(prefix, "IdToken"));
+    cookie_names->set_refresh_token(absl::StrCat(prefix, "RefreshToken"));
+    cookie_names->set_oauth_nonce(absl::StrCat(prefix, "OauthNonce"));
+    cookie_names->set_code_verifier(absl::StrCat(prefix, "CodeVerifier"));
+
+    auto* matcher = p.add_pass_through_matcher();
+    matcher->set_name(":method");
+    matcher->mutable_string_match()->set_exact("OPTIONS");
+
+    return p;
+  };
+
+  auto run_test_with_prefix = [&](absl::string_view prefix, bool expect_secure) {
+    auto p = make_config(prefix);
+    auto secret_reader = std::make_shared<MockSecretReader>();
+    init(std::make_shared<FilterConfig>(p, factory_context_.server_factory_context_, secret_reader,
+                                        scope_, "test."));
+
+    EXPECT_CALL(decoder_callbacks_, encodeHeaders_(_, true))
+        .WillOnce(Invoke([&](Http::ResponseHeaderMap& passed_headers, bool) {
+          EXPECT_EQ(passed_headers.get(Http::Headers::get().SetCookie).size(), 6);
+          const auto& cookie_str =
+              passed_headers.get(Http::Headers::get().SetCookie)[0]->value().getStringView();
+          if (expect_secure) {
+            EXPECT_THAT(cookie_str, testing::HasSubstr("; Secure"));
+          } else {
+            EXPECT_THAT(cookie_str, testing::Not(testing::HasSubstr("; Secure")));
+          }
+        }));
+    auto request_headers = Http::TestRequestHeaderMapImpl{
+        {Http::Headers::get().Host.get(), "traffic.example.com"},
+        {Http::Headers::get().Path.get(), "/_signout"},
+        {Http::Headers::get().Method.get(), Http::Headers::get().MethodValues.Get},
+    };
+    EXPECT_EQ(Http::FilterHeadersStatus::StopIteration,
+              filter_->decodeHeaders(request_headers, false));
+  };
+
+  run_test_with_prefix("__Secure-", true);
+  run_test_with_prefix("__Host-", true);
+  run_test_with_prefix("", false);
 }
 
 } // namespace Oauth2

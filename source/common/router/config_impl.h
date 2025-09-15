@@ -90,7 +90,7 @@ using RouteEntryImplBaseConstSharedPtr = std::shared_ptr<const RouteEntryImplBas
 class SslRedirector : public DirectResponseEntry {
 public:
   // Router::DirectResponseEntry
-  void finalizeResponseHeaders(Http::ResponseHeaderMap&,
+  void finalizeResponseHeaders(Http::ResponseHeaderMap&, const Formatter::HttpFormatterContext&,
                                const StreamInfo::StreamInfo&) const override {}
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo&,
                                                   bool) const override {
@@ -677,11 +677,13 @@ public:
     return HeaderParser::defaultParser();
   }
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
+                              const Formatter::HttpFormatterContext& context,
                               const StreamInfo::StreamInfo& stream_info,
                               bool keep_original_host_or_path) const override;
   Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                  bool do_formatting = true) const override;
   void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+                               const Formatter::HttpFormatterContext& context,
                                const StreamInfo::StreamInfo& stream_info) const override;
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                   bool do_formatting = true) const override;
@@ -747,12 +749,16 @@ public:
     GrpcTimeoutHeaderMax,
     GrpcTimeoutHeaderOffset,
     MaxGrpcTimeout,
-    GrpcTimeoutOffset
+    GrpcTimeoutOffset,
+    FlushTimeout,
   };
-  using OptionalTimeouts = PackedStruct<std::chrono::milliseconds, 6, OptionalTimeoutNames>;
+  using OptionalTimeouts = PackedStruct<std::chrono::milliseconds, 7, OptionalTimeoutNames>;
 
   absl::optional<std::chrono::milliseconds> idleTimeout() const override {
     return getOptionalTimeout<OptionalTimeoutNames::IdleTimeout>();
+  }
+  absl::optional<std::chrono::milliseconds> flushTimeout() const override {
+    return getOptionalTimeout<OptionalTimeoutNames::FlushTimeout>();
   }
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override {
     return getOptionalTimeout<OptionalTimeoutNames::MaxStreamDuration>();

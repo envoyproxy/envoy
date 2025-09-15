@@ -35,6 +35,7 @@
 // ASAP by filing a bug on github. Overriding non-buggy code is strongly discouraged to avoid the
 // problem of the bugs being found after the old code path has been removed.
 RUNTIME_GUARD(envoy_reloadable_features_async_host_selection);
+RUNTIME_GUARD(envoy_reloadable_features_decouple_explicit_drain_pools_and_dns_refresh);
 RUNTIME_GUARD(envoy_reloadable_features_dfp_cluster_resolves_hosts);
 RUNTIME_GUARD(envoy_reloadable_features_disallow_quic_client_udp_mmsg);
 RUNTIME_GUARD(envoy_reloadable_features_enable_cel_regex_precompilation);
@@ -167,6 +168,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_no_ai_flags);
 // take over the split ones, and will be used as a base for the
 // implementation of on-demand DNS.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
+// Force a local reply from upstream envoy for reverse connections.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_reverse_conn_force_local_reply);
 
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT

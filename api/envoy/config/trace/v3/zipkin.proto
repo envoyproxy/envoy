@@ -2,13 +2,14 @@ syntax = "proto3";
 
 package envoy.config.trace.v3;
 
+import "envoy/config/core/v3/http_service.proto";
+
 import "google/protobuf/wrappers.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.trace.v3";
 option java_outer_classname = "ZipkinProto";
@@ -21,7 +22,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Configuration for the Zipkin tracer.
 // [#extension: envoy.tracers.zipkin]
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message ZipkinConfig {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.trace.v2.ZipkinConfig";
 
@@ -60,11 +61,17 @@ message ZipkinConfig {
   }
 
   // The cluster manager cluster that hosts the Zipkin collectors.
-  string collector_cluster = 1 [(validate.rules).string = {min_len: 1}];
+  // Note: This field will be deprecated in future releases in favor of
+  // :ref:`collector_service <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_service>`.
+  // Either this field or collector_service must be specified.
+  string collector_cluster = 1;
 
   // The API endpoint of the Zipkin service where the spans will be sent. When
   // using a standard Zipkin installation.
-  string collector_endpoint = 2 [(validate.rules).string = {min_len: 1}];
+  // Note: This field will be deprecated in future releases in favor of
+  // :ref:`collector_service <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_service>`.
+  // Required when using collector_cluster.
+  string collector_endpoint = 2;
 
   // Determines whether a 128bit trace id will be used when creating a new
   // trace instance. The default value is false, which will result in a 64 bit trace id being used.
@@ -79,6 +86,8 @@ message ZipkinConfig {
 
   // Optional hostname to use when sending spans to the collector_cluster. Useful for collectors
   // that require a specific hostname. Defaults to :ref:`collector_cluster <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_cluster>` above.
+  // Note: This field will be deprecated in future releases in favor of
+  // :ref:`collector_service <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_service>`.
   string collector_hostname = 6;
 
   // If this is set to true, then Envoy will be treated as an independent hop in trace chain. A complete span pair will be created for a single
@@ -106,4 +115,54 @@ message ZipkinConfig {
   // Here is the spec for W3C trace headers: https://www.w3.org/TR/trace-context/
   // The default value is USE_B3 to maintain backward compatibility.
   TraceContextOption trace_context_option = 8;
+
+  // HTTP service configuration for the Zipkin collector.
+  // When specified, this configuration takes precedence over the legacy fields:
+  // collector_cluster, collector_endpoint, and collector_hostname.
+  // This provides a complete HTTP service configuration including cluster, URI, timeout, and headers.
+  // If not specified, the legacy fields above will be used for backward compatibility.
+  //
+  // Required fields when using collector_service:
+  //
+  // * ``http_uri.cluster`` - Must be specified and non-empty
+  // * ``http_uri.uri`` - Must be specified and non-empty
+  // * ``http_uri.timeout`` - Optional
+  //
+  // Full URI Support with Automatic Parsing:
+  //
+  // The ``uri`` field supports both path-only and full URI formats:
+  //
+  // .. code-block:: yaml
+  //
+  //   tracing:
+  //     provider:
+  //       name: envoy.tracers.zipkin
+  //       typed_config:
+  //         "@type": type.googleapis.com/envoy.config.trace.v3.ZipkinConfig
+  //         collector_service:
+  //           http_uri:
+  //             # Full URI format - hostname and path are extracted automatically
+  //             uri: "https://zipkin-collector.example.com/api/v2/spans"
+  //             cluster: zipkin
+  //             timeout: 5s
+  //           request_headers_to_add:
+  //             - header:
+  //                 key: "X-Custom-Token"
+  //                 value: "your-custom-token"
+  //             - header:
+  //                 key: "X-Service-ID"
+  //                 value: "your-service-id"
+  //
+  // URI Parsing Behavior:
+  //
+  // * Full URI: ``"https://zipkin-collector.example.com/api/v2/spans"``
+  //
+  //   * Hostname: ``zipkin-collector.example.com`` (sets HTTP ``Host`` header)
+  //   * Path: ``/api/v2/spans`` (sets HTTP request path)
+  //
+  // * Path only: ``"/api/v2/spans"``
+  //
+  //   * Hostname: Uses cluster name as fallback
+  //   * Path: ``/api/v2/spans``
+  core.v3.HttpService collector_service = 9;
 }
