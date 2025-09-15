@@ -98,7 +98,7 @@ TEST(HttpExtProcConfigTest, CorrectGrpcServiceConfigServerContext) {
   TestUtility::loadFromYaml(yaml, *proto_config);
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor()).Times(3);
+  EXPECT_CALL(context, messageValidationVisitor());
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProtoWithServerContext(*proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -125,7 +125,7 @@ TEST(HttpExtProcConfigTest, CorrectHttpServiceConfigServerContext) {
   TestUtility::loadFromYaml(yaml, *proto_config);
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor()).Times(3);
+  EXPECT_CALL(context, messageValidationVisitor());
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProtoWithServerContext(*proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
@@ -395,7 +395,7 @@ TEST(HttpExtProcConfigTest, UpstreamConfig) {
   TestUtility::loadFromYaml(yaml, *proto_config);
 
   testing::NiceMock<Server::Configuration::MockServerFactoryContext> context;
-  EXPECT_CALL(context, messageValidationVisitor()).Times(3);
+  EXPECT_CALL(context, messageValidationVisitor());
   Http::FilterFactoryCb cb =
       factory.createFilterFactoryFromProtoWithServerContext(*proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
