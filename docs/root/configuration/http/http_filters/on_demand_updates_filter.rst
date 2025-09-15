@@ -39,8 +39,8 @@ Per-Route Configuration Limitations
 
 .. warning::
 
-   **IMPORTANT LIMITATION**: When VH discovery brings in per-route filter configuration overrides, 
-   requests with body data cannot use stream recreation because it would lose the buffered request body. 
+   **IMPORTANT LIMITATION**: When VH discovery brings in per-route filter configuration overrides,
+   requests with body data cannot use stream recreation because it would lose the buffered request body.
    This creates inconsistent behavior where:
 
    - Bodyless requests (GET, HEAD, etc.) receive per-route config overrides ✓
