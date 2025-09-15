@@ -75,6 +75,13 @@ envoy.bootstrap.wasm:
   status: alpha
   type_urls:
   - envoy.extensions.wasm.v3.WasmService
+envoy.bootstrap.reverse_tunnel.downstream_socket_interface:
+  categories:
+  - envoy.bootstrap
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface
 envoy.bootstrap.reverse_tunnel.upstream_socket_interface:
   categories:
   - envoy.bootstrap
@@ -1521,6 +1528,11 @@ envoy.network.dns_resolver.getaddrinfo:
   status: stable
   type_urls:
   - envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
+envoy.resolvers.reverse_connection:
+  categories:
+  - envoy.resolvers
+  security_posture: unknown
+  status: wip
 envoy.rbac.matchers.upstream_ip_port:
   categories:
   - envoy.rbac.matchers

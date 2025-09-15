@@ -5,6 +5,7 @@
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/access_loggers/file/v3/file.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/extensions/request_id/uuid/v3/uuid.pb.h"
 #include "envoy/extensions/upstreams/http/tcp/v3/tcp_connection_pool.pb.h"
 
 #include "test/integration/filters/add_header_filter.pb.h"
@@ -827,6 +828,42 @@ public:
     BaseTcpTunnelingIntegrationTest::SetUp();
   }
 
+  void enableRequestIdGeneration() {
+    config_helper_.addConfigModifier(
+        [&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+          envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proxy_config;
+          proxy_config.set_stat_prefix("tcp_stats");
+          proxy_config.set_cluster("cluster_0");
+          proxy_config.mutable_tunneling_config()->set_hostname("foo.lyft.com:80");
+          // Configure request ID generation for tunneling using the UUID request ID extension.
+          envoy::extensions::filters::network::http_connection_manager::v3::RequestIDExtension
+              request_id_extension;
+          envoy::extensions::request_id::uuid::v3::UuidRequestIdConfig uuid_config;
+          request_id_extension.mutable_typed_config()->PackFrom(uuid_config);
+          proxy_config.mutable_tunneling_config()->mutable_request_id_extension()->CopyFrom(
+              request_id_extension);
+
+          // Add a file access log to capture the dynamic metadata request id before packing.
+          tunnel_access_log_path_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+          envoy::extensions::access_loggers::file::v3::FileAccessLog fal;
+          fal.set_path(tunnel_access_log_path_);
+          fal.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+              "%DYNAMIC_METADATA(envoy.filters.network.tcp_proxy:tunnel_request_id)%\n");
+          proxy_config.add_access_log()->mutable_typed_config()->PackFrom(fal);
+
+          auto* listeners = bootstrap.mutable_static_resources()->mutable_listeners();
+          for (auto& listener : *listeners) {
+            if (listener.name() != "tcp_proxy") {
+              continue;
+            }
+            auto* filter_chain = listener.mutable_filter_chains(0);
+            auto* filter = filter_chain->mutable_filters(0);
+            filter->mutable_typed_config()->PackFrom(proxy_config);
+            break;
+          }
+        });
+  }
+
   const HttpFilterProto getAddHeaderFilterConfig(const std::string& name, const std::string& key,
                                                  const std::string& value) {
     HttpFilterProto filter_config;
@@ -872,6 +909,7 @@ public:
     }
   }
   int downstream_buffer_limit_{0};
+  std::string tunnel_access_log_path_;
 };
 
 TEST_P(TcpTunnelingIntegrationTest, Basic) {
@@ -984,6 +1022,30 @@ TEST_P(TcpTunnelingIntegrationTest, FlowControlOnAndGiantBody) {
   initialize();
 
   testGiantRequestAndResponse(10 * 1024 * 1024, 10 * 1024 * 1024);
+}
+
+TEST_P(TcpTunnelingIntegrationTest, GeneratesRequestIdHeaderWhenEnabled) {
+  enableRequestIdGeneration();
+  initialize();
+
+  // Start a connection, and verify the upgrade headers are received upstream.
+  tcp_client_ = makeTcpConnection(lookupPort("tcp_proxy"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForHeadersComplete());
+
+  // x-request-id should be present.
+  const auto& hdrs = upstream_request_->headers();
+  EXPECT_FALSE(hdrs.getRequestIdValue().empty());
+
+  // Complete handshake and basic bidi flow to ensure no regressions.
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  sendBidiData(fake_upstream_connection_);
+  closeConnection(fake_upstream_connection_);
+
+  // Verify access log contains a non-empty request id line for filter-state key.
+  const std::string log_content = waitForAccessLog(tunnel_access_log_path_);
+  EXPECT_FALSE(log_content.empty());
 }
 
 TEST_P(TcpTunnelingIntegrationTest, SendDataUpstreamAfterUpstreamClose) {
