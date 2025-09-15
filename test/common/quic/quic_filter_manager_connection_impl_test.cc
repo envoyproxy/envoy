@@ -153,5 +153,10 @@ TEST_F(QuicFilterManagerConnectionImplTest, SetSocketOption) {
   EXPECT_FALSE(impl_.setSocketOption(sockopt_name, sockopt_val));
 }
 
+TEST_F(QuicFilterManagerConnectionImplTest, GetSocketPanics) {
+  // getSocket() should panic as it's not implemented for QuicFilterManagerConnectionImpl.
+  EXPECT_DEATH(impl_.getSocket(), "not implemented");
+}
+
 } // namespace Quic
 } // namespace Envoy

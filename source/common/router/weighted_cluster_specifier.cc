@@ -130,13 +130,15 @@ public:
   }
 
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
+                              const Formatter::HttpFormatterContext& context,
                               const StreamInfo::StreamInfo& stream_info,
                               bool insert_envoy_original_path) const override {
-    requestHeaderParser().evaluateHeaders(headers, stream_info);
+    requestHeaderParser().evaluateHeaders(headers, context, stream_info);
     if (!config_->host_rewrite_.empty()) {
       headers.setHost(config_->host_rewrite_);
     }
-    DynamicRouteEntry::finalizeRequestHeaders(headers, stream_info, insert_envoy_original_path);
+    DynamicRouteEntry::finalizeRequestHeaders(headers, context, stream_info,
+                                              insert_envoy_original_path);
   }
   Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                  bool do_formatting) const override {
@@ -146,13 +148,10 @@ public:
     return transforms;
   }
   void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+                               const Formatter::HttpFormatterContext& context,
                                const StreamInfo::StreamInfo& stream_info) const override {
-    const Http::RequestHeaderMap& request_headers =
-        stream_info.getRequestHeaders() == nullptr
-            ? *Http::StaticEmptyHeaders::get().request_headers
-            : *stream_info.getRequestHeaders();
-    responseHeaderParser().evaluateHeaders(headers, {&request_headers, &headers}, stream_info);
-    DynamicRouteEntry::finalizeResponseHeaders(headers, stream_info);
+    responseHeaderParser().evaluateHeaders(headers, context, stream_info);
+    DynamicRouteEntry::finalizeResponseHeaders(headers, context, stream_info);
   }
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                   bool do_formatting) const override {

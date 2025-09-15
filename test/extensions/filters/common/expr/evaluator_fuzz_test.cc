@@ -20,7 +20,7 @@ namespace {
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::common::expr::EvaluatorTestCase& input) {
   // Create builder without constant folding.
-  static Expr::BuilderPtr builder = Expr::createBuilder(nullptr);
+  static auto builder = Expr::createBuilder(nullptr);
   MockTimeSystem time_source;
   std::unique_ptr<TestStreamInfo> stream_info;
 
@@ -51,11 +51,15 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::common::expr::EvaluatorTest
       ENVOY_LOG_MISC(debug, "Failed to convert expression to new format");
       return;
     }
-    Expr::ExpressionPtr expr = Expr::createExpression(*builder, new_expr);
+    auto expr = Expr::CompiledExpression::Create(builder, new_expr);
+    if (!expr.ok()) {
+      ENVOY_LOG_MISC(debug, "Failed to compile");
+      return;
+    }
 
     // Evaluate the CEL expression.
     Protobuf::Arena arena;
-    Expr::evaluate(*expr, arena, nullptr, *stream_info, &request_headers, &response_headers,
+    expr->evaluate(arena, nullptr, *stream_info, &request_headers, &response_headers,
                    &response_trailers);
   } catch (const CelException& e) {
     ENVOY_LOG_MISC(debug, "CelException: {}", e.what());

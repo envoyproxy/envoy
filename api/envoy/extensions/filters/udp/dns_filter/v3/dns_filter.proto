@@ -102,6 +102,13 @@ message DnsFilterConfig {
 
   // Client context configuration controls Envoy's behavior when it must use external
   // resolvers to answer a query. This object is optional and if omitted instructs
-  // the filter to resolve queries from the data in the server_config
+  // the filter to resolve queries from the data in the server_config.
+  // Also, if ``client_config`` is omitted, here is the Envoy's behavior to create DNS resolver:
+  //
+  // 1. If :ref:`typed_dns_resolver_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.typed_dns_resolver_config>`
+  // is not empty, uses it.
+  //
+  // 2. Otherwise, uses the default c-ares DNS resolver.
+  //
   ClientContextConfig client_config = 3;
 }

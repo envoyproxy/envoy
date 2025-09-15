@@ -61,6 +61,9 @@ public:
   std::chrono::milliseconds streamIdleTimeout() const override {
     return parent_.streamIdleTimeout();
   }
+  absl::optional<std::chrono::milliseconds> streamFlushTimeout() const override {
+    return parent_.streamFlushTimeout();
+  }
   std::chrono::milliseconds requestTimeout() const override { return parent_.requestTimeout(); }
   std::chrono::milliseconds requestHeadersTimeout() const override {
     return parent_.requestHeadersTimeout();
