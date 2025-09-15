@@ -10,10 +10,13 @@ envoy_extension_package()
 
 envoy_cc_extension(
     name = "filter_lib",
+    srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     deps = [
         "//envoy/access_log:access_log_interface",
+        "//source/common/init:target_lib",
         "//source/extensions/filters/common/local_ratelimit:local_ratelimit_lib",
+        "@envoy_api//envoy/extensions/access_loggers/filters/local_ratelimit/v3:pkg_cc_proto",
     ],
 )
 

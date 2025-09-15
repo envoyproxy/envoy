@@ -5,7 +5,9 @@
 #include <memory>
 
 #include "envoy/runtime/runtime.h"
+#include "envoy/type/v3/token_bucket.pb.validate.h"
 
+#include "source/common/grpc/common.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
@@ -323,50 +325,143 @@ DynamicDescriptor::addOrGetDescriptor(const RateLimit::Descriptor& request_descr
   return token_bucket;
 }
 
-LocalRateLimiterMapSingleton::RateLimiter::~RateLimiter() {
-  limiter_.reset();
-  // If weak_ptr in the singleton map gets expired, remove the rate limiter from the singleton map.
-  auto it = map_->limiter_map_.find(key_);
-  ENVOY_BUG(it != map_->limiter_map_.end(),
-            "the rate limiter should be tracked in the singleton map");
-  std::shared_ptr<LocalRateLimiterImpl> ptr = it->second.lock();
-  if (ptr == nullptr) {
-    map_->limiter_map_.erase(it);
+SINGLETON_MANAGER_REGISTRATION(local_ratelimit);
+
+std::shared_ptr<LocalRateLimiterImpl>
+createRateLimiterImpl(const envoy::type::v3::TokenBucket& token_bucket,
+                      Event::Dispatcher& dispatcher) {
+  const auto fill_interval =
+      std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(token_bucket, fill_interval));
+  const auto max_tokens = token_bucket.max_tokens();
+  const auto tokens_per_fill = PROTOBUF_GET_WRAPPED_OR_DEFAULT(token_bucket, tokens_per_fill, 1);
+  return std::make_shared<LocalRateLimiterImpl>(
+      fill_interval, max_tokens, tokens_per_fill, dispatcher,
+      Protobuf::RepeatedPtrField<
+          envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>());
+}
+
+RateLimiterProviderSingleton::RateLimiterPtr RateLimiterProviderSingleton::getRateLimiter(
+    Server::Configuration::FactoryContext& factory_context, absl::string_view key,
+    const envoy::config::core::v3::ConfigSource& config_source, SetRateLimiterCb callback) {
+  RateLimiterProviderSingletonSharedPtr provider =
+      factory_context.serverFactoryContext()
+          .singletonManager()
+          .getTyped<RateLimiterProviderSingleton>(
+              SINGLETON_MANAGER_REGISTERED_NAME(local_ratelimit),
+              [&factory_context, &config_source] {
+                return std::make_shared<RateLimiterProviderSingleton>(
+                    factory_context.serverFactoryContext(), config_source);
+              });
+
+  auto it = provider->limiters_.find(key);
+  if (it != provider->limiters_.end()) {
+    auto& limiter_ref = it->second;
+    if (auto limiter = limiter_ref.limiter_.lock(); !limiter) {
+      const auto& named_token_bucket = limiter_ref.config_;
+      limiter_ref.limiter_ = createRateLimiterImpl(
+          named_token_bucket.token_bucket(), provider->factory_context_.mainThreadDispatcher());
+    }
+    return std::make_unique<RateLimiterProviderSingleton::RateLimiterWrapper>(
+        provider, std::string(key), limiter_ref.limiter_.lock(),
+        limiter_ref.token_bucket_config_hash_);
+  }
+
+  provider->setter_cbs_[std::string(key)].push_back(std::move(callback));
+  // Return a RateLimiter with a null limiter_ for now, it will be filled in
+  // by the callback.
+  return std::make_unique<RateLimiterProviderSingleton::RateLimiterWrapper>(
+      provider, std::string(key), nullptr, 0);
+}
+
+// RateLimiterProviderSingleton::RatelimiterSubscription method implementations
+RateLimiterProviderSingleton::RatelimiterSubscription::RatelimiterSubscription(
+    RateLimiterProviderSingleton& parent)
+    : Config::SubscriptionBase<envoy::type::v3::TokenBucketConfig>(
+          parent.factory_context_.messageValidationVisitor(), "uid"),
+      parent_(parent) {
+  subscription_ = THROW_OR_RETURN_VALUE(
+      parent.factory_context_.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
+          parent.config_source_, Grpc::Common::typeUrl(getResourceName()), *parent.scope_, *this,
+          resource_decoder_, {}),
+      Config::SubscriptionPtr);
+}
+
+void RateLimiterProviderSingleton::RatelimiterSubscription::handleAddedResources(
+    const std::vector<Config::DecodedResourceRef>& added_resources) {
+  for (const auto& resource : added_resources) {
+    std::string key = resource.get().name();
+    const auto& named_token_bucket =
+        dynamic_cast<const envoy::type::v3::TokenBucketConfig&>(resource.get().resource());
+    size_t hash = MessageUtil::hash(named_token_bucket);
+
+    auto it = parent_.limiters_.find(key);
+    if (it == parent_.limiters_.end()) {
+      parent_.limiters_[key] = {named_token_bucket, hash, std::weak_ptr<LocalRateLimiterImpl>()};
+    } else if (hash != it->second.token_bucket_config_hash_) {
+      it->second.config_ = named_token_bucket;
+      it->second.token_bucket_config_hash_ = hash;
+      it->second.limiter_.reset();
+    } else {
+      // The config is the same as the existing one.
+      // There shouldn't be any pending callbacks for the same config as it
+      continue;
+    }
+
+    auto callback_it = parent_.setter_cbs_.find(key);
+    if (callback_it == parent_.setter_cbs_.end()) {
+      // No pending callbacks.
+      continue;
+    }
+
+    auto limiter = createRateLimiterImpl(named_token_bucket.token_bucket(),
+                                         parent_.factory_context_.mainThreadDispatcher());
+    parent_.limiters_[key].limiter_ = limiter;
+    for (const auto& callback : callback_it->second) {
+      callback(limiter);
+    }
+    parent_.setter_cbs_.erase(callback_it);
   }
 }
 
-SINGLETON_MANAGER_REGISTRATION(local_ratelimit);
+void RateLimiterProviderSingleton::RatelimiterSubscription::handleRemovedResources(
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
+  for (const auto& key : removed_resources) {
+    auto it = parent_.limiters_.find(key);
+    if (it != parent_.limiters_.end()) {
+      // The wrapper containing the config and the weak_ptr is removed.
+      // Any existing shared_ptr instances held by RateLimiter objects
+      // will keep the LocalRateLimiterImpl alive until they are destroyed.
+      parent_.limiters_.erase(it);
+    }
+  }
+}
 
-LocalRateLimiterMapSingleton::RateLimiter LocalRateLimiterMapSingleton::getRateLimiter(
-    Singleton::Manager& manager, absl::string_view key_prefix,
-    const envoy::type::v3::TokenBucket& token_bucket, Event::Dispatcher& dispatcher,
-    const Protobuf::RepeatedPtrField<
-        envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>& descriptors,
-    bool always_consume_default_token_bucket, ShareProviderSharedPtr shared_provider,
-    const uint32_t lru_size) {
-  LocalRateLimiterMapSingletonSharedPtr map = manager.getTyped<LocalRateLimiterMapSingleton>(
-      SINGLETON_MANAGER_REGISTERED_NAME(local_ratelimit),
-      [] { return std::make_shared<LocalRateLimiterMapSingleton>(); });
-
-  RateLimiterKey final_key = {std::string(key_prefix), MessageUtil::hash(token_bucket)};
-
-  auto it = map->limiter_map_.find(final_key);
-  if (it == map->limiter_map_.end()) {
-    const auto fill_interval =
-        std::chrono::milliseconds(PROTOBUF_GET_MS_REQUIRED(token_bucket, fill_interval));
-    const auto max_tokens = token_bucket.max_tokens();
-    const auto tokens_per_fill = PROTOBUF_GET_WRAPPED_OR_DEFAULT(token_bucket, tokens_per_fill, 1);
-    auto limiter = std::make_shared<LocalRateLimiterImpl>(
-        fill_interval, max_tokens, tokens_per_fill, dispatcher, descriptors,
-        always_consume_default_token_bucket, shared_provider, lru_size);
-    map->limiter_map_.insert({final_key, limiter});
-    return LocalRateLimiterMapSingleton::RateLimiter{map, final_key, limiter};
+absl::Status RateLimiterProviderSingleton::RatelimiterSubscription::onConfigUpdate(
+    const std::vector<Config::DecodedResourceRef>& resources, const std::string&) {
+  // SOTW update. We need to determine what was removed.
+  absl::flat_hash_set<std::string> new_keys;
+  for (const auto& res : resources) {
+    new_keys.insert(res.get().name());
   }
 
-  std::shared_ptr<LocalRateLimiterImpl> ptr = it->second.lock();
-  ENVOY_BUG(ptr != nullptr, "the rate limiter should still be alive otherwise it should be "
-                            "destructed in `~RateLimiter()`");
-  return LocalRateLimiterMapSingleton::RateLimiter{map, final_key, ptr};
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  for (const auto& pair : parent_.limiters_) {
+    if (!new_keys.contains(pair.first)) {
+      *removed_resources.Add() = pair.first;
+    }
+  }
+
+  handleAddedResources(resources);
+  handleRemovedResources(removed_resources);
+  return absl::OkStatus();
+}
+
+absl::Status RateLimiterProviderSingleton::RatelimiterSubscription::onConfigUpdate(
+    const std::vector<Config::DecodedResourceRef>& added_resources,
+    const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
+  handleAddedResources(added_resources);
+  handleRemovedResources(removed_resources);
+  return absl::OkStatus();
 }
 
 } // namespace LocalRateLimit
