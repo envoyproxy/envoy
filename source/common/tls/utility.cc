@@ -112,7 +112,7 @@ std::string getRFC2253NameFromCertificate(X509& cert, CertName desired_name) {
   bssl::UniquePtr<BIO> buf(BIO_new(BIO_s_mem()));
   RELEASE_ASSERT(buf != nullptr, "");
 
-  X509_NAME* name = nullptr;
+  const X509_NAME* name = nullptr;
   switch (desired_name) {
   case CertName::Issuer:
     name = X509_get_issuer_name(&cert);
@@ -143,7 +143,7 @@ std::string getRFC2253NameFromCertificate(X509& cert, CertName desired_name) {
  * @return Envoy::Ssl::ParsedX509NamePtr returns the struct contains the parsed values.
  */
 Envoy::Ssl::ParsedX509NamePtr parseX509NameFromCertificate(X509& cert, CertName desired_name) {
-  X509_NAME* name = nullptr;
+  const X509_NAME* name = nullptr;
   switch (desired_name) {
   case CertName::Issuer:
     name = X509_get_issuer_name(&cert);
@@ -156,8 +156,7 @@ Envoy::Ssl::ParsedX509NamePtr parseX509NameFromCertificate(X509& cert, CertName 
   auto parsed = std::make_unique<Envoy::Ssl::ParsedX509Name>();
   int cnt = X509_NAME_entry_count(name);
   for (int i = 0; i < cnt; i++) {
-    const X509_NAME_ENTRY* ent;
-    ent = X509_NAME_get_entry(name, i);
+    const X509_NAME_ENTRY* ent = X509_NAME_get_entry(name, i);
 
     const ASN1_OBJECT* fn = X509_NAME_ENTRY_get_object(ent);
     int fn_nid = OBJ_obj2nid(fn);
@@ -237,19 +236,19 @@ std::vector<std::string> Utility::getSubjectAltNames(X509& cert, int type) {
 
 std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
   std::string san;
-  ASN1_STRING* str = nullptr;
+  const ASN1_STRING* str = nullptr;
   switch (general_name->type) {
   case GEN_DNS:
     str = general_name->d.dNSName;
-    san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+    san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(str)), ASN1_STRING_length(str));
     break;
   case GEN_URI:
     str = general_name->d.uniformResourceIdentifier;
-    san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+    san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(str)), ASN1_STRING_length(str));
     break;
   case GEN_EMAIL:
     str = general_name->d.rfc822Name;
-    san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(str)), ASN1_STRING_length(str));
+    san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(str)), ASN1_STRING_length(str));
     break;
   case GEN_IPADD: {
     if (general_name->d.ip->length == 4) {
@@ -270,7 +269,7 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
     break;
   }
   case GEN_OTHERNAME: {
-    ASN1_TYPE* value = general_name->d.otherName->value;
+    const ASN1_TYPE* value = general_name->d.otherName->value;
     if (value == nullptr) {
       break;
     }
@@ -304,38 +303,38 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
       break;
     }
     case V_ASN1_BIT_STRING: {
-      ASN1_BIT_STRING* tmp_str = value->value.bit_string;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_BIT_STRING* tmp_str = value->value.bit_string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
     case V_ASN1_OCTET_STRING: {
-      ASN1_OCTET_STRING* tmp_str = value->value.octet_string;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_OCTET_STRING* tmp_str = value->value.octet_string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
     case V_ASN1_PRINTABLESTRING: {
-      ASN1_PRINTABLESTRING* tmp_str = value->value.printablestring;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_PRINTABLESTRING* tmp_str = value->value.printablestring;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
     case V_ASN1_T61STRING: {
-      ASN1_T61STRING* tmp_str = value->value.t61string;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_T61STRING* tmp_str = value->value.t61string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
     case V_ASN1_IA5STRING: {
-      ASN1_IA5STRING* tmp_str = value->value.ia5string;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_IA5STRING* tmp_str = value->value.ia5string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
     case V_ASN1_GENERALSTRING: {
-      ASN1_GENERALSTRING* tmp_str = value->value.generalstring;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_GENERALSTRING* tmp_str = value->value.generalstring;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
@@ -360,38 +359,38 @@ std::string Utility::generalNameAsString(const GENERAL_NAME* general_name) {
       break;
     }
     case V_ASN1_UTCTIME: {
-      ASN1_UTCTIME* tmp_str = value->value.utctime;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_UTCTIME* tmp_str = value->value.utctime;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
     case V_ASN1_GENERALIZEDTIME: {
-      ASN1_GENERALIZEDTIME* tmp_str = value->value.generalizedtime;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_GENERALIZEDTIME* tmp_str = value->value.generalizedtime;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
     case V_ASN1_VISIBLESTRING: {
-      ASN1_VISIBLESTRING* tmp_str = value->value.visiblestring;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_VISIBLESTRING* tmp_str = value->value.visiblestring;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
     case V_ASN1_UTF8STRING: {
-      ASN1_UTF8STRING* tmp_str = value->value.utf8string;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_UTF8STRING* tmp_str = value->value.utf8string;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
     case V_ASN1_SET: {
-      ASN1_STRING* tmp_str = value->value.set;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_STRING* tmp_str = value->value.set;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
     case V_ASN1_SEQUENCE: {
-      ASN1_STRING* tmp_str = value->value.sequence;
-      san.assign(reinterpret_cast<const char*>(ASN1_STRING_data(tmp_str)),
+      const ASN1_STRING* tmp_str = value->value.sequence;
+      san.assign(reinterpret_cast<const char*>(ASN1_STRING_get0_data(tmp_str)),
                  ASN1_STRING_length(tmp_str));
       break;
     }
@@ -450,7 +449,7 @@ std::vector<std::string> Utility::getCertificateExtensionOids(X509& cert) {
 
   int count = X509_get_ext_count(&cert);
   for (int pos = 0; pos < count; pos++) {
-    X509_EXTENSION* extension = X509_get_ext(&cert, pos);
+    const X509_EXTENSION* extension = X509_get_ext(&cert, pos);
     RELEASE_ASSERT(extension != nullptr, "");
 
     char oid[MAX_OID_LENGTH];
@@ -476,7 +475,7 @@ absl::string_view Utility::getCertificateExtensionValue(X509& cert,
     return {};
   }
 
-  X509_EXTENSION* extension = X509_get_ext(&cert, pos);
+  const X509_EXTENSION* extension = X509_get_ext(&cert, pos);
   if (extension == nullptr) {
     return {};
   }

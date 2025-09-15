@@ -1206,6 +1206,76 @@ typed_config:
   EXPECT_EQ(1UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());
 }
 
+// Verify option record_upstream_connection
+// when a request header is matched in a static configuration.
+TEST_P(TapIntegrationTest, StaticFilePerHttpBufferTraceTapUpstreamConnection) {
+  constexpr absl::string_view filter_config =
+      R"EOF(
+name: tap
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.tap.v3.Tap
+  common_config:
+    static_config:
+      match:
+        http_request_headers_match:
+          headers:
+            - name: foo
+              string_match:
+                exact: bar
+      output_config:
+        sinks:
+          - format: PROTO_BINARY_LENGTH_DELIMITED
+            file_per_tap:
+              path_prefix: {}
+  record_upstream_connection: true
+)EOF";
+
+  const std::string path_prefix = getTempPathPrefix();
+  initializeFilter(fmt::format(filter_config, path_prefix));
+
+  // Initial request/response with tap.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  makeRequest(request_headers_tap_, {"hello"}, &request_trailers_, response_headers_no_tap_,
+              {"world"}, &response_trailers_);
+  codec_client_->close();
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
+
+  std::vector<envoy::data::tap::v3::TraceWrapper> traces =
+      Extensions::Common::Tap::readTracesFromPath(path_prefix);
+  ASSERT_EQ(1, traces.size());
+  EXPECT_TRUE(traces[0].has_http_buffered_trace());
+  EXPECT_TRUE(traces[0].http_buffered_trace().has_upstream_connection());
+  using ::testing::AnyOf;
+  using ::testing::StrEq;
+  std::string upstream_local_address = traces[0]
+                                           .http_buffered_trace()
+                                           .upstream_connection()
+                                           .local_address()
+                                           .socket_address()
+                                           .address();
+  EXPECT_THAT(upstream_local_address, AnyOf(StrEq("127.0.0.1"), StrEq("::1")));
+  EXPECT_TRUE(traces[0]
+                  .http_buffered_trace()
+                  .upstream_connection()
+                  .local_address()
+                  .socket_address()
+                  .has_port_value());
+  std::string upstream_remote_address = traces[0]
+                                            .http_buffered_trace()
+                                            .upstream_connection()
+                                            .remote_address()
+                                            .socket_address()
+                                            .address();
+  EXPECT_THAT(upstream_remote_address, AnyOf(StrEq("127.0.0.1"), StrEq("::1")));
+  EXPECT_TRUE(traces[0]
+                  .http_buffered_trace()
+                  .upstream_connection()
+                  .remote_address()
+                  .socket_address()
+                  .has_port_value());
+  EXPECT_EQ(1UL, test_server_->counter("http.config_test.tap.rq_tapped")->value());
+}
+
 // Verify that body matching works.
 TEST_P(TapIntegrationTest, AdminBodyMatching) {
   initializeFilter(admin_filter_config_);

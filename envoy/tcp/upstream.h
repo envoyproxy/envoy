@@ -4,6 +4,7 @@
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_evaluator.h"
+#include "envoy/http/request_id_extension.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/upstream.h"
@@ -41,6 +42,9 @@ public:
 
   // The evaluator to add additional HTTP request headers to the upstream request.
   virtual Envoy::Http::HeaderEvaluator& headerEvaluator() const PURE;
+
+  // The request ID extension used for generation/validation when tunneling.
+  virtual const Envoy::Http::RequestIDExtensionSharedPtr& requestIDExtension() const PURE;
 
   // Save HTTP response headers to the downstream filter state.
   virtual void

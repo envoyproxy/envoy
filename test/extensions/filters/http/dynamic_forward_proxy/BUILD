@@ -66,6 +66,20 @@ envoy_cc_test_library(
     alwayslink = 1,
 )
 
+envoy_cc_test_library(
+    name = "modify_host_filter_lib",
+    srcs = ["modify_host_filter.cc"],
+    deps = [
+        "//envoy/http:filter_interface",
+        "//envoy/registry",
+        "//envoy/server:filter_config_interface",
+        "//source/extensions/filters/http/common:factory_base_lib",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
+        "//test/integration/filters:common_lib",
+    ],
+)
+
 envoy_extension_cc_test(
     name = "proxy_filter_integration_test",
     size = "large",
@@ -79,6 +93,7 @@ envoy_extension_cc_test(
     #   https://gist.github.com/wrowe/a152cb1d12c2f751916122aed39d8517
     tags = ["fails_on_clang_cl"],
     deps = [
+        ":modify_host_filter_lib",
         ":test_resolver_lib",
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
@@ -114,6 +129,7 @@ envoy_extension_cc_test(
     #   https://gist.github.com/wrowe/a152cb1d12c2f751916122aed39d8517
     tags = ["fails_on_clang_cl"],
     deps = [
+        ":modify_host_filter_lib",
         ":test_resolver_lib",
         "//source/extensions/clusters/dns:dns_cluster_lib",
         "//source/extensions/clusters/dynamic_forward_proxy:cluster",
