@@ -1,6 +1,7 @@
 #include "source/common/http/codec_wrappers.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 using testing::_;
@@ -23,6 +24,39 @@ TEST(MockResponseDecoderWrapper, dumpState) {
   std::stringstream os;
   EXPECT_CALL(inner_decoder, dumpState(_, _));
   wrapper.dumpState(os, 0);
+}
+
+TEST(MockResponseDecoderWrapper, decoderDestroyedBeforeDecoding) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues({{"envoy.reloadable_features.abort_when_accessing_dead_decoder", "false"}});
+  auto inner_decoder = std::make_unique<MockResponseDecoder>();
+  MockResponseDecoderWrapper wrapper(*inner_decoder);
+
+  inner_decoder.reset();
+
+  EXPECT_ENVOY_BUG(
+      wrapper.decodeHeaders(ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "200"}}},
+                            true),
+      "Wrapped decoder use after free detected");
+
+  EXPECT_ENVOY_BUG(wrapper.decode1xxHeaders(
+                       ResponseHeaderMapPtr{new TestResponseHeaderMapImpl{{":status", "100"}}}),
+                   "Wrapped decoder use after free detected");
+
+  Buffer::OwnedImpl data("foo");
+  EXPECT_ENVOY_BUG(wrapper.decodeData(data, true), "Wrapped decoder use after free detected");
+
+  EXPECT_ENVOY_BUG(wrapper.decodeTrailers(
+                       ResponseTrailerMapPtr{new TestResponseTrailerMapImpl{{"key", "value"}}}),
+                   "Wrapped decoder use after free detected");
+
+  MetadataMapPtr metadata = std::make_unique<MetadataMap>();
+  (*metadata)["key1"] = "value1";
+  EXPECT_ENVOY_BUG(wrapper.decodeMetadata(std::move(metadata)),
+                   "Wrapped decoder use after free detected");
+
+  std::stringstream os;
+  EXPECT_ENVOY_BUG(wrapper.dumpState(os, 0), "Wrapped decoder use after free detected");
 }
 
 class MockRequestEncoderWrapper : public RequestEncoderWrapper {
