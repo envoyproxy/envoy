@@ -175,6 +175,21 @@ The following command operators are supported:
 %START_TIME_LOCAL%
   Same as :ref:`START_TIME <config_access_log_format_start_time>`, but use local time zone.
 
+.. _config_access_log_format_end_time:
+
+%END_TIME%
+  HTTP/THRIFT
+    Time of the request last byte out, including milliseconds.
+
+  TCP
+    Downstream connection end time including milliseconds.
+
+  UDP
+    Not implemented (0).
+
+  END_TIME can be customized using a `format string <https://en.cppreference.com/w/cpp/io/manip/put_time>`_.
+  See :ref:`START_TIME <config_access_log_format_start_time>` for additional format specifiers and examples.
+
 .. _config_access_log_format_emit_time:
 
 %EMIT_TIME%
