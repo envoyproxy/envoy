@@ -254,9 +254,7 @@ message GrpcService {
 
     // The channel credentials to use. See `channel credentials
     // <https://grpc.io/docs/guides/auth.html#credential-types>`_.
-    // Ignored if :ref:`channel_credentials_plugin
-    // <envoy_api_field_config.core.v3.GrpcService.GoogleGrpc.channel_credentials_plugin>`
-    // is set.
+    // Ignored if ``channel_credentials_plugin`` is set.
     ChannelCredentials channel_credentials = 2;
 
     // A list of channel credentials plugins.
@@ -268,9 +266,7 @@ message GrpcService {
 
     // The call credentials to use. See `channel credentials
     // <https://grpc.io/docs/guides/auth.html#credential-types>`_.
-    // Ignored if :ref:`call_credentials_plugin
-    // <envoy_api_field_config.core.v3.GrpcService.GoogleGrpc.call_credentials_plugin>`
-    // is set.
+    // Ignored if ``call_credentials_plugin`` is set.
     repeated CallCredentials call_credentials = 3;
 
     // A list of call credentials plugins. All supported plugins will be used.
