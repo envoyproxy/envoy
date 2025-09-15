@@ -392,4 +392,10 @@ new_features:
 - area: dynamic_modules
   change: |
     Added support for counters, gauges, histograms, and their vector variants to the dynamic modules API.
+- area: dns_resolver
+  change: |
+    Added :ref:`max_udp_channel_duration
+    <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.max_udp_channel_duration>`
+    configuration field to the c-ares DNS resolver. This allows periodic refresh of the UDP channel
+    to help with avoiding stale socket states, and providing better load distribution across UDP ports.
 deprecated:
