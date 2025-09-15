@@ -446,6 +446,8 @@ private:
 
     bool addedViaApi() const override { return false; }
 
+    Network::FilterChainInfoSharedPtr filterChainInfo() const override { return nullptr; }
+
   private:
     const Network::RawBufferSocketFactory transport_socket_factory_;
     const Filter::NetworkFilterFactoriesList empty_network_filter_factory_;

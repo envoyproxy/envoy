@@ -197,6 +197,8 @@ public:
 
   bool addedViaApi() const override { return false; }
 
+  FilterChainInfoSharedPtr filterChainInfo() const override { return nullptr; }
+
 private:
   const DownstreamTransportSocketFactoryPtr transport_socket_factory_;
   const NetworkFilterFactoriesList empty_network_filter_factory_{};
