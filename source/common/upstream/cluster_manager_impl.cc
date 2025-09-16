@@ -456,8 +456,14 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
       cds_resources_locator =
           std::make_unique<xds::core::v3::ResourceLocator>(std::move(url_or_error.value()));
     }
-    auto cds_or_error =
-        factory_.createCds(dyn_resources.cds_config(), cds_resources_locator.get(), *this);
+    // In case cds_config is configured and the new xDS-TP configs are used,
+    // then the CdsApi will need to track the resources, as the xDS-TP configs
+    // may be used for OD-CDS. If this is not set, the SotW update may override
+    // the OD-CDS resources.
+    const bool support_multi_ads_sources =
+        bootstrap.has_default_config_source() || !bootstrap.config_sources().empty();
+    auto cds_or_error = factory_.createCds(dyn_resources.cds_config(), cds_resources_locator.get(),
+                                           *this, support_multi_ads_sources);
     RETURN_IF_NOT_OK_REF(cds_or_error.status())
     cds_api_ = std::move(*cds_or_error);
     init_helper_.setCds(cds_api_.get());
@@ -2272,11 +2278,11 @@ ProdClusterManagerFactory::clusterFromProto(const envoy::config::cluster::v3::Cl
 absl::StatusOr<CdsApiPtr>
 ProdClusterManagerFactory::createCds(const envoy::config::core::v3::ConfigSource& cds_config,
                                      const xds::core::v3::ResourceLocator* cds_resources_locator,
-                                     ClusterManager& cm) {
+                                     ClusterManager& cm, bool support_multi_ads_sources) {
   // TODO(htuch): Differentiate static vs. dynamic validation visitors.
   return CdsApiImpl::create(cds_config, cds_resources_locator, cm, *stats_.rootScope(),
                             context_.messageValidationContext().dynamicValidationVisitor(),
-                            context_);
+                            context_, support_multi_ads_sources);
 }
 
 } // namespace Upstream
