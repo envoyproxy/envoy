@@ -454,6 +454,8 @@ private:
   };
 
   uint32_t stats_eviction_counter_{0};
+  std::unique_ptr<Logger::SinkDelegate> log_sink_;
+
 
 #ifdef ENVOY_PERFETTO
   std::unique_ptr<perfetto::TracingSession> tracing_session_{};

@@ -486,6 +486,9 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
     RETURN_IF_NOT_OK(
         Utility::assertExclusiveLogFormatMethod(options_, bootstrap_.application_log_config()));
     RETURN_IF_NOT_OK(Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config()));
+    log_sink_ = THROW_OR_RETURN_VALUE(
+          Utility::maybeAddApplicationLogSink(bootstrap_.application_log_config()),
+          std::unique_ptr<Utility::ApplicationLogSink>);
   }
 
 #ifdef ENVOY_PERFETTO
@@ -1103,6 +1106,8 @@ void InstanceBase::terminate() {
   if (stat_flush_timer_) {
     flushStats();
   }
+  // TODO maybe flush here
+  log_sink_.reset();
 
   if (config_.clusterManager() != nullptr) {
     config_.clusterManager()->shutdown();

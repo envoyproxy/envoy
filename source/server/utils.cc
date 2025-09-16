@@ -53,6 +53,38 @@ absl::Status maybeSetApplicationLogFormat(
   return absl::OkStatus();
 }
 
+absl::StatusOr<std::unique_ptr<ApplicationLogSink>> maybeAddApplicationLogSink(
+    const envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig& application_log_config) {
+    if (application_log_config.log_sinks().size() > 0) {
+      return std::make_unique<ApplicationLogSink>(Logger::Registry::getSink());
+    }
+    return nullptr;
+}
+
+ApplicationLogSink::ApplicationLogSink(
+    Envoy::Logger::DelegatingLogSinkSharedPtr log_sink)
+    : Envoy::Logger::SinkDelegate(log_sink) {
+  setDelegate();
+}
+
+ApplicationLogSink::~ApplicationLogSink() { restoreDelegate(); }
+
+void ApplicationLogSink::log(absl::string_view message,
+         const spdlog::details::log_msg& log_msg) {
+  if (auto* sink = previousDelegate(); sink != nullptr) {
+    sink->log(message, log_msg);
+  }
+}
+
+void ApplicationLogSink::logWithStableName(absl::string_view stable_name, absl::string_view level,
+                               absl::string_view component, absl::string_view msg) {
+  if (auto* sink = previousDelegate(); sink != nullptr) {
+    sink->logWithStableName(stable_name, level, component, msg);
+  }
+}
+
+void ApplicationLogSink::flush() {}
+
 } // namespace Utility
 } // namespace Server
 } // namespace Envoy

@@ -120,6 +120,9 @@ message Bootstrap {
     // the default log format. Setting both this field and :option:`--log-format` command line
     // option is not allowed, and will cause a bootstrap error.
     LogFormat log_format = 1;
+
+    // Configuration for the additional :ref:`log sinks <arch_overview_access_logs>`.
+    repeated accesslog.v3.AccessLog log_sinks = 22;
   }
 
   message DeferredStatOptions {
