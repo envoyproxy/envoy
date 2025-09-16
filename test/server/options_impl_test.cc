@@ -20,8 +20,10 @@
 #if defined(__linux__)
 #include <sched.h>
 #include "source/server/options_impl_platform_linux.h"
+#include "source/server/cgroup_cpu_util.h"
 #endif
 #include "test/mocks/api/mocks.h"
+#include "test/mocks/filesystem/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/registry.h"
@@ -657,6 +659,125 @@ TEST_F(OptionsImplPlatformLinuxTest, AffinityTest4) {
   EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
       .WillOnce(DoAll(SetArgPointee<2>(test_set), Return(Api::SysCallIntResult{-1, 0})));
   EXPECT_EQ(OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads), fake_hw_threads);
+}
+
+// Pure cgroup mock tests - use filesystem mocks to work on Linux
+TEST_F(OptionsImplPlatformLinuxTest, CgroupV2CpuLimit) {
+  // Test cgroup v2 CPU limit detection following the same mocking pattern
+  Filesystem::MockInstance mock_fs;
+
+  // Mock no hierarchy info available (fallback to root)
+  EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/cgroup"))
+      .WillRepeatedly(Return(absl::InvalidArgumentError("not found")));
+
+  // Mock cgroup v2 cpu.max content: 150000 / 100000 = 1.5 CPUs, ceil = 2
+  EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/cpu.max"))
+      .WillOnce(Return(std::string("150000 100000")));
+
+  // Mock v1 files as not available (will return error)
+  EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/cpu/cpu.cfs_quota_us"))
+      .WillOnce(Return(absl::InvalidArgumentError("not found")));
+
+  absl::optional<uint32_t> result = CgroupCpuUtil::getCpuLimit(mock_fs);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(result.value(), 2); // max(1, ceil(1.5)) = max(1, 2) = 2
+}
+
+TEST_F(OptionsImplPlatformLinuxTest, CgroupV1CpuLimit) {
+  // Test cgroup v1 CPU limit detection
+  Filesystem::MockInstance mock_fs;
+
+  // Mock no hierarchy info available
+  EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/cgroup"))
+      .WillRepeatedly(Return(absl::InvalidArgumentError("not found")));
+
+  // Mock v2 file as not available (will return error)
+  EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/cpu.max"))
+      .WillOnce(Return(absl::InvalidArgumentError("not found")));
+
+  // Mock cgroup v1 content: 50000 / 100000 = 0.5 CPUs, ceil = 1
+  EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/cpu/cpu.cfs_quota_us"))
+      .WillOnce(Return(std::string("50000")));
+  EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/cpu/cpu.cfs_period_us"))
+      .WillOnce(Return(std::string("100000")));
+
+  absl::optional<uint32_t> result = CgroupCpuUtil::getCpuLimit(mock_fs);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(result.value(), 1); // max(1, ceil(0.5)) = max(1, 1) = 1
+}
+
+TEST_F(OptionsImplPlatformLinuxTest, CgroupUnlimited) {
+  // Test when cgroup shows unlimited CPU
+  Filesystem::MockInstance mock_fs;
+
+  EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/cgroup"))
+      .WillRepeatedly(Return(absl::InvalidArgumentError("not found")));
+
+  // Mock unlimited: "max 100000"
+  EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/cpu.max"))
+      .WillOnce(Return(std::string("max 100000")));
+
+  // Mock v1 files as not available
+  EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/cpu/cpu.cfs_quota_us"))
+      .WillOnce(Return(absl::InvalidArgumentError("not found")));
+
+  absl::optional<uint32_t> result = CgroupCpuUtil::getCpuLimit(mock_fs);
+  EXPECT_FALSE(result.has_value()); // Should return nullopt when unlimited
+}
+
+TEST_F(OptionsImplPlatformLinuxTest, NoCgroupFilesAvailable) {
+  // Test fallback when no cgroup files exist
+  Filesystem::MockInstance mock_fs;
+
+  // Mock no cgroup files available - all reads will fail
+  EXPECT_CALL(mock_fs, fileReadToEnd(_))
+      .WillRepeatedly(Return(absl::InvalidArgumentError("not found")));
+
+  absl::optional<uint32_t> result = CgroupCpuUtil::getCpuLimit(mock_fs);
+  EXPECT_FALSE(result.has_value()); // Should return nullopt when no cgroup files available
+}
+
+TEST_F(OptionsImplPlatformLinuxTest, CpuCountIntegration) {
+  // Test the complete getCpuCount() integration that combines hardware, affinity, and cgroup
+  unsigned int fake_hw_threads = 8;
+  Api::MockLinuxOsSysCalls linux_os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(&linux_os_sys_calls);
+
+  // Mock CPU affinity: 4 CPUs available
+  cpu_set_t test_set;
+  CPU_ZERO(&test_set);
+  for (int i = 0; i < 4; i++) {
+    CPU_SET(i, &test_set);
+  }
+  EXPECT_CALL(linux_os_sys_calls, sched_getaffinity(_, _, _))
+      .WillOnce(DoAll(SetArgPointee<2>(test_set), Return(Api::SysCallIntResult{0, 0})));
+
+  // Note: This test validates the affinity part. The complete integration with cgroup
+  // would require injecting the filesystem mock into OptionsImplPlatform::getCpuCount(),
+  // which would require refactoring that function to accept a filesystem parameter.
+
+  uint32_t affinity_result = OptionsImplPlatformLinux::getCpuAffinityCount(fake_hw_threads);
+  EXPECT_EQ(affinity_result, 4); // Should respect CPU affinity constraint
+}
+
+TEST_F(OptionsImplPlatformLinuxTest, CgroupMinimumEnforcement) {
+  // Test that we always return at least 1 CPU (Envoy's minimum)
+  Filesystem::MockInstance mock_fs;
+
+  EXPECT_CALL(mock_fs, fileReadToEnd("/proc/self/cgroup"))
+      .WillRepeatedly(Return(absl::InvalidArgumentError("not found")));
+
+  // Mock very low CPU limit: 10000 / 100000 = 0.1 CPUs
+  EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/cpu.max"))
+      .WillOnce(Return(std::string("10000 100000")));
+
+  // Mock v1 files as not available
+  EXPECT_CALL(mock_fs, fileReadToEnd("/sys/fs/cgroup/cpu/cpu.cfs_quota_us"))
+      .WillOnce(Return(absl::InvalidArgumentError("not found")));
+
+  absl::optional<uint32_t> result = CgroupCpuUtil::getCpuLimit(mock_fs);
+  ASSERT_TRUE(result.has_value());
+  EXPECT_EQ(result.value(), 1); // max(1, ceil(0.1)) = max(1, 1) = 1
 }
 
 #endif
