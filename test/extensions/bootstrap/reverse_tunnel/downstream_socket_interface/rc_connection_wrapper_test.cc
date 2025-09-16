@@ -941,8 +941,6 @@ TEST_F(SimpleConnReadFilterTest, OnDataWithPartialData) {
   EXPECT_EQ(result, Network::FilterStatus::StopIteration);
 }
 
-// Removed protobuf-based response tests as the handshake now uses HTTP headers only.
-
 } // namespace ReverseConnection
 } // namespace Bootstrap
 } // namespace Extensions

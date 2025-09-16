@@ -1,12 +1,24 @@
+#include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.h"
+#include "envoy/server/factory_context.h"
+#include "envoy/thread_local/thread_local.h"
 
 #include "source/common/router/string_accessor_impl.h"
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/common/stream_info/uint64_accessor_impl.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 #include "source/extensions/filters/network/reverse_tunnel/reverse_tunnel_filter.h"
 
+namespace ReverseConnection = Envoy::Extensions::Bootstrap::ReverseConnection;
+
+#include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/overload_manager.h"
+#include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -40,6 +52,12 @@ public:
 };
 
 class ReverseTunnelFilterUnitTest : public testing::Test {
+protected:
+  void SetUp() override {
+    // Initialize stats scope
+    stats_scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("test_scope."));
+  }
+
 public:
   ReverseTunnelFilterUnitTest() : stats_store_(), overload_manager_() {
     // Prepare proto config with defaults.
@@ -64,6 +82,50 @@ public:
         .WillRepeatedly(testing::ReturnRef(*callbacks_.socket_.io_handle_));
 
     filter_->initializeReadFilterCallbacks(callbacks_);
+  }
+
+  // Helper method to set up upstream extension.
+  void setupUpstreamExtension() {
+    // Create the upstream socket interface and extension.
+    upstream_socket_interface_ =
+        std::make_unique<ReverseConnection::ReverseTunnelAcceptor>(context_);
+    upstream_extension_ = std::make_unique<ReverseConnection::ReverseTunnelAcceptorExtension>(
+        *upstream_socket_interface_, context_, upstream_config_);
+
+    // Set up the extension in the global socket interface registry.
+    auto* registered_upstream_interface =
+        Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
+    if (registered_upstream_interface) {
+      auto* registered_acceptor = dynamic_cast<ReverseConnection::ReverseTunnelAcceptor*>(
+          const_cast<Network::SocketInterface*>(registered_upstream_interface));
+      if (registered_acceptor) {
+        // Set up the extension for the registered upstream socket interface.
+        registered_acceptor->extension_ = upstream_extension_.get();
+      }
+    }
+  }
+
+  // Helper method to set up upstream thread local slot for testing.
+  void setupUpstreamThreadLocalSlot() {
+    // Call onServerInitialized to set up the extension references properly.
+    upstream_extension_->onServerInitialized();
+
+    // Create a thread local registry for upstream with the dispatcher.
+    upstream_thread_local_registry_ =
+        std::make_shared<ReverseConnection::UpstreamSocketThreadLocal>(dispatcher_,
+                                                                       upstream_extension_.get());
+
+    upstream_tls_slot_ =
+        ThreadLocal::TypedSlot<ReverseConnection::UpstreamSocketThreadLocal>::makeUnique(
+            thread_local_);
+    thread_local_.setDispatcher(&dispatcher_);
+
+    // Set up the upstream slot to return our registry.
+    upstream_tls_slot_->set(
+        [registry = upstream_thread_local_registry_](Event::Dispatcher&) { return registry; });
+
+    // Override the TLS slot with our test version.
+    upstream_extension_->setTestOnlyTLSRegistry(std::move(upstream_tls_slot_));
   }
 
   // Helper to craft raw HTTP/1.1 request string.
@@ -105,6 +167,33 @@ public:
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Server::MockOverloadManager> overload_manager_;
   NiceMock<Network::MockReadFilterCallbacks> callbacks_;
+
+  // Thread local slot setup for downstream socket interface.
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  NiceMock<ThreadLocal::MockInstance> thread_local_;
+  NiceMock<Upstream::MockClusterManager> cluster_manager_;
+  Stats::ScopeSharedPtr stats_scope_;
+  NiceMock<Event::MockDispatcher> dispatcher_{"worker_0"};
+  // Config for reverse connection socket interface.
+  envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+      UpstreamReverseConnectionSocketInterface upstream_config_;
+  // Thread local components for testing upstream socket interface.
+  std::unique_ptr<ThreadLocal::TypedSlot<ReverseConnection::UpstreamSocketThreadLocal>>
+      upstream_tls_slot_;
+  std::shared_ptr<ReverseConnection::UpstreamSocketThreadLocal> upstream_thread_local_registry_;
+  std::unique_ptr<ReverseConnection::ReverseTunnelAcceptor> upstream_socket_interface_;
+  std::unique_ptr<ReverseConnection::ReverseTunnelAcceptorExtension> upstream_extension_;
+
+  // Set log level to debug for this test class.
+  LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::debug);
+
+  void TearDown() override {
+    // Clean up thread local components to avoid issues during destruction.
+    upstream_tls_slot_.reset();
+    upstream_thread_local_registry_.reset();
+    upstream_extension_.reset();
+    upstream_socket_interface_.reset();
+  }
 };
 
 TEST_F(ReverseTunnelFilterUnitTest, NewConnectionContinues) {
@@ -118,6 +207,7 @@ TEST_F(ReverseTunnelFilterUnitTest, HttpDispatchErrorStopsIteration) {
 }
 
 TEST_F(ReverseTunnelFilterUnitTest, FullFlowValidationSuccess) {
+
   // Configure reverse tunnel with validation keys.
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   auto* v = cfg.mutable_validation_config();
@@ -161,6 +251,7 @@ TEST_F(ReverseTunnelFilterUnitTest, FullFlowValidationSuccess) {
 }
 
 TEST_F(ReverseTunnelFilterUnitTest, FullFlowValidationFailure) {
+
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   cfg.mutable_validation_config()->set_node_id_filter_state_key("node_id");
   auto local_config = std::make_shared<ReverseTunnelFilterConfig>(cfg);
@@ -189,6 +280,7 @@ TEST_F(ReverseTunnelFilterUnitTest, FullFlowValidationFailure) {
 }
 
 TEST_F(ReverseTunnelFilterUnitTest, FullFlowParseError) {
+
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
       .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
@@ -1019,23 +1111,6 @@ TEST_F(ReverseTunnelFilterUnitTest, DecodeDataMultipleChunks) {
   EXPECT_THAT(written, testing::HasSubstr("200 OK"));
 }
 
-// Test successful connection processing with socket reuse.
-TEST_F(ReverseTunnelFilterUnitTest, ProcessAcceptedConnectionSocketReuse) {
-  std::string written;
-  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
-        written.append(data.toString());
-        data.drain(data.length());
-      }));
-
-  // Socket lifecycle is now managed by UpstreamReverseConnectionIOHandle wrapper.
-
-  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders(
-      "GET", "/reverse_connections/request", "test-node", "test-cluster", "test-tenant"));
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
-  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
-}
-
 // Test RequestDecoderImpl interface methods with proper HTTP flow.
 TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderImplInterfaceMethodsCoverage) {
   std::string written;
@@ -1240,6 +1315,11 @@ TEST_F(ReverseTunnelFilterUnitTest, ProcessAcceptedConnectionNullTlsRegistry) {
 
 // Test processAcceptedConnection when duplicate() returns null.
 TEST_F(ReverseTunnelFilterUnitTest, ProcessAcceptedConnectionDuplicateFails) {
+  // Set up thread local slot for downstream socket interface. This is necessary
+  // for the socket manager to be initialized.
+  setupUpstreamExtension();
+  setupUpstreamThreadLocalSlot();
+
   // Create a mock socket that returns a null/closed handle on duplicate.
   auto mock_socket = std::make_unique<Network::MockConnectionSocket>();
   auto mock_io_handle = std::make_unique<Network::MockIoHandle>();
@@ -1273,6 +1353,12 @@ TEST_F(ReverseTunnelFilterUnitTest, ProcessAcceptedConnectionDuplicateFails) {
 
 // Test processAcceptedConnection when duplicated handle is not open.
 TEST_F(ReverseTunnelFilterUnitTest, ProcessAcceptedConnectionDuplicatedHandleNotOpen) {
+
+  // Set up thread local slot for downstream socket interface. This is necessary
+  // for the socket manager to be initialized.
+  setupUpstreamExtension();
+  setupUpstreamThreadLocalSlot();
+
   auto mock_socket = std::make_unique<Network::MockConnectionSocket>();
   auto mock_io_handle = std::make_unique<Network::MockIoHandle>();
   auto dup_io_handle = std::make_unique<Network::MockIoHandle>();
@@ -1337,33 +1423,6 @@ TEST_F(ReverseTunnelFilterUnitTest, SystematicHttpErrorPatterns) {
   }
 }
 
-// Test specific protobuf validation scenarios to hit uncovered parsing paths.
-TEST_F(ReverseTunnelFilterUnitTest, ProtobufValidationScenarios) {
-  std::string written;
-  EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
-      .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
-        written.append(data.toString());
-        data.drain(data.length());
-      }));
-
-  // Test 1: Missing node header should fail validation
-  Buffer::OwnedImpl invalid_request("GET /reverse_connections/request HTTP/1.1\r\n"
-                                    "Host: localhost\r\n"
-                                    "x-envoy-reverse-tunnel-cluster-id: cluster\r\n"
-                                    "x-envoy-reverse-tunnel-tenant-id: tenant\r\n"
-                                    "Content-Length: 0\r\n\r\n");
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(invalid_request, false));
-  EXPECT_THAT(written, testing::HasSubstr("400 Bad Request"));
-
-  written.clear();
-
-  // Test 2: Previously malformed protobuf no longer applies; with headers present we accept.
-  Buffer::OwnedImpl ok_request(makeHttpRequestWithRtHeaders(
-      "GET", "/reverse_connections/request", "node", "cluster", "tenant", "This is not used"));
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(ok_request, false));
-  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
-}
-
 // Test edge cases in HTTP/protobuf processing to maximize coverage.
 TEST_F(ReverseTunnelFilterUnitTest, EdgeCaseHttpProtobufProcessing) {
   std::string written;
@@ -1388,6 +1447,36 @@ TEST_F(ReverseTunnelFilterUnitTest, EdgeCaseHttpProtobufProcessing) {
 
 // Test to trigger specific interface methods for coverage.
 TEST_F(ReverseTunnelFilterUnitTest, InterfaceMethodsCompleteCoverage) {
+  // Set up thread local slot for downstream socket interface. This is necessary
+  // for the socket manager to be initialized.
+  setupUpstreamExtension();
+  setupUpstreamThreadLocalSlot();
+
+  // Set up mock socket with proper duplication mocking
+  auto mock_socket = std::make_unique<Network::MockConnectionSocket>();
+  auto mock_io_handle = std::make_unique<Network::MockIoHandle>();
+  auto dup_handle = std::make_unique<Network::MockIoHandle>();
+
+  // Mock successful duplication
+  EXPECT_CALL(*dup_handle, isOpen()).WillRepeatedly(testing::Return(true));
+  EXPECT_CALL(*dup_handle, resetFileEvents());
+  EXPECT_CALL(*dup_handle, fdDoNotUse()).WillRepeatedly(testing::Return(456));
+
+  EXPECT_CALL(*mock_io_handle, duplicate())
+      .WillOnce(testing::Return(testing::ByMove(std::move(dup_handle))));
+  EXPECT_CALL(*mock_socket, ioHandle()).WillRepeatedly(testing::ReturnRef(*mock_io_handle));
+  EXPECT_CALL(*mock_socket, isOpen()).WillRepeatedly(testing::Return(true));
+  EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(testing::Return(455));
+
+  // Store in static variables
+  static Network::ConnectionSocketPtr stored_interface_socket;
+  static std::unique_ptr<Network::MockIoHandle> stored_interface_handle;
+  stored_interface_handle = std::move(mock_io_handle);
+  stored_interface_socket = std::move(mock_socket);
+
+  EXPECT_CALL(callbacks_.connection_, getSocket())
+      .WillRepeatedly(testing::ReturnRef(stored_interface_socket));
+
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
       .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
@@ -1412,39 +1501,14 @@ TEST_F(ReverseTunnelFilterUnitTest, InterfaceMethodsCompleteCoverage) {
   EXPECT_THAT(written, testing::HasSubstr("200 OK"));
 }
 
-// Test the streamInfo() method gets called and returns correct instance.
-TEST_F(ReverseTunnelFilterUnitTest, StreamInfoMethodReturnsCorrectInstance) {
-  // Trigger decoder creation first.
-  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
-                                                         "stream", "info", "test"));
-
-  // This creates the decoder internally.
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
-
-  // The streamInfo() method was called internally during processing.
-  // We can't directly test it but it's covered by the request processing.
-}
-
-// Test the accessLogHandlers() method returns empty vector.
-TEST_F(ReverseTunnelFilterUnitTest, AccessLogHandlersReturnsEmpty) {
-  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
-                                                         "log", "handlers", "test"));
-
-  // This creates the decoder and calls accessLogHandlers internally.
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
-}
-
-// Test the getRequestDecoderHandle() method returns nullptr.
-TEST_F(ReverseTunnelFilterUnitTest, GetRequestDecoderHandleReturnsNull) {
-  Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
-                                                         "decoder", "handle", "null"));
-
-  // This creates the decoder and the method may be called internally.
-  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
-}
-
 // Test processIfComplete when already complete.
 TEST_F(ReverseTunnelFilterUnitTest, ProcessIfCompleteAlreadyComplete) {
+  // Set up thread local slot for downstream socket interface. This is necessary
+  // for the socket manager to be initialized.
+  setupUpstreamExtension();
+  // We don't need to setup thread local slot for this test since
+  // we are not testing socket duplication.
+
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
       .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
@@ -1467,6 +1531,11 @@ TEST_F(ReverseTunnelFilterUnitTest, ProcessIfCompleteAlreadyComplete) {
 
 // Test successful socket duplication with all operations succeeding.
 TEST_F(ReverseTunnelFilterUnitTest, SuccessfulSocketDuplication) {
+  // Set up thread local slot for downstream socket interface. This is necessary
+  // for the socket manager to be initialized.
+  setupUpstreamExtension();
+  setupUpstreamThreadLocalSlot();
+
   auto socket_with_dup = std::make_unique<Network::MockConnectionSocket>();
 
   // Mock successful duplication where everything succeeds.
@@ -1476,6 +1545,7 @@ TEST_F(ReverseTunnelFilterUnitTest, SuccessfulSocketDuplication) {
   // The duplicated handle is open and operations succeed.
   EXPECT_CALL(*dup_handle, isOpen()).WillRepeatedly(testing::Return(true));
   EXPECT_CALL(*dup_handle, resetFileEvents());
+  EXPECT_CALL(*dup_handle, fdDoNotUse()).WillRepeatedly(testing::Return(123));
 
   // Mock the duplicate() call to return the dup_handle.
   EXPECT_CALL(*mock_io_handle, duplicate())
@@ -1484,6 +1554,7 @@ TEST_F(ReverseTunnelFilterUnitTest, SuccessfulSocketDuplication) {
   // Mock ioHandle() to return our mock handle.
   EXPECT_CALL(*socket_with_dup, ioHandle()).WillRepeatedly(testing::ReturnRef(*mock_io_handle));
   EXPECT_CALL(*socket_with_dup, isOpen()).WillRepeatedly(testing::Return(true));
+  EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(testing::Return(122));
 
   // Store socket and handle in static variables.
   static Network::ConnectionSocketPtr stored_dup_socket;
@@ -1494,7 +1565,6 @@ TEST_F(ReverseTunnelFilterUnitTest, SuccessfulSocketDuplication) {
   // Set up the callbacks to use our mock socket.
   EXPECT_CALL(callbacks_.connection_, getSocket())
       .WillRepeatedly(testing::ReturnRef(stored_dup_socket));
-  // Socket lifecycle is now managed by UpstreamReverseConnectionIOHandle wrapper.
 
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))

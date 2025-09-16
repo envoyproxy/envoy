@@ -18,7 +18,9 @@ class ReverseTunnelFilterConfigFactory
     : public Common::FactoryBase<
           envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel> {
 public:
-  ReverseTunnelFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().ReverseTunnel) {}
+  // Always mark the reverse tunnel filter as terminal filter.
+  ReverseTunnelFilterConfigFactory()
+      : FactoryBase(NetworkFilterNames::get().ReverseTunnel, true /* isTerminalFilter */) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(

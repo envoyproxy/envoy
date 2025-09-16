@@ -7,6 +7,7 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "test/integration/integration.h"
+#include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -82,6 +83,9 @@ typed_config:
     request += body;
     return request;
   }
+
+  // Set log level to debug for this test class.
+  LogLevelSetter log_level_setter_ = LogLevelSetter(spdlog::level::debug);
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ReverseTunnelFilterIntegrationTest,
@@ -517,115 +521,122 @@ typed_config:
 }
 
 // End-to-end test where the downstream reverse connection listener (rc://) initiates a
-// connection to an upstream listener running the reverse_tunnel filter. The downstream
+// connection to upstream envoy instance running the reverse_tunnel filter. The downstream
 // side sends HTTP headers using the same helpers as the upstream expects, and the upstream
 // socket manager updates connection stats. We verify the gauges to confirm full flow.
-TEST_P(ReverseTunnelFilterIntegrationTest, FullFlowWithDownstreamSocketInterface) {
-  // Configure two bootstrap extensions (downstream and upstream socket interfaces),
-  // two listeners (upstream reverse_tunnel listener and a reverse connection listener),
-  // and a cluster that targets the upstream listener via an internal address.
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    // Add upstream socket interface bootstrap extension.
-    {
-      auto* ext = bootstrap.add_bootstrap_extensions();
-      ext->set_name("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
-      auto* any = ext->mutable_typed_config();
-      any->set_type_url("type.googleapis.com/"
-                        "envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3."
-                        "UpstreamReverseConnectionSocketInterface");
+TEST_P(ReverseTunnelFilterIntegrationTest, FullFlowWithTwoInstances) {
+  envoy::config::bootstrap::v3::Bootstrap upstream_bootstrap;
+
+  // Configure admin.
+  upstream_bootstrap.mutable_admin()->mutable_address()->mutable_socket_address()->set_address(
+      "127.0.0.1");
+  upstream_bootstrap.mutable_admin()->mutable_address()->mutable_socket_address()->set_port_value(
+      0);
+
+  // Add upstream socket interface bootstrap extension.
+  auto* ext = upstream_bootstrap.add_bootstrap_extensions();
+  ext->set_name("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
+  ext->mutable_typed_config()->set_type_url(
+      "type.googleapis.com/"
+      "envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3."
+      "UpstreamReverseConnectionSocketInterface");
+
+  // Configure listener with reverse tunnel filter.
+  auto* listener = upstream_bootstrap.mutable_static_resources()->add_listeners();
+  listener->set_name("upstream_listener");
+  listener->mutable_address()->mutable_socket_address()->set_address("127.0.0.1");
+  listener->mutable_address()->mutable_socket_address()->set_port_value(0);
+
+  auto* filter_chain = listener->add_filter_chains();
+  auto* filter = filter_chain->add_filters();
+  filter->set_name("envoy.filters.network.reverse_tunnel");
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel rt_config;
+  rt_config.mutable_ping_interval()->set_seconds(2);
+  rt_config.set_auto_close_connections(false);
+  rt_config.set_request_path("/reverse_connections/request");
+  rt_config.set_request_method("GET");
+  filter->mutable_typed_config()->PackFrom(rt_config);
+
+  // Write config to file using standard approach.
+  const std::string upstream_config_path = TestEnvironment::writeStringToFileForTest(
+      "upstream_bootstrap.pb", TestUtility::getProtobufBinaryStringFromMessage(upstream_bootstrap));
+
+  // Create upstream server.
+  auto upstream_server = IntegrationTestServer::create(upstream_config_path, GetParam(), nullptr,
+                                                       nullptr, absl::nullopt, timeSystem(), *api_);
+  upstream_server->waitUntilListenersReady();
+
+  // Get the upstream listener port - access through the listener manager properly.
+  uint32_t upstream_port = 0;
+  const auto& listeners = upstream_server->server().listenerManager().listeners();
+  if (!listeners.empty()) {
+    // Get the upstream listener port. This is the port the downstream will connect to.
+    const auto& listener_ref = listeners[0];
+    const auto& socket_factories = listener_ref.get().listenSocketFactories();
+    if (!socket_factories.empty()) {
+      Network::Address::InstanceConstSharedPtr listener_addr = socket_factories[0]->localAddress();
+      if (listener_addr->ip()) {
+        upstream_port = listener_addr->ip()->port();
+      }
     }
+  }
 
-    // Add downstream socket interface bootstrap extension.
-    {
-      auto* ext = bootstrap.add_bootstrap_extensions();
-      ext->set_name("envoy.bootstrap.reverse_tunnel.downstream_socket_interface");
-      auto* any = ext->mutable_typed_config();
-      any->set_type_url("type.googleapis.com/"
-                        "envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3."
-                        "DownstreamReverseConnectionSocketInterface");
-    }
+  // Set up the downstream Envoy instance with downstream socket interface +
+  // reverse_connection_listener
+  config_helper_.addBootstrapExtension(R"EOF(
+name: envoy.bootstrap.reverse_tunnel.downstream_socket_interface
+typed_config:
+  "@type": "type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface"
+)EOF");
 
-    // Ensure we have at least one listener. We will use the first as the upstream listener
-    // and clear its filters, then add the reverse_tunnel network filter.
-    if (bootstrap.static_resources().listeners_size() == 0) {
-      auto* listener = bootstrap.mutable_static_resources()->add_listeners();
-      listener->set_name("upstream_listener");
-      auto* sock = listener->mutable_address()->mutable_socket_address();
-      sock->set_address("0.0.0.0");
-      sock->set_port_value(0);
-    }
+  config_helper_.addConfigModifier(
+      [upstream_port](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+        // Clear the default listener and add reverse connection listener
+        bootstrap.mutable_static_resources()->clear_listeners();
 
-    auto* upstream_listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
-    upstream_listener->set_name("upstream_listener");
-    if (upstream_listener->filter_chains_size() > 0) {
-      upstream_listener->mutable_filter_chains(0)->clear_filters();
-    } else {
-      upstream_listener->add_filter_chains();
-    }
-    {
-      auto* filter = upstream_listener->mutable_filter_chains(0)->add_filters();
-      filter->set_name("envoy.filters.network.reverse_tunnel");
-      envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel rt_cfg;
-      rt_cfg.mutable_ping_interval()->set_seconds(2);
-      rt_cfg.set_auto_close_connections(false);
-      rt_cfg.set_request_path("/reverse_connections/request");
-      rt_cfg.set_request_method("GET");
-      Protobuf::Any* typed_config = filter->mutable_typed_config();
-      typed_config->PackFrom(rt_cfg);
-    }
+        auto* rc_listener = bootstrap.mutable_static_resources()->add_listeners();
+        rc_listener->set_name("reverse_connection_listener");
+        auto* rc_sock = rc_listener->mutable_address()->mutable_socket_address();
+        // rc://<node>:<cluster>:<tenant>@<target_cluster>:<count>
+        rc_sock->set_address(
+            "rc://integration-test-node:integration-test-cluster:integration-test-tenant@"
+            "upstream_cluster:1");
+        rc_sock->set_port_value(0);
+        rc_sock->set_resolver_name("envoy.resolvers.reverse_connection");
 
-    // Add an additional listener that uses the rc:// resolver to initiate reverse connections.
-    auto* rc_listener = bootstrap.mutable_static_resources()->add_listeners();
-    rc_listener->set_name("reverse_connection_listener");
-    auto* rc_sock = rc_listener->mutable_address()->mutable_socket_address();
-    // rc://<node>:<cluster>:<tenant>@<target_cluster>:<count>
-    rc_sock->set_address(
-        "rc://integration-test-node:integration-test-cluster:integration-test-tenant@"
-        "upstream_cluster:1");
-    rc_sock->set_port_value(0);
-    // Tell Envoy to use our custom resolver for rc:// scheme.
-    rc_sock->set_resolver_name("envoy.resolvers.reverse_connection");
-    // Minimal filter chain; echo is fine since accept() returns a connected socket.
-    auto* rc_chain = rc_listener->add_filter_chains();
-    auto* echo_filter = rc_chain->add_filters();
-    echo_filter->set_name("envoy.filters.network.echo");
-    auto* echo_any = echo_filter->mutable_typed_config();
-    echo_any->set_type_url("type.googleapis.com/envoy.extensions.filters.network.echo.v3.Echo");
+        // Add echo filter for the reverse connection listener
+        auto* rc_chain = rc_listener->add_filter_chains();
+        auto* echo_filter = rc_chain->add_filters();
+        echo_filter->set_name("envoy.filters.network.echo");
+        auto* echo_any = echo_filter->mutable_typed_config();
+        echo_any->set_type_url("type.googleapis.com/envoy.extensions.filters.network.echo.v3.Echo");
 
-    // Define the upstream cluster that points to the upstream_listener via internal address.
-    auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
-    cluster->set_name("upstream_cluster");
-    cluster->set_type(envoy::config::cluster::v3::Cluster::STATIC);
-    cluster->mutable_load_assignment()->set_cluster_name("upstream_cluster");
-    // Configure transport socket for internal upstream connections.
-    auto* ts = cluster->mutable_transport_socket();
-    ts->set_name("envoy.transport_sockets.internal_upstream");
-    envoy::extensions::transport_sockets::internal_upstream::v3::InternalUpstreamTransport ts_cfg;
-    // Wrap a raw_buffer transport socket as the underlying transport.
-    auto* inner_ts = ts_cfg.mutable_transport_socket();
-    inner_ts->set_name("envoy.transport_sockets.raw_buffer");
-    Protobuf::Any* inner_any = inner_ts->mutable_typed_config();
-    inner_any->set_type_url(
-        "type.googleapis.com/envoy.extensions.transport_sockets.raw_buffer.v3.RawBuffer");
-    Protobuf::Any* ts_any = ts->mutable_typed_config();
-    ts_any->PackFrom(ts_cfg);
+        // Define upstream cluster pointing to the real upstream instance
+        auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+        cluster->set_name("upstream_cluster");
+        cluster->set_type(envoy::config::cluster::v3::Cluster::STATIC);
+        cluster->mutable_load_assignment()->set_cluster_name("upstream_cluster");
 
-    auto* locality = cluster->mutable_load_assignment()->add_endpoints();
-    auto* lb_endpoint = locality->add_lb_endpoints();
-    auto* endpoint = lb_endpoint->mutable_endpoint();
-    auto* ep_addr = endpoint->mutable_address()->mutable_envoy_internal_address();
-    ep_addr->set_server_listener_name("upstream_listener");
-    ep_addr->set_endpoint_id("rt_endpoint");
-  });
+        auto* locality = cluster->mutable_load_assignment()->add_endpoints();
+        auto* lb_endpoint = locality->add_lb_endpoints();
+        auto* endpoint = lb_endpoint->mutable_endpoint();
+        auto* addr = endpoint->mutable_address()->mutable_socket_address();
+        addr->set_address("127.0.0.1");
+        addr->set_port_value(upstream_port);
+      });
 
+  // Initialize downstream instance.
   BaseIntegrationTest::initialize();
 
-  // Wait for the upstream side to record at least one accepted connection for the node and cluster.
-  // ReverseTunnelAcceptorExtension publishes gauges with names:
-  //   reverse_connections.nodes.<node_id>
-  //   reverse_connections.clusters.<cluster_id>
-  test_server_->waitForGaugeEq("reverse_connections.nodes.integration-test-node", 1);
-  test_server_->waitForGaugeEq("reverse_connections.clusters.integration-test-cluster", 1);
+  // Wait a bit for connections to establish.
+  timeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
+
+  // Wait for connections to be established - these gauges should be available on the downstream
+  // instance which initiates the reverse connections.
+  test_server_->waitForGaugeEq(
+      fmt::format("reverse_connections.host.127.0.0.1:{}.connected", upstream_port), 1);
+  test_server_->waitForGaugeEq("reverse_connections.cluster.upstream_cluster.connected", 1);
 }
 
 } // namespace

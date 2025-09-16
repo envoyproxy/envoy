@@ -21,182 +21,6 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace ReverseTunnel {
 
-// UpstreamReverseConnectionIOHandle implementation.
-UpstreamReverseConnectionIOHandle::UpstreamReverseConnectionIOHandle(
-    Network::IoHandlePtr&& wrapped_handle, std::function<void()> on_close_callback)
-    : wrapped_handle_(std::move(wrapped_handle)), on_close_callback_(std::move(on_close_callback)) {
-}
-
-os_fd_t UpstreamReverseConnectionIOHandle::fdDoNotUse() const {
-  return wrapped_handle_->fdDoNotUse();
-}
-
-Api::IoCallUint64Result UpstreamReverseConnectionIOHandle::close() {
-  // If this is a reverse tunnel socket, don't actually close it.
-  // Instead, let the upstream socket manager handle its lifecycle.
-  if (is_reverse_tunnel_socket_ && !close_called_) {
-    close_called_ = true;
-    if (on_close_callback_) {
-      on_close_callback_();
-    }
-    // Return success without actually closing the FD.
-    return Api::IoCallUint64Result(0, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
-  }
-  return wrapped_handle_->close();
-}
-
-bool UpstreamReverseConnectionIOHandle::isOpen() const { return wrapped_handle_->isOpen(); }
-
-Api::IoCallUint64Result UpstreamReverseConnectionIOHandle::readv(uint64_t max_length,
-                                                                 Buffer::RawSlice* slices,
-                                                                 uint64_t num_slices) {
-  return wrapped_handle_->readv(max_length, slices, num_slices);
-}
-
-Api::IoCallUint64Result
-UpstreamReverseConnectionIOHandle::read(Buffer::Instance& buffer,
-                                        absl::optional<uint64_t> max_length) {
-  return wrapped_handle_->read(buffer, max_length);
-}
-
-Api::IoCallUint64Result UpstreamReverseConnectionIOHandle::writev(const Buffer::RawSlice* slices,
-                                                                  uint64_t num_slices) {
-  return wrapped_handle_->writev(slices, num_slices);
-}
-
-Api::IoCallUint64Result UpstreamReverseConnectionIOHandle::write(Buffer::Instance& buffer) {
-  return wrapped_handle_->write(buffer);
-}
-
-Api::IoCallUint64Result
-UpstreamReverseConnectionIOHandle::sendmsg(const Buffer::RawSlice* slices, uint64_t num_slices,
-                                           int flags, const Network::Address::Ip* self_ip,
-                                           const Network::Address::Instance& peer_address) {
-  return wrapped_handle_->sendmsg(slices, num_slices, flags, self_ip, peer_address);
-}
-
-Api::IoCallUint64Result UpstreamReverseConnectionIOHandle::recvmsg(
-    Buffer::RawSlice* slices, const uint64_t num_slices, uint32_t self_port,
-    const Network::IoHandle::UdpSaveCmsgConfig& save_cmsg_config, RecvMsgOutput& output) {
-  return wrapped_handle_->recvmsg(slices, num_slices, self_port, save_cmsg_config, output);
-}
-
-Api::IoCallUint64Result UpstreamReverseConnectionIOHandle::recvmmsg(
-    RawSliceArrays& slices, uint32_t self_port,
-    const Network::IoHandle::UdpSaveCmsgConfig& save_cmsg_config, RecvMsgOutput& output) {
-  return wrapped_handle_->recvmmsg(slices, self_port, save_cmsg_config, output);
-}
-
-bool UpstreamReverseConnectionIOHandle::supportsMmsg() const {
-  return wrapped_handle_->supportsMmsg();
-}
-
-bool UpstreamReverseConnectionIOHandle::supportsUdpGro() const {
-  return wrapped_handle_->supportsUdpGro();
-}
-
-Api::SysCallIntResult
-UpstreamReverseConnectionIOHandle::bind(Network::Address::InstanceConstSharedPtr address) {
-  return wrapped_handle_->bind(address);
-}
-
-Api::SysCallIntResult UpstreamReverseConnectionIOHandle::listen(int backlog) {
-  return wrapped_handle_->listen(backlog);
-}
-
-Network::IoHandlePtr UpstreamReverseConnectionIOHandle::accept(struct sockaddr* addr,
-                                                               socklen_t* addrlen) {
-  return wrapped_handle_->accept(addr, addrlen);
-}
-
-Api::SysCallIntResult
-UpstreamReverseConnectionIOHandle::connect(Network::Address::InstanceConstSharedPtr address) {
-  return wrapped_handle_->connect(address);
-}
-
-Api::SysCallIntResult UpstreamReverseConnectionIOHandle::setOption(int level, int optname,
-                                                                   const void* optval,
-                                                                   socklen_t optlen) {
-  return wrapped_handle_->setOption(level, optname, optval, optlen);
-}
-
-Api::SysCallIntResult UpstreamReverseConnectionIOHandle::getOption(int level, int optname,
-                                                                   void* optval,
-                                                                   socklen_t* optlen) {
-  return wrapped_handle_->getOption(level, optname, optval, optlen);
-}
-
-Api::SysCallIntResult UpstreamReverseConnectionIOHandle::setBlocking(bool blocking) {
-  return wrapped_handle_->setBlocking(blocking);
-}
-
-absl::optional<int> UpstreamReverseConnectionIOHandle::domain() {
-  return wrapped_handle_->domain();
-}
-
-absl::StatusOr<Network::Address::InstanceConstSharedPtr>
-UpstreamReverseConnectionIOHandle::localAddress() {
-  return wrapped_handle_->localAddress();
-}
-
-absl::StatusOr<Network::Address::InstanceConstSharedPtr>
-UpstreamReverseConnectionIOHandle::peerAddress() {
-  return wrapped_handle_->peerAddress();
-}
-
-void UpstreamReverseConnectionIOHandle::initializeFileEvent(Event::Dispatcher& dispatcher,
-                                                            Event::FileReadyCb cb,
-                                                            Event::FileTriggerType trigger,
-                                                            uint32_t events) {
-  wrapped_handle_->initializeFileEvent(dispatcher, cb, trigger, events);
-}
-
-void UpstreamReverseConnectionIOHandle::activateFileEvents(uint32_t events) {
-  wrapped_handle_->activateFileEvents(events);
-}
-
-void UpstreamReverseConnectionIOHandle::enableFileEvents(uint32_t events) {
-  wrapped_handle_->enableFileEvents(events);
-}
-
-void UpstreamReverseConnectionIOHandle::resetFileEvents() { wrapped_handle_->resetFileEvents(); }
-
-Network::IoHandlePtr UpstreamReverseConnectionIOHandle::duplicate() {
-  return wrapped_handle_->duplicate();
-}
-
-bool UpstreamReverseConnectionIOHandle::wasConnected() const {
-  return wrapped_handle_->wasConnected();
-}
-
-Api::IoCallUint64Result UpstreamReverseConnectionIOHandle::recv(void* buffer, size_t length,
-                                                                int flags) {
-  return wrapped_handle_->recv(buffer, length, flags);
-}
-
-Api::SysCallIntResult UpstreamReverseConnectionIOHandle::ioctl(
-    unsigned long control_code, void* in_buffer, unsigned long in_buffer_len, void* out_buffer,
-    unsigned long out_buffer_len, unsigned long* bytes_returned) {
-  return wrapped_handle_->ioctl(control_code, in_buffer, in_buffer_len, out_buffer, out_buffer_len,
-                                bytes_returned);
-}
-
-Api::SysCallIntResult UpstreamReverseConnectionIOHandle::shutdown(int how) {
-  return wrapped_handle_->shutdown(how);
-}
-
-absl::optional<std::chrono::milliseconds> UpstreamReverseConnectionIOHandle::lastRoundTripTime() {
-  return wrapped_handle_->lastRoundTripTime();
-}
-
-absl::optional<uint64_t> UpstreamReverseConnectionIOHandle::congestionWindowInBytes() const {
-  return wrapped_handle_->congestionWindowInBytes();
-}
-
-absl::optional<std::string> UpstreamReverseConnectionIOHandle::interfaceName() {
-  return wrapped_handle_->interfaceName();
-}
-
 // Stats helper implementation.
 ReverseTunnelFilter::ReverseTunnelStats
 ReverseTunnelFilter::ReverseTunnelStats::generateStats(const std::string& prefix,
@@ -211,7 +35,8 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
                          ? std::chrono::milliseconds(
                                DurationUtil::durationToMilliseconds(proto_config.ping_interval()))
                          : std::chrono::milliseconds(2000)),
-      auto_close_connections_(proto_config.auto_close_connections()),
+      auto_close_connections_(
+          proto_config.auto_close_connections() ? proto_config.auto_close_connections() : false),
       request_path_(proto_config.request_path().empty() ? "/reverse_connections/request"
                                                         : proto_config.request_path()),
       request_method_(proto_config.request_method().empty() ? "GET"
@@ -334,6 +159,9 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
   // Validate method/path.
   const absl::string_view method = headers_->getMethodValue();
   const absl::string_view path = headers_->getPathValue();
+  ENVOY_LOG(debug,
+            "ReverseTunnelFilter::RequestDecoderImpl::processIfComplete: method: {}, path: {}",
+            method, path);
   if (!absl::EqualsIgnoreCase(method, parent_.config_->requestMethod()) ||
       path != parent_.config_->requestPath()) {
     sendLocalReply(Http::Code::NotFound, "Not a reverse tunnel request", nullptr, absl::nullopt,
@@ -436,19 +264,14 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
     return;
   }
 
-  // Create a wrapper around the original socket's IO handle that prevents premature closure.
-  Network::IoHandlePtr original_handle = socket->ioHandle().duplicate();
-  if (!original_handle || !original_handle->isOpen()) {
+  // Duplicate the original socket's IO handle for reuse.
+  Network::IoHandlePtr wrapped_handle = socket->ioHandle().duplicate();
+  if (!wrapped_handle || !wrapped_handle->isOpen()) {
     ENVOY_CONN_LOG(error, "reverse_tunnel: failed to duplicate socket handle", connection);
     return;
   }
 
-  // Wrap the duplicated handle in our custom wrapper that manages reverse tunnel lifecycle.
-  auto wrapped_handle =
-      std::make_unique<UpstreamReverseConnectionIOHandle>(std::move(original_handle));
-  wrapped_handle->markAsReverseTunnelSocket();
-
-  // Build a new ConnectionSocket from the wrapped handle, preserving addressing info.
+  // Build a new ConnectionSocket from the duplicated handle, preserving addressing info.
   auto wrapped_socket = std::make_unique<Network::ConnectionSocketImpl>(
       std::move(wrapped_handle), socket->connectionInfoProvider().localAddress(),
       socket->connectionInfoProvider().remoteAddress());
@@ -475,6 +298,10 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
 bool ReverseTunnelFilter::validateRequestUsingFilterState(absl::string_view node_uuid,
                                                           absl::string_view cluster_uuid,
                                                           absl::string_view tenant_uuid) {
+  ENVOY_LOG(debug,
+            "ReverseTunnelFilter::validateRequestUsingFilterState: called with node_uuid: {}, "
+            "cluster_uuid: {}, tenant_uuid: {}",
+            node_uuid, cluster_uuid, tenant_uuid);
   const Network::Connection& connection = read_callbacks_->connection();
   const StreamInfo::FilterState& filter_state = connection.streamInfo().filterState();
 

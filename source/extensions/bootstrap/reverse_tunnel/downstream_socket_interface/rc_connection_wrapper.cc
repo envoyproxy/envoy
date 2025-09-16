@@ -153,8 +153,13 @@ void RCConnectionWrapper::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bo
     ENVOY_LOG(debug, "Received HTTP 200 OK response");
     onHandshakeSuccess();
   } else {
-    ENVOY_LOG(error, "Received non-200 HTTP response: {}", status);
-    onHandshakeFailure("HTTP handshake failed with non-200 response");
+    // Get the reason phrase from the status header if available
+    const auto status_header = headers->getStatusValue();
+    const std::string status_message = status_header.empty()
+                                           ? absl::StrCat("HTTP ", status)
+                                           : absl::StrCat("HTTP ", status, " ", status_header);
+    ENVOY_LOG(error, "Received non-200 HTTP response: {}", status_message);
+    onHandshakeFailure(absl::StrCat("HTTP handshake failed with status ", status_message));
   }
 }
 
