@@ -686,6 +686,8 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
   }
 }
 
+// Filter that blocks request and response body processing within the filter chain and
+// instead injects request and response body within a scheduler callback.
 struct InjectBodyHttpFilterConfig {}
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for InjectBodyHttpFilterConfig {
@@ -705,6 +707,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for InjectBodyHttpFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    // Schedule request body injection outside the filter lifecycle.
     envoy_filter
       .new_scheduler()
       .commit(EVENT_INJECT_REQUEST_BODY);
@@ -716,6 +719,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for InjectBodyHttpFilter {
     _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_body_status {
+    // Ignore downstream request body.
     return envoy_dynamic_module_type_on_http_filter_request_body_status::StopIterationAndBuffer;
   }
 
@@ -724,6 +728,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for InjectBodyHttpFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    // Schedule response body injection outside the filter lifecycle.
     envoy_filter
       .new_scheduler()
       .commit(EVENT_INJECT_RESPONSE_BODY);
@@ -735,10 +740,13 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for InjectBodyHttpFilter {
     _envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_response_body_status {
+    // Ignore upstream response body.
     return envoy_dynamic_module_type_on_http_filter_response_body_status::StopIterationAndBuffer;
   }
 
   fn on_scheduled(&mut self, envoy_filter: &mut EHF, event_id: u64) {
+    // Inject the request or response body based on the event type. We inject
+    // both without and with end_stream to ensure the full body is sent correctly.
     match event_id {
       EVENT_INJECT_REQUEST_BODY => {
         envoy_filter.inject_request_body(b"injected_", false);
