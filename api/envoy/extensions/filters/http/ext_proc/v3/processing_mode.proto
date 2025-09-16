@@ -78,11 +78,11 @@ message ProcessingMode {
     // up to the buffer limit will be sent.
     BUFFERED_PARTIAL = 3;
 
-    // The ext_proc client streams the body to the server in pieces as they arrive.
+    // The ext_proc client (the data plane) streams the body to the server in pieces as they arrive.
     //
     // 1) The server may choose to buffer any number chunks of data before processing them.
     // After it finishes buffering, the server processes the buffered data. Then it splits the processed
-    // data into any number of chunks, and streams them back to the client one by one.
+    // data into any number of chunks, and streams them back to the ext_proc client one by one.
     // The server may continuously do so until the complete body is processed.
     // The individual response chunk size is recommended to be no greater than 64K bytes, or
     // :ref:`max_receive_message_length <envoy_v3_api_field_config.core.v3.GrpcService.EnvoyGrpc.max_receive_message_length>`
