@@ -77,7 +77,6 @@ env:
 
 jobs:
   request:
-    if: ${{ github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI }}
     runs-on: ubuntu-24.04
     permissions:
       actions: read
