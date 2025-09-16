@@ -46,11 +46,7 @@ jobs:
       packages: read
       pull-requests: read
     if: |
-      (github.event_name == 'workflow_dispatch')
-      || (github.event.workflow_run.conclusion == 'success'
-          && github.event.workflow_run.repository.full_name == github.repository
-          && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
-          && (github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI))
+      github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     uses: ./.github/workflows/_load.yml
     with:
       check-name: checks
