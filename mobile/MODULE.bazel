@@ -70,7 +70,7 @@ git_override(
 )
 
 bazel_dep(name = "gazelle", version = "0.45.0", repo_name = "bazel_gazelle")
-bazel_dep(name = "googleapis", version = "0.0.0-20250703-f9d6fe4a", repo_name = "com_google_googleapis")
+bazel_dep(name = "googleapis", version = "0.0.0-20241220-5e258e33.bcr.1", repo_name = "com_google_googleapis")
 bazel_dep(name = "googletest", version = "1.17.0", repo_name = "com_google_googletest")
 bazel_dep(name = "googleurl", version = "0.0.0-dev", repo_name = "com_googlesource_googleurl")
 git_override(

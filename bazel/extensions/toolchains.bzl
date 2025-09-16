@@ -23,12 +23,18 @@ def _toolchains_impl(module_ctx):
     """
 
     # Main dependency imports setup
-    apple_rules_dependencies()
+    # In bzlmod mode, since @platforms is a direct dependency, we need to
+    # avoid creating duplicate repositories. Try to call only necessary functions.
     grcov_repository()
-    rules_fuzzing_dependencies(
-        oss_fuzz = True,
-        honggfuzz = False,
-    )
+    setup_sanitizer_libs()
+    
+    # Try to conditionally call rules_fuzzing_dependencies only if needed
+    if not native.existing_rule("rules_fuzzing_oss_fuzz"):
+        rules_fuzzing_dependencies(
+            oss_fuzz = True,
+            honggfuzz = False,
+        )
+    
     parser_deps()
 
     # Repository metadata setup
