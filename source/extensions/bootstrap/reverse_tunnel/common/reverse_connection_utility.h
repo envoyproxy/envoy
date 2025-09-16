@@ -7,7 +7,10 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
+#include "source/common/http/header_map_impl.h"
+#include "source/common/http/headers.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -35,6 +38,25 @@ public:
 private:
   ReverseConnectionUtility() = delete;
 };
+
+// Header names used by reverse tunnel handshake over HTTP.
+inline const Http::LowerCaseString& reverseTunnelNodeIdHeader() {
+  static const Http::LowerCaseString kHeader{
+      absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-node-id")};
+  return kHeader;
+}
+
+inline const Http::LowerCaseString& reverseTunnelClusterIdHeader() {
+  static const Http::LowerCaseString kHeader{
+      absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-cluster-id")};
+  return kHeader;
+}
+
+inline const Http::LowerCaseString& reverseTunnelTenantIdHeader() {
+  static const Http::LowerCaseString kHeader{
+      absl::StrCat(Http::Headers::get().prefix(), "-reverse-tunnel-tenant-id")};
+  return kHeader;
+}
 
 class ReverseConnectionMessageHandlerFactory {
 public:

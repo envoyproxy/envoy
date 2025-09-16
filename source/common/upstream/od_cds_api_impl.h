@@ -8,6 +8,7 @@
 #include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/protobuf/message_validator.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -38,7 +39,8 @@ public:
   create(const envoy::config::core::v3::ConfigSource& odcds_config,
          OptRef<xds::core::v3::ResourceLocator> odcds_resources_locator,
          Config::XdsManager& xds_manager, ClusterManager& cm, MissingClusterNotifier& notifier,
-         Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor);
+         Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
+         Server::Configuration::ServerFactoryContext& server_factory_context);
 
   // Upstream::OdCdsApi
   void updateOnDemand(std::string cluster_name) override;
@@ -67,6 +69,44 @@ private:
   StartStatus status_{StartStatus::NotStarted};
   absl::flat_hash_set<std::string> awaiting_names_;
   Config::SubscriptionPtr subscription_;
+};
+
+/**
+ * ODCDS API implementation that fetches via Subscription for xDS-TP based
+ * configs and resources.
+ */
+class XdstpOdCdsApiImpl : public OdCdsApi {
+public:
+  static absl::StatusOr<OdCdsApiSharedPtr>
+  create(const envoy::config::core::v3::ConfigSource&, OptRef<xds::core::v3::ResourceLocator>,
+         Config::XdsManager& xds_manager, ClusterManager& cm, MissingClusterNotifier& notifier,
+         Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
+         Server::Configuration::ServerFactoryContext& server_factory_context);
+
+  // Upstream::OdCdsApi
+  void updateOnDemand(std::string cluster_name) override;
+
+private:
+  class XdstpOdcdsSubscriptionsManager;
+  using XdstpOdcdsSubscriptionsManagerSharedPtr = std::shared_ptr<XdstpOdcdsSubscriptionsManager>;
+
+  XdstpOdCdsApiImpl(Config::XdsManager& xds_manager, ClusterManager& cm,
+                    MissingClusterNotifier& notifier, Stats::Scope& scope,
+                    Server::Configuration::ServerFactoryContext& server_context,
+                    ProtobufMessage::ValidationVisitor& validation_visitor,
+                    absl::Status& creation_status);
+
+  // Fetches, and potentially creates, the singleton subscriptions manager.
+  // The arguments will be passed to the subscriptions manager's constructor, if
+  // it is the first time it is initialized.
+  static XdstpOdcdsSubscriptionsManagerSharedPtr
+  subscriptionsManager(Server::Configuration::ServerFactoryContext& context,
+                       Config::XdsManager& xds_manager, ClusterManager& cm,
+                       MissingClusterNotifier& notifier, Stats::Scope& scope,
+                       ProtobufMessage::ValidationVisitor& validation_visitor);
+
+  // A singleton through which all subscriptions will be processed.
+  XdstpOdcdsSubscriptionsManagerSharedPtr subscriptions_manager_;
 };
 
 } // namespace Upstream

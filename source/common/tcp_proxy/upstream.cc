@@ -18,6 +18,34 @@ namespace TcpProxy {
 using TunnelingConfig =
     envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy_TunnelingConfig;
 
+// Constants for tunnel request ID metadata.
+const std::string& tunnelRequestIdMetadataNamespace() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.filters.network.tcp_proxy");
+}
+
+const std::string& tunnelRequestIdMetadataKey() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "tunnel_request_id");
+}
+
+// Helper function to generate and store request ID in dynamic metadata.
+void generateAndStoreRequestId(const TunnelingConfigHelper& config, Http::RequestHeaderMap& headers,
+                               StreamInfo::StreamInfo& downstream_info) {
+  if (config.requestIDExtension() != nullptr) {
+    // For tunneling requests there is no way to get the external request ID as the incoming
+    // traffic could be anything - HTTPS, MySQL, Postgres, etc.
+    config.requestIDExtension()->set(headers, /*edge_request=*/true,
+                                     /*keep_external_id=*/false);
+    // Also store the request ID in dynamic metadata to allow TCP access logs to format it.
+    const auto rid = headers.getRequestIdValue();
+    if (!rid.empty()) {
+      Protobuf::Struct md;
+      auto& fields = *md.mutable_fields();
+      fields[tunnelRequestIdMetadataKey()].mutable_string_value()->assign(rid.data(), rid.size());
+      downstream_info.setDynamicMetadata(tunnelRequestIdMetadataNamespace(), md);
+    }
+  }
+}
+
 TcpUpstream::TcpUpstream(Tcp::ConnectionPool::ConnectionDataPtr&& data,
                          Tcp::ConnectionPool::UpstreamCallbacks& upstream_callbacks)
     : upstream_conn_data_(std::move(data)) {
@@ -120,6 +148,10 @@ void HttpUpstream::setRequestEncoder(Http::RequestEncoder& request_encoder, bool
       headers->addReference(Http::Headers::get().Scheme, scheme);
     }
   }
+
+  // Optionally generate a request ID before evaluating configured headers so
+  // it is available to header formatters.
+  generateAndStoreRequestId(config_, *headers, downstream_info_);
 
   config_.headerEvaluator().evaluateHeaders(*headers, {downstream_info_.getRequestHeaders()},
                                             downstream_info_);
@@ -422,6 +454,8 @@ CombinedUpstream::CombinedUpstream(HttpConnPool& http_conn_pool,
   if (config_.usePost()) {
     downstream_headers_->addReference(Http::Headers::get().Path, config_.postPath());
   }
+
+  generateAndStoreRequestId(config_, *downstream_headers_, downstream_info_);
 
   config_.headerEvaluator().evaluateHeaders(
       *downstream_headers_, {downstream_info_.getRequestHeaders()}, downstream_info_);

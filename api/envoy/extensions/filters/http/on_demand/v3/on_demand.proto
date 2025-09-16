@@ -8,7 +8,6 @@ import "google/protobuf/duration.proto";
 
 import "udpa/annotations/status.proto";
 import "udpa/annotations/versioning.proto";
-import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.http.on_demand.v3";
 option java_outer_classname = "OnDemandProto";
@@ -29,7 +28,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 message OnDemandCds {
   // A configuration source for the service that will be used for
   // on-demand cluster discovery.
-  config.core.v3.ConfigSource source = 1 [(validate.rules).message = {required: true}];
+  config.core.v3.ConfigSource source = 1;
 
   // xdstp:// resource locator for on-demand cluster collection.
   string resources_locator = 2;

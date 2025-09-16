@@ -18,7 +18,9 @@ class DynamicModuleHttpFilter : public Http::StreamFilter,
                                 public std::enable_shared_from_this<DynamicModuleHttpFilter>,
                                 public Logger::Loggable<Logger::Id::dynamic_modules> {
 public:
-  DynamicModuleHttpFilter(DynamicModuleHttpFilterConfigSharedPtr config) : config_(config) {}
+  DynamicModuleHttpFilter(DynamicModuleHttpFilterConfigSharedPtr config,
+                          Stats::SymbolTable& symbol_table)
+      : config_(config), stat_name_pool_(symbol_table) {}
   ~DynamicModuleHttpFilter() override;
 
   /**
@@ -165,6 +167,7 @@ public:
                   Http::RequestMessagePtr&& message, uint64_t timeout_milliseconds);
 
   const DynamicModuleHttpFilterConfig& getFilterConfig() const { return *config_; }
+  Stats::StatNameDynamicPool& getStatNamePool() { return stat_name_pool_; }
 
 private:
   /**
@@ -193,6 +196,7 @@ private:
 
   const DynamicModuleHttpFilterConfigSharedPtr config_ = nullptr;
   envoy_dynamic_module_type_http_filter_module_ptr in_module_filter_ = nullptr;
+  Stats::StatNameDynamicPool stat_name_pool_;
 
   /**
    * This implementation of the AsyncClient::Callbacks is used to handle the response from the HTTP

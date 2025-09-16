@@ -23,8 +23,28 @@ envoy_cc_test(
         "//source/common/upstream:od_cds_api_lib",
         "//test/mocks/config:xds_manager_mocks",
         "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:missing_cluster_notifier_mocks",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "xdstp_od_cds_api_impl_test",
+    srcs = ["xdstp_od_cds_api_impl_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//envoy/config:subscription_interface",
+        "//source/common/stats:isolated_store_lib",
+        "//source/common/upstream:od_cds_api_lib",
+        "//test/mocks/config:xds_manager_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/upstream:cluster_manager_mocks",
+        "//test/mocks/upstream:missing_cluster_notifier_mocks",
+        "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

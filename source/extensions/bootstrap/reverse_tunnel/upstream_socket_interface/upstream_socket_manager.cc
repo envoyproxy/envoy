@@ -400,7 +400,7 @@ void UpstreamSocketManager::pingConnections() {
 }
 
 UpstreamSocketManager::~UpstreamSocketManager() {
-  ENVOY_LOG(debug, "UpstreamSocketManager destructor called");
+  ENVOY_LOG(debug, "UpstreamSocketManager: destructor called");
 
   // Clean up all active file events and timers first
   for (auto& [fd, event] : fd_to_event_map_) {

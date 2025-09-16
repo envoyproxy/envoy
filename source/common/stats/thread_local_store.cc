@@ -675,7 +675,9 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
     StatNameTagHelper tag_helper(parent_, joiner.tagExtractedName(), stat_name_tags);
 
     ConstSupportedBuckets* buckets = nullptr;
-    buckets = &parent_.histogram_settings_->buckets(symbolTable().toString(final_stat_name));
+    const auto string_stat_name = symbolTable().toString(final_stat_name);
+    buckets = &parent_.histogram_settings_->buckets(string_stat_name);
+    const auto bins = parent_.histogram_settings_->bins(string_stat_name);
 
     RefcountPtr<ParentHistogramImpl> stat;
     {
@@ -686,7 +688,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatNameWithTags(
       } else {
         stat = new ParentHistogramImpl(final_stat_name, unit, parent_,
                                        tag_helper.tagExtractedName(), tag_helper.statNameTags(),
-                                       *buckets, parent_.next_histogram_id_++);
+                                       *buckets, bins, parent_.next_histogram_id_++);
         if (!parent_.shutting_down_) {
           parent_.histogram_set_.insert(stat.get());
           if (parent_.sink_predicates_.has_value() &&
@@ -793,7 +795,7 @@ Histogram& ThreadLocalStoreImpl::tlsHistogram(ParentHistogramImpl& parent, uint6
 
   TlsHistogramSharedPtr hist_tls_ptr(
       new ThreadLocalHistogramImpl(parent.statName(), parent.unit(), tag_helper.tagExtractedName(),
-                                   tag_helper.statNameTags(), symbolTable()));
+                                   tag_helper.statNameTags(), symbolTable(), parent.bins()));
 
   parent.addTlsHistogram(hist_tls_ptr);
 
@@ -807,11 +809,12 @@ Histogram& ThreadLocalStoreImpl::tlsHistogram(ParentHistogramImpl& parent, uint6
 ThreadLocalHistogramImpl::ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit,
                                                    StatName tag_extracted_name,
                                                    const StatNameTagVector& stat_name_tags,
-                                                   SymbolTable& symbol_table)
+                                                   SymbolTable& symbol_table,
+                                                   absl::optional<uint32_t> bins)
     : HistogramImplHelper(name, tag_extracted_name, stat_name_tags, symbol_table), unit_(unit),
       used_(false), created_thread_id_(std::this_thread::get_id()), symbol_table_(symbol_table) {
-  histograms_[0] = hist_alloc();
-  histograms_[1] = hist_alloc();
+  histograms_[0] = bins ? hist_alloc_nbins(bins.value()) : hist_alloc();
+  histograms_[1] = bins ? hist_alloc_nbins(bins.value()) : hist_alloc();
 }
 
 ThreadLocalHistogramImpl::~ThreadLocalHistogramImpl() {
@@ -836,10 +839,11 @@ ParentHistogramImpl::ParentHistogramImpl(StatName name, Histogram::Unit unit,
                                          ThreadLocalStoreImpl& thread_local_store,
                                          StatName tag_extracted_name,
                                          const StatNameTagVector& stat_name_tags,
-                                         ConstSupportedBuckets& supported_buckets, uint64_t id)
+                                         ConstSupportedBuckets& supported_buckets,
+                                         absl::optional<uint32_t> bins, uint64_t id)
     : MetricImpl(name, tag_extracted_name, stat_name_tags, thread_local_store.symbolTable()),
-      unit_(unit), thread_local_store_(thread_local_store), interval_histogram_(hist_alloc()),
-      cumulative_histogram_(hist_alloc()),
+      unit_(unit), bins_(bins), thread_local_store_(thread_local_store),
+      interval_histogram_(hist_alloc()), cumulative_histogram_(hist_alloc()),
       interval_statistics_(interval_histogram_, unit, supported_buckets),
       cumulative_statistics_(cumulative_histogram_, unit, supported_buckets), id_(id) {}
 

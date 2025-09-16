@@ -41,7 +41,7 @@ LogicalHost::LogicalHost(
 }
 
 Network::Address::InstanceConstSharedPtr LogicalHost::healthCheckAddress() const {
-  absl::MutexLock lock(&address_lock_);
+  absl::MutexLock lock(address_lock_);
   return health_check_address_;
 }
 
@@ -57,7 +57,7 @@ void LogicalHost::setNewAddresses(const Network::Address::InstanceConstSharedPtr
     ASSERT(*address_list.front() == *address);
   }
   {
-    absl::MutexLock lock(&address_lock_);
+    absl::MutexLock lock(address_lock_);
     address_ = address;
     address_list_or_null_ = std::move(shared_address_list);
     health_check_address_ = std::move(health_check_address);
@@ -65,12 +65,12 @@ void LogicalHost::setNewAddresses(const Network::Address::InstanceConstSharedPtr
 }
 
 HostDescription::SharedConstAddressVector LogicalHost::addressListOrNull() const {
-  absl::MutexLock lock(&address_lock_);
+  absl::MutexLock lock(address_lock_);
   return address_list_or_null_;
 }
 
 Network::Address::InstanceConstSharedPtr LogicalHost::address() const {
-  absl::MutexLock lock(&address_lock_);
+  absl::MutexLock lock(address_lock_);
   return address_;
 }
 
@@ -80,7 +80,7 @@ Upstream::Host::CreateConnectionData LogicalHost::createConnection(
   Network::Address::InstanceConstSharedPtr address;
   SharedConstAddressVector address_list_or_null;
   {
-    absl::MutexLock lock(&address_lock_);
+    absl::MutexLock lock(address_lock_);
     address = address_;
     address_list_or_null = address_list_or_null_;
   }

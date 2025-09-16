@@ -21,7 +21,7 @@ index 88949fe9740..a4d47a7ee65 100644
 +  "absl/debugging/internal/stacktrace_unimplemented-inl.inc"
  
  #elif defined(__ANDROID__) && __ANDROID_API__ >= 33
- 
+ #ifdef ABSL_HAVE_THREAD_LOCAL
 diff --git a/absl/debugging/symbolize.cc b/absl/debugging/symbolize.cc
 index 344436f9d10..6f8088d1d08 100644
 --- a/absl/debugging/symbolize.cc

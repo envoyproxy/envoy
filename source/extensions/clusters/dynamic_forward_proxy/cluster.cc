@@ -100,7 +100,7 @@ Cluster::~Cluster() {
   }
   // Should remove all sub clusters, otherwise, might be memory leaking.
   // This lock is useless, just make compiler happy.
-  absl::WriterMutexLock lock{&cluster_map_lock_};
+  absl::WriterMutexLock lock{cluster_map_lock_};
   for (auto it = cluster_map_.cbegin(); it != cluster_map_.cend();) {
     auto cluster_name = it->first;
     ENVOY_LOG(debug, "cluster='{}' removing from cluster_map & cluster manager", cluster_name);
@@ -126,7 +126,7 @@ void Cluster::startPreInit() {
 }
 
 bool Cluster::touch(const std::string& cluster_name) {
-  absl::ReaderMutexLock lock{&cluster_map_lock_};
+  absl::ReaderMutexLock lock{cluster_map_lock_};
   const auto cluster_it = cluster_map_.find(cluster_name);
   if (cluster_it != cluster_map_.end()) {
     cluster_it->second->touch();
@@ -140,7 +140,7 @@ void Cluster::checkIdleSubCluster() {
   ASSERT(main_thread_dispatcher_.isThreadSafe());
   {
     // TODO: try read lock first.
-    absl::WriterMutexLock lock{&cluster_map_lock_};
+    absl::WriterMutexLock lock{cluster_map_lock_};
     for (auto it = cluster_map_.cbegin(); it != cluster_map_.cend();) {
       if (it->second->checkIdle()) {
         auto cluster_name = it->first;
@@ -159,7 +159,7 @@ std::pair<bool, absl::optional<envoy::config::cluster::v3::Cluster>>
 Cluster::createSubClusterConfig(const std::string& cluster_name, const std::string& host,
                                 const int port) {
   {
-    absl::WriterMutexLock lock{&cluster_map_lock_};
+    absl::WriterMutexLock lock{cluster_map_lock_};
     const auto cluster_it = cluster_map_.find(cluster_name);
     if (cluster_it != cluster_map_.end()) {
       cluster_it->second->touch();
@@ -259,7 +259,7 @@ absl::Status Cluster::addOrUpdateHost(
     std::unique_ptr<Upstream::HostVector>& hosts_added) {
   Upstream::LogicalHostSharedPtr emplaced_host;
   {
-    absl::WriterMutexLock lock{&host_map_lock_};
+    absl::WriterMutexLock lock{host_map_lock_};
 
     // NOTE: Right now we allow a DNS cache to be shared between multiple clusters. Though we have
     // connection/request circuit breakers on the cluster, we don't have any way to control the
@@ -332,7 +332,7 @@ void Cluster::updatePriorityState(const Upstream::HostVector& hosts_added,
   Upstream::PriorityStateManager priority_state_manager(*this, local_info_, nullptr, random_);
   priority_state_manager.initializePriorityFor(dummy_locality_lb_endpoint_);
   {
-    absl::ReaderMutexLock lock{&host_map_lock_};
+    absl::ReaderMutexLock lock{host_map_lock_};
     for (const auto& host : host_map_) {
       priority_state_manager.registerHostForPriority(host.second.logical_host_,
                                                      dummy_locality_lb_endpoint_);
@@ -346,7 +346,7 @@ void Cluster::updatePriorityState(const Upstream::HostVector& hosts_added,
 void Cluster::onDnsHostRemove(const std::string& host) {
   Upstream::HostVector hosts_removed;
   {
-    absl::WriterMutexLock lock{&host_map_lock_};
+    absl::WriterMutexLock lock{host_map_lock_};
     const auto host_map_it = host_map_.find(host);
     ASSERT(host_map_it != host_map_.end());
     hosts_removed.emplace_back(host_map_it->second.logical_host_);
@@ -478,7 +478,7 @@ Upstream::HostConstSharedPtr Cluster::LoadBalancer::findHostByName(const std::st
 
 Upstream::HostConstSharedPtr Cluster::findHostByName(const std::string& host) const {
   {
-    absl::ReaderMutexLock lock{&host_map_lock_};
+    absl::ReaderMutexLock lock{host_map_lock_};
     const auto host_it = host_map_.find(host);
     if (host_it == host_map_.end()) {
       ENVOY_LOG(debug, "host {} not found", host);
