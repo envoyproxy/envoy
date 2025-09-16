@@ -456,6 +456,14 @@ message StreamedBodyResponse {
   // message, which will result in discarding any other messages sent by
   // the client application.
   bool end_of_stream = 2;
+
+  // This field is used in ``GRPC`` body send mode when ``end_of_stream`` is
+  // true and ``body`` is empty. Those values would normally indicate an
+  // empty message on the stream with the end-of-stream bit set.
+  // However, if the half-close happens after the last message on the
+  // stream was already sent, then this field will be true to indicate an
+  // end-of-stream with *no* message (as opposed to an empty message).
+  bool end_of_stream_without_message = 3;
 }
 
 // This message specifies the body mutation the server sends to the data plane.
