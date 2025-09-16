@@ -107,15 +107,15 @@ jobs:
     # Handle any failure in triggering job
     # Remove any `checks` we dont care about
     # Prepare a check request
-    - uses: envoyproxy/toolshed/gh-actions/github/env/load@actions-v0.3.24
-      name: Load env
-      id: data
-      with:
-        run-id: ${{ steps.run-id.outputs.value || inputs.run-id }}
-        check-name: ${{ inputs.check-name }}
-        head-sha: ${{ inputs.head-sha }}
-      env:
-        GH_TOKEN: ${{ github.token }}
+    # - uses: envoyproxy/toolshed/gh-actions/github/env/load@actions-v0.3.24
+    #   name: Load env
+    #   id: data
+    #   with:
+    #     run-id: ${{ steps.run-id.outputs.value || inputs.run-id }}
+    #     check-name: ${{ inputs.check-name }}
+    #     head-sha: ${{ inputs.head-sha }}
+    #   env:
+    #     GH_TOKEN: ${{ github.token }}
 
     #  Update the check
     - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.24
