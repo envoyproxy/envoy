@@ -1039,7 +1039,7 @@ public:
     // Sending non-mergeable updates.
     cluster_->prioritySet().updateHosts(
         0, HostSetImpl::partitionHosts(hosts_ptr, HostsPerLocalityImpl::empty()), nullptr, hosts,
-        {}, 123, absl::nullopt, 100);
+        {}, absl::nullopt, 100);
   }
 
   Cluster* cluster_{};
