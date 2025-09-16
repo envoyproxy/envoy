@@ -11,10 +11,14 @@ namespace Extensions {
 namespace DynamicModules {
 namespace HttpFilters {
 
-using OnHttpConfigDestoryType = decltype(&envoy_dynamic_module_on_http_filter_config_destroy);
+// The custom stat namespace which prepends all the user-defined metrics.
+// Note that the prefix is removed from the final output of /stats endpoints.
+constexpr absl::string_view CustomStatNamespace = "dynamicmodulescustom";
+
+using OnHttpConfigDestroyType = decltype(&envoy_dynamic_module_on_http_filter_config_destroy);
 using OnHttpFilterNewType = decltype(&envoy_dynamic_module_on_http_filter_new);
 
-using OnHttpPerRouteConfigDestoryType =
+using OnHttpPerRouteConfigDestroyType =
     decltype(&envoy_dynamic_module_on_http_filter_per_route_config_destroy);
 using OnHttpFilterRequestHeadersType =
     decltype(&envoy_dynamic_module_on_http_filter_request_headers);
@@ -49,7 +53,7 @@ public:
    */
   DynamicModuleHttpFilterConfig(const absl::string_view filter_name,
                                 const absl::string_view filter_config,
-                                DynamicModulePtr dynamic_module,
+                                DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
                                 Server::Configuration::ServerFactoryContext& context);
 
   ~DynamicModuleHttpFilterConfig();
@@ -60,7 +64,7 @@ public:
   // The function pointers for the module related to the HTTP filter. All of them are resolved
   // during the construction of the config and made sure they are not nullptr after that.
 
-  OnHttpConfigDestoryType on_http_filter_config_destroy_ = nullptr;
+  OnHttpConfigDestroyType on_http_filter_config_destroy_ = nullptr;
   OnHttpFilterNewType on_http_filter_new_ = nullptr;
   OnHttpFilterRequestHeadersType on_http_filter_request_headers_ = nullptr;
   OnHttpFilterRequestBodyType on_http_filter_request_body_ = nullptr;
@@ -74,6 +78,187 @@ public:
   OnHttpFilterScheduled on_http_filter_scheduled_ = nullptr;
 
   Envoy::Upstream::ClusterManager& cluster_manager_;
+  const Stats::ScopeSharedPtr stats_scope_;
+  Stats::StatNamePool stat_name_pool_;
+  // We only allow the module to create stats during envoy_dynamic_module_on_http_filter_config_new,
+  // and not later during request handling, so that we don't have to wrap the stat storage in a
+  // lock.
+  bool stat_creation_frozen_ = false;
+
+  class ModuleCounterHandle {
+  public:
+    ModuleCounterHandle(Stats::Counter& counter) : counter_(counter) {}
+
+    void add(uint64_t amount) const { counter_.add(amount); }
+
+  private:
+    Stats::Counter& counter_;
+  };
+
+  class ModuleCounterVecHandle {
+  public:
+    ModuleCounterVecHandle(Stats::StatName name, Stats::StatNameVec label_names)
+        : name_(name), label_names_(label_names) {}
+
+    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
+    void add(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
+      ASSERT(tags.has_value());
+      Stats::Utility::counterFromElements(scope, {name_}, tags).add(amount);
+    }
+
+  private:
+    Stats::StatName name_;
+    Stats::StatNameVec label_names_;
+  };
+
+  class ModuleGaugeHandle {
+  public:
+    ModuleGaugeHandle(Stats::Gauge& gauge) : gauge_(gauge) {}
+
+    void increase(uint64_t amount) const { gauge_.add(amount); }
+    void decrease(uint64_t amount) const { gauge_.sub(amount); }
+    void set(uint64_t amount) const { gauge_.set(amount); }
+
+  private:
+    Stats::Gauge& gauge_;
+  };
+
+  class ModuleGaugeVecHandle {
+  public:
+    ModuleGaugeVecHandle(Stats::StatName name, Stats::StatNameVec label_names,
+                         Stats::Gauge::ImportMode import_mode)
+        : name_(name), label_names_(label_names), import_mode_(import_mode) {}
+
+    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
+
+    void increase(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
+                  uint64_t amount) const {
+      ASSERT(tags.has_value());
+      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).add(amount);
+    }
+    void decrease(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
+                  uint64_t amount) const {
+      ASSERT(tags.has_value());
+      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).sub(amount);
+    }
+    void set(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags, uint64_t amount) const {
+      ASSERT(tags.has_value());
+      Stats::Utility::gaugeFromElements(scope, {name_}, import_mode_, tags).set(amount);
+    }
+
+  private:
+    Stats::StatName name_;
+    Stats::StatNameVec label_names_;
+    Stats::Gauge::ImportMode import_mode_;
+  };
+
+  class ModuleHistogramHandle {
+  public:
+    ModuleHistogramHandle(Stats::Histogram& histogram) : histogram_(histogram) {}
+
+    void recordValue(uint64_t value) const { histogram_.recordValue(value); }
+
+  private:
+    Stats::Histogram& histogram_;
+  };
+
+  class ModuleHistogramVecHandle {
+  public:
+    ModuleHistogramVecHandle(Stats::StatName name, Stats::StatNameVec label_names,
+                             Stats::Histogram::Unit unit)
+        : name_(name), label_names_(label_names), unit_(unit) {}
+
+    const Stats::StatNameVec& getLabelNames() const { return label_names_; }
+
+    void recordValue(Stats::Scope& scope, Stats::StatNameTagVectorOptConstRef tags,
+                     uint64_t value) const {
+      ASSERT(tags.has_value());
+      Stats::Utility::histogramFromElements(scope, {name_}, unit_, tags).recordValue(value);
+    }
+
+  private:
+    Stats::StatName name_;
+    Stats::StatNameVec label_names_;
+    Stats::Histogram::Unit unit_;
+  };
+
+  size_t addCounter(ModuleCounterHandle&& counter) {
+    size_t id = counters_.size();
+    counters_.push_back(std::move(counter));
+    return id;
+  }
+
+  size_t addCounterVec(ModuleCounterVecHandle&& counter_vec) {
+    size_t id = counter_vecs_.size();
+    counter_vecs_.push_back(std::move(counter_vec));
+    return id;
+  }
+
+  OptRef<const ModuleCounterHandle> getCounterById(size_t id) const {
+    if (id >= counters_.size()) {
+      return {};
+    }
+    return counters_[id];
+  }
+
+  OptRef<const ModuleCounterVecHandle> getCounterVecById(size_t id) const {
+    if (id >= counter_vecs_.size()) {
+      return {};
+    }
+    return counter_vecs_[id];
+  }
+
+  size_t addGauge(ModuleGaugeHandle&& gauge) {
+    size_t id = gauges_.size();
+    gauges_.push_back(std::move(gauge));
+    return id;
+  }
+
+  size_t addGaugeVec(ModuleGaugeVecHandle&& gauge_vec) {
+    size_t id = gauge_vecs_.size();
+    gauge_vecs_.push_back(std::move(gauge_vec));
+    return id;
+  }
+
+  OptRef<const ModuleGaugeHandle> getGaugeById(size_t id) const {
+    if (id >= gauges_.size()) {
+      return {};
+    }
+    return gauges_[id];
+  }
+
+  OptRef<const ModuleGaugeVecHandle> getGaugeVecById(size_t id) const {
+    if (id >= gauge_vecs_.size()) {
+      return {};
+    }
+    return gauge_vecs_[id];
+  }
+
+  size_t addHistogram(ModuleHistogramHandle&& hist) {
+    size_t id = hists_.size();
+    hists_.push_back(std::move(hist));
+    return id;
+  }
+
+  OptRef<const ModuleHistogramHandle> getHistogramById(size_t id) const {
+    if (id >= hists_.size()) {
+      return {};
+    }
+    return hists_[id];
+  }
+
+  size_t addHistogramVec(ModuleHistogramVecHandle&& hist_vec) {
+    size_t id = hist_vecs_.size();
+    hist_vecs_.push_back(std::move(hist_vec));
+    return id;
+  }
+
+  OptRef<const ModuleHistogramVecHandle> getHistogramVecById(size_t id) const {
+    if (id >= hist_vecs_.size()) {
+      return {};
+    }
+    return hist_vecs_[id];
+  }
 
 private:
   // The name of the filter passed in the constructor.
@@ -81,6 +266,14 @@ private:
 
   // The configuration for the module.
   const std::string filter_config_;
+
+  // The cached references to stats and their metadata.
+  std::vector<ModuleCounterHandle> counters_;
+  std::vector<ModuleCounterVecHandle> counter_vecs_;
+  std::vector<ModuleGaugeHandle> gauges_;
+  std::vector<ModuleGaugeVecHandle> gauge_vecs_;
+  std::vector<ModuleHistogramHandle> hists_;
+  std::vector<ModuleHistogramVecHandle> hist_vecs_;
 
   // The handle for the module.
   Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
@@ -90,14 +283,14 @@ class DynamicModuleHttpPerRouteFilterConfig : public Router::RouteSpecificFilter
 public:
   DynamicModuleHttpPerRouteFilterConfig(
       envoy_dynamic_module_type_http_filter_config_module_ptr config,
-      OnHttpPerRouteConfigDestoryType destroy)
+      OnHttpPerRouteConfigDestroyType destroy)
       : config_(config), destroy_(destroy) {}
   ~DynamicModuleHttpPerRouteFilterConfig() override;
 
   envoy_dynamic_module_type_http_filter_config_module_ptr config_;
 
 private:
-  OnHttpPerRouteConfigDestoryType destroy_;
+  OnHttpPerRouteConfigDestroyType destroy_;
 };
 
 using DynamicModuleHttpFilterConfigSharedPtr = std::shared_ptr<DynamicModuleHttpFilterConfig>;
@@ -117,11 +310,10 @@ newDynamicModuleHttpPerRouteConfig(const absl::string_view per_route_config_name
  * @param context the server factory context.
  * @return a shared pointer to the new config object or an error if the module could not be loaded.
  */
-absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr>
-newDynamicModuleHttpFilterConfig(const absl::string_view filter_name,
-                                 const absl::string_view filter_config,
-                                 Extensions::DynamicModules::DynamicModulePtr dynamic_module,
-                                 Server::Configuration::ServerFactoryContext& context);
+absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilterConfig(
+    const absl::string_view filter_name, const absl::string_view filter_config,
+    Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
+    Server::Configuration::ServerFactoryContext& context);
 
 } // namespace HttpFilters
 } // namespace DynamicModules

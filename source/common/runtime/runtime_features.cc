@@ -84,6 +84,7 @@ RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
 RUNTIME_GUARD(envoy_reloadable_features_websocket_allow_4xx_5xx_through_filter_chain);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 
+RUNTIME_GUARD(envoy_restart_features_move_locality_schedulers_to_lb);
 RUNTIME_GUARD(envoy_restart_features_raise_file_limits);
 RUNTIME_GUARD(envoy_restart_features_skip_backing_cluster_check_for_sds);
 RUNTIME_GUARD(envoy_restart_features_use_eds_cache_for_ads);
@@ -168,6 +169,8 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_no_ai_flags);
 // take over the split ones, and will be used as a base for the
 // implementation of on-demand DNS.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
+// Force a local reply from upstream envoy for reverse connections.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_reverse_conn_force_local_reply);
 
 // TODO(pradeepcrao): Create a config option to enable this instead after
 // testing.
