@@ -100,6 +100,8 @@ void GrpcAccessLoggerImpl::initMessage() {}
 
 void GrpcAccessLoggerImpl::clearMessage() { root_->clear_log_records(); }
 
+uint32_t GrpcAccessLoggerImpl::countLogEntries() const { return root_->log_records_size(); }
+
 GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& async_client_manager,
                                                      Stats::Scope& scope,
                                                      ThreadLocal::SlotAllocator& tls,
