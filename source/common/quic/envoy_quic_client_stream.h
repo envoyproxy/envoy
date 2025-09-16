@@ -93,6 +93,7 @@ private:
   void useCapsuleProtocol();
 #endif
 
+  // Returns nullptr if the response decoder has already been destructed.
   Http::ResponseDecoder* getResponseDecoder();
 
   void onResponseDecoderDead() const;
