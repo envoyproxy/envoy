@@ -38,6 +38,14 @@ on:
           \($summary)
 
           \($extra)
+      request:
+        type: string
+        required: false
+        default: ''
+      trusted:
+        type: string
+        required: false
+        default: ''
 
     outputs:
       build-image:
