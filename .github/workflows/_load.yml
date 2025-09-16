@@ -136,8 +136,10 @@ jobs:
       name: Print request summary
       with:
         input: |
-          action: ${{ fromJSON(steps.data.outputs.data).data.check.action }}
-          summary: ${{ toJSON(fromJSON(steps.data.outputs.data).data.summary) }}
+          action: RUN
+          summary:
+            linked-title: Manual run
+            summary: This is a static summary for debugging.
         input-format: yaml
         output-path: GITHUB_STEP_SUMMARY
         options: -r
@@ -145,12 +147,12 @@ jobs:
           .action as $action
           | .summary as $summary
           | if ($action != "RUN") then
-              "### ${{ github.workflow }} was skipped"
+              "### Manual run was skipped"
             else "" end
           | . as $extra
           | $summary["linked-title"] as $linkedTitle
           | $summary.summary as $summary
-          | "${{ inputs.template-request-summary }}"
+          | "## \($linkedTitle)\n\n\($summary)\n\n\($extra)"
 
     - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.24
       id: request-output
