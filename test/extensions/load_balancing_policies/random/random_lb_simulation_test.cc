@@ -107,7 +107,7 @@ public:
           updateHostsParams(originating_hosts, per_zone_local_shared,
                             std::make_shared<const HealthyHostVector>(*originating_hosts),
                             per_zone_local_shared),
-          {}, empty_vector_, empty_vector_, random_.random(), absl::nullopt);
+          {}, empty_vector_, empty_vector_, absl::nullopt);
 
       HostConstSharedPtr selected = lb.chooseHost(nullptr).host;
       hits[selected->address()->asString()]++;
