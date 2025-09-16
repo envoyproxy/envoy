@@ -109,7 +109,7 @@ private:
 
     void triggerCallbacks() {
       for (size_t i = 0; i < hostSetsPerPriority().size(); ++i) {
-        THROW_IF_NOT_OK(runReferenceUpdateCallbacks(i, {}, {}));
+        runReferenceUpdateCallbacks(i, {}, {});
       }
     }
 
@@ -118,7 +118,7 @@ private:
                       uint64_t seed) {
       reinterpret_cast<HostSubsetImpl*>(host_sets_[priority].get())
           ->update(matching_hosts, hosts_added, hosts_removed, seed);
-      THROW_IF_NOT_OK(runUpdateCallbacks(hosts_added, hosts_removed));
+      runUpdateCallbacks(hosts_added, hosts_removed);
     }
 
     // Thread aware LB if applicable.

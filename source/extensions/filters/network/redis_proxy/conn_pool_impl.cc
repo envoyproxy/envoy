@@ -173,7 +173,6 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
              const std::vector<Upstream::HostSharedPtr>& hosts_removed) -> absl::Status {
         onHostsAdded(hosts_added);
         onHostsRemoved(hosts_removed);
-        return absl::OkStatus();
       });
 
   ASSERT(host_address_map_.empty());

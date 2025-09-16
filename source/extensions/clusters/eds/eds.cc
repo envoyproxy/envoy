@@ -77,9 +77,8 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
   absl::flat_hash_set<std::string> all_new_hosts;
   PriorityStateManager priority_state_manager(parent_, parent_.local_info_, &host_update_cb,
                                               parent_.random_);
+  THROW_IF_NOT_OK(parent_.validateEndpoints(cluster_load_assignment_.endpoints()));
   for (const auto& locality_lb_endpoint : cluster_load_assignment_.endpoints()) {
-    THROW_IF_NOT_OK(parent_.validateEndpointsForZoneAwareRouting(locality_lb_endpoint));
-
     priority_state_manager.initializePriorityFor(locality_lb_endpoint);
 
     if (locality_lb_endpoint.has_leds_cluster_locality_config()) {
