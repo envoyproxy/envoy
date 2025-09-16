@@ -335,23 +335,13 @@ TEST_P(RoundRobinLoadBalancerTest, Locality) {
   hostSet().healthy_hosts_ = *hosts;
   hostSet().healthy_hosts_per_locality_ = hosts_per_locality;
   init(false, true);
-  // chooseHealthyLocality() return value determines which locality we use.
-  EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(0));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
-  EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(1));
+
+  // Round robin through all localities.
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
-  EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(0));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
-  EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(1));
+  EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr).host);
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
-  EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(0));
   EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
-  // When there is no locality, we RR over all available hosts.
-  EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(absl::optional<uint32_t>()));
-  EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
-  EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(absl::optional<uint32_t>()));
-  EXPECT_EQ(hostSet().healthy_hosts_[1], lb_->chooseHost(nullptr).host);
-  EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(absl::optional<uint32_t>()));
   EXPECT_EQ(hostSet().healthy_hosts_[2], lb_->chooseHost(nullptr).host);
 }
 
@@ -380,13 +370,12 @@ TEST_P(RoundRobinLoadBalancerTest, DegradedLocality) {
   hostSet().degraded_hosts_per_locality_ = degraded_hosts_per_locality;
   init(false, true);
 
-  EXPECT_CALL(random_, random()).WillOnce(Return(50)).WillOnce(Return(0));
+  EXPECT_CALL(random_, random()).WillOnce(Return(50)).WillOnce(Return(0)).WillOnce(Return(51));
   // Since we're split between healthy and degraded, the LB should call into both
   // chooseHealthyLocality and chooseDegradedLocality.
-  EXPECT_CALL(hostSet(), chooseDegradedLocality()).WillOnce(Return(1));
   EXPECT_EQ(hostSet().degraded_hosts_[0], lb_->chooseHost(nullptr).host);
-  EXPECT_CALL(hostSet(), chooseHealthyLocality()).WillOnce(Return(0));
   EXPECT_EQ(hostSet().healthy_hosts_[0], lb_->chooseHost(nullptr).host);
+  EXPECT_EQ(hostSet().degraded_hosts_[1], lb_->chooseHost(nullptr).host);
 }
 
 TEST_P(RoundRobinLoadBalancerTest, Weighted) {
