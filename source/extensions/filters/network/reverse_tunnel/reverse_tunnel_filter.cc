@@ -81,6 +81,8 @@ Network::FilterStatus ReverseTunnelFilter::onData(Buffer::Instance& data, bool) 
   if (!status.ok()) {
     ENVOY_CONN_LOG(debug, "reverse_tunnel: codec dispatch error: {}", read_callbacks_->connection(),
                    status.message());
+    // Close connection on codec error.
+    read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
     return Network::FilterStatus::StopIteration;
   }
   return Network::FilterStatus::StopIteration;
@@ -166,6 +168,8 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
       path != parent_.config_->requestPath()) {
     sendLocalReply(Http::Code::NotFound, "Not a reverse tunnel request", nullptr, absl::nullopt,
                    "reverse_tunnel_not_found");
+    // Close the connection after sending the response.
+    parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
     return;
   }
 
@@ -183,6 +187,8 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
                    parent_.read_callbacks_->connection());
     sendLocalReply(Http::Code::BadRequest, "Missing required reverse tunnel headers", nullptr,
                    absl::nullopt, "reverse_tunnel_missing_headers");
+    // Close the connection after sending the response.
+    parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
     return;
   }
 
@@ -196,6 +202,8 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
     parent_.stats_.rejected_.inc();
     sendLocalReply(Http::Code::Forbidden, "Request validation failed", nullptr, absl::nullopt,
                    "reverse_tunnel_validation_failed");
+    // Close the connection after sending the response.
+    parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
     return;
   }
 

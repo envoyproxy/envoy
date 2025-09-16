@@ -5,12 +5,14 @@
 #include <cstring>
 
 #include "envoy/event/deferred_deletable.h"
+#include "envoy/event/timer.h"
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
+#include "source/common/event/real_time_system.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/connection_socket_impl.h"
 #include "source/common/network/socket_interface_impl.h"
@@ -70,13 +72,12 @@ void ReverseConnectionIOHandle::cleanup() {
   ENVOY_LOG_MISC(debug, "Gracefully shutting down {} connection wrappers.",
                  connection_wrappers_.size());
 
-  // Signal all connections to close gracefully.
+  // Move wrappers for deferred cleanup (destructors will handle shutdown).
   std::vector<std::unique_ptr<RCConnectionWrapper>> wrappers_to_delete;
   for (auto& wrapper : connection_wrappers_) {
     if (wrapper) {
-      ENVOY_LOG(debug, "Initiating graceful shutdown for connection wrapper.");
-      wrapper->shutdown();
-      // Move wrapper for deferred cleanup
+      ENVOY_LOG(debug, "Moving connection wrapper for deferred cleanup.");
+      // Don't call shutdown() explicitly - let the destructor handle it safely
       wrappers_to_delete.push_back(std::move(wrapper));
     }
   }
@@ -86,11 +87,10 @@ void ReverseConnectionIOHandle::cleanup() {
   conn_wrapper_to_host_map_.clear();
 
   // Clean up wrappers with safe deletion.
+  // Always use direct cleanup to avoid deferred delete issues during test teardown
   for (auto& wrapper : wrappers_to_delete) {
-    if (wrapper && isThreadLocalDispatcherAvailable()) {
-      getThreadLocalDispatcher().deferredDelete(std::move(wrapper));
-    } else {
-      // Direct cleanup when dispatcher not available.
+    if (wrapper) {
+      // Direct cleanup - let the destructor handle shutdown safely
       wrapper.reset();
     }
   }
@@ -365,6 +365,26 @@ void ReverseConnectionIOHandle::onEvent(Network::ConnectionEvent event) {
 
 int ReverseConnectionIOHandle::getPipeMonitorFd() const { return trigger_pipe_read_fd_; }
 
+// Get time source for consistent time operations.
+TimeSource& ReverseConnectionIOHandle::getTimeSource() const {
+  // Try to get time source from thread-local dispatcher first.
+  if (extension_) {
+    auto* local_registry = extension_->getLocalRegistry();
+    if (local_registry) {
+      return local_registry->dispatcher().timeSource();
+    }
+  }
+
+  // Fallback to worker dispatcher if available.
+  if (worker_dispatcher_) {
+    return worker_dispatcher_->timeSource();
+  }
+
+  // This should not happen in production. Assert to ensure proper initialization.
+  ENVOY_BUG(false, "No time source available. dispatcher not properly initialized");
+  PANIC("ReverseConnectionIOHandle: No valid time source available");
+}
+
 // Use the thread-local registry to get the dispatcher.
 Event::Dispatcher& ReverseConnectionIOHandle::getThreadLocalDispatcher() const {
   // Get the thread-local dispatcher from the socket interface's registry.
@@ -420,12 +440,12 @@ void ReverseConnectionIOHandle::maybeUpdateHostsMappingsAndConnections(
       host_to_conn_info_map_[host] = HostConnectionInfo{
           host,
           cluster_id,
-          {},                                               // connection_keys - empty set initially
-          1,                                                // default target_connection_count
-          0,                                                // failure_count
-          worker_dispatcher_->timeSource().monotonicTime(), // last_failure_time
-          worker_dispatcher_->timeSource().monotonicTime(), // backoff_until (no backoff initially)
-          {} // connection_states - empty map initially
+          {},                              // connection_keys - empty set initially
+          1,                               // default target_connection_count
+          0,                               // failure_count
+          getTimeSource().monotonicTime(), // last_failure_time
+          getTimeSource().monotonicTime(), // backoff_until (no backoff initially)
+          {}                               // connection_states - empty map initially
       };
     } else {
       // Update cluster name if host moved to different cluster.
@@ -620,17 +640,17 @@ bool ReverseConnectionIOHandle::shouldAttemptConnectionToHost(const std::string&
     host_to_conn_info_map_[host_address] = HostConnectionInfo{
         host_address,
         cluster_name,
-        {},                                               // connection_keys - empty set initially
-        1,                                                // default target_connection_count
-        0,                                                // failure_count
-        worker_dispatcher_->timeSource().monotonicTime(), // last_failure_time
-        worker_dispatcher_->timeSource().monotonicTime(), // backoff_until (no backoff initially)
-        {}                                                // connection_states - empty map initially
+        {},                              // connection_keys - empty set initially
+        1,                               // default target_connection_count
+        0,                               // failure_count
+        getTimeSource().monotonicTime(), // last_failure_time
+        getTimeSource().monotonicTime(), // backoff_until (no backoff initially)
+        {}                               // connection_states - empty map initially
     };
     host_it = host_to_conn_info_map_.find(host_address);
   }
   auto& host_info = host_it->second;
-  auto now = worker_dispatcher_->timeSource().monotonicTime();
+  auto now = getTimeSource().monotonicTime();
   ENVOY_LOG(debug, "host: {} now: {} ms backoff_until: {} ms", host_address,
             std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count(),
             std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -652,25 +672,14 @@ void ReverseConnectionIOHandle::trackConnectionFailure(const std::string& host_a
                                                        const std::string& cluster_name) {
   auto host_it = host_to_conn_info_map_.find(host_address);
   if (host_it == host_to_conn_info_map_.end()) {
-    // Create host entry on-demand to avoid race conditions during initialization.
-    ENVOY_LOG(debug,
-              "Creating HostConnectionInfo on-demand for failure tracking of host {} in cluster {}",
-              host_address, cluster_name);
-    host_to_conn_info_map_[host_address] = HostConnectionInfo{
-        host_address,
-        cluster_name,
-        {},                                               // connection_keys - empty set initially
-        1,                                                // default target_connection_count
-        0,                                                // failure_count
-        worker_dispatcher_->timeSource().monotonicTime(), // last_failure_time
-        worker_dispatcher_->timeSource().monotonicTime(), // backoff_until (no backoff initially)
-        {}                                                // connection_states - empty map initially
-    };
-    host_it = host_to_conn_info_map_.find(host_address);
+    // Don't create entries for hosts that aren't actually in any cluster.
+    ENVOY_LOG(debug, "Host {} not found in host_to_conn_info_map_, skipping failure tracking",
+              host_address);
+    return;
   }
   auto& host_info = host_it->second;
   host_info.failure_count++;
-  host_info.last_failure_time = worker_dispatcher_->timeSource().monotonicTime();
+  host_info.last_failure_time = getTimeSource().monotonicTime();
   // Calculate exponential backoff: base_delay * 2^(failure_count - 1)
   const uint32_t base_delay_ms = 1000; // 1 second base delay
   const uint32_t max_delay_ms = 30000; // 30 seconds max delay
@@ -700,24 +709,14 @@ void ReverseConnectionIOHandle::trackConnectionFailure(const std::string& host_a
 void ReverseConnectionIOHandle::resetHostBackoff(const std::string& host_address) {
   auto host_it = host_to_conn_info_map_.find(host_address);
   if (host_it == host_to_conn_info_map_.end()) {
-    // Create host entry on-demand to avoid race conditions during initialization.
-    ENVOY_LOG(debug, "Creating HostConnectionInfo on-demand for backoff reset of host {}",
+    // Don't create entries for hosts that aren't actually in any cluster.
+    ENVOY_LOG(debug, "Host {} not found in host_to_conn_info_map_, skipping backoff reset",
               host_address);
-    host_to_conn_info_map_[host_address] = HostConnectionInfo{
-        host_address,
-        "unknown",                                        // cluster_name - will be updated later
-        {},                                               // connection_keys - empty set initially
-        1,                                                // default target_connection_count
-        0,                                                // failure_count
-        worker_dispatcher_->timeSource().monotonicTime(), // last_failure_time
-        worker_dispatcher_->timeSource().monotonicTime(), // backoff_until (no backoff initially)
-        {}                                                // connection_states - empty map initially
-    };
-    host_it = host_to_conn_info_map_.find(host_address);
+    return;
   }
 
   auto& host_info = host_it->second;
-  auto now = worker_dispatcher_->timeSource().monotonicTime();
+  auto now = getTimeSource().monotonicTime();
 
   // Check if the host is actually in backoff before resetting.
   if (now >= host_info.backoff_until) {
@@ -726,7 +725,7 @@ void ReverseConnectionIOHandle::resetHostBackoff(const std::string& host_address
   }
 
   host_info.failure_count = 0;
-  host_info.backoff_until = worker_dispatcher_->timeSource().monotonicTime();
+  host_info.backoff_until = getTimeSource().monotonicTime();
   ENVOY_LOG(debug, "ReverseConnectionIOHandle: Reset backoff for host {}", host_address);
 
   // Mark host as recovered using the same key used by backoff to change the state from backoff to
@@ -975,16 +974,7 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
             "balancer context",
             host_address, cluster_name);
 
-  // Add null check for worker_dispatcher before attempting connection creation
-  if (!worker_dispatcher_) {
-    ENVOY_LOG(error,
-              "ReverseConnectionIOHandle: worker_dispatcher is null, cannot create connection to "
-              "{} in cluster {}",
-              host_address, cluster_name);
-    updateConnectionState(host_address, cluster_name, temp_connection_key,
-                          ReverseConnectionState::CannotConnect);
-    return false;
-  }
+  // Worker dispatcher null check is no longer needed since getTimeSource() has proper fallbacks.
 
   // Use tcpConn which should not throw exceptions in normal operation
   conn_data = thread_local_cluster->tcpConn(&lb_context);

@@ -30,7 +30,9 @@ RCConnectionWrapper::RCConnectionWrapper(ReverseConnectionIOHandle& parent,
 // RCConnectionWrapper destructor implementation.
 RCConnectionWrapper::~RCConnectionWrapper() {
   ENVOY_LOG(debug, "RCConnectionWrapper destructor called");
-  this->shutdown();
+  if (!shutdown_called_) {
+    this->shutdown();
+  }
 }
 
 void RCConnectionWrapper::onEvent(Network::ConnectionEvent event) {
@@ -184,34 +186,72 @@ void RCConnectionWrapper::onHandshakeFailure(const std::string& message) {
 }
 
 void RCConnectionWrapper::shutdown() {
+  if (shutdown_called_) {
+    ENVOY_LOG(debug, "RCConnectionWrapper: Shutdown already called, skipping");
+    return;
+  }
+  shutdown_called_ = true;
+
   if (!connection_) {
     ENVOY_LOG(error, "RCConnectionWrapper: Connection already null, nothing to shutdown");
     return;
   }
 
-  ENVOY_LOG(debug, "RCConnectionWrapper: Shutting down connection ID: {}, state: {}",
-            connection_->id(), static_cast<int>(connection_->state()));
+  // Clean up connections during shutdown.
+  TRY_ASSERT_MAIN_THREAD {
+    uint64_t connection_id = 0;
+    Network::Connection::State state = Network::Connection::State::Closed;
 
-  // Remove connection callbacks first to prevent recursive calls during shutdown.
-  auto state = connection_->state();
-  if (state != Network::Connection::State::Closed) {
-    connection_->removeConnectionCallbacks(*this);
-    ENVOY_LOG(debug, "Connection callbacks removed");
+    // Safely get connection info before cleanup.
+    TRY_ASSERT_MAIN_THREAD {
+      connection_id = connection_->id();
+      state = connection_->state();
+      ENVOY_LOG(debug, "RCConnectionWrapper: Shutting down connection ID: {}, state: {}",
+                connection_id, static_cast<int>(state));
+    }
+    END_TRY
+    CATCH(const std::exception& e, {
+      ENVOY_LOG(debug, "RCConnectionWrapper: Error getting connection info during shutdown: {}",
+                e.what());
+    })
+
+    // Remove connection callbacks first to prevent recursive calls during shutdown.
+    TRY_ASSERT_MAIN_THREAD {
+      if (state != Network::Connection::State::Closed) {
+        connection_->removeConnectionCallbacks(*this);
+        ENVOY_LOG(debug, "Connection callbacks removed");
+      }
+    }
+    END_TRY
+    CATCH(const std::exception& e,
+          { ENVOY_LOG(debug, "RCConnectionWrapper: Error removing callbacks: {}", e.what()); })
+
+    // Close the connection if it's still open.
+    TRY_ASSERT_MAIN_THREAD {
+      state = connection_->state();
+      if (state == Network::Connection::State::Open) {
+        ENVOY_LOG(debug, "Closing open connection gracefully");
+        connection_->close(Network::ConnectionCloseType::FlushWrite);
+      } else if (state == Network::Connection::State::Closing) {
+        ENVOY_LOG(debug, "Connection already closing");
+      } else {
+        ENVOY_LOG(debug, "Connection already closed");
+      }
+    }
+    END_TRY
+    CATCH(const std::exception& e,
+          { ENVOY_LOG(debug, "RCConnectionWrapper: Error closing connection: {}", e.what()); })
+    // Clear the connection pointer after shutdown.
+    connection_.reset();
+    ENVOY_LOG(debug, "RCConnectionWrapper: Connection cleared after shutdown");
   }
+  END_TRY
+  CATCH(const std::exception& e, {
+    ENVOY_LOG(error, "RCConnectionWrapper: Exception during shutdown: {}", e.what());
+    // Force clear connection even on errors.
+    connection_.reset();
+  })
 
-  // Close the connection if it's still open.
-  state = connection_->state();
-  if (state == Network::Connection::State::Open) {
-    ENVOY_LOG(debug, "Closing open connection gracefully");
-    connection_->close(Network::ConnectionCloseType::FlushWrite);
-  } else if (state == Network::Connection::State::Closing) {
-    ENVOY_LOG(debug, "Connection already closing");
-  } else {
-    ENVOY_LOG(debug, "Connection already closed");
-  }
-
-  // Clear the connection pointer to prevent further access.
-  connection_.reset();
   ENVOY_LOG(debug, "RCConnectionWrapper: Shutdown completed");
 }
 

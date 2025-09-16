@@ -32,16 +32,10 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/stats:isolated_store_lib",
         "//source/common/stream_info:uint64_accessor_lib",
-        "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
-        "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:upstream_socket_manager_lib",
         "//source/extensions/filters/network/reverse_tunnel:reverse_tunnel_filter_lib",
-        "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
-        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:overload_manager_mocks",
-        "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:logging_lib",
-        "@envoy_api//envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/reverse_tunnel/v3:pkg_cc_proto",
     ],
 )
