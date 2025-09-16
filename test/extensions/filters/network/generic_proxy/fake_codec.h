@@ -64,6 +64,8 @@ public:
 
   class FakeResponse : public FakeStreamBase<ResponseHeaderFrame> {
   public:
+    FakeResponse() = default;
+    FakeResponse(int code, bool ok) : status_(code, ok) {}
     absl::string_view protocol() const override { return protocol_; }
     StreamStatus status() const override { return status_; }
 

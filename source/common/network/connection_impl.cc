@@ -120,7 +120,7 @@ ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPt
 }
 
 ConnectionImpl::~ConnectionImpl() {
-  ASSERT((socket_ == nullptr || !socket_->isOpen()) && delayed_close_timer_ == nullptr,
+  ASSERT(!socket_->isOpen() && delayed_close_timer_ == nullptr,
          "ConnectionImpl destroyed with open socket and/or active timer");
 
   // In general we assume that owning code has called close() previously to the destructor being
@@ -148,8 +148,8 @@ bool ConnectionImpl::initializeReadFilters() { return filter_manager_.initialize
 
 void ConnectionImpl::close(ConnectionCloseType type) {
   if (!socket_->isOpen()) {
-    ENVOY_CONN_LOG_EVENT(debug, "connection_closing",
-                         "Not closing conn, socket object is null or socket is not open", *this);
+    ENVOY_CONN_LOG_EVENT(debug, "connection_closing", "Not closing conn, socket is not open",
+                         *this);
     return;
   }
 
@@ -288,7 +288,7 @@ void ConnectionImpl::setDetectedCloseType(DetectedCloseType close_type) {
 }
 
 void ConnectionImpl::closeThroughFilterManager(ConnectionCloseAction close_action) {
-  if (socket_ == nullptr || !socket_->isOpen()) {
+  if (!socket_->isOpen()) {
     return;
   }
 
@@ -303,11 +303,8 @@ void ConnectionImpl::closeThroughFilterManager(ConnectionCloseAction close_actio
 }
 
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
-  ENVOY_CONN_LOG(trace, "closeSocket called, socket_={}, socket_isOpen={}", *this,
-                 socket_ ? "not_null" : "null", socket_ ? socket_->isOpen() : false);
-
   if (!socket_->isOpen()) {
-    ENVOY_CONN_LOG(trace, "closeSocket: socket is null or not open, returning", *this);
+    ENVOY_CONN_LOG(trace, "closeSocket: socket is not open, returning", *this);
     return;
   }
 
@@ -893,7 +890,7 @@ void ConnectionImpl::onWriteReady() {
         }
 
         // If a callback closes the socket, stop iterating.
-        if (socket_ == nullptr || !socket_->isOpen()) {
+        if (!socket_->isOpen()) {
           return;
         }
       }

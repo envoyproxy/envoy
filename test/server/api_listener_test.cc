@@ -6,6 +6,7 @@
 
 #include "source/extensions/api_listeners/default_api_listener/api_listener_impl.h"
 
+#include "test/mocks/http/stream_encoder.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/server/listener_component_factory.h"
@@ -238,6 +239,9 @@ api_listener:
 
   EXPECT_ENVOY_BUG(connection.enableHalfClose(true), "Unexpected function call");
   EXPECT_ENVOY_BUG(connection.isHalfCloseEnabled(), "Unexpected function call");
+
+  // Validate methods updated in SyntheticConnection.
+  EXPECT_DEATH(connection.getSocket(), "not implemented");
 }
 
 // Exercise SyntheticReadCallbacks unimplemented methods and PANIC behavior for socket().

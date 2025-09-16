@@ -747,6 +747,13 @@ public:
     return builder.listener();
   }
 
+  envoy::config::endpoint::v3::ClusterLoadAssignment
+  buildClusterLoadAssignment(const std::string& name, size_t upstream_idx) {
+    return ConfigHelper::buildClusterLoadAssignment(
+        name, Network::Test::getLoopbackAddressString(ipVersion()),
+        fake_upstreams_[upstream_idx]->localAddress()->ip()->port());
+  }
+
   bool compareRequest(const std::string& type_url,
                       const std::vector<std::string>& expected_resource_subscriptions,
                       const std::vector<std::string>& expected_resource_unsubscriptions,
@@ -915,6 +922,72 @@ TEST_P(OdCdsXdstpIntegrationTest, OnDemandClusterDiscoveryAsksForNonexistentClus
 
   ASSERT_TRUE(response->waitForEndStream());
   verifyResponse(std::move(response), "503", {}, {});
+
+  cleanupUpstreamAndDownstream();
+}
+
+// tests a scenario when:
+//  - making a request to an unknown cluster
+//  - odcds initiates a connection with a request for the cluster
+//  - a response contains an EDS cluster
+//  - an EDS request is sent to the same authority
+//  - an EDS response is received
+//  - request is resumed
+TEST_P(OdCdsXdstpIntegrationTest, OnDemandCdsWithEds) {
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  const std::string cds_cluster_name =
+      "xdstp://authority1.com/envoy.config.cluster.v3.Cluster/on_demand_clusters/"
+      "new_cluster_with_eds";
+  const std::string eds_service_name =
+      "xdstp://authority1.com/envoy.config.endpoint.v3.ClusterLoadAssignment/on_demand_clusters/"
+      "new_cluster_with_eds";
+
+  envoy::config::cluster::v3::Cluster new_cluster_with_eds;
+  new_cluster_with_eds.set_name(cds_cluster_name);
+  new_cluster_with_eds.set_type(envoy::config::cluster::v3::Cluster::EDS);
+  auto* eds_cluster_config = new_cluster_with_eds.mutable_eds_cluster_config();
+  eds_cluster_config->set_service_name(eds_service_name);
+  ConfigHelper::setHttp2(new_cluster_with_eds);
+
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"Pick-This-Cluster", cds_cluster_name}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  // Authority1 should receive the ODCDS request.
+  EXPECT_TRUE(compareDiscoveryRequest(
+      Config::TestTypeUrl::get().Cluster, "", {cds_cluster_name}, {cds_cluster_name}, {}, true,
+      Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
+      Config::TestTypeUrl::get().Cluster, {new_cluster_with_eds}, {new_cluster_with_eds}, {}, "1",
+      {}, authority1_xds_stream_.get());
+  // After the CDS response, Envoy will send an EDS request for the new cluster.
+  EXPECT_TRUE(compareDiscoveryRequest(
+      Config::TestTypeUrl::get().ClusterLoadAssignment, "", {eds_service_name}, {eds_service_name},
+      {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
+  sendDiscoveryResponse<envoy::config::endpoint::v3::ClusterLoadAssignment>(
+      Config::TestTypeUrl::get().ClusterLoadAssignment,
+      {buildClusterLoadAssignment(eds_service_name, new_cluster_upstream_idx_)},
+      {buildClusterLoadAssignment(eds_service_name, new_cluster_upstream_idx_)}, {}, "2", {},
+      authority1_xds_stream_.get());
+  // Now, Envoy should ACK the original CDS response.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "1", {cds_cluster_name},
+                                      {}, {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                                      authority1_xds_stream_.get()));
+  // And finally, Envoy should ACK the EDS response.
+  EXPECT_TRUE(compareDiscoveryRequest(
+      Config::TestTypeUrl::get().ClusterLoadAssignment, "2", {eds_service_name}, {}, {}, false,
+      Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
+
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
+  // Send response headers, and end_stream if there is no response body.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200", {}, {});
 
   cleanupUpstreamAndDownstream();
 }
