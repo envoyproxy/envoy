@@ -807,9 +807,9 @@ pub trait EnvoyHttpFilter {
   fn append_request_body(&mut self, data: &[u8]) -> bool;
 
   /// Injects the given request data into the filter stream.
-  /// 
+  ///
   /// Returns false if the request filter chain is not available.
-  /// 
+  ///
   /// This must only be called from on_http_callout_done or on_scheduled callbacks.
   /// The request filter should have been stopped and continue_decoding must not
   /// be called.
@@ -872,9 +872,9 @@ pub trait EnvoyHttpFilter {
   fn append_response_body(&mut self, data: &[u8]) -> bool;
 
   /// Injects the given response data into the filter stream.
-  /// 
+  ///
   /// Returns false if the response filter chain is not available.
-  /// 
+  ///
   /// This must only be called from on_http_callout_done or on_scheduled callbacks.
   /// The response filter should have been stopped and continue_encoding must not
   /// be called.
