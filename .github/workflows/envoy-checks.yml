@@ -11,6 +11,7 @@ on:
     # - Envoy/Prechecks
     types:
     - completed
+  workflow_dispatch:
 
 concurrency:
   group: >-
