@@ -161,12 +161,22 @@ private:
       initMessage();
     }
 
-    if (client_->log(message_)) {
-      // Clear the message regardless of the success.
-      approximate_message_size_bytes_ = 0;
-      clearMessage();
+    uint32_t entry_count = countLogEntries();
+    bool success = client_->log(message_);
+
+    if (success && entry_count > 0) {
+      incLogsWrittenStats(entry_count);
+    } else {
+      incLogsDroppedStats(entry_count);
     }
+
+    // clear the message regardless of the outcome to avoid the buffer growing uncontrollably
+    approximate_message_size_bytes_ = 0;
+    clearMessage();
   }
+
+  // Count the total number of log entries in the message
+  virtual uint32_t countLogEntries() const PURE;
 
   // `canLogMore()` is only for streaming gRPC client only which could run into
   // AboveWriteBufferHighWatermark during `flush()` so that we tracks the log entries dropped caused
@@ -178,27 +188,24 @@ private:
   // [2]https://github.com/envoyproxy/envoy/blob/cd5ef906026160ec2cd766d8d18217e668c256d8/source/extensions/access_loggers/common/grpc_access_logger.h#L126
   bool canLogMore() {
     if (max_buffer_size_bytes_ == 0 || approximate_message_size_bytes_ < max_buffer_size_bytes_) {
-      incLogsWrittenStats();
       return true;
     }
     flush();
     if (approximate_message_size_bytes_ < max_buffer_size_bytes_) {
-      incLogsWrittenStats();
       return true;
     }
-    incLogsDroppedStats();
     return false;
   }
 
-  void incLogsDroppedStats() {
+  void incLogsDroppedStats(uint32_t count = 1) {
     if (stats_) {
-      stats_->logs_dropped_.inc();
+      stats_->logs_dropped_.add(count);
     }
   }
 
-  void incLogsWrittenStats() {
+  void incLogsWrittenStats(uint32_t count = 1) {
     if (stats_) {
-      stats_->logs_written_.inc();
+      stats_->logs_written_.add(count);
     }
   }
 

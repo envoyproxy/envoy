@@ -14,8 +14,8 @@ The gRPC access log has statistics rooted at *access_logs.grpc_access_log.* with
    :header: Name, Type, Description
    :widths: 1, 1, 2
 
-   logs_written, Counter, Total log entries sent to the logger which were not dropped. This does not imply the logs have been flushed to the gRPC endpoint yet.
-   logs_dropped, Counter, Total log entries dropped due to network or application level back up.
+   logs_written, Counter, Total log entries successfully flushed to the gRPC endpoint
+   logs_dropped, Counter, Total log entries dropped due to network or application level back up
 
 
 File access log statistics

@@ -34,6 +34,7 @@ private:
   void addEntry(envoy::data::accesslog::v3::TCPAccessLogEntry&& entry) override;
   bool isEmpty() override;
   void initMessage() override;
+  uint32_t countLogEntries() const override;
 
   const std::string log_name_;
   const LocalInfo::LocalInfo& local_info_;

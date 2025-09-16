@@ -92,6 +92,7 @@ private:
   bool isEmpty() override;
   void initMessage() override;
   void clearMessage() override;
+  uint32_t countLogEntries() const override;
 
   std::function<OTelLogRequestCallbacks&()> genOTelCallbacksFactory();
 
