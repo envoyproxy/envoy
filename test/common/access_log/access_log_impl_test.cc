@@ -1695,7 +1695,6 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, InitedWithDeltaUpdate) {
   ASSERT_EQ(subscriptions_.size(), 1);
   ASSERT_EQ(callbackss_.size(), 1);
 
-  // Not inited with the STOW config.
   auto token_bucket = TestUtility::parseYaml<envoy::type::v3::TokenBucketConfig>(R"EOF(
 name: "another_token_bucket"
 )EOF");
@@ -1732,6 +1731,33 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, SharedTokenBucketInitTogether) {
   EXPECT_CALL(*file_, write(_)).Times(0);
   log2->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
 
+  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+  EXPECT_CALL(*file_, write(_));
+  log2->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log1->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+}
+
+TEST_F(AccessLogImplTestWithRateLimitFilter, SharedTokenBucketInitSeparately) {
+  InstanceSharedPtr log1 =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(default_access_log_), context_);
+  context_.init_manager_.initialize(init_watcher_);
+  ASSERT_EQ(subscriptions_.size(), 1);
+  ASSERT_EQ(callbackss_.size(), 1);
+
+  init_watcher_.expectReady();
+  const auto decoded_resources = TestUtility::decodeResources({token_bucket_});
+  EXPECT_TRUE(callbackss_[0]->onConfigUpdate(decoded_resources.refvec_, "").ok());
+  EXPECT_CALL(*file_, write(_));
+  log1->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+
+  // Init the second log with the same token bucket.
+  InstanceSharedPtr log2 =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(default_access_log_), context_);
+  init_watcher_.expectReady();
+  context_.init_manager_.initialize(init_watcher_);
+  EXPECT_CALL(*file_, write(_)).Times(0);
+  log2->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
   time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
   EXPECT_CALL(*file_, write(_));
   log2->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);

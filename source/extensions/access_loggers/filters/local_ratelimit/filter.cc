@@ -40,9 +40,8 @@ void LocalRateLimitFilter::initializeRateLimiter() {
           [this](std::shared_ptr<
                  Envoy::Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterImpl>
                      limiter) -> void {
-            if (limiter == nullptr) {
-              return;
-            }
+            ASSERT(limiter != nullptr,
+                   "limiter shouldn't be null if the `limiter` is set from callback.");
             rate_limiter_->setLimiter(limiter);
             init_target_->ready();
           });
