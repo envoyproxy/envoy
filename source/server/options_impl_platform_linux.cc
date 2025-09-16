@@ -41,23 +41,19 @@ uint32_t OptionsImplPlatformLinux::getCpuAffinityCount(unsigned int hw_threads) 
 }
 
 uint32_t OptionsImplPlatform::getCpuCount() {
-  // Step 1: Get hardware thread count
   unsigned int hw_threads = std::max(1U, std::thread::hardware_concurrency());
-
-  // Step 2: Get CPU affinity count (respects taskset, cpuset, etc.)
   uint32_t affinity_count = OptionsImplPlatformLinux::getCpuAffinityCount(hw_threads);
 
-  // Step 3: Get cgroup CPU limit with hierarchy scanning (enabled by default)
   uint32_t cgroup_limit = hw_threads; // Fallback to hw_threads if cgroup detection fails
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.enable_cgroup_cpu_detection")) {
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.enable_cgroup_cpu_detection")) {
     Filesystem::InstanceImpl fs;
-    cgroup_limit = CgroupCpuUtil::getCpuLimit(fs, hw_threads);
+    absl::optional<uint32_t> detected_limit = CgroupCpuUtil::getCpuLimit(fs);
+    if (detected_limit.has_value()) {
+      cgroup_limit = detected_limit.value();
+    }
   }
 
-  // Step 4: Take minimum of all constraints for container-aware CPU detection
   uint32_t effective_count = std::min({hw_threads, affinity_count, cgroup_limit});
-
-  // Step 5: Ensure minimum of 1 CPU
   return std::max(1U, effective_count);
 }
 

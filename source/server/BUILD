@@ -237,8 +237,10 @@ envoy_cc_library(
     hdrs = ["cgroup_cpu_util.h"],
     deps = [
         "//envoy/filesystem:filesystem_interface",
+        "//source/common/common:logger_lib",
         "//source/common/filesystem:filesystem_lib",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
