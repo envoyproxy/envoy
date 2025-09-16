@@ -118,12 +118,12 @@ jobs:
     #     GH_TOKEN: ${{ github.token }}
 
     #  Update the check
-    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.24
-      name: Appauth
-      id: appauth
-      with:
-        app_id: ${{ secrets.app-id }}
-        key: ${{ secrets.app-key }}
+    # - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.24
+    #   name: Appauth
+    #   id: appauth
+    #   with:
+    #     app_id: ${{ secrets.app-id }}
+    #     key: ${{ secrets.app-key }}
     - uses: envoyproxy/toolshed/gh-actions/github/checks@actions-v0.3.24
       name: Update check
       if: ${{ fromJSON(steps.data.outputs.data).data.check.action == 'RUN' }}
