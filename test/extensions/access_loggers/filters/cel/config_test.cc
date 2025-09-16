@@ -555,6 +555,46 @@ typed_config:
 #endif
 }
 
+// Test filter creation with cel_config using direct proto construction.
+TEST_F(CELAccessLogFilterConfigTest, CreateFilterDirectProtoCelConfig) {
+#if defined(USE_CEL_PARSER)
+  envoy::config::accesslog::v3::ExtensionFilter proto_config;
+  proto_config.set_name("cel");
+
+  auto* typed_config = proto_config.mutable_typed_config();
+  typed_config->set_type_url(
+      "type.googleapis.com/envoy.extensions.access_loggers.filters.cel.v3.ExpressionFilter");
+
+  // Create the ExpressionFilter proto directly to ensure cel_config is properly set.
+  envoy::extensions::access_loggers::filters::cel::v3::ExpressionFilter expression_filter;
+  expression_filter.set_expression("response.code >= 400");
+
+  // Set cel_config to test the configuration branch.
+  auto* cel_config = expression_filter.mutable_cel_config();
+  cel_config->set_enable_string_conversion(true);
+  cel_config->set_enable_string_concat(false);
+  cel_config->set_enable_string_functions(false);
+  cel_config->set_enable_constant_folding(false);
+
+  expression_filter.SerializeToString(typed_config->mutable_value());
+
+  // Test filter creation with cel_config present.
+  auto filter = factory_.createFilter(proto_config, context_);
+  ASSERT_NE(filter, nullptr);
+
+  // Verify functionality.
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.response_code_ = 404;
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  Formatter::HttpFormatterContext log_context{
+      &request_headers, &response_headers, &response_trailers, {}};
+
+  EXPECT_TRUE(filter->evaluate(log_context, stream_info));
+#endif
+}
+
 // Test expression compilation failure in CEL filter constructor.
 // This test creates an expression that will compile successfully at parse time
 // but fail during expression compilation due to an invalid operation.
@@ -640,7 +680,7 @@ typed_config:
 #endif
 }
 
-// Test with cel_config that enables constant folding.
+// Test filter creation with constant folding enabled in cel_config.
 TEST_F(CELAccessLogFilterConfigTest, CreateFilterWithConstantFolding) {
 #if defined(USE_CEL_PARSER)
   const std::string yaml = R"EOF(
@@ -671,7 +711,7 @@ typed_config:
 #endif
 }
 
-// Test with expression that evaluates to a non-error, non-bool value.
+// Test expression evaluation with non-boolean result.
 TEST_F(CELAccessLogFilterConfigTest, FilterEvaluationNonBoolNonErrorResult) {
 #if defined(USE_CEL_PARSER)
   const std::string yaml = R"EOF(
@@ -694,7 +734,7 @@ typed_config:
   Formatter::HttpFormatterContext log_context{
       &request_headers, &response_headers, &response_trailers, {}};
 
-  // String result should return false.
+  // Non-boolean expressions should return false for filtering.
   EXPECT_FALSE(filter->evaluate(log_context, stream_info));
 #endif
 }
@@ -818,6 +858,61 @@ TEST_F(CELAccessLogFilterConfigTest, FactoryRegistration) {
           empty_config.get());
   EXPECT_NE(typed_config, nullptr);
   EXPECT_TRUE(typed_config->expression().empty());
+}
+
+// Test filter creation with comprehensive cel_config using PackFrom.
+TEST_F(CELAccessLogFilterConfigTest, ForceHitLines38_39InConfigCC) {
+#if defined(USE_CEL_PARSER)
+  // Build the proto configuration manually to ensure cel_config is properly set.
+  envoy::extensions::access_loggers::filters::cel::v3::ExpressionFilter cel_filter_config;
+  cel_filter_config.set_expression("response.code >= 400");
+
+  // Configure cel_config with all string features enabled.
+  auto* cel_config = cel_filter_config.mutable_cel_config();
+  cel_config->set_enable_string_conversion(true);
+  cel_config->set_enable_string_concat(true);
+  cel_config->set_enable_string_functions(true);
+  cel_config->set_enable_constant_folding(true);
+
+  // Create the ExtensionFilter wrapper.
+  envoy::config::accesslog::v3::ExtensionFilter extension_filter;
+  extension_filter.set_name("cel");
+  extension_filter.mutable_typed_config()->PackFrom(cel_filter_config);
+
+  // Test filter creation with cel_config using PackFrom method.
+  auto filter = factory_.createFilter(extension_filter, context_);
+  ASSERT_NE(filter, nullptr);
+
+  // Test functionality to ensure the filter works.
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.response_code_ = 500;
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  Formatter::HttpFormatterContext log_context{
+      &request_headers, &response_headers, &response_trailers, {}};
+
+  EXPECT_TRUE(filter->evaluate(log_context, stream_info));
+#endif
+}
+
+// Test expression compilation failure with invalid CEL syntax.
+TEST_F(CELAccessLogFilterConfigTest, InvalidCelExpressionCompilation) {
+#if defined(USE_CEL_PARSER)
+  const std::string yaml = R"EOF(
+name: cel
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.cel.v3.ExpressionFilter
+  expression: "invalid syntax @#$%^&*()"
+)EOF";
+
+  envoy::config::accesslog::v3::ExtensionFilter proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  // Should throw during filter creation due to parse failure.
+  EXPECT_THROW_WITH_MESSAGE(factory_.createFilter(proto_config, context_), EnvoyException,
+                            "Not able to parse filter expression:");
+#endif
 }
 
 } // namespace

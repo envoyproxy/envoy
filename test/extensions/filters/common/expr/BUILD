@@ -69,6 +69,19 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_extension_cc_test(
+    name = "evaluator_arena_test",
+    srcs = ["evaluator_arena_test.cc"],
+    extension_names = ["envoy.filters.http.rbac"],
+    rbe_pool = "6gig",
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/extensions/filters/common/expr:evaluator_lib",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
+
 envoy_proto_library(
     name = "evaluator_fuzz_proto",
     srcs = ["evaluator_fuzz.proto"],
