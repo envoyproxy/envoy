@@ -18,7 +18,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // Filters for rate limiting the access logs using token buckets. It relies on ``envoy.type.v3.TokenBucketConfig`` for token bucket sharing within process.
 message LocalRateLimitFilter {
-  // Specify the `name` field of the ``envoy.type.v3.TokenBucketConfig`` for lookup.
+  // Specify the ``name``` field of the ``envoy.type.v3.TokenBucketConfig`` for lookup.
   string resource_name = 1 [(validate.rules).string = {min_len: 1}];
 
   // The configuration source for the ``envoy.type.v3.TokenBucketConfig``.
