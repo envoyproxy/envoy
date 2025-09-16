@@ -486,9 +486,6 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
     RETURN_IF_NOT_OK(
         Utility::assertExclusiveLogFormatMethod(options_, bootstrap_.application_log_config()));
     RETURN_IF_NOT_OK(Utility::maybeSetApplicationLogFormat(bootstrap_.application_log_config()));
-    log_sink_ = THROW_OR_RETURN_VALUE(
-          Utility::maybeAddApplicationLogSink(bootstrap_.application_log_config()),
-          std::unique_ptr<Utility::ApplicationLogSink>);
   }
 
 #ifdef ENVOY_PERFETTO
@@ -809,6 +806,14 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
       serverFactoryContext(),
       [this]() -> Network::DnsResolverSharedPtr { return this->getOrCreateDnsResolver(); },
       quic_stat_names_);
+
+  // Start application log sinks once the cluster manager is initialized.
+  if (bootstrap_.has_application_log_config()) {
+    log_sink_ = THROW_OR_RETURN_VALUE(
+          Utility::maybeAddApplicationLogSink(bootstrap_.application_log_config(),
+            serverFactoryContext()),
+          std::unique_ptr<Utility::ApplicationLogSink>);
+  }
 
   // Now that the worker thread are initialized, notify the bootstrap extensions.
   for (auto&& bootstrap_extension : bootstrap_extensions_) {

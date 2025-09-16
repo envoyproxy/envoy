@@ -3,6 +3,7 @@
 #include "envoy/common/exception.h"
 
 #include "source/common/common/assert.h"
+#include "source/common/access_log/access_log_impl.h"
 
 namespace Envoy {
 namespace Server {
@@ -54,16 +55,29 @@ absl::Status maybeSetApplicationLogFormat(
 }
 
 absl::StatusOr<std::unique_ptr<ApplicationLogSink>> maybeAddApplicationLogSink(
-    const envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig& application_log_config) {
-    if (application_log_config.log_sinks().size() > 0) {
-      return std::make_unique<ApplicationLogSink>(Logger::Registry::getSink());
+    const envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig& application_log_config,
+    Server::Configuration::ServerFactoryContext& context) {
+  if (const auto& proto_sinks = application_log_config.log_sinks(); proto_sinks.size() > 0) {
+    std::vector<AccessLog::InstanceSharedPtr> logs;
+    logs.reserve(proto_sinks.size());
+    TRY_ASSERT_MAIN_THREAD {
+    for (const auto& config : proto_sinks) {
+        logs.push_back(AccessLog::AccessLogFactory::fromProto(config, context, {}));
     }
-    return nullptr;
+    END_TRY
+    CATCH(const EnvoyException& e, {
+      return absl::InvalidArgumentError(
+          fmt::format("Failed to initialize application logs: {}", e.what()));
+    });
+    return std::make_unique<ApplicationLogSink>(std::move(logs), Logger::Registry::getSink());
+  }
+  return nullptr;
 }
 
 ApplicationLogSink::ApplicationLogSink(
+    std::vector<AccessLog::InstanceSharedPtr>&& logs,
     Envoy::Logger::DelegatingLogSinkSharedPtr log_sink)
-    : Envoy::Logger::SinkDelegate(log_sink) {
+    : Envoy::Logger::SinkDelegate(log_sink), logs_(std::move(logs)) {
   setDelegate();
 }
 

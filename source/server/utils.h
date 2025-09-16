@@ -4,6 +4,8 @@
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 #include "envoy/init/manager.h"
 #include "envoy/server/options.h"
+#include "envoy/server/factory_context.h"
+#include "envoy/access_log/access_log.h"
 
 #include "source/common/common/logger_delegates.h"
 
@@ -17,6 +19,7 @@ namespace Utility {
 class ApplicationLogSink : public Logger::SinkDelegate {
 public:
   explicit ApplicationLogSink(
+      std::vector<AccessLog::InstanceSharedPtr>&& logs,
       Envoy::Logger::DelegatingLogSinkSharedPtr log_sink);
 
   ~ApplicationLogSink() override;
@@ -27,6 +30,9 @@ public:
   void logWithStableName(absl::string_view stable_name, absl::string_view level,
                                  absl::string_view component, absl::string_view msg) override;
   void flush() override;
+
+private:
+  const std::vector<AccessLog::InstanceSharedPtr> logs_;
 };
 
 /*
@@ -44,7 +50,8 @@ absl::Status maybeSetApplicationLogFormat(
     const envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig& application_log_config);
 
 absl::StatusOr<std::unique_ptr<ApplicationLogSink>> maybeAddApplicationLogSink(
-    const envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig& application_log_config);
+    const envoy::config::bootstrap::v3::Bootstrap::ApplicationLogConfig& application_log_config,
+    Server::Configuration::ServerFactoryContext& context);
 
 } // namespace Utility
 } // namespace Server
