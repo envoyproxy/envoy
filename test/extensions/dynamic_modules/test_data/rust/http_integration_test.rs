@@ -34,9 +34,6 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "send_response" => Some(Box::new(SendResponseHttpFilterConfig::new(config))),
     "http_filter_scheduler" => Some(Box::new(HttpFilterSchedulerConfig {})),
     "fake_external_cache" => Some(Box::new(FakeExternalCachingFilterConfig {})),
-<<<<<<< HEAD
-    "inject_body" => Some(Box::new(InjectBodyHttpFilterConfig {})),
-=======
     "stats_callbacks" => {
       let config = String::from_utf8(config.to_owned()).unwrap();
       let mut config_iter = config.split(',');
@@ -69,7 +66,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
         header_to_set: config_iter.next().unwrap().to_owned(),
       }))
     },
->>>>>>> 8b5588380cdccab7b7a30e06d0b2b725d0ad11e3
+    "inject_body" => Some(Box::new(InjectBodyHttpFilterConfig {})),
     _ => panic!("Unknown filter name: {}", name),
   }
 }
