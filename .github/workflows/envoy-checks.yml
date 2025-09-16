@@ -51,7 +51,7 @@ jobs:
     with:
       check-name: checks
       # head-sha: ${{ github.sha }}
-      request: ${{ inputs.request }}
+  request: ${{ inputs.request != '' && inputs.request || '{"run": {"check-build": true, "check-coverage": true, "check-san": true}, "summary": {"title": "Manual run"}}' }}
       trusted: ${{ inputs.trusted }}
 
   build:
