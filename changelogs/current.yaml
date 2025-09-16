@@ -93,6 +93,9 @@ bug_fixes:
     Fixed a bug where the premature resets of streams may result in the recursive draining and potential
     stack overflow. Setting proper ``max_concurrent_streams`` value for HTTP/2 or HTTP/3 could eliminate
     the risk of the stack overflow before this fix.
+- area: listener
+  change: |
+    Fixed a bug where comparing listeners did not consider the network namespace they were listening in.
 - area: http
   change: |
     Fixed a bug where the ``response_headers_to_add`` may be processed multiple times for the local responses from

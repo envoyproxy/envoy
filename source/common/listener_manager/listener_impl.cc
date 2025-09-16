@@ -1135,7 +1135,7 @@ bool ListenerImpl::hasCompatibleAddress(const ListenerImpl& other) const {
     return false;
   }
 
-  // Second, check if the listener has the same addresses.
+  // Second, check if the listener has the same addresses (including network namespaces if Linux).
   // The listener support listening on the zero port address for test. Multiple zero
   // port addresses are also supported. For comparing two listeners with multiple
   // zero port addresses, only need to ensure there are the same number of zero
