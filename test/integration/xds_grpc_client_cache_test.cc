@@ -1,20 +1,11 @@
 #include <chrono>
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "envoy/config/bootstrap/v3/bootstrap.pb.h"
-#include "envoy/config/cluster/v3/cluster.pb.h"
-#include "envoy/config/core/v3/config_source.pb.h"
-#include "envoy/config/core/v3/grpc_service.pb.h"
 
 #include "test/integration/http_integration.h"
-#include "test/integration/utility.h"
-#include "test/mocks/server/options.h"
-#include "test/test_common/network_utility.h"
 #include "test/test_common/test_runtime.h"
-
-#include "google/protobuf/duration.pb.h"
 
 namespace Envoy {
 namespace {
