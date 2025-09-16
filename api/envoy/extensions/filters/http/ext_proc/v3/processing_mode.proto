@@ -78,7 +78,7 @@ message ProcessingMode {
     // up to the buffer limit will be sent.
     BUFFERED_PARTIAL = 3;
 
-    // The ext_proc client streams the body to the server in pieces as they arrive.
+    // The ext_proc client (the data plane) streams the body to the server in pieces as they arrive.
     //
     // 1) The server may choose to buffer any number chunks of data before processing them.
     // After it finishes buffering, the server processes the buffered data. Then it splits the processed
