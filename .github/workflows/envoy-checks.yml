@@ -17,7 +17,8 @@ on:
       request:
         description: 'Request JSON object (leave default for basic build)'
         required: false
-        default: '{"run": {"check-build": true, "check-coverage": true, "check-san": true}, "summary": {"title": "Manual run"}}'
+        default: |
+          {"run": {"check-build": true, "check-coverage": true, "check-san": true}, "summary": {"title": "Manual run"}}
       trusted:
         description: 'Trusted (true/false)'
         required: false
