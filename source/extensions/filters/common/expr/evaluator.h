@@ -108,6 +108,21 @@ BuilderInstanceSharedConstPtr
 getBuilder(Server::Configuration::CommonFactoryContext& context,
            const envoy::config::core::v3::CelExpressionConfig& config);
 
+// Gets an expression builder with the arena optimization.
+// Uses arena-optimized builder when constant folding is enabled and arena is available,
+// otherwise falls back to the cached builder. Must be called on the main thread.
+BuilderInstanceSharedConstPtr
+getBuilderWithArenaOptimization(Server::Configuration::CommonFactoryContext& context,
+                                const envoy::config::core::v3::CelExpressionConfig& config,
+                                Protobuf::Arena* arena);
+
+// Creates an arena-optimized builder for performance-critical scenarios.
+// This bypasses caching to enable constant folding with arena.
+// Must be called on the main thread.
+BuilderInstanceSharedConstPtr
+getArenaOptimizedBuilder(Protobuf::Arena* arena,
+                         const envoy::config::core::v3::CelExpressionConfig& config);
+
 // Compiled CEL expression. This class ensures both the builder and the source expression outlive
 // the compiled expression.
 class CompiledExpression {
@@ -120,6 +135,12 @@ public:
   static absl::StatusOr<CompiledExpression>
   Create(Server::Configuration::CommonFactoryContext& context, const cel::expr::Expr& expr,
          const envoy::config::core::v3::CelExpressionConfig* config);
+
+  // Creates an interpretable expression with arena optimization for performance.
+  // Requires enable_constant_folding to be true in the configuration.
+  static absl::StatusOr<CompiledExpression>
+  CreateWithArena(Protobuf::Arena* arena, const cel::expr::Expr& expr,
+                  const envoy::config::core::v3::CelExpressionConfig& config);
 
   // Creates an interpretable expression from xDS CEL expr format, making a copy of it.
   static absl::StatusOr<CompiledExpression> Create(const BuilderInstanceSharedConstPtr& builder,

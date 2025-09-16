@@ -116,10 +116,12 @@ BuilderPtr createBuilder(Protobuf::Arena* arena,
 
   // Resolve options from configuration or fall back to security-oriented defaults.
   bool enable_string_functions = false;
+  bool enable_constant_folding = false;
   if (config != nullptr) {
     options.enable_string_conversion = config->enable_string_conversion();
     options.enable_string_concat = config->enable_string_concat();
     enable_string_functions = config->enable_string_functions();
+    enable_constant_folding = config->enable_constant_folding();
   } else {
     options.enable_string_conversion = false;
     options.enable_string_concat = false;
@@ -131,8 +133,9 @@ BuilderPtr createBuilder(Protobuf::Arena* arena,
     options.enable_regex_precompilation = true;
   }
 
-  // Enable constant folding (performance optimization)
-  if (arena != nullptr) {
+  // Enable constant folding. Only enable if both arena is provided AND
+  // configuration allows it.
+  if (arena != nullptr && enable_constant_folding) {
     options.constant_folding = true;
     options.constant_arena = arena;
   }
@@ -174,7 +177,7 @@ public:
     if (config) {
       // Create a simple hash based on the configuration values.
       hash = absl::HashOf(config->enable_string_conversion(), config->enable_string_concat(),
-                          config->enable_string_functions());
+                          config->enable_string_functions(), config->enable_constant_folding());
     }
 
     absl::MutexLock lock(&mutex_);
@@ -213,6 +216,41 @@ getBuilder(Server::Configuration::CommonFactoryContext& context,
   return cache->getOrCreateBuilder(&config);
 }
 
+BuilderInstanceSharedConstPtr
+getBuilderWithArenaOptimization(Server::Configuration::CommonFactoryContext& context,
+                                const envoy::config::core::v3::CelExpressionConfig& config,
+                                Protobuf::Arena* arena) {
+  // If constant folding is enabled and arena is available, use arena-optimized builder.
+  if (config.enable_constant_folding() && arena != nullptr) {
+    return getArenaOptimizedBuilder(arena, config);
+  }
+  // Otherwise fall-back to the cached builder.
+  return getBuilder(context, config);
+}
+
+namespace {
+
+// Helper function to get error message for invalid arena optimization request.
+const std::string& getArenaOptimizationErrorMessage() {
+  CONSTRUCT_ON_FIRST_USE(std::string,
+                         "Arena-optimized builder requires both arena and enable_constant_folding");
+}
+
+} // namespace
+
+// Creates an arena-optimized builder for performance-critical scenarios.
+// This bypasses caching to enable constant folding with arena.
+BuilderInstanceSharedConstPtr
+getArenaOptimizedBuilder(Protobuf::Arena* arena,
+                         const envoy::config::core::v3::CelExpressionConfig& config) {
+  if (arena == nullptr || !config.enable_constant_folding()) {
+    throw CelException(getArenaOptimizationErrorMessage());
+  }
+
+  auto builder = createBuilder(arena, &config);
+  return std::make_shared<BuilderInstance>(std::move(builder));
+}
+
 absl::StatusOr<CompiledExpression>
 CompiledExpression::Create(Server::Configuration::CommonFactoryContext& context,
                            const cel::expr::Expr& expr,
@@ -224,6 +262,18 @@ CompiledExpression::Create(Server::Configuration::CommonFactoryContext& context,
     builder = getBuilder(context);
   }
   return Create(builder, expr);
+}
+
+absl::StatusOr<CompiledExpression>
+CompiledExpression::CreateWithArena(Protobuf::Arena* arena, const cel::expr::Expr& expr,
+                                    const envoy::config::core::v3::CelExpressionConfig& config) {
+  if (arena != nullptr && config.enable_constant_folding()) {
+    // Use arena-optimized builder for performance.
+    auto builder = getArenaOptimizedBuilder(arena, config);
+    return Create(builder, expr);
+  } else {
+    throw CelException(getArenaOptimizationErrorMessage());
+  }
 }
 
 absl::StatusOr<CompiledExpression>

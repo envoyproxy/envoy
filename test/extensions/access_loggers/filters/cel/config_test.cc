@@ -448,8 +448,6 @@ typed_config:
   EXPECT_TRUE(filter->evaluate(log_context, stream_info));
 }
 
-// Test creating filter with cel_config to ensure line 38 of config.cc is covered.
-// This specifically tests the path where cel_config.has_cel_config() returns true.
 TEST_F(CELAccessLogFilterConfigTest, CreateFilterWithCelConfigCoverageTest) {
   const std::string yaml = R"EOF(
 name: cel
@@ -465,8 +463,6 @@ typed_config:
   envoy::config::accesslog::v3::ExtensionFilter proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
 
-  // This call will exercise line 38 where cel_config.has_cel_config() is true
-  // and getBuilder is called with the cel_config
   auto filter = factory_.createFilter(proto_config, context_);
   ASSERT_NE(filter, nullptr);
 
@@ -525,6 +521,304 @@ typed_config:
 }
 
 #endif
+
+TEST_F(CELAccessLogFilterConfigTest, CreateFilterWithCelConfigLineCoverage) {
+#if defined(USE_CEL_PARSER)
+  const std::string yaml = R"EOF(
+name: cel
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.cel.v3.ExpressionFilter
+  expression: "response.code >= 500"
+  cel_config:
+    enable_string_conversion: true
+    enable_string_concat: true
+    enable_string_functions: true
+    enable_constant_folding: true
+)EOF";
+
+  envoy::config::accesslog::v3::ExtensionFilter proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  auto filter = factory_.createFilter(proto_config, context_);
+  ASSERT_NE(filter, nullptr);
+
+  // Test that the filter works with all configurations enabled.
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.response_code_ = 500;
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  Formatter::HttpFormatterContext log_context{
+      &request_headers, &response_headers, &response_trailers, {}};
+
+  EXPECT_TRUE(filter->evaluate(log_context, stream_info));
+#endif
+}
+
+// Test expression compilation failure in CEL filter constructor.
+// This test creates an expression that will compile successfully at parse time
+// but fail during expression compilation due to an invalid operation.
+TEST_F(CELAccessLogFilterConfigTest, FilterConstructorCompilationFailure) {
+#if defined(USE_CEL_PARSER)
+  // Create a mock factory context that will cause expression compilation to fail.
+  NiceMock<Server::Configuration::MockFactoryContext> mock_context;
+  NiceMock<LocalInfo::MockLocalInfo> mock_local_info;
+  ON_CALL(mock_context.server_factory_context_, localInfo())
+      .WillByDefault(ReturnRef(mock_local_info));
+
+  // This expression should parse but fail during compilation due to type mismatch.
+  const std::string yaml = R"EOF(
+name: cel
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.cel.v3.ExpressionFilter
+  expression: 'true + false'  # Invalid: cannot add booleans
+)EOF";
+
+  envoy::config::accesslog::v3::ExtensionFilter proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  // This should throw during filter creation due to expression compilation failure.
+  EXPECT_THROW_WITH_MESSAGE(factory_.createFilter(proto_config, mock_context), EnvoyException,
+                            "failed to create an expression:");
+#endif
+}
+
+// Test evaluate method with expression that returns an error value.
+TEST_F(CELAccessLogFilterConfigTest, FilterEvaluationWithErrorResult) {
+#if defined(USE_CEL_PARSER)
+  const std::string yaml = R"EOF(
+name: cel
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.cel.v3.ExpressionFilter
+  expression: '1 / 0'  # This should create an error during evaluation
+)EOF";
+
+  envoy::config::accesslog::v3::ExtensionFilter proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  auto filter = factory_.createFilter(proto_config, context_);
+  ASSERT_NE(filter, nullptr);
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  Formatter::HttpFormatterContext log_context{
+      &request_headers, &response_headers, &response_trailers, {}};
+
+  // Expression that causes division by zero should return false.
+  EXPECT_FALSE(filter->evaluate(log_context, stream_info));
+#endif
+}
+
+// Test evaluate method with expression that has no result (returns empty optional).
+TEST_F(CELAccessLogFilterConfigTest, FilterEvaluationWithNoResult) {
+#if defined(USE_CEL_PARSER)
+  // Create an expression that might not have a value in certain contexts.
+  const std::string yaml = R"EOF(
+name: cel
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.cel.v3.ExpressionFilter
+  expression: 'request.headers["non-existent-header"] != ""'
+)EOF";
+
+  envoy::config::accesslog::v3::ExtensionFilter proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  auto filter = factory_.createFilter(proto_config, context_);
+  ASSERT_NE(filter, nullptr);
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_headers; // Empty headers
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  Formatter::HttpFormatterContext log_context{
+      &request_headers, &response_headers, &response_trailers, {}};
+
+  // This should handle the case where the header doesn't exist gracefully.
+  EXPECT_FALSE(filter->evaluate(log_context, stream_info));
+#endif
+}
+
+// Test with cel_config that enables constant folding.
+TEST_F(CELAccessLogFilterConfigTest, CreateFilterWithConstantFolding) {
+#if defined(USE_CEL_PARSER)
+  const std::string yaml = R"EOF(
+name: cel
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.cel.v3.ExpressionFilter
+  expression: "response.code >= 400"
+  cel_config:
+    enable_constant_folding: true
+)EOF";
+
+  envoy::config::accesslog::v3::ExtensionFilter proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  auto filter = factory_.createFilter(proto_config, context_);
+  ASSERT_NE(filter, nullptr);
+
+  // Test that the filter works correctly with constant folding enabled.
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  stream_info.response_code_ = 404;
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  Formatter::HttpFormatterContext log_context{
+      &request_headers, &response_headers, &response_trailers, {}};
+
+  EXPECT_TRUE(filter->evaluate(log_context, stream_info));
+#endif
+}
+
+// Test with expression that evaluates to a non-error, non-bool value.
+TEST_F(CELAccessLogFilterConfigTest, FilterEvaluationNonBoolNonErrorResult) {
+#if defined(USE_CEL_PARSER)
+  const std::string yaml = R"EOF(
+name: cel
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.cel.v3.ExpressionFilter
+  expression: '"hello world"'  # Returns string, not bool or error
+)EOF";
+
+  envoy::config::accesslog::v3::ExtensionFilter proto_config;
+  TestUtility::loadFromYaml(yaml, proto_config);
+
+  auto filter = factory_.createFilter(proto_config, context_);
+  ASSERT_NE(filter, nullptr);
+
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  Http::TestRequestHeaderMapImpl request_headers;
+  Http::TestResponseHeaderMapImpl response_headers;
+  Http::TestResponseTrailerMapImpl response_trailers;
+  Formatter::HttpFormatterContext log_context{
+      &request_headers, &response_headers, &response_trailers, {}};
+
+  // String result should return false.
+  EXPECT_FALSE(filter->evaluate(log_context, stream_info));
+#endif
+}
+
+// Test various cel_config combinations to ensure all config paths are covered.
+TEST_F(CELAccessLogFilterConfigTest, CreateFilterWithVariousCelConfigs) {
+#if defined(USE_CEL_PARSER)
+  // Test with only enable_constant_folding set.
+  {
+    const std::string yaml = R"EOF(
+name: cel
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.cel.v3.ExpressionFilter
+  expression: "response.code == 200"
+  cel_config:
+    enable_constant_folding: true
+    enable_string_conversion: false
+    enable_string_concat: false
+    enable_string_functions: false
+)EOF";
+
+    envoy::config::accesslog::v3::ExtensionFilter proto_config;
+    TestUtility::loadFromYaml(yaml, proto_config);
+
+    auto filter = factory_.createFilter(proto_config, context_);
+    EXPECT_NE(filter, nullptr);
+  }
+
+  // Test with mixed configuration.
+  {
+    const std::string yaml = R"EOF(
+name: cel
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.cel.v3.ExpressionFilter
+  expression: 'string(response.code) + "_test"'
+  cel_config:
+    enable_constant_folding: false
+    enable_string_conversion: true
+    enable_string_concat: true
+    enable_string_functions: false
+)EOF";
+
+    envoy::config::accesslog::v3::ExtensionFilter proto_config;
+    TestUtility::loadFromYaml(yaml, proto_config);
+
+    auto filter = factory_.createFilter(proto_config, context_);
+    EXPECT_NE(filter, nullptr);
+  }
+#endif
+}
+
+// Test additional edge cases in expression evaluation to improve coverage.
+TEST_F(CELAccessLogFilterConfigTest, FilterEvaluationEdgeCases) {
+#if defined(USE_CEL_PARSER)
+  // Test with null/missing response code.
+  {
+    const std::string yaml = R"EOF(
+name: cel
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.cel.v3.ExpressionFilter
+  expression: "has(response.code) && response.code >= 400"
+)EOF";
+
+    envoy::config::accesslog::v3::ExtensionFilter proto_config;
+    TestUtility::loadFromYaml(yaml, proto_config);
+
+    auto filter = factory_.createFilter(proto_config, context_);
+    ASSERT_NE(filter, nullptr);
+
+    // Test with stream info that has no response code set.
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    // Don't set response_code_ to test the has() condition
+    Http::TestRequestHeaderMapImpl request_headers;
+    Http::TestResponseHeaderMapImpl response_headers;
+    Http::TestResponseTrailerMapImpl response_trailers;
+    Formatter::HttpFormatterContext log_context{
+        &request_headers, &response_headers, &response_trailers, {}};
+
+    EXPECT_FALSE(filter->evaluate(log_context, stream_info));
+  }
+
+  // Test with expression that can return null.
+  {
+    const std::string yaml = R"EOF(
+name: cel
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.cel.v3.ExpressionFilter
+  expression: 'request.headers["x-custom-header"].size() > 0'
+)EOF";
+
+    envoy::config::accesslog::v3::ExtensionFilter proto_config;
+    TestUtility::loadFromYaml(yaml, proto_config);
+
+    auto filter = factory_.createFilter(proto_config, context_);
+    ASSERT_NE(filter, nullptr);
+
+    // Test without the header - should handle gracefully.
+    NiceMock<StreamInfo::MockStreamInfo> stream_info;
+    Http::TestRequestHeaderMapImpl request_headers; // No x-custom-header
+    Http::TestResponseHeaderMapImpl response_headers;
+    Http::TestResponseTrailerMapImpl response_trailers;
+    Formatter::HttpFormatterContext log_context{
+        &request_headers, &response_headers, &response_trailers, {}};
+
+    EXPECT_FALSE(filter->evaluate(log_context, stream_info));
+  }
+#endif
+}
+
+// Test to ensure factory method registration path is tested.
+TEST_F(CELAccessLogFilterConfigTest, FactoryRegistration) {
+  // Test the factory instance.
+  EXPECT_EQ(factory_.name(), "envoy.access_loggers.extension_filters.cel");
+
+  // Test createEmptyConfigProto method.
+  auto empty_config = factory_.createEmptyConfigProto();
+  EXPECT_NE(empty_config, nullptr);
+
+  auto* typed_config =
+      dynamic_cast<envoy::extensions::access_loggers::filters::cel::v3::ExpressionFilter*>(
+          empty_config.get());
+  EXPECT_NE(typed_config, nullptr);
+  EXPECT_TRUE(typed_config->expression().empty());
+}
 
 } // namespace
 } // namespace CEL

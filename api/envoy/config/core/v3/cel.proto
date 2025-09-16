@@ -46,9 +46,11 @@ message CelExpressionConfig {
   // * ``split(separator)`` - Splits a string into a list of substrings.
   // * ``lowerAscii()`` - Converts ASCII characters to lowercase.
   // * ``upperAscii()`` - Converts ASCII characters to uppercase.
-  // * ``contains(substring)`` - Checks if a string contains a substring.
-  // * ``startsWith(prefix)`` - Checks if a string starts with a prefix.
-  // * ``endsWith(suffix)`` - Checks if a string ends with a suffix.
+  //
+  // .. note::
+  //
+  //   Standard CEL string functions like ``contains()``, ``startsWith()``, and
+  //   ``endsWith()`` are always available regardless of this setting.
   //
   // .. attention::
   //
@@ -58,4 +60,15 @@ message CelExpressionConfig {
   //   proportional to input data size. Under adversarial inputs this can lead to
   //   unbounded allocations and memory exhaustion.
   bool enable_string_functions = 3;
+
+  // Enable constant folding optimization for CEL expressions. When enabled, CEL
+  // expressions perform compile-time constant evaluation using arenas for improved
+  // performance at the cost of additional memory usage.
+  //
+  // .. attention::
+  //
+  //   This option is disabled by default for cached builders to avoid unbounded
+  //   arena growth. Enable this only when you control the arena lifecycle and
+  //   can ensure proper cleanup.
+  bool enable_constant_folding = 4;
 }
