@@ -1954,8 +1954,10 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
     return nullptr;
   }
 
+  // Lower-case the value of the host header, as hostnames are case insensitive.
+  absl::string_view host_header_value = absl::AsciiStrToLower(headers.getHostValue());
+
   // If 'ignore_port_in_host_matching' is set, ignore the port number in the host header(if any).
-  absl::string_view host_header_value = headers.getHostValue();
   if (ignorePortInHostMatching()) {
     if (const absl::string_view::size_type port_start =
             Http::HeaderUtility::getPortStart(host_header_value);
@@ -1975,15 +1977,13 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
 
   // TODO (@rshriram) Match Origin header in WebSocket
   // request with VHost, using wildcard match
-  // Lower-case the value of the host header, as hostnames are case insensitive.
-  const std::string host = absl::AsciiStrToLower(host_header_value);
-  const auto iter = virtual_hosts_.find(host);
+  const auto iter = virtual_hosts_.find(host_header_value);
   if (iter != virtual_hosts_.end()) {
     return iter->second.get();
   }
   if (!wildcard_virtual_host_suffixes_.empty()) {
     const VirtualHostImpl* vhost = findWildcardVirtualHost(
-        host, wildcard_virtual_host_suffixes_,
+        host_header_value, wildcard_virtual_host_suffixes_,
         [](absl::string_view h, int l) -> absl::string_view { return h.substr(h.size() - l); });
     if (vhost != nullptr) {
       return vhost;
@@ -1991,7 +1991,7 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   }
   if (!wildcard_virtual_host_prefixes_.empty()) {
     const VirtualHostImpl* vhost = findWildcardVirtualHost(
-        host, wildcard_virtual_host_prefixes_,
+        host_header_value, wildcard_virtual_host_prefixes_,
         [](absl::string_view h, int l) -> absl::string_view { return h.substr(0, l); });
     if (vhost != nullptr) {
       return vhost;
