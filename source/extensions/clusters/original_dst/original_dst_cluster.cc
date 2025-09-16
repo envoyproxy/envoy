@@ -240,9 +240,9 @@ void OriginalDstCluster::addHost(HostSharedPtr& host) {
   const auto& first_host_set = priority_set_.getOrCreateHostSet(0);
   HostVectorSharedPtr all_hosts(new HostVector(first_host_set.hosts()));
   all_hosts->emplace_back(host);
-  priority_set_.updateHosts(
-      0, HostSetImpl::partitionHosts(all_hosts, HostsPerLocalityImpl::empty()), {},
-      {std::move(host)}, {}, random_.random(), absl::nullopt, absl::nullopt);
+  priority_set_.updateHosts(0,
+                            HostSetImpl::partitionHosts(all_hosts, HostsPerLocalityImpl::empty()),
+                            {}, {std::move(host)}, {}, absl::nullopt, absl::nullopt);
 }
 
 void OriginalDstCluster::cleanup() {
