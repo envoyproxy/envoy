@@ -391,7 +391,10 @@ new_features:
     See https://maxmind.github.io/MaxMind-DB/#build_epoch for more details.
 - area: overload management
   change: |
-    Added a new scaled timer type ``HttpDownstreamStreamFlush`` to the overload manager. This allows Envoy to scale the periodic timer for flushing downstream responses based on resource pressure. The new timer can be configured via the :ref:`ScaleTimersOverloadActionConfig <envoy_v3_api_msg_config.overload.v3.ScaleTimersOverloadActionConfig>`.
+    Added a new scaled timer type ``HttpDownstreamStreamFlush`` to the overload manager. This allows
+    Envoy to scale the periodic timer for flushing downstream responses based on resource pressure.
+    The new timer can be configured via the
+    :ref:`ScaleTimersOverloadActionConfig <envoy_v3_api_msg_config.overload.v3.ScaleTimersOverloadActionConfig>`.
 - area: dynamic_modules
   change: |
     Added support for counters, gauges, histograms, and their vector variants to the dynamic modules API.
