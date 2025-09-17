@@ -1955,7 +1955,7 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::RequestHeaderMa
   }
 
   // Lower-case the value of the host header, as hostnames are case insensitive.
-  absl::string_view host_header_value = absl::AsciiStrToLower(headers.getHostValue());
+  std::string host_header_value = absl::AsciiStrToLower(headers.getHostValue());
 
   // If 'ignore_port_in_host_matching' is set, ignore the port number in the host header(if any).
   if (ignorePortInHostMatching()) {
