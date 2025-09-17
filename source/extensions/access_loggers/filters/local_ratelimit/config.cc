@@ -20,11 +20,6 @@ AccessLog::FilterPtr LocalRateLimitFilterFactory::createFilter(
   const auto& local_ratelimit_config = dynamic_cast<
       const envoy::extensions::access_loggers::filters::local_ratelimit::v3::LocalRateLimitFilter&>(
       *factory_config);
-
-  // the filter should be created and then call init() which
-  // - let xds agent to subscribe the token bucket config
-  // - let xds agent to call the callback to update the token bucket and then
-  // finish the initialization
   auto filter = std::make_unique<LocalRateLimitFilter>(context, local_ratelimit_config);
   return filter;
 }
