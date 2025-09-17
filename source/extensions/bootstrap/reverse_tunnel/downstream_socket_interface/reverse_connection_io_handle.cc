@@ -72,12 +72,11 @@ void ReverseConnectionIOHandle::cleanup() {
   ENVOY_LOG_MISC(debug, "Gracefully shutting down {} connection wrappers.",
                  connection_wrappers_.size());
 
-  // Move wrappers for deferred cleanup (destructors will handle shutdown).
+  // Move wrappers for deferred cleanup.
   std::vector<std::unique_ptr<RCConnectionWrapper>> wrappers_to_delete;
   for (auto& wrapper : connection_wrappers_) {
     if (wrapper) {
       ENVOY_LOG(debug, "Moving connection wrapper for deferred cleanup.");
-      // Don't call shutdown() explicitly - let the destructor handle it safely
       wrappers_to_delete.push_back(std::move(wrapper));
     }
   }
@@ -87,10 +86,11 @@ void ReverseConnectionIOHandle::cleanup() {
   conn_wrapper_to_host_map_.clear();
 
   // Clean up wrappers with safe deletion.
-  // Always use direct cleanup to avoid deferred delete issues during test teardown
   for (auto& wrapper : wrappers_to_delete) {
-    if (wrapper) {
-      // Direct cleanup - let the destructor handle shutdown safely
+    if (wrapper && isThreadLocalDispatcherAvailable()) {
+      getThreadLocalDispatcher().deferredDelete(std::move(wrapper));
+    } else {
+      // Direct cleanup when dispatcher not available.
       wrapper.reset();
     }
   }
@@ -279,9 +279,6 @@ Envoy::Network::IoHandlePtr ReverseConnectionIOHandle::accept(struct sockaddr* a
         auto io_handle = std::make_unique<DownstreamReverseConnectionIOHandle>(
             std::move(duplicated_socket), this, connection_key);
 
-        // Enable protection against upstream-initiated closures immediately.
-        // This prevents premature socket closure when upstream connections close.
-        io_handle->ignoreCloseAndShutdown();
         ENVOY_LOG(debug, "ReverseConnectionIOHandle: RAII IoHandle created with duplicated socket "
                          "and protection enabled.");
 
@@ -672,7 +669,6 @@ void ReverseConnectionIOHandle::trackConnectionFailure(const std::string& host_a
                                                        const std::string& cluster_name) {
   auto host_it = host_to_conn_info_map_.find(host_address);
   if (host_it == host_to_conn_info_map_.end()) {
-    // Don't create entries for hosts that aren't actually in any cluster.
     ENVOY_LOG(debug, "Host {} not found in host_to_conn_info_map_, skipping failure tracking",
               host_address);
     return;
@@ -709,7 +705,6 @@ void ReverseConnectionIOHandle::trackConnectionFailure(const std::string& host_a
 void ReverseConnectionIOHandle::resetHostBackoff(const std::string& host_address) {
   auto host_it = host_to_conn_info_map_.find(host_address);
   if (host_it == host_to_conn_info_map_.end()) {
-    // Don't create entries for hosts that aren't actually in any cluster.
     ENVOY_LOG(debug, "Host {} not found in host_to_conn_info_map_, skipping backoff reset",
               host_address);
     return;
@@ -974,8 +969,6 @@ bool ReverseConnectionIOHandle::initiateOneReverseConnection(const std::string& 
             "balancer context",
             host_address, cluster_name);
 
-  // Worker dispatcher null check is no longer needed since getTimeSource() has proper fallbacks.
-
   // Use tcpConn which should not throw exceptions in normal operation
   conn_data = thread_local_cluster->tcpConn(&lb_context);
 
@@ -1167,6 +1160,10 @@ void ReverseConnectionIOHandle::onConnectionDone(const std::string& error,
 
     // Reset file events safely.
     if (connection->getSocket()) {
+      ENVOY_LOG(
+          debug,
+          "ReverseConnectionIOHandle: Removing connection callbacks and resetting file events");
+      connection->removeConnectionCallbacks(*wrapper);
       connection->getSocket()->ioHandle().resetFileEvents();
     }
 

@@ -941,6 +941,44 @@ TEST_F(SimpleConnReadFilterTest, OnDataWithPartialData) {
   EXPECT_EQ(result, Network::FilterStatus::StopIteration);
 }
 
+// Test all no-op methods in RCConnectionWrapper.
+TEST_F(RCConnectionWrapperTest, NoOpMethods) {
+  // Create a mock connection with proper socket setup.
+  auto mock_connection = setupMockConnection();
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  // Create RCConnectionWrapper with the mock connection.
+  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+
+  // Test Network::ConnectionCallbacks no-op methods
+  wrapper.onAboveWriteBufferHighWatermark();
+  wrapper.onBelowWriteBufferLowWatermark();
+
+  // Test Http::ResponseDecoder no-op methods
+  wrapper.decode1xxHeaders(nullptr);
+
+  Buffer::OwnedImpl data("test data");
+  wrapper.decodeData(data, false);
+  wrapper.decodeData(data, true);
+
+  wrapper.decodeTrailers(nullptr);
+  wrapper.decodeMetadata(nullptr);
+
+  std::ostringstream output;
+  wrapper.dumpState(output, 0);
+  wrapper.dumpState(output, 2);
+
+  // Test Http::ConnectionCallbacks no-op methods
+  wrapper.onGoAway(Http::GoAwayErrorCode::NoError);
+  wrapper.onGoAway(Http::GoAwayErrorCode::Other);
+
+  NiceMock<Http::MockReceivedSettings> settings;
+  wrapper.onSettings(settings);
+
+  wrapper.onMaxStreamsChanged(0);
+  wrapper.onMaxStreamsChanged(100);
+}
+
 } // namespace ReverseConnection
 } // namespace Bootstrap
 } // namespace Extensions
