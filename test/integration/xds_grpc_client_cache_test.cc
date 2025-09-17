@@ -41,13 +41,13 @@ public:
       auto* endpoint = lb_endpoint->mutable_endpoint();
       auto* address = endpoint->mutable_address()->mutable_socket_address();
       address->set_address(Network::Test::getLoopbackAddressString(ipVersion()));
-      address->set_port_value(xds_upstream->localAddress()->ip()->port());
+      address->set_port_value(xds_upstream_->localAddress()->ip()->port());
 
       lb_endpoint = locality_lb_endpoints->add_lb_endpoints();
       endpoint = lb_endpoint->mutable_endpoint();
       address = endpoint->mutable_address()->mutable_socket_address();
       address->set_address(Network::Test::getLoopbackAddressString(ipVersion()));
-      address->set_port_value(xds_upstream->localAddress()->ip()->port());
+      address->set_port_value(xds_upstream2_->localAddress()->ip()->port());
 
       // Configure ADS to use the xds_cluster
       auto* ads_api_config = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
@@ -55,7 +55,7 @@ public:
       ads_api_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
       ads_api_config->clear_grpc_services(); // Clear any defaults
       auto* ads_grpc_service = ads_api_config->add_grpc_services();
-      setGrpcService(*ads_grpc_service, "xds_cluster", xds_upstream->localAddress());
+      setGrpcService(*ads_grpc_service, "xds_cluster", xds_upstream_->localAddress());
 
       // Configure LRS to use the same xds_cluster
       auto* load_stats_config = bootstrap.mutable_cluster_manager()->mutable_load_stats_config();
@@ -63,7 +63,7 @@ public:
       load_stats_config->set_transport_api_version(envoy::config::core::v3::ApiVersion::V3);
       load_stats_config->clear_grpc_services(); // Clear any defaults
       auto* lrs_grpc_service = load_stats_config->add_grpc_services();
-      setGrpcService(*lrs_grpc_service, "xds_cluster", xds_upstream->localAddress());
+      setGrpcService(*lrs_grpc_service, "xds_cluster", xds_upstream_->localAddress());
 
       // Add a dummy static cluster to trigger LRS
       auto* data_cluster = bootstrap.mutable_static_resources()->add_clusters();
@@ -83,7 +83,8 @@ public:
   }
 
   void createUpstreams() override {
-    xds_upstream = &addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    xds_upstream_ = &addFakeUpstream(FakeHttpConnection::Type::HTTP2);
+    xds_upstream2_ = &addFakeUpstream(FakeHttpConnection::Type::HTTP2);
 
     // Create backends and initialize their wrapper.
     HttpIntegrationTest::createUpstreams();
@@ -99,7 +100,8 @@ public:
   }
 
 protected:
-  FakeUpstream* xds_upstream;
+  FakeUpstream* xds_upstream_;
+  FakeUpstream* xds_upstream2_;
 
 private:
   TestScopedRuntime scoped_runtime_;
@@ -119,7 +121,7 @@ TEST_P(XdsGrpcClientCacheTest, Basic) {
 
   // Envoy will start and connect to the fake upstream for ADS.
   FakeHttpConnectionPtr ads_connection;
-  ASSERT_TRUE(xds_upstream->waitForHttpConnection(*dispatcher_, ads_connection));
+  ASSERT_TRUE(xds_upstream_->waitForHttpConnection(*dispatcher_, ads_connection));
 
   // We expect an ADS stream to be established.
   FakeStreamPtr ads_stream;
@@ -132,8 +134,10 @@ TEST_P(XdsGrpcClientCacheTest, Basic) {
   FakeHttpConnectionPtr lrs_connection;
   FakeStreamPtr lrs_stream;
   if (clientType() == Grpc::ClientType::EnvoyGrpc) {
-    EXPECT_TRUE(xds_upstream->waitForHttpConnection(*dispatcher_, lrs_connection,
-                                                    std::chrono::milliseconds(500)));
+    // EnvoyGrpc will pick a different host for the new stream, so we need a new
+    // connection.
+    EXPECT_TRUE(xds_upstream2_->waitForHttpConnection(*dispatcher_, lrs_connection,
+                                                      std::chrono::milliseconds(500)));
     EXPECT_TRUE(lrs_connection->waitForNewStream(*dispatcher_, lrs_stream));
   } else {
     EXPECT_TRUE(ads_connection->waitForNewStream(*dispatcher_, lrs_stream));
