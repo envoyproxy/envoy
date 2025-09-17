@@ -16,11 +16,13 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: LocalRateLimitFilter]
 // [#extension: envoy.access_loggers.extension_filters.local_ratelimit]
 
-// Filters for rate limiting the access logs using token buckets. It relies on ``envoy.type.v3.TokenBucketConfig`` for token bucket sharing within process.
+// Filters for rate limiting the access log emission using global token buckets per process and shared across all listeners.
 message LocalRateLimitFilter {
-  // Specify the ``name``` field of the ``envoy.type.v3.TokenBucketConfig`` for lookup.
+  // Specify the ``name``` field of the :ref:`envoy.type.v3.TokenBucketConfig`for lookup.
   string resource_name = 1 [(validate.rules).string = {min_len: 1}];
 
-  // The configuration source for the ``envoy.type.v3.TokenBucketConfig``.
+  // The configuration source for the :ref:`envoy.type.v3.TokenBucketConfig`.
+  // It should stay the same through the process lifetime.
+  // TODO(taoxuy): add support for dynamic config_source if needed.
   config.core.v3.ConfigSource config_source = 2 [(validate.rules).message = {required: true}];
 }

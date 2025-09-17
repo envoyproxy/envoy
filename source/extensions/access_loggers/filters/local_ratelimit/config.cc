@@ -26,7 +26,6 @@ AccessLog::FilterPtr LocalRateLimitFilterFactory::createFilter(
   // - let xds agent to call the callback to update the token bucket and then
   // finish the initialization
   auto filter = std::make_unique<LocalRateLimitFilter>(context, local_ratelimit_config);
-  filter->init();
   return filter;
 }
 

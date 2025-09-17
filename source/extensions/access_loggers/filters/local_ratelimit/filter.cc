@@ -10,45 +10,28 @@ namespace Extensions {
 namespace AccessLoggers {
 namespace Filters {
 namespace LocalRateLimit {
-
 LocalRateLimitFilter::LocalRateLimitFilter(
     Server::Configuration::FactoryContext& context,
     const envoy::extensions::access_loggers::filters::local_ratelimit::v3::LocalRateLimitFilter&
         config)
-    : context_(context), config_(config) {}
-
-bool LocalRateLimitFilter::evaluate(const Formatter::HttpFormatterContext&,
-                                    const StreamInfo::StreamInfo&) const {
-  ENVOY_BUG(rate_limiter_ != nullptr,
-            "rate_limiter_ should be set by init_target_'s init callback.");
-  ENVOY_BUG(rate_limiter_->getLimiter() != nullptr,
-            "rate_limiter_.limiter_ should be alreadyset");
-  return rate_limiter_->getLimiter()->requestAllowed({}).allowed;
-}
-
-void LocalRateLimitFilter::init() {
-  init_target_ = std::make_unique<Envoy::Init::TargetImpl>("local_ratelimit_filter",
-                                                           [this] { initializeRateLimiter(); });
-  context_.initManager().add(*init_target_);
-}
-
-void LocalRateLimitFilter::initializeRateLimiter() {
+    : context_(context), config_(config) {
   rate_limiter_ = Envoy::Extensions::Filters::Common::LocalRateLimit::RateLimiterProviderSingleton::
       getRateLimiter(
           context_, config_.resource_name(), config_.config_source(),
           [this](std::shared_ptr<
                  Envoy::Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterImpl>
                      limiter) -> void {
-            ASSERT(limiter != nullptr,
-                   "limiter shouldn't be null if the `limiter` is set from "
-                   "callback.");
+            ASSERT(limiter != nullptr, "limiter shouldn't be null if the `limiter` is set from "
+                                       "callback.");
             rate_limiter_->setLimiter(limiter);
-            init_target_->ready();
           });
+}
 
-  if (rate_limiter_ != nullptr && rate_limiter_->getLimiter() != nullptr) {
-    init_target_->ready();
-  }
+bool LocalRateLimitFilter::evaluate(const Formatter::HttpFormatterContext&,
+                                    const StreamInfo::StreamInfo&) const {
+  ENVOY_BUG(rate_limiter_->getLimiter() != nullptr,
+            "rate_limiter_.limiter_ should be already set in init callback.");
+  return rate_limiter_->getLimiter()->requestAllowed({}).allowed;
 }
 
 } // namespace LocalRateLimit
