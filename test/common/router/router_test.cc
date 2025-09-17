@@ -5055,8 +5055,6 @@ makeShadowPolicy(std::string cluster = "", std::string cluster_header = "",
 class RouterShadowingTest : public RouterTest, public testing::WithParamInterface<bool> {
 public:
   RouterShadowingTest() : streaming_shadow_(GetParam()) {
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.streaming_shadow", streaming_shadow_ ? "true" : "false"}});
     // Add default mock for requestBodyBufferLimit which is called during router initialization.
     EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit())
         .WillRepeatedly(Return(std::numeric_limits<uint64_t>::max()));
