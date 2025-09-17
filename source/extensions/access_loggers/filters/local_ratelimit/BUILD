@@ -15,7 +15,7 @@ envoy_cc_extension(
     deps = [
         "//envoy/access_log:access_log_interface",
         "//source/common/init:target_lib",
-        "//source/extensions/filters/common/local_ratelimit:local_ratelimit_lib",
+        "//source/extensions/filters/common/local_ratelimit:provider_singleton_lib",
         "@envoy_api//envoy/extensions/access_loggers/filters/local_ratelimit/v3:pkg_cc_proto",
     ],
 )
@@ -33,7 +33,7 @@ envoy_cc_extension(
         "//envoy/registry",
         "//source/common/access_log:access_log_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/filters/common/local_ratelimit:local_ratelimit_lib",
+        "//source/extensions/filters/common/local_ratelimit:provider_singleton_lib",
         "@envoy_api//envoy/extensions/access_loggers/filters/local_ratelimit/v3:pkg_cc_proto",
     ],
 )
