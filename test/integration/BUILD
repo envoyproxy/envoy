@@ -2055,6 +2055,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/request_id/uuid/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/upstreams/http/tcp/v3:pkg_cc_proto",
     ],
 )
