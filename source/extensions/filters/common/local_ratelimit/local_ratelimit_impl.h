@@ -171,41 +171,33 @@ using RateLimiterProviderSingletonSharedPtr = std::shared_ptr<RateLimiterProvide
 class RateLimiterProviderSingleton : public Singleton::Instance {
 public:
   class RateLimiterWrapper {
-  public:
-    RateLimiterWrapper(RateLimiterProviderSingletonSharedPtr provider, std::string key,
-                       std::shared_ptr<LocalRateLimiterImpl> limiter,
-                       size_t token_bucket_config_hash)
-        : provider_(std::move(provider)), name_(std::move(key)), limiter_(std::move(limiter)),
-          token_bucket_config_hash_(token_bucket_config_hash) {}
-
-    const std::string& getKey() const { return name_; }
-    std::shared_ptr<LocalRateLimiterImpl> getLimiter() const { return limiter_; }
-    void setLimiter(std::shared_ptr<LocalRateLimiterImpl> limiter) {
-      limiter_ = std::move(limiter);
+   public:
+    RateLimiterWrapper(RateLimiterProviderSingletonSharedPtr provider,
+                       std::shared_ptr<LocalRateLimiterImpl> limiter)
+        : provider_(provider), limiter_(limiter) {}
+    std::shared_ptr<LocalRateLimiterImpl> getLimiter() const {
+      return limiter_;
     }
-    size_t getTokenBucketConfigHash() const { return token_bucket_config_hash_; }
+    void setLimiter(std::shared_ptr<LocalRateLimiterImpl> limiter) {
+      limiter_ = limiter;
+    }
 
-  private:
-    // The `map_` holds the ownership of this singleton by shared
+   private:
+    // The `provider_` holds the ownership of this singleton by shared
     // pointer, as the rate limiter map singleton isn't pinned and is
     // shared among all the access log rate limit filters.
     RateLimiterProviderSingletonSharedPtr provider_;
-
-    // The name for `limiter_` in `provider_->limiters_`.
-    std::string name_;
 
     // The `limiter_` holds the ownership of the rate limiter(with the
     // underlying token bucket) by shared pointer. Access loggers using the same
     // `resource_name` of token bucket will share the same rate limiter.
     std::shared_ptr<LocalRateLimiterImpl> limiter_;
-
-    // The hash of the token bucket config used by the rate limiter.
-    size_t token_bucket_config_hash_;
   };
-  using RateLimiterPtr = std::unique_ptr<RateLimiterWrapper>;
+  using RateLimiterWrapperPtr = std::unique_ptr<RateLimiterWrapper>;
 
   using SetRateLimiterCb = std::function<void(std::shared_ptr<LocalRateLimiterImpl>)>;
-  static RateLimiterPtr getRateLimiter(Server::Configuration::FactoryContext& factory_context,
+  static RateLimiterWrapperPtr getRateLimiter(
+    Server::Configuration::FactoryContext& factory_context,
                                        absl::string_view key,
                                        const envoy::config::core::v3::ConfigSource& config_source,
                                        SetRateLimiterCb callback);

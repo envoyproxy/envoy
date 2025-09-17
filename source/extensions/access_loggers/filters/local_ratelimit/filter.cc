@@ -22,8 +22,7 @@ bool LocalRateLimitFilter::evaluate(const Formatter::HttpFormatterContext&,
   ENVOY_BUG(rate_limiter_ != nullptr,
             "rate_limiter_ should be set by init_target_'s init callback.");
   ENVOY_BUG(rate_limiter_->getLimiter() != nullptr,
-            "LocalRateLimitFilter::evaluate: rate_limiter_ should be "
-            "initialized by init() but it is null now.");
+            "rate_limiter_.limiter_ should be alreadyset");
   return rate_limiter_->getLimiter()->requestAllowed({}).allowed;
 }
 
@@ -41,12 +40,13 @@ void LocalRateLimitFilter::initializeRateLimiter() {
                  Envoy::Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterImpl>
                      limiter) -> void {
             ASSERT(limiter != nullptr,
-                   "limiter shouldn't be null if the `limiter` is set from callback.");
+                   "limiter shouldn't be null if the `limiter` is set from "
+                   "callback.");
             rate_limiter_->setLimiter(limiter);
             init_target_->ready();
           });
 
-  if (rate_limiter_->getLimiter() != nullptr) {
+  if (rate_limiter_ != nullptr && rate_limiter_->getLimiter() != nullptr) {
     init_target_->ready();
   }
 }
