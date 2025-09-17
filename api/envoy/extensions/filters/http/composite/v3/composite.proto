@@ -58,7 +58,6 @@ message DynamicConfig {
 
 // Composite match action (see :ref:`matching docs <arch_overview_matching_api>` for more info on match actions).
 // This specifies the filter configuration of the filter that the composite filter should delegate filter interactions to.
-// [#next-free-field: 5]
 message ExecuteFilterAction {
   // Filter specific configuration which depends on the filter being
   // instantiated. See the supported filters for further documentation.
