@@ -874,6 +874,20 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       request_headers_->setPath(new_path);
     }
 
+    if (request_headers_->size() > request_headers_->maxHeadersCount()) {
+      ENVOY_STREAM_LOG(
+          debug,
+          "ext_authz filter rejected the request because the header count limit would be exceeded",
+          *decoder_callbacks_);
+      decoder_callbacks_->streamInfo().setResponseFlag(
+          StreamInfo::CoreResponseFlag::OverloadManager);
+      decoder_callbacks_->sendLocalReply(
+          Http::Code::InternalServerError,
+          "request headers too large after ext_authz modifications", nullptr, absl::nullopt,
+          Filters::Common::ExtAuthz::ResponseCodeDetails::get().AuthzError);
+      return;
+    }
+
     if (cluster_) {
       config_->incCounter(cluster_->statsScope(), config_->ext_authz_ok_);
     }
