@@ -86,7 +86,7 @@ private:
           scale_locality_weight_(scale_locality_weight) {}
 
     void update(const HostHashSet& matching_hosts, const HostVector& hosts_added,
-                const HostVector& hosts_removed, uint64_t seed);
+                const HostVector& hosts_removed);
     LocalityWeightsConstSharedPtr
     determineLocalityWeights(const HostsPerLocality& hosts_per_locality) const;
 
@@ -103,7 +103,7 @@ private:
                        bool scale_locality_weight);
 
     void update(uint32_t priority, const HostHashSet& matching_hosts, const HostVector& hosts_added,
-                const HostVector& hosts_removed, uint64_t seed);
+                const HostVector& hosts_removed);
 
     bool empty() const { return empty_; }
 
@@ -114,10 +114,9 @@ private:
     }
 
     void updateSubset(uint32_t priority, const HostHashSet& matching_hosts,
-                      const HostVector& hosts_added, const HostVector& hosts_removed,
-                      uint64_t seed) {
+                      const HostVector& hosts_added, const HostVector& hosts_removed) {
       reinterpret_cast<HostSubsetImpl*>(host_sets_[priority].get())
-          ->update(matching_hosts, hosts_added, hosts_removed, seed);
+          ->update(matching_hosts, hosts_added, hosts_removed);
       THROW_IF_NOT_OK(runUpdateCallbacks(hosts_added, hosts_removed));
     }
 
@@ -226,7 +225,7 @@ private:
     virtual ~LbSubset() = default;
     virtual HostSelectionResponse chooseHost(LoadBalancerContext* context) const PURE;
     virtual void pushHost(uint32_t priority, HostSharedPtr host) PURE;
-    virtual void finalize(uint32_t priority, uint64_t seed) PURE;
+    virtual void finalize(uint32_t priority) PURE;
     virtual bool active() const PURE;
   };
   using LbSubsetPtr = std::unique_ptr<LbSubset>;
@@ -249,7 +248,7 @@ private:
     }
     // Called after pushHost. Update subset by the hosts that pushed in the pushHost. If no any host
     // is pushed then subset_ will be set to empty.
-    void finalize(uint32_t priority, uint64_t seed) override;
+    void finalize(uint32_t priority) override;
 
     bool active() const override { return !subset_.empty(); }
 
@@ -266,7 +265,7 @@ private:
     }
     // Called after pushHost. Update subset by the host that pushed in the pushHost. If no any host
     // is pushed then subset_ will be set to nullptr.
-    void finalize(uint32_t priority, uint64_t) override {
+    void finalize(uint32_t priority) override {
       if (auto iter = new_hosts_.find(priority); iter == new_hosts_.end()) {
         // No any host for current subset and priority. Try remove record in the hosts_.
         hosts_.erase(priority);
