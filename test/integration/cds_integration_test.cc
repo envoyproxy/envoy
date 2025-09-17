@@ -635,6 +635,8 @@ TEST_P(CdsIntegrationTest, CdsClusterDownWithLotsOfIdleConnections) {
             ->mutable_idle_timeout()
             ->set_seconds(600);
       });
+  config_helper_.setDownstreamHttp2MaxConcurrentStreams(2001);
+
   initialize();
   std::vector<IntegrationStreamDecoderPtr> responses;
   std::vector<FakeHttpConnectionPtr> upstream_connections;
