@@ -72,9 +72,13 @@ void ActiveStreamFilterBase::commonContinue() {
     restoreContextOnContinue(encapsulated_object);
     state.emplace(&encapsulated_object, parent_.dispatcher_);
   }
-
-  ENVOY_STREAM_LOG(trace, "continuing filter chain: filter={}", *this,
-                   static_cast<const void*>(this));
+  ENVOY_STREAM_LOG(
+      trace,
+      "continuing filter chain: filter={}, filter_name={}, observedEndStream={}, "
+      "filters_observed_decode_end_stream_: {}, filters_observed_encode_end_stream_: {}",
+      *this, static_cast<const void*>(this), filter_context_.config_name, observedEndStream(),
+      parent_.state_.filters_observed_decode_end_stream_.to_string(),
+      parent_.state_.filters_observed_encode_end_stream_.to_string());
   ASSERT(!canIterate(),
          "Attempting to continue iteration while the IterationState is already Continue");
   // If iteration has stopped for all frame types, set iterate_from_current_filter_ to true so the
@@ -400,7 +404,13 @@ Buffer::InstancePtr& ActiveStreamDecoderFilter::bufferedData() {
   return parent_.buffered_request_data_;
 }
 
-bool ActiveStreamDecoderFilter::observedEndStream() { return parent_.decoderObservedEndStream(); }
+bool ActiveStreamDecoderFilter::observedEndStream() {
+  int num_decoder_filters = static_cast<int>(parent_.decoder_filters_.entries_.size() - 1);
+  bool all_non_terminal_filters_observed_end_stream =
+      (std::countr_one(parent_.state_.filters_observed_decode_end_stream_.to_ulong()) ==
+       num_decoder_filters);
+  return parent_.decoderObservedEndStream() && all_non_terminal_filters_observed_end_stream;
+}
 
 void ActiveStreamDecoderFilter::doHeaders(bool end_stream) {
   parent_.decodeHeaders(this, *parent_.filter_manager_callbacks_.requestHeaders(), end_stream);
@@ -459,6 +469,12 @@ MetadataMapVector& ActiveStreamDecoderFilter::addDecodedMetadata() {
 
 void ActiveStreamDecoderFilter::injectDecodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
+  std::size_t current_filter_idx = std::distance(parent_.decoder_filters_.begin(), entry_);
+  parent_.state_.filters_observed_decode_end_stream_.set(size_t(current_filter_idx), end_stream);
+  ENVOY_STREAM_LOG(trace,
+                   "injectDecodedDataToFilterChain, updating observed decoded end stream={} for "
+                   "filter={} idx={}",
+                   *this, end_stream, filter_context_.config_name, current_filter_idx);
   if (!headers_continued_) {
     headers_continued_ = true;
     doHeaders(false);
@@ -577,7 +593,6 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
   bool terminal_filter_decoded_end_stream = false;
   ASSERT(!state_.decoder_filter_chain_complete_ || entry == decoder_filters_.end() ||
          (*entry)->end_stream_);
-
   for (; entry != decoder_filters_.end(); entry++) {
     ENVOY_EXECUTION_SCOPE(trackedStream(), &(*entry)->filter_context_);
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeHeaders));
@@ -587,6 +602,17 @@ void FilterManager::decodeHeaders(ActiveStreamDecoderFilter* filter, RequestHead
       state_.filter_call_state_ |= FilterCallState::EndOfStream;
     }
     FilterHeadersStatus status = (*entry)->decodeHeaders(headers, (*entry)->end_stream_);
+    if (std::next(entry) != decoder_filters_.end()) {
+      std::size_t current_filter_idx = std::distance(decoder_filters_.begin(), entry);
+      state_.filters_observed_decode_end_stream_.set(size_t(current_filter_idx),
+                                                     (*entry)->end_stream_);
+      ENVOY_STREAM_LOG(trace,
+                       "decodeHeaders marking filter delivered end_stream: filter={}, idx={}, "
+                       "end_stream={}, filters_observed_decode_end_stream_={}",
+                       *this, (*entry)->filter_context_.config_name, current_filter_idx,
+                       (*entry)->end_stream_,
+                       state_.filters_observed_decode_end_stream_.to_string());
+    }
     state_.filter_call_state_ &= ~FilterCallState::DecodeHeaders;
     if ((*entry)->end_stream_) {
       state_.filter_call_state_ &= ~FilterCallState::EndOfStream;
@@ -742,6 +768,17 @@ void FilterManager::decodeData(ActiveStreamDecoderFilter* filter, Buffer::Instan
     state_.filter_call_state_ |= FilterCallState::DecodeData;
     (*entry)->end_stream_ = end_stream && !filter_manager_callbacks_.requestTrailers();
     FilterDataStatus status = (*entry)->handle_->decodeData(data, (*entry)->end_stream_);
+    if (std::next(entry) != decoder_filters_.end()) {
+      std::size_t current_filter_idx = std::distance(decoder_filters_.begin(), entry);
+      state_.filters_observed_decode_end_stream_.set(size_t(current_filter_idx),
+                                                     (*entry)->end_stream_);
+      ENVOY_STREAM_LOG(trace,
+                       "decodeData marking filter delivered end_stream: filter={}, idx={}, "
+                       "end_stream={}, filters_observed_decode_end_stream_={}",
+                       *this, (*entry)->filter_context_.config_name, current_filter_idx,
+                       (*entry)->end_stream_,
+                       state_.filters_observed_decode_end_stream_.to_string());
+    }
     if ((*entry)->end_stream_) {
       (*entry)->handle_->decodeComplete();
     }
@@ -1276,6 +1313,14 @@ void FilterManager::encodeHeaders(ActiveStreamEncoderFilter* filter, ResponseHea
       state_.filter_call_state_ |= FilterCallState::EndOfStream;
     }
     FilterHeadersStatus status = (*entry)->handle_->encodeHeaders(headers, (*entry)->end_stream_);
+    std::size_t current_filter_idx = std::distance(encoder_filters_.begin(), entry);
+    state_.filters_observed_encode_end_stream_.set(size_t(current_filter_idx),
+                                                   (*entry)->end_stream_);
+    ENVOY_STREAM_LOG(trace,
+                     "encodeHeaders marking filter delivered end_stream: filter={}, idx={}, "
+                     "end_stream={}, filters_observed_encode_end_stream_={}",
+                     *this, (*entry)->filter_context_.config_name, current_filter_idx,
+                     (*entry)->end_stream_, state_.filters_observed_encode_end_stream_.to_string());
     if (state_.encoder_filter_chain_aborted_) {
       ENVOY_STREAM_LOG(trace,
                        "encodeHeaders filter iteration aborted due to local reply: filter={}",
@@ -1466,6 +1511,14 @@ void FilterManager::encodeData(ActiveStreamEncoderFilter* filter, Buffer::Instan
 
     (*entry)->end_stream_ = end_stream && !filter_manager_callbacks_.responseTrailers();
     FilterDataStatus status = (*entry)->handle_->encodeData(data, (*entry)->end_stream_);
+    std::size_t current_filter_idx = std::distance(encoder_filters_.begin(), entry);
+    state_.filters_observed_encode_end_stream_.set(size_t(current_filter_idx),
+                                                   (*entry)->end_stream_);
+    ENVOY_STREAM_LOG(trace,
+                     "encodeData marking filter delivered end_stream: filter={}, idx={}, "
+                     "end_stream={}, filters_observed_encode_end_stream_={}",
+                     *this, (*entry)->filter_context_.config_name, current_filter_idx,
+                     (*entry)->end_stream_, state_.filters_observed_encode_end_stream_.to_string());
     if (state_.encoder_filter_chain_aborted_) {
       ENVOY_STREAM_LOG(trace, "encodeData filter iteration aborted due to local reply: filter={}",
                        *this, (*entry)->filter_context_.config_name);
@@ -1821,7 +1874,12 @@ Buffer::InstancePtr& ActiveStreamEncoderFilter::bufferedData() {
   return parent_.buffered_response_data_;
 }
 bool ActiveStreamEncoderFilter::observedEndStream() {
-  return parent_.state_.observed_encode_end_stream_;
+  int num_encoder_filters = static_cast<int>(parent_.encoder_filters_.entries_.size());
+  bool all_non_terminal_filters_observed_end_stream =
+      (std::countr_one(parent_.state_.filters_observed_encode_end_stream_.to_ulong()) ==
+       num_encoder_filters);
+  return parent_.state_.observed_encode_end_stream_ &&
+         all_non_terminal_filters_observed_end_stream;
 }
 bool ActiveStreamEncoderFilter::has1xxHeaders() {
   return parent_.state_.has_1xx_headers_ && !continued_1xx_headers_;
@@ -1875,6 +1933,12 @@ void ActiveStreamEncoderFilter::addEncodedData(Buffer::Instance& data, bool stre
 
 void ActiveStreamEncoderFilter::injectEncodedDataToFilterChain(Buffer::Instance& data,
                                                                bool end_stream) {
+  std::size_t current_filter_idx = std::distance(parent_.encoder_filters_.begin(), entry_);
+  parent_.state_.filters_observed_encode_end_stream_.set(size_t(current_filter_idx), end_stream);
+  ENVOY_STREAM_LOG(trace,
+                   "injectEncodedDataToFilterChain, updating observed encoded end stream={} for "
+                   "filter={} idx={}",
+                   *this, end_stream, filter_context_.config_name, current_filter_idx);
   if (!headers_continued_) {
     headers_continued_ = true;
     doHeaders(false);
