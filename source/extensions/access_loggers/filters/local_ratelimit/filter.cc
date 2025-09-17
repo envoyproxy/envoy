@@ -30,7 +30,8 @@ LocalRateLimitFilter::LocalRateLimitFilter(
 bool LocalRateLimitFilter::evaluate(const Formatter::HttpFormatterContext&,
                                     const StreamInfo::StreamInfo&) const {
   ENVOY_BUG(rate_limiter_->getLimiter() != nullptr,
-            "rate_limiter_.limiter_ should be already set in init callback.");
+            "rate_limiter_.limiter_ should be already set in the callback put in `getRateLimiter` "
+            "call in made the constructor.");
   return rate_limiter_->getLimiter()->requestAllowed({}).allowed;
 }
 
