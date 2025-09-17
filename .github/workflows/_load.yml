@@ -38,14 +38,6 @@ on:
           \($summary)
 
           \($extra)
-      request:
-        type: string
-        required: false
-        default: ''
-      trusted:
-        type: string
-        required: false
-        default: ''
 
     outputs:
       build-image:
@@ -77,6 +69,7 @@ env:
 
 jobs:
   request:
+    if: ${{ github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI }}
     runs-on: ubuntu-24.04
     permissions:
       actions: read
@@ -107,24 +100,24 @@ jobs:
     # Handle any failure in triggering job
     # Remove any `checks` we dont care about
     # Prepare a check request
-    # - uses: envoyproxy/toolshed/gh-actions/github/env/load@actions-v0.3.24
-    #   name: Load env
-    #   id: data
-    #   with:
-    #     run-id: ${{ steps.run-id.outputs.value || inputs.run-id }}
-    #     check-name: ${{ inputs.check-name }}
-    #     head-sha: ${{ inputs.head-sha }}
-    #   env:
-    #     GH_TOKEN: ${{ github.token }}
+    - uses: envoyproxy/toolshed/gh-actions/github/env/load@actions-v0.3.23
+      name: Load env
+      id: data
+      with:
+        run-id: ${{ steps.run-id.outputs.value || inputs.run-id }}
+        check-name: ${{ inputs.check-name }}
+        head-sha: ${{ inputs.head-sha }}
+      env:
+        GH_TOKEN: ${{ github.token }}
 
     #  Update the check
-    # - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.24
-    #   name: Appauth
-    #   id: appauth
-    #   with:
-    #     app_id: ${{ secrets.app-id }}
-    #     key: ${{ secrets.app-key }}
-    - uses: envoyproxy/toolshed/gh-actions/github/checks@actions-v0.3.24
+    - uses: envoyproxy/toolshed/gh-actions/appauth@actions-v0.3.23
+      name: Appauth
+      id: appauth
+      with:
+        app_id: ${{ secrets.app-id }}
+        key: ${{ secrets.app-key }}
+    - uses: envoyproxy/toolshed/gh-actions/github/checks@actions-v0.3.23
       name: Update check
       if: ${{ fromJSON(steps.data.outputs.data).data.check.action == 'RUN' }}
       with:
@@ -132,14 +125,12 @@ jobs:
         checks: ${{ toJSON(fromJSON(steps.data.outputs.data).checks) }}
         token: ${{ steps.appauth.outputs.token }}
 
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.24
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.23
       name: Print request summary
       with:
         input: |
-          action: RUN
-          summary:
-            linked-title: Manual run
-            summary: This is a static summary for debugging.
+          action: ${{ fromJSON(steps.data.outputs.data).data.check.action }}
+          summary: ${{ toJSON(fromJSON(steps.data.outputs.data).data.summary) }}
         input-format: yaml
         output-path: GITHUB_STEP_SUMMARY
         options: -r
@@ -147,14 +138,14 @@ jobs:
           .action as $action
           | .summary as $summary
           | if ($action != "RUN") then
-              "### Manual run was skipped"
+              "### ${{ github.workflow }} was skipped"
             else "" end
           | . as $extra
           | $summary["linked-title"] as $linkedTitle
           | $summary.summary as $summary
-          | "## \($linkedTitle)\n\n\($summary)\n\n\($extra)"
+          | "${{ inputs.template-request-summary }}"
 
-    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.24
+    - uses: envoyproxy/toolshed/gh-actions/jq@actions-v0.3.23
       id: request-output
       name: Load request
       with:

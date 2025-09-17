@@ -12,18 +12,6 @@ on:
     types:
     - completed
 
-  workflow_dispatch:
-    inputs:
-      request:
-        description: 'Request JSON object (leave default for basic build)'
-        required: false
-        default: |
-          {"run": {"check-build": true, "check-coverage": true, "check-san": true}, "summary": {"title": "Manual run"}}
-      trusted:
-        description: 'Trusted (true/false)'
-        required: false
-        default: 'true'
-
 concurrency:
   group: >-
     ${{ ((github.event.workflow_run.head_branch == 'main'
@@ -48,13 +36,14 @@ jobs:
       packages: read
       pull-requests: read
     if: |
-      github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+      github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.repository.full_name == github.repository
+      && contains(fromJSON('["pull_request_target", "push", "schedule"]'), github.event.workflow_run.event)
+      && (github.repository == 'envoyproxy/envoy' || vars.ENVOY_CI)
     uses: ./.github/workflows/_load.yml
     with:
       check-name: checks
       # head-sha: ${{ github.sha }}
-      request: ${{ inputs.request != '' ? inputs.request : '{"run": {"check-build": true, "check-coverage": true, "check-san": true}, "summary": {"title": "Manual run"}}' }}
-      trusted: ${{ inputs.trusted }}
 
   build:
     secrets:
