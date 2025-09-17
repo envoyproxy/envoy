@@ -49,7 +49,7 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config,
 
 absl::Status CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                         const std::string& version_info) {
-  // If another source may be adding clusters to the cluter-manager, Envoy needs to
+  // If another source may be adding clusters to the cluster-manager, Envoy needs to
   // track which clusters are received via the SotW CDS configuration, so only
   // clusters that were added through SotW CDS and are not updated will be removed.
   if (support_multi_ads_sources_) {
@@ -71,8 +71,8 @@ absl::Status CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourc
     // Even if the onConfigUpdate() above returns an error, some of the clusters
     // may have been updated. Either way, we use the new update to override the
     // contents.
-    // TODO(adisuissa): Thie will not be needed once the xDS-Cache layer is
-    // intorduced, as it will keep track of only the valid resources.
+    // TODO(adisuissa): This will not be needed once the xDS-Cache layer is
+    // introduced, as it will keep track of only the valid resources.
     sotw_resource_names_ = std::move(next_sotw_resource_names);
     return status;
   }
