@@ -340,7 +340,7 @@ createRateLimiterImpl(const envoy::type::v3::TokenBucket& token_bucket,
           envoy::extensions::common::ratelimit::v3::LocalRateLimitDescriptor>());
 }
 
-RateLimiterProviderSingleton::RateLimiterPtr RateLimiterProviderSingleton::getRateLimiter(
+RateLimiterProviderSingleton::RateLimiterWrapperPtr RateLimiterProviderSingleton::getRateLimiter(
     Server::Configuration::FactoryContext& factory_context, absl::string_view key,
     const envoy::config::core::v3::ConfigSource& config_source, SetRateLimiterCb callback) {
   RateLimiterProviderSingletonSharedPtr provider =
@@ -362,15 +362,14 @@ RateLimiterProviderSingleton::RateLimiterPtr RateLimiterProviderSingleton::getRa
           named_token_bucket.token_bucket(), provider->factory_context_.mainThreadDispatcher());
     }
     return std::make_unique<RateLimiterProviderSingleton::RateLimiterWrapper>(
-        provider, std::string(key), limiter_ref.limiter_.lock(),
-        limiter_ref.token_bucket_config_hash_);
+        provider, limiter_ref.limiter_.lock());
   }
 
   provider->setter_cbs_[std::string(key)].push_back(std::move(callback));
   // Return a RateLimiter with a null limiter_ for now, it will be filled in
   // by the callback.
   return std::make_unique<RateLimiterProviderSingleton::RateLimiterWrapper>(
-      provider, std::string(key), nullptr, 0);
+      provider, nullptr);
 }
 
 // RateLimiterProviderSingleton::RatelimiterSubscription method implementations

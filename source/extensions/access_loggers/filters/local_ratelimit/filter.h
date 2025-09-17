@@ -30,8 +30,8 @@ private:
   Server::Configuration::FactoryContext& context_;
   const envoy::extensions::access_loggers::filters::local_ratelimit::v3::LocalRateLimitFilter
       config_;
-  mutable Envoy::Extensions::Filters::Common::LocalRateLimit::RateLimiterProviderSingleton::
-      RateLimiterPtr rate_limiter_;
+  mutable Envoy::Extensions::Filters::Common::LocalRateLimit::
+      RateLimiterProviderSingleton::RateLimiterWrapperPtr rate_limiter_;
   mutable std::unique_ptr<Init::TargetImpl> init_target_;
 };
 
