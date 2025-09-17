@@ -1,6 +1,11 @@
 date: Pending
 
 behavior_changes:
+- area: response_decoder
+  change: |
+    Updated EnvoyQuicClientStream and ResponseDecoderWrapper to use a handle to access the response decoder
+    to prevent use-after-free errors by ensuring the decoder instance is still live before calling its methods.
+    This change is guarded by the runtime flag ``envoy.reloadable_features.use_response_decoder_handle``.
 - area: http
   change: |
     A route refresh will now result in a tracing refresh. The trace sampling decision and decoration
@@ -11,10 +16,29 @@ behavior_changes:
     <envoy_v3_api_field_extensions.request_id.uuid.v3.UuidRequestIdConfig.pack_trace_reason>` is set
     to ``true`` (it is ``true`` by default), a request marked as traced cannot be unmarked as traced
     after the tracing refresh.
+- area: http2
+  change: |
+    The default value for the :ref:`maximum number of concurrent streams in HTTP/2
+    <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_concurrent_streams>`
+    has been changed from 2147483647 to 1024.
+    The default value for the :ref:`initial stream window size in HTTP/2
+    <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.initial_stream_window_size>`
+    has been changed from 256MiB to 16MiB.
+    The default value for the :ref:`initial connection window size in HTTP/2
+    <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.initial_connection_window_size>`
+    has been changed from 256MiB to 24MiB.
+    This change could be reverted temporarily by
+    setting the runtime guard ``envoy.reloadable_features.safe_http2_options``
+    to ``false``.
 - area: ext_proc
   change: |
     Reverted `#39740 <https://github.com/envoyproxy/envoy/pull/39740>`_ to re-enable ``fail_open`` +
     ``FULL_DUPLEX_STREAMED`` configuration combination.
+- area: load balancing
+  change: |
+    Moved locality WRR structures out of HostSetImpl and into a separate class. Locality WRR schedulers are now by default owned
+    and constructed by the underlying Zone Aware LB, instead of owned and constructed by the Host Set. There should be no visible
+    behavior change for existing users of Zone Aware LBs.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -88,6 +112,9 @@ bug_fixes:
     Fixed a bug where the premature resets of streams may result in the recursive draining and potential
     stack overflow. Setting proper ``max_concurrent_streams`` value for HTTP/2 or HTTP/3 could eliminate
     the risk of the stack overflow before this fix.
+- area: listener
+  change: |
+    Fixed a bug where comparing listeners did not consider the network namespace they were listening in.
 - area: http
   change: |
     Fixed a bug where the ``response_headers_to_add`` may be processed multiple times for the local responses from
@@ -389,5 +416,7 @@ new_features:
     Added a new metric ``db_build_epoch`` to track the build timestamp of the MaxMind geolocation database files.
     This can be used to monitor the freshness of the databases currently in use by the filter.
     See `MaxMind DB build_epoch <https://maxmind.github.io/MaxMind-DB/#build_epoch>`_ for more details.
-
+- area: dynamic_modules
+  change: |
+    Added support for counters, gauges, histograms, and their vector variants to the dynamic modules API.
 deprecated:

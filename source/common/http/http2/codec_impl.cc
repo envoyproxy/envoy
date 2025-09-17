@@ -2003,7 +2003,7 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
     : Http2Options(http2_options, max_headers_kb) {
   og_options_.perspective = http2::adapter::Perspective::kClient;
   og_options_.remote_max_concurrent_streams =
-      ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS;
+      ::Envoy::Http2::Utility::OptionsLimits::MAX_MAX_CONCURRENT_STREAMS;
 
 #ifdef ENVOY_NGHTTP2
   // Temporarily disable initial max streams limit/protection, since we might want to create
@@ -2011,7 +2011,7 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
   //
   // TODO(PiotrSikora): remove this once multiple upstream connections or queuing are implemented.
   nghttp2_option_set_peer_max_concurrent_streams(
-      options_, ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
+      options_, ::Envoy::Http2::Utility::OptionsLimits::MAX_MAX_CONCURRENT_STREAMS);
 
   // nghttp2 REQUIRES setting max number of CONTINUATION frames.
   // 1024 is chosen to accommodate Envoy's 8Mb max limit of max_request_headers_kb
