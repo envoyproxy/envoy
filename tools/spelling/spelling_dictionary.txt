@@ -493,6 +493,7 @@ TTLs
 TX
 TXT
 UA
+UAF
 UBSAN
 UDP
 UDS
@@ -973,6 +974,7 @@ linkability
 linkable
 linux
 livelock
+liveness
 llvm
 loc
 localhost

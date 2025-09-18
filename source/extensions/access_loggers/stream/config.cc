@@ -22,7 +22,7 @@ namespace File {
 
 AccessLog::InstanceSharedPtr StdoutAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::FactoryContext& context,
+    Server::Configuration::GenericFactoryContext& context,
     std::vector<Formatter::CommandParserPtr>&& command_parsers) {
   return AccessLoggers::createStreamAccessLogInstance<
       envoy::extensions::access_loggers::stream::v3::StdoutAccessLog,
@@ -45,7 +45,7 @@ LEGACY_REGISTER_FACTORY(StdoutAccessLogFactory, AccessLog::AccessLogInstanceFact
 
 AccessLog::InstanceSharedPtr StderrAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::FactoryContext& context,
+    Server::Configuration::GenericFactoryContext& context,
     std::vector<Formatter::CommandParserPtr>&& command_parsers) {
   return createStreamAccessLogInstance<
       envoy::extensions::access_loggers::stream::v3::StderrAccessLog,

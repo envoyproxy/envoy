@@ -12,10 +12,12 @@ absl::StatusOr<CdsApiPtr>
 CdsApiImpl::create(const envoy::config::core::v3::ConfigSource& cds_config,
                    const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm,
                    Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
-                   Server::Configuration::ServerFactoryContext& factory_context) {
+                   Server::Configuration::ServerFactoryContext& factory_context,
+                   bool support_multi_ads_sources) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = CdsApiPtr{new CdsApiImpl(cds_config, cds_resources_locator, cm, scope,
-                                      validation_visitor, factory_context, creation_status)};
+  auto ret =
+      CdsApiPtr{new CdsApiImpl(cds_config, cds_resources_locator, cm, scope, validation_visitor,
+                               factory_context, support_multi_ads_sources, creation_status)};
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
@@ -25,12 +27,13 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config,
                        ClusterManager& cm, Stats::Scope& scope,
                        ProtobufMessage::ValidationVisitor& validation_visitor,
                        Server::Configuration::ServerFactoryContext& factory_context,
-                       absl::Status& creation_status)
+                       bool support_multi_ads_sources, absl::Status& creation_status)
     : Envoy::Config::SubscriptionBase<envoy::config::cluster::v3::Cluster>(validation_visitor,
                                                                            "name"),
       helper_(cm, factory_context.xdsManager(), "cds"), cm_(cm),
       scope_(scope.createScope("cluster_manager.cds.")), factory_context_(factory_context),
-      stats_({ALL_CDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}) {
+      stats_({ALL_CDS_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))}),
+      support_multi_ads_sources_(support_multi_ads_sources) {
   const auto resource_name = getResourceName();
   absl::StatusOr<Config::SubscriptionPtr> subscription_or_error;
   if (cds_resources_locator == nullptr) {
@@ -46,6 +49,34 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3::ConfigSource& cds_config,
 
 absl::Status CdsApiImpl::onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
                                         const std::string& version_info) {
+  // If another source may be adding clusters to the cluster-manager, Envoy needs to
+  // track which clusters are received via the SotW CDS configuration, so only
+  // clusters that were added through SotW CDS and are not updated will be removed.
+  if (support_multi_ads_sources_) {
+    // The input resources will be the next sotw_resource_names_.
+    absl::flat_hash_set<std::string> next_sotw_resource_names;
+    next_sotw_resource_names.reserve(resources.size());
+    std::transform(resources.cbegin(), resources.cend(),
+                   std::inserter(next_sotw_resource_names, next_sotw_resource_names.begin()),
+                   [](const Config::DecodedResourceRef resource) { return resource.get().name(); });
+    // Find all the clusters that are currently used, but no longer appear in
+    // the next step.
+    Protobuf::RepeatedPtrField<std::string> to_remove;
+    for (const std::string& cluster_name : sotw_resource_names_) {
+      if (!next_sotw_resource_names.contains(cluster_name)) {
+        to_remove.Add(std::string(cluster_name));
+      }
+    }
+    absl::Status status = onConfigUpdate(resources, to_remove, version_info);
+    // Even if the onConfigUpdate() above returns an error, some of the clusters
+    // may have been updated. Either way, we use the new update to override the
+    // contents.
+    // TODO(adisuissa): This will not be needed once the xDS-Cache layer is
+    // introduced, as it will keep track of only the valid resources.
+    sotw_resource_names_ = std::move(next_sotw_resource_names);
+    return status;
+  }
+
   auto all_existing_clusters = cm_.clusters();
   // Exclude the clusters which CDS wants to add.
   for (const auto& resource : resources) {

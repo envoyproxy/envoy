@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/header_mutation/header_mutation.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
@@ -65,17 +66,19 @@ TEST(HeaderMutationFilterTest, RequestMutationTest) {
         append_action: "ADD_IF_ABSENT"
   )EOF";
 
+  Server::Configuration::MockServerFactoryContext context;
+
   PerRouteProtoConfig per_route_proto_config;
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
 
   absl::Status creation_status = absl::OkStatus();
   PerRouteHeaderMutationSharedPtr config =
-      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, creation_status);
+      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, context, creation_status);
 
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config_yaml, proto_config);
   HeaderMutationConfigSharedPtr global_config =
-      std::make_shared<HeaderMutationConfig>(proto_config, creation_status);
+      std::make_shared<HeaderMutationConfig>(proto_config, context, creation_status);
 
   {
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
@@ -177,17 +180,19 @@ TEST(HeaderMutationFilterTest, ResponseMutationTest) {
     - remove: "global-flag-header"
   )EOF";
 
+  Server::Configuration::MockServerFactoryContext context;
+
   PerRouteProtoConfig per_route_proto_config;
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
 
   absl::Status creation_status = absl::OkStatus();
   PerRouteHeaderMutationSharedPtr config =
-      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, creation_status);
+      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, context, creation_status);
 
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config_yaml, proto_config);
   HeaderMutationConfigSharedPtr global_config =
-      std::make_shared<HeaderMutationConfig>(proto_config, creation_status);
+      std::make_shared<HeaderMutationConfig>(proto_config, context, creation_status);
 
   // Case where the decodeHeaders() is not called and the encodeHeaders() is called.
   {
@@ -353,17 +358,19 @@ TEST(HeaderMutationFilterTest, ResponseTrailerMutationTest) {
     - remove: "global-flag-header"
   )EOF";
 
+  Server::Configuration::MockServerFactoryContext context;
+
   PerRouteProtoConfig per_route_proto_config;
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
 
   absl::Status creation_status = absl::OkStatus();
   PerRouteHeaderMutationSharedPtr config =
-      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, creation_status);
+      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, context, creation_status);
 
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config_yaml, proto_config);
   HeaderMutationConfigSharedPtr global_config =
-      std::make_shared<HeaderMutationConfig>(proto_config, creation_status);
+      std::make_shared<HeaderMutationConfig>(proto_config, context, creation_status);
 
   // Case where the decodeHeaders() is not called and the encodeHeaders() is called.
   {
@@ -531,17 +538,19 @@ TEST(HeaderMutationFilterTest, HybridMutationTest) {
     - remove: "global-flag-header"
   )EOF";
 
+  Server::Configuration::MockServerFactoryContext context;
+
   PerRouteProtoConfig per_route_proto_config;
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
 
   absl::Status creation_status = absl::OkStatus();
   PerRouteHeaderMutationSharedPtr config =
-      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, creation_status);
+      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, context, creation_status);
 
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config_yaml, proto_config);
   HeaderMutationConfigSharedPtr global_config =
-      std::make_shared<HeaderMutationConfig>(proto_config, creation_status);
+      std::make_shared<HeaderMutationConfig>(proto_config, context, creation_status);
 
   {
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
@@ -661,17 +670,19 @@ TEST(HeaderMutationFilterTest, QueryParameterMutationTest) {
     - remove: "global-flag-header"
   )EOF";
 
+  Server::Configuration::MockServerFactoryContext context;
+
   PerRouteProtoConfig per_route_proto_config;
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
 
   absl::Status creation_status = absl::OkStatus();
   PerRouteHeaderMutationSharedPtr config =
-      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, creation_status);
+      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, context, creation_status);
 
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config_yaml, proto_config);
   HeaderMutationConfigSharedPtr global_config =
-      std::make_shared<HeaderMutationConfig>(proto_config, creation_status);
+      std::make_shared<HeaderMutationConfig>(proto_config, context, creation_status);
 
   {
     NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks;
@@ -773,17 +784,19 @@ TEST(HeaderMutationFilterTest, RequestTrailerMutationTest) {
     - remove: "global-flag-header"
   )EOF";
 
+  Server::Configuration::MockServerFactoryContext context;
+
   PerRouteProtoConfig per_route_proto_config;
   TestUtility::loadFromYaml(route_config_yaml, per_route_proto_config);
 
   absl::Status creation_status = absl::OkStatus();
   PerRouteHeaderMutationSharedPtr config =
-      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, creation_status);
+      std::make_shared<PerRouteHeaderMutation>(per_route_proto_config, context, creation_status);
 
   ProtoConfig proto_config;
   TestUtility::loadFromYaml(config_yaml, proto_config);
   HeaderMutationConfigSharedPtr global_config =
-      std::make_shared<HeaderMutationConfig>(proto_config, creation_status);
+      std::make_shared<HeaderMutationConfig>(proto_config, context, creation_status);
 
   // Case where the decodeHeaders() is not called and the encodeHeaders() is called.
   {

@@ -1283,7 +1283,6 @@ TEST_P(TcpProxyTest, InvalidIdleTimeoutObjectFactory) {
 TEST_P(TcpProxyTest, IdleTimeoutWithFilterStateOverride) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_idle_timeout()->set_seconds(1);
-  setup(1, config);
 
   uint64_t idle_timeout_override = 5000;
 
@@ -1295,6 +1294,9 @@ TEST_P(TcpProxyTest, IdleTimeoutWithFilterStateOverride) {
       StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
 
   Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(idle_timeout_override), _));
+  setup(1, config);
+
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(idle_timeout_override), _));
   raiseEventUpstreamConnected(0);
 
@@ -1323,9 +1325,10 @@ TEST_P(TcpProxyTest, IdleTimeoutWithFilterStateOverride) {
 TEST_P(TcpProxyTest, IdleTimeout) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_idle_timeout()->set_seconds(1);
+  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   setup(1, config);
 
-  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   raiseEventUpstreamConnected(0);
 
@@ -1353,9 +1356,10 @@ TEST_P(TcpProxyTest, IdleTimeout) {
 TEST_P(TcpProxyTest, IdleTimerDisabledDownstreamClose) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_idle_timeout()->set_seconds(1);
+  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   setup(1, config);
 
-  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   raiseEventUpstreamConnected(0);
 
@@ -1367,9 +1371,10 @@ TEST_P(TcpProxyTest, IdleTimerDisabledDownstreamClose) {
 TEST_P(TcpProxyTest, IdleTimerDisabledUpstreamClose) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_idle_timeout()->set_seconds(1);
+  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   setup(1, config);
 
-  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   raiseEventUpstreamConnected(0);
 
@@ -1381,9 +1386,10 @@ TEST_P(TcpProxyTest, IdleTimerDisabledUpstreamClose) {
 TEST_P(TcpProxyTest, IdleTimeoutWithOutstandingDataFlushed) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_idle_timeout()->set_seconds(1);
+  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   setup(1, config);
 
-  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
   EXPECT_CALL(*idle_timer, enableTimer(std::chrono::milliseconds(1000), _));
   raiseEventUpstreamConnected(0);
 
@@ -1652,10 +1658,10 @@ TEST_P(TcpProxyTest, UpstreamFlushNoTimeout) {
 TEST_P(TcpProxyTest, UpstreamFlushTimeoutConfigured) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_idle_timeout()->set_seconds(1);
+  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(_, _));
   setup(1, config);
 
-  NiceMock<Event::MockTimer>* idle_timer =
-      new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
   EXPECT_CALL(*idle_timer, enableTimer(_, _));
   raiseEventUpstreamConnected(0);
 
@@ -1683,10 +1689,10 @@ TEST_P(TcpProxyTest, UpstreamFlushTimeoutConfigured) {
 TEST_P(TcpProxyTest, UpstreamFlushTimeoutExpired) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_idle_timeout()->set_seconds(1);
+  Event::MockTimer* idle_timer = new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*idle_timer, enableTimer(_, _));
   setup(1, config);
 
-  NiceMock<Event::MockTimer>* idle_timer =
-      new NiceMock<Event::MockTimer>(&filter_callbacks_.connection_.dispatcher_);
   EXPECT_CALL(*idle_timer, enableTimer(_, _));
   raiseEventUpstreamConnected(0);
 
@@ -1700,6 +1706,7 @@ TEST_P(TcpProxyTest, UpstreamFlushTimeoutExpired) {
   EXPECT_EQ(1U, config_->stats().upstream_flush_active_.value());
 
   EXPECT_CALL(*upstream_connections_.at(0), close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*idle_timer, disableTimer());
   idle_timer->invokeCallback();
   EXPECT_EQ(1U, config_->stats().upstream_flush_total_.value());
   EXPECT_EQ(0U, config_->stats().upstream_flush_active_.value());

@@ -42,6 +42,7 @@ envoy_cc_library(
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
         "//source/common/common:random_generator_lib",
+        "//source/common/http:response_decoder_impl_base",
         "//source/common/network:socket_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",

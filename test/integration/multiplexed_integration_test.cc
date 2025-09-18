@@ -1347,6 +1347,9 @@ TEST_P(MultiplexedIntegrationTestWithSimulatedTimeHttp2Only, TooManyRequestReset
     return;
   }
 
+  config_helper_.setDownstreamHttp2MaxConcurrentStreams(60000);
+  config_helper_.setUpstreamHttp2MaxConcurrentStreams(60000);
+
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     bootstrap.mutable_static_resources()
         ->mutable_clusters(0)
@@ -3112,6 +3115,9 @@ TEST_P(Http2FrameIntegrationTest, CloseConnectionWithDeferredStreams) {
             ->mutable_timeout()
             ->set_seconds(0);
       });
+  config_helper_.setDownstreamHttp2MaxConcurrentStreams(20001);
+  config_helper_.setUpstreamHttp2MaxConcurrentStreams(20001);
+
   beginSession();
 
   std::string buffer;

@@ -438,7 +438,6 @@ envoy_cc_library(
     deps = [
         ":load_balancer_context_base_lib",
         ":resource_manager_lib",
-        ":scheduler_lib",
         ":upstream_factory_context_lib",
         "//envoy/event:timer_interface",
         "//envoy/filter:config_provider_manager_interface",

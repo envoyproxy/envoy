@@ -11,6 +11,7 @@
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/ads_integration.h"
+#include "test/integration/ads_xdstp_config_sources_integration.h"
 #include "test/integration/fake_upstream.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/scoped_rds.h"
@@ -992,6 +993,187 @@ TEST_P(OdCdsXdstpIntegrationTest, OnDemandCdsWithEds) {
   cleanupUpstreamAndDownstream();
 }
 
+/**
+ * Tests a use-case where OD-CDS is using xDS-TP based config source, and an
+ * (old) ADS source updates the wildcard clusters subscriptions.
+ */
+class OdCdsXdstpAdsIntegrationTest : public AdsXdsTpConfigsIntegrationTest {
+public:
+  OdCdsXdstpAdsIntegrationTest() : AdsXdsTpConfigsIntegrationTest() {
+    // Override the sotw_or_delta_ settings to only use SotW-ADS.
+    // Note that in the future this can be modified to support other types as
+    // well, but currently not needed.
+    ads_config_type_override_ = envoy::config::core::v3::ApiConfigSource::GRPC;
+  }
+
+  void initialize() override {
+    // Skipping port usage validation because this tests will create new clusters
+    // that will be sent to the OD-CDS subscriptions.
+    config_helper_.skipPortUsageValidation();
+    AdsXdsTpConfigsIntegrationTest::initialize();
+
+    // Add a fake cluster server that will be returned for the OD-CDS request.
+    new_cluster_upstream_idx_ = fake_upstreams_.size();
+    addFakeUpstream(Http::CodecType::HTTP2);
+    new_cluster_ = ConfigHelper::buildStaticCluster(
+        "xdstp://authority1.com/envoy.config.cluster.v3.Cluster/on_demand_clusters/new_cluster",
+        fake_upstreams_[new_cluster_upstream_idx_]->localAddress()->ip()->port(),
+        Network::Test::getLoopbackAddressString(ipVersion()));
+  }
+
+  envoy::config::listener::v3::Listener buildListener() {
+    OdCdsListenerBuilder builder(Network::Test::getLoopbackAddressString(ipVersion()));
+    auto per_route_config = OdCdsIntegrationHelper::createPerRouteConfig(absl::nullopt, 2500);
+    OdCdsIntegrationHelper::addPerRouteConfig(builder.hcm(), std::move(per_route_config),
+                                              "integration", {});
+    return builder.listener();
+  }
+
+  envoy::config::endpoint::v3::ClusterLoadAssignment
+  buildClusterLoadAssignment(const std::string& name, size_t upstream_idx) {
+    return ConfigHelper::buildClusterLoadAssignment(
+        name, Network::Test::getLoopbackAddressString(ipVersion()),
+        fake_upstreams_[upstream_idx]->localAddress()->ip()->port());
+  }
+
+  bool compareRequest(const std::string& type_url,
+                      const std::vector<std::string>& expected_resource_subscriptions,
+                      const std::vector<std::string>& expected_resource_unsubscriptions,
+                      bool expect_node = false) {
+    return compareDeltaDiscoveryRequest(type_url, expected_resource_subscriptions,
+                                        expected_resource_unsubscriptions,
+                                        Grpc::Status::WellKnownGrpcStatus::Ok, "", expect_node);
+  };
+
+  // Compares a discovery request from the (old) ADS stream. This only supports
+  // SotW at the moment.
+  AssertionResult compareAdsDiscoveryRequest(
+      const std::string& expected_type_url, const std::string& expected_version,
+      const std::vector<std::string>& expected_resource_names, bool expect_node = false,
+      const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
+      const std::string& expected_error_substring = "") {
+    return compareSotwDiscoveryRequest(expected_type_url, expected_version, expected_resource_names,
+                                       expect_node, expected_error_code, expected_error_substring);
+  }
+
+  // Sends a discovery response using the (old) ADS stream. This only supports
+  // SotW at the moment.
+  template <class T>
+  void sendAdsDiscoveryResponse(const std::string& type_url,
+                                const std::vector<T>& state_of_the_world,
+                                const std::string& version) {
+    sendSotwDiscoveryResponse(type_url, state_of_the_world, version);
+  }
+
+  std::size_t new_cluster_upstream_idx_;
+  envoy::config::cluster::v3::Cluster new_cluster_;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    IpVersionsClientTypeDeltaWildcard, OdCdsXdstpAdsIntegrationTest,
+    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                     testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),
+                     // TODO(adisuissa): add SotW validation - this should work
+                     // as long as there isn't both empty wildcard and on-demand
+                     // on the same xds-tp gRPC-mux (which is not supported at
+                     // the moment).
+                     // Only delta xDS is supported for on-demand CDS.
+                     testing::Values(Grpc::SotwOrDelta::Delta, Grpc::SotwOrDelta::UnifiedDelta)));
+
+// tests a scenario when:
+//  - Envoy receives a CDS over SotW-ADS update, and receives 1 cluster
+//  - downstream client makes a request to an unknown cluster
+//  - odcds initiates a connection with a request for the cluster
+//  - a response contains the cluster
+//  - request is resumed
+//  - Envoy receives an update to the CDS over SotW-ADS
+//  - another request is sent to the same on-demand cluster
+//  - no odcds happens, because the cluster is known, and the request is successful
+TEST_P(OdCdsXdstpAdsIntegrationTest, OnDemandClusterDiscoveryWithSotwAds) {
+  // Sets the cds_config (lds is needed to allow proper integration test suite initialization).
+  setupClustersFromOldAds();
+  setupListenersFromOldAds();
+  initialize();
+
+  // Handle the CDS request - send a single cluster.
+  // Wait for ADS clusters request and send a cluster that points to load
+  // assignment in authority1.com.
+  EXPECT_TRUE(compareAdsDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "", {}, true));
+  envoy::config::cluster::v3::Cluster sotw_cluster = ConfigHelper::buildStaticCluster(
+      "sotw_cluster", 1234, Network::Test::getLoopbackAddressString(ipVersion()));
+  sendAdsDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
+                                                                {sotw_cluster}, "1");
+
+  // Send the Listener (with the OD-CDS filter) using the old ADS.
+  EXPECT_TRUE(compareAdsDiscoveryRequest(Config::TestTypeUrl::get().Listener, "", {}));
+  const envoy::config::listener::v3::Listener listener = buildListener();
+  sendAdsDiscoveryResponse<envoy::config::listener::v3::Listener>(
+      Config::TestTypeUrl::get().Listener, {listener}, "1");
+
+  // Old ADS receives a CDS and a LDS ACK.
+  EXPECT_TRUE(compareAdsDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "1", {}));
+  EXPECT_TRUE(compareAdsDiscoveryRequest(Config::TestTypeUrl::get().Listener, "1", {}));
+  // Expected 5 clusters: dummy, authority1_cluster, default_authority_cluster,
+  // ads_cluster and sotw_cluster.
+  EXPECT_EQ(5, test_server_->gauge("cluster_manager.active_clusters")->value());
+
+  // Envoy should now complete initialization.
+  test_server_->waitForCounterGe("listener_manager.listener_create_success", 1);
+  registerTestServerPorts({"http"});
+
+  // Send the first request.
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  const std::string& cluster_name = new_cluster_.name();
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "vhost.first"},
+                                                 {"Pick-This-Cluster", cluster_name}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+  // Authority1 should receive the ODCDS request.
+  EXPECT_TRUE(compareDiscoveryRequest(
+      Config::TestTypeUrl::get().Cluster, "", {cluster_name}, {cluster_name}, {}, true,
+      Grpc::Status::WellKnownGrpcStatus::Ok, "", authority1_xds_stream_.get()));
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
+                                                             {new_cluster_}, {new_cluster_}, {},
+                                                             "1", {}, authority1_xds_stream_.get());
+  // Expect a CDS ACK from authority1.
+  EXPECT_TRUE(compareDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "1", {cluster_name}, {},
+                                      {}, false, Grpc::Status::WellKnownGrpcStatus::Ok, "",
+                                      authority1_xds_stream_.get()));
+
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
+  // Send response headers, and end_stream if there is no response body.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200", {}, {});
+
+  // Expected 6 clusters: dummy, authority1_cluster, default_authority_cluster,
+  // ads_cluster, sotw_cluster, and the OD-CDS-cluster.
+  EXPECT_EQ(6, test_server_->gauge("cluster_manager.active_clusters")->value());
+
+  // Update the SotW cluster, and send it.
+  sotw_cluster.mutable_connect_timeout()->set_seconds(5);
+  sendAdsDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TestTypeUrl::get().Cluster,
+                                                                {sotw_cluster}, "2");
+  // Old ADS receives a CDS ACK.
+  EXPECT_TRUE(compareAdsDiscoveryRequest(Config::TestTypeUrl::get().Cluster, "2", {}));
+  // Expected 6 clusters: dummy, authority1_cluster, default_authority_cluster,
+  // ads_cluster, sotw_cluster, and the OD-CDS-cluster.
+  EXPECT_EQ(6, test_server_->gauge("cluster_manager.active_clusters")->value());
+
+  // Next request should be handled right away (no xDS subscription).
+  response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  waitForNextUpstreamRequest(new_cluster_upstream_idx_);
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  verifyResponse(std::move(response), "200", {}, {});
+
+  cleanupUpstreamAndDownstream();
+}
+
 class OdCdsScopedRdsIntegrationTestBase : public ScopedRdsIntegrationTest {
 public:
   void addOnDemandConfig(OdCdsIntegrationHelper::OnDemandConfig config) {
@@ -1307,6 +1489,5 @@ TEST_P(OdCdsScopedRdsIntegrationTest, OnDemandUpdateFailsBecauseOdCdsIsDisabledI
 
   cleanupUpstreamAndDownstream();
 }
-
 } // namespace
 } // namespace Envoy

@@ -131,16 +131,15 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_test(
-    name = "ads_xdstp_config_sources_integration_test",
-    srcs = ["ads_xdstp_config_sources_integration_test.cc"],
+envoy_cc_test_library(
+    name = "ads_xdstp_config_sources_integration_lib",
+    hdrs = ["ads_xdstp_config_sources_integration.h"],
     rbe_pool = "4core",
     tags = [
         "cpu:3",
     ],
     deps = [
         ":ads_integration_lib",
-        ":http_integration_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf:utility_lib",
         "//test/common/grpc:grpc_client_integration_lib",
@@ -153,6 +152,18 @@ envoy_cc_test(
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "ads_xdstp_config_sources_integration_test",
+    srcs = ["ads_xdstp_config_sources_integration_test.cc"],
+    rbe_pool = "4core",
+    tags = [
+        "cpu:3",
+    ],
+    deps = [
+        ":ads_xdstp_config_sources_integration_lib",
     ],
 )
 
