@@ -2009,11 +2009,10 @@ TEST_F(HttpFilterTest, DownstreamRequestFailsOnHeaderLimit) {
   prepareCheck();
 
   EXPECT_CALL(*client_, check(_, _, _, _))
-      .WillOnce(Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
-                           const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
-                           const StreamInfo::StreamInfo&) -> void {
-        request_callbacks_ = &callbacks;
-      }));
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers, false));

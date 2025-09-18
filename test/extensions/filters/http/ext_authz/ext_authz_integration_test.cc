@@ -1925,7 +1925,9 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamRequestFailsOnHeaderLimit) {
   // violating this limit.
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-             hcm) { hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(16); });
+             hcm) {
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(16);
+      });
 
   initializeConfig();
   setDownstreamProtocol(Http::CodecType::HTTP2);
