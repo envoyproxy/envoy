@@ -93,6 +93,13 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: tcp_proxy
+  change:
+    Fixes a bug when downstream TCP connection is created and the upstream connection isn't fully established, no idle timeout
+    is set on the downstream connection, which may lead to connection leak if the client doesn't close the connection.
+    The fix is to set an idle timeout on the downstream connection immediately after creation.
+    This fix can be reverted by setting runtime guard ``envoy.reloadable_features.tcp_proxy_set_idle_timer_immediately_on_new_connection``
+    to ``false``.
 - area: udp_proxy
   change: |
     Fixed a crash in the UDP proxy that occurred during ``ENVOY_SIGTERM`` when active tunneling sessions were present.
