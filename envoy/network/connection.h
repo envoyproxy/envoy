@@ -343,7 +343,7 @@ public:
   virtual bool aboveHighWatermark() const PURE;
 
   /**
-   * @return ConnectionSocketPtr& To get socket from current connection.
+   * @return const ConnectionSocketPtr& reference to the socket from current connection.
    */
   virtual const ConnectionSocketPtr& getSocket() const PURE;
 

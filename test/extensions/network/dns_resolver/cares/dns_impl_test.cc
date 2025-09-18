@@ -21,6 +21,7 @@
 #include "source/common/network/listen_socket_impl.h"
 #include "source/common/network/tcp_listener_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/extensions/network/dns_resolver/cares/dns_impl.h"
 

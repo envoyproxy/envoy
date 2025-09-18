@@ -18,14 +18,6 @@
 namespace Envoy {
 namespace Http {
 
-namespace {
-Router::RetryPolicyConstSharedPtr sharedEmptyRetryPolicy() {
-  static Router::RetryPolicyConstSharedPtr empty_policy =
-      std::make_shared<Router::RetryPolicyImpl>();
-  return empty_policy;
-}
-} // namespace
-
 const absl::string_view AsyncClientImpl::ResponseBufferLimit = "http.async_response_buffer_limit";
 
 AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
@@ -98,19 +90,23 @@ AsyncClient::Stream* AsyncClientImpl::start(AsyncClient::StreamCallbacks& callba
   return active_streams_.front().get();
 }
 
-Router::RetryPolicyConstSharedPtr
-createRetryPolicy(const AsyncClient::StreamOptions& options,
+std::unique_ptr<const Router::RetryPolicy>
+createRetryPolicy(AsyncClientImpl& parent, const AsyncClient::StreamOptions& options,
                   Server::Configuration::CommonFactoryContext& context,
                   absl::Status& creation_status) {
   if (options.retry_policy.has_value()) {
+    Upstream::RetryExtensionFactoryContextImpl factory_context(
+        parent.factory_context_.singletonManager());
     auto policy_or_error = Router::RetryPolicyImpl::create(
-        options.retry_policy.value(), ProtobufMessage::getNullValidationVisitor(), context);
+        options.retry_policy.value(), ProtobufMessage::getNullValidationVisitor(), factory_context,
+        context);
     creation_status = policy_or_error.status();
-    return policy_or_error.status().ok() ? std::move(policy_or_error.value())
-                                         : sharedEmptyRetryPolicy();
+    return policy_or_error.status().ok() ? std::move(policy_or_error.value()) : nullptr;
   }
-  return options.parsed_retry_policy != nullptr ? options.parsed_retry_policy
-                                                : sharedEmptyRetryPolicy();
+  if (options.parsed_retry_policy == nullptr) {
+    return std::make_unique<Router::RetryPolicyImpl>();
+  }
+  return nullptr;
 }
 
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
@@ -126,7 +122,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
                        : std::make_shared<StreamInfo::FilterStateImpl>(
                              StreamInfo::FilterState::LifeSpan::FilterChain)),
       tracing_config_(Tracing::EgressConfig::get()), local_reply_(*parent.local_reply_),
-      retry_policy_(createRetryPolicy(options, parent.factory_context_, creation_status)),
+      retry_policy_(createRetryPolicy(parent, options, parent_.factory_context_, creation_status)),
       account_(options.account_), buffer_limit_(options.buffer_limit_), send_xff_(options.send_xff),
       send_internal_(options.send_internal) {
   // A field initialization may set the creation-status as unsuccessful.
@@ -148,8 +144,10 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
   }
 
   auto route_or_error = NullRouteImpl::create(
-      parent_.cluster_->name(), *retry_policy_, parent_.factory_context_.regexEngine(),
-      options.timeout, options.hash_policy, metadata_matching_criteria);
+      parent_.cluster_->name(),
+      retry_policy_ != nullptr ? *retry_policy_ : *options.parsed_retry_policy,
+      parent_.factory_context_.regexEngine(), options.timeout, options.hash_policy,
+      metadata_matching_criteria);
   SET_AND_RETURN_IF_NOT_OK(route_or_error.status(), creation_status);
   route_ = std::move(*route_or_error);
   stream_info_.dynamicMetadata().MergeFrom(options.metadata);
