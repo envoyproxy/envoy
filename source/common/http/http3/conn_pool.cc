@@ -1,3 +1,4 @@
+#include "conn_pool.h"
 #include "source/common/http/http3/conn_pool.h"
 
 #include <cstdint>
@@ -60,7 +61,8 @@ std::string sni(const Network::TransportSocketOptionsConstSharedPtr& options,
 } // namespace
 
 ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
-                           Upstream::Host::CreateConnectionData& data)
+                           Upstream::Host::CreateConnectionData& data,
+                           Quic::EnvoyQuicClientSession& session)
     : MultiplexedActiveClientBase(
           parent, getMaxStreams(parent.host()->cluster()), getMaxStreams(parent.host()->cluster()),
           parent.host()->cluster().trafficStats()->upstream_cx_http3_total_, data),
@@ -74,7 +76,8 @@ ActiveClient::ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
           // as early data.
           parent_.onUpstreamReadyForEarlyData(*this);
         }
-      })) {
+      })),
+      session_(session) {
   ASSERT(codec_client_);
   if (!codec_client_->connectCalled()) {
     // Hasn't called connect() yet, schedule one for the next event loop.
@@ -137,7 +140,7 @@ void Http3ConnPoolImpl::onConnectFailed(Envoy::ConnectionPool::ActiveClient& cli
 // Make sure all connections are torn down before quic_info_ is deleted.
 Http3ConnPoolImpl::~Http3ConnPoolImpl() { destructAllConnections(); }
 
-std::unique_ptr<Network::ClientConnection>
+std::unique_ptr<Quic::EnvoyQuicClientSession>
 Http3ConnPoolImpl::createClientConnection(Quic::QuicStatNames& quic_stat_names,
                                           OptRef<Http::HttpServerPropertiesCache> rtt_cache,
                                           Stats::Scope& scope) {
@@ -187,16 +190,17 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
           return nullptr;
         }
         Http3ConnPoolImpl* h3_pool = reinterpret_cast<Http3ConnPoolImpl*>(pool);
-        Upstream::Host::CreateConnectionData data{};
-        data.host_description_ = pool->host();
-        data.connection_ = h3_pool->createClientConnection(quic_stat_names, rtt_cache, scope);
-        if (data.connection_ == nullptr) {
+        std::unique_ptr<Quic::EnvoyQuicClientSession> session =
+            h3_pool->createClientConnection(quic_stat_names, rtt_cache, scope);
+        if (session == nullptr) {
           ENVOY_LOG_EVERY_POW_2_TO_LOGGER(
               Envoy::Logger::Registry::getLog(Envoy::Logger::Id::pool), warn,
               "Failed to create Http/3 client. Failed to create quic network connection.");
           return nullptr;
         }
-        auto client = std::make_unique<ActiveClient>(*pool, data);
+        Quic::EnvoyQuicClientSession& session_ref = *session;
+        Upstream::Host::CreateConnectionData data{std::move(session), pool->host()};
+        auto client = std::make_unique<ActiveClient>(*pool, data, session_ref);
         return client;
       },
       [](Upstream::Host::CreateConnectionData& data, HttpConnPoolImplBase* pool) {
@@ -212,6 +216,18 @@ allocateConnPool(Event::Dispatcher& dispatcher, Random::RandomGenerator& random_
       },
       std::vector<Protocol>{Protocol::Http3}, connect_callback, quic_info,
       network_observer_registry, overload_manager, attempt_happy_eyeballs);
+}
+
+bool ActiveClient::isConnectionErrorTransient() const {
+  // These errors will likely no apply to following new connections.
+  static std::list<quic::QuicErrorCode> transient_errors{
+      quic::QUIC_NO_ERROR,
+      quic::QUIC_CONNECTION_MIGRATION_HANDSHAKE_UNCONFIRMED,
+      quic::QUIC_CONNECTION_MIGRATION_NON_MIGRATABLE_STREAM,
+      quic::QUIC_CONNECTION_MIGRATION_DISABLED_BY_CONFIG,
+  };
+  return std::find(transient_errors.begin(), transient_errors.end(), session_.error()) !=
+         transient_errors.end();
 }
 
 } // namespace Http3

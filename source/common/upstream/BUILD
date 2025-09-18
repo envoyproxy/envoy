@@ -129,6 +129,7 @@ envoy_cc_library(
     ] + envoy_select_enable_http3([
         "//source/common/http/http3:conn_pool_lib",
         "//source/common/http:conn_pool_grid",
+        "//source/common/quic:envoy_quic_client_session_lib",
     ]),
 )
 
