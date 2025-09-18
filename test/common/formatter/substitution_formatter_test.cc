@@ -4153,7 +4153,7 @@ TEST(SubstitutionFormatterTest, FilterStateSpeciferTest) {
   Http::TestRequestHeaderMapImpl request_headers;
   Http::TestResponseHeaderMapImpl response_headers;
   Http::TestResponseTrailerMapImpl response_trailers;
-  StreamInfo::MockStreamInfo stream_info;
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
   std::string body;
 
   HttpFormatterContext formatter_context(&request_headers, &response_headers, &response_trailers,
@@ -4162,13 +4162,18 @@ TEST(SubstitutionFormatterTest, FilterStateSpeciferTest) {
   stream_info.filter_state_->setData(
       "test_key", std::make_unique<TestSerializedStringFilterState>("test_value"),
       StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.upstream_info_->setUpstreamFilterState(
+      stream_info.filter_state_); // Reuse the same filter state for test only.
   EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
 
   const std::string expected_json_map = R"EOF(
     {
       "test_key_plain": "test_value By PLAIN",
       "test_key_typed": "test_value By TYPED",
-      "test_key_field": "test_value"
+      "test_key_field": "test_value",
+      "upstream_test_key_plain": "test_value By PLAIN",
+      "upstream_test_key_typed": "test_value By TYPED",
+      "upstream_test_key_field": "test_value"
     }
   )EOF";
 
@@ -4177,6 +4182,9 @@ TEST(SubstitutionFormatterTest, FilterStateSpeciferTest) {
     test_key_plain: '%FILTER_STATE(test_key:PLAIN)%'
     test_key_typed: '%FILTER_STATE(test_key:TYPED)%'
     test_key_field: '%FILTER_STATE(test_key:FIELD:test_field)%'
+    upstream_test_key_plain: '%UPSTREAM_FILTER_STATE(test_key:PLAIN)%'
+    upstream_test_key_typed: '%UPSTREAM_FILTER_STATE(test_key:TYPED)%'
+    upstream_test_key_field: '%UPSTREAM_FILTER_STATE(test_key:FIELD:test_field)%'
   )EOF",
                             key_mapping);
   JsonFormatterImpl formatter(key_mapping, false);

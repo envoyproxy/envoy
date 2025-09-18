@@ -496,6 +496,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/runtime:runtime_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
