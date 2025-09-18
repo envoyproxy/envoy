@@ -20,6 +20,7 @@ public:
 
   bool evaluate(const Formatter::HttpFormatterContext&,
                 const StreamInfo::StreamInfo&) const override;
+
 private:
   mutable Envoy::Extensions::Filters::Common::LocalRateLimit::RateLimiterProviderSingleton::
       RateLimiterWrapperPtr rate_limiter_;
