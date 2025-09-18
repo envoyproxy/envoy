@@ -440,7 +440,7 @@ class FakeAccessLogExtensionFilterFactory : public AccessLog::ExtensionFilterFac
 public:
   // AccessLogFilterFactory
   AccessLog::FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter&,
-                                    Server::Configuration::FactoryContext&) override {
+                                    Server::Configuration::GenericFactoryContext&) override {
     return std::make_unique<FakeAccessLogExtensionFilter>();
   }
 
