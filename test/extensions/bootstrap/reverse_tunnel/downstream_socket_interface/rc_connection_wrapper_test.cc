@@ -5,6 +5,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/http/header_map_impl.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/reverse_tunnel_initiator.h"
@@ -625,6 +626,84 @@ TEST_F(RCConnectionWrapperTest, OnEventWithNullConnection) {
 
   // Verify that the event was handled gracefully even with connection closure.
   // The exact behavior depends on the implementation, but it should not crash.
+}
+
+// Test decodeHeaders handles HTTP 200 status by calling success path.
+TEST_F(RCConnectionWrapperTest, DecodeHeadersOk) {
+  auto mock_connection = setupMockConnection();
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+
+  Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+  headers->setStatus(200);
+
+  wrapper.decodeHeaders(std::move(headers), true);
+}
+
+// Test decodeHeaders handles non-200 status by calling failure path.
+TEST_F(RCConnectionWrapperTest, DecodeHeadersNonOk) {
+  auto mock_connection = setupMockConnection();
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+
+  Http::ResponseHeaderMapPtr headers = Http::ResponseHeaderMapImpl::create();
+  headers->setStatus(404);
+
+  wrapper.decodeHeaders(std::move(headers), true);
+}
+
+// Test dispatchHttp1 error path by initializing codec via connect() and
+// then feeding invalid bytes to the parser.
+TEST_F(RCConnectionWrapperTest, DispatchHttp1ErrorPath) {
+  auto mock_connection = std::make_unique<NiceMock<Network::MockClientConnection>>();
+
+  EXPECT_CALL(*mock_connection, addConnectionCallbacks(_));
+  EXPECT_CALL(*mock_connection, addReadFilter(_));
+  EXPECT_CALL(*mock_connection, connect());
+  EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(42));
+  EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+  // Allow writes made by the HTTP/1 encoder and drain them to simulate kernel behavior.
+  EXPECT_CALL(*mock_connection, write(_, _))
+      .WillRepeatedly(
+          Invoke([](Buffer::Instance& buffer, bool) { buffer.drain(buffer.length()); }));
+
+  // Provide connection info provider.
+  auto mock_remote = std::make_shared<Network::Address::Ipv4Instance>("10.0.0.1", 80);
+  auto mock_local = std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 10001);
+  EXPECT_CALL(*mock_connection, connectionInfoProvider())
+      .WillRepeatedly(Invoke([mock_remote, mock_local]() -> const Network::ConnectionInfoProvider& {
+        static auto provider =
+            std::make_unique<Network::ConnectionInfoSetterImpl>(mock_local, mock_remote);
+        return *provider;
+      }));
+
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+  // Initialize codec inside the wrapper.
+  (void)wrapper.connect("tenant", "cluster", "node");
+
+  // Feed clearly invalid/non-HTTP bytes to exercise error log path.
+  Buffer::OwnedImpl invalid_bytes("\x00\x01garbage");
+  wrapper.dispatchHttp1(invalid_bytes);
+}
+
+// Test that destructor invokes shutdown when not already called.
+TEST_F(RCConnectionWrapperTest, DestructorInvokesShutdown) {
+  auto mock_connection = setupMockConnection();
+  auto mock_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
+
+  EXPECT_CALL(*mock_connection, removeConnectionCallbacks(_));
+  EXPECT_CALL(*mock_connection, state()).WillRepeatedly(Return(Network::Connection::State::Open));
+  EXPECT_CALL(*mock_connection, close(Network::ConnectionCloseType::FlushWrite));
+  EXPECT_CALL(*mock_connection, id()).WillRepeatedly(Return(777));
+
+  {
+    RCConnectionWrapper wrapper(*io_handle_, std::move(mock_connection), mock_host, "test-cluster");
+    // No explicit shutdown; leaving scope should run destructor which calls shutdown.
+  }
 }
 
 // Test RCConnectionWrapper::releaseConnection method.

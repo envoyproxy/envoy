@@ -333,6 +333,33 @@ TEST_F(ReverseTunnelFilterUnitTest, AutoCloseConnectionsClosesAfterAccept) {
   EXPECT_THAT(written, testing::HasSubstr("200 OK"));
 }
 
+// Exercise RequestDecoder interface methods by obtaining the decoder via
+// ReverseTunnelFilter::newStream (avoids accessing the private impl type).
+TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderInterfaceCoverageViaNewStream) {
+  // Ensure filter has callbacks initialized so decoder can access time source.
+  filter_->initializeReadFilterCallbacks(callbacks_);
+
+  // Get a decoder instance via newStream.
+  Http::MockResponseEncoder encoder;
+  Http::RequestDecoder& decoder = filter_->newStream(encoder, false);
+
+  // Provide minimal headers so processIfComplete paths are safe if triggered.
+  auto headers = Http::RequestHeaderMapImpl::create();
+  decoder.decodeHeaders(std::move(headers), false);
+
+  // Call decodeMetadata (no-op) explicitly.
+  Http::MetadataMapPtr meta;
+  decoder.decodeMetadata(std::move(meta));
+
+  // Accessor methods.
+  auto& si = decoder.streamInfo();
+  (void)si;
+  auto logs = decoder.accessLogHandlers();
+  EXPECT_TRUE(logs.empty());
+  auto handle = decoder.getRequestDecoderHandle();
+  EXPECT_EQ(nullptr, handle.get());
+}
+
 // Test configuration with custom ping interval.
 TEST_F(ReverseTunnelFilterUnitTest, ConfigurationCustomPingInterval) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
@@ -729,6 +756,31 @@ TEST_F(ReverseTunnelFilterUnitTest, SendLocalReplyWithHeaderModifier) {
   Buffer::OwnedImpl request(makeHttpRequest("GET", "/wrong/path", "test-body"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
   EXPECT_THAT(written, testing::HasSubstr("404 Not Found"));
+}
+
+// Explicitly call RequestDecoderImpl::sendLocalReply with a header modifier to
+// test the modify_headers.
+TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderSendLocalReplyHeaderModifier) {
+  // Ensure callbacks are initialized to provide a time source.
+  filter_->initializeReadFilterCallbacks(callbacks_);
+
+  // Mock encoder to capture headers set via modifier.
+  Http::MockResponseEncoder encoder;
+  bool saw_custom_header = false;
+  EXPECT_CALL(encoder, encodeHeaders(testing::_, testing::_))
+      .WillOnce(testing::Invoke([&](const Http::ResponseHeaderMap& headers, bool) {
+        auto values = headers.get(Http::LowerCaseString("x-custom-mod"));
+        saw_custom_header = !values.empty() && values[0]->value().getStringView() == "v";
+      }));
+
+  // Obtain a decoder and call sendLocalReply with a modifier.
+  Http::RequestDecoder& decoder = filter_->newStream(encoder, false);
+  decoder.sendLocalReply(
+      Http::Code::Forbidden, "",
+      [](Http::ResponseHeaderMap& h) { h.addCopy(Http::LowerCaseString("x-custom-mod"), "v"); },
+      absl::nullopt, "test");
+
+  EXPECT_TRUE(saw_custom_header);
 }
 
 // Test protobuf validation failure in request.
