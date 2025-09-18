@@ -68,10 +68,11 @@ public:
 
   // Adds a gauge metric data point. Aggregates by summing if a point with the
   // same attributes exists.
-  void addGauge(
-      absl::string_view metric_name, int64_t value, int64_t snapshot_time_ns,
-      int64_t start_time_unix_nano,
-      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes);
+  void
+  addGauge(absl::string_view metric_name, int64_t value, int64_t snapshot_time_ns,
+           int64_t start_time_unix_nano,
+           const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes,
+           bool is_custom_metric);
 
   // Adds a counter metric data point. Aggregates by summing the delta or value
   // based on temporality if a point with the same attributes exists.
@@ -79,7 +80,8 @@ public:
       absl::string_view metric_name, uint64_t value, uint64_t delta, int64_t snapshot_time_ns,
       int64_t start_time_unix_nano,
       ::opentelemetry::proto::metrics::v1::AggregationTemporality temporality,
-      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes);
+      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes,
+      bool is_custom_metric);
 
   // Adds a histogram metric data point. Aggregates counts and sums if a point
   // with the same attributes and compatible bounds exists.
@@ -88,7 +90,8 @@ public:
       const Stats::HistogramStatistics& stats, int64_t snapshot_time_ns,
       int64_t start_time_unix_nano,
       ::opentelemetry::proto::metrics::v1::AggregationTemporality temporality,
-      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes);
+      const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes,
+      bool is_custom_metric);
 
   // Returns a RepeatedPtrField of ResourceMetrics containing all aggregated
   // metrics.
@@ -110,6 +113,9 @@ private:
       const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes);
 
   absl::flat_hash_map<std::string, MetricData> metrics_;
+  // Currently, the metrics without defined in `custom_metric_conversions` won't be aggregated and
+  // will be directly stored in this list.
+  std::vector<::opentelemetry::proto::metrics::v1::Metric> non_aggregated_metrics_;
 };
 
 class OtlpOptions {

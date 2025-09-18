@@ -586,8 +586,8 @@ TEST_F(OtlpMetricsFlusherTests, DeltaHistogramMetric) {
   expectHistogram(*findHistogram(metrics, getTagExtractedName("test_histogram2")),
                   getTagExtractedName("test_histogram2"), true);
 }
-
-TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationCounter) {
+using OtlpMetricsFlusherTestsWithConversion = OtlpMetricsFlusherTests;
+TEST_F(OtlpMetricsFlusherTestsWithConversion, MetricsWithLabelsAggregationCounter) {
   OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "prefix", {},
                                              R"pb(
         matcher_list {
@@ -647,10 +647,12 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationCounter) {
   addCounterToSnapshot("test_counter-1", 0, 1, true, {{"key", "val1"}});
   addCounterToSnapshot("test_counter-2", 0, 99, true, {{"key", "val1"}});
   addCounterToSnapshot("test_counter-1", 0, 3, true, {{"key", "val2"}});
-  addCounterToSnapshot("unmapped_counter", 0, 1, true, {{"key", "val3"}});
+  // Add unconverted metrics with the same name but different tags
+  addCounterToSnapshot("unmapped_counter", 0, 1, true, {{"keyX", "valX"}});
+  addCounterToSnapshot("unmapped_counter", 0, 5, true, {{"keyY", "valY"}});
 
   MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 123);
-  expectMetricsCount(metrics, 2);
+  expectMetricsCount(metrics, 3);
 
   auto& exported_metrics =
       const_cast<Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::Metric>&>(
@@ -659,7 +661,8 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationCounter) {
 
   // Expected metrics in sorted order:
   // 0: new_counter_name (from test_counter)
-  // 1: prefix.unmapped_counter-tagged
+  // 1: prefix.unmapped_counter-tagged (keyX:valX)
+  // 2: prefix.unmapped_counter-tagged (keyY:valY)
 
   // Counter: new_counter_name (remapped)
   {
@@ -688,11 +691,21 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationCounter) {
     EXPECT_EQ(1, metric.sum().data_points()[0].as_int());
     EXPECT_EQ(expected_time_ns_, metric.sum().data_points()[0].time_unix_nano());
     EXPECT_EQ(123, metric.sum().data_points()[0].start_time_unix_nano());
-    expectAttributes(metric.sum().data_points()[0].attributes(), "key", "val3");
+    expectAttributes(metric.sum().data_points()[0].attributes(), "keyX", "valX");
+  }
+
+  // Counter: prefix.unmapped_counter-tagged (unmapped, keyY)
+  {
+    const auto& metric = exported_metrics[2];
+    EXPECT_EQ(getTagExtractedName("prefix.unmapped_counter"), metric.name());
+    EXPECT_TRUE(metric.has_sum());
+    EXPECT_EQ(1, metric.sum().data_points().size());
+    EXPECT_EQ(5, metric.sum().data_points()[0].as_int());
+    expectAttributes(metric.sum().data_points()[0].attributes(), "keyY", "valY");
   }
 }
 
-TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationGauge) {
+TEST_F(OtlpMetricsFlusherTestsWithConversion, MetricsWithLabelsAggregationGauge) {
   OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "prefix", {},
                                              R"pb(
         matcher_list {
@@ -760,10 +773,12 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationGauge) {
   addGaugeToSnapshot("test_gauge-1", 1, true, {{"key", "valA"}});
   addGaugeToSnapshot("test_gauge-2", 2, true, {{"key", "valA"}});
   addGaugeToSnapshot("test_gauge-1", 3, true, {{"key", "valB"}});
-  addGaugeToSnapshot("unmapped_gauge", 4, true, {{"key", "valC"}});
+  // Add unconverted metrics with the same name but different tags
+  addGaugeToSnapshot("unmapped_gauge", 4, true, {{"keyX", "valX"}});
+  addGaugeToSnapshot("unmapped_gauge", 10, true, {{"keyY", "valY"}});
 
   MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 123);
-  expectMetricsCount(metrics, 2);
+  expectMetricsCount(metrics, 3);
 
   auto& exported_metrics =
       const_cast<Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::Metric>&>(
@@ -772,7 +787,8 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationGauge) {
 
   // Expected metrics in sorted order:
   // 0: new_gauge_name (from test_gauge-1, test_gauge-2)
-  // 1: prefix.unmapped_gauge-tagged
+  // 1: prefix.unmapped_gauge-tagged (keyX:valX)
+  // 2: prefix.unmapped_gauge-tagged (keyY:valY)
 
   // Gauge: new_gauge_name (remapped)
   {
@@ -801,11 +817,20 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationGauge) {
     EXPECT_EQ(4, metric.gauge().data_points()[0].as_int());
     EXPECT_EQ(123, metric.gauge().data_points()[0].start_time_unix_nano());
     EXPECT_EQ(expected_time_ns_, metric.gauge().data_points()[0].time_unix_nano());
-    expectAttributes(metric.gauge().data_points()[0].attributes(), "key", "valC");
+    expectAttributes(metric.gauge().data_points()[0].attributes(), "keyX", "valX");
+  }
+  // Gauge: prefix.unmapped_gauge-tagged (unmapped, keyY)
+  {
+    const auto& metric = exported_metrics[2];
+    EXPECT_EQ(getTagExtractedName("prefix.unmapped_gauge"), metric.name());
+    EXPECT_TRUE(metric.has_gauge());
+    EXPECT_EQ(1, metric.gauge().data_points().size());
+    EXPECT_EQ(10, metric.gauge().data_points()[0].as_int());
+    expectAttributes(metric.gauge().data_points()[0].attributes(), "keyY", "valY");
   }
 }
 
-TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationHistogram) {
+TEST_F(OtlpMetricsFlusherTestsWithConversion, MetricsWithLabelsAggregationHistogram) {
   OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "prefix", {},
                                              R"pb(
         matcher_list {
@@ -873,19 +898,21 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationHistogram) {
   addHistogramToSnapshot("test_histogram-1", false, true, {{"key", "hist1"}});
   addHistogramToSnapshot("test_histogram-2", false, true, {{"key", "hist1"}});
   addHistogramToSnapshot("test_histogram-1", false, true, {{"key", "hist2"}});
-  addHistogramToSnapshot("unmapped_histogram", false, true, {{"key", "hist3"}});
+  // Add unconverted metrics with the same name but different tags
+  addHistogramToSnapshot("unmapped_histogram", false, true, {{"keyX", "valX"}});
+  addHistogramToSnapshot("unmapped_histogram", false, true, {{"keyY", "valY"}});
 
   MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 123);
-  expectMetricsCount(metrics, 2);
+  expectMetricsCount(metrics, 3);
 
   auto& exported_metrics =
       const_cast<Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::Metric>&>(
           metrics->resource_metrics()[0].scope_metrics()[0].metrics());
   sortMetrics(exported_metrics);
-
   // Expected metrics in sorted order:
   // 0: new_histogram_name (from test_histogram-1, test_histogram-2)
-  // 1: prefix.unmapped_histogram-tagged
+  // 1: prefix.unmapped_histogram-tagged (keyX:valX)
+  // 2: prefix.unmapped_histogram-tagged (keyY:valY)
 
   // Histogram: new_histogram_name (remapped)
   {
@@ -917,19 +944,26 @@ TEST_F(OtlpMetricsFlusherTests, MetricsWithLabelsAggregationHistogram) {
     expectAttributes(data_point2.attributes(), "key", "hist2");
   }
 
-  // Histogram: prefix.unmapped_histogram-tagged (unmapped)
+  // Histogram: prefix.unmapped_histogram-tagged (unmapped, keyX)
   {
     const auto& metric = exported_metrics[1];
     EXPECT_EQ(getTagExtractedName("prefix.unmapped_histogram"), metric.name());
     EXPECT_TRUE(metric.has_histogram());
-    EXPECT_EQ(expected_time_ns_, metric.histogram().data_points()[0].time_unix_nano());
-    EXPECT_EQ(123, metric.histogram().data_points()[0].start_time_unix_nano());
     EXPECT_EQ(1, metric.histogram().data_points().size());
-    expectAttributes(metric.histogram().data_points()[0].attributes(), "key", "hist3");
+    expectAttributes(metric.histogram().data_points()[0].attributes(), "keyX", "valX");
+  }
+
+  // Histogram: prefix.unmapped_histogram-tagged (unmapped, keyY)
+  {
+    const auto& metric = exported_metrics[2];
+    EXPECT_EQ(getTagExtractedName("prefix.unmapped_histogram"), metric.name());
+    EXPECT_TRUE(metric.has_histogram());
+    EXPECT_EQ(1, metric.histogram().data_points().size());
+    expectAttributes(metric.histogram().data_points()[0].attributes(), "keyY", "valY");
   }
 }
 
-TEST_F(OtlpMetricsFlusherTests, MetricsWithStaticMetricLabels) {
+TEST_F(OtlpMetricsFlusherTestsWithConversion, MetricsWithStaticMetricLabels) {
   OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "", {},
                                              R"pb(
         matcher_list {
