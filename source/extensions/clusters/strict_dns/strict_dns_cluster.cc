@@ -42,6 +42,8 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
       respect_dns_ttl_(dns_cluster.respect_dns_ttl()),
       dns_lookup_family_(
           Envoy::DnsUtils::getDnsLookupFamilyFromEnum(dns_cluster.dns_lookup_family())) {
+  RETURN_ONLY_IF_NOT_OK_REF(creation_status);
+
   failure_backoff_strategy_ = Config::Utility::prepareDnsRefreshStrategy(
       dns_cluster, dns_refresh_rate_ms_.count(),
       context.serverFactoryContext().api().randomGenerator());
