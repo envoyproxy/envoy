@@ -177,6 +177,12 @@ message RouteConfiguration {
   // be matched by a VirtualHost with a domain entry of
   // 'foo.bar.example.org', due to the second label in the domain
   // being replaced by the simplification rule to 'bar'.
+  // If multiple rules are provided, they are processed in order. The
+  // results of the first rule will be used by the second rule, and so
+  // on. It is unlikely that you want to depend on this behavior,
+  // however, due to the potential for confusion. It is recommended
+  // that, if you need multiple simplification rules, they should be
+  // as independent of each other as possible.
   repeated type.matcher.v3.RegexMatchAndSubstitute host_simplification_rules = 18;
 }
 
