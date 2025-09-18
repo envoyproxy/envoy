@@ -429,3 +429,4 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /contrib/qat/ @giantcroc @soulxu
 /contrib/generic_proxy/ @wbpcode @UNOWNED
 /contrib/tap_sinks/ @coolg92003 @yiyibaoguo
+/contrib/reverse_connection/ @basundhara-c @tejas-sangol @arun-vasudev @adityajaltade
