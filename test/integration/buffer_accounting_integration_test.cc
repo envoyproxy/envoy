@@ -365,7 +365,6 @@ TEST_P(Http2BufferWatermarksTest, ShouldTrackAllocatedBytesToShadowUpstream) {
   const uint32_t request_body_size = 4096;
   const uint32_t response_body_size = 4096;
   TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.reloadable_features.streaming_shadow", "true"}});
 
   autonomous_upstream_ = true;
   autonomous_allow_incomplete_streams_ = true;
