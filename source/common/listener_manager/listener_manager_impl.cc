@@ -293,16 +293,22 @@ absl::StatusOr<Network::SocketSharedPtr> ProdListenerComponentFactory::createLis
                                         worker_index);
     };
 
-    auto result = Network::Utility::execInNetworkNamespace(fn, netns.value().c_str());
+    // Here we're running `fn` in a different network namespace. It will return a `absl::StatusOr`
+    // that wraps the result of the function we pass in, which is another `absl::StatusOr`.
+    auto outer_result = Network::Utility::execInNetworkNamespace(fn, netns.value().c_str());
 
-    // We have a nested absl::StatusOr type, so if there were no issues with changing the namespace,
-    // we want to return the inner absl::StatusOr.
-    if (result->ok()) {
-      return result->value();
+    // We have a nested absl::StatusOr type. The "outer" result is the result of our attempt to jump
+    // between network namespaces. The "inner" result is that of the `createListenSocketInternal`
+    // function we passed in to run in the other netns.
+    if (outer_result.ok()) {
+      // We successfully jumped network namespaces and ran `createListenSocketInternal` in that
+      // namespace before jumping back. Here we return the result of that
+      // `createListenSocketInternal` function.
+      return outer_result.value();
     }
 
-    // The result was not ok, so we want to return the outer status.
-    return result.status();
+    // The "outer" result was not ok, which means we failed to jump network namespaces.
+    return outer_result.status();
   }
 #endif
 
