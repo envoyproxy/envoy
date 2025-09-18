@@ -4,6 +4,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/upstream/cluster_factory_impl.h"
 #include "source/extensions/clusters/dns/dns_cluster.h"
+#include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/registry.h"
@@ -230,6 +231,8 @@ public:
     TestEnvironment::setEnvVar("AWS_CONTAINER_CREDENTIALS_FULL_URI",
                                "http://127.0.0.1/path/to/creds", 1);
     TestEnvironment::setEnvVar("AWS_CONTAINER_AUTHORIZATION_TOKEN", "auth_token", 1);
+
+    addBootstrapDefaultDns();
   }
 
   ~AwsRequestSigningIntegrationTest() override {
@@ -257,6 +260,16 @@ public:
       protocol_options.mutable_upstream_http_protocol_options()->set_auto_san_validation(true);
       protocol_options.mutable_explicit_http_config()->mutable_http_protocol_options();
       ConfigHelper::setProtocolOptions(*cluster, protocol_options);
+    });
+  }
+
+  void addBootstrapDefaultDns() {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* typed_dns_resolver_config = bootstrap.mutable_typed_dns_resolver_config();
+      typed_dns_resolver_config->set_name("envoy.network.dns_resolver.getaddrinfo");
+      envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+          config;
+      typed_dns_resolver_config->mutable_typed_config()->PackFrom(config);
     });
   }
 

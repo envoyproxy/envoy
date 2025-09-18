@@ -109,6 +109,13 @@ message ScaleTimersOverloadActionConfig {
     // :ref:`HttpConnectionManager.common_http_protocol_options.max_connection_duration
     // <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_connection_duration>`.
     HTTP_DOWNSTREAM_CONNECTION_MAX = 4;
+
+    // Adjusts the timeout for the downstream codec to flush an ended stream.
+    // This affects the value of :ref:`RouteAction.flush_timeout
+    // <envoy_v3_api_field_config.route.v3.RouteAction.flush_timeout>` and
+    // :ref:`HttpConnectionManager.stream_flush_timeout
+    // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_flush_timeout>`
+    HTTP_DOWNSTREAM_STREAM_FLUSH = 5;
   }
 
   message ScaleTimer {

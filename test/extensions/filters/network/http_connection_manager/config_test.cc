@@ -3596,6 +3596,38 @@ TEST_F(HttpConnectionManagerConfigTest, TranslateLegacyConfigToDefaultHeaderVali
 #endif
 }
 
+TEST_F(HttpConnectionManagerConfigTest, HealtchCheckIncorrectConfigTest) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+server_name: foo
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: health_check
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
+    pass_through_mode: false
+    cluster_min_healthy_percentages:
+      test: {value: nan}
+- name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "cluster_min_healthy_percentages contains a NaN value for cluster: test");
+}
+
 class HcmUtilityTest : public testing::Test {
 public:
   HcmUtilityTest() {

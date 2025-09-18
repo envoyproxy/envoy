@@ -221,9 +221,38 @@ Run the debug configuration generator:
 ```bash
 tools/vscode/generate_debug_config.py //source/exe:envoy-static --args "-c envoy.yaml"
 ```
+
+**Advanced Configuration Options:**
+
+The script now supports automatic compiler configuration detection and manual override options:
+
+- **Auto-detection**: The script automatically detects the optimal compiler configuration based on your platform:
+  - On ARM64/aarch64 architectures (Apple Silicon Macs): Automatically uses `clang` for better C++20 concepts compatibility
+  - On other architectures: Uses Bazel's default configuration
+
+- **Manual override**: You can explicitly specify a build configuration using the `--config` flag:
+  ```bash
+  # Force use of clang configuration
+  tools/vscode/generate_debug_config.py //source/exe:envoy-static --args "-c envoy.yaml" --config clang
+
+  # Force use of gcc configuration
+  tools/vscode/generate_debug_config.py //source/exe:envoy-static --args "-c envoy.yaml" --config gcc
+  ```
+
+- **Additional options**:
+  ```bash
+  # Use LLDB debugger instead of GDB (recommended for macOS)
+  tools/vscode/generate_debug_config.py //source/exe:envoy-static --args "-c envoy.yaml" --debugger lldb
+
+  # Overwrite existing configuration completely
+  tools/vscode/generate_debug_config.py //source/exe:envoy-static --args "-c envoy.yaml" --overwrite
+  ```
+
 ![Debug Configuration Run](./images/debug-configuration-run.png)
 
 > **Important**: This command may take over an hour to complete. You'll need to re-run this script whenever you make code changes.
+
+> **ARM64/Apple Silicon Note**: If you're using an ARM64 system (like Apple Silicon Macs) and encounter GCC-related compilation errors with C++20 concepts compatibility, the script will automatically use clang configuration to resolve these issues. This addresses protobuf dependency compatibility problems that can occur with GCC on ARM64 architectures.
 
 There are two types of debuggers envoy community recommends to use, GDB (GNU Debugger) , a widely used and powerful debugger for various languages, including C++ and  LLDB,  the LLVM project's debugger, often used with Clang-compiled code (Clang is one of the many compilers for C++).
 

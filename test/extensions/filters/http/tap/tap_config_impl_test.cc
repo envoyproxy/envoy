@@ -323,6 +323,37 @@ http_streamed_trace_segment:
   EXPECT_TRUE(tapper_->onDestroyLog());
 }
 
+// Request headers are not guaranteed to be present during
+// response reply.
+// One known scenario is - request headers are too large. In this
+// case processing of the request will be terminated with 431
+// status before request headers are parsed.
+TEST_F(HttpPerRequestTapperImplTest, StreamNoRequestHeader) {
+  EXPECT_CALL(*config_, streaming()).WillRepeatedly(Return(true));
+  EXPECT_CALL(*config_, maxBufferedRxBytes()).WillRepeatedly(Return(1024));
+  EXPECT_CALL(*config_, maxBufferedTxBytes()).WillRepeatedly(Return(1024));
+
+  InSequence s;
+  EXPECT_CALL(matcher_, onHttpResponseHeaders(_, _))
+      .WillOnce(Assign(&(*statuses_)[0].matches_, true));
+  EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
+                                  R"EOF(
+http_streamed_trace_segment:
+  trace_id: 1
+)EOF")));
+  EXPECT_CALL(*sink_manager_, submitTrace_(TraceEqual(
+                                  R"EOF(
+http_streamed_trace_segment:
+  trace_id: 1
+  response_headers:
+    headers:
+      - key: e
+        value: f
+)EOF")));
+  // onResponseHeaders called without onRequestHeaders prior
+  tapper_->onResponseHeaders(response_headers_);
+}
+
 class HttpPerRequestTapperImplForSpecificConfigTest : public testing::Test {
 public:
   HttpPerRequestTapperImplForSpecificConfigTest() {

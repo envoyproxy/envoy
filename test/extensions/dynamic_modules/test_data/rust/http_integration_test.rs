@@ -13,7 +13,7 @@ fn init() -> bool {
 }
 
 fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
-  _envoy_filter_config: &mut EC,
+  envoy_filter_config: &mut EC,
   name: &str,
   config: &[u8],
 ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
@@ -34,6 +34,38 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
     "send_response" => Some(Box::new(SendResponseHttpFilterConfig::new(config))),
     "http_filter_scheduler" => Some(Box::new(HttpFilterSchedulerConfig {})),
     "fake_external_cache" => Some(Box::new(FakeExternalCachingFilterConfig {})),
+    "stats_callbacks" => {
+      let config = String::from_utf8(config.to_owned()).unwrap();
+      let mut config_iter = config.split(',');
+      Some(Box::new(StatsCallbacksFilterConfig {
+        requests_total: envoy_filter_config
+          .define_counter("requests_total")
+          .unwrap(),
+        requests_pending: envoy_filter_config
+          .define_gauge("requests_pending")
+          .unwrap(),
+        requests_set_value: envoy_filter_config
+          .define_gauge("requests_set_value")
+          .unwrap(),
+        requests_header_values: envoy_filter_config
+          .define_histogram("requests_header_values")
+          .unwrap(),
+        entrypoint_total: envoy_filter_config
+          .define_counter_vec("entrypoint_total", &["entrypoint", "method"])
+          .unwrap(),
+        entrypoint_set_value: envoy_filter_config
+          .define_gauge_vec("entrypoint_set_value", &["entrypoint", "method"])
+          .unwrap(),
+        entrypoint_pending: envoy_filter_config
+          .define_gauge_vec("entrypoint_pending", &["entrypoint", "method"])
+          .unwrap(),
+        entrypoint_header_values: envoy_filter_config
+          .define_histogram_vec("entrypoint_header_values", &["entrypoint", "method"])
+          .unwrap(),
+        header_to_count: config_iter.next().unwrap().to_owned(),
+        header_to_set: config_iter.next().unwrap().to_owned(),
+      }))
+    },
     _ => panic!("Unknown filter name: {}", name),
   }
 }
@@ -683,5 +715,188 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for FakeExternalCachingFilter {
     // Return StopIteration to indicate that we will continue the processing
     // once the scheduled event is completed.
     envoy_dynamic_module_type_on_http_filter_response_headers_status::StopIteration
+  }
+}
+
+struct StatsCallbacksFilterConfig {
+  requests_total: EnvoyCounterId,
+  requests_pending: EnvoyGaugeId,
+  requests_header_values: EnvoyHistogramId,
+  requests_set_value: EnvoyGaugeId,
+  entrypoint_total: EnvoyCounterVecId,
+  entrypoint_pending: EnvoyGaugeVecId,
+  entrypoint_header_values: EnvoyHistogramVecId,
+  entrypoint_set_value: EnvoyGaugeVecId,
+  header_to_count: String,
+  header_to_set: String,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StatsCallbacksFilterConfig {
+  fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(StatsCallbacksFilter {
+      requests_total: self.requests_total,
+      requests_pending: self.requests_pending,
+      requests_header_values: self.requests_header_values,
+      requests_set_value: self.requests_set_value,
+      entrypoint_total: self.entrypoint_total,
+      entrypoint_pending: self.entrypoint_pending,
+      entrypoint_header_values: self.entrypoint_header_values,
+      entrypoint_set_value: self.entrypoint_set_value,
+      header_to_count: self.header_to_count.clone(),
+      header_to_set: self.header_to_set.clone(),
+      method: None,
+    })
+  }
+}
+
+struct StatsCallbacksFilter {
+  requests_total: EnvoyCounterId,
+  requests_pending: EnvoyGaugeId,
+  requests_set_value: EnvoyGaugeId,
+  requests_header_values: EnvoyHistogramId,
+
+  entrypoint_total: EnvoyCounterVecId,
+  entrypoint_pending: EnvoyGaugeVecId,
+  entrypoint_set_value: EnvoyGaugeVecId,
+  entrypoint_header_values: EnvoyHistogramVecId,
+  header_to_count: String,
+  header_to_set: String,
+  method: Option<String>,
+}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    envoy_filter
+      .increment_counter(self.requests_total, 1)
+      .unwrap();
+    envoy_filter
+      .increase_gauge(self.requests_pending, 1)
+      .unwrap();
+    let method = envoy_filter.get_request_header_value(":method").unwrap();
+    let method = std::str::from_utf8(method.as_slice()).unwrap();
+    envoy_filter
+      .increment_counter_vec(self.entrypoint_total, &["on_request_headers", method], 1)
+      .unwrap();
+    envoy_filter
+      .increase_gauge_vec(self.entrypoint_pending, &["on_request_headers", method], 1)
+      .unwrap();
+    self.method = Some(method.to_owned());
+
+    // Record histogram value to provided value in header
+    if let Some(header_val) = envoy_filter.get_request_header_value(self.header_to_count.as_str()) {
+      let header_val = std::str::from_utf8(header_val.as_slice())
+        .unwrap()
+        .parse()
+        .unwrap();
+      envoy_filter
+        .record_histogram_value(self.requests_header_values, header_val)
+        .unwrap();
+      envoy_filter
+        .record_histogram_value_vec(
+          self.entrypoint_header_values,
+          &["on_request_headers", method],
+          header_val,
+        )
+        .unwrap();
+    }
+
+
+    // Set gauges to provided value in header
+    if let Some(header_val) = envoy_filter.get_request_header_value(self.header_to_set.as_str()) {
+      let header_val = std::str::from_utf8(header_val.as_slice())
+        .unwrap()
+        .parse()
+        .unwrap();
+      envoy_filter
+        .set_gauge(self.requests_set_value, header_val)
+        .unwrap();
+      envoy_filter
+        .set_gauge_vec(
+          self.entrypoint_set_value,
+          &["on_request_headers", method],
+          header_val,
+        )
+        .unwrap();
+    }
+
+    abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
+  }
+
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    envoy_filter
+      .increment_counter_vec(
+        self.entrypoint_total,
+        &["on_response_headers", self.method.as_ref().unwrap()],
+        1,
+      )
+      .unwrap();
+    envoy_filter
+      .decrease_gauge(self.requests_pending, 1)
+      .unwrap();
+    envoy_filter
+      .decrease_gauge_vec(
+        self.entrypoint_pending,
+        &["on_request_headers", self.method.as_ref().unwrap()],
+        1,
+      )
+      .unwrap();
+    envoy_filter
+      .increase_gauge_vec(
+        self.entrypoint_pending,
+        &["on_response_headers", self.method.as_ref().unwrap()],
+        1,
+      )
+      .unwrap();
+
+    // Record histogram value to provided value in header
+    if let Some(header_val) = envoy_filter.get_response_header_value(self.header_to_count.as_str())
+    {
+      let header_val = std::str::from_utf8(header_val.as_slice())
+        .unwrap()
+        .parse()
+        .unwrap();
+      envoy_filter
+        .record_histogram_value_vec(
+          self.entrypoint_header_values,
+          &["on_response_headers", self.method.as_ref().unwrap()],
+          header_val,
+        )
+        .unwrap();
+    }
+
+    // Set gauges to provided value in header
+    if let Some(header_val) = envoy_filter.get_response_header_value(self.header_to_set.as_str()) {
+      let header_val = std::str::from_utf8(header_val.as_slice())
+        .unwrap()
+        .parse()
+        .unwrap();
+      envoy_filter
+        .set_gauge_vec(
+          self.entrypoint_set_value,
+          &["on_response_headers", self.method.as_ref().unwrap()],
+          header_val,
+        )
+        .unwrap();
+    }
+
+    abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  }
+
+  fn on_stream_complete(&mut self, envoy_filter: &mut EHF) {
+    envoy_filter
+      .decrease_gauge_vec(
+        self.entrypoint_pending,
+        &["on_response_headers", self.method.as_ref().unwrap()],
+        1,
+      )
+      .unwrap();
   }
 }

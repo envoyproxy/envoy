@@ -94,5 +94,7 @@ envoy_cc_test(
         "//test/mocks/upstream:cluster_manager_mocks",
         "//test/mocks/upstream:load_balancer_context_mock",
         "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/request_id/uuid/v3:pkg_cc_proto",
     ],
 )

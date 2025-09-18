@@ -5,6 +5,7 @@ package envoy.extensions.network.dns_resolver.cares.v3;
 import "envoy/config/core/v3/address.proto";
 import "envoy/config/core/v3/resolver.proto";
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/status.proto";
@@ -20,7 +21,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.network.dns_resolver.cares]
 
 // Configuration for c-ares DNS resolver.
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message CaresDnsResolverConfig {
   // A list of DNS resolver addresses.
   // :ref:`use_resolvers_as_fallback <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.use_resolvers_as_fallback>`
@@ -80,13 +81,22 @@ message CaresDnsResolverConfig {
 
   // Maximum EDNS0 UDP payload size in bytes.
   // If set, c-ares will include EDNS0 in DNS queries and use this value as the maximum UDP response size.
-
+  //
   // Recommended values:
   //
-  //   - 1232: Safe default (avoids fragmentation)
-  //   - 4096: Maximum allowed
+  // * **1232**: Safe default (avoids fragmentation).
+  // * **4096**: Maximum allowed.
   //
   // If unset, c-ares uses its internal default (usually 1232).
   google.protobuf.UInt32Value edns0_max_payload_size = 9
       [(validate.rules).uint32 = {lte: 4096 gte: 512}];
+
+  // The maximum duration for which a UDP channel will be kept alive before being refreshed.
+  //
+  // If set, the DNS resolver will periodically reinitialize its c-ares channel after the
+  // specified duration. This can help with avoiding stale socket states, and providing
+  // better load distribution across UDP ports.
+  //
+  // If not specified, no periodic refresh will be performed.
+  google.protobuf.Duration max_udp_channel_duration = 10 [(validate.rules).duration = {gte {}}];
 }

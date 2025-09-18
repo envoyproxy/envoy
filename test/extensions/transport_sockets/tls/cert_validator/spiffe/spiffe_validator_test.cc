@@ -751,15 +751,16 @@ typed_config:
   bool foundTestCA = false;
   SSLContextPtr ctx = SSL_CTX_new(TLS_method());
   ASSERT_TRUE(validator().addClientValidationContext(ctx.get(), false).ok());
-  for (X509_NAME* name : SSL_CTX_get_client_CA_list(ctx.get())) {
+  for (const X509_NAME* name : SSL_CTX_get_client_CA_list(ctx.get())) {
     const int cn_index = X509_NAME_get_index_by_NID(name, NID_commonName, -1);
     EXPECT_TRUE(cn_index >= 0);
-    X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(name, cn_index);
+    const X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(name, cn_index);
     EXPECT_TRUE(cn_entry);
-    ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
+    const ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
     EXPECT_TRUE(cn_asn1);
 
-    auto cn_str = std::string(reinterpret_cast<char const*>(ASN1_STRING_data(cn_asn1)));
+    auto cn_str = std::string(reinterpret_cast<char const*>(ASN1_STRING_get0_data(cn_asn1)),
+                              ASN1_STRING_length(cn_asn1));
     if (cn_str == "Test Server") {
       foundTestServer = true;
     } else if (cn_str == "Test CA") {

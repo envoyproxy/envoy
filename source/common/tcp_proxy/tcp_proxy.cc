@@ -10,6 +10,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
+#include "envoy/extensions/request_id/uuid/v3/uuid.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stream_info/bool_accessor.h"
@@ -26,6 +27,7 @@
 #include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/http/request_id_extension_impl.h"
 #include "source/common/network/application_protocol.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
 #include "source/common/network/socket_option_factory.h"
@@ -788,6 +790,17 @@ TunnelingConfigHelperImpl::TunnelingConfigHelperImpl(
   hostname_fmt_ = THROW_OR_RETURN_VALUE(Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
                                             substitution_format_config, context),
                                         Formatter::FormatterPtr);
+
+  // Initialize request ID extension if explicitly configured.
+  const auto& rid_config = config_message.tunneling_config().request_id_extension();
+  if (rid_config.has_typed_config()) {
+    auto extension_or_error = Http::RequestIDExtensionFactory::fromProto(rid_config, context);
+    if (!extension_or_error.ok()) {
+      throw EnvoyException(absl::StrCat("Failed to create request ID extension: ",
+                                        extension_or_error.status().ToString()));
+    }
+    request_id_extension_ = extension_or_error.value();
+  }
 }
 
 std::string TunnelingConfigHelperImpl::host(const StreamInfo::StreamInfo& stream_info) const {
@@ -873,6 +886,29 @@ Network::FilterStatus Filter::onNewConnection() {
     access_log_flush_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onAccessLogFlushInterval(); });
     resetAccessLogFlushTimer();
+  }
+
+  idle_timeout_ = config_->idleTimeout();
+  if (const auto* per_connection_idle_timeout =
+          getStreamInfo().filterState()->getDataReadOnly<StreamInfo::UInt64Accessor>(
+              PerConnectionIdleTimeoutMs);
+      per_connection_idle_timeout != nullptr) {
+    idle_timeout_ = std::chrono::milliseconds(per_connection_idle_timeout->value());
+  }
+
+  if (idle_timeout_) {
+    // The idle_timer_ can be moved to a Drainer, so related callbacks call into
+    // the UpstreamCallbacks, which has the same lifetime as the timer, and can dispatch
+    // the call to either TcpProxy or to Drainer, depending on the current state.
+    idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+        [upstream_callbacks = upstream_callbacks_]() { upstream_callbacks->onIdleTimeout(); });
+
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.tcp_proxy_set_idle_timer_immediately_on_new_connection")) {
+      // Start the idle timer immediately so that if no response is received from the upstream,
+      // the downstream connection will time out.
+      resetIdleTimer();
+    }
   }
 
   // Set UUID for the connection. This is used for logging and tracing.
@@ -1032,20 +1068,7 @@ void Filter::onUpstreamConnection() {
                  read_callbacks_->connection(),
                  getStreamInfo().downstreamAddressProvider().requestedServerName());
 
-  idle_timeout_ = config_->idleTimeout();
-  if (const auto* per_connection_idle_timeout =
-          getStreamInfo().filterState()->getDataReadOnly<StreamInfo::UInt64Accessor>(
-              PerConnectionIdleTimeoutMs);
-      per_connection_idle_timeout != nullptr) {
-    idle_timeout_ = std::chrono::milliseconds(per_connection_idle_timeout->value());
-  }
-
   if (idle_timeout_) {
-    // The idle_timer_ can be moved to a Drainer, so related callbacks call into
-    // the UpstreamCallbacks, which has the same lifetime as the timer, and can dispatch
-    // the call to either TcpProxy or to Drainer, depending on the current state.
-    idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
-        [upstream_callbacks = upstream_callbacks_]() { upstream_callbacks->onIdleTimeout(); });
     resetIdleTimer();
     read_callbacks_->connection().addBytesSentCallback([this](uint64_t) {
       resetIdleTimer();

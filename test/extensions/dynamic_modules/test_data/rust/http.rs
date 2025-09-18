@@ -20,10 +20,27 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
 ) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
   match name {
     "stats_callbacks" => Some(Box::new(StatsCallbacksFilterConfig {
-      streams_total: envoy_filter_config.define_counter("streams_total"),
-      concurrent_streams: envoy_filter_config.define_gauge("concurrent_streams"),
-      ones: envoy_filter_config.define_histogram("ones"),
-      magic_number: envoy_filter_config.define_gauge("magic_number"),
+      streams_total: envoy_filter_config
+        .define_counter("streams_total")
+        .expect("failed to define counter"),
+      concurrent_streams: envoy_filter_config
+        .define_gauge("concurrent_streams")
+        .expect("failed to define gauge"),
+      ones: envoy_filter_config
+        .define_histogram("ones")
+        .expect("failed to define histogram"),
+      magic_number: envoy_filter_config
+        .define_gauge("magic_number")
+        .expect("failed to define gauge"),
+      test_counter_vec: envoy_filter_config
+        .define_counter_vec("test_counter_vec", &["test_label"])
+        .expect("failed to define counter vec"),
+      test_gauge_vec: envoy_filter_config
+        .define_gauge_vec("test_gauge_vec", &["test_label"])
+        .expect("failed to define gauge vec"),
+      test_histogram_vec: envoy_filter_config
+        .define_histogram_vec("test_histogram_vec", &["test_label"])
+        .expect("failed to define histogram vec"),
     })),
     "header_callbacks" => Some(Box::new(HeaderCallbacksFilterConfig {})),
     "send_response" => Some(Box::new(SendResponseFilterConfig {})),
@@ -44,18 +61,48 @@ struct StatsCallbacksFilterConfig {
   magic_number: EnvoyGaugeId,
   // It's full of 1s.
   ones: EnvoyHistogramId,
+  test_counter_vec: EnvoyCounterVecId,
+  test_gauge_vec: EnvoyGaugeVecId,
+  test_histogram_vec: EnvoyHistogramVecId,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StatsCallbacksFilterConfig {
   fn new_http_filter(&mut self, envoy_filter: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
-    envoy_filter.increment_counter(self.streams_total, 1);
-    envoy_filter.increase_gauge(self.concurrent_streams, 1);
-    envoy_filter.set_gauge(self.magic_number, 42);
+    envoy_filter
+      .increment_counter(self.streams_total, 1)
+      .expect("failed to increment counter");
+    envoy_filter
+      .increase_gauge(self.concurrent_streams, 1)
+      .expect("failed to increase gauge");
+    envoy_filter
+      .set_gauge(self.magic_number, 42)
+      .expect("failed to set gauge");
+    envoy_filter
+      .increment_counter_vec(self.test_counter_vec, &["increment"], 1)
+      .expect("failed to increment counter vec");
+    envoy_filter
+      .increase_gauge_vec(self.test_gauge_vec, &["increase"], 1)
+      .expect("failed to increase gauge vec");
+    envoy_filter
+      .increase_gauge_vec(self.test_gauge_vec, &["decrease"], 10)
+      .expect("failed to increase gauge vec");
+    envoy_filter
+      .decrease_gauge_vec(self.test_gauge_vec, &["decrease"], 8)
+      .expect("failed to decrease gauge vec");
+    envoy_filter
+      .set_gauge_vec(self.test_gauge_vec, &["set"], 9001)
+      .expect("failed to set gauge vec");
+    envoy_filter
+      .record_histogram_value_vec(self.test_histogram_vec, &["record"], 1)
+      .expect("failed to record histogram value vec");
     // Copy the stats handles onto the filter so that we can observe stats while
     // handling requests.
     Box::new(StatsCallbacksFilter {
       concurrent_streams: self.concurrent_streams,
       ones: self.ones,
+      test_counter_vec: self.test_counter_vec,
+      test_gauge_vec: self.test_gauge_vec,
+      test_histogram_vec: self.test_histogram_vec,
     })
   }
 }
@@ -64,6 +111,9 @@ impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StatsCallbacksFilterConfig 
 struct StatsCallbacksFilter {
   concurrent_streams: EnvoyGaugeId,
   ones: EnvoyHistogramId,
+  test_counter_vec: EnvoyCounterVecId,
+  test_gauge_vec: EnvoyGaugeVecId,
+  test_histogram_vec: EnvoyHistogramVecId,
 }
 
 impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
@@ -72,12 +122,40 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> abi::envoy_dynamic_module_type_on_http_filter_request_headers_status {
-    envoy_filter.record_histogram_value(self.ones, 1);
+    envoy_filter
+      .record_histogram_value(self.ones, 1)
+      .expect("failed to record histogram value");
+
+    let header = envoy_filter.get_request_header_value("header").unwrap();
+    let header = std::str::from_utf8(header.as_slice()).unwrap();
+    envoy_filter
+      .increment_counter_vec(self.test_counter_vec, &[header], 1)
+      .expect("failed to increment counter vec");
+    envoy_filter
+      .increase_gauge_vec(self.test_gauge_vec, &[header], 1)
+      .expect("failed to increase gauge vec");
+    envoy_filter
+      .record_histogram_value_vec(self.test_histogram_vec, &[header], 1)
+      .expect("failed to record histogram value vec");
+
     abi::envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue
   }
 
   fn on_stream_complete(&mut self, envoy_filter: &mut EHF) {
-    envoy_filter.decrease_gauge(self.concurrent_streams, 1);
+    envoy_filter
+      .decrease_gauge(self.concurrent_streams, 1)
+      .expect("failed to decrease gauge");
+
+    let local_var = "local_var".to_owned();
+    envoy_filter
+      .increment_counter_vec(self.test_counter_vec, &[&local_var], 1)
+      .expect("failed to increment counter vec");
+    envoy_filter
+      .increase_gauge_vec(self.test_gauge_vec, &[&local_var], 1)
+      .expect("failed to increase gauge vec");
+    envoy_filter
+      .record_histogram_value_vec(self.test_histogram_vec, &[&local_var], 1)
+      .expect("failed to record histogram value vec");
   }
 }
 

@@ -95,6 +95,7 @@ envoy_cc_library(
         "//envoy/tracing:tracer_interface",
         "//envoy/upstream:resource_manager_interface",
         "//envoy/upstream:retry_interface",
+        "//source/common/http:response_decoder_impl_base",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "@com_google_absl//absl/types:optional",

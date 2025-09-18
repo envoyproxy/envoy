@@ -423,24 +423,23 @@ SubsetLoadBalancer::LbSubsetEntryPtr SubsetLoadBalancer::findSubset(
 }
 
 void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority, const HostVector& all_hosts) {
-  auto update_func = [priority, &all_hosts](LbSubsetPtr& subset, const HostPredicate& predicate,
-                                            uint64_t seed) {
+  auto update_func = [priority, &all_hosts](LbSubsetPtr& subset, const HostPredicate& predicate) {
     for (const auto& host : all_hosts) {
       if (predicate(*host)) {
         subset->pushHost(priority, host);
       }
     }
-    subset->finalize(priority, seed);
+    subset->finalize(priority);
   };
 
   if (subset_any_ != nullptr) {
-    update_func(subset_any_->lb_subset_, [](const Host&) { return true; }, random_.random());
+    update_func(subset_any_->lb_subset_, [](const Host&) { return true; });
   }
 
   if (subset_default_ != nullptr) {
     HostPredicate predicate = std::bind(&SubsetLoadBalancer::hostMatches, this,
                                         default_subset_metadata_, std::placeholders::_1);
-    update_func(subset_default_->lb_subset_, predicate, random_.random());
+    update_func(subset_default_->lb_subset_, predicate);
   }
 
   if (fallback_subset_ == nullptr) {
@@ -515,9 +514,9 @@ void SubsetLoadBalancer::processSubsets(uint32_t priority, const HostVector& all
   single_duplicate_stat_->set(collision_count_of_single_host_entries);
 
   // Finalize updates after all the hosts are evaluated.
-  forEachSubset(subsets_, [priority, this](LbSubsetEntryPtr entry) {
+  forEachSubset(subsets_, [priority](LbSubsetEntryPtr entry) {
     if (entry->initialized()) {
-      entry->lb_subset_->finalize(priority, random_.random());
+      entry->lb_subset_->finalize(priority);
     }
   });
 }
@@ -732,7 +731,7 @@ SubsetLoadBalancer::PrioritySubsetImpl::PrioritySubsetImpl(const SubsetLoadBalan
 // hosts that belong in this subset.
 void SubsetLoadBalancer::HostSubsetImpl::update(const HostHashSet& matching_hosts,
                                                 const HostVector& hosts_added,
-                                                const HostVector& hosts_removed, uint64_t seed) {
+                                                const HostVector& hosts_removed) {
   auto cached_predicate = [&matching_hosts](const auto& host) {
     return matching_hosts.count(&host) == 1;
   };
@@ -793,7 +792,7 @@ void SubsetLoadBalancer::HostSubsetImpl::update(const HostHashSet& matching_host
       HostSetImpl::updateHostsParams(
           hosts, hosts_per_locality, healthy_hosts, healthy_hosts_per_locality, degraded_hosts,
           degraded_hosts_per_locality, excluded_hosts, excluded_hosts_per_locality),
-      determineLocalityWeights(*hosts_per_locality), hosts_added, hosts_removed, seed,
+      determineLocalityWeights(*hosts_per_locality), hosts_added, hosts_removed,
       original_host_set_.weightedPriorityHealth(), original_host_set_.overprovisioningFactor());
 }
 
@@ -850,10 +849,9 @@ HostSetImplPtr SubsetLoadBalancer::PrioritySubsetImpl::createHostSet(
 void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,
                                                     const HostHashSet& matching_hosts,
                                                     const HostVector& hosts_added,
-                                                    const HostVector& hosts_removed,
-                                                    uint64_t seed) {
+                                                    const HostVector& hosts_removed) {
   const auto& host_subset = getOrCreateHostSet(priority);
-  updateSubset(priority, matching_hosts, hosts_added, hosts_removed, seed);
+  updateSubset(priority, matching_hosts, hosts_added, hosts_removed);
 
   if (host_subset.hosts().empty() != empty_) {
     empty_ = true;
@@ -870,7 +868,7 @@ void SubsetLoadBalancer::PrioritySubsetImpl::update(uint32_t priority,
   }
 }
 
-void SubsetLoadBalancer::PriorityLbSubset::finalize(uint32_t priority, uint64_t seed) {
+void SubsetLoadBalancer::PriorityLbSubset::finalize(uint32_t priority) {
   while (host_sets_.size() <= priority) {
     host_sets_.push_back({HostHashSet(), HostHashSet()});
   }
@@ -891,7 +889,7 @@ void SubsetLoadBalancer::PriorityLbSubset::finalize(uint32_t priority, uint64_t 
     }
   }
 
-  subset_.update(priority, new_hosts, added, removed, seed);
+  subset_.update(priority, new_hosts, added, removed);
 
   old_hosts.swap(new_hosts);
   new_hosts.clear();

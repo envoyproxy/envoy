@@ -132,12 +132,13 @@ private:
 
 class EnvoyQuicServerConnection : public quic::QuicConnection, public QuicNetworkConnection {
 public:
+  // Creates a new `EnvoyQuicServerConnection`. `writer` is owned by the caller and must
+  // outlive the connection.
   EnvoyQuicServerConnection(const quic::QuicConnectionId& server_connection_id,
                             quic::QuicSocketAddress initial_self_address,
                             quic::QuicSocketAddress initial_peer_address,
                             quic::QuicConnectionHelperInterface& helper,
                             quic::QuicAlarmFactory& alarm_factory, quic::QuicPacketWriter* writer,
-                            bool owns_writer,
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Network::ConnectionSocketPtr connection_socket,
                             quic::ConnectionIdGeneratorInterface& generator,

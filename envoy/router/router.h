@@ -27,6 +27,7 @@
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/retry.h"
 
+#include "source/common/http/response_decoder_impl_base.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 
@@ -57,6 +58,7 @@ public:
    * @param stream_info holds additional information about the request.
    */
   virtual void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+                                       const Formatter::HttpFormatterContext& context,
                                        const StreamInfo::StreamInfo& stream_info) const PURE;
 
   /**
@@ -941,6 +943,7 @@ public:
    *        or x-envoy-original-host header if host rewritten.
    */
   virtual void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
+                                      const Formatter::HttpFormatterContext& context,
                                       const StreamInfo::StreamInfo& stream_info,
                                       bool keep_original_host_or_path) const PURE;
 
@@ -1488,7 +1491,7 @@ public:
  * An API for the interactions the upstream stream needs to have with the downstream stream
  * and/or router components
  */
-class UpstreamToDownstream : public Http::ResponseDecoder, public Http::StreamCallbacks {
+class UpstreamToDownstream : public Http::ResponseDecoderImplBase, public Http::StreamCallbacks {
 public:
   /**
    * @return return the route for the downstream stream.

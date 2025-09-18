@@ -106,6 +106,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/redis_proxy:config",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//source/extensions/load_balancing_policies/round_robin:config",
+        "//source/extensions/network/dns_resolver/getaddrinfo:config",
         "//test/integration:ads_integration_lib",
         "//test/integration:integration_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",

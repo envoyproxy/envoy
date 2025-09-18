@@ -910,12 +910,13 @@ void RouteEntryImplBase::finalizeHostHeader(Http::RequestHeaderMap& headers,
 }
 
 void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
+                                                const Formatter::HttpFormatterContext& context,
                                                 const StreamInfo::StreamInfo& stream_info,
                                                 bool keep_original_host_or_path) const {
   for (const HeaderParser* header_parser : getRequestHeaderParsers(
            /*specificity_ascend=*/vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
-    header_parser->evaluateHeaders(headers, stream_info);
+    header_parser->evaluateHeaders(headers, context, stream_info);
   }
 
   // Restore the port if this was a CONNECT request.
@@ -940,12 +941,12 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::RequestHeaderMap& headers,
 }
 
 void RouteEntryImplBase::finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+                                                 const Formatter::HttpFormatterContext& context,
                                                  const StreamInfo::StreamInfo& stream_info) const {
   for (const HeaderParser* header_parser : getResponseHeaderParsers(
            /*specificity_ascend=*/vhost_->globalRouteConfig().mostSpecificHeaderMutationsWins())) {
     // Later evaluated header parser wins.
-    header_parser->evaluateHeaders(headers, {stream_info.getRequestHeaders(), &headers},
-                                   stream_info);
+    header_parser->evaluateHeaders(headers, context, stream_info);
   }
 }
 
