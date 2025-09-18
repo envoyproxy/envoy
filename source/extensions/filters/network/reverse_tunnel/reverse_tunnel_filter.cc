@@ -161,7 +161,7 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
   // Validate method/path.
   const absl::string_view method = headers_->getMethodValue();
   const absl::string_view path = headers_->getPathValue();
-  ENVOY_LOG(debug,
+  ENVOY_LOG(trace,
             "ReverseTunnelFilter::RequestDecoderImpl::processIfComplete: method: {}, path: {}",
             method, path);
   if (!absl::EqualsIgnoreCase(method, parent_.config_->requestMethod()) ||
@@ -224,7 +224,7 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
 void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
                                                     absl::string_view cluster_id,
                                                     absl::string_view tenant_id) {
-  ENVOY_CONN_LOG(info,
+  ENVOY_CONN_LOG(debug,
                  "reverse_tunnel: connection accepted for node '{}' in cluster '{}' (tenant: '{}')",
                  read_callbacks_->connection(), node_id, cluster_id, tenant_id);
 

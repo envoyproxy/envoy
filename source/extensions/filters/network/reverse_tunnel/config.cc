@@ -11,12 +11,13 @@ Network::FilterFactoryCb ReverseTunnelFilterConfigFactory::createFilterFactoryFr
     const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
     Server::Configuration::FactoryContext& context) {
   auto config = std::make_shared<ReverseTunnelFilterConfig>(proto_config);
-  Stats::Scope& scope = context.scope();
-  Server::OverloadManager& overload_manager = context.serverFactoryContext().overloadManager();
+  // Capture scope and overload manager pointers to avoid dangling references.
+  Stats::Scope* scope = &context.scope();
+  Server::OverloadManager* overload_manager = &context.serverFactoryContext().overloadManager();
 
-  return [config, &scope, &overload_manager](Network::FilterManager& filter_manager) -> void {
+  return [config, scope, overload_manager](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(
-        std::make_shared<ReverseTunnelFilter>(config, scope, overload_manager));
+        std::make_shared<ReverseTunnelFilter>(config, *scope, *overload_manager));
   };
 }
 
