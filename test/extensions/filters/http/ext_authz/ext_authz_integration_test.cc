@@ -1936,7 +1936,6 @@ TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamRequestFailsOnHeaderLimit) {
   waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP2));
   sendExtAuthzResponse({{"header16", "value"}, {"header17", "value"}}, {}, {}, {}, {}, {}, {}, {});
 
-  // The request should now fail with a 431 status code.
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("500", response_->headers().getStatusValue());
