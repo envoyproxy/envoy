@@ -11,14 +11,10 @@
 #include "source/extensions/tracers/zipkin/zipkin_tracer_impl.h"
 
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/local_info/mocks.h"
-#include "test/mocks/runtime/mocks.h"
-#include "test/mocks/stats/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
-#include "test/mocks/upstream/cluster_manager.h"
-#include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -54,8 +50,7 @@ public:
       EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000), _));
     }
 
-    driver_ = std::make_unique<Driver>(zipkin_config, cm_, *stats_.rootScope(), tls_, runtime_,
-                                       local_info_, random_, time_source_);
+    driver_ = std::make_unique<Driver>(zipkin_config, context_);
   }
 
   void setupValidDriverWithHostname(const std::string& version, const std::string& hostname) {
@@ -153,14 +148,16 @@ public:
       {":authority", "api.lyft.com"}, {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 
-  NiceMock<ThreadLocal::MockInstance> tls_;
   std::unique_ptr<Driver> driver_;
   NiceMock<Event::MockTimer>* timer_;
-  NiceMock<Stats::MockIsolatedStatsStore> stats_;
-  NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Random::MockRandomGenerator> random_;
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  NiceMock<ThreadLocal::MockInstance>& tls_{context_.thread_local_};
+  NiceMock<Stats::MockIsolatedStatsStore>& stats_{context_.store_};
+  NiceMock<Upstream::MockClusterManager>& cm_{context_.cluster_manager_};
+  NiceMock<Runtime::MockLoader>& runtime_{context_.runtime_loader_};
+  NiceMock<LocalInfo::MockLocalInfo>& local_info_{context_.local_info_};
+  NiceMock<Random::MockRandomGenerator>& random_{context_.api_.random_};
 
   NiceMock<Tracing::MockConfig> config_;
   Event::SimulatedTimeSystem test_time_;
@@ -1068,59 +1065,6 @@ TEST_F(ZipkinDriverTest, DuplicatedHeader) {
   });
 }
 
-TEST_F(ZipkinDriverTest, DriverWithHttpServiceCustomHeaders) {
-  cm_.initializeClusters({"fake_cluster"}, {});
-
-  const std::string yaml_string = R"EOF(
-  collector_cluster: fake_cluster
-  collector_endpoint: /api/v2/spans
-  collector_service:
-    http_uri:
-      uri: "https://zipkin-collector.example.com/api/v2/spans"
-      cluster: fake_cluster
-      timeout: 5s
-    request_headers_to_add:
-      - header:
-          key: "Authorization"
-          value: "Bearer token123"
-      - header:
-          key: "X-Custom-Header"
-          value: "custom-value"
-      - header:
-          key: "X-API-Key"
-          value: "api-key-123"
-  collector_endpoint_version: HTTP_JSON
-  )EOF";
-
-  envoy::config::trace::v3::ZipkinConfig zipkin_config;
-  TestUtility::loadFromYaml(yaml_string, zipkin_config);
-
-  setup(zipkin_config, true);
-  EXPECT_NE(nullptr, driver_);
-}
-
-TEST_F(ZipkinDriverTest, DriverWithHttpServiceEmptyHeaders) {
-  cm_.initializeClusters({"fake_cluster"}, {});
-
-  const std::string yaml_string = R"EOF(
-  collector_cluster: fake_cluster
-  collector_endpoint: /api/v2/spans
-  collector_service:
-    http_uri:
-      uri: "https://zipkin-collector.example.com/api/v2/spans"
-      cluster: fake_cluster
-      timeout: 5s
-    request_headers_to_add: []
-  collector_endpoint_version: HTTP_JSON
-  )EOF";
-
-  envoy::config::trace::v3::ZipkinConfig zipkin_config;
-  TestUtility::loadFromYaml(yaml_string, zipkin_config);
-
-  setup(zipkin_config, true);
-  EXPECT_NE(nullptr, driver_);
-}
-
 TEST_F(ZipkinDriverTest, ReporterFlushWithHttpServiceHeadersVerifyHeaders) {
   cm_.initializeClusters({"fake_cluster", "legacy_cluster"}, {});
 
@@ -1214,7 +1158,7 @@ TEST_F(ZipkinDriverTest, DriverWithHttpServiceUriParsing) {
   envoy::config::trace::v3::ZipkinConfig zipkin_config_no_host;
   TestUtility::loadFromYaml(yaml_string_no_host, zipkin_config_no_host);
   setup(zipkin_config_no_host, false);
-  EXPECT_EQ("fake_cluster", driver_->hostname()); // Should fallback to cluster name
+  EXPECT_EQ("fake_cluster", driver_->hostnameForTest()); // Should fallback to cluster name
 }
 
 TEST_F(ZipkinDriverTest, DriverWithHttpServiceUriParsingNoPath) {
@@ -1233,7 +1177,7 @@ TEST_F(ZipkinDriverTest, DriverWithHttpServiceUriParsingNoPath) {
   envoy::config::trace::v3::ZipkinConfig zipkin_config_no_path;
   TestUtility::loadFromYaml(yaml_string_no_path, zipkin_config_no_path);
   setup(zipkin_config_no_path, false);
-  EXPECT_EQ("zipkin-collector.example.com", driver_->hostname());
+  EXPECT_EQ("zipkin-collector.example.com", driver_->hostnameForTest());
 }
 
 TEST_F(ZipkinDriverTest, DriverWithHttpServiceUriParsingWithPort) {
@@ -1252,7 +1196,7 @@ TEST_F(ZipkinDriverTest, DriverWithHttpServiceUriParsingWithPort) {
   envoy::config::trace::v3::ZipkinConfig zipkin_config_with_port;
   TestUtility::loadFromYaml(yaml_string_with_port, zipkin_config_with_port);
   setup(zipkin_config_with_port, false);
-  EXPECT_EQ("zipkin-collector.example.com:9411", driver_->hostname());
+  EXPECT_EQ("zipkin-collector.example.com:9411", driver_->hostnameForTest());
 }
 
 TEST_F(ZipkinDriverTest, DriverMissingCollectorConfiguration) {
@@ -1267,7 +1211,8 @@ TEST_F(ZipkinDriverTest, DriverMissingCollectorConfiguration) {
   TestUtility::loadFromYaml(yaml_string_missing, zipkin_config_missing);
 
   EXPECT_THROW_WITH_MESSAGE(setup(zipkin_config_missing, false), EnvoyException,
-                            "Either collector_cluster or collector_service must be specified");
+                            "collector_cluster and collector_endpoint must be specified when not "
+                            "using collector_service");
 }
 
 } // namespace

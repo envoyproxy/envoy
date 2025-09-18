@@ -64,6 +64,8 @@ public:
 
   class FakeResponse : public FakeStreamBase<ResponseHeaderFrame> {
   public:
+    FakeResponse() = default;
+    FakeResponse(int code, bool ok) : status_(code, ok) {}
     absl::string_view protocol() const override { return protocol_; }
     StreamStatus status() const override { return status_; }
 
@@ -438,7 +440,7 @@ class FakeAccessLogExtensionFilterFactory : public AccessLog::ExtensionFilterFac
 public:
   // AccessLogFilterFactory
   AccessLog::FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter&,
-                                    Server::Configuration::FactoryContext&) override {
+                                    Server::Configuration::GenericFactoryContext&) override {
     return std::make_unique<FakeAccessLogExtensionFilter>();
   }
 

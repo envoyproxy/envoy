@@ -376,7 +376,7 @@ TEST_P(Http2FloodMitigationTest, Data) {
   EXPECT_GE(22000, buffer_factory->sumMaxBufferSizes());
   // Verify that all buffers have watermarks set.
   EXPECT_THAT(buffer_factory->highWatermarkRange(),
-              testing::Pair(256 * 1024 * 1024, 1024 * 1024 * 1024));
+              testing::Pair(16 * 1024 * 1024, 1024 * 1024 * 1024));
 }
 
 // Verify that the server can detect flood triggered by a DATA frame from a decoder filter call

@@ -157,6 +157,7 @@ public:
 
     // Change the port for each of the discovery host in cluster_0.
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      // Add default DNS resolver config.
       auto* typed_dns_resolver_config = bootstrap.mutable_typed_dns_resolver_config();
       typed_dns_resolver_config->set_name("envoy.network.dns_resolver.getaddrinfo");
       envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig

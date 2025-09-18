@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/event/scaled_timer.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codec.h"
 
@@ -123,7 +124,8 @@ protected:
   void createPendingFlushTimer() {
     ASSERT(stream_flush_timer_ == nullptr);
     if (stream_flush_timeout_.count() > 0) {
-      stream_flush_timer_ = dispatcher_.createTimer([this] { onPendingFlushTimer(); });
+      stream_flush_timer_ = dispatcher_.createScaledTimer(
+          Event::ScaledTimerType::HttpDownstreamStreamFlush, [this] { onPendingFlushTimer(); });
       stream_flush_timer_->enableTimer(stream_flush_timeout_);
     }
   }
