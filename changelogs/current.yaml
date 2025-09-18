@@ -432,7 +432,13 @@ new_features:
   change: |
     Added a new metric ``db_build_epoch`` to track the build timestamp of the MaxMind geolocation database files.
     This can be used to monitor the freshness of the databases currently in use by the filter.
-    See `MaxMind DB build_epoch <https://maxmind.github.io/MaxMind-DB/#build_epoch>`_ for more details.
+    See https://maxmind.github.io/MaxMind-DB/#build_epoch for more details.
+- area: overload management
+  change: |
+    Added a new scaled timer type ``HttpDownstreamStreamFlush`` to the overload manager. This allows
+    Envoy to scale the periodic timer for flushing downstream responses based on resource pressure.
+    The new timer can be configured via the
+    :ref:`ScaleTimersOverloadActionConfig <envoy_v3_api_msg_config.overload.v3.ScaleTimersOverloadActionConfig>`.
 - area: dynamic_modules
   change: |
     Added support for counters, gauges, histograms, and their vector variants to the dynamic modules API.
@@ -442,4 +448,5 @@ new_features:
     <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.max_udp_channel_duration>`
     configuration field to the c-ares DNS resolver. This allows periodic refresh of the UDP channel
     to help with avoiding stale socket states, and providing better load distribution across UDP ports.
+
 deprecated:
