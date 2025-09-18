@@ -13,8 +13,7 @@ namespace LocalRateLimit {
 LocalRateLimitFilter::LocalRateLimitFilter(
     Server::Configuration::FactoryContext& context,
     const envoy::extensions::access_loggers::filters::local_ratelimit::v3::LocalRateLimitFilter&
-        config)
-    {
+        config) {
   rate_limiter_ = Envoy::Extensions::Filters::Common::LocalRateLimit::RateLimiterProviderSingleton::
       getRateLimiter(
           context, config.resource_name(), config.config_source(),
