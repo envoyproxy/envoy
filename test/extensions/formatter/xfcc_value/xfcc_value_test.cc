@@ -76,6 +76,22 @@ TEST_F(XfccValueTest, Test) {
   }
 
   {
+    // With escaped backslash.
+    Http::TestRequestHeaderMapImpl headers{
+        {"x-forwarded-client-cert",
+         "By=test;DNS=example.com,By=test;URI=\"\\\\\";DNS=example.com"}};
+    EXPECT_EQ(formatter->formatValueWithContext({&headers}, stream_info_).string_value(), "\\");
+  }
+
+  {
+    // With escaped backslash and escaped quote.
+    Http::TestRequestHeaderMapImpl headers{
+        {"x-forwarded-client-cert",
+         "By=test;DNS=example.com,By=test;URI=\"\\\\\\\"\";DNS=example.com"}};
+    EXPECT_EQ(formatter->formatValueWithContext({&headers}, stream_info_).string_value(), "\\\"");
+  }
+
+  {
     // Unclosed quotes in XFCC header.
     Http::TestRequestHeaderMapImpl headers{
         {"x-forwarded-client-cert", "By=test;URI=\"abc;DNS=example.com"}};

@@ -1,4 +1,6 @@
 #include "source/extensions/formatter/xfcc_value/xfcc_value.h"
+#include <cstddef>
+#include <ranges>
 
 namespace Envoy {
 namespace Extensions {
@@ -17,6 +19,19 @@ const absl::flat_hash_set<std::string>& supportedKeys() {
                                                                "uri",
                                                                "dns",
                                                            });
+}
+
+size_t countBackslashes(absl::string_view str) {
+  size_t count = 0;
+  // Search from end to start for first not '\'
+  for (char r : std::ranges::reverse_view(str)) {
+    if (r == '\\') {
+      ++count;
+    } else {
+      break;
+    }
+  }
+  return count;
 }
 
 // The XFCC header value is a comma (`,`) separated string. Each substring is an XFCC element,
@@ -55,18 +70,32 @@ absl::optional<std::string> parseKeyValuePair(absl::string_view pair, absl::stri
     return std::string(raw_value);
   }
 
-  // Unescape double quotes.
-  // Note: this only handles escaped double quotes, not other escape sequences.
+  // Handle unescaping.
+
+  // If the raw value only contains a single backslash then return it as is.
+  if (raw_value.size() < 2) {
+    return std::string(raw_value);
+  }
+
+  // Unescape double quotes and backslashes.
   std::string unescaped;
   unescaped.reserve(raw_value.size());
-  for (size_t i = 0; i < raw_value.size(); ++i) {
-    if (raw_value[i] == '\\' && i + 1 < raw_value.size() && raw_value[i + 1] == '"') {
-      unescaped.push_back('"');
-      ++i;
-    } else {
-      unescaped.push_back(raw_value[i]);
+  size_t i = 0;
+  for (; i < raw_value.size() - 1; ++i) {
+    if (raw_value[i] == '\\') {
+      if (raw_value[i + 1] == '"' || raw_value[i + 1] == '\\') {
+        unescaped.push_back(raw_value[i + 1]);
+        ++i;
+        continue;
+      }
     }
+    unescaped.push_back(raw_value[i]);
   }
+  // Handle the last character.
+  if (i < raw_value.size()) {
+    unescaped.push_back(raw_value[i]);
+  }
+
   return unescaped;
 }
 
@@ -94,7 +123,7 @@ absl::optional<std::string> parseElementForKey(absl::string_view element,
 
     // Switch quote state if we encounter a quote character.
     if (element[i] == '"') {
-      if (i == 0 || element[i - 1] != '\\') {
+      if (countBackslashes(element.substr(0, i)) % 2 == 0) {
         in_quotes = !in_quotes;
       }
     }
@@ -135,7 +164,7 @@ absl::StatusOr<std::string> parseValueFromXfccByKey(const Http::RequestHeaderMap
 
     // Switch quote state if we encounter a quote character.
     if (value[i] == '"') {
-      if (i == 0 || value[i - 1] != '\\') {
+      if (countBackslashes(value.substr(0, i)) % 2 == 0) {
         in_quotes = !in_quotes;
       }
     }
