@@ -14,10 +14,10 @@ LocalRateLimitFilter::LocalRateLimitFilter(
     Server::Configuration::FactoryContext& context,
     const envoy::extensions::access_loggers::filters::local_ratelimit::v3::LocalRateLimitFilter&
         config)
-    : context_(context), config_(config) {
+    {
   rate_limiter_ = Envoy::Extensions::Filters::Common::LocalRateLimit::RateLimiterProviderSingleton::
       getRateLimiter(
-          context_, config_.resource_name(), config_.config_source(),
+          context, config.resource_name(), config.config_source(),
           [this](std::shared_ptr<
                  Envoy::Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterImpl>
                      limiter) -> void {

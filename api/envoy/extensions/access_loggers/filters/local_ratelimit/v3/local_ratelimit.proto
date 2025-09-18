@@ -23,6 +23,5 @@ message LocalRateLimitFilter {
 
   // The configuration source for the :ref:`token_bucket <envoy_v3_api_field_type.v3.TokenBucketConfig.token_bucket>`.
   // It should stay the same through the process lifetime.
-  // TODO(taoxuy): add support for dynamic config_source if needed.
   config.core.v3.ConfigSource config_source = 2 [(validate.rules).message = {required: true}];
 }
