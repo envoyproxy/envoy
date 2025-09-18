@@ -502,7 +502,7 @@ message Http2ProtocolOptions {
 
   // `Maximum concurrent streams <https://httpwg.org/specs/rfc7540.html#rfc.section.5.1.2>`_
   // allowed for peer on one HTTP/2 connection. Valid values range from 1 to 2147483647 (2^31 - 1)
-  // and defaults to 2147483647.
+  // and defaults to 1024 for safety and should be sufficient for most use cases.
   //
   // For upstream connections, this also limits how many streams Envoy will initiate concurrently
   // on a single connection. If the limit is reached, Envoy may queue requests or establish
@@ -516,8 +516,8 @@ message Http2ProtocolOptions {
 
   // `Initial stream-level flow-control window
   // <https://httpwg.org/specs/rfc7540.html#rfc.section.6.9.2>`_ size. Valid values range from 65535
-  // (2^16 - 1, HTTP/2 default) to 2147483647 (2^31 - 1, HTTP/2 maximum) and defaults to 268435456
-  // (256 * 1024 * 1024).
+  // (2^16 - 1, HTTP/2 default) to 2147483647 (2^31 - 1, HTTP/2 maximum) and defaults to
+  // 16MiB (16 * 1024 * 1024).
   //
   // .. note::
   //
@@ -531,7 +531,7 @@ message Http2ProtocolOptions {
       [(validate.rules).uint32 = {lte: 2147483647 gte: 65535}];
 
   // Similar to ``initial_stream_window_size``, but for connection-level flow-control
-  // window. Currently, this has the same minimum/maximum/default as ``initial_stream_window_size``.
+  // window. The default is 24MiB (24 * 1024 * 1024).
   google.protobuf.UInt32Value initial_connection_window_size = 4
       [(validate.rules).uint32 = {lte: 2147483647 gte: 65535}];
 

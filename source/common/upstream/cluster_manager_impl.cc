@@ -1481,13 +1481,13 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
     const std::string& name, uint32_t priority,
     PrioritySet::UpdateHostsParams&& update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-    const HostVector& hosts_removed, uint64_t seed, absl::optional<bool> weighted_priority_health,
+    const HostVector& hosts_removed, absl::optional<bool> weighted_priority_health,
     absl::optional<uint32_t> overprovisioning_factor,
     HostMapConstSharedPtr cross_priority_host_map) {
   ENVOY_LOG(debug, "membership update for TLS cluster {} added {} removed {}", name,
             hosts_added.size(), hosts_removed.size());
   priority_set_.updateHosts(priority, std::move(update_hosts_params), std::move(locality_weights),
-                            hosts_added, hosts_removed, seed, weighted_priority_health,
+                            hosts_added, hosts_removed, weighted_priority_health,
                             overprovisioning_factor, std::move(cross_priority_host_map));
   // If an LB is thread aware, create a new worker local LB on membership changes.
   if (lb_factory_ != nullptr && lb_factory_->recreateOnHostChange()) {
@@ -1536,8 +1536,9 @@ ClusterManagerImpl::allocateOdCdsApi(OdCdsCreationFunction creation_function,
   // TODO(krnowak): Instead of creating a new handle every time, store the handles internally and
   // return an already existing one if the config or locator matches. Note that this may need a
   // way to clean up the unused handles, so we can close the unnecessary connections.
-  auto odcds_or_error = creation_function(odcds_config, odcds_resources_locator, xds_manager_,
-                                          *this, *this, *stats_.rootScope(), validation_visitor);
+  auto odcds_or_error =
+      creation_function(odcds_config, odcds_resources_locator, xds_manager_, *this, *this,
+                        *stats_.rootScope(), validation_visitor, context_);
   RETURN_IF_NOT_OK_REF(odcds_or_error.status());
   return OdCdsApiHandleImpl::create(*this, std::move(*odcds_or_error));
 }
@@ -1793,8 +1794,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
   const auto& cluster_entry = thread_local_clusters_[name];
   cluster_entry->updateHosts(name, priority, std::move(update_hosts_params),
                              std::move(locality_weights), hosts_added, hosts_removed,
-                             parent_.random_.random(), weighted_priority_health,
-                             overprovisioning_factor, std::move(cross_priority_host_map));
+                             weighted_priority_health, overprovisioning_factor,
+                             std::move(cross_priority_host_map));
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(

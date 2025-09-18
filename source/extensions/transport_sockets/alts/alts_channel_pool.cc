@@ -54,7 +54,7 @@ AltsChannelPool::AltsChannelPool(const std::vector<std::shared_ptr<grpc::Channel
 std::shared_ptr<grpc::Channel> AltsChannelPool::getChannel() {
   std::shared_ptr<grpc::Channel> channel;
   {
-    absl::MutexLock lock(&mu_);
+    absl::MutexLock lock(mu_);
     channel = channel_pool_[index_];
     index_ = (index_ + 1) % channel_pool_.size();
   }
