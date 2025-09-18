@@ -19,7 +19,6 @@ StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& 
       cluster_load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
   weighted_priority_health_ = cluster_load_assignment.policy().weighted_priority_health();
 
-  THROW_IF_NOT_OK(validateEndpoints(cluster_load_assignment.endpoints()));
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
     priority_state_manager_->initializePriorityFor(locality_lb_endpoint);
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
@@ -47,6 +46,9 @@ StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& 
           address_list, locality_lb_endpoint, lb_endpoint);
     }
   }
+
+  THROW_IF_NOT_OK(validateEndpoints(cluster_load_assignment.endpoints(),
+                                    priority_state_manager_->priorityState()));
 }
 
 void StaticClusterImpl::startPreInit() {

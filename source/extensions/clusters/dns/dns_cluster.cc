@@ -187,7 +187,7 @@ DnsClusterImpl::DnsClusterImpl(const envoy::config::cluster::v3::Cluster& cluste
     // Strict DNS clusters must ensure that the priority for all localities
     // are set to zero when using zone-aware routing. Zone-aware routing only
     // works for localities with priority zero (the highest).
-    SET_AND_RETURN_IF_NOT_OK(validateEndpoints(locality_lb_endpoints), creation_status);
+    SET_AND_RETURN_IF_NOT_OK(validateEndpoints(locality_lb_endpoints, {}), creation_status);
   }
 
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {

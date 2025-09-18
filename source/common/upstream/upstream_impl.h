@@ -1234,7 +1234,8 @@ protected:
   MainPrioritySetImpl priority_set_;
 
   absl::Status validateEndpoints(
-      absl::Span<const envoy::config::endpoint::v3::LocalityLbEndpoints* const> endpoints) const;
+      absl::Span<const envoy::config::endpoint::v3::LocalityLbEndpoints* const> endpoints,
+      OptRef<const PriorityState> priorities) const;
 
 private:
   static const absl::string_view DoNotValidateAlpnRuntimeKey;

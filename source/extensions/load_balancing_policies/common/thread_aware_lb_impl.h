@@ -189,8 +189,7 @@ public:
   TypedHashLbConfigBase(absl::Span<const HashPolicyProto* const> hash_policy,
                         Regex::Engine& regex_engine, absl::Status& creation_status);
 
-  absl::Status validateEndpoints(
-      absl::Span<const envoy::config::endpoint::v3::LocalityLbEndpoints* const>) const override;
+  absl::Status validateEndpoints(const PriorityState& priorities) const override;
 
   HashPolicySharedPtr hash_policy_;
 };

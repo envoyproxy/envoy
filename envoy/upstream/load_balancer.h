@@ -340,10 +340,7 @@ public:
    * an error, the load balancer must be able to use these endpoints in an update from the priority
    * set.
    */
-  virtual absl::Status validateEndpoints(
-      absl::Span<const envoy::config::endpoint::v3::LocalityLbEndpoints* const>) const {
-    return absl::OkStatus();
-  }
+  virtual absl::Status validateEndpoints(const PriorityState&) const { return absl::OkStatus(); }
 };
 using LoadBalancerConfigPtr = std::unique_ptr<LoadBalancerConfig>;
 

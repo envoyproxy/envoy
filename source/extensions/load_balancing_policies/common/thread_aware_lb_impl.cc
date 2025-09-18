@@ -48,9 +48,6 @@ void normalizeLocalityWeights(const HostsPerLocality& hosts_per_locality,
   for (const auto weight : locality_weights) {
     sum += weight;
     if (sum > std::numeric_limits<uint32_t>::max()) {
-      /*return absl::InvalidArgumentError(
-          fmt::format("The sum of weights of all localities at the same priority exceeds {}",
-          std::numeric_limits<uint32_t>::max()));*/
       IS_ENVOY_BUG("locality weights should have been validated in validateEndpoints");
     }
   }
@@ -362,27 +359,32 @@ TypedHashLbConfigBase::TypedHashLbConfigBase(absl::Span<const HashPolicyProto* c
   hash_policy_ = std::move(hash_policy_or).value();
 }
 
-absl::Status TypedHashLbConfigBase::validateEndpoints(
-    absl::Span<const envoy::config::endpoint::v3::LocalityLbEndpoints* const> endpoints) const {
-  for (const auto* lb_endpoints : endpoints) {
-    // sum should be at most uint32_t max value, so we can validate it by accumulating into unit64_t
-    // and making sure there was no overflow
-    uint64_t sum = 0;
-    for (const auto& ep : lb_endpoints->lb_endpoints()) {
-      uint32_t weight = 1;
-      if (ep.has_load_balancing_weight()) {
-        weight = ep.load_balancing_weight().value();
-      }
-      sum += weight;
-      if (sum > std::numeric_limits<uint32_t>::max()) {
+absl::Status TypedHashLbConfigBase::validateEndpoints(const PriorityState& priorities) const {
+
+  for (const auto& [hosts, locality_weights_map] : priorities) {
+    // Sum should be at most uint32_t max value, so we can validate it by accumulating into uint64_t
+    // and making sure there was no overflow.
+    uint64_t host_sum = 0;
+    for (const auto& host : *hosts) {
+      host_sum += host->weight();
+      if (host_sum > std::numeric_limits<uint32_t>::max()) {
         return absl::InvalidArgumentError(
             fmt::format("The sum of weights of all upstream hosts in a locality exceeds {}",
                         std::numeric_limits<uint32_t>::max()));
       }
     }
+
+    uint64_t locality_sum = 0;
+    for (const auto& [_, weight] : locality_weights_map) {
+      locality_sum += weight;
+      if (locality_sum > std::numeric_limits<uint32_t>::max()) {
+        return absl::InvalidArgumentError(
+            fmt::format("The sum of weights of all localities at the same priority exceeds {}",
+                        std::numeric_limits<uint32_t>::max()));
+      }
+    }
   }
 
-  // TODO: locality validation
   return absl::OkStatus();
 }
 

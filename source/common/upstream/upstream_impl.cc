@@ -1867,7 +1867,8 @@ ClusterImplBase::resolveProtoAddress(const envoy::config::core::v3::Address& add
 }
 
 absl::Status ClusterImplBase::validateEndpoints(
-    absl::Span<const envoy::config::endpoint::v3::LocalityLbEndpoints* const> localities) const {
+    absl::Span<const envoy::config::endpoint::v3::LocalityLbEndpoints* const> localities,
+    OptRef<const PriorityState> priorities) const {
   for (const auto* endpoints : localities) {
     if (local_cluster_ && endpoints->priority() > 0) {
       return absl::InvalidArgumentError(
@@ -1875,9 +1876,11 @@ absl::Status ClusterImplBase::validateEndpoints(
     }
   }
 
-  OptRef<const LoadBalancerConfig> lb_config = info_->loadBalancerConfig();
-  if (lb_config.has_value()) {
-    return lb_config->validateEndpoints(localities);
+  if (priorities.has_value()) {
+    OptRef<const LoadBalancerConfig> lb_config = info_->loadBalancerConfig();
+    if (lb_config.has_value()) {
+      return lb_config->validateEndpoints(*priorities);
+    }
   }
   return absl::OkStatus();
 }

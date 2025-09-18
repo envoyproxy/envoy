@@ -50,7 +50,7 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
 
   std::list<ResolveTargetPtr> resolve_targets;
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
-  THROW_IF_NOT_OK(validateEndpoints(locality_lb_endpoints));
+  THROW_IF_NOT_OK(validateEndpoints(locality_lb_endpoints, {}));
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       const auto& socket_address = lb_endpoint.endpoint().address().socket_address();
