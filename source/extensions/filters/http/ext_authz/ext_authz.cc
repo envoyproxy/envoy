@@ -880,7 +880,7 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           "ext_authz filter rejected the request because the header count limit would be exceeded",
           *decoder_callbacks_);
       decoder_callbacks_->streamInfo().setResponseFlag(
-          StreamInfo::CoreResponseFlag::OverloadManager);
+          StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
       decoder_callbacks_->sendLocalReply(
           Http::Code::InternalServerError,
           "request headers too large after ext_authz modifications", nullptr, absl::nullopt,

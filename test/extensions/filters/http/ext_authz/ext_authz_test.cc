@@ -2023,6 +2023,8 @@ TEST_F(HttpFilterTest, DownstreamRequestFailsOnHeaderLimit) {
   response.headers_to_set = {{"foo", "bar"}, {"foo2", "bar2"}};
 
   // Now the test should fail, since we expect the downstream request to fail.
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
   EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _))
       .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
         EXPECT_EQ(headers.getStatusValue(),
