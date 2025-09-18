@@ -432,6 +432,8 @@ TEST_P(ReverseTunnelFilterIntegrationTest, BasicReverseTunnelHandshake) {
 // success. The ping interval is kept at a very high value (5 minutes) to avoid ping timeout on
 // accepted reverse connections.
 TEST_P(ReverseTunnelFilterIntegrationTest, EndToEndReverseConnectionHandshake) {
+  DISABLE_IF_ADMIN_DISABLED; // Test requires admin interface for draining listener.
+
   // Use a deterministic port to avoid timing issues.
   const uint32_t upstream_port = GetParam() == Network::Address::IpVersion::v4 ? 15000 : 15001;
   const std::string loopback_addr =
@@ -442,6 +444,14 @@ TEST_P(ReverseTunnelFilterIntegrationTest, EndToEndReverseConnectionHandshake) {
                                        envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     // Clear existing listeners and add our custom setup.
     bootstrap.mutable_static_resources()->clear_listeners();
+
+    // Ensure admin interface is configured.
+    if (!bootstrap.has_admin()) {
+      auto* admin = bootstrap.mutable_admin();
+      auto* admin_address = admin->mutable_address()->mutable_socket_address();
+      admin_address->set_address(loopback_addr);
+      admin_address->set_port_value(0); // Use ephemeral port
+    }
 
     // Listener 1: Upstream listener with reverse tunnel filter (accepts reverse connections).
     auto* upstream_listener = bootstrap.mutable_static_resources()->add_listeners();
@@ -493,6 +503,9 @@ TEST_P(ReverseTunnelFilterIntegrationTest, EndToEndReverseConnectionHandshake) {
   });
 
   initialize();
+
+  // Register admin port after initialization since we cleared listeners.
+  registerTestServerPorts({});
 
   ENVOY_LOG_MISC(info, "Waiting for reverse connections to be established.");
   // Wait for reverse connections to be established.
