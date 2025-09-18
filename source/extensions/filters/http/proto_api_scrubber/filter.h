@@ -7,11 +7,16 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 #include "source/extensions/filters/http/grpc_field_extraction/message_converter/message_converter.h"
 #include "source/extensions/filters/http/proto_api_scrubber/filter_config.h"
+#include "source/extensions/filters/http/proto_api_scrubber/scrubbing_util/field_checker.h"
+
+#include "proto_processing_lib/proto_scrubber/proto_scrubber.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace ProtoApiScrubber {
+
+using proto_processing_lib::proto_scrubber::ProtoScrubber;
 
 inline constexpr const char kFilterName[] = "envoy.filters.http.proto_api_scrubber";
 
@@ -39,6 +44,12 @@ private:
   // Request message converter which converts Envoy Buffer data to StreamMessage (for scrubbing) and
   // vice-versa.
   GrpcFieldExtraction::MessageConverterPtr request_msg_converter_{nullptr};
+
+  // An instance of ProtoScrubber for scrubbing request protobuf payloads.
+  std::unique_ptr<ProtoScrubber> request_scrubber_{nullptr};
+
+  // Field checker for request scrubbing.
+  std::unique_ptr<FieldChecker> request_field_checker_{nullptr};
 };
 
 class FilterFactory : public Common::FactoryBase<ProtoApiScrubberConfig> {
