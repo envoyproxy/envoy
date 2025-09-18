@@ -251,6 +251,7 @@ message TcpProxy {
   // Percentage-based jitter for max_downstream_connection_duration. The jitter will be added
   // randomly to the max_downstream_connection_duration.
   // This field is ignored if max_downstream_connection_duration is not set.
+  // If not set, no jitter will be added.
   type.v3.Percent max_downstream_connection_duration_jitter_percentage = 20;
 
   // Note that if both this field and :ref:`access_log_flush_interval
