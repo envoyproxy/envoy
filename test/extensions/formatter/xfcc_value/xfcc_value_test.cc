@@ -61,40 +61,39 @@ TEST_F(XfccValueTest, Test) {
   // Normal value with special characters.
   {
     Http::TestRequestHeaderMapImpl headers{
-        {"x-forwarded-client-cert", "By=test;URI=\"a,b,c;\\\"e;f;g=x\";DNS=example.com"}};
+        {"x-forwarded-client-cert", R"(By=test;URI="a,b,c;\"e;f;g=x";DNS=example.com)"}};
     EXPECT_EQ(formatter->formatValueWithContext({&headers}, stream_info_).string_value(),
-              "a,b,c;\"e;f;g=x");
+              R"(a,b,c;"e;f;g=x)");
   }
 
   {
     // Multiple elements.
     Http::TestRequestHeaderMapImpl headers{
         {"x-forwarded-client-cert",
-         "By=test;DNS=example.com,By=test;URI=\"a,b,c;\\\"e;f;g=x\";DNS=example.com"}};
+         R"(By=test;DNS=example.com,By=test;URI="a,b,c;\"e;f;g=x";DNS=example.com)"}};
     EXPECT_EQ(formatter->formatValueWithContext({&headers}, stream_info_).string_value(),
-              "a,b,c;\"e;f;g=x");
+              R"(a,b,c;"e;f;g=x)");
   }
 
   {
     // With escaped backslash.
     Http::TestRequestHeaderMapImpl headers{
-        {"x-forwarded-client-cert",
-         "By=test;DNS=example.com,By=test;URI=\"\\\\\";DNS=example.com"}};
-    EXPECT_EQ(formatter->formatValueWithContext({&headers}, stream_info_).string_value(), "\\");
+        {"x-forwarded-client-cert", R"(By=test;DNS=example.com,By=test;URI="\\";DNS=example.com)"}};
+    EXPECT_EQ(formatter->formatValueWithContext({&headers}, stream_info_).string_value(), R"(\)");
   }
 
   {
     // With escaped backslash and escaped quote.
     Http::TestRequestHeaderMapImpl headers{
         {"x-forwarded-client-cert",
-         "By=test;DNS=example.com,By=test;URI=\"\\\\\\\"\";DNS=example.com"}};
-    EXPECT_EQ(formatter->formatValueWithContext({&headers}, stream_info_).string_value(), "\\\"");
+         R"(By=test;DNS=example.com,By=test;URI="\\\"";DNS=example.com)"}};
+    EXPECT_EQ(formatter->formatValueWithContext({&headers}, stream_info_).string_value(), R"(\")");
   }
 
   {
     // Unclosed quotes in XFCC header.
     Http::TestRequestHeaderMapImpl headers{
-        {"x-forwarded-client-cert", "By=test;URI=\"abc;DNS=example.com"}};
+        {"x-forwarded-client-cert", R"(By=test;URI="abc;DNS=example.com)"}};
     EXPECT_TRUE(formatter->formatValueWithContext({&headers}, stream_info_).has_null_value());
   }
 
