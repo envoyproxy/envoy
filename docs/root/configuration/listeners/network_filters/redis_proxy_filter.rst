@@ -99,24 +99,12 @@ or runtime key are set).
 
 Example configuration:
 
-.. code-block:: yaml
-
-  faults:
-  - fault_type: ERROR
-    fault_enabled:
-      default_value:
-        numerator: 10
-        denominator: HUNDRED
-      runtime_key: "bogus_key"
-      commands:
-      - GET
-    - fault_type: DELAY
-      fault_enabled:
-        default_value:
-          numerator: 10
-          denominator: HUNDRED
-        runtime_key: "bogus_key"
-      delay: 2s
+.. literalinclude:: _include/redis-fault-injection.yaml
+   :language: yaml
+   :lines: 19-34
+   :linenos:
+   :lineno-start: 19
+   :caption: :download:`redis-fault-injection.yaml <_include/redis-fault-injection.yaml>`
 
 This creates two faults- an error, applying only to GET commands at 10%, and a delay, applying to all
 commands at 10%. This means that 20% of GET commands will have a fault applied, as discussed earlier.
@@ -126,21 +114,12 @@ DNS lookups on redirections
 
 As noted in the :ref:`architecture overview <arch_overview_redis>`, when Envoy sees a MOVED or ASK response containing a hostname it will not perform a DNS lookup and instead bubble up the error to the client. The following configuration example enables DNS lookups on such responses to avoid the client error and have Envoy itself perform the redirection:
 
-.. code-block:: yaml
-
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
-    stat_prefix: redis_stats
-    prefix_routes:
-      catch_all_route:
-        cluster: cluster_0
-    settings:
-      op_timeout: 5
-      enable_redirection: true
-      dns_cache_config:
-        name: dns_cache_for_redis
-        dns_lookup_family: V4_ONLY
-        max_hosts: 100
+.. literalinclude:: _include/redis-dns-lookups.yaml
+   :language: yaml
+   :lines: 11-23
+   :linenos:
+   :lineno-start: 11
+   :caption: :download:`redis-dns-lookups.yaml <_include/redis-dns-lookups.yaml>`
 
 
 .. _config_network_filters_redis_proxy_aws_iam:
@@ -160,40 +139,9 @@ The `service_name` should be `elasticache` for an Amazon ElastiCache cache in va
 matches the service which is added to the IAM Policy for the associated IAM principal being used to make the connection. For example, `service_name: memorydb` matches
 an AWS IAM Policy containing the Action `memorydb:Connect`, and that policy must be attached to the IAM principal being used by envoy.
 
-.. code-block:: yaml
-
-    filter_chains:
-    - filters:
-      - name: envoy.filters.network.redis_proxy
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
-          stat_prefix: egress_redis
-          settings:
-            op_timeout: 5s
-          prefix_routes:
-            catch_all_route:
-              cluster: redis_cluster
-  clusters:
-  - name: redis_cluster
-    connect_timeout: 1s
-    type: strict_dns
-    load_assignment:
-      cluster_name: redis_cluster
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: testcache-7dh4z9.serverless.apse2.cache.amazonaws.com
-                port_value: 6379
-    typed_extension_protocol_options:
-      envoy.filters.network.redis_proxy:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
-        auth_username:
-          inline_string: test
-        aws_iam:
-          region: ap-southeast-2
-          service_name: elasticache
-          cache_name: testcache
-          expiration_time: 900s
-
+.. literalinclude:: _include/redis-aws-iam-auth.yaml
+   :language: yaml
+   :lines: 8-41
+   :linenos:
+   :lineno-start: 8
+   :caption: :download:`redis-aws-iam-auth.yaml <_include/redis-aws-iam-auth.yaml>`
