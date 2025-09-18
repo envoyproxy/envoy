@@ -36,6 +36,60 @@ TEST_F(IoUringWorkerFactoryImplTest, Basic) {
   EXPECT_TRUE(factory.getIoUringWorker().has_value());
 }
 
+TEST_F(IoUringWorkerFactoryImplTest, ModeConfigurationDefault) {
+  // Test default mode (ReadWritev)
+  IoUringWorkerFactoryImpl factory(2, false, 8192, 1000, context_.threadLocal());
+  auto dispatcher = api_->allocateDispatcher("test_thread");
+  factory.onWorkerThreadInitialized();
+
+  auto worker = factory.getIoUringWorker();
+  EXPECT_TRUE(worker.has_value());
+  EXPECT_EQ(worker->get().getMode(), IoUringMode::ReadWritev);
+}
+
+TEST_F(IoUringWorkerFactoryImplTest, ModeConfigurationSendRecv) {
+  // Test SendRecv mode
+  IoUringWorkerFactoryImpl factory(2, false, 8192, 1000, context_.threadLocal(),
+                                   IoUringMode::SendRecv);
+  auto dispatcher = api_->allocateDispatcher("test_thread");
+  factory.onWorkerThreadInitialized();
+
+  auto worker = factory.getIoUringWorker();
+  EXPECT_TRUE(worker.has_value());
+  EXPECT_EQ(worker->get().getMode(), IoUringMode::SendRecv);
+}
+
+TEST_F(IoUringWorkerFactoryImplTest, ModeConfigurationSendmsgRecvmsg) {
+  // Test SendmsgRecvmsg mode
+  IoUringWorkerFactoryImpl factory(2, false, 8192, 1000, context_.threadLocal(),
+                                   IoUringMode::SendmsgRecvmsg);
+  auto dispatcher = api_->allocateDispatcher("test_thread");
+  factory.onWorkerThreadInitialized();
+
+  auto worker = factory.getIoUringWorker();
+  EXPECT_TRUE(worker.has_value());
+  EXPECT_EQ(worker->get().getMode(), IoUringMode::SendmsgRecvmsg);
+}
+
+TEST_F(IoUringWorkerFactoryImplTest, ModeConfigurationBackwardCompatibility) {
+  // Test that not specifying mode defaults to ReadWritev for backward compatibility
+  IoUringWorkerFactoryImpl factory_default(2, false, 8192, 1000, context_.threadLocal());
+  IoUringWorkerFactoryImpl factory_explicit(2, false, 8192, 1000, context_.threadLocal(),
+                                            IoUringMode::ReadWritev);
+
+  auto dispatcher = api_->allocateDispatcher("test_thread");
+  factory_default.onWorkerThreadInitialized();
+  factory_explicit.onWorkerThreadInitialized();
+
+  auto worker_default = factory_default.getIoUringWorker();
+  auto worker_explicit = factory_explicit.getIoUringWorker();
+
+  EXPECT_TRUE(worker_default.has_value());
+  EXPECT_TRUE(worker_explicit.has_value());
+  EXPECT_EQ(worker_default->get().getMode(), worker_explicit->get().getMode());
+  EXPECT_EQ(worker_default->get().getMode(), IoUringMode::ReadWritev);
+}
+
 } // namespace
 } // namespace Io
 } // namespace Envoy
