@@ -64,10 +64,11 @@ void ReverseConnectionIOHandle::cleanup() {
   }
 
   // Cancel the retry timer safely.
-  if (rev_conn_retry_timer_) {
+  if (rev_conn_retry_timer_ && rev_conn_retry_timer_->enabled()) {
     ENVOY_LOG_MISC(trace, "ReverseConnectionIOHandle: cancelling and resetting retry timer.");
     rev_conn_retry_timer_.reset();
   }
+
   // Graceful shutdown of connection wrappers with exception safety.
   ENVOY_LOG_MISC(debug, "Gracefully shutting down {} connection wrappers.",
                  connection_wrappers_.size());
@@ -349,6 +350,10 @@ Api::IoCallUint64Result ReverseConnectionIOHandle::close() {
     ENVOY_LOG(error,
               "Skipping close of pipe trigger FD {} - will be handled by base close() method.",
               fd_);
+  }
+
+  if (rev_conn_retry_timer_) {
+    rev_conn_retry_timer_.reset();
   }
 
   return IoSocketHandleImpl::close();

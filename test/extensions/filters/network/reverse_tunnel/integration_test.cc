@@ -7,6 +7,7 @@
 #include "source/common/protobuf/protobuf.h"
 
 #include "test/integration/integration.h"
+#include "test/integration/utility.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
@@ -43,6 +44,7 @@ typed_config:
     BaseIntegrationTest::initialize();
   }
 
+protected:
   void addSetFilterStateFilter(const std::string& node_id = "integration-test-node",
                                const std::string& cluster_id = "integration-test-cluster",
                                const std::string& tenant_id = "integration-test-tenant") {
@@ -502,6 +504,16 @@ TEST_P(ReverseTunnelFilterIntegrationTest, EndToEndReverseConnectionHandshake) {
 
   // Verify stats show successful reverse tunnel handshake.
   test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+
+  // Drain listeners to trigger proper cleanup of ReverseConnectionIOHandle.
+  BufferingStreamDecoderPtr admin_response = IntegrationUtil::makeSingleRequest(
+      lookupPort("admin"), "POST", "/drain_listeners", "", Http::CodecType::HTTP1, GetParam());
+  EXPECT_TRUE(admin_response->complete());
+  EXPECT_EQ("200", admin_response->headers().getStatusValue());
+
+  // Wait for listeners to be stopped, which triggers ReverseConnectionIOHandle cleanup.
+  test_server_->waitForCounterEq("listener_manager.listener_stopped",
+                                 2); // 2 listeners in this test
 }
 
 } // namespace
