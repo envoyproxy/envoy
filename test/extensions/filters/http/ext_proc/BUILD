@@ -43,6 +43,7 @@ envoy_extension_cc_test(
     tags = ["skip_on_windows"],
     deps = [
         ":mock_server_lib",
+        ":test_attribute_builder_lib",
         ":utils_lib",
         "//envoy/http:filter_interface",
         "//envoy/network:filter_interface",
@@ -54,6 +55,7 @@ envoy_extension_cc_test(
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/http/ext_proc",
         "//source/extensions/filters/http/ext_proc:on_processing_response_interface",
+        "//source/extensions/http/ext_proc/attribute_builders/default_attribute_builder:default_attribute_builder_lib",
         "//source/extensions/http/ext_proc/response_processors/save_processing_response:save_processing_response_lib",
         "//test/common/http:common_lib",
         "//test/common/http:conn_manager_impl_test_base_lib",
@@ -69,6 +71,25 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/http/ext_proc/response_processors/save_processing_response/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "test_attribute_builder_proto",
+    srcs = ["test_attribute_builder.proto"],
+)
+
+envoy_extension_cc_test_library(
+    name = "test_attribute_builder_lib",
+    srcs = ["test_attribute_builder.cc"],
+    hdrs = ["test_attribute_builder.h"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    deps = [
+        ":test_attribute_builder_proto_cc_proto",
+        "//source/common/protobuf:utility_lib",
+        "//source/extensions/filters/common/expr:evaluator_lib",
+        "//source/extensions/filters/http/ext_proc:attribute_builder_interface",
+        "//source/extensions/filters/http/ext_proc:matching_utils_lib",
     ],
 )
 
@@ -190,6 +211,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ext_proc:config",
         "//source/extensions/filters/http/ext_proc:on_processing_response_interface",
         "//source/extensions/filters/http/set_metadata:config",
+        "//source/extensions/http/ext_proc/attribute_builders/default_attribute_builder:default_attribute_builder_lib",
         "//source/extensions/retry/host/previous_hosts:config",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
@@ -258,6 +280,7 @@ envoy_extension_cc_test(
         ":utils_lib",
         "//source/common/network:address_lib",
         "//source/extensions/filters/http/ext_proc:config",
+        "//source/extensions/http/ext_proc/attribute_builders/default_attribute_builder:default_attribute_builder_lib",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",

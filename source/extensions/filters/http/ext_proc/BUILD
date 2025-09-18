@@ -21,6 +21,7 @@ envoy_cc_library(
     ],
     tags = ["skip_on_windows"],
     deps = [
+        ":attribute_builder_interface",
         ":client_lib",
         ":matching_utils_lib",
         ":mutation_utils_lib",
@@ -36,12 +37,14 @@ envoy_cc_library(
         "//source/extensions/filters/common/mutation_rules:mutation_rules_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/http/ext_proc/http_client:http_client_lib",
+        "//source/extensions/http/ext_proc/attribute_builders/default_attribute_builder:default_attribute_builder_lib",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/strings:string_view",
         "@envoy_api//envoy/config/common/mutation_rules/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/http/ext_proc/attribute_builders/default_attribute_builder/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
@@ -113,6 +116,17 @@ envoy_cc_library(
             ],
         },
     ),
+)
+
+envoy_cc_library(
+    name = "attribute_builder_interface",
+    hdrs = ["attribute_builder.h"],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:factory_context_interface",
+        "//source/common/protobuf",
+    ],
 )
 
 envoy_cc_library(

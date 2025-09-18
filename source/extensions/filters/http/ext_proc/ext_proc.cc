@@ -7,11 +7,14 @@
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/processing_mode.pb.h"
+#include "envoy/extensions/http/ext_proc/attribute_builders/default_attribute_builder/v3/default_attribute_builder.pb.h"
+#include "envoy/extensions/http/ext_proc/attribute_builders/default_attribute_builder/v3/default_attribute_builder.pb.validate.h"
 
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
+#include "source/extensions/filters/http/ext_proc/attribute_builder.h"
 #include "source/extensions/filters/http/ext_proc/http_client/http_client_impl.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
@@ -185,6 +188,18 @@ void mergeHeaderValuesField(
   }
 }
 
+std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig>
+makeDefaultAttributeBuilderConfig(const ExternalProcessor& ext_proc_config) {
+  envoy::extensions::http::ext_proc::attribute_builders::default_attribute_builder::v3::
+      DefaultAttributeBuilder config;
+  *config.mutable_request_attributes() = ext_proc_config.request_attributes();
+  *config.mutable_response_attributes() = ext_proc_config.response_attributes();
+  auto typed_config = std::make_unique<envoy::config::core::v3::TypedExtensionConfig>();
+  typed_config->set_name("envoy.extensions.http.ext_proc.default_attribute_builder");
+  typed_config->mutable_typed_config()->PackFrom(config);
+  return typed_config;
+}
+
 // Changes to headers are normally tested against the MutationRules supplied
 // with configuration. When writing an immediate response message, however,
 // we want to support a more liberal set of rules so that filters can create
@@ -251,11 +266,10 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
           config.metadata_options().receiving_namespaces().untyped().end()),
       allowed_override_modes_(config.allowed_override_modes().begin(),
                               config.allowed_override_modes().end()),
-      expression_manager_(builder, context.localInfo(), config.request_attributes(),
-                          config.response_attributes()),
       immediate_mutation_checker_(context.regexEngine()),
       on_processing_response_factory_cb_(
           createOnProcessingResponseCb(config, context, stats_prefix)),
+      attribute_builder_(createAttributeBuilder(config, builder, context)),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()),
       remote_close_timeout_(context.runtime().snapshot().getInteger(
           RemoteCloseTimeout, DefaultRemoteCloseTimeoutMilliseconds)) {
@@ -1395,18 +1409,19 @@ void Filter::addDynamicMetadata(const ProcessorState& state, ProcessingRequest& 
 }
 
 void Filter::addAttributes(ProcessorState& state, ProcessingRequest& req) {
-  if (!state.sendAttributes(config_->expressionManager())) {
+  if (config_->attributeBuilder() == nullptr || !state.sendAttributes()) {
     return;
   }
-
-  auto activation_ptr = Filters::Common::Expr::createActivation(
-      &config_->expressionManager().localInfo(), state.callbacks()->streamInfo(),
-      state.requestHeaders(), dynamic_cast<const Http::ResponseHeaderMap*>(state.responseHeaders()),
-      dynamic_cast<const Http::ResponseTrailerMap*>(state.responseTrailers()));
-  auto attributes = state.evaluateAttributes(config_->expressionManager(), *activation_ptr);
-
-  state.setSentAttributes(true);
-  (*req.mutable_attributes())[FilterName] = attributes;
+  AttributeBuilder::BuildParams build_params = {
+      .traffic_direction = state.trafficDirection(),
+      .stream_info = state.callbacks()->streamInfo(),
+      .request_headers = state.requestHeaders(),
+      .response_headers = state.responseHeaders(),
+      .response_trailers = state.responseTrailers(),
+  };
+  if (config_->attributeBuilder()->build(build_params, req.mutable_attributes())) {
+    state.setSentAttributes(true);
+  }
 }
 
 void Filter::setDynamicMetadata(Http::StreamFilterCallbacks* cb, const ProcessorState& state,
@@ -1919,6 +1934,32 @@ std::function<std::unique_ptr<OnProcessingResponse>()> FilterConfig::createOnPro
     return factory.createOnProcessingResponse(*shared_on_processing_response_config, context,
                                               stats_prefix);
   };
+}
+
+std::unique_ptr<AttributeBuilder> FilterConfig::createAttributeBuilder(
+    const ExternalProcessor& config,
+    Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
+    Server::Configuration::CommonFactoryContext& context) {
+  std::unique_ptr<envoy::config::core::v3::TypedExtensionConfig> attribute_builder_holder;
+  const envoy::config::core::v3::TypedExtensionConfig* attribute_builder;
+  if (config.has_attribute_builder()) {
+    attribute_builder = &config.attribute_builder();
+  } else {
+    attribute_builder_holder = makeDefaultAttributeBuilderConfig(config);
+    attribute_builder = attribute_builder_holder.get();
+  }
+
+  auto& factory =
+      Envoy::Config::Utility::getAndCheckFactory<AttributeBuilderFactory>(*attribute_builder);
+  auto attribute_builder_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
+      attribute_builder->typed_config(), context.messageValidationVisitor(), factory);
+  if (attribute_builder_config != nullptr) {
+    return factory.createAttributeBuilder(*attribute_builder_config, FilterName, builder, context);
+  } else {
+    IS_ENVOY_BUG(absl::StrCat("Invalid attribute_builder config with name: ",
+                              config.attribute_builder().name()));
+    return nullptr;
+  }
 }
 
 std::unique_ptr<OnProcessingResponse> FilterConfig::createOnProcessingResponse() const {
