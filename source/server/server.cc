@@ -807,15 +807,7 @@ absl::Status InstanceBase::initializeOrThrow(Network::Address::InstanceConstShar
       [this]() -> Network::DnsResolverSharedPtr { return this->getOrCreateDnsResolver(); },
       quic_stat_names_);
 
-  // Start application log sinks once the cluster manager is initialized.
-  if (bootstrap_.has_application_log_config()) {
-    log_sink_ = THROW_OR_RETURN_VALUE(
-          Utility::maybeAddApplicationLogSink(bootstrap_.application_log_config(),
-            serverFactoryContext()),
-          std::unique_ptr<Utility::ApplicationLogSink>);
-  }
-
-  // Now that the worker thread are initialized, notify the bootstrap extensions.
+  // Now that the worker threads are initialized, notify the bootstrap extensions.
   for (auto&& bootstrap_extension : bootstrap_extensions_) {
     bootstrap_extension->onWorkerThreadInitialized();
   }
@@ -936,6 +928,15 @@ void InstanceBase::startWorkers() {
         updateServerStats();
         workers_started_ = true;
         hooks_.onWorkersStarted();
+
+        // Start application log sinks once the cluster manager is initialized.
+        if (bootstrap_.has_application_log_config()) {
+          log_sink_ =
+              THROW_OR_RETURN_VALUE(Utility::maybeAddApplicationLogSink(
+                                        bootstrap_.application_log_config(), serverFactoryContext()),
+                                    std::unique_ptr<Utility::ApplicationLogSink>);
+        }
+
         // At this point we are ready to take traffic and all listening ports are up. Notify our
         // parent if applicable that they can stop listening and drain.
         restarter_.drainParentListeners();
