@@ -740,6 +740,32 @@ TEST_P(WasmHttpFilterTest, BodyResponseBufferThenStreamBody) {
   filter().onDestroy();
 }
 
+// Script that adds a request body.
+TEST_P(WasmHttpFilterTest, BodyRequestSetBodyDuringHeaders) {
+  setupTest("body");
+  setupFilter();
+  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody set.during.headers"))));
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"},
+                                                 {"x-test-operation", "SetBodyDuringHeaders"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, true));
+  filter().onDestroy();
+}
+
+// Script that adds a response body.
+TEST_P(WasmHttpFilterTest, BodyResponseSetBodyDuringHeaders) {
+  setupTest("body");
+  setupFilter();
+  EXPECT_CALL(filter(), log_(spdlog::level::err, Eq(absl::string_view("onBody set.during.headers"))));
+
+  Http::TestRequestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().decodeHeaders(request_headers, true));
+
+  Http::TestResponseHeaderMapImpl response_headers{{":status", "200"},
+                                                   {"x-test-operation", "SetBodyDuringHeaders"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter().encodeHeaders(response_headers, true));
+  filter().onDestroy();
+}
+
 // Script testing AccessLog::Instance::log.
 TEST_P(WasmHttpFilterTest, AccessLog) {
   setupTest("", "headers");
