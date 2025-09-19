@@ -1,4 +1,5 @@
 #include "source/extensions/formatter/xfcc_value/xfcc_value.h"
+
 #include <cstddef>
 #include <ranges>
 
