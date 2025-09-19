@@ -125,7 +125,7 @@ ServerContextConfigImpl::ServerContextConfigImpl(
           DEFAULT_MAX_VERSION, FIPS_mode() ? DEFAULT_CIPHER_SUITES_FIPS : DEFAULT_CIPHER_SUITES,
           FIPS_mode() ? DEFAULT_CURVES_FIPS : DEFAULT_CURVES, factory_context, creation_status),
       require_client_certificate_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, absl::nullopt)),
       ocsp_staple_policy_(ocspStaplePolicyFromProto(config.ocsp_staple_policy())),
       session_ticket_keys_provider_(
           getTlsSessionTicketKeysConfigProvider(factory_context, config, creation_status)),

@@ -25,7 +25,8 @@ QuicServerTransportSocketConfigFactory::createTransportSocketFactory(
   RETURN_IF_NOT_OK(server_config_or_error.status());
   auto server_config = std::move(server_config_or_error.value());
   // TODO(RyanTheOptimist): support TLS client authentication.
-  if (server_config->requireClientCertificate()) {
+  if (server_config->requireClientCertificate().has_value() &&
+      *server_config->requireClientCertificate()) {
     return absl::InvalidArgumentError("TLS Client Authentication is not supported over QUIC");
   }
 

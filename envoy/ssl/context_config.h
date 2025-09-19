@@ -184,7 +184,7 @@ public:
   /**
    * @return True if client certificate is required, false otherwise.
    */
-  virtual bool requireClientCertificate() const PURE;
+  virtual absl::optional<bool> requireClientCertificate() const PURE;
 
   /**
    * @return OcspStaplePolicy The rule for determining whether to staple OCSP

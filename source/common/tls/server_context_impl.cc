@@ -140,9 +140,10 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
   for (uint32_t i = 0; i < tls_certificates.size(); ++i) {
     auto& ctx = tls_contexts_[i];
     if (!config.capabilities().verifies_peer_certificates) {
-      SET_AND_RETURN_IF_NOT_OK(cert_validator_->addClientValidationContext(
-                                   ctx.ssl_ctx_.get(), config.requireClientCertificate()),
-                               creation_status);
+      SET_AND_RETURN_IF_NOT_OK(
+          cert_validator_->addClientValidationContext(
+              ctx.ssl_ctx_.get(), config.requireClientCertificate().value_or(false)),
+          creation_status);
     }
 
     if (!parsed_alpn_protocols_.empty() && !config.capabilities().handles_alpn_selection) {
