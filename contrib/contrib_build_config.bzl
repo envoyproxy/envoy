@@ -14,6 +14,7 @@ CONTRIB_EXTENSIONS = {
     "envoy.filters.http.dynamo":                                "//contrib/dynamo/filters/http/source:config",
     "envoy.filters.http.golang":                                "//contrib/golang/filters/http/source:config",
     "envoy.filters.http.language":                              "//contrib/language/filters/http/source:config_lib",
+    "envoy.filters.http.peak_ewma":                             "//contrib/peak_ewma/filters/http/source:config",
     "envoy.filters.http.sxg":                                   "//contrib/sxg/filters/http/source:config",
 
     #
@@ -76,6 +77,11 @@ CONTRIB_EXTENSIONS = {
     # Extensions for generic proxy
     #
     "envoy.generic_proxy.codecs.kafka":                         "//contrib/generic_proxy/filters/network/source/codecs/kafka:config",
+
+    #
+    # Load balancing policies
+    #
+    "envoy.load_balancing_policies.peak_ewma":      "//contrib/peak_ewma/load_balancing_policies/source:config",
 
     #
     # xDS delegates
