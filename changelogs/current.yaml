@@ -1,11 +1,6 @@
 date: Pending
 
 behavior_changes:
-- area: response_decoder
-  change: |
-    Updated EnvoyQuicClientStream and ResponseDecoderWrapper to use a handle to access the response decoder
-    to prevent use-after-free errors by ensuring the decoder instance is still live before calling its methods.
-    This change is guarded by the runtime flag ``envoy.reloadable_features.use_response_decoder_handle``.
 - area: http
   change: |
     A route refresh will now result in a tracing refresh. The trace sampling decision and decoration

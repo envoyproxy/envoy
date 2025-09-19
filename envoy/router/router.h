@@ -27,7 +27,6 @@
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/retry.h"
 
-#include "source/common/http/response_decoder_impl_base.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 
@@ -1491,7 +1490,7 @@ public:
  * An API for the interactions the upstream stream needs to have with the downstream stream
  * and/or router components
  */
-class UpstreamToDownstream : public Http::ResponseDecoderImplBase, public Http::StreamCallbacks {
+class UpstreamToDownstream : public Http::ResponseDecoder, public Http::StreamCallbacks {
 public:
   /**
    * @return return the route for the downstream stream.

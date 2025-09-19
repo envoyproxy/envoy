@@ -18,7 +18,6 @@ envoy_cc_extension(
     ],
     deps = [
         "//source/common/http:codec_client_lib",
-        "//source/common/http:response_decoder_impl_base",
         "//source/common/upstream:health_checker_lib",
         "//source/common/upstream:host_utility_lib",
         "//source/extensions/health_checkers/common:health_checker_base_lib",

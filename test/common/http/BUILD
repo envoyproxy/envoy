@@ -162,7 +162,6 @@ envoy_cc_test(
     deps = [
         "//source/common/http:codec_wrappers_lib",
         "//test/mocks/http:http_mocks",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
