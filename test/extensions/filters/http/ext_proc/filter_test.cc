@@ -916,8 +916,8 @@ TEST_F(HttpFilterTest, CustomProcessingRequestModifier) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
   processResponseHeaders(false, absl::nullopt);
 
-  Buffer::OwnedImpl resp_data_2("bar");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data_2, true));
+  Buffer::OwnedImpl resp_data("bar");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
   filter_->onDestroy();
 }
@@ -979,8 +979,43 @@ TEST_F(HttpFilterTest, CustomProcessingRequestModifierOverride) {
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
   processResponseHeaders(false, absl::nullopt);
 
-  Buffer::OwnedImpl resp_data_2("bar");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data_2, true));
+  Buffer::OwnedImpl resp_data("bar");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, CustomProcessingRequestModifierDoesNotCrashWithMissingType) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_request_modifier:
+    name: "invalid_processing_request_modifier"
+    typed_config:
+      "@type": type.googleapis.com/envoy.test.extensions.filters.http.ext_proc.v3.TestProcessingRequestModifierConfig
+      mapped_request_attributes:
+        "remapped.path": "request.path"
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  EXPECT_TRUE(last_request_.has_request_headers());
+  const auto& attributes = last_request_.attributes();
+  EXPECT_EQ(0, attributes.size());
+
+  processRequestHeaders(false, absl::nullopt);
+
+  // Let the rest of the request play out
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+
+  Buffer::OwnedImpl resp_data("bar");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, true));
   EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
   filter_->onDestroy();
 }

@@ -32,7 +32,7 @@ ProtoMapValuesToUniqueVector(const Protobuf::Map<std::string, std::string>& prot
 TestProcessingRequestModifier::TestProcessingRequestModifier(
     const TestProcessingRequestModifierConfig& config,
     Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr expr_builder,
-      Server::Configuration::CommonFactoryContext& context)
+    Server::Configuration::CommonFactoryContext& context)
     : config_(config),
       expression_manager_(expr_builder, context.localInfo(),
                           ProtoMapValuesToUniqueVector(config.mapped_request_attributes()),
