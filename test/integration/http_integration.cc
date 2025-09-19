@@ -1888,18 +1888,21 @@ void HttpIntegrationTest::expectDownstreamBytesSentAndReceived(BytesCountExpecta
 }
 
 void Http2RawFrameIntegrationTest::startHttp2Session() {
+  startHttp2Session(Http2Frame::makeEmptySettingsFrame());
+}
+
+void Http2RawFrameIntegrationTest::startHttp2Session(const Http2Frame& settings) {
   ASSERT_TRUE(tcp_client_->write(Http2Frame::Preamble, false, false));
 
-  // Send empty initial SETTINGS frame.
-  auto settings = Http2Frame::makeEmptySettingsFrame();
+  // Send initial SETTINGS frame.
   ASSERT_TRUE(tcp_client_->write(std::string(settings), false, false));
 
   // Read initial SETTINGS frame from the server.
   readFrame();
 
-  // Send an SETTINGS ACK.
-  settings = Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack);
-  ASSERT_TRUE(tcp_client_->write(std::string(settings), false, false));
+  // Send a SETTINGS ACK.
+  auto settings_ack = Http2Frame::makeEmptySettingsFrame(Http2Frame::SettingsFlags::Ack);
+  ASSERT_TRUE(tcp_client_->write(std::string(settings_ack), false, false));
 
   // read pending SETTINGS and WINDOW_UPDATE frames
   readFrame();
@@ -1907,6 +1910,10 @@ void Http2RawFrameIntegrationTest::startHttp2Session() {
 }
 
 void Http2RawFrameIntegrationTest::beginSession() {
+  beginSession(Http2Frame::makeEmptySettingsFrame());
+}
+
+void Http2RawFrameIntegrationTest::beginSession(const Http2Frame& settings) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
   setUpstreamProtocol(Http::CodecType::HTTP2);
   // set lower outbound frame limits to make tests run faster
@@ -1918,7 +1925,7 @@ void Http2RawFrameIntegrationTest::beginSession() {
       envoy::config::core::v3::SocketOption::STATE_PREBIND,
       ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RCVBUF), 1024));
   tcp_client_ = makeTcpConnection(lookupPort("http"), options);
-  startHttp2Session();
+  startHttp2Session(settings);
 }
 
 Http2Frame Http2RawFrameIntegrationTest::readFrame() {

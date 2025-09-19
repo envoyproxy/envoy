@@ -668,14 +668,14 @@ case $CI_TARGET in
         CONFIG="${CONFIG_PREFIX}gcc"
         BAZEL_BUILD_OPTIONS+=("--config=${CONFIG}")
         echo "gcc toolchain configured: ${CONFIG}"
+        echo "bazel fastbuild build with gcc..."
+        bazel_envoy_binary_build fastbuild
         echo "Testing ${TEST_TARGETS[*]}"
         bazel_with_collection \
             test "${BAZEL_BUILD_OPTIONS[@]}" \
             -c fastbuild  \
             --remote_download_minimal \
             -- "${TEST_TARGETS[@]}"
-        echo "bazel release build with gcc..."
-        bazel_envoy_binary_build fastbuild
         ;;
 
     info)
