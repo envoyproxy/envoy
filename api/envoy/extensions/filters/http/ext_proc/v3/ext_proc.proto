@@ -347,6 +347,7 @@ message ExternalProcessor {
   //
   // .. note::
   //   Processing request modifiers are currently in alpha.
+  //
   config.core.v3.TypedExtensionConfig processing_request_modifier = 24
       [(xds.annotations.v3.field_status).work_in_progress = true];
 
@@ -485,6 +486,7 @@ message ExtProcOverrides {
   //
   // .. note::
   //   Processing request modifiers are currently in alpha.
+  //
   // This is a per-route override of
   // :ref:`processing_request_modifier <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_request_modifier>`.
   config.core.v3.TypedExtensionConfig processing_request_modifier = 9
