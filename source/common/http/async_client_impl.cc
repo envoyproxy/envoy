@@ -118,9 +118,10 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
                        : std::make_shared<StreamInfo::FilterStateImpl>(
                              StreamInfo::FilterState::LifeSpan::FilterChain)),
       tracing_config_(Tracing::EgressConfig::get()), local_reply_(*parent.local_reply_),
-      retry_policy_(createRetryPolicy(options, parent.factory_context_, creation_status)),
       account_(options.account_), buffer_limit_(options.buffer_limit_), send_xff_(options.send_xff),
       send_internal_(options.send_internal) {
+  auto retry_policy = createRetryPolicy(options, parent.factory_context_, creation_status);
+
   // A field initialization may set the creation-status as unsuccessful.
   // In that case return immediately.
   if (!creation_status.ok()) {
@@ -140,7 +141,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
   }
 
   auto route_or_error = NullRouteImpl::create(
-      parent_.cluster_->name(), *retry_policy_, parent_.factory_context_.regexEngine(),
+      parent_.cluster_->name(), std::move(retry_policy), parent_.factory_context_.regexEngine(),
       options.timeout, options.hash_policy, metadata_matching_criteria);
   SET_AND_RETURN_IF_NOT_OK(route_or_error.status(), creation_status);
   route_ = std::move(*route_or_error);

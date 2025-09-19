@@ -205,7 +205,7 @@ using RetryPolicyConstSharedPtr = std::shared_ptr<const RetryPolicy>;
 /**
  * Route level retry policy.
  */
-class RetryPolicy : public std::enable_shared_from_this<RetryPolicy> {
+class RetryPolicy {
 public:
   // clang-format off
   static constexpr uint32_t RETRY_ON_5XX                                = 0x1;
@@ -313,11 +313,6 @@ public:
    * back-off interval parsed from response headers.
    */
   virtual std::chrono::milliseconds resetMaxInterval() const PURE;
-
-  /**
-   * @return RetryPolicyConstSharedPtr a shared pointer to this instance.
-   */
-  RetryPolicyConstSharedPtr getConstShared() const { return shared_from_this(); }
 };
 
 /**
@@ -993,6 +988,12 @@ public:
    *         if it is empty and does not allow retries.
    */
   virtual const RetryPolicy& retryPolicy() const PURE;
+
+  /**
+   * @return const RetryPolicy& the retry policy for the route. All routes have a retry policy even
+   *         if it is empty and does not allow retries.
+   */
+  virtual const RetryPolicyConstSharedPtr& sharedRetryPolicy() const PURE;
 
   /**
    * @return const InternalRedirectPolicy& the internal redirect policy for the route. All routes

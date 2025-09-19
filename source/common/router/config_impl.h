@@ -637,6 +637,7 @@ public:
     }
     return *RetryPolicyImpl::DefaultRetryPolicy;
   }
+  const RetryPolicyConstSharedPtr& sharedRetryPolicy() const override { return retry_policy_; }
   const InternalRedirectPolicy& internalRedirectPolicy() const override {
     if (internal_redirect_policy_ != nullptr) {
       return *internal_redirect_policy_;
