@@ -312,7 +312,7 @@ private:
   static Http::Code toErrorCode(uint64_t status) {
     const auto code = static_cast<Http::Code>(status);
     // Only allow 4xx and 5xx status codes.
-    if (code >= Http::Code::BadRequest && status <= Http::Code::LastUnassignedServerErrorCode) {
+    if (code >= Http::Code::BadRequest && code <= Http::Code::LastUnassignedServerErrorCode) {
       return code;
     }
     return Http::Code::InternalServerError;
