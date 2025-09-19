@@ -93,7 +93,7 @@ bool Rule::matches(const ThriftProxy::MessageMetadata& metadata) const {
 PayloadToMetadataFilter::PayloadToMetadataFilter(const ConfigSharedPtr config) : config_(config) {}
 
 void PayloadToMetadataFilter::handleOnPresent(
-    std::variant<absl::string_view, int64_t, double> value, const std::vector<uint16_t>& rule_ids,
+    absl::variant<absl::string_view, int64_t, double> value, const std::vector<uint16_t>& rule_ids,
     bool is_request) {
   ASSERT(is_request); // Currently we only support request rules.
   for (uint16_t rule_id : rule_ids) {
@@ -107,9 +107,9 @@ void PayloadToMetadataFilter::handleOnPresent(
     ASSERT(rule_id < config_->requestRules().size());
     const Rule& rule = config_->requestRules()[rule_id];
     std::string value_str;
-    if (std::holds_alternative<absl::string_view>(value)) {
+    if (absl::holds_alternative<absl::string_view>(value)) {
       value_str = std::get<absl::string_view>(value);
-    } else if (std::holds_alternative<int64_t>(value)) {
+    } else if (absl::holds_alternative<int64_t>(value)) {
       value_str = std::to_string(std::get<int64_t>(value));
     } else {
       value_str = std::to_string(std::get<double>(value));

@@ -59,7 +59,7 @@ class MetadataHandler {
 public:
   virtual ~MetadataHandler() = default;
   virtual FilterStatus handleThriftMetadata(MessageMetadataSharedPtr metadata) PURE;
-  virtual void handleOnPresent(std::variant<absl::string_view, int64_t, double> value,
+  virtual void handleOnPresent(absl::variant<absl::string_view, int64_t, double> value,
                                const std::vector<uint16_t>& rule_ids, bool is_request) PURE;
   virtual void handleComplete(bool is_request) PURE;
 };
@@ -105,7 +105,7 @@ public:
 
 private:
   FilterStatus numberValue(int64_t value);
-  FilterStatus handleValue(std::variant<absl::string_view, int64_t, double> value);
+  FilterStatus handleValue(absl::variant<absl::string_view, int64_t, double> value);
   void assertNode();
   void assertLastFieldId();
 

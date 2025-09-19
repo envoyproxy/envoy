@@ -319,7 +319,7 @@ FilterStatus Filter::handleThriftMetadata(MessageMetadataSharedPtr metadata) {
 }
 
 // PayloadExtractor::MetadataHandler
-void Filter::handleOnPresent(std::variant<absl::string_view, int64_t, double> value,
+void Filter::handleOnPresent(absl::variant<absl::string_view, int64_t, double> value,
                              const std::vector<uint16_t>& rule_ids, bool is_request) {
   for (uint16_t rule_id : rule_ids) {
     if (matched_field_selector_rule_ids_.find(rule_id) == matched_field_selector_rule_ids_.end()) {
@@ -332,7 +332,7 @@ void Filter::handleOnPresent(std::variant<absl::string_view, int64_t, double> va
     auto& rules = is_request ? config_->requestRules() : config_->responseRules();
     ASSERT(rule_id < rules.size());
     const Rule& rule = rules[rule_id];
-    if (std::holds_alternative<absl::string_view>(value)) {
+    if (absl::holds_alternative<absl::string_view>(value)) {
       absl::string_view string_view_val = std::get<absl::string_view>(value);
       if (string_view_val.empty()) {
         continue;
@@ -340,7 +340,7 @@ void Filter::handleOnPresent(std::variant<absl::string_view, int64_t, double> va
       Protobuf::Value val;
       val.set_string_value(std::get<absl::string_view>(value));
       handleOnPresent(std::move(val), rule);
-    } else if (std::holds_alternative<int64_t>(value)) {
+    } else if (absl::holds_alternative<int64_t>(value)) {
       Protobuf::Value val;
       val.set_number_value(std::get<int64_t>(value));
       handleOnPresent(std::move(val), rule);
