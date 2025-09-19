@@ -14,7 +14,7 @@ namespace LocalRateLimit {
 class LocalRateLimitFilterFactory : public AccessLog::ExtensionFilterFactory {
 public:
   AccessLog::FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                                    Server::Configuration::FactoryContext& context) override;
+                                    Server::Configuration::GenericFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() const override {
     return "envoy.access_loggers.extension_filters.local_ratelimit";
