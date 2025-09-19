@@ -92,9 +92,9 @@ bool Rule::matches(const ThriftProxy::MessageMetadata& metadata) const {
 
 PayloadToMetadataFilter::PayloadToMetadataFilter(const ConfigSharedPtr config) : config_(config) {}
 
-void PayloadToMetadataFilter::handleOnPresent(std::string&& value,
-                                              const std::vector<uint16_t>& rule_ids,
-                                              bool is_request) {
+void PayloadToMetadataFilter::handleOnPresent(
+    std::variant<absl::string_view, int64_t, double> value, const std::vector<uint16_t>& rule_ids,
+    bool is_request) {
   ASSERT(is_request); // Currently we only support request rules.
   for (uint16_t rule_id : rule_ids) {
     if (matched_rule_ids_.find(rule_id) == matched_rule_ids_.end()) {
@@ -106,14 +106,23 @@ void PayloadToMetadataFilter::handleOnPresent(std::string&& value,
     matched_rule_ids_.erase(rule_id);
     ASSERT(rule_id < config_->requestRules().size());
     const Rule& rule = config_->requestRules()[rule_id];
-    if (!value.empty() && rule.rule().has_on_present()) {
+    std::string value_str;
+    if (std::holds_alternative<absl::string_view>(value)) {
+      value_str = std::get<absl::string_view>(value);
+    } else if (std::holds_alternative<int64_t>(value)) {
+      value_str = std::to_string(std::get<int64_t>(value));
+    } else {
+      value_str = std::to_string(std::get<double>(value));
+    }
+
+    if (!value_str.empty() && rule.rule().has_on_present()) {
       // We can *not* always std::move(value) here since we need `value` if multiple rules are
       // matched. Optimize the most common usage, which is one rule per payload field.
       if (rule_ids.size() == 1) {
-        applyKeyValue(std::move(value), rule, rule.rule().on_present());
+        applyKeyValue(std::move(value_str), rule, rule.rule().on_present());
         break;
       } else {
-        applyKeyValue(value, rule, rule.rule().on_present());
+        applyKeyValue(value_str, rule, rule.rule().on_present());
       }
     }
   }

@@ -87,8 +87,8 @@ public:
   FilterStatus handleThriftMetadata(MessageMetadataSharedPtr) override {
     return FilterStatus::Continue;
   }
-  void handleOnPresent(std::string&& value, const std::vector<uint16_t>& rule_ids,
-                       bool is_request) override;
+  void handleOnPresent(std::variant<absl::string_view, int64_t, double> value,
+                       const std::vector<uint16_t>& rule_ids, bool is_request) override;
   void handleComplete(bool is_request) override;
 
 private:

@@ -74,16 +74,22 @@ FilterStatus TrieMatchHandler::fieldEnd() {
 FilterStatus TrieMatchHandler::stringValue(absl::string_view value) {
   assertLastFieldId();
   ENVOY_LOG(trace, "TrieMatchHandler stringValue id:{} value:{}", field_ids_.back(), value);
-  return handleString(static_cast<std::string>(value));
+  return handleValue(value);
 }
 
-template <typename NumberType> FilterStatus TrieMatchHandler::numberValue(NumberType value) {
+FilterStatus TrieMatchHandler::numberValue(int64_t value) {
   assertLastFieldId();
   ENVOY_LOG(trace, "TrieMatchHandler numberValue id:{} value:{}", field_ids_.back(), value);
-  return handleString(std::to_string(value));
+  return handleValue(value);
 }
 
-FilterStatus TrieMatchHandler::handleString(std::string value) {
+FilterStatus TrieMatchHandler::doubleValue(double& value) {
+  assertLastFieldId();
+  ENVOY_LOG(trace, "TrieMatchHandler doubleValue id:{} value:{}", field_ids_.back(), value);
+  return handleValue(value);
+}
+
+FilterStatus TrieMatchHandler::handleValue(std::variant<absl::string_view, int64_t, double> value) {
   ASSERT(steps_ >= 0);
   assertNode();
   assertLastFieldId();

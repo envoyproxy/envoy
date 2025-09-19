@@ -319,11 +319,8 @@ FilterStatus Filter::handleThriftMetadata(MessageMetadataSharedPtr metadata) {
 }
 
 // PayloadExtractor::MetadataHandler
-// TODO: thrift_proxy/payload_to_metadata filter uses ValueType to determine the type of value.
-// However, this filter aims on use the original type of value in thrift payload. We may need to
-// revisit this if any use case requires type conversion.
-void Filter::handleOnPresent(std::string&& value, const std::vector<uint16_t>& rule_ids,
-                             bool is_request) {
+void Filter::handleOnPresent(std::variant<absl::string_view, int64_t, double> value,
+                             const std::vector<uint16_t>& rule_ids, bool is_request) {
   for (uint16_t rule_id : rule_ids) {
     if (matched_field_selector_rule_ids_.find(rule_id) == matched_field_selector_rule_ids_.end()) {
       ENVOY_LOG(trace, "rule_id {} is not matched.", rule_id);
@@ -335,9 +332,21 @@ void Filter::handleOnPresent(std::string&& value, const std::vector<uint16_t>& r
     auto& rules = is_request ? config_->requestRules() : config_->responseRules();
     ASSERT(rule_id < rules.size());
     const Rule& rule = rules[rule_id];
-    if (!value.empty()) {
+    if (std::holds_alternative<absl::string_view>(value)) {
+      absl::string_view string_view_val = std::get<absl::string_view>(value);
+      if (string_view_val.empty()) {
+        continue;
+      }
       Protobuf::Value val;
-      val.set_string_value(std::move(value));
+      val.set_string_value(std::get<absl::string_view>(value));
+      handleOnPresent(std::move(val), rule);
+    } else if (std::holds_alternative<int64_t>(value)) {
+      Protobuf::Value val;
+      val.set_number_value(std::get<int64_t>(value));
+      handleOnPresent(std::move(val), rule);
+    } else {
+      Protobuf::Value val;
+      val.set_number_value(std::get<double>(value));
       handleOnPresent(std::move(val), rule);
     }
   }

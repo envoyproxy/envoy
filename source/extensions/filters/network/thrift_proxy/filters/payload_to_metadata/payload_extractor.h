@@ -59,8 +59,8 @@ class MetadataHandler {
 public:
   virtual ~MetadataHandler() = default;
   virtual FilterStatus handleThriftMetadata(MessageMetadataSharedPtr metadata) PURE;
-  virtual void handleOnPresent(std::string&& value, const std::vector<uint16_t>& rule_ids,
-                               bool is_request) PURE;
+  virtual void handleOnPresent(std::variant<absl::string_view, int64_t, double> value,
+                               const std::vector<uint16_t>& rule_ids, bool is_request) PURE;
   virtual void handleComplete(bool is_request) PURE;
 };
 
@@ -84,7 +84,7 @@ public:
   FilterStatus int16Value(int16_t& value) override { return numberValue(value); }
   FilterStatus int32Value(int32_t& value) override { return numberValue(value); }
   FilterStatus int64Value(int64_t& value) override { return numberValue(value); }
-  FilterStatus doubleValue(double& value) override { return numberValue(value); }
+  FilterStatus doubleValue(double& value) override;
   FilterStatus stringValue(absl::string_view value) override;
   FilterStatus mapBegin(FieldType&, FieldType&, uint32_t&) override {
     return handleContainerBegin();
@@ -104,8 +104,8 @@ public:
   bool isComplete() const { return complete_; };
 
 private:
-  template <typename NumberType> FilterStatus numberValue(NumberType value);
-  FilterStatus handleString(std::string value);
+  FilterStatus numberValue(int64_t value);
+  FilterStatus handleValue(std::variant<absl::string_view, int64_t, double> value);
   void assertNode();
   void assertLastFieldId();
 
