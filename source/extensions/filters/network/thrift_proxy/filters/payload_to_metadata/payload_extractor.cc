@@ -89,7 +89,8 @@ FilterStatus TrieMatchHandler::doubleValue(double& value) {
   return handleValue(value);
 }
 
-FilterStatus TrieMatchHandler::handleValue(absl::variant<absl::string_view, int64_t, double> value) {
+FilterStatus
+TrieMatchHandler::handleValue(absl::variant<absl::string_view, int64_t, double> value) {
   ASSERT(steps_ >= 0);
   assertNode();
   assertLastFieldId();
