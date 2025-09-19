@@ -534,6 +534,14 @@ envoy_cmake(
         "//bazel:windows_x86_64": ["zlib.lib"],
         "//conditions:default": ["libz.a"],
     }),
+    postfix_script = select({
+        "@platforms//cpu:wasm32": """
+            if [[ -f libzlib.a ]]; then
+                cp libzlib.a $$INSTALLDIR/lib/libz.a
+            fi
+        """,
+        "//conditions:default": "",
+    }),
 )
 
 envoy_cmake(
