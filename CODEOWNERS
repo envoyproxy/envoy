@@ -235,6 +235,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # Formatters
 /*/extensions/formatter/metadata @cpakulski @ravenblackx @nezdolik
 /*/extensions/formatter/cel @kyessenov @zirain
+/*/extensions/formatter/xfcc_value @wbpcode @vikaschoudhary16
 # IP address input matcher
 /*/extensions/matching/input_matchers/ip @aguinet @mattklein123
 # Key Value store
