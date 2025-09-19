@@ -306,8 +306,17 @@ public:
 
   std::unique_ptr<OnProcessingResponse> createOnProcessingResponse() const;
 
-  ProcessingRequestModifier* processingRequestModifier() const {
-    return processing_request_modifier_.get();
+  const absl::optional<const envoy::config::core::v3::TypedExtensionConfig>&
+  processingRequestModifierConfig() const {
+    return processing_request_modifier_config_;
+  }
+
+  Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder() const {
+    return builder_;
+  }
+
+  Server::Configuration::CommonFactoryContext& commonFactoryContext() const {
+    return common_factory_context_;
   }
 
 private:
@@ -357,11 +366,16 @@ private:
   const ExpressionManager expression_manager_;
   const ImmediateMutationChecker immediate_mutation_checker_;
 
-  const std::unique_ptr<ProcessingRequestModifier> processing_request_modifier_;
   const std::function<std::unique_ptr<OnProcessingResponse>()> on_processing_response_factory_cb_;
 
   ThreadLocal::SlotPtr thread_local_stream_manager_slot_;
   const std::chrono::milliseconds remote_close_timeout_;
+
+  const absl::optional<const envoy::config::core::v3::TypedExtensionConfig>
+      processing_request_modifier_config_;
+
+  Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder_;
+  Server::Configuration::CommonFactoryContext& common_factory_context_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -401,6 +415,11 @@ public:
   }
   const absl::optional<bool>& failureModeAllow() const { return failure_mode_allow_; }
 
+  const absl::optional<const envoy::config::core::v3::TypedExtensionConfig>&
+  processingRequestModifierConfig() const {
+    return processing_request_modifier_config_;
+  }
+
 private:
   const bool disabled_;
   const absl::optional<const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode>
@@ -412,6 +431,9 @@ private:
   const absl::optional<const std::vector<std::string>> typed_forwarding_namespaces_;
   const absl::optional<const std::vector<std::string>> untyped_receiving_namespaces_;
   const absl::optional<bool> failure_mode_allow_;
+
+  const absl::optional<const envoy::config::core::v3::TypedExtensionConfig>
+      processing_request_modifier_config_;
 };
 
 class Filter : public Logger::Loggable<Logger::Id::ext_proc>,
@@ -443,6 +465,7 @@ public:
                         config->untypedForwardingMetadataNamespaces(),
                         config->typedForwardingMetadataNamespaces(),
                         config->untypedReceivingMetadataNamespaces()),
+        processing_request_modifier_config_(config->processingRequestModifierConfig()),
         on_processing_response_(config->createOnProcessingResponse()),
         failure_mode_allow_(config->failureModeAllow()) {}
 
@@ -579,6 +602,11 @@ private:
 
   void encodeProtocolConfig(envoy::service::ext_proc::v3::ProcessingRequest& req);
 
+  std::unique_ptr<ProcessingRequestModifier> createProcessingRequestModifier(
+      const absl::optional<envoy::config::core::v3::TypedExtensionConfig>& config,
+      Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
+      Server::Configuration::CommonFactoryContext& context);
+
   const FilterConfigSharedPtr config_;
   const ClientBasePtr client_;
   const ExtProcFilterStats& stats_;
@@ -599,6 +627,14 @@ private:
   // The gRPC stream to the external processor, which will be opened
   // when it's time to send the first message.
   ExternalProcessorStream* stream_ = nullptr;
+
+  // The effective ProcessingRequestModifier, considering both the main config and per-route
+  // overrides.
+  absl::optional<envoy::config::core::v3::TypedExtensionConfig> processing_request_modifier_config_;
+  // Keep track of whether or not initialization was attempted so that we avoid trying to create the
+  // object just because it is null.
+  bool processing_request_modifier_initialized_ = false;
+  std::unique_ptr<ProcessingRequestModifier> processing_request_modifier_;
 
   std::unique_ptr<OnProcessingResponse> on_processing_response_;
 
