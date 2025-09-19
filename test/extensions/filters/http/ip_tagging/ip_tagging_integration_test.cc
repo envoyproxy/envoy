@@ -100,7 +100,8 @@ ip_tags:
   TestEnvironment::renameFile(
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml"),
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"));
-  timeSystem().advanceTimeWait(std::chrono::seconds(1));
+  timeSystem().advanceTimeWait(std::chrono::seconds(2));
+  test_server_->waitForCounterGe("ip_tagging_reload.reload_success", 3);
 
   response = codec_client_->makeHeaderOnlyRequest(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
@@ -190,7 +191,7 @@ ip_tags:
   TestEnvironment::renameFile(
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_new_target.yaml"),
       TestEnvironment::temporaryPath("ip_tagging_test/watcher_target.yaml"));
-  timeSystem().advanceTimeWait(std::chrono::seconds(1));
+  timeSystem().advanceTimeWait(std::chrono::seconds(3));
   test_server_->waitForCounterGe("ip_tagging_reload.reload_success", 3);
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto response = codec_client_->makeHeaderOnlyRequest(
