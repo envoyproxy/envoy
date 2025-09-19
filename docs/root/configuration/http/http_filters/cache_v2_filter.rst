@@ -1,7 +1,7 @@
 .. _config_http_filters_cache_v2:
 
 CacheV2 filter
-============
+==============
 
 * This filter should be configured with the type URL ``type.googleapis.com/envoy.extensions.filters.http.cache_v2.v3.CacheV2Config``.
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.cache_v2.v3.CacheV2Config>`
@@ -73,7 +73,4 @@ involves duplicating the full route config into an internal listener (unfortunat
    :lineno-start: 38
    :caption: :download:`http-cache-v2-configuration-internal-listener.yaml <_include/http-cache-v2-configuration-internal-listener.yaml>`
 
-.. seealso::
-
-   :ref:`Envoy Cache Sandbox <install_sandboxes_cache_v2_filter>`
-      Learn more about the Envoy Cache filter in the step by step sandbox.
+.. TODO(ravenblackx): Add sandbox and link it here, similar to what cache_filter does.
