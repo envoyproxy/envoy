@@ -2929,3 +2929,13 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "xds_grpc_client_cache_test",
+    srcs = ["xds_grpc_client_cache_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        "//test/test_common:test_runtime_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+    ],
+)
