@@ -311,7 +311,8 @@ public:
 private:
   static Http::Code toErrorCode(uint64_t status) {
     const auto code = static_cast<Http::Code>(status);
-    if (code >= Http::Code::Continue && code <= Http::Code::NetworkAuthenticationRequired) {
+    // Only allow 4xx and 5xx status codes.
+    if (code >= Http::Code::BadRequest && status <= Http::Code::LastUnassignedServerErrorCode) {
       return code;
     }
     return Http::Code::InternalServerError;
