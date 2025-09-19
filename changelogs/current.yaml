@@ -443,5 +443,14 @@ new_features:
     <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.max_udp_channel_duration>`
     configuration field to the c-ares DNS resolver. This allows periodic refresh of the UDP channel
     to help with avoiding stale socket states, and providing better load distribution across UDP ports.
+- area: matching
+  change: |
+    Added :ref:`NetworkNamespaceInput
+    <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.NetworkNamespaceInput>` to the
+    matcher framework. This input returns the listener address's ``network_namespace_filepath``
+    for use with :ref:`filter_chain_matcher
+    <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`, enabling filter chain
+    selection based on the Linux network namespace of the bound socket. On non-Linux platforms,
+    the input returns an empty value and connections use the default filter chain.
 
 deprecated:
