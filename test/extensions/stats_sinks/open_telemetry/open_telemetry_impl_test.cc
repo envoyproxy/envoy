@@ -44,13 +44,15 @@ public:
               bool emit_tags_as_attributes = true, bool use_tag_extracted_name = true,
               const std::string& stat_prefix = "",
               absl::flat_hash_map<std::string, std::string> resource_attributes = {},
-              absl::string_view metric_conversion_pbtext = "") {
+              absl::string_view metric_conversion_pbtext = "",
+              bool enable_metric_aggregation = false) {
     envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
     sink_config.set_report_counters_as_deltas(report_counters_as_deltas);
     sink_config.set_report_histograms_as_deltas(report_histograms_as_deltas);
     sink_config.mutable_emit_tags_as_attributes()->set_value(emit_tags_as_attributes);
     sink_config.mutable_use_tag_extracted_name()->set_value(use_tag_extracted_name);
     sink_config.set_prefix(stat_prefix);
+    sink_config.set_enable_metric_aggregation(enable_metric_aggregation);
     Tracers::OpenTelemetry::Resource resource;
     for (const auto& [key, value] : resource_attributes) {
       resource.attributes_[key] = value;
@@ -586,63 +588,72 @@ TEST_F(OtlpMetricsFlusherTests, DeltaHistogramMetric) {
   expectHistogram(*findHistogram(metrics, getTagExtractedName("test_histogram2")),
                   getTagExtractedName("test_histogram2"), true);
 }
-using OtlpMetricsFlusherTestsWithConversion = OtlpMetricsFlusherTests;
-TEST_F(OtlpMetricsFlusherTestsWithConversion, MetricsWithLabelsAggregationCounter) {
+
+class OtlpMetricsFlusherTestsWithConversionAndAggregation
+    : public OtlpMetricsFlusherTests,
+      public testing::WithParamInterface<bool> {
+public:
+  bool IsAggregationEnabled() const { return GetParam(); }
+};
+
+INSTANTIATE_TEST_SUITE_P(OtlpMetricsFlusherTestsWithConversionAndAggregation,
+                         OtlpMetricsFlusherTestsWithConversionAndAggregation, testing::Bool());
+
+TEST_P(OtlpMetricsFlusherTestsWithConversionAndAggregation, MetricsWithLabelsAggregationCounter) {
   OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "prefix", {},
-                                             R"pb(
-        matcher_list {
-          matchers {
-            predicate {
-              single_predicate {
-                input {
-                  name: "stat_full_name_match_input"
-                  typed_config {
-                    [type.googleapis.com/
+                                             R"pb( matcher_list {
+             matchers {
+               predicate {
+                 single_predicate {
+                   input {
+                     name: "stat_full_name_match_input"
+                     typed_config {
+                       [type.googleapis.com/
                      envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
-                  }
-                }
-                value_match { safe_regex { regex: "test_counter-1" } }
-              }
-            }
-            on_match {
-              action {
-                name: "otlp_metric_conversion"
-                typed_config {
-                  [type.googleapis.com/envoy.extensions.stat_sinks
-                       .open_telemetry.v3.SinkConfig.ConversionAction] {
-                    metric_name: "new_counter_name"
-                  }
-                }
-              }
-            }
-          }
-          matchers {
-            predicate {
-              single_predicate {
-                input {
-                  name: "stat_full_name_match_input"
-                  typed_config {
-                    [type.googleapis.com/
+                     }
+                   }
+                   value_match { safe_regex { regex: "test_counter-1" } }
+                 }
+               }
+               on_match {
+                 action {
+                   name: "otlp_metric_conversion"
+                   typed_config {
+                     [type.googleapis.com/envoy.extensions.stat_sinks
+                          .open_telemetry.v3.SinkConfig.ConversionAction] {
+                       metric_name: "new_counter_name"
+                     }
+                   }
+                 }
+               }
+             }
+             matchers {
+               predicate {
+                 single_predicate {
+                   input {
+                     name: "stat_full_name_match_input"
+                     typed_config {
+                       [type.googleapis.com/
                      envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
-                  }
-                }
-                value_match { safe_regex { regex: "test_counter-." } }
-              }
-            }
-            on_match {
-              action {
-                name: "otlp_metric_conversion"
-                typed_config {
-                  [type.googleapis.com/envoy.extensions.stat_sinks
-                       .open_telemetry.v3.SinkConfig.ConversionAction] {
-                    metric_name: "new_counter_name"
-                  }
-                }
-              }
-            }
-          }
-        }
-      )pb"));
+                     }
+                   }
+                   value_match { safe_regex { regex: "test_counter-." } }
+                 }
+               }
+               on_match {
+                 action {
+                   name: "otlp_metric_conversion"
+                   typed_config {
+                     [type.googleapis.com/envoy.extensions.stat_sinks
+                          .open_telemetry.v3.SinkConfig.ConversionAction] {
+                       metric_name: "new_counter_name"
+                     }
+                   }
+                 }
+               }
+             }
+           })pb",
+                                             IsAggregationEnabled()));
   // Add counters with same name, different tags
   addCounterToSnapshot("test_counter-1", 0, 1, true, {{"key", "val1"}});
   addCounterToSnapshot("test_counter-2", 0, 99, true, {{"key", "val1"}});
@@ -652,123 +663,136 @@ TEST_F(OtlpMetricsFlusherTestsWithConversion, MetricsWithLabelsAggregationCounte
   addCounterToSnapshot("unmapped_counter", 0, 5, true, {{"keyY", "valY"}});
 
   MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 123);
-  expectMetricsCount(metrics, 3);
+  const int expected_metrics_count = IsAggregationEnabled() ? 2 : 5;
+  expectMetricsCount(metrics, expected_metrics_count);
 
   auto& exported_metrics =
       const_cast<Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::Metric>&>(
           metrics->resource_metrics()[0].scope_metrics()[0].metrics());
   sortMetrics(exported_metrics);
 
-  // Expected metrics in sorted order:
-  // 0: new_counter_name (from test_counter)
-  // 1: prefix.unmapped_counter-tagged (keyX:valX)
-  // 2: prefix.unmapped_counter-tagged (keyY:valY)
-
   // Counter: new_counter_name (remapped)
-  {
+  if (IsAggregationEnabled()) {
     const auto& metric = exported_metrics[0];
     EXPECT_EQ("new_counter_name", metric.name());
     EXPECT_TRUE(metric.has_sum());
     EXPECT_EQ(2, metric.sum().data_points().size());
     // Data Point 1: {"key": "val1"}
-    EXPECT_EQ(100, metric.sum().data_points()[0].as_int());
-    EXPECT_EQ(expected_time_ns_, metric.sum().data_points()[0].time_unix_nano());
-    EXPECT_EQ(123, metric.sum().data_points()[0].start_time_unix_nano());
+    EXPECT_EQ(100, metric.sum().data_points()[0].as_int()); // 1 + 99
     expectAttributes(metric.sum().data_points()[0].attributes(), "key", "val1");
     // Data Point 2: {"key": "val2"}
     EXPECT_EQ(3, metric.sum().data_points()[1].as_int());
-    EXPECT_EQ(expected_time_ns_, metric.sum().data_points()[1].time_unix_nano());
-    EXPECT_EQ(123, metric.sum().data_points()[1].start_time_unix_nano());
     expectAttributes(metric.sum().data_points()[1].attributes(), "key", "val2");
-  }
+  } else {
+    // Metric 0: new_counter_name {"key": "val1"} from test_counter-1
+    const auto& metric0 = exported_metrics[0];
+    EXPECT_EQ("new_counter_name", metric0.name());
+    EXPECT_TRUE(metric0.has_sum());
+    EXPECT_EQ(1, metric0.sum().data_points().size());
+    EXPECT_EQ(1, metric0.sum().data_points()[0].as_int());
+    expectAttributes(metric0.sum().data_points()[0].attributes(), "key", "val1");
 
+    // Metric 1: new_counter_name {"key": "val1"} from test_counter-2
+    const auto& metric1 = exported_metrics[1];
+    EXPECT_EQ("new_counter_name", metric1.name());
+    EXPECT_TRUE(metric1.has_sum());
+    EXPECT_EQ(1, metric1.sum().data_points().size());
+    EXPECT_EQ(99, metric1.sum().data_points()[0].as_int());
+    expectAttributes(metric1.sum().data_points()[0].attributes(), "key", "val1");
+
+    // Metric 2: new_counter_name {"key": "val2"} from test_counter-1
+    const auto& metric2 = exported_metrics[2];
+    EXPECT_EQ("new_counter_name", metric2.name());
+    EXPECT_TRUE(metric2.has_sum());
+    EXPECT_EQ(1, metric2.sum().data_points().size());
+    EXPECT_EQ(3, metric2.sum().data_points()[0].as_int());
+    expectAttributes(metric2.sum().data_points()[0].attributes(), "key", "val2");
+  }
   // Counter: prefix.unmapped_counter-tagged (unmapped)
-  {
+  if (IsAggregationEnabled()) {
     const auto& metric = exported_metrics[1];
     EXPECT_EQ(getTagExtractedName("prefix.unmapped_counter"), metric.name());
     EXPECT_TRUE(metric.has_sum());
-    EXPECT_EQ(1, metric.sum().data_points().size());
+    EXPECT_EQ(2, metric.sum().data_points().size());
+    // data point 1: keyX: valX
     EXPECT_EQ(1, metric.sum().data_points()[0].as_int());
-    EXPECT_EQ(expected_time_ns_, metric.sum().data_points()[0].time_unix_nano());
-    EXPECT_EQ(123, metric.sum().data_points()[0].start_time_unix_nano());
     expectAttributes(metric.sum().data_points()[0].attributes(), "keyX", "valX");
-  }
-
-  // Counter: prefix.unmapped_counter-tagged (unmapped, keyY)
-  {
-    const auto& metric = exported_metrics[2];
-    EXPECT_EQ(getTagExtractedName("prefix.unmapped_counter"), metric.name());
-    EXPECT_TRUE(metric.has_sum());
-    EXPECT_EQ(1, metric.sum().data_points().size());
-    EXPECT_EQ(5, metric.sum().data_points()[0].as_int());
-    expectAttributes(metric.sum().data_points()[0].attributes(), "keyY", "valY");
+    // data point 2: keyY: valY
+    EXPECT_EQ(5, metric.sum().data_points()[1].as_int());
+    expectAttributes(metric.sum().data_points()[1].attributes(), "keyY", "valY");
+  } else {
+    // Metric 3: keyX: valX
+    const auto& metric3 = exported_metrics[3];
+    EXPECT_EQ(getTagExtractedName("prefix.unmapped_counter"), metric3.name());
+    EXPECT_TRUE(metric3.has_sum());
+    EXPECT_EQ(1, metric3.sum().data_points().size());
+    EXPECT_EQ(1, metric3.sum().data_points()[0].as_int());
+    expectAttributes(metric3.sum().data_points()[0].attributes(), "keyX", "valX");
+    // Metric 4: keyY: valY
+    const auto& metric4 = exported_metrics[4];
+    EXPECT_EQ(getTagExtractedName("prefix.unmapped_counter"), metric4.name());
+    EXPECT_TRUE(metric4.has_sum());
+    EXPECT_EQ(1, metric4.sum().data_points().size());
+    EXPECT_EQ(5, metric4.sum().data_points()[0].as_int());
+    expectAttributes(metric4.sum().data_points()[0].attributes(), "keyY", "valY");
   }
 }
 
-TEST_F(OtlpMetricsFlusherTestsWithConversion, MetricsWithLabelsAggregationGauge) {
+TEST_P(OtlpMetricsFlusherTestsWithConversionAndAggregation, MetricsWithLabelsAggregationGauge) {
   OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "prefix", {},
-                                             R"pb(
-        matcher_list {
-          matchers {
-            predicate {
-              single_predicate {
-                input {
-                  name: "stat_full_name_match_input"
-                  typed_config {
-                    [type.googleapis.com/
+                                             R"pb( matcher_list {
+             matchers {
+               predicate {
+                 single_predicate {
+                   input {
+                     name: "stat_full_name_match_input"
+                     typed_config {
+                       [type.googleapis.com/
                      envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
-                  }
-                }
-                value_match {
-                  safe_regex {
-                    regex: "test_gauge-1"
-                  }
-                }
-              }
-            }
-            on_match {
-              action {
-                name: "otlp_metric_conversion"
-                typed_config {
-                  [type.googleapis.com/envoy.extensions.stat_sinks
-                       .open_telemetry.v3.SinkConfig.ConversionAction] {
-                    metric_name: "new_gauge_name"
-                  }
-                }
-              }
-            }
-          }
-          matchers {
-            predicate {
-              single_predicate {
-                input {
-                  name: "stat_full_name_match_input"
-                  typed_config {
-                    [type.googleapis.com/
+                     }
+                   }
+                   value_match { safe_regex { regex: "test_gauge-1" } }
+                 }
+               }
+               on_match {
+                 action {
+                   name: "otlp_metric_conversion"
+                   typed_config {
+                     [type.googleapis.com/envoy.extensions.stat_sinks
+                          .open_telemetry.v3.SinkConfig.ConversionAction] {
+                       metric_name: "new_gauge_name"
+                     }
+                   }
+                 }
+               }
+             }
+             matchers {
+               predicate {
+                 single_predicate {
+                   input {
+                     name: "stat_full_name_match_input"
+                     typed_config {
+                       [type.googleapis.com/
                      envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
-                  }
-                }
-                value_match {
-                  safe_regex {
-                    regex: "test_gauge-."
-                  }
-                }
-              }
-            }
-            on_match {
-              action {
-                name: "otlp_metric_conversion"
-                typed_config {
-                  [type.googleapis.com/envoy.extensions.stat_sinks
-                       .open_telemetry.v3.SinkConfig.ConversionAction] {
-                    metric_name: "new_gauge_name"
-                  }
-                }
-              }
-            }
-          }
-        }
-      )pb"));
+                     }
+                   }
+                   value_match { safe_regex { regex: "test_gauge-." } }
+                 }
+               }
+               on_match {
+                 action {
+                   name: "otlp_metric_conversion"
+                   typed_config {
+                     [type.googleapis.com/envoy.extensions.stat_sinks
+                          .open_telemetry.v3.SinkConfig.ConversionAction] {
+                       metric_name: "new_gauge_name"
+                     }
+                   }
+                 }
+               }
+             }
+           })pb",
+                                             IsAggregationEnabled()));
   // Add gauges with same name, different tags
   addGaugeToSnapshot("test_gauge-1", 1, true, {{"key", "valA"}});
   addGaugeToSnapshot("test_gauge-2", 2, true, {{"key", "valA"}});
@@ -778,20 +802,16 @@ TEST_F(OtlpMetricsFlusherTestsWithConversion, MetricsWithLabelsAggregationGauge)
   addGaugeToSnapshot("unmapped_gauge", 10, true, {{"keyY", "valY"}});
 
   MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 123);
-  expectMetricsCount(metrics, 3);
+  const int expected_metrics_count = IsAggregationEnabled() ? 2 : 5;
+  expectMetricsCount(metrics, expected_metrics_count);
 
   auto& exported_metrics =
       const_cast<Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::Metric>&>(
           metrics->resource_metrics()[0].scope_metrics()[0].metrics());
   sortMetrics(exported_metrics);
 
-  // Expected metrics in sorted order:
-  // 0: new_gauge_name (from test_gauge-1, test_gauge-2)
-  // 1: prefix.unmapped_gauge-tagged (keyX:valX)
-  // 2: prefix.unmapped_gauge-tagged (keyY:valY)
-
   // Gauge: new_gauge_name (remapped)
-  {
+  if (IsAggregationEnabled()) {
     const auto& metric = exported_metrics[0];
     EXPECT_EQ("new_gauge_name", metric.name());
     EXPECT_TRUE(metric.has_gauge());
@@ -799,101 +819,116 @@ TEST_F(OtlpMetricsFlusherTestsWithConversion, MetricsWithLabelsAggregationGauge)
     // Data Point 1: {"key": "valA"} - Aggregated from test_gauge-1 and
     // test_gauge-2
     EXPECT_EQ(3, metric.gauge().data_points()[0].as_int()); // 1 + 2
-    EXPECT_EQ(expected_time_ns_, metric.gauge().data_points()[0].time_unix_nano());
-    EXPECT_EQ(123, metric.gauge().data_points()[0].start_time_unix_nano());
     expectAttributes(metric.gauge().data_points()[0].attributes(), "key", "valA");
     // Data Point 2: {"key": "valB"} - From test_gauge-1
     EXPECT_EQ(3, metric.gauge().data_points()[1].as_int());
-    EXPECT_EQ(expected_time_ns_, metric.gauge().data_points()[1].time_unix_nano());
-    EXPECT_EQ(123, metric.gauge().data_points()[1].start_time_unix_nano());
     expectAttributes(metric.gauge().data_points()[1].attributes(), "key", "valB");
+  } else {
+    const auto& metric0 = exported_metrics[0];
+    EXPECT_EQ("new_gauge_name", metric0.name());
+    EXPECT_TRUE(metric0.has_gauge());
+    EXPECT_EQ(1, metric0.gauge().data_points().size());
+    EXPECT_EQ(1, metric0.gauge().data_points()[0].as_int());
+    expectAttributes(metric0.gauge().data_points()[0].attributes(), "key", "valA");
+
+    const auto& metric1 = exported_metrics[1];
+    EXPECT_EQ("new_gauge_name", metric1.name());
+    EXPECT_TRUE(metric1.has_gauge());
+    EXPECT_EQ(1, metric1.gauge().data_points().size());
+    EXPECT_EQ(2, metric1.gauge().data_points()[0].as_int());
+    expectAttributes(metric1.gauge().data_points()[0].attributes(), "key", "valA");
+
+    const auto& metric2 = exported_metrics[2];
+    EXPECT_EQ("new_gauge_name", metric2.name());
+    EXPECT_TRUE(metric2.has_gauge());
+    EXPECT_EQ(1, metric2.gauge().data_points().size());
+    EXPECT_EQ(3, metric2.gauge().data_points()[0].as_int());
+    expectAttributes(metric2.gauge().data_points()[0].attributes(), "key", "valB");
   }
   // Gauge: prefix.unmapped_gauge-tagged (unmapped)
-  {
+  if (IsAggregationEnabled()) {
     const auto& metric = exported_metrics[1];
     EXPECT_EQ(getTagExtractedName("prefix.unmapped_gauge"), metric.name());
     EXPECT_TRUE(metric.has_gauge());
-    EXPECT_EQ(1, metric.gauge().data_points().size());
+    EXPECT_EQ(2, metric.gauge().data_points().size());
+    // data point 1: keyX: valX
     EXPECT_EQ(4, metric.gauge().data_points()[0].as_int());
-    EXPECT_EQ(123, metric.gauge().data_points()[0].start_time_unix_nano());
-    EXPECT_EQ(expected_time_ns_, metric.gauge().data_points()[0].time_unix_nano());
     expectAttributes(metric.gauge().data_points()[0].attributes(), "keyX", "valX");
-  }
-  // Gauge: prefix.unmapped_gauge-tagged (unmapped, keyY)
-  {
-    const auto& metric = exported_metrics[2];
-    EXPECT_EQ(getTagExtractedName("prefix.unmapped_gauge"), metric.name());
-    EXPECT_TRUE(metric.has_gauge());
-    EXPECT_EQ(1, metric.gauge().data_points().size());
-    EXPECT_EQ(10, metric.gauge().data_points()[0].as_int());
-    expectAttributes(metric.gauge().data_points()[0].attributes(), "keyY", "valY");
+    // data point 2: keyY: valY
+    EXPECT_EQ(10, metric.gauge().data_points()[1].as_int());
+    expectAttributes(metric.gauge().data_points()[1].attributes(), "keyY", "valY");
+  } else {
+    const auto& metric3 = exported_metrics[3];
+    EXPECT_EQ(getTagExtractedName("prefix.unmapped_gauge"), metric3.name());
+    EXPECT_TRUE(metric3.has_gauge());
+    EXPECT_EQ(1, metric3.gauge().data_points().size());
+    EXPECT_EQ(4, metric3.gauge().data_points()[0].as_int());
+    expectAttributes(metric3.gauge().data_points()[0].attributes(), "keyX", "valX");
+
+    const auto& metric4 = exported_metrics[4];
+    EXPECT_EQ(getTagExtractedName("prefix.unmapped_gauge"), metric4.name());
+    EXPECT_TRUE(metric4.has_gauge());
+    EXPECT_EQ(1, metric4.gauge().data_points().size());
+    EXPECT_EQ(10, metric4.gauge().data_points()[0].as_int());
+    expectAttributes(metric4.gauge().data_points()[0].attributes(), "keyY", "valY");
   }
 }
 
-TEST_F(OtlpMetricsFlusherTestsWithConversion, MetricsWithLabelsAggregationHistogram) {
+TEST_P(OtlpMetricsFlusherTestsWithConversionAndAggregation, MetricsWithLabelsAggregationHistogram) {
   OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "prefix", {},
-                                             R"pb(
-        matcher_list {
-          matchers {
-            predicate {
-              single_predicate {
-                input {
-                  name: "stat_full_name_match_input"
-                  typed_config {
-                    [type.googleapis.com/
+                                             R"pb( matcher_list {
+             matchers {
+               predicate {
+                 single_predicate {
+                   input {
+                     name: "stat_full_name_match_input"
+                     typed_config {
+                       [type.googleapis.com/
                      envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
-                  }
-                }
-                value_match {
-                  safe_regex {
-                    regex: "test_histogram-1"
-                  }
-                }
-              }
-            }
-            on_match {
-              action {
-                name: "otlp_metric_conversion"
-                typed_config {
-                  [type.googleapis.com/envoy.extensions.stat_sinks
-                       .open_telemetry.v3.SinkConfig.ConversionAction] {
-                    metric_name: "new_histogram_name"
-                  }
-                }
-              }
-            }
-          }
-          matchers {
-            predicate {
-              single_predicate {
-                input {
-                  name: "stat_full_name_match_input"
-                  typed_config {
-                    [type.googleapis.com/
+                     }
+                   }
+                   value_match { safe_regex { regex: "test_histogram-1" } }
+                 }
+               }
+               on_match {
+                 action {
+                   name: "otlp_metric_conversion"
+                   typed_config {
+                     [type.googleapis.com/envoy.extensions.stat_sinks
+                          .open_telemetry.v3.SinkConfig.ConversionAction] {
+                       metric_name: "new_histogram_name"
+                     }
+                   }
+                 }
+               }
+             }
+             matchers {
+               predicate {
+                 single_predicate {
+                   input {
+                     name: "stat_full_name_match_input"
+                     typed_config {
+                       [type.googleapis.com/
                      envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
-                  }
-                }
-                value_match {
-                  safe_regex {
-                    regex: "test_histogram-."
-                  }
-                }
-              }
-            }
-            on_match {
-              action {
-                name: "otlp_metric_conversion"
-                typed_config {
-                  [type.googleapis.com/envoy.extensions.stat_sinks
-                       .open_telemetry.v3.SinkConfig.ConversionAction] {
-                    metric_name: "new_histogram_name"
-                  }
-                }
-              }
-            }
-          }
-        }
-      )pb"));
+                     }
+                   }
+                   value_match { safe_regex { regex: "test_histogram-." } }
+                 }
+               }
+               on_match {
+                 action {
+                   name: "otlp_metric_conversion"
+                   typed_config {
+                     [type.googleapis.com/envoy.extensions.stat_sinks
+                          .open_telemetry.v3.SinkConfig.ConversionAction] {
+                       metric_name: "new_histogram_name"
+                     }
+                   }
+                 }
+               }
+             }
+           })pb",
+                                             IsAggregationEnabled()));
   // Add histograms with same name, different tags
   addHistogramToSnapshot("test_histogram-1", false, true, {{"key", "hist1"}});
   addHistogramToSnapshot("test_histogram-2", false, true, {{"key", "hist1"}});
@@ -903,19 +938,16 @@ TEST_F(OtlpMetricsFlusherTestsWithConversion, MetricsWithLabelsAggregationHistog
   addHistogramToSnapshot("unmapped_histogram", false, true, {{"keyY", "valY"}});
 
   MetricsExportRequestSharedPtr metrics = flusher.flush(snapshot_, 123);
-  expectMetricsCount(metrics, 3);
+  const int expected_metrics_count = IsAggregationEnabled() ? 2 : 5;
+  expectMetricsCount(metrics, expected_metrics_count);
 
   auto& exported_metrics =
       const_cast<Protobuf::RepeatedPtrField<opentelemetry::proto::metrics::v1::Metric>&>(
           metrics->resource_metrics()[0].scope_metrics()[0].metrics());
   sortMetrics(exported_metrics);
-  // Expected metrics in sorted order:
-  // 0: new_histogram_name (from test_histogram-1, test_histogram-2)
-  // 1: prefix.unmapped_histogram-tagged (keyX:valX)
-  // 2: prefix.unmapped_histogram-tagged (keyY:valY)
 
   // Histogram: new_histogram_name (remapped)
-  {
+  if (IsAggregationEnabled()) {
     const auto& metric = exported_metrics[0];
     EXPECT_EQ("new_histogram_name", metric.name());
     EXPECT_TRUE(metric.has_histogram());
@@ -924,8 +956,6 @@ TEST_F(OtlpMetricsFlusherTestsWithConversion, MetricsWithLabelsAggregationHistog
     // test_histogram-2
     auto data_point1 = metric.histogram().data_points()[0];
     EXPECT_EQ(20, data_point1.count()); // Each original hist has count 10
-    EXPECT_EQ(expected_time_ns_, data_point1.time_unix_nano());
-    EXPECT_EQ(123, data_point1.start_time_unix_nano());
     // The sum should be double the sum of a single cumulative histogram.
     EXPECT_NEAR(data_point1.sum(), 11661106.51, 0.1);
     expectAttributes(data_point1.attributes(), "key", "hist1");
@@ -939,31 +969,53 @@ TEST_F(OtlpMetricsFlusherTestsWithConversion, MetricsWithLabelsAggregationHistog
     // Data Point 2: {"key": "hist2"} - From test_histogram-1
     auto data_point2 = metric.histogram().data_points()[1];
     EXPECT_EQ(10, data_point2.count());
-    EXPECT_EQ(expected_time_ns_, data_point2.time_unix_nano());
-    EXPECT_EQ(123, data_point2.start_time_unix_nano());
     expectAttributes(data_point2.attributes(), "key", "hist2");
+  } else {
+    const auto& metric0 = exported_metrics[0];
+    EXPECT_EQ("new_histogram_name", metric0.name());
+    EXPECT_TRUE(metric0.has_histogram());
+    EXPECT_EQ(1, metric0.histogram().data_points().size());
+    expectAttributes(metric0.histogram().data_points()[0].attributes(), "key", "hist1");
+
+    const auto& metric1 = exported_metrics[1];
+    EXPECT_EQ("new_histogram_name", metric1.name());
+    EXPECT_TRUE(metric1.has_histogram());
+    EXPECT_EQ(1, metric1.histogram().data_points().size());
+    expectAttributes(metric1.histogram().data_points()[0].attributes(), "key", "hist1");
+
+    const auto& metric2 = exported_metrics[2];
+    EXPECT_EQ("new_histogram_name", metric2.name());
+    EXPECT_TRUE(metric2.has_histogram());
+    EXPECT_EQ(1, metric2.histogram().data_points().size());
+    expectAttributes(metric2.histogram().data_points()[0].attributes(), "key", "hist2");
   }
 
-  // Histogram: prefix.unmapped_histogram-tagged (unmapped, keyX)
-  {
+  // Histogram: prefix.unmapped_histogram-tagged (unmapped)
+  if (IsAggregationEnabled()) {
     const auto& metric = exported_metrics[1];
     EXPECT_EQ(getTagExtractedName("prefix.unmapped_histogram"), metric.name());
     EXPECT_TRUE(metric.has_histogram());
-    EXPECT_EQ(1, metric.histogram().data_points().size());
+    EXPECT_EQ(2, metric.histogram().data_points().size());
+    // data point 1: keyX: valX
     expectAttributes(metric.histogram().data_points()[0].attributes(), "keyX", "valX");
-  }
+    // data point 2: keyY: valY
+    expectAttributes(metric.histogram().data_points()[1].attributes(), "keyY", "valY");
+  } else {
+    const auto& metric3 = exported_metrics[3];
+    EXPECT_EQ(getTagExtractedName("prefix.unmapped_histogram"), metric3.name());
+    EXPECT_TRUE(metric3.has_histogram());
+    EXPECT_EQ(1, metric3.histogram().data_points().size());
+    expectAttributes(metric3.histogram().data_points()[0].attributes(), "keyX", "valX");
 
-  // Histogram: prefix.unmapped_histogram-tagged (unmapped, keyY)
-  {
-    const auto& metric = exported_metrics[2];
-    EXPECT_EQ(getTagExtractedName("prefix.unmapped_histogram"), metric.name());
-    EXPECT_TRUE(metric.has_histogram());
-    EXPECT_EQ(1, metric.histogram().data_points().size());
-    expectAttributes(metric.histogram().data_points()[0].attributes(), "keyY", "valY");
+    const auto& metric4 = exported_metrics[4];
+    EXPECT_EQ(getTagExtractedName("prefix.unmapped_histogram"), metric4.name());
+    EXPECT_TRUE(metric4.has_histogram());
+    EXPECT_EQ(1, metric4.histogram().data_points().size());
+    expectAttributes(metric4.histogram().data_points()[0].attributes(), "keyY", "valY");
   }
 }
 
-TEST_F(OtlpMetricsFlusherTestsWithConversion, MetricsWithStaticMetricLabels) {
+TEST_F(OtlpMetricsFlusherTestsWithConversionAndAggregation, MetricsWithStaticMetricLabels) {
   OtlpMetricsFlusherImpl flusher(otlpOptions(false, false, true, true, "", {},
                                              R"pb(
         matcher_list {

@@ -23,7 +23,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Stats configuration proto schema for ``envoy.stat_sinks.open_telemetry`` sink.
 // [#extension: envoy.stat_sinks.open_telemetry]
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message SinkConfig {
   // ConversionAction is used to convert a stat to a metric. If a stat matches,
   // the metric_name and static_metric_labels will be
@@ -75,4 +75,11 @@ message SinkConfig {
   // ``envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput`` and the only support action is
   // ``envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.ConversionAction``.
   xds.type.matcher.v3.Matcher custom_metric_conversions = 8;
+
+  // If set to true, the sink will attempt to aggregate metrics
+  // - for metrics with the same name and attributes, they will be aggregated
+  // into a single data point.
+  // - for metrics with the same name but different attributes, they will be
+  // aggregated into separate data points under the same metric.
+  bool enable_metric_aggregation = 9;
 }
