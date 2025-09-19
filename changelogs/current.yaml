@@ -93,6 +93,13 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: tcp_proxy
+  change:
+    Fixes a bug when downstream TCP connection is created and the upstream connection isn't fully established, no idle timeout
+    is set on the downstream connection, which may lead to connection leak if the client doesn't close the connection.
+    The fix is to set an idle timeout on the downstream connection immediately after creation.
+    This fix can be reverted by setting runtime guard ``envoy.reloadable_features.tcp_proxy_set_idle_timer_immediately_on_new_connection``
+    to ``false``.
 - area: udp_proxy
   change: |
     Fixed a crash in the UDP proxy that occurred during ``ENVOY_SIGTERM`` when active tunneling sessions were present.
@@ -112,6 +119,9 @@ bug_fixes:
     Fixed a bug where the premature resets of streams may result in the recursive draining and potential
     stack overflow. Setting proper ``max_concurrent_streams`` value for HTTP/2 or HTTP/3 could eliminate
     the risk of the stack overflow before this fix.
+- area: listener
+  change: |
+    Fixed a bug where comparing listeners did not consider the network namespace they were listening in.
 - area: http
   change: |
     Fixed a bug where the ``response_headers_to_add`` may be processed multiple times for the local responses from
@@ -305,7 +315,11 @@ new_features:
     will take precedence over this field.
 - area: redis
   change: |
-    Added support for ``GEOSEARCH`` and ``GETEX``.
+    Added support for 33 new Redis commands including COPY, RPOPLPUSH, SMOVE, SUNION, SDIFF,
+    SINTER, SINTERSTORE, ZUNIONSTORE, ZINTERSTORE, PFMERGE, GEORADIUS, GEORADIUSBYMEMBER,
+    RENAME, SORT, SORT_RO, ZMSCORE, SDIFFSTORE, MSETNX, SUBSTR, ZRANGESTORE, ZUNION, ZDIFF,
+    SUNIONSTORE, SMISMEMBER, HRANDFIELD, GEOSEARCHSTORE, ZDIFFSTORE, ZINTER, ZRANDMEMBER,
+    BITOP, LPOS, RENAMENX.
 - area: observability
   change: |
     Added ``ENVOY_NOTIFICATION`` macro to track specific conditions in production environments.
@@ -408,12 +422,31 @@ new_features:
     :ref:`stream_flush_timeout
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_flush_timeout>`
     to allow for configuring a stream flush timeout independently from the stream idle timeout.
+- area: http
+  change: |
+    Added support for header removal based on header key matching. The new
+    :ref:`remove_on_match <envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutation.remove_on_match>`
+    allows removing headers that match a specified key pattern. This enables more flexible and
+    dynamic header manipulation based on header names.
 - area: geoip
   change: |
     Added a new metric ``db_build_epoch`` to track the build timestamp of the MaxMind geolocation database files.
     This can be used to monitor the freshness of the databases currently in use by the filter.
-    See `MaxMind DB build_epoch <https://maxmind.github.io/MaxMind-DB/#build_epoch>`_ for more details.
+    See https://maxmind.github.io/MaxMind-DB/#build_epoch for more details.
+- area: overload management
+  change: |
+    Added a new scaled timer type ``HttpDownstreamStreamFlush`` to the overload manager. This allows
+    Envoy to scale the periodic timer for flushing downstream responses based on resource pressure.
+    The new timer can be configured via the
+    :ref:`ScaleTimersOverloadActionConfig <envoy_v3_api_msg_config.overload.v3.ScaleTimersOverloadActionConfig>`.
 - area: dynamic_modules
   change: |
     Added support for counters, gauges, histograms, and their vector variants to the dynamic modules API.
+- area: dns_resolver
+  change: |
+    Added :ref:`max_udp_channel_duration
+    <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.max_udp_channel_duration>`
+    configuration field to the c-ares DNS resolver. This allows periodic refresh of the UDP channel
+    to help with avoiding stale socket states, and providing better load distribution across UDP ports.
+
 deprecated:

@@ -46,7 +46,8 @@ public:
 
   MOCK_METHOD(absl::StatusOr<CdsApiPtr>, createCds,
               (const envoy::config::core::v3::ConfigSource& cds_config,
-               const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm));
+               const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm,
+               bool support_multi_ads_sources));
 };
 
 } // namespace Upstream
