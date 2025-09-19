@@ -806,6 +806,15 @@ pub trait EnvoyHttpFilter {
   /// content-length header if necessary.
   fn append_request_body(&mut self, data: &[u8]) -> bool;
 
+  /// Injects the given request data into the filter stream.
+  ///
+  /// Returns false if the request filter chain is not available.
+  ///
+  /// This must only be called from on_http_callout_done or on_scheduled callbacks.
+  /// The request filter should have been stopped and continue_decoding must not
+  /// be called.
+  fn inject_request_body(&mut self, data: &[u8], end_stream: bool) -> bool;
+
   /// Get the currently buffered response body. The body is represented as a list of
   /// [`EnvoyBuffer`]. Memory contents pointed by each [`EnvoyBuffer`] is mutable and can be
   /// modified in place. However, the buffer itself is immutable. For example, adding or removing
@@ -861,6 +870,15 @@ pub trait EnvoyHttpFilter {
   /// Note that after changing the response body, it is caller's responsibility to modify the
   /// content-length header if necessary.
   fn append_response_body(&mut self, data: &[u8]) -> bool;
+
+  /// Injects the given response data into the filter stream.
+  ///
+  /// Returns false if the response filter chain is not available.
+  ///
+  /// This must only be called from on_http_callout_done or on_scheduled callbacks.
+  /// The response filter should have been stopped and continue_encoding must not
+  /// be called.
+  fn inject_response_body(&mut self, data: &[u8], end_stream: bool) -> bool;
 
   /// Clear the route cache calculated during a previous phase of the filter chain.
   ///
@@ -1396,6 +1414,17 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
+  fn inject_request_body(&mut self, data: &[u8], end_stream: bool) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_inject_request_body(
+        self.raw_ptr,
+        data.as_ptr() as *const _ as *mut _,
+        data.len(),
+        end_stream,
+      )
+    }
+  }
+
   fn get_response_body(&mut self) -> Option<Vec<EnvoyMutBuffer>> {
     let mut size: usize = 0;
     let ok = unsafe {
@@ -1431,6 +1460,17 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
         self.raw_ptr,
         data.as_ptr() as *const _ as *mut _,
         data.len(),
+      )
+    }
+  }
+
+  fn inject_response_body(&mut self, data: &[u8], end_stream: bool) -> bool {
+    unsafe {
+      abi::envoy_dynamic_module_callback_http_inject_response_body(
+        self.raw_ptr,
+        data.as_ptr() as *const _ as *mut _,
+        data.len(),
+        end_stream,
       )
     }
   }
