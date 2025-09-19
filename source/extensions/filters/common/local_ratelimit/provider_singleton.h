@@ -45,8 +45,8 @@ public:
 
   using SetRateLimiterCb = std::function<void(std::shared_ptr<LocalRateLimiterImpl>)>;
   static RateLimiterWrapperPtr
-  getRateLimiter(Server::Configuration::FactoryContext& factory_context, absl::string_view key,
-                 const envoy::config::core::v3::ConfigSource& config_source,
+  getRateLimiter(Server::Configuration::ServerFactoryContext& factory_context,
+                 absl::string_view key, const envoy::config::core::v3::ConfigSource& config_source,
                  SetRateLimiterCb callback);
 
   RateLimiterProviderSingleton(Server::Configuration::ServerFactoryContext& factory_context,
@@ -131,7 +131,7 @@ public:
 
   class RateLimitConfigCallback {
   public:
-    explicit RateLimitConfigCallback(Server::Configuration::FactoryContext& factory_context);
+    explicit RateLimitConfigCallback(Server::Configuration::ServerFactoryContext& factory_context);
 
     void addCallback(SetRateLimiterCb callback);
 

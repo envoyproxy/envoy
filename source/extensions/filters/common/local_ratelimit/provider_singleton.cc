@@ -24,17 +24,13 @@ createRateLimiterImpl(const envoy::type::v3::TokenBucket& token_bucket,
 }
 
 RateLimiterProviderSingleton::RateLimiterWrapperPtr RateLimiterProviderSingleton::getRateLimiter(
-    Server::Configuration::FactoryContext& factory_context, absl::string_view key,
+    Server::Configuration::ServerFactoryContext& factory_context, absl::string_view key,
     const envoy::config::core::v3::ConfigSource& config_source, SetRateLimiterCb callback) {
   RateLimiterProviderSingletonSharedPtr provider =
-      factory_context.serverFactoryContext()
-          .singletonManager()
-          .getTyped<RateLimiterProviderSingleton>(
-              SINGLETON_MANAGER_REGISTERED_NAME(local_ratelimit),
-              [&factory_context, &config_source] {
-                return std::make_shared<RateLimiterProviderSingleton>(
-                    factory_context.serverFactoryContext(), config_source);
-              });
+      factory_context.singletonManager().getTyped<RateLimiterProviderSingleton>(
+          SINGLETON_MANAGER_REGISTERED_NAME(local_ratelimit), [&factory_context, &config_source] {
+            return std::make_shared<RateLimiterProviderSingleton>(factory_context, config_source);
+          });
   auto it = provider->limiters_.find(key);
   if (it != provider->limiters_.end()) {
     auto& limiter_ref = it->second;
@@ -67,7 +63,7 @@ RateLimiterProviderSingleton::RateLimiterWrapperPtr RateLimiterProviderSingleton
 
 // Definition of RateLimitConfigCallback methods
 RateLimiterProviderSingleton::RateLimitConfigCallback::RateLimitConfigCallback(
-    Server::Configuration::FactoryContext& factory_context)
+    Server::Configuration::ServerFactoryContext& factory_context)
     : init_target_(std::make_unique<Init::TargetImpl>("RateLimitConfigCallback", []() {})) {
   factory_context.initManager().add(*init_target_);
 }

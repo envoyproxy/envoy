@@ -14,13 +14,14 @@ namespace LocalRateLimit {
 
 AccessLog::FilterPtr LocalRateLimitFilterFactory::createFilter(
     const envoy::config::accesslog::v3::ExtensionFilter& config,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::GenericFactoryContext& context) {
   auto factory_config =
       Config::Utility::translateToFactoryConfig(config, context.messageValidationVisitor(), *this);
   const auto& local_ratelimit_config = dynamic_cast<
       const envoy::extensions::access_loggers::filters::local_ratelimit::v3::LocalRateLimitFilter&>(
       *factory_config);
-  auto filter = std::make_unique<LocalRateLimitFilter>(context, local_ratelimit_config);
+  auto filter = std::make_unique<LocalRateLimitFilter>(context.serverFactoryContext(),
+                                                       local_ratelimit_config);
   return filter;
 }
 
