@@ -58,7 +58,7 @@ message IPTagging {
 
   // Specifies the content of the IP tag file.
   // Allow the file to be created with no IP tags.
-  message IPTagFile {
+  message IPTags {
     repeated IPTag ip_tags = 1;
   }
 

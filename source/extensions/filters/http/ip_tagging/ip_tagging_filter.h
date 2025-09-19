@@ -25,7 +25,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
 
-using IpTagFileProto = envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTagFile;
+using IPTagsProto = envoy::extensions::filters::http::ip_tagging::v3::IPTagging::IPTags;
 using LcTrieSharedPtr = std::shared_ptr<Network::LcTrie::LcTrie<std::string>>;
 
 /**

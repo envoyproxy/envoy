@@ -137,7 +137,7 @@ IpTagsLoader::loadTags(const envoy::config::core::v3::DataSource& ip_tags_dataso
 
 absl::StatusOr<LcTrieSharedPtr> IpTagsLoader::refreshTags() {
   if (data_source_provider_) {
-    IpTagFileProto ip_tags_proto;
+    IPTagsProto ip_tags_proto;
     const auto new_data = data_source_provider_->data();
     if (absl::EndsWith(ip_tags_path_, MessageUtil::FileExtensions::get().Yaml)) {
       auto load_status =
