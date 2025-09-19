@@ -153,7 +153,9 @@ public:
 
   bool addedViaApi() const override { return added_via_api_; }
 
-  Network::FilterChainInfoSharedPtr filterChainInfo() const override { return filter_chain_info_; }
+  const Network::FilterChainInfoSharedPtr& filterChainInfo() const override {
+    return filter_chain_info_;
+  }
 
 private:
   Configuration::FilterChainFactoryContextPtr factory_context_;

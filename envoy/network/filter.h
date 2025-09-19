@@ -647,7 +647,7 @@ public:
   /**
    * @return the filter chain info for this filter chain.
    */
-  virtual FilterChainInfoSharedPtr filterChainInfo() const PURE;
+  virtual const FilterChainInfoSharedPtr& filterChainInfo() const PURE;
 };
 
 using FilterChainSharedPtr = std::shared_ptr<FilterChain>;

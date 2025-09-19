@@ -336,9 +336,10 @@ public:
   MOCK_METHOD(void, startDraining, ());
   MOCK_METHOD(absl::string_view, name, (), (const));
   MOCK_METHOD(bool, addedViaApi, (), (const));
-  MOCK_METHOD(FilterChainInfoSharedPtr, filterChainInfo, (), (const));
+  MOCK_METHOD(const FilterChainInfoSharedPtr&, filterChainInfo, (), (const));
 
   envoy::config::core::v3::Metadata metadata_{};
+  FilterChainInfoSharedPtr filter_chain_info_;
 };
 
 class MockFilterChainInfo : public FilterChainInfo {
