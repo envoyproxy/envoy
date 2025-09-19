@@ -439,7 +439,7 @@ message ExtProcPerRoute {
 }
 
 // Overrides that may be set on a per-route basis
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message ExtProcOverrides {
   // Set a different processing mode for this route than the default.
   ProcessingMode processing_mode = 1;
@@ -479,4 +479,14 @@ message ExtProcOverrides {
   // or could not be opened. This field is the per-route override of
   // :ref:`failure_mode_allow <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.failure_mode_allow>`.
   google.protobuf.BoolValue failure_mode_allow = 8;
+
+  // Decorator to introduce custom logic that runs after the ``ProcessingRequest`` is constructed, but
+  // before it is sent to the External Processor. The ``ProcessingRequest`` may be modified.
+  //
+  // .. note::
+  //   Processing request modifiers are currently in alpha.
+  // This is a per-route override of
+  // :ref:`processing_request_modifier <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_request_modifier>`.
+  config.core.v3.TypedExtensionConfig processing_request_modifier = 9
+      [(xds.annotations.v3.field_status).work_in_progress = true];
 }

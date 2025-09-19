@@ -31,10 +31,10 @@ ProtoMapValuesToUniqueVector(const Protobuf::Map<std::string, std::string>& prot
 
 TestProcessingRequestModifier::TestProcessingRequestModifier(
     const TestProcessingRequestModifierConfig& config,
-    Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
-    Server::Configuration::CommonFactoryContext& context)
+    Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr expr_builder,
+      Server::Configuration::CommonFactoryContext& context)
     : config_(config),
-      expression_manager_(builder, context.localInfo(),
+      expression_manager_(expr_builder, context.localInfo(),
                           ProtoMapValuesToUniqueVector(config.mapped_request_attributes()),
                           Protobuf::RepeatedPtrField<std::string>()) {}
 
@@ -70,7 +70,7 @@ std::unique_ptr<ProcessingRequestModifier>
 TestProcessingRequestModifierFactory::createProcessingRequestModifier(
     const Protobuf::Message& config,
     Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
-    Envoy::Server::Configuration::CommonFactoryContext& context) const {
+    Server::Configuration::CommonFactoryContext& context) const {
   const auto& proto_config =
       MessageUtil::downcastAndValidate<const TestProcessingRequestModifierConfig&>(
           config, context.messageValidationVisitor());

@@ -104,6 +104,22 @@ std::vector<std::string> initNamespaces(const Protobuf::RepeatedPtrField<std::st
   return namespaces;
 }
 
+absl::optional<envoy::config::core::v3::TypedExtensionConfig>
+getProcessingRequestModifierConfig(const ExternalProcessor& config) {
+  if (config.has_processing_request_modifier()) {
+    return config.processing_request_modifier();
+  }
+  return absl::nullopt;
+}
+
+absl::optional<envoy::config::core::v3::TypedExtensionConfig>
+initProcessingRequestModifierConfig(const ExtProcPerRoute& config) {
+  if (config.has_overrides() && config.overrides().has_processing_request_modifier()) {
+    return config.overrides().processing_request_modifier();
+  }
+  return absl::nullopt;
+}
+
 absl::optional<std::vector<std::string>>
 initUntypedForwardingNamespaces(const ExtProcPerRoute& config) {
   if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
@@ -255,13 +271,14 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       expression_manager_(builder, context.localInfo(), config.request_attributes(),
                           config.response_attributes()),
       immediate_mutation_checker_(context.regexEngine()),
-      processing_request_modifier_(createProcessingRequestModifier(config, builder, context)),
       on_processing_response_factory_cb_(
           createOnProcessingResponseCb(config, context, stats_prefix)),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()),
       remote_close_timeout_(context.runtime().snapshot().getInteger(
           RemoteCloseTimeout, DefaultRemoteCloseTimeoutMilliseconds)),
-      status_on_error_(toErrorCode(config.status_on_error().code())) {
+      status_on_error_(toErrorCode(config.status_on_error().code())),
+      processing_request_modifier_config_(getProcessingRequestModifierConfig(config)),
+      builder_(builder), common_factory_context_(context) {
 
   if (config.disable_clear_route_cache()) {
     route_cache_action_ = ExternalProcessor::RETAIN;
@@ -503,7 +520,8 @@ FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
       failure_mode_allow_(
           config.overrides().has_failure_mode_allow()
               ? absl::optional<bool>(config.overrides().failure_mode_allow().value())
-              : absl::nullopt) {}
+              : absl::nullopt),
+      processing_request_modifier_config_(initProcessingRequestModifierConfig(config)) {}
 
 FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_specific,
                                            const FilterConfigPerRoute& more_specific)
@@ -523,7 +541,11 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
                                         : less_specific.untypedReceivingMetadataNamespaces()),
       failure_mode_allow_(more_specific.failureModeAllow().has_value()
                               ? more_specific.failureModeAllow()
-                              : less_specific.failureModeAllow()) {}
+                              : less_specific.failureModeAllow()),
+      processing_request_modifier_config_(
+          more_specific.processingRequestModifierConfig().has_value()
+              ? more_specific.processingRequestModifierConfig()
+              : less_specific.processingRequestModifierConfig()) {}
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
@@ -549,7 +571,14 @@ void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callb
 
 void Filter::sendRequest(ProcessorState& state, ProcessingRequest&& req, bool end_stream) {
   // Calling the client send function to send the request.
-  if (config_->processingRequestModifier()) {
+  if (!processing_request_modifier_initialized_) {
+    processing_request_modifier_initialized_ = true;
+    processing_request_modifier_ = createProcessingRequestModifier(
+        processing_request_modifier_config_, config_->builder(), config_->commonFactoryContext());
+  }
+
+  // This can still be null, even after initialization.
+  if (processing_request_modifier_) {
     ProcessingRequestModifier::Params params = {
         .traffic_direction = state.trafficDirection(),
         .stream_info = state.callbacks()->streamInfo(),
@@ -557,8 +586,9 @@ void Filter::sendRequest(ProcessorState& state, ProcessingRequest&& req, bool en
         .response_headers = state.responseHeaders(),
         .response_trailers = state.responseTrailers(),
     };
-    config_->processingRequestModifier()->run(params, req);
+    processing_request_modifier_->run(params, req);
   }
+
   client_->sendRequest(std::move(req), end_stream, filter_callbacks_->streamId(), this, stream_);
 }
 
@@ -1870,6 +1900,12 @@ void Filter::mergePerRouteConfig() {
                      *decoder_callbacks_);
     failure_mode_allow_ = merged_config->failureModeAllow().value();
   }
+
+  if (merged_config->processingRequestModifierConfig().has_value()) {
+    ENVOY_STREAM_LOG(trace, "Setting processing request modifier from per-route configuration",
+                     *decoder_callbacks_);
+    processing_request_modifier_config_ = merged_config->processingRequestModifierConfig().value();
+  }
 }
 
 void DeferredDeletableStream::closeStreamOnTimer() {
@@ -1914,6 +1950,32 @@ std::string responseCaseToString(const ProcessingResponse::ResponseCase response
   }
 }
 
+std::unique_ptr<ProcessingRequestModifier> Filter::createProcessingRequestModifier(
+    const absl::optional<envoy::config::core::v3::TypedExtensionConfig>& config,
+    Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
+    Server::Configuration::CommonFactoryContext& context) {
+  if (!config.has_value()) {
+    return nullptr;
+  }
+  // We mark this as optional so that we don't throw in the request path and crash.
+  auto* factory = Envoy::Config::Utility::getAndCheckFactory<ProcessingRequestModifierFactory>(
+      config.value(), /*is_optional=*/true);
+  if (factory == nullptr) {
+    return nullptr;
+  }
+  // Avoid using translateAnyToFactoryConfig since it might throw. Do this manually.
+  ProtobufTypes::MessagePtr extension_config = factory->createEmptyConfigProto();
+  if (extension_config == nullptr) {
+    return nullptr;
+  }
+  if (Envoy::Config::Utility::translateOpaqueConfig(config->typed_config(),
+                                                    context.messageValidationVisitor(),
+                                                    *extension_config) != absl::OkStatus()) {
+    return nullptr;
+  }
+  return factory->createProcessingRequestModifier(*extension_config, builder, context);
+}
+
 std::function<std::unique_ptr<OnProcessingResponse>()> FilterConfig::createOnProcessingResponseCb(
     const ExternalProcessor& config, Envoy::Server::Configuration::CommonFactoryContext& context,
     const std::string& stats_prefix) {
@@ -1934,25 +1996,6 @@ std::function<std::unique_ptr<OnProcessingResponse>()> FilterConfig::createOnPro
     return factory.createOnProcessingResponse(*shared_on_processing_response_config, context,
                                               stats_prefix);
   };
-}
-
-std::unique_ptr<ProcessingRequestModifier> FilterConfig::createProcessingRequestModifier(
-    const ExternalProcessor& config,
-    Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
-    Server::Configuration::CommonFactoryContext& context) {
-  if (!config.has_processing_request_modifier()) {
-    return nullptr;
-  }
-  auto& factory = Envoy::Config::Utility::getAndCheckFactory<ProcessingRequestModifierFactory>(
-      config.processing_request_modifier());
-  auto processing_request_modifier_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
-      config.processing_request_modifier().typed_config(), context.messageValidationVisitor(),
-      factory);
-  if (processing_request_modifier_config == nullptr) {
-    return nullptr;
-  }
-  return factory.createProcessingRequestModifier(*processing_request_modifier_config, builder,
-                                                 context);
 }
 
 std::unique_ptr<OnProcessingResponse> FilterConfig::createOnProcessingResponse() const {
