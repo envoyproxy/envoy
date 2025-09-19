@@ -73,4 +73,11 @@ involves duplicating the full route config into an internal listener (unfortunat
    :lineno-start: 38
    :caption: :download:`http-cache-v2-configuration-internal-listener.yaml <_include/http-cache-v2-configuration-internal-listener.yaml>`
 
-.. TODO(ravenblackx): Add sandbox and link it here, similar to what cache_filter does.
+.. TODO(ravenblackx): Add sandbox and link it below, similar to what cache_filter does.
+
+.. TODO(ravenblackx): Update the docs like the recent update to the old cache docs.
+
+.. seealso::
+
+   :ref:`Old cache filter <config_http_filters_cache>`
+      The deprecated cache filter.
