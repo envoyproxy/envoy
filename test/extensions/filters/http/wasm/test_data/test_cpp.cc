@@ -1212,6 +1212,30 @@ void TestRootContext::onTick() {
       }
       ::free(sign_out);
     }
+
+    // Test mutual exclusion: should fail if both PEM and DER keys are provided
+    {
+      envoy::source::extensions::common::wasm::VerifySignatureArguments args;
+      args.set_text(data);
+      args.set_public_key(public_key_str);     // DER key
+      args.set_public_key_pem(public_key_str); // PEM key (same content, but should fail)
+      args.set_signature("dummy_signature");   // Dummy signature for test
+      args.set_hash_function(hashFunc);
+
+      std::string in;
+      args.SerializeToString(&in);
+      char* out = nullptr;
+      size_t out_size = 0;
+
+      if (WasmResult::BadArgument == proxy_call_foreign_function(verify_function.data(),
+                                                                 verify_function.size(), in.data(),
+                                                                 in.size(), &out, &out_size)) {
+        logInfo("mutual exclusion test passed: both PEM and DER keys rejected");
+      } else {
+        logError("mutual exclusion test failed: should have rejected both PEM and DER keys");
+      }
+      ::free(out);
+    }
   }
 }
 

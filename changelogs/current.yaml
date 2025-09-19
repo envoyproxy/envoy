@@ -371,10 +371,6 @@ new_features:
     :ref:`stream_flush_timeout
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_flush_timeout>`
     to allow for configuring a stream flush timeout independently from the stream idle timeout.
-- area: wasm
-  change: |
-    Added ``sign`` foreign function to create cryptographic signatures.
-    See :ref:`Wasm foreign functions <arch_overview_wasm_foreign_functions>` for more details.
 - area: geoip
   change: |
     Added a new metric ``db_build_epoch`` to track the build timestamp of the MaxMind geolocation database files.

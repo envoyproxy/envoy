@@ -50,22 +50,49 @@ RegisterForeignFunction registerVerifySignatureForeignFunction(
       envoy::source::extensions::common::wasm::VerifySignatureArguments args;
       if (args.ParseFromArray(arguments.data(), arguments.size())) {
         const auto& hash = args.hash_function();
-        auto key_str = args.public_key();
         auto signature_str = args.signature();
         auto text_str = args.text();
 
-        std::vector<uint8_t> key(key_str.begin(), key_str.end());
         std::vector<uint8_t> signature(signature_str.begin(), signature_str.end());
         std::vector<uint8_t> text(text_str.begin(), text_str.end());
 
+        // Check which key format is provided (mutually exclusive)
+        bool has_pem = !args.public_key_pem().empty();
+        bool has_der = !args.public_key().empty();
+
+        if (has_pem && has_der) {
+          return WasmResult::BadArgument; // Both PEM and DER keys provided
+        }
+
+        std::vector<uint8_t> key;
+        if (has_pem) {
+          auto key_str = args.public_key_pem();
+          key.assign(key_str.begin(), key_str.end());
+        } else if (has_der) {
+          auto key_str = args.public_key();
+          key.assign(key_str.begin(), key_str.end());
+        } else {
+          return WasmResult::BadArgument; // No key provided
+        }
+
         auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-        Envoy::Common::Crypto::CryptoObjectPtr crypto_ptr = crypto_util.importPublicKey(key);
+        Envoy::Common::Crypto::CryptoObjectPtr crypto_ptr;
+        if (has_pem) {
+          crypto_ptr = crypto_util.importPublicKeyPEM(key);
+        } else {
+          crypto_ptr = crypto_util.importPublicKeyDER(key);
+        }
 
         auto output = crypto_util.verifySignature(hash, *crypto_ptr, signature, text);
 
         envoy::source::extensions::common::wasm::VerifySignatureResult verification_result;
-        verification_result.set_result(output.result_);
-        verification_result.set_error(output.error_message_);
+        if (output.ok()) {
+          verification_result.set_result(*output);
+          verification_result.set_error("");
+        } else {
+          verification_result.set_result(false);
+          verification_result.set_error(output.status().message());
+        }
 
         auto size = verification_result.ByteSizeLong();
         auto result = alloc_result(size);
@@ -82,23 +109,48 @@ RegisterForeignFunction registerSignForeignFunction(
       envoy::source::extensions::common::wasm::SignArguments args;
       if (args.ParseFromArray(arguments.data(), arguments.size())) {
         const auto& hash = args.hash_function();
-        auto key_str = args.private_key();
         auto text_str = args.text();
 
-        std::vector<uint8_t> key(key_str.begin(), key_str.end());
         std::vector<uint8_t> text(text_str.begin(), text_str.end());
 
+        // Check which key format is provided (mutually exclusive)
+        bool has_pem = !args.private_key_pem().empty();
+        bool has_der = !args.private_key().empty();
+
+        if (has_pem && has_der) {
+          return WasmResult::BadArgument; // Both PEM and DER keys provided
+        }
+
+        std::vector<uint8_t> key;
+        if (has_pem) {
+          auto key_str = args.private_key_pem();
+          key.assign(key_str.begin(), key_str.end());
+        } else if (has_der) {
+          auto key_str = args.private_key();
+          key.assign(key_str.begin(), key_str.end());
+        } else {
+          return WasmResult::BadArgument; // No key provided
+        }
+
         auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-        Envoy::Common::Crypto::CryptoObjectPtr crypto_ptr = crypto_util.importPrivateKey(key);
+        Envoy::Common::Crypto::CryptoObjectPtr crypto_ptr;
+        if (has_pem) {
+          crypto_ptr = crypto_util.importPrivateKeyPEM(key);
+        } else {
+          crypto_ptr = crypto_util.importPrivateKeyDER(key);
+        }
 
         auto output = crypto_util.sign(hash, *crypto_ptr, text);
 
         envoy::source::extensions::common::wasm::SignResult signing_result;
-        signing_result.set_result(output.result_);
-        if (output.result_) {
-          signing_result.set_signature(output.signature_.data(), output.signature_.size());
+        if (output.ok()) {
+          signing_result.set_result(true);
+          signing_result.set_signature(output->data(), output->size());
+          signing_result.set_error("");
+        } else {
+          signing_result.set_result(false);
+          signing_result.set_error(output.status().message());
         }
-        signing_result.set_error(output.error_message_);
 
         auto size = signing_result.ByteSizeLong();
         auto result = alloc_result(size);

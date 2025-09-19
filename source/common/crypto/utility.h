@@ -9,41 +9,11 @@
 #include "source/common/singleton/threadsafe_singleton.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/status/statusor.h"
 
 namespace Envoy {
 namespace Common {
 namespace Crypto {
-
-struct VerificationOutput {
-  /**
-   * Verification result. If result_ is true, error_message_ is empty.
-   */
-  bool result_;
-
-  /**
-   * Error message when verification failed.
-   * TODO(crazyxy): switch to absl::StatusOr when available
-   */
-  std::string error_message_;
-};
-
-struct SignOutput {
-  /**
-   * Signing result. If result_ is true, error_message_ is empty.
-   */
-  bool result_;
-
-  /**
-   * Generated signature when signing succeeded.
-   */
-  std::vector<uint8_t> signature_;
-
-  /**
-   * Error message when signing failed.
-   * TODO(crazyxy): switch to absl::StatusOr when available
-   */
-  std::string error_message_;
-};
 
 class Utility {
 public:
@@ -71,14 +41,14 @@ public:
    * @param key CryptoObject containing EVP_PKEY public key (must be imported via importPublicKey())
    * @param signature signature bytes to verify
    * @param text clear text that was signed
-   * @return If the result_ is true, the error_message_ is empty; otherwise,
-   * the error_message_ stores the error message
+   * @return absl::StatusOr<bool> containing true if verification succeeds, or error status on
+   * failure
    * @note The key must be imported using importPublicKey() which supports both DER and PEM formats
    * @note Works with public keys imported from DER (PKCS#1) or PEM (PKCS#1/PKCS#8) formats
    */
-  virtual const VerificationOutput verifySignature(absl::string_view hash, CryptoObject& key,
-                                                   const std::vector<uint8_t>& signature,
-                                                   const std::vector<uint8_t>& text) PURE;
+  virtual absl::StatusOr<bool> verifySignature(absl::string_view hash, CryptoObject& key,
+                                               const std::vector<uint8_t>& signature,
+                                               const std::vector<uint8_t>& text) PURE;
 
   /**
    * Sign data with a private key.
@@ -86,35 +56,41 @@ public:
    * @param key CryptoObject containing EVP_PKEY private key (must be imported via
    * importPrivateKey())
    * @param text clear text to sign
-   * @return If the result_ is true, the signature_ contains the generated signature and
-   * error_message_ is empty; otherwise, the error_message_ stores the error message
+   * @return absl::StatusOr<std::vector<uint8_t>> containing the signature on success, or error
+   * status on failure
    * @note The key must be imported using importPrivateKey() which supports both DER and PEM formats
    * @note Works with private keys imported from DER (PKCS#8) or PEM (PKCS#1/PKCS#8) formats
    */
-  virtual const SignOutput sign(absl::string_view hash, CryptoObject& key,
-                                const std::vector<uint8_t>& text) PURE;
+  virtual absl::StatusOr<std::vector<uint8_t>> sign(absl::string_view hash, CryptoObject& key,
+                                                    const std::vector<uint8_t>& text) PURE;
 
   /**
-   * Import public key.
-   * @param key Public key in DER (hex-encoded) or PEM format
+   * Import public key from PEM format.
+   * @param key Public key in PEM format
    * @return pointer to EVP_PKEY public key
-   * @note Supports both DER (hex-encoded) and PEM formats with auto-detection
-   * @note DER format: SubjectPublicKeyInfo format (SEQUENCE { SEQUENCE { OID, NULL }, BIT STRING })
-   * containing PKCS#1 key
-   * @note PEM format: Automatically handles both PKCS#1 and PKCS#8 formats
    */
-  virtual CryptoObjectPtr importPublicKey(const std::vector<uint8_t>& key) PURE;
+  virtual CryptoObjectPtr importPublicKeyPEM(const std::vector<uint8_t>& key) PURE;
 
   /**
-   * Import private key.
-   * @param key Private key in DER (hex-encoded) or PEM format
-   * @return pointer to EVP_PKEY private key
-   * @note Supports both DER (hex-encoded) and PEM formats with auto-detection
-   * @note DER format: PKCS#8 PrivateKeyInfo format (SEQUENCE { INTEGER, SEQUENCE { OID, NULL },
-   * OCTET STRING })
-   * @note PEM format: Automatically handles both PKCS#1 and PKCS#8 formats
+   * Import public key from DER format.
+   * @param key Public key in DER format
+   * @return pointer to EVP_PKEY public key
    */
-  virtual CryptoObjectPtr importPrivateKey(const std::vector<uint8_t>& key) PURE;
+  virtual CryptoObjectPtr importPublicKeyDER(const std::vector<uint8_t>& key) PURE;
+
+  /**
+   * Import private key from PEM format.
+   * @param key Private key in PEM format
+   * @return pointer to EVP_PKEY private key
+   */
+  virtual CryptoObjectPtr importPrivateKeyPEM(const std::vector<uint8_t>& key) PURE;
+
+  /**
+   * Import private key from DER format.
+   * @param key Private key in DER format
+   * @return pointer to EVP_PKEY private key
+   */
+  virtual CryptoObjectPtr importPrivateKeyDER(const std::vector<uint8_t>& key) PURE;
 };
 
 using UtilitySingleton = InjectableSingleton<Utility>;

@@ -710,11 +710,12 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
   // Step 5: Verify signature.
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   auto output = crypto_util.verifySignature(hash, *ptr->second, sig_vec, text_vec);
-  lua_pushboolean(state, output.result_);
-  if (output.result_) {
+  if (output.ok()) {
+    lua_pushboolean(state, *output);
     lua_pushnil(state);
   } else {
-    lua_pushlstring(state, output.error_message_.data(), output.error_message_.size());
+    lua_pushboolean(state, false);
+    lua_pushlstring(state, output.status().message().data(), output.status().message().size());
   }
   return 2;
 }
@@ -728,7 +729,7 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
     public_key_wrapper_.pushStack();
   } else {
     auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-    Envoy::Common::Crypto::CryptoObjectPtr crypto_ptr = crypto_util.importPublicKey(key);
+    Envoy::Common::Crypto::CryptoObjectPtr crypto_ptr = crypto_util.importPublicKeyDER(key);
     auto wrapper = Envoy::Common::Crypto::Access::getTyped<Envoy::Common::Crypto::PublicKeyObject>(
         *crypto_ptr);
     if (wrapper == nullptr) {
