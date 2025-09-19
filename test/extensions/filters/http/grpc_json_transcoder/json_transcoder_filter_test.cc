@@ -495,12 +495,6 @@ protected:
     ON_CALL(encoder_callbacks_, encoderBufferLimit()).WillByDefault(Return(2 << 20));
   }
 
-  virtual envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder
-  modifyProtoConfig(envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&&
-                        proto_config) {
-    return proto_config;
-  }
-
   static envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder
   bookstoreProtoConfig() {
     const std::string json_string = "{\"proto_descriptor\": \"" + bookstoreDescriptorPath() +
