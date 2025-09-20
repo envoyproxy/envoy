@@ -134,6 +134,10 @@ Config::SharedConfig::SharedConfig(
         DurationUtil::durationToMilliseconds(config.max_downstream_connection_duration());
     max_downstream_connection_duration_ = std::chrono::milliseconds(connection_duration);
   }
+  if (config.has_max_downstream_connection_duration_jitter_percentage()) {
+    max_downstream_connection_duration_jitter_percentage_ =
+        config.max_downstream_connection_duration_jitter_percentage().value();
+  }
 
   if (config.has_access_log_options()) {
     if (config.flush_access_log_on_connected() /* deprecated */) {
@@ -260,6 +264,31 @@ RouteConstSharedPtr Config::getRouteFromEntries(Network::Connection& connection)
   }
   return WeightedClusterUtil::pickCluster(weighted_clusters_, total_cluster_weight_,
                                           random_generator_.random(), false);
+}
+
+const absl::optional<std::chrono::milliseconds>
+Config::calculateMaxDownstreamConnectionDurationWithJitter() {
+  const auto& max_downstream_connection_duration = maxDownstreamConnectionDuration();
+  if (!max_downstream_connection_duration) {
+    return max_downstream_connection_duration;
+  }
+
+  const auto& jitter_percentage = maxDownstreamConnectionDurationJitterPercentage();
+  if (!jitter_percentage) {
+    return max_downstream_connection_duration;
+  }
+
+  // Apply jitter: base_duration * (1 + random(0, jitter_factor));
+  const uint64_t max_jitter_ms = std::ceil(max_downstream_connection_duration.value().count() *
+                                           (jitter_percentage.value() / 100.0));
+
+  if (max_jitter_ms == 0) {
+    return max_downstream_connection_duration;
+  }
+
+  const uint64_t jitter_ms = randomGenerator().random() % max_jitter_ms;
+  return std::chrono::milliseconds(
+      static_cast<uint64_t>(max_downstream_connection_duration.value().count() + jitter_ms));
 }
 
 UpstreamDrainManager& Config::drainManager() {
@@ -875,10 +904,12 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
 }
 
 Network::FilterStatus Filter::onNewConnection() {
-  if (config_->maxDownstreamConnectionDuration()) {
+  const auto& max_downstream_connection_duration =
+      config_->calculateMaxDownstreamConnectionDurationWithJitter();
+  if (max_downstream_connection_duration) {
     connection_duration_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onMaxDownstreamConnectionDuration(); });
-    connection_duration_timer_->enableTimer(config_->maxDownstreamConnectionDuration().value());
+    connection_duration_timer_->enableTimer(max_downstream_connection_duration.value());
   }
 
   if (config_->accessLogFlushInterval().has_value()) {
