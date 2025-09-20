@@ -29,6 +29,11 @@ bool UpstreamHttp11ConnectSocket::isValidConnectResponse(absl::string_view respo
          parser.headersComplete() && parser.parser().statusCode() == Http::Code::OK;
 }
 
+// Helper method to create a properly formatted CONNECT request with Host header
+std::string UpstreamHttp11ConnectSocket::formatConnectRequest(absl::string_view target) {
+  return absl::StrCat("CONNECT ", target, " HTTP/1.1\r\n", "Host: ", target, "\r\n\r\n");
+}
+
 UpstreamHttp11ConnectSocket::UpstreamHttp11ConnectSocket(
     Network::TransportSocketPtr&& transport_socket,
     Network::TransportSocketOptionsConstSharedPtr options,
@@ -38,10 +43,10 @@ UpstreamHttp11ConnectSocket::UpstreamHttp11ConnectSocket(
   // options, we want to maintain the original behavior of this transport socket.
   if (options_ && options_->http11ProxyInfo()) {
     if (transport_socket_->ssl()) {
-      header_buffer_.add(absl::StrCat(
-          "CONNECT ", options_->http11ProxyInfo()->hostname,
-          Http::HeaderUtility::hostHasPort(options_->http11ProxyInfo()->hostname) ? "" : ":443",
-          " HTTP/1.1\r\n\r\n"));
+      std::string target = absl::StrCat(
+          options_->http11ProxyInfo()->hostname,
+          Http::HeaderUtility::hostHasPort(options_->http11ProxyInfo()->hostname) ? "" : ":443");
+      header_buffer_.add(formatConnectRequest(target));
       need_to_strip_connect_response_ = true;
     }
     return;
@@ -57,8 +62,17 @@ UpstreamHttp11ConnectSocket::UpstreamHttp11ConnectSocket(
     const bool has_proxy_addr = metadata->typed_filter_metadata().contains(
         Config::MetadataFilters::get().ENVOY_HTTP11_PROXY_TRANSPORT_SOCKET_ADDR);
     if (has_proxy_addr) {
-      header_buffer_.add(
-          absl::StrCat("CONNECT ", host->address()->asStringView(), " HTTP/1.1\r\n\r\n"));
+      if (!host->hostname().empty()) {
+        // Use hostname with port from address for RFC 7231 (section 4.3.6) compliance
+        const uint32_t port = host->address()->ip()->port();
+        std::string target = absl::StrCat(host->hostname(), ":", port);
+        header_buffer_.add(formatConnectRequest(target));
+      } else {
+        // Fall back to using the IP address if hostname is not available for backwards
+        // compatibility
+        header_buffer_.add(
+            absl::StrCat("CONNECT ", host->address()->asStringView(), " HTTP/1.1\r\n\r\n"));
+      }
       need_to_strip_connect_response_ = true;
     }
   }
