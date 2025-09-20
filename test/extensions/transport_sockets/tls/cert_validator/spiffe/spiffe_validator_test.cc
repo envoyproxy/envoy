@@ -1117,6 +1117,24 @@ typed_config:
   EXPECT_EQ(gauge_opt->get().value(), 1787339642);
 }
 
+TEST_F(TestSPIFFEValidator, TestGetCaCertificates) {
+  EXPECT_TRUE(initialize(TestEnvironment::substitute(R"EOF(
+name: envoy.tls.cert_validator.spiffe
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.SPIFFECertValidatorConfig
+  trust_domains:
+    - name: lyft.com
+      trust_bundle:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  )EOF"))
+                  .ok());
+
+  // Test getCaCertificates returns nullptr for SPIFFE validator
+  // This is expected behavior as SPIFFE validator doesn't use the traditional CA list approach
+  auto ca_list = validator().getCaCertificates();
+  EXPECT_EQ(ca_list, nullptr);
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions
