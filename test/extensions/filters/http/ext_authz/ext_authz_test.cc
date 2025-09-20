@@ -1987,6 +1987,53 @@ TEST_F(HttpFilterTest, ClearCacheRouteHeadersToRemoveOnly) {
   EXPECT_EQ(1U, config_->stats().ok_.value());
 }
 
+// Verifies that the downstream request fails when the ext_authz response
+// would cause the request headers to exceed their limit.
+TEST_F(HttpFilterTest, DownstreamRequestFailsOnHeaderLimit) {
+  InSequence s;
+
+  initialize(R"EOF(
+      grpc_service:
+        envoy_grpc:
+          cluster_name: "ext_authz_server"
+      )EOF");
+
+  // The total number of headers in the request header map is not allowed to
+  // exceed the limit.
+  Http::TestRequestHeaderMapImpl request_headers({}, /*max_headers_kb=*/99999,
+                                                 /*max_headers_count=*/4);
+  request_headers.addCopy(Http::Headers::get().Host, "host");
+  request_headers.addCopy(Http::Headers::get().Path, "/");
+  request_headers.addCopy(Http::Headers::get().Method, "GET");
+
+  prepareCheck();
+
+  EXPECT_CALL(*client_, check(_, _, _, _))
+      .WillOnce(
+          Invoke([&](Filters::Common::ExtAuthz::RequestCallbacks& callbacks,
+                     const envoy::service::auth::v3::CheckRequest&, Tracing::Span&,
+                     const StreamInfo::StreamInfo&) -> void { request_callbacks_ = &callbacks; }));
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
+            filter_->decodeHeaders(request_headers, false));
+
+  Filters::Common::ExtAuthz::Response response{};
+  response.status = Filters::Common::ExtAuthz::CheckStatus::OK;
+  response.headers_to_set = {{"foo", "bar"}, {"foo2", "bar2"}};
+
+  // Now the test should fail, since we expect the downstream request to fail.
+  EXPECT_CALL(decoder_filter_callbacks_.stream_info_,
+              setResponseFlag(Envoy::StreamInfo::CoreResponseFlag::UnauthorizedExternalService));
+  EXPECT_CALL(decoder_filter_callbacks_, encodeHeaders_(_, _))
+      .WillOnce(Invoke([&](const Http::ResponseHeaderMap& headers, bool) -> void {
+        EXPECT_EQ(headers.getStatusValue(),
+                  std::to_string(enumToInt(Http::Code::InternalServerError)));
+      }));
+  EXPECT_CALL(decoder_filter_callbacks_, continueDecoding()).Times(0);
+
+  request_callbacks_->onComplete(std::make_unique<Filters::Common::ExtAuthz::Response>(response));
+}
+
 // Verifies that the filter DOES NOT clear the route cache when an authorization response:
 // 1. is an OK response.
 // 2. has NO headers to append.
