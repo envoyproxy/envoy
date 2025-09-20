@@ -199,14 +199,25 @@ private:
 class PolicyMatcher : public Matcher, NonCopyable {
 public:
   PolicyMatcher(const envoy::config::rbac::v3::Policy& policy,
-                Expr::BuilderInstanceSharedPtr& builder,
                 ProtobufMessage::ValidationVisitor& validation_visitor,
                 Server::Configuration::CommonFactoryContext& context)
       : permissions_(policy.permissions(), validation_visitor, context),
         principals_(policy.principals(), context),
+        arena_(policy.has_condition() ? std::make_unique<Protobuf::Arena>() : nullptr),
         expr_([&]() -> absl::optional<Expr::CompiledExpression> {
           if (policy.has_condition()) {
-            auto compiled = Expr::CompiledExpression::Create(builder, policy.condition());
+            // Use the CEL configuration from the policy if available.
+            const envoy::config::core::v3::CelExpressionConfig* config =
+                policy.has_cel_config() ? &policy.cel_config() : nullptr;
+            absl::StatusOr<Expr::CompiledExpression> compiled =
+                config != nullptr ? ([&]() {
+                  // Use arena-optimized builder when configuration allows constant folding.
+                  auto builder =
+                      Expr::getBuilderWithArenaOptimization(context, *config, arena_.get());
+                  return Expr::CompiledExpression::Create(builder, policy.condition());
+                })()
+                                  : Expr::CompiledExpression::Create(Expr::getBuilder(context),
+                                                                     policy.condition());
             if (!compiled.ok()) {
               throw Expr::CelException(
                   absl::StrCat("failed to create an expression: ", compiled.status().message()));
@@ -222,6 +233,8 @@ public:
 private:
   const OrMatcher permissions_;
   const OrMatcher principals_;
+  // Arena for constant folding optimization. It is scoped to the policy lifetime.
+  const std::unique_ptr<Protobuf::Arena> arena_;
   const absl::optional<Expr::CompiledExpression> expr_;
 };
 
