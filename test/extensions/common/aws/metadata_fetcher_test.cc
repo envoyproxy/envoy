@@ -1,3 +1,4 @@
+#include "source/common/common/thread.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
 #include "source/extensions/common/aws/metadata_fetcher.h"
@@ -301,6 +302,31 @@ TEST_F(MetadataFetcherTest, TestFailureToStringConversion) {
             "MissingConfig");
   EXPECT_EQ(fetcher_->failureToString(static_cast<MetadataFetcher::MetadataReceiver::Failure>(999)),
             "");
+}
+
+TEST_F(MetadataFetcherTest, TestDestructionFromWorkerThread) {
+  setupFetcher();
+
+  // Create a fetcher that will be destroyed from a worker thread
+  auto fetcher_to_destroy = MetadataFetcher::create(
+      mock_factory_ctx_.server_factory_context_.cluster_manager_, "cluster_name");
+
+  // Create actual worker thread to test destruction from non-main thread
+  bool destruction_completed = false;
+  Thread::ThreadPtr worker_thread =
+      Thread::threadFactoryForTest().createThread([&fetcher_to_destroy, &destruction_completed]() {
+        // Skip thread assertions since we're intentionally on worker thread
+        Thread::SkipAsserts skip;
+
+        // This should not crash even when called from worker thread
+        fetcher_to_destroy.reset();
+        destruction_completed = true;
+      });
+
+  worker_thread->join();
+
+  // Verify destruction completed without crash
+  EXPECT_TRUE(destruction_completed);
 }
 
 } // namespace Aws

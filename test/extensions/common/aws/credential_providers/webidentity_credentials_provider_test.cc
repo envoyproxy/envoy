@@ -616,7 +616,7 @@ not json
   auto provider_friend = MetadataCredentialsProviderBaseFriend(provider_);
   auto mock_fetcher = std::make_unique<MockMetadataFetcher>();
 
-  EXPECT_CALL(*mock_fetcher, cancel);
+  EXPECT_CALL(*mock_fetcher, cancel).Times(2);
   EXPECT_CALL(*mock_fetcher, fetch(_, _, _));
   // Ensure we have a metadata fetcher configured, so we expect this to receive a cancel
   provider_friend.setMetadataFetcher(std::move(mock_fetcher));
