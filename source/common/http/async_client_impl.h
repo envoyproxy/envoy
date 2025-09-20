@@ -278,6 +278,7 @@ private:
   Tracing::NullSpan active_span_;
   const Tracing::Config& tracing_config_;
   const LocalReply::LocalReply& local_reply_;
+  Router::RouteConstSharedPtr parent_route_;
   std::shared_ptr<NullRouteImpl> route_;
   uint32_t high_watermark_calls_{};
   bool local_closed_{};

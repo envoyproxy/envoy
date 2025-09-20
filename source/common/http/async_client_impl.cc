@@ -131,9 +131,11 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
   const Router::MetadataMatchCriteria* metadata_matching_criteria = nullptr;
   if (options.parent_context.stream_info != nullptr) {
     stream_info_.setParentStreamInfo(*options.parent_context.stream_info);
-    const auto route = options.parent_context.stream_info->route();
-    if (route != nullptr) {
-      const auto* route_entry = route->routeEntry();
+    // Keep the parent root to ensure the metadata_matching_criteria will not become
+    // dangling pointer once the parent downstream request is gone.
+    parent_route_ = options.parent_context.stream_info->route();
+    if (parent_route_ != nullptr) {
+      const auto* route_entry = parent_route_->routeEntry();
       if (route_entry != nullptr) {
         metadata_matching_criteria = route_entry->metadataMatchCriteria();
       }
