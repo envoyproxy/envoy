@@ -64,7 +64,7 @@ message GrpcService {
     bool skip_envoy_headers = 5;
   }
 
-  // [#next-free-field: 9]
+  // [#next-free-field: 11]
   message GoogleGrpc {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.GrpcService.GoogleGrpc";
@@ -249,15 +249,30 @@ message GrpcService {
     }
 
     // The target URI when using the `Google C++ gRPC client
-    // <https://github.com/grpc/grpc>`_. SSL credentials will be supplied in
-    // :ref:`channel_credentials <envoy_v3_api_field_config.core.v3.GrpcService.GoogleGrpc.channel_credentials>`.
+    // <https://github.com/grpc/grpc>`_.
     string target_uri = 1 [(validate.rules).string = {min_len: 1}];
 
+    // The channel credentials to use. See `channel credentials
+    // <https://grpc.io/docs/guides/auth.html#credential-types>`_.
+    // Ignored if ``channel_credentials_plugin`` is set.
     ChannelCredentials channel_credentials = 2;
 
-    // A set of call credentials that can be composed with `channel credentials
+    // A list of channel credentials plugins.
+    // The data plane will iterate over the list in order and stop at the first credential type
+    // that it supports. This provides a mechanism for starting to use new credential types that
+    // are not yet supported by all data planes.
+    // [#not-implemented-hide:]
+    repeated google.protobuf.Any channel_credentials_plugin = 9;
+
+    // The call credentials to use. See `channel credentials
     // <https://grpc.io/docs/guides/auth.html#credential-types>`_.
+    // Ignored if ``call_credentials_plugin`` is set.
     repeated CallCredentials call_credentials = 3;
+
+    // A list of call credentials plugins. All supported plugins will be used.
+    // Unsupported plugin types will be ignored.
+    // [#not-implemented-hide:]
+    repeated google.protobuf.Any call_credentials_plugin = 10;
 
     // The human readable prefix to use when emitting statistics for the gRPC
     // service.
