@@ -63,10 +63,8 @@ ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb::WorkerLocalLb(
                                  common_config, healthy_panic_threshold, 100, 50),
                              getRoundRobinConfig(common_config), time_source) {
   if (tls_shim.has_value()) {
-    apply_weights_cb_handle_ = tls_shim->apply_weights_cb_helper_.add([this](uint32_t priority) {
-      refresh(priority);
-      return absl::OkStatus();
-    });
+    apply_weights_cb_handle_ =
+        tls_shim->apply_weights_cb_helper_.add([this](uint32_t priority) { refresh(priority); });
   }
 }
 
@@ -258,7 +256,7 @@ void ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLbFactory::applyWeight
     uint32_t priority) {
   tls_->runOnAllThreads([priority](OptRef<ThreadLocalShim> tls_shim) -> void {
     if (tls_shim.has_value()) {
-      auto status = tls_shim->apply_weights_cb_helper_.runCallbacks(priority);
+      tls_shim->apply_weights_cb_helper_.runCallbacks(priority);
     }
   });
 }
@@ -295,10 +293,9 @@ absl::Status ClientSideWeightedRoundRobinLoadBalancer::initialize() {
 
   // Setup a callback to receive priority set updates.
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
-      [this](uint32_t, const HostVector& hosts_added, const HostVector&) -> absl::Status {
+      [this](uint32_t, const HostVector& hosts_added, const HostVector&) {
         addClientSideLbPolicyDataToHosts(hosts_added);
         updateWeightsOnMainThread();
-        return absl::OkStatus();
       });
 
   weight_calculation_timer_->enableTimer(weight_update_period_);

@@ -217,6 +217,13 @@ public:
                            TypedLoadBalancerFactory* child_factory,
                            LoadBalancerConfigPtr child_config);
 
+  absl::Status validateEndpoints(const PriorityState& priorities) const override {
+    if (child_lb_config_ != nullptr) {
+      return child_lb_config_->validateEndpoints(priorities);
+    }
+    return absl::OkStatus();
+  }
+
   Upstream::ThreadAwareLoadBalancerPtr
   createLoadBalancer(const Upstream::ClusterInfo& cluster_info,
                      const Upstream::PrioritySet& child_priority_set, Runtime::Loader& runtime,
