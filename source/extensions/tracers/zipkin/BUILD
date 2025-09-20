@@ -12,28 +12,44 @@ licenses(["notice"])  # Apache 2
 envoy_extension_package()
 
 envoy_cc_library(
+    name = "span_context_lib",
+    hdrs = ["span_context.h"],
+)
+
+envoy_cc_library(
+    name = "util_lib",
+    srcs = ["util.cc"],
+    hdrs = ["util.h"],
+    deps = [
+        "//source/common/common:byte_order_lib",
+        "//source/common/common:utility_lib",
+        "//source/common/protobuf:utility_lib",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+envoy_cc_library(
     name = "zipkin_lib",
     srcs = [
         "span_buffer.cc",
         "span_context_extractor.cc",
         "tracer.cc",
-        "util.cc",
         "zipkin_core_types.cc",
         "zipkin_tracer_impl.cc",
     ],
     hdrs = [
         "span_buffer.h",
-        "span_context.h",
         "span_context_extractor.h",
         "tracer.h",
         "tracer_interface.h",
-        "util.h",
         "zipkin_core_constants.h",
         "zipkin_core_types.h",
         "zipkin_json_field_names.h",
         "zipkin_tracer_impl.h",
     ],
     deps = [
+        ":span_context_lib",
+        ":util_lib",
         "//envoy/common:time_interface",
         "//envoy/local_info:local_info_interface",
         "//envoy/network:address_interface",
@@ -54,7 +70,7 @@ envoy_cc_library(
         "//source/common/singleton:const_singleton",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:cluster_update_tracker_lib",
-        "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
+        "//source/extensions/propagators/zipkin:propagator_factory_lib",
         "@com_github_openzipkin_zipkinapi//:zipkin_cc_proto",
         "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",

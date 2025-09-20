@@ -3,8 +3,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/time.h"
-
 #include "source/common/common/byte_order.h"
 #include "source/common/protobuf/utility.h"
 
@@ -18,11 +16,6 @@ namespace Zipkin {
  */
 class Util {
 public:
-  /**
-   * Returns a randomly-generated 64-bit integer number.
-   */
-  static uint64_t generateRandom64(TimeSource& time_source);
-
   /**
    * Returns byte string representation of a number.
    *
