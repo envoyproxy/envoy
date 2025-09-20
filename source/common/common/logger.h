@@ -253,7 +253,7 @@ private:
     return sink_;
   }
 
-  SinkDelegate* sink_ ABSL_GUARDED_BY(sink_mutex_){nullptr};
+  SinkDelegate* sink_; //ABSL_GUARDED_BY(sink_mutex_){nullptr};
   absl::Mutex sink_mutex_;
   std::unique_ptr<StderrSinkDelegate> stderr_sink_; // Builtin sink to use as a last resort.
   std::unique_ptr<spdlog::formatter> formatter_ ABSL_GUARDED_BY(format_mutex_);

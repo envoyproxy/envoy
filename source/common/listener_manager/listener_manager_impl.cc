@@ -847,8 +847,15 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
     removeListenerInternal(listener.name(), true);
     return;
   }
+  const auto worker_pending_init =
+      std::make_shared<std::atomic<uint64_t>>(workers_.size());
+
   for (const auto& worker : workers_) {
-    addListenerToWorker(*worker, absl::nullopt, listener, nullptr);
+    addListenerToWorker(*worker, absl::nullopt, listener, [worker_pending_init]() {
+                            if (--(*worker_pending_init) == 0) {
+                              ENVOY_LOG_EVENT(debug, "listener_ready", "<listener_name>");
+                            }
+                          });
   }
 
   auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
