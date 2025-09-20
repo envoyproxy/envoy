@@ -16,6 +16,7 @@
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
+#include "test/test_common/utility.h"
 
 using testing::_;
 using testing::InSequence;
@@ -370,7 +371,8 @@ TEST_F(StreamingGrpcAccessLogTest, TcpLoggingWithTimerFlush) {
   logger_->log(mockHttpEntry());
 
   // Simulate the stream being established by calling onCreateInitialMetadata
-  callbacks->onCreateInitialMetadata(Http::RequestHeaderMap::createEmpty());
+  Http::TestRequestHeaderMapImpl empty_headers;
+  callbacks->onCreateInitialMetadata(empty_headers);
 
   EXPECT_EQ(1, logger_->numInits());
   EXPECT_EQ(1, logger_->numClears());
