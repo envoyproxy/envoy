@@ -5,6 +5,7 @@
 
 #include "envoy/config/accesslog/v3/accesslog.pb.h"
 #include "envoy/config/accesslog/v3/accesslog.pb.validate.h"
+#include "envoy/type/v3/token_bucket.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
@@ -59,6 +60,8 @@ public:
     stream_info_.protocol(Http::Protocol::Http11);
     // Clear default stream id provider.
     stream_info_.stream_id_provider_ = nullptr;
+    time_system_ = new Envoy::Event::SimulatedTimeSystem();
+    context_.server_factory_context_.dispatcher_.time_system_.reset(time_system_);
   }
 
 protected:
@@ -75,6 +78,7 @@ protected:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Envoy::AccessLog::MockAccessLogManager> log_manager_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
+  Envoy::Event::SimulatedTimeSystem* time_system_;
 };
 
 TEST_F(AccessLogImplTest, LogMoreData) {
@@ -1596,6 +1600,239 @@ typed_config:
   EXPECT_CALL(*file_, write(_));
 
   default_true_log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info);
+}
+
+class AccessLogImplTestWithRateLimitFilter : public AccessLogImplTest {
+public:
+  AccessLogImplTestWithRateLimitFilter() : AccessLogImplTest() {
+    ON_CALL(context_.server_factory_context_.cluster_manager_.subscription_factory_,
+            subscriptionFromConfigSource(_, _, _, _, _, _))
+        .WillByDefault(Invoke(
+            [this](const envoy::config::core::v3::ConfigSource&, absl::string_view, Stats::Scope&,
+                   Config::SubscriptionCallbacks& callbacks, Config::OpaqueResourceDecoderSharedPtr,
+                   const Config::SubscriptionOptions&) -> Config::SubscriptionPtr {
+              auto ret = std::make_unique<testing::NiceMock<Config::MockSubscription>>();
+              subscriptions_.push_back(ret.get());
+              callbackss_.push_back(&callbacks);
+              return ret;
+            }));
+
+    ON_CALL(context_.server_factory_context_.init_manager_, add(_))
+        .WillByDefault(Invoke([this](const Init::Target& target) {
+          init_target_handles_.push_back(target.createHandle("test"));
+        }));
+
+    ON_CALL(context_.server_factory_context_.init_manager_, initialize(_))
+        .WillByDefault(Invoke([this](const Init::Watcher& watcher) {
+          while (!init_target_handles_.empty()) {
+            init_target_handles_.back()->initialize(watcher);
+            init_target_handles_.pop_back();
+          }
+        }));
+  }
+
+protected:
+  void expectWritesAndLog(InstanceSharedPtr log, int expect_write_times, int log_call_times) {
+    EXPECT_CALL(*file_, write(_)).Times(expect_write_times);
+    for (int i = 0; i < log_call_times; ++i) {
+      log->log({&request_headers_, &response_headers_, &response_trailers_}, stream_info_);
+    }
+  }
+
+  const std::string default_access_log_ = R"EOF(
+name: accesslog
+filter:
+  extension_filter:
+    name: local_ratelimit_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.local_ratelimit.v3.LocalRateLimitFilter
+      resource_name: "token_bucket_name"
+      config_source:
+        ads: {}
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+
+  const envoy::type::v3::TokenBucketConfig token_bucket_ =
+      TestUtility::parseYaml<envoy::type::v3::TokenBucketConfig>(R"EOF(
+name: "token_bucket_name"
+token_bucket:
+  max_tokens: 1
+  tokens_per_fill: 1
+  fill_interval:
+    seconds: 1
+)EOF");
+
+  std::vector<Config::MockSubscription*> subscriptions_;
+  std::vector<Config::SubscriptionCallbacks*> callbackss_;
+  std::vector<Init::TargetHandlePtr> init_target_handles_;
+  NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
+};
+
+TEST_F(AccessLogImplTestWithRateLimitFilter, FilterDestructedBeforeCallback) {
+  InstanceSharedPtr log1 =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(default_access_log_), context_);
+  // log2 is to hold the provider singleton alive.
+  InstanceSharedPtr log2 =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(default_access_log_), context_);
+  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
+  ASSERT_EQ(subscriptions_.size(), 1);
+  ASSERT_EQ(callbackss_.size(), 1);
+
+  // Destruct the log object, which destructs the filter.
+  log1.reset();
+
+  // Now, simulate the config update arriving. The lambda captured in
+  // getRateLimiter should handle the filter being gone.
+  init_watcher_.expectReady();
+  const auto decoded_resources = TestUtility::decodeResources({token_bucket_});
+  EXPECT_TRUE(callbackss_[0]->onConfigUpdate(decoded_resources.refvec_, "").ok());
+
+  // No crash should occur. The main thing we are testing is that the callback
+  // doesn't try to access any members of the destructed filter.
+}
+
+TEST_F(AccessLogImplTestWithRateLimitFilter, HappyPath) {
+  InstanceSharedPtr log =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(default_access_log_), context_);
+  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
+  ASSERT_EQ(subscriptions_.size(), 1);
+  ASSERT_EQ(callbackss_.size(), 1);
+
+  init_watcher_.expectReady();
+  const auto decoded_resources = TestUtility::decodeResources({token_bucket_});
+  EXPECT_TRUE(callbackss_[0]->onConfigUpdate(decoded_resources.refvec_, "").ok());
+
+  // First log is written, second is rate limited.
+  expectWritesAndLog(log, /*expect_write_times=*/1, /*log_call_times=*/2);
+
+  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+  // Third log is written, fourth is rate limited.
+  expectWritesAndLog(log, /*expect_write_times=*/1, /*log_call_times=*/2);
+}
+
+TEST_F(AccessLogImplTestWithRateLimitFilter, InitedWithDeltaUpdate) {
+  InstanceSharedPtr log =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(default_access_log_), context_);
+  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
+  ASSERT_EQ(subscriptions_.size(), 1);
+  ASSERT_EQ(callbackss_.size(), 1);
+
+  auto token_bucket = TestUtility::parseYaml<envoy::type::v3::TokenBucketConfig>(R"EOF(
+name: "another_token_bucket"
+)EOF");
+  init_watcher_.expectReady().Times(0);
+  const auto decoded_resources = TestUtility::decodeResources({token_bucket});
+  EXPECT_TRUE(callbackss_[0]->onConfigUpdate(decoded_resources.refvec_, "").ok());
+
+  const auto decoded_resources_2 = TestUtility::decodeResources({token_bucket_});
+  init_watcher_.expectReady();
+  EXPECT_TRUE(callbackss_[0]->onConfigUpdate(decoded_resources_2.refvec_, {}, "").ok());
+
+  expectWritesAndLog(log, /*expect_write_times=*/1, /*log_call_times=*/2);
+}
+
+TEST_F(AccessLogImplTestWithRateLimitFilter, SharedTokenBucketInitTogether) {
+  InstanceSharedPtr log1 =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(default_access_log_), context_);
+  InstanceSharedPtr log2 =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(default_access_log_), context_);
+  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
+  ASSERT_EQ(subscriptions_.size(), 1);
+  ASSERT_EQ(callbackss_.size(), 1);
+
+  init_watcher_.expectReady();
+  const auto decoded_resources = TestUtility::decodeResources({token_bucket_});
+  EXPECT_TRUE(callbackss_[0]->onConfigUpdate(decoded_resources.refvec_, "").ok());
+
+  expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/1);
+  expectWritesAndLog(log2, /*expect_write_times=*/0, /*log_call_times=*/1);
+
+  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+  expectWritesAndLog(log2, /*expect_write_times=*/1, /*log_call_times=*/1);
+  expectWritesAndLog(log1, /*expect_write_times=*/0, /*log_call_times=*/1);
+}
+
+TEST_F(AccessLogImplTestWithRateLimitFilter, SharedTokenBucketInitSeparately) {
+  InstanceSharedPtr log1 =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(default_access_log_), context_);
+  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
+  ASSERT_EQ(subscriptions_.size(), 1);
+  ASSERT_EQ(callbackss_.size(), 1);
+
+  init_watcher_.expectReady();
+  const auto decoded_resources = TestUtility::decodeResources({token_bucket_});
+  EXPECT_TRUE(callbackss_[0]->onConfigUpdate(decoded_resources.refvec_, "").ok());
+  expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/1);
+
+  // Init the second log with the same token bucket.
+  InstanceSharedPtr log2 =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(default_access_log_), context_);
+  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
+  expectWritesAndLog(log2, /*expect_write_times=*/0, /*log_call_times=*/1);
+  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+  expectWritesAndLog(log2, /*expect_write_times=*/1, /*log_call_times=*/1);
+  expectWritesAndLog(log1, /*expect_write_times=*/0, /*log_call_times=*/1);
+}
+
+TEST_F(AccessLogImplTestWithRateLimitFilter, DeletedTokenBucketKeepWorkingInAliveRateLimiter) {
+  InstanceSharedPtr log1 =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(default_access_log_), context_);
+  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
+  ASSERT_EQ(subscriptions_.size(), 1);
+  ASSERT_EQ(callbackss_.size(), 1);
+
+  init_watcher_.expectReady();
+  const auto decoded_resources = TestUtility::decodeResources({token_bucket_});
+  EXPECT_TRUE(callbackss_[0]->onConfigUpdate(decoded_resources.refvec_, "").ok());
+
+  expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/2);
+
+  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+
+  // Remove the token bucket.
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  removed_resources.Add("token_bucket_name");
+  EXPECT_TRUE(callbackss_[0]->onConfigUpdate({}, removed_resources, "").ok());
+  // The existing rate limiter should still work. First log is written, second is rate limited.
+  expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/2);
+
+  // Fail to init a new rate limiter with the same token.
+  InstanceSharedPtr log2 =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(default_access_log_), context_);
+  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
+  init_watcher_.expectReady().Times(0);
+}
+
+TEST_F(AccessLogImplTestWithRateLimitFilter, TokenBucketConfigUpdatedUnderSameResourceName) {
+  InstanceSharedPtr log1 =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(default_access_log_), context_);
+  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
+  ASSERT_EQ(subscriptions_.size(), 1);
+  ASSERT_EQ(callbackss_.size(), 1);
+
+  init_watcher_.expectReady();
+  const auto decoded_resources = TestUtility::decodeResources({token_bucket_});
+  EXPECT_TRUE(callbackss_[0]->onConfigUpdate(decoded_resources.refvec_, "").ok());
+  expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/2);
+
+  const auto decoded_resources_2 = TestUtility::decodeResources(
+      {TestUtility::parseYaml<envoy::type::v3::TokenBucketConfig>(R"EOF(
+name: "token_bucket_name"
+token_bucket:
+  max_tokens: 2
+  tokens_per_fill: 2
+  fill_interval:
+    seconds: 1
+)EOF")});
+  EXPECT_TRUE(callbackss_[0]->onConfigUpdate(decoded_resources_2.refvec_, "").ok());
+  // Init the second log with the same token bucket.
+  InstanceSharedPtr log2 =
+      AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(default_access_log_), context_);
+  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
+  // The new token bucket allows 2 writes per second. We call log 3 times.
+  expectWritesAndLog(log2, /*expect_write_times=*/2, /*log_call_times=*/3);
 }
 
 class TestHeaderFilterFactory : public ExtensionFilterFactory {
