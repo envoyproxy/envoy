@@ -368,6 +368,10 @@ TEST_F(StreamingGrpcAccessLogTest, TcpLoggingWithTimerFlush) {
   // First log an HTTP entry to establish the stream
   expectFlushedLogEntriesCount(stream, MOCK_HTTP_LOG_FIELD_NAME, 1);
   logger_->log(mockHttpEntry());
+
+  // Simulate the stream being established by calling onCreateInitialMetadata
+  callbacks->onCreateInitialMetadata(Http::RequestHeaderMap::createEmpty());
+
   EXPECT_EQ(1, logger_->numInits());
   EXPECT_EQ(1, logger_->numClears());
   EXPECT_EQ(1,
