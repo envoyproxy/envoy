@@ -108,11 +108,11 @@ void PayloadToMetadataFilter::handleOnPresent(
     const Rule& rule = config_->requestRules()[rule_id];
     std::string value_str;
     if (absl::holds_alternative<absl::string_view>(value)) {
-      value_str = std::get<absl::string_view>(value);
+      value_str = absl::get<absl::string_view>(value);
     } else if (absl::holds_alternative<int64_t>(value)) {
-      value_str = std::to_string(std::get<int64_t>(value));
+      value_str = std::to_string(absl::get<int64_t>(value));
     } else {
-      value_str = std::to_string(std::get<double>(value));
+      value_str = std::to_string(absl::get<double>(value));
     }
 
     if (!value_str.empty() && rule.rule().has_on_present()) {

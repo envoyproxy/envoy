@@ -333,20 +333,20 @@ void Filter::handleOnPresent(absl::variant<absl::string_view, int64_t, double> v
     ASSERT(rule_id < rules.size());
     const Rule& rule = rules[rule_id];
     if (absl::holds_alternative<absl::string_view>(value)) {
-      absl::string_view string_view_val = std::get<absl::string_view>(value);
+      absl::string_view string_view_val = absl::get<absl::string_view>(value);
       if (string_view_val.empty()) {
         continue;
       }
       Protobuf::Value val;
-      val.set_string_value(std::get<absl::string_view>(value));
+      val.set_string_value(string_view_val);
       handleOnPresent(std::move(val), rule);
     } else if (absl::holds_alternative<int64_t>(value)) {
       Protobuf::Value val;
-      val.set_number_value(std::get<int64_t>(value));
+      val.set_number_value(absl::get<int64_t>(value));
       handleOnPresent(std::move(val), rule);
     } else {
       Protobuf::Value val;
-      val.set_number_value(std::get<double>(value));
+      val.set_number_value(absl::get<double>(value));
       handleOnPresent(std::move(val), rule);
     }
   }
