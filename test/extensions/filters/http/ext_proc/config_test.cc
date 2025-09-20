@@ -519,6 +519,50 @@ TEST(HttpExtProcConfigTest, FullDuplexStreamedValidation) {
   EXPECT_TRUE(other_result.ok());
 }
 
+TEST(HttpExtProcConfigTest, StatusOnErrorConfig) {
+  std::string yaml = R"EOF(
+  grpc_service:
+    google_grpc:
+      target_uri: ext_proc_server
+      stat_prefix: google
+  status_on_error:
+    code: 503
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
+}
+
+TEST(HttpExtProcConfigTest, StatusOnErrorDefaultConfig) {
+  std::string yaml = R"EOF(
+  grpc_service:
+    google_grpc:
+      target_uri: ext_proc_server
+      stat_prefix: google
+  )EOF";
+
+  ExternalProcessingFilterConfig factory;
+  ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
+  TestUtility::loadFromYaml(yaml, *proto_config);
+
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_CALL(context, messageValidationVisitor());
+  Http::FilterFactoryCb cb =
+      factory.createFilterFactoryFromProto(*proto_config, "stats", context).value();
+  Http::MockFilterChainFactoryCallbacks filter_callback;
+  EXPECT_CALL(filter_callback, addStreamFilter(_));
+  cb(filter_callback);
+}
+
 } // namespace
 } // namespace ExternalProcessing
 } // namespace HttpFilters

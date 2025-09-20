@@ -9,6 +9,7 @@ import "envoy/config/core/v3/grpc_service.proto";
 import "envoy/config/core/v3/http_service.proto";
 import "envoy/extensions/filters/http/ext_proc/v3/processing_mode.proto";
 import "envoy/type/matcher/v3/string.proto";
+import "envoy/type/v3/http_status.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
@@ -95,7 +96,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // <arch_overview_advanced_filter_state_sharing>` object in a namespace matching the filter
 // name.
 //
-// [#next-free-field: 24]
+// [#next-free-field: 25]
 message ExternalProcessor {
   // Describes the route cache action to be taken when an external processor response
   // is received in response to request headers.
@@ -350,6 +351,12 @@ message ExternalProcessor {
   // [#extension-category: envoy.http.ext_proc.response_processors]
   config.core.v3.TypedExtensionConfig on_processing_response = 23
       [(xds.annotations.v3.field_status).work_in_progress = true];
+
+  // Sets the HTTP status code that is returned to the client when the external processing server returns
+  // an error, fails to respond, or cannot be reached.
+  //
+  // The default status is ``HTTP 500 Internal Server Error``.
+  type.v3.HttpStatus status_on_error = 24;
 }
 
 // ExtProcHttpService is used for HTTP communication between the filter and the external processing service.

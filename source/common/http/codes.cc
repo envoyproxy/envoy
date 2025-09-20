@@ -292,6 +292,7 @@ const char* CodeUtility::toString(Code code) {
   case Code::LoopDetected:                  return "Loop Detected";
   case Code::NotExtended:                   return "Not Extended";
   case Code::NetworkAuthenticationRequired: return "Network Authentication Required";
+  case Code::LastUnassignedServerErrorCode: return "Last Unassigned Server Error Code";
   }
   // clang-format on
 
