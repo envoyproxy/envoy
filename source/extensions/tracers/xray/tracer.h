@@ -30,7 +30,6 @@ constexpr absl::string_view SpanClientIp = "client_ip";
 constexpr absl::string_view SpanXForwardedFor = "x_forwarded_for";
 constexpr absl::string_view Subsegment = "subsegment";
 
-const Tracing::TraceContextHandler& xRayTraceHeader();
 const Tracing::TraceContextHandler& xForwardedForHeader();
 
 class Span : public Tracing::Span, Logger::Loggable<Logger::Id::config> {

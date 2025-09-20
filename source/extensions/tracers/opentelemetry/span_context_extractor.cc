@@ -12,6 +12,9 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace OpenTelemetry {
+
+using W3cConstants = Envoy::Extensions::Propagators::W3c::W3cConstants;
+
 namespace {
 
 // See https://www.w3.org/TR/trace-context/#traceparent-header
@@ -38,12 +41,12 @@ SpanContextExtractor::SpanContextExtractor(Tracing::TraceContext& trace_context)
 SpanContextExtractor::~SpanContextExtractor() = default;
 
 bool SpanContextExtractor::propagationHeaderPresent() {
-  auto propagation_header = OpenTelemetryConstants::get().TRACE_PARENT.get(trace_context_);
+  auto propagation_header = W3cConstants::get().TRACE_PARENT.get(trace_context_);
   return propagation_header.has_value();
 }
 
 absl::StatusOr<SpanContext> SpanContextExtractor::extractSpanContext() {
-  auto propagation_header = OpenTelemetryConstants::get().TRACE_PARENT.get(trace_context_);
+  auto propagation_header = W3cConstants::get().TRACE_PARENT.get(trace_context_);
   if (!propagation_header.has_value()) {
     // We should have already caught this, but just in case.
     return absl::InvalidArgumentError("No propagation header found");
@@ -89,7 +92,7 @@ absl::StatusOr<SpanContext> SpanContextExtractor::extractSpanContext() {
   // it is invalid and MUST be discarded. Because we're already checking for the
   // traceparent header above, we don't need to check here.
   // See https://www.w3.org/TR/trace-context/#processing-model-for-working-with-trace-context
-  const auto tracestate_values = OpenTelemetryConstants::get().TRACE_STATE.getAll(trace_context_);
+  const auto tracestate_values = W3cConstants::get().TRACE_STATE.getAll(trace_context_);
 
   SpanContext parent_context(version, trace_id, span_id, sampled,
                              absl::StrJoin(tracestate_values, ","));
