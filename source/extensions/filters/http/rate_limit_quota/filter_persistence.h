@@ -67,7 +67,7 @@ public:
 
   // Get an existing TLS store by index, or create one if not found.
   static std::shared_ptr<TlsStore>
-  getTlsStore(Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
+  getTlsStore(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
               Server::Configuration::FactoryContext& context, absl::string_view target_address,
               absl::string_view domain);
 
@@ -95,12 +95,6 @@ private:
     static absl::NoDestructor<TlsStoreMap> tls_stores{};
     return *tls_stores;
   }
-
-  // Find or initialize a TLS store for the given config.
-  static std::shared_ptr<TlsStore>
-  getTlsStoreImpl(Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
-                  Server::Configuration::FactoryContext& context, TlsStoreIndex& index,
-                  bool* new_store_out);
 
   // Clear a specified index when it is no longer captured by any filter factories.
   static void clearTlsStore(const TlsStoreIndex& index) { stores().erase(index); }
