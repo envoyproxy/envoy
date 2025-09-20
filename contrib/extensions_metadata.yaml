@@ -139,3 +139,18 @@ envoy.upstreams.http.tcp.golang:
   - envoy.upstreams
   security_posture: requires_trusted_downstream_and_upstream
   status: alpha
+envoy.filters.http.mcp_sse_stateful_session:
+  categories:
+  - envoy.filters.http
+  security_posture: requires_trusted_downstream_and_upstream
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.mcp_sse_stateful_session.v3alpha.McpSseStatefulSession
+  - envoy.extensions.filters.http.mcp_sse_stateful_session.v3alpha.McpSseStatefulSessionPerRoute
+envoy.http.sse_stateful_session.envelope:
+  categories:
+  - envoy.http.sse_stateful_session
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.http.sse_stateful_session.envelope.v3alpha.EnvelopeSessionState
