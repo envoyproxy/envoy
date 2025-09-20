@@ -49,6 +49,7 @@ These input functions are available for matching TCP connections and HTTP reques
 * :ref:`Direct source IP <extension_envoy.matching.inputs.direct_source_ip>`.
 * :ref:`Source type <extension_envoy.matching.inputs.source_type>`.
 * :ref:`Server name <extension_envoy.matching.inputs.server_name>`.
+* :ref:`Network namespace <extension_envoy.matching.inputs.network_namespace>`.
 * :ref:`Filter state <extension_envoy.matching.inputs.filter_state>`.
 
 These input functions are available for matching TCP connections:

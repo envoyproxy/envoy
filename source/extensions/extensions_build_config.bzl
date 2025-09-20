@@ -103,6 +103,7 @@ EXTENSIONS = {
     "envoy.matching.inputs.direct_source_ip":           "//source/extensions/matching/network/common:inputs_lib",
     "envoy.matching.inputs.source_type":                "//source/extensions/matching/network/common:inputs_lib",
     "envoy.matching.inputs.server_name":                "//source/extensions/matching/network/common:inputs_lib",
+    "envoy.matching.inputs.network_namespace":          "//source/extensions/matching/network/common:inputs_lib",
     "envoy.matching.inputs.transport_protocol":         "//source/extensions/matching/network/common:inputs_lib",
     "envoy.matching.inputs.filter_state":               "//source/extensions/matching/network/common:inputs_lib",
 

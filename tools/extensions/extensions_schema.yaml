@@ -19,6 +19,7 @@ builtin:
 - envoy.matching.inputs.direct_source_ip
 - envoy.matching.inputs.source_type
 - envoy.matching.inputs.server_name
+- envoy.matching.inputs.network_namespace
 - envoy.matching.inputs.transport_protocol
 - envoy.matching.inputs.application_protocol
 - envoy.matching.inputs.filter_state
