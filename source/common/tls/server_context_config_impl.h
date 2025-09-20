@@ -18,7 +18,9 @@ public:
          bool for_quic);
 
   // Ssl::ServerContextConfig
-  bool requireClientCertificate() const override { return require_client_certificate_; }
+  absl::optional<bool> requireClientCertificate() const override {
+    return require_client_certificate_;
+  }
   OcspStaplePolicy ocspStaplePolicy() const override { return ocsp_staple_policy_; }
   const std::vector<SessionTicketKey>& sessionTicketKeys() const override {
     return session_ticket_keys_;
@@ -58,7 +60,7 @@ private:
   static const std::string DEFAULT_CURVES;
   static const std::string DEFAULT_CURVES_FIPS;
 
-  const bool require_client_certificate_;
+  const absl::optional<bool> require_client_certificate_;
   const OcspStaplePolicy ocsp_staple_policy_;
   std::vector<SessionTicketKey> session_ticket_keys_;
   const Secret::TlsSessionTicketKeysConfigProviderSharedPtr session_ticket_keys_provider_;

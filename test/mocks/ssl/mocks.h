@@ -160,7 +160,7 @@ public:
   MOCK_METHOD(Ssl::HandshakerCapabilities, capabilities, (), (const, override));
   MOCK_METHOD(Ssl::SslCtxCb, sslctxCb, (), (const, override));
 
-  MOCK_METHOD(bool, requireClientCertificate, (), (const));
+  MOCK_METHOD(absl::optional<bool>, requireClientCertificate, (), (const));
   MOCK_METHOD(OcspStaplePolicy, ocspStaplePolicy, (), (const));
   MOCK_METHOD(const std::vector<SessionTicketKey>&, sessionTicketKeys, (), (const));
   MOCK_METHOD(bool, disableStatelessSessionResumption, (), (const));
