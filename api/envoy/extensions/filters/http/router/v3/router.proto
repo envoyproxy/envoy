@@ -135,3 +135,15 @@ message Router {
   // [#extension-category: envoy.filters.http.upstream]
   repeated network.http_connection_manager.v3.HttpFilter upstream_http_filters = 8;
 }
+
+// Router cluster-specific protocol options for configuring per-cluster router behavior.
+// This message can be used in cluster's ``typed_extension_protocol_options`` field
+// with the key ``envoy.filters.http.router``.
+message RouterClusterConfig {
+  // Enable copy-on-write for request body handling. When enabled, the router will use
+  // memory efficient copy-on-write buffers when duplicating request bodies for retries,
+  // shadows, and mirrors. This is beneficial for workloads with large request bodies.
+  //
+  // Defaults to ``false``.
+  bool enable_copy_on_write = 1;
+}

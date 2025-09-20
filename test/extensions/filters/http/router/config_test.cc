@@ -6,6 +6,7 @@
 
 #include "source/common/http/utility.h"
 #include "source/common/router/config_utility.h"
+#include "source/common/router/router_cluster_config.h"
 #include "source/extensions/filters/http/router/config.h"
 
 #include "test/mocks/server/factory_context.h"
@@ -22,6 +23,42 @@ namespace Extensions {
 namespace HttpFilters {
 namespace RouterFilter {
 namespace {
+TEST(RouterProtocolOptionsFactoryTest, CreateEmptyProtocolOptionsProto) {
+  RouterFilterConfig factory;
+  auto msg = factory.createEmptyProtocolOptionsProto();
+  ASSERT_NE(msg, nullptr);
+  // Verify the concrete type is RouterClusterConfig.
+  auto* typed =
+      dynamic_cast<envoy::extensions::filters::http::router::v3::RouterClusterConfig*>(msg.get());
+  EXPECT_NE(typed, nullptr);
+}
+
+TEST(RouterProtocolOptionsFactoryTest, CreateProtocolOptionsConfigTrue) {
+  RouterFilterConfig factory;
+  envoy::extensions::filters::http::router::v3::RouterClusterConfig config;
+  config.set_enable_copy_on_write(true);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto created = factory.createProtocolOptionsConfig(config, context);
+  ASSERT_TRUE(created.ok());
+  auto options =
+      std::dynamic_pointer_cast<const Router::RouterClusterProtocolOptionsConfig>(*created);
+  ASSERT_NE(options, nullptr);
+  EXPECT_TRUE(options->enableCopyOnWrite());
+}
+
+TEST(RouterProtocolOptionsFactoryTest, CreateProtocolOptionsConfigFalseByDefault) {
+  RouterFilterConfig factory;
+  envoy::extensions::filters::http::router::v3::RouterClusterConfig config; // default false
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto created = factory.createProtocolOptionsConfig(config, context);
+  ASSERT_TRUE(created.ok());
+  auto options =
+      std::dynamic_pointer_cast<const Router::RouterClusterProtocolOptionsConfig>(*created);
+  ASSERT_NE(options, nullptr);
+  EXPECT_FALSE(options->enableCopyOnWrite());
+}
 
 class QueryParameterMatcherTest : public testing::Test {
 protected:

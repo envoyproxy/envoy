@@ -113,6 +113,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "copy_on_write_buffer_test",
+    srcs = ["copy_on_write_buffer_test.cc"],
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/buffer:copy_on_write_buffer_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "zero_copy_input_stream_test",
     srcs = ["zero_copy_input_stream_test.cc"],
     rbe_pool = "6gig",
