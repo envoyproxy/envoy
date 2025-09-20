@@ -168,8 +168,7 @@ ConnectionManagerUtility::MutateRequestHeadersResult ConnectionManagerUtility::m
     //
     // If we find one, it will be used as the downstream address for logging. It may or may not be
     // used for determining internal/external status (see below).
-    OriginalIPDetectionParams params = {request_headers,
-                                        connection.connectionInfoProvider().remoteAddress()};
+    OriginalIPDetectionParams params = {request_headers, connection, config};
     for (const auto& detection_extension : config.originalIpDetectionExtensions()) {
       const auto result = detection_extension->detect(params);
 
