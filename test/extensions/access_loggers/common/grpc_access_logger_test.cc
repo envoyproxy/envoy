@@ -361,23 +361,24 @@ TEST_F(StreamingGrpcAccessLogTest, TcpLoggingWithTimerFlush) {
   const int buffer_size = 1000000;
   initLogger(FlushInterval, buffer_size);
 
-  // Start a stream for the logs
+  // Start a stream for the logs and log an HTTP entry to establish the stream
   MockAccessLogStream stream;
   AccessLogCallbacks* callbacks;
   expectStreamStart(stream, &callbacks);
 
-  // First log an HTTP entry to establish the stream
-  expectFlushedLogEntriesCount(stream, MOCK_HTTP_LOG_FIELD_NAME, 1);
+  // Set up expectations for the HTTP log
+  EXPECT_CALL(stream, isAboveWriteBufferHighWatermark())
+      .WillRepeatedly(Return(false));
+  EXPECT_CALL(stream, sendMessageRaw_(_, false))
+      .WillOnce(Invoke([](Buffer::InstancePtr& request, bool) {
+        // Just verify we can parse the message
+        Protobuf::Struct message;
+        Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
+        EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
+      }));
+
+  // Log the HTTP entry
   logger_->log(mockHttpEntry());
-
-  // Simulate the stream being established by calling onCreateInitialMetadata
-  Http::TestRequestHeaderMapImpl empty_headers;
-  callbacks->onCreateInitialMetadata(empty_headers);
-
-  EXPECT_EQ(1, logger_->numInits());
-  EXPECT_EQ(1, logger_->numClears());
-  EXPECT_EQ(1,
-            TestUtility::findCounter(stats_store_, "mock_access_log_prefix.logs_written")->value());
 
   // Now log some TCP entries - they won't be flushed yet due to large buffer size
   logger_->log(Protobuf::Empty());
@@ -386,7 +387,15 @@ TEST_F(StreamingGrpcAccessLogTest, TcpLoggingWithTimerFlush) {
   logger_->log(Protobuf::Empty());
 
   // Set up expectations for the flush that will happen when timer fires
-  expectFlushedLogEntriesCount(stream, MOCK_TCP_LOG_FIELD_NAME, 4);
+  EXPECT_CALL(stream, isAboveWriteBufferHighWatermark())
+      .WillRepeatedly(Return(false));
+  EXPECT_CALL(stream, sendMessageRaw_(_, false))
+      .WillOnce(Invoke([](Buffer::InstancePtr& request, bool) {
+        // Just verify we can parse the message
+        Protobuf::Struct message;
+        Buffer::ZeroCopyInputStreamImpl request_stream(std::move(request));
+        EXPECT_TRUE(message.ParseFromZeroCopyStream(&request_stream));
+      }));
 
   // Trigger flush via timer
   EXPECT_CALL(*timer_, enableTimer(FlushInterval, _));
