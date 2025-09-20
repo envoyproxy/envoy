@@ -198,6 +198,9 @@ public:
 
 using ResetHeaderParserSharedPtr = std::shared_ptr<ResetHeaderParser>;
 
+class RetryPolicy;
+using RetryPolicyConstSharedPtr = std::shared_ptr<const RetryPolicy>;
+
 /**
  * Route level retry policy.
  */
@@ -984,6 +987,12 @@ public:
    *         if it is empty and does not allow retries.
    */
   virtual const RetryPolicy& retryPolicy() const PURE;
+
+  /**
+   * @return const RetryPolicy& the retry policy for the route. All routes have a retry policy even
+   *         if it is empty and does not allow retries.
+   */
+  virtual const RetryPolicyConstSharedPtr& sharedRetryPolicy() const PURE;
 
   /**
    * @return const InternalRedirectPolicy& the internal redirect policy for the route. All routes

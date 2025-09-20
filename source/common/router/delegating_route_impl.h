@@ -103,6 +103,7 @@ public:
   Upstream::ResourcePriority priority() const override;
   const RateLimitPolicy& rateLimitPolicy() const override;
   const RetryPolicy& retryPolicy() const override;
+  const RetryPolicyConstSharedPtr& sharedRetryPolicy() const override;
   const Router::PathMatcherSharedPtr& pathMatcher() const override;
   const Router::PathRewriterSharedPtr& pathRewriter() const override;
   const InternalRedirectPolicy& internalRedirectPolicy() const override;
