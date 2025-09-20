@@ -57,7 +57,8 @@ TraceIdRatioBasedSampler::TraceIdRatioBasedSampler(
 
 SamplingResult TraceIdRatioBasedSampler::shouldSample(
     const StreamInfo::StreamInfo&, const absl::optional<SpanContext> parent_context,
-    const std::string& trace_id, const std::string& /*name*/, OTelSpanKind /*kind*/,
+    const std::string& trace_id, const std::string& /*name*/,
+    Envoy::Extensions::Common::OpenTelemetry::Sdk::Trace::OTelSpanKind /*kind*/,
     OptRef<const Tracing::TraceContext> /*trace_context*/,
     const std::vector<SpanContext>& /*links*/) {
   SamplingResult result;

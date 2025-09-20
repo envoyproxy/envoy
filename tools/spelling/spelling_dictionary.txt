@@ -346,6 +346,8 @@ Oauth
 OCSP
 OD
 ODCDS
+opentelemetry
+OpenTelemetry
 middlewildcard
 monostate
 mpd
@@ -477,6 +479,7 @@ TBD
 TCLAP
 TCP
 TE
+temporality
 TFO
 TID
 TLS
