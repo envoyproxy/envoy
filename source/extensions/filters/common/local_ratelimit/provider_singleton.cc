@@ -86,7 +86,7 @@ void RateLimiterProviderSingleton::RateLimitConfigCallback::setLimiter(
 RateLimiterProviderSingleton::RatelimiterSubscription::RatelimiterSubscription(
     RateLimiterProviderSingleton& parent)
     : Config::SubscriptionBase<envoy::type::v3::TokenBucketConfig>(
-          parent.factory_context_.messageValidationVisitor(), "uid"),
+          parent.factory_context_.messageValidationVisitor(), "name"),
       parent_(parent) {
   subscription_ = THROW_OR_RETURN_VALUE(
       parent.factory_context_.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
