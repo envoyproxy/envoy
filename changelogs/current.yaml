@@ -1,11 +1,6 @@
 date: Pending
 
 behavior_changes:
-- area: response_decoder
-  change: |
-    Updated EnvoyQuicClientStream and ResponseDecoderWrapper to use a handle to access the response decoder
-    to prevent use-after-free errors by ensuring the decoder instance is still live before calling its methods.
-    This change is guarded by the runtime flag ``envoy.reloadable_features.use_response_decoder_handle``.
 - area: http
   change: |
     A route refresh will now result in a tracing refresh. The trace sampling decision and decoration
@@ -93,6 +88,13 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: tcp_proxy
+  change:
+    Fixes a bug when downstream TCP connection is created and the upstream connection isn't fully established, no idle timeout
+    is set on the downstream connection, which may lead to connection leak if the client doesn't close the connection.
+    The fix is to set an idle timeout on the downstream connection immediately after creation.
+    This fix can be reverted by setting runtime guard ``envoy.reloadable_features.tcp_proxy_set_idle_timer_immediately_on_new_connection``
+    to ``false``.
 - area: udp_proxy
   change: |
     Fixed a crash in the UDP proxy that occurred during ``ENVOY_SIGTERM`` when active tunneling sessions were present.
@@ -430,8 +432,21 @@ new_features:
   change: |
     Added a new metric ``db_build_epoch`` to track the build timestamp of the MaxMind geolocation database files.
     This can be used to monitor the freshness of the databases currently in use by the filter.
-    See `MaxMind DB build_epoch <https://maxmind.github.io/MaxMind-DB/#build_epoch>`_ for more details.
+    See https://maxmind.github.io/MaxMind-DB/#build_epoch for more details.
+- area: overload management
+  change: |
+    Added a new scaled timer type ``HttpDownstreamStreamFlush`` to the overload manager. This allows
+    Envoy to scale the periodic timer for flushing downstream responses based on resource pressure.
+    The new timer can be configured via the
+    :ref:`ScaleTimersOverloadActionConfig <envoy_v3_api_msg_config.overload.v3.ScaleTimersOverloadActionConfig>`.
 - area: dynamic_modules
   change: |
     Added support for counters, gauges, histograms, and their vector variants to the dynamic modules API.
+- area: dns_resolver
+  change: |
+    Added :ref:`max_udp_channel_duration
+    <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.max_udp_channel_duration>`
+    configuration field to the c-ares DNS resolver. This allows periodic refresh of the UDP channel
+    to help with avoiding stale socket states, and providing better load distribution across UDP ports.
+
 deprecated:

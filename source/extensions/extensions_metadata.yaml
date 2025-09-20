@@ -881,6 +881,12 @@ envoy.formatter.req_without_query:
   status: alpha
   type_urls:
   - envoy.extensions.formatter.req_without_query.v3.ReqWithoutQuery
+envoy.built_in_formatters.xfcc_value:
+  categories:
+  - envoy.built_in_formatters
+  security_posture: unknown
+  status: alpha
+  undocumented: true
 envoy.geoip_providers.maxmind:
   categories:
   - envoy.geoip_providers

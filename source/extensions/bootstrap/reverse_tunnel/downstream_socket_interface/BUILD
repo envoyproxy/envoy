@@ -77,7 +77,6 @@ envoy_cc_library(
         "//source/common/common:logger_lib",
         "//source/common/grpc:typed_async_client_lib",
         "//source/common/http:codec_client_lib",
-        "//source/common/http:response_decoder_impl_base",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http1:codec_stats_lib",
         "//source/common/network:address_lib",

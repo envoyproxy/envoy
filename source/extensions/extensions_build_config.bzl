@@ -461,6 +461,7 @@ EXTENSIONS = {
     "envoy.formatter.cel":                              "//source/extensions/formatter/cel:config",
     "envoy.formatter.metadata":                         "//source/extensions/formatter/metadata:config",
     "envoy.formatter.req_without_query":                "//source/extensions/formatter/req_without_query:config",
+    "envoy.built_in_formatters.xfcc_value":             "//source/extensions/formatter/xfcc_value:config",
 
     #
     # Key value store
