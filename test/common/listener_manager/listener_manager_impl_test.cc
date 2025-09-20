@@ -575,6 +575,33 @@ filter_chains:
   EXPECT_EQ(filter_chain->transportSocketConnectTimeout(), std::chrono::seconds(3));
 }
 
+TEST_P(ListenerManagerImplWithRealFiltersTest, FilterChainNameAndMetadata) {
+  const std::string yaml = R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- name: foo
+  metadata:
+    filter_metadata:
+      envoy.test:
+        test_key: "test_value"
+  filters: []
+  )EOF";
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, default_bind_type, _, 0));
+  addOrUpdateListener(parseListenerFromV3Yaml(yaml));
+  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_EQ(filter_chain->name(), "foo");
+  const auto& filter_chain_info = filter_chain->filterChainInfo();
+  EXPECT_EQ(
+      Config::Metadata::metadataValue(&filter_chain_info->metadata(), "envoy.test", "test_key")
+          .string_value(),
+      "test_value");
+}
+
 TEST_P(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(*worker_, start(_, _));
   EXPECT_FALSE(manager_->isWorkerStarted());
