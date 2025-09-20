@@ -454,5 +454,13 @@ new_features:
     <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.max_udp_channel_duration>`
     configuration field to the c-ares DNS resolver. This allows periodic refresh of the UDP channel
     to help avoid stale socket states and provide better load distribution across UDP ports.
+- area: upstream
+  change: |
+    Added :ref:`transport_socket_matcher
+    <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matcher>` to clusters. This matcher
+    uses the generic xDS matcher framework to select a named transport socket from
+    :ref:`transport_socket_matches
+    <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>` based on connection
+    attributes such as destination/source IP and port, SNI, ALPN, and dynamic metadata.
 
 deprecated:

@@ -22,6 +22,7 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "xds/core/v3/collection_entry.proto";
+import "xds/type/matcher/v3/matcher.proto";
 
 import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
@@ -45,7 +46,7 @@ message ClusterCollection {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 59]
+// [#next-free-field: 60]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -808,6 +809,28 @@ message Cluster {
   //
   // [#comment:TODO(incfly): add a detailed architecture doc on intended usage.]
   repeated TransportSocketMatch transport_socket_matches = 43;
+
+  // Optional matcher that selects a transport socket from
+  // :ref:`transport_socket_matches <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>`.
+  //
+  // This matcher uses the generic xDS matcher framework and may reference common
+  // network inputs such as destination IP, source IP, destination port, source port,
+  // Server Name Indication (SNI), Application-Layer Protocol Negotiation (ALPN), and
+  // dynamic metadata to select a named transport socket. This provides flexibility
+  // similar to the listener :ref:`filter_chain_matcher
+  // <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`.
+  //
+  // If this field is set, it takes precedence over legacy metadata-based selection
+  // performed by :ref:`transport_socket_matches
+  // <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>` alone.
+  // If the matcher does not yield a match, Envoy uses the default transport socket
+  // configured for the cluster.
+  //
+  // When using this field, each entry in
+  // :ref:`transport_socket_matches <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>`
+  // must have a unique ``name``. The matcher outcome is expected to reference one of
+  // these names.
+  xds.type.matcher.v3.Matcher transport_socket_matcher = 59;
 
   // Supplies the name of the cluster which must be unique across all clusters.
   // The cluster name is used when emitting

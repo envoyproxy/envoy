@@ -6,8 +6,13 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/matcher/matcher.h"
+#include "envoy/network/address.h"
+#include "envoy/network/connection.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/host_description.h"
 #include "envoy/upstream/upstream.h"
 
@@ -15,6 +20,10 @@
 #include "source/common/config/metadata.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/protobuf/protobuf.h"
+#include "source/common/upstream/transport_socket_input.h"
+
+#include "absl/container/flat_hash_map.h"
+#include "xds/type/matcher/v3/matcher.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -25,6 +34,13 @@ public:
   static absl::StatusOr<std::unique_ptr<TransportSocketMatcherImpl>> create(
       const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
           socket_matches,
+      Server::Configuration::TransportSocketFactoryContext& factory_context,
+      Network::UpstreamTransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope);
+
+  static absl::StatusOr<std::unique_ptr<TransportSocketMatcherImpl>> create(
+      const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
+          socket_matches,
+      const xds::type::matcher::v3::Matcher* transport_socket_matcher,
       Server::Configuration::TransportSocketFactoryContext& factory_context,
       Network::UpstreamTransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope);
 
@@ -41,12 +57,30 @@ public:
   MatchData resolve(const envoy::config::core::v3::Metadata* endpoint_metadata,
                     const envoy::config::core::v3::Metadata* locality_metadata) const override;
 
+  /**
+   * Resolve method that accepts additional network context for comprehensive matching.
+   */
+  MatchData resolve(const envoy::config::core::v3::Metadata* endpoint_metadata,
+                    const envoy::config::core::v3::Metadata* locality_metadata,
+                    const Network::Address::Instance* local_address,
+                    const Network::Address::Instance* remote_address,
+                    const Network::ConnectionInfoProvider* connection_info = nullptr,
+                    const StreamInfo::FilterState* filter_state = nullptr,
+                    absl::string_view server_name = "",
+                    const std::vector<std::string>* application_protocols = nullptr) const;
+
   bool allMatchesSupportAlpn() const override {
     if (!default_match_.factory->supportsAlpn()) {
       return false;
     }
     for (const auto& match : matches_) {
       if (!match.factory->supportsAlpn()) {
+        return false;
+      }
+    }
+    // Also check transport sockets in the matcher-based map.
+    for (const auto& [name, factory] : transport_sockets_by_name_) {
+      if (!factory->supportsAlpn()) {
         return false;
       }
     }
@@ -61,10 +95,84 @@ protected:
       Network::UpstreamTransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope,
       absl::Status& creation_status);
 
-  TransportSocketMatchStats generateStats(const std::string& prefix);
+  TransportSocketMatcherImpl(
+      const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
+          socket_matches,
+      const xds::type::matcher::v3::Matcher* transport_socket_matcher,
+      Server::Configuration::TransportSocketFactoryContext& factory_context,
+      Network::UpstreamTransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope,
+      absl::Status& creation_status);
+
+  TransportSocketMatchStats generateStats(const std::string& prefix) const;
+
+private:
+  /**
+   * Resolve the transport socket configuration using the matcher if available.
+   * @param endpoint_metadata the metadata of the given host.
+   * @param locality_metadata the metadata of the host's locality.
+   * @return the match information of the transport socket selected.
+   */
+  MatchData resolveUsingMatcher(const envoy::config::core::v3::Metadata* endpoint_metadata,
+                                const envoy::config::core::v3::Metadata* locality_metadata) const;
+
+  /**
+   * Setup transport socket matcher based on the provided configuration.
+   * @param transport_socket_matcher the matcher configuration.
+   * @param socket_matches the socket matches configuration.
+   * @param factory_context the factory context.
+   * @param creation_status reference to store creation status.
+   */
+  void setupTransportSocketMatcher(
+      const xds::type::matcher::v3::Matcher* transport_socket_matcher,
+      const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
+          socket_matches,
+      Server::Configuration::TransportSocketFactoryContext& factory_context,
+      absl::Status& creation_status);
+
   Stats::Scope& stats_scope_;
   FactoryMatch default_match_;
   std::vector<FactoryMatch> matches_;
+
+  // Matcher-based transport socket selection.
+  using TransportSocketsByName =
+      absl::flat_hash_map<std::string, Network::UpstreamTransportSocketFactoryPtr>;
+  TransportSocketsByName transport_sockets_by_name_;
+  // Persistent stats for matcher-selected transport sockets keyed by name.
+  mutable absl::flat_hash_map<std::string, TransportSocketMatchStats> matcher_stats_by_name_;
+  std::unique_ptr<Matcher::MatchTree<TransportSocketMatchingData>> matcher_;
+};
+
+/**
+ * Action that carries a transport socket name.
+ */
+class TransportSocketNameAction : public Matcher::Action {
+public:
+  explicit TransportSocketNameAction(const std::string& name) : name_(name) {}
+  const std::string& name() const { return name_; }
+  absl::string_view typeUrl() const override {
+    return "type.googleapis.com/google.protobuf.StringValue";
+  }
+
+private:
+  const std::string name_;
+};
+
+/**
+ * ActionFactory that creates TransportSocketNameAction from a StringValue.
+ */
+class TransportSocketNameActionFactory : public Matcher::ActionFactory<TransportSocketMatchingData>,
+                                         public Logger::Loggable<Logger::Id::upstream> {
+public:
+  std::string name() const override { return "transport-socket-name"; }
+  Matcher::ActionConstSharedPtr createAction(const Protobuf::Message& config,
+                                             TransportSocketMatchingData&,
+                                             ProtobufMessage::ValidationVisitor&) override {
+    const auto& string_config = dynamic_cast<const Protobuf::StringValue&>(config);
+    return std::make_shared<TransportSocketNameAction>(string_config.value());
+  }
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::StringValue>();
+  }
 };
 
 } // namespace Upstream
