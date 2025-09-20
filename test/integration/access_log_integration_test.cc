@@ -122,8 +122,7 @@ typed_config:
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  // Send 2 requests, only the first one should be logged.
-  sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0, 0);
+  // Send 2 requests(we have 2 access_log under HCM) and we only get 3 logs(1 got rate-limited).
   sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0, 0);
   sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0, 0);
   cleanupUpstreamAndDownstream();
@@ -135,7 +134,7 @@ typed_config:
   timeSystem().advanceTimeWait(std::chrono::seconds(2));
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  // Send 2 requests, both should be logged.
+  // Send 2 requests(we have 2 access_log under HCM) and we only get 3 logs(1 got rate-limited).
   sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0, 0);
   sendRequestAndWaitForResponse(default_request_headers_, 0, default_response_headers_, 0, 0);
   cleanupUpstreamAndDownstream();
