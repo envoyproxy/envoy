@@ -1427,6 +1427,7 @@ templating
 templatize
 templatized
 templatizing
+temporality
 teredo
 testability
 testcase
