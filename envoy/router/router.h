@@ -27,7 +27,6 @@
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/retry.h"
 
-#include "source/common/http/response_decoder_impl_base.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 
@@ -198,6 +197,9 @@ public:
 };
 
 using ResetHeaderParserSharedPtr = std::shared_ptr<ResetHeaderParser>;
+
+class RetryPolicy;
+using RetryPolicyConstSharedPtr = std::shared_ptr<const RetryPolicy>;
 
 /**
  * Route level retry policy.
@@ -987,6 +989,12 @@ public:
   virtual const RetryPolicy& retryPolicy() const PURE;
 
   /**
+   * @return const RetryPolicy& the retry policy for the route. All routes have a retry policy even
+   *         if it is empty and does not allow retries.
+   */
+  virtual const RetryPolicyConstSharedPtr& sharedRetryPolicy() const PURE;
+
+  /**
    * @return const InternalRedirectPolicy& the internal redirect policy for the route. All routes
    *         have a internal redirect policy even if it is not enabled, which means redirects are
    *         simply proxied as normal responses.
@@ -1491,7 +1499,7 @@ public:
  * An API for the interactions the upstream stream needs to have with the downstream stream
  * and/or router components
  */
-class UpstreamToDownstream : public Http::ResponseDecoderImplBase, public Http::StreamCallbacks {
+class UpstreamToDownstream : public Http::ResponseDecoder, public Http::StreamCallbacks {
 public:
   /**
    * @return return the route for the downstream stream.

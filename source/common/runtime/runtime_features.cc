@@ -81,7 +81,6 @@ RUNTIME_GUARD(envoy_reloadable_features_trace_refresh_after_route_refresh);
 RUNTIME_GUARD(envoy_reloadable_features_udp_set_do_not_fragment);
 RUNTIME_GUARD(envoy_reloadable_features_uhv_allow_malformed_url_encoding);
 RUNTIME_GUARD(envoy_reloadable_features_uri_template_match_on_asterisk);
-RUNTIME_GUARD(envoy_reloadable_features_use_response_decoder_handle);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
 RUNTIME_GUARD(envoy_reloadable_features_websocket_allow_4xx_5xx_through_filter_chain);
@@ -177,8 +176,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_reverse_conn_force_local_reply);
 // TODO(pradeepcrao): Create a config option to enable this instead after
 // testing.
 FALSE_RUNTIME_GUARD(envoy_restart_features_use_cached_grpc_client_for_xds);
-// RELEASE_ASSERT when upstream stream detects UAF of downstream response decoder instance.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_abort_when_accessing_dead_decoder);
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT

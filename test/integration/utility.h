@@ -17,7 +17,6 @@
 #include "source/common/common/dump_state_utils.h"
 #include "source/common/common/utility.h"
 #include "source/common/http/codec_client.h"
-#include "source/common/http/response_decoder_impl_base.h"
 #include "source/common/stats/isolated_store_impl.h"
 
 #include "test/test_common/printers.h"
@@ -30,7 +29,7 @@ namespace Envoy {
 /**
  * A buffering response decoder used for testing.
  */
-class BufferingStreamDecoder : public Http::ResponseDecoderImplBase, public Http::StreamCallbacks {
+class BufferingStreamDecoder : public Http::ResponseDecoder, public Http::StreamCallbacks {
 public:
   BufferingStreamDecoder(std::function<void()> on_complete_cb) : on_complete_cb_(on_complete_cb) {}
 
