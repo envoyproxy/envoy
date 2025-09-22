@@ -47,6 +47,10 @@ minor_behavior_changes:
   change: |
     Allow 4xx and 5xx to go through the filter chain for the WebSocket handshake response check. This behavior can be
     disabled by the runtime guard ``envoy.reloadable_features.websocket_allow_4xx_5xx_through_filter_chain``.
+- area: websocket
+  change: |
+      Support route and per-try timeouts on websocket upgrade. This can be disabled by the runtime guard
+      ``envoy.reloadable_features.websocket_enable_timeout_on_upgrade_response``.
 - area: testing
   change: |
     In test code for external extensions, matchers ``Http::HeaderValueOf``, ``HasHeader``, and ``HeaderHasValueRef``
