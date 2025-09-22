@@ -336,8 +336,8 @@ envoy_cmake(
         "//conditions:default": ["libcares.a"],
     }),
     postfix_script = select({
-        "//bazel:windows_x86_64": "cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/src/lib/ares_nameser.h $INSTALLDIR/include/ares_nameser.h && cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $INSTALLDIR/include/ares_dns.h",
-        "//conditions:default": "rm -f $INSTALLDIR/include/ares_dns.h && cp -L $EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $INSTALLDIR/include/ares_dns.h",
+        "//bazel:windows_x86_64": "cp -L $$EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/src/lib/ares_nameser.h $$INSTALLDIR/include/ares_nameser.h && cp -L $$EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $$INSTALLDIR/include/ares_dns.h",
+        "//conditions:default": "rm -f $$INSTALLDIR/include/ares_dns.h && cp -L $$EXT_BUILD_ROOT/external/com_github_c_ares_c_ares/include/ares_dns.h $$INSTALLDIR/include/ares_dns.h",
     }),
 )
 
@@ -533,6 +533,14 @@ envoy_cmake(
     out_static_libs = select({
         "//bazel:windows_x86_64": ["zlib.lib"],
         "//conditions:default": ["libz.a"],
+    }),
+    postfix_script = select({
+        "@platforms//cpu:wasm32": """
+            if [[ -f libzlib.a ]]; then
+                cp libzlib.a $$INSTALLDIR/lib/libz.a
+            fi
+        """,
+        "//conditions:default": "",
     }),
 )
 
