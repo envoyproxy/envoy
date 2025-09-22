@@ -59,6 +59,30 @@ TEST_F(CacheFilterFactoryTest, UnregisteredTypedConfig) {
       EnvoyException);
 }
 
+class FailToCreateCacheFactory : public HttpCacheFactory {
+public:
+  std::string name() const override {
+    return std::string("envoy.extensions.http.cache_v2.fake_fail");
+  }
+  // Arbitrarily use "Key" as the proto type of the config because it's convenient,
+  // and we have to register it as *some* type of proto message.
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override { return std::make_unique<Key>(); }
+  absl::StatusOr<std::shared_ptr<CacheSessions>>
+  getCache(const envoy::extensions::filters::http::cache_v2::v3::CacheV2Config&,
+           Server::Configuration::FactoryContext&) override {
+    return absl::InvalidArgumentError("intentional fail");
+  }
+};
+
+static Registry::RegisterFactory<FailToCreateCacheFactory, HttpCacheFactory> register_;
+
+TEST_F(CacheFilterFactoryTest, FactoryFailsToCreateCache) {
+  config_.mutable_typed_config()->PackFrom(Key());
+  EXPECT_THROW(
+      factory_.createFilterFactoryFromProto(config_, "stats", context_).status().IgnoreError(),
+      EnvoyException);
+}
+
 } // namespace
 } // namespace CacheV2
 } // namespace HttpFilters
