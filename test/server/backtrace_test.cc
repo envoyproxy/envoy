@@ -4,6 +4,8 @@
 
 #include "gtest/gtest.h"
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 TEST(Backward, Basic) {
   // There isn't much to test here and this feature is really just useful for

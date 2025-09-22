@@ -7,6 +7,8 @@
 #include <initializer_list>
 #include <memory>
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 
 using Extensions::TransportSockets::Tls::ContextImplPeer;

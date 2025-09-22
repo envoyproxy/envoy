@@ -11,6 +11,8 @@
 
 using testing::ContainsRegex;
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 namespace Regex {
 namespace {

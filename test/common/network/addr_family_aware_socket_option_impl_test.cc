@@ -8,6 +8,8 @@
 
 #include "test/common/network/socket_option_test.h"
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 namespace Network {
 namespace {

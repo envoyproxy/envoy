@@ -32,6 +32,8 @@ using testing::AnyNumber;
 using testing::Return;
 using testing::StrictMock;
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 namespace Http {
 

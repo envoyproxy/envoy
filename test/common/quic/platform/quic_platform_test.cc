@@ -51,6 +51,8 @@ using quiche::getVerbosityLogThreshold;
 using quiche::setVerbosityLogThreshold;
 using testing::HasSubstr;
 
+SETUP_LOG_RECORDER;
+
 namespace quic {
 namespace {
 

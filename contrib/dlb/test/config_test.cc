@@ -10,6 +10,8 @@
 #include "contrib/envoy/extensions/network/connection_balance/dlb/v3alpha/dlb.pb.h"
 #include "gtest/gtest.h"
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 namespace Extensions {
 namespace Dlb {

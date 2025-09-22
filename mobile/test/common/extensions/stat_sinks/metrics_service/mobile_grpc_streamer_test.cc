@@ -16,6 +16,8 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {

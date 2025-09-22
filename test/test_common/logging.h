@@ -10,6 +10,7 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "absl/synchronization/mutex.h"
+#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -64,10 +65,48 @@ public:
     return copy;
   }
 
+  void start() {
+    ASSERT(!enabled_);
+    enabled_ = true;
+  }
+
+  void stop() {
+    ASSERT(enabled_);
+    enabled_ = false;
+  }
+
+  void clear() {
+    absl::MutexLock ml(&mtx_);
+    messages_.clear();
+  }
+
 private:
   mutable absl::Mutex mtx_;
   std::vector<std::string> messages_ ABSL_GUARDED_BY(mtx_);
+  std::atomic<bool> enabled_{false};
 };
+
+class LogEnvironment : public ::testing::Environment {
+public:
+  void SetUp() override {
+    Envoy::Logger::DelegatingLogSinkSharedPtr sink_ptr = Envoy::Logger::Registry::getSink();
+    log_recorder_ = std::make_unique<Envoy::LogRecordingSink>(sink_ptr);
+  }
+
+  void TearDown() override { log_recorder_.reset(); }
+
+  void start() { log_recorder_->start(); }
+
+  void stop() { log_recorder_->stop(); }
+
+  void clear() { log_recorder_->clear(); }
+
+  std::unique_ptr<LogRecordingSink> log_recorder_;
+};
+
+#define SETUP_LOG_RECORDER                                                                         \
+  ::Envoy::LogEnvironment* const log_env = static_cast<::Envoy::LogEnvironment*>(                  \
+      ::testing::AddGlobalTestEnvironment(new ::Envoy::LogEnvironment));
 
 using StringPair = std::pair<std::string, std::string>;
 
@@ -102,9 +141,11 @@ using ExpectedLogMessages = std::vector<StringPair>;
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
     Envoy::Logger::DelegatingLogSinkSharedPtr sink_ptr = Envoy::Logger::Registry::getSink();       \
     sink_ptr->setShouldEscape(escaped);                                                            \
-    Envoy::LogRecordingSink log_recorder(sink_ptr);                                                \
+    log_env->start();                                                                              \
     stmt;                                                                                          \
-    auto messages = log_recorder.messages();                                                       \
+    log_env->stop();                                                                               \
+    auto messages = log_env->log_recorder_->messages();                                            \
+    log_env->clear();                                                                              \
     if (messages.empty()) {                                                                        \
       FAIL() << "Expected message(s), but NONE was recorded.";                                     \
     }                                                                                              \
@@ -142,9 +183,11 @@ using ExpectedLogMessages = std::vector<StringPair>;
 #define EXPECT_LOG_NOT_CONTAINS(loglevel, substr, stmt)                                            \
   do {                                                                                             \
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
-    Envoy::LogRecordingSink log_recorder(Envoy::Logger::Registry::getSink());                      \
+    log_env->start();                                                                              \
     stmt;                                                                                          \
-    auto messages = log_recorder.messages();                                                       \
+    log_env->stop();                                                                               \
+    auto messages = log_env->log_recorder_->messages();                                            \
+    log_env->clear();                                                                              \
     for (const std::string& message : messages) {                                                  \
       if ((message.find(substr) != std::string::npos) &&                                           \
           (message.find(loglevel) != std::string::npos)) {                                         \
@@ -173,9 +216,11 @@ using ExpectedLogMessages = std::vector<StringPair>;
 #define EXPECT_LOG_CONTAINS_N_TIMES(loglevel, substr, expected_occurrences, stmt)                  \
   do {                                                                                             \
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
-    Envoy::LogRecordingSink log_recorder(Envoy::Logger::Registry::getSink());                      \
+    log_env->start();                                                                              \
     stmt;                                                                                          \
-    auto messages = log_recorder.messages();                                                       \
+    log_env->stop();                                                                               \
+    auto messages = log_env->log_recorder_->messages();                                            \
+    log_env->clear();                                                                              \
     uint64_t actual_occurrences = 0;                                                               \
     for (const std::string& message : messages) {                                                  \
       if ((message.find(substr) != std::string::npos) &&                                           \
@@ -198,8 +243,11 @@ using ExpectedLogMessages = std::vector<StringPair>;
   do {                                                                                             \
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
     Envoy::LogRecordingSink log_recorder(Envoy::Logger::Registry::getSink());                      \
+    log_env->start();                                                                              \
     stmt;                                                                                          \
-    const std::vector<std::string> logs = log_recorder.messages();                                 \
+    log_env->stop();                                                                               \
+    auto logs = log_env->log_recorder_->messages();                                                \
+    log_env->clear();                                                                              \
     ASSERT_EQ(0, logs.size()) << " Logs:\n   " << absl::StrJoin(logs, "   ");                      \
   } while (false)
 
@@ -211,10 +259,11 @@ using ExpectedLogMessages = std::vector<StringPair>;
     Envoy::Logger::DelegatingLogSinkSharedPtr sink_ptr = Envoy::Logger::Registry::getSink();       \
     std::string loglevel = loglevel_raw;                                                           \
     std::string substr = substr_raw;                                                               \
-    Envoy::LogRecordingSink log_recorder(sink_ptr);                                                \
+    log_env->start();                                                                              \
     stmt;                                                                                          \
+    log_env->stop();                                                                               \
     while (true) {                                                                                 \
-      auto messages = log_recorder.messages();                                                     \
+      auto messages = log_env->log_recorder_->messages();                                          \
       if (messages.empty()) {                                                                      \
         continue;                                                                                  \
       }                                                                                            \
@@ -227,6 +276,7 @@ using ExpectedLogMessages = std::vector<StringPair>;
         break;                                                                                     \
       }                                                                                            \
     }                                                                                              \
+    log_env->clear();                                                                              \
   } while (false)
 
 } // namespace Envoy

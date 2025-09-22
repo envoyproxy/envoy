@@ -11,6 +11,8 @@ using testing::HasSubstr;
 using testing::Property;
 using testing::Return;
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 namespace Server {
 

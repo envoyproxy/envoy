@@ -4,6 +4,8 @@
 #include "test/integration/integration.h"
 #include "test/test_common/test_runtime.h"
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 
 namespace {

@@ -45,6 +45,8 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::SaveArg;
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 namespace Config {
 namespace {
