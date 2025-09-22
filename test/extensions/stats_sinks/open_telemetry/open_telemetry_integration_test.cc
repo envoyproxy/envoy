@@ -245,7 +245,6 @@ public:
       envoy::extensions::stat_sinks::open_telemetry::v3::SinkConfig sink_config;
       setGrpcService(*sink_config.mutable_grpc_service(), "otlp_collector",
                      fake_upstreams_.back()->localAddress());
-      sink_config.set_enable_metric_aggregation(true);
 
       // Add custom conversion rules.
       Protobuf::TextFormat::ParseFromString(

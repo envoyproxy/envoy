@@ -254,7 +254,7 @@ OtlpOptions::OtlpOptions(const SinkConfig& sink_config,
       use_tag_extracted_name_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(sink_config, use_tag_extracted_name, true)),
       stat_prefix_(!sink_config.prefix().empty() ? sink_config.prefix() + "." : ""),
-      enable_metric_aggregation_(sink_config.enable_metric_aggregation()),
+      enable_metric_aggregation_(sink_config.has_custom_metric_conversions()),
       resource_attributes_(generateResourceAttributes(resource)),
       matcher_(createMatcher(sink_config.custom_metric_conversions(), server)) {}
 
