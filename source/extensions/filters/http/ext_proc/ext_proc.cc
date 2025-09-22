@@ -113,7 +113,7 @@ getProcessingRequestModifierConfig(const ExternalProcessor& config) {
 }
 
 absl::optional<envoy::config::core::v3::TypedExtensionConfig>
-initProcessingRequestModifierConfig(const ExtProcPerRoute& config) {
+initProcessingRequestModifierPerRouteConfig(const ExtProcPerRoute& config) {
   if (config.has_overrides() && config.overrides().has_processing_request_modifier()) {
     return config.overrides().processing_request_modifier();
   }
@@ -521,7 +521,7 @@ FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
           config.overrides().has_failure_mode_allow()
               ? absl::optional<bool>(config.overrides().failure_mode_allow().value())
               : absl::nullopt),
-      processing_request_modifier_config_(initProcessingRequestModifierConfig(config)) {}
+      processing_request_modifier_config_(initProcessingRequestModifierPerRouteConfig(config)) {}
 
 FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_specific,
                                            const FilterConfigPerRoute& more_specific)
