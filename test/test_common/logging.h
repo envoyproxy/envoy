@@ -73,9 +73,6 @@ public:
   void stop() {
     ASSERT(enabled_);
     enabled_ = false;
-  }
-
-  void clear() {
     absl::MutexLock ml(&mtx_);
     messages_.clear();
   }
@@ -95,18 +92,24 @@ public:
 
   void TearDown() override { log_recorder_.reset(); }
 
-  void start() { log_recorder_->start(); }
-
-  void stop() { log_recorder_->stop(); }
-
-  void clear() { log_recorder_->clear(); }
-
   std::unique_ptr<LogRecordingSink> log_recorder_;
 };
 
 #define SETUP_LOG_RECORDER                                                                         \
   ::Envoy::LogEnvironment* const log_env = static_cast<::Envoy::LogEnvironment*>(                  \
       ::testing::AddGlobalTestEnvironment(new ::Envoy::LogEnvironment));
+
+class StartStopRecording {
+public:
+  explicit StartStopRecording(LogEnvironment* log_env) : log_env_(log_env) {
+    log_env->log_recorder_->start();
+  }
+  const std::vector<std::string> messages() const { return log_env_->log_recorder_->messages(); }
+  ~StartStopRecording() { log_env_->log_recorder_->stop(); }
+
+private:
+  LogEnvironment* log_env_;
+};
 
 using StringPair = std::pair<std::string, std::string>;
 
@@ -141,11 +144,9 @@ using ExpectedLogMessages = std::vector<StringPair>;
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
     Envoy::Logger::DelegatingLogSinkSharedPtr sink_ptr = Envoy::Logger::Registry::getSink();       \
     sink_ptr->setShouldEscape(escaped);                                                            \
-    log_env->start();                                                                              \
+    ::Envoy::StartStopRecording recording(log_env);                                                \
     stmt;                                                                                          \
-    log_env->stop();                                                                               \
-    auto messages = log_env->log_recorder_->messages();                                            \
-    log_env->clear();                                                                              \
+    auto messages = recording.messages();                                                          \
     if (messages.empty()) {                                                                        \
       FAIL() << "Expected message(s), but NONE was recorded.";                                     \
     }                                                                                              \
@@ -183,11 +184,9 @@ using ExpectedLogMessages = std::vector<StringPair>;
 #define EXPECT_LOG_NOT_CONTAINS(loglevel, substr, stmt)                                            \
   do {                                                                                             \
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
-    log_env->start();                                                                              \
+    ::Envoy::StartStopRecording recording(log_env);                                                \
     stmt;                                                                                          \
-    log_env->stop();                                                                               \
-    auto messages = log_env->log_recorder_->messages();                                            \
-    log_env->clear();                                                                              \
+    auto messages = recording.messages();                                                          \
     for (const std::string& message : messages) {                                                  \
       if ((message.find(substr) != std::string::npos) &&                                           \
           (message.find(loglevel) != std::string::npos)) {                                         \
@@ -216,11 +215,9 @@ using ExpectedLogMessages = std::vector<StringPair>;
 #define EXPECT_LOG_CONTAINS_N_TIMES(loglevel, substr, expected_occurrences, stmt)                  \
   do {                                                                                             \
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
-    log_env->start();                                                                              \
+    ::Envoy::StartStopRecording recording(log_env);                                                \
     stmt;                                                                                          \
-    log_env->stop();                                                                               \
-    auto messages = log_env->log_recorder_->messages();                                            \
-    log_env->clear();                                                                              \
+    auto messages = recording.messages();                                                          \
     uint64_t actual_occurrences = 0;                                                               \
     for (const std::string& message : messages) {                                                  \
       if ((message.find(substr) != std::string::npos) &&                                           \
@@ -243,11 +240,9 @@ using ExpectedLogMessages = std::vector<StringPair>;
   do {                                                                                             \
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
     Envoy::LogRecordingSink log_recorder(Envoy::Logger::Registry::getSink());                      \
-    log_env->start();                                                                              \
+    ::Envoy::StartStopRecording recording(log_env);                                                \
     stmt;                                                                                          \
-    log_env->stop();                                                                               \
-    auto logs = log_env->log_recorder_->messages();                                                \
-    log_env->clear();                                                                              \
+    auto logs = recording.messages();                                                              \
     ASSERT_EQ(0, logs.size()) << " Logs:\n   " << absl::StrJoin(logs, "   ");                      \
   } while (false)
 
@@ -259,11 +254,10 @@ using ExpectedLogMessages = std::vector<StringPair>;
     Envoy::Logger::DelegatingLogSinkSharedPtr sink_ptr = Envoy::Logger::Registry::getSink();       \
     std::string loglevel = loglevel_raw;                                                           \
     std::string substr = substr_raw;                                                               \
-    log_env->start();                                                                              \
+    ::Envoy::StartStopRecording recording(log_env);                                                \
     stmt;                                                                                          \
-    log_env->stop();                                                                               \
     while (true) {                                                                                 \
-      auto messages = log_env->log_recorder_->messages();                                          \
+      auto messages = recording.messages();                                                        \
       if (messages.empty()) {                                                                      \
         continue;                                                                                  \
       }                                                                                            \
@@ -276,7 +270,6 @@ using ExpectedLogMessages = std::vector<StringPair>;
         break;                                                                                     \
       }                                                                                            \
     }                                                                                              \
-    log_env->clear();                                                                              \
   } while (false)
 
 } // namespace Envoy
