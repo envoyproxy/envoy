@@ -31,7 +31,7 @@ behavior_changes:
     ``FULL_DUPLEX_STREAMED`` configuration combination.
 - area: load balancing
   change: |
-    Moved locality WRR structures out of HostSetImpl and into a separate class. Locality WRR schedulers are now by default owned
+    Moved locality WRR structures out of ``HostSetImpl`` and into a separate class. Locality WRR schedulers are now by default owned
     and constructed by the underlying Zone Aware LB, instead of owned and constructed by the Host Set. There should be no visible
     behavior change for existing users of Zone Aware LBs.
 
@@ -45,8 +45,8 @@ minor_behavior_changes:
     reach the configured size but has been held for more than 15 seconds, it will be sent immediately.
 - area: websocket
   change: |
-      Allow 4xx and 5xx to go through the filter chain for websocket handshake response check, and the behavior can be
-      disabled by the runtime guard ``envoy.reloadable_features.websocket_allow_4xx_5xx_through_filter_chain``.
+    Allow 4xx and 5xx to go through the filter chain for the WebSocket handshake response check. This behavior can be
+    disabled by the runtime guard ``envoy.reloadable_features.websocket_allow_4xx_5xx_through_filter_chain``.
 - area: testing
   change: |
     In test code for external extensions, matchers ``Http::HeaderValueOf``, ``HasHeader``, and ``HeaderHasValueRef``
@@ -59,7 +59,7 @@ minor_behavior_changes:
     ``envoy.reloadable_features.generic_proxy_codec_buffer_limit`` to ``false``.
 - area: http3
   change: |
-    Turn off HTTP/3 happy eyeballs in upstream via runtime guard ``envoy.reloadable_features.http3_happy_eyeballs``.
+    Turned off HTTP/3 happy eyeballs in upstream via the runtime guard ``envoy.reloadable_features.http3_happy_eyeballs``.
     It was found to favor TCP over QUIC when UDP does not work on IPv6 but works on IPv4.
 - area: mobile
   change: |
@@ -70,7 +70,7 @@ minor_behavior_changes:
   change: |
     Added accounting for decompressed HTTP header bytes sent and received. Existing stats only count wire-encoded header bytes.
     This can be accessed through the ``%UPSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED%``,
-    ``%DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED%``, ``%UPSTREAM_DECOMPRESSED_HEADER_BYTES_SENT%``, and the
+    ``%DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_RECEIVED%``, ``%UPSTREAM_DECOMPRESSED_HEADER_BYTES_SENT%``, and
     ``%DOWNSTREAM_DECOMPRESSED_HEADER_BYTES_SENT%`` access log command operators.
 - area: oauth2
   change: |
@@ -85,16 +85,21 @@ minor_behavior_changes:
     Honor the default DNS resolver configuration in the bootstrap config
     :ref:`typed_dns_resolver_config <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.typed_dns_resolver_config>` if the
     :ref:`client_config <envoy_v3_api_field_extensions.filters.udp.dns_filter.v3.DnsFilterConfig.client_config>` is empty.
+- area: grpc_json_transcoder
+  change: |
+    Cap the frame size for streamed grpc at 1MB. Without this change there was a small chance
+    that if a request streamed in sufficiently faster than it was processed, a frame larger than
+    4MB could be encoded, which most upstream grpc services would, by default, treat as an error.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
 - area: tcp_proxy
-  change:
-    Fixes a bug when downstream TCP connection is created and the upstream connection isn't fully established, no idle timeout
-    is set on the downstream connection, which may lead to connection leak if the client doesn't close the connection.
+  change: |
+    Fixed a bug where when a downstream TCP connection is created and the upstream connection is not fully established, no idle timeout
+    is set on the downstream connection, which may lead to a connection leak if the client does not close the connection.
     The fix is to set an idle timeout on the downstream connection immediately after creation.
-    This fix can be reverted by setting runtime guard ``envoy.reloadable_features.tcp_proxy_set_idle_timer_immediately_on_new_connection``
-    to ``false``.
+    This fix can be reverted by setting the runtime guard
+    ``envoy.reloadable_features.tcp_proxy_set_idle_timer_immediately_on_new_connection`` to ``false``.
 - area: udp_proxy
   change: |
     Fixed a crash in the UDP proxy that occurred during ``ENVOY_SIGTERM`` when active tunneling sessions were present.
@@ -106,14 +111,14 @@ bug_fixes:
     `libmaxminddb.md <https://github.com/maxmind/libmaxminddb/blob/main/doc/libmaxminddb.md#mmdb_lookup_result_s>`_.
 - area: http3
   change: |
-    Fixed a bug where access log gets skipped for HTTP/3 requests when the stream is half closed. This behavior can be
+    Fixed a bug where the access log was skipped for HTTP/3 requests when the stream was half closed. This behavior can be
     reverted by setting the runtime guard
     ``envoy.reloadable_features.quic_fix_defer_logging_miss_for_half_closed_stream`` to ``false``.
 - area: http
   change: |
-    Fixed a bug where the premature resets of streams may result in the recursive draining and potential
-    stack overflow. Setting proper ``max_concurrent_streams`` value for HTTP/2 or HTTP/3 could eliminate
-    the risk of the stack overflow before this fix.
+    Fixed a bug where premature resets of streams could result in recursive draining and a potential
+    stack overflow. Setting a proper ``max_concurrent_streams`` value for HTTP/2 or HTTP/3 could eliminate
+    the risk of a stack overflow before this fix.
 - area: listener
   change: |
     Fixed a bug where comparing listeners did not consider the network namespace they were listening in.
@@ -126,7 +131,7 @@ bug_fixes:
     Fixed a bug where the ``%TRACE_ID%`` command cannot work properly at the header mutations.
 - area: listeners
   change: |
-    Fixed issue where :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` timed out
+    Fixed an issue where :ref:`TLS inspector listener filter <config_listener_filters_tls_inspector>` timed out
     when used with other listener filters. The bug was triggered when a previous listener filter processed more data
     than the TLS inspector had requested, causing the TLS inspector to incorrectly calculate its buffer growth strategy.
     The fix ensures that buffer growth is now based on actual bytes available rather than the previously requested amount.
@@ -135,7 +140,7 @@ bug_fixes:
     Added missing session name, session duration, and ``external_id`` parameters in AssumeRole credentials provider.
 - area: oauth2
   change: |
-    Fixed a bug introduced in PR [#40228](https://github.com/envoyproxy/envoy/pull/40228), where OAuth2 cookies were
+    Fixed a bug introduced in PR `#40228 <https://github.com/envoyproxy/envoy/pull/40228>`_, where OAuth2 cookies were
     removed for requests matching the ``pass_through_matcher`` configuration. This broke setups with multiple OAuth2
     filter instances using different ``pass_through_matcher`` configurations, because the first matching instance removed
     the OAuth2 cookies--even when a passthrough was intended--impacting subsequent filters that still needed those cookies.
@@ -155,7 +160,7 @@ bug_fixes:
     Forwarding Proxy and Router filters.
 - area: release
   change: |
-    Fix distroless image to ensure nonroot.
+    Fixed the distroless image to ensure nonroot.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -262,7 +267,7 @@ new_features:
     during the metric flush.
 - area: tap
   change: |
-    Add :ref:`record_upstream_connection <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_upstream_connection>`
+    Added :ref:`record_upstream_connection <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_upstream_connection>`
     to determine whether upstream connection information is recorded in the HTTP buffer trace output.
 - area: quic
   change: |
@@ -291,7 +296,7 @@ new_features:
     dynamic metadata for routing decisions.
 - area: lua
   change: |
-    Added a new ``filterState()`` on ``streamInfo()`` which provides access to filter state objects stored during request processing.
+    Added a new ``filterState()`` to ``streamInfo()`` which provides access to filter state objects stored during request processing.
     This allows Lua scripts to retrieve string, boolean, and numeric values stored by various filters for use in routing decisions,
     header modifications, and other processing logic. See :ref:`Filter State API <config_http_filters_lua_stream_info_filter_state_wrapper>`
     for more details.
@@ -310,11 +315,11 @@ new_features:
     will take precedence over this field.
 - area: redis
   change: |
-    Added support for 33 new Redis commands including COPY, RPOPLPUSH, SMOVE, SUNION, SDIFF,
-    SINTER, SINTERSTORE, ZUNIONSTORE, ZINTERSTORE, PFMERGE, GEORADIUS, GEORADIUSBYMEMBER,
-    RENAME, SORT, SORT_RO, ZMSCORE, SDIFFSTORE, MSETNX, SUBSTR, ZRANGESTORE, ZUNION, ZDIFF,
-    SUNIONSTORE, SMISMEMBER, HRANDFIELD, GEOSEARCHSTORE, ZDIFFSTORE, ZINTER, ZRANDMEMBER,
-    BITOP, LPOS, RENAMENX.
+    Added support for thirty-three new Redis commands including ``COPY``, ``RPOPLPUSH``, ``SMOVE``, ``SUNION``, ``SDIFF``,
+    ``SINTER``, ``SINTERSTORE``, ``ZUNIONSTORE``, ``ZINTERSTORE``, ``PFMERGE``, ``GEORADIUS``, ``GEORADIUSBYMEMBER``,
+    ``RENAME``, ``SORT``, ``SORT_RO``, ``ZMSCORE``, ``SDIFFSTORE``, ``MSETNX``, ``SUBSTR``, ``ZRANGESTORE``, ``ZUNION``,
+    ``ZDIFF``, ``SUNIONSTORE``, ``SMISMEMBER``, ``HRANDFIELD``, ``GEOSEARCHSTORE``, ``ZDIFFSTORE``, ``ZINTER``, ``ZRANDMEMBER``,
+    ``BITOP``, ``LPOS``, ``RENAMENX``.
 - area: observability
   change: |
     Added ``ENVOY_NOTIFICATION`` macro to track specific conditions in production environments.
@@ -377,25 +382,25 @@ new_features:
   change: |
     Enhanced Zipkin tracer with advanced collector configuration via
     :ref:`collector_service <envoy_v3_api_field_config.trace.v3.ZipkinConfig.collector_service>`
-    using HttpService. New features include:
+    using ``HttpService``. New features include:
 
-    1. **Custom HTTP Headers**: Add headers to collector requests for custom metadata, service identification,
+    #. **Custom HTTP Headers**: Add headers to collector requests for custom metadata, service identification,
        and collector-specific routing.
 
-    2. **Full URI Parsing**: The ``uri`` field now supports both path-only (``/api/v2/spans``) and
+    #. **Full URI Parsing**: The ``uri`` field now supports both path-only (``/api/v2/spans``) and
        full URI formats (``https://zipkin-collector.example.com/api/v2/spans``). When using full URIs,
        Envoy automatically extracts hostname and path components - hostname sets the HTTP ``Host`` header,
-       and path sets the request path. Path-only URIs fallback to using cluster name as hostname.
+       and path sets the request path. Path-only URIs fall back to using the cluster name as the hostname.
 
-    When configured, collector_service takes precedence over legacy configuration fields (collector_cluster,
-    collector_endpoint, collector_hostname), which will be deprecated in a future release. Legacy configuration
+    When configured, ``collector_service`` takes precedence over legacy configuration fields (``collector_cluster``,
+    ``collector_endpoint``, ``collector_hostname``), which will be deprecated in a future release. Legacy configuration
     does not support custom headers or URI parsing.
 - area: composite
   change: |
-    Allow composite filter to be configured to insert a filter into the filter chain outside of the decode headers lifecycle phase.
+    Allow the composite filter to be configured to insert a filter into the filter chain outside of the decode headers lifecycle phase.
 - area: rbac
   change: |
-    Switch the IP matcher to use LC-Trie for performance improvements.
+    Switched the IP matcher to use LC-Trie for performance improvements.
 - area: tls_inspector
   change: |
     Added dynamic metadata when failing to parse the ``ClientHello``.
@@ -412,7 +417,7 @@ new_features:
     so as to not break compatibility with the existing command's behavior.
 - area: dynamic_modules
   change: |
-    Added a new Logging ABI that allows modules to emit logs in the standard Envoy logging stream under "dynamic_modules" ID.
+    Added a new Logging ABI that allows modules to emit logs in the standard Envoy logging stream under ``dynamic_modules`` ID.
     In the Rust SDK, they are available as ``envoy_log_info``, etc.
 - area: http
   change: |
@@ -433,7 +438,7 @@ new_features:
   change: |
     Added a new metric ``db_build_epoch`` to track the build timestamp of the MaxMind geolocation database files.
     This can be used to monitor the freshness of the databases currently in use by the filter.
-    See https://maxmind.github.io/MaxMind-DB/#build_epoch for more details.
+    See `MaxMind-DB build_epoch <https://maxmind.github.io/MaxMind-DB/#build_epoch>`_ for more details.
 - area: overload management
   change: |
     Added a new scaled timer type ``HttpDownstreamStreamFlush`` to the overload manager. This allows
@@ -448,6 +453,6 @@ new_features:
     Added :ref:`max_udp_channel_duration
     <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.max_udp_channel_duration>`
     configuration field to the c-ares DNS resolver. This allows periodic refresh of the UDP channel
-    to help with avoiding stale socket states, and providing better load distribution across UDP ports.
+    to help avoid stale socket states and provide better load distribution across UDP ports.
 
 deprecated:
