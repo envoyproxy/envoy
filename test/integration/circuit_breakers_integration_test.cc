@@ -359,7 +359,8 @@ TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteNon5xxAsErrors) {
 
   codec_client_->close();
 }
-
+// Test verifies that 5xx gateway errors configured in cluster protocol options are
+// forwarded to outlier detection in the original form and are not converted to code 500.
 TEST_P(OutlierDetectionIntegrationTest, ClusterOverwriteGatewayErrors) {
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
