@@ -491,6 +491,7 @@ public:
   const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
   absl::optional<bool> traceSampled() const override { return trace_sampled_; }
   bool disableShadowHostSuffixAppend() const override { return disable_shadow_host_suffix_append_; }
+  const Http::HeaderEvaluator& headerEvaluator() const override;
 
 private:
   explicit ShadowPolicyImpl(const RequestMirrorPolicy& config, absl::Status& creation_status);
@@ -501,6 +502,7 @@ private:
   envoy::type::v3::FractionalPercent default_value_;
   absl::optional<bool> trace_sampled_;
   const bool disable_shadow_host_suffix_append_;
+  Router::HeaderParserPtr request_headers_parser_;
 };
 
 /**

@@ -5035,7 +5035,9 @@ std::shared_ptr<ShadowPolicyImpl>
 makeShadowPolicy(std::string cluster = "", std::string cluster_header = "",
                  absl::optional<std::string> runtime_key = absl::nullopt,
                  absl::optional<envoy::type::v3::FractionalPercent> default_value = absl::nullopt,
-                 bool trace_sampled = true) {
+                 bool trace_sampled = true,
+                 std::vector<std::pair<std::string, std::string>> headers_to_add = {},
+                 std::vector<std::string> headers_to_remove = {}) {
   envoy::config::route::v3::RouteAction::RequestMirrorPolicy policy;
   policy.set_cluster(cluster);
   policy.set_cluster_header(cluster_header);
@@ -5046,6 +5048,16 @@ makeShadowPolicy(std::string cluster = "", std::string cluster_header = "",
     *policy.mutable_runtime_fraction()->mutable_default_value() = default_value.value();
   }
   policy.mutable_trace_sampled()->set_value(trace_sampled);
+
+  for (const auto& header_pair : headers_to_add) {
+    auto* header = policy.add_request_headers_to_add();
+    header->mutable_header()->set_key(header_pair.first);
+    header->mutable_header()->set_value(header_pair.second);
+  }
+
+  for (const auto& header_name : headers_to_remove) {
+    policy.add_request_headers_to_remove(header_name);
+  }
 
   return THROW_OR_RETURN_VALUE(ShadowPolicyImpl::create(policy), std::shared_ptr<ShadowPolicyImpl>);
 }
@@ -5273,6 +5285,66 @@ TEST_P(RouterShadowingTest, ShadowRequestCarriesParentContext) {
 
   EXPECT_CALL(foo_request, removeWatermarkCallbacks());
   EXPECT_CALL(foo_request, cancel());
+
+  router_->onDestroy();
+}
+
+TEST_P(RouterShadowingTest, ShadowWithHeaderManipulation) {
+  ShadowPolicyPtr policy =
+      makeShadowPolicy("foo", "", "bar", absl::nullopt, true,
+                       {{"x-mirror-test", "mirror-value"}, {"x-mirror-static", "static-value"}},
+                       {"x-sensitive-header", "authorization"});
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
+  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
+
+  NiceMock<Http::MockRequestEncoder> encoder;
+  Http::ResponseDecoder* response_decoder = nullptr;
+  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
+
+  expectResponseTimerCreate();
+
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
+                     43))
+      .WillOnce(Return(true));
+
+  Http::TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  headers.setCopy(Http::LowerCaseString("x-sensitive-header"), "secret");
+  headers.setCopy(Http::LowerCaseString("authorization"), "Bearer token123");
+
+  NiceMock<Http::MockAsyncClient> foo_client;
+  NiceMock<Http::MockAsyncClientOngoingRequest> foo_request(&foo_client);
+
+  EXPECT_CALL(*shadow_writer_, streamingShadow_("foo", _, _))
+      .WillOnce(Invoke([&](const std::string&, Http::RequestHeaderMapPtr& shadow_headers,
+                           const Http::AsyncClient::RequestOptions&) {
+        // Verify headers were added
+        EXPECT_EQ("mirror-value", shadow_headers->get(Http::LowerCaseString("x-mirror-test"))[0]
+                                      ->value()
+                                      .getStringView());
+        EXPECT_EQ("static-value", shadow_headers->get(Http::LowerCaseString("x-mirror-static"))[0]
+                                      ->value()
+                                      .getStringView());
+
+        // Verify headers were removed
+        EXPECT_TRUE(shadow_headers->get(Http::LowerCaseString("x-sensitive-header")).empty());
+        EXPECT_TRUE(shadow_headers->get(Http::LowerCaseString("authorization")).empty());
+
+        return &foo_request;
+      }));
+
+  router_->decodeHeaders(headers, false);
+
+  Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
+  EXPECT_CALL(callbacks_, addDecodedData(_, true)).Times(0);
+  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, true));
+
+  response_decoder->decodeHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
+                                      Http::TestResponseHeaderMapImpl{{":status", "200"}}),
+                                  true);
+  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
 
   router_->onDestroy();
 }

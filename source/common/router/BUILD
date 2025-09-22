@@ -489,6 +489,7 @@ envoy_cc_library(
     ],
     hdrs = ["header_parser.h"],
     deps = [
+        "//envoy/formatter:substitution_formatter_interface",
         "//envoy/http:header_evaluator",
         "//envoy/http:header_map_interface",
         "//source/common/formatter:substitution_formatter_lib",

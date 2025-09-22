@@ -833,7 +833,7 @@ message RouteAction {
   // .. note::
   //
   //   Shadowing doesn't support Http CONNECT and upgrades.
-  // [#next-free-field: 7]
+  // [#next-free-field: 9]
   message RequestMirrorPolicy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteAction.RequestMirrorPolicy";
@@ -885,6 +885,21 @@ message RouteAction {
 
     // Disables appending the ``-shadow`` suffix to the shadowed ``Host`` header. Defaults to ``false``.
     bool disable_shadow_host_suffix_append = 6;
+
+    // Specifies a list of HTTP headers that should be added to each mirrored request.
+    // Headers specified here take precedence over any headers with the same name
+    // from the original request. For more information, including details on header value syntax, see
+    // the documentation on :ref:`custom request headers
+    // <config_http_conn_man_headers_custom_request_headers>`.
+    repeated core.v3.HeaderValueOption request_headers_to_add = 7
+        [(validate.rules).repeated = {max_items: 1000}];
+
+    // Specifies a list of HTTP headers that should be removed from each request that is sent to the
+    // health checked cluster.
+    repeated string request_headers_to_remove = 8 [(validate.rules).repeated = {
+      items {string {well_known_regex: HTTP_HEADER_NAME strict: false}}
+    }];
+
   }
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer

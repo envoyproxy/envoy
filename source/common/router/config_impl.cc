@@ -451,6 +451,21 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config, absl::Stat
   // disabled.
   trace_sampled_ = config.has_trace_sampled() ? absl::optional<bool>(config.trace_sampled().value())
                                               : absl::nullopt;
+
+  // Create HeaderParser for header manipulation
+  if (!config.request_headers_to_add().empty() || !config.request_headers_to_remove().empty()) {
+    auto parser_or_error = Router::HeaderParser::configure(config.request_headers_to_add(),
+                                                           config.request_headers_to_remove());
+    SET_AND_RETURN_IF_NOT_OK(parser_or_error.status(), creation_status);
+    request_headers_parser_ = std::move(parser_or_error.value());
+  }
+}
+
+const Http::HeaderEvaluator& ShadowPolicyImpl::headerEvaluator() const {
+  if (request_headers_parser_) {
+    return *request_headers_parser_;
+  }
+  return HeaderParser::defaultParser();
 }
 
 DecoratorImpl::DecoratorImpl(const envoy::config::route::v3::Decorator& decorator)
