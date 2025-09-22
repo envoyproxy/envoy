@@ -10,13 +10,15 @@
 namespace Envoy {
 namespace {
 
-class XdsGrpcClientCacheTest
+// Test class to test the behavior of shared v/s unique gRPC clients for ADS and
+// LRS.
+class AdsLrsGrpcClientCacheTest
     : public Grpc::BaseGrpcClientIntegrationParamTest,
       public HttpIntegrationTest,
       public testing::TestWithParam<
           std::tuple<Network::Address::IpVersion, Grpc::ClientType, std::string>> {
 public:
-  XdsGrpcClientCacheTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {
+  AdsLrsGrpcClientCacheTest() : HttpIntegrationTest(Http::CodecType::HTTP2, ipVersion()) {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     setCachedGrpcCLientForXdsFeatureValue();
   }
@@ -108,15 +110,15 @@ private:
 };
 
 INSTANTIATE_TEST_SUITE_P(
-    IpVersions, XdsGrpcClientCacheTest,
+    IpVersions, AdsLrsGrpcClientCacheTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                      testing::ValuesIn(TestEnvironment::getsGrpcVersionsForTest()),
                      testing::Values("true", "false")),
-    XdsGrpcClientCacheTest::testParamsToString);
+    AdsLrsGrpcClientCacheTest::testParamsToString);
 
 // Verify that using shared clients does not result in any crashes in an
 // integration test.
-TEST_P(XdsGrpcClientCacheTest, Basic) {
+TEST_P(AdsLrsGrpcClientCacheTest, Basic) {
   initialize();
 
   // Envoy will start and connect to the fake upstream for ADS.
