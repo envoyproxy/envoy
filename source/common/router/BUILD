@@ -348,6 +348,17 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "upstream_to_downstream_impl_base",
+    srcs = [
+        "upstream_to_downstream_impl_base.h",
+    ],
+    deps = [
+        "//envoy/router:router_interface",
+        "//source/common/http:response_decoder_impl_base",
+    ],
+)
+
+envoy_cc_library(
     name = "router_lib",
     srcs = [
         "router.cc",
@@ -364,6 +375,7 @@ envoy_cc_library(
         ":metadatamatchcriteria_lib",
         ":retry_state_lib",
         ":upstream_codec_filter_lib",
+        ":upstream_to_downstream_impl_base",
         "//envoy/event:dispatcher_interface",
         "//envoy/event:timer_interface",
         "//envoy/grpc:status",
@@ -422,6 +434,7 @@ envoy_cc_library(
     ],
     deps = [
         ":config_lib",
+        ":upstream_to_downstream_impl_base",
         "//envoy/event:dispatcher_interface",
         "//envoy/http:codec_interface",
         "//envoy/http:filter_interface",

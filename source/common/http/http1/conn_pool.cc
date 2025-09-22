@@ -30,6 +30,13 @@ ActiveClient::StreamWrapper::StreamWrapper(ResponseDecoder& response_decoder, Ac
   RequestEncoderWrapper::inner_encoder_->getStream().addCallbacks(*this);
 }
 
+ActiveClient::StreamWrapper::StreamWrapper(ResponseDecoderHandlePtr response_decoder_handle,
+                                           ActiveClient& parent)
+    : ResponseDecoderWrapper(std::move(response_decoder_handle)),
+      RequestEncoderWrapper(&parent.codec_client_->newStream(*this)), parent_(parent) {
+  RequestEncoderWrapper::inner_encoder_->getStream().addCallbacks(*this);
+}
+
 ActiveClient::StreamWrapper::~StreamWrapper() {
   // Upstream connection might be closed right after response is complete. Setting delay=true
   // here to attach pending requests in next dispatcher loop to handle that case.
@@ -89,6 +96,12 @@ bool ActiveClient::closingWithIncompleteStream() const {
 RequestEncoder& ActiveClient::newStreamEncoder(ResponseDecoder& response_decoder) {
   ASSERT(!stream_wrapper_);
   stream_wrapper_ = std::make_unique<StreamWrapper>(response_decoder, *this);
+  return *stream_wrapper_;
+}
+
+RequestEncoder& ActiveClient::newStreamEncoder(ResponseDecoderHandlePtr response_decoder_handle) {
+  ASSERT(!stream_wrapper_);
+  stream_wrapper_ = std::make_unique<StreamWrapper>(std::move(response_decoder_handle), *this);
   return *stream_wrapper_;
 }
 

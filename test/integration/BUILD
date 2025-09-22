@@ -1196,6 +1196,7 @@ envoy_cc_test_library(
         "//envoy/http:header_map_interface",
         "//envoy/http:metadata_interface",
         "//source/common/common:dump_state_utils",
+        "//source/common/http:response_decoder_impl_base",
         "//test/test_common:utility_lib",
     ],
 )
@@ -1391,6 +1392,7 @@ envoy_cc_test_library(
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
         "//source/common/http:codec_client_lib",
+        "//source/common/http:response_decoder_impl_base",
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/common/quic:quic_stat_names_lib",
