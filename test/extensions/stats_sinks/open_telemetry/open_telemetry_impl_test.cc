@@ -599,7 +599,7 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationCounter) 
                      name: "stat_full_name_match_input"
                      typed_config {
                        [type.googleapis.com/
-                        envoy.type.matcher.v3.StatFullNameMatchInput] {}
+                        envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
                      }
                    }
                    value_match { safe_regex { regex: "test_counter-1" } }
@@ -624,7 +624,7 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationCounter) 
                      name: "stat_full_name_match_input"
                      typed_config {
                        [type.googleapis.com/
-                        envoy.type.matcher.v3.StatFullNameMatchInput] {}
+                        envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
                      }
                    }
                    value_match { safe_regex { regex: "test_counter-." } }
@@ -695,7 +695,7 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationGauge) {
                      name: "stat_full_name_match_input"
                      typed_config {
                        [type.googleapis.com/
-                        envoy.type.matcher.v3.StatFullNameMatchInput] {}
+                        envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
                      }
                    }
                    value_match { safe_regex { regex: "test_gauge-1" } }
@@ -720,7 +720,7 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationGauge) {
                      name: "stat_full_name_match_input"
                      typed_config {
                        [type.googleapis.com/
-                        envoy.type.matcher.v3.StatFullNameMatchInput] {}
+                        envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
                      }
                    }
                    value_match { safe_regex { regex: "test_gauge-." } }
@@ -790,7 +790,7 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationHistogram
                      name: "stat_full_name_match_input"
                      typed_config {
                        [type.googleapis.com/
-                        envoy.type.matcher.v3.StatFullNameMatchInput] {}
+                        envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
                      }
                    }
                    value_match { safe_regex { regex: "test_histogram-1" } }
@@ -815,7 +815,7 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithLabelsAggregationHistogram
                      name: "stat_full_name_match_input"
                      typed_config {
                        [type.googleapis.com/
-                        envoy.type.matcher.v3.StatFullNameMatchInput] {}
+                        envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
                      }
                    }
                    value_match { safe_regex { regex: "test_histogram-." } }
@@ -896,7 +896,7 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithStaticMetricLabels) {
                   name: "stat_full_name_match_input"
                   typed_config {
                     [type.googleapis.com/
-                     envoy.type.matcher.v3.StatFullNameMatchInput] {}
+                     envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
                   }
                 }
                 value_match {
@@ -929,7 +929,7 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithStaticMetricLabels) {
                   name: "stat_full_name_match_input"
                   typed_config {
                     [type.googleapis.com/
-                     envoy.type.matcher.v3.StatFullNameMatchInput] {}
+                     envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
                   }
                 }
                 value_match {
@@ -962,7 +962,7 @@ TEST_F(OtlpMetricsFlusherAggregationTests, MetricsWithStaticMetricLabels) {
                   name: "stat_full_name_match_input"
                   typed_config {
                     [type.googleapis.com/
-                     envoy.type.matcher.v3.StatFullNameMatchInput] {}
+                     envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput] {}
                   }
                 }
                 value_match {
