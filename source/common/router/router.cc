@@ -1159,6 +1159,10 @@ void Filter::applyShadowPolicyHeaders(const ShadowPolicy& shadow_policy,
   const Envoy::Formatter::HttpFormatterContext formatter_context{&headers};
   shadow_policy.headerEvaluator().evaluateHeaders(headers, formatter_context,
                                                   callbacks_->streamInfo());
+
+  if (!shadow_policy.hostRewriteLiteral().empty()) {
+    headers.setHost(shadow_policy.hostRewriteLiteral());
+  }
 }
 
 void Filter::onRequestComplete() {

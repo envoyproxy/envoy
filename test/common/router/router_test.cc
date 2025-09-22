@@ -5031,13 +5031,12 @@ TEST_F(RouterTest, ResponseHeadersTCopyCopiesHeadersOrClears) {
 
 namespace {
 
-std::shared_ptr<ShadowPolicyImpl>
-makeShadowPolicy(std::string cluster = "", std::string cluster_header = "",
-                 absl::optional<std::string> runtime_key = absl::nullopt,
-                 absl::optional<envoy::type::v3::FractionalPercent> default_value = absl::nullopt,
-                 bool trace_sampled = true,
-                 std::vector<std::pair<std::string, std::string>> headers_to_add = {},
-                 std::vector<std::string> headers_to_remove = {}) {
+std::shared_ptr<ShadowPolicyImpl> makeShadowPolicy(
+    std::string cluster = "", std::string cluster_header = "",
+    absl::optional<std::string> runtime_key = absl::nullopt,
+    absl::optional<envoy::type::v3::FractionalPercent> default_value = absl::nullopt,
+    bool trace_sampled = true, std::vector<std::pair<std::string, std::string>> headers_to_add = {},
+    std::vector<std::string> headers_to_remove = {}, std::string host_rewrite_literal = "") {
   envoy::config::route::v3::RouteAction::RequestMirrorPolicy policy;
   policy.set_cluster(cluster);
   policy.set_cluster_header(cluster_header);
@@ -5057,6 +5056,10 @@ makeShadowPolicy(std::string cluster = "", std::string cluster_header = "",
 
   for (const auto& header_name : headers_to_remove) {
     policy.add_request_headers_to_remove(header_name);
+  }
+
+  if (!host_rewrite_literal.empty()) {
+    policy.set_host_rewrite_literal(host_rewrite_literal);
   }
 
   return THROW_OR_RETURN_VALUE(ShadowPolicyImpl::create(policy), std::shared_ptr<ShadowPolicyImpl>);

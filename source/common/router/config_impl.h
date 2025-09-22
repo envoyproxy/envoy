@@ -490,8 +490,11 @@ public:
   const std::string& runtimeKey() const override { return runtime_key_; }
   const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
   absl::optional<bool> traceSampled() const override { return trace_sampled_; }
-  bool disableShadowHostSuffixAppend() const override { return disable_shadow_host_suffix_append_; }
+  bool disableShadowHostSuffixAppend() const override {
+    return disable_shadow_host_suffix_append_ || !host_rewrite_literal_.empty();
+  }
   const Http::HeaderEvaluator& headerEvaluator() const override;
+  absl::string_view hostRewriteLiteral() const override { return host_rewrite_literal_; }
 
 private:
   explicit ShadowPolicyImpl(const RequestMirrorPolicy& config, absl::Status& creation_status);
@@ -502,6 +505,7 @@ private:
   envoy::type::v3::FractionalPercent default_value_;
   absl::optional<bool> trace_sampled_;
   const bool disable_shadow_host_suffix_append_;
+  const std::string host_rewrite_literal_;
   Router::HeaderParserPtr request_headers_parser_;
 };
 
