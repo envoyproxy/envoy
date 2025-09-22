@@ -419,4 +419,16 @@ new_features:
 - area: dynamic_modules
   change: |
     Added support for counters, gauges, histograms, and their vector variants to the dynamic modules API.
+- area: router
+  change: |
+    Added support for :ref:`request_headers_to_add
+    <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.request_headers_to_add>` and
+    :ref:`request_headers_to_remove
+    <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.request_headers_to_remove>` in
+    :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>` to enable header
+    manipulation for mirror requests.
+    Added support for :ref:`host_rewrite_literal
+    <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.host_rewrite_literal>` in
+    :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>` to enable
+    host header rewrite for mirror requests.
 deprecated:
