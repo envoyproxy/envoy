@@ -1087,17 +1087,15 @@ TEST_F(OAuth2Test, SetBearerTokenWithDisableTokenEncryptionConfig) {
   TestScopedRuntime scoped_runtime;
   scoped_runtime.mergeValues({{"envoy.reloadable_features.oauth2_encrypt_tokens", "true"}});
 
-  constexpr auto DisabledSameSite =
-      ::envoy::extensions::filters::http::oauth2::v3::CookieConfig_SameSite::
-          CookieConfig_SameSite_DISABLED;
+  constexpr auto DisabledSameSite = ::envoy::extensions::filters::http::oauth2::v3::
+      CookieConfig_SameSite::CookieConfig_SameSite_DISABLED;
 
-  init(getConfig(
-      false /* forward_bearer_token */, true /* use_refresh_token */,
-      ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
-          OAuth2Config_AuthType_URL_ENCODED_BODY,
-      0, false, false, false, false, false, DisabledSameSite, DisabledSameSite, DisabledSameSite,
-      DisabledSameSite, DisabledSameSite, DisabledSameSite, DisabledSameSite, 0, 0,
-      true /* disable_token_encryption */));
+  init(getConfig(false /* forward_bearer_token */, true /* use_refresh_token */,
+                 ::envoy::extensions::filters::http::oauth2::v3::OAuth2Config_AuthType::
+                     OAuth2Config_AuthType_URL_ENCODED_BODY,
+                 0, false, false, false, false, false, DisabledSameSite, DisabledSameSite,
+                 DisabledSameSite, DisabledSameSite, DisabledSameSite, DisabledSameSite,
+                 DisabledSameSite, 0, 0, true /* disable_token_encryption */));
 
   test_time_.setSystemTime(SystemTime(std::chrono::seconds(1000)));
 

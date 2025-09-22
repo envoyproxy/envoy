@@ -289,6 +289,11 @@ new_features:
     in the router check tool. The tool now accepts a ``dynamic_metadata`` field in test input to set metadata
     that can be matched by route configuration. This allows comprehensive testing of routes that depend on
     dynamic metadata for routing decisions.
+- area: oauth2
+  change: |
+    Added :ref:`disable_token_encryption
+    <envoy_v3_api_field_extensions.filters.http.oauth2.v3.OAuth2Config.disable_token_encryption>` option to the OAuth2 filter to
+    store ID and access tokens without encryption when running in trusted environments.
 - area: lua
   change: |
     Added a new ``filterState()`` on ``streamInfo()`` which provides access to filter state objects stored during request processing.
