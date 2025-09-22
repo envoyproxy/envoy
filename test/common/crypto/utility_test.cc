@@ -66,8 +66,7 @@ TEST(UtilityTest, TestImportPublicKey) {
 
   Common::Crypto::CryptoObjectPtr der_crypto_ptr(
       Common::Crypto::UtilitySingleton::get().importPublicKeyDER(Hex::decode(der_key)));
-  auto der_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*der_crypto_ptr);
+  auto der_wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*der_crypto_ptr);
   EVP_PKEY* der_pkey = der_wrapper->getEVP_PKEY();
   EXPECT_NE(nullptr, der_pkey) << "DER public key import failed";
 
@@ -85,8 +84,7 @@ TEST(UtilityTest, TestImportPublicKey) {
   Common::Crypto::CryptoObjectPtr pem_crypto_ptr(
       Common::Crypto::UtilitySingleton::get().importPublicKeyPEM(
           std::vector<uint8_t>(pem_key.begin(), pem_key.end())));
-  auto pem_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*pem_crypto_ptr);
+  auto pem_wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*pem_crypto_ptr);
   EVP_PKEY* pem_pkey = pem_wrapper->getEVP_PKEY();
   EXPECT_NE(nullptr, pem_pkey) << "PEM public key import failed";
 
@@ -100,8 +98,7 @@ TEST(UtilityTest, TestImportPublicKey) {
   auto bad_key = "badkey";
   auto bad_crypto_ptr =
       Common::Crypto::UtilitySingleton::get().importPublicKeyDER(Hex::decode(bad_key));
-  auto bad_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*bad_crypto_ptr);
+  auto bad_wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*bad_crypto_ptr);
   EVP_PKEY* bad_pkey = bad_wrapper->getEVP_PKEY();
   EXPECT_EQ(nullptr, bad_pkey) << "Invalid key should return nullptr";
 
@@ -228,7 +225,7 @@ TEST(UtilityTest, TestVerifySignature) {
   EXPECT_EQ("unknown is not supported.", result.status().message());
 
   // Test with an empty crypto object
-  auto empty_crypto = std::make_unique<PublicKeyObject>();
+  auto empty_crypto = std::make_unique<PKeyObject>();
   result = UtilitySingleton::get().verifySignature("sha256", *empty_crypto, sig, text);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ("Failed to initialize digest verify.", result.status().message());
@@ -281,13 +278,13 @@ TEST(UtilityTest, TestImportPrivateKey) {
 
   Common::Crypto::CryptoObjectPtr crypto_ptr(
       Common::Crypto::UtilitySingleton::get().importPrivateKeyDER(Hex::decode(key)));
-  auto wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(*crypto_ptr);
+  auto wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*crypto_ptr);
   EVP_PKEY* pkey = wrapper->getEVP_PKEY();
   EXPECT_NE(nullptr, pkey);
 
   key = "badkey";
   crypto_ptr = Common::Crypto::UtilitySingleton::get().importPrivateKeyDER(Hex::decode(key));
-  wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(*crypto_ptr);
+  wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*crypto_ptr);
   pkey = wrapper->getEVP_PKEY();
   EXPECT_EQ(nullptr, pkey);
 
@@ -436,7 +433,7 @@ TEST(UtilityTest, TestSign) {
   EXPECT_EQ("unknown is not supported.", result.status().message());
 
   // Test with empty crypto object
-  auto empty_crypto = std::make_unique<PrivateKeyObject>();
+  auto empty_crypto = std::make_unique<PKeyObject>();
   result = UtilitySingleton::get().sign("sha256", *empty_crypto, text);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ("Invalid key type: private key required for signing operation.",
@@ -534,7 +531,7 @@ TEST(UtilityTest, TestHashFunctionSupport) {
 
 TEST(UtilityTest, TestSignErrorPaths) {
   // Test with empty crypto object
-  auto empty_crypto = std::make_unique<PrivateKeyObject>();
+  auto empty_crypto = std::make_unique<PKeyObject>();
   auto data = "test data";
   std::vector<uint8_t> text(data, data + strlen(data));
 
@@ -544,7 +541,7 @@ TEST(UtilityTest, TestSignErrorPaths) {
             result.status().message());
 
   // Test with crypto object that has null EVP_PKEY
-  auto crypto_with_null = std::make_unique<PrivateKeyObject>();
+  auto crypto_with_null = std::make_unique<PKeyObject>();
   crypto_with_null->setEVP_PKEY(nullptr);
   result = UtilitySingleton::get().sign("sha256", *crypto_with_null, text);
   EXPECT_FALSE(result.ok());
@@ -554,7 +551,7 @@ TEST(UtilityTest, TestSignErrorPaths) {
 
 TEST(UtilityTest, TestVerifySignatureErrorPaths) {
   // Test with empty crypto object
-  auto empty_crypto = std::make_unique<PublicKeyObject>();
+  auto empty_crypto = std::make_unique<PKeyObject>();
   auto data = "test data";
   std::vector<uint8_t> text(data, data + strlen(data));
   auto signature = std::vector<uint8_t>{1, 2, 3, 4};
@@ -564,7 +561,7 @@ TEST(UtilityTest, TestVerifySignatureErrorPaths) {
   EXPECT_EQ("Failed to initialize digest verify.", result.status().message());
 
   // Test with crypto object that has null EVP_PKEY
-  auto crypto_with_null = std::make_unique<PublicKeyObject>();
+  auto crypto_with_null = std::make_unique<PKeyObject>();
   crypto_with_null->setEVP_PKEY(nullptr);
   result = UtilitySingleton::get().verifySignature("sha256", *crypto_with_null, signature, text);
   EXPECT_FALSE(result.ok());
@@ -585,18 +582,18 @@ TEST(UtilityTest, TestSingletonAccess) {
 }
 
 TEST(UtilityTest, TestCryptoObjectMethods) {
-  // Test PublicKeyObject methods (exercises crypto_impl.cc)
-  auto public_obj = std::make_unique<PublicKeyObject>();
-  EXPECT_EQ(nullptr, public_obj->getEVP_PKEY()) << "New PublicKeyObject should have null pkey";
+  // Test PKeyObject methods (exercises crypto_impl.cc)
+  auto public_obj = std::make_unique<PKeyObject>();
+  EXPECT_EQ(nullptr, public_obj->getEVP_PKEY()) << "New PKeyObject should have null pkey";
 
   // Create a dummy EVP_PKEY for testing
   EVP_PKEY* test_pkey = EVP_PKEY_new();
   public_obj->setEVP_PKEY(test_pkey);
   EXPECT_EQ(test_pkey, public_obj->getEVP_PKEY()) << "setEVP_PKEY should set the key";
 
-  // Test PrivateKeyObject methods (exercises crypto_impl.cc)
-  auto private_obj = std::make_unique<PrivateKeyObject>();
-  EXPECT_EQ(nullptr, private_obj->getEVP_PKEY()) << "New PrivateKeyObject should have null pkey";
+  // Test PKeyObject methods (exercises crypto_impl.cc)
+  auto private_obj = std::make_unique<PKeyObject>();
+  EXPECT_EQ(nullptr, private_obj->getEVP_PKEY()) << "New PKeyObject should have null pkey";
 
   EVP_PKEY* test_private_pkey = EVP_PKEY_new();
   private_obj->setEVP_PKEY(test_private_pkey);
@@ -639,7 +636,7 @@ TEST(UtilityTest, TestPEMParsingFailures) {
 
   auto crypto_ptr = UtilitySingleton::get().importPublicKeyDER(
       std::vector<uint8_t>(invalid_pem_public.begin(), invalid_pem_public.end()));
-  auto wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*crypto_ptr);
+  auto wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*crypto_ptr);
   EVP_PKEY* pkey = wrapper->getEVP_PKEY();
   EXPECT_EQ(nullptr, pkey) << "Invalid PEM public key should fail to parse";
 
@@ -651,7 +648,7 @@ TEST(UtilityTest, TestPEMParsingFailures) {
   auto private_crypto_ptr = UtilitySingleton::get().importPrivateKeyDER(
       std::vector<uint8_t>(invalid_pem_private.begin(), invalid_pem_private.end()));
   auto private_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(*private_crypto_ptr);
+      Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*private_crypto_ptr);
   EVP_PKEY* private_pkey = private_wrapper->getEVP_PKEY();
   EXPECT_EQ(nullptr, private_pkey) << "Invalid PEM private key should fail to parse";
 
@@ -661,7 +658,7 @@ TEST(UtilityTest, TestPEMParsingFailures) {
   large_key_data[1] = '-'; // Make it look like PEM start
   auto large_crypto_ptr = UtilitySingleton::get().importPublicKeyDER(large_key_data);
   auto large_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*large_crypto_ptr);
+      Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*large_crypto_ptr);
   EVP_PKEY* large_pkey = large_wrapper->getEVP_PKEY();
   EXPECT_EQ(nullptr, large_pkey) << "Large invalid key should fail to parse";
 }
@@ -709,7 +706,7 @@ TEST(UtilityTest, TestDeepErrorPaths) {
   EXPECT_FALSE(result->empty()) << "Large text signature should not be empty";
 
   // Test with corrupted key that might cause EVP_DigestVerifyInit to fail
-  auto corrupted_key = std::make_unique<PublicKeyObject>();
+  auto corrupted_key = std::make_unique<PKeyObject>();
   // Create a partially valid but corrupted EVP_PKEY that might cause init failures
   EVP_PKEY* corrupted_pkey = EVP_PKEY_new();
   corrupted_key->setEVP_PKEY(corrupted_pkey);
@@ -731,23 +728,23 @@ TEST(UtilityTest, TestHelperFunctionsCoverage) {
   std::vector<uint8_t> empty_key;
   auto empty_public_pem = impl->importPublicKeyPEM(empty_key);
   auto empty_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*empty_public_pem);
+      Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*empty_public_pem);
   EXPECT_EQ(nullptr, empty_wrapper->getEVP_PKEY()) << "Empty PEM key should fail";
 
   auto empty_private_pem = impl->importPrivateKeyPEM(empty_key);
   auto empty_private_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(*empty_private_pem);
+      Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*empty_private_pem);
   EXPECT_EQ(nullptr, empty_private_wrapper->getEVP_PKEY()) << "Empty PEM private key should fail";
 
   // Test DER functions directly with various invalid inputs
   std::vector<uint8_t> invalid_der = {0x30, 0x82}; // Truncated DER
   auto der_public = impl->importPublicKeyDER(invalid_der);
-  auto der_wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*der_public);
+  auto der_wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*der_public);
   EXPECT_EQ(nullptr, der_wrapper->getEVP_PKEY()) << "Invalid DER key should fail";
 
   auto der_private = impl->importPrivateKeyDER(invalid_der);
   auto der_private_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(*der_private);
+      Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*der_private);
   EXPECT_EQ(nullptr, der_private_wrapper->getEVP_PKEY()) << "Invalid DER private key should fail";
 }
 
@@ -761,12 +758,12 @@ TEST(UtilityTest, TestImportKeyErrorPaths) {
   // This tests the BIO_new_mem_buf with empty data
   auto null_public_pem = impl->importPublicKeyPEM(null_data);
   auto null_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*null_public_pem);
+      Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*null_public_pem);
   EXPECT_EQ(nullptr, null_wrapper->getEVP_PKEY()) << "Null data should fail PEM import";
 
   auto null_private_pem = impl->importPrivateKeyPEM(null_data);
   auto null_private_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(*null_private_pem);
+      Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*null_private_pem);
   EXPECT_EQ(nullptr, null_private_wrapper->getEVP_PKEY())
       << "Null data should fail private PEM import";
 
@@ -778,12 +775,12 @@ TEST(UtilityTest, TestImportKeyErrorPaths) {
 
   auto malformed_public = impl->importPublicKeyPEM(malformed_bytes);
   auto malformed_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*malformed_public);
+      Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*malformed_public);
   EXPECT_EQ(nullptr, malformed_wrapper->getEVP_PKEY()) << "Malformed PEM should fail";
 
   auto malformed_private = impl->importPrivateKeyPEM(malformed_bytes);
   auto malformed_private_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(*malformed_private);
+      Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*malformed_private);
   EXPECT_EQ(nullptr, malformed_private_wrapper->getEVP_PKEY())
       << "Malformed private PEM should fail";
 }
@@ -795,25 +792,23 @@ TEST(UtilityTest, TestEdgeCasesAndMissingCoverage) {
   // Test with empty data
   std::vector<uint8_t> empty;
   auto empty_pem = impl->importPublicKeyPEM(empty);
-  auto empty_pem_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*empty_pem);
+  auto empty_pem_wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*empty_pem);
   EXPECT_EQ(nullptr, empty_pem_wrapper->getEVP_PKEY()) << "Empty PEM should fail";
 
   auto empty_der = impl->importPublicKeyDER(empty);
-  auto empty_der_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*empty_der);
+  auto empty_der_wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*empty_der);
   EXPECT_EQ(nullptr, empty_der_wrapper->getEVP_PKEY()) << "Empty DER should fail";
 
   // Test with single character
   std::vector<uint8_t> single = {'A'};
   auto single_pem = impl->importPublicKeyPEM(single);
   auto single_pem_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*single_pem);
+      Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*single_pem);
   EXPECT_EQ(nullptr, single_pem_wrapper->getEVP_PKEY()) << "Single char PEM should fail";
 
   auto single_der = impl->importPublicKeyDER(single);
   auto single_der_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*single_der);
+      Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*single_der);
   EXPECT_EQ(nullptr, single_der_wrapper->getEVP_PKEY()) << "Single char DER should fail";
 
   // Test with invalid PEM format
@@ -821,7 +816,7 @@ TEST(UtilityTest, TestEdgeCasesAndMissingCoverage) {
   std::vector<uint8_t> invalid_pem_bytes(invalid_pem.begin(), invalid_pem.end());
   auto invalid_pem_result = impl->importPublicKeyPEM(invalid_pem_bytes);
   auto invalid_pem_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*invalid_pem_result);
+      Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*invalid_pem_result);
   EXPECT_EQ(nullptr, invalid_pem_wrapper->getEVP_PKEY()) << "Invalid PEM should fail";
 
   // Test with valid PEM format
@@ -837,32 +832,32 @@ TEST(UtilityTest, TestEdgeCasesAndMissingCoverage) {
   std::vector<uint8_t> valid_pem_bytes(valid_pem.begin(), valid_pem.end());
   auto valid_pem_result = impl->importPublicKeyPEM(valid_pem_bytes);
   auto valid_pem_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*valid_pem_result);
+      Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*valid_pem_result);
   EXPECT_NE(nullptr, valid_pem_wrapper->getEVP_PKEY()) << "Valid PEM should succeed";
 
   // Test DER import functions with various invalid inputs
   std::vector<uint8_t> invalid_der = {0x30, 0x01, 0x02}; // Invalid DER
   auto der_public = impl->importPublicKeyDER(invalid_der);
   auto der_public_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*der_public);
+      Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*der_public);
   EXPECT_EQ(nullptr, der_public_wrapper->getEVP_PKEY()) << "Invalid DER public key should fail";
 
   auto der_private = impl->importPrivateKeyDER(invalid_der);
   auto der_private_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(*der_private);
+      Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*der_private);
   EXPECT_EQ(nullptr, der_private_wrapper->getEVP_PKEY()) << "Invalid DER private key should fail";
 
   // Test with single byte DER data
   std::vector<uint8_t> single_byte_der = {0x30};
   auto single_der_public = impl->importPublicKeyDER(single_byte_der);
   auto single_der_public_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*single_der_public);
+      Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*single_der_public);
   EXPECT_EQ(nullptr, single_der_public_wrapper->getEVP_PKEY())
       << "Single byte DER public key should fail";
 
   auto single_der_private = impl->importPrivateKeyDER(single_byte_der);
   auto single_der_private_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(*single_der_private);
+      Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*single_der_private);
   EXPECT_EQ(nullptr, single_der_private_wrapper->getEVP_PKEY())
       << "Single byte DER private key should fail";
 }
@@ -938,7 +933,7 @@ TEST(UtilityTest, TestPEMStringConversion) {
 
   // Test that the converted bytes work with importPublicKeyPEM
   auto crypto_ptr = UtilitySingleton::get().importPublicKeyPEM(pem_bytes);
-  auto wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*crypto_ptr);
+  auto wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*crypto_ptr);
   EXPECT_NE(nullptr, wrapper->getEVP_PKEY()) << "Converted PEM string should import successfully";
 
   // Test with empty string
@@ -946,7 +941,7 @@ TEST(UtilityTest, TestPEMStringConversion) {
   std::vector<uint8_t> empty_bytes(empty_string.begin(), empty_string.end());
   auto empty_crypto_ptr = UtilitySingleton::get().importPublicKeyPEM(empty_bytes);
   auto empty_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*empty_crypto_ptr);
+      Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*empty_crypto_ptr);
   EXPECT_EQ(nullptr, empty_wrapper->getEVP_PKEY()) << "Empty string should fail import";
 
   // Test with string containing null characters
@@ -954,7 +949,7 @@ TEST(UtilityTest, TestPEMStringConversion) {
   std::vector<uint8_t> null_bytes(null_string.begin(), null_string.end());
   auto null_crypto_ptr = UtilitySingleton::get().importPublicKeyPEM(null_bytes);
   auto null_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*null_crypto_ptr);
+      Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*null_crypto_ptr);
   EXPECT_EQ(nullptr, null_wrapper->getEVP_PKEY()) << "String with null chars should fail import";
 }
 
@@ -962,16 +957,17 @@ TEST(UtilityTest, TestMissingErrorMessages) {
   // Test specific error messages that might not be fully covered
 
   // Test "Failed to initialize digest sign." error
-  auto public_crypto = std::make_unique<PublicKeyObject>();
+  auto public_crypto = std::make_unique<PKeyObject>();
   auto data = "test data";
   std::vector<uint8_t> text(data, data + strlen(data));
 
   auto result = UtilitySingleton::get().sign("sha256", *public_crypto, text);
   EXPECT_FALSE(result.ok());
-  EXPECT_EQ("Failed to initialize digest sign.", result.status().message());
+  EXPECT_EQ("Invalid key type: private key required for signing operation.",
+            result.status().message());
 
   // Test "Invalid key type: private key required for signing operation." error
-  auto private_crypto = std::make_unique<PrivateKeyObject>();
+  auto private_crypto = std::make_unique<PKeyObject>();
   result = UtilitySingleton::get().sign("sha256", *private_crypto, text);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ("Invalid key type: private key required for signing operation.",
@@ -991,7 +987,7 @@ TEST(UtilityTest, TestMissingErrorMessages) {
 
   // Test "Failed to get signature length." error
   // This is also difficult to trigger without specific conditions
-  auto empty_private = std::make_unique<PrivateKeyObject>();
+  auto empty_private = std::make_unique<PKeyObject>();
   result = UtilitySingleton::get().sign("sha256", *empty_private, text);
   EXPECT_FALSE(result.ok());
   EXPECT_EQ("Invalid key type: private key required for signing operation.",
@@ -1009,21 +1005,20 @@ TEST(UtilityTest, TestTemplateFunctionCoverage) {
   // This is difficult to trigger in practice, but we can test with edge cases
   std::vector<uint8_t> huge_key(1000000, 'A'); // 1MB key
   auto huge_pem = impl->importPublicKeyPEM(huge_key);
-  auto huge_wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*huge_pem);
+  auto huge_wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*huge_pem);
   EXPECT_EQ(nullptr, huge_wrapper->getEVP_PKEY()) << "Huge invalid PEM should fail";
 
   // Test CBS initialization in importKeyDER template
   std::vector<uint8_t> huge_der(1000000, 0x30); // 1MB DER
   auto huge_der_pem = impl->importPublicKeyDER(huge_der);
   auto huge_der_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*huge_der_pem);
+      Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*huge_der_pem);
   EXPECT_EQ(nullptr, huge_der_wrapper->getEVP_PKEY()) << "Huge invalid DER should fail";
 
   // Test with very large but reasonable size vectors (avoiding memory allocation failure)
   std::vector<uint8_t> large_key(10000000, 'A'); // 10MB key
   auto large_pem = impl->importPublicKeyPEM(large_key);
-  auto large_wrapper =
-      Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(*large_pem);
+  auto large_wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(*large_pem);
   EXPECT_EQ(nullptr, large_wrapper->getEVP_PKEY()) << "Large invalid key should fail";
 }
 

@@ -5,7 +5,6 @@
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
-
 #include "openssl/pem.h"
 
 namespace Envoy {
@@ -51,7 +50,7 @@ absl::StatusOr<bool> UtilityImpl::verifySignature(absl::string_view hash, Crypto
     return absl::InvalidArgumentError(absl::StrCat(hash, " is not supported."));
   }
   // Step 3: initialize EVP_DigestVerify
-  auto pkey_wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PublicKeyObject>(key);
+  auto pkey_wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(key);
   if (pkey_wrapper == nullptr) {
     return absl::InternalError("Failed to initialize digest verify.");
   }
@@ -79,20 +78,15 @@ absl::StatusOr<bool> UtilityImpl::verifySignature(absl::string_view hash, Crypto
 
 absl::StatusOr<std::vector<uint8_t>> UtilityImpl::sign(absl::string_view hash, CryptoObject& key,
                                                        const std::vector<uint8_t>& text) {
-  // Sign data using a private key
-  // The key must be imported via importPrivateKeyPEM() or importPrivateKeyDER()
-  // Step 1: initialize EVP_MD_CTX
   bssl::ScopedEVP_MD_CTX ctx;
 
-  // Step 2: initialize EVP_MD
   const EVP_MD* md = getHashFunction(hash);
 
   if (md == nullptr) {
     return absl::InvalidArgumentError(absl::StrCat(hash, " is not supported."));
   }
 
-  // Step 3: initialize EVP_DigestSign
-  auto pkey_wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PrivateKeyObject>(key);
+  auto pkey_wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(key);
   if (pkey_wrapper == nullptr) {
     return absl::InternalError("Failed to initialize digest sign.");
   }
@@ -107,21 +101,18 @@ absl::StatusOr<std::vector<uint8_t>> UtilityImpl::sign(absl::string_view hash, C
     return absl::InternalError("Invalid private key: key data is corrupted or malformed.");
   }
 
-  // Step 4: get signature length
   size_t sig_len = 0;
   ok = EVP_DigestSign(ctx.get(), nullptr, &sig_len, text.data(), text.size());
   if (!ok) {
     return absl::InternalError("Failed to get signature length.");
   }
 
-  // Step 5: create signature
   std::vector<uint8_t> signature(sig_len);
   ok = EVP_DigestSign(ctx.get(), signature.data(), &sig_len, text.data(), text.size());
   if (!ok) {
     return absl::InternalError("Failed to create signature.");
   }
 
-  // Step 6: resize signature to actual length and return
   RELEASE_ASSERT(signature.size() >= sig_len, "signature.size() >= sig_len");
   signature.resize(sig_len);
   return signature;
@@ -148,19 +139,19 @@ CryptoObjectPtr importKeyDER(const std::vector<uint8_t>& key, ParseFunction pars
 } // namespace
 
 CryptoObjectPtr UtilityImpl::importPublicKeyPEM(const std::vector<uint8_t>& key) {
-  return importKeyPEM<PublicKeyObject>(key, PEM_read_bio_PUBKEY);
+  return importKeyPEM<PKeyObject>(key, PEM_read_bio_PUBKEY);
 }
 
 CryptoObjectPtr UtilityImpl::importPublicKeyDER(const std::vector<uint8_t>& key) {
-  return importKeyDER<PublicKeyObject>(key, EVP_parse_public_key);
+  return importKeyDER<PKeyObject>(key, EVP_parse_public_key);
 }
 
 CryptoObjectPtr UtilityImpl::importPrivateKeyPEM(const std::vector<uint8_t>& key) {
-  return importKeyPEM<PrivateKeyObject>(key, PEM_read_bio_PrivateKey);
+  return importKeyPEM<PKeyObject>(key, PEM_read_bio_PrivateKey);
 }
 
 CryptoObjectPtr UtilityImpl::importPrivateKeyDER(const std::vector<uint8_t>& key) {
-  return importKeyDER<PrivateKeyObject>(key, EVP_parse_private_key);
+  return importKeyDER<PKeyObject>(key, EVP_parse_private_key);
 }
 
 const EVP_MD* UtilityImpl::getHashFunction(absl::string_view name) {

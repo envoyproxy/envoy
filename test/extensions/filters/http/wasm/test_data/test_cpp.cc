@@ -1217,9 +1217,9 @@ void TestRootContext::onTick() {
     {
       envoy::source::extensions::common::wasm::VerifySignatureArguments args;
       args.set_text(data);
-      args.set_public_key(public_key_str);     // DER key
-      args.set_public_key_pem(public_key_str); // PEM key (same content, but should fail)
-      args.set_signature("dummy_signature");   // Dummy signature for test
+      args.set_public_key(public_key_str);      // DER key
+      args.set_public_key_pem("dummy_pem_key"); // PEM key (dummy, but valid UTF-8)
+      args.set_signature("dummy_signature");    // Dummy signature for test
       args.set_hash_function(hashFunc);
 
       std::string in;

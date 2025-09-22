@@ -730,10 +730,10 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
   } else {
     auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
     Envoy::Common::Crypto::CryptoObjectPtr crypto_ptr = crypto_util.importPublicKeyDER(key);
-    auto wrapper = Envoy::Common::Crypto::Access::getTyped<Envoy::Common::Crypto::PublicKeyObject>(
-        *crypto_ptr);
+    auto wrapper =
+        Envoy::Common::Crypto::Access::getTyped<Envoy::Common::Crypto::PKeyObject>(*crypto_ptr);
     if (wrapper == nullptr) {
-      // Failed to cast to PublicKeyObject, create empty wrapper
+      // Failed to cast to PKeyObject, create empty wrapper
       public_key_wrapper_.reset(PublicKeyWrapper::create(state, EMPTY_STRING), true);
       return 1;
     }

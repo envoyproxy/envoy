@@ -8,8 +8,8 @@
 
 #include "source/common/singleton/threadsafe_singleton.h"
 
-#include "absl/strings/string_view.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Common {
