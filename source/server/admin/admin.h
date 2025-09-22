@@ -11,6 +11,7 @@
 #include "envoy/http/request_id_extension.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/network/listener.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
@@ -408,6 +409,9 @@ private:
     Init::Manager& initManager() override { return *init_manager_; }
     bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
     bool shouldBypassOverloadManager() const override { return true; }
+    uint32_t numQuicSessionsToCreatePerLoop() const override {
+      return Network::DefaultNumQuicSessionsToCreatePerLoop;
+    }
 
     AdminImpl& parent_;
     const std::string name_;

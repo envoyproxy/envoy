@@ -9,6 +9,7 @@
 #include "envoy/config/listener/v3/udp_listener_config.pb.h"
 #include "envoy/network/exception.h"
 #include "envoy/network/filter.h"
+#include "envoy/network/listener.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/common/utility.h"
@@ -183,6 +184,9 @@ public:
       open_connections_.setMax(num_connections);
     }
     void clearMaxConnections() { open_connections_.resetMax(); }
+    uint32_t numQuicSessionsToCreatePerLoop() const override {
+      return Network::DefaultNumQuicSessionsToCreatePerLoop;
+    }
 
     ConnectionHandlerTest& parent_;
     std::vector<std::shared_ptr<NiceMock<Network::MockListenSocket>>> sockets_;

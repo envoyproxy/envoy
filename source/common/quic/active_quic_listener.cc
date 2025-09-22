@@ -51,6 +51,7 @@ ActiveQuicListener::ActiveQuicListener(
                                               : quic::CurrentSupportedHttp3Versions()),
       kernel_worker_routing_(kernel_worker_routing),
       packets_to_read_to_connection_count_ratio_(packets_to_read_to_connection_count_ratio),
+      num_quic_sessions_to_create_per_loop_(listener_config.numQuicSessionsToCreatePerLoop()),
       crypto_server_stream_factory_(crypto_server_stream_factory),
       connection_id_generator_(std::move(cid_generator)),
       select_connection_id_worker_(std::move(worker_selector)) {
@@ -198,7 +199,7 @@ void ActiveQuicListener::onReadReady() {
     event_loops_with_buffered_chlo_for_test_++;
   }
 
-  quic_dispatcher_->ProcessBufferedChlos(kNumSessionsToCreatePerLoop);
+  quic_dispatcher_->ProcessBufferedChlos(num_quic_sessions_to_create_per_loop_);
 
   // If there were more buffered than the limit, schedule again for the next event loop.
   if (quic_dispatcher_->HasChlosBuffered()) {

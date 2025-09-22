@@ -8,6 +8,7 @@
 #include "envoy/extensions/filters/listener/proxy_protocol/v3/proxy_protocol.pb.h"
 #include "envoy/extensions/udp_packet_writer/v3/udp_default_writer_factory.pb.h"
 #include "envoy/network/exception.h"
+#include "envoy/network/listener.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/options.h"
 #include "envoy/server/transport_socket_config.h"
@@ -301,6 +302,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
       max_connections_to_accept_per_socket_event_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connections_to_accept_per_socket_event,
                                           Network::DefaultMaxConnectionsToAcceptPerSocketEvent)),
+      num_quic_sessions_to_create_per_loop_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, num_quic_sessions_to_create_per_loop,
+                                          Network::DefaultNumQuicSessionsToCreatePerLoop)),
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),
@@ -439,6 +443,9 @@ ListenerImpl::ListenerImpl(ListenerImpl& origin,
       max_connections_to_accept_per_socket_event_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connections_to_accept_per_socket_event,
                                           Network::DefaultMaxConnectionsToAcceptPerSocketEvent)),
+      num_quic_sessions_to_create_per_loop_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, num_quic_sessions_to_create_per_loop,
+                                          Network::DefaultNumQuicSessionsToCreatePerLoop)),
       validation_visitor_(
           added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
                          : parent_.server_.messageValidationContext().staticValidationVisitor()),

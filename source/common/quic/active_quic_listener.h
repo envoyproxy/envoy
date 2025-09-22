@@ -26,9 +26,6 @@ namespace Quic {
 class ActiveQuicListener : public Envoy::Server::ActiveUdpListenerBase,
                            Logger::Loggable<Logger::Id::quic> {
 public:
-  // TODO(bencebeky): Tune this value.
-  static const size_t kNumSessionsToCreatePerLoop = 16;
-
   ActiveQuicListener(Runtime::Loader& runtime, uint32_t worker_index, uint32_t concurrency,
                      Event::Dispatcher& dispatcher, Network::UdpConnectionHandler& parent,
                      Network::SocketSharedPtr&& listen_socket,
@@ -94,6 +91,7 @@ private:
   // TODO(ggreenway): Consider making this a published stat, or some variation of this information.
   uint64_t event_loops_with_buffered_chlo_for_test_{0};
   uint32_t packets_to_read_to_connection_count_ratio_;
+  uint32_t num_quic_sessions_to_create_per_loop_;
   EnvoyQuicCryptoServerStreamFactoryInterface& crypto_server_stream_factory_;
   const QuicConnectionIdGeneratorPtr connection_id_generator_;
   const QuicConnectionIdWorkerSelector select_connection_id_worker_;

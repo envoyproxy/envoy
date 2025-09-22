@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/network/filter.h"
+#include "envoy/network/listener.h"
 
 #include "source/common/listener_manager/connection_handler_impl.h"
 #include "source/common/network/connection_balancer_impl.h"
@@ -79,6 +80,9 @@ public:
   Init::Manager& initManager() override { return *init_manager_; }
   bool ignoreGlobalConnLimit() const override { return false; }
   bool shouldBypassOverloadManager() const override { return false; }
+  uint32_t numQuicSessionsToCreatePerLoop() const override {
+    return Network::DefaultNumQuicSessionsToCreatePerLoop;
+  }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&,

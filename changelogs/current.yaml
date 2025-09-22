@@ -454,5 +454,8 @@ new_features:
     <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.max_udp_channel_duration>`
     configuration field to the c-ares DNS resolver. This allows periodic refresh of the UDP channel
     to help avoid stale socket states and provide better load distribution across UDP ports.
+- area: quic
+  change: |
+    Add a new listener configuration field, 'num_quic_sessions_to_create_per_loop', to Envoy listener proto. This allows tuning the maximum number of new QUIC sessions created within a single event loop. The default value is 16, preserving the previous hardcoded limit.
 
 deprecated:

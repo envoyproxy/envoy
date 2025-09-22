@@ -324,6 +324,9 @@ public:
   uint32_t maxConnectionsToAcceptPerSocketEvent() const override {
     return max_connections_to_accept_per_socket_event_;
   }
+  uint32_t numQuicSessionsToCreatePerLoop() const override {
+    return num_quic_sessions_to_create_per_loop_;
+  }
   Init::Manager& initManager() override;
   bool ignoreGlobalConnLimit() const override { return ignore_global_conn_limit_; }
   bool shouldBypassOverloadManager() const override { return bypass_overload_manager_; }
@@ -453,6 +456,7 @@ private:
   const uint64_t maybe_stale_hash_;
   const uint32_t tcp_backlog_size_;
   const uint32_t max_connections_to_accept_per_socket_event_;
+  const uint32_t num_quic_sessions_to_create_per_loop_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const bool ignore_global_conn_limit_;
   const bool bypass_overload_manager_;
