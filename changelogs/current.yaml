@@ -259,6 +259,13 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.proxy_104`` and legacy code paths.
 
 new_features:
+- area: http
+  change: |
+    Added support for per-route compressor library override in the HTTP compressor filter.
+    Routes can now specify a different compressor library (e.g., gzip, brotli) via the
+    :ref:`compressor_library <envoy_v3_api_field_extensions.filters.http.compressor.v3.CompressorOverrides.compressor_library>`
+    field in the per-route configuration. This allows different routes to use different
+    compression algorithms and settings while maintaining the same filter configuration.
 - area: stats
   change: |
     Added support to remove unused metrics from memory for extensions that
