@@ -15,6 +15,8 @@
 #include "quiche/quic/core/crypto/null_encrypter.h"
 #include "quiche/quic/core/deterministic_connection_id_generator.h"
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 namespace Quic {
 

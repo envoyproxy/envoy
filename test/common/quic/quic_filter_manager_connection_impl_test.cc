@@ -8,6 +8,8 @@
 #include "quiche/quic/core/quic_connection.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 namespace Quic {
 

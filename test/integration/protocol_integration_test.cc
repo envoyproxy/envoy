@@ -54,6 +54,8 @@
 using testing::HasSubstr;
 using testing::Not;
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 
 void setDoNotValidateRouteConfig(

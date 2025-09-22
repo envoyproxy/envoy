@@ -7,6 +7,8 @@
 
 using testing::Return;
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 namespace Server {
 namespace Utility {
