@@ -115,6 +115,8 @@ def _rust_deps():
     )
 
 def envoy_dependencies(skip_targets = []):
+    external_http_archive("platforms")
+
     # Treat Envoy's overall build config as an external repo, so projects that
     # build Envoy as a subcomponent can easily override the config.
     if "envoy_build_config" not in native.existing_rules().keys():

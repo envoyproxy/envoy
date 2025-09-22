@@ -1553,6 +1553,23 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         license = "Emscripten SDK",
         license_url = "https://github.com/emscripten-core/emsdk/blob/{version}/LICENSE",
     ),
+    # TODO(phlax): required for rules_rust compat, may be possible to remove once
+    #   bazel is updated 8+
+    platforms = dict(
+        project_name = "platforms",
+        project_desc = "Constraint values for specifying platforms and toolchains",
+        project_url = "https://github.com/bazelbuild/platforms",
+        version = "1.0.0",
+        sha256 = "852b71bfa15712cec124e4a57179b6bc95d59fdf5052945f5d550e072501a769",
+        strip_prefix = "platforms-{version}",
+        urls = [
+            "https://github.com/bazelbuild/platforms/archive/{version}.tar.gz",
+        ],
+        release_date = "2025-05-27",
+        use_category = ["build"],
+        license = "Apache-2.0",
+        license_url = "https://github.com/bazelbuild/platforms/blob/{version}/LICENSE",
+    ),
     # After updating you may need to run:
     #
     #     CARGO_BAZEL_REPIN=1 bazel sync --only=crate_index
