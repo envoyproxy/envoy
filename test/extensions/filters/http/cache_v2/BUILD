@@ -82,7 +82,7 @@ envoy_extension_cc_test(
 envoy_extension_cc_test(
     name = "upstream_request_test",
     srcs = ["upstream_request_test.cc"],
-    extension_names = ["envoy.filters.http.cach_v2"],
+    extension_names = ["envoy.filters.http.cache_v2"],
     rbe_pool = "6gig",
     deps = [
         ":mocks",
