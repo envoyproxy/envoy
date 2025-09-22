@@ -610,8 +610,8 @@ private:
   buildHeaderRequest(ProcessorState& state, Http::RequestOrResponseHeaderMap& headers,
                      bool end_stream, bool observability_mode);
 
-  void sendRequest(ProcessorState& state, envoy::service::ext_proc::v3::ProcessingRequest&& req,
-                   bool end_stream);
+  void sendRequest(const ProcessorState& state,
+                   envoy::service::ext_proc::v3::ProcessingRequest&& req, bool end_stream);
 
   void encodeProtocolConfig(envoy::service::ext_proc::v3::ProcessingRequest& req);
 

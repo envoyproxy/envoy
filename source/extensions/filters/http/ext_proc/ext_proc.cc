@@ -569,7 +569,7 @@ void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callb
   watermark_callbacks_.setEncoderFilterCallbacks(&callbacks);
 }
 
-void Filter::sendRequest(ProcessorState& state, ProcessingRequest&& req, bool end_stream) {
+void Filter::sendRequest(const ProcessorState& state, ProcessingRequest&& req, bool end_stream) {
   // Calling the client send function to send the request.
   if (!processing_request_modifier_initialized_) {
     processing_request_modifier_initialized_ = true;
@@ -1961,6 +1961,8 @@ std::unique_ptr<ProcessingRequestModifier> Filter::createProcessingRequestModifi
   auto* factory = Envoy::Config::Utility::getAndCheckFactory<ProcessingRequestModifierFactory>(
       config.value(), /*is_optional=*/true);
   if (factory == nullptr) {
+    ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
+                       "ProcessingRequestModifier factory not found for type: {}", config->name());
     return nullptr;
   }
   // Avoid using translateAnyToFactoryConfig since it might throw. Do this manually.
@@ -1971,6 +1973,9 @@ std::unique_ptr<ProcessingRequestModifier> Filter::createProcessingRequestModifi
   if (Envoy::Config::Utility::translateOpaqueConfig(config->typed_config(),
                                                     context.messageValidationVisitor(),
                                                     *extension_config) != absl::OkStatus()) {
+    ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
+                       "ProcessingRequestModifier config translation failed for type: {}",
+                       config->typed_config().type_url());
     return nullptr;
   }
   return factory->createProcessingRequestModifier(*extension_config, builder, context);
