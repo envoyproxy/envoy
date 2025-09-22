@@ -24,7 +24,7 @@ public:
 
   struct Params {
     envoy::config::core::v3::TrafficDirection traffic_direction;
-    StreamInfo::StreamInfo& stream_info;
+    Http::StreamFilterCallbacks* callbacks;
     const Http::RequestHeaderMap* request_headers;
     const Http::RequestOrResponseHeaderMap* response_headers;
     const Http::HeaderMap* response_trailers;

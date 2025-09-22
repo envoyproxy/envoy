@@ -47,7 +47,7 @@ bool TestProcessingRequestModifier::run(const Params& params,
   sent_request_attributes_ = true;
 
   auto activation_ptr = Filters::Common::Expr::createActivation(
-      &expression_manager_.localInfo(), params.stream_info, params.request_headers,
+      &expression_manager_.localInfo(), params.callbacks->streamInfo(), params.request_headers,
       dynamic_cast<const Http::ResponseHeaderMap*>(params.response_headers),
       dynamic_cast<const Http::ResponseTrailerMap*>(params.response_trailers));
 

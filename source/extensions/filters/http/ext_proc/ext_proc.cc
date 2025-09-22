@@ -581,7 +581,7 @@ void Filter::sendRequest(const ProcessorState& state, ProcessingRequest&& req, b
   if (processing_request_modifier_) {
     ProcessingRequestModifier::Params params = {
         .traffic_direction = state.trafficDirection(),
-        .stream_info = state.callbacks()->streamInfo(),
+        .callbacks = state.callbacks(),
         .request_headers = state.requestHeaders(),
         .response_headers = state.responseHeaders(),
         .response_trailers = state.responseTrailers(),
