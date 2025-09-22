@@ -63,8 +63,8 @@ fi
 
 function cleanup() {
     if [[ "${ENVOY_BUILD_SKIP_CLEANUP}" == "true" ]]; then
-      echo "Skipping cleanup as requested."
-      return
+        echo "Skipping cleanup as requested."
+        return
     fi
 
     # Remove build artifacts. This doesn't mess with incremental builds as these
