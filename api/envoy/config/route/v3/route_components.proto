@@ -901,7 +901,9 @@ message RouteAction {
     }];
 
     // Indicates that during mirroring, the host header will be swapped with this value.
-    // `disable_shadow_host_suffix_append` is always enabled if this field is set.
+    // :ref:`disable_shadow_host_suffix_append
+    // <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.disable_shadow_host_suffix_append>`
+    // is implicitly enabled if this field is set.
     string host_rewrite_literal = 9
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
   }
