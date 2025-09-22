@@ -21,7 +21,9 @@ namespace Router {
 class RetryPolicyImpl : public RetryPolicy {
 
 public:
-  static absl::StatusOr<std::unique_ptr<RetryPolicyImpl>>
+  static RetryPolicyConstSharedPtr DefaultRetryPolicy;
+
+  static absl::StatusOr<std::shared_ptr<RetryPolicyImpl>>
   create(const envoy::config::route::v3::RetryPolicy& retry_policy,
          ProtobufMessage::ValidationVisitor& validation_visitor,
          Server::Configuration::CommonFactoryContext& common_context);
@@ -85,7 +87,6 @@ private:
   ProtobufMessage::ValidationVisitor* validation_visitor_{};
   std::vector<Upstream::RetryOptionsPredicateConstSharedPtr> retry_options_predicates_;
 };
-using DefaultRetryPolicy = ConstSingleton<RetryPolicyImpl>;
 
 } // namespace Router
 } // namespace Envoy

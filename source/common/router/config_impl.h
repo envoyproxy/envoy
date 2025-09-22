@@ -264,12 +264,7 @@ public:
   bool includeAttemptCountInResponse() const override { return include_attempt_count_in_response_; }
   bool includeIsTimeoutRetryHeader() const override { return include_is_timeout_retry_header_; }
   const std::vector<ShadowPolicyPtr>& shadowPolicies() const { return shadow_policies_; }
-  RetryPolicyConstOptRef retryPolicy() const {
-    if (retry_policy_ != nullptr) {
-      return *retry_policy_;
-    }
-    return absl::nullopt;
-  }
+  const RetryPolicyConstSharedPtr& retryPolicy() const { return retry_policy_; }
   HedgePolicyConstOptRef hedgePolicy() const {
     if (hedge_policy_ != nullptr) {
       return *hedge_policy_;
@@ -353,7 +348,7 @@ private:
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   std::unique_ptr<PerFilterConfigs> per_filter_configs_;
-  std::unique_ptr<envoy::config::route::v3::RetryPolicy> retry_policy_;
+  RetryPolicyConstSharedPtr retry_policy_;
   std::unique_ptr<envoy::config::route::v3::HedgePolicy> hedge_policy_;
   std::unique_ptr<const CatchAllVirtualCluster> virtual_cluster_catch_all_;
   RouteMetadataPackPtr metadata_;
@@ -640,8 +635,9 @@ public:
     if (retry_policy_ != nullptr) {
       return *retry_policy_;
     }
-    return DefaultRetryPolicy::get();
+    return *RetryPolicyImpl::DefaultRetryPolicy;
   }
+  const RetryPolicyConstSharedPtr& sharedRetryPolicy() const override { return retry_policy_; }
   const InternalRedirectPolicy& internalRedirectPolicy() const override {
     if (internal_redirect_policy_ != nullptr) {
       return *internal_redirect_policy_;
@@ -836,8 +832,8 @@ private:
   buildHedgePolicy(HedgePolicyConstOptRef vhost_hedge_policy,
                    const envoy::config::route::v3::RouteAction& route_config) const;
 
-  absl::StatusOr<std::unique_ptr<RetryPolicyImpl>>
-  buildRetryPolicy(RetryPolicyConstOptRef vhost_retry_policy,
+  absl::StatusOr<RetryPolicyConstSharedPtr>
+  buildRetryPolicy(const RetryPolicyConstSharedPtr& vhost_retry_policy,
                    const envoy::config::route::v3::RouteAction& route_config,
                    ProtobufMessage::ValidationVisitor& validation_visitor,
                    Server::Configuration::CommonFactoryContext& factory_context) const;
@@ -887,7 +883,7 @@ private:
   std::unique_ptr<const RuntimeData> runtime_;
   std::unique_ptr<const ::Envoy::Http::Utility::RedirectConfig> redirect_config_;
   std::unique_ptr<const HedgePolicyImpl> hedge_policy_;
-  std::unique_ptr<const RetryPolicyImpl> retry_policy_;
+  RetryPolicyConstSharedPtr retry_policy_;
   std::unique_ptr<const InternalRedirectPolicyImpl> internal_redirect_policy_;
   std::unique_ptr<const RateLimitPolicyImpl> rate_limit_policy_;
   std::vector<ShadowPolicyPtr> shadow_policies_;

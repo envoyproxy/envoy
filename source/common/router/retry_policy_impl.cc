@@ -1,5 +1,7 @@
 #include "source/common/router/retry_policy_impl.h"
 
+#include <memory>
+
 #include "source/common/config/utility.h"
 #include "source/common/router/reset_header_parser.h"
 #include "source/common/router/retry_state_impl.h"
@@ -8,16 +10,18 @@
 namespace Envoy {
 namespace Router {
 
-absl::StatusOr<std::unique_ptr<RetryPolicyImpl>>
+absl::StatusOr<std::shared_ptr<RetryPolicyImpl>>
 RetryPolicyImpl::create(const envoy::config::route::v3::RetryPolicy& retry_policy,
                         ProtobufMessage::ValidationVisitor& validation_visitor,
                         Server::Configuration::CommonFactoryContext& common_context) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<RetryPolicyImpl>(
+  auto ret = std::shared_ptr<RetryPolicyImpl>(
       new RetryPolicyImpl(retry_policy, validation_visitor, common_context, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
+
+RetryPolicyConstSharedPtr RetryPolicyImpl::DefaultRetryPolicy = std::make_shared<RetryPolicyImpl>();
 
 RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3::RetryPolicy& retry_policy,
                                  ProtobufMessage::ValidationVisitor& validation_visitor,

@@ -185,6 +185,8 @@ private:
   bool isCaresDefaultTheOnlyNameserver();
   // Update timer for c-ares timeouts.
   void updateAresTimer();
+  // Callback for periodic UDP channel refresh.
+  void onUdpChannelRefreshTimer();
   // Return default AresOptions.
   AresOptions defaultAresOptions();
 
@@ -192,6 +194,7 @@ private:
 
   Event::Dispatcher& dispatcher_;
   Event::TimerPtr timer_;
+  Event::TimerPtr udp_channel_refresh_timer_;
   ares_channel channel_;
   envoy::config::core::v3::DnsResolverOptions dns_resolver_options_;
 
@@ -202,6 +205,7 @@ private:
   const uint32_t query_tries_;
   const bool rotate_nameservers_;
   const uint32_t edns0_max_payload_size_;
+  const std::chrono::milliseconds max_udp_channel_duration_;
   const absl::optional<std::string> resolvers_csv_;
   const bool filter_unroutable_families_;
   Stats::ScopeSharedPtr scope_;

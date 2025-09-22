@@ -4,6 +4,7 @@ package envoy.config.common.mutation_rules.v3;
 
 import "envoy/config/core/v3/base.proto";
 import "envoy/type/matcher/v3/regex.proto";
+import "envoy/type/matcher/v3/string.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -90,6 +91,12 @@ message HeaderMutationRules {
 // The HeaderMutation structure specifies an action that may be taken on HTTP
 // headers.
 message HeaderMutation {
+  message RemoveOnMatch {
+    // A string matcher that will be applied to the header key. If the header key
+    // matches, the header will be removed.
+    type.matcher.v3.StringMatcher key_matcher = 1 [(validate.rules).message = {required: true}];
+  }
+
   oneof action {
     option (validate.required) = true;
 
@@ -99,5 +106,8 @@ message HeaderMutation {
 
     // Append new header by the specified HeaderValueOption.
     core.v3.HeaderValueOption append = 2;
+
+    // Remove the header if the key matches the specified string matcher.
+    RemoveOnMatch remove_on_match = 3;
   }
 }

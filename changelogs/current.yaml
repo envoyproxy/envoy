@@ -11,10 +11,29 @@ behavior_changes:
     <envoy_v3_api_field_extensions.request_id.uuid.v3.UuidRequestIdConfig.pack_trace_reason>` is set
     to ``true`` (it is ``true`` by default), a request marked as traced cannot be unmarked as traced
     after the tracing refresh.
+- area: http2
+  change: |
+    The default value for the :ref:`maximum number of concurrent streams in HTTP/2
+    <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.max_concurrent_streams>`
+    has been changed from 2147483647 to 1024.
+    The default value for the :ref:`initial stream window size in HTTP/2
+    <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.initial_stream_window_size>`
+    has been changed from 256MiB to 16MiB.
+    The default value for the :ref:`initial connection window size in HTTP/2
+    <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.initial_connection_window_size>`
+    has been changed from 256MiB to 24MiB.
+    This change could be reverted temporarily by
+    setting the runtime guard ``envoy.reloadable_features.safe_http2_options``
+    to ``false``.
 - area: ext_proc
   change: |
     Reverted `#39740 <https://github.com/envoyproxy/envoy/pull/39740>`_ to re-enable ``fail_open`` +
     ``FULL_DUPLEX_STREAMED`` configuration combination.
+- area: load balancing
+  change: |
+    Moved locality WRR structures out of HostSetImpl and into a separate class. Locality WRR schedulers are now by default owned
+    and constructed by the underlying Zone Aware LB, instead of owned and constructed by the Host Set. There should be no visible
+    behavior change for existing users of Zone Aware LBs.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
@@ -69,6 +88,13 @@ minor_behavior_changes:
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
+- area: tcp_proxy
+  change:
+    Fixes a bug when downstream TCP connection is created and the upstream connection isn't fully established, no idle timeout
+    is set on the downstream connection, which may lead to connection leak if the client doesn't close the connection.
+    The fix is to set an idle timeout on the downstream connection immediately after creation.
+    This fix can be reverted by setting runtime guard ``envoy.reloadable_features.tcp_proxy_set_idle_timer_immediately_on_new_connection``
+    to ``false``.
 - area: udp_proxy
   change: |
     Fixed a crash in the UDP proxy that occurred during ``ENVOY_SIGTERM`` when active tunneling sessions were present.
@@ -88,6 +114,9 @@ bug_fixes:
     Fixed a bug where the premature resets of streams may result in the recursive draining and potential
     stack overflow. Setting proper ``max_concurrent_streams`` value for HTTP/2 or HTTP/3 could eliminate
     the risk of the stack overflow before this fix.
+- area: listener
+  change: |
+    Fixed a bug where comparing listeners did not consider the network namespace they were listening in.
 - area: http
   change: |
     Fixed a bug where the ``response_headers_to_add`` may be processed multiple times for the local responses from
@@ -249,6 +278,11 @@ new_features:
     (``GET``, ``HEAD``, ``DELETE``, ``TRACE``) are validated and will throw an error if combined with payloads.
     The implementation is optimized to process the payload once during configuration and reuse it for all health
     check requests. See :ref:`HttpHealthCheck <envoy_v3_api_msg_config.core.v3.HealthCheck.HttpHealthCheck>` for configuration details.
+- area: tcp_proxy
+  change: |
+    Added support for generating and propagating a request ID on synthesized upstream HTTP requests when tunneling requests.
+    It can be configured using :ref:`request_id_extension
+    <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.request_id_extension>`.
 - area: router_check_tool
   change: |
     Added support for testing routes with :ref:`dynamic metadata matchers <envoy_v3_api_field_config.route.v3.RouteMatch.dynamic_metadata>`
@@ -276,7 +310,11 @@ new_features:
     will take precedence over this field.
 - area: redis
   change: |
-    Added support for ``GEOSEARCH`` and ``GETEX``.
+    Added support for 33 new Redis commands including COPY, RPOPLPUSH, SMOVE, SUNION, SDIFF,
+    SINTER, SINTERSTORE, ZUNIONSTORE, ZINTERSTORE, PFMERGE, GEORADIUS, GEORADIUSBYMEMBER,
+    RENAME, SORT, SORT_RO, ZMSCORE, SDIFFSTORE, MSETNX, SUBSTR, ZRANGESTORE, ZUNION, ZDIFF,
+    SUNIONSTORE, SMISMEMBER, HRANDFIELD, GEOSEARCHSTORE, ZDIFFSTORE, ZINTER, ZRANDMEMBER,
+    BITOP, LPOS, RENAMENX.
 - area: observability
   change: |
     Added ``ENVOY_NOTIFICATION`` macro to track specific conditions in production environments.
@@ -322,6 +360,12 @@ new_features:
     :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.grpc_service>`
     in the per-route ``check_settings``. Routes without this configuration continue to use the default
     authorization service.
+- area: ext_proc
+  change: |
+    Added :ref:`status_on_error <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.status_on_error>`
+    to the ``ext_proc`` HTTP filter. This allows configuring the HTTP status code returned to the downstream
+    client when communication with the external processor fails (e.g., gRPC error). Previously, these cases returned a
+    fixed ``500``.
 - area: tracing
   change: |
     Added :ref:`trace_context_option <envoy_v3_api_field_config.trace.v3.ZipkinConfig.trace_context_option>` enum
@@ -379,10 +423,31 @@ new_features:
     :ref:`stream_flush_timeout
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_flush_timeout>`
     to allow for configuring a stream flush timeout independently from the stream idle timeout.
+- area: http
+  change: |
+    Added support for header removal based on header key matching. The new
+    :ref:`remove_on_match <envoy_v3_api_field_config.common.mutation_rules.v3.HeaderMutation.remove_on_match>`
+    allows removing headers that match a specified key pattern. This enables more flexible and
+    dynamic header manipulation based on header names.
 - area: geoip
   change: |
     Added a new metric ``db_build_epoch`` to track the build timestamp of the MaxMind geolocation database files.
     This can be used to monitor the freshness of the databases currently in use by the filter.
-    See `MaxMind DB build_epoch <https://maxmind.github.io/MaxMind-DB/#build_epoch>`_ for more details.
+    See https://maxmind.github.io/MaxMind-DB/#build_epoch for more details.
+- area: overload management
+  change: |
+    Added a new scaled timer type ``HttpDownstreamStreamFlush`` to the overload manager. This allows
+    Envoy to scale the periodic timer for flushing downstream responses based on resource pressure.
+    The new timer can be configured via the
+    :ref:`ScaleTimersOverloadActionConfig <envoy_v3_api_msg_config.overload.v3.ScaleTimersOverloadActionConfig>`.
+- area: dynamic_modules
+  change: |
+    Added support for counters, gauges, histograms, and their vector variants to the dynamic modules API.
+- area: dns_resolver
+  change: |
+    Added :ref:`max_udp_channel_duration
+    <envoy_v3_api_field_extensions.network.dns_resolver.cares.v3.CaresDnsResolverConfig.max_udp_channel_duration>`
+    configuration field to the c-ares DNS resolver. This allows periodic refresh of the UDP channel
+    to help with avoiding stale socket states, and providing better load distribution across UDP ports.
 
 deprecated:
