@@ -210,8 +210,8 @@ TimeoutData FilterUtility::finalTimeout(const RouteEntry& route,
       timeout.global_timeout_ = route.timeout();
     }
   }
-  timeout.per_try_timeout_ = route.retryPolicy().perTryTimeout();
-  timeout.per_try_idle_timeout_ = route.retryPolicy().perTryIdleTimeout();
+  timeout.per_try_timeout_ = route.retryPolicy()->perTryTimeout();
+  timeout.per_try_idle_timeout_ = route.retryPolicy()->perTryIdleTimeout();
 
   uint64_t header_timeout;
 
@@ -790,7 +790,7 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
   ASSERT(headers.Scheme());
 
   retry_state_ = createRetryState(
-      route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_, route_stats_context_,
+      *route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_, route_stats_context_,
       config_->factory_context_, callbacks_->dispatcher(), route_entry_->priority());
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
@@ -2098,7 +2098,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(
 }
 
 void Filter::runRetryOptionsPredicates(UpstreamRequest& retriable_request) {
-  for (const auto& options_predicate : route_entry_->retryPolicy().retryOptionsPredicates()) {
+  for (const auto& options_predicate : route_entry_->retryPolicy()->retryOptionsPredicates()) {
     const Upstream::RetryOptionsPredicate::UpdateOptionsParameters parameters{
         retriable_request.streamInfo(), upstreamSocketOptions()};
     auto ret = options_predicate->updateOptions(parameters);

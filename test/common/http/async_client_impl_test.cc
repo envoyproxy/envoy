@@ -2407,14 +2407,14 @@ retry_back_off:
 
   auto& route_entry = getRouteFromStream();
 
-  EXPECT_EQ(route_entry.retryPolicy().numRetries(), 10);
-  EXPECT_EQ(route_entry.retryPolicy().perTryTimeout(), std::chrono::seconds(30));
+  EXPECT_EQ(route_entry.retryPolicy()->numRetries(), 10);
+  EXPECT_EQ(route_entry.retryPolicy()->perTryTimeout(), std::chrono::seconds(30));
   EXPECT_EQ(Router::RetryPolicy::RETRY_ON_CONNECT_FAILURE | Router::RetryPolicy::RETRY_ON_5XX |
                 Router::RetryPolicy::RETRY_ON_GATEWAY_ERROR | Router::RetryPolicy::RETRY_ON_RESET,
-            route_entry.retryPolicy().retryOn());
+            route_entry.retryPolicy()->retryOn());
 
-  EXPECT_EQ(route_entry.retryPolicy().baseInterval(), std::chrono::milliseconds(10));
-  EXPECT_EQ(route_entry.retryPolicy().maxInterval(), std::chrono::seconds(30));
+  EXPECT_EQ(route_entry.retryPolicy()->baseInterval(), std::chrono::milliseconds(10));
+  EXPECT_EQ(route_entry.retryPolicy()->maxInterval(), std::chrono::seconds(30));
 }
 
 TEST_F(AsyncClientImplUnitTest, AsyncStreamImplInitTestWithInvalidRetryPolicy) {
@@ -2448,15 +2448,15 @@ retry_back_off:
   setRetryPolicy(yaml);
   auto& route_entry = getRouteFromStream();
 
-  EXPECT_EQ(route_entry.retryPolicy().numRetries(), 10);
-  EXPECT_EQ(route_entry.retryPolicy().perTryTimeout(), std::chrono::seconds(30));
+  EXPECT_EQ(route_entry.retryPolicy()->numRetries(), 10);
+  EXPECT_EQ(route_entry.retryPolicy()->perTryTimeout(), std::chrono::seconds(30));
   EXPECT_EQ(Router::RetryPolicy::RETRY_ON_CONNECT_FAILURE | Router::RetryPolicy::RETRY_ON_5XX |
                 Router::RetryPolicy::RETRY_ON_GATEWAY_ERROR | Router::RetryPolicy::RETRY_ON_RESET |
                 Router::RetryPolicy::RETRY_ON_RESET_BEFORE_REQUEST,
-            route_entry.retryPolicy().retryOn());
+            route_entry.retryPolicy()->retryOn());
 
-  EXPECT_EQ(route_entry.retryPolicy().baseInterval(), std::chrono::milliseconds(10));
-  EXPECT_EQ(route_entry.retryPolicy().maxInterval(), std::chrono::seconds(30));
+  EXPECT_EQ(route_entry.retryPolicy()->baseInterval(), std::chrono::milliseconds(10));
+  EXPECT_EQ(route_entry.retryPolicy()->maxInterval(), std::chrono::seconds(30));
 }
 
 TEST_F(AsyncClientImplUnitTest, NullConfig) {
