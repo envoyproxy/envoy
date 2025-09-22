@@ -63,6 +63,15 @@ public:
     Metadata = 77,
   };
 
+  enum class Setting : uint16_t {
+    HeaderTableSize = 0x1,
+    EnablePush = 0x2,
+    MaxConcurrentStreams = 0x3,
+    InitialWindowSize = 0x4,
+    MaxFrameSize = 0x5,
+    MaxHeaderListSize = 0x6,
+  };
+
   enum class SettingsFlags : uint8_t {
     None = 0,
     Ack = 1,

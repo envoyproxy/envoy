@@ -1751,7 +1751,13 @@ TEST_P(Http2CodecImplDeferredResetTest, DeferredResetServerIfLocalEndStreamBefor
     response_encoder_->encodeHeaders(response_headers, false);
     Buffer::OwnedImpl body(std::string(32 * 1024, 'a'));
     EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
-    auto flush_timer = new Event::MockTimer(&server_connection_.dispatcher_);
+    auto flush_timer = new Event::MockTimer();
+    EXPECT_CALL(server_connection_.dispatcher_,
+                createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
+        .WillOnce(Invoke([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
+          flush_timer->callback_ = cb;
+          return flush_timer;
+        }));
     EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
     response_encoder_->encodeData(body, true);
     EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
@@ -1791,7 +1797,13 @@ TEST_P(Http2CodecImplDeferredResetTest, LargeDataDeferredResetServerIfLocalEndSt
     response_encoder_->encodeHeaders(response_headers, false);
     Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
     EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
-    auto flush_timer = new Event::MockTimer(&server_connection_.dispatcher_);
+    auto flush_timer = new Event::MockTimer();
+    EXPECT_CALL(server_connection_.dispatcher_,
+                createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
+        .WillOnce(Invoke([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
+          flush_timer->callback_ = cb;
+          return flush_timer;
+        }));
     EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
     response_encoder_->encodeData(body, true);
     EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
@@ -2190,7 +2202,13 @@ TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBody) {
   // server, intentionally exhausting the window.
   driveServer();
   driveClient();
-  auto flush_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
+  auto flush_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(server_connection_.dispatcher_,
+              createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
+      .WillOnce(Invoke([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
+        flush_timer->callback_ = cb;
+        return flush_timer;
+      }));
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   response_encoder_->encodeTrailers(TestResponseTrailerMapImpl{{"trailing", "header"}});
 
@@ -2226,7 +2244,13 @@ TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBodyFlushTimeout
   driveToCompletion();
   EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark());
   EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
-  auto flush_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
+  auto flush_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(server_connection_.dispatcher_,
+              createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
+      .WillOnce(Invoke([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
+        flush_timer->callback_ = cb;
+        return flush_timer;
+      }));
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
   response_encoder_->encodeData(body, false);
@@ -2242,6 +2266,7 @@ TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBodyFlushTimeout
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
   EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
   EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
+  ENVOY_LOG_MISC(debug, "invoke callback");
   flush_timer->invokeCallback();
   driveToCompletion();
   EXPECT_EQ(1, server_stats_store_.counter("http2.tx_flush_timeout").value());
@@ -2267,7 +2292,13 @@ TEST_P(Http2CodecImplFlowControlTest, LargeServerBodyFlushTimeout) {
   driveToCompletion();
 
   // The server enables the flush timer under encodeData(). The client then decodes some data.
-  auto flush_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
+  auto flush_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(server_connection_.dispatcher_,
+              createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
+      .WillOnce(Invoke([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
+        flush_timer->callback_ = cb;
+        return flush_timer;
+      }));
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
@@ -2308,7 +2339,13 @@ TEST_P(Http2CodecImplFlowControlTest, LargeServerBodyFlushTimeoutAfterGoaway) {
   driveToCompletion();
 
   // The server enables the flush timer under encodeData(). The client then decodes some data.
-  auto flush_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
+  auto flush_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(server_connection_.dispatcher_,
+              createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
+      .WillOnce(Invoke([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
+        flush_timer->callback_ = cb;
+        return flush_timer;
+      }));
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   EXPECT_CALL(response_decoder_, decodeData(_, false)).Times(AtLeast(1));
   Buffer::OwnedImpl body(std::string(1024 * 1024, 'a'));
@@ -2442,7 +2479,13 @@ TEST_P(Http2CodecImplFlowControlTest, RstStreamOnPendingFlushTimeoutFlood) {
   // client stream windows should have 5535 bytes left and the next frame should overflow it.
   // nghttp2 sends 1 DATA frame for the remainder of the client window and it should make
   // outbound frame queue 1 away from overflow.
-  auto flush_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
+  auto flush_timer = new NiceMock<Event::MockTimer>();
+  EXPECT_CALL(server_connection_.dispatcher_,
+              createScaledTypedTimer_(Event::ScaledTimerType::HttpDownstreamStreamFlush, _))
+      .WillOnce(Invoke([flush_timer](Event::ScaledTimerType, Event::TimerCb cb) {
+        flush_timer->callback_ = cb;
+        return flush_timer;
+      }));
   EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
   Buffer::OwnedImpl large_body(std::string(6 * 1024, '1'));
   response_encoder_->encodeData(large_body, true);

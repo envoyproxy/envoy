@@ -50,6 +50,11 @@ public:
           proto_config,
       Api::Api& api);
 
+  // grpc by default doesn't like a frame larger than 4MB. Splitting streamed data
+  // into 1MB pieces should keep that threshold from being exceeded when data comes
+  // in as a large buffer.
+  static constexpr size_t MaxStreamedPieceSize = 1024 * 1024;
+
   /**
    * Create an instance of Transcoder interface based on incoming request.
    * @param headers headers received from decoder.

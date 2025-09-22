@@ -162,7 +162,6 @@ envoy_cc_test(
     deps = [
         "//source/common/http:codec_wrappers_lib",
         "//test/mocks/http:http_mocks",
-        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
     ],
 )
@@ -653,6 +652,7 @@ envoy_cc_test(
     deps = [
         "//source/common/formatter:formatter_extension_lib",
         "//source/common/http:header_mutation_lib",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
     ],

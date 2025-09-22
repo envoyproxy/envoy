@@ -132,18 +132,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "codec_wrappers_lib",
     hdrs = ["codec_wrappers.h"],
-    deps = [
-        ":response_decoder_impl_base",
-        "//envoy/http:codec_interface",
-    ],
-)
-
-envoy_cc_library(
-    name = "response_decoder_impl_base",
-    hdrs = ["response_decoder_impl_base.h"],
-    deps = [
-        "//envoy/http:codec_interface",
-    ],
+    deps = ["//envoy/http:codec_interface"],
 )
 
 envoy_cc_library(
@@ -638,6 +627,7 @@ envoy_cc_library(
         ":header_map_lib",
         ":utility_lib",
         "//envoy/http:header_evaluator",
+        "//source/common/common:matchers_lib",
         "//source/common/router:header_parser_lib",
         "@envoy_api//envoy/config/common/mutation_rules/v3:pkg_cc_proto",
     ],

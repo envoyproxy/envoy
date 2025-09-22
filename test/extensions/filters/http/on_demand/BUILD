@@ -64,6 +64,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/on_demand:on_demand_update_lib",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/integration:ads_integration_lib",
+        "//test/integration:ads_xdstp_config_sources_integration_lib",
         "//test/integration:fake_upstream_lib",
         "//test/integration:http_integration_lib",
         "//test/integration:scoped_rds_lib",

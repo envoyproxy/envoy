@@ -36,8 +36,8 @@ public:
     Envoy::Http::ActiveClient::releaseResources();
   }
 
-  struct StreamWrapper : public ResponseDecoderWrapper,
-                         public RequestEncoderWrapper,
+  struct StreamWrapper : public RequestEncoderWrapper,
+                         public ResponseDecoderWrapper,
                          public StreamCallbacks,
                          public Event::DeferredDeletable,
                          protected Logger::Loggable<Logger::Id::pool> {

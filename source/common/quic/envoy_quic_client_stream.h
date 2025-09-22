@@ -3,7 +3,6 @@
 #include "envoy/buffer/buffer.h"
 
 #include "source/common/quic/envoy_quic_stream.h"
-#include "source/common/runtime/runtime_features.h"
 
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
 #include "source/common/quic/http_datagram_handler.h"
@@ -26,7 +25,7 @@ public:
                         quic::StreamType type, Http::Http3::CodecStats& stats,
                         const envoy::config::core::v3::Http3ProtocolOptions& http3_options);
 
-  void setResponseDecoder(Http::ResponseDecoder& decoder);
+  void setResponseDecoder(Http::ResponseDecoder& decoder) { response_decoder_ = &decoder; }
 
   // Http::StreamEncoder
   Http::Http1StreamEncoderOptionsOptRef http1StreamEncoderOptions() override {
@@ -93,12 +92,6 @@ private:
   void useCapsuleProtocol();
 #endif
 
-  // Returns nullptr if the response decoder has already been destructed.
-  Http::ResponseDecoder* getResponseDecoder();
-
-  void onResponseDecoderDead() const;
-
-  Http::ResponseDecoderHandlePtr response_decoder_handle_;
   Http::ResponseDecoder* response_decoder_{nullptr};
   bool decoded_1xx_{false};
 

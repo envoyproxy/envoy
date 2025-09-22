@@ -17,7 +17,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/grpc/codec.h"
 #include "source/common/http/codec_client.h"
-#include "source/common/http/response_decoder_impl_base.h"
 #include "source/common/router/header_parser.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/upstream/health_checker_impl.h"
@@ -78,7 +77,7 @@ public:
 
 private:
   struct HttpActiveHealthCheckSession : public ActiveHealthCheckSession,
-                                        public Http::ResponseDecoderImplBase,
+                                        public Http::ResponseDecoder,
                                         public Http::StreamCallbacks {
     HttpActiveHealthCheckSession(HttpHealthCheckerImpl& parent, const HostSharedPtr& host);
     ~HttpActiveHealthCheckSession() override;
