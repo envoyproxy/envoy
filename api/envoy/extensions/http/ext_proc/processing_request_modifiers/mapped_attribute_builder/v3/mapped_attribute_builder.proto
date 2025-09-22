@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package envoy.extensions.http.ext_proc.processing_request_modifiers.mapped_attribute_builder.v3;
+
+import "xds/annotations/v3/status.proto";
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.http.ext_proc.processing_request_modifiers.mapped_attribute_builder.v3";
+option java_outer_classname = "MappedAttributeBuilderProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/ext_proc/response_processors/save_processing_response/v3;save_processing_responsev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+option (xds.annotations.v3.file_status).work_in_progress = true;
+
+// [#protodoc-title: Mapped Attribute Builder for the external processor.]
+// [#extension: envoy.http.ext_proc.processing_request_modifiers.mapped_attribute_builder]
+//
+// Extension to build custom attributes in the :ref:`request
+// <envoy_v3_api_msg_service.ext_proc.v3.ProcessingRequest>` based on a configurable mapping. The
+// native implementation uses the CEL expression as the key, which is not always desirable. Using this
+// extension, one can re-map a CEL expression that references internal filter state into a more
+// user-friendly key that decouples the value from the underlying filter implementation.
+//
+// If this extension is configured, then the :ref:`request_attributes
+// <envoy_v3_api_msg_service.ext_proc.v3.ProcessingRequest.request_attributes>` are ignored,
+// and all `request_attributes` should be passed via this extension.
+//
+// .. note::
+//   Processing request modifiers are currently in alpha.
+//
+// [#next-free-field: 2]
+message MappedAttributeBuilder {
+  // A map of request attributes to set in the attributes struct.
+  // The key is the attribute name, the value is the attribute value,
+  // interpretable by CEL. This allows for the re-mapping of attributes, which is not supported
+  // by the native attribute building logic.
+  map<string, string> mapped_request_attributes = 1;
+}

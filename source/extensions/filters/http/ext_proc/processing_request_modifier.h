@@ -32,8 +32,9 @@ public:
 
   // Called to modify the request. Takes in the params needed to create the attributes.
   // Implementations are expected to set attributes and then return true iff any were set.
-  virtual bool run(const Params& params,
-                   envoy::service::ext_proc::v3::ProcessingRequest& processingRequest) PURE;
+  virtual bool
+  modifyRequest(const Params& params,
+                envoy::service::ext_proc::v3::ProcessingRequest& processingRequest) PURE;
 };
 
 class ProcessingRequestModifierFactory : public Config::TypedFactory {

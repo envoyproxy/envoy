@@ -2,6 +2,7 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3/mapped_attribute_builder.pb.h"
 #include "envoy/extensions/http/ext_proc/response_processors/save_processing_response/v3/save_processing_response.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/connection.h"
@@ -16,13 +17,15 @@
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
+#include "source/extensions/filters/http/ext_proc/processing_request_modifier.h"
+#include "source/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/mapped_attribute_builder.h"
+#include "source/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/mapped_attribute_builder_factory.h"
 #include "source/extensions/http/ext_proc/response_processors/save_processing_response/save_processing_response.h"
 #include "source/extensions/http/ext_proc/response_processors/save_processing_response/save_processing_response_factory.h"
 
 #include "test/common/http/common.h"
 #include "test/common/http/conn_manager_impl_test_base.h"
 #include "test/extensions/filters/http/ext_proc/mock_server.h"
-#include "test/extensions/filters/http/ext_proc/test_processing_request_modifier.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -77,6 +80,7 @@ using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestRequestTrailerMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
 using ::Envoy::Http::TestResponseTrailerMapImpl;
+using ::Envoy::Http::ExternalProcessing::MappedAttributeBuilderFactory;
 using ::Envoy::Http::ExternalProcessing::SaveProcessingResponseFactory;
 using ::Envoy::Http::ExternalProcessing::SaveProcessingResponseFilterState;
 
@@ -873,7 +877,7 @@ TEST_F(HttpFilterTest, SendAttributes) {
 }
 
 TEST_F(HttpFilterTest, CustomProcessingRequestModifier) {
-  TestProcessingRequestModifierFactory factory;
+  MappedAttributeBuilderFactory factory;
   Registry::InjectFactory<ProcessingRequestModifierFactory> registration(factory);
 
   initialize(R"EOF(
@@ -881,9 +885,9 @@ TEST_F(HttpFilterTest, CustomProcessingRequestModifier) {
     envoy_grpc:
       cluster_name: "ext_proc_server"
   processing_request_modifier:
-    name: "test_processing_request_modifier"
+    name: "mapped_attribute_builder"
     typed_config:
-      "@type": type.googleapis.com/envoy.test.extensions.filters.http.ext_proc.v3.TestProcessingRequestModifierConfig
+      '@type': type.googleapis.com/envoy.extensions.http.ext_proc.processing_request_modifiers.mapped_attribute_builder.v3.MappedAttributeBuilder
       mapped_request_attributes:
         "remapped.path": "request.path"
         "remapped.uri": "request.path"
@@ -923,7 +927,7 @@ TEST_F(HttpFilterTest, CustomProcessingRequestModifier) {
 }
 
 TEST_F(HttpFilterTest, CustomProcessingRequestModifierOverride) {
-  TestProcessingRequestModifierFactory factory;
+  MappedAttributeBuilderFactory factory;
   Registry::InjectFactory<ProcessingRequestModifierFactory> registration(factory);
 
   initialize(R"EOF(
@@ -931,9 +935,9 @@ TEST_F(HttpFilterTest, CustomProcessingRequestModifierOverride) {
     envoy_grpc:
       cluster_name: "ext_proc_server"
   processing_request_modifier:
-    name: "test_processing_request_modifier"
+    name: "mapped_attribute_builder"
     typed_config:
-      "@type": type.googleapis.com/envoy.test.extensions.filters.http.ext_proc.v3.TestProcessingRequestModifierConfig
+      '@type': type.googleapis.com/envoy.extensions.http.ext_proc.processing_request_modifiers.mapped_attribute_builder.v3.MappedAttributeBuilder
       mapped_request_attributes:
         "remapped.path": "request.path"
         "remapped.uri": "request.path"
@@ -944,9 +948,9 @@ TEST_F(HttpFilterTest, CustomProcessingRequestModifierOverride) {
   const std::string override_yaml = R"EOF(
   overrides:
     processing_request_modifier:
-      name: "test_processing_request_modifier"
+      name: "mapped_attribute_builder"
       typed_config:
-        "@type": type.googleapis.com/envoy.test.extensions.filters.http.ext_proc.v3.TestProcessingRequestModifierConfig
+        '@type': type.googleapis.com/envoy.extensions.http.ext_proc.processing_request_modifiers.mapped_attribute_builder.v3.MappedAttributeBuilder
         mapped_request_attributes:
           "foo.bar": "request.path"
   )EOF";
@@ -993,7 +997,7 @@ TEST_F(HttpFilterTest, CustomProcessingRequestModifierDoesNotCrashWithMissingTyp
   processing_request_modifier:
     name: "invalid_processing_request_modifier"
     typed_config:
-      "@type": type.googleapis.com/envoy.test.extensions.filters.http.ext_proc.v3.TestProcessingRequestModifierConfig
+      '@type': type.googleapis.com/envoy.extensions.http.ext_proc.processing_request_modifiers.mapped_attribute_builder.v3.MappedAttributeBuilder
       mapped_request_attributes:
         "remapped.path": "request.path"
   )EOF");

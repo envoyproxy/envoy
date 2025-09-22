@@ -586,7 +586,7 @@ void Filter::sendRequest(const ProcessorState& state, ProcessingRequest&& req, b
         .response_headers = state.responseHeaders(),
         .response_trailers = state.responseTrailers(),
     };
-    processing_request_modifier_->run(params, req);
+    processing_request_modifier_->modifyRequest(params, req);
   }
 
   client_->sendRequest(std::move(req), end_stream, filter_callbacks_->streamId(), this, stream_);

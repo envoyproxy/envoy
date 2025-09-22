@@ -1,22 +1,13 @@
-#include "test/extensions/filters/http/ext_proc/test_processing_request_modifier.h"
+#include "source/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/mapped_attribute_builder.h"
 
-#include <memory>
-#include <string>
-
-#include "source/extensions/filters/common/expr/evaluator.h"
-#include "source/extensions/filters/http/ext_proc/matching_utils.h"
-#include "source/extensions/filters/http/ext_proc/processing_request_modifier.h"
-
-#include "test/extensions/filters/http/ext_proc/test_processing_request_modifier.pb.h"
-#include "test/extensions/filters/http/ext_proc/test_processing_request_modifier.pb.validate.h"
+#include "envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3/mapped_attribute_builder.pb.h"
+#include "envoy/stream_info/stream_info.h"
 
 namespace Envoy {
-namespace Extensions {
-namespace HttpFilters {
+namespace Http {
 namespace ExternalProcessing {
 
 using envoy::service::ext_proc::v3::ProcessingRequest;
-using envoy::test::extensions::filters::http::ext_proc::v3::TestProcessingRequestModifierConfig;
 
 // Helper function to convert proto map values to a unique vector of strings.
 // The order of elements in the returned vector is not guaranteed.
@@ -29,8 +20,9 @@ ProtoMapValuesToUniqueVector(const Protobuf::Map<std::string, std::string>& prot
   return {values.begin(), values.end()};
 }
 
-TestProcessingRequestModifier::TestProcessingRequestModifier(
-    const TestProcessingRequestModifierConfig& config,
+MappedAttributeBuilder::MappedAttributeBuilder(
+    const envoy::extensions::http::ext_proc::processing_request_modifiers::
+        mapped_attribute_builder::v3::MappedAttributeBuilder& config,
     Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr expr_builder,
     Server::Configuration::CommonFactoryContext& context)
     : config_(config),
@@ -38,15 +30,15 @@ TestProcessingRequestModifier::TestProcessingRequestModifier(
                           ProtoMapValuesToUniqueVector(config.mapped_request_attributes()),
                           Protobuf::RepeatedPtrField<std::string>()) {}
 
-bool TestProcessingRequestModifier::run(const Params& params,
-                                        envoy::service::ext_proc::v3::ProcessingRequest& request) {
+bool MappedAttributeBuilder::modifyRequest(
+    const Params& params, envoy::service::ext_proc::v3::ProcessingRequest& request) {
   if (params.traffic_direction != envoy::config::core::v3::TrafficDirection::INBOUND ||
       config_.mapped_request_attributes().empty() || sent_request_attributes_) {
     return false;
   }
   sent_request_attributes_ = true;
 
-  auto activation_ptr = Filters::Common::Expr::createActivation(
+  auto activation_ptr = Extensions::Filters::Common::Expr::createActivation(
       &expression_manager_.localInfo(), params.callbacks->streamInfo(), params.request_headers,
       dynamic_cast<const Http::ResponseHeaderMap*>(params.response_headers),
       dynamic_cast<const Http::ResponseTrailerMap*>(params.response_trailers));
@@ -55,6 +47,7 @@ bool TestProcessingRequestModifier::run(const Params& params,
 
   Protobuf::Struct& remapped_attributes =
       (*request.mutable_attributes())["envoy.filters.http.ext_proc"];
+  remapped_attributes.clear_fields();
   for (const auto& pair : config_.mapped_request_attributes()) {
     const std::string& key = pair.first;
     const std::string& cel_expr_string = pair.second;
@@ -66,18 +59,6 @@ bool TestProcessingRequestModifier::run(const Params& params,
   return true;
 }
 
-std::unique_ptr<ProcessingRequestModifier>
-TestProcessingRequestModifierFactory::createProcessingRequestModifier(
-    const Protobuf::Message& config,
-    Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
-    Server::Configuration::CommonFactoryContext& context) const {
-  const auto& proto_config =
-      MessageUtil::downcastAndValidate<const TestProcessingRequestModifierConfig&>(
-          config, context.messageValidationVisitor());
-  return std::make_unique<TestProcessingRequestModifier>(proto_config, builder, context);
-}
-
 } // namespace ExternalProcessing
-} // namespace HttpFilters
-} // namespace Extensions
+} // namespace Http
 } // namespace Envoy
