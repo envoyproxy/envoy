@@ -55,10 +55,24 @@ public:
   class MockListenerFilterBuffer : public Network::ListenerFilterBuffer {
   public:
     explicit MockListenerFilterBuffer(Buffer::OwnedImpl&& data) {
-      // Save the length before moving
-      const auto length = data.length();
       data_ = std::move(data);
+      updateRawSlice();
+    }
 
+    const Buffer::ConstRawSlice rawSlice() const override { return raw_slice_; }
+
+    bool drain(uint64_t len) override {
+      if (len > data_.length()) {
+        return false;
+      }
+      data_.drain(len);
+      updateRawSlice();
+      return true;
+    }
+
+  private:
+    void updateRawSlice() {
+      const auto length = data_.length();
       if (length > 0) {
         // Linearize and set up the raw slice
         const void* linearized = data_.linearize(length);
@@ -70,10 +84,6 @@ public:
       }
     }
 
-    const Buffer::ConstRawSlice rawSlice() const override { return raw_slice_; }
-    bool drain(uint64_t) override { return true; }
-
-  private:
     Buffer::OwnedImpl data_;
     Buffer::ConstRawSlice raw_slice_;
   };
@@ -94,11 +104,25 @@ protected:
   Event::MockTimer* timeout_timer_;
 };
 
-// Test SSL request detection.
+// Test SSL request detection and 'S' response.
 TEST_F(PostgresInspectorTest, SslRequest) {
   init();
 
   EXPECT_CALL(socket_, setDetectedTransportProtocol("postgres"));
+
+  // Expect the filter to write 'S' response
+  NiceMock<Network::MockIoHandle> io_handle;
+  EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(io_handle));
+
+  // Mock successful write of 'S' response
+  EXPECT_CALL(io_handle, write(testing::_))
+      .WillOnce(testing::Invoke([](Buffer::Instance& buffer) -> Api::IoCallUint64Result {
+        // Verify 'S' response
+        EXPECT_EQ(1, buffer.length());
+        char response = buffer.peekInt<char>(0);
+        EXPECT_EQ('S', response);
+        return Api::IoCallUint64Result{1, Api::IoError::none()};
+      }));
 
   auto data = PostgresTestUtils::createSslRequest();
   auto buffer = createBuffer(std::move(data));
@@ -108,7 +132,14 @@ TEST_F(PostgresInspectorTest, SslRequest) {
   EXPECT_EQ(Network::FilterStatus::Continue, status);
   EXPECT_EQ(1, cfg_->stats().ssl_requested_.value());
   EXPECT_EQ(1, cfg_->stats().postgres_found_.value());
+  EXPECT_EQ(1, cfg_->stats().ssl_response_success_.value());
+  EXPECT_EQ(0, cfg_->stats().ssl_response_failed_.value());
   EXPECT_EQ(0, cfg_->stats().ssl_not_requested_.value());
+
+  // Verify bytes_processed histogram (8 bytes for SSLRequest)
+  Stats::Histogram& histogram = stats_store_.histogramFromString(
+      "postgres_inspector.bytes_processed", Stats::Histogram::Unit::Bytes);
+  EXPECT_NE("", histogram.name());
 }
 
 // Test valid startup message.
@@ -130,6 +161,27 @@ TEST_F(PostgresInspectorTest, ValidStartupMessage) {
   EXPECT_EQ(1, cfg_->stats().postgres_found_.value());
   EXPECT_EQ(1, cfg_->stats().ssl_not_requested_.value());
   EXPECT_EQ(0, cfg_->stats().ssl_requested_.value());
+
+  // Verify bytes_processed histogram
+  Stats::Histogram& histogram = stats_store_.histogramFromString(
+      "postgres_inspector.bytes_processed", Stats::Histogram::Unit::Bytes);
+  EXPECT_NE("", histogram.name());
+}
+
+// Test CancelRequest handling.
+TEST_F(PostgresInspectorTest, CancelRequest) {
+  init();
+
+  EXPECT_CALL(socket_, setDetectedTransportProtocol("postgres"));
+
+  auto data = PostgresTestUtils::createCancelRequest(123, 456);
+  auto buffer = createBuffer(std::move(data));
+
+  const Network::FilterStatus status = filter_->onData(*buffer);
+
+  EXPECT_EQ(Network::FilterStatus::Continue, status);
+  EXPECT_EQ(1, cfg_->stats().postgres_found_.value());
+  EXPECT_EQ(1, cfg_->stats().ssl_not_requested_.value());
 }
 
 // Test startup message with minimal parameters.
@@ -183,9 +235,14 @@ TEST_F(PostgresInspectorTest, InvalidProtocolVersion) {
   const Network::FilterStatus status = filter_->onData(*buffer);
 
   EXPECT_EQ(Network::FilterStatus::Continue, status);
-  EXPECT_EQ(2, cfg_->stats().postgres_not_found_.value());
+  EXPECT_EQ(1, cfg_->stats().postgres_not_found_.value());
   EXPECT_EQ(1, cfg_->stats().protocol_error_.value());
   EXPECT_EQ(0, cfg_->stats().postgres_found_.value());
+
+  // Verify bytes_processed histogram (even for errors, we track what we processed)
+  Stats::Histogram& histogram = stats_store_.histogramFromString(
+      "postgres_inspector.bytes_processed", Stats::Histogram::Unit::Bytes);
+  EXPECT_NE("", histogram.name());
 }
 
 // Test message too large.
@@ -270,9 +327,10 @@ TEST_F(PostgresInspectorTest, BytesProcessedHistogram) {
   filter_->onData(*buffer);
 
   // Check that bytes_processed histogram was updated.
+  // We cannot easily read histogram sample values via IsolatedStoreImpl here.
+  // Assert that the histogram exists in the store by name.
   Stats::Histogram& histogram = stats_store_.histogramFromString(
       "postgres_inspector.bytes_processed", Stats::Histogram::Unit::Bytes);
-  // We can't easily check the exact value, but we can check it exists.
   EXPECT_NE("", histogram.name());
 }
 

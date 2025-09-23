@@ -30,6 +30,9 @@ using ProtoConfig =
   COUNTER(postgres_not_found)                                                                      \
   COUNTER(ssl_requested)                                                                           \
   COUNTER(ssl_not_requested)                                                                       \
+  COUNTER(ssl_response_success)                                                                    \
+  COUNTER(ssl_response_failed)                                                                     \
+  COUNTER(protocol_violation)                                                                      \
   COUNTER(startup_message_too_large)                                                               \
   COUNTER(startup_message_timeout)                                                                 \
   COUNTER(protocol_error)                                                                          \
@@ -43,10 +46,8 @@ struct PostgresInspectorStats {
 };
 
 enum class ParseState {
-  // Waiting for initial message (SSL request or startup message).
+  // Waiting for initial message (SSL request, cancel request, or startup message).
   Initial,
-  // Processing startup message.
-  ProcessingStartup,
   // Parse result is out. It could be Postgres or not.
   Done,
   // Parser reports unrecoverable error.
@@ -65,8 +66,9 @@ public:
   uint32_t maxStartupMessageSize() const { return max_startup_message_size_; }
   std::chrono::milliseconds startupTimeout() const { return startup_timeout_; }
 
-  // Maximum startup message size (10KB by default).
-  static constexpr uint32_t DEFAULT_MAX_STARTUP_MESSAGE_SIZE = 10240;
+  // Maximum startup message size (10KB per PostgreSQL definition) by default.
+  // PostgreSQL defines MAX_STARTUP_PACKET_LENGTH as 10000 bytes.
+  static constexpr uint32_t DEFAULT_MAX_STARTUP_MESSAGE_SIZE = 10000;
   // Default timeout for startup message (10 seconds).
   static constexpr uint32_t DEFAULT_STARTUP_TIMEOUT_MS = 10000;
 
@@ -93,7 +95,6 @@ public:
 
 private:
   Network::FilterStatus processInitialData(Network::ListenerFilterBuffer& buffer);
-  Network::FilterStatus processSslResponse(Network::ListenerFilterBuffer& buffer);
   Network::FilterStatus processStartupMessage(Network::ListenerFilterBuffer& buffer);
 
   void extractMetadata(const StartupMessage& message);
@@ -104,6 +105,7 @@ private:
   Network::ListenerFilterCallbacks* cb_{nullptr};
   ParseState state_{ParseState::Initial};
   uint64_t bytes_read_{0};
+  uint64_t bytes_processed_for_histogram_{0};
   bool ssl_requested_{false};
   Event::TimerPtr timeout_timer_;
 

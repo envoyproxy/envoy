@@ -1,5 +1,7 @@
 #include "contrib/postgres_inspector/filters/listener/source/postgres_inspector.h"
 
+#include <algorithm>
+
 #include "envoy/network/listen_socket.h"
 #include "envoy/stats/scope.h"
 
@@ -46,7 +48,7 @@ Network::FilterStatus Filter::onAccept(Network::ListenerFilterCallbacks& cb) {
 
 Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
   const auto raw_slice = buffer.rawSlice();
-  ENVOY_LOG(debug, "postgres inspector: onData called with {} bytes, bytes_read_={}, state_={}",
+  ENVOY_LOG(trace, "postgres inspector: onData called with {} bytes, bytes_read_={}, state_={}",
             raw_slice.len_, bytes_read_, static_cast<int>(state_));
 
   // Skip data we've already processed.
@@ -60,12 +62,7 @@ Network::FilterStatus Filter::onData(Network::ListenerFilterBuffer& buffer) {
   switch (state_) {
   case ParseState::Initial: {
     auto status = processInitialData(buffer);
-    // After processInitialData we may have drained 8 bytes. We recompute bytes_read_.
-    bytes_read_ = buffer.rawSlice().len_;
-    return status;
-  }
-  case ParseState::ProcessingStartup: {
-    auto status = processStartupMessage(buffer);
+    // After processInitialData we may have drained bytes. Recompute bytes_read_.
     bytes_read_ = buffer.rawSlice().len_;
     return status;
   }
@@ -84,11 +81,11 @@ Network::FilterStatus Filter::processInitialData(Network::ListenerFilterBuffer& 
   const auto raw_slice = buffer.rawSlice();
   const size_t len = raw_slice.len_;
 
-  ENVOY_LOG(debug, "postgres inspector: processInitialData called with len={}", len);
+  ENVOY_LOG(trace, "postgres inspector: processInitialData called with len={}", len);
 
-  // We need at least 8 bytes for initial message.
-  if (len < 8) {
-    ENVOY_LOG(debug, "postgres inspector: insufficient data ({} < 8)", len);
+  // We need at least STARTUP_HEADER_SIZE bytes for initial message.
+  if (len < STARTUP_HEADER_SIZE) {
+    ENVOY_LOG(trace, "postgres inspector: insufficient data ({} < {})", len, STARTUP_HEADER_SIZE);
     return Network::FilterStatus::StopIteration;
   }
 
@@ -96,47 +93,83 @@ Network::FilterStatus Filter::processInitialData(Network::ListenerFilterBuffer& 
   Buffer::OwnedImpl temp_buffer;
   temp_buffer.add(raw_slice.mem_, len);
 
-  ENVOY_LOG(debug, "postgres inspector: created temp buffer with {} bytes", temp_buffer.length());
-
-  // Log the raw data for debugging purposes.
-  if (len >= 8) {
-    const uint32_t* data = static_cast<const uint32_t*>(raw_slice.mem_);
-    ENVOY_LOG(debug, "postgres inspector: raw data - word1=0x{:08x} word2=0x{:08x}", data[0],
-              data[1]);
-  }
+  ENVOY_LOG(trace, "postgres inspector: created temp buffer with {} bytes", temp_buffer.length());
 
   // Check if it's an SSL request.
   bool is_ssl = PostgresMessageParser::isSslRequest(temp_buffer, 0);
-  ENVOY_LOG(debug, "postgres inspector: isSslRequest returned {}", is_ssl);
+  ENVOY_LOG(trace, "postgres inspector: isSslRequest returned {}", is_ssl);
   if (is_ssl) {
-    ENVOY_LOG(debug, "postgres inspector: SSL request detected");
-    config_->stats().ssl_requested_.inc();
+    ENVOY_LOG(debug, "postgres inspector: SSL request detected.");
     ssl_requested_ = true;
 
     // Set protocol as Postgres.
     cb_->socket().setDetectedTransportProtocol("postgres");
     config_->stats().postgres_found_.inc();
+    config_->stats().ssl_requested_.inc();
 
-    // Pass through to TLS Inspector. Drain the SSLRequest bytes so TLS inspector sees
-    // ClientHello.
-    if (len >= 8) {
-      const bool drained = buffer.drain(8);
-      ENVOY_LOG(debug, "postgres inspector: drained SSLRequest bytes: {}", drained);
+    // Reply 'S' to indicate SSL is supported. This enables SNI-based routing for all PostgreSQL
+    // versions by allowing TLS Inspector to extract SNI from the subsequent ClientHello.
+    //
+    // Protocol flow:
+    // 1. Client sends SSLRequest (8 bytes)
+    // 2. We send 'S' (1 byte) to indicate SSL is supported
+    // 3. Client proceeds with TLS ClientHello
+    // 4. TLS Inspector extracts SNI for filter chain matching
+    //
+    // This works for both PostgreSQL 17+ (direct SSL) and < 17 (negotiated SSL).
+    absl::string_view ssl_response(&SSL_RESPONSE_ACCEPT, 1);
+    Buffer::OwnedImpl write_buffer{};
+    write_buffer.add(ssl_response);
+    Api::IoCallUint64Result result = cb_->socket().ioHandle().write(write_buffer);
+
+    if (!result.ok()) {
+      std::string error_msg = fmt::format(
+          "postgres inspector: failed to write SSL response. code: {} error: {}",
+          static_cast<int>(result.err_->getErrorCode()), result.err_->getErrorDetails());
+      ENVOY_LOG(error, "{}", error_msg);
+      config_->stats().ssl_response_failed_.inc();
+      state_ = ParseState::Error;
+      cb_->socket().ioHandle().close();
+      return Network::FilterStatus::StopIteration;
     }
-    ENVOY_LOG(debug, "postgres inspector: passing SSL request to TLS inspector");
+
+    // Drain the SSLRequest from buffer.
+    const bool drained = buffer.drain(SSL_REQUEST_MESSAGE_SIZE);
+    ENVOY_LOG(debug, "postgres inspector: sent 'S' response, drained SSLRequest: {}", drained);
+    bytes_processed_for_histogram_ = SSL_REQUEST_MESSAGE_SIZE;
+
+    // Note: For PostgreSQL 17+ (direct SSL), the client may send ClientHello immediately
+    // after SSLRequest in the same TCP segment. That's expected behavior, not a MITM attack.
+    // For pre-17 versions, client waits for our 'S' response before sending ClientHello.
+    // In both cases, TLS Inspector will process any remaining data as TLS handshake.
+
+    bytes_read_ = 0; // Reset for next message
+    config_->stats().ssl_response_success_.inc();
     done(true);
     return Network::FilterStatus::Continue;
   }
 
-  // Not SSL request, should be startup message.
-  ENVOY_LOG(trace, "postgres inspector: no SSL request, checking for startup message");
-  state_ = ParseState::ProcessingStartup;
-  return processStartupMessage(buffer);
-}
+  // Check if it's a CancelRequest. This is sent by clients to cancel long-running queries.
+  // CancelRequest is special because:
+  // - It's sent on a NEW TCP connection (separate from the original query connection).
+  // - It's always unencrypted, even if the original connection used SSL.
+  // - Format: Int32(16) + Int32(80877102) + Int32(process_id) + Int32(secret_key).
+  // - It does NOT contain startup parameters (no user/database metadata to extract).
+  if (PostgresMessageParser::isCancelRequest(temp_buffer, 0)) {
+    ENVOY_LOG(debug, "postgres inspector: CancelRequest detected.");
+    // Treat as Postgres protocol present but no SSL requested.
+    cb_->socket().setDetectedTransportProtocol("postgres");
+    config_->stats().postgres_found_.inc();
+    config_->stats().ssl_not_requested_.inc();
+    bytes_processed_for_histogram_ = CANCEL_REQUEST_MESSAGE_SIZE;
+    bytes_read_ = buffer.rawSlice().len_;
+    done(true);
+    return Network::FilterStatus::Continue;
+  }
 
-Network::FilterStatus Filter::processSslResponse(Network::ListenerFilterBuffer&) {
-  // SSL negotiation is always passed through to TLS inspector.
-  return Network::FilterStatus::Continue;
+  // Not SSL request, try parsing startup message.
+  ENVOY_LOG(trace, "postgres inspector: no SSL request, checking for startup message.");
+  return processStartupMessage(buffer);
 }
 
 Network::FilterStatus Filter::processStartupMessage(Network::ListenerFilterBuffer& buffer) {
@@ -149,54 +182,57 @@ Network::FilterStatus Filter::processStartupMessage(Network::ListenerFilterBuffe
 
   StartupMessage message;
 
-  if (!PostgresMessageParser::parseStartupMessage(temp_buffer, 0, message,
-                                                  config_->maxStartupMessageSize())) {
-    // Check if message is too large.
-    if (len >= config_->maxStartupMessageSize()) {
-      ENVOY_LOG(debug, "postgres inspector: startup message too large: {} bytes", len);
+  const uint32_t max_size = std::min<uint32_t>(config_->maxStartupMessageSize(), 10000);
+  if (len < 4) {
+    return Network::FilterStatus::StopIteration;
+  }
+  const uint32_t claimed_length = temp_buffer.peekBEInt<uint32_t>(0);
+  const uint32_t maybe_version =
+      (len >= STARTUP_HEADER_SIZE) ? temp_buffer.peekBEInt<uint32_t>(4) : 0;
+  if (claimed_length > max_size) {
+    if (maybe_version == POSTGRES_PROTOCOL_VERSION) {
+      ENVOY_LOG(debug, "postgres inspector: startup message too large: {} bytes.", claimed_length);
       config_->stats().startup_message_too_large_.inc();
       state_ = ParseState::Error;
       cb_->socket().ioHandle().close();
       return Network::FilterStatus::StopIteration;
+    } else {
+      // Not a valid startup header; treat as not Postgres.
+      ENVOY_LOG(debug, "postgres inspector: invalid header with excessive length ({}).",
+                claimed_length);
+      config_->stats().protocol_error_.inc();
+      done(false);
+      return Network::FilterStatus::Continue;
     }
-
-    // Check if the claimed message length looks unreasonable. In which case,
-    // it is likely not Postgres.
-    uint32_t claimed_length = 0;
-    if (len >= 4) {
-      claimed_length = temp_buffer.peekBEInt<uint32_t>(0);
-      // If claimed length is way larger than what we have and seems unreasonable, reject
-      if (claimed_length > len * 10 && claimed_length > 1000) {
-        ENVOY_LOG(debug, "postgres inspector: unreasonable message length {}, not Postgres",
-                  claimed_length);
-        config_->stats().protocol_error_.inc();
-        done(false);
-        return Network::FilterStatus::Continue;
-      }
+  }
+  if (!PostgresMessageParser::parseStartupMessage(temp_buffer, 0, message, max_size)) {
+    // Need more data if the claimed length seems plausible; otherwise treat as not Postgres.
+    if (claimed_length >= STARTUP_HEADER_SIZE && claimed_length <= max_size &&
+        len < claimed_length) {
+      ENVOY_LOG(trace, "postgres inspector: need more data for startup message ({} < {}).", len,
+                claimed_length);
+      return Network::FilterStatus::StopIteration;
     }
-
-    // Need more data.
-    ENVOY_LOG(trace, "postgres inspector: need more data for startup message");
-    return Network::FilterStatus::StopIteration;
+    ENVOY_LOG(debug, "postgres inspector: invalid startup message.");
+    config_->stats().protocol_error_.inc();
+    done(false);
+    return Network::FilterStatus::Continue;
   }
 
   // Validate protocol version.
   if (message.protocol_version != POSTGRES_PROTOCOL_VERSION) {
     ENVOY_LOG(debug, "postgres inspector: invalid protocol version {}", message.protocol_version);
     config_->stats().protocol_error_.inc();
-    config_->stats().postgres_not_found_.inc();
     done(false);
     return Network::FilterStatus::Continue;
   }
 
   // Valid Postgres connection.
-  ENVOY_LOG(debug, "postgres inspector: valid Postgres connection detected");
+  ENVOY_LOG(debug, "postgres inspector: valid Postgres connection detected.");
   cb_->socket().setDetectedTransportProtocol("postgres");
   config_->stats().postgres_found_.inc();
-
-  if (!ssl_requested_) {
-    config_->stats().ssl_not_requested_.inc();
-  }
+  config_->stats().ssl_not_requested_.inc();
+  bytes_processed_for_histogram_ = message.length;
 
   // Extract metadata if enabled.
   if (config_->enableMetadataExtraction()) {
@@ -252,7 +288,13 @@ void Filter::extractMetadata(const StartupMessage& message) {
 }
 
 void Filter::onTimeout() {
-  ENVOY_LOG(debug, "postgres inspector: timeout waiting for startup message");
+  ENVOY_LOG(debug, "postgres inspector: timeout waiting for startup message.");
+  // Check if we've already completed processing. This can happen if done() was called
+  // just before the timeout fired. Since a TCP connection is processed by a single thread,
+  // we don't need complex locking - just check the state.
+  if (state_ == ParseState::Done) {
+    return;
+  }
   config_->stats().startup_message_timeout_.inc();
   state_ = ParseState::Error;
   cb_->socket().ioHandle().close();
@@ -265,7 +307,8 @@ void Filter::done(bool success) {
   }
 
   state_ = ParseState::Done;
-  config_->stats().bytes_processed_.recordValue(bytes_read_);
+  // Record bytes processed for this inspection.
+  config_->stats().bytes_processed_.recordValue(bytes_processed_for_histogram_);
 
   if (!success) {
     config_->stats().postgres_not_found_.inc();

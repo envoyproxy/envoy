@@ -18,6 +18,7 @@ envoy_cc_library(
     hdrs = ["postgres_message_parser.h"],
     repository = "@envoy",
     deps = [
+        "//contrib/postgres/protocol:postgres_protocol_lib",
         "//envoy/buffer:buffer_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
@@ -40,6 +41,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
         "//source/common/common:logger_lib",
+        "//source/common/common:utility_lib",
         "//source/common/network:address_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//contrib/envoy/extensions/filters/listener/postgres_inspector/v3alpha:pkg_cc_proto",
