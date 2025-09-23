@@ -23,6 +23,7 @@ public:
   virtual ~ProcessingRequestModifier() = default;
 
   struct Params {
+
     envoy::config::core::v3::TrafficDirection traffic_direction;
     Http::StreamFilterCallbacks* callbacks;
     const Http::RequestHeaderMap* request_headers;
@@ -30,8 +31,8 @@ public:
     const Http::HeaderMap* response_trailers;
   };
 
-  // Called to modify the request. Takes in the params needed to create the attributes.
-  // Implementations are expected to set attributes and then return true iff any were set.
+  // Called to modify the request after it is created, but before it is sent on the wire.
+  // Implementations may modify the request and must return true if any modications were made.
   virtual bool
   modifyRequest(const Params& params,
                 envoy::service::ext_proc::v3::ProcessingRequest& processingRequest) PURE;
