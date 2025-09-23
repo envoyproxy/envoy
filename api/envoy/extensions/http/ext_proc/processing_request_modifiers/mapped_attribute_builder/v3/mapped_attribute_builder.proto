@@ -9,7 +9,7 @@ import "udpa/annotations/status.proto";
 option java_package = "io.envoyproxy.envoy.extensions.http.ext_proc.processing_request_modifiers.mapped_attribute_builder.v3";
 option java_outer_classname = "MappedAttributeBuilderProto";
 option java_multiple_files = true;
-option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/ext_proc/response_processors/save_processing_response/v3;save_processing_responsev3";
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3;mapped_attribute_builderv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
@@ -29,7 +29,6 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 // .. note::
 //   Processing request modifiers are currently in alpha.
 //
-// [#next-free-field: 2]
 message MappedAttributeBuilder {
   // A map of request attributes to set in the attributes struct.
   // The key is the attribute name, the value is the attribute value,
