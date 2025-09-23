@@ -501,6 +501,28 @@ TEST_F(CacheFilterTest, EndOfRequestedRangeEndsStreamWhenUpstreamDoesNot) {
   EXPECT_THAT(decoder_callbacks_.details(), Eq("cache.response_from_cache_filter"));
 }
 
+TEST_F(CacheFilterTest, EndOfRequestedRangeEndsTraileredStreamWithoutSendingTrailers) {
+  request_headers_.addCopy("range", "bytes=8-11");
+  response_headers_.setStatus(std::to_string(enumToInt(Http::Code::PartialContent)));
+  response_headers_.addCopy("content-range", "bytes 8-11/12");
+  CacheFilterSharedPtr filter = makeFilter(mock_cache_);
+  EXPECT_CALL(stats(), incForStatus(CacheEntryStatus::Hit));
+  EXPECT_CALL(*mock_cache_, lookup);
+  EXPECT_THAT(filter->decodeHeaders(request_headers_, true),
+              Eq(Http::FilterHeadersStatus::StopIteration));
+  EXPECT_CALL(*mock_http_source_, getHeaders);
+  EXPECT_CALL(*mock_http_source_, getBody(IsRange(8, 12), _));
+  captured_lookup_callback_(std::make_unique<ActiveLookupResult>(
+      ActiveLookupResult{std::move(mock_http_source_), CacheEntryStatus::Hit}));
+  EXPECT_CALL(decoder_callbacks_, encodeHeaders_(IsSupersetOfHeaders(response_headers_), false));
+  EXPECT_CALL(decoder_callbacks_, encodeData(BufferStringEqual("beep"), true));
+  captured_get_headers_callback_(createHeaderMap<Http::ResponseHeaderMapImpl>(response_headers_),
+                                 EndStream::More);
+  // More here, at the end of the source data, indicates that trailers exist.
+  captured_get_body_callback_(std::make_unique<Buffer::OwnedImpl>("beep"), EndStream::More);
+  EXPECT_THAT(decoder_callbacks_.details(), Eq("cache.response_from_cache_filter"));
+}
+
 TEST_F(CacheFilterTest, FilterDestroyedDuringEncodeDataPreventsFurtherRequests) {
   CacheFilterSharedPtr filter = makeFilter(mock_cache_, false);
   EXPECT_CALL(stats(), incForStatus(CacheEntryStatus::Hit));
