@@ -224,6 +224,11 @@ public:
   friend class CompressorFilterTestingPeer;
 
 private:
+  // Initialize and cache the most specific per-route config only once for this stream.
+  // Subsequent accesses should use the cached pointer to avoid any inconsistencies if
+  // the route is refreshed mid-stream.
+  void initPerRouteConfig();
+
   bool compressionEnabled(const CompressorFilterConfig::ResponseDirectionConfig& config,
                           const CompressorPerRouteFilterConfig* per_route_config) const;
   bool removeAcceptEncodingHeader(const CompressorFilterConfig::ResponseDirectionConfig& config,
@@ -268,6 +273,8 @@ private:
   Envoy::Compression::Compressor::CompressorPtr request_compressor_;
   const CompressorFilterConfigSharedPtr config_;
   std::unique_ptr<std::string> accept_encoding_;
+  // Cached per-route configuration pointer, initialized once per stream.
+  const CompressorPerRouteFilterConfig* per_route_config_{};
 };
 
 } // namespace Compressor

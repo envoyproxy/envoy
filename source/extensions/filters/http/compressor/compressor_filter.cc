@@ -181,6 +181,14 @@ Envoy::Compression::Compressor::CompressorPtr CompressorFilterConfig::makeCompre
 
 CompressorFilter::CompressorFilter(const CompressorFilterConfigSharedPtr config)
     : config_(std::move(config)) {}
+void CompressorFilter::initPerRouteConfig() {
+  if (decoder_callbacks_ == nullptr || per_route_config_ != nullptr) {
+    return;
+  }
+  per_route_config_ =
+      Http::Utility::resolveMostSpecificPerFilterConfig<CompressorPerRouteFilterConfig>(
+          decoder_callbacks_);
+}
 
 CompressorPerRouteFilterConfig::CompressorPerRouteFilterConfig(
     const envoy::extensions::filters::http::compressor::v3::CompressorPerRoute& config,
@@ -237,12 +245,14 @@ Http::FilterHeadersStatus CompressorFilter::decodeHeaders(Http::RequestHeaderMap
     accept_encoding_ = std::make_unique<std::string>(accept_encoding->value().getStringView());
   }
 
+  // Ensure per-route configuration is initialized only once for this stream.
+  if (per_route_config_ == nullptr) {
+    initPerRouteConfig();
+  }
+
   const auto& response_config = config_->responseDirectionConfig();
-  const auto* per_route_config =
-      Http::Utility::resolveMostSpecificPerFilterConfig<CompressorPerRouteFilterConfig>(
-          decoder_callbacks_);
-  if (compressionEnabled(response_config, per_route_config) &&
-      removeAcceptEncodingHeader(response_config, per_route_config)) {
+  if (compressionEnabled(response_config, per_route_config_) &&
+      removeAcceptEncodingHeader(response_config, per_route_config_)) {
     headers.removeInline(accept_encoding_handle.handle());
   }
 
@@ -323,14 +333,15 @@ bool isResponseCodeCompressible(const Http::ResponseHeaderMap& headers,
 
 Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMap& headers,
                                                           bool end_stream) {
+  // Ensure per-route config is initialized for encoder path as well.
+  if (per_route_config_ == nullptr) {
+    initPerRouteConfig();
+  }
   const auto& config = config_->responseDirectionConfig();
-  const auto* per_route_config =
-      Http::Utility::resolveMostSpecificPerFilterConfig<CompressorPerRouteFilterConfig>(
-          decoder_callbacks_);
 
   // This is used to decide whether stats for accept-encoding header should be touched.
   const bool isEnabledAndContentLengthBigEnough =
-      compressionEnabled(config, per_route_config) && config.isMinimumContentLength(headers);
+      compressionEnabled(config, per_route_config_) && config.isMinimumContentLength(headers);
 
   const bool isCompressible =
       isEnabledAndContentLengthBigEnough && !Http::Utility::isUpgrade(headers) &&
@@ -725,23 +736,18 @@ bool CompressorFilter::removeAcceptEncodingHeader(
 }
 
 Envoy::Compression::Compressor::CompressorFactory& CompressorFilter::getCompressorFactory() const {
-  const auto* per_route_config =
-      Http::Utility::resolveMostSpecificPerFilterConfig<CompressorPerRouteFilterConfig>(
-          decoder_callbacks_);
-  if (per_route_config && per_route_config->compressorFactory()) {
+  // Use cached per-route config if available.
+  if (per_route_config_ && per_route_config_->compressorFactory()) {
     return const_cast<Envoy::Compression::Compressor::CompressorFactory&>(
-        *per_route_config->compressorFactory());
+        *per_route_config_->compressorFactory());
   }
   return const_cast<Envoy::Compression::Compressor::CompressorFactory&>(
       config_->compressorFactory());
 }
 
 std::string CompressorFilter::getContentEncoding() const {
-  const auto* per_route_config =
-      Http::Utility::resolveMostSpecificPerFilterConfig<CompressorPerRouteFilterConfig>(
-          decoder_callbacks_);
-  if (per_route_config && per_route_config->contentEncoding().has_value()) {
-    return per_route_config->contentEncoding().value();
+  if (per_route_config_ && per_route_config_->contentEncoding().has_value()) {
+    return per_route_config_->contentEncoding().value();
   }
   return config_->contentEncoding();
 }
