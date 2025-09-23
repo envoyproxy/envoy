@@ -417,6 +417,9 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
                            ? PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
                                  locality_config->zone_aware_lb_config(), routing_enabled, 100, 100)
                            : 100),
+      locality_basis_(locality_config.has_value()
+                          ? locality_config->zone_aware_lb_config().locality_basis()
+                          : LocalityLbConfig::ZoneAwareLbConfig::HEALTHY_HOSTS_NUM),
       fail_traffic_on_panic_(locality_config.has_value()
                                  ? locality_config->zone_aware_lb_config().fail_traffic_on_panic()
                                  : false),
@@ -424,6 +427,12 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
                                    locality_config->has_locality_weighted_lb_config()) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
   resizePerPriorityState();
+  if (locality_weighted_balancing_) {
+    for (uint32_t priority = 0; priority < priority_set_.hostSetsPerPriority().size(); ++priority) {
+      rebuildLocalityWrrForPriority(priority);
+    }
+  }
+
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) -> absl::Status {
         // Make sure per_priority_state_ is as large as priority_set_.hostSetsPerPriority()
@@ -432,6 +441,10 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
         // disabled at all other levels.
         if (local_priority_set_ && priority == 0) {
           regenerateLocalityRoutingStructures();
+        }
+
+        if (locality_weighted_balancing_) {
+          rebuildLocalityWrrForPriority(priority);
         }
         return absl::OkStatus();
       });
@@ -450,6 +463,13 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
           return absl::OkStatus();
         });
   }
+}
+
+void ZoneAwareLoadBalancerBase::rebuildLocalityWrrForPriority(uint32_t priority) {
+  ASSERT(priority < priority_set_.hostSetsPerPriority().size());
+  auto& host_set = *priority_set_.hostSetsPerPriority()[priority];
+  per_priority_state_[priority]->locality_wrr_ =
+      std::make_unique<LocalityWrr>(host_set, random_.random());
 }
 
 void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
@@ -637,18 +657,57 @@ absl::FixedArray<ZoneAwareLoadBalancerBase::LocalityPercentages>
 ZoneAwareLoadBalancerBase::calculateLocalityPercentages(
     const HostsPerLocality& local_hosts_per_locality,
     const HostsPerLocality& upstream_hosts_per_locality) {
-  uint64_t total_local_hosts = 0;
-  std::map<envoy::config::core::v3::Locality, uint64_t, LocalityLess> local_counts;
+  absl::flat_hash_map<envoy::config::core::v3::Locality, uint64_t, LocalityHash, LocalityEqualTo>
+      local_weights;
+  absl::flat_hash_map<envoy::config::core::v3::Locality, uint64_t, LocalityHash, LocalityEqualTo>
+      upstream_weights;
+  uint64_t total_local_weight = 0;
   for (const auto& locality_hosts : local_hosts_per_locality.get()) {
-    total_local_hosts += locality_hosts.size();
+    uint64_t locality_weight = 0;
+    switch (locality_basis_) {
+    // If locality_basis_ is set to HEALTHY_HOSTS_WEIGHT, it uses the host's weight to calculate the
+    // locality percentage.
+    case LocalityLbConfig::ZoneAwareLbConfig::HEALTHY_HOSTS_WEIGHT:
+      for (const auto& host : locality_hosts) {
+        locality_weight += host->weight();
+      }
+      break;
+    // By default it uses the number of healthy hosts in the locality.
+    case LocalityLbConfig::ZoneAwareLbConfig::HEALTHY_HOSTS_NUM:
+      locality_weight = locality_hosts.size();
+      break;
+    default:
+      PANIC_DUE_TO_CORRUPT_ENUM;
+    }
+    total_local_weight += locality_weight;
     // If there is no entry in the map for a given locality, it is assumed to have 0 hosts.
     if (!locality_hosts.empty()) {
-      local_counts.insert(std::make_pair(locality_hosts[0]->locality(), locality_hosts.size()));
+      local_weights.emplace(locality_hosts[0]->locality(), locality_weight);
     }
   }
-  uint64_t total_upstream_hosts = 0;
+  uint64_t total_upstream_weight = 0;
   for (const auto& locality_hosts : upstream_hosts_per_locality.get()) {
-    total_upstream_hosts += locality_hosts.size();
+    uint64_t locality_weight = 0;
+    switch (locality_basis_) {
+    // If locality_basis_ is set to HEALTHY_HOSTS_WEIGHT, it uses the host's weight to calculate the
+    // locality percentage.
+    case LocalityLbConfig::ZoneAwareLbConfig::HEALTHY_HOSTS_WEIGHT:
+      for (const auto& host : locality_hosts) {
+        locality_weight += host->weight();
+      }
+      break;
+    // By default it uses the number of healthy hosts in the locality.
+    case LocalityLbConfig::ZoneAwareLbConfig::HEALTHY_HOSTS_NUM:
+      locality_weight = locality_hosts.size();
+      break;
+    default:
+      PANIC_DUE_TO_CORRUPT_ENUM;
+    }
+    total_upstream_weight += locality_weight;
+    // If there is no entry in the map for a given locality, it is assumed to have 0 hosts.
+    if (!locality_hosts.empty()) {
+      upstream_weights.emplace(locality_hosts[0]->locality(), locality_weight);
+    }
   }
 
   absl::FixedArray<LocalityPercentages> percentages(upstream_hosts_per_locality.get().size());
@@ -664,13 +723,17 @@ ZoneAwareLoadBalancerBase::calculateLocalityPercentages(
     }
     const auto& locality = upstream_hosts[0]->locality();
 
-    const auto& local_count_it = local_counts.find(locality);
-    const uint64_t local_count = local_count_it == local_counts.end() ? 0 : local_count_it->second;
+    const auto local_weight_it = local_weights.find(locality);
+    const uint64_t local_weight =
+        local_weight_it == local_weights.end() ? 0 : local_weight_it->second;
+    const auto upstream_weight_it = upstream_weights.find(locality);
+    const uint64_t upstream_weight =
+        upstream_weight_it == upstream_weights.end() ? 0 : upstream_weight_it->second;
 
     const uint64_t local_percentage =
-        total_local_hosts > 0 ? 10000ULL * local_count / total_local_hosts : 0;
+        total_local_weight > 0 ? 10000ULL * local_weight / total_local_weight : 0;
     const uint64_t upstream_percentage =
-        total_upstream_hosts > 0 ? 10000ULL * upstream_hosts.size() / total_upstream_hosts : 0;
+        total_upstream_weight > 0 ? 10000ULL * upstream_weight / total_upstream_weight : 0;
 
     percentages[i] = LocalityPercentages{local_percentage, upstream_percentage};
   }
@@ -765,9 +828,9 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context, uint64_
   if (locality_weighted_balancing_) {
     absl::optional<uint32_t> locality;
     if (host_availability == HostAvailability::Degraded) {
-      locality = host_set.chooseDegradedLocality();
+      locality = chooseDegradedLocality(host_set);
     } else {
-      locality = host_set.chooseHealthyLocality();
+      locality = chooseHealthyLocality(host_set);
     }
 
     if (locality.has_value()) {

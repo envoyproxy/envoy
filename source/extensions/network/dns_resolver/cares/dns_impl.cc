@@ -19,6 +19,8 @@
 #include "source/common/network/address_impl.h"
 #include "source/common/network/resolver_impl.h"
 #include "source/common/network/utility.h"
+#include "source/common/protobuf/protobuf.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/strings/str_join.h"
@@ -54,15 +56,29 @@ DnsResolverImpl::DnsResolverImpl(
       rotate_nameservers_(config.rotate_nameservers()),
       edns0_max_payload_size_(static_cast<uint32_t>(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, edns0_max_payload_size, 0))), // 0 means use c-ares default EDNS0
+      max_udp_channel_duration_(
+          config.has_max_udp_channel_duration()
+              ? std::chrono::milliseconds(Protobuf::util::TimeUtil::DurationToMilliseconds(
+                    config.max_udp_channel_duration()))
+              : std::chrono::milliseconds::zero()),
       resolvers_csv_(resolvers_csv),
       filter_unroutable_families_(config.filter_unroutable_families()),
       scope_(root_scope.createScope("dns.cares.")), stats_(generateCaresDnsResolverStats(*scope_)) {
   AresOptions options = defaultAresOptions();
   initializeChannel(&options.options_, options.optmask_);
+
+  // Initialize the periodic UDP channel refresh timer if configured.
+  if (max_udp_channel_duration_ > std::chrono::milliseconds::zero()) {
+    udp_channel_refresh_timer_ = dispatcher.createTimer([this] { onUdpChannelRefreshTimer(); });
+    udp_channel_refresh_timer_->enableTimer(max_udp_channel_duration_);
+  }
 }
 
 DnsResolverImpl::~DnsResolverImpl() {
   timer_->disableTimer();
+  if (udp_channel_refresh_timer_) {
+    udp_channel_refresh_timer_->disableTimer();
+  }
   ares_destroy(channel_);
 }
 
@@ -443,6 +459,20 @@ void DnsResolverImpl::reinitializeChannel() {
       result = ares_set_servers_ports_csv(channel_, resolvers_csv_->c_str());
       RELEASE_ASSERT(result == ARES_SUCCESS, "c-ares set servers failed during re-initialization");
     }
+  }
+}
+
+void DnsResolverImpl::onUdpChannelRefreshTimer() {
+  ENVOY_LOG_EVENT(debug, "cares_udp_channel_periodic_refresh",
+                  "Performing periodic UDP channel refresh after {} ms",
+                  max_udp_channel_duration_.count());
+
+  // Reinitialize the channel to refresh UDP sockets.
+  reinitializeChannel();
+
+  // Re-enable the timer for the next periodic refresh.
+  if (udp_channel_refresh_timer_) {
+    udp_channel_refresh_timer_->enableTimer(max_udp_channel_duration_);
   }
 }
 

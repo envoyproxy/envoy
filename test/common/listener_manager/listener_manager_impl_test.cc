@@ -6691,6 +6691,59 @@ TEST_P(ListenerManagerImplWithRealFiltersTest, MptcpNotSupported) {
       "listener mptcp-udp: enable_mptcp is set but MPTCP is not supported by the operating system");
 }
 
+// Test that hasCompatibleAddress returns false if network namespace is different.
+TEST_P(ListenerManagerImplTest, HasCompatibleAddressWithNetNs) {
+  const std::string yaml_config1 = R"EOF(
+name: listener_0
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 10001
+    network_namespace_filepath: "/var/run/netns/ns1"
+filter_chains: {}
+)EOF";
+
+  const std::string yaml_config2 = R"EOF(
+name: listener_0
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 10001
+    network_namespace_filepath: "/var/run/netns/ns2"
+filter_chains: {}
+)EOF";
+
+  const std::string yaml_config3 = R"EOF(
+name: listener_0
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 10001
+    network_namespace_filepath: "/var/run/netns/ns1"
+filter_chains: {}
+)EOF";
+
+  envoy::config::listener::v3::Listener config1 =
+      TestUtility::parseYaml<envoy::config::listener::v3::Listener>(yaml_config1);
+  envoy::config::listener::v3::Listener config2 =
+      TestUtility::parseYaml<envoy::config::listener::v3::Listener>(yaml_config2);
+  envoy::config::listener::v3::Listener config3 =
+      TestUtility::parseYaml<envoy::config::listener::v3::Listener>(yaml_config3);
+
+  auto listener1 = ListenerImpl::create(config1, "", *manager_, config1.name(), false, false,
+                                        MessageUtil::hash(config1));
+  ASSERT_TRUE(listener1.ok());
+  auto listener2 = ListenerImpl::create(config2, "", *manager_, config2.name(), false, false,
+                                        MessageUtil::hash(config2));
+  ASSERT_TRUE(listener2.ok());
+  auto listener3 = ListenerImpl::create(config3, "", *manager_, config3.name(), false, false,
+                                        MessageUtil::hash(config3));
+  ASSERT_TRUE(listener3.ok());
+
+  EXPECT_FALSE(listener1.value()->hasCompatibleAddress(*(listener2.value())));
+  EXPECT_TRUE(listener1.value()->hasCompatibleAddress(*(listener3.value())));
+}
+
 // Set the resolver to the default IP resolver. The address resolver logic is unit tested in
 // resolver_impl_test.cc.
 TEST_P(ListenerManagerImplWithRealFiltersTest, AddressResolver) {

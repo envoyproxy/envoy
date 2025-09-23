@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3";
+option java_outer_classname = "DownstreamReverseConnectionSocketInterfaceProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/v3;downstream_socket_interfacev3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Bootstrap settings for downstream reverse connection socket interface]
+// [#extension: envoy.bootstrap.reverse_tunnel.downstream_socket_interface]
+
+// Configuration for the downstream reverse connection socket interface.
+// This interface initiates reverse connections to upstream Envoys and provides
+// them as socket connections for downstream requests.
+message DownstreamReverseConnectionSocketInterface {
+  // Stat prefix to be used for downstream reverse connection socket interface stats.
+  string stat_prefix = 1;
+}

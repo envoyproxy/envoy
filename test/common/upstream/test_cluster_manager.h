@@ -118,8 +118,8 @@ public:
   }
 
   absl::StatusOr<CdsApiPtr> createCds(const envoy::config::core::v3::ConfigSource&,
-                                      const xds::core::v3::ResourceLocator*,
-                                      ClusterManager&) override {
+                                      const xds::core::v3::ResourceLocator*, ClusterManager&,
+                                      bool) override {
     return CdsApiPtr{createCds_()};
   }
 

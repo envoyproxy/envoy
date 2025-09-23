@@ -74,7 +74,9 @@ enum class Code : uint16_t {
   InsufficientStorage           = 507,
   LoopDetected                  = 508,
   NotExtended                   = 510,
-  NetworkAuthenticationRequired = 511
+  NetworkAuthenticationRequired = 511,
+  // 512-599 are unassigned server error codes.
+  LastUnassignedServerErrorCode = 599
   // clang-format on
 };
 

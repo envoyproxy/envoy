@@ -6,6 +6,7 @@
 #include "source/common/network/io_socket_handle_impl.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_connection_io_handle.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 
@@ -13,46 +14,6 @@ namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
-
-// UpstreamReverseConnectionIOHandle implementation
-UpstreamReverseConnectionIOHandle::UpstreamReverseConnectionIOHandle(
-    Network::ConnectionSocketPtr socket, const std::string& cluster_name)
-    : IoSocketHandleImpl(socket->ioHandle().fdDoNotUse()), cluster_name_(cluster_name),
-      owned_socket_(std::move(socket)) {
-
-  ENVOY_LOG(trace, "reverse_tunnel: created IO handle for cluster: {}, fd: {}", cluster_name_, fd_);
-}
-
-UpstreamReverseConnectionIOHandle::~UpstreamReverseConnectionIOHandle() {
-  ENVOY_LOG(trace, "reverse_tunnel: destroying IO handle for cluster: {}, fd: {}", cluster_name_,
-            fd_);
-  // The owned_socket_ will be automatically destroyed via RAII.
-}
-
-Api::SysCallIntResult UpstreamReverseConnectionIOHandle::connect(
-    Envoy::Network::Address::InstanceConstSharedPtr address) {
-  ENVOY_LOG(trace, "reverse_tunnel: connect() to {} - connection already established",
-            address->asString());
-
-  // For reverse connections, the connection is already established.
-  return Api::SysCallIntResult{0, 0};
-}
-
-Api::IoCallUint64Result UpstreamReverseConnectionIOHandle::close() {
-  ENVOY_LOG(debug, "reverse_tunnel: close() called for fd: {}", fd_);
-
-  // Prefer letting the owned ConnectionSocket perform the actual close to avoid
-  // double-close.
-  if (owned_socket_) {
-    ENVOY_LOG(debug, "reverse_tunnel: releasing socket for cluster: {}", cluster_name_);
-    owned_socket_.reset();
-    // Invalidate our fd so base destructor won't close again.
-    SET_SOCKET_INVALID(fd_);
-    return Api::ioCallUint64ResultNoError();
-  }
-  // If we no longer own the socket, fall back to base close.
-  return IoSocketHandleImpl::close();
-}
 
 // ReverseTunnelAcceptor implementation
 ReverseTunnelAcceptor::ReverseTunnelAcceptor(Server::Configuration::ServerFactoryContext& context)
@@ -93,7 +54,7 @@ ReverseTunnelAcceptor::socket(Envoy::Network::Socket::Type socket_type,
     // Try to get a cached socket for the node.
     auto socket = socket_manager->getConnectionSocket(node_id);
     if (socket) {
-      ENVOY_LOG(info, "reverse_tunnel: reusing cached socket for node: {}", node_id);
+      ENVOY_LOG(debug, "reverse_tunnel: reusing cached socket for node: {}", node_id);
       // Create IOHandle that owns the socket using RAII.
       auto io_handle =
           std::make_unique<UpstreamReverseConnectionIOHandle>(std::move(socket), node_id);

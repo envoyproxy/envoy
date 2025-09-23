@@ -28,6 +28,20 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "locality_wrr_test",
+    srcs = ["locality_wrr_test.cc"],
+    deps = [
+        "//envoy/upstream:upstream_interface",
+        "//source/common/upstream:upstream_includes",
+        "//source/extensions/load_balancing_policies/common:locality_wrr_lib",
+        "//test/common/upstream:utility_lib",
+        "//test/mocks/upstream:cluster_info_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:test_runtime_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "bounded_load_hlb_test",
     srcs = ["bounded_load_hlb_test.cc"],
     rbe_pool = "6gig",

@@ -18,5 +18,7 @@ envoy_cc_extension(
         "//envoy/network:connection_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
+        "//source/common/http:header_map_lib",
+        "//source/common/http:headers_lib",
     ],
 )

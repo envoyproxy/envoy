@@ -298,10 +298,12 @@ message HistogramBucketSettings {
   // Each value is the upper bound of a bucket. Each bucket must be greater than 0 and unique.
   // The order of the buckets does not matter.
   repeated double buckets = 2 [(validate.rules).repeated = {
-    min_items: 1
     unique: true
     items {double {gt: 0.0}}
   }];
+
+  // Initial number of bins for the ``circllhist`` thread local histogram per time series. Default value is 100.
+  google.protobuf.UInt32Value bins = 3 [(validate.rules).uint32 = {lte: 46082 gt: 0}];
 }
 
 // Stats configuration proto schema for built-in ``envoy.stat_sinks.statsd`` sink. This sink does not support
