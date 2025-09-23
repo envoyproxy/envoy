@@ -169,13 +169,6 @@ public:
    * @return bool whether the listener should bypass overload manager actions
    */
   virtual bool shouldBypassOverloadManager() const PURE;
-
-  /**
-   * @return uint32_t the number of QUIC sessions to create per event loop.
-   * This is an equivalent of the number of connections to accept per event loop
-   * for TCP listeners.
-   */
-  virtual uint32_t numQuicSessionsToCreatePerLoop() const PURE;
 };
 
 using ListenerInfoConstSharedPtr = std::shared_ptr<const ListenerInfo>;
