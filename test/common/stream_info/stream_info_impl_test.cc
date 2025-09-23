@@ -197,7 +197,7 @@ enum LegacyResponseFlag {
   DownstreamRemoteReset = 0x10000000,
   // Unconditionally drop all traffic due to drop_overload is set to 100%.
   UnconditionalDropOverload = 0x20000000,
-  // Reset with NO_ERRROR
+  // Reset with NO_ERROR
   ResetWithNoError = 0x40000000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
   LastFlag = ResetWithNoError,
