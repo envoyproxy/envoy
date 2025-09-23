@@ -2151,9 +2151,9 @@ TEST_P(TcpProxyTest, MaxDownstreamConnectionDurationWithJitterPercentage) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   config.mutable_max_downstream_connection_duration()->set_seconds(10);
   config.mutable_max_downstream_connection_duration_jitter_percentage()->set_value(50.0);
-  
+
   // Idle timeout also uses createTimer, clear it to avoid mixing up timers in tests.
-  config.mutable_idle_timeout()->clear_seconds(); 
+  config.mutable_idle_timeout()->clear_seconds();
 
   EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random())
       .WillRepeatedly(Return(2500));
