@@ -94,6 +94,9 @@ minor_behavior_changes:
     Cap the frame size for streamed grpc at 1MB. Without this change there was a small chance
     that if a request streamed in sufficiently faster than it was processed, a frame larger than
     4MB could be encoded, which most upstream grpc services would, by default, treat as an error.
+- area: build
+  change: |
+    GCC build now use GNU ld. The gold linker was deprecated in binutils 2.44.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*

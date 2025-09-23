@@ -101,13 +101,12 @@ cc_toolchain_config(
     dbg_compile_flags = ["-g"],
     host_system_name = "local",
     link_flags = [
-        "-fuse-ld=lld",
+        "-fuse-ld=bfd",
         "-Wl,-no-as-needed",
         "-Wl,-z,relro,-z,now",
         "-B/usr/bin",
         "-pass-exit-codes",
         "-lm",
-        "-fuse-ld=gold",
     ],
     link_libs = ["-l:libstdc++.a"],
     opt_compile_flags = [
@@ -119,7 +118,7 @@ cc_toolchain_config(
         "-fdata-sections",
     ],
     opt_link_flags = ["-Wl,--gc-sections"],
-    supports_start_end_lib = True,
+    supports_start_end_lib = False,
     target_libc = "local",
     target_system_name = "local",
     tool_paths = {

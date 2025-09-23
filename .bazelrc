@@ -76,7 +76,7 @@ build:linux --conlyopt=-fexceptions
 build:linux --fission=dbg,opt
 build:linux --features=per_object_debug_info
 build:linux --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
-build:linux --action_env=BAZEL_LINKOPTS=-lm:-fuse-ld=gold
+build:linux --action_env=BAZEL_LINKOPTS=-lm:-fuse-ld=bfd
 
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
@@ -109,7 +109,7 @@ build:clang-pch --define=ENVOY_CLANG_PCH=1
 build:libstdc++ --@envoy//bazel:libc++=false
 build:libstdc++ --@envoy//bazel:libstdc++=true
 
-# Use gold linker for gcc compiler.
+# Gcc with libstdc++
 build:gcc --config=libstdc++
 build:gcc --test_env=HEAPCHECK=
 build:gcc --action_env=BAZEL_COMPILER=gcc
@@ -127,7 +127,11 @@ build:gcc --cxxopt=-Wno-missing-requires
 build:gcc --cxxopt=-Wno-dangling-reference
 build:gcc --cxxopt=-Wno-nonnull-compare
 build:gcc --incompatible_enable_cc_toolchain_resolution=false
-build:gcc --linkopt=-fuse-ld=gold --host_linkopt=-fuse-ld=gold
+build:gcc --linkopt=-fuse-ld=bfd --host_linkopt=-fuse-ld=bfd
+build:gcc --features=-supports_start_end_lib --host_features=-supports_start_end_lib
+# Optimize for memory usage during linking to avoid OOM kills.
+build:gcc --linkopt=-Wl,--no-keep-memory
+build:gcc --linkopt=-Wl,--reduce-memory-overheads
 
 # Clang-tidy
 # TODO(phlax): enable this, its throwing some errors as well as finding more issues
