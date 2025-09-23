@@ -78,6 +78,11 @@ BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion
 }
 
 void BaseClientIntegrationTest::initialize() {
+  builder_.setOnEngineRunning([&]() { engine_running.Notify(); });
+  {
+    absl::MutexLock l(&engine_lock_);
+    engine_ = builder_.build();
+  }
   BaseIntegrationTest::initialize();
   {
     absl::MutexLock l(&engine_lock_);
@@ -126,11 +131,6 @@ BaseClientIntegrationTest::createNewStream(EnvoyStreamCallbacks&& stream_callbac
 }
 
 void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running) {
-  builder_.setOnEngineRunning([&]() { engine_running.Notify(); });
-  {
-    absl::MutexLock l(&engine_lock_);
-    engine_ = builder_.build();
-  }
   full_dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 

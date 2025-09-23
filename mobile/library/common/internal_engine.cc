@@ -85,13 +85,22 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
                                bool disable_dns_refresh_on_network_change,
                                Thread::PosixThreadFactoryPtr thread_factory)
     : thread_factory_(std::move(thread_factory)), callbacks_(std::move(callbacks)),
-      logger_(std::move(logger)), event_tracker_(std::move(event_tracker)),
+      event_tracker_(std::move(event_tracker)),
       thread_priority_(thread_priority),
       dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()),
       disable_dns_refresh_on_network_change_(disable_dns_refresh_on_network_change) {
   ExtensionRegistry::registerFactories();
 
   Api::External::registerApi(std::string(ENVOY_EVENT_TRACKER_API_NAME), &event_tracker_);
+
+  // We let the thread clean up this log delegate pointer
+  if (logger != nullptr) {
+    log_delegate_ptr_ = std::make_unique<Logger::LambdaDelegate>(std::move(logger),
+                                                                 Logger::Registry::getSink());
+  } else {
+    log_delegate_ptr_ =
+        std::make_unique<Logger::DefaultDelegate>(log_mutex_, Logger::Registry::getSink());
+  }
 }
 
 InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
@@ -177,15 +186,6 @@ envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
                   {{"name", "bug"}, {"location", std::string(location)}}};
               event_tracker_->on_track_(event);
             });
-      }
-
-      // We let the thread clean up this log delegate pointer
-      if (logger_ != nullptr) {
-        log_delegate_ptr_ = std::make_unique<Logger::LambdaDelegate>(std::move(logger_),
-                                                                     Logger::Registry::getSink());
-      } else {
-        log_delegate_ptr_ =
-            std::make_unique<Logger::DefaultDelegate>(log_mutex_, Logger::Registry::getSink());
       }
 
       main_common = std::make_unique<EngineCommon>(options);
