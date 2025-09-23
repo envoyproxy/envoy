@@ -64,10 +64,12 @@ void StderrSinkDelegate::flush() {
 }
 
 void DelegatingLogSink::set_formatter(std::unique_ptr<spdlog::formatter> formatter) {
+  absl::MutexLock lock(&format_mutex_);
   formatter_ = std::move(formatter);
 }
 
 void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
+  absl::ReleasableMutexLock lock(&format_mutex_);
   absl::string_view msg_view = absl::string_view(msg.payload.data(), msg.payload.size());
 
   // This memory buffer must exist in the scope of the entire function,
@@ -77,6 +79,7 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
     formatter_->format(msg, formatted);
     msg_view = absl::string_view(formatted.data(), formatted.size());
   }
+  lock.Release();
 
   auto log_to_sink = [this, msg_view, msg](SinkDelegate& sink) {
     if (should_escape_) {
