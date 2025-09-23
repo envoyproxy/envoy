@@ -13,7 +13,7 @@ option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/htt
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 option (xds.annotations.v3.file_status).work_in_progress = true;
 
-// [#protodoc-title: Mapped Attribute Builder for the external processor.]
+// [#protodoc-title: Mapped Attribute Builder for the external processor]
 // [#extension: envoy.http.ext_proc.processing_request_modifiers.mapped_attribute_builder]
 //
 // Extension to build custom attributes in the :ref:`request
