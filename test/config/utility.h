@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
@@ -414,6 +415,14 @@ public:
 
   // Set limits on pending upstream outbound frames.
   void setUpstreamOutboundFramesLimits(uint32_t max_all_frames, uint32_t max_control_frames);
+
+  // Set limits on HTTP/2 concurrent streams.
+  void setDownstreamHttp2MaxConcurrentStreams(uint32_t max_streams);
+  void setUpstreamHttp2MaxConcurrentStreams(uint32_t max_streams);
+
+  // Set limits on HTTP/2 window sizes.
+  void setDownstreamHttp2WindowSize(uint32_t stream_window, uint32_t connection_window);
+  void setUpstreamHttp2WindowSize(uint32_t stream_window, uint32_t connection_window);
 
   // Return the bootstrap configuration for hand-off to Envoy.
   const envoy::config::bootstrap::v3::Bootstrap& bootstrap() { return bootstrap_; }

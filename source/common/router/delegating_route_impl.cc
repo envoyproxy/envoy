@@ -63,7 +63,7 @@ const RateLimitPolicy& DelegatingRouteEntry::rateLimitPolicy() const {
   return base_route_entry_->rateLimitPolicy();
 }
 
-const RetryPolicy& DelegatingRouteEntry::retryPolicy() const {
+const RetryPolicyConstSharedPtr& DelegatingRouteEntry::retryPolicy() const {
   return base_route_entry_->retryPolicy();
 }
 

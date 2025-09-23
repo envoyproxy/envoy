@@ -1211,5 +1211,12 @@ TEST_F(MultiConnectionBaseImplTest, SetSocketOptionFailedTest) {
   EXPECT_FALSE(impl_->setSocketOption(sockopt_name, sockopt_val));
 }
 
+TEST_F(MultiConnectionBaseImplTest, GetSocketPanics) {
+  setupMultiConnectionImpl(2);
+
+  // getSocket() should panic as it's not implemented for MultiConnectionBaseImpl.
+  EXPECT_DEATH(impl_->getSocket(), "not implemented");
+}
+
 } // namespace Network
 } // namespace Envoy
