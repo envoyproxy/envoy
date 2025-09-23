@@ -6,7 +6,6 @@
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
-#include "source/common/runtime/runtime_features.h"
 
 #include "absl/container/flat_hash_set.h"
 #include "absl/types/optional.h"
@@ -143,6 +142,7 @@ CompressorFilterConfig::ResponseDirectionConfig::ResponseDirectionConfig(
           proto_config.has_response_direction_config()
               ? proto_config.response_direction_config().remove_accept_encoding_header()
               : proto_config.remove_accept_encoding_header()),
+      status_header_enabled_(proto_config.response_direction_config().status_header_enabled()),
       uncompressible_response_codes_(uncompressibleResponseCodesSet(
           proto_config.response_direction_config().uncompressible_response_codes())),
       response_stats_{generateResponseStats(stats_prefix, scope)} {}
@@ -306,10 +306,8 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::ResponseHeaderMa
   const auto* per_route_config =
       Http::Utility::resolveMostSpecificPerFilterConfig<CompressorPerRouteFilterConfig>(
           decoder_callbacks_);
-  const bool is_status_header_enabled =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.compressor_add_status_header");
 
-  if (is_status_header_enabled) {
+  if (config.statusHeaderEnabled()) {
     return encodeHeadersWithStatusHeader(headers, end_stream, config, per_route_config);
   }
 

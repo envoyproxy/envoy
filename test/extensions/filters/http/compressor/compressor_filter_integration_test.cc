@@ -23,17 +23,25 @@ public:
   CompressorIntegrationTest()
       : HttpIntegrationTest(Http::CodecType::HTTP1, std::get<0>(GetParam())) {}
 
-  void SetUp() override {
-    Runtime::maybeSetRuntimeGuard("envoy.reloadable_features.compressor_add_status_header",
-                                  std::get<1>(GetParam()));
-    decompressor_.init(window_bits);
-  }
+  void SetUp() override { decompressor_.init(window_bits); }
   void TearDown() override { cleanupUpstreamAndDownstream(); }
 
   void initializeFilter(const std::string& config) {
     config_helper_.prependFilter(config);
     initialize();
     codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  }
+
+  void initializeDefaultFilter() {
+    const std::string& filter_to_initialize =
+        std::get<1>(GetParam()) ? default_config_with_status_header : default_config;
+    initializeFilter(filter_to_initialize);
+  }
+
+  void initializeFullFilter() {
+    const std::string& filter_to_initialize =
+        std::get<1>(GetParam()) ? full_config_with_status_header : full_config;
+    initializeFilter(filter_to_initialize);
   }
 
   void doCompressedRequest(Http::TestRequestHeaderMapImpl&& request_headers,
@@ -145,10 +153,59 @@ public:
             compression_strategy: rle
     )EOF"};
 
+  const std::string full_config_with_status_header{R"EOF(
+      name: compressor
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+        response_direction_config:
+          disable_on_etag_header: true
+          remove_accept_encoding_header: false
+          status_header_enabled: true
+          common_config:
+            enabled:
+              default_value: true
+              runtime_key: foo_key
+            min_content_length: 100
+            content_type:
+              - text/html
+              - application/json
+          uncompressible_response_codes:
+            - 206
+        request_direction_config:
+          common_config:
+            enabled:
+              default_value: true
+              runtime_key: enable_requests
+            min_content_length: 100
+            content_type:
+              - text/html
+              - application/json
+        compressor_library:
+          name: testlib
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
+            memory_level: 3
+            window_bits: 10
+            compression_level: best_compression
+            compression_strategy: rle
+    )EOF"};
+
   const std::string default_config{R"EOF(
       name: envoy.filters.http.compressor
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+        compressor_library:
+          name: testlib
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
+    )EOF"};
+
+  const std::string default_config_with_status_header{R"EOF(
+      name: envoy.filters.http.compressor
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+        response_direction_config:
+          status_header_enabled: true
         compressor_library:
           name: testlib
           typed_config:
@@ -174,7 +231,7 @@ INSTANTIATE_TEST_SUITE_P(
  * Exercises gzip compression with default configuration.
  */
 TEST_P(CompressorIntegrationTest, AcceptanceDefaultConfigTest) {
-  initializeFilter(default_config);
+  initializeDefaultFilter();
   doRequestAndCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                          {":path", "/test/long/url"},
                                                          {":scheme", "http"},
@@ -189,7 +246,7 @@ TEST_P(CompressorIntegrationTest, AcceptanceDefaultConfigTest) {
  * Exercises gzip compression with full configuration.
  */
 TEST_P(CompressorIntegrationTest, AcceptanceFullConfigTest) {
-  initializeFilter(full_config);
+  initializeDefaultFilter();
   doRequestAndCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                          {":path", "/test/long/url"},
                                                          {":scheme", "http"},
@@ -204,7 +261,7 @@ TEST_P(CompressorIntegrationTest, AcceptanceFullConfigTest) {
  * Exercises filter when client request contains 'identity' type.
  */
 TEST_P(CompressorIntegrationTest, IdentityAcceptEncoding) {
-  initializeFilter(default_config);
+  initializeDefaultFilter();
   doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                            {":path", "/test/long/url"},
                                                            {":scheme", "http"},
@@ -219,7 +276,7 @@ TEST_P(CompressorIntegrationTest, IdentityAcceptEncoding) {
  * Exercises filter when client request contains unsupported 'accept-encoding' type.
  */
 TEST_P(CompressorIntegrationTest, NotSupportedAcceptEncoding) {
-  initializeFilter(default_config);
+  initializeDefaultFilter();
   doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                            {":path", "/test/long/url"},
                                                            {":scheme", "http"},
@@ -234,7 +291,7 @@ TEST_P(CompressorIntegrationTest, NotSupportedAcceptEncoding) {
  * Exercises filter when upstream response is already encoded.
  */
 TEST_P(CompressorIntegrationTest, UpstreamResponseAlreadyEncoded) {
-  initializeFilter(default_config);
+  initializeDefaultFilter();
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},
@@ -263,7 +320,7 @@ TEST_P(CompressorIntegrationTest, UpstreamResponseAlreadyEncoded) {
  * Exercises filter when upstream responds with content length below the default threshold.
  */
 TEST_P(CompressorIntegrationTest, NotEnoughContentLength) {
-  initializeFilter(default_config);
+  initializeDefaultFilter();
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},
@@ -287,7 +344,7 @@ TEST_P(CompressorIntegrationTest, NotEnoughContentLength) {
  * Exercises filter when response from upstream service is empty.
  */
 TEST_P(CompressorIntegrationTest, EmptyResponse) {
-  initializeFilter(default_config);
+  initializeDefaultFilter();
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},
@@ -310,7 +367,7 @@ TEST_P(CompressorIntegrationTest, EmptyResponse) {
  * Exercises filter when upstream responds with restricted content-type value.
  */
 TEST_P(CompressorIntegrationTest, SkipOnContentType) {
-  initializeFilter(full_config);
+  initializeFullFilter();
   doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                            {":path", "/test/long/url"},
                                                            {":scheme", "http"},
@@ -325,7 +382,7 @@ TEST_P(CompressorIntegrationTest, SkipOnContentType) {
  * Exercises filter when upstream responds with restricted response code value.
  */
 TEST_P(CompressorIntegrationTest, SkipOnUncompressibleResponseCode) {
-  initializeFilter(full_config);
+  initializeFullFilter();
   doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                            {":path", "/test/long/url"},
                                                            {":scheme", "http"},
@@ -342,7 +399,7 @@ TEST_P(CompressorIntegrationTest, SkipOnUncompressibleResponseCode) {
  * Exercises filter when upstream responds with restricted cache-control value.
  */
 TEST_P(CompressorIntegrationTest, SkipOnCacheControl) {
-  initializeFilter(full_config);
+  initializeFullFilter();
   doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                            {":path", "/test/long/url"},
                                                            {":scheme", "http"},
@@ -358,7 +415,7 @@ TEST_P(CompressorIntegrationTest, SkipOnCacheControl) {
  * Exercises gzip compression when upstream returns a chunked response.
  */
 TEST_P(CompressorIntegrationTest, AcceptanceFullConfigChunkedResponse) {
-  initializeFilter(full_config);
+  initializeFullFilter();
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},
@@ -385,7 +442,7 @@ TEST_P(CompressorIntegrationTest, AcceptanceFullConfigChunkedResponse) {
  * Verify Vary header values are preserved.
  */
 TEST_P(CompressorIntegrationTest, AcceptanceFullConfigVaryHeader) {
-  initializeFilter(default_config);
+  initializeDefaultFilter();
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},
@@ -413,7 +470,7 @@ TEST_P(CompressorIntegrationTest, AcceptanceFullConfigVaryHeader) {
  * Exercises gzip request compression with full configuration.
  */
 TEST_P(CompressorIntegrationTest, CompressedRequestAcceptanceFullConfigTest) {
-  initializeFilter(full_config);
+  initializeFullFilter();
   doCompressedRequest(Http::TestRequestHeaderMapImpl{{":method", "PUT"},
                                                      {":path", "/test/long/url"},
                                                      {":scheme", "http"},
@@ -426,6 +483,7 @@ TEST_P(CompressorIntegrationTest, CompressedRequestAcceptanceFullConfigTest) {
 
 // Enable filter, then disable per-route.
 TEST_P(CompressorIntegrationTest, PerRouteDisable) {
+  const bool is_add_status_header = std::get<1>(GetParam());
   config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& cm) {
     auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
     auto* route = vh->mutable_routes()->Mutable(0);
@@ -437,23 +495,45 @@ TEST_P(CompressorIntegrationTest, PerRouteDisable) {
     route->mutable_typed_per_filter_config()->insert(
         MapPair<std::string, Any>("envoy.filters.http.compressor", cfg_any));
   });
-  initializeFilter(R"EOF(
-      name: envoy.filters.http.compressor
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
-        compressor_library:
-          name: testlib
+
+  if (is_add_status_header) {
+    initializeFilter(R"EOF(
+        name: envoy.filters.http.compressor
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+          compressor_library:
+            name: testlib
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
+          response_direction_config:
+            status_header_enabled: true
+            common_config:
+              enabled:
+                default_value: true
+                runtime_key: foo_key
+              content_type:
+                - text/html
+                - application/json
+      )EOF");
+  } else {
+    initializeFilter(R"EOF(
+          name: envoy.filters.http.compressor
           typed_config:
-            "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
-        response_direction_config:
-          common_config:
-            enabled:
-              default_value: true
-              runtime_key: foo_key
-            content_type:
-              - text/html
-              - application/json
-    )EOF");
+            "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+            compressor_library:
+              name: testlib
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
+            response_direction_config:
+              common_config:
+                enabled:
+                  default_value: true
+                  runtime_key: foo_key
+                content_type:
+                  - text/html
+                  - application/json
+        )EOF");
+  }
   doRequestAndNoCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                            {":path", "/nocompress"},
                                                            {":scheme", "http"},
@@ -466,6 +546,7 @@ TEST_P(CompressorIntegrationTest, PerRouteDisable) {
 
 // Disable filter, then enable per-route.
 TEST_P(CompressorIntegrationTest, PerRouteEnable) {
+  const bool is_add_status_header = std::get<1>(GetParam());
   config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& cm) {
     auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
     auto* route = vh->mutable_routes()->Mutable(0);
@@ -477,7 +558,27 @@ TEST_P(CompressorIntegrationTest, PerRouteEnable) {
     route->mutable_typed_per_filter_config()->insert(
         MapPair<std::string, Any>("envoy.filters.http.compressor", cfg_any));
   });
-  initializeFilter(R"EOF(
+
+  if (is_add_status_header) {
+    initializeFilter(R"EOF(
+        name: envoy.filters.http.compressor
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+          compressor_library:
+            name: testlib
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
+          response_direction_config:
+            status_header_enabled: true
+            common_config:
+              enabled:
+                default_value: false
+                runtime_key: foo_key
+              content_type:
+                - text/xml
+      )EOF");
+  } else {
+    initializeFilter(R"EOF(
       name: envoy.filters.http.compressor
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
@@ -493,6 +594,8 @@ TEST_P(CompressorIntegrationTest, PerRouteEnable) {
             content_type:
               - text/xml
     )EOF");
+  }
+
   doRequestAndCompression(Http::TestRequestHeaderMapImpl{{":method", "GET"},
                                                          {":path", "/compress"},
                                                          {":scheme", "http"},
@@ -504,8 +607,7 @@ TEST_P(CompressorIntegrationTest, PerRouteEnable) {
 }
 
 /**
- * Test suite for cases where the envoy.reloadable_features.compressor_add_status_header flag is
- * explicitly set to true.
+ * Test suite for cases where the status_header_enabled configuration flag is set to true.
  */
 class CompressorIntegrationTestWithStatusHeader : public CompressorIntegrationTest {};
 
@@ -522,7 +624,7 @@ INSTANTIATE_TEST_SUITE_P(
  * Exercises filter when upstream responds with content length below the default threshold.
  */
 TEST_P(CompressorIntegrationTestWithStatusHeader, EnvoyCompressionStatusContentLengthTooSmall) {
-  initializeFilter(default_config);
+  initializeDefaultFilter();
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},
@@ -550,7 +652,7 @@ TEST_P(CompressorIntegrationTestWithStatusHeader, EnvoyCompressionStatusContentL
  * Exercises filter when upstream responds with restricted content-type value.
  */
 TEST_P(CompressorIntegrationTestWithStatusHeader, EnvoyCompressionStatusContentTypeNotAllowed) {
-  initializeFilter(full_config);
+  initializeFullFilter();
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},
@@ -577,7 +679,7 @@ TEST_P(CompressorIntegrationTestWithStatusHeader, EnvoyCompressionStatusContentT
  * Exercises filter when upstream responds with an ETag header and disable_on_etag_header is true.
  */
 TEST_P(CompressorIntegrationTestWithStatusHeader, EnvoyCompressionStatusEtagNotAllowed) {
-  initializeFilter(full_config);
+  initializeFullFilter();
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},
@@ -606,7 +708,7 @@ TEST_P(CompressorIntegrationTestWithStatusHeader, EnvoyCompressionStatusEtagNotA
  * Exercises filter when upstream responds with restricted response code value.
  */
 TEST_P(CompressorIntegrationTestWithStatusHeader, EnvoyCompressionStatusStatusCodeNotAllowed) {
-  initializeFilter(full_config);
+  initializeFullFilter();
   Http::TestRequestHeaderMapImpl request_headers{
       {":method", "GET"},     {":path", "/test/long/url"},          {":scheme", "http"},
       {":authority", "host"}, {"accept-encoding", "deflate, gzip"}, {"range", "bytes=100-227"}};
@@ -634,7 +736,7 @@ TEST_P(CompressorIntegrationTestWithStatusHeader, EnvoyCompressionStatusStatusCo
  * header.
  */
 TEST_P(CompressorIntegrationTestWithStatusHeader, EnvoyCompressionStatusCompressed) {
-  initializeFilter(full_config);
+  initializeFullFilter();
   Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
                                                  {":path", "/test/long/url"},
                                                  {":scheme", "http"},

@@ -62,6 +62,7 @@ message Compressor {
   }
 
   // Configuration for filter behavior on the response direction.
+  // [#next-free-field: 6]
   message ResponseDirectionConfig {
     CommonDirectionConfig common_config = 1;
 
@@ -85,6 +86,10 @@ message Compressor {
       unique: true
       items {uint32 {lt: 600 gte: 200}}
     }];
+
+    // If true compressor filter returns additional x-envoy-compression-status
+    // header and the order of the conditions checked in the filter is altered.
+    bool status_header_enabled = 5;
   }
 
   // Minimum response length, in bytes, which will trigger compression. The default value is 30.
@@ -158,8 +163,9 @@ message Compressor {
   bool choose_first = 9;
 }
 
-// Per-route overrides of ``ResponseDirectionConfig``. Anything added here should be optional,
-// to allow overriding arbitrary subsets of configuration. Omitted fields must have no effect.
+// Per-route overrides of ``ResponseDirectionConfig``. Anything added here
+// should be optional, to allow overriding arbitrary subsets of configuration.
+// Omitted fields must have no effect.
 message ResponseDirectionOverrides {
   // If set, overrides the filter-level
   // :ref:`remove_accept_encoding_header<envoy_v3_api_field_extensions.filters.http.compressor.v3.Compressor.ResponseDirectionConfig.remove_accept_encoding_header>`.
@@ -182,7 +188,8 @@ message CompressorPerRoute {
     // Overrides ``Compressor.runtime_enabled`` and ``CommonDirectionConfig.enabled``.
     bool disabled = 1 [(validate.rules).bool = {const: true}];
 
-    // Per-route overrides. Fields set here will override corresponding fields in ``Compressor``.
+    // Per-route overrides. Fields set here will override corresponding fields
+    // in ``Compressor``.
     CompressorOverrides overrides = 2;
   }
 }
