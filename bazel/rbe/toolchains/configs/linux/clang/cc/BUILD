@@ -214,7 +214,6 @@ aarch64_cc_toolchain_config(
         "/opt/llvm/include/aarch64-unknown-linux-gnu/c++/v1",
         "/opt/llvm/include/c++/v1",
     ],
-
     cxx_flags = ["-stdlib=libc++"],
     dbg_compile_flags = ["-g"],
     host_system_name = "local",
