@@ -75,7 +75,7 @@ message SinkConfig {
   // ``envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput`` and the only support action is
   // ``envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.ConversionAction``.
   //
-  // If this field is set to, the sink will attempt to aggregate all the metrics
+  // If this field is set, the sink will attempt to aggregate all the metrics
   // - for metrics with the same name and attributes, they will be aggregated
   // into a single data point.
   // - for metrics with the same name but different attributes, they will be
