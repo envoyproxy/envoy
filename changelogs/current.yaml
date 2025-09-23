@@ -408,6 +408,15 @@ new_features:
 - area: tls_inspector
   change: |
     Added dynamic metadata when failing to parse the ``ClientHello``.
+- area: matching
+  change: |
+    Added :ref:`NetworkNamespaceInput
+    <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.NetworkNamespaceInput>` to the
+    matcher framework. This input returns the listener address's ``network_namespace_filepath``
+    for use with :ref:`filter_chain_matcher
+    <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`, enabling filter chain
+    selection based on the Linux network namespace of the bound socket. On non-Linux platforms,
+    the input returns an empty value and connections use the default filter chain.
 - area: lua
   change: |
     Added ``route()`` to the Stream handle API, allowing Lua scripts to retrieve route information. So far, the only method
