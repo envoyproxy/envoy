@@ -416,6 +416,12 @@ bool CacheFilter::onBody(Buffer::InstancePtr&& body, EndStream end_stream_enum) 
 
   // For a range request the upstream may not have thought it was end_stream
   // but it still could be for the downstream.
+  // This also covers the case where a range request wanted the last byte and
+  // trailers are present; in this case we don't send trailers.
+  // (It is unclear from the spec whether we should, but pragmatically we
+  // may not have any indication of whether trailers are present or not, and
+  // range requests in general are for filling in missing chunks so including
+  // trailers with every chunk would be wasteful.)
   if (is_partial_response_ && remaining_ranges_.empty()) {
     end_stream = true;
   }
@@ -437,14 +443,6 @@ bool CacheFilter::onBody(Buffer::InstancePtr&& body, EndStream end_stream_enum) 
     } else {
       return true;
     }
-  } else if (is_partial_response_) {
-    // If a range was requested we don't send trailers.
-    // (It is unclear from the spec whether we should, but pragmatically we
-    // don't have any indication of whether trailers are present or not, and
-    // range requests in general are for filling in missing chunks so including
-    // trailers with every chunk would be wasteful.)
-    finalizeEncodingCachedResponse();
-    return false;
   } else {
     getTrailers();
     return false;
