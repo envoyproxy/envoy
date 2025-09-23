@@ -1166,6 +1166,75 @@ TEST_F(FilterTestExtractOk, ExtractSizeRepeatedStringField) {
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data, true));
 }
 
+TEST_F(FilterTestExtractOk, ExtractSizeNonRepeatedField) {
+  setUp(R"pb(
+    mode: FIRST_AND_LAST
+    extraction_by_method: {
+      key: "apikeys.ApiKeys.CreateApiKey"
+      value: {
+        response_extraction_by_field: { key: "name" value: EXTRACT_SIZE }
+      }
+    })pb");
+
+  TestRequestHeaderMapImpl req_headers =
+      TestRequestHeaderMapImpl{{":method", "POST"},
+                               {":path", "/apikeys.ApiKeys/CreateApiKey"},
+                               {"content-type", "application/grpc"}};
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(req_headers, true));
+
+  CreateApiKeyRequest request = makeCreateApiKeyRequest();
+  Envoy::Buffer::InstancePtr request_data = Envoy::Grpc::Common::serializeToGrpcFrame(request);
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->decodeData(*request_data, true));
+
+  Envoy::Http::TestResponseHeaderMapImpl resp_headers = TestResponseHeaderMapImpl{
+      {":status", "200"},
+      {"grpc-status", "1"},
+      {"content-type", "application/grpc"},
+  };
+  EXPECT_EQ(Envoy::Http::FilterHeadersStatus::Continue,
+            filter_->encodeHeaders(resp_headers, false));
+
+  apikeys::ApiKey response = makeCreateApiKeyResponse(R"pb(
+    name: ""
+  )pb");
+  Envoy::Buffer::InstancePtr response_data = Envoy::Grpc::Common::serializeToGrpcFrame(response);
+
+  EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
+      .WillOnce(
+        [](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
+          EXPECT_EQ(ns, kFilterName);
+          checkProtoStruct(new_dynamic_metadata, R"pb(
+            fields {
+              key: "responses"
+              value {
+                struct_value {
+                  fields {
+                    key: "first"
+                    value {
+                      struct_value {
+                        fields {
+                          key: "@type"
+                          value {
+                            string_value: "type.googleapis.com/apikeys.ApiKey"
+                          }
+                        }
+                        fields {
+                          key: "numResponseItems"
+                          value {
+                            string_value: "-1"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          )pb");
+        });
+  EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data, true));
+}
+
 using FilterTestFieldTypes = FilterTestBase;
 
 TEST_F(FilterTestFieldTypes, SingularType) {
