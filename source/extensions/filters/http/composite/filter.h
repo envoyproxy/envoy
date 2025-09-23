@@ -118,12 +118,6 @@ private:
                          const std::string& action_name);
 
   Event::Dispatcher& dispatcher_;
-  // Use these to track whether we are allowed to insert a specific kind of filter. These mainly
-  // serve to surface an easier to understand error, as attempting to insert a filter at a later
-  // time will result in various FM assertions firing.
-  // We should be protected against this by the match tree validation that only allows request
-  // headers, this just provides some additional sanity checking.
-  bool decoded_headers_{false};
 
   // Wraps a stream encoder OR a stream decoder filter into a stream filter, making it easier to
   // delegate calls.

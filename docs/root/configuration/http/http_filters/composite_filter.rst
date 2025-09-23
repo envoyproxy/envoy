@@ -9,10 +9,10 @@ or filter configurations to be selected based on the incoming request, allowing 
 configuration that could become prohibitive when making use of per route configurations (e.g.
 because the cardinality would cause a route table explosion).
 
-The filter does not do any kind of buffering, and as a result it must be able to instantiate the
-filter it will delegate to before it receives any callbacks that it needs to delegate. Because of
-this, in order to delegate all the data to the specified filter, the decision must be made based
-on just the request headers.
+The filter does not do any kind of buffering, and as a result it will only
+delegate callbacks received during or after the phase which instantiates the
+delegated filter. In order to delegate all the data to the specified filter,
+the decision must be made based on just the request headers.
 
 Delegation can fail if the filter factory attempted to use a callback not supported by the
 composite filter. In either case, the ``<stat_prefix>.composite.delegation_error`` stat will be

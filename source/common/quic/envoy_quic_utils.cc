@@ -1,18 +1,53 @@
 #include "source/common/quic/envoy_quic_utils.h"
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <memory>
+#include <string>
 
-#include "envoy/common/platform.h"
-#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/api/os_sys_calls_common.h"
+#include "envoy/http/header_map.h"
+#include "envoy/http/stream_reset_handler.h"
+#include "envoy/network/address.h"
+#include "envoy/network/io_handle.h"
+#include "envoy/network/listen_socket.h"
+#include "envoy/network/socket.h"
+#include "envoy/network/socket_interface.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
-#include "source/common/http/utility.h"
+#include "source/common/common/assert.h"
+#include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
+#include "source/common/http/http_option_limits.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/connection_socket_impl.h"
 #include "source/common/network/socket_option_factory.h"
-#include "source/common/network/utility.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/quic/quic_io_handle_wrapper.h"
 #include "source/common/runtime/runtime_features.h"
 
+#include "absl/numeric/int128.h"
+#include "absl/strings/str_cat.h"
+#include "absl/strings/string_view.h"
 #include "openssl/crypto.h"
+#include "openssl/ec.h"
+#include "openssl/ec_key.h"
+#include "openssl/evp.h"
+#include "openssl/nid.h"
+#include "openssl/rsa.h"
+#include "openssl/ssl.h"
+#include "openssl/x509.h"
+#include "quiche/common/http/http_header_block.h"
+#include "quiche/common/quiche_ip_address_family.h"
+#include "quiche/quic/core/quic_config.h"
+#include "quiche/quic/core/quic_constants.h"
+#include "quiche/quic/core/quic_error_codes.h"
+#include "quiche/quic/core/quic_tag.h"
+#include "quiche/quic/core/quic_time.h"
+#include "quiche/quic/core/quic_types.h"
+#include "quiche/quic/platform/api/quic_socket_address.h"
 
 namespace Envoy {
 namespace Quic {

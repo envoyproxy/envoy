@@ -219,7 +219,7 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
                            const std::chrono::milliseconds message_timeout,
                            const uint32_t max_message_timeout_ms, Stats::Scope& scope,
                            const std::string& stats_prefix, bool is_upstream,
-                           Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
+                           Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
                            Server::Configuration::CommonFactoryContext& context)
     : failure_mode_allow_(config.failure_mode_allow()),
       observability_mode_(config.observability_mode()),
@@ -258,7 +258,8 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
           createOnProcessingResponseCb(config, context, stats_prefix)),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()),
       remote_close_timeout_(context.runtime().snapshot().getInteger(
-          RemoteCloseTimeout, DefaultRemoteCloseTimeoutMilliseconds)) {
+          RemoteCloseTimeout, DefaultRemoteCloseTimeoutMilliseconds)),
+      status_on_error_(toErrorCode(config.status_on_error().code())) {
 
   if (config.disable_clear_route_cache()) {
     route_cache_action_ = ExternalProcessor::RETAIN;
@@ -577,7 +578,8 @@ void Filter::onError() {
     decoding_state_.onFinishProcessorCall(Grpc::Status::Aborted);
     encoding_state_.onFinishProcessorCall(Grpc::Status::Aborted);
     ImmediateResponse errorResponse;
-    errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
+    errorResponse.mutable_status()->set_code(
+        static_cast<StatusCode>(static_cast<uint32_t>(config_->statusOnError())));
     errorResponse.set_details(absl::StrCat(ErrorPrefix, "_HTTP_ERROR"));
     sendImmediateResponse(errorResponse);
   }
@@ -1456,7 +1458,8 @@ void Filter::handleErrorResponse(absl::Status processing_status) {
   onFinishProcessorCalls(processing_status.raw_code());
   closeStream();
   ImmediateResponse invalid_mutation_response;
-  invalid_mutation_response.mutable_status()->set_code(StatusCode::InternalServerError);
+  invalid_mutation_response.mutable_status()->set_code(
+      static_cast<StatusCode>(static_cast<uint32_t>(config_->statusOnError())));
   invalid_mutation_response.set_details(std::string(processing_status.message()));
   sendImmediateResponse(invalid_mutation_response);
 }
@@ -1631,7 +1634,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       // instance's lifetime to protect us from a malformed server.
       stats_.failure_mode_allowed_.inc();
       closeStream();
-      clearAsyncState();
+      clearAsyncState(processing_status.raw_code());
       processing_complete_ = true;
     } else {
       // Send an immediate response if fail close is configured.
@@ -1655,8 +1658,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
   }
 
   if (failure_mode_allow_) {
-    // Ignore this and treat as a successful close
-    onGrpcClose();
+    onGrpcCloseWithStatus(status);
     stats_.failure_mode_allowed_.inc();
 
   } else {
@@ -1666,14 +1668,17 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
     onFinishProcessorCalls(status);
     closeStream();
     ImmediateResponse errorResponse;
-    errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
+    errorResponse.mutable_status()->set_code(
+        static_cast<StatusCode>(static_cast<uint32_t>(config_->statusOnError())));
     errorResponse.set_details(
         absl::StrFormat("%s_gRPC_error_%i{%s}", ErrorPrefix, status, message));
     sendImmediateResponse(errorResponse);
   }
 }
 
-void Filter::onGrpcClose() {
+void Filter::onGrpcClose() { onGrpcCloseWithStatus(Grpc::Status::Aborted); }
+
+void Filter::onGrpcCloseWithStatus(Grpc::Status::GrpcStatus status) {
   ENVOY_STREAM_LOG(debug, "Received gRPC stream close", *decoder_callbacks_);
 
   processing_complete_ = true;
@@ -1681,7 +1686,7 @@ void Filter::onGrpcClose() {
   // Successful close. We can ignore the stream for the rest of our request
   // and response processing.
   closeStream();
-  clearAsyncState();
+  clearAsyncState(status);
 }
 
 void Filter::onMessageTimeout() {
@@ -1696,7 +1701,7 @@ void Filter::onMessageTimeout() {
     processing_complete_ = true;
     closeStream();
     stats_.failure_mode_allowed_.inc();
-    clearAsyncState();
+    clearAsyncState(Grpc::Status::DeadlineExceeded);
 
   } else {
     // Return an error and stop processing the current stream.
@@ -1705,7 +1710,6 @@ void Filter::onMessageTimeout() {
     decoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     encoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     ImmediateResponse errorResponse;
-
     errorResponse.mutable_status()->set_code(StatusCode::GatewayTimeout);
     errorResponse.set_details(absl::StrFormat("%s_per-message_timeout_exceeded", ErrorPrefix));
     sendImmediateResponse(errorResponse);
@@ -1714,9 +1718,9 @@ void Filter::onMessageTimeout() {
 
 // Regardless of the current filter state, reset it to "IDLE", continue
 // the current callback, and reset timers. This is used in a few error-handling situations.
-void Filter::clearAsyncState() {
-  decoding_state_.clearAsyncState();
-  encoding_state_.clearAsyncState();
+void Filter::clearAsyncState(Grpc::Status::GrpcStatus call_status) {
+  decoding_state_.clearAsyncState(call_status);
+  encoding_state_.clearAsyncState(call_status);
 }
 
 // Regardless of the current state, ensure that the timers won't fire

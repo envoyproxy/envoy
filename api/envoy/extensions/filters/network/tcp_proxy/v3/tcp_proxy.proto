@@ -7,6 +7,7 @@ import "envoy/config/core/v3/backoff.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/proxy_protocol.proto";
+import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
 import "envoy/type/v3/hash_policy.proto";
 
 import "google/protobuf/duration.proto";
@@ -67,7 +68,7 @@ message TcpProxy {
   // Configuration for tunneling TCP over other transports or application layers.
   // Tunneling is supported over both HTTP/1.1 and HTTP/2. Upstream protocol is
   // determined by the cluster configuration.
-  // [#next-free-field: 7]
+  // [#next-free-field: 8]
   message TunnelingConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.TunnelingConfig";
@@ -116,6 +117,19 @@ message TcpProxy {
     // Save the response trailers to the downstream info filter state for consumption
     // by the network filters. The filter state key is ``envoy.tcp_proxy.propagate_response_trailers``.
     bool propagate_response_trailers = 6;
+
+    // The configuration of the request ID extension used for generation, validation, and
+    // associated tracing operations when tunneling.
+    //
+    // If this field is set, a request ID is generated using the specified extension. If
+    // this field is not set, no request ID is generated.
+    //
+    // When a request ID is generated, it is also stored in the downstream connection's
+    // dynamic metadata under the namespace ``envoy.filters.network.tcp_proxy`` with the key
+    // ``tunnel_request_id`` to allow emission from TCP proxy access logs via the
+    // ``%DYNAMIC_METADATA(envoy.filters.network.tcp_proxy:tunnel_request_id)%`` formatter.
+    // [#extension-category: envoy.request_id]
+    http_connection_manager.v3.RequestIDExtension request_id_extension = 7;
   }
 
   message OnDemand {

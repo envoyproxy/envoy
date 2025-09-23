@@ -85,9 +85,9 @@ envoy_cmake(
         "libvlibmemoryclient.a",
     ],
     postfix_script = """
-        mkdir -p $INSTALLDIR/lib/external $INSTALLDIR/include/external \
-        && find . -name "*.a" | xargs -I{} cp -a {} $INSTALLDIR/lib/ \
-        && find . -name "*.h" ! -name config.h | xargs -I{} cp -a {} $INSTALLDIR/include
+        mkdir -p $$INSTALLDIR/lib/external $$INSTALLDIR/include/external \
+        && find . -name "*.a" | xargs -I{} cp -a {} $$INSTALLDIR/lib/ \
+        && find . -name "*.h" ! -name config.h | xargs -I{} cp -a {} $$INSTALLDIR/include
     """,
     tags = [
         "cpu:16",

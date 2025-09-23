@@ -377,12 +377,12 @@ bool BaseIntegrationTest::getSocketOption(const std::string& listener_name, int 
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
   test_server_->server().dispatcher().post([&]() {
     listeners = test_server_->server().listenerManager().listeners();
-    l.Lock();
+    l.lock();
     listeners_ready = true;
-    l.Unlock();
+    l.unlock();
   });
   l.LockWhen(absl::Condition(&listeners_ready));
-  l.Unlock();
+  l.unlock();
 
   for (auto& listener : listeners) {
     if (listener.get().name() == listener_name) {
@@ -404,12 +404,12 @@ void BaseIntegrationTest::registerTestServerPorts(const std::vector<std::string>
   std::vector<std::reference_wrapper<Network::ListenerConfig>> listeners;
   test_server->server().dispatcher().post([&listeners, &listeners_ready, &l, &test_server]() {
     listeners = test_server->server().listenerManager().listeners();
-    l.Lock();
+    l.lock();
     listeners_ready = true;
-    l.Unlock();
+    l.unlock();
   });
   l.LockWhen(absl::Condition(&listeners_ready));
-  l.Unlock();
+  l.unlock();
 
   auto listener_it = listeners.cbegin();
   auto port_it = port_names.cbegin();

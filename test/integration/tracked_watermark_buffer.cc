@@ -141,14 +141,14 @@ uint64_t TrackedWatermarkBufferFactory::sumMaxBufferSizes() const {
   return val;
 }
 
-std::pair<uint32_t, uint32_t> TrackedWatermarkBufferFactory::highWatermarkRange() const {
+std::pair<uint64_t, uint64_t> TrackedWatermarkBufferFactory::highWatermarkRange() const {
   absl::MutexLock lock(&mutex_);
-  uint32_t min_watermark = 0;
-  uint32_t max_watermark = 0;
+  uint64_t min_watermark = 0;
+  uint64_t max_watermark = 0;
   bool watermarks_set = false;
 
   for (auto& item : buffer_infos_) {
-    uint32_t watermark = item.second.watermark_;
+    uint64_t watermark = item.second.watermark_;
     if (watermark == 0) {
       max_watermark = 0;
       watermarks_set = true;

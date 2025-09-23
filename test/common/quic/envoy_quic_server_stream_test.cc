@@ -898,10 +898,10 @@ TEST_F(EnvoyQuicServerStreamTest, MetadataNotSupported) {
 TEST_F(EnvoyQuicServerStreamTest, EncodeCapsule) {
   setUpCapsuleProtocol(false, true);
   Buffer::OwnedImpl buffer(capsule_fragment_);
-  EXPECT_CALL(quic_connection_, SendMessage(_, _, _))
-      .WillOnce([this](quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice> message, bool) {
+  EXPECT_CALL(quic_connection_, SendDatagram(_, _, _))
+      .WillOnce([this](quic::QuicDatagramId, absl::Span<quiche::QuicheMemSlice> message, bool) {
         EXPECT_EQ(message.data()->AsStringView(), datagram_fragment_);
-        return quic::MESSAGE_STATUS_SUCCESS;
+        return quic::DATAGRAM_STATUS_SUCCESS;
       });
   quic_stream_->encodeData(buffer, /*end_stream=*/true);
 }
@@ -909,7 +909,7 @@ TEST_F(EnvoyQuicServerStreamTest, EncodeCapsule) {
 TEST_F(EnvoyQuicServerStreamTest, DecodeHttp3Datagram) {
   setUpCapsuleProtocol(true, false);
   EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(capsule_fragment_), _));
-  quic_session_.OnMessageReceived(datagram_fragment_);
+  quic_session_.OnDatagramReceived(datagram_fragment_);
 }
 #endif
 

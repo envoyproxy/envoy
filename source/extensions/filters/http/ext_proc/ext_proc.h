@@ -10,6 +10,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/grpc/async_client.h"
+#include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/stats/scope.h"
@@ -225,7 +226,7 @@ public:
                const std::chrono::milliseconds message_timeout,
                const uint32_t max_message_timeout_ms, Stats::Scope& scope,
                const std::string& stats_prefix, bool is_upstream,
-               Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
+               Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
                Server::Configuration::CommonFactoryContext& context);
 
   bool failureModeAllow() const { return failure_mode_allow_; }
@@ -305,7 +306,18 @@ public:
 
   std::unique_ptr<OnProcessingResponse> createOnProcessingResponse() const;
 
+  Http::Code statusOnError() const { return status_on_error_; }
+
 private:
+  static Http::Code toErrorCode(uint64_t status) {
+    const auto code = static_cast<Http::Code>(status);
+    // Only allow 4xx and 5xx status codes.
+    if (code >= Http::Code::BadRequest && code <= Http::Code::LastUnassignedServerErrorCode) {
+      return code;
+    }
+    return Http::Code::InternalServerError;
+  }
+
   ExtProcFilterStats generateStats(const std::string& prefix,
                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
     const std::string final_prefix = absl::StrCat(prefix, "ext_proc.", filter_stats_prefix);
@@ -353,6 +365,7 @@ private:
 
   ThreadLocal::SlotPtr thread_local_stream_manager_slot_;
   const std::chrono::milliseconds remote_close_timeout_;
+  const Http::Code status_on_error_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
@@ -471,6 +484,7 @@ public:
       std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>&& response) override;
   void onGrpcError(Grpc::Status::GrpcStatus error, const std::string& message) override;
   void onGrpcClose() override;
+  void onGrpcCloseWithStatus(Grpc::Status::GrpcStatus status);
   void logStreamInfoBase(const Envoy::StreamInfo::StreamInfo* stream_info);
   void logStreamInfo() override;
 
@@ -523,7 +537,7 @@ private:
   void halfCloseAndWaitForRemoteClose();
 
   void onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status);
-  void clearAsyncState();
+  void clearAsyncState(Grpc::Status::GrpcStatus call_status = Grpc::Status::Aborted);
   void sendImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse& response);
 
   Http::FilterHeadersStatus onHeaders(ProcessorState& state,

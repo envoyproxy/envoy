@@ -34,10 +34,17 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
 void MetadataCredentialsProviderBase::onClusterAddOrUpdate() {
   ENVOY_LOG(debug, "Received callback from aws cluster manager for cluster {}", cluster_name_);
   if (!cache_duration_timer_) {
-    cache_duration_timer_ = context_.mainThreadDispatcher().createTimer([this]() -> void {
-      stats_->credential_refreshes_performed_.inc();
-      refresh();
-    });
+    std::weak_ptr<MetadataCredentialsProviderStats> weak_stats = stats_;
+    std::weak_ptr<MetadataCredentialsProviderBase> weak_self = shared_from_this();
+    cache_duration_timer_ =
+        context_.mainThreadDispatcher().createTimer([weak_stats, weak_self]() -> void {
+          if (auto stats = weak_stats.lock()) {
+            stats->credential_refreshes_performed_.inc();
+          }
+          if (auto self = weak_self.lock()) {
+            self->refresh();
+          }
+        });
   }
   if (!cache_duration_timer_->enabled()) {
     cache_duration_timer_->enableTimer(std::chrono::milliseconds(1));
@@ -116,21 +123,24 @@ void MetadataCredentialsProviderBase::setCredentialsToAllThreads(
         /* Notify waiting signers on completion of credential setting above */
         [this]() {
           credentials_pending_.store(false);
-          std::list<CredentialSubscriberCallbacks*> subscribers_copy;
+          std::list<std::weak_ptr<CredentialSubscriberCallbacks>> subscribers_copy;
           {
             Thread::LockGuard guard(mu_);
             subscribers_copy = credentials_subscribers_;
           }
-          for (auto& cb : subscribers_copy) {
-            ENVOY_LOG(debug, "Notifying subscriber of credential update");
-            cb->onCredentialUpdate();
+          for (auto& weak_cb : subscribers_copy) {
+            if (auto cb = weak_cb.lock()) {
+              ENVOY_LOG(debug, "Notifying subscriber of credential update");
+              cb->onCredentialUpdate();
+            }
           }
         });
   }
 }
 
 CredentialSubscriberCallbacksHandlePtr
-MetadataCredentialsProviderBase::subscribeToCredentialUpdates(CredentialSubscriberCallbacks& cs) {
+MetadataCredentialsProviderBase::subscribeToCredentialUpdates(
+    CredentialSubscriberCallbacksSharedPtr cs) {
   Thread::LockGuard guard(mu_);
   return std::make_unique<CredentialSubscriberCallbacksHandle>(cs, credentials_subscribers_);
 }

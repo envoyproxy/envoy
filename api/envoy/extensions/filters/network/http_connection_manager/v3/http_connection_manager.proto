@@ -37,7 +37,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 59]
+// [#next-free-field: 60]
 message HttpConnectionManager {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager";
@@ -527,16 +527,6 @@ message HttpConnectionManager {
   // is terminated with a 408 Request Timeout error code if no upstream response
   // header has been received, otherwise a stream reset occurs.
   //
-  // This timeout also specifies the amount of time that Envoy will wait for the peer to open enough
-  // window to write any remaining stream data once the entirety of stream data (local end stream is
-  // true) has been buffered pending available window. In other words, this timeout defends against
-  // a peer that does not release enough window to completely write the stream, even though all
-  // data has been proxied within available flow control windows. If the timeout is hit in this
-  // case, the :ref:`tx_flush_timeout <config_http_conn_man_stats_per_codec>` counter will be
-  // incremented. Note that :ref:`max_stream_duration
-  // <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>` does not apply to
-  // this corner case.
-  //
   // If the :ref:`overload action <config_overload_manager_overload_actions>` "envoy.overload_actions.reduce_timeouts"
   // is configured, this timeout is scaled according to the value for
   // :ref:`HTTP_DOWNSTREAM_STREAM_IDLE <envoy_v3_api_enum_value_config.overload.v3.ScaleTimersOverloadActionConfig.TimerType.HTTP_DOWNSTREAM_STREAM_IDLE>`.
@@ -549,8 +539,28 @@ message HttpConnectionManager {
   //
   // A value of 0 will completely disable the connection manager stream idle
   // timeout, although per-route idle timeout overrides will continue to apply.
+  //
+  // This timeout is also used as the default value for :ref:`stream_flush_timeout
+  // <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_flush_timeout>`.
   google.protobuf.Duration stream_idle_timeout = 24
       [(udpa.annotations.security).configure_for_untrusted_downstream = true];
+
+  // The stream flush timeout for connections managed by the connection manager.
+  //
+  // If not specified, the value of stream_idle_timeout is used. This is for backwards compatibility
+  // since this was the original behavior. In essence this timeout is an override for the
+  // stream_idle_timeout that applies specifically to the end of stream flush case.
+  //
+  // This timeout specifies the amount of time that Envoy will wait for the peer to open enough
+  // window to write any remaining stream data once the entirety of stream data (local end stream is
+  // true) has been buffered pending available window. In other words, this timeout defends against
+  // a peer that does not release enough window to completely write the stream, even though all
+  // data has been proxied within available flow control windows. If the timeout is hit in this
+  // case, the :ref:`tx_flush_timeout <config_http_conn_man_stats_per_codec>` counter will be
+  // incremented. Note that :ref:`max_stream_duration
+  // <envoy_v3_api_field_config.core.v3.HttpProtocolOptions.max_stream_duration>` does not apply to
+  // this corner case.
+  google.protobuf.Duration stream_flush_timeout = 59;
 
   // The amount of time that Envoy will wait for the entire request to be received.
   // The timer is activated when the request is initiated, and is disarmed when the last byte of the

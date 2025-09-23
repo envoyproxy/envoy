@@ -11,6 +11,9 @@ quiche_common_copts = [
     # hpack_huffman_decoder.cc overloads operator<<.
     "-Wno-unused-function",
     "-Wno-old-style-cast",
+
+    # Envoy build should not fail if a dependency has a warning.
+    "-Wno-error",
 ]
 
 quiche_copts = select({

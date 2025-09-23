@@ -80,6 +80,7 @@ public:
 
   // Router::ResponseEntry
   void finalizeResponseHeaders(Http::ResponseHeaderMap& headers,
+                               const Formatter::HttpFormatterContext& context,
                                const StreamInfo::StreamInfo& stream_info) const override;
   Http::HeaderTransforms responseHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
                                                   bool do_formatting = true) const override;
@@ -91,6 +92,7 @@ public:
   absl::optional<std::string>
   currentUrlPathAfterRewrite(const Http::RequestHeaderMap& headers) const override;
   void finalizeRequestHeaders(Http::RequestHeaderMap& headers,
+                              const Formatter::HttpFormatterContext& context,
                               const StreamInfo::StreamInfo& stream_info,
                               bool insert_envoy_original_path) const override;
   Http::HeaderTransforms requestHeaderTransforms(const StreamInfo::StreamInfo& stream_info,
@@ -100,7 +102,7 @@ public:
   const HedgePolicy& hedgePolicy() const override;
   Upstream::ResourcePriority priority() const override;
   const RateLimitPolicy& rateLimitPolicy() const override;
-  const RetryPolicy& retryPolicy() const override;
+  const RetryPolicyConstSharedPtr& retryPolicy() const override;
   const Router::PathMatcherSharedPtr& pathMatcher() const override;
   const Router::PathRewriterSharedPtr& pathRewriter() const override;
   const InternalRedirectPolicy& internalRedirectPolicy() const override;
@@ -108,6 +110,7 @@ public:
   const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const override;
   std::chrono::milliseconds timeout() const override;
   absl::optional<std::chrono::milliseconds> idleTimeout() const override;
+  absl::optional<std::chrono::milliseconds> flushTimeout() const override;
   bool usingNewTimeouts() const override;
   absl::optional<std::chrono::milliseconds> maxStreamDuration() const override;
   absl::optional<std::chrono::milliseconds> grpcTimeoutHeaderMax() const override;

@@ -46,6 +46,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/network/sni_dynamic_forward_proxy:config",
         "//source/extensions/filters/network/tcp_proxy:config",
+        "//source/extensions/network/dns_resolver/getaddrinfo:config",
         "//test/integration:http_integration_lib",
         "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",

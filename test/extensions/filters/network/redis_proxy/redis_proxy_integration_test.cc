@@ -6,6 +6,7 @@
 #include "source/common/common/fmt.h"
 #include "source/extensions/filters/network/common/redis/fault_impl.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
+#include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/integration.h"
@@ -88,6 +89,10 @@ constexpr absl::string_view CONFIG_WITH_REDIRECTION_DNS = R"EOF({}
               name: foo
               dns_lookup_family: {}
               max_hosts: 100
+              typed_dns_resolver_config:
+                name: envoy.network.dns_resolver.getaddrinfo
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
 )EOF";
 
 // This is a configuration with batching enabled.

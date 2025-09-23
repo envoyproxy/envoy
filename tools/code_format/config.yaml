@@ -324,6 +324,8 @@ paths:
     - test/extensions/filters/http/common/fuzz/uber_filter.h
     - test/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util_test.cc
     - test/tools/router_check/router_check.cc
+    - source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper.cc
+    - test/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper_test.cc
 
   # Files in these paths can use std::regex
   std_regex:

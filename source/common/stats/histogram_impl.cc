@@ -4,6 +4,7 @@
 #include <string>
 
 #include "source/common/common/utility.h"
+#include "source/common/protobuf/utility.h"
 
 #include "absl/strings/str_join.h"
 
@@ -107,7 +108,10 @@ HistogramSettingsImpl::HistogramSettingsImpl(const envoy::config::metrics::v3::S
           std::vector<double> buckets{matcher.buckets().begin(), matcher.buckets().end()};
           std::sort(buckets.begin(), buckets.end());
           configs.emplace_back(Matchers::StringMatcherImpl(matcher.match(), context),
-                               std::move(buckets));
+                               buckets.empty()
+                                   ? absl::nullopt
+                                   : absl::make_optional<ConstSupportedBuckets>(std::move(buckets)),
+                               PROTOBUF_GET_OPTIONAL_WRAPPED(matcher, bins));
         }
 
         return configs;
@@ -115,11 +119,20 @@ HistogramSettingsImpl::HistogramSettingsImpl(const envoy::config::metrics::v3::S
 
 const ConstSupportedBuckets& HistogramSettingsImpl::buckets(absl::string_view stat_name) const {
   for (const auto& config : configs_) {
-    if (config.first.match(stat_name)) {
-      return config.second;
+    if (config.matcher_.match(stat_name) && config.buckets_.has_value()) {
+      return config.buckets_.value();
     }
   }
   return defaultBuckets();
+}
+
+absl::optional<uint32_t> HistogramSettingsImpl::bins(absl::string_view stat_name) const {
+  for (const auto& config : configs_) {
+    if (config.matcher_.match(stat_name) && config.bins_.has_value()) {
+      return config.bins_;
+    }
+  }
+  return {};
 }
 
 const ConstSupportedBuckets& HistogramSettingsImpl::defaultBuckets() {

@@ -116,11 +116,10 @@ size_t WatermarkBuffer::addFragments(absl::Span<const absl::string_view> fragmen
   return total_size_to_write;
 }
 
-void WatermarkBuffer::setWatermarks(uint32_t high_watermark,
+void WatermarkBuffer::setWatermarks(uint64_t high_watermark,
                                     uint32_t overflow_watermark_multiplier) {
   if (overflow_watermark_multiplier > 0 &&
-      (static_cast<uint64_t>(overflow_watermark_multiplier) * high_watermark) >
-          std::numeric_limits<uint32_t>::max()) {
+      (high_watermark > std::numeric_limits<uint64_t>::max() / overflow_watermark_multiplier)) {
     ENVOY_LOG_MISC(debug, "Error setting overflow threshold: overflow_watermark_multiplier * "
                           "high_watermark is overflowing. Disabling overflow watermark.");
     overflow_watermark_multiplier = 0;

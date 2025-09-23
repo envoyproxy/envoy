@@ -54,14 +54,21 @@ class TestAccessLogFactory : public AccessLog::AccessLogInstanceFactory {
 public:
   AccessLog::InstanceSharedPtr
   createAccessLogInstance(const Protobuf::Message&, AccessLog::FilterPtr&&,
-                          Server::Configuration::FactoryContext& context,
+                          Server::Configuration::GenericFactoryContext&,
                           std::vector<Formatter::CommandParserPtr>&& = {}) override {
-    // Check that expected listener metadata is present
-    EXPECT_EQ(1, context.listenerInfo().metadata().typed_filter_metadata().size());
-    const auto iter = context.listenerInfo().metadata().typed_filter_metadata().find(
-        "test.listener.typed.metadata");
-    EXPECT_NE(iter, context.listenerInfo().metadata().typed_filter_metadata().end());
-    return std::make_shared<NiceMock<MockAccessLog>>();
+    auto out = std::make_shared<NiceMock<MockAccessLog>>();
+    EXPECT_CALL(*out, log(_, _))
+        .WillRepeatedly(testing::Invoke(
+            [](const Formatter::HttpFormatterContext&, const StreamInfo::StreamInfo& info) -> void {
+              // Check that expected listener metadata is present
+              auto listener_info = info.downstreamAddressProvider().listenerInfo();
+              ASSERT_TRUE(listener_info.has_value());
+              EXPECT_EQ(1, listener_info->metadata().typed_filter_metadata().size());
+              const auto iter = listener_info->metadata().typed_filter_metadata().find(
+                  "test.listener.typed.metadata");
+              EXPECT_NE(iter, listener_info->metadata().typed_filter_metadata().end());
+            }));
+    return out;
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {

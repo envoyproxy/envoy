@@ -25,7 +25,7 @@ std::string enhancedGrpcMessage(const std::string& original_message,
              : absl::StrCat(original_message, "{", http_response_code_details, "}");
 }
 
-void Base64EscapeBinHeaders(Http::RequestHeaderMap& headers) {
+void base64EscapeBinHeaders(Http::RequestHeaderMap& headers) {
   absl::flat_hash_map<absl::string_view, std::string> bin_metadata;
   headers.iterate([&bin_metadata](const Http::HeaderEntry& header) {
     if (absl::EndsWith(header.key().getStringView(), "-bin")) {
@@ -209,7 +209,7 @@ void AsyncStreamImpl::initialize(bool buffer_body_for_retry) {
   current_span_->injectContext(trace_context, upstream_context);
   callbacks_.onCreateInitialMetadata(headers_message_->headers());
   // base64 encode on "-bin" metadata.
-  Base64EscapeBinHeaders(headers_message_->headers());
+  base64EscapeBinHeaders(headers_message_->headers());
   stream_->sendHeaders(headers_message_->headers(), false);
 }
 

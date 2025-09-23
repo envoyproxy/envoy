@@ -193,11 +193,11 @@ void SignerBaseImpl::createQueryParams(Envoy::Http::Utility::QueryParamsMulti& q
   }
   // X-Amz-Credential
   query_params.add(SignatureQueryParameterValues::AmzCredential,
-                   Utility::encodeQueryComponent(credential));
+                   Utility::encodeQueryComponentPreservingPlus(credential));
   // X-Amz-SignedHeaders
-  query_params.add(
-      SignatureQueryParameterValues::AmzSignedHeaders,
-      Utility::encodeQueryComponent(Utility::joinCanonicalHeaderNames(signed_headers)));
+  query_params.add(SignatureQueryParameterValues::AmzSignedHeaders,
+                   Utility::encodeQueryComponentPreservingPlus(
+                       Utility::joinCanonicalHeaderNames(signed_headers)));
 }
 
 } // namespace Aws

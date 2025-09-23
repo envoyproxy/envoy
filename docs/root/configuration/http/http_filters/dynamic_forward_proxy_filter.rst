@@ -155,5 +155,5 @@ namespace.
   :header: Name, Type, Description
   :widths: 1, 1, 2
 
-  rq_pending_open, Gauge, Whether the requests circuit breaker is closed (0) or open (1)
-  rq_pending_remaining, Gauge, Number of remaining requests until the circuit breaker opens
+  rq_pending_open, Gauge, Whether the requests circuit breaker is closed (0) or open (1).
+  rq_pending_remaining, Gauge, Number of remaining requests until the circuit breaker opens.

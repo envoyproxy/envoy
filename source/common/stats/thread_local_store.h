@@ -34,7 +34,8 @@ namespace Stats {
 class ThreadLocalHistogramImpl : public HistogramImplHelper {
 public:
   ThreadLocalHistogramImpl(StatName name, Histogram::Unit unit, StatName tag_extracted_name,
-                           const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table);
+                           const StatNameTagVector& stat_name_tags, SymbolTable& symbol_table,
+                           absl::optional<uint32_t> bins);
   ~ThreadLocalHistogramImpl() override;
 
   void merge(histogram_t* target);
@@ -64,12 +65,12 @@ public:
   bool hidden() const override { return false; }
 
 private:
-  Histogram::Unit unit_;
+  const Histogram::Unit unit_;
   uint64_t otherHistogramIndex() const { return 1 - current_active_; }
   uint64_t current_active_{0};
   histogram_t* histograms_[2];
   std::atomic<bool> used_;
-  std::thread::id created_thread_id_;
+  const std::thread::id created_thread_id_;
   SymbolTable& symbol_table_;
 };
 
@@ -84,7 +85,8 @@ class ParentHistogramImpl : public MetricImpl<ParentHistogram> {
 public:
   ParentHistogramImpl(StatName name, Histogram::Unit unit, ThreadLocalStoreImpl& parent,
                       StatName tag_extracted_name, const StatNameTagVector& stat_name_tags,
-                      ConstSupportedBuckets& supported_buckets, uint64_t id);
+                      ConstSupportedBuckets& supported_buckets, absl::optional<uint32_t> bins,
+                      uint64_t id);
   ~ParentHistogramImpl() override;
 
   void addTlsHistogram(const TlsHistogramSharedPtr& hist_ptr);
@@ -128,13 +130,15 @@ public:
   // Indicates that the ThreadLocalStore is shutting down, so no need to clear its histogram_set_.
   void setShuttingDown(bool shutting_down) { shutting_down_ = shutting_down; }
   bool shuttingDown() const { return shutting_down_; }
+  absl::optional<uint32_t> bins() const { return bins_; }
 
 private:
   bool usedLockHeld() const ABSL_EXCLUSIVE_LOCKS_REQUIRED(merge_lock_);
   static std::vector<Stats::ParentHistogram::Bucket>
   detailedlBucketsHelper(const histogram_t& histogram);
 
-  Histogram::Unit unit_;
+  const Histogram::Unit unit_;
+  const absl::optional<uint32_t> bins_;
   ThreadLocalStoreImpl& thread_local_store_;
   histogram_t* interval_histogram_;
   histogram_t* cumulative_histogram_;

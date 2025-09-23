@@ -339,6 +339,18 @@ TEST_F(CELFormatterTest, TestTypedInvalidExpression) {
       EnvoyException, "Not able to parse expression: .*");
 }
 
+TEST_F(CELFormatterTest, TestInvalidSemanticExpression) {
+  const std::string yaml = R"EOF(
+  text_format_source:
+    inline_string: "%CEL(f())%"
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  EXPECT_THROW_WITH_REGEX(
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_),
+      EnvoyException, "failed to create an expression: .*");
+}
+
 TEST_F(CELFormatterTest, TestRegexExtFunctions) {
   const std::string yaml = R"EOF(
   text_format_source:
@@ -349,6 +361,19 @@ TEST_F(CELFormatterTest, TestRegexExtFunctions) {
   auto formatter =
       *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
   EXPECT_EQ("true ", formatter->formatWithContext(formatter_context_, stream_info_));
+}
+
+TEST_F(CELFormatterTest, TestRegexExtFunctionsWithActualExtraction) {
+  const std::string yaml = R"EOF(
+  text_format_source:
+    inline_string: "%CEL(re.extract(request.host, '(.+?)\\\\:(\\\\d+)', '\\\\2'))%"
+)EOF";
+  TestUtility::loadFromYaml(yaml, config_);
+
+  request_headers_.addCopy("host", "example.com:443");
+  auto formatter =
+      *Envoy::Formatter::SubstitutionFormatStringUtils::fromProtoConfig(config_, context_);
+  EXPECT_EQ("443", formatter->formatWithContext(formatter_context_, stream_info_));
 }
 
 TEST_F(CELFormatterTest, TestUntypedJsonFormat) {

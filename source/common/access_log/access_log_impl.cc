@@ -54,7 +54,7 @@ bool ComparisonFilter::compareAgainstValue(uint64_t lhs) const {
 }
 
 FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLogFilter& config,
-                                   Server::Configuration::FactoryContext& context) {
+                                   Server::Configuration::GenericFactoryContext& context) {
   Runtime::Loader& runtime = context.serverFactoryContext().runtime();
   Random::RandomGenerator& random = context.serverFactoryContext().api().randomGenerator();
   ProtobufMessage::ValidationVisitor& validation_visitor = context.messageValidationVisitor();
@@ -157,7 +157,7 @@ bool RuntimeFilter::evaluate(const Formatter::HttpFormatterContext&,
 
 OperatorFilter::OperatorFilter(
     const Protobuf::RepeatedPtrField<envoy::config::accesslog::v3::AccessLogFilter>& configs,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::GenericFactoryContext& context) {
   for (const auto& config : configs) {
     auto filter = FilterFactory::fromProto(config, context);
     if (filter != nullptr) {
@@ -167,11 +167,11 @@ OperatorFilter::OperatorFilter(
 }
 
 OrFilter::OrFilter(const envoy::config::accesslog::v3::OrFilter& config,
-                   Server::Configuration::FactoryContext& context)
+                   Server::Configuration::GenericFactoryContext& context)
     : OperatorFilter(config.filters(), context) {}
 
 AndFilter::AndFilter(const envoy::config::accesslog::v3::AndFilter& config,
-                     Server::Configuration::FactoryContext& context)
+                     Server::Configuration::GenericFactoryContext& context)
     : OperatorFilter(config.filters(), context) {}
 
 bool OrFilter::evaluate(const Formatter::HttpFormatterContext& context,
@@ -330,7 +330,7 @@ bool MetadataFilter::evaluate(const Formatter::HttpFormatterContext&,
 
 InstanceSharedPtr
 AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
-                            Server::Configuration::FactoryContext& context,
+                            Server::Configuration::GenericFactoryContext& context,
                             std::vector<Formatter::CommandParserPtr>&& command_parsers) {
   FilterPtr filter;
   if (config.has_filter()) {

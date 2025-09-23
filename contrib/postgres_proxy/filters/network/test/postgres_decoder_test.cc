@@ -728,8 +728,8 @@ public:
   MOCK_METHOD(ssize_t, search, (const void*, uint64_t, size_t, size_t), (const, override));
   MOCK_METHOD(bool, startsWith, (absl::string_view), (const, override));
   MOCK_METHOD(std::string, toString, (), (const, override));
-  MOCK_METHOD(void, setWatermarks, (uint32_t, uint32_t), (override));
-  MOCK_METHOD(uint32_t, highWatermark, (), (const, override));
+  MOCK_METHOD(void, setWatermarks, (uint64_t, uint32_t), (override));
+  MOCK_METHOD(uint64_t, highWatermark, (), (const, override));
   MOCK_METHOD(bool, highWatermarkTriggered, (), (const, override));
   MOCK_METHOD(size_t, addFragments, (absl::Span<const absl::string_view>));
 };

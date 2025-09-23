@@ -35,12 +35,23 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "locality_wrr_lib",
+    srcs = ["locality_wrr.cc"],
+    hdrs = ["locality_wrr.h"],
+    deps = [
+        "//envoy/upstream:upstream_interface",
+        "//source/common/upstream:scheduler_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "load_balancer_lib",
     srcs = ["load_balancer_impl.cc"],
     hdrs = ["load_balancer_impl.h"],
     # previously considered core code and used by mobile.
     visibility = ["//visibility:public"],
     deps = [
+        ":locality_wrr_lib",
         "//envoy/common:random_generator_interface",
         "//envoy/runtime:runtime_interface",
         "//envoy/stats:stats_interface",

@@ -14,12 +14,9 @@ namespace ExternalProcessing {
 
 class ExpressionManager : public Logger::Loggable<Logger::Id::ext_proc> {
 public:
-  struct CelExpression {
-    cel::expr::ParsedExpr parsed_expr_;
-    Filters::Common::Expr::ExpressionPtr compiled_expr_;
-  };
+  using CelExpression = Filters::Common::Expr::CompiledExpression;
 
-  ExpressionManager(Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder,
+  ExpressionManager(Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
                     const LocalInfo::LocalInfo& local_info,
                     const Protobuf::RepeatedPtrField<std::string>& request_matchers,
                     const Protobuf::RepeatedPtrField<std::string>& response_matchers)
@@ -51,7 +48,7 @@ private:
   absl::flat_hash_map<std::string, CelExpression>
   initExpressions(const Protobuf::RepeatedPtrField<std::string>& matchers);
 
-  Extensions::Filters::Common::Expr::BuilderInstanceSharedPtr builder_;
+  const Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder_;
   const LocalInfo::LocalInfo& local_info_;
 
   const absl::flat_hash_map<std::string, CelExpression> request_expr_;

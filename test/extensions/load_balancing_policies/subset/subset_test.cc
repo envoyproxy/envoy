@@ -475,7 +475,7 @@ public:
             std::make_shared<HealthyHostVector>(*local_hosts_), local_hosts_per_locality_,
             std::make_shared<DegradedHostVector>(), HostsPerLocalityImpl::empty(),
             std::make_shared<ExcludedHostVector>(), HostsPerLocalityImpl::empty()),
-        {}, {}, {}, 0, absl::nullopt);
+        {}, {}, {}, absl::nullopt);
 
     initLbConfigAndLB(nullptr, true);
   }
@@ -624,7 +624,7 @@ public:
           updateHostsParams(local_hosts_, local_hosts_per_locality_,
                             std::make_shared<HealthyHostVector>(*local_hosts_),
                             local_hosts_per_locality_),
-          {}, {}, remove, 0, absl::nullopt);
+          {}, {}, remove, absl::nullopt);
     }
 
     for (const auto& host : add) {
@@ -641,7 +641,7 @@ public:
             updateHostsParams(local_hosts_, local_hosts_per_locality_,
                               std::make_shared<HealthyHostVector>(*local_hosts_),
                               local_hosts_per_locality_),
-            {}, add, {}, 0, absl::nullopt);
+            {}, add, {}, absl::nullopt);
       }
     } else if (!add.empty() || !remove.empty()) {
       local_priority_set_.updateHosts(
@@ -649,7 +649,7 @@ public:
           updateHostsParams(local_hosts_, local_hosts_per_locality_,
                             std::make_shared<const HealthyHostVector>(*local_hosts_),
                             local_hosts_per_locality_),
-          {}, add, remove, 0, absl::nullopt);
+          {}, add, remove, absl::nullopt);
     }
   }
 

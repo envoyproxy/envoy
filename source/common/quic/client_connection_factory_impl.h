@@ -12,6 +12,7 @@
 #include "source/common/tls/client_ssl_socket.h"
 #include "source/extensions/quic/crypto_stream/envoy_quic_crypto_client_stream.h"
 
+#include "quiche/quic/core/http/quic_connection_migration_manager.h"
 #include "quiche/quic/core/quic_utils.h"
 
 namespace Envoy {
@@ -34,6 +35,8 @@ struct PersistentQuicInfoImpl : public Http::PersistentQuicInfo {
   // Override the maximum packet length of connections for tunneling. Use the default length in
   // QUICHE if this is set to 0.
   quic::QuicByteCount max_packet_length_;
+  // TODO(danzh): Add a config knob to configure connection migration.
+  quic::QuicConnectionMigrationConfig migration_config_;
 };
 
 std::unique_ptr<PersistentQuicInfoImpl>

@@ -21,7 +21,7 @@ fn new_nop_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter
   _envoy_filter_config: &mut EC,
   name: &str,
   config: &[u8],
-) -> Option<Box<dyn HttpFilterConfig<EC, EHF>>> {
+) -> Option<Box<dyn HttpFilterConfig<EHF>>> {
   let name = name.to_string();
   let config = String::from_utf8(config.to_owned()).unwrap_or_default();
   Some(Box::new(NopHttpFilterConfig { name, config }))
@@ -35,10 +35,8 @@ struct NopHttpFilterConfig {
   config: String,
 }
 
-impl<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter> HttpFilterConfig<EC, EHF>
-  for NopHttpFilterConfig
-{
-  fn new_http_filter(&mut self, _envoy: &mut EC) -> Box<dyn HttpFilter<EHF>> {
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for NopHttpFilterConfig {
+  fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
     Box::new(NopHttpFilter {
       on_request_headers_called: false,
       on_request_body_called: false,

@@ -64,6 +64,7 @@ security_postures:
 categories:
 - envoy.access_loggers
 - envoy.bootstrap
+- envoy.built_in_formatters
 - envoy.clusters
 - envoy.compression.compressor
 - envoy.compression.decompressor
@@ -120,6 +121,7 @@ categories:
 - envoy.common.key_value
 - envoy.network.dns_resolver
 - envoy.network.connection_balance
+- envoy.resolvers
 - envoy.rbac.matchers
 - envoy.rbac.principals
 - envoy.rbac.audit_loggers

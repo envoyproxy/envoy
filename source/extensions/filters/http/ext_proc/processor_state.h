@@ -210,7 +210,7 @@ public:
 
   virtual void continueProcessing() const PURE;
   void continueIfNecessary();
-  void clearAsyncState();
+  void clearAsyncState(Grpc::Status::GrpcStatus call_status = Grpc::Status::Aborted);
 
   virtual envoy::service::ext_proc::v3::HttpHeaders*
   mutableHeaders(envoy::service::ext_proc::v3::ProcessingRequest& request) const PURE;

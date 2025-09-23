@@ -906,6 +906,119 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
   EXPECT_EQ(0, config.streamIdleTimeout().count());
 }
 
+TEST_F(HttpConnectionManagerConfigTest, StreamIdleTimeoutDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  // 5 minutes -> ms.
+  EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
+}
+
+// Tracks stream_idle_timeout. If neither stream_idle_timeout nor stream_flush_timeout are set,
+// stream_flush_timeout should default to stream_idle_timeout's default.
+TEST_F(HttpConnectionManagerConfigTest, StreamFlushTimeoutDefault) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_TRUE(config.streamFlushTimeout().has_value());
+  // 5 minutes.
+  EXPECT_EQ(5 * 60 * 1000, config.streamFlushTimeout().value().count());
+}
+
+// If stream_idle_timeout is set and stream_flush_timeout is not set, stream_flush_timeout should
+// default to stream_idle_timeout.
+TEST_F(HttpConnectionManagerConfigTest, StreamFlushTimeoutDefaultStreamIdleTimeoutSet) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  stream_idle_timeout: 10s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_TRUE(config.streamFlushTimeout().has_value());
+  // 10 seconds.
+  EXPECT_EQ(10 * 1000, config.streamFlushTimeout().value().count());
+}
+
+// Validate that an explicit zero stream flush timeout disables it.
+TEST_F(HttpConnectionManagerConfigTest, DisabledStreamFlushTimeout) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  stream_flush_timeout: 0s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  ASSERT_TRUE(config.streamFlushTimeout().has_value());
+  EXPECT_EQ(0, config.streamFlushTimeout().value().count());
+}
+
+// Validate that the flush timeout and idle timeout can be set independently.
+TEST_F(HttpConnectionManagerConfigTest, StreamFlushTimeoutAndStreamIdleTimeoutSet) {
+  const std::string yaml_string = R"EOF(
+  stat_prefix: ingress_http
+  stream_idle_timeout: 10s
+  stream_flush_timeout: 20s
+  route_config:
+    name: local_route
+  http_filters:
+  - name: envoy.filters.http.router
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromYaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     &scoped_routes_config_provider_manager_, tracer_manager_,
+                                     filter_config_provider_manager_, creation_status_);
+  ASSERT_TRUE(creation_status_.ok());
+  EXPECT_EQ(10 * 1000, config.streamIdleTimeout().count());
+  ASSERT_TRUE(config.streamFlushTimeout().has_value());
+  EXPECT_EQ(20 * 1000, config.streamFlushTimeout().value().count());
+}
+
 // Validate that idle_timeout set in common_http_protocol_options is used.
 TEST_F(HttpConnectionManagerConfigTest, CommonHttpProtocolIdleTimeout) {
   const std::string yaml_string = R"EOF(
@@ -3481,6 +3594,38 @@ TEST_F(HttpConnectionManagerConfigTest, TranslateLegacyConfigToDefaultHeaderVali
                                      filter_config_provider_manager_, creation_status_);
   EXPECT_FALSE(creation_status_.ok());
 #endif
+}
+
+TEST_F(HttpConnectionManagerConfigTest, HealtchCheckIncorrectConfigTest) {
+  const std::string yaml_string = R"EOF(
+codec_type: http1
+server_name: foo
+stat_prefix: router
+route_config:
+  virtual_hosts:
+  - name: service
+    domains:
+    - "*"
+    routes:
+    - match:
+        prefix: "/"
+      route:
+        cluster: cluster
+http_filters:
+- name: health_check
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.health_check.v3.HealthCheck
+    pass_through_mode: false
+    cluster_min_healthy_percentages:
+      test: {value: nan}
+- name: envoy.filters.http.router
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      createHttpConnectionManagerConfig(yaml_string), EnvoyException,
+      "cluster_min_healthy_percentages contains a NaN value for cluster: test");
 }
 
 class HcmUtilityTest : public testing::Test {

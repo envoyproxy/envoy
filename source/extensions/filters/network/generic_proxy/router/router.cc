@@ -241,6 +241,13 @@ void UpstreamRequest::onDecodingSuccess(ResponseHeaderFramePtr response_header_f
     upstream_info_->upstreamTiming().onFirstUpstreamRxByteReceived(parent_.time_source_);
   }
 
+  if (!response_header_frame->status().ok()) {
+    if (span_ != nullptr) {
+      span_->setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
+      span_->setTag(Tracing::Tags::get().ErrorReason, "upstream_failure");
+    }
+  }
+
   if (response_header_frame->frameFlags().endStream()) {
     onUpstreamResponseComplete(response_header_frame->frameFlags().drainClose());
   }
