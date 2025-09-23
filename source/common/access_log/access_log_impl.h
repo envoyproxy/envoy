@@ -249,7 +249,7 @@ public:
                 const StreamInfo::StreamInfo& info) const override;
 
 private:
-  Matchers::ValueMatcherConstSharedPtr present_matcher_;
+  Matchers::PresentMatcher present_matcher_;
   Matchers::ValueMatcherConstSharedPtr value_matcher_;
 
   std::vector<std::string> path_;
