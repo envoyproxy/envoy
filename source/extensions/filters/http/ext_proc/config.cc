@@ -115,7 +115,8 @@ ExternalProcessingFilterConfig::createRouteSpecificFilterConfigTyped(
     Server::Configuration::ServerFactoryContext& server_context,
     ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<FilterConfigPerRoute>(
-      proto_config, Envoy::Extensions::Filters::Common::Expr::getBuilder(context), server_context);
+      proto_config, Envoy::Extensions::Filters::Common::Expr::getBuilder(server_context),
+      server_context);
 }
 
 // This method will only be called when the filter is in downstream.

@@ -894,6 +894,7 @@ TEST_F(HttpFilterTest, MappedAttributeBuilder) {
         "remapped.path": "request.path"
         "remapped.uri": "request.path"
         "remapped.method": "request.method"
+        "remapped.foo": "request.foo"
   )EOF");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
