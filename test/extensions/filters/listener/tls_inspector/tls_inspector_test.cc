@@ -9,7 +9,6 @@
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/test_runtime.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 
 #include "absl/strings/str_format.h"
@@ -259,10 +258,8 @@ TEST_P(TlsInspectorTest, NoExtensions) {
 // Test that the filter fails if the ClientHello is larger than the
 // maximum allowed size.
 TEST_P(TlsInspectorTest, ClientHelloTooBig) {
-  Envoy::TestScopedRuntime test_runtime;
-  test_runtime.mergeValues(
-      {{"envoy.reloadable_features.tls_inspector_no_length_check_on_error", "false"}});
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  proto_config.set_close_connection_on_client_hello_parsing_errors(true);
   cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHelloFromJA3Fingerprint(
       "769,47-53-5-10-49161-49162-49171-49172-50-56-19-4,0-10-11,23-24-25,0", 17000);
@@ -299,7 +296,7 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
   ASSERT_EQ(1, bytes_processed.size());
 }
 
-TEST_P(TlsInspectorTest, ClientHelloTooBigWithoutLengthCheck) {
+TEST_P(TlsInspectorTest, ClientHelloTooBigTreatParsingErrorAsPlainText) {
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
   cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHelloFromJA3Fingerprint(
