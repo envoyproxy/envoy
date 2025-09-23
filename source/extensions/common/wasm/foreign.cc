@@ -76,7 +76,7 @@ RegisterForeignFunction registerVerifySignatureForeignFunction(
         }
 
         auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-        Envoy::Common::Crypto::CryptoObjectPtr crypto_ptr;
+        Envoy::Common::Crypto::PKeyObjectPtr crypto_ptr;
         if (has_pem) {
           crypto_ptr = crypto_util.importPublicKeyPEM(key);
         } else {
@@ -133,7 +133,7 @@ RegisterForeignFunction registerSignForeignFunction(
         }
 
         auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-        Envoy::Common::Crypto::CryptoObjectPtr crypto_ptr;
+        Envoy::Common::Crypto::PKeyObjectPtr crypto_ptr;
         if (has_pem) {
           crypto_ptr = crypto_util.importPrivateKeyPEM(key);
         } else {

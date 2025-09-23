@@ -729,15 +729,13 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
     public_key_wrapper_.pushStack();
   } else {
     auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-    Envoy::Common::Crypto::CryptoObjectPtr crypto_ptr = crypto_util.importPublicKeyDER(key);
-    auto wrapper =
-        Envoy::Common::Crypto::Access::getTyped<Envoy::Common::Crypto::PKeyObject>(*crypto_ptr);
-    if (wrapper == nullptr) {
-      // Failed to cast to PKeyObject, create empty wrapper
+    Envoy::Common::Crypto::PKeyObjectPtr crypto_ptr = crypto_util.importPublicKeyDER(key);
+    if (crypto_ptr == nullptr) {
+      // Failed to import key, create empty wrapper
       public_key_wrapper_.reset(PublicKeyWrapper::create(state, EMPTY_STRING), true);
       return 1;
     }
-    EVP_PKEY* pkey = wrapper->getEVP_PKEY();
+    EVP_PKEY* pkey = crypto_ptr->getEVP_PKEY();
     if (pkey == nullptr) {
       // TODO(dio): Call luaL_error here instead of failing silently. However, the current behavior
       // is to return nil (when calling get() to the wrapped object, hence we create a wrapper

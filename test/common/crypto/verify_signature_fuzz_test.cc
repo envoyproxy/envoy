@@ -15,9 +15,9 @@ DEFINE_PROTO_FUZZER(const test::common::crypto::VerifySignatureFuzzTestCase& inp
   const auto& signature = input.signature();
   const auto& data = input.data();
 
-  Common::Crypto::CryptoObjectPtr crypto_ptr(
+  Common::Crypto::PKeyObjectPtr crypto_ptr(
       Common::Crypto::UtilitySingleton::get().importPublicKeyDER(Hex::decode(key)));
-  Common::Crypto::CryptoObject* crypto(crypto_ptr.get());
+  Common::Crypto::PKeyObject* crypto(crypto_ptr.get());
 
   std::vector<uint8_t> text(data.begin(), data.end());
 

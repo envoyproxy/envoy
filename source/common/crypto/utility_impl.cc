@@ -35,7 +35,7 @@ std::vector<uint8_t> UtilityImpl::getSha256Hmac(const std::vector<uint8_t>& key,
   return hmac;
 }
 
-absl::StatusOr<bool> UtilityImpl::verifySignature(absl::string_view hash, CryptoObject& key,
+absl::StatusOr<bool> UtilityImpl::verifySignature(absl::string_view hash, PKeyObject& key,
                                                   const std::vector<uint8_t>& signature,
                                                   const std::vector<uint8_t>& text) {
   // Verify cryptographic signature using a public key
@@ -50,11 +50,7 @@ absl::StatusOr<bool> UtilityImpl::verifySignature(absl::string_view hash, Crypto
     return absl::InvalidArgumentError(absl::StrCat(hash, " is not supported."));
   }
   // Step 3: initialize EVP_DigestVerify
-  auto pkey_wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(key);
-  if (pkey_wrapper == nullptr) {
-    return absl::InternalError("Failed to initialize digest verify.");
-  }
-  EVP_PKEY* pkey = pkey_wrapper->getEVP_PKEY();
+  EVP_PKEY* pkey = key.getEVP_PKEY();
 
   if (pkey == nullptr) {
     return absl::InternalError("Failed to initialize digest verify.");
@@ -76,7 +72,7 @@ absl::StatusOr<bool> UtilityImpl::verifySignature(absl::string_view hash, Crypto
   return absl::InternalError(absl::StrCat("Failed to verify digest. Error code: ", ok));
 }
 
-absl::StatusOr<std::vector<uint8_t>> UtilityImpl::sign(absl::string_view hash, CryptoObject& key,
+absl::StatusOr<std::vector<uint8_t>> UtilityImpl::sign(absl::string_view hash, PKeyObject& key,
                                                        const std::vector<uint8_t>& text) {
   bssl::ScopedEVP_MD_CTX ctx;
 
@@ -86,11 +82,7 @@ absl::StatusOr<std::vector<uint8_t>> UtilityImpl::sign(absl::string_view hash, C
     return absl::InvalidArgumentError(absl::StrCat(hash, " is not supported."));
   }
 
-  auto pkey_wrapper = Common::Crypto::Access::getTyped<Common::Crypto::PKeyObject>(key);
-  if (pkey_wrapper == nullptr) {
-    return absl::InternalError("Failed to initialize digest sign.");
-  }
-  EVP_PKEY* pkey = pkey_wrapper->getEVP_PKEY();
+  EVP_PKEY* pkey = key.getEVP_PKEY();
 
   if (pkey == nullptr) {
     return absl::InternalError("Invalid key type: private key required for signing operation.");
@@ -121,7 +113,7 @@ absl::StatusOr<std::vector<uint8_t>> UtilityImpl::sign(absl::string_view hash, C
 namespace {
 // Template helper for importing keys with different formats and types
 template <typename KeyObjectType, typename ParseFunction>
-CryptoObjectPtr importKeyPEM(const std::vector<uint8_t>& key, ParseFunction parse_func) {
+PKeyObjectPtr importKeyPEM(const std::vector<uint8_t>& key, ParseFunction parse_func) {
   // PEM format: Use PEM parsing which automatically handles both PKCS#1 and PKCS#8 formats
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(key.data(), key.size()));
   if (!bio) {
@@ -131,26 +123,26 @@ CryptoObjectPtr importKeyPEM(const std::vector<uint8_t>& key, ParseFunction pars
 }
 
 template <typename KeyObjectType, typename ParseFunction>
-CryptoObjectPtr importKeyDER(const std::vector<uint8_t>& key, ParseFunction parse_func) {
+PKeyObjectPtr importKeyDER(const std::vector<uint8_t>& key, ParseFunction parse_func) {
   // DER format: Use DER parsing
   CBS cbs({key.data(), key.size()});
   return std::make_unique<KeyObjectType>(parse_func(&cbs));
 }
 } // namespace
 
-CryptoObjectPtr UtilityImpl::importPublicKeyPEM(const std::vector<uint8_t>& key) {
+PKeyObjectPtr UtilityImpl::importPublicKeyPEM(const std::vector<uint8_t>& key) {
   return importKeyPEM<PKeyObject>(key, PEM_read_bio_PUBKEY);
 }
 
-CryptoObjectPtr UtilityImpl::importPublicKeyDER(const std::vector<uint8_t>& key) {
+PKeyObjectPtr UtilityImpl::importPublicKeyDER(const std::vector<uint8_t>& key) {
   return importKeyDER<PKeyObject>(key, EVP_parse_public_key);
 }
 
-CryptoObjectPtr UtilityImpl::importPrivateKeyPEM(const std::vector<uint8_t>& key) {
+PKeyObjectPtr UtilityImpl::importPrivateKeyPEM(const std::vector<uint8_t>& key) {
   return importKeyPEM<PKeyObject>(key, PEM_read_bio_PrivateKey);
 }
 
-CryptoObjectPtr UtilityImpl::importPrivateKeyDER(const std::vector<uint8_t>& key) {
+PKeyObjectPtr UtilityImpl::importPrivateKeyDER(const std::vector<uint8_t>& key) {
   return importKeyDER<PKeyObject>(key, EVP_parse_private_key);
 }
 

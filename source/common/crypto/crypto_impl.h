@@ -20,6 +20,8 @@ private:
   bssl::UniquePtr<EVP_PKEY> pkey_;
 };
 
+using PKeyObjectPtr = std::unique_ptr<PKeyObject>;
+
 } // namespace Crypto
 } // namespace Common
 } // namespace Envoy

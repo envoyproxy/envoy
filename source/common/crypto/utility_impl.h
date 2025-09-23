@@ -1,5 +1,6 @@
 #pragma once
 
+#include "source/common/crypto/crypto_impl.h"
 #include "source/common/crypto/utility.h"
 
 #include "openssl/bio.h"
@@ -16,15 +17,15 @@ public:
   std::vector<uint8_t> getSha256Digest(const Buffer::Instance& buffer) override;
   std::vector<uint8_t> getSha256Hmac(const std::vector<uint8_t>& key,
                                      absl::string_view message) override;
-  absl::StatusOr<bool> verifySignature(absl::string_view hash, CryptoObject& key,
+  absl::StatusOr<bool> verifySignature(absl::string_view hash, PKeyObject& key,
                                        const std::vector<uint8_t>& signature,
                                        const std::vector<uint8_t>& text) override;
-  absl::StatusOr<std::vector<uint8_t>> sign(absl::string_view hash, CryptoObject& key,
+  absl::StatusOr<std::vector<uint8_t>> sign(absl::string_view hash, PKeyObject& key,
                                             const std::vector<uint8_t>& text) override;
-  CryptoObjectPtr importPublicKeyPEM(const std::vector<uint8_t>& key) override;
-  CryptoObjectPtr importPublicKeyDER(const std::vector<uint8_t>& key) override;
-  CryptoObjectPtr importPrivateKeyPEM(const std::vector<uint8_t>& key) override;
-  CryptoObjectPtr importPrivateKeyDER(const std::vector<uint8_t>& key) override;
+  PKeyObjectPtr importPublicKeyPEM(const std::vector<uint8_t>& key) override;
+  PKeyObjectPtr importPublicKeyDER(const std::vector<uint8_t>& key) override;
+  PKeyObjectPtr importPrivateKeyPEM(const std::vector<uint8_t>& key) override;
+  PKeyObjectPtr importPrivateKeyDER(const std::vector<uint8_t>& key) override;
 
 private:
   const EVP_MD* getHashFunction(absl::string_view name);
