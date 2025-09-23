@@ -165,7 +165,7 @@ void BaseClientIntegrationTest::createEnvoy() {
   }
 
   envoy_thread_ = api_->threadFactory().createThread(
-      [this]() -> void { threadRoutine(engine_running_); });
+      [this]() -> void { threadRoutine(); });
   engine_running_.WaitForNotification();
 }
 
