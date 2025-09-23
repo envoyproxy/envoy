@@ -52,7 +52,7 @@ message Compressor {
     // * ``text/html``
     // * ``text/plain``
     // * ``text/xml``
-    // 
+    //
     repeated string content_type = 3;
   }
 
