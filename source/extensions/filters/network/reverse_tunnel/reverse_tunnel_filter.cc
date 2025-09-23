@@ -30,7 +30,8 @@ ReverseTunnelFilter::ReverseTunnelStats::generateStats(const std::string& prefix
 
 // ReverseTunnelFilterConfig implementation.
 ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
-    const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config)
+    const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
+    Server::Configuration::FactoryContext&)
     : ping_interval_(proto_config.has_ping_interval()
                          ? std::chrono::milliseconds(
                                DurationUtil::durationToMilliseconds(proto_config.ping_interval()))
@@ -39,19 +40,13 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
           proto_config.auto_close_connections() ? proto_config.auto_close_connections() : false),
       request_path_(proto_config.request_path().empty() ? "/reverse_connections/request"
                                                         : proto_config.request_path()),
-      request_method_(proto_config.request_method().empty() ? "GET"
-                                                            : proto_config.request_method()),
-      node_id_filter_state_key_(proto_config.has_validation_config()
-                                    ? proto_config.validation_config().node_id_filter_state_key()
-                                    : ""),
-      cluster_id_filter_state_key_(
-          proto_config.has_validation_config()
-              ? proto_config.validation_config().cluster_id_filter_state_key()
-              : ""),
-      tenant_id_filter_state_key_(
-          proto_config.has_validation_config()
-              ? proto_config.validation_config().tenant_id_filter_state_key()
-              : "") {}
+      request_method_string_([&proto_config]() -> std::string {
+        envoy::config::core::v3::RequestMethod method = proto_config.request_method();
+        if (method == envoy::config::core::v3::METHOD_UNSPECIFIED) {
+          method = envoy::config::core::v3::GET;
+        }
+        return envoy::config::core::v3::RequestMethod_Name(method);
+      }()) {}
 
 // ReverseTunnelFilter implementation.
 ReverseTunnelFilter::ReverseTunnelFilter(ReverseTunnelFilterConfigSharedPtr config,
@@ -196,17 +191,6 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
   const absl::string_view cluster_id = cluster_vals[0]->value().getStringView();
   const absl::string_view tenant_id = tenant_vals[0]->value().getStringView();
 
-  // Validate request using filter state if validation keys are configured.
-  if (!parent_.validateRequestUsingFilterState(node_id, cluster_id, tenant_id)) {
-    parent_.stats_.validation_failed_.inc();
-    parent_.stats_.rejected_.inc();
-    sendLocalReply(Http::Code::Forbidden, "Request validation failed", nullptr, absl::nullopt,
-                   "reverse_tunnel_validation_failed");
-    // Close the connection after sending the response.
-    parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
-    return;
-  }
-
   // Respond with 200 OK.
   auto resp_headers = Http::ResponseHeaderMapImpl::create();
   resp_headers->setStatus(200);
@@ -301,90 +285,6 @@ void ReverseTunnelFilter::processAcceptedConnection(absl::string_view node_id,
     ENVOY_CONN_LOG(debug, "reverse_tunnel: successfully registered wrapped socket for reuse",
                    connection);
   }
-}
-
-bool ReverseTunnelFilter::validateRequestUsingFilterState(absl::string_view node_uuid,
-                                                          absl::string_view cluster_uuid,
-                                                          absl::string_view tenant_uuid) {
-  ENVOY_LOG(debug,
-            "ReverseTunnelFilter::validateRequestUsingFilterState: called with node_uuid: {}, "
-            "cluster_uuid: {}, tenant_uuid: {}",
-            node_uuid, cluster_uuid, tenant_uuid);
-  const Network::Connection& connection = read_callbacks_->connection();
-  const StreamInfo::FilterState& filter_state = connection.streamInfo().filterState();
-
-  // Validate node ID if key is configured.
-  if (!config_->nodeIdFilterStateKey().empty()) {
-    const StreamInfo::FilterState::Object* node_obj =
-        filter_state.getDataReadOnly<StreamInfo::FilterState::Object>(
-            config_->nodeIdFilterStateKey());
-    if (!node_obj) {
-      ENVOY_CONN_LOG(debug,
-                     "reverse_tunnel: node ID validation failed. filter state key '{}' not found",
-                     connection, config_->nodeIdFilterStateKey());
-      return false;
-    }
-
-    // Try to get the value as a string.
-    const auto* string_obj = dynamic_cast<const Envoy::Router::StringAccessorImpl*>(node_obj);
-    if (!string_obj || string_obj->asString() != node_uuid) {
-      ENVOY_CONN_LOG(debug, "reverse_tunnel: node ID validation failed. expected '{}', got '{}'",
-                     connection, node_uuid, string_obj ? string_obj->asString() : "null");
-      return false;
-    }
-
-    ENVOY_CONN_LOG(trace, "reverse_tunnel: node ID validation passed for '{}'", connection,
-                   node_uuid);
-  }
-
-  // Validate cluster ID if key is configured.
-  if (!config_->clusterIdFilterStateKey().empty()) {
-    const StreamInfo::FilterState::Object* cluster_obj =
-        filter_state.getDataReadOnly<StreamInfo::FilterState::Object>(
-            config_->clusterIdFilterStateKey());
-    if (!cluster_obj) {
-      ENVOY_CONN_LOG(
-          debug, "reverse_tunnel: cluster ID validation failed. filter state key '{}' not found",
-          connection, config_->clusterIdFilterStateKey());
-      return false;
-    }
-
-    const auto* string_obj = dynamic_cast<const Envoy::Router::StringAccessorImpl*>(cluster_obj);
-    if (!string_obj || string_obj->asString() != cluster_uuid) {
-      ENVOY_CONN_LOG(debug, "reverse_tunnel: cluster ID validation failed. expected '{}', got '{}'",
-                     connection, cluster_uuid, string_obj ? string_obj->asString() : "null");
-      return false;
-    }
-
-    ENVOY_CONN_LOG(trace, "reverse_tunnel: cluster ID validation passed for '{}'", connection,
-                   cluster_uuid);
-  }
-
-  // Validate tenant ID if key is configured.
-  if (!config_->tenantIdFilterStateKey().empty()) {
-    const StreamInfo::FilterState::Object* tenant_obj =
-        filter_state.getDataReadOnly<StreamInfo::FilterState::Object>(
-            config_->tenantIdFilterStateKey());
-    if (!tenant_obj) {
-      ENVOY_CONN_LOG(debug,
-                     "reverse_tunnel: tenant ID validation failed. filter state key '{}' not found",
-                     connection, config_->tenantIdFilterStateKey());
-      return false;
-    }
-
-    const auto* string_obj = dynamic_cast<const Envoy::Router::StringAccessorImpl*>(tenant_obj);
-    if (!string_obj || string_obj->asString() != tenant_uuid) {
-      ENVOY_CONN_LOG(debug, "reverse_tunnel: tenant ID validation failed. expected '{}', got '{}'",
-                     connection, tenant_uuid, string_obj ? string_obj->asString() : "null");
-      return false;
-    }
-
-    ENVOY_CONN_LOG(trace, "reverse_tunnel: tenant ID validation passed for '{}'", connection,
-                   tenant_uuid);
-  }
-
-  ENVOY_CONN_LOG(debug, "reverse_tunnel: all configured validations passed", connection);
-  return true;
 }
 
 } // namespace ReverseTunnel

@@ -3,6 +3,7 @@
 #include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/filter.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/server/overload/overload_manager.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
@@ -27,28 +28,19 @@ namespace ReverseTunnel {
 class ReverseTunnelFilterConfig {
 public:
   ReverseTunnelFilterConfig(
-      const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config);
+      const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
+      Server::Configuration::FactoryContext& context);
 
   std::chrono::milliseconds pingInterval() const { return ping_interval_; }
   bool autoCloseConnections() const { return auto_close_connections_; }
   const std::string& requestPath() const { return request_path_; }
-  const std::string& requestMethod() const { return request_method_; }
-
-  // Validation configuration accessors.
-  const std::string& nodeIdFilterStateKey() const { return node_id_filter_state_key_; }
-  const std::string& clusterIdFilterStateKey() const { return cluster_id_filter_state_key_; }
-  const std::string& tenantIdFilterStateKey() const { return tenant_id_filter_state_key_; }
+  const std::string& requestMethod() const { return request_method_string_; }
 
 private:
   const std::chrono::milliseconds ping_interval_;
   const bool auto_close_connections_;
   const std::string request_path_;
-  const std::string request_method_;
-
-  // Filter state keys for validation.
-  const std::string node_id_filter_state_key_;
-  const std::string cluster_id_filter_state_key_;
-  const std::string tenant_id_filter_state_key_;
+  const std::string request_method_string_;
 };
 
 using ReverseTunnelFilterConfigSharedPtr = std::shared_ptr<ReverseTunnelFilterConfig>;
@@ -82,7 +74,6 @@ private:
 // Stats definition.
 #define ALL_REVERSE_TUNNEL_HANDSHAKE_STATS(COUNTER)                                                \
   COUNTER(parse_error)                                                                             \
-  COUNTER(validation_failed)                                                                       \
   COUNTER(accepted)                                                                                \
   COUNTER(rejected)
 
@@ -94,11 +85,6 @@ private:
   // Process reverse tunnel connection.
   void processAcceptedConnection(absl::string_view node_id, absl::string_view cluster_id,
                                  absl::string_view tenant_id);
-
-  // Validate reverse tunnel request using filter state.
-  // Returns true if validation passes or no validation keys are configured.
-  bool validateRequestUsingFilterState(absl::string_view node_uuid, absl::string_view cluster_uuid,
-                                       absl::string_view tenant_uuid);
 
   ReverseTunnelFilterConfigSharedPtr config_;
   Network::ReadFilterCallbacks* read_callbacks_{nullptr};

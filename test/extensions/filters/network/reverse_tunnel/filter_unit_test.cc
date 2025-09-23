@@ -1,3 +1,4 @@
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3/upstream_reverse_connection_socket_interface.pb.h"
 #include "envoy/extensions/filters/network/reverse_tunnel/v3/reverse_tunnel.pb.h"
 #include "envoy/server/factory_context.h"
@@ -62,8 +63,8 @@ public:
   ReverseTunnelFilterUnitTest() : stats_store_(), overload_manager_() {
     // Prepare proto config with defaults.
     proto_config_.set_request_path("/reverse_connections/request");
-    proto_config_.set_request_method("GET");
-    config_ = std::make_shared<ReverseTunnelFilterConfig>(proto_config_);
+    proto_config_.set_request_method(envoy::config::core::v3::GET);
+    config_ = std::make_shared<ReverseTunnelFilterConfig>(proto_config_, factory_context_);
     filter_ = std::make_unique<ReverseTunnelFilter>(config_, *stats_store_.rootScope(),
                                                     overload_manager_);
 
@@ -170,6 +171,7 @@ public:
 
   // Thread local slot setup for downstream socket interface.
   NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   NiceMock<ThreadLocal::MockInstance> thread_local_;
   NiceMock<Upstream::MockClusterManager> cluster_manager_;
   Stats::ScopeSharedPtr stats_scope_;
@@ -206,30 +208,16 @@ TEST_F(ReverseTunnelFilterUnitTest, HttpDispatchErrorStopsIteration) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
 }
 
-TEST_F(ReverseTunnelFilterUnitTest, FullFlowValidationSuccess) {
+TEST_F(ReverseTunnelFilterUnitTest, FullFlowAccepts) {
 
-  // Configure reverse tunnel with validation keys.
+  // Configure reverse tunnel filter.
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
-  auto* v = cfg.mutable_validation_config();
-  v->set_node_id_filter_state_key("node_id");
-  v->set_cluster_id_filter_state_key("cluster_id");
-  v->set_tenant_id_filter_state_key("tenant_id");
-  auto local_config = std::make_shared<ReverseTunnelFilterConfig>(cfg);
+  auto local_config = std::make_shared<ReverseTunnelFilterConfig>(cfg, factory_context_);
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
   filter.initializeReadFilterCallbacks(callbacks_);
 
-  // Populate connection filter state with expected string values.
-  auto& si = callbacks_.connection_.streamInfo();
-  si.filterState()->setData("node_id", std::make_unique<Router::StringAccessorImpl>("n"),
-                            StreamInfo::FilterState::StateType::ReadOnly,
-                            StreamInfo::FilterState::LifeSpan::Connection);
-  si.filterState()->setData("cluster_id", std::make_unique<Router::StringAccessorImpl>("c"),
-                            StreamInfo::FilterState::StateType::ReadOnly,
-                            StreamInfo::FilterState::LifeSpan::Connection);
-  si.filterState()->setData("tenant_id", std::make_unique<Router::StringAccessorImpl>("t"),
-                            StreamInfo::FilterState::StateType::ReadOnly,
-                            StreamInfo::FilterState::LifeSpan::Connection);
+  // Filter state does not affect acceptance.
 
   // Capture writes to connection.
   std::string written;
@@ -250,33 +238,24 @@ TEST_F(ReverseTunnelFilterUnitTest, FullFlowValidationSuccess) {
   EXPECT_EQ(1, accepted->value());
 }
 
-TEST_F(ReverseTunnelFilterUnitTest, FullFlowValidationFailure) {
+TEST_F(ReverseTunnelFilterUnitTest, FullFlowMissingHeadersIsBadRequest) {
 
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
-  cfg.mutable_validation_config()->set_node_id_filter_state_key("node_id");
-  auto local_config = std::make_shared<ReverseTunnelFilterConfig>(cfg);
+  auto local_config = std::make_shared<ReverseTunnelFilterConfig>(cfg, factory_context_);
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
   filter.initializeReadFilterCallbacks(callbacks_);
 
-  // Missing node_id filter state should cause 403.
+  // Missing required headers should cause 400.
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
       .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
         written.append(data.toString());
         data.drain(data.length());
       }));
-  Buffer::OwnedImpl request(
-      makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
+  Buffer::OwnedImpl request(makeHttpRequest("GET", "/reverse_connections/request", ""));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
-  EXPECT_THAT(written, testing::HasSubstr("403 Forbidden"));
-  // Stats: validation_failed and rejected should increment.
-  auto vf = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.validation_failed");
-  auto rejected = TestUtility::findCounter(stats_store_, "reverse_tunnel.handshake.rejected");
-  ASSERT_NE(nullptr, vf);
-  ASSERT_NE(nullptr, rejected);
-  EXPECT_EQ(1, vf->value());
-  EXPECT_EQ(1, rejected->value());
+  EXPECT_THAT(written, testing::HasSubstr("400 Bad Request"));
 }
 
 TEST_F(ReverseTunnelFilterUnitTest, FullFlowParseError) {
@@ -313,7 +292,7 @@ TEST_F(ReverseTunnelFilterUnitTest, NotFoundForNonReverseTunnelPath) {
 TEST_F(ReverseTunnelFilterUnitTest, AutoCloseConnectionsClosesAfterAccept) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
   cfg.set_auto_close_connections(true);
-  auto local_config = std::make_shared<ReverseTunnelFilterConfig>(cfg);
+  auto local_config = std::make_shared<ReverseTunnelFilterConfig>(cfg, factory_context_);
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
   filter.initializeReadFilterCallbacks(callbacks_);
@@ -366,27 +345,20 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationCustomPingInterval) {
   proto_config.mutable_ping_interval()->set_seconds(10);
   proto_config.set_auto_close_connections(true);
   proto_config.set_request_path("/custom/path");
-  proto_config.set_request_method("PUT");
+  proto_config.set_request_method(envoy::config::core::v3::PUT);
 
-  ReverseTunnelFilterConfig config(proto_config);
+  ReverseTunnelFilterConfig config(proto_config, factory_context_);
   EXPECT_EQ(std::chrono::milliseconds(10000), config.pingInterval());
   EXPECT_TRUE(config.autoCloseConnections());
   EXPECT_EQ("/custom/path", config.requestPath());
   EXPECT_EQ("PUT", config.requestMethod());
 }
 
-// Test configuration with validation config.
-TEST_F(ReverseTunnelFilterUnitTest, ConfigurationWithValidation) {
+// Ensure defaults remain stable.
+TEST_F(ReverseTunnelFilterUnitTest, ConfigurationDefaultsRemainStable) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
-  auto* validation = proto_config.mutable_validation_config();
-  validation->set_node_id_filter_state_key("node_key");
-  validation->set_cluster_id_filter_state_key("cluster_key");
-  validation->set_tenant_id_filter_state_key("tenant_key");
-
-  ReverseTunnelFilterConfig config(proto_config);
-  EXPECT_EQ("node_key", config.nodeIdFilterStateKey());
-  EXPECT_EQ("cluster_key", config.clusterIdFilterStateKey());
-  EXPECT_EQ("tenant_key", config.tenantIdFilterStateKey());
+  ReverseTunnelFilterConfig config(proto_config, factory_context_);
+  EXPECT_EQ("/reverse_connections/request", config.requestPath());
 }
 
 // Test configuration with default values.
@@ -394,14 +366,11 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationDefaults) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
   // Leave everything empty to test defaults.
 
-  ReverseTunnelFilterConfig config(proto_config);
+  ReverseTunnelFilterConfig config(proto_config, factory_context_);
   EXPECT_EQ(std::chrono::milliseconds(2000), config.pingInterval());
   EXPECT_FALSE(config.autoCloseConnections());
   EXPECT_EQ("/reverse_connections/request", config.requestPath());
   EXPECT_EQ("GET", config.requestMethod());
-  EXPECT_TRUE(config.nodeIdFilterStateKey().empty());
-  EXPECT_TRUE(config.clusterIdFilterStateKey().empty());
-  EXPECT_TRUE(config.tenantIdFilterStateKey().empty());
 }
 
 // Test RequestDecoder methods not fully covered.
@@ -504,20 +473,12 @@ TEST_F(ReverseTunnelFilterUnitTest, ParseEmptyPayload) {
   EXPECT_EQ(1, parse_error->value());
 }
 
-// Test validation with non-string filter state object.
-TEST_F(ReverseTunnelFilterUnitTest, ValidationWithNonStringFilterState) {
+TEST_F(ReverseTunnelFilterUnitTest, NonStringFilterStateIgnored) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
-  cfg.mutable_validation_config()->set_node_id_filter_state_key("node_id");
-  auto local_config = std::make_shared<ReverseTunnelFilterConfig>(cfg);
+  auto local_config = std::make_shared<ReverseTunnelFilterConfig>(cfg, factory_context_);
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
   filter.initializeReadFilterCallbacks(callbacks_);
-
-  // Add a non-string object to filter state.
-  auto& si = callbacks_.connection_.streamInfo();
-  si.filterState()->setData("node_id", std::make_unique<StreamInfo::UInt64AccessorImpl>(12345),
-                            StreamInfo::FilterState::StateType::ReadOnly,
-                            StreamInfo::FilterState::LifeSpan::Connection);
 
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
@@ -529,23 +490,15 @@ TEST_F(ReverseTunnelFilterUnitTest, ValidationWithNonStringFilterState) {
   Buffer::OwnedImpl request(
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
-  EXPECT_THAT(written, testing::HasSubstr("403 Forbidden"));
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
 }
 
-// Test validation with cluster ID mismatch.
-TEST_F(ReverseTunnelFilterUnitTest, ValidationClusterIdMismatch) {
+TEST_F(ReverseTunnelFilterUnitTest, ClusterIdMismatchIgnored) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
-  cfg.mutable_validation_config()->set_cluster_id_filter_state_key("cluster_id");
-  auto local_config = std::make_shared<ReverseTunnelFilterConfig>(cfg);
+  auto local_config = std::make_shared<ReverseTunnelFilterConfig>(cfg, factory_context_);
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
   filter.initializeReadFilterCallbacks(callbacks_);
-
-  // Add wrong cluster ID to filter state.
-  auto& si = callbacks_.connection_.streamInfo();
-  si.filterState()->setData("cluster_id", std::make_unique<Router::StringAccessorImpl>("wrong"),
-                            StreamInfo::FilterState::StateType::ReadOnly,
-                            StreamInfo::FilterState::LifeSpan::Connection);
 
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
@@ -557,19 +510,16 @@ TEST_F(ReverseTunnelFilterUnitTest, ValidationClusterIdMismatch) {
   Buffer::OwnedImpl request(
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
-  EXPECT_THAT(written, testing::HasSubstr("403 Forbidden"));
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
 }
 
-// Test validation with tenant ID missing.
-TEST_F(ReverseTunnelFilterUnitTest, ValidationTenantIdMissing) {
+TEST_F(ReverseTunnelFilterUnitTest, TenantIdMissingIgnored) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
-  cfg.mutable_validation_config()->set_tenant_id_filter_state_key("tenant_id");
-  auto local_config = std::make_shared<ReverseTunnelFilterConfig>(cfg);
+  auto local_config = std::make_shared<ReverseTunnelFilterConfig>(cfg, factory_context_);
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
   filter.initializeReadFilterCallbacks(callbacks_);
 
-  // Don't add tenant_id to filter state.
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
       .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
@@ -580,7 +530,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ValidationTenantIdMissing) {
   Buffer::OwnedImpl request(
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
-  EXPECT_THAT(written, testing::HasSubstr("403 Forbidden"));
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
 }
 
 // Test closed socket scenario.
@@ -783,8 +733,8 @@ TEST_F(ReverseTunnelFilterUnitTest, RequestDecoderSendLocalReplyHeaderModifier) 
   EXPECT_TRUE(saw_custom_header);
 }
 
-// Test protobuf validation failure in request.
-TEST_F(ReverseTunnelFilterUnitTest, RequestValidationFailure) {
+// Missing required headers should return 400.
+TEST_F(ReverseTunnelFilterUnitTest, MissingReverseTunnelHeadersReturns400) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
       .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
@@ -792,7 +742,7 @@ TEST_F(ReverseTunnelFilterUnitTest, RequestValidationFailure) {
         data.drain(data.length());
       }));
 
-  // Missing required header should fail validation.
+  // Missing required header should fail.
   std::string req = "GET /reverse_connections/request HTTP/1.1\r\n"
                     "Host: localhost\r\n"
                     "x-envoy-reverse-tunnel-cluster-id: c\r\n"
@@ -844,23 +794,12 @@ TEST_F(ReverseTunnelFilterUnitTest, CompleteRequestSingleCall) {
   EXPECT_THAT(written, testing::HasSubstr("200 OK"));
 }
 
-// Test validation with all three IDs configured but only some present.
-TEST_F(ReverseTunnelFilterUnitTest, PartialValidationConfiguration) {
+TEST_F(ReverseTunnelFilterUnitTest, PartialStateIgnored) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
-  auto* v = cfg.mutable_validation_config();
-  v->set_node_id_filter_state_key("node_id");
-  v->set_cluster_id_filter_state_key("cluster_id");
-  v->set_tenant_id_filter_state_key("tenant_id");
-  auto local_config = std::make_shared<ReverseTunnelFilterConfig>(cfg);
+  auto local_config = std::make_shared<ReverseTunnelFilterConfig>(cfg, factory_context_);
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
   filter.initializeReadFilterCallbacks(callbacks_);
-
-  // Only add node_id, leaving cluster_id and tenant_id missing.
-  auto& si = callbacks_.connection_.streamInfo();
-  si.filterState()->setData("node_id", std::make_unique<Router::StringAccessorImpl>("n"),
-                            StreamInfo::FilterState::StateType::ReadOnly,
-                            StreamInfo::FilterState::LifeSpan::Connection);
 
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
@@ -872,7 +811,7 @@ TEST_F(ReverseTunnelFilterUnitTest, PartialValidationConfiguration) {
   Buffer::OwnedImpl request(
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
-  EXPECT_THAT(written, testing::HasSubstr("403 Forbidden"));
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
 }
 
 // Test string parsing through HTTP path (parseHandshakeRequest is private).
@@ -947,14 +886,14 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationAllBranches) {
     envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
     cfg.mutable_ping_interval()->set_seconds(5);
     cfg.mutable_ping_interval()->set_nanos(500000000);
-    ReverseTunnelFilterConfig config(cfg);
+    ReverseTunnelFilterConfig config(cfg, factory_context_);
     EXPECT_EQ(std::chrono::milliseconds(5500), config.pingInterval());
   }
 
   // Test config without ping_interval (default).
   {
     envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
-    ReverseTunnelFilterConfig config(cfg);
+    ReverseTunnelFilterConfig config(cfg, factory_context_);
     EXPECT_EQ(std::chrono::milliseconds(2000), config.pingInterval());
   }
 
@@ -962,8 +901,8 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationAllBranches) {
   {
     envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
     cfg.set_request_path("");
-    cfg.set_request_method("");
-    ReverseTunnelFilterConfig config(cfg);
+    cfg.set_request_method(envoy::config::core::v3::METHOD_UNSPECIFIED);
+    ReverseTunnelFilterConfig config(cfg, factory_context_);
     EXPECT_EQ("/reverse_connections/request", config.requestPath());
     EXPECT_EQ("GET", config.requestMethod());
   }
@@ -1046,20 +985,12 @@ TEST_F(ReverseTunnelFilterUnitTest, CodecDispatchError) {
   // Should get no response since the filter returns early on dispatch error.
 }
 
-// Test validation with tenant ID value mismatch.
-TEST_F(ReverseTunnelFilterUnitTest, ValidationTenantIdMismatch) {
+TEST_F(ReverseTunnelFilterUnitTest, TenantIdMismatchIgnored2) {
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel cfg;
-  cfg.mutable_validation_config()->set_tenant_id_filter_state_key("tenant_id");
-  auto local_config = std::make_shared<ReverseTunnelFilterConfig>(cfg);
+  auto local_config = std::make_shared<ReverseTunnelFilterConfig>(cfg, factory_context_);
   ReverseTunnelFilter filter(local_config, *stats_store_.rootScope(), overload_manager_);
   EXPECT_CALL(callbacks_, connection()).WillRepeatedly(ReturnRef(callbacks_.connection_));
   filter.initializeReadFilterCallbacks(callbacks_);
-
-  // Add wrong tenant ID to filter state.
-  auto& si = callbacks_.connection_.streamInfo();
-  si.filterState()->setData(
-      "tenant_id", std::make_unique<Router::StringAccessorImpl>("wrong-tenant"),
-      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
 
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
@@ -1071,7 +1002,7 @@ TEST_F(ReverseTunnelFilterUnitTest, ValidationTenantIdMismatch) {
   Buffer::OwnedImpl request(
       makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "n", "c", "t"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter.onData(request, false));
-  EXPECT_THAT(written, testing::HasSubstr("403 Forbidden"));
+  EXPECT_THAT(written, testing::HasSubstr("200 OK"));
 }
 
 // Test newStream with is_internally_created parameter via HTTP processing.
@@ -1116,16 +1047,13 @@ TEST_F(ReverseTunnelFilterUnitTest, ConfigurationDeprecatedField) {
   // Test the deprecated field if it exists.
   cfg.set_auto_close_connections(false);
   cfg.set_request_path("/test");
-  cfg.set_request_method("PUT");
-  // Don't set validation_config to test the empty branch.
+  cfg.set_request_method(envoy::config::core::v3::PUT);
+  // No extra options set to test defaults.
 
-  ReverseTunnelFilterConfig config(cfg);
+  ReverseTunnelFilterConfig config(cfg, factory_context_);
   EXPECT_FALSE(config.autoCloseConnections());
   EXPECT_EQ("/test", config.requestPath());
   EXPECT_EQ("PUT", config.requestMethod());
-  EXPECT_TRUE(config.nodeIdFilterStateKey().empty());
-  EXPECT_TRUE(config.clusterIdFilterStateKey().empty());
-  EXPECT_TRUE(config.tenantIdFilterStateKey().empty());
 }
 
 // Test decodeData with multiple chunks.
@@ -1228,10 +1156,8 @@ TEST_F(ReverseTunnelFilterUnitTest, CodecDispatchMultipleErrorTypes) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter2->onData(req2, false));
 }
 
-// Test to trigger response validation failure path (lines 195-200).
-TEST_F(ReverseTunnelFilterUnitTest, ResponseValidationFailurePath) {
-  // This is tricky since we can't easily mock the Validate function.
-  // But we can create a scenario that might trigger response validation issues.
+// Ensure success path works without additional validations.
+TEST_F(ReverseTunnelFilterUnitTest, SuccessPathCoverage) {
   std::string written;
   EXPECT_CALL(callbacks_.connection_, write(testing::_, testing::_))
       .WillRepeatedly(testing::Invoke([&](Buffer::Instance& data, bool) {
@@ -1239,13 +1165,12 @@ TEST_F(ReverseTunnelFilterUnitTest, ResponseValidationFailurePath) {
         data.drain(data.length());
       }));
 
-  // Create a valid request - the response validation happens internally
+  // Create a valid request; response verification occurs normally.
   Buffer::OwnedImpl request(makeHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
                                                          "response-test", "cluster", "tenant"));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(request, false));
 
-  // The response validation failure path is internal and hard to trigger
-  // without modifying the source, but this test ensures the success path works
+  // Ensure the success path works.
   EXPECT_THAT(written, testing::HasSubstr("200 OK"));
 }
 

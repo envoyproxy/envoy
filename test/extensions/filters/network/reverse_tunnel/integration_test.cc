@@ -106,8 +106,7 @@ typed_config:
 
   void addReverseTunnelFilter(bool auto_close_connections = false,
                               const std::string& request_path = "/reverse_connections/request",
-                              const std::string& request_method = "GET",
-                              bool add_validation_config = false) {
+                              const std::string& request_method = "GET") {
     const std::string filter_config =
         fmt::format(R"EOF(
         name: envoy.filters.network.reverse_tunnel
@@ -117,15 +116,9 @@ typed_config:
             seconds: 300
           auto_close_connections: {}
           request_path: "{}"
-          request_method: "{}"{}
+          request_method: {}
 )EOF",
-                    auto_close_connections ? "true" : "false", request_path, request_method,
-                    add_validation_config ? R"(
-          validation_config:
-            node_id_filter_state_key: "node_id"
-            cluster_id_filter_state_key: "cluster_id"
-            tenant_id_filter_state_key: "tenant_id")"
-                                          : "");
+                    auto_close_connections ? "true" : "false", request_path, request_method);
 
     config_helper_.addConfigModifier(
         [filter_config](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -321,61 +314,22 @@ TEST_P(ReverseTunnelFilterIntegrationTest, MissingNodeUuidRejection) {
   tcp_client->waitForDisconnect();
 }
 
-TEST_P(ReverseTunnelFilterIntegrationTest, ValidationSucceedsWithFilterState) {
-  // Add set_filter_state filter first to set validation values.
-  addSetFilterStateFilter();
-  // Add reverse tunnel filter with validation config.
-  addReverseTunnelFilter(/*auto_close_connections=*/false, "/reverse_connections/request", "GET",
-                         /*add_validation_config=*/true);
+// Filter accepts when method/path/headers match.
+TEST_P(ReverseTunnelFilterIntegrationTest, AcceptsWhenHeadersPresent) {
+  addReverseTunnelFilter();
   initialize();
 
   std::string http_request =
       createHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "integration-test-node",
                                      "integration-test-cluster", "integration-test-tenant");
-
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  if (!tcp_client->write(http_request)) {
-    // Server may have already sent the response and closed.
-    tcp_client->waitForData("HTTP/1.1 200 OK");
-    return;
-  }
-
+  ASSERT_TRUE(tcp_client->write(http_request));
   tcp_client->waitForData("HTTP/1.1 200 OK");
   tcp_client->close();
 }
 
-TEST_P(ReverseTunnelFilterIntegrationTest, ValidationFailsWhenKeyMissing) {
-  // Only set cluster/tenant; configure reverse_tunnel to require node_id, causing 403.
-  addSetFilterStateFilter("", "integration-test-cluster",
-                          "integration-test-tenant"); // Missing node_id
-  addReverseTunnelFilter(/*auto_close_connections=*/false, "/reverse_connections/request", "GET",
-                         /*add_validation_config=*/true);
-  initialize();
-
-  std::string http_request =
-      createHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "integration-test-node",
-                                     "integration-test-cluster", "integration-test-tenant");
-
-  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  if (!tcp_client->write(http_request)) {
-    // Server may have already sent the response and closed.
-    tcp_client->waitForData("HTTP/1.1 403 Forbidden");
-    return;
-  }
-
-  // Should receive HTTP 403 Forbidden response due to missing node_id in filter state.
-  tcp_client->waitForData("HTTP/1.1 403 Forbidden");
-
-  // Advance simulated time slightly to allow internal callbacks to drain.
-  timeSystem().advanceTimeWait(std::chrono::milliseconds(50));
-  tcp_client->close();
-}
-
-TEST_P(ReverseTunnelFilterIntegrationTest, ValidationFailsOnValueMismatch) {
-  // Set keys but with different values than in the handshake request, expect 403.
-  addSetFilterStateFilter("wrong-node", "wrong-cluster", "wrong-tenant");
-  addReverseTunnelFilter(/*auto_close_connections=*/false, "/reverse_connections/request", "GET",
-                         /*add_validation_config=*/true);
+TEST_P(ReverseTunnelFilterIntegrationTest, IgnoresFilterStateValues) {
+  addReverseTunnelFilter();
   initialize();
 
   std::string http_request =
@@ -384,10 +338,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationFailsOnValueMismatch) {
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
   ASSERT_TRUE(tcp_client->write(http_request));
-  tcp_client->waitForData("HTTP/1.1 403 Forbidden");
-
-  // Advance simulated time slightly to allow internal callbacks to drain.
-  timeSystem().advanceTimeWait(std::chrono::milliseconds(50));
+  tcp_client->waitForData("HTTP/1.1 200 OK");
   tcp_client->close();
 }
 
@@ -468,7 +419,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, EndToEndReverseConnectionHandshake) {
         300); // Set the ping interval to the max value to avoid ping timeout.
     rt_config.set_auto_close_connections(false);
     rt_config.set_request_path("/reverse_connections/request");
-    rt_config.set_request_method("GET");
+    rt_config.set_request_method(envoy::config::core::v3::GET);
     rt_filter->mutable_typed_config()->PackFrom(rt_config);
 
     // Listener 2: Reverse connection listener (initiates reverse connections).

@@ -1,3 +1,5 @@
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "source/extensions/filters/network/reverse_tunnel/config.h"
 
 #include "test/mocks/server/factory_context.h"
@@ -20,7 +22,7 @@ ping_interval:
   seconds: 5
 auto_close_connections: false
 request_path: "/custom/reverse"
-request_method: "PUT"
+request_method: PUT
 )EOF";
 
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
@@ -42,9 +44,9 @@ TEST(ReverseTunnelFilterConfigFactoryTest, DefaultConfiguration) {
   ReverseTunnelFilterConfigFactory factory;
 
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
-  // Set minimum required fields to satisfy validation.
+  // Set minimum required fields for configuration.
   proto_config.set_request_path("/reverse_connections/request");
-  proto_config.set_request_method("POST");
+  proto_config.set_request_method(envoy::config::core::v3::POST);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   auto result = factory.createFilterFactoryFromProto(proto_config, context);
@@ -69,7 +71,7 @@ TEST(ReverseTunnelFilterConfigFactoryTest, ConfigProperties) {
             empty_config->GetTypeName());
 }
 
-TEST(ReverseTunnelFilterConfigFactoryTest, ConfigurationWithValidation) {
+TEST(ReverseTunnelFilterConfigFactoryTest, ConfigurationNoValidation) {
   ReverseTunnelFilterConfigFactory factory;
 
   const std::string yaml_string = R"EOF(
@@ -78,11 +80,7 @@ ping_interval:
   nanos: 500000000
 auto_close_connections: true
 request_path: "/test/path"
-request_method: "POST"
-validation_config:
-  node_id_filter_state_key: "test_node"
-  cluster_id_filter_state_key: "test_cluster"
-  tenant_id_filter_state_key: "test_tenant"
+request_method: POST
 )EOF";
 
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
@@ -105,7 +103,7 @@ TEST(ReverseTunnelFilterConfigFactoryTest, MinimalConfigurationYaml) {
 
   const std::string yaml_string = R"EOF(
 request_path: "/minimal"
-request_method: "POST"
+request_method: POST
 )EOF";
 
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
@@ -138,11 +136,7 @@ ping_interval:
   seconds: 3
 auto_close_connections: true
 request_path: "/factory/test"
-request_method: "PUT"
-validation_config:
-  node_id_filter_state_key: "factory_node"
-  cluster_id_filter_state_key: "factory_cluster"
-  tenant_id_filter_state_key: "factory_tenant"
+request_method: PUT
 )EOF";
 
   envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
