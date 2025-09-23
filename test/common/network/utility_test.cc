@@ -831,6 +831,36 @@ TEST_F(ExecInNetnsTest, OpenFail) {
   // Expecting failure.
   auto result = Utility::execInNetworkNamespace([]() -> int { return 0; }, "bleh");
   EXPECT_FALSE(result.ok());
+  EXPECT_TRUE(result.status().message().starts_with("failed to open netns file"));
+}
+
+TEST_F(ExecInNetnsTest, FailtoReturnToOriginalNetns) {
+  EXPECT_DEATH(
+      {
+        // Make the tests use mock syscalls.
+        testing::StrictMock<Api::MockLinuxOsSysCalls> linux_os_syscalls;
+        testing::StrictMock<Api::MockOsSysCalls> os_syscalls;
+        TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_syscalls);
+        TestThreadsafeSingletonInjector<Api::LinuxOsSysCallsImpl> linux_os_calls(
+            &linux_os_syscalls);
+
+        EXPECT_CALL(os_syscalls, open(_, O_RDONLY))
+            .WillRepeatedly(
+                Invoke([](const char*, int) -> Api::SysCallIntResult { return {1337, 0}; }));
+        EXPECT_CALL(os_syscalls, close(_)).WillRepeatedly(Invoke([](int) -> Api::SysCallIntResult {
+          return {0, 0};
+        }));
+
+        // Succeed on the first network namespace syscall, which would jump to a different netns.
+        // The second call, which would jump back to the original netns, should fail. This is an
+        // unrecoverable error, so it should result in process death.
+        EXPECT_CALL(linux_os_syscalls, setns(_, _))
+            .WillOnce(Invoke([](int, int) -> Api::SysCallIntResult { return {0, 0}; }))
+            .WillOnce(Invoke([](int, int) -> Api::SysCallIntResult { return {-1, -1}; }));
+
+        auto _ = Utility::execInNetworkNamespace([]() -> int { return 0; }, "bleh");
+      },
+      "failed to restore original netns .*");
 }
 #endif
 

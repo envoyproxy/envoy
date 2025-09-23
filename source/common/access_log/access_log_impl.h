@@ -188,7 +188,6 @@ public:
                 const StreamInfo::StreamInfo& info) const override;
 
 private:
-  const bool has_configured_flags_{};
   std::vector<bool> configured_flags_{};
 };
 
@@ -249,7 +248,7 @@ public:
                 const StreamInfo::StreamInfo& info) const override;
 
 private:
-  Matchers::ValueMatcherConstSharedPtr present_matcher_;
+  Matchers::PresentMatcher present_matcher_;
   Matchers::ValueMatcherConstSharedPtr value_matcher_;
 
   std::vector<std::string> path_;

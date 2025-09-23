@@ -197,6 +197,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/matching/input_matchers/metadata @vikaschoudhary16 @kyessenov
 # environment generic input
 /*/extensions/matching/common_inputs/environment @donyu @mattklein123
+# network common inputs
+/*/extensions/matching/common_inputs/network @agrawroh @kyessenov @wbpcode
 # format string matching
 /*/extensions/matching/actions/format_string @kyessenov @cpakulski
 # CEL data input

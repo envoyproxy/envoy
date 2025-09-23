@@ -1152,6 +1152,25 @@ absl::optional<absl::string_view> Filter::getShadowCluster(const ShadowPolicy& p
   }
 }
 
+void Filter::setupRouteTimeoutForWebsocketUpgrade() {
+  // Set up the route timeout early for websocket upgrades, since the upstream request
+  // will be paused waiting for the upgrade response and we need the timeout active.
+  if (!response_timeout_ && timeout_.global_timeout_.count() > 0) {
+    Event::Dispatcher& dispatcher = callbacks_->dispatcher();
+    response_timeout_ = dispatcher.createTimer([this]() -> void { onResponseTimeout(); });
+    response_timeout_->enableTimer(timeout_.global_timeout_);
+  }
+}
+
+void Filter::disableRouteTimeoutForWebsocketUpgrade() {
+  // Disable the route timeout after websocket upgrade completes successfully
+  // to prevent timeout from firing after the upgrade is done.
+  if (response_timeout_) {
+    response_timeout_->disableTimer();
+    response_timeout_.reset();
+  }
+}
+
 void Filter::onRequestComplete() {
   // This should be called exactly once, when the downstream request has been received in full.
   ASSERT(!downstream_end_stream_);
@@ -1163,7 +1182,7 @@ void Filter::onRequestComplete() {
   if (!upstream_requests_.empty()) {
     // Even if we got an immediate reset, we could still shadow, but that is a riskier change and
     // seems unnecessary right now.
-    if (timeout_.global_timeout_.count() > 0) {
+    if (timeout_.global_timeout_.count() > 0 && !response_timeout_) {
       response_timeout_ = dispatcher.createTimer([this]() -> void { onResponseTimeout(); });
       response_timeout_->enableTimer(timeout_.global_timeout_);
     }
