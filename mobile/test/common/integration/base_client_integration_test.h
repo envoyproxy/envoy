@@ -54,7 +54,7 @@ protected:
   Platform::StreamSharedPtr createNewStream(EnvoyStreamCallbacks&& stream_callbacks);
 
   void createEnvoy() override;
-  void threadRoutine();
+  void threadRoutine(absl::Notification& engine_running);
 
   // Get the value of a Counter in the Envoy instance.
   uint64_t getCounterValue(const std::string& name);
@@ -83,7 +83,6 @@ protected:
   bool expect_data_streams_ = true;
   Platform::EngineBuilder builder_;
   envoy_final_stream_intel last_stream_final_intel_;
-  absl::Notification engine_running_;
 };
 
 } // namespace Envoy

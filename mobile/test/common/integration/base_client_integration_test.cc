@@ -78,11 +78,6 @@ BaseClientIntegrationTest::BaseClientIntegrationTest(Network::Address::IpVersion
 }
 
 void BaseClientIntegrationTest::initialize() {
-  builder_.setOnEngineRunning([&]() { engine_running_.Notify(); });
-  {
-    absl::MutexLock l(&engine_lock_);
-    engine_ = builder_.build();
-  }
   BaseIntegrationTest::initialize();
   {
     absl::MutexLock l(&engine_lock_);
@@ -130,7 +125,12 @@ BaseClientIntegrationTest::createNewStream(EnvoyStreamCallbacks&& stream_callbac
   return stream_prototype_->start(std::move(stream_callbacks), explicit_flow_control_);
 }
 
-void BaseClientIntegrationTest::threadRoutine() {
+void BaseClientIntegrationTest::threadRoutine(absl::Notification& engine_running) {
+  builder_.setOnEngineRunning([&]() { engine_running.Notify(); });
+  {
+    absl::MutexLock l(&engine_lock_);
+    engine_ = builder_.build();
+  }
   full_dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
@@ -164,9 +164,10 @@ void BaseClientIntegrationTest::createEnvoy() {
     }
   }
 
+  absl::Notification engine_running;
   envoy_thread_ = api_->threadFactory().createThread(
-      [this]() -> void { threadRoutine(); });
-  engine_running_.WaitForNotification();
+      [this, &engine_running]() -> void { threadRoutine(engine_running); });
+  engine_running.WaitForNotification();
 }
 
 uint64_t BaseClientIntegrationTest::getCounterValue(const std::string& name) {

@@ -236,6 +236,7 @@ private:
   Stats::ScopeSharedPtr client_scope_;
   Stats::StatNameSetPtr stat_name_set_;
   std::unique_ptr<EngineCallbacks> callbacks_;
+  std::unique_ptr<EnvoyLogger> logger_;
   std::unique_ptr<EnvoyEventTracker> event_tracker_;
   absl::optional<int> thread_priority_;
   Assert::ActionRegistrationPtr assert_handler_registration_;
