@@ -152,7 +152,7 @@ bug_fixes:
     was not being properly extracted in the final Prometheus stat name.
 - area: odcds
   change: |
-    Fixed a bug where using OD-CDS without cds_config would not workin some
+    Fixed a bug where using OD-CDS without cds_config would not work in some
     cases. This change introduces a new internal OD-CDS component. This change
     could be reverted temporarily by setting the runtime guard
     ``envoy.reloadable_features.odcds_over_ads_fix`` to ``false``.

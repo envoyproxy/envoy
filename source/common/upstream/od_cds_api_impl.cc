@@ -304,11 +304,8 @@ XdstpOdCdsApiImpl::create(const envoy::config::core::v3::ConfigSource& config_so
                           Server::Configuration::ServerFactoryContext& server_factory_context) {
   absl::Status creation_status = absl::OkStatus();
   // TODO(adisuissa): convert the config_source to optional.
-  bool old_ads = false;
-  if (config_source.config_source_specifier_case() ==
-      envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds) {
-    old_ads = true;
-  }
+  const bool old_ads = config_source.config_source_specifier_case() ==
+                       envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds;
   auto ret = OdCdsApiSharedPtr(new XdstpOdCdsApiImpl(xds_manager, cm, notifier, scope,
                                                      server_factory_context, old_ads,
                                                      validation_visitor, creation_status));

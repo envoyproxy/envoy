@@ -107,7 +107,7 @@ private:
 
   // A singleton through which all subscriptions will be processed.
   XdstpOdcdsSubscriptionsManagerSharedPtr subscriptions_manager_;
-  bool old_ads_;
+  const bool old_ads_;
 };
 
 } // namespace Upstream
