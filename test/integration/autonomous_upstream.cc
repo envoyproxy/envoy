@@ -44,7 +44,7 @@ void AutonomousStream::decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, 
   FakeStream::decodeHeaders(std::move(headers), end_stream);
 
   if (send_response) {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     sendResponse();
   }
 }

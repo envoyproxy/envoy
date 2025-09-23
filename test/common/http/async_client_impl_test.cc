@@ -2312,21 +2312,18 @@ class AsyncClientImplUnitTest : public AsyncClientImplTest {
 public:
   AsyncClientImplUnitTest() {
     envoy::config::route::v3::RetryPolicy proto_policy;
-    Upstream::RetryExtensionFactoryContextImpl factory_context(
-        client_.factory_context_.singletonManager());
-    auto policy_or_error =
-        Router::RetryPolicyImpl::create(proto_policy, ProtobufMessage::getNullValidationVisitor(),
-                                        factory_context, client_.factory_context_);
+    auto policy_or_error = Router::RetryPolicyImpl::create(
+        proto_policy, ProtobufMessage::getNullValidationVisitor(), client_.factory_context_);
     THROW_IF_NOT_OK_REF(policy_or_error.status());
     retry_policy_ = std::move(policy_or_error.value());
     EXPECT_TRUE(retry_policy_.get());
 
     route_impl_ = *NullRouteImpl::create(
-        client_.cluster_->name(), *retry_policy_, regex_engine_, absl::nullopt,
+        client_.cluster_->name(), retry_policy_, regex_engine_, absl::nullopt,
         Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>());
   }
 
-  std::unique_ptr<Router::RetryPolicyImpl> retry_policy_;
+  std::shared_ptr<Router::RetryPolicyImpl> retry_policy_;
   Regex::GoogleReEngine regex_engine_;
   std::unique_ptr<NullRouteImpl> route_impl_;
   std::unique_ptr<Http::AsyncStreamImpl> stream_ = std::move(
@@ -2350,18 +2347,15 @@ public:
     envoy::config::route::v3::RetryPolicy proto_policy;
 
     TestUtility::loadFromYaml(yaml_config, proto_policy);
-    Upstream::RetryExtensionFactoryContextImpl factory_context(
-        client_.factory_context_.singletonManager());
-    auto policy_or_error =
-        Router::RetryPolicyImpl::create(proto_policy, ProtobufMessage::getNullValidationVisitor(),
-                                        factory_context, client_.factory_context_);
+    auto policy_or_error = Router::RetryPolicyImpl::create(
+        proto_policy, ProtobufMessage::getNullValidationVisitor(), client_.factory_context_);
     THROW_IF_NOT_OK_REF(policy_or_error.status());
     retry_policy_ = std::move(policy_or_error.value());
     EXPECT_TRUE(retry_policy_.get());
 
     stream_ = std::move(
         Http::AsyncStreamImpl::create(client_, stream_callbacks_,
-                                      AsyncClient::StreamOptions().setRetryPolicy(*retry_policy_))
+                                      AsyncClient::StreamOptions().setRetryPolicy(retry_policy_))
             .value());
   }
 
@@ -2413,14 +2407,14 @@ retry_back_off:
 
   auto& route_entry = getRouteFromStream();
 
-  EXPECT_EQ(route_entry.retryPolicy().numRetries(), 10);
-  EXPECT_EQ(route_entry.retryPolicy().perTryTimeout(), std::chrono::seconds(30));
+  EXPECT_EQ(route_entry.retryPolicy()->numRetries(), 10);
+  EXPECT_EQ(route_entry.retryPolicy()->perTryTimeout(), std::chrono::seconds(30));
   EXPECT_EQ(Router::RetryPolicy::RETRY_ON_CONNECT_FAILURE | Router::RetryPolicy::RETRY_ON_5XX |
                 Router::RetryPolicy::RETRY_ON_GATEWAY_ERROR | Router::RetryPolicy::RETRY_ON_RESET,
-            route_entry.retryPolicy().retryOn());
+            route_entry.retryPolicy()->retryOn());
 
-  EXPECT_EQ(route_entry.retryPolicy().baseInterval(), std::chrono::milliseconds(10));
-  EXPECT_EQ(route_entry.retryPolicy().maxInterval(), std::chrono::seconds(30));
+  EXPECT_EQ(route_entry.retryPolicy()->baseInterval(), std::chrono::milliseconds(10));
+  EXPECT_EQ(route_entry.retryPolicy()->maxInterval(), std::chrono::seconds(30));
 }
 
 TEST_F(AsyncClientImplUnitTest, AsyncStreamImplInitTestWithInvalidRetryPolicy) {
@@ -2454,15 +2448,15 @@ retry_back_off:
   setRetryPolicy(yaml);
   auto& route_entry = getRouteFromStream();
 
-  EXPECT_EQ(route_entry.retryPolicy().numRetries(), 10);
-  EXPECT_EQ(route_entry.retryPolicy().perTryTimeout(), std::chrono::seconds(30));
+  EXPECT_EQ(route_entry.retryPolicy()->numRetries(), 10);
+  EXPECT_EQ(route_entry.retryPolicy()->perTryTimeout(), std::chrono::seconds(30));
   EXPECT_EQ(Router::RetryPolicy::RETRY_ON_CONNECT_FAILURE | Router::RetryPolicy::RETRY_ON_5XX |
                 Router::RetryPolicy::RETRY_ON_GATEWAY_ERROR | Router::RetryPolicy::RETRY_ON_RESET |
                 Router::RetryPolicy::RETRY_ON_RESET_BEFORE_REQUEST,
-            route_entry.retryPolicy().retryOn());
+            route_entry.retryPolicy()->retryOn());
 
-  EXPECT_EQ(route_entry.retryPolicy().baseInterval(), std::chrono::milliseconds(10));
-  EXPECT_EQ(route_entry.retryPolicy().maxInterval(), std::chrono::seconds(30));
+  EXPECT_EQ(route_entry.retryPolicy()->baseInterval(), std::chrono::milliseconds(10));
+  EXPECT_EQ(route_entry.retryPolicy()->maxInterval(), std::chrono::seconds(30));
 }
 
 TEST_F(AsyncClientImplUnitTest, NullConfig) {

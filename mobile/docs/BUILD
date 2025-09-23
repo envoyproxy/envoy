@@ -3,6 +3,7 @@ load("@envoy//bazel:envoy_build_system.bzl", "envoy_mobile_package")
 load("@envoy//tools/python:namespace.bzl", "envoy_py_namespace")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_filegroup", "pkg_files")
 load("@rules_pkg//pkg:pkg.bzl", "pkg_tar")
+load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 
 licenses(["notice"])  # Apache 2
 
