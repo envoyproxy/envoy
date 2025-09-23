@@ -19,21 +19,21 @@ TEST_F(PostgresMessageParserTest, IsSslRequestValid) {
 
 TEST_F(PostgresMessageParserTest, IsSslRequestInvalidCode) {
   Buffer::OwnedImpl buffer;
-  buffer.writeBEInt<uint32_t>(8);     // Correct length
-  buffer.writeBEInt<uint32_t>(12345); // Wrong code
+  buffer.writeBEInt<uint32_t>(SSL_REQUEST_MESSAGE_SIZE); // Correct length
+  buffer.writeBEInt<uint32_t>(12345);                    // Wrong code
   EXPECT_FALSE(PostgresMessageParser::isSslRequest(buffer, 0));
 }
 
 TEST_F(PostgresMessageParserTest, IsSslRequestInvalidLength) {
   Buffer::OwnedImpl buffer;
-  buffer.writeBEInt<uint32_t>(12);       // Wrong length
-  buffer.writeBEInt<uint32_t>(80877103); // Correct code
+  buffer.writeBEInt<uint32_t>(SSL_REQUEST_MESSAGE_SIZE + 4); // Wrong length
+  buffer.writeBEInt<uint32_t>(SSL_REQUEST_CODE);             // Correct code
   EXPECT_FALSE(PostgresMessageParser::isSslRequest(buffer, 0));
 }
 
 TEST_F(PostgresMessageParserTest, IsSslRequestInsufficientData) {
   Buffer::OwnedImpl buffer;
-  buffer.writeBEInt<uint32_t>(8); // Only 4 bytes
+  buffer.writeBEInt<uint32_t>(SSL_REQUEST_MESSAGE_SIZE); // Only 4 bytes
   EXPECT_FALSE(PostgresMessageParser::isSslRequest(buffer, 0));
 }
 
@@ -99,8 +99,8 @@ TEST_F(PostgresMessageParserTest, ParseStartupMessageInsufficientData) {
 
 TEST_F(PostgresMessageParserTest, ParseStartupMessageTooSmall) {
   Buffer::OwnedImpl buffer;
-  buffer.writeBEInt<uint32_t>(6); // Too small (< 8 bytes)
-  buffer.writeBEInt<uint32_t>(196608);
+  buffer.writeBEInt<uint32_t>(STARTUP_HEADER_SIZE - 2); // Too small (< header size)
+  buffer.writeBEInt<uint32_t>(POSTGRES_PROTOCOL_VERSION);
 
   StartupMessage message;
   EXPECT_FALSE(PostgresMessageParser::parseStartupMessage(buffer, 0, message, 1024));
@@ -109,10 +109,26 @@ TEST_F(PostgresMessageParserTest, ParseStartupMessageTooSmall) {
 TEST_F(PostgresMessageParserTest, ParseStartupMessageTooLarge) {
   Buffer::OwnedImpl buffer;
   buffer.writeBEInt<uint32_t>(2000); // Larger than max allowed
-  buffer.writeBEInt<uint32_t>(196608);
+  buffer.writeBEInt<uint32_t>(POSTGRES_PROTOCOL_VERSION);
 
   StartupMessage message;
   EXPECT_FALSE(PostgresMessageParser::parseStartupMessage(buffer, 0, message, 1000));
+}
+
+TEST_F(PostgresMessageParserTest, IsCancelRequestValid) {
+  Buffer::OwnedImpl buffer;
+  buffer.writeBEInt<uint32_t>(CANCEL_REQUEST_MESSAGE_SIZE);
+  buffer.writeBEInt<uint32_t>(CANCEL_REQUEST_CODE);
+  buffer.writeBEInt<uint32_t>(123); // pid
+  buffer.writeBEInt<uint32_t>(456); // secret
+  EXPECT_TRUE(PostgresMessageParser::isCancelRequest(buffer, 0));
+}
+
+TEST_F(PostgresMessageParserTest, IsCancelRequestInvalid) {
+  Buffer::OwnedImpl wrong_len;
+  wrong_len.writeBEInt<uint32_t>(CANCEL_REQUEST_MESSAGE_SIZE - 1);
+  wrong_len.writeBEInt<uint32_t>(CANCEL_REQUEST_CODE);
+  EXPECT_FALSE(PostgresMessageParser::isCancelRequest(wrong_len, 0));
 }
 
 TEST_F(PostgresMessageParserTest, ParseStartupMessageIncomplete) {

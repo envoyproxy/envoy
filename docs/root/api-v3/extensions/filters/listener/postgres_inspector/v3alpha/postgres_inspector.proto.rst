@@ -16,7 +16,8 @@ contrib.envoy.extensions.filters.listener.postgres_inspector.v3alpha.PostgresIns
 
   message PostgresInspector {
     google.protobuf.BoolValue enable_metadata_extraction = 1;
-    google.protobuf.UInt32Value max_startup_message_size = 2 [(validate.rules).uint32 = {lte: 65536 gte: 256}];
+    // PostgreSQL defines MAX_STARTUP_PACKET_LENGTH as 10KB. The valid range is in between 256 and 10000 bytes.
+    google.protobuf.UInt32Value max_startup_message_size = 2 [(validate.rules).uint32 = {lte: 10000 gte: 256}];
     google.protobuf.Duration startup_timeout = 3 [(validate.rules).duration = {gte {seconds: 1}}];
   }
 

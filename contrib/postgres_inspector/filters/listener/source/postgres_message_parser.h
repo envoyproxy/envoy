@@ -13,8 +13,14 @@ namespace ListenerFilters {
 namespace PostgresInspector {
 
 // PostgreSQL protocol constants.
-constexpr uint32_t POSTGRES_PROTOCOL_VERSION = 196608; // Protocol version 3.0
-constexpr uint32_t SSL_REQUEST_CODE = 80877103;        // Magic number for SSL request
+constexpr uint32_t POSTGRES_PROTOCOL_VERSION = 196608; // Protocol version 3.0.
+constexpr uint32_t SSL_REQUEST_CODE = 80877103;        // SSL request code.
+constexpr uint32_t CANCEL_REQUEST_CODE = 80877102;     // Cancel request code.
+
+// Message size constants.
+constexpr uint32_t STARTUP_HEADER_SIZE = 8;          // Length(4) + Version(4).
+constexpr uint32_t SSL_REQUEST_MESSAGE_SIZE = 8;     // Length(4) + Code(4).
+constexpr uint32_t CANCEL_REQUEST_MESSAGE_SIZE = 16; // Length(4) + Code(4) + PID(4) + Key(4).
 
 /**
  * Parsed PostgreSQL startup message.
@@ -41,12 +47,21 @@ class PostgresMessageParser {
 public:
   /**
    * Check if buffer contains an SSL request at the given offset.
-   * SSL request format: Int32(8) + Int32(80877103)
+   * SSL request format: Int32(8) + Int32(80877103).
    * @param buffer the buffer to examine
    * @param offset the offset in the buffer to start checking
    * @return true if SSL request found, false otherwise
    */
   static bool isSslRequest(const Buffer::Instance& buffer, uint64_t offset);
+
+  /**
+   * Check if buffer contains a CancelRequest at the given offset.
+   * CancelRequest format: Int32(16) + Int32(80877102) + Int32(process_id) + Int32(secret_key).
+   * @param buffer the buffer to examine.
+   * @param offset the offset in the buffer to start checking.
+   * @return true if CancelRequest found, false otherwise.
+   */
+  static bool isCancelRequest(const Buffer::Instance& buffer, uint64_t offset);
 
   /**
    * Parse a startup message from the buffer.

@@ -132,6 +132,22 @@ TEST_F(PostgresInspectorTest, ValidStartupMessage) {
   EXPECT_EQ(0, cfg_->stats().ssl_requested_.value());
 }
 
+// Test CancelRequest handling.
+TEST_F(PostgresInspectorTest, CancelRequest) {
+  init();
+
+  EXPECT_CALL(socket_, setDetectedTransportProtocol("postgres"));
+
+  auto data = PostgresTestUtils::createCancelRequest(123, 456);
+  auto buffer = createBuffer(std::move(data));
+
+  const Network::FilterStatus status = filter_->onData(*buffer);
+
+  EXPECT_EQ(Network::FilterStatus::Continue, status);
+  EXPECT_EQ(1, cfg_->stats().postgres_found_.value());
+  EXPECT_EQ(1, cfg_->stats().ssl_not_requested_.value());
+}
+
 // Test startup message with minimal parameters.
 TEST_F(PostgresInspectorTest, MinimalStartupMessage) {
   init();
@@ -183,7 +199,7 @@ TEST_F(PostgresInspectorTest, InvalidProtocolVersion) {
   const Network::FilterStatus status = filter_->onData(*buffer);
 
   EXPECT_EQ(Network::FilterStatus::Continue, status);
-  EXPECT_EQ(2, cfg_->stats().postgres_not_found_.value());
+  EXPECT_EQ(1, cfg_->stats().postgres_not_found_.value());
   EXPECT_EQ(1, cfg_->stats().protocol_error_.value());
   EXPECT_EQ(0, cfg_->stats().postgres_found_.value());
 }
@@ -270,9 +286,10 @@ TEST_F(PostgresInspectorTest, BytesProcessedHistogram) {
   filter_->onData(*buffer);
 
   // Check that bytes_processed histogram was updated.
+  // We cannot easily read histogram sample values via IsolatedStoreImpl here.
+  // Assert that the histogram exists in the store by name.
   Stats::Histogram& histogram = stats_store_.histogramFromString(
       "postgres_inspector.bytes_processed", Stats::Histogram::Unit::Bytes);
-  // We can't easily check the exact value, but we can check it exists.
   EXPECT_NE("", histogram.name());
 }
 
