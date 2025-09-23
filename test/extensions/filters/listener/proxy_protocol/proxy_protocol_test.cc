@@ -6,8 +6,8 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/proxy_protocol.pb.h"
 #include "envoy/data/core/v3/tlv_metadata.pb.h"
-#include "envoy/network/proxy_protocol.h"
 #include "envoy/network/listener.h"
+#include "envoy/network/proxy_protocol.h"
 #include "envoy/stats/scope.h"
 
 #include "source/common/api/os_sys_calls_impl.h"
