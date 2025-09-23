@@ -8,6 +8,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/header_utility.h"
+#include "source/extensions/filters/http/cache_v2/cache_custom_headers.h"
 #include "source/extensions/filters/http/cache_v2/cache_headers_utils.h"
 
 #include "test/mocks/server/server_factory_context.h"
@@ -171,9 +172,9 @@ TEST(RequestCacheControl, StreamingTest) {
 TEST(ResponseCacheControl, StreamingTest) {
   std::ostringstream os;
   ResponseCacheControl response_cache_control(
-      "no-cache, must-revalidate, no-store, no-transform, max-age=0");
+      "no-cache, must-revalidate, no-store, no-transform, max-age=0, public");
   os << response_cache_control;
-  EXPECT_EQ(os.str(), "{must_validate, no_store, no_transform, no_stale, max-age=0}");
+  EXPECT_EQ(os.str(), "{must_validate, no_store, no_transform, no_stale, public, max-age=0}");
 }
 
 struct TestResponseCacheControl : public ResponseCacheControl {
@@ -912,6 +913,26 @@ TEST_F(VaryAllowListTest, NotAllowsHeadersSingle) {
 TEST_F(VaryAllowListTest, NotAllowsHeadersMixed) {
   response_headers_.addCopy("vary", "accept, wrong-header");
   EXPECT_FALSE(vary_allow_list_.allowsHeaders(response_headers_));
+}
+
+TEST(InjectValidationHeaders, InjectsIfModifiedSince) {
+  Http::TestResponseHeaderMapImpl old_response_headers;
+  constexpr absl::string_view mod_time = "Fri, 01 Aug 2025 09:25:10 GMT";
+  old_response_headers.setInline(CacheCustomHeaders::lastModified(), mod_time);
+  Http::TestRequestHeaderMapImpl request_headers;
+  CacheHeadersUtils::injectValidationHeaders(request_headers, old_response_headers);
+  EXPECT_THAT(request_headers, ContainsHeader("if-modified-since", mod_time));
+}
+
+TEST(ShouldUpdateCachedEntry, ComparesEtags) {
+  Http::TestResponseHeaderMapImpl old_headers, new_headers;
+  old_headers.setStatus(304);
+  new_headers.setStatus(304);
+  old_headers.setInline(CacheCustomHeaders::etag(), "abc");
+  new_headers.setInline(CacheCustomHeaders::etag(), "abc");
+  EXPECT_TRUE(CacheHeadersUtils::shouldUpdateCachedEntry(new_headers, old_headers));
+  new_headers.setInline(CacheCustomHeaders::etag(), "def");
+  EXPECT_FALSE(CacheHeadersUtils::shouldUpdateCachedEntry(new_headers, old_headers));
 }
 
 } // namespace
