@@ -32,7 +32,7 @@ public:
   };
 
   // Called to modify the request after it is created, but before it is sent on the wire.
-  // Implementations may modify the request and must return true if any modications were made.
+  // Implementations may modify the request and must return true if any modifications were made.
   virtual bool
   modifyRequest(const Params& params,
                 envoy::service::ext_proc::v3::ProcessingRequest& processingRequest) PURE;
