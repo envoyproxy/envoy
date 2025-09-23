@@ -139,6 +139,12 @@ bug_fixes:
     when used with other listener filters. The bug was triggered when a previous listener filter processed more data
     than the TLS inspector had requested, causing the TLS inspector to incorrectly calculate its buffer growth strategy.
     The fix ensures that buffer growth is now based on actual bytes available rather than the previously requested amount.
+- area: listener
+  change: |
+    Fixed a bug where a failure to create listener sockets in different Linux network namespaces was
+    not handled properly. The success of the netns switch was not checked before attempting to
+    access the result of the socket creation. This is only relevant for Linux and if a listening
+    socket address was specified with a non-default network namespace.
 - area: aws
   change: |
     Added missing session name, session duration, and ``external_id`` parameters in AssumeRole credentials provider.
