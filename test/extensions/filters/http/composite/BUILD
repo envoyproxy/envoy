@@ -36,6 +36,7 @@ envoy_extension_cc_test(
     srcs = ["composite_filter_integration_test.cc"],
     extension_names = ["envoy.filters.http.composite"],
     rbe_pool = "6gig",
+    shard_count = 6,
     deps = [
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/composite:config",
@@ -44,6 +45,7 @@ envoy_extension_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
+        "//test/integration/filters:local_reply_during_encoding_filter_lib",
         "//test/integration/filters:server_factory_context_filter_config_proto_cc_proto",
         "//test/integration/filters:server_factory_context_filter_lib",
         "//test/integration/filters:set_response_code_filter_config_proto_cc_proto",

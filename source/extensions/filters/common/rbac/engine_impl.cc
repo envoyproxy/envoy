@@ -46,13 +46,13 @@ RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
     Server::Configuration::CommonFactoryContext& context, const EnforcementMode mode)
     : action_(rules.action()), mode_(mode) {
   // A pointer to the builder, if one will be created.
-  Expr::Builder* builder = nullptr;
+  Expr::BuilderInstanceSharedPtr builder = nullptr;
   // guard expression builder by presence of a condition in policies
   for (const auto& policy : rules.policies()) {
     if (policy.second.has_condition()) {
       builder_with_arena_ = std::make_unique<ExprBuilderWithArena>();
       builder_with_arena_->builder_ = Expr::createBuilder(&builder_with_arena_->constant_arena_);
-      builder = builder_with_arena_->builder_.get();
+      builder = builder_with_arena_->builder_;
       break;
     }
   }

@@ -140,9 +140,7 @@ protected:
     }
     config_ = std::make_shared<FilterConfig>(
         proto_config, 200ms, 10000, *stats_store_.rootScope(), "", is_upstream_filter,
-        std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
-            Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr)),
-        factory_context_);
+        Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr), factory_context_);
     filter_ = std::make_unique<Filter>(config_, std::move(client_));
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(Return(BufferSize));
@@ -1718,6 +1716,37 @@ failure_mode_allow: true)EOF";
   filter_->onDestroy();
 
   EXPECT_EQ(config_->stats().failure_mode_allowed_.value(), 1);
+}
+
+// Verify that when status_on_error is configured, gRPC errors use the configured HTTP status.
+TEST_F(HttpFilterTest, GrpcErrorUsesConfiguredStatusOnError) {
+  std::string yaml_config = R"EOF(
+grpc_service:
+  envoy_grpc:
+    cluster_name: "ext_proc_server"
+status_on_error:
+  code: 503
+)EOF";
+  initialize(std::move(yaml_config));
+
+  // Start header processing to open the stream and arm timers.
+  EXPECT_EQ(filter_->decodeHeaders(request_headers_, false), FilterHeadersStatus::StopIteration);
+  test_time_->advanceTimeWait(std::chrono::microseconds(10));
+
+  // Expect a 503 Service Unavailable local reply instead of the previous default 500.
+  TestResponseHeaderMapImpl immediate_response_headers;
+  EXPECT_CALL(encoder_callbacks_,
+              sendLocalReply(::Envoy::Http::Code::ServiceUnavailable, "", _, Eq(absl::nullopt),
+                             "ext_proc_error_gRPC_error_13{error_message}"))
+      .WillOnce(Invoke([&immediate_response_headers](
+                           Unused, Unused,
+                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
+                           Unused) { modify_headers(immediate_response_headers); }));
+
+  // Simulate a gRPC error from the external processor.
+  server_closed_stream_ = true;
+  stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error_message");
+  filter_->onDestroy();
 }
 
 TEST_F(FailureModeAllowOverrideTest, FilterDisallowNoRouteOverride) {

@@ -84,7 +84,7 @@ public:
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) override;
   absl::StatusOr<CdsApiPtr> createCds(const envoy::config::core::v3::ConfigSource& cds_config,
                                       const xds::core::v3::ResourceLocator* cds_resources_locator,
-                                      ClusterManager& cm) override;
+                                      ClusterManager& cm, bool support_multi_ads_sources) override;
 
 protected:
   Server::Configuration::ServerFactoryContext& context_;
@@ -361,7 +361,8 @@ public:
   void drainConnections(const std::string& cluster,
                         DrainConnectionsHostPredicate predicate) override;
 
-  void drainConnections(DrainConnectionsHostPredicate predicate) override;
+  void drainConnections(DrainConnectionsHostPredicate predicate,
+                        ConnectionPool::DrainBehavior drain_behavior) override;
 
   absl::Status checkActiveStaticCluster(const std::string& cluster) override;
 
@@ -603,7 +604,7 @@ private:
                        PrioritySet::UpdateHostsParams&& update_hosts_params,
                        LocalityWeightsConstSharedPtr locality_weights,
                        const HostVector& hosts_added, const HostVector& hosts_removed,
-                       uint64_t seed, absl::optional<bool> weighted_priority_health,
+                       absl::optional<bool> weighted_priority_health,
                        absl::optional<uint32_t> overprovisioning_factor,
                        HostMapConstSharedPtr cross_priority_host_map);
 

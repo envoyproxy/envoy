@@ -118,6 +118,11 @@ public:
   virtual void forEachScope(SizeFn f_size, StatFn<const Scope> f_stat) const PURE;
 
   /**
+   * Delete unused metrics from all the evictable scope caches, and mark the rest as unused.
+   */
+  virtual void evictUnused() PURE;
+
+  /**
    * @return a null counter that will ignore increments and always return 0.
    */
   virtual Counter& nullCounter() PURE;
@@ -172,7 +177,9 @@ public:
   /**
    * @return a scope of the given name.
    */
-  ScopeSharedPtr createScope(const std::string& name) { return rootScope()->createScope(name); }
+  ScopeSharedPtr createScope(const std::string& name, bool evictable = false) {
+    return rootScope()->createScope(name, evictable);
+  }
 
   /**
    * Extracts tags from the name and appends them to the provided StatNameTagVector.

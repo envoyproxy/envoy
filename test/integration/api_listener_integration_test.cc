@@ -162,7 +162,7 @@ TEST_P(ApiListenerIntegrationTest, FromWorkerThread) {
       ThreadLocal::TypedSlot<>::makeUnique(test_server_->server().threadLocal());
   slot->set([&dispatchers_mutex, &dispatchers, &has_dispatcher](
                 Event::Dispatcher& dispatcher) -> std::shared_ptr<ThreadLocal::ThreadLocalObject> {
-    absl::MutexLock ml(&dispatchers_mutex);
+    absl::MutexLock ml(dispatchers_mutex);
     // A string comparison on thread name seems to be the only way to
     // distinguish worker threads from the main thread with the slots interface.
     if (dispatcher.name() != "main_thread") {

@@ -287,6 +287,9 @@ void ConnectionImpl::ServerStreamImpl::encode1xxHeaders(const ResponseHeaderMap&
 
 void ConnectionImpl::StreamImpl::encodeHeadersBase(const HeaderMap& headers, bool end_stream) {
   local_end_stream_ = end_stream;
+
+  bytes_meter_->addDecompressedHeaderBytesSent(headers.byteSize());
+
   submitHeaders(headers, end_stream);
   if (parent_.sendPendingFramesAndHandleError()) {
     // Intended to check through coverage that this error case is tested
@@ -357,6 +360,9 @@ void ConnectionImpl::StreamImpl::encodeTrailersBase(const HeaderMap& trailers) {
   parent_.updateActiveStreamsOnEncode(*this);
   ASSERT(!local_end_stream_);
   local_end_stream_ = true;
+
+  bytes_meter_->addDecompressedHeaderBytesSent(trailers.byteSize());
+
   if (pending_send_data_->length() > 0) {
     // In this case we want trailers to come after we release all pending body data that is
     // waiting on window updates. We need to save the trailers so that we can emit them later.
@@ -1258,7 +1264,7 @@ int ConnectionImpl::onFrameSend(int32_t stream_id, size_t length, uint8_t type, 
       // teardown. As part of the work to remove exceptions we should aim to clean up all of this
       // error handling logic and only handle this type of case at the end of dispatch.
       for (auto& stream : active_streams_) {
-        stream->disarmStreamIdleTimer();
+        stream->disarmStreamFlushTimer();
       }
       return ERR_CALLBACK_FAILURE;
     }
@@ -1554,6 +1560,8 @@ int ConnectionImpl::saveHeader(int32_t stream_id, HeaderString&& name, HeaderStr
     stats_.headers_cb_no_stream_.inc();
     return 0;
   }
+
+  stream->bytes_meter_->addDecompressedHeaderBytesReceived(name.size() + value.size());
 
   // TODO(10646): Switch to use HeaderUtility::checkHeaderNameForUnderscores().
   auto should_return = checkHeaderNameForUnderscores(name.getStringView());
@@ -2033,7 +2041,7 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
     : Http2Options(http2_options, max_headers_kb) {
   og_options_.perspective = http2::adapter::Perspective::kClient;
   og_options_.remote_max_concurrent_streams =
-      ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS;
+      ::Envoy::Http2::Utility::OptionsLimits::MAX_MAX_CONCURRENT_STREAMS;
 
 #ifdef ENVOY_NGHTTP2
   // Temporarily disable initial max streams limit/protection, since we might want to create
@@ -2041,7 +2049,7 @@ ConnectionImpl::ClientHttp2Options::ClientHttp2Options(
   //
   // TODO(PiotrSikora): remove this once multiple upstream connections or queuing are implemented.
   nghttp2_option_set_peer_max_concurrent_streams(
-      options_, ::Envoy::Http2::Utility::OptionsLimits::DEFAULT_MAX_CONCURRENT_STREAMS);
+      options_, ::Envoy::Http2::Utility::OptionsLimits::MAX_MAX_CONCURRENT_STREAMS);
 
   // nghttp2 REQUIRES setting max number of CONTINUATION frames.
   // 1024 is chosen to accommodate Envoy's 8Mb max limit of max_request_headers_kb

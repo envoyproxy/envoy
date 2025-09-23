@@ -210,8 +210,8 @@ TimeoutData FilterUtility::finalTimeout(const RouteEntry& route,
       timeout.global_timeout_ = route.timeout();
     }
   }
-  timeout.per_try_timeout_ = route.retryPolicy().perTryTimeout();
-  timeout.per_try_idle_timeout_ = route.retryPolicy().perTryIdleTimeout();
+  timeout.per_try_timeout_ = route.retryPolicy()->perTryTimeout();
+  timeout.per_try_idle_timeout_ = route.retryPolicy()->perTryIdleTimeout();
 
   uint64_t header_timeout;
 
@@ -450,8 +450,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
       modify_headers_from_upstream_lb_(headers);
     }
 
-    route_entry_->finalizeResponseHeaders(headers, callbacks_->streamInfo());
-
     if (attempt_count_ == 0 || !route_entry_->includeAttemptCountInResponse()) {
       return;
     }
@@ -487,11 +485,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     direct_response->rewritePathHeader(headers, !config_->suppress_envoy_headers_);
     callbacks_->sendLocalReply(
         direct_response->responseCode(), direct_response->responseBody(),
-        [this, direct_response,
-         &request_headers = headers](Http::ResponseHeaderMap& response_headers) -> void {
+        [this, direct_response](Http::ResponseHeaderMap& response_headers) -> void {
           std::string new_uri;
-          if (request_headers.Path()) {
-            new_uri = direct_response->newUri(request_headers);
+          ASSERT(downstream_headers_ != nullptr);
+          if (downstream_headers_->Path()) {
+            new_uri = direct_response->newUri(*downstream_headers_);
           }
           // See https://tools.ietf.org/html/rfc7231#section-7.1.2.
           const auto add_location =
@@ -500,7 +498,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
           if (!new_uri.empty() && add_location) {
             response_headers.addReferenceKey(Http::Headers::get().Location, new_uri);
           }
-          direct_response->finalizeResponseHeaders(response_headers, callbacks_->streamInfo());
+          const Formatter::HttpFormatterContext formatter_context(
+              downstream_headers_, &response_headers, {}, {}, {}, &callbacks_->activeSpan());
+          direct_response->finalizeResponseHeaders(response_headers, formatter_context,
+                                                   callbacks_->streamInfo());
         },
         absl::nullopt, StreamInfo::ResponseCodeDetails::get().DirectResponse);
     return Http::FilterHeadersStatus::StopIteration;
@@ -585,12 +586,24 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::RequestHeaderMap& headers,
     return Http::FilterHeadersStatus::StopIteration;
   }
 
+  // If large request buffering is enabled and its size is more than current buffer limit, update
+  // the buffer limit to a new larger value.
+  uint64_t effective_buffer_limit = calculateEffectiveBufferLimit();
+  if (effective_buffer_limit != std::numeric_limits<uint64_t>::max() &&
+      effective_buffer_limit > callbacks_->decoderBufferLimit()) {
+    ENVOY_STREAM_LOG(debug, "Setting new filter manager buffer limit: {}", *callbacks_,
+                     effective_buffer_limit);
+    callbacks_->setDecoderBufferLimit(effective_buffer_limit);
+  }
+
   // Increment the attempt count from 0 to 1 at the first upstream request.
   attempt_count_++;
   callbacks_->streamInfo().setAttemptCount(attempt_count_);
 
   // Finalize the request headers before the host selection.
-  route_entry_->finalizeRequestHeaders(headers, callbacks_->streamInfo(),
+  const Formatter::HttpFormatterContext formatter_context(&headers, {}, {}, {}, {},
+                                                          &callbacks_->activeSpan());
+  route_entry_->finalizeRequestHeaders(headers, formatter_context, callbacks_->streamInfo(),
                                        !config_->suppress_envoy_headers_);
 
   // Fetch a connection pool for the upstream cluster.
@@ -777,7 +790,7 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
   ASSERT(headers.Scheme());
 
   retry_state_ = createRetryState(
-      route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_, route_stats_context_,
+      *route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_, route_stats_context_,
       config_->factory_context_, callbacks_->dispatcher(), route_entry_->priority());
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
@@ -1139,6 +1152,25 @@ absl::optional<absl::string_view> Filter::getShadowCluster(const ShadowPolicy& p
   }
 }
 
+void Filter::setupRouteTimeoutForWebsocketUpgrade() {
+  // Set up the route timeout early for websocket upgrades, since the upstream request
+  // will be paused waiting for the upgrade response and we need the timeout active.
+  if (!response_timeout_ && timeout_.global_timeout_.count() > 0) {
+    Event::Dispatcher& dispatcher = callbacks_->dispatcher();
+    response_timeout_ = dispatcher.createTimer([this]() -> void { onResponseTimeout(); });
+    response_timeout_->enableTimer(timeout_.global_timeout_);
+  }
+}
+
+void Filter::disableRouteTimeoutForWebsocketUpgrade() {
+  // Disable the route timeout after websocket upgrade completes successfully
+  // to prevent timeout from firing after the upgrade is done.
+  if (response_timeout_) {
+    response_timeout_->disableTimer();
+    response_timeout_.reset();
+  }
+}
+
 void Filter::onRequestComplete() {
   // This should be called exactly once, when the downstream request has been received in full.
   ASSERT(!downstream_end_stream_);
@@ -1150,7 +1182,7 @@ void Filter::onRequestComplete() {
   if (!upstream_requests_.empty()) {
     // Even if we got an immediate reset, we could still shadow, but that is a riskier change and
     // seems unnecessary right now.
-    if (timeout_.global_timeout_.count() > 0) {
+    if (timeout_.global_timeout_.count() > 0 && !response_timeout_) {
       response_timeout_ = dispatcher.createTimer([this]() -> void { onResponseTimeout(); });
       response_timeout_->enableTimer(timeout_.global_timeout_);
     }
@@ -1783,6 +1815,9 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
 
   // Modify response headers after we have set the final upstream info because we may need to
   // modify the headers based on the upstream host.
+  const Formatter::HttpFormatterContext formatter_context(downstream_headers_, headers.get(), {},
+                                                          {}, {}, &callbacks_->activeSpan());
+  route_entry_->finalizeResponseHeaders(*headers, formatter_context, callbacks_->streamInfo());
   modify_headers_(*headers);
 
   if (end_stream) {
@@ -2084,7 +2119,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(
 }
 
 void Filter::runRetryOptionsPredicates(UpstreamRequest& retriable_request) {
-  for (const auto& options_predicate : route_entry_->retryPolicy().retryOptionsPredicates()) {
+  for (const auto& options_predicate : route_entry_->retryPolicy()->retryOptionsPredicates()) {
     const Upstream::RetryOptionsPredicate::UpdateOptionsParameters parameters{
         retriable_request.streamInfo(), upstreamSocketOptions()};
     auto ret = options_predicate->updateOptions(parameters);

@@ -5,23 +5,16 @@
 
 #include "envoy/config/trace/v3/zipkin.pb.h"
 
-#include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
 #include "source/common/http/message_impl.h"
-#include "source/common/runtime/runtime_impl.h"
-#include "source/common/tracing/http_tracer_impl.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 #include "source/extensions/tracers/zipkin/zipkin_tracer_impl.h"
 
 #include "test/mocks/http/mocks.h"
-#include "test/mocks/local_info/mocks.h"
-#include "test/mocks/runtime/mocks.h"
-#include "test/mocks/stats/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/tracing/mocks.h"
-#include "test/mocks/upstream/cluster_manager.h"
-#include "test/mocks/upstream/thread_local_cluster.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -57,8 +50,7 @@ public:
       EXPECT_CALL(*timer_, enableTimer(std::chrono::milliseconds(5000), _));
     }
 
-    driver_ = std::make_unique<Driver>(zipkin_config, cm_, *stats_.rootScope(), tls_, runtime_,
-                                       local_info_, random_, time_source_);
+    driver_ = std::make_unique<Driver>(zipkin_config, context_);
   }
 
   void setupValidDriverWithHostname(const std::string& version, const std::string& hostname) {
@@ -156,14 +148,16 @@ public:
       {":authority", "api.lyft.com"}, {":path", "/"}, {":method", "GET"}, {"x-request-id", "foo"}};
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
 
-  NiceMock<ThreadLocal::MockInstance> tls_;
   std::unique_ptr<Driver> driver_;
   NiceMock<Event::MockTimer>* timer_;
-  NiceMock<Stats::MockIsolatedStatsStore> stats_;
-  NiceMock<Upstream::MockClusterManager> cm_;
-  NiceMock<Runtime::MockLoader> runtime_;
-  NiceMock<LocalInfo::MockLocalInfo> local_info_;
-  NiceMock<Random::MockRandomGenerator> random_;
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  NiceMock<ThreadLocal::MockInstance>& tls_{context_.thread_local_};
+  NiceMock<Stats::MockIsolatedStatsStore>& stats_{context_.store_};
+  NiceMock<Upstream::MockClusterManager>& cm_{context_.cluster_manager_};
+  NiceMock<Runtime::MockLoader>& runtime_{context_.runtime_loader_};
+  NiceMock<LocalInfo::MockLocalInfo>& local_info_{context_.local_info_};
+  NiceMock<Random::MockRandomGenerator>& random_{context_.api_.random_};
 
   NiceMock<Tracing::MockConfig> config_;
   Event::SimulatedTimeSystem test_time_;
@@ -204,6 +198,141 @@ TEST_F(ZipkinDriverTest, InitializeDriver) {
 
     setup(zipkin_config, true);
   }
+}
+
+TEST_F(ZipkinDriverTest, TraceContextOptionConfiguration) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  {
+    // Test default trace_context_option value (USE_B3) - W3C fallback should be disabled.
+    const std::string yaml_string = R"EOF(
+    collector_cluster: fake_cluster
+    collector_endpoint: /api/v2/spans
+    collector_endpoint_version: HTTP_JSON
+    )EOF";
+    envoy::config::trace::v3::ZipkinConfig zipkin_config;
+    TestUtility::loadFromYaml(yaml_string, zipkin_config);
+
+    setup(zipkin_config, true);
+    EXPECT_FALSE(driver_->w3cFallbackEnabled()); // W3C fallback should be disabled by default
+    EXPECT_EQ(driver_->traceContextOption(), envoy::config::trace::v3::ZipkinConfig::USE_B3);
+  }
+
+  {
+    // Test trace_context_option explicitly set to USE_B3 - W3C fallback should be disabled.
+    const std::string yaml_string = R"EOF(
+    collector_cluster: fake_cluster
+    collector_endpoint: /api/v2/spans
+    collector_endpoint_version: HTTP_JSON
+    trace_context_option: USE_B3
+    )EOF";
+    envoy::config::trace::v3::ZipkinConfig zipkin_config;
+    TestUtility::loadFromYaml(yaml_string, zipkin_config);
+
+    setup(zipkin_config, true);
+    EXPECT_FALSE(driver_->w3cFallbackEnabled()); // W3C fallback should be disabled
+    EXPECT_EQ(driver_->traceContextOption(), envoy::config::trace::v3::ZipkinConfig::USE_B3);
+  }
+
+  {
+    // Test trace_context_option set to USE_B3_WITH_W3C_PROPAGATION - W3C fallback should be
+    // enabled.
+    const std::string yaml_string = R"EOF(
+    collector_cluster: fake_cluster
+    collector_endpoint: /api/v2/spans
+    collector_endpoint_version: HTTP_JSON
+    trace_context_option: USE_B3_WITH_W3C_PROPAGATION
+    )EOF";
+    envoy::config::trace::v3::ZipkinConfig zipkin_config;
+    TestUtility::loadFromYaml(yaml_string, zipkin_config);
+
+    setup(zipkin_config, true);
+    EXPECT_TRUE(driver_->w3cFallbackEnabled()); // W3C fallback should be enabled
+    EXPECT_EQ(driver_->traceContextOption(),
+              envoy::config::trace::v3::ZipkinConfig::USE_B3_WITH_W3C_PROPAGATION);
+  }
+}
+
+TEST_F(ZipkinDriverTest, DualHeaderExtractionAndInjection) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  // Test complete dual header cycle: extract from B3 headers, then inject both B3 and W3C headers
+  const std::string yaml_string = R"EOF(
+  collector_cluster: fake_cluster
+  collector_endpoint: /api/v2/spans
+  collector_endpoint_version: HTTP_JSON
+  trace_context_option: USE_B3_WITH_W3C_PROPAGATION
+  )EOF";
+  envoy::config::trace::v3::ZipkinConfig zipkin_config;
+  TestUtility::loadFromYaml(yaml_string, zipkin_config);
+
+  setup(zipkin_config, true);
+
+  // Step 1: Simulate incoming request with B3 headers (extraction phase)
+  Tracing::TestTraceContextImpl incoming_trace_context{
+      {"x-b3-traceid", "463ac35c9f6413ad48485a3953bb6124"},
+      {"x-b3-spanid", "a2fb4a1d1a96d312"},
+      {"x-b3-sampled", "1"}};
+
+  // Create a span from the incoming B3 headers
+  Tracing::SpanPtr span = driver_->startSpan(config_, incoming_trace_context, stream_info_,
+                                             "test_operation", {Tracing::Reason::Sampling, true});
+
+  // Step 2: Inject context for outgoing request (injection phase)
+  Tracing::TestTraceContextImpl outgoing_trace_context{{}};
+  Tracing::UpstreamContext upstream_context;
+  span->injectContext(outgoing_trace_context, upstream_context);
+
+  // Step 3: Verify both B3 and W3C headers are injected
+
+  // Verify B3 headers are injected
+  auto b3_traceid = outgoing_trace_context.get("x-b3-traceid");
+  auto b3_spanid = outgoing_trace_context.get("x-b3-spanid");
+  auto b3_sampled = outgoing_trace_context.get("x-b3-sampled");
+
+  EXPECT_TRUE(b3_traceid.has_value());
+  EXPECT_TRUE(b3_spanid.has_value());
+  EXPECT_TRUE(b3_sampled.has_value());
+
+  // Verify the trace ID is preserved from extraction
+  EXPECT_EQ(b3_traceid.value(), "463ac35c9f6413ad48485a3953bb6124");
+  EXPECT_EQ(b3_sampled.value(), "1");
+
+  // Verify W3C traceparent header is also injected
+  auto traceparent = outgoing_trace_context.get("traceparent");
+  EXPECT_TRUE(traceparent.has_value());
+  EXPECT_FALSE(traceparent.value().empty());
+
+  // Verify traceparent format and contains the same trace ID
+  const std::string traceparent_value = std::string(traceparent.value());
+  EXPECT_EQ(traceparent_value.length(), 55);                                      // 2+1+32+1+16+1+2
+  EXPECT_EQ(traceparent_value.substr(0, 3), "00-");                               // version
+  EXPECT_EQ(traceparent_value.substr(3, 32), "463ac35c9f6413ad48485a3953bb6124"); // same trace ID
+  EXPECT_EQ(traceparent_value[35], '-');            // separator after trace-id
+  EXPECT_EQ(traceparent_value[52], '-');            // separator after span-id
+  EXPECT_EQ(traceparent_value.substr(53, 2), "01"); // sampled flag
+
+  // Step 4: Test W3C extraction fallback when B3 headers are not present
+  Tracing::TestTraceContextImpl w3c_only_context{
+      {"traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"}};
+
+  Tracing::SpanPtr w3c_span =
+      driver_->startSpan(config_, w3c_only_context, stream_info_, "w3c_test_operation",
+                         {Tracing::Reason::Sampling, true});
+
+  // Inject context for W3C extracted span
+  Tracing::TestTraceContextImpl w3c_outgoing_context{{}};
+  w3c_span->injectContext(w3c_outgoing_context, upstream_context);
+
+  // Verify both B3 and W3C headers are injected even when extracted from W3C
+  EXPECT_TRUE(w3c_outgoing_context.get("x-b3-traceid").has_value());
+  EXPECT_TRUE(w3c_outgoing_context.get("x-b3-spanid").has_value());
+  EXPECT_TRUE(w3c_outgoing_context.get("x-b3-sampled").has_value());
+  EXPECT_TRUE(w3c_outgoing_context.get("traceparent").has_value());
+
+  // Verify the trace ID is preserved from W3C extraction
+  auto w3c_b3_traceid = w3c_outgoing_context.get("x-b3-traceid");
+  EXPECT_EQ(w3c_b3_traceid.value(), "4bf92f3577b34da6a3ce929d0e0e4736");
 }
 
 TEST_F(ZipkinDriverTest, AllowCollectorClusterToBeAddedViaApi) {
@@ -934,6 +1063,156 @@ TEST_F(ZipkinDriverTest, DuplicatedHeader) {
     dup_callback(key);
     return true;
   });
+}
+
+TEST_F(ZipkinDriverTest, ReporterFlushWithHttpServiceHeadersVerifyHeaders) {
+  cm_.initializeClusters({"fake_cluster", "legacy_cluster"}, {});
+
+  const std::string yaml_string = R"EOF(
+  collector_cluster: legacy_cluster
+  collector_endpoint: /legacy/api/v1/spans
+  collector_service:
+    http_uri:
+      uri: "https://zipkin-collector.example.com/api/v2/spans"
+      cluster: fake_cluster
+      timeout: 5s
+    request_headers_to_add:
+      - header:
+          key: "Authorization"
+          value: "Bearer token123"
+      - header:
+          key: "X-Custom-Header"
+          value: "custom-value"
+      - header:
+          key: "X-API-Key"
+          value: "api-key-123"
+  collector_endpoint_version: HTTP_JSON
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config;
+  TestUtility::loadFromYaml(yaml_string, zipkin_config);
+  setup(zipkin_config, true);
+
+  Http::MockAsyncClientRequest request(&cm_.thread_local_cluster_.async_client_);
+  Http::AsyncClient::Callbacks* callback;
+  const absl::optional<std::chrono::milliseconds> timeout(std::chrono::seconds(5));
+
+  // Set up expectations for the HTTP request with custom headers
+  EXPECT_CALL(cm_.thread_local_cluster_.async_client_,
+              send_(_, _, Http::AsyncClient::RequestOptions().setTimeout(timeout)))
+      .WillOnce(
+          Invoke([&](Http::RequestMessagePtr& message, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callback = &callbacks;
+
+            // Verify standard headers are present
+            EXPECT_EQ("/api/v2/spans", message->headers().getPathValue());
+            EXPECT_EQ("zipkin-collector.example.com", message->headers().getHostValue());
+            EXPECT_EQ("application/json", message->headers().getContentTypeValue());
+
+            // Verify custom headers are present
+            auto auth_header = message->headers().get(Http::LowerCaseString("authorization"));
+            EXPECT_FALSE(auth_header.empty());
+            EXPECT_EQ("Bearer token123", auth_header[0]->value().getStringView());
+
+            auto custom_header = message->headers().get(Http::LowerCaseString("x-custom-header"));
+            EXPECT_FALSE(custom_header.empty());
+            EXPECT_EQ("custom-value", custom_header[0]->value().getStringView());
+
+            auto api_key_header = message->headers().get(Http::LowerCaseString("x-api-key"));
+            EXPECT_FALSE(api_key_header.empty());
+            EXPECT_EQ("api-key-123", api_key_header[0]->value().getStringView());
+
+            return &request;
+          }));
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.min_flush_spans", 5))
+      .WillOnce(Return(1));
+  EXPECT_CALL(runtime_.snapshot_, getInteger("tracing.zipkin.request_timeout", 5000U))
+      .WillOnce(Return(5000U));
+
+  Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, stream_info_,
+                                             operation_name_, {Tracing::Reason::Sampling, true});
+  span->finishSpan();
+
+  Http::ResponseHeaderMapPtr response_headers{
+      new Http::TestResponseHeaderMapImpl{{":status", "202"}}};
+  callback->onSuccess(request,
+                      std::make_unique<Http::ResponseMessageImpl>(std::move(response_headers)));
+}
+
+// Test URI parsing edge cases to improve coverage
+TEST_F(ZipkinDriverTest, DriverWithHttpServiceUriParsing) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  // Test 1: URI without hostname (should fallback to cluster name)
+  const std::string yaml_string_no_host = R"EOF(
+  collector_service:
+    http_uri:
+      uri: "/api/v2/spans"
+      cluster: fake_cluster
+      timeout: 5s
+  collector_endpoint_version: HTTP_JSON
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config_no_host;
+  TestUtility::loadFromYaml(yaml_string_no_host, zipkin_config_no_host);
+  setup(zipkin_config_no_host, false);
+  EXPECT_EQ("fake_cluster", driver_->hostnameForTest()); // Should fallback to cluster name
+}
+
+TEST_F(ZipkinDriverTest, DriverWithHttpServiceUriParsingNoPath) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  // Test 2: URI with hostname but no path (should use "/" as default)
+  const std::string yaml_string_no_path = R"EOF(
+  collector_service:
+    http_uri:
+      uri: "https://zipkin-collector.example.com"
+      cluster: fake_cluster
+      timeout: 5s
+  collector_endpoint_version: HTTP_JSON
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config_no_path;
+  TestUtility::loadFromYaml(yaml_string_no_path, zipkin_config_no_path);
+  setup(zipkin_config_no_path, false);
+  EXPECT_EQ("zipkin-collector.example.com", driver_->hostnameForTest());
+}
+
+TEST_F(ZipkinDriverTest, DriverWithHttpServiceUriParsingWithPort) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  // Test 3: URI with hostname and port
+  const std::string yaml_string_with_port = R"EOF(
+  collector_service:
+    http_uri:
+      uri: "http://zipkin-collector.example.com:9411/api/v2/spans"
+      cluster: fake_cluster
+      timeout: 5s
+  collector_endpoint_version: HTTP_JSON
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config_with_port;
+  TestUtility::loadFromYaml(yaml_string_with_port, zipkin_config_with_port);
+  setup(zipkin_config_with_port, false);
+  EXPECT_EQ("zipkin-collector.example.com:9411", driver_->hostnameForTest());
+}
+
+TEST_F(ZipkinDriverTest, DriverMissingCollectorConfiguration) {
+  cm_.initializeClusters({"fake_cluster"}, {});
+
+  // Test missing both collector_cluster and collector_service
+  const std::string yaml_string_missing = R"EOF(
+  collector_endpoint_version: HTTP_JSON
+  )EOF";
+
+  envoy::config::trace::v3::ZipkinConfig zipkin_config_missing;
+  TestUtility::loadFromYaml(yaml_string_missing, zipkin_config_missing);
+
+  EXPECT_THROW_WITH_MESSAGE(setup(zipkin_config_missing, false), EnvoyException,
+                            "collector_cluster and collector_endpoint must be specified when not "
+                            "using collector_service");
 }
 
 } // namespace

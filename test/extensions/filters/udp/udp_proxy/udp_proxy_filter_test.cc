@@ -1851,7 +1851,7 @@ tunneling_config:
 
   auto session = filter_->createTunnelingSession();
   EXPECT_NO_THROW(session->onAboveWriteBufferHighWatermark());
-  session->onSessionComplete();
+  filter_.reset();
 }
 
 TEST_F(UdpProxyFilterTest, TunnelingSessionUpstreamClosedDuringFlush) {

@@ -14,6 +14,7 @@ load("@fuzzing_pip3//:requirements.bzl", pip_fuzzing_dependencies = "install_dep
 load("@io_bazel_rules_go//go:deps.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
 load("@rules_buf//buf:repositories.bzl", "rules_buf_toolchains")
+load("@rules_cc//cc:extensions.bzl", "compatibility_proxy_repo")
 load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
@@ -24,13 +25,13 @@ load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains", "rust_repository_set")
 
 # go version for rules_go
-GO_VERSION = "1.23.1"
+GO_VERSION = "1.24.6"
 
 JQ_VERSION = "1.7"
 YQ_VERSION = "4.24.4"
 
-BUF_SHA = "736e74d1697dcf253bc60b2f0fb4389c39dbc7be68472a7d564a953df8b19d12"
-BUF_VERSION = "v1.50.0"
+BUF_SHA = "5790beb45aaf51a6d7e68ca2255b22e1b14c9ae405a6c472cdcfc228c66abfc1"
+BUF_VERSION = "v1.56.0"
 
 def envoy_dependency_imports(
         go_version = GO_VERSION,
@@ -38,6 +39,7 @@ def envoy_dependency_imports(
         yq_version = YQ_VERSION,
         buf_sha = BUF_SHA,
         buf_version = BUF_VERSION):
+    compatibility_proxy_repo()
     rules_foreign_cc_dependencies()
     go_rules_dependencies()
     go_register_toolchains(go_version)

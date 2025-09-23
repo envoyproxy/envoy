@@ -413,7 +413,7 @@ absl::Status ConvertToStruct(const Protobuf::field_extraction::MessageData& mess
   }
 
   (*message_struct->mutable_fields())[kTypeProperty].set_string_value(
-      google::protobuf::util::converter::GetFullTypeWithUrl(type.name()));
+      ProtobufUtil::converter::GetFullTypeWithUrl(type.name()));
   return absl::OkStatus();
 }
 

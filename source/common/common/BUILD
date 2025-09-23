@@ -139,7 +139,7 @@ envoy_basic_cc_library(
     hdrs = ["fmt.h"],
     deps = [
         "//envoy/common:base_includes",
-        "@com_github_fmtlib_fmt//:fmtlib",
+        "@com_github_fmtlib_fmt//:fmt",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
     ],
@@ -486,11 +486,6 @@ envoy_cc_library(
         ":thread_annotations",
         "//envoy/thread:thread_interface",
     ],
-)
-
-envoy_cc_library(
-    name = "trie_lookup_table_lib",
-    hdrs = ["trie_lookup_table.h"],
 )
 
 envoy_cc_library(

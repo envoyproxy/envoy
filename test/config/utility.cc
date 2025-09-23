@@ -1775,6 +1775,62 @@ void ConfigHelper::setUpstreamOutboundFramesLimits(uint32_t max_all_frames,
       });
 }
 
+void ConfigHelper::setDownstreamHttp2MaxConcurrentStreams(uint32_t max_streams) {
+  auto filter = getFilterFromListener("http");
+  if (filter) {
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
+        hcm_config;
+    loadHttpConnectionManager(hcm_config);
+    if (hcm_config.codec_type() == envoy::extensions::filters::network::http_connection_manager::
+                                       v3::HttpConnectionManager::HTTP2) {
+      auto* options = hcm_config.mutable_http2_protocol_options();
+      options->mutable_max_concurrent_streams()->set_value(max_streams);
+      storeHttpConnectionManager(hcm_config);
+    }
+  }
+}
+
+void ConfigHelper::setUpstreamHttp2MaxConcurrentStreams(uint32_t max_streams) {
+  addConfigModifier([max_streams](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* http_protocol_options =
+        protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+    http_protocol_options->mutable_max_concurrent_streams()->set_value(max_streams);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+}
+
+void ConfigHelper::setDownstreamHttp2WindowSize(uint32_t stream_window,
+                                                uint32_t connection_window) {
+  auto filter = getFilterFromListener("http");
+  if (filter) {
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
+        hcm_config;
+    loadHttpConnectionManager(hcm_config);
+    if (hcm_config.codec_type() == envoy::extensions::filters::network::http_connection_manager::
+                                       v3::HttpConnectionManager::HTTP2) {
+      auto* options = hcm_config.mutable_http2_protocol_options();
+      options->mutable_initial_stream_window_size()->set_value(stream_window);
+      options->mutable_initial_connection_window_size()->set_value(connection_window);
+      storeHttpConnectionManager(hcm_config);
+    }
+  }
+}
+
+void ConfigHelper::setUpstreamHttp2WindowSize(uint32_t stream_window, uint32_t connection_window) {
+  addConfigModifier([stream_window,
+                     connection_window](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    ConfigHelper::HttpProtocolOptions protocol_options;
+    auto* http_protocol_options =
+        protocol_options.mutable_explicit_http_config()->mutable_http2_protocol_options();
+    http_protocol_options->mutable_initial_stream_window_size()->set_value(stream_window);
+    http_protocol_options->mutable_initial_connection_window_size()->set_value(connection_window);
+    ConfigHelper::setProtocolOptions(*bootstrap.mutable_static_resources()->mutable_clusters(0),
+                                     protocol_options);
+  });
+}
+
 void ConfigHelper::setLocalReply(
     const envoy::extensions::filters::network::http_connection_manager::v3::LocalReplyConfig&
         config) {

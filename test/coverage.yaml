@@ -28,6 +28,7 @@ directories:
   source/exe: 94.4  # increased by #32346, need coverage for terminate_handler and hot restart failures
   source/extensions/api_listeners: 55.0  # Many IS_ENVOY_BUG are not covered.
   source/extensions/api_listeners/default_api_listener: 59.0  # Many IS_ENVOY_BUG are not covered.
+  source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface: 95.6
   source/extensions/common/aws: 98.5
   source/extensions/common/aws/credential_providers: 100.0
   source/extensions/common/proxy_protocol: 94.6  # Adjusted for security patch
@@ -36,7 +37,7 @@ directories:
   source/extensions/common/wasm/ext: 100.0
   source/extensions/filters/common: 97.1
   source/extensions/filters/common/fault: 94.5
-  source/extensions/filters/common/rbac: 92.6
+  source/extensions/filters/common/rbac: 95.4
   source/extensions/filters/common/lua: 95.6
   source/extensions/filters/http/cache: 95.9
   source/extensions/filters/http/dynamic_forward_proxy: 94.8
@@ -53,7 +54,7 @@ directories:
   source/extensions/filters/network/dubbo_proxy: 96.2
   source/extensions/filters/network/mongo_proxy: 96.1
   source/extensions/filters/network/sni_cluster: 88.9
-  source/extensions/formatter/cel: 93.9
+  source/extensions/formatter/cel: 100.0
   source/extensions/internal_redirect: 86.2
   source/extensions/internal_redirect/safe_cross_scheme: 81.3
   source/extensions/internal_redirect/allow_listed_routes: 85.7
@@ -65,7 +66,7 @@ directories:
   source/extensions/rate_limit_descriptors/expr: 88.2
   source/extensions/stat_sinks/graphite_statsd: 82.8  # Death tests don't report LCOV
   source/extensions/stat_sinks/statsd: 85.2  # Death tests don't report LCOV
-  source/extensions/tracers/zipkin: 96.1
+  source/extensions/tracers/zipkin: 95.3
   source/extensions/transport_sockets/proxy_protocol: 96.2
   source/extensions/wasm_runtime/wamr: 0.0  # Not enabled in coverage build
   source/extensions/wasm_runtime/wasmtime: 0.0  # Not enabled in coverage build
@@ -79,4 +80,4 @@ directories:
   source/extensions/health_checkers/http: 94.6
   source/extensions/health_checkers/grpc: 92.3
   source/extensions/config_subscription/rest: 94.9
-  source/extensions/matching/input_matchers/cel_matcher: 82.6  # Death tests don't report LCOV
+  source/extensions/matching/input_matchers/cel_matcher: 100.0

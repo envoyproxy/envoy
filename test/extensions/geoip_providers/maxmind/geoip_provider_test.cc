@@ -148,13 +148,22 @@ public:
   }
 
   void expectStats(const absl::string_view& db_type, const uint32_t total_count = 1,
-                   const uint32_t hit_count = 1, const uint32_t error_count = 0) {
+                   const uint32_t hit_count = 1, const uint32_t error_count = 0,
+                   const uint64_t build_epoch = 0) {
     auto& provider_scope = GeoipProviderPeer::providerScope(provider_);
     EXPECT_EQ(provider_scope.counterFromString(absl::StrCat(db_type, ".total")).value(),
               total_count);
     EXPECT_EQ(provider_scope.counterFromString(absl::StrCat(db_type, ".hit")).value(), hit_count);
     EXPECT_EQ(provider_scope.counterFromString(absl::StrCat(db_type, ".lookup_error")).value(),
               error_count);
+
+    if (build_epoch > 0) {
+      EXPECT_EQ(provider_scope
+                    .gaugeFromString(absl::StrCat(db_type, ".db_build_epoch"),
+                                     Stats::Gauge::ImportMode::Accumulate)
+                    .value(),
+                build_epoch);
+    }
   }
 
   void expectReloadStats(const absl::string_view& db_type, const uint32_t reload_success_count = 0,
@@ -616,6 +625,39 @@ TEST_F(GeoipProviderTest, DbReloadedOnMmdbFileUpdate) {
 
   const auto& city1_it = captured_lookup_response_.find("x-geo-city");
   EXPECT_EQ("BoxfordImaginary", city1_it->second);
+  // Clean up modifications to mmdb file names.
+  TestEnvironment::renameFile(city_db_path, reloaded_city_db_path);
+  TestEnvironment::renameFile(city_db_path + "1", city_db_path);
+}
+
+TEST_F(GeoipProviderTest, DbEpochGaugeUpdatesWhenReloadedOnMmdbFileUpdate) {
+  constexpr absl::string_view config_yaml = R"EOF(
+    common_provider_config:
+      geo_headers_to_add:
+        city: "x-geo-city"
+    city_db_path: {}
+  )EOF";
+  std::string city_db_path = TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test.mmdb");
+  std::string reloaded_city_db_path = TestEnvironment::substitute(
+      "{{ test_rundir "
+      "}}/test/extensions/geoip_providers/maxmind/test_data/GeoLite2-City-Test-Updated.mmdb");
+  const std::string formatted_config =
+      fmt::format(config_yaml, TestEnvironment::substitute(city_db_path));
+  auto cb_added_opt = absl::make_optional<ConditionalInitializer>();
+  initializeProvider(formatted_config, cb_added_opt);
+  expectStats("city_db", 0, 0, 0, 1671567063);
+  TestEnvironment::renameFile(city_db_path, city_db_path + "1");
+  TestEnvironment::renameFile(reloaded_city_db_path, city_db_path);
+  cb_added_opt.value().waitReady();
+  {
+    absl::ReaderMutexLock guard(&mutex_);
+    EXPECT_TRUE(on_changed_cbs_[0](Filesystem::Watcher::Events::MovedTo).ok());
+  }
+  expectReloadStats("city_db", 1, 0);
+  expectStats("city_db", 0, 0, 0, 1753263760);
+
   // Clean up modifications to mmdb file names.
   TestEnvironment::renameFile(city_db_path, reloaded_city_db_path);
   TestEnvironment::renameFile(city_db_path + "1", city_db_path);
