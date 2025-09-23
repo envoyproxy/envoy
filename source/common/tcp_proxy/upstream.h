@@ -17,7 +17,6 @@
 #include "source/common/http/codec_client.h"
 #include "source/common/http/hash_policy.h"
 #include "source/common/http/null_route_impl.h"
-#include "source/common/http/response_decoder_impl_base.h"
 #include "source/common/network/utility.h"
 #include "source/common/router/config_impl.h"
 #include "source/common/router/header_parser.h"
@@ -231,7 +230,8 @@ protected:
   std::unique_ptr<Http::RequestHeaderMapImpl> downstream_headers_;
 
 private:
-  class DecoderShim : public Http::ResponseDecoderImplBase {
+  Upstream::ClusterInfoConstSharedPtr cluster_;
+  class DecoderShim : public Http::ResponseDecoder {
   public:
     DecoderShim(HttpUpstream& parent) : parent_(parent) {}
     void decode1xxHeaders(Http::ResponseHeaderMapPtr&&) override {}
@@ -322,6 +322,8 @@ public:
   void onPerTryTimeout(UpstreamRequest&) override {}
   void onPerTryIdleTimeout(UpstreamRequest&) override {}
   void onStreamMaxDurationReached(UpstreamRequest&) override {}
+  void setupRouteTimeoutForWebsocketUpgrade() override {}
+  void disableRouteTimeoutForWebsocketUpgrade() override {}
   Http::StreamDecoderFilterCallbacks* callbacks() override { return &decoder_filter_callbacks_; }
   Upstream::ClusterInfoConstSharedPtr cluster() override {
     return decoder_filter_callbacks_.clusterInfo();
@@ -351,7 +353,7 @@ protected:
 
 private:
   Http::StreamDecoderFilterCallbacks& decoder_filter_callbacks_;
-  class DecoderShim : public Http::ResponseDecoderImplBase {
+  class DecoderShim : public Http::ResponseDecoder {
   public:
     DecoderShim(CombinedUpstream& parent) : parent_(parent) {}
     // Http::ResponseDecoder

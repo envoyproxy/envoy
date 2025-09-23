@@ -50,19 +50,13 @@ Http::FilterFactoryCb RateLimitQuotaFilterFactory::createFilterFactoryFromProtoT
     matcher = matcher_factory.create(config->bucket_matchers())();
   }
 
-  // Get the rlqs_server destination from the cluster manager.
-  absl::StatusOr<Grpc::RawAsyncClientSharedPtr> rlqs_stream_client =
-      context.serverFactoryContext()
-          .clusterManager()
-          .grpcAsyncClientManager()
-          .getOrCreateRawAsyncClientWithHashKey(config_with_hash_key, context.scope(), true);
-  if (!rlqs_stream_client.ok()) {
-    throw EnvoyException(std::string(rlqs_stream_client.status().message()));
-  }
+  std::string rlqs_server_target = config->rlqs_server().has_envoy_grpc()
+                                       ? config->rlqs_server().envoy_grpc().cluster_name()
+                                       : config->rlqs_server().google_grpc().target_uri();
 
   // Get the TLS store from the global map, or create one if it doesn't exist.
   std::shared_ptr<TlsStore> tls_store = GlobalTlsStores::getTlsStore(
-      config_with_hash_key, context, (*rlqs_stream_client)->destination(), filter_config.domain());
+      config_with_hash_key, context, rlqs_server_target, filter_config.domain());
 
   return [&, config = std::move(config), config_with_hash_key, tls_store = std::move(tls_store),
           matcher = std::move(matcher)](Http::FilterChainFactoryCallbacks& callbacks) -> void {

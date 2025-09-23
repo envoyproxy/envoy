@@ -82,6 +82,15 @@ diff --git a/bazel/defs.bzl b/bazel/defs.bzl
 index 0539ea176ac..92c7aeb904f 100644
 --- a/bazel/defs.bzl
 +++ b/bazel/defs.bzl
+@@ -106,7 +106,7 @@ def _default_args():
+             "@v8//bazel/config:is_posix": [
+                 "-fPIC",
+                 "-fno-strict-aliasing",
+-                "-Werror",
++                "-Wno-error", # Envoy build should not fail for warnings in dependencies
+                 "-Wextra",
+                 "-Wno-unneeded-internal-declaration",
+                 "-Wno-unknown-warning-option", # b/330781959
 @@ -117,6 +117,9 @@ def _default_args():
                  "-Wno-implicit-int-float-conversion",
                  "-Wno-deprecated-copy",
