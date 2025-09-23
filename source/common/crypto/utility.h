@@ -3,15 +3,12 @@
 #include <cstdint>
 #include <vector>
 
-#include "envoy/buffer/buffer.h"
-#include "envoy/common/crypto/crypto.h"
-
-#include "source/common/crypto/crypto_impl.h"
-
-#include "source/common/singleton/threadsafe_singleton.h"
-
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
+#include "envoy/buffer/buffer.h"
+#include "envoy/common/crypto/crypto.h"
+#include "source/common/crypto/crypto_impl.h"
+#include "source/common/singleton/threadsafe_singleton.h"
 
 namespace Envoy {
 namespace Common {
