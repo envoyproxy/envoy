@@ -1,5 +1,7 @@
 #include "source/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/mapped_attribute_builder.h"
 
+#include <string>
+
 #include "envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3/mapped_attribute_builder.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -12,7 +14,7 @@ using envoy::service::ext_proc::v3::ProcessingRequest;
 // Helper function to convert proto map values to a unique vector of strings.
 // The order of elements in the returned vector is not guaranteed.
 Protobuf::RepeatedPtrField<std::string>
-ProtoMapValuesToUniqueVector(const Protobuf::Map<std::string, std::string>& proto_map) {
+protoMapValuesToUniqueVector(const Protobuf::Map<std::string, std::string>& proto_map) {
   absl::flat_hash_set<std::string> values;
   for (const auto& [_, value] : proto_map) {
     values.insert(value);
@@ -27,7 +29,7 @@ MappedAttributeBuilder::MappedAttributeBuilder(
     Server::Configuration::CommonFactoryContext& context)
     : config_(config),
       expression_manager_(expr_builder, context.localInfo(),
-                          ProtoMapValuesToUniqueVector(config.mapped_request_attributes()),
+                          protoMapValuesToUniqueVector(config.mapped_request_attributes()),
                           Protobuf::RepeatedPtrField<std::string>()) {}
 
 bool MappedAttributeBuilder::modifyRequest(

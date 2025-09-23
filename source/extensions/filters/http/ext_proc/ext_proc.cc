@@ -8,6 +8,7 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/processing_mode.pb.h"
 
+#include "ext_proc.h"
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"
@@ -104,22 +105,6 @@ std::vector<std::string> initNamespaces(const Protobuf::RepeatedPtrField<std::st
   return namespaces;
 }
 
-absl::optional<envoy::config::core::v3::TypedExtensionConfig>
-getProcessingRequestModifierConfig(const ExternalProcessor& config) {
-  if (config.has_processing_request_modifier()) {
-    return config.processing_request_modifier();
-  }
-  return absl::nullopt;
-}
-
-absl::optional<envoy::config::core::v3::TypedExtensionConfig>
-initProcessingRequestModifierPerRouteConfig(const ExtProcPerRoute& config) {
-  if (config.has_overrides() && config.overrides().has_processing_request_modifier()) {
-    return config.overrides().processing_request_modifier();
-  }
-  return absl::nullopt;
-}
-
 absl::optional<std::vector<std::string>>
 initUntypedForwardingNamespaces(const ExtProcPerRoute& config) {
   if (!config.has_overrides() || !config.overrides().has_metadata_options() ||
@@ -202,6 +187,32 @@ void mergeHeaderValuesField(
   }
 }
 
+template <typename ConfigType>
+std::function<std::unique_ptr<ProcessingRequestModifier>()> createProcessingRequestModifierCb(
+    const ConfigType& config,
+    Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
+    Server::Configuration::CommonFactoryContext& context) {
+  if (!config.has_processing_request_modifier()) {
+    return nullptr;
+  }
+  auto& factory = Envoy::Config::Utility::getAndCheckFactory<ProcessingRequestModifierFactory>(
+      config.processing_request_modifier());
+  auto processing_request_modifier_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
+      config.processing_request_modifier().typed_config(), context.messageValidationVisitor(),
+      factory);
+  if (processing_request_modifier_config == nullptr) {
+    return nullptr;
+  }
+
+  std::shared_ptr<const Protobuf::Message> shared_processing_request_modifier_config =
+      std::move(processing_request_modifier_config);
+  return [&factory, shared_processing_request_modifier_config, builder,
+          &context]() -> std::unique_ptr<ProcessingRequestModifier> {
+    return factory.createProcessingRequestModifier(*shared_processing_request_modifier_config,
+                                                   builder, context);
+  };
+}
+
 // Changes to headers are normally tested against the MutationRules supplied
 // with configuration. When writing an immediate response message, however,
 // we want to support a more liberal set of rules so that filters can create
@@ -271,15 +282,14 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       expression_manager_(builder, context.localInfo(), config.request_attributes(),
                           config.response_attributes()),
       immediate_mutation_checker_(context.regexEngine()),
+      processing_request_modifier_factory_cb_(
+          createProcessingRequestModifierCb(config, builder, context)),
       on_processing_response_factory_cb_(
           createOnProcessingResponseCb(config, context, stats_prefix)),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()),
       remote_close_timeout_(context.runtime().snapshot().getInteger(
           RemoteCloseTimeout, DefaultRemoteCloseTimeoutMilliseconds)),
-      status_on_error_(toErrorCode(config.status_on_error().code())),
-      processing_request_modifier_config_(getProcessingRequestModifierConfig(config)),
-      builder_(builder), common_factory_context_(context) {
-
+      status_on_error_(toErrorCode(config.status_on_error().code())) {
   if (config.disable_clear_route_cache()) {
     route_cache_action_ = ExternalProcessor::RETAIN;
   }
@@ -509,7 +519,10 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   return {};
 }
 
-FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
+FilterConfigPerRoute::FilterConfigPerRoute(
+    const ExtProcPerRoute& config,
+    Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
+    Server::Configuration::CommonFactoryContext& context)
     : disabled_(config.disabled()), processing_mode_(initProcessingMode(config)),
       grpc_service_(initGrpcService(config)),
       grpc_initial_metadata_(config.overrides().grpc_initial_metadata().begin(),
@@ -521,7 +534,8 @@ FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
           config.overrides().has_failure_mode_allow()
               ? absl::optional<bool>(config.overrides().failure_mode_allow().value())
               : absl::nullopt),
-      processing_request_modifier_config_(initProcessingRequestModifierPerRouteConfig(config)) {}
+      processing_request_modifier_factory_cb_(
+          createProcessingRequestModifierCb(config.overrides(), builder, context)) {}
 
 FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_specific,
                                            const FilterConfigPerRoute& more_specific)
@@ -542,10 +556,10 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
       failure_mode_allow_(more_specific.failureModeAllow().has_value()
                               ? more_specific.failureModeAllow()
                               : less_specific.failureModeAllow()),
-      processing_request_modifier_config_(
-          more_specific.processingRequestModifierConfig().has_value()
-              ? more_specific.processingRequestModifierConfig()
-              : less_specific.processingRequestModifierConfig()) {}
+      processing_request_modifier_factory_cb_(
+          more_specific.processing_request_modifier_factory_cb_
+              ? more_specific.processing_request_modifier_factory_cb_
+              : less_specific.processing_request_modifier_factory_cb_) {}
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
@@ -570,14 +584,6 @@ void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callb
 }
 
 void Filter::sendRequest(const ProcessorState& state, ProcessingRequest&& req, bool end_stream) {
-  // Calling the client send function to send the request.
-  if (!processing_request_modifier_initialized_) {
-    processing_request_modifier_initialized_ = true;
-    processing_request_modifier_ = createProcessingRequestModifier(
-        processing_request_modifier_config_, config_->builder(), config_->commonFactoryContext());
-  }
-
-  // This can still be null, even after initialization.
   if (processing_request_modifier_) {
     ProcessingRequestModifier::Params params = {
         .traffic_direction = state.trafficDirection(),
@@ -1901,10 +1907,10 @@ void Filter::mergePerRouteConfig() {
     failure_mode_allow_ = merged_config->failureModeAllow().value();
   }
 
-  if (merged_config->processingRequestModifierConfig().has_value()) {
+  if (merged_config->hasProcessingRequestModifierConfig()) {
     ENVOY_STREAM_LOG(trace, "Setting processing request modifier from per-route configuration",
                      *decoder_callbacks_);
-    processing_request_modifier_config_ = merged_config->processingRequestModifierConfig().value();
+    processing_request_modifier_ = merged_config->createProcessingRequestModifier();
   }
 }
 
@@ -1950,37 +1956,6 @@ std::string responseCaseToString(const ProcessingResponse::ResponseCase response
   }
 }
 
-std::unique_ptr<ProcessingRequestModifier> Filter::createProcessingRequestModifier(
-    const absl::optional<envoy::config::core::v3::TypedExtensionConfig>& config,
-    Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
-    Server::Configuration::CommonFactoryContext& context) {
-  if (!config.has_value()) {
-    return nullptr;
-  }
-  // We mark this as optional so that we don't throw in the request path and crash.
-  auto* factory = Envoy::Config::Utility::getAndCheckFactory<ProcessingRequestModifierFactory>(
-      config.value(), /*is_optional=*/true);
-  if (factory == nullptr) {
-    ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
-                       "ProcessingRequestModifier factory not found for type: {}", config->name());
-    return nullptr;
-  }
-  // Avoid using translateAnyToFactoryConfig since it might throw. Do this manually.
-  ProtobufTypes::MessagePtr extension_config = factory->createEmptyConfigProto();
-  if (extension_config == nullptr) {
-    return nullptr;
-  }
-  if (Envoy::Config::Utility::translateOpaqueConfig(config->typed_config(),
-                                                    context.messageValidationVisitor(),
-                                                    *extension_config) != absl::OkStatus()) {
-    ENVOY_LOG_PERIODIC(error, std::chrono::seconds(10),
-                       "ProcessingRequestModifier config translation failed for type: {}",
-                       config->typed_config().type_url());
-    return nullptr;
-  }
-  return factory->createProcessingRequestModifier(*extension_config, builder, context);
-}
-
 std::function<std::unique_ptr<OnProcessingResponse>()> FilterConfig::createOnProcessingResponseCb(
     const ExternalProcessor& config, Envoy::Server::Configuration::CommonFactoryContext& context,
     const std::string& stats_prefix) {
@@ -2008,6 +1983,13 @@ std::unique_ptr<OnProcessingResponse> FilterConfig::createOnProcessingResponse()
     return nullptr;
   }
   return on_processing_response_factory_cb_();
+}
+
+std::unique_ptr<ProcessingRequestModifier> FilterConfig::createProcessingRequestModifier() const {
+  if (!processing_request_modifier_factory_cb_) {
+    return nullptr;
+  }
+  return processing_request_modifier_factory_cb_();
 }
 
 void Filter::onProcessHeadersResponse(const envoy::service::ext_proc::v3::HeadersResponse& response,
