@@ -39,7 +39,7 @@ message ReverseTunnel {
   string request_path = 3 [(validate.rules).string = {min_len: 1 max_len: 255 ignore_empty: true}];
 
   // HTTP method to match for reverse tunnel requests.
-  // If not specified, defaults to "POST".
+  // If not specified, defaults to "GET".
   string request_method = 4 [(validate.rules).string = {min_len: 1 max_len: 10 ignore_empty: true}];
 
   // Configuration for validating reverse tunnel connection requests using filter state.

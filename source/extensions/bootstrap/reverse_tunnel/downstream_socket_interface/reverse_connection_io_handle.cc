@@ -548,8 +548,7 @@ void ReverseConnectionIOHandle::maintainClusterConnections(
         host_address, cluster_name);
 
     // Ensure HostConnectionInfo exists for this host, handling internal addresses consistently.
-    const std::string key =
-        absl::StartsWith(host_address, "envoy://") ? host_address : host_address;
+    const std::string key = host_address;
     auto host_it = host_to_conn_info_map_.find(key);
     if (host_it == host_to_conn_info_map_.end()) {
       ENVOY_LOG(debug, "Creating HostConnectionInfo for host {} in cluster {}", key, cluster_name);
