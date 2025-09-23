@@ -26,12 +26,6 @@ behavior_changes:
     setting the runtime guard ``envoy.reloadable_features.safe_http2_options``
     to ``false``.
 - area: ext_proc
-  change: |
-    Reverted https://github.com/envoyproxy/envoy/pull/39740 to re-enable fail_open+FULL_DUPLEX_STREAMED configuraton combination.
-- area: http
-  change: |
-    Changing the default reset code from NO_ERROR to INTERNAL_ERROR. This behavioral change can be reverted by setting runtime
-    guard ``envoy.reloadable_features.reset_with_error`` to false.
     Reverted `#39740 <https://github.com/envoyproxy/envoy/pull/39740>`_ to re-enable ``fail_open`` +
     ``FULL_DUPLEX_STREAMED`` configuration combination.
 - area: load balancing
@@ -39,6 +33,10 @@ behavior_changes:
     Moved locality WRR structures out of ``HostSetImpl`` and into a separate class. Locality WRR schedulers are now by default owned
     and constructed by the underlying Zone Aware LB, instead of owned and constructed by the Host Set. There should be no visible
     behavior change for existing users of Zone Aware LBs.
+- area: http
+  change: |
+    Changing the default reset code from NO_ERROR to INTERNAL_ERROR. This behavioral change can be reverted by setting runtime
+    guard ``envoy.reloadable_features.reset_with_error`` to false.
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
