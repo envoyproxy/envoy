@@ -26,6 +26,7 @@ behavior_changes:
     setting the runtime guard ``envoy.reloadable_features.safe_http2_options``
     to ``false``.
 - area: ext_proc
+  change: |
     Reverted `#39740 <https://github.com/envoyproxy/envoy/pull/39740>`_ to re-enable ``fail_open`` +
     ``FULL_DUPLEX_STREAMED`` configuration combination.
 - area: load balancing
