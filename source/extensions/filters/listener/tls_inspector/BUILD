@@ -39,7 +39,6 @@ envoy_cc_library(
         "//source/common/common:hex_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/runtime:runtime_features_lib",
         "//source/common/tls:utility_lib",
         "@envoy_api//envoy/extensions/filters/listener/tls_inspector/v3:pkg_cc_proto",
     ],

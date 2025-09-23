@@ -16,7 +16,6 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/hex.h"
 #include "source/common/protobuf/utility.h"
-#include "source/common/runtime/runtime_features.h"
 #include "source/common/tls/utility.h"
 #include "source/extensions/filters/listener/tls_inspector/ja4_fingerprint.h"
 
