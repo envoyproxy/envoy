@@ -160,6 +160,12 @@ bug_fixes:
     ``cluster.<cluster_name>.ssl.certificate.<cert_name>.<metric_name>``
     and ``listener.<address>.ssl.certificate.<cert_name>.<metric_name>``
     was not being properly extracted in the final Prometheus stat name.
+- area: odcds
+  change: |
+    Fixed a bug where using OD-CDS without cds_config would not work in some
+    cases. This change introduces a new internal OD-CDS component. This change
+    could be reverted temporarily by setting the runtime guard
+    ``envoy.reloadable_features.odcds_over_ads_fix`` to ``false``.
 - area: oauth2
   change: |
     Fixed an issue where cookies prefixed with ``__Secure-`` or ``__Host-`` were not receiving a
