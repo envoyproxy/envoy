@@ -1,3 +1,4 @@
+#include "ext_proc.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include <functional>
@@ -8,7 +9,6 @@
 #include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/processing_mode.pb.h"
 
-#include "ext_proc.h"
 #include "source/common/config/utility.h"
 #include "source/common/http/utility.h"
 #include "source/common/protobuf/utility.h"

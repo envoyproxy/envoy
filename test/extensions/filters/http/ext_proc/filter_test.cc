@@ -144,9 +144,8 @@ protected:
       TestUtility::loadFromYaml(yaml, proto_config);
     }
     builder_ = Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr);
-    config_ = std::make_shared<FilterConfig>(
-        proto_config, 200ms, 10000, *stats_store_.rootScope(), "", is_upstream_filter,
-        builder_, factory_context_);
+    config_ = std::make_shared<FilterConfig>(proto_config, 200ms, 10000, *stats_store_.rootScope(),
+                                             "", is_upstream_filter, builder_, factory_context_);
     filter_ = std::make_unique<Filter>(config_, std::move(client_));
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(Return(BufferSize));
@@ -1990,11 +1989,13 @@ failure_mode_allow: true)EOF";
 
   ExtProcPerRoute route_proto_less_specific;
   route_proto_less_specific.mutable_overrides()->mutable_failure_mode_allow()->set_value(true);
-  FilterConfigPerRoute route_config_less_specific(route_proto_less_specific, builder_, factory_context_);
+  FilterConfigPerRoute route_config_less_specific(route_proto_less_specific, builder_,
+                                                  factory_context_);
 
   ExtProcPerRoute route_proto_more_specific;
   route_proto_more_specific.mutable_overrides()->mutable_failure_mode_allow()->set_value(false);
-  FilterConfigPerRoute route_config_more_specific(route_proto_more_specific, builder_, factory_context_);
+  FilterConfigPerRoute route_config_more_specific(route_proto_more_specific, builder_,
+                                                  factory_context_);
 
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
       .WillRepeatedly(testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs {
@@ -3830,7 +3831,7 @@ TEST_F(HttpFilterTest, OutOfOrderFailClose) {
 }
 
 class OverrideTest : public testing::Test {
- protected:
+protected:
   void SetUp() override {
     builder_ = Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr);
   }
