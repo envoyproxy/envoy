@@ -1,6 +1,6 @@
 module example.com/routeconfig
 
-go 1.22
+go 1.23
 
 require (
 	github.com/cncf/xds/go v0.0.0-20231128003011-0fa0005c9caa
@@ -15,7 +15,7 @@ require (
 require (
 	github.com/envoyproxy/protoc-gen-validate v1.0.2 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
-	google.golang.org/protobuf v1.36.6
+	google.golang.org/protobuf v1.36.9
 )
 
 replace github.com/envoyproxy/envoy => ../../../../../../../
