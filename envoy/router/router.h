@@ -986,13 +986,7 @@ public:
    * @return const RetryPolicy& the retry policy for the route. All routes have a retry policy even
    *         if it is empty and does not allow retries.
    */
-  virtual const RetryPolicy& retryPolicy() const PURE;
-
-  /**
-   * @return const RetryPolicy& the retry policy for the route. All routes have a retry policy even
-   *         if it is empty and does not allow retries.
-   */
-  virtual const RetryPolicyConstSharedPtr& sharedRetryPolicy() const PURE;
+  virtual const RetryPolicyConstSharedPtr& retryPolicy() const PURE;
 
   /**
    * @return const InternalRedirectPolicy& the internal redirect policy for the route. All routes

@@ -53,12 +53,14 @@ directories:
   source/extensions/filters/listener/tls_inspector: 94.1
   source/extensions/filters/network/dubbo_proxy: 96.2
   source/extensions/filters/network/mongo_proxy: 96.1
+  source/extensions/filters/network/reverse_tunnel: 91.0
   source/extensions/filters/network/sni_cluster: 88.9
   source/extensions/formatter/cel: 100.0
   source/extensions/internal_redirect: 86.2
   source/extensions/internal_redirect/safe_cross_scheme: 81.3
   source/extensions/internal_redirect/allow_listed_routes: 85.7
   source/extensions/internal_redirect/previous_routes: 89.3
+  source/extensions/load_balancing_policies/common: 96.3
   source/extensions/load_balancing_policies/maglev: 94.9
   source/extensions/load_balancing_policies/round_robin: 96.4
   source/extensions/load_balancing_policies/ring_hash: 96.9

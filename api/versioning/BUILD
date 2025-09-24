@@ -186,6 +186,7 @@ proto_library(
         "//envoy/extensions/filters/network/ratelimit/v3:pkg",
         "//envoy/extensions/filters/network/rbac/v3:pkg",
         "//envoy/extensions/filters/network/redis_proxy/v3:pkg",
+        "//envoy/extensions/filters/network/reverse_tunnel/v3:pkg",
         "//envoy/extensions/filters/network/set_filter_state/v3:pkg",
         "//envoy/extensions/filters/network/sni_cluster/v3:pkg",
         "//envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3:pkg",

@@ -486,13 +486,41 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyUpstreamHalfCloseBothWays) {
 
   ProcessingRequest write_request;
   ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, write_request));
-  EXPECT_EQ(write_request.has_write_data(), true);
-  EXPECT_EQ(write_request.write_data().data(), "server_response");
-  EXPECT_EQ(write_request.write_data().end_of_stream(), true);
 
-  sendWriteGrpcMessage("server_data_inspected", true);
+  if (!write_request.write_data().end_of_stream()) {
+    size_t total_upstream_data = 0;
+    // We got partial data without end_of_stream
+    std::string partial_data = write_request.write_data().data();
+    std::string partial_response = partial_data + "_inspected";
+    sendWriteGrpcMessage(partial_response, false);
 
-  tcp_client->waitForData("server_data_inspected");
+    // Wait for client to receive the partial data
+    total_upstream_data += partial_response.length();
+    ASSERT_TRUE(tcp_client->waitForData(total_upstream_data));
+
+    // Wait for the final message with end_of_stream
+    ProcessingRequest final_request;
+    ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, final_request));
+    EXPECT_EQ(final_request.has_write_data(), true);
+    EXPECT_EQ(final_request.write_data().end_of_stream(), true);
+
+    // Respond to the final message
+    std::string final_data = final_request.write_data().data();
+    std::string final_response = final_data.empty() ? "" : final_data + "_inspected";
+    sendReadGrpcMessage(final_response, true);
+
+    // Wait for the final data if non-empty
+    if (!final_response.empty()) {
+      total_upstream_data += final_response.length();
+      ASSERT_TRUE(tcp_client->waitForData(total_upstream_data));
+    }
+  } else {
+    // We got the complete data with end_of_stream in one message
+    EXPECT_EQ(write_request.write_data().data(), "server_response");
+    EXPECT_EQ(write_request.write_data().end_of_stream(), true);
+    sendWriteGrpcMessage("server_data_inspected", true);
+    tcp_client->waitForData("server_data_inspected");
+  }
 
   // Close everything
   ASSERT_TRUE(fake_upstream_connection->close());

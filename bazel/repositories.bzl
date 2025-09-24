@@ -1021,6 +1021,7 @@ def _com_github_fdio_vpp_vcl():
         name = "com_github_fdio_vpp_vcl",
         build_file_content = _build_all_content(exclude = ["**/*doc*/**", "**/examples/**", "**/plugins/**"]),
         patches = ["@envoy//bazel/foreign_cc:vpp_vcl.patch"],
+        patch_args = ["-p1"],
     )
 
 def _rules_ruby():

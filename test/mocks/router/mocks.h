@@ -434,8 +434,7 @@ public:
   MOCK_METHOD(const Router::TlsContextMatchCriteria*, tlsContextMatchCriteria, (), (const));
   MOCK_METHOD(Upstream::ResourcePriority, priority, (), (const));
   MOCK_METHOD(const RateLimitPolicy&, rateLimitPolicy, (), (const));
-  MOCK_METHOD(const RetryPolicy&, retryPolicy, (), (const));
-  MOCK_METHOD(const RetryPolicyConstSharedPtr&, sharedRetryPolicy, (), (const));
+  MOCK_METHOD(const RetryPolicyConstSharedPtr&, retryPolicy, (), (const));
   MOCK_METHOD(const InternalRedirectPolicy&, internalRedirectPolicy, (), (const));
   MOCK_METHOD(const PathMatcherSharedPtr&, pathMatcher, (), (const));
   MOCK_METHOD(const PathRewriterSharedPtr&, pathRewriter, (), (const));
@@ -558,8 +557,7 @@ public:
   MOCK_METHOD(const Router::TlsContextMatchCriteria*, tlsContextMatchCriteria, (), (const));
   MOCK_METHOD(Upstream::ResourcePriority, priority, (), (const));
   MOCK_METHOD(const RateLimitPolicy&, rateLimitPolicy, (), (const));
-  MOCK_METHOD(const RetryPolicy&, retryPolicy, (), (const));
-  MOCK_METHOD(const RetryPolicyConstSharedPtr&, sharedRetryPolicy, (), (const));
+  MOCK_METHOD(const RetryPolicyConstSharedPtr&, retryPolicy, (), (const));
   MOCK_METHOD(const InternalRedirectPolicy&, internalRedirectPolicy, (), (const));
   MOCK_METHOD(const PathMatcherSharedPtr&, pathMatcher, (), (const));
   MOCK_METHOD(const PathRewriterSharedPtr&, pathRewriter, (), (const));

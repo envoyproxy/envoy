@@ -57,6 +57,7 @@ RUNTIME_GUARD(envoy_reloadable_features_jwt_fetcher_use_scheme_from_uri);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_cleanup_cookies);
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_encrypt_tokens);
+RUNTIME_GUARD(envoy_reloadable_features_odcds_over_ads_fix);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_original_src_fix_port_exhaustion);
 RUNTIME_GUARD(envoy_reloadable_features_prefix_map_matcher_resume_after_subtree_miss);
@@ -84,6 +85,7 @@ RUNTIME_GUARD(envoy_reloadable_features_uri_template_match_on_asterisk);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
 RUNTIME_GUARD(envoy_reloadable_features_websocket_allow_4xx_5xx_through_filter_chain);
+RUNTIME_GUARD(envoy_reloadable_features_websocket_enable_timeout_on_upgrade_response);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 
 RUNTIME_GUARD(envoy_restart_features_move_locality_schedulers_to_lb);
@@ -164,6 +166,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_allow_multiplexed_upstream_half_cl
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_ext_proc_graceful_grpc_close);
 
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_no_ai_flags);
+
+// Flag to remove legacy route formatter support in header parser
+// Flip to true after two release periods.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_remove_legacy_route_formatter);
 
 // TODO(grnmeira):
 // Enables the new DNS implementation, a merged implementation of
