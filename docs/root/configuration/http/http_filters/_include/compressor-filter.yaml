@@ -45,6 +45,7 @@ static_resources:
                   - text/html
                   - application/json
                 disable_on_etag_header: true
+                status_header_enabled: false
                 uncompressible_response_codes:
               request_direction_config:
                 common_config:
