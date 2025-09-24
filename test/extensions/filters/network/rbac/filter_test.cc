@@ -261,7 +261,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedWithOneTimeEnforcement) {
 
   setDestinationPort(123);
 
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   // Call onData() twice, should only increase stats once.
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
@@ -282,7 +282,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedWithContinuousEnforcement
 
   setDestinationPort(123);
 
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   // Call onData() twice, should increase stats twice.
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
@@ -304,7 +304,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, RequestedServerName) {
   setDestinationPort(999);
   setRequestedServerName("www.cncf.io");
 
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   // Call onData() twice, should only increase stats once.
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
@@ -326,7 +326,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedWithNoPolicy) {
   setDestinationPort(0);
 
   // Allow access and no metric change when there is no policy.
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
   EXPECT_EQ(0U, config_->stats().allowed_.value());
   EXPECT_EQ(0U, config_->stats().denied_.value());
@@ -396,7 +396,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherAllowedWithOneTimeEnforce
 
   setDestinationPort(123);
 
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   // Call onData() twice, should only increase stats once.
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
@@ -417,7 +417,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherAllowedWithContinuousEnfo
 
   setDestinationPort(123);
 
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   // Call onData() twice, should increase stats twice.
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
@@ -439,7 +439,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, RequestedServerNameMatcher) {
   setDestinationPort(999);
   setRequestedServerName("www.cncf.io");
 
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 
   // Call onData() twice, should only increase stats once.
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
@@ -461,7 +461,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedWithNoMatcher) {
   setDestinationPort(0);
 
   // Allow access and no metric change when there is no policy.
-  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
   EXPECT_EQ(0U, config_->stats().allowed_.value());
   EXPECT_EQ(0U, config_->stats().denied_.value());
