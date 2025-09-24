@@ -132,11 +132,12 @@ public:
         return false;
       }
       stream_->stream_->sendMessage(request, false);
+      return true;
     } else {
       // Clear out the stream data due to stream creation failure.
       stream_.reset();
+      return false;
     }
-    return true;
   }
 
   std::unique_ptr<LocalStream> stream_;
