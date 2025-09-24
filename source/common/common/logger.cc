@@ -68,6 +68,11 @@ void DelegatingLogSink::set_formatter(std::unique_ptr<spdlog::formatter> formatt
   formatter_ = std::move(formatter);
 }
 
+void DelegatingLogSink::setShouldEscape(bool should_escape) {
+  absl::MutexLock lock(&format_mutex_);
+  should_escape_ = should_escape;
+}
+
 void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   absl::ReleasableMutexLock lock(&format_mutex_);
   absl::string_view msg_view = absl::string_view(msg.payload.data(), msg.payload.size());
@@ -79,10 +84,11 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
     formatter_->format(msg, formatted);
     msg_view = absl::string_view(formatted.data(), formatted.size());
   }
+  const bool escape = should_escape_;
   lock.Release();
 
   auto log_to_sink = [this, msg_view, msg](SinkDelegate& sink) {
-    if (should_escape_) {
+    if (escape) {
       sink.log(escapeLogLine(msg_view), msg);
     } else {
       sink.log(msg_view, msg);
