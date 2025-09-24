@@ -258,7 +258,8 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
           createOnProcessingResponseCb(config, context, stats_prefix)),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()),
       remote_close_timeout_(context.runtime().snapshot().getInteger(
-          RemoteCloseTimeout, DefaultRemoteCloseTimeoutMilliseconds)) {
+          RemoteCloseTimeout, DefaultRemoteCloseTimeoutMilliseconds)),
+      status_on_error_(toErrorCode(config.status_on_error().code())) {
 
   if (config.disable_clear_route_cache()) {
     route_cache_action_ = ExternalProcessor::RETAIN;
@@ -577,7 +578,8 @@ void Filter::onError() {
     decoding_state_.onFinishProcessorCall(Grpc::Status::Aborted);
     encoding_state_.onFinishProcessorCall(Grpc::Status::Aborted);
     ImmediateResponse errorResponse;
-    errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
+    errorResponse.mutable_status()->set_code(
+        static_cast<StatusCode>(static_cast<uint32_t>(config_->statusOnError())));
     errorResponse.set_details(absl::StrCat(ErrorPrefix, "_HTTP_ERROR"));
     sendImmediateResponse(errorResponse);
   }
@@ -1456,7 +1458,8 @@ void Filter::handleErrorResponse(absl::Status processing_status) {
   onFinishProcessorCalls(processing_status.raw_code());
   closeStream();
   ImmediateResponse invalid_mutation_response;
-  invalid_mutation_response.mutable_status()->set_code(StatusCode::InternalServerError);
+  invalid_mutation_response.mutable_status()->set_code(
+      static_cast<StatusCode>(static_cast<uint32_t>(config_->statusOnError())));
   invalid_mutation_response.set_details(std::string(processing_status.message()));
   sendImmediateResponse(invalid_mutation_response);
 }
@@ -1665,7 +1668,8 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
     onFinishProcessorCalls(status);
     closeStream();
     ImmediateResponse errorResponse;
-    errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
+    errorResponse.mutable_status()->set_code(
+        static_cast<StatusCode>(static_cast<uint32_t>(config_->statusOnError())));
     errorResponse.set_details(
         absl::StrFormat("%s_gRPC_error_%i{%s}", ErrorPrefix, status, message));
     sendImmediateResponse(errorResponse);
@@ -1706,7 +1710,6 @@ void Filter::onMessageTimeout() {
     decoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     encoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     ImmediateResponse errorResponse;
-
     errorResponse.mutable_status()->set_code(StatusCode::GatewayTimeout);
     errorResponse.set_details(absl::StrFormat("%s_per-message_timeout_exceeded", ErrorPrefix));
     sendImmediateResponse(errorResponse);

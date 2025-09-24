@@ -1033,7 +1033,7 @@ public:
 // Also verify retry options predicates work.
 TEST_F(RouterTest, EnvoyAttemptCountInRequestUpdatedInRetries) {
   auto retry_options_predicate = std::make_shared<MockRetryOptionsPredicate>();
-  callbacks_.route_->route_entry_.retry_policy_.retry_options_predicates_.emplace_back(
+  callbacks_.route_->route_entry_.retry_policy_->retry_options_predicates_.emplace_back(
       retry_options_predicate);
 
   setIncludeAttemptCountInRequest(true);
@@ -1912,7 +1912,7 @@ TEST_F(RouterTest, UpstreamTimeoutWithAltResponse) {
 TEST_F(RouterTest, UpstreamPerTryIdleTimeout) {
   InSequence s;
 
-  callbacks_.route_->route_entry_.retry_policy_.per_try_idle_timeout_ =
+  callbacks_.route_->route_entry_.retry_policy_->per_try_idle_timeout_ =
       std::chrono::milliseconds(3000);
 
   // This pattern helps ensure that we're actually invoking the callback.
@@ -1983,7 +1983,7 @@ TEST_F(RouterTest, UpstreamPerTryIdleTimeout) {
 TEST_F(RouterTest, UpstreamPerTryIdleTimeoutSuccess) {
   InSequence s;
 
-  callbacks_.route_->route_entry_.retry_policy_.per_try_idle_timeout_ =
+  callbacks_.route_->route_entry_.retry_policy_->per_try_idle_timeout_ =
       std::chrono::milliseconds(3000);
 
   NiceMock<Http::MockRequestEncoder> encoder;
@@ -2188,7 +2188,7 @@ TEST_F(RouterTest, UpstreamPerTryTimeoutExcludesNewStream) {
 // canceled). Also verify retry options predicates work.
 TEST_F(RouterTest, HedgedPerTryTimeoutFirstRequestSucceeds) {
   auto retry_options_predicate = std::make_shared<MockRetryOptionsPredicate>();
-  callbacks_.route_->route_entry_.retry_policy_.retry_options_predicates_.emplace_back(
+  callbacks_.route_->route_entry_.retry_policy_->retry_options_predicates_.emplace_back(
       retry_options_predicate);
 
   enableHedgeOnPerTryTimeout();
@@ -2679,7 +2679,7 @@ TEST_F(RouterTest, BadHeadersDroppedIfPreviousRetryScheduled) {
 // has sent any of the body. Also verify retry options predicates work.
 TEST_F(RouterTest, RetryRequestBeforeBody) {
   auto retry_options_predicate = std::make_shared<MockRetryOptionsPredicate>();
-  callbacks_.route_->route_entry_.retry_policy_.retry_options_predicates_.emplace_back(
+  callbacks_.route_->route_entry_.retry_policy_->retry_options_predicates_.emplace_back(
       retry_options_predicate);
 
   NiceMock<Http::MockRequestEncoder> encoder1;
@@ -5055,8 +5055,6 @@ makeShadowPolicy(std::string cluster = "", std::string cluster_header = "",
 class RouterShadowingTest : public RouterTest, public testing::WithParamInterface<bool> {
 public:
   RouterShadowingTest() : streaming_shadow_(GetParam()) {
-    scoped_runtime_.mergeValues(
-        {{"envoy.reloadable_features.streaming_shadow", streaming_shadow_ ? "true" : "false"}});
     // Add default mock for requestBodyBufferLimit which is called during router initialization.
     EXPECT_CALL(callbacks_.route_->route_entry_, requestBodyBufferLimit())
         .WillRepeatedly(Return(std::numeric_limits<uint64_t>::max()));
@@ -5861,7 +5859,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   }
   {
     NiceMock<MockRouteEntry> route;
-    route.retry_policy_.per_try_timeout_ = std::chrono::milliseconds(7);
+    route.retry_policy_->per_try_timeout_ = std::chrono::milliseconds(7);
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "15"}};
     TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false, false, false);
@@ -5874,7 +5872,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   }
   {
     NiceMock<MockRouteEntry> route;
-    route.retry_policy_.per_try_timeout_ = std::chrono::milliseconds(10);
+    route.retry_policy_->per_try_timeout_ = std::chrono::milliseconds(10);
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(0)));
     Http::TestRequestHeaderMapImpl headers;
     TimeoutData timeout = FilterUtility::finalTimeout(route, headers, true, false, false, false);
@@ -5887,7 +5885,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
   }
   {
     NiceMock<MockRouteEntry> route;
-    route.retry_policy_.per_try_timeout_ = std::chrono::milliseconds(7);
+    route.retry_policy_->per_try_timeout_ = std::chrono::milliseconds(7);
     EXPECT_CALL(route, timeout()).WillOnce(Return(std::chrono::milliseconds(10)));
     Http::TestRequestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "15"},
                                            {"x-envoy-upstream-rq-per-try-timeout-ms", "5"}};
@@ -6040,7 +6038,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, maxGrpcTimeout())
         .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
-    route.retry_policy_.per_try_timeout_ = std::chrono::milliseconds(7);
+    route.retry_policy_->per_try_timeout_ = std::chrono::milliseconds(7);
     Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                            {"grpc-timeout", "1000m"},
                                            {"x-envoy-upstream-rq-timeout-ms", "15"}};
@@ -6056,7 +6054,7 @@ TEST(RouterFilterUtilityTest, FinalTimeout) {
     NiceMock<MockRouteEntry> route;
     EXPECT_CALL(route, maxGrpcTimeout())
         .WillRepeatedly(Return(absl::optional<std::chrono::milliseconds>(0)));
-    route.retry_policy_.per_try_timeout_ = std::chrono::milliseconds(7);
+    route.retry_policy_->per_try_timeout_ = std::chrono::milliseconds(7);
     Http::TestRequestHeaderMapImpl headers{{"content-type", "application/grpc"},
                                            {"grpc-timeout", "1000m"},
                                            {"x-envoy-upstream-rq-timeout-ms", "15"},
@@ -6701,7 +6699,7 @@ TEST_F(RouterTest, Http3DisabledForHttp11Proxies) {
 
 TEST_F(RouterTest, ExpectedUpstreamTimeoutUpdatedDuringRetries) {
   auto retry_options_predicate = std::make_shared<MockRetryOptionsPredicate>();
-  callbacks_.route_->route_entry_.retry_policy_.retry_options_predicates_.emplace_back(
+  callbacks_.route_->route_entry_.retry_policy_->retry_options_predicates_.emplace_back(
       retry_options_predicate);
 
   setIncludeAttemptCountInRequest(true);

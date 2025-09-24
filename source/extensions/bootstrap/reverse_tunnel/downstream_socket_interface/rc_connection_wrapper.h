@@ -148,6 +148,7 @@ private:
   std::string connection_key_;
   bool http_handshake_sent_{false};
   bool handshake_completed_{false};
+  bool shutdown_called_{false};
 
 public:
   // Dispatch incoming bytes to HTTP/1 codec.

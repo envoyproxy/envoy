@@ -75,6 +75,7 @@ envoy_cc_library(
         "//envoy/upstream:cluster_manager_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:logger_lib",
+        "//source/common/event:real_time_system_lib",
         "//source/common/grpc:typed_async_client_lib",
         "//source/common/http:codec_client_lib",
         "//source/common/http/http1:codec_lib",

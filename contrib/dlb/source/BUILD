@@ -18,7 +18,7 @@ make(
     env = {"DLB_DISABLE_DOMAIN_SERVER": "TRUE"},
     lib_source = "@intel_dlb//:libdlb",
     out_static_libs = ["libdlb.a"],
-    postfix_script = "mv libdlb.a $INSTALLDIR/lib && rm -rf $INSTALLDIR/include && mkdir -p $INSTALLDIR/include && cp -L *.h $INSTALLDIR/include",
+    postfix_script = "mv libdlb.a $$INSTALLDIR/lib && rm -rf $$INSTALLDIR/include && mkdir -p $$INSTALLDIR/include && cp -L *.h $$INSTALLDIR/include",
     tags = ["skip_on_windows"],
     target_compatible_with = envoy_contrib_linux_x86_64_constraints(),
     targets = ["libdlb.a"],
