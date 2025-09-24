@@ -621,9 +621,8 @@ public:
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
 
 protected:
-  virtual absl::Status runUpdateCallbacks(const HostVector& hosts_added,
-                                          const HostVector& hosts_removed) {
-    return member_update_cb_helper_.runCallbacks(priority_, hosts_added, hosts_removed);
+  virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
+    member_update_cb_helper_.runCallbacks(priority_, hosts_added, hosts_removed);
   }
 
 private:
@@ -639,7 +638,7 @@ private:
   HostsPerLocalityConstSharedPtr degraded_hosts_per_locality_{HostsPerLocalityImpl::empty()};
   HostsPerLocalityConstSharedPtr excluded_hosts_per_locality_{HostsPerLocalityImpl::empty()};
   // TODO(mattklein123): Remove mutable.
-  mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
+  mutable Common::CallbackManager<void, uint32_t, const HostVector&, const HostVector&>
       member_update_cb_helper_;
   // Locality weights.
   LocalityWeightsConstSharedPtr locality_weights_;
@@ -693,13 +692,12 @@ protected:
                                          overprovisioning_factor);
   }
 
-  virtual absl::Status runUpdateCallbacks(const HostVector& hosts_added,
-                                          const HostVector& hosts_removed) {
-    return member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
+  virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
+    member_update_cb_helper_.runCallbacks(hosts_added, hosts_removed);
   }
-  virtual absl::Status runReferenceUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
-                                                   const HostVector& hosts_removed) {
-    return priority_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
+  virtual void runReferenceUpdateCallbacks(uint32_t priority, const HostVector& hosts_added,
+                                           const HostVector& hosts_removed) {
+    priority_update_cb_helper_.runCallbacks(priority, hosts_added, hosts_removed);
   }
   // This vector will generally have at least one member, for priority level 0.
   // It will expand as host sets are added but currently does not shrink to
@@ -714,8 +712,9 @@ private:
   // because host_sets_ is directly returned so we avoid translation.
   std::vector<Common::CallbackHandlePtr> host_sets_priority_update_cbs_;
   // TODO(mattklein123): Remove mutable.
-  mutable Common::CallbackManager<const HostVector&, const HostVector&> member_update_cb_helper_;
-  mutable Common::CallbackManager<uint32_t, const HostVector&, const HostVector&>
+  mutable Common::CallbackManager<void, const HostVector&, const HostVector&>
+      member_update_cb_helper_;
+  mutable Common::CallbackManager<void, uint32_t, const HostVector&, const HostVector&>
       priority_update_cb_helper_;
   bool batch_update_ : 1;
 
@@ -1234,8 +1233,9 @@ protected:
   Random::RandomGenerator& random_;
   MainPrioritySetImpl priority_set_;
 
-  absl::Status validateEndpointsForZoneAwareRouting(
-      const envoy::config::endpoint::v3::LocalityLbEndpoints& endpoints) const;
+  absl::Status validateEndpoints(
+      absl::Span<const envoy::config::endpoint::v3::LocalityLbEndpoints* const> endpoints,
+      OptRef<const PriorityState> priorities) const;
 
 private:
   static const absl::string_view DoNotValidateAlpnRuntimeKey;
