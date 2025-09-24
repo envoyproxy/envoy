@@ -427,6 +427,21 @@ const StreamInfo::StreamInfo& AsyncRequestImpl::streamInfo() const {
   return AsyncStreamImpl::streamInfo();
 }
 
+void AsyncRequestImpl::detach() {
+  // TODO(wbpcode): In most tracers the span will hold a reference to the tracer self
+  // and it's possible that become a dangling reference for long time async request.
+  // This require further PR to resolve.
+
+  if (options_.sidestream_watermark_callbacks != nullptr) {
+    stream_->removeWatermarkCallbacks();
+    options_.sidestream_watermark_callbacks = nullptr;
+  }
+  options_.parent_span_ = nullptr;
+  options_.parent_context.stream_info = nullptr;
+
+  streamInfo().clearParentStreamInfo();
+}
+
 void AsyncRequestImpl::onCreateInitialMetadata(Http::RequestHeaderMap& metadata) {
   Tracing::HttpTraceContext trace_context(metadata);
   Tracing::UpstreamContext upstream_context(nullptr,                         // host_

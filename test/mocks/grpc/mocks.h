@@ -26,6 +26,7 @@ public:
 
   MOCK_METHOD(void, cancel, ());
   MOCK_METHOD(const StreamInfo::StreamInfo&, streamInfo, (), (const));
+  MOCK_METHOD(void, detach, ());
 };
 
 class MockAsyncStream : public RawAsyncStream {
