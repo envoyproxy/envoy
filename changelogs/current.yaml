@@ -139,6 +139,12 @@ bug_fixes:
     when used with other listener filters. The bug was triggered when a previous listener filter processed more data
     than the TLS inspector had requested, causing the TLS inspector to incorrectly calculate its buffer growth strategy.
     The fix ensures that buffer growth is now based on actual bytes available rather than the previously requested amount.
+- area: listener
+  change: |
+    Fixed a bug where a failure to create listener sockets in different Linux network namespaces was
+    not handled properly. The success of the netns switch was not checked before attempting to
+    access the result of the socket creation. This is only relevant for Linux and if a listening
+    socket address was specified with a non-default network namespace.
 - area: aws
   change: |
     Added missing session name, session duration, and ``external_id`` parameters in AssumeRole credentials provider.
@@ -154,6 +160,12 @@ bug_fixes:
     ``cluster.<cluster_name>.ssl.certificate.<cert_name>.<metric_name>``
     and ``listener.<address>.ssl.certificate.<cert_name>.<metric_name>``
     was not being properly extracted in the final Prometheus stat name.
+- area: odcds
+  change: |
+    Fixed a bug where using OD-CDS without cds_config would not work in some
+    cases. This change introduces a new internal OD-CDS component. This change
+    could be reverted temporarily by setting the runtime guard
+    ``envoy.reloadable_features.odcds_over_ads_fix`` to ``false``.
 - area: oauth2
   change: |
     Fixed an issue where cookies prefixed with ``__Secure-`` or ``__Host-`` were not receiving a
@@ -408,6 +420,15 @@ new_features:
 - area: tls_inspector
   change: |
     Added dynamic metadata when failing to parse the ``ClientHello``.
+- area: matching
+  change: |
+    Added :ref:`NetworkNamespaceInput
+    <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.NetworkNamespaceInput>` to the
+    matcher framework. This input returns the listener address's ``network_namespace_filepath``
+    for use with :ref:`filter_chain_matcher
+    <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`, enabling filter chain
+    selection based on the Linux network namespace of the bound socket. On non-Linux platforms,
+    the input returns an empty value and connections use the default filter chain.
 - area: lua
   change: |
     Added ``route()`` to the Stream handle API, allowing Lua scripts to retrieve route information. So far, the only method
