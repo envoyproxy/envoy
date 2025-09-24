@@ -434,6 +434,12 @@ new_features:
     <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`, enabling filter chain
     selection based on the Linux network namespace of the bound socket. On non-Linux platforms,
     the input returns an empty value and connections use the default filter chain.
+- area: rbac
+  change: |
+    Enabled use of :ref:`NetworkNamespaceInput
+    <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.NetworkNamespaceInput>` in the
+    network RBAC filter's matcher. This allows RBAC policies to evaluate the Linux network namespace
+    of the listening socket via the generic matcher API.
 - area: lua
   change: |
     Added ``route()`` to the Stream handle API, allowing Lua scripts to retrieve route information. So far, the only method
