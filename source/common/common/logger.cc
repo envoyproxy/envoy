@@ -95,7 +95,8 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   // protection is really only needed in tests. It would be nice to figure out a test-only
   // mechanism for this that does not require extra locking that we don't explicitly need in the
   // prod code.
-  absl::ReaderMutexLock sink_lock(&sink_mutex_);
+  //
+  //absl::ReaderMutexLock sink_lock(&sink_mutex_);
   log_to_sink(*sink_);
 }
 
