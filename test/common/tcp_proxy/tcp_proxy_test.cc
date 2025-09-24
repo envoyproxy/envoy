@@ -2145,6 +2145,33 @@ TEST_P(TcpProxyTest, UpstreamStartSecureTransport) {
   filter_->startUpstreamSecureTransport();
 }
 
+// Verify the filter uses the value returned by
+// Config::calculateMaxDownstreamConnectionDurationWithJitter.
+TEST_P(TcpProxyTest, MaxDownstreamConnectionDurationWithJitterPercentage) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  config.mutable_max_downstream_connection_duration()->set_seconds(10);
+  config.mutable_max_downstream_connection_duration_jitter_percentage()->set_value(50.0);
+
+  // Idle timeout also uses createTimer, clear it to avoid mixing up timers in tests.
+  config.mutable_idle_timeout()->clear_seconds();
+
+  EXPECT_CALL(factory_context_.server_factory_context_.api_.random_, random())
+      .WillRepeatedly(Return(2500));
+
+  setup(1, config);
+
+  // Calculation of expected value is verified in config test. Here we just verify that the filter
+  // uses the value returned by the config.
+  const auto expected = config_->calculateMaxDownstreamConnectionDurationWithJitter();
+  ASSERT_TRUE(expected.has_value());
+
+  Event::MockTimer* connection_duration_timer =
+      new Event::MockTimer(&filter_callbacks_.connection_.dispatcher_);
+
+  EXPECT_CALL(*connection_duration_timer, enableTimer(expected.value(), _));
+  EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
+}
+
 // Test that the proxy protocol TLV is set.
 TEST_P(TcpProxyTest, SetTLV) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
