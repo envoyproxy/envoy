@@ -1,7 +1,7 @@
-diff --git src/CMakeLists.txt src/CMakeLists.txt
-index 68d0a4f..9bf7ade 100644
---- src/CMakeLists.txt
-+++ src/CMakeLists.txt
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 68d0a4fe6..9bf7adede 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
 @@ -50,13 +50,8 @@ include(cmake/ccache.cmake)
  ##############################################################################
  # VPP Version
@@ -27,10 +27,10 @@ index 68d0a4f..9bf7ade 100644
    )
  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
    set(SUBDIRS vppinfra)
-diff --git src/cmake/ccache.cmake src/cmake/ccache.cmake
-index a7b395b..d6a4c5b 100644
---- src/cmake/ccache.cmake
-+++ src/cmake/ccache.cmake
+diff --git a/src/cmake/ccache.cmake b/src/cmake/ccache.cmake
+index a7b395bc6..d6a4c5b30 100644
+--- a/src/cmake/ccache.cmake
++++ b/src/cmake/ccache.cmake
 @@ -14,7 +14,7 @@
  ##############################################################################
  # ccache
@@ -40,10 +40,10 @@ index a7b395b..d6a4c5b 100644
  if(VPP_USE_CCACHE)
    find_program(CCACHE_FOUND ccache)
    message(STATUS "Looking for ccache")
-diff --git src/cmake/library.cmake src/cmake/library.cmake
-index 45b3944..b1dcc56 100644
---- src/cmake/library.cmake
-+++ src/cmake/library.cmake
+diff --git a/src/cmake/library.cmake b/src/cmake/library.cmake
+index 45b3944eb..b1dcc56e1 100644
+--- a/src/cmake/library.cmake
++++ b/src/cmake/library.cmake
 @@ -24,7 +24,7 @@ macro(add_vpp_library lib)
    set_target_properties(${lo} PROPERTIES POSITION_INDEPENDENT_CODE ON)
    target_compile_options(${lo} PUBLIC ${VPP_DEFAULT_MARCH_FLAGS})
@@ -53,10 +53,10 @@ index 45b3944..b1dcc56 100644
    target_sources(${lib} PRIVATE $<TARGET_OBJECTS:${lo}>)
  
    if(VPP_LIB_VERSION)
-diff --git src/tools/vppapigen/CMakeLists.txt src/tools/vppapigen/CMakeLists.txt
-index 04ebed5..bfabc3a 100644
---- src/tools/vppapigen/CMakeLists.txt
-+++ src/tools/vppapigen/CMakeLists.txt
+diff --git a/src/tools/vppapigen/CMakeLists.txt b/src/tools/vppapigen/CMakeLists.txt
+index 04ebed548..bfabc3a67 100644
+--- a/src/tools/vppapigen/CMakeLists.txt
++++ b/src/tools/vppapigen/CMakeLists.txt
 @@ -11,22 +11,6 @@
  # See the License for the specific language governing permissions and
  # limitations under the License.
@@ -80,28 +80,29 @@ index 04ebed5..bfabc3a 100644
  install(
    FILES vppapigen.py
    RENAME vppapigen
-diff --git src/tools/vppapigen/vppapigen.py src/tools/vppapigen/vppapigen.py
-index 2b0ce99..f28a173 100755
---- src/tools/vppapigen/vppapigen.py
-+++ src/tools/vppapigen/vppapigen.py
-@@ -7,6 +7,13 @@ import logging
+diff --git a/src/tools/vppapigen/vppapigen.py b/src/tools/vppapigen/vppapigen.py
+index 2b0ce9999..f8a7586ea 100755
+--- a/src/tools/vppapigen/vppapigen.py
++++ b/src/tools/vppapigen/vppapigen.py
+@@ -7,6 +7,14 @@ import logging
  import binascii
  import os
  from subprocess import Popen, PIPE
 +
++
 +# Put ply on the path ...
 +plypath = os.path.join(
 +    os.environ["EXT_BUILD_ROOT"],
-+    os.path.dirname(os.environ["PLYPATHS"].split()[0]))
++    os.path.dirname(os.path.dirname(os.environ["PLYPATHS"].split()[0])))
 +sys.path += [plypath]
 +
  import ply.lex as lex
  import ply.yacc as yacc
  
-diff --git src/vcl/CMakeLists.txt src/vcl/CMakeLists.txt
-index 610b422..c5e6f8c 100644
---- src/vcl/CMakeLists.txt
-+++ src/vcl/CMakeLists.txt
+diff --git a/src/vcl/CMakeLists.txt b/src/vcl/CMakeLists.txt
+index 610b422d1..c5e6f8ca8 100644
+--- a/src/vcl/CMakeLists.txt
++++ b/src/vcl/CMakeLists.txt
 @@ -35,6 +35,8 @@ if (LDP_HAS_GNU_SOURCE)
    add_compile_definitions(HAVE_GNU_SOURCE)
  endif(LDP_HAS_GNU_SOURCE)
@@ -111,10 +112,10 @@ index 610b422..c5e6f8c 100644
  add_vpp_library(vcl_ldpreload
    SOURCES
    ldp_socket_wrapper.c
-diff --git src/vppinfra/CMakeLists.txt src/vppinfra/CMakeLists.txt
-index f34ceed..51fd2be 100644
---- src/vppinfra/CMakeLists.txt
-+++ src/vppinfra/CMakeLists.txt
+diff --git a/src/vppinfra/CMakeLists.txt b/src/vppinfra/CMakeLists.txt
+index f34ceed9d..51fd2becf 100644
+--- a/src/vppinfra/CMakeLists.txt
++++ b/src/vppinfra/CMakeLists.txt
 @@ -233,13 +233,28 @@ option(VPP_USE_EXTERNAL_LIBEXECINFO "Use external libexecinfo (useful for non-gl
  if(VPP_USE_EXTERNAL_LIBEXECINFO)
    set(EXECINFO_LIB execinfo)
