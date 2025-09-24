@@ -8,7 +8,7 @@ namespace Filters {
 namespace Common {
 namespace LocalRateLimit {
 
-SINGLETON_MANAGER_REGISTRATION(local_ratelimit);
+SINGLETON_MANAGER_REGISTRATION(local_ratelimit_provider);
 
 std::shared_ptr<LocalRateLimiterImpl>
 createRateLimiterImpl(const envoy::type::v3::TokenBucket& token_bucket,
@@ -26,146 +26,140 @@ createRateLimiterImpl(const envoy::type::v3::TokenBucket& token_bucket,
 RateLimiterProviderSingleton::RateLimiterWrapperPtr RateLimiterProviderSingleton::getRateLimiter(
     Server::Configuration::ServerFactoryContext& factory_context, absl::string_view key,
     const envoy::config::core::v3::ConfigSource& config_source, SetRateLimiterCb callback) {
-  RateLimiterProviderSingletonSharedPtr provider =
-      factory_context.singletonManager().getTyped<RateLimiterProviderSingleton>(
-          SINGLETON_MANAGER_REGISTERED_NAME(local_ratelimit), [&factory_context, &config_source] {
-            return std::make_shared<RateLimiterProviderSingleton>(factory_context, config_source);
-          });
-  auto it = provider->limiters_.find(key);
-  if (it != provider->limiters_.end()) {
-    auto& limiter_ref = it->second;
-    auto limiter = limiter_ref.limiter().lock();
-    if (limiter) {
-      // The limiter is still alive, return the wrapper with the limiter.
-      return std::make_unique<RateLimiterProviderSingleton::RateLimiterWrapper>(provider, limiter);
-    }
+  auto provider = factory_context.singletonManager().getTyped<RateLimiterProviderSingleton>(
+      SINGLETON_MANAGER_REGISTERED_NAME(local_ratelimit_provider),
+      [&factory_context, &config_source] {
+        return std::make_shared<RateLimiterProviderSingleton>(factory_context, config_source);
+      });
 
-    // The limiter doesn't exist but the config is still there, create a new one
-    // and return the wrapper with the new limiter.
-    const auto& named_token_bucket = limiter_ref.config();
-    limiter = createRateLimiterImpl(named_token_bucket.token_bucket(),
-                                    provider->factory_context_.mainThreadDispatcher());
-    limiter_ref.setLimiter(limiter);
-    return std::make_unique<RateLimiterProviderSingleton::RateLimiterWrapper>(provider, limiter);
+  // Find the subscription for the given key.
+  auto it = provider->subscriptions_.find(key);
+  if (it == provider->subscriptions_.end()) {
+    // If the subscription doesn't exist, create a new one.
+    auto subscription = std::make_unique<TokenBucketSubscription>(*provider, key);
+    it = provider->subscriptions_.emplace(key, std::move(subscription)).first;
   }
 
-  // The limiter doesn't exist and the config doesn't exist either, we need to
-  // wait for the config to be ready. Add the callback to the list of callbacks
-  // for the config.
-  auto callback_it = provider->setter_cbs_.find(key);
-  if (callback_it == provider->setter_cbs_.end()) {
-    callback_it = provider->setter_cbs_.emplace(key, factory_context).first;
+  auto& subscription = it->second;
+
+  // If the limiter is already created, return it.
+  if (auto limiter = subscription->getLimiter()) {
+    return std::make_unique<RateLimiterWrapper>(provider, limiter);
   }
-  callback_it->second.addCallback(std::move(callback));
 
-  return std::make_unique<RateLimiterProviderSingleton::RateLimiterWrapper>(provider, nullptr);
+  // Otherwise, return a wrapper with a null limiter. The limiter will be
+  // set when the config is received.
+  subscription->addSetter(std::move(callback));
+  return std::make_unique<RateLimiterWrapper>(provider, nullptr);
 }
 
-// Definition of RateLimitConfigCallback methods
-RateLimiterProviderSingleton::RateLimitConfigCallback::RateLimitConfigCallback(
-    Server::Configuration::ServerFactoryContext& factory_context)
-    : init_target_(std::make_unique<Init::TargetImpl>("RateLimitConfigCallback", []() {})) {
-  factory_context.initManager().add(*init_target_);
+std::shared_ptr<LocalRateLimiterImpl>
+RateLimiterProviderSingleton::TokenBucketSubscription::getLimiter() {
+  auto limiter = limiter_.lock();
+  if (limiter) {
+    return limiter;
+  }
+  if (config_.has_value()) {
+    limiter = createRateLimiterImpl(config_->token_bucket(),
+                                    parent_.factory_context_.mainThreadDispatcher());
+    limiter_ = limiter;
+    return limiter;
+  }
+  return nullptr;
 }
 
-void RateLimiterProviderSingleton::RateLimitConfigCallback::addCallback(SetRateLimiterCb callback) {
-  setters_.push_back(std::move(callback));
+RateLimiterProviderSingleton::TokenBucketSubscription::TokenBucketSubscription(
+    RateLimiterProviderSingleton& parent, absl::string_view resource_name)
+    : Config::SubscriptionBase<envoy::type::v3::TokenBucketConfig>(
+          parent.factory_context_.messageValidationVisitor(), "name"),
+      parent_(parent),
+      init_target_(std::make_unique<Init::TargetImpl>("RateLimitConfigCallback", []() {})),
+      resource_name_(resource_name), token_bucket_config_hash_(0) {
+  parent_.factory_context_.initManager().add(*init_target_);
+  subscription_ = THROW_OR_RETURN_VALUE(
+      parent.factory_context_.xdsManager().subscribeToSingletonResource(
+          resource_name, parent.config_source_, Grpc::Common::typeUrl(getResourceName()),
+          *parent.scope_, *this, resource_decoder_, {}),
+      Config::SubscriptionPtr);
+  subscription_->start({resource_name_});
 }
 
-void RateLimiterProviderSingleton::RateLimitConfigCallback::setLimiter(
-    std::shared_ptr<LocalRateLimiterImpl> limiter) {
+void RateLimiterProviderSingleton::TokenBucketSubscription::handleAddedResource(
+    const Config::DecodedResourceRef& resource) {
+  const auto& config =
+      dynamic_cast<const envoy::type::v3::TokenBucketConfig&>(resource.get().resource());
+  // Update the config.
+  size_t new_hash = MessageUtil::hash(config);
+  // If the config is the same, no op.
+  if (new_hash == token_bucket_config_hash_) {
+    return;
+  }
+  config_ = config;
+  token_bucket_config_hash_ = new_hash;
+  limiter_.reset();
+
+  // If limiter is not created, create a new limiter and set it.
+  auto limiter = limiter_.lock();
+  if (limiter == nullptr) {
+    limiter = createRateLimiterImpl(config.token_bucket(),
+                                    parent_.factory_context_.mainThreadDispatcher());
+  }
+
+  limiter_ = limiter;
   for (auto& setter : setters_) {
     setter(limiter);
   }
+
   // Mark ready only once.
-  if (!init_target_->ready()) {
-    init_target_->ready();
-  }
+  init_target_->ready();
 }
 
-RateLimiterProviderSingleton::RatelimiterSubscription::RatelimiterSubscription(
-    RateLimiterProviderSingleton& parent)
-    : Config::SubscriptionBase<envoy::type::v3::TokenBucketConfig>(
-          parent.factory_context_.messageValidationVisitor(), "name"),
-      parent_(parent) {
-  subscription_ = THROW_OR_RETURN_VALUE(
-      parent.factory_context_.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          parent.config_source_, Grpc::Common::typeUrl(getResourceName()), *parent.scope_, *this,
-          resource_decoder_, {}),
-      Config::SubscriptionPtr);
+void RateLimiterProviderSingleton::TokenBucketSubscription::handleRemovedResource(
+    absl::string_view resource) {
+  parent_.subscriptions_.erase(resource);
 }
 
-void RateLimiterProviderSingleton::RatelimiterSubscription::handleAddedResources(
-    const std::vector<Config::DecodedResourceRef>& added_resources) {
-  for (const auto& resource : added_resources) {
-    std::string key = resource.get().name();
-    const auto& named_token_bucket =
-        dynamic_cast<const envoy::type::v3::TokenBucketConfig&>(resource.get().resource());
-
-    auto it = parent_.limiters_.find(key);
-    if (it == parent_.limiters_.end()) {
-      parent_.limiters_.emplace(
-          key, RateLimiterRef(named_token_bucket, std::weak_ptr<LocalRateLimiterImpl>()));
-    } else {
-      // The config may be different from the existing one. We need to update the
-      // config and reset the limiter if it is.
-      it->second.setConfig(named_token_bucket);
-    }
-
-    auto callback_it = parent_.setter_cbs_.find(key);
-    if (callback_it == parent_.setter_cbs_.end()) {
-      continue; // No pending callbacks for this key.
-    }
-
-    auto limiter = createRateLimiterImpl(named_token_bucket.token_bucket(),
-                                         parent_.factory_context_.mainThreadDispatcher());
-    parent_.limiters_.at(key).setLimiter(limiter);
-    callback_it->second.setLimiter(limiter); // Notify all waiting callbacks.
-    parent_.setter_cbs_.erase(callback_it);
-  }
-}
-
-void RateLimiterProviderSingleton::RatelimiterSubscription::handleRemovedResources(
-    const Protobuf::RepeatedPtrField<std::string>& removed_resources) {
-  for (const auto& key : removed_resources) {
-    auto it = parent_.limiters_.find(key);
-    if (it != parent_.limiters_.end()) {
-      // The wrapper containing the config and the weak_ptr is removed.
-      // Any existing shared_ptr instances held by RateLimiter objects
-      // will keep the LocalRateLimiterImpl alive until they are destroyed.
-      parent_.limiters_.erase(it);
-    }
-  }
-}
-
-absl::Status RateLimiterProviderSingleton::RatelimiterSubscription::onConfigUpdate(
+absl::Status RateLimiterProviderSingleton::TokenBucketSubscription::onConfigUpdate(
     const std::vector<Config::DecodedResourceRef>& resources, const std::string&) {
-  // SOTW update. We need to determine what was removed.
-  absl::flat_hash_set<std::string> new_keys;
-  for (const auto& res : resources) {
-    new_keys.insert(res.get().name());
-  }
+  ENVOY_BUG(resources.size() == 1,
+            fmt::format("for singleton resource subscription, only one resource should be "
+                        "added or removed at a time but got {}",
+                        resources.size()));
+  ENVOY_BUG(resources[0].get().name() == resource_name_,
+            fmt::format("for singleton resource subscription, the added resource name "
+                        "should be the same as the subscription resource name but got "
+                        "{} != {}",
+                        resources[0].get().name(), resource_name_));
 
-  Protobuf::RepeatedPtrField<std::string> removed_resources;
-  for (const auto& pair : parent_.limiters_) {
-    if (!new_keys.contains(pair.first)) {
-      *removed_resources.Add() = pair.first;
-    }
-  }
-
-  handleAddedResources(resources);
-  handleRemovedResources(removed_resources);
+  handleAddedResource(resources[0]);
   return absl::OkStatus();
 }
 
-absl::Status RateLimiterProviderSingleton::RatelimiterSubscription::onConfigUpdate(
+absl::Status RateLimiterProviderSingleton::TokenBucketSubscription::onConfigUpdate(
     const std::vector<Config::DecodedResourceRef>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
-  handleAddedResources(added_resources);
-  handleRemovedResources(removed_resources);
+  ENVOY_BUG(added_resources.size() + removed_resources.size() == 1,
+            fmt::format("for singleton resource subscription, only one resource should be "
+                        "added or removed at a time but got {}",
+                        added_resources.size() + removed_resources.size()));
+  if (added_resources.size() == 1) {
+    ENVOY_BUG(added_resources[0].get().name() == resource_name_,
+              fmt::format("for singleton resource subscription, the added resource name "
+                          "should be the same as the subscription resource name but got {} "
+                          "!= {}",
+                          added_resources[0].get().name(), resource_name_));
+    handleAddedResource(added_resources[0]);
+  } else {
+    ENVOY_BUG(removed_resources[0] == resource_name_,
+              fmt::format("for singleton resource subscription, the removed resource name "
+                          "should be the same as the subscription resource name but got {} "
+                          "!= {}",
+                          removed_resources[0], resource_name_));
+    handleRemovedResource(removed_resources[0]);
+  }
+
   return absl::OkStatus();
 }
-
 } // namespace LocalRateLimit
 } // namespace Common
 } // namespace Filters

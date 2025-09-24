@@ -9,19 +9,19 @@ namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace Filters {
-namespace LocalRateLimit {
+namespace ProcessRateLimit {
 
-class LocalRateLimitFilterFactory : public AccessLog::ExtensionFilterFactory {
+class ProcessRateLimitFilterFactory : public AccessLog::ExtensionFilterFactory {
 public:
   AccessLog::FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
                                     Server::Configuration::GenericFactoryContext& context) override;
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
   std::string name() const override {
-    return "envoy.access_loggers.extension_filters.local_ratelimit";
+    return "envoy.access_loggers.extension_filters.process_ratelimit";
   }
 };
 
-} // namespace LocalRateLimit
+} // namespace ProcessRateLimit
 } // namespace Filters
 } // namespace AccessLoggers
 } // namespace Extensions

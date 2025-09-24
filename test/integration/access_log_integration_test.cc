@@ -102,12 +102,13 @@ filter:
   extension_filter:
     name: local_ratelimit_extension_filter
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.local_ratelimit.v3.LocalRateLimitFilter
-      resource_name: "token_bucket_name"
-      config_source:
-        path_config_source:
-          path: "{}"
-        resource_api_version: V3
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter
+      dynamic_config:
+        resource_name: "token_bucket_name"
+        config_source:
+          path_config_source:
+            path: "{}"
+          resource_api_version: V3
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: "{}"

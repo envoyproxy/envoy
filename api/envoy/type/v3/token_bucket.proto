@@ -38,7 +38,7 @@ message TokenBucket {
   }];
 }
 
-// The token bucket as a resource config. It is being used in ``envoy.extensions.access_loggers.filters.local_ratelimit.v3.LocalRateLimitFilter``.
+// The token bucket as a resource config.
 message TokenBucketConfig {
   // Required.The name of the token bucket. Used to identify the token bucket in
   // access log rate limit filter.
