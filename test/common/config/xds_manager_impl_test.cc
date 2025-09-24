@@ -816,6 +816,52 @@ TEST_P(XdsManagerImplTest, AdsReplacementContentsOfCustomValidatorsRejection) {
               HasSubstr("Cannot replace config_validators in ADS config (different contents)"));
 }
 
+// Validates that ADS initialization fails when the primary gRPC client is null.
+TEST_P(XdsManagerImplTest, AdsInitializationFailsWithNullPrimaryClient) {
+  NiceMock<MockGrpcMuxFactory> factory;
+  Registry::InjectFactory<MuxFactory> registry(factory);
+  initialize(R"EOF(
+  dynamic_resources:
+    ads_config:
+      api_type: GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: ads_cluster
+  static_resources:
+    clusters:
+    - name: ads_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: ads_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF");
+
+  if (GetParam()) { // use_cached_grpc_client_for_xds is true
+    EXPECT_CALL(cm_.async_client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
+        .WillOnce(Return(ByMove(absl::StatusOr<Grpc::RawAsyncClientSharedPtr>(nullptr))));
+  } else { // use_cached_grpc_client_for_xds is false
+    auto mock_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
+    EXPECT_CALL(*mock_factory, createUncachedRawAsyncClient())
+        .WillOnce(Return(ByMove(absl::StatusOr<Grpc::RawAsyncClientPtr>(nullptr))));
+    EXPECT_CALL(cm_.async_client_manager_, factoryForGrpcService(_, _, _))
+        .WillOnce(
+            Return(ByMove(absl::StatusOr<Grpc::AsyncClientFactoryPtr>(std::move(mock_factory)))));
+  }
+
+  const auto res = xds_manager_impl_.initializeAdsConnections(server_.bootstrap_);
+  EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_EQ(res.message(), "gRPC client construction failed for primary cluster.");
+}
+
 /*
  * Tests that cover the usage of xDS-TP based configuration-sources.
  */

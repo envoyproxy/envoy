@@ -125,6 +125,9 @@ absl::Status createGrpcClients(Grpc::AsyncClientManager& async_client_manager,
                                          skip_cluster_check, xdstp_config_source, primary_client,
                                          failover_client));
   }
+  if (primary_client == nullptr) {
+    return absl::InvalidArgumentError("gRPC client construction failed for primary cluster.");
+  }
   return absl::OkStatus();
 }
 } // namespace
