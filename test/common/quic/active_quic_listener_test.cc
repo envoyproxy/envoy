@@ -8,6 +8,7 @@
 #include "source/common/http/utility.h"
 #include "source/common/listener_manager/connection_handler_impl.h"
 #include "source/common/network/listen_socket_impl.h"
+#include "source/common/network/listener.h"
 #include "source/common/network/socket_option_factory.h"
 #include "source/common/network/udp_packet_writer_handler_impl.h"
 #include "source/common/quic/active_quic_listener.h"
@@ -157,6 +158,8 @@ protected:
     // supported.
     ON_CALL(listener_config_, udpListenerConfig())
         .WillByDefault(Return(Network::UdpListenerConfigOptRef(udp_listener_config_)));
+    ON_CALL(listener_config_, numQuicSessionsToCreatePerLoop())
+        .WillByDefault(Return(Network::DefaultNumQuicSessionsToCreatePerLoop));
     ON_CALL(udp_listener_config_, packetWriterFactory())
         .WillByDefault(ReturnRef(udp_packet_writer_factory_));
     ON_CALL(udp_packet_writer_factory_, createUdpPacketWriter(_, _))
@@ -536,7 +539,7 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   initialize();
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(quic_dispatcher_);
-  const uint32_t count = (ActiveQuicListener::kNumSessionsToCreatePerLoop * 2) + 1;
+  const uint32_t count = (listener_config_.numQuicSessionsToCreatePerLoop() * 2) + 1;
   maybeConfigureMocks(count + 1);
   // Create 1 session to increase number of packet to read in the next read event.
   sendCHLO(quic::test::TestConnectionId());

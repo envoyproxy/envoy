@@ -981,6 +981,9 @@ private:
       connection_resource_.setMax(num_connections);
     }
     void clearMaxConnections() { connection_resource_.resetMax(); }
+    uint32_t numQuicSessionsToCreatePerLoop() const override {
+      return Network::DefaultNumQuicSessionsToCreatePerLoop;
+    }
 
     FakeUpstream& parent_;
     const std::string name_;

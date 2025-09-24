@@ -516,6 +516,7 @@ public:
   MOCK_METHOD(Init::Manager&, initManager, ());
   MOCK_METHOD(bool, ignoreGlobalConnLimit, (), (const));
   MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
+  MOCK_METHOD(uint32_t, numQuicSessionsToCreatePerLoop, (), (const));
 
   const AccessLog::InstanceSharedPtrVector& accessLogs() const override {
     return empty_access_logs_;
@@ -680,6 +681,7 @@ public:
   MOCK_METHOD(Api::IoCallUint64Result, flush, ());
   MOCK_METHOD(void, activateRead, ());
   MOCK_METHOD(bool, shouldBypassOverloadManager, (), (const));
+  MOCK_METHOD(uint32_t, numQuicSessionsToCreatePerLoop, (), (const));
 
   Event::MockDispatcher dispatcher_;
 };

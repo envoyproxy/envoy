@@ -54,7 +54,7 @@ message ListenerCollection {
   repeated xds.core.v3.CollectionEntry entries = 1;
 }
 
-// [#next-free-field: 37]
+// [#next-free-field: 38]
 message Listener {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
@@ -416,6 +416,9 @@ message Listener {
 
   // Whether the listener bypasses configured overload manager actions.
   bool bypass_overload_manager = 35;
+
+  google.protobuf.UInt32Value num_quic_sessions_to_create_per_loop = 37
+      [(validate.rules).uint32 = {gt: 0}];
 }
 
 // A placeholder proto so that users can explicitly configure the standard

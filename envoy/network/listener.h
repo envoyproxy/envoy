@@ -27,6 +27,7 @@ namespace Network {
 
 // Set this to the maximum value which effectively accepts all connections.
 constexpr uint32_t DefaultMaxConnectionsToAcceptPerSocketEvent = UINT32_MAX;
+constexpr uint32_t DefaultNumQuicSessionsToCreatePerLoop = 16;
 
 class ActiveUdpListenerFactory;
 class UdpListenerWorkerRouter;
@@ -302,6 +303,13 @@ public:
    * @return bool whether the listener should bypass overload manager actions
    */
   virtual bool shouldBypassOverloadManager() const PURE;
+
+  /**
+   * @return uint32_t the number of sessions to create per event loop.
+   * This is an equivalent of the number of connections to accept per event loop
+   * for tcp listeners.
+   */
+  virtual uint32_t numQuicSessionsToCreatePerLoop() const PURE;
 };
 
 /**
