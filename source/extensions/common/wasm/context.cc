@@ -827,6 +827,12 @@ BufferInterface* Context::getBuffer(WasmBufferType type) {
           [&buffer_instance](::Envoy::Buffer::Instance& buffer) { buffer_instance = &buffer; });
       return buffer_.set(buffer_instance);
     }
+    if (request_headers_ != nullptr && end_of_stream_ &&
+        added_request_body_buffer_ == nullptr && decoder_callbacks_) {
+      // Allow plugin to add a request body in decodeHeaders.
+      added_request_body_buffer_ = std::make_unique<::Envoy::Buffer::OwnedImpl>();
+      request_body_buffer_ = added_request_body_buffer_.get();
+    }
     return buffer_.set(request_body_buffer_);
   case WasmBufferType::HttpResponseBody:
     if (buffering_response_body_ && encoder_callbacks_) {
@@ -835,6 +841,12 @@ BufferInterface* Context::getBuffer(WasmBufferType type) {
       encoder_callbacks_->modifyEncodingBuffer(
           [&buffer_instance](::Envoy::Buffer::Instance& buffer) { buffer_instance = &buffer; });
       return buffer_.set(buffer_instance);
+    }
+    if (response_headers_ != nullptr && end_of_stream_ &&
+        added_response_body_buffer_ == nullptr && encoder_callbacks_) {
+      // Allow plugin to add a response body in decodeHeaders.
+      added_response_body_buffer_ = std::make_unique<::Envoy::Buffer::OwnedImpl>();
+      response_body_buffer_ = added_response_body_buffer_.get();
     }
     return buffer_.set(response_body_buffer_);
   case WasmBufferType::NetworkDownstreamData:
@@ -1660,6 +1672,9 @@ Http::FilterHeadersStatus Context::decodeHeaders(Http::RequestHeaderMap& headers
   request_headers_ = &headers;
   end_of_stream_ = end_stream;
   auto result = convertFilterHeadersStatus(onRequestHeaders(headerSize(&headers), end_stream));
+  if (added_request_body_buffer_ != nullptr && decoder_callbacks_) {
+    decoder_callbacks_->addDecodedData(*added_request_body_buffer_, /*streaming_filter=*/true);
+  }
   if (result == Http::FilterHeadersStatus::Continue) {
     request_headers_ = nullptr;
   }
@@ -1743,6 +1758,9 @@ Http::FilterHeadersStatus Context::encodeHeaders(Http::ResponseHeaderMap& header
   response_headers_ = &headers;
   end_of_stream_ = end_stream;
   auto result = convertFilterHeadersStatus(onResponseHeaders(headerSize(&headers), end_stream));
+  if (added_response_body_buffer_ != nullptr && encoder_callbacks_) {
+    encoder_callbacks_->addEncodedData(*added_response_body_buffer_, /*streaming_filter=*/true);
+  }
   if (result == Http::FilterHeadersStatus::Continue) {
     response_headers_ = nullptr;
   }
