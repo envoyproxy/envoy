@@ -39,7 +39,7 @@ enum class StreamResetReason {
   OverloadManager,
   // If stream was locally reset due to HTTP/1 upstream half closing before downstream.
   Http1PrematureUpstreamHalfClose,
-  // If the stream was set with NO_ERROR.
+  // If the stream was reset with NO_ERROR.
   RemoteResetNoError,
 };
 

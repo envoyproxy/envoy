@@ -1807,7 +1807,7 @@ TEST_P(Http2CodecImplDeferredResetTest, LargeDataDeferredResetServerIfLocalEndSt
     EXPECT_CALL(*flush_timer, enableTimer(std::chrono::milliseconds(30000), _));
     response_encoder_->encodeData(body, true);
     EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
-    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset()).Times(2);
     EXPECT_CALL(*flush_timer, disableTimer());
     response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
   }));
@@ -1844,7 +1844,7 @@ TEST_P(Http2CodecImplDeferredResetTest, NoDeferredResetServerIfResetBeforeLocalE
     EXPECT_CALL(server_stream_callbacks_, onAboveWriteBufferHighWatermark()).Times(AnyNumber());
     response_encoder_->encodeData(body, false);
     EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::LocalReset, _));
-    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset()).Times(2);
     response_encoder_->getStream().resetStream(StreamResetReason::LocalReset);
   }));
   EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
@@ -2264,7 +2264,7 @@ TEST_P(Http2CodecImplFlowControlTest, TrailingHeadersLargeServerBodyFlushTimeout
   // Invoke a stream flush timeout. Make sure we don't get a reset locally for higher layers but
   // we do get a reset on the client.
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
-  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset()).Times(2);
   EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
   ENVOY_LOG_MISC(debug, "invoke callback");
   flush_timer->invokeCallback();
@@ -2312,7 +2312,7 @@ TEST_P(Http2CodecImplFlowControlTest, LargeServerBodyFlushTimeout) {
   // Invoke a stream flush timeout. Make sure we don't get a reset locally for higher layers but
   // we do get a reset on the client.
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
-  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset()).Times(2);
   EXPECT_CALL(client_stream_callbacks, onResetStream(StreamResetReason::RemoteReset, _));
   flush_timer->invokeCallback();
   driveToCompletion();
@@ -2493,7 +2493,7 @@ TEST_P(Http2CodecImplFlowControlTest, RstStreamOnPendingFlushTimeoutFlood) {
 
   EXPECT_FALSE(violation_callback->enabled_);
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
-  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+  EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset()).Times(2);
 
   // Pending flush timeout causes RST_STREAM to be sent and overflow the outbound frame queue.
   flush_timer->invokeCallback();
@@ -3761,10 +3761,10 @@ TEST_P(Http2CodecImplTest, ResetStreamCausesOutboundFlood) {
   EXPECT_NO_THROW(driveToCompletion());
 
   EXPECT_FALSE(violation_callback->enabled_);
-  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteReset, _));
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(StreamResetReason::RemoteResetNoError, _));
   EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
 
-  server_->getStream(1)->resetStream(StreamResetReason::RemoteReset);
+  server_->getStream(1)->resetStream(StreamResetReason::RemoteResetNoError);
 
   EXPECT_TRUE(violation_callback->enabled_);
   EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
