@@ -75,10 +75,9 @@ message SinkConfig {
   // ``envoy.extensions.matching.common_inputs.stats.v3.StatFullNameMatchInput`` and the only support action is
   // ``envoy.extensions.stat_sinks.open_telemetry.v3.SinkConfig.ConversionAction``.
   //
-  // If this field is set, the sink will attempt to aggregate all the metrics
-  // - for metrics with the same name and attributes, they will be aggregated
-  // into a single data point.
-  // - for metrics with the same name but different attributes, they will be
-  // aggregated into separate data points under the same metric.
+  // If set, the sink will aggregate metrics including the ones not defined in this field as follows:
+  // - Metrics with the same name and identical attributes are aggregated into a single data point.
+  // - Metrics with the same name but different attributes are grouped under the same metric,
+  //   with each unique attribute set producing a separate data point.
   xds.type.matcher.v3.Matcher custom_metric_conversions = 8;
 }
