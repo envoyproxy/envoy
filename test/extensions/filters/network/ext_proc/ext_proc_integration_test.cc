@@ -486,7 +486,7 @@ TEST_P(NetworkExtProcFilterIntegrationTest, TcpProxyUpstreamHalfCloseBothWays) {
 
   ProcessingRequest write_request;
   ASSERT_TRUE(processor_stream_->waitForGrpcMessage(*dispatcher_, write_request));
- 
+
   if (!write_request.write_data().end_of_stream()) {
     size_t total_upstream_data = 0;
     // We got partial data without end_of_stream
