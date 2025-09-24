@@ -70,7 +70,7 @@ public:
    * @param key Public key in PEM format
    * @return pointer to EVP_PKEY public key
    */
-  virtual PKeyObjectPtr importPublicKeyPEM(const std::vector<uint8_t>& key) PURE;
+  virtual PKeyObjectPtr importPublicKeyPEM(absl::string_view key) PURE;
 
   /**
    * Import public key from DER format.
@@ -84,7 +84,7 @@ public:
    * @param key Private key in PEM format
    * @return pointer to EVP_PKEY private key
    */
-  virtual PKeyObjectPtr importPrivateKeyPEM(const std::vector<uint8_t>& key) PURE;
+  virtual PKeyObjectPtr importPrivateKeyPEM(absl::string_view key) PURE;
 
   /**
    * Import private key from DER format.

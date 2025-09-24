@@ -113,7 +113,7 @@ absl::StatusOr<std::vector<uint8_t>> UtilityImpl::sign(absl::string_view hash, P
 namespace {
 // Template helper for importing keys with different formats and types
 template <typename KeyObjectType, typename ParseFunction>
-PKeyObjectPtr importKeyPEM(const std::vector<uint8_t>& key, ParseFunction parse_func) {
+PKeyObjectPtr importKeyPEM(absl::string_view key, ParseFunction parse_func) {
   // PEM format: Use PEM parsing which automatically handles both PKCS#1 and PKCS#8 formats
   bssl::UniquePtr<BIO> bio(BIO_new_mem_buf(key.data(), key.size()));
   if (!bio) {
@@ -130,7 +130,7 @@ PKeyObjectPtr importKeyDER(const std::vector<uint8_t>& key, ParseFunction parse_
 }
 } // namespace
 
-PKeyObjectPtr UtilityImpl::importPublicKeyPEM(const std::vector<uint8_t>& key) {
+PKeyObjectPtr UtilityImpl::importPublicKeyPEM(absl::string_view key) {
   return importKeyPEM<PKeyObject>(key, PEM_read_bio_PUBKEY);
 }
 
@@ -138,7 +138,7 @@ PKeyObjectPtr UtilityImpl::importPublicKeyDER(const std::vector<uint8_t>& key) {
   return importKeyDER<PKeyObject>(key, EVP_parse_public_key);
 }
 
-PKeyObjectPtr UtilityImpl::importPrivateKeyPEM(const std::vector<uint8_t>& key) {
+PKeyObjectPtr UtilityImpl::importPrivateKeyPEM(absl::string_view key) {
   return importKeyPEM<PKeyObject>(key, PEM_read_bio_PrivateKey);
 }
 

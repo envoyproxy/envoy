@@ -18,6 +18,52 @@ using proxy_wasm::RegisterForeignFunction;
 using proxy_wasm::WasmForeignFunction;
 
 namespace Envoy {
+
+namespace {
+// Helper function to import public key from either PEM or DER format
+Envoy::Common::Crypto::PKeyObjectPtr
+importPublicKey(Envoy::Common::Crypto::Utility& crypto_util,
+                const envoy::source::extensions::common::wasm::VerifySignatureArguments& args) {
+  bool has_pem = !args.public_key_pem().empty();
+  bool has_der = !args.public_key().empty();
+
+  if (has_pem && has_der) {
+    return nullptr; // Both PEM and DER keys provided
+  }
+
+  if (has_pem) {
+    return crypto_util.importPublicKeyPEM(args.public_key_pem());
+  } else if (has_der) {
+    auto key_str = args.public_key();
+    std::vector<uint8_t> key(key_str.begin(), key_str.end());
+    return crypto_util.importPublicKeyDER(key);
+  } else {
+    return nullptr; // No key provided
+  }
+}
+
+// Helper function to import private key from either PEM or DER format
+Envoy::Common::Crypto::PKeyObjectPtr
+importPrivateKey(Envoy::Common::Crypto::Utility& crypto_util,
+                 const envoy::source::extensions::common::wasm::SignArguments& args) {
+  bool has_pem = !args.private_key_pem().empty();
+  bool has_der = !args.private_key().empty();
+
+  if (has_pem && has_der) {
+    return nullptr; // Both PEM and DER keys provided
+  }
+
+  if (has_pem) {
+    return crypto_util.importPrivateKeyPEM(args.private_key_pem());
+  } else if (has_der) {
+    auto key_str = args.private_key();
+    std::vector<uint8_t> key(key_str.begin(), key_str.end());
+    return crypto_util.importPrivateKeyDER(key);
+  } else {
+    return nullptr; // No key provided
+  }
+}
+} // namespace
 namespace Extensions {
 namespace Common {
 namespace Wasm {
@@ -56,31 +102,10 @@ RegisterForeignFunction registerVerifySignatureForeignFunction(
         std::vector<uint8_t> signature(signature_str.begin(), signature_str.end());
         std::vector<uint8_t> text(text_str.begin(), text_str.end());
 
-        // Check which key format is provided (mutually exclusive)
-        bool has_pem = !args.public_key_pem().empty();
-        bool has_der = !args.public_key().empty();
-
-        if (has_pem && has_der) {
-          return WasmResult::BadArgument; // Both PEM and DER keys provided
-        }
-
-        std::vector<uint8_t> key;
-        if (has_pem) {
-          auto key_str = args.public_key_pem();
-          key.assign(key_str.begin(), key_str.end());
-        } else if (has_der) {
-          auto key_str = args.public_key();
-          key.assign(key_str.begin(), key_str.end());
-        } else {
-          return WasmResult::BadArgument; // No key provided
-        }
-
         auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-        Envoy::Common::Crypto::PKeyObjectPtr crypto_ptr;
-        if (has_pem) {
-          crypto_ptr = crypto_util.importPublicKeyPEM(key);
-        } else {
-          crypto_ptr = crypto_util.importPublicKeyDER(key);
+        auto crypto_ptr = importPublicKey(crypto_util, args);
+        if (!crypto_ptr) {
+          return WasmResult::BadArgument;
         }
 
         auto output = crypto_util.verifySignature(hash, *crypto_ptr, signature, text);
@@ -113,31 +138,10 @@ RegisterForeignFunction registerSignForeignFunction(
 
         std::vector<uint8_t> text(text_str.begin(), text_str.end());
 
-        // Check which key format is provided (mutually exclusive)
-        bool has_pem = !args.private_key_pem().empty();
-        bool has_der = !args.private_key().empty();
-
-        if (has_pem && has_der) {
-          return WasmResult::BadArgument; // Both PEM and DER keys provided
-        }
-
-        std::vector<uint8_t> key;
-        if (has_pem) {
-          auto key_str = args.private_key_pem();
-          key.assign(key_str.begin(), key_str.end());
-        } else if (has_der) {
-          auto key_str = args.private_key();
-          key.assign(key_str.begin(), key_str.end());
-        } else {
-          return WasmResult::BadArgument; // No key provided
-        }
-
         auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
-        Envoy::Common::Crypto::PKeyObjectPtr crypto_ptr;
-        if (has_pem) {
-          crypto_ptr = crypto_util.importPrivateKeyPEM(key);
-        } else {
-          crypto_ptr = crypto_util.importPrivateKeyDER(key);
+        auto crypto_ptr = importPrivateKey(crypto_util, args);
+        if (!crypto_ptr) {
+          return WasmResult::BadArgument;
         }
 
         auto output = crypto_util.sign(hash, *crypto_ptr, text);

@@ -22,9 +22,9 @@ public:
                                        const std::vector<uint8_t>& text) override;
   absl::StatusOr<std::vector<uint8_t>> sign(absl::string_view hash, PKeyObject& key,
                                             const std::vector<uint8_t>& text) override;
-  PKeyObjectPtr importPublicKeyPEM(const std::vector<uint8_t>& key) override;
+  PKeyObjectPtr importPublicKeyPEM(absl::string_view key) override;
   PKeyObjectPtr importPublicKeyDER(const std::vector<uint8_t>& key) override;
-  PKeyObjectPtr importPrivateKeyPEM(const std::vector<uint8_t>& key) override;
+  PKeyObjectPtr importPrivateKeyPEM(absl::string_view key) override;
   PKeyObjectPtr importPrivateKeyDER(const std::vector<uint8_t>& key) override;
 
 private:

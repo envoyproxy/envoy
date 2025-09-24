@@ -81,8 +81,7 @@ TEST(UtilityTest, TestImportPublicKey) {
                         "-----END PUBLIC KEY-----";
 
   Common::Crypto::PKeyObjectPtr pem_crypto_ptr(
-      Common::Crypto::UtilitySingleton::get().importPublicKeyPEM(
-          std::vector<uint8_t>(pem_key.begin(), pem_key.end())));
+      Common::Crypto::UtilitySingleton::get().importPublicKeyPEM(pem_key));
   EVP_PKEY* pem_pkey = pem_crypto_ptr->getEVP_PKEY();
   EXPECT_NE(nullptr, pem_pkey) << "PEM public key import failed";
 
@@ -137,8 +136,7 @@ TEST(UtilityTest, TestVerifySignature) {
   Common::Crypto::PKeyObject* der_crypto = der_crypto_ptr.get();
 
   Common::Crypto::PKeyObjectPtr pem_crypto_ptr(
-      Common::Crypto::UtilitySingleton::get().importPublicKeyPEM(
-          std::vector<uint8_t>(pem_key.begin(), pem_key.end())));
+      Common::Crypto::UtilitySingleton::get().importPublicKeyPEM(pem_key));
   Common::Crypto::PKeyObject* pem_crypto = pem_crypto_ptr.get();
 
   // Map of hash function names and their respective signatures
@@ -357,8 +355,7 @@ TEST(UtilityTest, TestSign) {
                                 "-----END PRIVATE KEY-----";
 
   Common::Crypto::PKeyObjectPtr pem_private_crypto_ptr(
-      Common::Crypto::UtilitySingleton::get().importPrivateKeyPEM(
-          std::vector<uint8_t>(pem_private_key.begin(), pem_private_key.end())));
+      Common::Crypto::UtilitySingleton::get().importPrivateKeyPEM(pem_private_key));
   Common::Crypto::PKeyObject* pem_private_crypto = pem_private_crypto_ptr.get();
 
   // Test signing with different hash functions
@@ -411,8 +408,7 @@ TEST(UtilityTest, TestSign) {
         "-----END PUBLIC KEY-----";
 
     Common::Crypto::PKeyObjectPtr pem_public_crypto_ptr(
-        Common::Crypto::UtilitySingleton::get().importPublicKeyPEM(
-            std::vector<uint8_t>(pem_public_key.begin(), pem_public_key.end())));
+        Common::Crypto::UtilitySingleton::get().importPublicKeyPEM(pem_public_key));
     Common::Crypto::PKeyObject* pem_public_crypto(pem_public_crypto_ptr.get());
 
     auto pem_verify_result =
@@ -557,8 +553,7 @@ TEST(UtilityTest, TestPEMParsingFailures) {
                                    "INVALID_BASE64_CONTENT_HERE\n"
                                    "-----END PUBLIC KEY-----";
 
-  auto crypto_ptr = UtilitySingleton::get().importPublicKeyDER(
-      std::vector<uint8_t>(invalid_pem_public.begin(), invalid_pem_public.end()));
+  auto crypto_ptr = UtilitySingleton::get().importPublicKeyPEM(invalid_pem_public);
   EVP_PKEY* pkey = crypto_ptr->getEVP_PKEY();
   EXPECT_EQ(nullptr, pkey) << "Invalid PEM public key should fail to parse";
 
@@ -567,8 +562,7 @@ TEST(UtilityTest, TestPEMParsingFailures) {
                                     "INVALID_BASE64_CONTENT_HERE\n"
                                     "-----END PRIVATE KEY-----";
 
-  auto private_crypto_ptr = UtilitySingleton::get().importPrivateKeyDER(
-      std::vector<uint8_t>(invalid_pem_private.begin(), invalid_pem_private.end()));
+  auto private_crypto_ptr = UtilitySingleton::get().importPrivateKeyPEM(invalid_pem_private);
   EVP_PKEY* private_pkey = private_crypto_ptr->getEVP_PKEY();
   EXPECT_EQ(nullptr, private_pkey) << "Invalid PEM private key should fail to parse";
 
@@ -642,8 +636,8 @@ TEST(UtilityTest, TestHelperFunctionsCoverage) {
   // Test helper functions directly to improve coverage
   auto impl = std::make_unique<UtilityImpl>();
 
-  // Test empty key vector (exercises BIO allocation with edge case)
-  std::vector<uint8_t> empty_key;
+  // Test empty key string (exercises BIO allocation with edge case)
+  std::string empty_key;
   auto empty_public_pem = impl->importPublicKeyPEM(empty_key);
   EXPECT_EQ(nullptr, empty_public_pem->getEVP_PKEY()) << "Empty PEM key should fail";
 
@@ -664,9 +658,8 @@ TEST(UtilityTest, TestImportKeyErrorPaths) {
   auto impl = std::make_unique<UtilityImpl>();
 
   // Test with null data pointer (edge case)
-  std::vector<uint8_t> null_data;
-  null_data.resize(100);
-  // This tests the BIO_new_mem_buf with empty data
+  std::string null_data(100, '\0'); // 100 null characters
+  // This tests the BIO_new_mem_buf with null data
   auto null_public_pem = impl->importPublicKeyPEM(null_data);
   EXPECT_EQ(nullptr, null_public_pem->getEVP_PKEY()) << "Null data should fail PEM import";
 
@@ -677,12 +670,11 @@ TEST(UtilityTest, TestImportKeyErrorPaths) {
   std::string malformed_pem = "-----BEGIN PUBLIC KEY-----\n"
                               "This is not valid base64 content\n"
                               "-----END PUBLIC KEY-----";
-  std::vector<uint8_t> malformed_bytes(malformed_pem.begin(), malformed_pem.end());
 
-  auto malformed_public = impl->importPublicKeyPEM(malformed_bytes);
+  auto malformed_public = impl->importPublicKeyPEM(malformed_pem);
   EXPECT_EQ(nullptr, malformed_public->getEVP_PKEY()) << "Malformed PEM should fail";
 
-  auto malformed_private = impl->importPrivateKeyPEM(malformed_bytes);
+  auto malformed_private = impl->importPrivateKeyPEM(malformed_pem);
   EXPECT_EQ(nullptr, malformed_private->getEVP_PKEY()) << "Malformed private PEM should fail";
 }
 
@@ -691,25 +683,26 @@ TEST(UtilityTest, TestEdgeCasesAndMissingCoverage) {
   auto impl = std::make_unique<UtilityImpl>();
 
   // Test with empty data
-  std::vector<uint8_t> empty;
+  std::string empty;
   auto empty_pem = impl->importPublicKeyPEM(empty);
   EXPECT_EQ(nullptr, empty_pem->getEVP_PKEY()) << "Empty PEM should fail";
 
-  auto empty_der = impl->importPublicKeyDER(empty);
+  std::vector<uint8_t> empty_vec;
+  auto empty_der = impl->importPublicKeyDER(empty_vec);
   EXPECT_EQ(nullptr, empty_der->getEVP_PKEY()) << "Empty DER should fail";
 
   // Test with single character
-  std::vector<uint8_t> single = {'A'};
+  std::string single = "A";
   auto single_pem = impl->importPublicKeyPEM(single);
   EXPECT_EQ(nullptr, single_pem->getEVP_PKEY()) << "Single char PEM should fail";
 
-  auto single_der = impl->importPublicKeyDER(single);
+  std::vector<uint8_t> single_vec = {'A'};
+  auto single_der = impl->importPublicKeyDER(single_vec);
   EXPECT_EQ(nullptr, single_der->getEVP_PKEY()) << "Single char DER should fail";
 
   // Test with invalid PEM format
   std::string invalid_pem = "-----BEGIN PUBLIC KEY-----CONTENT-----END PUBLIC KEY-----";
-  std::vector<uint8_t> invalid_pem_bytes(invalid_pem.begin(), invalid_pem.end());
-  auto invalid_pem_result = impl->importPublicKeyPEM(invalid_pem_bytes);
+  auto invalid_pem_result = impl->importPublicKeyPEM(invalid_pem);
   EXPECT_EQ(nullptr, invalid_pem_result->getEVP_PKEY()) << "Invalid PEM should fail";
 
   // Test with valid PEM format
@@ -722,8 +715,7 @@ TEST(UtilityTest, TestEdgeCasesAndMissingCoverage) {
                           "yLw3OKayGs/4FUBa+ijlGD9VDawZq88RRaf5ztmH22gOSiKcrHXe40fsnrzh/D27\n"
                           "uwIDAQAB\n"
                           "-----END PUBLIC KEY-----";
-  std::vector<uint8_t> valid_pem_bytes(valid_pem.begin(), valid_pem.end());
-  auto valid_pem_result = impl->importPublicKeyPEM(valid_pem_bytes);
+  auto valid_pem_result = impl->importPublicKeyPEM(valid_pem);
   EXPECT_NE(nullptr, valid_pem_result->getEVP_PKEY()) << "Valid PEM should succeed";
 
   // Test DER import functions with various invalid inputs
@@ -813,22 +805,19 @@ TEST(UtilityTest, TestPEMStringConversion) {
   std::string converted_back(pem_bytes.begin(), pem_bytes.end());
   EXPECT_EQ(pem_string, converted_back) << "String-to-bytes conversion should preserve content";
 
-  // Test that the converted bytes work with importPublicKeyPEM
-  auto crypto_ptr = UtilitySingleton::get().importPublicKeyPEM(pem_bytes);
-  EXPECT_NE(nullptr, crypto_ptr->getEVP_PKEY())
-      << "Converted PEM string should import successfully";
+  // Test that the PEM string works with importPublicKeyPEM
+  auto crypto_ptr = UtilitySingleton::get().importPublicKeyPEM(pem_string);
+  EXPECT_NE(nullptr, crypto_ptr->getEVP_PKEY()) << "PEM string should import successfully";
 
   // Test with empty string
   std::string empty_string;
-  std::vector<uint8_t> empty_bytes(empty_string.begin(), empty_string.end());
-  auto empty_crypto_ptr = UtilitySingleton::get().importPublicKeyPEM(empty_bytes);
+  auto empty_crypto_ptr = UtilitySingleton::get().importPublicKeyPEM(empty_string);
   auto empty_wrapper = empty_crypto_ptr.get();
   EXPECT_EQ(nullptr, empty_wrapper->getEVP_PKEY()) << "Empty string should fail import";
 
   // Test with string containing null characters
   std::string null_string = "test\0null\0chars";
-  std::vector<uint8_t> null_bytes(null_string.begin(), null_string.end());
-  auto null_crypto_ptr = UtilitySingleton::get().importPublicKeyPEM(null_bytes);
+  auto null_crypto_ptr = UtilitySingleton::get().importPublicKeyPEM(null_string);
   auto null_wrapper = null_crypto_ptr.get();
   EXPECT_EQ(nullptr, null_wrapper->getEVP_PKEY()) << "String with null chars should fail import";
 }
@@ -883,7 +872,7 @@ TEST(UtilityTest, TestSingletonInitialization) {
 TEST(UtilityTest, TestBIOAllocationFailure) {
   // Test with extremely large data that might cause BIO allocation issues
   // This exercises the BIO_new_mem_buf path in template functions
-  std::vector<uint8_t> huge_data(100000000, 'A'); // 100MB
+  std::string huge_data(100000000, 'A'); // 100MB
   auto result = UtilitySingleton::get().importPublicKeyPEM(huge_data);
   EXPECT_EQ(nullptr, result->getEVP_PKEY()) << "Huge invalid PEM should fail";
 
@@ -972,21 +961,19 @@ TEST(UtilityTest, TestOpenSSLInternalErrorPaths) {
   std::string malformed_pem = "-----BEGIN PUBLIC KEY-----\n"
                               "This is not valid base64 content at all\n"
                               "-----END PUBLIC KEY-----";
-  std::vector<uint8_t> malformed_bytes(malformed_pem.begin(), malformed_pem.end());
 
-  auto malformed_public = impl->importPublicKeyPEM(malformed_bytes);
+  auto malformed_public = impl->importPublicKeyPEM(malformed_pem);
   EXPECT_EQ(nullptr, malformed_public->getEVP_PKEY()) << "Malformed PEM should fail";
 
-  auto malformed_private = impl->importPrivateKeyPEM(malformed_bytes);
+  auto malformed_private = impl->importPrivateKeyPEM(malformed_pem);
   EXPECT_EQ(nullptr, malformed_private->getEVP_PKEY()) << "Malformed private PEM should fail";
 
   // Test with data that has PEM markers but corrupted content
   std::string corrupted_pem = "-----BEGIN PUBLIC KEY-----\n"
                               "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAINVALID_CONTENT_HERE\n"
                               "-----END PUBLIC KEY-----";
-  std::vector<uint8_t> corrupted_bytes(corrupted_pem.begin(), corrupted_pem.end());
 
-  auto corrupted_public = impl->importPublicKeyPEM(corrupted_bytes);
+  auto corrupted_public = impl->importPublicKeyPEM(corrupted_pem);
   EXPECT_EQ(nullptr, corrupted_public->getEVP_PKEY()) << "Corrupted PEM should fail";
 }
 
@@ -995,9 +982,7 @@ TEST(UtilityTest, TestOpenSSLInternalErrorPathsAdvanced) {
   auto impl = std::make_unique<UtilityImpl>();
 
   // Test with data that might cause BIO_new_mem_buf to fail or return null
-  std::vector<uint8_t> problematic_data;
-  problematic_data.resize(1000);
-  std::fill(problematic_data.begin(), problematic_data.end(), 0xFF);
+  std::string problematic_data(1000, '\xFF'); // 1000 bytes of 0xFF
 
   // Test PEM import with problematic data
   auto pem_result = impl->importPublicKeyPEM(problematic_data);
@@ -1007,10 +992,11 @@ TEST(UtilityTest, TestOpenSSLInternalErrorPathsAdvanced) {
   EXPECT_EQ(nullptr, private_pem_result->getEVP_PKEY()) << "Problematic private PEM should fail";
 
   // Test DER import with problematic data
-  auto der_result = impl->importPublicKeyDER(problematic_data);
+  std::vector<uint8_t> problematic_data_vec(1000, 0xFF);
+  auto der_result = impl->importPublicKeyDER(problematic_data_vec);
   EXPECT_EQ(nullptr, der_result->getEVP_PKEY()) << "Problematic DER data should fail";
 
-  auto private_der_result = impl->importPrivateKeyDER(problematic_data);
+  auto private_der_result = impl->importPrivateKeyDER(problematic_data_vec);
   EXPECT_EQ(nullptr, private_der_result->getEVP_PKEY()) << "Problematic private DER should fail";
 }
 
