@@ -87,15 +87,11 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   const bool escape = should_escape_;
   lock.Release();
 
-  auto log_to_sink = [this, msg_view, msg](SinkDelegate& sink) {
-    if (escape) {
-      sink.log(escapeLogLine(msg_view), msg);
-    } else {
-      sink.log(msg_view, msg);
-    }
-  };
-
-  log_to_sink(*sink_);
+  if (escape) {
+    sink_->log(escapeLogLine(msg_view), msg);
+  } else {
+    sink_->log(msg_view, msg);
+  }
 }
 
 std::string DelegatingLogSink::escapeLogLine(absl::string_view msg_view) {
