@@ -1200,10 +1200,9 @@ TEST_F(FilterTestExtractOk, ExtractSizeNonRepeatedField) {
   Envoy::Buffer::InstancePtr response_data = Envoy::Grpc::Common::serializeToGrpcFrame(response);
 
   EXPECT_CALL(mock_encoder_callbacks_.stream_info_, setDynamicMetadata(_, _))
-      .WillOnce(
-        [](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
-          EXPECT_EQ(ns, kFilterName);
-          checkProtoStruct(new_dynamic_metadata, R"pb(
+      .WillOnce([](const std::string& ns, const Envoy::Protobuf::Struct& new_dynamic_metadata) {
+        EXPECT_EQ(ns, kFilterName);
+        checkProtoStruct(new_dynamic_metadata, R"pb(
             fields {
               key: "responses"
               value {
@@ -1231,7 +1230,7 @@ TEST_F(FilterTestExtractOk, ExtractSizeNonRepeatedField) {
               }
             }
           )pb");
-        });
+      });
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data, true));
 }
 
