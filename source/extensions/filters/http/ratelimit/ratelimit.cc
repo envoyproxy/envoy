@@ -190,18 +190,22 @@ void Filter::onDestroy() {
   if (state_ == State::Calling) {
     state_ = State::Complete;
     client_->cancel();
-  } else if (client_ != nullptr &&
-             request_headers_ != nullptr) // If decodeHeaders is not called because of a local
-                                          // reply, we do not set request_headers_.
-  {
+  } else if (client_ != nullptr && request_headers_ != nullptr) {
     std::vector<Envoy::RateLimit::Descriptor> descriptors;
     populateRateLimitDescriptors(descriptors, *request_headers_, true);
     if (!descriptors.empty()) {
+      // If the limit() call fails directly then the callback and client will be destroyed
+      // when calling the limit() function. To make sure we can call the detach() function
+      // safely, we convert the client_ to a shared_ptr.
+
+      std::shared_ptr<Filters::Common::RateLimit::Client> shared_client = std::move(client_);
       // Since this filter is being destroyed, we need to keep the client alive until the request
       // is complete by leaking the client with OnStreamDoneCallBack.
-      auto callback = new OnStreamDoneCallBack(std::move(client_));
+      auto callback = new OnStreamDoneCallBack(shared_client);
       callback->client().limit(*callback, getDomain(), descriptors, Tracing::NullSpan::instance(),
-                               absl::nullopt, getHitAddend());
+                               callbacks_->streamInfo(), getHitAddend());
+      // If the limit() call fails directly then the detach() will be no-op.
+      shared_client->detach();
     }
   }
 }

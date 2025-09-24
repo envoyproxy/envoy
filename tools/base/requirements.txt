@@ -464,10 +464,11 @@ coloredlogs==15.0.1 \
     # via
     #   -r requirements.in
     #   aio-run-runner
-cryptography==44.0.1 \
-    --hash=sha256:436df4f203482f41aad60ed1813811ac4ab102765ecae7a2bbb1dbb66dcff5a7 \
-    --hash=sha256:72198e2b5925155497a5a3e8c216c7fb3e64c16ccee11f0e7da272fa93b35c4c \
-    --hash=sha256:a2d8a7045e1ab9b9f803f0d9531ead85f90c5f2859e653b61497228b18452008
+cryptography==46.0.1 \
+    --hash=sha256:0dfb7c88d4462a0cfdd0d87a3c245a7bc3feb59de101f6ff88194f740f72eda6 \
+    --hash=sha256:757af4f6341ce7a1e47c326ca2a81f41d236070217e5fbbad61bbfe299d55d28 \
+    --hash=sha256:e22801b61613ebdebf7deb18b507919e107547a1d39a3b57f5f855032dd7cfb8 \
+    --hash=sha256:f7a24ea78de345cfa7f6a8d3bde8b242c7fac27f2bd78fa23474ca38dfaeeab9
     # via
     #   -r requirements.in
     #   aioquic
@@ -701,9 +702,9 @@ gitdb==4.0.11 \
     --hash=sha256:81a3407ddd2ee8df444cbacea00e2d038e40150acfa3001696fe0dcf1d3adfa4 \
     --hash=sha256:bf5421126136d6d0af55bc1e7c1af1c397a34f5b7bd79e776cd3e89785c2b04b
     # via gitpython
-gitpython==3.1.44 \
-    --hash=sha256:9e0e10cda9bed1ee64bc9a6de50e7e38a9c9943241cd7f585f6df3ed28011110 \
-    --hash=sha256:c87e30b26253bf5418b01b0660f818967f3c503193838337fe5e573331249269
+gitpython==3.1.45 \
+    --hash=sha256:85b0ee964ceddf211c41b9f27a49086010a190fd8132a24e21f362a4b36a791c \
+    --hash=sha256:8908cb2e02fb3b93b7eb0f2827125cb699869470432cc885f019b8fd0fccff77
     # via -r requirements.in
 humanfriendly==10.0 \
     --hash=sha256:1697e1a8a8f550fd43c2865cd84542fc175a61dcb779b6fee18cf6b6ccba1477 \
