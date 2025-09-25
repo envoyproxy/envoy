@@ -148,8 +148,8 @@ The HTTP filter outputs statistics in the ``cluster.<route target cluster>.ext_a
   error, Counter, Total errors contacting the external service.
   denied, Counter, Total responses from the authorization service that denied the request.
   disabled, Counter, Total requests that were allowed without calling the external service because the filter is disabled.
-  failure_mode_allowed, Counter, Total error responses that were allowed through because :ref:`failure_mode_allow
-  <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.failure_mode_allow>` is set to ``true``.
+  failure_mode_allowed, Counter, "Total error responses that were allowed through because :ref:`failure_mode_allow
+  <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.ExtAuthz.failure_mode_allow>` is set to ``true``."
   invalid, Counter, Total responses rejected due to invalid header or query parameter mutations.
 
 Dynamic Metadata
