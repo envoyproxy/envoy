@@ -184,9 +184,9 @@ ServerContextConfigImpl::ServerContextConfigImpl(
               ValidationContextTypeCase::VALIDATION_CONTEXT_TYPE_NOT_SET) {
     ENVOY_LOG_MISC(
         warn,
-        "Using deprecated insecure default of not requiring client cert when a validation context is configured. "
-        "This default will be changed in a future version. Please explicitly configure a value for "
-        "require_client_certificate.");
+        "Using deprecated insecure default of not requiring client cert when a validation context "
+        "is configured. This default will be changed in a future version. Please explicitly "
+        "configure a value for require_client_certificate.");
     factory_context.serverFactoryContext().runtime().countDeprecatedFeatureUse();
   }
 
