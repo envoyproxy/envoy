@@ -40,7 +40,6 @@ envoy_cc_test(
         "//bazel:windows_x86_64": [],  # TODO: fix the windows ANTLR build
         "//conditions:default": [
             "//source/extensions/access_loggers/filters/cel:config",
-            "//source/extensions/access_loggers/filters/process_ratelimit:config",
         ],
     }),
 )

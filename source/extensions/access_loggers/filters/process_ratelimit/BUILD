@@ -24,10 +24,6 @@ envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    extra_visibility = [
-        "//test/common/access_log:__subpackages__",
-        "//test/integration:__subpackages__",
-    ],
     deps = [
         ":filter_lib",
         "//envoy/access_log:access_log_interface",
