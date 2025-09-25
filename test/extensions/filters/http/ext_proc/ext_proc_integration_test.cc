@@ -7,6 +7,7 @@
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/extensions/filters/http/set_metadata/v3/set_metadata.pb.h"
 #include "envoy/extensions/filters/http/upstream_codec/v3/upstream_codec.pb.h"
+#include "envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3/mapped_attribute_builder.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/type/v3/http_status.pb.h"
@@ -4535,6 +4536,53 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
                           return true;
                         });
 
+  verifyDownstreamResponse(*response, 200);
+}
+
+TEST_P(ExtProcIntegrationTest, MappedAttributeBuilder) {
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
+
+  envoy::extensions::http::ext_proc::processing_request_modifiers::mapped_attribute_builder::v3::
+      MappedAttributeBuilder builder;
+  auto* mapped_attributes = builder.mutable_mapped_request_attributes();
+  (*mapped_attributes)["remapped.method"] = "request.method";
+  auto* modifier_config = proto_config_.mutable_processing_request_modifier();
+  modifier_config->set_name("envoy.extensions.http.ext_proc.mapped_attribute_builder");
+  modifier_config->mutable_typed_config()->PackFrom(builder);
+
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  const std::string body_str = "Hello";
+  auto response = sendDownstreamRequestWithBody(body_str, absl::nullopt);
+
+  // Handle request headers message.
+  processGenericMessage(
+      *grpc_upstreams_[0], true, [](const ProcessingRequest& req, ProcessingResponse& resp) {
+        // Add something to the response so the message isn't seen as spurious
+        envoy::service::ext_proc::v3::HeadersResponse headers_resp;
+        *(resp.mutable_request_headers()) = headers_resp;
+
+        EXPECT_TRUE(req.has_request_headers());
+        EXPECT_EQ(req.attributes().size(), 1);
+        auto proto_struct = req.attributes().at("envoy.filters.http.ext_proc");
+        EXPECT_EQ(proto_struct.fields().at("remapped.method").string_value(), "POST");
+        // Make sure we did not include anything else
+        EXPECT_EQ(proto_struct.fields().size(), 1);
+        return true;
+      });
+
+  // Handle body message, making sure we did not send request attributes again.
+  processGenericMessage(*grpc_upstreams_[0], false,
+                        [](const ProcessingRequest& req, ProcessingResponse&) {
+                          EXPECT_TRUE(req.has_request_body());
+                          EXPECT_EQ(req.request_body().body(), body_str);
+                          EXPECT_EQ(req.attributes().size(), 0);
+                          return true;
+                        });
+
+  handleUpstreamRequest();
   verifyDownstreamResponse(*response, 200);
 }
 #endif

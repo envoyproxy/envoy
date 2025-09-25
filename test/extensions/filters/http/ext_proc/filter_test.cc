@@ -823,57 +823,6 @@ TEST_F(HttpFilterTest, PostAndChangeHeaders) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
-TEST_F(HttpFilterTest, SendAttributes) {
-  initialize(R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: "ext_proc_server"
-  request_attributes: ["request.path"]
-  response_attributes: ["response.code"]
-  )EOF");
-
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-
-  // The important part of this test is to check the contents of "last_request_"
-  // which is captured when the filter sends the request to the mock client.
-  // The response from the processor doesn't matter here.
-  EXPECT_TRUE(last_request_.has_request_headers());
-  EXPECT_GT(last_request_.attributes_size(), 0);
-  const auto& req_attributes = last_request_.attributes();
-  EXPECT_EQ(1, req_attributes.size());
-  EXPECT_TRUE(req_attributes.contains("envoy.filters.http.ext_proc"));
-  const auto& req_filter_attributes = req_attributes.at("envoy.filters.http.ext_proc");
-  EXPECT_EQ(1, req_filter_attributes.fields_size());
-  EXPECT_TRUE(req_filter_attributes.fields().contains("request.path"));
-  EXPECT_EQ("/", req_filter_attributes.fields().at("request.path").string_value());
-  processRequestHeaders(false, absl::nullopt);
-
-  // Let the rest of the request play out
-  Buffer::OwnedImpl req_data("foo");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-
-  response_headers_.addCopy(LowerCaseString(":status"), "200");
-  EXPECT_CALL(stream_info_, responseCode()).WillRepeatedly(Return(200));
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-
-  EXPECT_TRUE(last_request_.has_response_headers());
-  EXPECT_GT(last_request_.attributes_size(), 0);
-  const auto& resp_attributes = last_request_.attributes();
-  EXPECT_EQ(1, resp_attributes.size());
-  EXPECT_TRUE(resp_attributes.contains("envoy.filters.http.ext_proc"));
-  const auto& resp_filter_attributes = resp_attributes.at("envoy.filters.http.ext_proc");
-  EXPECT_EQ(1, resp_filter_attributes.fields_size());
-  EXPECT_TRUE(resp_filter_attributes.fields().contains("response.code"));
-  EXPECT_EQ(200, resp_filter_attributes.fields().at("response.code").number_value());
-  processResponseHeaders(false, absl::nullopt);
-
-  Buffer::OwnedImpl resp_data("bar");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, true));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
-  filter_->onDestroy();
-}
-
 TEST_F(HttpFilterTest, ProcessingRequestModifier) {
   TestProcessingRequestModifierFactory factory;
   Registry::InjectFactory<ProcessingRequestModifierFactory> registration(factory);
@@ -885,23 +834,72 @@ TEST_F(HttpFilterTest, ProcessingRequestModifier) {
   processing_request_modifier:
     name: "test_processing_request_modifier"
     typed_config:
-      "@type": "type.googleapis.com/google.protobuf.Empty"
+      "@type": "type.googleapis.com/google.protobuf.Struct"
   )EOF");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  // Check that our custom attribute builder was used
-  EXPECT_TRUE(last_request_.has_request_headers());
-  const auto& headers = last_request_.request_headers().headers();
-  bool found = false;
-  for (const auto& header : headers.headers()) {
-    if (header.key() == "x-test-request-modifier") {
-      found = true;
-      break;
-    }
-  }
-  EXPECT_TRUE(found);
 
-  processRequestHeaders(false, absl::nullopt);
+  // Check that our custom attribute builder was used
+  processRequestHeaders(false,
+                        [](const HttpHeaders& header_req, ProcessingResponse&, HeadersResponse&) {
+                          EXPECT_FALSE(header_req.end_of_stream());
+                          TestRequestHeaderMapImpl expected{{":path", "/"},
+                                                            {":method", "POST"},
+                                                            {":scheme", "http"},
+                                                            {":authority", "host"},
+                                                            {"x-test-request-modifier", ""}};
+                          EXPECT_THAT(header_req.headers(), HeaderProtosEqual(expected));
+                        });
+
+  // Let the rest of the request play out
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+
+  Buffer::OwnedImpl resp_data("bar");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, ProcessingRequestModifierOverrides) {
+  TestProcessingRequestModifierFactory factory;
+  Registry::InjectFactory<ProcessingRequestModifierFactory> registration(factory);
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  ExtProcPerRoute route_proto;
+  Envoy::Protobuf::Struct empty;
+  auto* modifier_config = route_proto.mutable_overrides()->mutable_processing_request_modifier();
+  modifier_config->set_name("test_processing_request_modifier");
+  modifier_config->mutable_typed_config()->PackFrom(empty);
+
+  FilterConfigPerRoute route_config(route_proto, builder_, factory_context_);
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+      .WillRepeatedly(
+          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  // Check that our custom attribute builder was used
+  processRequestHeaders(false,
+                        [](const HttpHeaders& header_req, ProcessingResponse&, HeadersResponse&) {
+                          EXPECT_FALSE(header_req.end_of_stream());
+                          TestRequestHeaderMapImpl expected{{":path", "/"},
+                                                            {":method", "POST"},
+                                                            {":scheme", "http"},
+                                                            {":authority", "host"},
+                                                            {"x-test-request-modifier", ""}};
+                          EXPECT_THAT(header_req.headers(), HeaderProtosEqual(expected));
+                        });
 
   // Let the rest of the request play out
   Buffer::OwnedImpl req_data("foo");

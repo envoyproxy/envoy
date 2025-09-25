@@ -23,6 +23,10 @@ MappedAttributeBuilderFactory::createProcessingRequestModifier(
   return std::make_unique<MappedAttributeBuilder>(proto_config, builder, context);
 }
 
+REGISTER_FACTORY(
+    MappedAttributeBuilderFactory,
+    Envoy::Extensions::HttpFilters::ExternalProcessing::ProcessingRequestModifierFactory);
+
 } // namespace ExternalProcessing
 } // namespace Http
 } // namespace Envoy

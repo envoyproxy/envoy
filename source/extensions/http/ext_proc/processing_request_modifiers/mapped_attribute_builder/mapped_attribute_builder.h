@@ -17,6 +17,10 @@ namespace Envoy {
 namespace Http {
 namespace ExternalProcessing {
 
+// Provides an alternative way of constructing request attributes. Internally, it uses CEL
+// evaluation. The difference is it allows for a custom keys, unlike the base implementation.
+// Assumes that all Params are populated. Attributes are only passed once per the lifetime of
+// this object, in line with the original impl.
 class MappedAttributeBuilder
     : public Envoy::Extensions::HttpFilters::ExternalProcessing::ProcessingRequestModifier {
 public:

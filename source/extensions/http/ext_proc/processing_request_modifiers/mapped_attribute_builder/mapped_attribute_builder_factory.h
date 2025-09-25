@@ -29,7 +29,9 @@ public:
             mapped_attribute_builder::v3::MappedAttributeBuilder()};
   }
 
-  std::string name() const override { return "mapped_attribute_builder"; }
+  std::string name() const override {
+    return "envoy.extensions.http.ext_proc.mapped_attribute_builder";
+  }
 };
 
 } // namespace ExternalProcessing
