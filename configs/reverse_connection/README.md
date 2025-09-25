@@ -1,63 +1,196 @@
-# Running the Sandbox for reverse connections
+# Reverse Tunnels
 
-## Steps to run sandbox
+Reverse tunnels enable establishing persistent connections from downstream Envoy instances to upstream Envoy instances without requiring the upstream to be directly reachable from the downstream. This is particularly useful when downstream instances are behind NATs, firewalls, or in private networks.
 
-1. Build envoy with reverse connections feature:
-   - ```./ci/run_envoy_docker.sh './ci/do_ci.sh bazel.release.server_only'```
-2. Build envoy docker image:
-   - ```docker build -f ci/Dockerfile-envoy-image -t envoy:latest .```
-3. Launch test containers.
-   - ```docker-compose -f configs/reverse_connection/docker-compose.yaml up```
+## Configuration files
 
-   **Note**: The docker-compose maps the following ports:
-   - **on-prem-envoy**: Host port 9000 → Container port 9000 (reverse connection API)
-   - **cloud-envoy**: Host port 9001 → Container port 9000 (reverse connection API)
+- [`initiator-envoy.yaml`](initiator-envoy.yaml): Configuration for the initiator Envoy (downstream)
+- [`responder-envoy.yaml`](responder-envoy.yaml): Configuration for the responder Envoy (upstream)
 
-4. The reverse example configuration in onprem-envoy.yaml initiates reverse connections to cloud envoy using a custom address resolver. The configuration includes:
+## Initiator configuration (downstream Envoy)
 
-    ```yaml    
-    # Bootstrap extension for reverse tunnel functionality
+The initiator Envoy requires the following configuration components:
+
+### Bootstrap extension for socket interface
+
+```yaml   
     bootstrap_extensions:
     - name: envoy.bootstrap.reverse_tunnel.downstream_socket_interface
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface
         stat_prefix: "downstream_reverse_connection"
-    
-    # Reverse connection listener with custom address format
+```
+
+This extension enables the initiator to initiate and manage reverse tunnels to the responder Envoy.
+
+### Reverse tunnel listener
+
+The reverse tunnel listener triggers the reverse connection initiation to the upstream Envoy instance and encodes identity metadata for the local Envoy. It also contains the route configuration for downstream services reachable via reverse tunnels.
+
+```yaml
     - name: reverse_conn_listener
+  listener_filters_timeout: 0s
+  listener_filters:
       address:
         socket_address:
           # Format: rc://src_node_id:src_cluster_id:src_tenant_id@remote_cluster:connection_count
-          address: "rc://on-prem-node:on-prem:on-prem@cloud:1"
+      address: "rc://downstream-node:downstream-cluster:downstream-tenant@upstream-cluster:1"
           port_value: 0
+      # Use custom resolver that can parse reverse connection metadata
           resolver_name: "envoy.resolvers.reverse_connection"
-    ```
+  filter_chains:
+    - filters:
+        - name: envoy.filters.network.http_connection_manager
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+            stat_prefix: reverse_conn_listener
+            route_config:
+              virtual_hosts:
+                - name: backend
+                  domains:
+                    - "*"
+                  routes:
+                    - match:
+                        prefix: '/downstream_service'
+                      route:
+                        cluster: downstream-service
+            http_filters:
+              - name: envoy.filters.http.router
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+```
 
-5. Verify that the reverse connections are established by sending requests to the reverse conn API:
-   On on-prem envoy, the expected output is a list of envoy clusters to which reverse connections have been
-   established, in this instance, just "cloud".
+The special `rc://` address format encodes:
+- `src_node_id`: "downstream-node" - Unique identifier for this downstream node
+- `src_cluster_id`: "downstream-cluster" - Cluster name of the downstream Envoy
+- `src_tenant_id`: "downstream-tenant" - Tenant identifier
+- `remote_cluster`: "upstream-cluster" - Name of the upstream cluster to connect to
+- `connection_count`: "1" - Number of reverse connections to establish
 
-    ```bash
-    [basundhara.c@basundhara-c ~]$ curl localhost:9000/reverse_connections               
-    {"accepted":[],"connected":["cloud"]} 
-    ``` 
-   On cloud-envoy, the expected output is a list on nodes that have initiated reverse connections to it,
-   in this case, "on-prem-node".
-   
-   ```bash
-    [basundhara.c@basundhara-c ~]$ curl localhost:9001/reverse_connections                  
-    {"accepted":["on-prem-node"],"connected":[]}
-   ``` 
+### Upstream Cluster
 
-6. Test reverse connection:
-   - Perform http request for the service behind on-prem envoy, to cloud-envoy. This request will be sent
-   over a reverse connection.
+The upstream cluster configuration defines where reverse tunnels should be initiated:
 
-    ```bash
-    [basundhara.c@basundhara-c ~]$ curl -H "x-remote-node-id: on-prem-node" -H "x-dst-cluster-uuid: on-prem" http://localhost:8081/on_prem_service  
-    Server address: 172.21.0.3:80
-    Server name: 281282e5b496
-    Date: 26/Nov/2024:04:04:03 +0000
-    URI: /on_prem_service
-    Request ID: 726030e25e52db44a6c06061c4206a53
-    ``` 
+```yaml
+- name: upstream-cluster
+  type: STRICT_DNS
+  connect_timeout: 30s
+  load_assignment:
+    cluster_name: upstream-cluster
+    endpoints:
+    - lb_endpoints:
+      - endpoint:
+          address:
+            socket_address:
+              address: upstream-envoy  # Responder Envoy address
+              port_value: 9000         # Port where responder listens for reverse tunnel requests
+```
+
+### Downstream Service for Reverse Tunnel Data
+
+The downstream service represents the service behind the initiator Envoy that should be reachable via reverse tunnels:
+
+```yaml
+- name: downstream-service
+  type: STRICT_DNS
+  connect_timeout: 30s
+  load_assignment:
+    cluster_name: downstream-service
+    endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: downstream-service
+                port_value: 80
+```
+
+## Responder configuration (upstream Envoy)
+
+The responder Envoy requires the following configuration components:
+
+### Bootstrap extension for socket interface
+
+```yaml
+bootstrap_extensions:
+- name: envoy.bootstrap.reverse_tunnel.upstream_socket_interface
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface
+    stat_prefix: "upstream_reverse_connection"
+```
+
+This extension enables the responder to accept and manage reverse connections from initiator Envoys.
+
+### Reverse tunnel filter and listener
+
+```yaml
+- name: rev_conn_api_listener
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 9000  # Port where initiator will connect for tunnel establishment
+  filter_chains:
+    - filters:
+        - name: envoy.filters.network.reverse_tunnel
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.network.reverse_tunnel.v3.ReverseTunnel
+            ping_interval: 2s
+```
+
+The `envoy.filters.network.reverse_tunnel` network filter handles the reverse tunnel handshake protocol and connection acceptance.
+
+### Reverse connection cluster
+
+Each downstream node reachable from upstream Envoy via reverse connections needs to be configured with a reverse connection cluster. When a data request arrives at the upstream Envoy, this cluster uses cached "reverse connections" instead of creating new forward connections.
+
+```yaml
+- name: reverse_connection_cluster
+  connect_timeout: 200s
+  lb_policy: CLUSTER_PROVIDED
+  cluster_type:
+    name: envoy.clusters.reverse_connection
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+      http_header_names:
+        - x-remote-node-id     # Should be set to "downstream-node"
+        - x-dst-cluster-uuid   # Should be set to "downstream-cluster"
+  typed_extension_protocol_options:
+    envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+      "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+      explicit_http_config:
+        http2_protocol_options: {}  # HTTP/2 required for reverse connections
+```
+
+### Egress listener for data traffic
+
+The egress listener receives data traffic on the upstream Envoy and routes it to the reverse connection cluster:
+
+```yaml
+- name: egress_listener
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 8085  # Port for sending requests to initiator services
+  filter_chains:
+    - filters:
+        - name: envoy.http_connection_manager
+          typed_config:
+            route_config:
+              virtual_hosts:
+                - name: backend
+                  domains: ["*"]
+                  routes:
+                    - match:
+                        prefix: "/downstream_service"
+                      route:
+                        cluster: reverse_connection_cluster  # Routes to initiator via reverse tunnel
+```
+
+This is the egress listener that receives data traffic on upstream envoy and routes it to the reverse connection cluster.
+
+## How It Works
+
+1. **Tunnel Establishment**: The initiator Envoy establishes reverse tunnels to the responder Envoy on port 9000.
+2. **Service Access**: When a request comes to the responder's egress listener (port 8085) for `/downstream_service`, it's routed through to the reverse connection cluster. Instead of creating forward connections to downstream-envoy, a cached "reverse connection" is picked and the data request is routed through it.
+3. **Header-Based Routing**: The reverse connection cluster uses `x-remote-node-id` and `x-dst-cluster-uuid` headers to identify which cached reverse connection to use.
+4. **Service Response**: The request travels through the reverse tunnel to the initiator, gets routed to the local service, and the response travels back through the same tunnel.
