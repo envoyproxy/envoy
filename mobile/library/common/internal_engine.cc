@@ -83,8 +83,7 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
                                std::unique_ptr<EnvoyEventTracker> event_tracker,
                                absl::optional<int> thread_priority,
                                bool disable_dns_refresh_on_network_change,
-                               Thread::PosixThreadFactoryPtr thread_factory,
-                               bool enable_logger)
+                               Thread::PosixThreadFactoryPtr thread_factory, bool enable_logger)
     : thread_factory_(std::move(thread_factory)), callbacks_(std::move(callbacks)),
       logger_(std::move(logger)), event_tracker_(std::move(event_tracker)),
       thread_priority_(thread_priority),
@@ -100,12 +99,10 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
                                std::unique_ptr<EnvoyLogger> logger,
                                std::unique_ptr<EnvoyEventTracker> event_tracker,
                                absl::optional<int> thread_priority,
-                               bool disable_dns_refresh_on_network_change,
-                               bool enable_logger)
+                               bool disable_dns_refresh_on_network_change, bool enable_logger)
     : InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker),
                      thread_priority, disable_dns_refresh_on_network_change,
-                     Thread::PosixThreadFactory::create(),
-                     enable_logger) {}
+                     Thread::PosixThreadFactory::create(), enable_logger) {}
 
 envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
 

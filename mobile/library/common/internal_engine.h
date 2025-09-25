@@ -34,8 +34,7 @@ public:
   InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
                  std::unique_ptr<EnvoyEventTracker> event_tracker,
                  absl::optional<int> thread_priority = absl::nullopt,
-                 bool disable_dns_refresh_on_network_change = false,
-                 bool enable_logger = true);
+                 bool disable_dns_refresh_on_network_change = false, bool enable_logger = true);
 
   /**
    * InternalEngine destructor.
@@ -210,8 +209,7 @@ private:
   InternalEngine(std::unique_ptr<EngineCallbacks> callbacks, std::unique_ptr<EnvoyLogger> logger,
                  std::unique_ptr<EnvoyEventTracker> event_tracker,
                  absl::optional<int> thread_priority, bool disable_dns_refresh_on_network_change,
-                 Thread::PosixThreadFactoryPtr thread_factory,
-                 bool enable_logger = true);
+                 Thread::PosixThreadFactoryPtr thread_factory, bool enable_logger = true);
 
   envoy_status_t main(std::shared_ptr<OptionsImplBase> options);
   static void logInterfaces(absl::string_view event,
