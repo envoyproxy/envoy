@@ -2,7 +2,6 @@
 
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/grpc_service.pb.h"
-#include "envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3/mapped_attribute_builder.pb.h"
 #include "envoy/extensions/http/ext_proc/response_processors/save_processing_response/v3/save_processing_response.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/connection.h"
@@ -18,14 +17,13 @@
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
 #include "source/extensions/filters/http/ext_proc/processing_request_modifier.h"
-#include "source/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/mapped_attribute_builder.h"
-#include "source/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/mapped_attribute_builder_factory.h"
 #include "source/extensions/http/ext_proc/response_processors/save_processing_response/save_processing_response.h"
 #include "source/extensions/http/ext_proc/response_processors/save_processing_response/save_processing_response_factory.h"
 
 #include "test/common/http/common.h"
 #include "test/common/http/conn_manager_impl_test_base.h"
 #include "test/extensions/filters/http/ext_proc/mock_server.h"
+#include "test/extensions/filters/http/ext_proc/test_processing_request_modifier.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -80,7 +78,6 @@ using ::Envoy::Http::TestRequestHeaderMapImpl;
 using ::Envoy::Http::TestRequestTrailerMapImpl;
 using ::Envoy::Http::TestResponseHeaderMapImpl;
 using ::Envoy::Http::TestResponseTrailerMapImpl;
-using ::Envoy::Http::ExternalProcessing::MappedAttributeBuilderFactory;
 using ::Envoy::Http::ExternalProcessing::SaveProcessingResponseFactory;
 using ::Envoy::Http::ExternalProcessing::SaveProcessingResponseFilterState;
 
@@ -877,8 +874,8 @@ TEST_F(HttpFilterTest, SendAttributes) {
   filter_->onDestroy();
 }
 
-TEST_F(HttpFilterTest, MappedAttributeBuilder) {
-  MappedAttributeBuilderFactory factory;
+TEST_F(HttpFilterTest, ProcessingRequestModifier) {
+  TestProcessingRequestModifierFactory factory;
   Registry::InjectFactory<ProcessingRequestModifierFactory> registration(factory);
 
   initialize(R"EOF(
@@ -886,93 +883,23 @@ TEST_F(HttpFilterTest, MappedAttributeBuilder) {
     envoy_grpc:
       cluster_name: "ext_proc_server"
   processing_request_modifier:
-    name: "mapped_attribute_builder"
+    name: "test_processing_request_modifier"
     typed_config:
-      '@type': type.googleapis.com/envoy.extensions.http.ext_proc.processing_request_modifiers.mapped_attribute_builder.v3.MappedAttributeBuilder
-      mapped_request_attributes:
-        "remapped.path": "request.path"
-        "remapped.uri": "request.path"
-        "remapped.method": "request.method"
-        "remapped.foo": "request.foo"
+      "@type": "type.googleapis.com/google.protobuf.Empty"
   )EOF");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
   // Check that our custom attribute builder was used
   EXPECT_TRUE(last_request_.has_request_headers());
-  const auto& attributes = last_request_.attributes();
-  EXPECT_EQ(1, attributes.size());
-  EXPECT_TRUE(attributes.contains("envoy.filters.http.ext_proc"));
-  const auto& filter_attributes = attributes.at("envoy.filters.http.ext_proc");
-  EXPECT_EQ(3, filter_attributes.fields_size());
-  EXPECT_TRUE(filter_attributes.fields().contains("remapped.path"));
-  EXPECT_EQ("/", filter_attributes.fields().at("remapped.path").string_value());
-  EXPECT_TRUE(filter_attributes.fields().contains("remapped.uri"));
-  EXPECT_EQ("/", filter_attributes.fields().at("remapped.uri").string_value());
-  EXPECT_TRUE(filter_attributes.fields().contains("remapped.method"));
-  EXPECT_EQ("POST", filter_attributes.fields().at("remapped.method").string_value());
-
-  processRequestHeaders(false, absl::nullopt);
-
-  // Let the rest of the request play out
-  Buffer::OwnedImpl req_data("foo");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
-
-  response_headers_.addCopy(LowerCaseString(":status"), "200");
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
-  processResponseHeaders(false, absl::nullopt);
-
-  Buffer::OwnedImpl resp_data("bar");
-  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, true));
-  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
-  filter_->onDestroy();
-}
-
-TEST_F(HttpFilterTest, MappedAttributeBuilderOverride) {
-  MappedAttributeBuilderFactory factory;
-  Registry::InjectFactory<ProcessingRequestModifierFactory> registration(factory);
-
-  initialize(R"EOF(
-  grpc_service:
-    envoy_grpc:
-      cluster_name: "ext_proc_server"
-  processing_request_modifier:
-    name: "mapped_attribute_builder"
-    typed_config:
-      '@type': type.googleapis.com/envoy.extensions.http.ext_proc.processing_request_modifiers.mapped_attribute_builder.v3.MappedAttributeBuilder
-      mapped_request_attributes:
-        "remapped.path": "request.path"
-        "remapped.uri": "request.path"
-        "remapped.method": "request.method"
-  )EOF");
-
-  ExtProcPerRoute override_cfg;
-  const std::string override_yaml = R"EOF(
-  overrides:
-    processing_request_modifier:
-      name: "mapped_attribute_builder"
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.http.ext_proc.processing_request_modifiers.mapped_attribute_builder.v3.MappedAttributeBuilder
-        mapped_request_attributes:
-          "foo.bar": "request.path"
-  )EOF";
-  TestUtility::loadFromYaml(override_yaml, override_cfg);
-  FilterConfigPerRoute route_config(override_cfg, builder_, factory_context_);
-
-  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
-      .WillOnce(
-          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
-
-  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  // Check that our custom attribute builder was used
-  EXPECT_TRUE(last_request_.has_request_headers());
-  const auto& attributes = last_request_.attributes();
-  EXPECT_EQ(1, attributes.size());
-  EXPECT_TRUE(attributes.contains("envoy.filters.http.ext_proc"));
-  const auto& filter_attributes = attributes.at("envoy.filters.http.ext_proc");
-  EXPECT_EQ(1, filter_attributes.fields_size());
-  EXPECT_TRUE(filter_attributes.fields().contains("foo.bar"));
-  EXPECT_EQ("/", filter_attributes.fields().at("foo.bar").string_value());
+  const auto& headers = last_request_.request_headers().headers();
+  bool found = false;
+  for (const auto& header : headers.headers()) {
+    if (header.key() == "x-test-request-modifier") {
+      found = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found);
 
   processRequestHeaders(false, absl::nullopt);
 

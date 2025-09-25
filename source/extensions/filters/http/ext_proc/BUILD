@@ -121,6 +121,7 @@ envoy_cc_library(
     hdrs = ["processing_request_modifier.h"],
     tags = ["skip_on_windows"],
     deps = [
+        ":matching_utils_lib",
         "//envoy/config:typed_config_interface",
         "//envoy/server:factory_context_interface",
         "//source/common/protobuf",
