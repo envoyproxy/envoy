@@ -3,6 +3,7 @@ load("@envoy_repo//:path.bzl", "PATH")
 load("@rules_python//python:defs.bzl", "py_binary")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
 load("//tools/base:envoy_python.bzl", "envoy_genjson", "envoy_pytool_binary")
 load("//tools/python:namespace.bzl", "envoy_py_namespace")
 
@@ -33,7 +34,10 @@ envoy_genjson(
         "-L",
         "tools/dependency",
     ],
-    data = [":cve_utils.jq"],
+    data = [
+        ":cve_utils.jq",
+        ":version.jq",
+    ],
     filter = """
     import "cve_utils" as Utils;
     .[0] as $deps
@@ -139,4 +143,94 @@ sh_binary(
         # NOTE: usage of PATH means this _must_ be run locally
         "CVE_DATA_PATH": "%s/tools/dependency/cve_data" % PATH,
     },
+)
+
+envoy_genjson(
+    name = "ignored-cves",
+    filter = """
+    .[0].ignored_cves
+    """,
+    visibility = ["//visibility:public"],
+    yaml_srcs = [":cve.yaml"],
+)
+
+filegroup(
+    name = "cve-data",
+    srcs = glob(["cve_data/*.json"]),
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "cves",
+    srcs = ["cves.sh"],
+    data = [
+        ":cpe-dependencies",
+        ":cve-data",
+        ":cve_matcher.jq",
+        ":cve_utils.jq",
+        ":ignored-cves.json",
+        ":version.jq",
+        "@jq_toolchains//:resolved_toolchain",
+    ],
+    env = {
+        "JQ_BIN": "$(JQ_BIN)",
+        "CPE_DEPS": "$(location :cpe-dependencies)",
+        "JQ_CVE_UTILS": "$(location :cve_utils.jq)",
+        "JQ_CVE_MATCHER": "$(location :cve_matcher.jq)",
+        "JQ_VERSION_UTILS": "$(location :version.jq)",
+        "CVES_IGNORED": "$(location :ignored-cves.json)",
+        "CVES": "$(locations :cve-data)",
+    },
+    toolchains = ["@jq_toolchains//:resolved_toolchain"],
+)
+
+genrule(
+    name = "cves-scanned",
+    outs = ["scanned.json"],
+    cmd = """
+    export JQ_BIN="$(JQ_BIN)"
+    export CPE_DEPS="$(location :cpe-dependencies)"
+    export JQ_CVE_UTILS="$(location :cve_utils.jq)"
+    export JQ_CVE_MATCHER="$(location :cve_matcher.jq)"
+    export JQ_VERSION_UTILS="$(location :version.jq)"
+    export CVES_IGNORED="$(location :ignored-cves.json)"
+    export CVES="$(locations :cve-data)"
+    $(location :cves) \
+      > $@ || :
+    """,
+    tags = ["no-remote-exec"],
+    toolchains = ["@jq_toolchains//:resolved_toolchain"],
+    tools = [
+        ":cpe-dependencies",
+        ":cve-data",
+        ":cve_matcher.jq",
+        ":cve_utils.jq",
+        ":cves",
+        ":ignored-cves.json",
+        ":version.jq",
+        "@jq_toolchains//:resolved_toolchain",
+    ],
+)
+
+sh_test(
+    name = "cve_test",
+    srcs = [":cve_test.sh"],
+    args = ["$(location :cves-scanned)"],
+    data = [
+        ":ansi.jq",
+        ":cve_report.jq",
+        ":cve_utils.jq",
+        ":cves-scanned",
+        ":version.jq",
+        "@jq_toolchains//:resolved_toolchain",
+    ],
+    env = {
+        "JQ_BIN": "$(JQ_BIN)",
+        "JQ_ANSI_UTILS": "$(location :ansi.jq)",
+        "JQ_CVE_UTILS": "$(location :cve_utils.jq)",
+        "JQ_VERSION_UTILS": "$(location :version.jq)",
+        "JQ_REPORT": "$(location :cve_report.jq)",
+    },
+    tags = ["no-remote-exec"],
+    toolchains = ["@jq_toolchains//:resolved_toolchain"],
 )
