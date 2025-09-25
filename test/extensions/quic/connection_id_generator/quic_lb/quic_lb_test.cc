@@ -1,6 +1,6 @@
+#include "source/common/network/socket_option_factory.h"
 #include "source/extensions/quic/connection_id_generator/quic_lb/quic_lb.h"
 
-#include "source/common/network/socket_option_factory.h"
 #include "test/mocks/server/factory_context.h"
 #include "test/test_common/network_utility.h"
 
