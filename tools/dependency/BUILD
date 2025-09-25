@@ -36,6 +36,24 @@ envoy_genjson(
     """,
 )
 
+envoy_genjson(
+    name = "cpe-dependencies",
+    srcs = [":filtered-dependencies"],
+    args = [
+        "-s",
+        "-c",
+        "-L",
+        "tools/dependency",
+    ],
+    data = [":cve_utils.jq"],
+    filter = """
+    import "cve_utils" as Utils;
+    .[0] as $deps
+    | Utils::parse_deps($deps)
+    """,
+    visibility = ["//visibility:public"],
+)
+
 envoy_entry_point(
     name = "check",
     args = [
