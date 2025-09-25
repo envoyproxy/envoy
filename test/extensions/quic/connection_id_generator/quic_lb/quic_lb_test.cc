@@ -44,9 +44,15 @@ encryptionParamaters(uint8_t version_int = 0, std::string key_str = "0123456789a
   return encryption_parameters;
 }
 
+// Creates a set of sockets in a reuse-port group and attaches the BPF filter from
+// the provided connection id generator.
+//
+// With this setup, specific UDP payloads for testing QUIC header processing can
+// be tested, and the socket which receives the packet is determined to validate
+// correct functionality of the BPF program.
 class KernelBpfTester {
 public:
-  KernelBpfTester(uint32_t concurrency, Factory& factory) {
+  KernelBpfTester(uint32_t concurrency, EnvoyQuicConnectionIdGeneratorFactory& factory) {
     auto bpf_socket_option = factory.createCompatibleLinuxBpfSocketOption(concurrency);
     if (bpf_socket_option == nullptr) {
       ENVOY_LOG_MISC(error, "Cannot test BPF filter on this OS/kernel");
@@ -87,6 +93,7 @@ public:
     ASSERT(default_host_ != non_default_host_);
   }
 
+  // Send `data` to the socket group and return which socket index received it.
   uint32_t sendAndGetRecipient(const Buffer::OwnedImpl& data) {
     Buffer::OwnedImpl buffer;
     uint32_t recipient = UINT32_MAX;
@@ -119,19 +126,27 @@ public:
     return recipient;
   }
 
+  // True if a BPF filter was available on this platform; false if not.
   bool initialized() const { return !sockets_.empty(); }
-  uint32_t defaultHost() const { return default_host_; }
-  uint32_t nonDefaultHost() const { return non_default_host_; }
 
+  // The host that the client is directed to if there isn't a valid QUIC header.
+  uint32_t defaultHost() const {
+    ASSERT(default_host_ != UINT32_MAX);
+    return default_host_;
+  }
+
+  // A host that is a valid index and is not the `defaultHost()`.
+  uint32_t nonDefaultHost() const {
+    ASSERT(non_default_host_ != UINT32_MAX);
+    return non_default_host_;
+  }
+
+private:
   Network::Address::InstanceConstSharedPtr address_;
   std::vector<Network::SocketPtr> sockets_;
   Network::Address::InstanceConstSharedPtr client_address_;
   Network::SocketPtr client_;
-
-  // The host that the client is directed to if there isn't a valid QUIC header.
   uint32_t default_host_{UINT32_MAX};
-
-  // A host that is a valid index and is not the `default_host_`.
   uint32_t non_default_host_{UINT32_MAX};
 };
 
