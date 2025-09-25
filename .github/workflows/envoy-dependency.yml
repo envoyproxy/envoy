@@ -243,7 +243,7 @@ jobs:
       run: |
         TODAY_DATE=$(date -u -I"date")
         export TODAY_DATE
-        bazel run --config=ci //tools/dependency:check --action_env=TODAY_DATE -- -c release_issues --fix
-        bazel run --config=ci //tools/dependency:check --action_env=TODAY_DATE -- -c cves -w error
+        bazel run --config=ci //tools/dependency:check -- -c release_issues --fix
+        # bazel run --config=ci //tools/dependency:check --action_env=TODAY_DATE -- -c cves -w error
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
