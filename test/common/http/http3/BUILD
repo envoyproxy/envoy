@@ -14,7 +14,6 @@ envoy_cc_test(
     srcs = envoy_select_enable_http3(["conn_pool_test.cc"]),
     rbe_pool = "6gig",
     deps = envoy_select_enable_http3([
-        "//test/test_common:test_runtime_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/http/http3:conn_pool_lib",
         "//source/common/network:utility_lib",

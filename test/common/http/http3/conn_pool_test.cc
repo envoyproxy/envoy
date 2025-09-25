@@ -15,7 +15,6 @@
 #include "test/mocks/upstream/cluster_info.h"
 #include "test/mocks/upstream/host.h"
 #include "test/test_common/simulated_time_system.h"
-#include "test/test_common/test_runtime.h"
 
 using testing::NiceMock;
 using testing::Return;
@@ -220,17 +219,7 @@ void Http3ConnPoolImplTest::createNewStream() {
   pool_->onConnectionEvent(*clients.front(), "", Network::ConnectionEvent::Connected);
 }
 
-TEST_F(Http3ConnPoolImplTest, CreationAndNewStreamWithDecoderHandle) {
-  TestScopedRuntime runtime;
-  runtime.mergeValues({{"envoy.reloadable_features.use_response_decoder_handle", "true"}});
-  createNewStream();
-}
-
-TEST_F(Http3ConnPoolImplTest, CreationAndNewStreamWithoutDecoderHandle) {
-  TestScopedRuntime runtime;
-  runtime.mergeValues({{"envoy.reloadable_features.use_response_decoder_handle", "false"}});
-  createNewStream();
-}
+TEST_F(Http3ConnPoolImplTest, CreationAndNewStream) { createNewStream(); }
 
 TEST_F(Http3ConnPoolImplTest, CreationAndNewHappyEyeballsStream) {
   happy_eyeballs_ = true;

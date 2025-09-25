@@ -393,7 +393,7 @@ TEST_F(Http1ConnPoolImplTest, VerifyCancelInCallback) {
  */
 TEST_F(Http1ConnPoolImplTest, RequestAndResponseWithoutDecoderHandle) {
   TestScopedRuntime runtime;
-  runtime.mergeValues({{"envoy.reloadable_features.abort_when_accessing_dead_decoder", "false"}});
+  runtime.mergeValues({{"envoy.reloadable_features.use_response_decoder_handle", "false"}});
 
   InSequence s;
   ActiveTestRequest r1(*this, 0, ActiveTestRequest::Type::CreateConnection);
