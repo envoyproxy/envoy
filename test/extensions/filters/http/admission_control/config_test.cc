@@ -127,6 +127,9 @@ aggression:
 rps_threshold:
   default_value: 5
   runtime_key: "foo.rps_threshold"
+requests_threshold:
+  default_value: 10
+  runtime_key: "foo.requests_threshold"
 max_rejection_probability:
   default_value:
     value: 70.0
@@ -142,6 +145,7 @@ success_criteria:
   EXPECT_EQ(4.2, config->aggression());
   EXPECT_EQ(0.92, config->successRateThreshold());
   EXPECT_EQ(5, config->rpsThreshold());
+  EXPECT_EQ(10, config->requestsThreshold());
   EXPECT_EQ(0.7, config->maxRejectionProbability());
 }
 
@@ -181,6 +185,9 @@ aggression:
 rps_threshold:
   default_value: 5
   runtime_key: "foo.rps_threshold"
+requests_threshold:
+  default_value: 10
+  runtime_key: "foo.requests_threshold"
 max_rejection_probability:
   default_value:
     value: 70.0
@@ -200,6 +207,8 @@ success_criteria:
   EXPECT_EQ(0.24, config->successRateThreshold());
   EXPECT_CALL(runtime_.snapshot_, getInteger("foo.rps_threshold", 5)).WillOnce(Return(12));
   EXPECT_EQ(12, config->rpsThreshold());
+  EXPECT_CALL(runtime_.snapshot_, getInteger("foo.requests_threshold", 10)).WillOnce(Return(12));
+  EXPECT_EQ(12, config->requestsThreshold());
   EXPECT_CALL(runtime_.snapshot_, getDouble("foo.max_rejection_probability", 70.0))
       .WillOnce(Return(32.0));
   EXPECT_EQ(0.32, config->maxRejectionProbability());
@@ -211,6 +220,9 @@ success_criteria:
   EXPECT_EQ(0.92, config->successRateThreshold());
   EXPECT_CALL(runtime_.snapshot_, getInteger("foo.rps_threshold", 5)).WillOnce(Return(99ull << 40));
   EXPECT_EQ(5, config->rpsThreshold());
+  EXPECT_CALL(runtime_.snapshot_, getInteger("foo.requests_threshold", 10))
+      .WillOnce(Return(99ull << 40));
+  EXPECT_EQ(10, config->requestsThreshold());
   EXPECT_CALL(runtime_.snapshot_, getDouble("foo.max_rejection_probability", 70.0))
       .WillOnce(Return(-2.0));
   EXPECT_EQ(0.7, config->maxRejectionProbability());

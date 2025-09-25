@@ -30,6 +30,7 @@ using GrpcStatus = Grpc::Status::GrpcStatus;
 static constexpr double defaultAggression = 1.0;
 static constexpr double defaultSuccessRateThreshold = 95.0;
 static constexpr uint32_t defaultRpsThreshold = 0;
+static constexpr uint32_t defaultRequestsThreshold = 0;
 static constexpr double defaultMaxRejectionProbability = 80.0;
 
 AdmissionControlFilterConfig::AdmissionControlFilterConfig(
@@ -48,6 +49,10 @@ AdmissionControlFilterConfig::AdmissionControlFilterConfig(
       rps_threshold_(proto_config.has_rps_threshold()
                          ? std::make_unique<Runtime::UInt32>(proto_config.rps_threshold(), runtime)
                          : nullptr),
+      requests_threshold_(
+          proto_config.has_requests_threshold()
+              ? std::make_unique<Runtime::UInt32>(proto_config.requests_threshold(), runtime)
+              : nullptr),
       max_rejection_probability_(proto_config.has_max_rejection_probability()
                                      ? std::make_unique<Runtime::Percentage>(
                                            proto_config.max_rejection_probability(), runtime)
@@ -65,6 +70,10 @@ double AdmissionControlFilterConfig::successRateThreshold() const {
 
 uint32_t AdmissionControlFilterConfig::rpsThreshold() const {
   return rps_threshold_ ? rps_threshold_->value() : defaultRpsThreshold;
+}
+
+uint32_t AdmissionControlFilterConfig::requestsThreshold() const {
+  return requests_threshold_ ? requests_threshold_->value() : defaultRequestsThreshold;
 }
 
 double AdmissionControlFilterConfig::maxRejectionProbability() const {
@@ -86,6 +95,11 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::RequestHea
 
   if (config_->getController().averageRps() < config_->rpsThreshold()) {
     ENVOY_LOG(debug, "Current rps: {} is below rps_threshold: {}, continue");
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  if (config_->getController().numRequestsInWindow() < config_->requestsThreshold()) {
+    ENVOY_LOG(debug, "Current requests: {} is below requests_threshold: {}, continue");
     return Http::FilterHeadersStatus::Continue;
   }
 

@@ -503,5 +503,12 @@ new_features:
   change: |
     Added ``max_downstream_connection_duration_jitter_percentage`` to allow adding a jitter to the max downstream connection duration.
     This can be used to avoid thundering herd problems with many clients being disconnected and possibly reconnecting at the same time.
+- area: admission control
+  change: |
+    Added :ref:`requests_threshold
+    <envoy_v3_api_field_extensions.filters.http.admission_control.v3.AdmissionControl.requests_threshold>`
+    configuration field to the admission control filter. This allows configuring a threshold for the number of requests
+    within the sampling window to bypass rejection. This can be useful for low qps scenarios (< 1 qps) where the sampling
+    window occurs over a long period of time.
 
 deprecated:

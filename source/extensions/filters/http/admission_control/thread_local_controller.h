@@ -41,6 +41,9 @@ public:
   // Returns the average RPS across the sampling window.
   virtual uint32_t averageRps() const PURE;
 
+  // Returns the current number of requests.
+  virtual uint32_t numRequestsInWindow() const PURE;
+
   // Returns the sample window for this controller.
   virtual std::chrono::seconds samplingWindow() const PURE;
 };
@@ -70,6 +73,8 @@ public:
   }
 
   uint32_t averageRps() const override;
+
+  uint32_t numRequestsInWindow() const override;
 
   std::chrono::seconds samplingWindow() const override { return sampling_window_; }
 
