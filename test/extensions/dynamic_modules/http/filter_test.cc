@@ -31,7 +31,7 @@ TEST_P(DynamicModuleTestLanguages, Nop) {
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
           filter_name, filter_config, std::move(dynamic_module.value()),
-          *stats_store.createScope(""), context);
+          *stats_store.createScope(""), "", context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -71,7 +71,7 @@ TEST(DynamicModulesTest, ConfigInitializationFailure) {
   Stats::IsolatedStoreImpl stats_store;
   auto filter_config_or_status =
       newDynamicModuleHttpFilterConfig("config_init_failure", "", std::move(dynamic_module.value()),
-                                       *stats_store.createScope(""), context);
+                                       *stats_store.createScope(""), "", context);
   EXPECT_FALSE(filter_config_or_status.ok());
   EXPECT_THAT(filter_config_or_status.status().message(),
               testing::HasSubstr("Failed to initialize dynamic module"));
@@ -92,7 +92,7 @@ TEST(DynamicModulesTest, StatsCallbacks) {
   Stats::TestUtil::TestScope stats_scope{"", stats_store};
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, std::move(dynamic_module.value()), stats_scope, context);
+          filter_name, filter_config, std::move(dynamic_module.value()), stats_scope, "", context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -197,6 +197,34 @@ TEST(DynamicModulesTest, StatsCallbacks) {
   filter->onDestroy();
 }
 
+TEST(DynamicModulesTest, StatsCallbacksWithPrefix) {
+  const std::string filter_name = "stats_callbacks";
+  const std::string filter_config = "";
+  // TODO: Add non-Rust test program once we have non-Rust SDK.
+  auto dynamic_module = newDynamicModule(testSharedObjectPath("http", "rust"), false);
+  if (!dynamic_module.ok()) {
+    ENVOY_LOG_MISC(debug, "Failed to load dynamic module: {}", dynamic_module.status().message());
+  }
+  EXPECT_TRUE(dynamic_module.ok());
+
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
+  Stats::TestUtil::TestStore stats_store;
+  Stats::TestUtil::TestScope stats_scope{"", stats_store};
+  auto filter_config_or_status =
+      Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
+          filter_name, filter_config, std::move(dynamic_module.value()), stats_scope, "fooprefix",
+          context);
+  EXPECT_TRUE(filter_config_or_status.ok());
+
+  auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
+                                                          stats_scope.symbolTable());
+  filter->initializeInModuleFilter();
+
+  Stats::CounterOptConstRef counter = stats_store.findCounterByString("fooprefix.streams_total");
+  EXPECT_TRUE(counter.has_value());
+  EXPECT_EQ(counter->get().value(), 1);
+}
+
 TEST(DynamicModulesTest, HeaderCallbacks) {
   const std::string filter_name = "header_callbacks";
   const std::string filter_config = "";
@@ -212,7 +240,7 @@ TEST(DynamicModulesTest, HeaderCallbacks) {
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
           filter_name, filter_config, std::move(dynamic_module.value()),
-          *stats_store.createScope(""), context);
+          *stats_store.createScope(""), "", context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -274,7 +302,7 @@ TEST(DynamicModulesTest, DynamicMetadataCallbacks) {
   auto stats_scope = stats_store.createScope("");
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, std::move(dynamic_module.value()), *stats_scope, context);
+          filter_name, filter_config, std::move(dynamic_module.value()), *stats_scope, "", context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -357,7 +385,7 @@ TEST(DynamicModulesTest, FilterStateCallbacks) {
   auto stats_scope = stats_store.createScope("");
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, std::move(dynamic_module.value()), *stats_scope, context);
+          filter_name, filter_config, std::move(dynamic_module.value()), *stats_scope, "", context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -434,7 +462,7 @@ TEST(DynamicModulesTest, BodyCallbacks) {
   auto stats_scope = stats_store.createScope("");
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, std::move(dynamic_module.value()), *stats_scope, context);
+          filter_name, filter_config, std::move(dynamic_module.value()), *stats_scope, "", context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto filter = std::make_shared<DynamicModuleHttpFilter>(filter_config_or_status.value(),
@@ -511,7 +539,7 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_non_existing_cluster) {
       .WillOnce(testing::Return(nullptr));
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, std::move(dynamic_module.value()), *stats_scope, context);
+          filter_name, filter_config, std::move(dynamic_module.value()), *stats_scope, "", context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   Http::MockStreamDecoderFilterCallbacks callbacks;
@@ -548,7 +576,7 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_immediate_failing_cluster) {
   const std::string filter_config = "immediate_failing_cluster";
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, std::move(dynamic_module.value()), *stats_scope, context);
+          filter_name, filter_config, std::move(dynamic_module.value()), *stats_scope, "", context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   std::shared_ptr<Upstream::MockThreadLocalCluster> cluster =
@@ -601,7 +629,7 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_success) {
   const std::string filter_config = "success_cluster";
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, std::move(dynamic_module.value()), *stats_scope, context);
+          filter_name, filter_config, std::move(dynamic_module.value()), *stats_scope, "", context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   std::shared_ptr<Upstream::MockThreadLocalCluster> cluster =
@@ -670,7 +698,7 @@ TEST(DynamicModulesTest, HttpFilterHttpCallout_resetting) {
   const std::string filter_config = "resetting_cluster";
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, std::move(dynamic_module.value()), *stats_scope, context);
+          filter_name, filter_config, std::move(dynamic_module.value()), *stats_scope, "", context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   std::shared_ptr<Upstream::MockThreadLocalCluster> cluster =
@@ -723,7 +751,7 @@ TEST(DynamicModulesTest, HttpFilterPerFilterConfigLifetimes) {
   const std::string filter_config = "listener config";
   auto filter_config_or_status =
       Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
-          filter_name, filter_config, std::move(dynamic_module.value()), *stats_scope, context);
+          filter_name, filter_config, std::move(dynamic_module.value()), *stats_scope, "", context);
   EXPECT_TRUE(filter_config_or_status.ok());
 
   auto dynamic_module_for_route =

@@ -58,6 +58,10 @@ message DynamicModuleFilter {
   //    value: aGVsbG8= # echo -n "hello" | base64
   //
   google.protobuf.Any filter_config = 3;
+
+  // Allows configuring the stat prefix for all metrics emitted by the filter. By default, the stat prefix
+  // is equal to `dynamicmodulescustom`.
+  string stat_prefix = 4;
 }
 
 // Configuration of the HTTP per-route filter for dynamic modules. This filter allows loading shared object files

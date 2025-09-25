@@ -54,6 +54,7 @@ public:
   DynamicModuleHttpFilterConfig(const absl::string_view filter_name,
                                 const absl::string_view filter_config,
                                 DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
+                                const std::string stat_prefix,
                                 Server::Configuration::ServerFactoryContext& context);
 
   ~DynamicModuleHttpFilterConfig();
@@ -309,13 +310,14 @@ newDynamicModuleHttpPerRouteConfig(const absl::string_view per_route_config_name
  * @param filter_name the name of the filter.
  * @param filter_config the configuration for the module.
  * @param dynamic_module the dynamic module to use.
+ * @param stat_prefix the stat prefix for the filter.
  * @param context the server factory context.
  * @return a shared pointer to the new config object or an error if the module could not be loaded.
  */
 absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
-    Server::Configuration::ServerFactoryContext& context);
+    const std::string stat_prefix, Server::Configuration::ServerFactoryContext& context);
 
 } // namespace HttpFilters
 } // namespace DynamicModules

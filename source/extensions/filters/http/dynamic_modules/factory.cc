@@ -30,7 +30,7 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
       filter_config =
           Envoy::Extensions::DynamicModules::HttpFilters::newDynamicModuleHttpFilterConfig(
               proto_config.filter_name(), config, std::move(dynamic_module.value()),
-              dual_info.scope, context);
+              dual_info.scope, proto_config.stat_prefix(), context);
 
   if (!filter_config.ok()) {
     return absl::InvalidArgumentError("Failed to create filter config: " +

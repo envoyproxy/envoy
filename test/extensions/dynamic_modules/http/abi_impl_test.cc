@@ -1103,7 +1103,7 @@ TEST(ABIImpl, Stats) {
   Stats::TestUtil::TestScope stats_scope{"", stats_store};
   NiceMock<Server::Configuration::MockServerFactoryContext> context;
   auto filter_config = std::make_shared<DynamicModuleHttpFilterConfig>(
-      "some_name", "some_config", nullptr, stats_scope, context);
+      "some_name", "some_config", nullptr, stats_scope, "", context);
   DynamicModuleHttpFilter filter{filter_config, stats_scope.symbolTable()};
 
   const std::string counter_name{"some_counter"};

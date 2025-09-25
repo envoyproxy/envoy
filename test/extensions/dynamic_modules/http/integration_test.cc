@@ -14,7 +14,7 @@ public:
   initializeFilter(const std::string& filter_name, const std::string& config = "",
                    const std::string& per_route_config = "",
                    const std::string& type_url = "type.googleapis.com/google.protobuf.StringValue",
-                   bool upstream_filter = false) {
+                   bool upstream_filter = false, const std::string& stat_prefix = "") {
     TestEnvironment::setEnvVar(
         "ENVOY_DYNAMIC_MODULES_SEARCH_PATH",
         TestEnvironment::substitute(
@@ -31,6 +31,8 @@ typed_config:
   filter_config:
     "@type": {}
     value: {}
+  stat_prefix: {}
+
 )EOF";
 
     if (!per_route_config.empty()) {
@@ -63,8 +65,8 @@ filter_config:
 
     config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
     config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
-    config_helper_.prependFilter(fmt::format(filter_config, filter_name, type_url, config),
-                                 !upstream_filter);
+    config_helper_.prependFilter(
+        fmt::format(filter_config, filter_name, type_url, config, stat_prefix), !upstream_filter);
     initialize();
   }
   void runHeaderCallbacksTest(bool upstream_filter) {
@@ -598,12 +600,30 @@ TEST_P(DynamicModulesIntegrationTest, StatsCallbacks) {
               3 + 13);
 
     Http::TestResponseHeaderMapImpl response_headers = default_response_headers_;
-    response_headers.addCopy(Http::LowerCaseString("header_to_count"), "5");
-    response_headers.addCopy(Http::LowerCaseString("header_to_set"), "1000");
     upstream_request_->encodeHeaders(response_headers, true);
     ASSERT_TRUE(response->waitForEndStream());
     EXPECT_TRUE(response->complete());
   }
+}
+
+TEST_P(DynamicModulesIntegrationTest, StatsCallbacksWithPrefix) {
+  initializeFilter("stats_callbacks", "header_to_count,header_to_set", "",
+                   "type.googleapis.com/google.protobuf.StringValue", false, "fooprefix");
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+
+  Http::TestRequestHeaderMapImpl request_headers = default_request_headers_;
+  request_headers.addCopy(Http::LowerCaseString("header_to_count"), "13");
+  auto encoder_decoder = codec_client_->startRequest(request_headers, true);
+  auto response = std::move(encoder_decoder.second);
+  waitForNextUpstreamRequest();
+  test_server_->waitUntilHistogramHasSamples("fooprefix.requests_header_values");
+
+  EXPECT_EQ(test_server_->counter("fooprefix.requests_total")->value(), 1);
+
+  Http::TestResponseHeaderMapImpl response_headers = default_response_headers_;
+  upstream_request_->encodeHeaders(response_headers, true);
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
 }
 
 TEST_P(DynamicModulesIntegrationTest, InjectBody) {

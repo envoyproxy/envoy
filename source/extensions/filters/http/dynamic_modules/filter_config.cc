@@ -8,9 +8,10 @@ namespace HttpFilters {
 DynamicModuleHttpFilterConfig::DynamicModuleHttpFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
-    Server::Configuration::ServerFactoryContext& context)
+    const std::string stat_prefix, Server::Configuration::ServerFactoryContext& context)
     : cluster_manager_(context.clusterManager()),
-      stats_scope_(stats_scope.createScope(std::string(CustomStatNamespace) + ".")),
+      stats_scope_(stats_scope.createScope(
+          (stat_prefix.length() > 0 ? stat_prefix : std::string(CustomStatNamespace)) + ".")),
       stat_name_pool_(stats_scope_->symbolTable()), filter_name_(filter_name),
       filter_config_(filter_config), dynamic_module_(std::move(dynamic_module)) {};
 
@@ -54,7 +55,7 @@ newDynamicModuleHttpPerRouteConfig(const absl::string_view per_route_config_name
 absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilterConfig(
     const absl::string_view filter_name, const absl::string_view filter_config,
     Extensions::DynamicModules::DynamicModulePtr dynamic_module, Stats::Scope& stats_scope,
-    Server::Configuration::ServerFactoryContext& context) {
+    const std::string stat_prefix, Server::Configuration::ServerFactoryContext& context) {
   auto constructor =
       dynamic_module->getFunctionPointer<decltype(&envoy_dynamic_module_on_http_filter_config_new)>(
           "envoy_dynamic_module_on_http_filter_config_new");
@@ -110,7 +111,7 @@ absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilte
   RETURN_IF_NOT_OK_REF(on_scheduled.status());
 
   auto config = std::make_shared<DynamicModuleHttpFilterConfig>(
-      filter_name, filter_config, std::move(dynamic_module), stats_scope, context);
+      filter_name, filter_config, std::move(dynamic_module), stats_scope, stat_prefix, context);
 
   const void* filter_config_envoy_ptr =
       (*constructor.value())(static_cast<void*>(config.get()), filter_name.data(),
