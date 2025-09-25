@@ -43,7 +43,7 @@ public:
   }
 
   void addMatcher(FieldMatcherPtr<DataType>&& matcher, OnMatch<DataType> action) {
-    matchers_.push_back({std::move(matcher), std::move(action)});
+    matchers_.emplace_back(std::move(matcher), std::move(action));
   }
 
 private:
