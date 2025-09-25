@@ -61,6 +61,7 @@ EXTENSIONS = {
     # Reverse Connection
     #
 
+    "envoy.bootstrap.reverse_tunnel.downstream_socket_interface": "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_initiator_lib",
     "envoy.bootstrap.reverse_tunnel.upstream_socket_interface": "//source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface:reverse_tunnel_acceptor_lib",
 
     #
@@ -102,6 +103,7 @@ EXTENSIONS = {
     "envoy.matching.inputs.direct_source_ip":           "//source/extensions/matching/network/common:inputs_lib",
     "envoy.matching.inputs.source_type":                "//source/extensions/matching/network/common:inputs_lib",
     "envoy.matching.inputs.server_name":                "//source/extensions/matching/network/common:inputs_lib",
+    "envoy.matching.inputs.network_namespace":          "//source/extensions/matching/network/common:inputs_lib",
     "envoy.matching.inputs.transport_protocol":         "//source/extensions/matching/network/common:inputs_lib",
     "envoy.matching.inputs.filter_state":               "//source/extensions/matching/network/common:inputs_lib",
 
@@ -221,6 +223,7 @@ EXTENSIONS = {
     "envoy.filters.network.echo":                                 "//source/extensions/filters/network/echo:config",
     "envoy.filters.network.ext_authz":                            "//source/extensions/filters/network/ext_authz:config",
     "envoy.filters.network.ext_proc":                             "//source/extensions/filters/network/ext_proc:config",
+    "envoy.filters.network.reverse_tunnel":                       "//source/extensions/filters/network/reverse_tunnel:config",
     "envoy.filters.network.http_connection_manager":              "//source/extensions/filters/network/http_connection_manager:config",
     "envoy.filters.network.local_ratelimit":                      "//source/extensions/filters/network/local_ratelimit:config",
     "envoy.filters.network.mongo_proxy":                          "//source/extensions/filters/network/mongo_proxy:config",
@@ -460,6 +463,7 @@ EXTENSIONS = {
     "envoy.formatter.cel":                              "//source/extensions/formatter/cel:config",
     "envoy.formatter.metadata":                         "//source/extensions/formatter/metadata:config",
     "envoy.formatter.req_without_query":                "//source/extensions/formatter/req_without_query:config",
+    "envoy.built_in_formatters.xfcc_value":             "//source/extensions/formatter/xfcc_value:config",
 
     #
     # Key value store
@@ -489,6 +493,12 @@ EXTENSIONS = {
     "envoy.network.dns_resolver.apple":                "//source/extensions/network/dns_resolver/apple:config",
     # getaddrinfo DNS resolver extension can be used when the system resolver is desired (e.g., Android)
     "envoy.network.dns_resolver.getaddrinfo":          "//source/extensions/network/dns_resolver/getaddrinfo:config",
+
+    #
+    # Address Resolvers
+    #
+
+    "envoy.resolvers.reverse_connection":               "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_resolver_lib",
 
     #
     # Custom matchers

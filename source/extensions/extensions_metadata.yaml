@@ -75,6 +75,13 @@ envoy.bootstrap.wasm:
   status: alpha
   type_urls:
   - envoy.extensions.wasm.v3.WasmService
+envoy.bootstrap.reverse_tunnel.downstream_socket_interface:
+  categories:
+  - envoy.bootstrap
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface
 envoy.bootstrap.reverse_tunnel.upstream_socket_interface:
   categories:
   - envoy.bootstrap
@@ -708,6 +715,13 @@ envoy.filters.network.ext_proc:
   status: wip
   type_urls:
   - envoy.extensions.filters.network.ext_proc.v3.NetworkExternalProcessor
+envoy.filters.network.reverse_tunnel:
+  categories:
+  - envoy.filters.network
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.reverse_tunnel.v3.ReverseTunnel
 envoy.filters.network.http_connection_manager:
   categories:
   - envoy.filters.network
@@ -874,6 +888,12 @@ envoy.formatter.req_without_query:
   status: alpha
   type_urls:
   - envoy.extensions.formatter.req_without_query.v3.ReqWithoutQuery
+envoy.built_in_formatters.xfcc_value:
+  categories:
+  - envoy.built_in_formatters
+  security_posture: unknown
+  status: alpha
+  undocumented: true
 envoy.geoip_providers.maxmind:
   categories:
   - envoy.geoip_providers
@@ -1521,6 +1541,11 @@ envoy.network.dns_resolver.getaddrinfo:
   status: stable
   type_urls:
   - envoy.extensions.network.dns_resolver.getaddrinfo.v3.GetAddrInfoDnsResolverConfig
+envoy.resolvers.reverse_connection:
+  categories:
+  - envoy.resolvers
+  security_posture: unknown
+  status: wip
 envoy.rbac.matchers.upstream_ip_port:
   categories:
   - envoy.rbac.matchers
@@ -1683,6 +1708,14 @@ envoy.matching.inputs.dynamic_metadata:
   status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.network.v3.DynamicMetadataInput
+envoy.matching.inputs.network_namespace:
+  categories:
+  - envoy.matching.http.input
+  - envoy.matching.network.input
+  security_posture: unknown
+  status: stable
+  type_urls:
+  - envoy.extensions.matching.common_inputs.network.v3.NetworkNamespaceInput
 envoy.matching.inputs.uri_san:
   categories:
   - envoy.matching.http.input

@@ -456,8 +456,14 @@ ClusterManagerImpl::initialize(const envoy::config::bootstrap::v3::Bootstrap& bo
       cds_resources_locator =
           std::make_unique<xds::core::v3::ResourceLocator>(std::move(url_or_error.value()));
     }
-    auto cds_or_error =
-        factory_.createCds(dyn_resources.cds_config(), cds_resources_locator.get(), *this);
+    // In case cds_config is configured and the new xDS-TP configs are used,
+    // then the CdsApi will need to track the resources, as the xDS-TP configs
+    // may be used for OD-CDS. If this is not set, the SotW update may override
+    // the OD-CDS resources.
+    const bool support_multi_ads_sources =
+        bootstrap.has_default_config_source() || !bootstrap.config_sources().empty();
+    auto cds_or_error = factory_.createCds(dyn_resources.cds_config(), cds_resources_locator.get(),
+                                           *this, support_multi_ads_sources);
     RETURN_IF_NOT_OK_REF(cds_or_error.status())
     cds_api_ = std::move(*cds_or_error);
     init_helper_.setCds(cds_api_.get());
@@ -500,11 +506,26 @@ absl::Status ClusterManagerImpl::initializeSecondaryClusters(
 
     absl::Status status = Config::Utility::checkTransportVersion(load_stats_config);
     RETURN_IF_NOT_OK(status);
-    auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-        *async_client_manager_, load_stats_config, *stats_.rootScope(), false, 0, false);
-    RETURN_IF_NOT_OK_REF(factory_or_error.status());
-    absl::StatusOr<Grpc::RawAsyncClientSharedPtr> client_or_error =
-        factory_or_error.value()->createUncachedRawAsyncClient();
+    absl::StatusOr<Grpc::RawAsyncClientSharedPtr> client_or_error;
+    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.use_cached_grpc_client_for_xds")) {
+      absl::StatusOr<Envoy::OptRef<const envoy::config::core::v3::GrpcService>> maybe_grpc_service =
+          Envoy::Config::Utility::getGrpcConfigFromApiConfigSource(load_stats_config,
+                                                                   /*grpc_service_idx*/ 0,
+                                                                   /*xdstp_config_source*/ false);
+      RETURN_IF_NOT_OK_REF(maybe_grpc_service.status());
+      if (maybe_grpc_service.value().has_value()) {
+        client_or_error = async_client_manager_->getOrCreateRawAsyncClientWithHashKey(
+            Grpc::GrpcServiceConfigWithHashKey(*maybe_grpc_service.value()), *stats_.rootScope(),
+            /*skip_cluster_check*/ false);
+      } else {
+        return absl::InvalidArgumentError("Invalid grpc service.");
+      }
+    } else {
+      auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+          *async_client_manager_, load_stats_config, *stats_.rootScope(), false, 0, false);
+      RETURN_IF_NOT_OK_REF(factory_or_error.status());
+      client_or_error = factory_or_error.value()->createUncachedRawAsyncClient();
+    }
     RETURN_IF_NOT_OK_REF(client_or_error.status());
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
         local_info_, *this, *stats_.rootScope(), std::move(client_or_error.value()), dispatcher_);
@@ -549,7 +570,7 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
   // This is used by cluster types such as EDS clusters to drain the connection pools of removed
   // hosts.
   cluster_data->second->member_update_cb_ = cluster.prioritySet().addMemberUpdateCb(
-      [&cluster, this](const HostVector&, const HostVector& hosts_removed) -> absl::Status {
+      [&cluster, this](const HostVector&, const HostVector& hosts_removed) {
         if (cluster.info()->lbConfig().close_connections_on_host_set_change()) {
           for (const auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
             // This will drain all tcp and http connection pools.
@@ -566,7 +587,6 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
             postThreadLocalRemoveHosts(cluster, hosts_removed);
           }
         }
-        return absl::OkStatus();
       });
 
   // This is used by cluster types such as EDS clusters to update the cluster
@@ -607,7 +627,6 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
           postThreadLocalClusterUpdate(
               cm_cluster, ThreadLocalClusterUpdateParams(priority, hosts_added, hosts_removed));
         }
-        return absl::OkStatus();
       });
 
   // Finally, post updates cross-thread so the per-thread load balancers are ready. First we
@@ -1481,13 +1500,13 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::updateHost
     const std::string& name, uint32_t priority,
     PrioritySet::UpdateHostsParams&& update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
-    const HostVector& hosts_removed, uint64_t seed, absl::optional<bool> weighted_priority_health,
+    const HostVector& hosts_removed, absl::optional<bool> weighted_priority_health,
     absl::optional<uint32_t> overprovisioning_factor,
     HostMapConstSharedPtr cross_priority_host_map) {
   ENVOY_LOG(debug, "membership update for TLS cluster {} added {} removed {}", name,
             hosts_added.size(), hosts_removed.size());
   priority_set_.updateHosts(priority, std::move(update_hosts_params), std::move(locality_weights),
-                            hosts_added, hosts_removed, seed, weighted_priority_health,
+                            hosts_added, hosts_removed, weighted_priority_health,
                             overprovisioning_factor, std::move(cross_priority_host_map));
   // If an LB is thread aware, create a new worker local LB on membership changes.
   if (lb_factory_ != nullptr && lb_factory_->recreateOnHostChange()) {
@@ -1536,8 +1555,9 @@ ClusterManagerImpl::allocateOdCdsApi(OdCdsCreationFunction creation_function,
   // TODO(krnowak): Instead of creating a new handle every time, store the handles internally and
   // return an already existing one if the config or locator matches. Note that this may need a
   // way to clean up the unused handles, so we can close the unnecessary connections.
-  auto odcds_or_error = creation_function(odcds_config, odcds_resources_locator, xds_manager_,
-                                          *this, *this, *stats_.rootScope(), validation_visitor);
+  auto odcds_or_error =
+      creation_function(odcds_config, odcds_resources_locator, xds_manager_, *this, *this,
+                        *stats_.rootScope(), validation_visitor, context_);
   RETURN_IF_NOT_OK_REF(odcds_or_error.status());
   return OdCdsApiHandleImpl::create(*this, std::move(*odcds_or_error));
 }
@@ -1793,8 +1813,8 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
   const auto& cluster_entry = thread_local_clusters_[name];
   cluster_entry->updateHosts(name, priority, std::move(update_hosts_params),
                              std::move(locality_weights), hosts_added, hosts_removed,
-                             parent_.random_.random(), weighted_priority_health,
-                             overprovisioning_factor, std::move(cross_priority_host_map));
+                             weighted_priority_health, overprovisioning_factor,
+                             std::move(cross_priority_host_map));
 }
 
 void ClusterManagerImpl::ThreadLocalClusterManagerImpl::onHostHealthFailure(
@@ -2271,11 +2291,11 @@ ProdClusterManagerFactory::clusterFromProto(const envoy::config::cluster::v3::Cl
 absl::StatusOr<CdsApiPtr>
 ProdClusterManagerFactory::createCds(const envoy::config::core::v3::ConfigSource& cds_config,
                                      const xds::core::v3::ResourceLocator* cds_resources_locator,
-                                     ClusterManager& cm) {
+                                     ClusterManager& cm, bool support_multi_ads_sources) {
   // TODO(htuch): Differentiate static vs. dynamic validation visitors.
   return CdsApiImpl::create(cds_config, cds_resources_locator, cm, *stats_.rootScope(),
                             context_.messageValidationContext().dynamicValidationVisitor(),
-                            context_);
+                            context_, support_multi_ads_sources);
 }
 
 } // namespace Upstream

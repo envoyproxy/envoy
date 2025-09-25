@@ -10,6 +10,7 @@
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/http/ext_proc/v3/ext_proc.pb.h"
 #include "envoy/grpc/async_client.h"
+#include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
 #include "envoy/service/ext_proc/v3/external_processor.pb.h"
 #include "envoy/stats/scope.h"
@@ -305,7 +306,18 @@ public:
 
   std::unique_ptr<OnProcessingResponse> createOnProcessingResponse() const;
 
+  Http::Code statusOnError() const { return status_on_error_; }
+
 private:
+  static Http::Code toErrorCode(uint64_t status) {
+    const auto code = static_cast<Http::Code>(status);
+    // Only allow 4xx and 5xx status codes.
+    if (code >= Http::Code::BadRequest && code <= Http::Code::LastUnassignedServerErrorCode) {
+      return code;
+    }
+    return Http::Code::InternalServerError;
+  }
+
   ExtProcFilterStats generateStats(const std::string& prefix,
                                    const std::string& filter_stats_prefix, Stats::Scope& scope) {
     const std::string final_prefix = absl::StrCat(prefix, "ext_proc.", filter_stats_prefix);
@@ -353,6 +365,7 @@ private:
 
   ThreadLocal::SlotPtr thread_local_stream_manager_slot_;
   const std::chrono::milliseconds remote_close_timeout_;
+  const Http::Code status_on_error_;
 };
 
 using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;

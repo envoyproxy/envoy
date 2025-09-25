@@ -170,10 +170,9 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   ASSERT(host_set_member_update_cb_handle_ == nullptr);
   host_set_member_update_cb_handle_ = cluster_->prioritySet().addMemberUpdateCb(
       [this](const std::vector<Upstream::HostSharedPtr>& hosts_added,
-             const std::vector<Upstream::HostSharedPtr>& hosts_removed) -> absl::Status {
+             const std::vector<Upstream::HostSharedPtr>& hosts_removed) {
         onHostsAdded(hosts_added);
         onHostsRemoved(hosts_removed);
-        return absl::OkStatus();
       });
 
   ASSERT(host_address_map_.empty());

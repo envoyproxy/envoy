@@ -1,4 +1,5 @@
 load("@com_google_protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 load(
     "@envoy//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
@@ -13,7 +14,6 @@ load(
     "envoy_quiche_platform_impl_cc_test_library",
     "quiche_copts",
 )
-load("@rules_proto//proto:defs.bzl", "proto_library")
 
 licenses(["notice"])  # Apache 2
 

@@ -167,6 +167,8 @@ public:
   // Exposes streamInfo for the upstream stream.
   StreamInfo::StreamInfo& streamInfo() { return stream_info_; }
   bool hadUpstream() const { return had_upstream_; }
+  // Disable per-try timeouts for websocket upgrades after successful handshake
+  void disablePerTryTimeoutForWebsocketUpgrade();
 
 private:
   friend class UpstreamFilterManager;
@@ -368,6 +370,9 @@ public:
   void setPausedForWebsocketUpgrade(bool value) override {
     upstream_request_.paused_for_websocket_ = value;
   }
+
+  void disableRouteTimeoutForWebsocketUpgrade() override;
+  void disablePerTryTimeoutForWebsocketUpgrade() override;
 
   const Http::ConnectionPool::Instance::StreamOptions& upstreamStreamOptions() const override {
     return upstream_request_.upstreamStreamOptions();

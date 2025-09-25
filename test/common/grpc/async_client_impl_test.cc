@@ -529,6 +529,59 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpClientException) {
   EXPECT_EQ(grpc_stream, nullptr);
 }
 
+TEST_F(EnvoyAsyncClientImplTest, AsyncRequestDetach) {
+  NiceMock<MockAsyncRequestCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream;
+  ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
+  ON_CALL(http_stream, streamInfo()).WillByDefault(ReturnRef(stream_info));
+
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions&) {
+            http_callbacks = &callbacks;
+            return &http_stream;
+          }));
+
+  const std::string expected_downstream_local_address = "5.5.5.5";
+  EXPECT_CALL(grpc_callbacks, onCreateInitialMetadata(_));
+  EXPECT_CALL(http_stream, sendHeaders(_, _));
+
+  // Prepare the parent context of this call.
+  auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
+      std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address), nullptr);
+
+  StreamInfo::StreamInfoImpl parent_stream_info{test_time_.timeSystem(), connection_info_provider,
+                                                StreamInfo::FilterState::LifeSpan::FilterChain};
+  Http::AsyncClient::ParentContext parent_context{&parent_stream_info};
+  testing::NiceMock<Http::MockSidestreamWatermarkCallbacks> watermark_callbacks;
+  auto parent_span = std::make_unique<Tracing::NullSpan>();
+
+  Http::AsyncClient::StreamOptions stream_options;
+  stream_options.setParentContext(parent_context);
+  stream_options.setSidestreamWatermarkCallbacks(&watermark_callbacks);
+  stream_options.setParentSpan(*parent_span);
+
+  helloworld::HelloRequest request_msg;
+  auto grpc_request = grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks,
+                                         *parent_span, stream_options);
+  EXPECT_NE(grpc_request, nullptr);
+
+  EXPECT_CALL(http_stream, removeWatermarkCallbacks());
+  stream_info.setParentStreamInfo(parent_stream_info); // Mock Envoy setting parent stream info.
+
+  grpc_request->detach();
+
+  EXPECT_FALSE(grpc_request->streamInfo().parentStreamInfo().has_value());
+
+  // Clean up by simulating a reset from the HTTP stream.
+  http_callbacks->onReset();
+}
+
 } // namespace
 } // namespace Grpc
 } // namespace Envoy
