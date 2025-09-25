@@ -34,6 +34,14 @@ LogLevelSetter::~LogLevelSetter() {
   }
 }
 
+LogExpectation::LogExpectation(
+    LogEnvironment* log_env,
+    absl::AnyInvocable<void(Logger::Logger::Levels, const std::string&)> on_log)
+    : log_env_(log_env), on_log_(std::move(on_log)) {
+  log_env_->log_recorder_->addExpectation(this);
+}
+LogExpectation::~LogExpectation() { log_env_->log_recorder_->removeExpectation(this); }
+
 LogRecordingSink::LogRecordingSink(Logger::DelegatingLogSinkSharedPtr log_sink)
     : Logger::SinkDelegate(log_sink) {
   setDelegate();
@@ -48,6 +56,39 @@ void LogRecordingSink::log(absl::string_view msg, const spdlog::details::log_msg
     absl::MutexLock ml(&mtx_);
     messages_.push_back(std::string(msg));
   }
+
+  absl::MutexLock ml(&exp_mtx_);
+  for (auto* expect : expectations_) {
+    expect->on_log_(static_cast<Logger::Logger::Levels>(log_msg.level), std::string(msg));
+  }
+}
+
+const std::vector<std::string> LogRecordingSink::messages() const {
+  absl::MutexLock ml(&mtx_);
+  std::vector<std::string> copy(messages_);
+  return copy;
+}
+
+void LogRecordingSink::start() {
+  ASSERT(!enabled_);
+  enabled_ = true;
+}
+
+void LogRecordingSink::stop() {
+  ASSERT(enabled_);
+  enabled_ = false;
+  absl::MutexLock ml(&mtx_);
+  messages_.clear();
+}
+
+void LogRecordingSink::addExpectation(LogExpectation* exp) {
+  absl::MutexLock ml(&exp_mtx_);
+  expectations_.insert(exp);
+}
+
+void LogRecordingSink::removeExpectation(LogExpectation* exp) {
+  absl::MutexLock ml(&exp_mtx_);
+  expectations_.erase(exp);
 }
 
 void LogRecordingSink::flush() { previousDelegate()->flush(); }

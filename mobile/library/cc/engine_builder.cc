@@ -60,6 +60,11 @@ EngineBuilder& EngineBuilder::setLogger(std::unique_ptr<EnvoyLogger> logger) {
   return *this;
 }
 
+EngineBuilder& EngineBuilder::enableLogger(bool logger_on) {
+  enable_logger_ = logger_on;
+  return *this;
+}
+
 EngineBuilder& EngineBuilder::setEngineCallbacks(std::unique_ptr<EngineCallbacks> callbacks) {
   callbacks_ = std::move(callbacks);
   return *this;
@@ -880,7 +885,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 EngineSharedPtr EngineBuilder::build() {
   InternalEngine* envoy_engine =
       new InternalEngine(std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
-                         network_thread_priority_, disable_dns_refresh_on_network_change_);
+                         network_thread_priority_, disable_dns_refresh_on_network_change_, enable_logger_);
 
   for (const auto& [name, store] : key_value_stores_) {
     // TODO(goaway): This leaks, but it's tied to the life of the engine.
