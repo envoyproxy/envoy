@@ -7,7 +7,7 @@ External Authorization
 * :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>`
 
 The external authorization filter calls an external gRPC or HTTP service to determine whether an incoming
-HTTP request is authorized. If the request is unauthorized, Envoy returns a 403 (Forbidden) response.
+HTTP request is authorized. If the request is unauthorized, Envoy returns a ``403 (Forbidden)`` response.
 It is also possible to send additional custom metadata to the authorization service, and to propagate metadata
 returned by the authorization service to the upstream or downstream. See the :ref:`HTTP filter API
 <envoy_v3_api_msg_extensions.filters.http.ext_authz.v3.ExtAuthz>` for details.
