@@ -4575,7 +4575,7 @@ TEST_P(ExtProcIntegrationTest, MappedAttributeBuilder) {
 
   // Handle body message, making sure we did not send request attributes again.
   processGenericMessage(*grpc_upstreams_[0], false,
-                        [](const ProcessingRequest& req, ProcessingResponse&) {
+                        [&body_str](const ProcessingRequest& req, ProcessingResponse&) {
                           EXPECT_TRUE(req.has_request_body());
                           EXPECT_EQ(req.request_body().body(), body_str);
                           EXPECT_EQ(req.attributes().size(), 0);
