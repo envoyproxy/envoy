@@ -76,5 +76,6 @@ jobs:
           diskspace-hack: true
           diskspace-hack-paths: |
             /opt/hostedtoolcache
+            /usr/local/lib/android
         - target: fuzz_coverage
           name: Fuzz coverage
