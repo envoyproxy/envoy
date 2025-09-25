@@ -7128,7 +7128,8 @@ TEST_F(RouterTest, OrcaLoadReportCallbacks) {
 
   xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
   EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_, _))
-      .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report) {
+      .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
+                           const StreamInfo::StreamInfo&) {
         received_orca_load_report = orca_load_report;
         return absl::OkStatus();
       }));
@@ -7181,7 +7182,8 @@ TEST_F(RouterTest, OrcaLoadReportCallbackReturnsError) {
 
   xds::data::orca::v3::OrcaLoadReport received_orca_load_report;
   EXPECT_CALL(*host_lb_policy_data_raw_ptr, onOrcaLoadReport(_, _))
-      .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report) {
+      .WillOnce(Invoke([&](const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
+                           const StreamInfo::StreamInfo&) {
         received_orca_load_report = orca_load_report;
         // Return an error that gets logged by router filter.
         return absl::InvalidArgumentError("Unexpected ORCA load Report");
