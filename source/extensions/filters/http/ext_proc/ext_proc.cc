@@ -192,6 +192,7 @@ std::function<std::unique_ptr<ProcessingRequestModifier>()> createProcessingRequ
     const ConfigType& config,
     Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
     Server::Configuration::CommonFactoryContext& context) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   if (!config.has_processing_request_modifier()) {
     return nullptr;
   }
