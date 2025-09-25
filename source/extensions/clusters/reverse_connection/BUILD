@@ -16,6 +16,9 @@ envoy_cc_extension(
     deps = [
         "//envoy/upstream:cluster_factory_interface",
         "//source/common/http:header_utility_lib",
+        "//source/common/http/matching:data_impl_lib",
+        "//source/common/http/matching:inputs_lib",
+        "//source/common/matcher:matcher_lib",
         "//source/common/network:address_lib",
         "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:upstream_includes",

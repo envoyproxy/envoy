@@ -16,7 +16,7 @@ UpstreamSocketThreadLocal::UpstreamSocketThreadLocal(Event::Dispatcher& dispatch
 // ReverseTunnelAcceptorExtension implementation
 void ReverseTunnelAcceptorExtension::onServerInitialized() {
   ENVOY_LOG(debug,
-            "ReverseTunnelAcceptorExtension::onServerInitialized - creating thread local slot");
+            "ReverseTunnelAcceptorExtension::onServerInitialized: creating thread local slot");
 
   // Set the extension reference in the socket interface.
   if (socket_interface_) {
@@ -35,7 +35,7 @@ void ReverseTunnelAcceptorExtension::onServerInitialized() {
 // Get thread local registry for the current thread
 UpstreamSocketThreadLocal* ReverseTunnelAcceptorExtension::getLocalRegistry() const {
   if (!tls_slot_) {
-    ENVOY_LOG(error, "ReverseTunnelAcceptorExtension::getLocalRegistry() - no thread local slot");
+    ENVOY_LOG(error, "ReverseTunnelAcceptorExtension::getLocalRegistry(): no thread local slot");
     return nullptr;
   }
 

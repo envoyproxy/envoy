@@ -14,6 +14,8 @@
 #include "envoy/extensions/clusters/reverse_connection/v3/reverse_connection.pb.validate.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/http/matching/data_impl.h"
+#include "source/common/matcher/matcher.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/upstream/cluster_factory_impl.h"
@@ -29,10 +31,6 @@ namespace Extensions {
 namespace ReverseConnection {
 
 namespace BootstrapReverseConnection = Envoy::Extensions::Bootstrap::ReverseConnection;
-
-// Constants for reverse connection headers.
-const Http::LowerCaseString EnvoyDstNodeUUID{"x-remote-node-id"};
-const Http::LowerCaseString EnvoyDstClusterUUID{"x-dst-cluster-uuid"};
 
 /**
  * Custom address type that uses the UpstreamReverseSocketInterface.
@@ -149,25 +147,10 @@ public:
   public:
     LoadBalancer(const std::shared_ptr<RevConCluster>& parent) : parent_(parent) {}
 
-    // Chooses a host to send a downstream request over to a reverse connection endpoint.
-    // A request intended for a reverse connection has to have either of the below set and are.
-    // checked in the given order:.
-    // 1. If the host_id is set, it is used for creating the host.
-    // 2. The request should have either of the HTTP headers given in the RevConClusterConfig's
-    // http_header_names set. If any of the headers are set, the first found header is used to
-    // create the host.
-    // 3. The Host header should be set to "<uuid>.tcpproxy.envoy.remote:<remote_port>". This is
-    // mandatory if none of fields in 1. or 2. are set. The uuid is extracted from the host header
-    // and is used to create the host.
+    // Chooses a host to send a downstream request over a reverse connection endpoint.
+    // The request MUST provide a host identifier via dynamic metadata populated by a matcher
+    // action. No header or authority/SNI fallbacks are used.
     Upstream::HostSelectionResponse chooseHost(Upstream::LoadBalancerContext* context) override;
-
-    // Helper function to verify that the host header is of the format.
-    // "<uuid>.tcpproxy.envoy.remote:<remote_port>" and extract the uuid from the header.
-    absl::optional<absl::string_view> getUUIDFromHost(const Http::RequestHeaderMap& headers);
-
-    // Helper function to extract UUID from SNI (Server Name Indication) if it follows the format.
-    // "<uuid>.tcpproxy.envoy.remote".
-    absl::optional<absl::string_view> getUUIDFromSNI(const Network::Connection* connection);
 
     // Virtual functions that are not supported by our custom load-balancer.
     Upstream::HostConstSharedPtr peekAnotherHost(Upstream::LoadBalancerContext*) override {
@@ -215,13 +198,8 @@ private:
   // Periodically cleans the stale hosts from host_map_.
   void cleanup();
 
-  // Checks if a host exists for a given `host_id` and if not it creates and caches.
-  // that host to the map.
-  Upstream::HostSelectionResponse checkAndCreateHost(const std::string host_id);
-
-  // Checks if the request headers contain any header that hold host_id value.
-  // If such header is present, it return that header value.
-  absl::string_view getHostIdValue(const Http::RequestHeaderMap* request_headers);
+  // Checks if a host exists for a given host identifier and if not creates and caches it.
+  Upstream::HostSelectionResponse checkAndCreateHost(absl::string_view host_id);
 
   // Get the upstream socket manager from the thread-local registry.
   BootstrapReverseConnection::UpstreamSocketManager* getUpstreamSocketManager() const;
@@ -234,9 +212,11 @@ private:
   Event::TimerPtr cleanup_timer_;
   absl::Mutex host_map_lock_;
   absl::flat_hash_map<std::string, Upstream::HostSharedPtr> host_map_;
-  std::vector<absl::optional<Http::LowerCaseString>> http_header_names_;
-  // Host header suffix expected by envoy when acting as a L4 proxy.
-  std::string proxy_host_suffix_;
+  // Match tree that yields a HostIdAction.
+  Envoy::Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> host_id_match_tree_;
+  // Metadata namespace and key for the host identifier, populated by a matcher action.
+  static constexpr absl::string_view kMetadataNamespace{"reverse_connection"};
+  static constexpr absl::string_view kHostIdKey{"host_id"};
   friend class RevConClusterFactory;
 };
 

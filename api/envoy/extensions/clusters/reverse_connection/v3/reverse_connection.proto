@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.clusters.reverse_connection.v3;
 
 import "google/protobuf/duration.proto";
+import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
@@ -13,19 +14,72 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/clusters/reverse_connection/v3;reverse_connectionv3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Settings for the Reverse Connection Cluster]
+// [#protodoc-title: Reverse connection cluster]
 // [#extension: envoy.clusters.reverse_connection]
 
-// Specific configuration for a cluster configured as REVERSE_CONNECTION cluster.
+// Configuration for a cluster of type REVERSE_CONNECTION.
 message RevConClusterConfig {
-  // List of HTTP headers to look for in downstream request headers, to deduce the
-  // upstream endpoint.
-  repeated string http_header_names = 1;
+  // Time interval after which Envoy removes unused dynamic hosts created for reverse connections.
+  // Hosts that are not referenced by any connection pool are deleted during cleanup.
+  //
+  // If unset, Envoy uses a default of 60s.
+  google.protobuf.Duration cleanup_interval = 1 [(validate.rules).duration = {gt {}}];
 
-  // Time interval after which envoy attempts to clean the stale host entries.
-  google.protobuf.Duration cleanup_interval = 2 [(validate.rules).duration = {gt {}}];
+  // Host identifier matcher.
+  //
+  // This matcher is evaluated on the downstream request and yields a ``HostIdAction``.
+  // The action's payload is used as the host identifier to select the reverse connection
+  // endpoint.
+  //
+  // Typical rules use built-in inputs such as:
+  //
+  // * ``HttpRequestHeaderMatchInput`` to map a request header value.
+  // * ``HttpAttributesCelMatchInput`` to compute a value with CEL from headers/SNI.
+  //
+  // The match tree can be a list or a map matcher. The first matching rule should
+  // return a ``HostIdAction`` with the desired identifier.
+  //
+  // Example:
+  //
+  // .. validated-code-block:: yaml
+  //   :type-name: xds.type.matcher.v3.Matcher
+  //
+  //   matcher_list:
+  //     matchers:
+  //     - predicate:
+  //         single_predicate:
+  //           input:
+  //             typed_config:
+  //               '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+  //               header_name: x-remote-node-id
+  //           value_match:
+  //             exact: node-a
+  //       on_match:
+  //         action:
+  //           typed_config:
+  //             '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
+  //             host_id: "node-a"
+  //
+  //     - predicate:
+  //         single_predicate:
+  //           input:
+  //             typed_config:
+  //               '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+  //               header_name: x-remote-node-id
+  //           value_match:
+  //             exact: node-b
+  //       on_match:
+  //         action:
+  //           typed_config:
+  //             '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
+  //             host_id: "node-b"
+  //
+  // If the matcher does not return a ``HostIdAction``, the request will not be routed.
+  xds.type.matcher.v3.Matcher host_id_matcher = 2 [(validate.rules).message = {required: true}];
+}
 
-  // Suffix expected in the host header when envoy acts as a L4 proxy and deduces
-  // the cluster from the host header.
-  string proxy_host_suffix = 3;
+// Action that returns the resolved host identifier.
+message HostIdAction {
+  // Resolved host identifier for the reverse connection endpoint.
+  string host_id = 1 [(validate.rules).string = {min_len: 1}];
 }
