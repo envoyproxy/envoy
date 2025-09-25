@@ -1603,7 +1603,7 @@ public:
   ~TestHeaderFilterFactory() override = default;
 
   FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                         Server::Configuration::FactoryContext& context) override {
+                         Server::Configuration::GenericFactoryContext& context) override {
     auto factory_config = Config::Utility::translateToFactoryConfig(
         config, context.messageValidationVisitor(), *this);
     const auto& header_config =
@@ -1699,7 +1699,7 @@ public:
   ~SampleExtensionFilterFactory() override = default;
 
   FilterPtr createFilter(const envoy::config::accesslog::v3::ExtensionFilter& config,
-                         Server::Configuration::FactoryContext& context) override {
+                         Server::Configuration::GenericFactoryContext& context) override {
     auto factory_config = Config::Utility::translateToFactoryConfig(
         config, context.messageValidationVisitor(), *this);
 

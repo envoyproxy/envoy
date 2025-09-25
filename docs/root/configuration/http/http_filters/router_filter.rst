@@ -83,8 +83,8 @@ can be specified using a ',' delimited list. The supported policies are:
     request, including any retries that take place.
 
 gateway-error
-  This policy is similar to the *5xx* policy but will only retry requests that result in a 502, 503,
-  or 504.
+  This policy is similar to the *5xx* policy but will attempt a retry if the upstream server responds
+  with 502, 503, or 504 response code, or does not respond at all (disconnect/reset/read timeout).
 
 reset
   Envoy will attempt a retry if the upstream server does not respond at all (disconnect/reset/read timeout.)

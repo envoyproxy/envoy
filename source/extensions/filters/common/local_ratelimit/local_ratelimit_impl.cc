@@ -37,10 +37,8 @@ ShareProviderManager::ShareProviderManager(Event::Dispatcher& main_dispatcher,
     : main_dispatcher_(main_dispatcher), cluster_(cluster) {
   // It's safe to capture the local cluster reference here because the local cluster is
   // guaranteed to be static cluster and should never be removed.
-  handle_ = cluster_.prioritySet().addMemberUpdateCb([this](const auto&, const auto&) {
-    share_monitor_->onLocalClusterUpdate(cluster_);
-    return absl::OkStatus();
-  });
+  handle_ = cluster_.prioritySet().addMemberUpdateCb(
+      [this](const auto&, const auto&) { share_monitor_->onLocalClusterUpdate(cluster_); });
   share_monitor_ = std::make_shared<DefaultEvenShareMonitor>();
   share_monitor_->onLocalClusterUpdate(cluster_);
 }
