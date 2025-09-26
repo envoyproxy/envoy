@@ -26,6 +26,8 @@ envoy_cc_library(
         "@com_google_cel_cpp//eval/public:cel_expression",
         "@com_google_cel_cpp//eval/public:cel_value",
         "@com_google_cel_cpp//extensions:regex_functions",
+        "@com_google_cel_cpp//extensions:strings",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
