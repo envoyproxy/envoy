@@ -883,8 +883,7 @@ void InstanceBase::onRuntimeReady() {
   if (bootstrap_.has_hds_config()) {
     const auto& hds_config = bootstrap_.hds_config();
     async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-        *config_.clusterManager(), thread_local_, server_contexts_, grpc_context_.statNames(),
-        bootstrap_.grpc_async_client_manager_config());
+        bootstrap_.grpc_async_client_manager_config(), server_contexts_, grpc_context_.statNames());
     TRY_ASSERT_MAIN_THREAD {
       THROW_IF_NOT_OK(Config::Utility::checkTransportVersion(hds_config));
       // HDS does not support xDS-Failover.
@@ -907,11 +906,13 @@ void InstanceBase::onRuntimeReady() {
 
   // TODO (nezdolik): Fully deprecate this runtime key in the next release.
   if (runtime().snapshot().get(Runtime::Keys::GlobalMaxCxRuntimeKey)) {
-    ENVOY_LOG(warn,
-              "Usage of the deprecated runtime key {}, consider switching to "
-              "`envoy.resource_monitors.global_downstream_max_connections` instead."
-              "This runtime key will be removed in future.",
-              Runtime::Keys::GlobalMaxCxRuntimeKey);
+    if (!options_.skipDeprecatedLogs()) {
+      ENVOY_LOG(warn,
+                "Usage of the deprecated runtime key {}, consider switching to "
+                "`envoy.resource_monitors.global_downstream_max_connections` instead."
+                "This runtime key will be removed in future.",
+                Runtime::Keys::GlobalMaxCxRuntimeKey);
+    }
   }
 }
 

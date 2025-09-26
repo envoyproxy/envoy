@@ -30,6 +30,7 @@
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/router/upstream_to_downstream_impl_base.h"
 #include "source/common/stats/symbol_table.h"
 
 #include "test/mocks/stats/mocks.h"
@@ -714,7 +715,7 @@ public:
       new NiceMock<Upstream::MockHostDescription>()};
 };
 
-class MockUpstreamToDownstream : public UpstreamToDownstream {
+class MockUpstreamToDownstream : public UpstreamToDownstreamImplBase {
 public:
   MOCK_METHOD(const Route&, route, (), (const));
   MOCK_METHOD(OptRef<const Network::Connection>, connection, (), (const));
