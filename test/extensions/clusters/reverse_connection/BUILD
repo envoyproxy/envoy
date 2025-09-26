@@ -11,9 +11,12 @@ envoy_package()
 envoy_cc_test(
     name = "reverse_connection_cluster_test",
     srcs = ["reverse_connection_cluster_test.cc"],
+    copts = ["-DUSE_CEL_PARSER"],
     deps = [
         "//envoy/registry",
+        "//source/common/formatter:formatter_extension_lib",
         "//source/extensions/clusters/reverse_connection:reverse_connection_lib",
+        "//source/extensions/formatter/cel:cel_lib",
         "//source/extensions/load_balancing_policies/cluster_provided:config",
         "//test/common/upstream:utility_lib",
         "//test/mocks/network:network_mocks",
