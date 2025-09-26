@@ -95,7 +95,7 @@ envoy.clusters.reverse_connection:
   security_posture: unknown
   status: wip
   type_urls:
-  - envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+  - envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
 envoy.extensions.http.cache.file_system_http_cache:
   categories:
   - envoy.http.cache

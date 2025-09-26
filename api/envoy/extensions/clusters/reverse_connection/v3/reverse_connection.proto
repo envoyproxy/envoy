@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#extension: envoy.clusters.reverse_connection]
 
 // Configuration for a cluster of type REVERSE_CONNECTION.
-message RevConClusterConfig {
+message ReverseConnectionClusterConfig {
   // Time interval after which Envoy removes unused dynamic hosts created for reverse connections.
   // Hosts that are not referenced by any connection pool are deleted during cleanup.
   //

@@ -135,7 +135,7 @@ class RevConCluster : public Upstream::ClusterImplBase {
 public:
   RevConCluster(const envoy::config::cluster::v3::Cluster& config,
                 Upstream::ClusterFactoryContext& context, absl::Status& creation_status,
-                const envoy::extensions::clusters::reverse_connection::v3::RevConClusterConfig&
+                const envoy::extensions::clusters::reverse_connection::v3::ReverseConnectionClusterConfig&
                     rev_con_config);
 
   ~RevConCluster() override { cleanup_timer_->disableTimer(); }
@@ -224,7 +224,7 @@ using RevConClusterSharedPtr = std::shared_ptr<RevConCluster>;
 
 class RevConClusterFactory
     : public Upstream::ConfigurableClusterFactoryBase<
-          envoy::extensions::clusters::reverse_connection::v3::RevConClusterConfig> {
+          envoy::extensions::clusters::reverse_connection::v3::ReverseConnectionClusterConfig> {
 public:
   RevConClusterFactory() : ConfigurableClusterFactoryBase("envoy.clusters.reverse_connection") {}
 
@@ -234,7 +234,7 @@ private:
       std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
   createClusterWithConfig(
       const envoy::config::cluster::v3::Cluster& cluster,
-      const envoy::extensions::clusters::reverse_connection::v3::RevConClusterConfig& proto_config,
+      const envoy::extensions::clusters::reverse_connection::v3::ReverseConnectionClusterConfig& proto_config,
       Upstream::ClusterFactoryContext& context) override;
 };
 

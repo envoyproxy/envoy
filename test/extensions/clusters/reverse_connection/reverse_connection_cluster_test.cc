@@ -44,6 +44,41 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Extensions {
 namespace ReverseConnection {
+// HostIdActionFactory unit tests.
+TEST(HostIdActionFactoryTest, NameAndCreateAction) {
+  // Prepare a minimal cluster factory context.
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
+  NiceMock<ThreadLocal::MockInstance> thread_local;
+  Stats::IsolatedStoreImpl stats_store;
+  auto stats_scope = Stats::ScopeSharedPtr(stats_store.createScope("test_scope."));
+  EXPECT_CALL(server_context, threadLocal()).WillRepeatedly(ReturnRef(thread_local));
+  EXPECT_CALL(server_context, scope()).WillRepeatedly(ReturnRef(*stats_scope));
+
+  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context, nullptr, nullptr,
+                                                             false);
+
+  // Build a HostIdAction proto.
+  envoy::extensions::clusters::reverse_connection::v3::HostIdAction action_proto;
+  action_proto.set_host_id("host-123");
+
+  // Create the factory and verify name.
+  HostIdActionFactory factory;
+  EXPECT_EQ(factory.name(), "envoy.matching.actions.reverse_connection.host_id");
+
+  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
+  auto action = factory.createAction(action_proto, factory_context, validation_visitor);
+  ASSERT_NE(action, nullptr);
+
+  // Verify the created action carries the host identifier.
+  const auto& typed = action->getTyped<HostIdAction>();
+  EXPECT_EQ(typed.host_id(), "host-123");
+
+  // Verify createEmptyConfigProto returns the expected message type.
+  auto empty = factory.createEmptyConfigProto();
+  auto* empty_typed =
+      dynamic_cast<envoy::extensions::clusters::reverse_connection::v3::HostIdAction*>(empty.get());
+  EXPECT_NE(empty_typed, nullptr);
+}
 
 class TestLoadBalancerContext : public Upstream::LoadBalancerContextBase {
 public:
@@ -127,8 +162,8 @@ public:
 
     RevConClusterFactory factory;
 
-    // Parse the RevConClusterConfig from the cluster's typed_config.
-    envoy::extensions::clusters::reverse_connection::v3::RevConClusterConfig rev_con_config;
+    // Parse the ReverseConnectionClusterConfig from the cluster's typed_config.
+    envoy::extensions::clusters::reverse_connection::v3::ReverseConnectionClusterConfig rev_con_config;
     THROW_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
         cluster_config.cluster_type().typed_config(), validation_visitor_, rev_con_config));
 
@@ -290,7 +325,7 @@ TEST(ReverseConnectionClusterConfigTest, ValidConfig) {
     cluster_type:
       name: envoy.clusters.reverse_connection
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
         host_id_matcher:
           matcher_list:
@@ -334,7 +369,7 @@ TEST_F(ReverseConnectionClusterTest, BadConfigWithLoadAssignment) {
     cluster_type:
       name: envoy.clusters.reverse_connection
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
   )EOF";
 
@@ -352,7 +387,7 @@ TEST_F(ReverseConnectionClusterTest, BadConfigWithWrongLbPolicy) {
     cluster_type:
       name: envoy.clusters.reverse_connection
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
   )EOF";
 
@@ -371,7 +406,7 @@ TEST_F(ReverseConnectionClusterTest, BasicSetup) {
     cluster_type:
       name: envoy.clusters.reverse_connection
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
         host_id_matcher:
           matcher_list:
@@ -409,7 +444,7 @@ TEST_F(ReverseConnectionClusterTest, NoContext) {
     cluster_type:
       name: envoy.clusters.reverse_connection
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
         host_id_matcher:
           matcher_list:
@@ -467,7 +502,7 @@ TEST_F(ReverseConnectionClusterTest, NoHeaders) {
     cluster_type:
       name: envoy.clusters.reverse_connection
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
         host_id_matcher:
           matcher_list:
@@ -511,7 +546,7 @@ TEST_F(ReverseConnectionClusterTest, MissingRequiredHeaders) {
     cluster_type:
       name: envoy.clusters.reverse_connection
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
         host_id_matcher:
           matcher_list:
@@ -565,7 +600,7 @@ TEST_F(ReverseConnectionClusterTest, HostCreationWithoutSocketManager) {
     cluster_type:
       name: envoy.clusters.reverse_connection
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
         host_id_matcher:
           matcher_list:
@@ -625,7 +660,7 @@ TEST_F(ReverseConnectionClusterTest, SocketInterfaceNotRegistered) {
     cluster_type:
       name: envoy.clusters.reverse_connection
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
         host_id_matcher:
           matcher_list:
@@ -675,7 +710,7 @@ TEST_F(ReverseConnectionClusterTest, HostCreationWithSocketManager) {
     cluster_type:
       name: envoy.clusters.reverse_connection
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
         host_id_matcher:
           matcher_list:
@@ -767,7 +802,7 @@ TEST_F(ReverseConnectionClusterTest, HostReuse) {
     cluster_type:
       name: envoy.clusters.reverse_connection
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
         host_id_matcher:
           matcher_list:
@@ -826,7 +861,7 @@ TEST_F(ReverseConnectionClusterTest, DifferentHostsForDifferentUUIDs) {
     cluster_type:
       name: envoy.clusters.reverse_connection
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
         host_id_matcher:
           matcher_list:
@@ -901,7 +936,7 @@ TEST_F(ReverseConnectionClusterTest, TestCleanup) {
     cluster_type:
       name: envoy.clusters.reverse_connection
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
         host_id_matcher:
           matcher_list:
@@ -1005,7 +1040,7 @@ TEST_F(ReverseConnectionClusterTest, TestCleanupWithUsedHosts) {
     cluster_type:
       name: envoy.clusters.reverse_connection
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
         host_id_matcher:
           matcher_list:
@@ -1113,7 +1148,7 @@ TEST_F(ReverseConnectionClusterTest, LoadBalancerFactory) {
     cluster_type:
       name: envoy.clusters.reverse_connection
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
         host_id_matcher:
           matcher_list:
@@ -1169,7 +1204,7 @@ TEST_F(ReverseConnectionClusterTest, ThreadAwareLoadBalancer) {
     cluster_type:
       name: envoy.clusters.reverse_connection
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
         host_id_matcher:
           matcher_list:
@@ -1224,7 +1259,7 @@ TEST_F(ReverseConnectionClusterTest, LoadBalancerNoopMethods) {
     cluster_type:
       name: envoy.clusters.reverse_connection
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
         host_id_matcher:
           matcher_list:
