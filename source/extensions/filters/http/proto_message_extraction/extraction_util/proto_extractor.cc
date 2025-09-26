@@ -134,6 +134,13 @@ ProtoExtractor::ExtractMessage(const Protobuf::field_extraction::MessageData& ra
       GetTargetResourceOrTargetResourceCallback(field_mask, message_copy, /*callback=*/true,
                                                 &extracted_message_metadata);
       break;
+    case ExtractedMessageDirective::EXTRACT_SIZE: {
+      // There should be at most one repeated field tagged with EXTRACT_SIZE.
+      auto result =
+          ExtractRepeatedFieldSize(*message_type_, type_finder_, &field_mask, message_copy);
+      extracted_message_metadata.num_response_items.emplace(result);
+      break;
+    }
     default:
       // No need to handle EXTRACT_REDACT, and method level directives.
       break;
