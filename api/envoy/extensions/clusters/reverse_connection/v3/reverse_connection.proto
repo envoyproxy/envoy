@@ -4,8 +4,6 @@ package envoy.extensions.clusters.reverse_connection.v3;
 
 import "google/protobuf/duration.proto";
 
-import "xds/type/matcher/v3/matcher.proto";
-
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
@@ -26,61 +24,26 @@ message ReverseConnectionClusterConfig {
   // If unset, Envoy uses a default of 60s.
   google.protobuf.Duration cleanup_interval = 1 [(validate.rules).duration = {gt {}}];
 
-  // Host identifier matcher.
+  // Host identifier format string.
   //
-  // This matcher is evaluated on the downstream request and yields a ``HostIdAction``.
-  // The action's payload is used as the host identifier to select the reverse connection
-  // endpoint.
+  // This format string is evaluated against the downstream request context to compute
+  // the host identifier for selecting the reverse connection endpoint. The format string
+  // supports Envoy's standard formatter syntax, including:
   //
-  // Typical rules use built-in inputs such as:
+  // * ``%REQ(header-name)%``: Extract request header value.
+  // * ``%DYNAMIC_METADATA(namespace:key)%``: Extract dynamic metadata value.
+  // * ``%CEL(expression)%``: Evaluate CEL expression.
+  // * ``%DOWNSTREAM_REMOTE_ADDRESS%``: Downstream connection address.
+  // * ``%DOWNSTREAM_LOCAL_ADDRESS%``: Downstream local address.
+  // * Plain text and combinations of the above.
   //
-  // * ``HttpRequestHeaderMatchInput`` to map a request header value.
-  // * ``HttpAttributesCelMatchInput`` to compute a value with CEL from headers/SNI.
+  // Examples:
   //
-  // The match tree can be a list or a map matcher. The first matching rule should
-  // return a ``HostIdAction`` with the desired identifier.
+  // * ``%REQ(x-remote-node-id)%``: Use the value of the ``x-remote-node-id`` header.
+  // * ``%REQ(host):EXTRACT_FIRST_PART%``: Extract the first part of the Host header before a dot.
+  // * ``%CEL(request.headers['x-node-id'] | orValue('default'))%``: Use CEL with fallback.
+  // * ``node-%REQ(x-tenant-id)%-%REQ(x-region)%``: Combine multiple values.
   //
-  // Example:
-  //
-  // .. validated-code-block:: yaml
-  //   :type-name: xds.type.matcher.v3.Matcher
-  //
-  //   matcher_list:
-  //     matchers:
-  //     - predicate:
-  //         single_predicate:
-  //           input:
-  //             typed_config:
-  //               '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-  //               header_name: x-remote-node-id
-  //           value_match:
-  //             exact: node-a
-  //       on_match:
-  //         action:
-  //           typed_config:
-  //             '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
-  //             host_id: "node-a"
-  //
-  //     - predicate:
-  //         single_predicate:
-  //           input:
-  //             typed_config:
-  //               '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-  //               header_name: x-remote-node-id
-  //           value_match:
-  //             exact: node-b
-  //       on_match:
-  //         action:
-  //           typed_config:
-  //             '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
-  //             host_id: "node-b"
-  //
-  // If the matcher does not return a ``HostIdAction``, the request will not be routed.
-  xds.type.matcher.v3.Matcher host_id_matcher = 2 [(validate.rules).message = {required: true}];
-}
-
-// Action that returns the resolved host identifier.
-message HostIdAction {
-  // Resolved host identifier for the reverse connection endpoint.
-  string host_id = 1 [(validate.rules).string = {min_len: 1}];
+  // If the format string evaluates to an empty value, the request will not be routed.
+  string host_id_format = 2 [(validate.rules).string = {min_len: 1}];
 }
