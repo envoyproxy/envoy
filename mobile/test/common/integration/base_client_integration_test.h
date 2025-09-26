@@ -48,7 +48,7 @@ public:
 protected:
   InternalEngine* internalEngine() {
     absl::MutexLock l(&engine_lock_);
-    return engine_->engine_;
+    return engine_->engine_.get();
   }
   void initialize() override;
   Platform::StreamSharedPtr createNewStream(EnvoyStreamCallbacks&& stream_callbacks);

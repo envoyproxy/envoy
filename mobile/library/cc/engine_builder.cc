@@ -883,7 +883,7 @@ std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> EngineBuilder::generate
 }
 
 EngineSharedPtr EngineBuilder::build() {
-  InternalEngine* envoy_engine = new InternalEngine(
+  auto envoy_engine = std::make_unique<InternalEngine>(
       std::move(callbacks_), std::move(logger_), std::move(event_tracker_),
       network_thread_priority_, disable_dns_refresh_on_network_change_, enable_logger_);
 
@@ -911,7 +911,7 @@ EngineSharedPtr EngineBuilder::build() {
   }
 #endif
 
-  Engine* engine = new Engine(envoy_engine);
+  Engine* engine = new Engine(std::move(envoy_engine));
 
   auto options = std::make_shared<Envoy::OptionsImplBase>();
   std::unique_ptr<envoy::config::bootstrap::v3::Bootstrap> bootstrap = generateBootstrap();
@@ -920,7 +920,7 @@ EngineSharedPtr EngineBuilder::build() {
   }
   options->setLogLevel(static_cast<spdlog::level::level_enum>(log_level_));
   options->setConcurrency(1);
-  envoy_engine->run(options);
+  engine->engine()->run(options);
 
   // we can't construct via std::make_shared
   // because Engine is only constructible as a friend
