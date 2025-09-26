@@ -906,11 +906,13 @@ void InstanceBase::onRuntimeReady() {
 
   // TODO (nezdolik): Fully deprecate this runtime key in the next release.
   if (runtime().snapshot().get(Runtime::Keys::GlobalMaxCxRuntimeKey)) {
-    ENVOY_LOG(warn,
-              "Usage of the deprecated runtime key {}, consider switching to "
-              "`envoy.resource_monitors.global_downstream_max_connections` instead."
-              "This runtime key will be removed in future.",
-              Runtime::Keys::GlobalMaxCxRuntimeKey);
+    if (!options_.skipDeprecatedLogs()) {
+      ENVOY_LOG(warn,
+                "Usage of the deprecated runtime key {}, consider switching to "
+                "`envoy.resource_monitors.global_downstream_max_connections` instead."
+                "This runtime key will be removed in future.",
+                Runtime::Keys::GlobalMaxCxRuntimeKey);
+    }
   }
 }
 
