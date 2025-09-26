@@ -4540,8 +4540,7 @@ TEST_P(ExtProcIntegrationTest, RequestResponseAttributes) {
 }
 
 TEST_P(ExtProcIntegrationTest, MappedAttributeBuilder) {
-  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
-  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::BUFFERED);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::STREAMED);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
 
   envoy::extensions::http::ext_proc::processing_request_modifiers::mapped_attribute_builder::v3::
@@ -4560,9 +4559,8 @@ TEST_P(ExtProcIntegrationTest, MappedAttributeBuilder) {
   // Handle request headers message.
   processGenericMessage(
       *grpc_upstreams_[0], true, [](const ProcessingRequest& req, ProcessingResponse& resp) {
-        // Add something to the response so the message isn't seen as spurious
-        envoy::service::ext_proc::v3::HeadersResponse headers_resp;
-        *(resp.mutable_request_headers()) = headers_resp;
+        // Set as a header response
+        resp.mutable_request_headers();
 
         EXPECT_TRUE(req.has_request_headers());
         EXPECT_EQ(req.attributes().size(), 1);
@@ -4575,7 +4573,10 @@ TEST_P(ExtProcIntegrationTest, MappedAttributeBuilder) {
 
   // Handle body message, making sure we did not send request attributes again.
   processGenericMessage(*grpc_upstreams_[0], false,
-                        [&body_str](const ProcessingRequest& req, ProcessingResponse&) {
+                        [&body_str](const ProcessingRequest& req, ProcessingResponse& resp) {
+                          // Set as a body response
+                          resp.mutable_request_body();
+
                           EXPECT_TRUE(req.has_request_body());
                           EXPECT_EQ(req.request_body().body(), body_str);
                           EXPECT_EQ(req.attributes().size(), 0);
