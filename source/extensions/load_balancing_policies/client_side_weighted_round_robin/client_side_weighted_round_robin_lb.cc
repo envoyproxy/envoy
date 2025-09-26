@@ -167,7 +167,7 @@ void ClientSideWeightedRoundRobinLoadBalancer::addClientSideLbPolicyDataToHosts(
 }
 
 absl::Status ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData::onOrcaLoadReport(
-    const Upstream::OrcaLoadReport& report) {
+    const Upstream::OrcaLoadReport& report, const StreamInfo::StreamInfo&) {
   ASSERT(report_handler_ != nullptr);
   return report_handler_->updateClientSideDataFromOrcaLoadReport(report, *this);
 }
