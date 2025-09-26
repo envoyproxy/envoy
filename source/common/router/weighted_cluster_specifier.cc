@@ -72,7 +72,10 @@ WeightedClusterSpecifierPlugin::WeightedClusterSpecifierPlugin(
     Server::Configuration::ServerFactoryContext& context, absl::Status& creation_status)
     : loader_(context.runtime()), random_value_header_(weighted_clusters.header_name()),
       runtime_key_prefix_(weighted_clusters.runtime_key_prefix()),
-      use_hash_policy_(weighted_clusters.has_use_hash_policy() ? weighted_clusters.use_hash_policy().value() : false) {
+      use_hash_policy_(weighted_clusters.random_value_specifier_case() ==
+                               WeightedClusterProto::kUseHashPolicy
+                           ? weighted_clusters.use_hash_policy().value()
+                           : false) {
 
   absl::string_view runtime_key_prefix = weighted_clusters.runtime_key_prefix();
 
@@ -204,25 +207,23 @@ private:
 // This function takes into account the weights set through configuration or through
 // runtime parameters.
 // Returns selected cluster, or nullptr if weighted configuration is invalid.
-RouteConstSharedPtr
-WeightedClusterSpecifierPlugin::pickWeightedCluster(RouteEntryAndRouteConstSharedPtr parent,
-                                                    const Http::RequestHeaderMap& headers,
-                                                    const uint64_t random_value,
-                                                    const StreamInfo::StreamInfo* stream_info) const {
+RouteConstSharedPtr WeightedClusterSpecifierPlugin::pickWeightedCluster(
+    RouteEntryAndRouteConstSharedPtr parent, const Http::RequestHeaderMap& headers,
+    const StreamInfo::StreamInfo* stream_info, const uint64_t random_value) const {
   absl::optional<uint64_t> hash_value;
-  
+
   // Only use hash policy if explicitly enabled via use_hash_policy field
   if (use_hash_policy_ && stream_info != nullptr) {
     const auto* route_hash_policy = parent->hashPolicy();
     if (route_hash_policy != nullptr) {
-      hash_value =
-          route_hash_policy->generateHash(OptRef<const Http::RequestHeaderMap>(headers),
-                                          OptRef<const StreamInfo::StreamInfo>(*stream_info), nullptr);
+      hash_value = route_hash_policy->generateHash(
+          OptRef<const Http::RequestHeaderMap>(headers),
+          OptRef<const StreamInfo::StreamInfo>(*stream_info), nullptr);
     }
   }
-  
+
   const uint64_t selection_value = hash_value.has_value() ? hash_value.value() : random_value;
-  
+
   absl::optional<uint64_t> random_value_from_header;
   // Retrieve the random value from the header if corresponding header name is specified.
   // weighted_clusters_config_ is known not to be nullptr here. If it were, pickWeightedCluster

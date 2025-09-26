@@ -210,7 +210,7 @@ TEST_P(WeightedClusterHashPolicyIntegrationTest, SameUserIdGoesToSameUpstream) {
   // Test: Same user ID should consistently go to only one upstream
   const std::string user_id = "consistent-user-123";
   std::string selected_upstream;
-  
+
   // Make multiple requests with the same user ID
   for (int request = 0; request < 5; ++request) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -258,7 +258,8 @@ TEST_P(WeightedClusterHashPolicyIntegrationTest, SameUserIdGoesToSameUpstream) {
       EXPECT_TRUE(selected_upstream == "upstream_0" || selected_upstream == "upstream_1");
     } else {
       EXPECT_EQ(selected_upstream, current_upstream)
-          << "Request " << (request + 1) << ": Same user ID should consistently route to same upstream. "
+          << "Request " << (request + 1)
+          << ": Same user ID should consistently route to same upstream. "
           << "Expected: " << selected_upstream << ", Got: " << current_upstream;
     }
 
@@ -275,7 +276,7 @@ TEST_P(WeightedClusterHashPolicyIntegrationTest, DifferentUserIdsCanGoToDifferen
   // Test with multiple different user IDs to verify they can go to different clusters
   std::vector<std::string> user_ids = {"user-1", "user-2", "user-3", "user-4", "user-5"};
   std::map<std::string, std::string> user_to_upstream;
-  
+
   for (const auto& user_id : user_ids) {
     codec_client_ = makeHttpConnection(lookupPort("http"));
 
@@ -325,7 +326,7 @@ TEST_P(WeightedClusterHashPolicyIntegrationTest, DifferentUserIdsCanGoToDifferen
   for (const auto& pair : user_to_upstream) {
     unique_upstreams.insert(pair.second);
   }
-  
+
   // We should have at least some distribution (not all users going to the same upstream)
   // Note: Due to hash distribution, it's possible all users go to the same upstream,
   // but it's unlikely with 5 different user IDs
@@ -339,7 +340,7 @@ TEST_P(WeightedClusterHashPolicyIntegrationTest, WeightedDistributionTest) {
   // Test weighted distribution by making many requests with different user IDs
   std::map<std::string, int> upstream_counts;
   const int num_requests = 100;
-  
+
   for (int i = 0; i < num_requests; ++i) {
     std::string user_id = "user-" + std::to_string(i);
     codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -385,7 +386,6 @@ TEST_P(WeightedClusterHashPolicyIntegrationTest, WeightedDistributionTest) {
     codec_client_->close();
   }
 
-  
   // The distribution should roughly follow the weights (60% vs 40%)
   // Hash policy ensures consistency for same user, but different users should
   // be distributed according to cluster weights
