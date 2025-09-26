@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package envoy.source.extensions.common.wasm;
+
+// Arguments for signing data with a private key.
+message SignArguments {
+  string hash_function = 1;   // Hash function to use (e.g., "sha256")
+  bytes private_key = 2;      // Private key in DER format (mutually exclusive with private_key_pem)
+  string private_key_pem = 4; // Private key in PEM format (mutually exclusive with private_key)
+  bytes text = 3;             // Data to sign
+}
+
+// Result of the signing operation.
+message SignResult {
+  bool result = 1;     // True if signing was successful
+  bytes signature = 2; // The generated signature
+  string error = 3;    // Error message if signing failed
+};
