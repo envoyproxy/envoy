@@ -59,8 +59,14 @@ public:
   bool enableJA3Fingerprinting() const { return enable_ja3_fingerprinting_; }
   uint32_t maxClientHelloSize() const { return max_client_hello_size_; }
   uint32_t initialReadBufferSize() const { return initial_read_buffer_size_; }
+  bool closeConnectionOnTlsHelloParsingErrors() const {
+    return close_connection_on_client_hello_parsing_errors_;
+  }
 
-  static constexpr size_t TLS_MAX_CLIENT_HELLO = 64 * 1024;
+  // This is the maximum size of a ClientHello that boring ssl will accept.
+  // Here is the check in boring ssl:
+  // https://boringssl.googlesource.com/boringssl/+/refs/tags/0.20250818.0/ssl/handshake.cc#137
+  static constexpr size_t TLS_MAX_CLIENT_HELLO = SSL3_RT_MAX_PLAIN_LENGTH;
   static const unsigned TLS_MIN_SUPPORTED_VERSION;
   static const unsigned TLS_MAX_SUPPORTED_VERSION;
 
@@ -68,6 +74,8 @@ private:
   TlsInspectorStats stats_;
   bssl::UniquePtr<SSL_CTX> ssl_ctx_;
   const bool enable_ja3_fingerprinting_;
+  const bool enable_ja4_fingerprinting_;
+  const bool close_connection_on_client_hello_parsing_errors_;
   const uint32_t max_client_hello_size_;
   const uint32_t initial_read_buffer_size_;
 };
@@ -93,6 +101,8 @@ private:
   void onServername(absl::string_view name);
   void createJA3Hash(const SSL_CLIENT_HELLO* ssl_client_hello);
   uint32_t maxConfigReadBytes() const { return config_->maxClientHelloSize(); }
+  ParseState getParserState(int handshake_status);
+  void setDynamicMetadata(absl::string_view failure_reason);
 
   ConfigSharedPtr config_;
   Network::ListenerFilterCallbacks* cb_{};
