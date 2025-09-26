@@ -465,6 +465,12 @@ new_features:
     when used in formatting contexts that accept non-string values, such as
     :ref:`json_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.json_format>`. The new command is introduced
     so as to not break compatibility with the existing command's behavior.
+- area: rbac
+  change: |
+    Enabled use of :ref:`NetworkNamespaceInput
+    <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.NetworkNamespaceInput>` in the
+    network and HTTP RBAC filters' matchers. This allows RBAC policies to evaluate the Linux network
+    namespace of the listening socket via the generic matcher API.
 - area: dynamic_modules
   change: |
     Added a new Logging ABI that allows modules to emit logs in the standard Envoy logging stream under ``dynamic_modules`` ID.
