@@ -40,6 +40,7 @@ struct GrpcInitializeConfigOpts {
   uint64_t timeout_ms = 300'000; // 5 minutes.
   bool validate_mutations = false;
   bool retry_5xx = false;
+  uint32_t max_denied_response_body_bytes = 0;
   // In some tests a request is never sent. If a request is never sent, stats are not set. In those
   // tests, we need to be able to override this to false.
   absl::optional<bool> expect_stats_override;
@@ -134,6 +135,7 @@ public:
       proto_config_.set_failure_mode_allow_header_add(opts.failure_mode_allow);
       proto_config_.set_validate_mutations(opts.validate_mutations);
       proto_config_.set_encode_raw_headers(encodeRawHeaders());
+      proto_config_.set_max_denied_response_body_bytes(opts.max_denied_response_body_bytes);
 
       if (emitFilterStateStats()) {
         proto_config_.set_emit_filter_state_stats(true);
@@ -1251,6 +1253,37 @@ TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailClosed) {
   ASSERT_TRUE(response_->waitForEndStream());
   EXPECT_TRUE(response_->complete());
   EXPECT_EQ("403", response_->headers().getStatusValue()); // Unauthorized status.
+
+  cleanup();
+}
+
+// Test that a DENIED response with a body from the authorization service is truncated if the body
+// size is larger than max_denied_response_body_bytes.
+TEST_P(ExtAuthzGrpcIntegrationTest, DeniedResponseWithBodyTruncation) {
+  GrpcInitializeConfigOpts opts;
+  opts.max_denied_response_body_bytes = 10;
+  ext_authz_grpc_status_ = LoggingTestFilterConfig::PERMISSION_DENIED;
+  initializeConfig(opts);
+
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+
+  ext_authz_request_->startGrpcStream();
+  envoy::service::auth::v3::CheckResponse check_response;
+  check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
+  check_response.mutable_denied_response()->set_body(
+      "this-is-a-long-body-that-should-be-truncated");
+  ext_authz_request_->sendGrpcMessage(check_response);
+  ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("403", response_->headers().getStatusValue());
+  EXPECT_EQ("this-is-a-", response_->body()); // Truncated to 10 bytes
 
   cleanup();
 }
