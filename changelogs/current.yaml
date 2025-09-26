@@ -290,6 +290,14 @@ new_features:
     support evictable metrics. This is done :ref:`periodically
     <envoy_v3_api_field_config.bootstrap.v3.Bootstrap.stats_eviction_interval>`
     during the metric flush.
+- area: http
+  change: |
+    Added statistics to the :ref:`Stateful session filter <config_http_filters_stateful_session>`
+    to help operators understand routing outcomes when session overrides are requested. The filter now
+    emits counters in the ``http.<stat_prefix>.stateful_session.[<filter_stat_prefix>.]`` namespace. An
+    optional per-filter :ref:`stat_prefix
+    <envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSession.stat_prefix>` can be used
+    to disambiguate multiple instances.
 - area: tap
   change: |
     Added :ref:`record_upstream_connection <envoy_v3_api_field_extensions.filters.http.tap.v3.Tap.record_upstream_connection>`

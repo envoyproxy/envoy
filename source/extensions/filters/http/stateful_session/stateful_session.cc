@@ -26,6 +26,9 @@ public:
 StatefulSessionConfig::StatefulSessionConfig(const ProtoConfig& config,
                                              Server::Configuration::GenericFactoryContext& context)
     : strict_(config.strict()) {
+  if (!config.stat_prefix().empty()) {
+    stat_prefix_override_ = config.stat_prefix();
+  }
   if (!config.has_session_state()) {
     factory_ = std::make_shared<EmptySessionStateFactory>();
     return;
@@ -69,6 +72,8 @@ Http::FilterHeadersStatus StatefulSession::decodeHeaders(Http::RequestHeaderMap&
   if (auto upstream_address = session_state_->upstreamAddress(); upstream_address.has_value()) {
     decoder_callbacks_->setUpstreamOverrideHost(
         std::make_pair(upstream_address.value(), config->isStrict()));
+    markOverrideAttempted();
+    override_address_ = std::string(upstream_address.value());
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -83,6 +88,21 @@ Http::FilterHeadersStatus StatefulSession::encodeHeaders(Http::ResponseHeaderMap
     auto host = upstream_info->upstreamHost();
     if (host != nullptr) {
       session_state_->onUpdate(host->address()->asStringView(), headers);
+      if (override_attempted_ && !accounted_) {
+        // If strict mode is disabled and override host was not found, router would have
+        // picked a host. Count as failed_open if the selected host address differs from
+        // attempted override.
+        const absl::string_view selected = host->address()->asStringView();
+        if (override_address_.has_value() && selected != override_address_.value()) {
+          if (!config_->isStrict()) {
+            markFailedOpen();
+          }
+        } else {
+          // Either matched override or no mismatch observable. We consider this routed.
+          markRouted();
+        }
+        accounted_ = true;
+      }
     }
   }
 
