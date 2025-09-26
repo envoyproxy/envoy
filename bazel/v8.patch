@@ -101,6 +101,14 @@ index 0539ea176ac..92c7aeb904f 100644
                  "-isystem .",
              ],
              "//conditions:default": [],
+@@ -141,6 +144,7 @@ def _default_args():
+                 "-Wno-return-type",
+                 "-Wno-stringop-overflow",
+                 "-Wno-deprecated-this-capture",
++                "-flax-vector-conversions", # for GCC builds on ARM
+                 # Use GNU dialect, because GCC doesn't allow using
+                 # ##__VA_ARGS__ when in standards-conforming mode.
+                 "-std=gnu++2a",
 -- 
 2.50.0.727.gbf7dc18ff4-goog
 
