@@ -163,7 +163,8 @@ public:
     RevConClusterFactory factory;
 
     // Parse the ReverseConnectionClusterConfig from the cluster's typed_config.
-    envoy::extensions::clusters::reverse_connection::v3::ReverseConnectionClusterConfig rev_con_config;
+    envoy::extensions::clusters::reverse_connection::v3::ReverseConnectionClusterConfig
+        rev_con_config;
     THROW_IF_NOT_OK(Config::Utility::translateOpaqueConfig(
         cluster_config.cluster_type().typed_config(), validation_visitor_, rev_con_config));
 
