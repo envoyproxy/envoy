@@ -1,4 +1,4 @@
-.. _config_reverse_connection:
+.. _config_reverse_tunnel:
 
 Reverse Tunnels
 ===============
@@ -18,7 +18,7 @@ Reverse tunnels require the following extensions:
 
 1. **Downstream socket interface**: Registered as a bootstrap extension on initiator envoy to initiate and maintain reverse tunnels.
 2. **Upstream socket interface**: Registered as a bootstrap extension on responder envoy to accept and manage reverse tunnels.
-3. **Reverse tunnel network filter**: On responder Envoy to accept reverse tunnel requests. 
+3. **Reverse tunnel network filter**: On responder Envoy to accept reverse tunnel requests.
 4. **Reverse connection cluster**: Added on responder Envoy for each downstream envoy node that needs to be reached through reverse tunnels.
 
 .. _config_reverse_tunnel_configuration_files:
@@ -257,12 +257,13 @@ and writes the handshake request on it over HTTP.
    * ``x-envoy-reverse-tunnel-tenant-id``: Tenant identifier for multi-tenant deployments (e.g., "on-prem")
 
    These identify values are obtained from the reverse tunnel listener address and the headers are automatically added by the reverse tunnel downstream socket interface during the handshake process.
+
 3. **Validation/Authentication**: The upstream Envoy performs the following validation checks on receiving the handshake request:
 
    * **HTTP Method Validation**: Verifies the request method matches the configured method (defaults to ``GET``)
    * **HTTP Path Validation**: Verifies the request path matches the configured path (defaults to ``/reverse_connections/request``)
    * **Required Headers Validation**: Ensures all three required identity headers are present:
-     
+
      - ``x-envoy-reverse-tunnel-node-id``
      - ``x-envoy-reverse-tunnel-cluster-id``
      - ``x-envoy-reverse-tunnel-tenant-id``
@@ -278,7 +279,6 @@ Reverse Connection Cluster
 Each downstream node reachable from upstream Envoy via reverse connections needs to be configured with a reverse connection cluster. When a data request arrives at the upstream Envoy, this cluster uses cached "reverse connections" instead of creating new forward connections.
 
 .. code-block:: yaml
-  :type-name: envoy.config.cluster.v3.Cluster
 
   name: reverse_connection_cluster
   connect_timeout: 200s

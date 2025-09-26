@@ -1,7 +1,7 @@
 ---
 node:
   id: downstream-node
-  cluster: downstream
+  cluster: downstream-cluster
 
 # Enable reverse connection bootstrap extension which registers the custom resolver
 bootstrap_extensions:
@@ -19,8 +19,8 @@ static_resources:
       # Use custom address with reverse connection metadata encoded in URL format
       address:
         socket_address:
-          # This encodes: src_node_id=downstream-node, src_cluster_id=downstream, src_tenant_id=downstream
-          # and remote clusters: upstream with 1 connection
+          # This encodes: src_node_id=downstream-node, src_cluster_id=downstream-cluster, src_tenant_id=downstream-tenant
+          # and remote clusters: upstream-cluster with 1 connection
           address: "rc://downstream-node:downstream-cluster:downstream-tenant@upstream-cluster:1"
           port_value: 0
           # Use custom resolver that can parse reverse connection metadata
@@ -58,8 +58,8 @@ static_resources:
           - endpoint:
               address:
                 socket_address:
-                  address: upstream-envoy # Container name of upstream-envoy in docker-compose
-                  port_value: 9000   # Port where upstream-envoy's rev_conn_api_listener listens
+                  address: upstream-envoy  # Address of upstream-envoy
+                  port_value: 9000  # Port where upstream-envoy's rev_conn_api_listener listens
 
     # Backend HTTP service behind downstream which
     # we will access via reverse connections

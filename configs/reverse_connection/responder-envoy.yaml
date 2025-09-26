@@ -1,12 +1,15 @@
 ---
 node:
-<<<<<<<< HEAD:configs/reverse_connection/upstream-envoy.yaml
-  id: upstream-envoy-node
-  cluster: upstream-envoy-cluster
-========
   id: upstream-node
   cluster: upstream-cluster
->>>>>>>> 5e41f1f358 (changes to reverse connection docs):configs/reverse_connection/responder-envoy.yaml
+
+# Enable reverse connection bootstrap extension
+bootstrap_extensions:
+- name: envoy.bootstrap.reverse_tunnel.upstream_socket_interface
+  typed_config:
+    "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface
+    stat_prefix: "upstream_reverse_connection"
+
 static_resources:
   listeners:
     # Accepts reverse tunnel requests
@@ -48,6 +51,7 @@ static_resources:
                   - name: envoy.filters.http.router
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
   # Cluster used to write requests to cached sockets
   clusters:
     - name: reverse_connection_cluster
@@ -60,29 +64,25 @@ static_resources:
           # The following headers are expected in downstream requests
           # to be sent over reverse connections
           http_header_names:
-            - x-remote-node-id # Should be set to the node ID of the downstream envoy node, ie., downstream-node
-            - x-dst-cluster-uuid # Should be set to the cluster ID of the downstream envoy node, ie., downstream
+            - x-remote-node-id  # Should be set to downstream-node
+            - x-dst-cluster-uuid  # Should be set to downstream
       typed_extension_protocol_options:
         envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
           "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
           explicit_http_config:
             # Right the moment, reverse connections are supported over HTTP/2 only
             http2_protocol_options: {}
+
 admin:
   access_log_path: "/dev/stdout"
   address:
     socket_address:
       address: 0.0.0.0
       port_value: 8888
+
 layered_runtime:
   layers:
   - name: layer
     static_layer:
       re2.max_program_size.error_level: 1000
       envoy.reloadable_features.reverse_conn_force_local_reply: true
-# Enable reverse connection bootstrap extension
-bootstrap_extensions:
-- name: envoy.bootstrap.reverse_tunnel.upstream_socket_interface
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface
-    stat_prefix: "upstream_reverse_connection"
