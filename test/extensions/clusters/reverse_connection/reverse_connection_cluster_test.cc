@@ -29,6 +29,7 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/admin.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
@@ -395,6 +396,65 @@ TEST_F(ReverseConnectionClusterTest, NoContext) {
     EXPECT_EQ(host, nullptr);
   }
 }
+
+// CEL-based formatter test extracting the SNI prefix before the first dot.
+#ifdef USE_CEL_PARSER
+TEST_F(ReverseConnectionClusterTest, CELFormatterSniPrefixExtraction) {
+  // Initialize server context singleton for CEL parser to avoid uninitialized singleton errors.
+  auto cel_context = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
+  ScopedThreadLocalServerContextSetter server_context_singleton_setter(
+      cel_context->server_factory_context_);
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        # Extract the prefix of SNI before the first dot.
+        host_id_format: "%CEL(re.extract(connection.requested_server_name, '^([^.]+)', '\\1'))%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+
+  RevConCluster::LoadBalancer lb(cluster_);
+
+  // Prepare connection and stream info with requested SNI.
+  auto connection = std::make_unique<NiceMock<Network::MockConnection>>();
+  auto stream_info = std::make_unique<NiceMock<StreamInfo::MockStreamInfo>>();
+
+  auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0),
+      std::make_shared<Network::Address::Ipv4Instance>("192.168.1.100", 8080));
+
+  // Case 1: "foo.bar.example" -> "foo".
+  connection_info->setRequestedServerName("foo.bar.example");
+  ON_CALL(*stream_info, downstreamAddressProvider()).WillByDefault(ReturnRef(*connection_info));
+  ON_CALL(*connection, streamInfo()).WillByDefault(ReturnRef(*stream_info));
+
+  TestLoadBalancerContext lb_context(connection.get(), stream_info.get());
+  auto result1 = lb.chooseHost(&lb_context);
+  ASSERT_NE(result1.host, nullptr);
+  EXPECT_EQ(result1.host->address()->logicalName(), "foo");
+
+  // Case 2: "node-123.prod" -> "node-123".
+  connection_info->setRequestedServerName("node-123.prod");
+  auto result2 = lb.chooseHost(&lb_context);
+  ASSERT_NE(result2.host, nullptr);
+  EXPECT_EQ(result2.host->address()->logicalName(), "node-123");
+
+  // Explicitly allow mock leaks to prevent the test failure.
+  testing::Mock::AllowLeak(connection.release());
+  testing::Mock::AllowLeak(stream_info.release());
+  testing::Mock::AllowLeak(cel_context.release());
+}
+#endif // USE_CEL_PARSER
 
 // Test host creation failure due to no headers.
 TEST_F(ReverseConnectionClusterTest, NoHeaders) {

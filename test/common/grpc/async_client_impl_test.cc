@@ -592,7 +592,7 @@ TEST_F(EnvoyAsyncClientImplTest, AsyncRequestDetach) {
   NiceMock<MockAsyncRequestCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
 
-  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+  StreamInfo::StreamInfoImpl stream_info{context_.time_system_, nullptr,
                                          StreamInfo::FilterState::LifeSpan::FilterChain};
   NiceMock<Http::MockAsyncClientStream> http_stream;
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
@@ -614,7 +614,7 @@ TEST_F(EnvoyAsyncClientImplTest, AsyncRequestDetach) {
   auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
       std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address), nullptr);
 
-  StreamInfo::StreamInfoImpl parent_stream_info{test_time_.timeSystem(), connection_info_provider,
+  StreamInfo::StreamInfoImpl parent_stream_info{context_.time_system_, connection_info_provider,
                                                 StreamInfo::FilterState::LifeSpan::FilterChain};
   Http::AsyncClient::ParentContext parent_context{&parent_stream_info};
   testing::NiceMock<Http::MockSidestreamWatermarkCallbacks> watermark_callbacks;
