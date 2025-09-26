@@ -37,6 +37,24 @@ envoy_genjson(
     visibility = ["//visibility:public"],
 )
 
+envoy_genjson(
+    name = "cpe-dependencies",
+    srcs = [":filtered-dependencies"],
+    args = [
+        "-s",
+        "-c",
+        "-L",
+        "tools/dependency",
+    ],
+    data = [":cve_utils.jq"],
+    filter = """
+    import "cve_utils" as Utils;
+    .[0] as $deps
+    | Utils::parse_deps($deps)
+    """,
+    visibility = ["//visibility:public"],
+)
+
 py_console_script_binary(
     name = "check",
     args = [

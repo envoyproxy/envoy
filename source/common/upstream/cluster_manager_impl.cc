@@ -506,11 +506,26 @@ absl::Status ClusterManagerImpl::initializeSecondaryClusters(
 
     absl::Status status = Config::Utility::checkTransportVersion(load_stats_config);
     RETURN_IF_NOT_OK(status);
-    auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-        *async_client_manager_, load_stats_config, *stats_.rootScope(), false, 0, false);
-    RETURN_IF_NOT_OK_REF(factory_or_error.status());
-    absl::StatusOr<Grpc::RawAsyncClientSharedPtr> client_or_error =
-        factory_or_error.value()->createUncachedRawAsyncClient();
+    absl::StatusOr<Grpc::RawAsyncClientSharedPtr> client_or_error;
+    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.use_cached_grpc_client_for_xds")) {
+      absl::StatusOr<Envoy::OptRef<const envoy::config::core::v3::GrpcService>> maybe_grpc_service =
+          Envoy::Config::Utility::getGrpcConfigFromApiConfigSource(load_stats_config,
+                                                                   /*grpc_service_idx*/ 0,
+                                                                   /*xdstp_config_source*/ false);
+      RETURN_IF_NOT_OK_REF(maybe_grpc_service.status());
+      if (maybe_grpc_service.value().has_value()) {
+        client_or_error = async_client_manager_->getOrCreateRawAsyncClientWithHashKey(
+            Grpc::GrpcServiceConfigWithHashKey(*maybe_grpc_service.value()), *stats_.rootScope(),
+            /*skip_cluster_check*/ false);
+      } else {
+        return absl::InvalidArgumentError("Invalid grpc service.");
+      }
+    } else {
+      auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+          *async_client_manager_, load_stats_config, *stats_.rootScope(), false, 0, false);
+      RETURN_IF_NOT_OK_REF(factory_or_error.status());
+      client_or_error = factory_or_error.value()->createUncachedRawAsyncClient();
+    }
     RETURN_IF_NOT_OK_REF(client_or_error.status());
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
         local_info_, *this, *stats_.rootScope(), std::move(client_or_error.value()), dispatcher_);
@@ -555,7 +570,7 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
   // This is used by cluster types such as EDS clusters to drain the connection pools of removed
   // hosts.
   cluster_data->second->member_update_cb_ = cluster.prioritySet().addMemberUpdateCb(
-      [&cluster, this](const HostVector&, const HostVector& hosts_removed) -> absl::Status {
+      [&cluster, this](const HostVector&, const HostVector& hosts_removed) {
         if (cluster.info()->lbConfig().close_connections_on_host_set_change()) {
           for (const auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
             // This will drain all tcp and http connection pools.
@@ -572,7 +587,6 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
             postThreadLocalRemoveHosts(cluster, hosts_removed);
           }
         }
-        return absl::OkStatus();
       });
 
   // This is used by cluster types such as EDS clusters to update the cluster
@@ -613,7 +627,6 @@ absl::Status ClusterManagerImpl::onClusterInit(ClusterManagerCluster& cm_cluster
           postThreadLocalClusterUpdate(
               cm_cluster, ThreadLocalClusterUpdateParams(priority, hosts_added, hosts_removed));
         }
-        return absl::OkStatus();
       });
 
   // Finally, post updates cross-thread so the per-thread load balancers are ready. First we
