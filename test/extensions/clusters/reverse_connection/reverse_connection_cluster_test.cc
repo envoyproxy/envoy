@@ -29,8 +29,8 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/server/admin.h"
+#include "test/mocks/server/factory_context.h"
 #include "test/mocks/server/instance.h"
-#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
@@ -401,9 +401,9 @@ TEST_F(ReverseConnectionClusterTest, NoContext) {
 #ifdef USE_CEL_PARSER
 TEST_F(ReverseConnectionClusterTest, CELFormatterSniPrefixExtraction) {
   // Initialize server context singleton for CEL parser to avoid uninitialized singleton errors.
-  NiceMock<Server::Configuration::MockFactoryContext> cel_context;
+  auto cel_context = std::make_unique<NiceMock<Server::Configuration::MockFactoryContext>>();
   ScopedThreadLocalServerContextSetter server_context_singleton_setter(
-      cel_context.server_factory_context_);
+      cel_context->server_factory_context_);
 
   const std::string yaml = R"EOF(
     name: name
@@ -426,8 +426,8 @@ TEST_F(ReverseConnectionClusterTest, CELFormatterSniPrefixExtraction) {
   RevConCluster::LoadBalancer lb(cluster_);
 
   // Prepare connection and stream info with requested SNI.
-  NiceMock<Network::MockConnection> connection;
-  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  auto connection = std::make_unique<NiceMock<Network::MockConnection>>();
+  auto stream_info = std::make_unique<NiceMock<StreamInfo::MockStreamInfo>>();
 
   auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 0),
@@ -435,10 +435,10 @@ TEST_F(ReverseConnectionClusterTest, CELFormatterSniPrefixExtraction) {
 
   // Case 1: "foo.bar.example" -> "foo".
   connection_info->setRequestedServerName("foo.bar.example");
-  ON_CALL(stream_info, downstreamAddressProvider()).WillByDefault(ReturnRef(*connection_info));
-  ON_CALL(connection, streamInfo()).WillByDefault(ReturnRef(stream_info));
+  ON_CALL(*stream_info, downstreamAddressProvider()).WillByDefault(ReturnRef(*connection_info));
+  ON_CALL(*connection, streamInfo()).WillByDefault(ReturnRef(*stream_info));
 
-  TestLoadBalancerContext lb_context(&connection, &stream_info);
+  TestLoadBalancerContext lb_context(connection.get(), stream_info.get());
   auto result1 = lb.chooseHost(&lb_context);
   ASSERT_NE(result1.host, nullptr);
   EXPECT_EQ(result1.host->address()->logicalName(), "foo");
@@ -448,6 +448,11 @@ TEST_F(ReverseConnectionClusterTest, CELFormatterSniPrefixExtraction) {
   auto result2 = lb.chooseHost(&lb_context);
   ASSERT_NE(result2.host, nullptr);
   EXPECT_EQ(result2.host->address()->logicalName(), "node-123");
+
+  // Explicitly allow mock leaks to prevent the test failure.
+  testing::Mock::AllowLeak(connection.release());
+  testing::Mock::AllowLeak(stream_info.release());
+  testing::Mock::AllowLeak(cel_context.release());
 }
 #endif // USE_CEL_PARSER
 
