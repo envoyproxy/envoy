@@ -32,8 +32,8 @@ message TlsInspector {
 
   // The size in bytes of the initial buffer requested by the tls_inspector.
   // If the filter needs to read additional bytes from the socket, the
-  // filter will double the buffer up to it's default maximum of 64KiB.
-  // If this size is not defined, defaults to maximum 64KiB that the
+  // filter will double the buffer up to it's default maximum of 16KiB.
+  // If this size is not defined, defaults to maximum 16KiB that the
   // tls inspector will consume.
   google.protobuf.UInt32Value initial_read_buffer_size = 2
       [(validate.rules).uint32 = {lt: 65537 gt: 255}];
