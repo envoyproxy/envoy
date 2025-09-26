@@ -521,11 +521,8 @@ new_features:
     This can be used to avoid thundering herd problems with many clients being disconnected and possibly reconnecting at the same time.
 - area: router
   change: |
-    Added support for :ref:`request_headers_to_add
-    <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.request_headers_to_add>` and
-    :ref:`request_headers_to_remove
-    <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.request_headers_to_remove>` in
-    :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>` to enable header
+    Added support for :ref:`request_mutations
+    <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.request_mutations>` to enable header
     manipulation for mirror requests.
     Added support for :ref:`host_rewrite_literal
     <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.host_rewrite_literal>` in
