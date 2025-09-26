@@ -4,29 +4,16 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/logger.h"
 
-#include "absl/strings/match.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
 bool ReverseConnectionUtility::isPingMessage(absl::string_view data) {
-  if (data.empty()) {
+  if (data.size() != PING_MESSAGE.size()) {
     return false;
   }
-
-  // Check for RPING at the start of the payload.
-  if (absl::StartsWith(data, PING_MESSAGE)) {
-    return true;
-  }
-
-  // Check for HTTP-embedded RPING.
-  if (data.find(PING_MESSAGE) != absl::string_view::npos) {
-    return true;
-  }
-
-  return false;
+  return ::memcmp(data.data(), PING_MESSAGE.data(), PING_MESSAGE.size()) == 0;
 }
 
 Buffer::InstancePtr ReverseConnectionUtility::createPingResponse() {

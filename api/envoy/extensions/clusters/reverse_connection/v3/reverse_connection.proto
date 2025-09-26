@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.extensions.clusters.reverse_connection.v3;
 
 import "google/protobuf/duration.proto";
+
 import "xds/type/matcher/v3/matcher.proto";
 
 import "udpa/annotations/status.proto";
