@@ -14,8 +14,7 @@
 #include "envoy/extensions/clusters/reverse_connection/v3/reverse_connection.pb.validate.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/http/matching/data_impl.h"
-#include "source/common/matcher/matcher.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/upstream/cluster_factory_impl.h"
@@ -213,11 +212,8 @@ private:
   Event::TimerPtr cleanup_timer_;
   absl::Mutex host_map_lock_;
   absl::flat_hash_map<std::string, Upstream::HostSharedPtr> host_map_;
-  // Match tree that yields a HostIdAction.
-  Envoy::Matcher::MatchTreeSharedPtr<Envoy::Http::HttpMatchingData> host_id_match_tree_;
-  // Metadata namespace and key for the host identifier, populated by a matcher action.
-  static constexpr absl::string_view kMetadataNamespace{"reverse_connection"};
-  static constexpr absl::string_view kHostIdKey{"host_id"};
+  // Formatter for computing host identifier from request context.
+  Envoy::Formatter::FormatterPtr host_id_formatter_;
   friend class RevConClusterFactory;
 };
 
