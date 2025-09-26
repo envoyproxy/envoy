@@ -1,7 +1,7 @@
 headers_to_add {
   header {
     key: "P"
-    value: "%PER_REQUEST_STATE(oB]$T)%"
+    value: "%FILTER_STATE(oB]$T)%"
   }
 }
 headers_to_add {
@@ -13,13 +13,13 @@ headers_to_add {
 headers_to_add {
   header {
     key: "A"
-    value: "%PER_REQUEST_STATE(dB]$T)%"
+    value: "%FILTER_STATE(dB]$T)%"
   }
 }
 headers_to_add {
   header {
     key: "\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177\177"
-    value: "%PER_REQUEST_STATE(dB]$T)%"
+    value: "%FILTER_STATE(dB]$T)%"
   }
   append {
     value: true

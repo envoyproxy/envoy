@@ -90,12 +90,19 @@ public:
   MOCK_METHOD(Config::SubscriptionPtr, create, (SubscriptionData & data), (override));
 };
 
-class XdsManagerImplTest : public testing::Test {
+class XdsManagerImplTest : public testing::TestWithParam<bool> {
 public:
   XdsManagerImplTest()
       : xds_manager_impl_(dispatcher_, api_, stats_, local_info_, validation_context_, server_) {
     ON_CALL(validation_context_, staticValidationVisitor())
         .WillByDefault(ReturnRef(validation_visitor_));
+    if (GetParam()) {
+      scoped_runtime_.mergeValues(
+          {{"envoy.restart_features.use_cached_grpc_client_for_xds", "true"}});
+    } else {
+      scoped_runtime_.mergeValues(
+          {{"envoy.restart_features.use_cached_grpc_client_for_xds", "false"}});
+    }
   }
 
   void initialize(const std::string& bootstrap_yaml = "") {
@@ -115,16 +122,20 @@ public:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   XdsManagerImpl xds_manager_impl_;
+  TestScopedRuntime scoped_runtime_;
 };
 
+INSTANTIATE_TEST_SUITE_P(XdsManagerImplTest, XdsManagerImplTest,
+                         ::testing::ValuesIn({false, true}));
+
 // Validates that a call to shutdown succeeds.
-TEST_F(XdsManagerImplTest, ShutdownSuccessful) {
+TEST_P(XdsManagerImplTest, ShutdownSuccessful) {
   initialize();
   xds_manager_impl_.shutdown();
 }
 
 // Validates that ADS replacement fails when ADS isn't configured.
-TEST_F(XdsManagerImplTest, AdsReplacementNoPriorAdsRejection) {
+TEST_P(XdsManagerImplTest, AdsReplacementNoPriorAdsRejection) {
   // Make the server return a bootstrap that returns a non-ADS config.
   initialize(R"EOF(
   static_resources:
@@ -162,9 +173,8 @@ TEST_F(XdsManagerImplTest, AdsReplacementNoPriorAdsRejection) {
 }
 
 // Validates that ADS replacement with primary source only works.
-TEST_F(XdsManagerImplTest, AdsReplacementPrimaryOnly) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.restart_features.xds_failover_support", "true"}});
+TEST_P(XdsManagerImplTest, AdsReplacementPrimaryOnly) {
+  scoped_runtime_.mergeValues({{"envoy.restart_features.xds_failover_support", "true"}});
   testing::InSequence s;
   NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<Config::MuxFactory> registry(factory);
@@ -252,9 +262,8 @@ TEST_F(XdsManagerImplTest, AdsReplacementPrimaryOnly) {
 }
 
 // Validates that ADS replacement with primary and failover sources works.
-TEST_F(XdsManagerImplTest, AdsReplacementPrimaryAndFailover) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.restart_features.xds_failover_support", "true"}});
+TEST_P(XdsManagerImplTest, AdsReplacementPrimaryAndFailover) {
+  scoped_runtime_.mergeValues({{"envoy.restart_features.xds_failover_support", "true"}});
   testing::InSequence s;
   NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<Config::MuxFactory> registry(factory);
@@ -347,7 +356,7 @@ TEST_F(XdsManagerImplTest, AdsReplacementPrimaryAndFailover) {
 }
 
 // Validates that setAdsConfigSource validation failure is detected.
-TEST_F(XdsManagerImplTest, AdsReplacementInvalidConfig) {
+TEST_P(XdsManagerImplTest, AdsReplacementInvalidConfig) {
   testing::InSequence s;
   NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<MuxFactory> registry(factory);
@@ -390,7 +399,7 @@ TEST_F(XdsManagerImplTest, AdsReplacementInvalidConfig) {
 }
 
 // Validates that ADS replacement with unknown cluster fails.
-TEST_F(XdsManagerImplTest, AdsReplacementUnknownCluster) {
+TEST_P(XdsManagerImplTest, AdsReplacementUnknownCluster) {
   testing::InSequence s;
   NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<MuxFactory> registry(factory);
@@ -433,19 +442,25 @@ TEST_F(XdsManagerImplTest, AdsReplacementUnknownCluster) {
   )EOF",
                             new_ads_config);
 
-  // Emulates an error for gRPC-cluster not found.
-  EXPECT_CALL(cm_.async_client_manager_, factoryForGrpcService(_, _, _))
-      .WillOnce(
-          Return(ByMove(absl::InvalidArgumentError("Unknown gRPC client cluster 'ads_cluster2'"))));
+  if (GetParam()) {
+    // Emulates an error for gRPC-cluster not found.
+    EXPECT_CALL(cm_.async_client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
+        .WillOnce(Return(
+            ByMove(absl::InvalidArgumentError("Unknown gRPC client cluster 'ads_cluster2'"))));
+  } else {
+    // Emulates an error for gRPC-cluster not found.
+    EXPECT_CALL(cm_.async_client_manager_, factoryForGrpcService(_, _, _))
+        .WillOnce(Return(
+            ByMove(absl::InvalidArgumentError("Unknown gRPC client cluster 'ads_cluster2'"))));
+  }
   const auto res = xds_manager_impl_.setAdsConfigSource(new_ads_config);
   EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
   EXPECT_EQ(res.message(), "Unknown gRPC client cluster 'ads_cluster2'");
 }
 
 // Validates that ADS replacement with unknown failover cluster fails.
-TEST_F(XdsManagerImplTest, AdsReplacementUnknownFailoverCluster) {
-  TestScopedRuntime scoped_runtime;
-  scoped_runtime.mergeValues({{"envoy.restart_features.xds_failover_support", "true"}});
+TEST_P(XdsManagerImplTest, AdsReplacementUnknownFailoverCluster) {
+  scoped_runtime_.mergeValues({{"envoy.restart_features.xds_failover_support", "true"}});
   testing::InSequence s;
   NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<MuxFactory> registry(factory);
@@ -509,24 +524,36 @@ TEST_F(XdsManagerImplTest, AdsReplacementUnknownFailoverCluster) {
   // Emulates a successful finding of the primary_ads_cluster.
   envoy::config::core::v3::GrpcService expected_primary_grpc_service;
   expected_primary_grpc_service.mutable_envoy_grpc()->set_cluster_name("primary_ads_cluster");
-  EXPECT_CALL(cm_.async_client_manager_,
-              factoryForGrpcService(ProtoEq(expected_primary_grpc_service), _, _))
-      .WillOnce(Return(ByMove(std::make_unique<Grpc::MockAsyncClientFactory>())));
+  if (GetParam()) {
+    EXPECT_CALL(cm_.async_client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
+        .WillOnce(Return(ByMove(std::make_shared<Grpc::MockAsyncClient>())));
+  } else {
+    EXPECT_CALL(cm_.async_client_manager_,
+                factoryForGrpcService(ProtoEq(expected_primary_grpc_service), _, _))
+        .WillOnce(Return(ByMove(std::make_unique<Grpc::MockAsyncClientFactory>())));
+  }
   // Emulates an error for non_existent_failover_ads_cluster not found.
   envoy::config::core::v3::GrpcService expected_failover_grpc_service;
   expected_failover_grpc_service.mutable_envoy_grpc()->set_cluster_name(
       "non_existent_failover_ads_cluster");
-  EXPECT_CALL(cm_.async_client_manager_,
-              factoryForGrpcService(ProtoEq(expected_failover_grpc_service), _, _))
-      .WillOnce(Return(ByMove(absl::InvalidArgumentError(
-          "Unknown gRPC client cluster 'non_existent_failover_ads_cluster'"))));
+  if (GetParam()) {
+    // Emulates an error for gRPC-cluster not found.
+    EXPECT_CALL(cm_.async_client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
+        .WillOnce(Return(ByMove(absl::InvalidArgumentError(
+            "Unknown gRPC client cluster 'non_existent_failover_ads_cluster'"))));
+  } else {
+    EXPECT_CALL(cm_.async_client_manager_,
+                factoryForGrpcService(ProtoEq(expected_failover_grpc_service), _, _))
+        .WillOnce(Return(ByMove(absl::InvalidArgumentError(
+            "Unknown gRPC client cluster 'non_existent_failover_ads_cluster'"))));
+  }
   const auto res = xds_manager_impl_.setAdsConfigSource(new_ads_config);
   EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
   EXPECT_EQ(res.message(), "Unknown gRPC client cluster 'non_existent_failover_ads_cluster'");
 }
 
 // Validates that ADS replacement fails when ADS type is different (SotW <-> Delta).
-TEST_F(XdsManagerImplTest, AdsReplacementDifferentAdsTypeRejection) {
+TEST_P(XdsManagerImplTest, AdsReplacementDifferentAdsTypeRejection) {
   NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<MuxFactory> registry(factory);
 
@@ -574,7 +601,7 @@ TEST_F(XdsManagerImplTest, AdsReplacementDifferentAdsTypeRejection) {
 }
 
 // Validates that ADS replacement fails when a wrong backoff strategy is used.
-TEST_F(XdsManagerImplTest, AdsReplacementInvalidBackoffRejection) {
+TEST_P(XdsManagerImplTest, AdsReplacementInvalidBackoffRejection) {
   NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<Config::MuxFactory> registry(factory);
 
@@ -624,7 +651,7 @@ TEST_F(XdsManagerImplTest, AdsReplacementInvalidBackoffRejection) {
 }
 
 // Validates that ADS replacement of unsupported API type is rejected.
-TEST_F(XdsManagerImplTest, AdsReplacementUnsupportedTypeRejection) {
+TEST_P(XdsManagerImplTest, AdsReplacementUnsupportedTypeRejection) {
   NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<Config::MuxFactory> registry(factory);
 
@@ -675,7 +702,7 @@ TEST_F(XdsManagerImplTest, AdsReplacementUnsupportedTypeRejection) {
 
 // Validates that ADS replacement fails when there are a different number of custom validators
 // defined between the original ADS config and the replacement.
-TEST_F(XdsManagerImplTest, AdsReplacementNumberOfCustomValidatorsRejection) {
+TEST_P(XdsManagerImplTest, AdsReplacementNumberOfCustomValidatorsRejection) {
   NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<MuxFactory> registry(factory);
   FakeConfigValidatorFactory fake_config_validator_factory;
@@ -729,7 +756,7 @@ TEST_F(XdsManagerImplTest, AdsReplacementNumberOfCustomValidatorsRejection) {
 
 // Validates that ADS replacement fails when a custom validators with some
 // different contents is used compared to the original ADS config.
-TEST_F(XdsManagerImplTest, AdsReplacementContentsOfCustomValidatorsRejection) {
+TEST_P(XdsManagerImplTest, AdsReplacementContentsOfCustomValidatorsRejection) {
   NiceMock<MockGrpcMuxFactory> factory;
   Registry::InjectFactory<Config::MuxFactory> registry(factory);
   FakeConfigValidatorFactory fake_config_validator_factory;
@@ -787,6 +814,52 @@ TEST_F(XdsManagerImplTest, AdsReplacementContentsOfCustomValidatorsRejection) {
   EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInternal));
   EXPECT_THAT(res.message(),
               HasSubstr("Cannot replace config_validators in ADS config (different contents)"));
+}
+
+// Validates that ADS initialization fails when the primary gRPC client is null.
+TEST_P(XdsManagerImplTest, AdsInitializationFailsWithNullPrimaryClient) {
+  NiceMock<MockGrpcMuxFactory> factory;
+  Registry::InjectFactory<MuxFactory> registry(factory);
+  initialize(R"EOF(
+  dynamic_resources:
+    ads_config:
+      api_type: GRPC
+      set_node_on_first_message_only: true
+      grpc_services:
+        envoy_grpc:
+          cluster_name: ads_cluster
+  static_resources:
+    clusters:
+    - name: ads_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: ads_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF");
+
+  if (GetParam()) { // use_cached_grpc_client_for_xds is true
+    EXPECT_CALL(cm_.async_client_manager_, getOrCreateRawAsyncClientWithHashKey(_, _, _))
+        .WillOnce(Return(ByMove(absl::StatusOr<Grpc::RawAsyncClientSharedPtr>(nullptr))));
+  } else { // use_cached_grpc_client_for_xds is false
+    auto mock_factory = std::make_unique<Grpc::MockAsyncClientFactory>();
+    EXPECT_CALL(*mock_factory, createUncachedRawAsyncClient())
+        .WillOnce(Return(ByMove(absl::StatusOr<Grpc::RawAsyncClientPtr>(nullptr))));
+    EXPECT_CALL(cm_.async_client_manager_, factoryForGrpcService(_, _, _))
+        .WillOnce(
+            Return(ByMove(absl::StatusOr<Grpc::AsyncClientFactoryPtr>(std::move(mock_factory)))));
+  }
+
+  const auto res = xds_manager_impl_.initializeAdsConnections(server_.bootstrap_);
+  EXPECT_THAT(res, StatusCodeIs(absl::StatusCode::kInvalidArgument));
+  EXPECT_EQ(res.message(), "gRPC client construction failed for primary cluster.");
 }
 
 /*

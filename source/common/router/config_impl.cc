@@ -461,7 +461,8 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   auto policy_or_error =
       buildRetryPolicy(vhost->retryPolicy(), route.route(), validator, factory_context);
   SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
-  retry_policy_ = std::move(policy_or_error.value());
+  retry_policy_ = policy_or_error.value() != nullptr ? std::move(policy_or_error.value())
+                                                     : RetryPolicyImpl::DefaultRetryPolicy;
 
   if (route.has_direct_response() && route.direct_response().has_body()) {
     auto provider_or_error = Envoy::Config::DataSource::DataSourceProvider::create(
