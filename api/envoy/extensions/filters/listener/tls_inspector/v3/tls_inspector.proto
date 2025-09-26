@@ -37,4 +37,15 @@ message TlsInspector {
   // tls inspector will consume.
   google.protobuf.UInt32Value initial_read_buffer_size = 2
       [(validate.rules).uint32 = {lt: 65537 gt: 255}];
+
+  // Close connection when TLS ClientHello message could not be parsed.
+  // This flag should be enabled only if it is known that incoming connections are expected to use
+  // TLS protocol, as Envoy does not distinguish between a plain text message or a malformed TLS
+  // ClientHello message.
+  // By default this flag is false and TLS ClientHello parsing errors are interpreted as a
+  // plain text connection.
+  // Setting this to true will cause connections to be terminated and the ``client_hello_too_large``
+  // counter to be incremented if the ClientHello message is over implementation defined limit
+  // (currently 16Kb).
+  bool close_connection_on_client_hello_parsing_errors = 4;
 }
