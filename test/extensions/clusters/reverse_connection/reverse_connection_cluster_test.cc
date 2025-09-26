@@ -9,9 +9,11 @@
 #include "envoy/server/bootstrap_extension_config.h"
 #include "envoy/stats/scope.h"
 
+#include "source/common/config/metadata.h"
 #include "source/common/config/utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/connection_impl.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/singleton/threadsafe_singleton.h"
@@ -29,10 +31,12 @@
 #include "test/mocks/server/admin.h"
 #include "test/mocks/server/instance.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/cluster_manager.h"
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -44,41 +48,6 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Extensions {
 namespace ReverseConnection {
-// HostIdActionFactory unit tests.
-TEST(HostIdActionFactoryTest, NameAndCreateAction) {
-  // Prepare a minimal cluster factory context.
-  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
-  NiceMock<ThreadLocal::MockInstance> thread_local;
-  Stats::IsolatedStoreImpl stats_store;
-  auto stats_scope = Stats::ScopeSharedPtr(stats_store.createScope("test_scope."));
-  EXPECT_CALL(server_context, threadLocal()).WillRepeatedly(ReturnRef(thread_local));
-  EXPECT_CALL(server_context, scope()).WillRepeatedly(ReturnRef(*stats_scope));
-
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context, nullptr, nullptr,
-                                                             false);
-
-  // Build a HostIdAction proto.
-  envoy::extensions::clusters::reverse_connection::v3::HostIdAction action_proto;
-  action_proto.set_host_id("host-123");
-
-  // Create the factory and verify name.
-  HostIdActionFactory factory;
-  EXPECT_EQ(factory.name(), "envoy.matching.actions.reverse_connection.host_id");
-
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
-  auto action = factory.createAction(action_proto, factory_context, validation_visitor);
-  ASSERT_NE(action, nullptr);
-
-  // Verify the created action carries the host identifier.
-  const auto& typed = action->getTyped<HostIdAction>();
-  EXPECT_EQ(typed.host_id(), "host-123");
-
-  // Verify createEmptyConfigProto returns the expected message type.
-  auto empty = factory.createEmptyConfigProto();
-  auto* empty_typed =
-      dynamic_cast<envoy::extensions::clusters::reverse_connection::v3::HostIdAction*>(empty.get());
-  EXPECT_NE(empty_typed, nullptr);
-}
 
 class TestLoadBalancerContext : public Upstream::LoadBalancerContextBase {
 public:
@@ -118,6 +87,12 @@ public:
     EXPECT_CALL(server_context_, threadLocal()).WillRepeatedly(ReturnRef(thread_local_));
     EXPECT_CALL(server_context_, scope()).WillRepeatedly(ReturnRef(*stats_scope_));
 
+    // Allow timers and file events to be created multiple times during tests.
+    ON_CALL(server_context_.dispatcher_, createTimer_(_))
+        .WillByDefault(testing::ReturnNew<NiceMock<Event::MockTimer>>());
+    ON_CALL(server_context_.dispatcher_, createFileEvent_(_, _, _, _))
+        .WillByDefault(testing::ReturnNew<NiceMock<Event::MockFileEvent>>());
+
     // Create the config.
     config_.set_stat_prefix("test_prefix");
   }
@@ -151,6 +126,8 @@ public:
     if (expect_success) {
       cleanup_timer_ = new Event::MockTimer(&server_context_.dispatcher_);
       EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+      EXPECT_CALL(*cleanup_timer_, disableTimer()).Times(testing::AnyNumber());
+      EXPECT_CALL(initialized_, ready());
     }
     setup(Upstream::parseClusterFromV3Yaml(yaml));
   }
@@ -188,17 +165,13 @@ public:
   }
 
   void TearDown() override {
-    if (init_complete_) {
-      EXPECT_CALL(*cleanup_timer_, disableTimer());
-    }
+    // Do not assert on timer teardown; allow destructor-time disable.
 
     // Clean up thread local resources if they were set up.
     if (tls_slot_) {
       tls_slot_.reset();
     }
-    if (thread_local_registry_) {
-      thread_local_registry_.reset();
-    }
+    // Don't reset thread_local_registry_ as it's owned by the extension.
     if (extension_) {
       extension_.reset();
     }
@@ -214,45 +187,23 @@ public:
       return;
     }
 
-    // Set up mock expectations for timer creation that will be needed by UpstreamSocketManager.
-    auto mock_timer = new NiceMock<Event::MockTimer>();
-    EXPECT_CALL(server_context_.dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
-
-    // First, call onServerInitialized to set up the extension reference properly.
+    // Let the extension create and own its TLS slot and manager to avoid duplicate timer/file
+    // event creation.
     extension_->onServerInitialized();
-
-    // Create a thread local registry with the properly initialized extension.
-    thread_local_registry_ =
-        std::make_shared<BootstrapReverseConnection::UpstreamSocketThreadLocal>(
-            server_context_.dispatcher_, extension_.get());
-
-    // Create the actual TypedSlot.
-    tls_slot_ =
-        ThreadLocal::TypedSlot<BootstrapReverseConnection::UpstreamSocketThreadLocal>::makeUnique(
-            thread_local_);
-    thread_local_.setDispatcher(&server_context_.dispatcher_);
-
-    // Set up the slot to return our registry.
-    tls_slot_->set([registry = thread_local_registry_](Event::Dispatcher&) { return registry; });
-
-    // Override the TLS slot with our test version.
-    extension_->setTestOnlyTLSRegistry(std::move(tls_slot_));
   }
 
   // Helper to add a socket to the manager for testing.
   void addTestSocket(const std::string& node_id, const std::string& cluster_id) {
-    if (!thread_local_registry_ || !thread_local_registry_->socketManager() || !socket_interface_) {
+    if (!socket_interface_) {
       return;
     }
 
-    // Set up mock expectations for timer and file event creation.
-    auto mock_timer = new NiceMock<Event::MockTimer>();
-    auto mock_file_event = new NiceMock<Event::MockFileEvent>();
-    EXPECT_CALL(server_context_.dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
-    EXPECT_CALL(server_context_.dispatcher_, createFileEvent_(_, _, _, _))
-        .WillOnce(Return(mock_file_event));
+    auto* local_registry = socket_interface_->getLocalRegistry();
+    if (local_registry == nullptr || local_registry->socketManager() == nullptr) {
+      return;
+    }
 
-    // Create a mock socket.
+    // Create a mock socket. Timer and file event creation will use the ON_CALL defaults.
     auto socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
     auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
     EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(Return(123));
@@ -260,7 +211,7 @@ public:
     socket->io_handle_ = std::move(mock_io_handle);
 
     // Get the socket manager from the thread local registry.
-    auto* tls_socket_manager = socket_interface_->getLocalRegistry()->socketManager();
+    auto* tls_socket_manager = local_registry->socketManager();
     EXPECT_NE(tls_socket_manager, nullptr);
 
     // Add the socket to the manager.
@@ -297,7 +248,6 @@ public:
   // Real thread local slot and registry for reverse connection testing.
   std::unique_ptr<ThreadLocal::TypedSlot<BootstrapReverseConnection::UpstreamSocketThreadLocal>>
       tls_slot_;
-  std::shared_ptr<BootstrapReverseConnection::UpstreamSocketThreadLocal> thread_local_registry_;
 
   // Real socket interface and extension.
   std::unique_ptr<BootstrapReverseConnection::ReverseTunnelAcceptor> socket_interface_;
@@ -328,22 +278,7 @@ TEST(ReverseConnectionClusterConfigTest, ValidConfig) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
-        host_id_matcher:
-          matcher_list:
-            matchers:
-            - predicate:
-                single_predicate:
-                  input:
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: x-remote-node-id
-                  value_match:
-                    exact: test-uuid-123
-              on_match:
-                action:
-                  typed_config:
-                    '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
-                    host_id: "test-uuid-123"
+        host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
   envoy::config::cluster::v3::Cluster cluster_config = Upstream::parseClusterFromV3Yaml(yaml);
@@ -409,25 +344,9 @@ TEST_F(ReverseConnectionClusterTest, BasicSetup) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
-        host_id_matcher:
-          matcher_list:
-            matchers:
-            - predicate:
-                single_predicate:
-                  input:
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: x-remote-node-id
-                  value_match:
-                    exact: test-uuid-123
-              on_match:
-                action:
-                  typed_config:
-                    '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
-                    host_id: "test-uuid-123"
+        host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(membership_updated_, ready()).Times(0);
   setupFromYaml(yaml);
 
@@ -447,25 +366,9 @@ TEST_F(ReverseConnectionClusterTest, NoContext) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
-        host_id_matcher:
-          matcher_list:
-            matchers:
-            - predicate:
-                single_predicate:
-                  input:
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: x-remote-node-id
-                  value_match:
-                    exact: test-uuid-123
-              on_match:
-                action:
-                  typed_config:
-                    '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
-                    host_id: "test-uuid-123"
+        host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(membership_updated_, ready()).Times(0);
   setupFromYaml(yaml);
 
@@ -505,25 +408,9 @@ TEST_F(ReverseConnectionClusterTest, NoHeaders) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
-        host_id_matcher:
-          matcher_list:
-            matchers:
-            - predicate:
-                single_predicate:
-                  input:
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: x-remote-node-id
-                  value_match:
-                    exact: test-uuid-123
-              on_match:
-                action:
-                  typed_config:
-                    '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
-                    host_id: "test-uuid-123"
+        host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   // Downstream connection but no headers => no host.
@@ -549,25 +436,9 @@ TEST_F(ReverseConnectionClusterTest, MissingRequiredHeaders) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
-        host_id_matcher:
-          matcher_list:
-            matchers:
-            - predicate:
-                single_predicate:
-                  input:
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: x-remote-node-id
-                  value_match:
-                    exact: test-uuid-123
-              on_match:
-                action:
-                  typed_config:
-                    '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
-                    host_id: "test-uuid-123"
+        host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   // Request with unsupported headers but missing all required headers (EnvoyDstNodeUUID,.
@@ -603,25 +474,9 @@ TEST_F(ReverseConnectionClusterTest, HostCreationWithoutSocketManager) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
-        host_id_matcher:
-          matcher_list:
-            matchers:
-            - predicate:
-                single_predicate:
-                  input:
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: x-remote-node-id
-                  value_match:
-                    exact: test-uuid-123
-              on_match:
-                action:
-                  typed_config:
-                    '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
-                    host_id: "test-uuid-123"
+        host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   RevConCluster::LoadBalancer lb(cluster_);
@@ -663,25 +518,9 @@ TEST_F(ReverseConnectionClusterTest, SocketInterfaceNotRegistered) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
-        host_id_matcher:
-          matcher_list:
-            matchers:
-            - predicate:
-                single_predicate:
-                  input:
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: x-remote-node-id
-                  value_match:
-                    exact: test-uuid-123
-              on_match:
-                action:
-                  typed_config:
-                    '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
-                    host_id: "test-uuid-123"
+        host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   RevConCluster::LoadBalancer lb(cluster_);
@@ -713,38 +552,9 @@ TEST_F(ReverseConnectionClusterTest, HostCreationWithSocketManager) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
-        host_id_matcher:
-          matcher_list:
-            matchers:
-            - predicate:
-                single_predicate:
-                  input:
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: x-remote-node-id
-                  value_match:
-                    exact: test-uuid-123
-              on_match:
-                action:
-                  typed_config:
-                    '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
-                    host_id: "test-uuid-123"
-            - predicate:
-                single_predicate:
-                  input:
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: x-remote-node-id
-                  value_match:
-                    exact: test-uuid-456
-              on_match:
-                action:
-                  typed_config:
-                    '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
-                    host_id: "test-uuid-456"
+        host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   // Set up the upstream extension for this test.
@@ -793,6 +603,70 @@ TEST_F(ReverseConnectionClusterTest, HostCreationWithSocketManager) {
   }
 }
 
+TEST_F(ReverseConnectionClusterTest, HostIdExtractionWithSafeRegex) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-remote-node-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+
+  // Initialize upstream extension and thread local registry for socket manager.
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+
+  // Provide reverse connection sockets for different host_ids.
+  addTestSocket("foo.bar", "cluster-foo-bar");
+  addTestSocket("node-123", "cluster-node-123");
+
+  RevConCluster::LoadBalancer lb(cluster_);
+
+  // Request: header value "foo.bar" routes to host_id "foo.bar".
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+        new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "foo.bar"}}};
+
+    auto result = lb.chooseHost(&lb_context);
+    ASSERT_NE(result.host, nullptr);
+    EXPECT_EQ(result.host->address()->logicalName(), "foo.bar");
+  }
+
+  // Request: header value "node-123" routes to host_id "node-123".
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+        new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "node-123"}}};
+
+    auto result = lb.chooseHost(&lb_context);
+    ASSERT_NE(result.host, nullptr);
+    EXPECT_EQ(result.host->address()->logicalName(), "node-123");
+  }
+
+  // Request: header value "unknown-node" creates a host even without socket.
+  // The socket availability check happens at connection time, not host selection time.
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+        new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "unknown-node"}}};
+
+    auto result = lb.chooseHost(&lb_context);
+    ASSERT_NE(result.host, nullptr);
+    EXPECT_EQ(result.host->address()->logicalName(), "unknown-node");
+  }
+}
+
 // Test host reuse for requests with same UUID.
 TEST_F(ReverseConnectionClusterTest, HostReuse) {
   const std::string yaml = R"EOF(
@@ -805,25 +679,9 @@ TEST_F(ReverseConnectionClusterTest, HostReuse) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
-        host_id_matcher:
-          matcher_list:
-            matchers:
-            - predicate:
-                single_predicate:
-                  input:
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: x-remote-node-id
-                  value_match:
-                    exact: test-uuid-123
-              on_match:
-                action:
-                  typed_config:
-                    '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
-                    host_id: "test-uuid-123"
+        host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   // Set up the upstream extension for this test.
@@ -864,38 +722,9 @@ TEST_F(ReverseConnectionClusterTest, DifferentHostsForDifferentUUIDs) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
-        host_id_matcher:
-          matcher_list:
-            matchers:
-            - predicate:
-                single_predicate:
-                  input:
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: x-remote-node-id
-                  value_match:
-                    exact: test-uuid-123
-              on_match:
-                action:
-                  typed_config:
-                    '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
-                    host_id: "test-uuid-123"
-            - predicate:
-                single_predicate:
-                  input:
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: x-remote-node-id
-                  value_match:
-                    exact: test-uuid-456
-              on_match:
-                action:
-                  typed_config:
-                    '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
-                    host_id: "test-uuid-456"
+        host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   // Set up the upstream extension for this test.
@@ -939,38 +768,9 @@ TEST_F(ReverseConnectionClusterTest, TestCleanup) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
-        host_id_matcher:
-          matcher_list:
-            matchers:
-            - predicate:
-                single_predicate:
-                  input:
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: x-remote-node-id
-                  value_match:
-                    exact: test-uuid-123
-              on_match:
-                action:
-                  typed_config:
-                    '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
-                    host_id: "test-uuid-123"
-            - predicate:
-                single_predicate:
-                  input:
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: x-remote-node-id
-                  value_match:
-                    exact: test-uuid-456
-              on_match:
-                action:
-                  typed_config:
-                    '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
-                    host_id: "test-uuid-456"
+        host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   // Set up the upstream extension for this test.
@@ -1043,38 +843,9 @@ TEST_F(ReverseConnectionClusterTest, TestCleanupWithUsedHosts) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
-        host_id_matcher:
-          matcher_list:
-            matchers:
-            - predicate:
-                single_predicate:
-                  input:
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: x-remote-node-id
-                  value_match:
-                    exact: test-uuid-123
-              on_match:
-                action:
-                  typed_config:
-                    '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
-                    host_id: "test-uuid-123"
-            - predicate:
-                single_predicate:
-                  input:
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: x-remote-node-id
-                  value_match:
-                    exact: test-uuid-456
-              on_match:
-                action:
-                  typed_config:
-                    '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
-                    host_id: "test-uuid-456"
+        host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   // Set up the upstream extension for this test.
@@ -1151,25 +922,9 @@ TEST_F(ReverseConnectionClusterTest, LoadBalancerFactory) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
-        host_id_matcher:
-          matcher_list:
-            matchers:
-            - predicate:
-                single_predicate:
-                  input:
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: x-remote-node-id
-                  value_match:
-                    exact: test-uuid-123
-              on_match:
-                action:
-                  typed_config:
-                    '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
-                    host_id: "test-uuid-123"
+        host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   // Set up the upstream extension for this test
@@ -1207,25 +962,9 @@ TEST_F(ReverseConnectionClusterTest, ThreadAwareLoadBalancer) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
-        host_id_matcher:
-          matcher_list:
-            matchers:
-            - predicate:
-                single_predicate:
-                  input:
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: x-remote-node-id
-                  value_match:
-                    exact: test-uuid-123
-              on_match:
-                action:
-                  typed_config:
-                    '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
-                    host_id: "test-uuid-123"
+        host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   // Set up the upstream extension for this test
@@ -1262,25 +1001,9 @@ TEST_F(ReverseConnectionClusterTest, LoadBalancerNoopMethods) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
-        host_id_matcher:
-          matcher_list:
-            matchers:
-            - predicate:
-                single_predicate:
-                  input:
-                    typed_config:
-                      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
-                      header_name: x-remote-node-id
-                  value_match:
-                    exact: test-uuid-123
-              on_match:
-                action:
-                  typed_config:
-                    '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
-                    host_id: "test-uuid-123"
+        host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   RevConCluster::LoadBalancer lb(cluster_);
@@ -1331,9 +1054,7 @@ public:
     if (tls_slot_) {
       tls_slot_.reset();
     }
-    if (thread_local_registry_) {
-      thread_local_registry_.reset();
-    }
+    // Don't reset thread_local_registry_ as it's owned by the extension.
     if (extension_) {
       extension_.reset();
     }
@@ -1360,29 +1081,8 @@ public:
       return;
     }
 
-    // Set up mock expectations for timer creation that will be needed by UpstreamSocketManager.
-    auto mock_timer = new NiceMock<Event::MockTimer>();
-    EXPECT_CALL(server_context_.dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
-
-    // First, call onServerInitialized to set up the extension reference properly.
+    // Let the extension create and manage its own TLS slot and timer.
     extension_->onServerInitialized();
-
-    // Create a thread local registry with the properly initialized extension.
-    thread_local_registry_ =
-        std::make_shared<BootstrapReverseConnection::UpstreamSocketThreadLocal>(
-            server_context_.dispatcher_, extension_.get());
-
-    // Create the actual TypedSlot.
-    tls_slot_ =
-        ThreadLocal::TypedSlot<BootstrapReverseConnection::UpstreamSocketThreadLocal>::makeUnique(
-            thread_local_);
-    thread_local_.setDispatcher(&server_context_.dispatcher_);
-
-    // Set up the slot to return our registry.
-    tls_slot_->set([registry = thread_local_registry_](Event::Dispatcher&) { return registry; });
-
-    // Override the TLS slot with our test version.
-    extension_->setTestOnlyTLSRegistry(std::move(tls_slot_));
 
     // Get the registered socket interface from the global registry and set up its extension.
     auto* registered_socket_interface =
@@ -1406,7 +1106,6 @@ public:
   // Real thread local slot and registry for reverse connection testing.
   std::unique_ptr<ThreadLocal::TypedSlot<BootstrapReverseConnection::UpstreamSocketThreadLocal>>
       tls_slot_;
-  std::shared_ptr<BootstrapReverseConnection::UpstreamSocketThreadLocal> thread_local_registry_;
 
   // Real socket interface and extension.
   std::unique_ptr<BootstrapReverseConnection::ReverseTunnelAcceptor> socket_interface_;
@@ -1596,6 +1295,403 @@ TEST_F(UpstreamReverseConnectionAddressTest, LongNodeId) {
   EXPECT_EQ(address.logicalName(), long_node_id);
   EXPECT_EQ(address.asString(), "127.0.0.1:0");
   EXPECT_EQ(address.type(), Network::Address::Type::Ip);
+}
+
+// Test header-based formatter.
+TEST_F(ReverseConnectionClusterTest, HeaderFormatterExpressions) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-node-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+  addTestSocket("production-node", "cluster-production");
+
+  RevConCluster::LoadBalancer lb(cluster_);
+
+  // Test header extraction.
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+        new Http::TestRequestHeaderMapImpl{{"x-node-id", "production-node"}}};
+
+    auto result = lb.chooseHost(&lb_context);
+    ASSERT_NE(result.host, nullptr);
+    EXPECT_EQ(result.host->address()->logicalName(), "production-node");
+  }
+}
+
+// Test multiple header formatter combinations.
+TEST_F(ReverseConnectionClusterTest, MultipleHeaderFormatters) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-env)%-%REQ(x-node-id)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+  addTestSocket("prod-node-123", "cluster-prod");
+  addTestSocket("dev-node-456", "cluster-dev");
+
+  RevConCluster::LoadBalancer lb(cluster_);
+
+  // Test 1: Production environment with node-123.
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+        new Http::TestRequestHeaderMapImpl{{"x-env", "prod"}, {"x-node-id", "node-123"}}};
+
+    auto result = lb.chooseHost(&lb_context);
+    ASSERT_NE(result.host, nullptr);
+    EXPECT_EQ(result.host->address()->logicalName(), "prod-node-123");
+  }
+
+  // Test 2: Development environment with node-456.
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+        new Http::TestRequestHeaderMapImpl{{"x-env", "dev"}, {"x-node-id", "node-456"}}};
+
+    auto result = lb.chooseHost(&lb_context);
+    ASSERT_NE(result.host, nullptr);
+    EXPECT_EQ(result.host->address()->logicalName(), "dev-node-456");
+  }
+
+  // Test 3: Missing header results in host creation (formatter returns "prod--" when x-node-id is
+  // missing).
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+        new Http::TestRequestHeaderMapImpl{{"x-env", "prod"}}}; // Missing x-node-id
+
+    auto result = lb.chooseHost(&lb_context);
+    ASSERT_NE(result.host, nullptr); // Host created for "prod--" (missing node-id becomes "-")
+    EXPECT_EQ(result.host->address()->logicalName(), "prod--");
+  }
+}
+
+// Test connection property formatters.
+TEST_F(ReverseConnectionClusterTest, ConnectionPropertyFormatters) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "conn-%DOWNSTREAM_REMOTE_ADDRESS%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+  addTestSocket("conn-192.168.1.100:8080", "cluster-conn");
+
+  RevConCluster::LoadBalancer lb(cluster_);
+
+  // Create stream info with connection info.
+  auto stream_info = std::make_unique<NiceMock<StreamInfo::MockStreamInfo>>();
+  auto remote = std::make_shared<Network::Address::Ipv4Instance>("192.168.1.100", 8080);
+  auto local = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0", 0);
+  Network::ConnectionInfoSetterImpl conn_info(local, remote);
+  ON_CALL(*stream_info, downstreamAddressProvider()).WillByDefault(ReturnRef(conn_info));
+
+  NiceMock<Network::MockConnection> connection;
+  ON_CALL(connection, streamInfo()).WillByDefault(testing::ReturnRef(*stream_info));
+  TestLoadBalancerContext lb_context(&connection, stream_info.get());
+  lb_context.downstream_headers_ =
+      Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-header", "value"}}};
+
+  auto result = lb.chooseHost(&lb_context);
+  ASSERT_NE(result.host, nullptr);
+  EXPECT_EQ(result.host->address()->logicalName(), "conn-192.168.1.100:8080");
+}
+
+// Test formatter error handling and edge cases.
+TEST_F(ReverseConnectionClusterTest, FormatterErrorHandling) {
+  // Test missing header returns nullptr.
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-missing-header)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+
+  RevConCluster::LoadBalancer lb(cluster_);
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection);
+  lb_context.downstream_headers_ =
+      Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-other-header", "value"}}};
+
+  // Should return nullptr for missing header.
+  auto result = lb.chooseHost(&lb_context);
+  EXPECT_EQ(result.host, nullptr);
+}
+
+// Test formatter with complex combinations and transformations.
+TEST_F(ReverseConnectionClusterTest, ComplexFormatterCombinations) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "svc-%REQ(x-service)%-env-%REQ(x-env)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+  addTestSocket("svc-api-env-prod", "cluster-complex");
+
+  RevConCluster::LoadBalancer lb(cluster_);
+
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection);
+  lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+      new Http::TestRequestHeaderMapImpl{{"x-service", "api"}, {"x-env", "prod"}}};
+
+  auto result = lb.chooseHost(&lb_context);
+  ASSERT_NE(result.host, nullptr);
+  EXPECT_EQ(result.host->address()->logicalName(), "svc-api-env-prod");
+}
+
+// Test scalability with many different host IDs.
+TEST_F(ReverseConnectionClusterTest, ScalabilityManyHostIds) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "node-%REQ(x-node-index)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+
+  RevConCluster::LoadBalancer lb(cluster_);
+
+  // Create sockets for 100 different nodes.
+  for (int i = 0; i < 100; ++i) {
+    std::string node_id = absl::StrCat("node-", i);
+    addTestSocket(node_id, absl::StrCat("cluster-", i));
+  }
+
+  // Verify each node gets its own host.
+  for (int i = 0; i < 100; ++i) {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    std::string node_index = absl::StrCat(i);
+    lb_context.downstream_headers_ =
+        Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-node-index", node_index}}};
+
+    auto result = lb.chooseHost(&lb_context);
+    ASSERT_NE(result.host, nullptr);
+    EXPECT_EQ(result.host->address()->logicalName(), absl::StrCat("node-", i));
+  }
+}
+
+// Test formatter validation during cluster creation
+TEST_F(ReverseConnectionClusterTest, FormatterValidationErrors) {
+  // Test invalid format string.
+  {
+    const std::string yaml = R"EOF(
+      name: name
+      connect_timeout: 0.25s
+      lb_policy: CLUSTER_PROVIDED
+      cleanup_interval: 1s
+      cluster_type:
+        name: envoy.clusters.reverse_connection
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+          cleanup_interval: 10s
+          host_id_format: "%INVALID_COMMAND()%"
+    )EOF";
+
+    EXPECT_THROW_WITH_MESSAGE(setupFromYaml(yaml, false), EnvoyException,
+                              "Not supported field in StreamInfo: INVALID_COMMAND");
+  }
+}
+
+// Test concurrent host creation and caching
+TEST_F(ReverseConnectionClusterTest, ConcurrentHostCreation) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-concurrent-node)%"
+  )EOF";
+
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+  addTestSocket("concurrent-node-1", "cluster-concurrent");
+
+  RevConCluster::LoadBalancer lb(cluster_);
+
+  // Create multiple concurrent requests for the same node.
+  std::vector<Upstream::HostConstSharedPtr> hosts;
+  for (int i = 0; i < 10; ++i) {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+        new Http::TestRequestHeaderMapImpl{{"x-concurrent-node", "concurrent-node-1"}}};
+
+    auto result = lb.chooseHost(&lb_context);
+    ASSERT_NE(result.host, nullptr);
+    hosts.push_back(result.host);
+  }
+
+  // All should return the same cached host.
+  for (size_t i = 1; i < hosts.size(); ++i) {
+    EXPECT_EQ(hosts[0], hosts[i]);
+  }
+}
+
+// Test comprehensive formatter functionality with various format strings.
+TEST_F(ReverseConnectionClusterTest, FormatterComprehensiveTests) {
+  // Test 1: Simple header extraction.
+  {
+    const std::string yaml = R"EOF(
+      name: name
+      connect_timeout: 0.25s
+      lb_policy: CLUSTER_PROVIDED
+      cleanup_interval: 1s
+      cluster_type:
+        name: envoy.clusters.reverse_connection
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+          cleanup_interval: 10s
+          host_id_format: "%REQ(x-node-id)%"
+    )EOF";
+
+    setupFromYaml(yaml);
+    setupUpstreamExtension();
+    setupThreadLocalSlot();
+    addTestSocket("node-123", "cluster-123");
+
+    RevConCluster::LoadBalancer lb(cluster_);
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ =
+        Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-node-id", "node-123"}}};
+
+    auto result = lb.chooseHost(&lb_context);
+    ASSERT_NE(result.host, nullptr);
+    EXPECT_EQ(result.host->address()->logicalName(), "node-123");
+  }
+
+  // Test 2: Combined format with multiple headers.
+  {
+    const std::string yaml = R"EOF(
+      name: name
+      connect_timeout: 0.25s
+      lb_policy: CLUSTER_PROVIDED
+      cleanup_interval: 1s
+      cluster_type:
+        name: envoy.clusters.reverse_connection
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+          cleanup_interval: 10s
+          host_id_format: "%REQ(x-tenant)%-%REQ(x-region)%"
+    )EOF";
+
+    setupFromYaml(yaml);
+    setupUpstreamExtension();
+    setupThreadLocalSlot();
+    addTestSocket("tenant-a-us-west", "cluster-multi");
+
+    RevConCluster::LoadBalancer lb(cluster_);
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+        new Http::TestRequestHeaderMapImpl{{"x-tenant", "tenant-a"}, {"x-region", "us-west"}}};
+
+    auto result = lb.chooseHost(&lb_context);
+    ASSERT_NE(result.host, nullptr);
+    EXPECT_EQ(result.host->address()->logicalName(), "tenant-a-us-west");
+  }
+
+  // Test 3: Missing header should result in no host.
+  {
+    const std::string yaml = R"EOF(
+      name: name
+      connect_timeout: 0.25s
+      lb_policy: CLUSTER_PROVIDED
+      cleanup_interval: 1s
+      cluster_type:
+        name: envoy.clusters.reverse_connection
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+          cleanup_interval: 10s
+          host_id_format: "%REQ(x-missing-header)%"
+    )EOF";
+
+    setupFromYaml(yaml);
+    setupUpstreamExtension();
+    setupThreadLocalSlot();
+
+    RevConCluster::LoadBalancer lb(cluster_);
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ =
+        Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-other-header", "value"}}};
+
+    auto result = lb.chooseHost(&lb_context);
+    EXPECT_EQ(result.host, nullptr);
+  }
 }
 
 } // namespace ReverseConnection

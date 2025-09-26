@@ -1,6 +1,11 @@
 date: Pending
 
 behavior_changes:
+- area: response_decoder
+  change: |
+    Updated EnvoyQuicClientStream and ResponseDecoderWrapper to use a handle to access the response decoder
+    to prevent use-after-free errors by ensuring the decoder instance is still live before calling its methods.
+    This change is guarded by the runtime flag ``envoy.reloadable_features.use_response_decoder_handle``.
 - area: http
   change: |
     A route refresh will now result in a tracing refresh. The trace sampling decision and decoration
@@ -163,6 +168,11 @@ bug_fixes:
     removed for requests matching the ``pass_through_matcher`` configuration. This broke setups with multiple OAuth2
     filter instances using different ``pass_through_matcher`` configurations, because the first matching instance removed
     the OAuth2 cookies--even when a passthrough was intended--impacting subsequent filters that still needed those cookies.
+- area: tls_inspector
+  change: |
+    Fixed regression in tls_inspector that caused plain text connections to be closed if more than 16Kb is read at once.
+    This behavior can be reverted by setting the runtime guard ``envoy.reloadable_features.tls_inspector_no_length_check_on_error``
+    to false.
 - area: stats
   change: |
     Fixed a bug where the metric name ``expiration_unix_time_seconds`` of
@@ -460,6 +470,12 @@ new_features:
     when used in formatting contexts that accept non-string values, such as
     :ref:`json_format <envoy_v3_api_field_config.core.v3.SubstitutionFormatString.json_format>`. The new command is introduced
     so as to not break compatibility with the existing command's behavior.
+- area: rbac
+  change: |
+    Enabled use of :ref:`NetworkNamespaceInput
+    <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.NetworkNamespaceInput>` in the
+    network and HTTP RBAC filters' matchers. This allows RBAC policies to evaluate the Linux network
+    namespace of the listening socket via the generic matcher API.
 - area: dynamic_modules
   change: |
     Added a new Logging ABI that allows modules to emit logs in the standard Envoy logging stream under ``dynamic_modules`` ID.

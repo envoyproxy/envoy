@@ -10,8 +10,7 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 
-#include "source/common/http/matching/data_impl.h"
-#include "source/common/matcher/matcher.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
@@ -25,37 +24,6 @@ namespace ReverseConnection {
 
 namespace BootstrapReverseConnection = Envoy::Extensions::Bootstrap::ReverseConnection;
 
-using HostIdActionProto = envoy::extensions::clusters::reverse_connection::v3::HostIdAction;
-
-// Action type that carries the host identifier returned by the matcher.
-class HostIdAction : public Envoy::Matcher::ActionBase<HostIdActionProto> {
-public:
-  explicit HostIdAction(std::string host_id) : host_id_(std::move(host_id)) {}
-  const std::string& host_id() const { return host_id_; }
-
-private:
-  const std::string host_id_;
-};
-
-// Factory to construct HostIdAction from proto.
-class HostIdActionFactory : public Envoy::Matcher::ActionFactory<Upstream::ClusterFactoryContext> {
-public:
-  std::string name() const override { return "envoy.matching.actions.reverse_connection.host_id"; }
-  Envoy::Matcher::ActionConstSharedPtr
-  createAction(const Protobuf::Message& config, Upstream::ClusterFactoryContext&,
-               ProtobufMessage::ValidationVisitor& validation_visitor) override {
-    const auto& proto =
-        MessageUtil::downcastAndValidate<const HostIdActionProto&>(config, validation_visitor);
-    return std::make_shared<HostIdAction>(proto.host_id());
-  }
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<HostIdActionProto>();
-  }
-};
-
-REGISTER_FACTORY(HostIdActionFactory,
-                 Envoy::Matcher::ActionFactory<Upstream::ClusterFactoryContext>);
-
 Upstream::HostSelectionResponse
 RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
   if (context == nullptr) {
@@ -63,26 +31,34 @@ RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) 
     return {nullptr};
   }
 
-  // Evaluate the configured host-id matcher to obtain the host identifier.
+  // Evaluate the configured host-id formatter to obtain the host identifier.
   if (context->downstreamHeaders() == nullptr) {
-    ENVOY_LOG(error, "reverse_connection: missing downstream headers; cannot evaluate matcher.");
+    ENVOY_LOG(error, "reverse_connection: missing downstream headers; cannot evaluate formatter.");
     return {nullptr};
   }
-  Http::Matching::HttpMatchingDataImpl data(context->downstreamConnection()->streamInfo());
-  data.onRequestHeaders(*context->downstreamHeaders());
-  const ::Envoy::Matcher::MatchResult result =
-      ::Envoy::Matcher::evaluateMatch<Envoy::Http::HttpMatchingData>(*parent_->host_id_match_tree_,
-                                                                     data);
-  if (!result.isMatch()) {
-    ENVOY_LOG(error, "reverse_connection: host_id matcher did not match.");
+
+  // Format the host identifier using the configured formatter.
+  const Envoy::Formatter::HttpFormatterContext formatter_context{
+      context->downstreamHeaders(),     nullptr /* response_headers */,
+      nullptr /* response_trailers */,  "" /* local_reply_body */,
+      AccessLog::AccessLogType::NotSet, nullptr /* active_span */};
+
+  // Use request stream info if available, otherwise fall back to connection stream info.
+  const StreamInfo::StreamInfo& stream_info = context->requestStreamInfo()
+                                                  ? *context->requestStreamInfo()
+                                                  : context->downstreamConnection()->streamInfo();
+
+  const std::string host_id =
+      parent_->host_id_formatter_->formatWithContext(formatter_context, stream_info);
+
+  // Treat "-" (formatter default for missing) as empty as well.
+  if (host_id.empty() || host_id == "-") {
+    ENVOY_LOG(error, "reverse_connection: host_id formatter returned empty value.");
     return {nullptr};
   }
-  const auto& action = result.action();
-  ASSERT(action != nullptr);
-  const auto& host_id_action = action->getTyped<HostIdAction>();
-  absl::string_view host_id_sv = host_id_action.host_id();
-  ENVOY_LOG(debug, "reverse_connection: using host identifier from matcher action: {}", host_id_sv);
-  return parent_->checkAndCreateHost(host_id_sv);
+
+  ENVOY_LOG(debug, "reverse_connection: using host identifier from formatter: {}", host_id);
+  return parent_->checkAndCreateHost(host_id);
 }
 
 Upstream::HostSelectionResponse RevConCluster::checkAndCreateHost(absl::string_view host_id) {
@@ -200,21 +176,15 @@ RevConCluster::RevConCluster(
       cleanup_interval_(std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(rev_con_config, cleanup_interval, 60000))),
       cleanup_timer_(dispatcher_.createTimer([this]() -> void { cleanup(); })) {
-  // Build the host-id matcher tree.
-  // No-op validation visitor for building the match tree.
-  struct NoopValidationVisitor
-      : public Envoy::Matcher::MatchTreeValidationVisitor<Envoy::Http::HttpMatchingData> {
-    absl::Status performDataInputValidation(
-        const Envoy::Matcher::DataInputFactory<Envoy::Http::HttpMatchingData>&,
-        absl::string_view) override {
-      return absl::OkStatus();
-    }
-  } validation_visitor;
-  Envoy::Matcher::MatchTreeFactory<Envoy::Http::HttpMatchingData, Upstream::ClusterFactoryContext>
-      factory(context, context.serverFactoryContext(), validation_visitor);
-  Envoy::Matcher::MatchTreeFactoryCb<Envoy::Http::HttpMatchingData> cb =
-      factory.create(rev_con_config.host_id_matcher());
-  host_id_match_tree_ = cb();
+  // Create the host-id formatter from the format string.
+  auto formatter_or_error = Envoy::Formatter::FormatterImpl::create(
+      rev_con_config.host_id_format(), /*omit_empty_values=*/false,
+      Envoy::Formatter::BuiltInCommandParserFactoryHelper::commandParsers());
+  if (!formatter_or_error.ok()) {
+    creation_status = formatter_or_error.status();
+    return;
+  }
+  host_id_formatter_ = std::move(*formatter_or_error);
 
   // Schedule periodic cleanup.
   cleanup_timer_->enableTimer(cleanup_interval_);
@@ -238,6 +208,12 @@ RevConClusterFactory::createClusterWithConfig(
     return absl::InvalidArgumentError(
         "Reverse Conn clusters must have no load assignment configured");
   }
+
+  // Validate the host_id_format early to catch formatter errors.
+  auto validation_or_error = Envoy::Formatter::FormatterImpl::create(
+      proto_config.host_id_format(), /*omit_empty_values=*/false,
+      Envoy::Formatter::BuiltInCommandParserFactoryHelper::commandParsers());
+  RETURN_IF_NOT_OK_REF(validation_or_error.status());
 
   absl::Status creation_status = absl::OkStatus();
   auto new_cluster = std::shared_ptr<RevConCluster>(
