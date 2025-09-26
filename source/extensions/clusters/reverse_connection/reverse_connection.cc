@@ -193,7 +193,8 @@ BootstrapReverseConnection::UpstreamSocketManager* RevConCluster::getUpstreamSoc
 RevConCluster::RevConCluster(
     const envoy::config::cluster::v3::Cluster& config, Upstream::ClusterFactoryContext& context,
     absl::Status& creation_status,
-    const envoy::extensions::clusters::reverse_connection::v3::ReverseConnectionClusterConfig& rev_con_config)
+    const envoy::extensions::clusters::reverse_connection::v3::ReverseConnectionClusterConfig&
+        rev_con_config)
     : ClusterImplBase(config, context, creation_status),
       dispatcher_(context.serverFactoryContext().mainThreadDispatcher()),
       cleanup_interval_(std::chrono::milliseconds(
@@ -222,7 +223,8 @@ RevConCluster::RevConCluster(
 absl::StatusOr<std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>>
 RevConClusterFactory::createClusterWithConfig(
     const envoy::config::cluster::v3::Cluster& cluster,
-    const envoy::extensions::clusters::reverse_connection::v3::ReverseConnectionClusterConfig& proto_config,
+    const envoy::extensions::clusters::reverse_connection::v3::ReverseConnectionClusterConfig&
+        proto_config,
     Upstream::ClusterFactoryContext& context) {
   if (cluster.lb_policy() != envoy::config::cluster::v3::Cluster::CLUSTER_PROVIDED) {
     return absl::InvalidArgumentError(
