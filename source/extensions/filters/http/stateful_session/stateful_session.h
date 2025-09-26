@@ -14,7 +14,6 @@
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "absl/strings/string_view.h"
-#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -96,7 +95,8 @@ public:
   Http::LocalErrorStatus onLocalReply(const Http::StreamFilterBase::LocalReplyData&) override {
     // For strict mode, if an override was attempted and a local reply was sent (e.g., 503),
     // consider this a failed-closed selection.
-    if (override_attempted_ && config_->isStrict() && !accounted_) {
+    if (override_attempted_ && effective_config_ != nullptr && effective_config_->isStrict() &&
+        !accounted_) {
       markFailedClosed();
       accounted_ = true;
     }
@@ -127,8 +127,9 @@ private:
   StatefulSessionConfigSharedPtr config_;
   std::shared_ptr<StatefulSessionFilterStats> stats_;
   bool override_attempted_{false};
-  absl::optional<std::string> override_address_;
   bool accounted_{false};
+  // Cached route config to avoid repeated resolution and dynamic_cast issues in tests.
+  const StatefulSessionConfig* effective_config_{nullptr};
 };
 
 } // namespace StatefulSession
