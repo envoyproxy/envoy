@@ -43,10 +43,16 @@ RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) 
       nullptr /* response_trailers */,  "" /* local_reply_body */,
       AccessLog::AccessLogType::NotSet, nullptr /* active_span */};
 
-  const std::string host_id = parent_->host_id_formatter_->formatWithContext(
-      formatter_context, context->downstreamConnection()->streamInfo());
+  // Use request stream info if available, otherwise fall back to connection stream info.
+  const StreamInfo::StreamInfo& stream_info = context->requestStreamInfo()
+                                                  ? *context->requestStreamInfo()
+                                                  : context->downstreamConnection()->streamInfo();
 
-  if (host_id.empty()) {
+  const std::string host_id =
+      parent_->host_id_formatter_->formatWithContext(formatter_context, stream_info);
+
+  // Treat "-" (formatter default for missing) as empty as well.
+  if (host_id.empty() || host_id == "-") {
     ENVOY_LOG(error, "reverse_connection: host_id formatter returned empty value.");
     return {nullptr};
   }
@@ -171,8 +177,9 @@ RevConCluster::RevConCluster(
           PROTOBUF_GET_MS_OR_DEFAULT(rev_con_config, cleanup_interval, 60000))),
       cleanup_timer_(dispatcher_.createTimer([this]() -> void { cleanup(); })) {
   // Create the host-id formatter from the format string.
-  auto formatter_or_error =
-      Envoy::Formatter::FormatterImpl::create(rev_con_config.host_id_format());
+  auto formatter_or_error = Envoy::Formatter::FormatterImpl::create(
+      rev_con_config.host_id_format(), /*omit_empty_values=*/false,
+      Envoy::Formatter::BuiltInCommandParserFactoryHelper::commandParsers());
   if (!formatter_or_error.ok()) {
     creation_status = formatter_or_error.status();
     return;
@@ -201,6 +208,12 @@ RevConClusterFactory::createClusterWithConfig(
     return absl::InvalidArgumentError(
         "Reverse Conn clusters must have no load assignment configured");
   }
+
+  // Validate the host_id_format early to catch formatter errors.
+  auto validation_or_error = Envoy::Formatter::FormatterImpl::create(
+      proto_config.host_id_format(), /*omit_empty_values=*/false,
+      Envoy::Formatter::BuiltInCommandParserFactoryHelper::commandParsers());
+  RETURN_IF_NOT_OK_REF(validation_or_error.status());
 
   absl::Status creation_status = absl::OkStatus();
   auto new_cluster = std::shared_ptr<RevConCluster>(

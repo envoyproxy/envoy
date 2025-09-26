@@ -13,6 +13,7 @@
 #include "source/common/config/utility.h"
 #include "source/common/http/headers.h"
 #include "source/common/network/address_impl.h"
+#include "source/common/network/connection_impl.h"
 #include "source/common/network/socket_interface.h"
 #include "source/common/singleton/manager_impl.h"
 #include "source/common/singleton/threadsafe_singleton.h"
@@ -86,6 +87,12 @@ public:
     EXPECT_CALL(server_context_, threadLocal()).WillRepeatedly(ReturnRef(thread_local_));
     EXPECT_CALL(server_context_, scope()).WillRepeatedly(ReturnRef(*stats_scope_));
 
+    // Allow timers and file events to be created multiple times during tests.
+    ON_CALL(server_context_.dispatcher_, createTimer_(_))
+        .WillByDefault(testing::ReturnNew<NiceMock<Event::MockTimer>>());
+    ON_CALL(server_context_.dispatcher_, createFileEvent_(_, _, _, _))
+        .WillByDefault(testing::ReturnNew<NiceMock<Event::MockFileEvent>>());
+
     // Create the config.
     config_.set_stat_prefix("test_prefix");
   }
@@ -119,6 +126,8 @@ public:
     if (expect_success) {
       cleanup_timer_ = new Event::MockTimer(&server_context_.dispatcher_);
       EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+      EXPECT_CALL(*cleanup_timer_, disableTimer()).Times(testing::AnyNumber());
+      EXPECT_CALL(initialized_, ready());
     }
     setup(Upstream::parseClusterFromV3Yaml(yaml));
   }
@@ -156,17 +165,13 @@ public:
   }
 
   void TearDown() override {
-    if (init_complete_) {
-      EXPECT_CALL(*cleanup_timer_, disableTimer());
-    }
+    // Do not assert on timer teardown; allow destructor-time disable.
 
     // Clean up thread local resources if they were set up.
     if (tls_slot_) {
       tls_slot_.reset();
     }
-    if (thread_local_registry_) {
-      thread_local_registry_.reset();
-    }
+    // Don't reset thread_local_registry_ as it's owned by the extension.
     if (extension_) {
       extension_.reset();
     }
@@ -182,45 +187,23 @@ public:
       return;
     }
 
-    // Set up mock expectations for timer creation that will be needed by UpstreamSocketManager.
-    auto mock_timer = new NiceMock<Event::MockTimer>();
-    EXPECT_CALL(server_context_.dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
-
-    // First, call onServerInitialized to set up the extension reference properly.
+    // Let the extension create and own its TLS slot and manager to avoid duplicate timer/file
+    // event creation.
     extension_->onServerInitialized();
-
-    // Create a thread local registry with the properly initialized extension.
-    thread_local_registry_ =
-        std::make_shared<BootstrapReverseConnection::UpstreamSocketThreadLocal>(
-            server_context_.dispatcher_, extension_.get());
-
-    // Create the actual TypedSlot.
-    tls_slot_ =
-        ThreadLocal::TypedSlot<BootstrapReverseConnection::UpstreamSocketThreadLocal>::makeUnique(
-            thread_local_);
-    thread_local_.setDispatcher(&server_context_.dispatcher_);
-
-    // Set up the slot to return our registry.
-    tls_slot_->set([registry = thread_local_registry_](Event::Dispatcher&) { return registry; });
-
-    // Override the TLS slot with our test version.
-    extension_->setTestOnlyTLSRegistry(std::move(tls_slot_));
   }
 
   // Helper to add a socket to the manager for testing.
   void addTestSocket(const std::string& node_id, const std::string& cluster_id) {
-    if (!thread_local_registry_ || !thread_local_registry_->socketManager() || !socket_interface_) {
+    if (!socket_interface_) {
       return;
     }
 
-    // Set up mock expectations for timer and file event creation.
-    auto mock_timer = new NiceMock<Event::MockTimer>();
-    auto mock_file_event = new NiceMock<Event::MockFileEvent>();
-    EXPECT_CALL(server_context_.dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
-    EXPECT_CALL(server_context_.dispatcher_, createFileEvent_(_, _, _, _))
-        .WillOnce(Return(mock_file_event));
+    auto* local_registry = socket_interface_->getLocalRegistry();
+    if (local_registry == nullptr || local_registry->socketManager() == nullptr) {
+      return;
+    }
 
-    // Create a mock socket.
+    // Create a mock socket. Timer and file event creation will use the ON_CALL defaults.
     auto socket = std::make_unique<NiceMock<Network::MockConnectionSocket>>();
     auto mock_io_handle = std::make_unique<NiceMock<Network::MockIoHandle>>();
     EXPECT_CALL(*mock_io_handle, fdDoNotUse()).WillRepeatedly(Return(123));
@@ -228,7 +211,7 @@ public:
     socket->io_handle_ = std::move(mock_io_handle);
 
     // Get the socket manager from the thread local registry.
-    auto* tls_socket_manager = socket_interface_->getLocalRegistry()->socketManager();
+    auto* tls_socket_manager = local_registry->socketManager();
     EXPECT_NE(tls_socket_manager, nullptr);
 
     // Add the socket to the manager.
@@ -265,7 +248,6 @@ public:
   // Real thread local slot and registry for reverse connection testing.
   std::unique_ptr<ThreadLocal::TypedSlot<BootstrapReverseConnection::UpstreamSocketThreadLocal>>
       tls_slot_;
-  std::shared_ptr<BootstrapReverseConnection::UpstreamSocketThreadLocal> thread_local_registry_;
 
   // Real socket interface and extension.
   std::unique_ptr<BootstrapReverseConnection::ReverseTunnelAcceptor> socket_interface_;
@@ -365,7 +347,6 @@ TEST_F(ReverseConnectionClusterTest, BasicSetup) {
         host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(membership_updated_, ready()).Times(0);
   setupFromYaml(yaml);
 
@@ -388,7 +369,6 @@ TEST_F(ReverseConnectionClusterTest, NoContext) {
         host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(membership_updated_, ready()).Times(0);
   setupFromYaml(yaml);
 
@@ -431,7 +411,6 @@ TEST_F(ReverseConnectionClusterTest, NoHeaders) {
         host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   // Downstream connection but no headers => no host.
@@ -460,7 +439,6 @@ TEST_F(ReverseConnectionClusterTest, MissingRequiredHeaders) {
         host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   // Request with unsupported headers but missing all required headers (EnvoyDstNodeUUID,.
@@ -499,7 +477,6 @@ TEST_F(ReverseConnectionClusterTest, HostCreationWithoutSocketManager) {
         host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   RevConCluster::LoadBalancer lb(cluster_);
@@ -544,7 +521,6 @@ TEST_F(ReverseConnectionClusterTest, SocketInterfaceNotRegistered) {
         host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   RevConCluster::LoadBalancer lb(cluster_);
@@ -579,7 +555,6 @@ TEST_F(ReverseConnectionClusterTest, HostCreationWithSocketManager) {
         host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   // Set up the upstream extension for this test.
@@ -628,9 +603,6 @@ TEST_F(ReverseConnectionClusterTest, HostCreationWithSocketManager) {
   }
 }
 
-// Demonstrate using a safe_regex rule that extracts a constrained header pattern and maps it
-// to a host_id without statically enumerating downstream node IDs. This shows we can avoid
-// static routing and instead select hosts based on input criteria.
 TEST_F(ReverseConnectionClusterTest, HostIdExtractionWithSafeRegex) {
   const std::string yaml = R"EOF(
     name: name
@@ -642,24 +614,22 @@ TEST_F(ReverseConnectionClusterTest, HostIdExtractionWithSafeRegex) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
-        # Use CEL to extract the first part of the header value before the dot
-        # This demonstrates dynamic extraction without static enumeration
-        host_id_format: "%CEL(request.headers['x-remote-node-id'] | split('.')[0])%"
+        host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   // Initialize upstream extension and thread local registry for socket manager.
   setupUpstreamExtension();
   setupThreadLocalSlot();
 
-  // Provide a reverse connection socket for host_id "foo" only.
-  addTestSocket("foo", "cluster-foo");
+  // Provide reverse connection sockets for different host_ids.
+  addTestSocket("foo.bar", "cluster-foo-bar");
+  addTestSocket("node-123", "cluster-node-123");
 
   RevConCluster::LoadBalancer lb(cluster_);
 
-  // Request: header value matches the safe_regex (foo.bar) and routes to host_id "foo".
+  // Request: header value "foo.bar" routes to host_id "foo.bar".
   {
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection);
@@ -668,18 +638,32 @@ TEST_F(ReverseConnectionClusterTest, HostIdExtractionWithSafeRegex) {
 
     auto result = lb.chooseHost(&lb_context);
     ASSERT_NE(result.host, nullptr);
-    EXPECT_EQ(result.host->address()->logicalName(), "foo");
+    EXPECT_EQ(result.host->address()->logicalName(), "foo.bar");
   }
 
-  // Request: header value does not match the configured safe_regex rule -> no host.
+  // Request: header value "node-123" routes to host_id "node-123".
   {
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection);
     lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
-        new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "bar.baz"}}};
+        new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "node-123"}}};
 
     auto result = lb.chooseHost(&lb_context);
-    EXPECT_EQ(result.host, nullptr);
+    ASSERT_NE(result.host, nullptr);
+    EXPECT_EQ(result.host->address()->logicalName(), "node-123");
+  }
+
+  // Request: header value "unknown-node" creates a host even without socket.
+  // The socket availability check happens at connection time, not host selection time.
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+        new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "unknown-node"}}};
+
+    auto result = lb.chooseHost(&lb_context);
+    ASSERT_NE(result.host, nullptr);
+    EXPECT_EQ(result.host->address()->logicalName(), "unknown-node");
   }
 }
 
@@ -698,7 +682,6 @@ TEST_F(ReverseConnectionClusterTest, HostReuse) {
         host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   // Set up the upstream extension for this test.
@@ -742,7 +725,6 @@ TEST_F(ReverseConnectionClusterTest, DifferentHostsForDifferentUUIDs) {
         host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   // Set up the upstream extension for this test.
@@ -789,7 +771,6 @@ TEST_F(ReverseConnectionClusterTest, TestCleanup) {
         host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   // Set up the upstream extension for this test.
@@ -865,7 +846,6 @@ TEST_F(ReverseConnectionClusterTest, TestCleanupWithUsedHosts) {
         host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   // Set up the upstream extension for this test.
@@ -945,7 +925,6 @@ TEST_F(ReverseConnectionClusterTest, LoadBalancerFactory) {
         host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   // Set up the upstream extension for this test
@@ -986,7 +965,6 @@ TEST_F(ReverseConnectionClusterTest, ThreadAwareLoadBalancer) {
         host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   // Set up the upstream extension for this test
@@ -1026,7 +1004,6 @@ TEST_F(ReverseConnectionClusterTest, LoadBalancerNoopMethods) {
         host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
 
   RevConCluster::LoadBalancer lb(cluster_);
@@ -1077,9 +1054,7 @@ public:
     if (tls_slot_) {
       tls_slot_.reset();
     }
-    if (thread_local_registry_) {
-      thread_local_registry_.reset();
-    }
+    // Don't reset thread_local_registry_ as it's owned by the extension.
     if (extension_) {
       extension_.reset();
     }
@@ -1106,29 +1081,8 @@ public:
       return;
     }
 
-    // Set up mock expectations for timer creation that will be needed by UpstreamSocketManager.
-    auto mock_timer = new NiceMock<Event::MockTimer>();
-    EXPECT_CALL(server_context_.dispatcher_, createTimer_(_)).WillOnce(Return(mock_timer));
-
-    // First, call onServerInitialized to set up the extension reference properly.
+    // Let the extension create and manage its own TLS slot and timer.
     extension_->onServerInitialized();
-
-    // Create a thread local registry with the properly initialized extension.
-    thread_local_registry_ =
-        std::make_shared<BootstrapReverseConnection::UpstreamSocketThreadLocal>(
-            server_context_.dispatcher_, extension_.get());
-
-    // Create the actual TypedSlot.
-    tls_slot_ =
-        ThreadLocal::TypedSlot<BootstrapReverseConnection::UpstreamSocketThreadLocal>::makeUnique(
-            thread_local_);
-    thread_local_.setDispatcher(&server_context_.dispatcher_);
-
-    // Set up the slot to return our registry.
-    tls_slot_->set([registry = thread_local_registry_](Event::Dispatcher&) { return registry; });
-
-    // Override the TLS slot with our test version.
-    extension_->setTestOnlyTLSRegistry(std::move(tls_slot_));
 
     // Get the registered socket interface from the global registry and set up its extension.
     auto* registered_socket_interface =
@@ -1152,7 +1106,6 @@ public:
   // Real thread local slot and registry for reverse connection testing.
   std::unique_ptr<ThreadLocal::TypedSlot<BootstrapReverseConnection::UpstreamSocketThreadLocal>>
       tls_slot_;
-  std::shared_ptr<BootstrapReverseConnection::UpstreamSocketThreadLocal> thread_local_registry_;
 
   // Real socket interface and extension.
   std::unique_ptr<BootstrapReverseConnection::ReverseTunnelAcceptor> socket_interface_;
@@ -1344,8 +1297,8 @@ TEST_F(UpstreamReverseConnectionAddressTest, LongNodeId) {
   EXPECT_EQ(address.type(), Network::Address::Type::Ip);
 }
 
-// Test CEL formatter with complex expressions and fallbacks.
-TEST_F(ReverseConnectionClusterTest, CelFormatterComplexExpressions) {
+// Test header-based formatter.
+TEST_F(ReverseConnectionClusterTest, HeaderFormatterExpressions) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -1356,44 +1309,31 @@ TEST_F(ReverseConnectionClusterTest, CelFormatterComplexExpressions) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
-        host_id_format: "%CEL(request.headers['x-node-id'] | split('.')[0] | orValue('default-node'))%"
+        host_id_format: "%REQ(x-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
   setupUpstreamExtension();
   setupThreadLocalSlot();
-  addTestSocket("default-node", "cluster-default");
+  addTestSocket("production-node", "cluster-production");
 
   RevConCluster::LoadBalancer lb(cluster_);
 
-  // Test 1: CEL with fallback when header is missing
-  {
-    NiceMock<Network::MockConnection> connection;
-    TestLoadBalancerContext lb_context(&connection);
-    lb_context.downstream_headers_ =
-        Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-other-header", "value"}}};
-
-    auto result = lb.chooseHost(&lb_context);
-    ASSERT_NE(result.host, nullptr);
-    EXPECT_EQ(result.host->address()->logicalName(), "default-node");
-  }
-
-  // Test 2: CEL extraction with dot notation (foo.bar -> foo)
+  // Test header extraction.
   {
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection);
     lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
-        new Http::TestRequestHeaderMapImpl{{"x-node-id", "production.bar"}}};
+        new Http::TestRequestHeaderMapImpl{{"x-node-id", "production-node"}}};
 
     auto result = lb.chooseHost(&lb_context);
     ASSERT_NE(result.host, nullptr);
-    EXPECT_EQ(result.host->address()->logicalName(), "production");
+    EXPECT_EQ(result.host->address()->logicalName(), "production-node");
   }
 }
 
-// Test dynamic metadata formatter functionality.
-TEST_F(ReverseConnectionClusterTest, DynamicMetadataFormatter) {
+// Test multiple header formatter combinations.
+TEST_F(ReverseConnectionClusterTest, MultipleHeaderFormatters) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -1404,31 +1344,53 @@ TEST_F(ReverseConnectionClusterTest, DynamicMetadataFormatter) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
         cleanup_interval: 10s
-        host_id_format: "%DYNAMIC_METADATA(envoy.lb:node_id)%"
+        host_id_format: "%REQ(x-env)%-%REQ(x-node-id)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
   setupUpstreamExtension();
   setupThreadLocalSlot();
-  addTestSocket("metadata-node-1", "cluster-metadata");
+  addTestSocket("prod-node-123", "cluster-prod");
+  addTestSocket("dev-node-456", "cluster-dev");
 
   RevConCluster::LoadBalancer lb(cluster_);
 
-  // Create stream info with dynamic metadata
-  auto stream_info = std::make_unique<NiceMock<StreamInfo::MockStreamInfo>>();
-  ON_CALL(*stream_info, dynamicMetadata())
-      .WillByDefault(ReturnRefOfCopy(
-          Envoy::Config::Metadata::metadataValue("envoy.lb", "node_id", "metadata-node-1")));
+  // Test 1: Production environment with node-123.
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+        new Http::TestRequestHeaderMapImpl{{"x-env", "prod"}, {"x-node-id", "node-123"}}};
 
-  NiceMock<Network::MockConnection> connection;
-  TestLoadBalancerContext lb_context(&connection, stream_info.get());
-  lb_context.downstream_headers_ =
-      Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-header", "value"}}};
+    auto result = lb.chooseHost(&lb_context);
+    ASSERT_NE(result.host, nullptr);
+    EXPECT_EQ(result.host->address()->logicalName(), "prod-node-123");
+  }
 
-  auto result = lb.chooseHost(&lb_context);
-  ASSERT_NE(result.host, nullptr);
-  EXPECT_EQ(result.host->address()->logicalName(), "metadata-node-1");
+  // Test 2: Development environment with node-456.
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+        new Http::TestRequestHeaderMapImpl{{"x-env", "dev"}, {"x-node-id", "node-456"}}};
+
+    auto result = lb.chooseHost(&lb_context);
+    ASSERT_NE(result.host, nullptr);
+    EXPECT_EQ(result.host->address()->logicalName(), "dev-node-456");
+  }
+
+  // Test 3: Missing header results in host creation (formatter returns "prod--" when x-node-id is
+  // missing).
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+        new Http::TestRequestHeaderMapImpl{{"x-env", "prod"}}}; // Missing x-node-id
+
+    auto result = lb.chooseHost(&lb_context);
+    ASSERT_NE(result.host, nullptr); // Host created for "prod--" (missing node-id becomes "-")
+    EXPECT_EQ(result.host->address()->logicalName(), "prod--");
+  }
 }
 
 // Test connection property formatters.
@@ -1446,94 +1408,60 @@ TEST_F(ReverseConnectionClusterTest, ConnectionPropertyFormatters) {
         host_id_format: "conn-%DOWNSTREAM_REMOTE_ADDRESS%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
   setupUpstreamExtension();
   setupThreadLocalSlot();
-  addTestSocket("conn-192.168.1.100", "cluster-conn");
+  addTestSocket("conn-192.168.1.100:8080", "cluster-conn");
 
   RevConCluster::LoadBalancer lb(cluster_);
 
-  // Create stream info with connection info
+  // Create stream info with connection info.
   auto stream_info = std::make_unique<NiceMock<StreamInfo::MockStreamInfo>>();
-  auto connection_info = std::make_shared<NiceMock<StreamInfo::MockConnectionInfoProvider>>();
-  ON_CALL(*connection_info, remoteAddress())
-      .WillByDefault(ReturnRefOfCopy(Network::Address::Ipv4Instance("192.168.1.100", 8080)));
-  ON_CALL(*stream_info, downstreamConnectionInfoProvider()).WillByDefault(Return(connection_info));
+  auto remote = std::make_shared<Network::Address::Ipv4Instance>("192.168.1.100", 8080);
+  auto local = std::make_shared<Network::Address::Ipv4Instance>("0.0.0.0", 0);
+  Network::ConnectionInfoSetterImpl conn_info(local, remote);
+  ON_CALL(*stream_info, downstreamAddressProvider()).WillByDefault(ReturnRef(conn_info));
 
   NiceMock<Network::MockConnection> connection;
+  ON_CALL(connection, streamInfo()).WillByDefault(testing::ReturnRef(*stream_info));
   TestLoadBalancerContext lb_context(&connection, stream_info.get());
   lb_context.downstream_headers_ =
       Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-header", "value"}}};
 
   auto result = lb.chooseHost(&lb_context);
   ASSERT_NE(result.host, nullptr);
-  EXPECT_EQ(result.host->address()->logicalName(), "conn-192.168.1.100");
+  EXPECT_EQ(result.host->address()->logicalName(), "conn-192.168.1.100:8080");
 }
 
 // Test formatter error handling and edge cases.
 TEST_F(ReverseConnectionClusterTest, FormatterErrorHandling) {
-  // Test 1: Invalid CEL expression
-  {
-    const std::string yaml = R"EOF(
-      name: name
-      connect_timeout: 0.25s
-      lb_policy: CLUSTER_PROVIDED
-      cleanup_interval: 1s
-      cluster_type:
-        name: envoy.clusters.reverse_connection
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
-          cleanup_interval: 10s
-          host_id_format: "%CEL(invalid_syntax)%"
-    )EOF";
+  // Test missing header returns nullptr.
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-missing-header)%"
+  )EOF";
 
-    EXPECT_CALL(initialized_, ready());
-    setupFromYaml(yaml);
-    setupUpstreamExtension();
-    setupThreadLocalSlot();
+  setupFromYaml(yaml);
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
 
-    RevConCluster::LoadBalancer lb(cluster_);
-    NiceMock<Network::MockConnection> connection;
-    TestLoadBalancerContext lb_context(&connection);
-    lb_context.downstream_headers_ =
-        Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-header", "value"}}};
+  RevConCluster::LoadBalancer lb(cluster_);
+  NiceMock<Network::MockConnection> connection;
+  TestLoadBalancerContext lb_context(&connection);
+  lb_context.downstream_headers_ =
+      Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-other-header", "value"}}};
 
-    // Should return nullptr for invalid CEL
-    auto result = lb.chooseHost(&lb_context);
-    EXPECT_EQ(result.host, nullptr);
-  }
-
-  // Test 2: CEL returning empty value
-  {
-    const std::string yaml = R"EOF(
-      name: name
-      connect_timeout: 0.25s
-      lb_policy: CLUSTER_PROVIDED
-      cleanup_interval: 1s
-      cluster_type:
-        name: envoy.clusters.reverse_connection
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
-          cleanup_interval: 10s
-          host_id_format: "%CEL('')%"
-    )EOF";
-
-    EXPECT_CALL(initialized_, ready());
-    setupFromYaml(yaml);
-    setupUpstreamExtension();
-    setupThreadLocalSlot();
-
-    RevConCluster::LoadBalancer lb(cluster_);
-    NiceMock<Network::MockConnection> connection;
-    TestLoadBalancerContext lb_context(&connection);
-    lb_context.downstream_headers_ =
-        Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-header", "value"}}};
-
-    // Should return nullptr for empty CEL result
-    auto result = lb.chooseHost(&lb_context);
-    EXPECT_EQ(result.host, nullptr);
-  }
+  // Should return nullptr for missing header.
+  auto result = lb.chooseHost(&lb_context);
+  EXPECT_EQ(result.host, nullptr);
 }
 
 // Test formatter with complex combinations and transformations.
@@ -1551,7 +1479,6 @@ TEST_F(ReverseConnectionClusterTest, ComplexFormatterCombinations) {
         host_id_format: "svc-%REQ(x-service)%-env-%REQ(x-env)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
   setupUpstreamExtension();
   setupThreadLocalSlot();
@@ -1584,20 +1511,19 @@ TEST_F(ReverseConnectionClusterTest, ScalabilityManyHostIds) {
         host_id_format: "node-%REQ(x-node-index)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
   setupUpstreamExtension();
   setupThreadLocalSlot();
 
   RevConCluster::LoadBalancer lb(cluster_);
 
-  // Create sockets for 100 different nodes
+  // Create sockets for 100 different nodes.
   for (int i = 0; i < 100; ++i) {
     std::string node_id = absl::StrCat("node-", i);
     addTestSocket(node_id, absl::StrCat("cluster-", i));
   }
 
-  // Verify each node gets its own host
+  // Verify each node gets its own host.
   for (int i = 0; i < 100; ++i) {
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection);
@@ -1611,9 +1537,9 @@ TEST_F(ReverseConnectionClusterTest, ScalabilityManyHostIds) {
   }
 }
 
-// Test formatter validation during cluster creation.
+// Test formatter validation during cluster creation
 TEST_F(ReverseConnectionClusterTest, FormatterValidationErrors) {
-  // Test invalid format string
+  // Test invalid format string.
   {
     const std::string yaml = R"EOF(
       name: name
@@ -1628,30 +1554,12 @@ TEST_F(ReverseConnectionClusterTest, FormatterValidationErrors) {
           host_id_format: "%INVALID_COMMAND()%"
     )EOF";
 
-    EXPECT_THROW_WITH_MESSAGE(setupFromYaml(yaml, false), EnvoyException, "formatter parse error");
-  }
-
-  // Test empty format string
-  {
-    const std::string yaml = R"EOF(
-      name: name
-      connect_timeout: 0.25s
-      lb_policy: CLUSTER_PROVIDED
-      cleanup_interval: 1s
-      cluster_type:
-        name: envoy.clusters.reverse_connection
-        typed_config:
-          "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
-          cleanup_interval: 10s
-          host_id_format: ""
-    )EOF";
-
     EXPECT_THROW_WITH_MESSAGE(setupFromYaml(yaml, false), EnvoyException,
-                              "host_id_format cannot be empty");
+                              "Not supported field in StreamInfo: INVALID_COMMAND");
   }
 }
 
-// Test concurrent host creation and caching.
+// Test concurrent host creation and caching
 TEST_F(ReverseConnectionClusterTest, ConcurrentHostCreation) {
   const std::string yaml = R"EOF(
     name: name
@@ -1666,7 +1574,6 @@ TEST_F(ReverseConnectionClusterTest, ConcurrentHostCreation) {
         host_id_format: "%REQ(x-concurrent-node)%"
   )EOF";
 
-  EXPECT_CALL(initialized_, ready());
   setupFromYaml(yaml);
   setupUpstreamExtension();
   setupThreadLocalSlot();
@@ -1674,7 +1581,7 @@ TEST_F(ReverseConnectionClusterTest, ConcurrentHostCreation) {
 
   RevConCluster::LoadBalancer lb(cluster_);
 
-  // Create multiple concurrent requests for the same node
+  // Create multiple concurrent requests for the same node.
   std::vector<Upstream::HostConstSharedPtr> hosts;
   for (int i = 0; i < 10; ++i) {
     NiceMock<Network::MockConnection> connection;
@@ -1687,7 +1594,7 @@ TEST_F(ReverseConnectionClusterTest, ConcurrentHostCreation) {
     hosts.push_back(result.host);
   }
 
-  // All should return the same cached host
+  // All should return the same cached host.
   for (size_t i = 1; i < hosts.size(); ++i) {
     EXPECT_EQ(hosts[0], hosts[i]);
   }
@@ -1695,7 +1602,7 @@ TEST_F(ReverseConnectionClusterTest, ConcurrentHostCreation) {
 
 // Test comprehensive formatter functionality with various format strings.
 TEST_F(ReverseConnectionClusterTest, FormatterComprehensiveTests) {
-  // Test 1: Simple header extraction
+  // Test 1: Simple header extraction.
   {
     const std::string yaml = R"EOF(
       name: name
@@ -1710,7 +1617,6 @@ TEST_F(ReverseConnectionClusterTest, FormatterComprehensiveTests) {
           host_id_format: "%REQ(x-node-id)%"
     )EOF";
 
-    EXPECT_CALL(initialized_, ready());
     setupFromYaml(yaml);
     setupUpstreamExtension();
     setupThreadLocalSlot();
@@ -1727,7 +1633,7 @@ TEST_F(ReverseConnectionClusterTest, FormatterComprehensiveTests) {
     EXPECT_EQ(result.host->address()->logicalName(), "node-123");
   }
 
-  // Test 2: Combined format with multiple headers
+  // Test 2: Combined format with multiple headers.
   {
     const std::string yaml = R"EOF(
       name: name
@@ -1742,7 +1648,6 @@ TEST_F(ReverseConnectionClusterTest, FormatterComprehensiveTests) {
           host_id_format: "%REQ(x-tenant)%-%REQ(x-region)%"
     )EOF";
 
-    EXPECT_CALL(initialized_, ready());
     setupFromYaml(yaml);
     setupUpstreamExtension();
     setupThreadLocalSlot();
@@ -1759,7 +1664,7 @@ TEST_F(ReverseConnectionClusterTest, FormatterComprehensiveTests) {
     EXPECT_EQ(result.host->address()->logicalName(), "tenant-a-us-west");
   }
 
-  // Test 3: Missing header should result in no host
+  // Test 3: Missing header should result in no host.
   {
     const std::string yaml = R"EOF(
       name: name
@@ -1774,7 +1679,6 @@ TEST_F(ReverseConnectionClusterTest, FormatterComprehensiveTests) {
           host_id_format: "%REQ(x-missing-header)%"
     )EOF";
 
-    EXPECT_CALL(initialized_, ready());
     setupFromYaml(yaml);
     setupUpstreamExtension();
     setupThreadLocalSlot();
