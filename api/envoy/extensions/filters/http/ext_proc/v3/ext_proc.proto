@@ -486,11 +486,6 @@ message ExtProcOverrides {
   // before it is sent to the External Processor. The ``ProcessingRequest`` may be modified.
   // This is a per-route override of
   // :ref:`processing_request_modifier <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_request_modifier>`.
-  //
-  // .. note::
-  //   Processing request modifiers are currently in alpha.
-  //
-  // [#extension-category: envoy.http.ext_proc.processing_request_modifiers]
   config.core.v3.TypedExtensionConfig processing_request_modifier = 9
       [(xds.annotations.v3.field_status).work_in_progress = true];
 }
