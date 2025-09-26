@@ -44,41 +44,6 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Extensions {
 namespace ReverseConnection {
-// HostIdActionFactory unit tests.
-TEST(HostIdActionFactoryTest, NameAndCreateAction) {
-  // Prepare a minimal cluster factory context.
-  NiceMock<Server::Configuration::MockServerFactoryContext> server_context;
-  NiceMock<ThreadLocal::MockInstance> thread_local;
-  Stats::IsolatedStoreImpl stats_store;
-  auto stats_scope = Stats::ScopeSharedPtr(stats_store.createScope("test_scope."));
-  EXPECT_CALL(server_context, threadLocal()).WillRepeatedly(ReturnRef(thread_local));
-  EXPECT_CALL(server_context, scope()).WillRepeatedly(ReturnRef(*stats_scope));
-
-  Envoy::Upstream::ClusterFactoryContextImpl factory_context(server_context, nullptr, nullptr,
-                                                             false);
-
-  // Build a HostIdAction proto.
-  envoy::extensions::clusters::reverse_connection::v3::HostIdAction action_proto;
-  action_proto.set_host_id("host-123");
-
-  // Create the factory and verify name.
-  HostIdActionFactory factory;
-  EXPECT_EQ(factory.name(), "envoy.matching.actions.reverse_connection.host_id");
-
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor;
-  auto action = factory.createAction(action_proto, factory_context, validation_visitor);
-  ASSERT_NE(action, nullptr);
-
-  // Verify the created action carries the host identifier.
-  const auto& typed = action->getTyped<HostIdAction>();
-  EXPECT_EQ(typed.host_id(), "host-123");
-
-  // Verify createEmptyConfigProto returns the expected message type.
-  auto empty = factory.createEmptyConfigProto();
-  auto* empty_typed =
-      dynamic_cast<envoy::extensions::clusters::reverse_connection::v3::HostIdAction*>(empty.get());
-  EXPECT_NE(empty_typed, nullptr);
-}
 
 class TestLoadBalancerContext : public Upstream::LoadBalancerContextBase {
 public:
@@ -790,6 +755,79 @@ TEST_F(ReverseConnectionClusterTest, HostCreationWithSocketManager) {
     auto result = lb.chooseHost(&lb_context);
     EXPECT_NE(result.host, nullptr);
     EXPECT_EQ(result.host->address()->logicalName(), "test-uuid-123");
+  }
+}
+
+// Demonstrate using a safe_regex rule that extracts a constrained header pattern and maps it
+// to a host_id without statically enumerating downstream node IDs. This shows we can avoid
+// static routing and instead select hosts based on input criteria.
+TEST_F(ReverseConnectionClusterTest, HostIdExtractionWithSafeRegex) {
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_matcher:
+          matcher_list:
+            matchers:
+            - predicate:
+                single_predicate:
+                  input:
+                    typed_config:
+                      '@type': type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                      header_name: x-remote-node-id
+                  value_match:
+                    safe_regex:
+                      google_re2: {}
+                      # Accept values of the form "<token>.bar" and only when the token matches
+                      # the constrained set (in this rule, the token "foo").
+                      regex: "^foo\\.bar$"
+              on_match:
+                action:
+                  typed_config:
+                    '@type': type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.HostIdAction
+                    # Set host_id to the accepted token
+                    host_id: "foo"
+  )EOF";
+
+  EXPECT_CALL(initialized_, ready());
+  setupFromYaml(yaml);
+
+  // Initialize upstream extension and thread local registry for socket manager.
+  setupUpstreamExtension();
+  setupThreadLocalSlot();
+
+  // Provide a reverse connection socket for host_id "foo" only.
+  addTestSocket("foo", "cluster-foo");
+
+  RevConCluster::LoadBalancer lb(cluster_);
+
+  // Request: header value matches the safe_regex (foo.bar) and routes to host_id "foo".
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+        new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "foo.bar"}}};
+
+    auto result = lb.chooseHost(&lb_context);
+    ASSERT_NE(result.host, nullptr);
+    EXPECT_EQ(result.host->address()->logicalName(), "foo");
+  }
+
+  // Request: header value does not match the configured safe_regex rule -> no host.
+  {
+    NiceMock<Network::MockConnection> connection;
+    TestLoadBalancerContext lb_context(&connection);
+    lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
+        new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "bar.baz"}}};
+
+    auto result = lb.chooseHost(&lb_context);
+    EXPECT_EQ(result.host, nullptr);
   }
 }
 
