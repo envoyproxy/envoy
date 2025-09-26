@@ -85,6 +85,7 @@ categories:
 - envoy.health_checkers
 - envoy.health_check.event_sinks
 - envoy.http.cache
+- envoy.http.cache_v2
 - envoy.http.header_validators
 - envoy.http.stateful_header_formatters
 - envoy.internal_redirect_predicates
