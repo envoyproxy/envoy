@@ -71,7 +71,8 @@ WeightedClusterSpecifierPlugin::WeightedClusterSpecifierPlugin(
     const MetadataMatchCriteria* parent_metadata_match, absl::string_view route_name,
     Server::Configuration::ServerFactoryContext& context, absl::Status& creation_status)
     : loader_(context.runtime()), random_value_header_(weighted_clusters.header_name()),
-      runtime_key_prefix_(weighted_clusters.runtime_key_prefix()) {
+      runtime_key_prefix_(weighted_clusters.runtime_key_prefix()),
+      use_hash_policy_(weighted_clusters.has_use_hash_policy() ? weighted_clusters.use_hash_policy().value() : false) {
 
   absl::string_view runtime_key_prefix = weighted_clusters.runtime_key_prefix();
 
@@ -304,12 +305,17 @@ RouteConstSharedPtr WeightedClusterSpecifierPlugin::route(RouteEntryAndRouteCons
                                                           const StreamInfo::StreamInfo& stream_info,
                                                           uint64_t random) const {
   absl::optional<uint64_t> hash_value;
-  const auto* route_hash_policy = parent->hashPolicy();
-  if (route_hash_policy != nullptr) {
-    hash_value =
-        route_hash_policy->generateHash(OptRef<const Http::RequestHeaderMap>(headers),
-                                        OptRef<const StreamInfo::StreamInfo>(stream_info), nullptr);
+  
+  // Only use hash policy if explicitly enabled via use_hash_policy field
+  if (use_hash_policy_) {
+    const auto* route_hash_policy = parent->hashPolicy();
+    if (route_hash_policy != nullptr) {
+      hash_value =
+          route_hash_policy->generateHash(OptRef<const Http::RequestHeaderMap>(headers),
+                                          OptRef<const StreamInfo::StreamInfo>(stream_info), nullptr);
+    }
   }
+  
   const uint64_t selection_value = hash_value.has_value() ? hash_value.value() : random;
 
   return pickWeightedCluster(std::move(parent), headers, selection_value);

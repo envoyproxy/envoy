@@ -418,6 +418,7 @@ message Route {
 // multiple upstream clusters along with weights that indicate the percentage of
 // traffic to be forwarded to each cluster. The router selects an upstream cluster based on the
 // weights.
+// [#next-free-field: 6]
 message WeightedCluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.WeightedCluster";
 
@@ -549,6 +550,12 @@ message WeightedCluster {
     string header_name = 4
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
   }
+
+  // When set to true, enables the use of route-level hash policies for weighted cluster selection.
+  // This ensures that requests with the same hash value (e.g., same session ID, user ID, etc.)
+  // will consistently be routed to the same weighted cluster. If not set or set to false,
+  // weighted cluster selection will use the standard weighted selection behavior.
+  google.protobuf.BoolValue use_hash_policy = 5;
 }
 
 // Configuration for a cluster specifier plugin.

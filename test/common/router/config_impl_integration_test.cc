@@ -188,6 +188,9 @@ public:
           cluster1->set_name("cluster_1");
           cluster1->mutable_weight()->set_value(40);
 
+          // Enable hash policy for weighted clusters
+          weighted_clusters->mutable_use_hash_policy()->set_value(true);
+
           auto* hash_policy = route->mutable_route()->add_hash_policy();
           hash_policy->mutable_header()->set_header_name("x-user-id");
         });
