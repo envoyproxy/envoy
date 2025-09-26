@@ -7,17 +7,6 @@
 namespace Envoy {
 namespace Server {
 
-class FilterChainInfoImpl : public Network::FilterChainInfo {
-public:
-  FilterChainInfoImpl(absl::string_view name) : name_(name) {}
-
-  // Network::FilterChainInfo
-  absl::string_view name() const override { return name_; }
-
-private:
-  const std::string name_;
-};
-
 ActiveStreamListenerBase::ActiveStreamListenerBase(Network::ConnectionHandler& parent,
                                                    Event::Dispatcher& dispatcher,
                                                    Network::ListenerPtr&& listener,
@@ -52,8 +41,7 @@ void ActiveStreamListenerBase::newConnection(Network::ConnectionSocketPtr&& sock
   }
 
   socket->connectionInfoProvider().setListenerInfo(config_->listenerInfo());
-  socket->connectionInfoProvider().setFilterChainInfo(
-      std::make_shared<FilterChainInfoImpl>(filter_chain->name()));
+  socket->connectionInfoProvider().setFilterChainInfo(filter_chain->filterChainInfo());
 
   auto transport_socket = filter_chain->transportSocketFactory().createDownstreamTransportSocket();
   auto server_conn_ptr = dispatcher().createServerConnection(
