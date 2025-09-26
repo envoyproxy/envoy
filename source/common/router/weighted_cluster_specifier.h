@@ -67,7 +67,8 @@ public:
 private:
   RouteConstSharedPtr pickWeightedCluster(RouteEntryAndRouteConstSharedPtr parent,
                                           const Http::RequestHeaderMap& headers,
-                                          uint64_t random_value) const;
+                                          uint64_t random_value,
+                                          const StreamInfo::StreamInfo* stream_info) const;
 
   Runtime::Loader& loader_;
   const Http::LowerCaseString random_value_header_;

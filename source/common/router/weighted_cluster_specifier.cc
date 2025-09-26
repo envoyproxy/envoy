@@ -207,7 +207,22 @@ private:
 RouteConstSharedPtr
 WeightedClusterSpecifierPlugin::pickWeightedCluster(RouteEntryAndRouteConstSharedPtr parent,
                                                     const Http::RequestHeaderMap& headers,
-                                                    const uint64_t random_value) const {
+                                                    const uint64_t random_value,
+                                                    const StreamInfo::StreamInfo* stream_info) const {
+  absl::optional<uint64_t> hash_value;
+  
+  // Only use hash policy if explicitly enabled via use_hash_policy field
+  if (use_hash_policy_ && stream_info != nullptr) {
+    const auto* route_hash_policy = parent->hashPolicy();
+    if (route_hash_policy != nullptr) {
+      hash_value =
+          route_hash_policy->generateHash(OptRef<const Http::RequestHeaderMap>(headers),
+                                          OptRef<const StreamInfo::StreamInfo>(*stream_info), nullptr);
+    }
+  }
+  
+  const uint64_t selection_value = hash_value.has_value() ? hash_value.value() : random_value;
+  
   absl::optional<uint64_t> random_value_from_header;
   // Retrieve the random value from the header if corresponding header name is specified.
   // weighted_clusters_config_ is known not to be nullptr here. If it were, pickWeightedCluster
@@ -264,7 +279,7 @@ WeightedClusterSpecifierPlugin::pickWeightedCluster(RouteEntryAndRouteConstShare
     return nullptr;
   }
   const uint64_t selected_value =
-      (random_value_from_header.has_value() ? random_value_from_header.value() : random_value) %
+      (random_value_from_header.has_value() ? random_value_from_header.value() : selection_value) %
       total_cluster_weight;
   uint64_t begin = 0;
   uint64_t end = 0;
@@ -304,21 +319,7 @@ RouteConstSharedPtr WeightedClusterSpecifierPlugin::route(RouteEntryAndRouteCons
                                                           const Http::RequestHeaderMap& headers,
                                                           const StreamInfo::StreamInfo& stream_info,
                                                           uint64_t random) const {
-  absl::optional<uint64_t> hash_value;
-  
-  // Only use hash policy if explicitly enabled via use_hash_policy field
-  if (use_hash_policy_) {
-    const auto* route_hash_policy = parent->hashPolicy();
-    if (route_hash_policy != nullptr) {
-      hash_value =
-          route_hash_policy->generateHash(OptRef<const Http::RequestHeaderMap>(headers),
-                                          OptRef<const StreamInfo::StreamInfo>(stream_info), nullptr);
-    }
-  }
-  
-  const uint64_t selection_value = hash_value.has_value() ? hash_value.value() : random;
-
-  return pickWeightedCluster(std::move(parent), headers, selection_value);
+  return pickWeightedCluster(std::move(parent), headers, random, &stream_info);
 }
 
 absl::Status

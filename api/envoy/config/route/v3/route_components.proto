@@ -551,10 +551,8 @@ message WeightedCluster {
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME strict: false}];
   }
 
-  // When set to true, enables the use of route-level hash policies for weighted cluster selection.
-  // This ensures that requests with the same hash value (e.g., same session ID, user ID, etc.)
-  // will consistently be routed to the same weighted cluster. If not set or set to false,
-  // weighted cluster selection will use the standard weighted selection behavior.
+  // When set to true, the hash policies will be used to generate the random value for weighted cluster selection.
+  // This could ensure consistent cluster picking across multiple proxy levels for weighted traffic.
   google.protobuf.BoolValue use_hash_policy = 5;
 }
 
