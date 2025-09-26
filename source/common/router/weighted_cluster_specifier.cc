@@ -301,9 +301,18 @@ WeightedClusterSpecifierPlugin::pickWeightedCluster(RouteEntryAndRouteConstShare
 
 RouteConstSharedPtr WeightedClusterSpecifierPlugin::route(RouteEntryAndRouteConstSharedPtr parent,
                                                           const Http::RequestHeaderMap& headers,
-                                                          const StreamInfo::StreamInfo&,
+                                                          const StreamInfo::StreamInfo& stream_info,
                                                           uint64_t random) const {
-  return pickWeightedCluster(std::move(parent), headers, random);
+  absl::optional<uint64_t> hash_value;
+  const auto* route_hash_policy = parent->hashPolicy();
+  if (route_hash_policy != nullptr) {
+    hash_value =
+        route_hash_policy->generateHash(OptRef<const Http::RequestHeaderMap>(headers),
+                                        OptRef<const StreamInfo::StreamInfo>(stream_info), nullptr);
+  }
+  const uint64_t selection_value = hash_value.has_value() ? hash_value.value() : random;
+
+  return pickWeightedCluster(std::move(parent), headers, selection_value);
 }
 
 absl::Status
