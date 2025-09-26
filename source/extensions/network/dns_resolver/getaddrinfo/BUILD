@@ -12,7 +12,7 @@ envoy_cc_extension(
     name = "config",
     srcs = ["getaddrinfo.cc"],
     hdrs = ["getaddrinfo.h"],
-    extra_visibility = ["//test:__subpackages__"],
+    visibility = ["//visibility:public"],
     deps = [
         "//envoy/network:dns_resolver_interface",
         "//envoy/registry",
