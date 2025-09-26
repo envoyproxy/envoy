@@ -251,6 +251,13 @@ message RateLimitQuotaBucketSettings {
     // The headers are added even when the rate limit quota was not enforced.
     repeated config.core.v3.HeaderValueOption response_headers_to_add = 4
         [(validate.rules).repeated = {max_items: 10}];
+
+    // Specifies whether a ``RESOURCE_EXHAUSTED`` gRPC code must be returned instead
+    // of the default ``UNAVAILABLE`` gRPC code for a rate limited gRPC call. The
+    // HTTP code will be 200 for a gRPC response.
+    //
+    // This field is ignored if ``grpc_status`` is explicitly set.
+    bool rate_limited_as_resource_exhausted = 5;
   }
 
   // ``BucketIdBuilder`` makes it possible to build :ref:`BucketId
