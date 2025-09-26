@@ -2245,7 +2245,7 @@ protected:
   {0}:
     - header:
         key: x-has-variable
-        value: "%PER_REQUEST_STATE(testing)%"
+        value: "%FILTER_STATE(testing:PLAIN)%"
       append_action: OVERWRITE_IF_EXISTS_OR_ADD
   )EOF";
     const std::string yaml =
@@ -2281,9 +2281,9 @@ protected:
     transforms = run_request_header_test
                      ? route_entry->requestHeaderTransforms(stream_info, /*do_formatting=*/false)
                      : route_entry->responseHeaderTransforms(stream_info, /*do_formatting=*/false);
-    EXPECT_THAT(
-        transforms.headers_to_overwrite_or_add,
-        ElementsAre(Pair(Http::LowerCaseString("x-has-variable"), "%PER_REQUEST_STATE(testing)%")));
+    EXPECT_THAT(transforms.headers_to_overwrite_or_add,
+                ElementsAre(Pair(Http::LowerCaseString("x-has-variable"),
+                                 "%FILTER_STATE(testing:PLAIN)%")));
   }
 };
 
@@ -4801,56 +4801,56 @@ virtual_hosts:
             config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .perTryTimeout());
+                ->perTryTimeout());
   EXPECT_EQ(std::chrono::milliseconds(0),
             config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .perTryIdleTimeout());
+                ->perTryIdleTimeout());
   EXPECT_EQ(1U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
-                    .numRetries());
+                    ->numRetries());
   EXPECT_EQ(RetryPolicy::RETRY_ON_CONNECT_FAILURE,
             config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .retryOn());
+                ->retryOn());
 
   EXPECT_EQ(std::chrono::milliseconds(0),
             config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .perTryTimeout());
+                ->perTryTimeout());
   EXPECT_EQ(1, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                    ->routeEntry()
                    ->retryPolicy()
-                   .numRetries());
+                   ->numRetries());
   EXPECT_EQ(0U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
-                    .retryOn());
+                    ->retryOn());
 
   EXPECT_EQ(std::chrono::milliseconds(1000),
             config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .perTryTimeout());
+                ->perTryTimeout());
   EXPECT_EQ(std::chrono::milliseconds(5000),
             config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .perTryIdleTimeout());
+                ->perTryIdleTimeout());
   EXPECT_EQ(3U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
-                    .numRetries());
+                    ->numRetries());
   EXPECT_EQ(RetryPolicy::RETRY_ON_CONNECT_FAILURE | RetryPolicy::RETRY_ON_5XX |
                 RetryPolicy::RETRY_ON_GATEWAY_ERROR | RetryPolicy::RETRY_ON_RESET,
             config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .retryOn());
+                ->retryOn());
 }
 
 class TestRetryOptionsPredicateFactory : public Upstream::RetryOptionsPredicateFactory {
@@ -4912,16 +4912,16 @@ virtual_hosts:
             config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .perTryTimeout());
+                ->perTryTimeout());
   EXPECT_EQ(1U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
-                    .numRetries());
+                    ->numRetries());
   EXPECT_EQ(RetryPolicy::RETRY_ON_CONNECT_FAILURE,
             config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .retryOn());
+                ->retryOn());
   EXPECT_EQ(7U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                     ->routeEntry()
                     ->requestBodyBufferLimit());
@@ -4931,7 +4931,7 @@ virtual_hosts:
   EXPECT_EQ(1U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
-                    .retryOptionsPredicates()
+                    ->retryOptionsPredicates()
                     .size());
 
   // Virtual Host level retry policy kicks in.
@@ -4939,17 +4939,17 @@ virtual_hosts:
             config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .perTryTimeout());
+                ->perTryTimeout());
   EXPECT_EQ(3U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
-                    .numRetries());
+                    ->numRetries());
   EXPECT_EQ(RetryPolicy::RETRY_ON_CONNECT_FAILURE | RetryPolicy::RETRY_ON_5XX |
                 RetryPolicy::RETRY_ON_GATEWAY_ERROR | RetryPolicy::RETRY_ON_RESET,
             config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .retryOn());
+                ->retryOn());
   EXPECT_EQ(8U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                     ->routeEntry()
                     ->requestBodyBufferLimit());
@@ -4960,17 +4960,17 @@ virtual_hosts:
             config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .perTryTimeout());
+                ->perTryTimeout());
   EXPECT_EQ(3U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
-                    .numRetries());
+                    ->numRetries());
   EXPECT_EQ(RetryPolicy::RETRY_ON_CONNECT_FAILURE | RetryPolicy::RETRY_ON_5XX |
                 RetryPolicy::RETRY_ON_GATEWAY_ERROR | RetryPolicy::RETRY_ON_RESET,
             config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .retryOn());
+                ->retryOn());
   EXPECT_EQ(8U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                     ->routeEntry()
                     ->requestBodyBufferLimit());
@@ -4980,7 +4980,7 @@ virtual_hosts:
   EXPECT_EQ(1U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
-                    .retryOptionsPredicates()
+                    ->retryOptionsPredicates()
                     .size());
 }
 
@@ -5019,46 +5019,46 @@ virtual_hosts:
             config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .perTryTimeout());
+                ->perTryTimeout());
   EXPECT_EQ(1U, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
-                    .numRetries());
+                    ->numRetries());
   EXPECT_EQ(RetryPolicy::RETRY_ON_CONNECT_FAILURE,
             config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .retryOn());
+                ->retryOn());
 
   EXPECT_EQ(std::chrono::milliseconds(0),
             config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .perTryTimeout());
+                ->perTryTimeout());
   EXPECT_EQ(1, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                    ->routeEntry()
                    ->retryPolicy()
-                   .numRetries());
+                   ->numRetries());
   EXPECT_EQ(0U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
-                    .retryOn());
+                    ->retryOn());
 
   EXPECT_EQ(std::chrono::milliseconds(1000),
             config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .perTryTimeout());
+                ->perTryTimeout());
   EXPECT_EQ(3U, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
-                    .numRetries());
+                    ->numRetries());
   EXPECT_EQ(RetryPolicy::RETRY_ON_5XX | RetryPolicy::RETRY_ON_GRPC_DEADLINE_EXCEEDED |
                 RetryPolicy::RETRY_ON_GRPC_RESOURCE_EXHAUSTED,
             config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .retryOn());
+                ->retryOn());
 }
 
 // Test route-specific retry back-off intervals.
@@ -5108,47 +5108,47 @@ virtual_hosts:
             config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .baseInterval());
+                ->baseInterval());
 
   EXPECT_EQ(absl::nullopt, config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
                                ->routeEntry()
                                ->retryPolicy()
-                               .maxInterval());
+                               ->maxInterval());
 
   EXPECT_EQ(absl::optional<std::chrono::milliseconds>(100),
             config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .baseInterval());
+                ->baseInterval());
 
   EXPECT_EQ(absl::optional<std::chrono::milliseconds>(500),
             config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .maxInterval());
+                ->maxInterval());
 
   // Sub-millisecond interval converted to 1 ms.
   EXPECT_EQ(absl::optional<std::chrono::milliseconds>(1),
             config.route(genHeaders("www.lyft.com", "/baz", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .baseInterval());
+                ->baseInterval());
 
   EXPECT_EQ(absl::optional<std::chrono::milliseconds>(1),
             config.route(genHeaders("www.lyft.com", "/baz", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .maxInterval());
+                ->maxInterval());
 
   EXPECT_EQ(absl::nullopt, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                                ->routeEntry()
                                ->retryPolicy()
-                               .baseInterval());
+                               ->baseInterval());
 
   EXPECT_EQ(absl::nullopt, config.route(genHeaders("www.lyft.com", "/", "GET"), 0)
                                ->routeEntry()
                                ->retryPolicy()
-                               .maxInterval());
+                               ->maxInterval());
 }
 
 // Test invalid route-specific retry back-off configs.
@@ -5220,29 +5220,29 @@ virtual_hosts:
   EXPECT_EQ(true, config.route(genHeaders("www.lyft.com", "/no-backoff", "GET"), 0)
                       ->routeEntry()
                       ->retryPolicy()
-                      .resetHeaders()
+                      ->resetHeaders()
                       .empty());
   EXPECT_EQ(std::chrono::milliseconds(300000),
             config.route(genHeaders("www.lyft.com", "/no-backoff", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .resetMaxInterval());
+                ->resetMaxInterval());
 
   // has sub millisecond interval
   EXPECT_EQ(1, config.route(genHeaders("www.lyft.com", "/sub-ms-interval", "GET"), 0)
                    ->routeEntry()
                    ->retryPolicy()
-                   .resetHeaders()
+                   ->resetHeaders()
                    .size());
   EXPECT_EQ(std::chrono::milliseconds(1),
             config.route(genHeaders("www.lyft.com", "/sub-ms-interval", "GET"), 0)
                 ->routeEntry()
                 ->retryPolicy()
-                .resetMaxInterval());
+                ->resetMaxInterval());
 
   // a typical configuration
   Http::TestRequestHeaderMapImpl headers = genHeaders("www.lyft.com", "/typical-backoff", "GET");
-  const auto& retry_policy = config.route(headers, 0)->routeEntry()->retryPolicy();
+  const auto& retry_policy = *config.route(headers, 0)->routeEntry()->retryPolicy();
   EXPECT_EQ(2, retry_policy.resetHeaders().size());
 
   Http::TestResponseHeaderMapImpl expected_0{{"Retry-After", "2"}};
@@ -9382,7 +9382,7 @@ virtual_hosts:
                         creation_status_);
   Http::TestRequestHeaderMapImpl headers =
       genRedirectHeaders("idle.lyft.com", "/regex", true, false);
-  const auto& retry_policy = config.route(headers, 0)->routeEntry()->retryPolicy();
+  const auto& retry_policy = *config.route(headers, 0)->routeEntry()->retryPolicy();
   const std::vector<uint32_t> expected_codes{100, 200};
   EXPECT_EQ(expected_codes, retry_policy.retriableStatusCodes());
 }
@@ -9411,7 +9411,7 @@ virtual_hosts:
                         creation_status_);
   Http::TestRequestHeaderMapImpl headers =
       genRedirectHeaders("idle.lyft.com", "/regex", true, false);
-  const auto& retry_policy = config.route(headers, 0)->routeEntry()->retryPolicy();
+  const auto& retry_policy = *config.route(headers, 0)->routeEntry()->retryPolicy();
   ASSERT_EQ(2, retry_policy.retriableHeaders().size());
 
   Http::TestResponseHeaderMapImpl expected_0{{":status", "500"}};
@@ -9600,7 +9600,7 @@ virtual_hosts:
                         creation_status_);
   Http::TestRequestHeaderMapImpl headers =
       genRedirectHeaders("idle.lyft.com", "/regex", true, false);
-  const auto& retry_policy = config.route(headers, 0)->routeEntry()->retryPolicy();
+  const auto& retry_policy = *config.route(headers, 0)->routeEntry()->retryPolicy();
   const auto priority1 = retry_policy.retryPriority();
   const auto priority2 = retry_policy.retryPriority();
   EXPECT_NE(priority1, priority2);

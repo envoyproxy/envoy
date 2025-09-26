@@ -155,10 +155,7 @@ protected:
     return Upstream::ResourcePriority::Default;
   }
   const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
-  const Router::RetryPolicy& retryPolicy() const override { return *retry_policy_; }
-  const Router::RetryPolicyConstSharedPtr& sharedRetryPolicy() const override {
-    return retry_policy_;
-  }
+  const Router::RetryPolicyConstSharedPtr& retryPolicy() const override { return retry_policy_; }
   const Router::InternalRedirectPolicy& internalRedirectPolicy() const override {
     return internal_redirect_policy_;
   }

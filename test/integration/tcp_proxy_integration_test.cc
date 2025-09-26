@@ -875,6 +875,31 @@ TEST_P(TcpProxyIntegrationTest, TestMaxDownstreamConnectionDurationWithLargeOuts
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect());
 }
 
+TEST_P(TcpProxyIntegrationTest, TestMaxDownstreamConnectionDurationWithJitter) {
+  autonomous_upstream_ = true;
+
+  enableHalfClose(false);
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
+
+    ASSERT_TRUE(config_blob->Is<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>());
+    auto tcp_proxy_config =
+        MessageUtil::anyConvert<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
+            *config_blob);
+    tcp_proxy_config.mutable_max_downstream_connection_duration()->set_nanos(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100))
+            .count());
+    tcp_proxy_config.mutable_max_downstream_connection_duration_jitter_percentage()->set_value(25);
+    config_blob->PackFrom(tcp_proxy_config);
+  });
+
+  initialize();
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("tcp_proxy"));
+  tcp_client->waitForDisconnect();
+}
+
 TEST_P(TcpProxyIntegrationTest, TestNoCloseOnHealthFailure) {
   concurrency_ = 2;
 
