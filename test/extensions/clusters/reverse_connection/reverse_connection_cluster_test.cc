@@ -3,8 +3,6 @@
 #include <string>
 #include <vector>
 
-#include "absl/strings/str_cat.h"
-
 #include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/extensions/clusters/reverse_connection/v3/reverse_connection.pb.h"
@@ -37,6 +35,7 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
+#include "absl/strings/str_cat.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -1372,8 +1371,8 @@ TEST_F(ReverseConnectionClusterTest, CelFormatterComplexExpressions) {
   {
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection);
-    lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
-        new Http::TestRequestHeaderMapImpl{{"x-other-header", "value"}}};
+    lb_context.downstream_headers_ =
+        Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-other-header", "value"}}};
 
     auto result = lb.chooseHost(&lb_context);
     ASSERT_NE(result.host, nullptr);
@@ -1419,13 +1418,13 @@ TEST_F(ReverseConnectionClusterTest, DynamicMetadataFormatter) {
   // Create stream info with dynamic metadata
   auto stream_info = std::make_unique<NiceMock<StreamInfo::MockStreamInfo>>();
   ON_CALL(*stream_info, dynamicMetadata())
-      .WillByDefault(ReturnRefOfCopy(Envoy::Config::Metadata::metadataValue(
-          "envoy.lb", "node_id", "metadata-node-1")));
+      .WillByDefault(ReturnRefOfCopy(
+          Envoy::Config::Metadata::metadataValue("envoy.lb", "node_id", "metadata-node-1")));
 
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection, stream_info.get());
-  lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
-      new Http::TestRequestHeaderMapImpl{{"x-header", "value"}}};
+  lb_context.downstream_headers_ =
+      Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-header", "value"}}};
 
   auto result = lb.chooseHost(&lb_context);
   ASSERT_NE(result.host, nullptr);
@@ -1464,8 +1463,8 @@ TEST_F(ReverseConnectionClusterTest, ConnectionPropertyFormatters) {
 
   NiceMock<Network::MockConnection> connection;
   TestLoadBalancerContext lb_context(&connection, stream_info.get());
-  lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
-      new Http::TestRequestHeaderMapImpl{{"x-header", "value"}}};
+  lb_context.downstream_headers_ =
+      Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-header", "value"}}};
 
   auto result = lb.chooseHost(&lb_context);
   ASSERT_NE(result.host, nullptr);
@@ -1497,8 +1496,8 @@ TEST_F(ReverseConnectionClusterTest, FormatterErrorHandling) {
     RevConCluster::LoadBalancer lb(cluster_);
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection);
-    lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
-        new Http::TestRequestHeaderMapImpl{{"x-header", "value"}}};
+    lb_context.downstream_headers_ =
+        Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-header", "value"}}};
 
     // Should return nullptr for invalid CEL
     auto result = lb.chooseHost(&lb_context);
@@ -1528,8 +1527,8 @@ TEST_F(ReverseConnectionClusterTest, FormatterErrorHandling) {
     RevConCluster::LoadBalancer lb(cluster_);
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection);
-    lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
-        new Http::TestRequestHeaderMapImpl{{"x-header", "value"}}};
+    lb_context.downstream_headers_ =
+        Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-header", "value"}}};
 
     // Should return nullptr for empty CEL result
     auto result = lb.chooseHost(&lb_context);
@@ -1603,8 +1602,8 @@ TEST_F(ReverseConnectionClusterTest, ScalabilityManyHostIds) {
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection);
     std::string node_index = absl::StrCat(i);
-    lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
-        new Http::TestRequestHeaderMapImpl{{"x-node-index", node_index}}};
+    lb_context.downstream_headers_ =
+        Http::RequestHeaderMapPtr{new Http::TestRequestHeaderMapImpl{{"x-node-index", node_index}}};
 
     auto result = lb.chooseHost(&lb_context);
     ASSERT_NE(result.host, nullptr);
@@ -1629,8 +1628,7 @@ TEST_F(ReverseConnectionClusterTest, FormatterValidationErrors) {
           host_id_format: "%INVALID_COMMAND()%"
     )EOF";
 
-    EXPECT_THROW_WITH_MESSAGE(setupFromYaml(yaml, false), EnvoyException,
-                              "formatter parse error");
+    EXPECT_THROW_WITH_MESSAGE(setupFromYaml(yaml, false), EnvoyException, "formatter parse error");
   }
 
   // Test empty format string
