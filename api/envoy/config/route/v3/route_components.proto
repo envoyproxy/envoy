@@ -891,7 +891,7 @@ message RouteAction {
     // Header mutations are applied in the order they are specified. For more information, including
     // details on header value syntax, see the documentation on :ref:`custom request headers
     // <config_http_conn_man_headers_custom_request_headers>`.
-    repeated config.common.mutation_rules.v3.HeaderMutation request_mutations = 7
+    repeated common.mutation_rules.v3.HeaderMutation request_mutations = 7
         [(validate.rules).repeated = {max_items: 1000}];
 
     // Indicates that during mirroring, the host header will be swapped with this value.
