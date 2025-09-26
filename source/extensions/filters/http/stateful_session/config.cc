@@ -15,12 +15,15 @@ Http::FilterFactoryCb StatefulSessionFactoryConfig::createFilterFactoryFromProto
     const ProtoConfig& proto_config, const std::string& stats_prefix,
     Server::Configuration::FactoryContext& context) {
   auto filter_config(std::make_shared<StatefulSessionConfig>(proto_config, context));
-  auto& scope = context.scope();
-  return
-      [filter_config, &scope, stats_prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-        callbacks.addStreamFilter(
-            Http::StreamFilterSharedPtr{new StatefulSession(filter_config, scope, stats_prefix)});
-      };
+  const std::string final_prefix =
+      absl::StrCat(stats_prefix, "stateful_session.", filter_config->statPrefixOverride());
+  auto stats = std::make_shared<StatefulSessionFilterStats>(StatefulSessionFilterStats{
+      ALL_STATEFUL_SESSION_FILTER_STATS(POOL_COUNTER_PREFIX(context.scope(), final_prefix))});
+  filter_config->setStats(stats);
+  return [filter_config, stats](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(
+        Http::StreamFilterSharedPtr{new StatefulSession(filter_config, stats)});
+  };
 }
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>

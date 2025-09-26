@@ -37,7 +37,13 @@ public:
 
     config_ = std::make_shared<StatefulSessionConfig>(proto_config, generic_context);
 
-    filter_ = std::make_shared<StatefulSession>(config_);
+    // Build shared stats like the factory would.
+    const std::string final_prefix =
+        absl::StrCat("", "stateful_session.", config_->statPrefixOverride());
+    auto stats = std::make_shared<StatefulSessionFilterStats>(StatefulSessionFilterStats{
+        ALL_STATEFUL_SESSION_FILTER_STATS(POOL_COUNTER_PREFIX(context_.scope(), final_prefix))});
+    config_->setStats(stats);
+    filter_ = std::make_shared<StatefulSession>(config_, stats);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
 

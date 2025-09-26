@@ -54,10 +54,14 @@ public:
 
   const std::string& statPrefixOverride() const { return stat_prefix_override_; }
 
+  void setStats(const std::shared_ptr<StatefulSessionFilterStats>& stats) { stats_ = stats; }
+  const std::shared_ptr<StatefulSessionFilterStats>& stats() const { return stats_; }
+
 private:
   Http::SessionStateFactorySharedPtr factory_;
   bool strict_{false};
   std::string stat_prefix_override_{};
+  std::shared_ptr<StatefulSessionFilterStats> stats_{};
 };
 using StatefulSessionConfigSharedPtr = std::shared_ptr<StatefulSessionConfig>;
 
@@ -78,10 +82,9 @@ using PerRouteStatefulSessionConfigSharedPtr = std::shared_ptr<PerRouteStatefulS
 class StatefulSession : public Http::PassThroughFilter,
                         public Logger::Loggable<Logger::Id::filter> {
 public:
-  StatefulSession(StatefulSessionConfigSharedPtr config, Stats::Scope& scope,
-                  const std::string& hcm_prefix)
-      : config_(std::move(config)), scope_(scope), hcm_prefix_(hcm_prefix),
-        stats_(generateStats(hcm_prefix_, config_->statPrefixOverride(), scope_)) {}
+  StatefulSession(StatefulSessionConfigSharedPtr config,
+                  std::shared_ptr<StatefulSessionFilterStats> stats)
+      : config_(std::move(config)), stats_(std::move(stats)) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
@@ -103,35 +106,26 @@ public:
   Http::SessionStatePtr& sessionStateForTest() { return session_state_; }
 
 private:
-  StatefulSessionFilterStats generateStats(const std::string& prefix,
-                                           const std::string& filter_stats_prefix,
-                                           Stats::Scope& scope) {
-    const std::string final_prefix = absl::StrCat(prefix, "stateful_session.", filter_stats_prefix);
-    return {ALL_STATEFUL_SESSION_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
-  }
-
   void markOverrideAttempted() { override_attempted_ = true; }
   void markRouted() {
-    if (override_attempted_) {
-      stats_.routed_.inc();
+    if (override_attempted_ && stats_ != nullptr) {
+      stats_->routed_.inc();
     }
   }
   void markFailedClosed() {
-    if (override_attempted_) {
-      stats_.failed_closed_.inc();
+    if (override_attempted_ && stats_ != nullptr) {
+      stats_->failed_closed_.inc();
     }
   }
   void markFailedOpen() {
-    if (override_attempted_) {
-      stats_.failed_open_.inc();
+    if (override_attempted_ && stats_ != nullptr) {
+      stats_->failed_open_.inc();
     }
   }
 
   Http::SessionStatePtr session_state_;
   StatefulSessionConfigSharedPtr config_;
-  Stats::Scope& scope_;
-  const std::string hcm_prefix_;
-  StatefulSessionFilterStats stats_;
+  std::shared_ptr<StatefulSessionFilterStats> stats_;
   bool override_attempted_{false};
   absl::optional<std::string> override_address_;
   bool accounted_{false};
