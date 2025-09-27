@@ -279,6 +279,17 @@ public:
     return absl::nullopt;
   }
 
+  OptRef<const Cluster> getActiveOrWarmingCluster(const std::string& cluster_name) const override {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+    if (const auto& it = active_clusters_.find(cluster_name); it != active_clusters_.end()) {
+      return *it->second->cluster_;
+    }
+    if (const auto& it = warming_clusters_.find(cluster_name); it != warming_clusters_.end()) {
+      return *it->second->cluster_;
+    }
+    return absl::nullopt;
+  }
+
   bool hasCluster(const std::string& cluster_name) const override {
     ASSERT_IS_MAIN_OR_TEST_THREAD();
     return active_clusters_.contains(cluster_name) || warming_clusters_.contains(cluster_name);

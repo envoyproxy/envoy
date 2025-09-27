@@ -38,8 +38,9 @@ MockClusterManager::MockClusterManager()
 MockClusterManager::~MockClusterManager() = default;
 
 void MockClusterManager::initializeClusters(const std::vector<std::string>& active_cluster_names,
-                                            const std::vector<std::string>&) {
+                                            const std::vector<std::string>& warming_cluster_names) {
   active_clusters_.clear();
+  warming_clusters_.clear();
   ClusterManager::ClusterInfoMaps info_map;
   for (const auto& name : active_cluster_names) {
     auto new_cluster = std::make_unique<NiceMock<MockCluster>>();
@@ -47,8 +48,12 @@ void MockClusterManager::initializeClusters(const std::vector<std::string>& acti
     info_map.active_clusters_.emplace(name, *new_cluster);
     active_clusters_.emplace(name, std::move(new_cluster));
   }
-
-  // TODO(mattklein123): Add support for warming clusters when needed.
+  for (const auto& name : warming_cluster_names) {
+    auto new_cluster = std::make_unique<NiceMock<MockCluster>>();
+    new_cluster->info_->name_ = name;
+    info_map.warming_clusters_.emplace(name, *new_cluster);
+    warming_clusters_.emplace(name, std::move(new_cluster));
+  }
 
   ON_CALL(*this, clusters()).WillByDefault(Return(info_map));
   ON_CALL(*this, getActiveCluster(_))
@@ -58,9 +63,20 @@ void MockClusterManager::initializeClusters(const std::vector<std::string>& acti
         }
         return absl::nullopt;
       }));
+  ON_CALL(*this, getActiveOrWarmingCluster(_))
+      .WillByDefault(Invoke([this](const std::string& cluster_name) -> OptRef<const Cluster> {
+        if (const auto& it = active_clusters_.find(cluster_name); it != active_clusters_.end()) {
+          return *it->second;
+        }
+        if (const auto& it = warming_clusters_.find(cluster_name); it != warming_clusters_.end()) {
+          return *it->second;
+        }
+        return absl::nullopt;
+      }));
   ON_CALL(*this, hasCluster(_))
       .WillByDefault(Invoke([this](const std::string& cluster_name) -> bool {
-        return active_clusters_.find(cluster_name) != active_clusters_.end();
+        return active_clusters_.find(cluster_name) != active_clusters_.end() ||
+               warming_clusters_.find(cluster_name) != warming_clusters_.end();
       }));
   ON_CALL(*this, hasActiveClusters()).WillByDefault(Return(!active_cluster_names.empty()));
 }
