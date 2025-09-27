@@ -5,10 +5,10 @@ package envoy.extensions.dynamic_modules.v3;
 import "udpa/annotations/status.proto";
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.dynamic_modules.v3";
-option java_outer_classname = "DynamicModulesProto";
-option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/dynamic_modules/v3;dynamic_modulesv3";
+option java_multiple_files = true;
+option java_outer_classname = "DynamicModulesProto";
+option java_package = "io.envoyproxy.envoy.extensions.dynamic_modules.v3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Dynamic Modules common configuration]
@@ -35,6 +35,10 @@ message DynamicModuleConfig {
   // The actual search path is ``${ENVOY_DYNAMIC_MODULES_SEARCH_PATH}/lib${name}.so``. TODO: make the search path configurable via
   // command line options.
   string name = 1 [(validate.rules).string = {min_len: 1}];
+
+  // Set true if the dynamic module is a terminal filter to use without an upstream.
+  // The dynamic module is responsible for creating and sending the response to downstream.
+  bool terminal_filter = 2;
 
   // Set true to prevent the module from being unloaded with dlclose.
   // This is useful for modules that have global state that should not be unloaded.
