@@ -1,5 +1,7 @@
 #include "source/extensions/filters/http/ratelimit/ratelimit_headers.h"
 
+#include <limits>
+
 #include "source/common/http/header_map_impl.h"
 #include "source/extensions/filters/http/common/ratelimit_headers.h"
 
@@ -29,7 +31,13 @@ Http::ResponseHeaderMapPtr XRateLimitHeaderUtils::create(
         status.limit_remaining() < min_remaining_limit_status.value().limit_remaining()) {
       min_remaining_limit_status.emplace(status);
     }
-    const uint32_t window = convertRateLimitUnit(status.current_limit().unit());
+    const uint32_t unit_multiplier = status.current_limit().unit_multiplier();
+    const uint64_t window_64 = static_cast<uint64_t>(unit_multiplier) *
+                               convertRateLimitUnit(status.current_limit().unit());
+    // Guard against overflow - if the result doesn't fit in uint32_t, clamp to max value
+    const uint32_t window = window_64 > std::numeric_limits<uint32_t>::max()
+                                ? std::numeric_limits<uint32_t>::max()
+                                : static_cast<uint32_t>(window_64);
     // Constructing the quota-policy per RFC
     // https://tools.ietf.org/id/draft-polli-ratelimit-headers-02.html#name-ratelimit-limit
     // Example of the result: `, 10;w=1;name="per-ip", 1000;w=3600`
