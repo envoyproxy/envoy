@@ -54,6 +54,12 @@ The name is used to search for the shared library file in the search path. The s
 For example, when the name ``my_module`` is referenced in the configuration and the search path is set to ``/path/to/modules``, Envoy will look for
 ``/path/to/modules/libmy_module.so``.
 
+Terminal filter
+--------------------------
+
+A dynamic module can opt into being a terminal filter with no upstream by setting `terminal_filter` to true in the configuration.
+A terminal dynamic module can use send_ ABI methods to send response headers, body and trailers to the downstream.
+
 Safety
 --------------------------
 The dynamic modules should be used under the assumption that all modules are fully trusted and have the same privilege level as the main Envoy program.
