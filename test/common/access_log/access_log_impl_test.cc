@@ -1068,6 +1068,7 @@ filter:
       - DO
       - DR
       - UDO
+      - RNE
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
   path: /dev/null

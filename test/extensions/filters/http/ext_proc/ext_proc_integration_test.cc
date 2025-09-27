@@ -1361,7 +1361,7 @@ TEST_P(ExtProcIntegrationTest, ServerHalfClosesAfterHeaders) {
   // However right after processing headers, half-close the stream indicating that server
   // is not interested in the request body.
   processor_stream_->finishGrpcStream(Grpc::Status::Ok);
-  processor_stream_->encodeResetStream();
+  processor_stream_->encodeResetStream(Http::StreamResetReason::RemoteResetNoError);
 
   // Even if the gRPC server half-closed, processing of the main request still continues.
   // Verify that data made it to upstream.
