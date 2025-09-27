@@ -58,7 +58,7 @@ Terminal filter
 --------------------------
 
 A dynamic module can opt into being a terminal filter with no upstream by setting `terminal_filter` to true in the configuration.
-A terminal dynamic module can use send_ ABI methods to send response headers, body and trailers to the downstream.
+A terminal dynamic module can use `send_` ABI methods to send response headers, body and trailers to the downstream.
 
 Safety
 --------------------------

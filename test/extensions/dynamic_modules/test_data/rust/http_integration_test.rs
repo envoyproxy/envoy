@@ -1,6 +1,7 @@
 use abi::*;
 use envoy_proxy_dynamic_modules_rust_sdk::*;
-use std::{any::Any, vec};
+use std::any::Any;
+use std::vec;
 
 declare_init_functions!(
   init,
@@ -804,7 +805,6 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
         .unwrap();
     }
 
-
     // Set gauges to provided value in header
     if let Some(header_val) = envoy_filter.get_request_header_value(self.header_to_set.as_str()) {
       let header_val = std::str::from_utf8(header_val.as_slice())
@@ -917,7 +917,9 @@ struct StreamingTerminalFilterConfig {}
 
 impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for StreamingTerminalFilterConfig {
   fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
-    Box::new(StreamingTerminalHttpFilter { request_closed: false })
+    Box::new(StreamingTerminalHttpFilter {
+      request_closed: false,
+    })
   }
 }
 
@@ -934,9 +936,7 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamingTerminalHttpFilter {
     envoy_filter: &mut EHF,
     _end_of_stream: bool,
   ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
-    envoy_filter
-      .new_scheduler()
-      .commit(EVENT_ID_START_RESPONSE);
+    envoy_filter.new_scheduler().commit(EVENT_ID_START_RESPONSE);
     return envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue;
   }
 
@@ -948,34 +948,44 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StreamingTerminalHttpFilter {
     if end_of_stream {
       self.request_closed = true;
     }
-    envoy_filter
-      .new_scheduler()
-      .commit(EVENT_ID_READ_REQUEST);
+    envoy_filter.new_scheduler().commit(EVENT_ID_READ_REQUEST);
     return envoy_dynamic_module_type_on_http_filter_request_body_status::StopIterationAndBuffer;
   }
 
   fn on_scheduled(&mut self, envoy_filter: &mut EHF, event_id: u64) {
     match event_id {
       EVENT_ID_START_RESPONSE => {
-        envoy_filter.send_response_headers(vec![(":status", b"200"), ("x-filter", b"terminal"), ("trailers", b"x-status")], false);
+        envoy_filter.send_response_headers(
+          vec![
+            (":status", b"200"),
+            ("x-filter", b"terminal"),
+            ("trailers", b"x-status"),
+          ],
+          false,
+        );
         envoy_filter.send_response_data(b"Who are you?", false);
-      }
+      },
       EVENT_ID_READ_REQUEST => {
         if !self.request_closed {
           let mut body = Vec::new();
           if let Some(buffers) = envoy_filter.get_request_body() {
-              for buffer in buffers {
-                  body.extend_from_slice(buffer.as_slice());
-              }
+            for buffer in buffers {
+              body.extend_from_slice(buffer.as_slice());
+            }
           }
           envoy_filter.drain_request_body(body.len());
-          envoy_filter.send_response_data([b"Hi ", body.as_slice(),  b". Anything else?"].concat().as_slice(), false);
+          envoy_filter.send_response_data(
+            [b"Hi ", body.as_slice(), b". Anything else?"]
+              .concat()
+              .as_slice(),
+            false,
+          );
         } else {
           envoy_filter.send_response_data(b"Thanks!", false);
           envoy_filter.send_response_trailers(vec![("x-status", b"finished")]);
         }
-      }
-      _ =>  unreachable!(),
+      },
+      _ => unreachable!(),
     }
   }
 }
