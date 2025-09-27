@@ -1,8 +1,8 @@
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index 68d0a4fe6..9bf7adede 100644
+index 71f0010bb..377fe1a56 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -50,13 +50,8 @@ include(cmake/ccache.cmake)
+@@ -35,13 +35,7 @@ include(cmake/ccache.cmake)
  ##############################################################################
  # VPP Version
  ##############################################################################
@@ -12,21 +12,19 @@ index 68d0a4fe6..9bf7adede 100644
 -  OUTPUT_VARIABLE VPP_VERSION
 -  OUTPUT_STRIP_TRAILING_WHITESPACE
 -)
- 
-+set(VPP_VERSION 24.03-dev)
+-
++set(VPP_VERSION 25.06-dev)
  if (VPP_PLATFORM)
    set(VPP_VERSION ${VPP_VERSION}-${VPP_PLATFORM_NAME})
  endif()
-@@ -277,8 +272,7 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux|FreeBSD")
+@@ -264,7 +258,6 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux|FreeBSD")
    find_package(OpenSSL)
    set(SUBDIRS
      vppinfra svm vlib vlibmemory vlibapi vnet vpp vat vat2 vcl vpp-api
--    plugins tools/vppapigen tools/g2 tools/perftool cmake pkg
--    tools/appimage
-+    tools/vppapigen cmake pkg
+-    plugins crypto_engines tools/vppapigen tools/g2 tools/perftool cmake pkg
+     tools/appimage
    )
  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-   set(SUBDIRS vppinfra)
 diff --git a/src/cmake/ccache.cmake b/src/cmake/ccache.cmake
 index a7b395bc6..d6a4c5b30 100644
 --- a/src/cmake/ccache.cmake
@@ -41,7 +39,7 @@ index a7b395bc6..d6a4c5b30 100644
    find_program(CCACHE_FOUND ccache)
    message(STATUS "Looking for ccache")
 diff --git a/src/cmake/library.cmake b/src/cmake/library.cmake
-index 45b3944eb..b1dcc56e1 100644
+index a06a795c6..eea0c73d3 100644
 --- a/src/cmake/library.cmake
 +++ b/src/cmake/library.cmake
 @@ -24,7 +24,7 @@ macro(add_vpp_library lib)
@@ -54,7 +52,7 @@ index 45b3944eb..b1dcc56e1 100644
  
    if(VPP_LIB_VERSION)
 diff --git a/src/tools/vppapigen/CMakeLists.txt b/src/tools/vppapigen/CMakeLists.txt
-index 04ebed548..bfabc3a67 100644
+index 97a6d35f9..55b662a8d 100644
 --- a/src/tools/vppapigen/CMakeLists.txt
 +++ b/src/tools/vppapigen/CMakeLists.txt
 @@ -11,22 +11,6 @@
@@ -81,14 +79,13 @@ index 04ebed548..bfabc3a67 100644
    FILES vppapigen.py
    RENAME vppapigen
 diff --git a/src/tools/vppapigen/vppapigen.py b/src/tools/vppapigen/vppapigen.py
-index 2b0ce9999..f8a7586ea 100755
+index 0bed578eb..ed5b2ce75 100755
 --- a/src/tools/vppapigen/vppapigen.py
 +++ b/src/tools/vppapigen/vppapigen.py
-@@ -7,6 +7,14 @@ import logging
+@@ -7,6 +7,13 @@ import logging
  import binascii
  import os
  from subprocess import Popen, PIPE
-+
 +
 +# Put ply on the path ...
 +plypath = os.path.join(
@@ -98,36 +95,44 @@ index 2b0ce9999..f8a7586ea 100755
 +
  import ply.lex as lex
  import ply.yacc as yacc
- 
+ from io import TextIOWrapper
 diff --git a/src/vcl/CMakeLists.txt b/src/vcl/CMakeLists.txt
-index 610b422d1..c5e6f8ca8 100644
+index 2787ce678..8cbe2b4fc 100644
 --- a/src/vcl/CMakeLists.txt
 +++ b/src/vcl/CMakeLists.txt
-@@ -35,6 +35,8 @@ if (LDP_HAS_GNU_SOURCE)
+@@ -41,6 +41,8 @@ if (LDP_HAS_GNU_SOURCE)
    add_compile_definitions(HAVE_GNU_SOURCE)
  endif(LDP_HAS_GNU_SOURCE)
  
 +file(COPY vppcom.h DESTINATION ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
 +
- add_vpp_library(vcl_ldpreload
-   SOURCES
-   ldp_socket_wrapper.c
+ if("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
+   message("WARNING: vcl_ldpreload isn't supported on FreeBSD - disabled")
+ else()
 diff --git a/src/vppinfra/CMakeLists.txt b/src/vppinfra/CMakeLists.txt
-index f34ceed9d..51fd2becf 100644
+index 131f5a5b5..06fe42179 100644
 --- a/src/vppinfra/CMakeLists.txt
 +++ b/src/vppinfra/CMakeLists.txt
-@@ -233,13 +233,28 @@ option(VPP_USE_EXTERNAL_LIBEXECINFO "Use external libexecinfo (useful for non-gl
- if(VPP_USE_EXTERNAL_LIBEXECINFO)
-   set(EXECINFO_LIB execinfo)
+@@ -27,7 +27,7 @@ vpp_find_library(LIBUNWIND_LIB NAMES unwind libunwind)
+ if (LIBUNWIND_INCLUDE_DIR AND LIBUNWIND_LIB)
+   message(STATUS "libunwind found at ${LIBUNWIND_LIB}")
+   list(APPEND VPPINFRA_LIBS ${LIBUNWIND_LIB})
+-  add_definitions(-DHAVE_LIBUNWIND=1)
++  add_definitions(-DHAVE_LIBUNWIND=0)
+ else()
+   message(WARNING "libunwind not found - stack traces disabled")
+   add_definitions(-DHAVE_LIBUNWIND=0)
+@@ -253,13 +253,26 @@ elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
+    )
  endif()
+ 
 -add_vpp_library(vppinfra
 -  SOURCES ${VPPINFRA_SRCS}
--  LINK_LIBRARIES m ${EXECINFO_LIB}
+-  LINK_LIBRARIES m ${VPPINFRA_LIBS}
 -  INSTALL_HEADERS ${VPPINFRA_HEADERS}
 -  COMPONENT libvppinfra
 -  LTO
 -)
-+
 +# GCC versions 11 and 12 at least have some kind of bug when
 +# LTO runs out of memory and breaking Envoy builds with gcc
 +# as a result. So we conditionally disable LTO on GCC builds
@@ -135,20 +140,19 @@ index f34ceed9d..51fd2becf 100644
 +if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
 +  add_vpp_library(vppinfra
 +    SOURCES ${VPPINFRA_SRCS}
-+    LINK_LIBRARIES m ${EXECINFO_LIB}
++    LINK_LIBRARIES m ${VPPINFRA_LIBS}
 +    INSTALL_HEADERS ${VPPINFRA_HEADERS}
 +    COMPONENT libvppinfra
 +  )
 +else()
 +  add_vpp_library(vppinfra
 +    SOURCES ${VPPINFRA_SRCS}
-+    LINK_LIBRARIES m ${EXECINFO_LIB}
++    LINK_LIBRARIES m ${VPPINFRA_LIBS}
 +    INSTALL_HEADERS ${VPPINFRA_HEADERS}
 +    COMPONENT libvppinfra
 +    LTO
 +  )
 +endif()
-+
  
  ##############################################################################
  # vppinfra headers
