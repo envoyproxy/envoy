@@ -17,6 +17,7 @@
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/synchronization/mutex.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -76,17 +77,17 @@ Upstream::HostSelectionResponse RevConCluster::checkAndCreateHost(absl::string_v
   std::string node_id = socket_manager->getNodeID(std::string(host_id));
   ENVOY_LOG(debug, "reverse_connection: resolved key '{}' to node: '{}'", host_id, node_id);
 
-  host_map_lock_.ReaderLock();
-  // Check if node_id is already present in host_map_ or not. This ensures,
-  // that envoy reuses a conn_pool_container for an endpoint.
-  auto host_itr = host_map_.find(node_id);
-  if (host_itr != host_map_.end()) {
-    ENVOY_LOG(debug, "reverse_connection: reusing existing host for {}.", node_id);
-    Upstream::HostSharedPtr host = host_itr->second;
-    host_map_lock_.ReaderUnlock();
-    return {host};
+  {
+    absl::ReaderMutexLock rlock(&host_map_lock_);
+    // Check if node_id is already present in host_map_ or not. This ensures,
+    // that envoy reuses a conn_pool_container for an endpoint.
+    auto host_itr = host_map_.find(node_id);
+    if (host_itr != host_map_.end()) {
+      ENVOY_LOG(debug, "reverse_connection: reusing existing host for {}.", node_id);
+      Upstream::HostSharedPtr host = host_itr->second;
+      return {host};
+    }
   }
-  host_map_lock_.ReaderUnlock();
 
   absl::WriterMutexLock wlock(&host_map_lock_);
 
