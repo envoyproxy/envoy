@@ -16,12 +16,14 @@
 #include "source/common/stats/isolated_store_impl.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
+#include "source/extensions/filters/http/ext_proc/processing_request_modifier.h"
 #include "source/extensions/http/ext_proc/response_processors/save_processing_response/save_processing_response.h"
 #include "source/extensions/http/ext_proc/response_processors/save_processing_response/save_processing_response_factory.h"
 
 #include "test/common/http/common.h"
 #include "test/common/http/conn_manager_impl_test_base.h"
 #include "test/extensions/filters/http/ext_proc/mock_server.h"
+#include "test/extensions/filters/http/ext_proc/test_processing_request_modifier.h"
 #include "test/extensions/filters/http/ext_proc/utils.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -138,9 +140,9 @@ protected:
     if (!yaml.empty()) {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
-    config_ = std::make_shared<FilterConfig>(
-        proto_config, 200ms, 10000, *stats_store_.rootScope(), "", is_upstream_filter,
-        Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr), factory_context_);
+    builder_ = Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr);
+    config_ = std::make_shared<FilterConfig>(proto_config, 200ms, 10000, *stats_store_.rootScope(),
+                                             "", is_upstream_filter, builder_, factory_context_);
     filter_ = std::make_unique<Filter>(config_, std::move(client_));
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(Return(BufferSize));
@@ -643,6 +645,7 @@ protected:
   bool server_closed_stream_ = false;
   bool observability_mode_ = false;
   testing::NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
+  Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder_;
   FilterConfigSharedPtr config_;
   std::shared_ptr<Filter> filter_;
   testing::NiceMock<Event::MockDispatcher> dispatcher_;
@@ -818,6 +821,99 @@ TEST_F(HttpFilterTest, PostAndChangeHeaders) {
   EXPECT_EQ(2, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(2, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
+TEST_F(HttpFilterTest, ProcessingRequestModifier) {
+  TestProcessingRequestModifierFactory factory;
+  Registry::InjectFactory<ProcessingRequestModifierFactory> registration(factory);
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  processing_request_modifier:
+    name: "test_processing_request_modifier"
+    typed_config:
+      "@type": "type.googleapis.com/google.protobuf.Struct"
+  )EOF");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  // Check that our custom attribute builder was used
+  processRequestHeaders(false,
+                        [](const HttpHeaders& header_req, ProcessingResponse&, HeadersResponse&) {
+                          EXPECT_FALSE(header_req.end_of_stream());
+                          TestRequestHeaderMapImpl expected{{":path", "/"},
+                                                            {":method", "POST"},
+                                                            {":scheme", "http"},
+                                                            {":authority", "host"},
+                                                            {"x-test-request-modifier", ""}};
+                          EXPECT_THAT(header_req.headers(), HeaderProtosEqual(expected));
+                        });
+
+  // Let the rest of the request play out
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+
+  Buffer::OwnedImpl resp_data("bar");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, ProcessingRequestModifierOverrides) {
+  TestProcessingRequestModifierFactory factory;
+  Registry::InjectFactory<ProcessingRequestModifierFactory> registration(factory);
+
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+
+  ExtProcPerRoute route_proto;
+  Envoy::Protobuf::Struct empty;
+  auto* modifier_config = route_proto.mutable_overrides()->mutable_processing_request_modifier();
+  modifier_config->set_name("test_processing_request_modifier");
+  modifier_config->mutable_typed_config()->PackFrom(empty);
+
+  FilterConfigPerRoute route_config(route_proto, builder_, factory_context_);
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+      .WillRepeatedly(
+          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+
+  // Check that our custom attribute builder was used
+  processRequestHeaders(false,
+                        [](const HttpHeaders& header_req, ProcessingResponse&, HeadersResponse&) {
+                          EXPECT_FALSE(header_req.end_of_stream());
+                          TestRequestHeaderMapImpl expected{{":path", "/"},
+                                                            {":method", "POST"},
+                                                            {":scheme", "http"},
+                                                            {":authority", "host"},
+                                                            {"x-test-request-modifier", ""}};
+                          EXPECT_THAT(header_req.headers(), HeaderProtosEqual(expected));
+                        });
+
+  // Let the rest of the request play out
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->decodeTrailers(request_trailers_));
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+
+  Buffer::OwnedImpl resp_data("bar");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->encodeData(resp_data, true));
+  EXPECT_EQ(FilterTrailersStatus::Continue, filter_->encodeTrailers(response_trailers_));
+  filter_->onDestroy();
 }
 
 // Using the default configuration, test the filter with a processor that
@@ -1639,7 +1735,7 @@ failure_mode_allow: true)EOF";
 
   ExtProcPerRoute route_proto;
   route_proto.mutable_overrides()->mutable_failure_mode_allow()->set_value(false);
-  FilterConfigPerRoute route_config(route_proto);
+  FilterConfigPerRoute route_config(route_proto, builder_, factory_context_);
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
       .WillRepeatedly(
           testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
@@ -1671,7 +1767,7 @@ failure_mode_allow: false)EOF";
 
   ExtProcPerRoute route_proto;
   route_proto.mutable_overrides()->mutable_failure_mode_allow()->set_value(true);
-  FilterConfigPerRoute route_config(route_proto);
+  FilterConfigPerRoute route_config(route_proto, builder_, factory_context_);
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
       .WillRepeatedly(
           testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
@@ -1786,7 +1882,7 @@ failure_mode_allow: true)EOF";
   // This override does not set failure_mode_allow, so the filter's value should still apply.
   route_proto.mutable_overrides()->mutable_processing_mode()->set_response_header_mode(
       ProcessingMode::SKIP);
-  FilterConfigPerRoute route_config(route_proto);
+  FilterConfigPerRoute route_config(route_proto, builder_, factory_context_);
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
       .WillRepeatedly(
           testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
@@ -1818,11 +1914,13 @@ failure_mode_allow: true)EOF";
 
   ExtProcPerRoute route_proto_less_specific;
   route_proto_less_specific.mutable_overrides()->mutable_failure_mode_allow()->set_value(true);
-  FilterConfigPerRoute route_config_less_specific(route_proto_less_specific);
+  FilterConfigPerRoute route_config_less_specific(route_proto_less_specific, builder_,
+                                                  factory_context_);
 
   ExtProcPerRoute route_proto_more_specific;
   route_proto_more_specific.mutable_overrides()->mutable_failure_mode_allow()->set_value(false);
-  FilterConfigPerRoute route_config_more_specific(route_proto_more_specific);
+  FilterConfigPerRoute route_config_more_specific(route_proto_more_specific, builder_,
+                                                  factory_context_);
 
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
       .WillRepeatedly(testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs {
@@ -3096,7 +3194,7 @@ TEST_F(HttpFilterTest, ProcessingModeResponseHeadersOnlyWithoutCallingDecodeHead
   ExtProcPerRoute route_proto;
   route_proto.mutable_overrides()->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
       "cluster_1");
-  FilterConfigPerRoute route_config(route_proto);
+  FilterConfigPerRoute route_config(route_proto, builder_, factory_context_);
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
       .WillOnce(
           testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
@@ -3142,7 +3240,7 @@ TEST_F(HttpFilterTest, ProtocolConfigEncodingPerRouteTest) {
   auto* processing_mode = route_proto.mutable_overrides()->mutable_processing_mode();
   processing_mode->set_request_body_mode(ProcessingMode::STREAMED);
   processing_mode->set_response_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
-  FilterConfigPerRoute route_config(route_proto);
+  FilterConfigPerRoute route_config(route_proto, builder_, factory_context_);
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
       .WillOnce(
           testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
@@ -3657,9 +3755,19 @@ TEST_F(HttpFilterTest, OutOfOrderFailClose) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
+class OverrideTest : public testing::Test {
+protected:
+  void SetUp() override {
+    builder_ = Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr);
+  }
+
+  Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder_;
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
+};
+
 // When merging two configurations, ensure that the second processing mode
 // overrides the first.
-TEST(OverrideTest, OverrideProcessingMode) {
+TEST_F(OverrideTest, OverrideProcessingMode) {
   ExtProcPerRoute cfg1;
   cfg1.mutable_overrides()->mutable_processing_mode()->set_request_header_mode(
       ProcessingMode::SKIP);
@@ -3668,8 +3776,8 @@ TEST(OverrideTest, OverrideProcessingMode) {
       ProcessingMode::STREAMED);
   cfg2.mutable_overrides()->mutable_processing_mode()->set_response_body_mode(
       ProcessingMode::BUFFERED);
-  FilterConfigPerRoute route1(cfg1);
-  FilterConfigPerRoute route2(cfg2);
+  FilterConfigPerRoute route1(cfg1, builder_, factory_context_);
+  FilterConfigPerRoute route2(cfg2, builder_, factory_context_);
   FilterConfigPerRoute merged_route(route1, route2);
   EXPECT_FALSE(merged_route.disabled());
   EXPECT_EQ(merged_route.processingMode()->request_header_mode(), ProcessingMode::DEFAULT);
@@ -3679,14 +3787,14 @@ TEST(OverrideTest, OverrideProcessingMode) {
 
 // When merging two configurations, if the first processing mode is set, and
 // the second is disabled, then the filter should be disabled.
-TEST(OverrideTest, DisableOverridesFirstMode) {
+TEST_F(OverrideTest, DisableOverridesFirstMode) {
   ExtProcPerRoute cfg1;
   cfg1.mutable_overrides()->mutable_processing_mode()->set_request_header_mode(
       ProcessingMode::SKIP);
   ExtProcPerRoute cfg2;
   cfg2.set_disabled(true);
-  FilterConfigPerRoute route1(cfg1);
-  FilterConfigPerRoute route2(cfg2);
+  FilterConfigPerRoute route1(cfg1, builder_, factory_context_);
+  FilterConfigPerRoute route2(cfg2, builder_, factory_context_);
   FilterConfigPerRoute merged_route(route1, route2);
   EXPECT_TRUE(merged_route.disabled());
   EXPECT_FALSE(merged_route.processingMode());
@@ -3694,14 +3802,14 @@ TEST(OverrideTest, DisableOverridesFirstMode) {
 
 // When merging two configurations, if the first override is disabled, and
 // the second has a new mode, then the filter should use the new mode.
-TEST(OverrideTest, ModeOverridesFirstDisable) {
+TEST_F(OverrideTest, ModeOverridesFirstDisable) {
   ExtProcPerRoute cfg1;
   cfg1.set_disabled(true);
   ExtProcPerRoute cfg2;
   cfg2.mutable_overrides()->mutable_processing_mode()->set_request_header_mode(
       ProcessingMode::SKIP);
-  FilterConfigPerRoute route1(cfg1);
-  FilterConfigPerRoute route2(cfg2);
+  FilterConfigPerRoute route1(cfg1, builder_, factory_context_);
+  FilterConfigPerRoute route2(cfg2, builder_, factory_context_);
   FilterConfigPerRoute merged_route(route1, route2);
   EXPECT_FALSE(merged_route.disabled());
   EXPECT_EQ(merged_route.processingMode()->request_header_mode(), ProcessingMode::SKIP);
@@ -3709,49 +3817,49 @@ TEST(OverrideTest, ModeOverridesFirstDisable) {
 
 // When merging two configurations, if both are disabled, then it's still
 // disabled.
-TEST(OverrideTest, DisabledThingsAreDisabled) {
+TEST_F(OverrideTest, DisabledThingsAreDisabled) {
   ExtProcPerRoute cfg1;
   cfg1.set_disabled(true);
   ExtProcPerRoute cfg2;
   cfg2.set_disabled(true);
-  FilterConfigPerRoute route1(cfg1);
-  FilterConfigPerRoute route2(cfg2);
+  FilterConfigPerRoute route1(cfg1, builder_, factory_context_);
+  FilterConfigPerRoute route2(cfg2, builder_, factory_context_);
   FilterConfigPerRoute merged_route(route1, route2);
   EXPECT_TRUE(merged_route.disabled());
   EXPECT_FALSE(merged_route.processingMode());
 }
 
 // When merging two configurations, second grpc_service overrides the first.
-TEST(OverrideTest, GrpcServiceOverride) {
+TEST_F(OverrideTest, GrpcServiceOverride) {
   ExtProcPerRoute cfg1;
   cfg1.mutable_overrides()->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
       "cluster_1");
   ExtProcPerRoute cfg2;
   cfg2.mutable_overrides()->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
       "cluster_2");
-  FilterConfigPerRoute route1(cfg1);
-  FilterConfigPerRoute route2(cfg2);
+  FilterConfigPerRoute route1(cfg1, builder_, factory_context_);
+  FilterConfigPerRoute route2(cfg2, builder_, factory_context_);
   FilterConfigPerRoute merged_route(route1, route2);
   ASSERT_TRUE(merged_route.grpcService().has_value());
   EXPECT_THAT(*merged_route.grpcService(), ProtoEq(cfg2.overrides().grpc_service()));
 }
 
 // When merging two configurations, unset grpc_service is equivalent to no override.
-TEST(OverrideTest, GrpcServiceNonOverride) {
+TEST_F(OverrideTest, GrpcServiceNonOverride) {
   ExtProcPerRoute cfg1;
   cfg1.mutable_overrides()->mutable_grpc_service()->mutable_envoy_grpc()->set_cluster_name(
       "cluster_1");
   ExtProcPerRoute cfg2;
   // Leave cfg2.grpc_service unset.
-  FilterConfigPerRoute route1(cfg1);
-  FilterConfigPerRoute route2(cfg2);
+  FilterConfigPerRoute route1(cfg1, builder_, factory_context_);
+  FilterConfigPerRoute route2(cfg2, builder_, factory_context_);
   FilterConfigPerRoute merged_route(route1, route2);
   ASSERT_TRUE(merged_route.grpcService().has_value());
   EXPECT_THAT(*merged_route.grpcService(), ProtoEq(cfg1.overrides().grpc_service()));
 }
 
 // When merging two configurations, second metadata override only extends the first's one.
-TEST(OverrideTest, GrpcMetadataOverride) {
+TEST_F(OverrideTest, GrpcMetadataOverride) {
   ExtProcPerRoute cfg1;
   cfg1.mutable_overrides()->mutable_grpc_initial_metadata()->Add()->CopyFrom(
       makeHeaderValue("a", "a"));
@@ -3764,8 +3872,8 @@ TEST(OverrideTest, GrpcMetadataOverride) {
   cfg2.mutable_overrides()->mutable_grpc_initial_metadata()->Add()->CopyFrom(
       makeHeaderValue("c", "c"));
 
-  FilterConfigPerRoute route1(cfg1);
-  FilterConfigPerRoute route2(cfg2);
+  FilterConfigPerRoute route1(cfg1, builder_, factory_context_);
+  FilterConfigPerRoute route2(cfg2, builder_, factory_context_);
   FilterConfigPerRoute merged_route(route1, route2);
 
   ASSERT_TRUE(merged_route.grpcInitialMetadata().size() == 3);
@@ -3943,7 +4051,7 @@ TEST_F(HttpFilterTest, MetadataOptionsOverride) {
   )EOF";
   TestUtility::loadFromYaml(override_yaml, override_cfg);
 
-  FilterConfigPerRoute route_config(override_cfg);
+  FilterConfigPerRoute route_config(override_cfg, builder_, factory_context_);
 
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
       .WillOnce(
@@ -4005,7 +4113,7 @@ TEST_F(HttpFilterTest, MetadataOptionsNoOverride) {
   )EOF";
   TestUtility::loadFromYaml(override_yaml, override_cfg);
 
-  FilterConfigPerRoute route_config(override_cfg);
+  FilterConfigPerRoute route_config(override_cfg, builder_, factory_context_);
 
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
       .WillOnce(
@@ -5544,7 +5652,7 @@ TEST_F(HttpFilterTest, GrpcServiceMetadataOverride) {
       makeHeaderValue("b", "c");
   *route_proto.mutable_overrides()->mutable_grpc_initial_metadata()->Add() =
       makeHeaderValue("c", "c");
-  FilterConfigPerRoute route_config(route_proto);
+  FilterConfigPerRoute route_config(route_proto, builder_, factory_context_);
   EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
       .WillOnce(
           testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
