@@ -28,6 +28,8 @@ using testing::HasSubstr;
 using testing::Not;
 #endif
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 
 TEST(TimeSpecToChrono, convertsCorrectly) {

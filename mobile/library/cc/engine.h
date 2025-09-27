@@ -29,10 +29,10 @@ public:
   envoy_status_t setProxySettings(absl::string_view host, const uint16_t port);
 
   envoy_status_t terminate();
-  Envoy::InternalEngine* engine() { return engine_; }
+  Envoy::InternalEngine* engine() { return engine_.get(); }
 
 private:
-  Engine(::Envoy::InternalEngine* engine);
+  Engine(std::unique_ptr<::Envoy::InternalEngine>&& engine);
 
   // required to access private constructor
   friend class EngineBuilder;
@@ -41,7 +41,7 @@ private:
   // for testing only
   friend class ::Envoy::BaseClientIntegrationTest;
 
-  Envoy::InternalEngine* engine_;
+  std::unique_ptr<Envoy::InternalEngine> engine_;
   StreamClientSharedPtr stream_client_;
 };
 

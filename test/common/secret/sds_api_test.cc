@@ -37,6 +37,8 @@ using ::testing::NiceMock;
 using ::testing::Return;
 using ::testing::Throw;
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 namespace Secret {
 namespace {

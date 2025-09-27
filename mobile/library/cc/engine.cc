@@ -7,7 +7,7 @@
 namespace Envoy {
 namespace Platform {
 
-Engine::Engine(::Envoy::InternalEngine* engine) : engine_(engine) {}
+Engine::Engine(std::unique_ptr<::Envoy::InternalEngine>&& engine) : engine_(std::move(engine)) {}
 
 Engine::~Engine() {
   if (!engine_->isTerminated()) {

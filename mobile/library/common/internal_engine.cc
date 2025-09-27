@@ -83,12 +83,13 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
                                std::unique_ptr<EnvoyEventTracker> event_tracker,
                                absl::optional<int> thread_priority,
                                bool disable_dns_refresh_on_network_change,
-                               Thread::PosixThreadFactoryPtr thread_factory)
+                               Thread::PosixThreadFactoryPtr thread_factory, bool enable_logger)
     : thread_factory_(std::move(thread_factory)), callbacks_(std::move(callbacks)),
       logger_(std::move(logger)), event_tracker_(std::move(event_tracker)),
       thread_priority_(thread_priority),
       dispatcher_(std::make_unique<Event::ProvisionalDispatcher>()),
-      disable_dns_refresh_on_network_change_(disable_dns_refresh_on_network_change) {
+      disable_dns_refresh_on_network_change_(disable_dns_refresh_on_network_change),
+      enable_logger_(enable_logger) {
   ExtensionRegistry::registerFactories();
 
   Api::External::registerApi(std::string(ENVOY_EVENT_TRACKER_API_NAME), &event_tracker_);
@@ -98,10 +99,10 @@ InternalEngine::InternalEngine(std::unique_ptr<EngineCallbacks> callbacks,
                                std::unique_ptr<EnvoyLogger> logger,
                                std::unique_ptr<EnvoyEventTracker> event_tracker,
                                absl::optional<int> thread_priority,
-                               bool disable_dns_refresh_on_network_change)
+                               bool disable_dns_refresh_on_network_change, bool enable_logger)
     : InternalEngine(std::move(callbacks), std::move(logger), std::move(event_tracker),
                      thread_priority, disable_dns_refresh_on_network_change,
-                     Thread::PosixThreadFactory::create()) {}
+                     Thread::PosixThreadFactory::create(), enable_logger) {}
 
 envoy_stream_t InternalEngine::initStream() { return current_stream_handle_++; }
 
@@ -180,12 +181,14 @@ envoy_status_t InternalEngine::main(std::shared_ptr<OptionsImplBase> options) {
       }
 
       // We let the thread clean up this log delegate pointer
-      if (logger_ != nullptr) {
-        log_delegate_ptr_ = std::make_unique<Logger::LambdaDelegate>(std::move(logger_),
-                                                                     Logger::Registry::getSink());
-      } else {
-        log_delegate_ptr_ =
-            std::make_unique<Logger::DefaultDelegate>(log_mutex_, Logger::Registry::getSink());
+      if (enable_logger_) {
+        if (logger_ != nullptr) {
+          log_delegate_ptr_ = std::make_unique<Logger::LambdaDelegate>(std::move(logger_),
+                                                                       Logger::Registry::getSink());
+        } else {
+          log_delegate_ptr_ =
+              std::make_unique<Logger::DefaultDelegate>(log_mutex_, Logger::Registry::getSink());
+        }
       }
 
       main_common = std::make_unique<EngineCommon>(options);
