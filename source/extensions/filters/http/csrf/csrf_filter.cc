@@ -26,16 +26,6 @@ using RcDetails = ConstSingleton<RcDetailsValues>;
 namespace {
 constexpr absl::string_view NullOrigin{"null"};
 
-bool isModifyMethod(const Http::RequestHeaderMap& headers) {
-  const absl::string_view method_type = headers.getMethodValue();
-  if (method_type.empty()) {
-    return false;
-  }
-  const auto& method_values = Http::Headers::get().MethodValues;
-  return (method_type == method_values.Post || method_type == method_values.Put ||
-          method_type == method_values.Delete || method_type == method_values.Patch);
-}
-
 std::string hostAndPort(const absl::string_view absolute_url) {
   Http::Utility::Url url;
   if (!absolute_url.empty()) {
@@ -99,10 +89,6 @@ Http::FilterHeadersStatus CsrfFilter::decodeHeaders(Http::RequestHeaderMap& head
   determinePolicy();
 
   if (!policy_->enabled() && !policy_->shadowEnabled()) {
-    return Http::FilterHeadersStatus::Continue;
-  }
-
-  if (!isModifyMethod(headers)) {
     return Http::FilterHeadersStatus::Continue;
   }
 
