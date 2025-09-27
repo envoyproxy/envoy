@@ -4595,6 +4595,43 @@ virtual_hosts:
   EXPECT_EQ("foo", bar_shadow_policies[0]->runtimeKey());
 }
 
+// Smoke test for request mirror policies with headers. We don't test the header parser internals.
+TEST_F(RouteMatcherTest, RequestMirrorPoliciesWithHeaders) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      request_mirror_policies:
+        - cluster: some_cluster
+          request_headers_to_add:
+            - header:
+                key: x-mirror-test
+                value: mirror-value
+            - header:
+                key: x-mirror-dynamic
+                value: "%REQ(:path)%"
+              append_action: OVERWRITE_IF_EXISTS_OR_ADD
+          request_headers_to_remove:
+            - x-sensitive-header
+            - x-internal-header
+      cluster: www2
+  )EOF";
+
+  factory_context_.cluster_manager_.initializeClusters({"www2", "some_cluster"}, {});
+  TestConfigImpl config(parseRouteConfigurationFromYaml(yaml), factory_context_, true,
+                        creation_status_);
+  const auto& foo_shadow_policies =
+      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->shadowPolicies();
+
+  EXPECT_EQ(1, foo_shadow_policies.size());
+  EXPECT_EQ("some_cluster", foo_shadow_policies[0]->cluster());
+}
+
 // Test if the higher level mirror policies are properly applied when routes
 // don't have one and not applied when they do.
 // In this test case, request_mirror_policies is set in route config level.

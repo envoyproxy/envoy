@@ -5,6 +5,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/formatter/substitution_formatter_base.h"
 #include "envoy/http/header_evaluator.h"
 #include "envoy/http/header_map.h"
 

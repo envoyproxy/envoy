@@ -2,6 +2,7 @@
 
 #include "envoy/config/common/mutation_rules/v3/mutation_rules.pb.h"
 #include "envoy/http/header_evaluator.h"
+#include "envoy/server/factory_context.h"
 
 #include "source/common/protobuf/protobuf.h"
 
