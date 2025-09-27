@@ -712,19 +712,15 @@ pub trait EnvoyHttpFilter {
   /// Necessary pseudo headers such as :status should be present.
   ///
   /// The headers are passed as a list of key-value pairs.
-  fn send_response_headers<'a>(
-    &mut self,
-    headers: Vec<(&'a str, &'a [u8])>,
-    end_stream: bool,
-  ) -> bool;
+  fn send_response_headers<'a>(&mut self, headers: Vec<(&'a str, &'a [u8])>, end_stream: bool);
 
   /// Send response body data to the downstream, optionally indicating end of stream.
-  fn send_response_data<'a>(&mut self, body: &'a [u8], end_stream: bool) -> bool;
+  fn send_response_data<'a>(&mut self, body: &'a [u8], end_stream: bool);
 
   /// Send response trailers to the downstream. This implicitly ends the stream.
   ///
   /// The trailers are passed as a list of key-value pairs.
-  fn send_response_trailers<'a>(&mut self, trailers: Vec<(&'a str, &'a [u8])>) -> bool;
+  fn send_response_trailers<'a>(&mut self, trailers: Vec<(&'a str, &'a [u8])>);
 
 
   /// Get the number-typed metadata value with the given key.
@@ -1242,7 +1238,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn send_response_headers(&mut self, headers: Vec<(&str, &[u8])>, end_stream: bool) -> bool {
+  fn send_response_headers(&mut self, headers: Vec<(&str, &[u8])>, end_stream: bool) {
     // Note: Casting a (&str, &[u8]) to an abi::envoy_dynamic_module_type_module_http_header works
     // not because of any formal layout guarantees but because:
     // 1) tuples _in practice_ are laid out packed and in order
@@ -1262,7 +1258,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn send_response_data(&mut self, body: &[u8], end_stream: bool) -> bool {
+  fn send_response_data(&mut self, body: &[u8], end_stream: bool) {
     let body_ptr = body.as_ptr();
     let body_length = body.len();
 
@@ -1276,7 +1272,7 @@ impl EnvoyHttpFilter for EnvoyHttpFilterImpl {
     }
   }
 
-  fn send_response_trailers(&mut self, trailers: Vec<(&str, &[u8])>) -> bool {
+  fn send_response_trailers(&mut self, trailers: Vec<(&str, &[u8])>) {
     // Note: Casting a (&str, &[u8]) to an abi::envoy_dynamic_module_type_module_http_header works
     // not because of any formal layout guarantees but because:
     // 1) tuples _in practice_ are laid out packed and in order

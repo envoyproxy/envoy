@@ -1311,7 +1311,7 @@ void envoy_dynamic_module_callback_http_send_response(
  * @param headers_vector_size is the size of the headers_vector.
  * @param end_stream is a boolean indicating whether to end the stream.
  */
-bool envoy_dynamic_module_callback_http_send_response_headers(
+void envoy_dynamic_module_callback_http_send_response_headers(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_http_header* headers_vector, size_t headers_vector_size,
     bool end_stream);
@@ -1326,7 +1326,7 @@ bool envoy_dynamic_module_callback_http_send_response_headers(
  * @param body_length is the length of the body.
  * @param end_stream is a boolean indicating whether to end the stream.
  */
-bool envoy_dynamic_module_callback_http_send_response_data(
+void envoy_dynamic_module_callback_http_send_response_data(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr data, size_t length, bool end_stream);
 
@@ -1340,7 +1340,7 @@ bool envoy_dynamic_module_callback_http_send_response_data(
  * the trailers of the response.
  * @param trailers_vector_size is the size of the trailers_vector.
  */
-bool envoy_dynamic_module_callback_http_send_response_trailers(
+void envoy_dynamic_module_callback_http_send_response_trailers(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_http_header* trailers_vector, size_t trailers_vector_size);
 

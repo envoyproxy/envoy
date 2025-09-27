@@ -558,14 +558,11 @@ void envoy_dynamic_module_callback_http_send_response(
                          "dynamic_module");
 }
 
-bool envoy_dynamic_module_callback_http_send_response_headers(
+void envoy_dynamic_module_callback_http_send_response_headers(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_http_header* headers_vector, size_t headers_vector_size,
     bool end_stream) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  if (!filter->decoder_callbacks_) {
-    return false;
-  }
 
   std::unique_ptr<ResponseHeaderMapImpl> headers = ResponseHeaderMapImpl::create();
   for (size_t i = 0; i < headers_vector_size; i++) {
@@ -577,31 +574,21 @@ bool envoy_dynamic_module_callback_http_send_response_headers(
   }
 
   filter->decoder_callbacks_->encodeHeaders(std::move(headers), end_stream, "");
-
-  return true;
 }
 
-bool envoy_dynamic_module_callback_http_send_response_data(
+void envoy_dynamic_module_callback_http_send_response_data(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_buffer_module_ptr data, size_t length, bool end_stream) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  if (!filter->decoder_callbacks_) {
-    return false;
-  }
 
   Buffer::OwnedImpl buffer(static_cast<const char*>(data), length);
   filter->decoder_callbacks_->encodeData(buffer, end_stream);
-
-  return true;
 }
 
-bool envoy_dynamic_module_callback_http_send_response_trailers(
+void envoy_dynamic_module_callback_http_send_response_trailers(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
     envoy_dynamic_module_type_module_http_header* trailers_vector, size_t trailers_vector_size) {
   DynamicModuleHttpFilter* filter = static_cast<DynamicModuleHttpFilter*>(filter_envoy_ptr);
-  if (!filter->decoder_callbacks_) {
-    return false;
-  }
 
   std::unique_ptr<ResponseTrailerMapImpl> trailers = ResponseTrailerMapImpl::create();
   for (size_t i = 0; i < trailers_vector_size; i++) {
@@ -613,8 +600,6 @@ bool envoy_dynamic_module_callback_http_send_response_trailers(
   }
 
   filter->decoder_callbacks_->encodeTrailers(std::move(trailers));
-
-  return true;
 }
 
 /**
