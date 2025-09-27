@@ -87,10 +87,34 @@ Similar example for header based configuration would be:
     :lineno-start: 28
     :caption: :download:`stateful-header-session.yaml <_include/stateful-header-session.yaml>`
 
-Note
-___________
-
-* The header based implementation assumes that a client will use the last supplied value for the session
+.. note::
+  The header based implementation assumes that a client will use the last supplied value for the session
   header and will pass it with every subsequent request.
-* StatefulSessionPerRoute should be used if path match is required.
 
+  ``StatefulSessionPerRoute`` should be used if path match is required.
+
+Statistics
+----------
+
+This filter outputs statistics in the
+``http.<stat_prefix>.stateful_session.`` namespace. The :ref:`stat prefix
+<envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stat_prefix>`
+comes from the owning HTTP connection manager.
+
+If :ref:`stat_prefix
+<envoy_v3_api_field_extensions.filters.http.stateful_session.v3.StatefulSession.stat_prefix>` is
+configured on the filter, an additional segment is inserted after ``stateful_session`` to allow
+distinguishing statistics from multiple instances, e.g. ``http.<stat_prefix>.stateful_session.my_prefix.routed``.
+
+The following statistics are supported:
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: auto
+
+  routed, Counter, "Total requests where a stateful session override was attempted and
+  successfully applied and the selected upstream matched the requested session destination."
+  failed_open, Counter, "Total requests where an override was attempted but the requested destination
+  was unavailable and the request proceeded using default load balancing (``strict`` is ``false``)."
+  failed_closed, Counter, "Total requests where an override was attempted but the requested
+  destination was unavailable and the request was fail-closed with a ``503`` (``strict`` is ``true``)."

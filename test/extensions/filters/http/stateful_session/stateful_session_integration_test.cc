@@ -149,6 +149,19 @@ typed_config:
       name: session-header
 )EOF";
 
+static const std::string STATEFUL_SESSION_HEADER_FILTER_WITH_PREFIX =
+    R"EOF(
+name: envoy.filters.http.stateful_session
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.http.stateful_session.v3.StatefulSession
+  stat_prefix: mystats
+  session_state:
+    name: envoy.http.stateful_session.header
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.http.stateful_session.header.v3.HeaderBasedSessionState
+      name: session-header
+)EOF";
+
 static const std::string STATEFUL_SESSION_ENVELOPE_AND_HEADER =
     R"EOF(
 name: envoy.filters.http.stateful_session
@@ -379,6 +392,9 @@ TEST_F(StatefulSessionIntegrationTest,
     EXPECT_EQ(
         "503",
         response->headers().get(Http::LowerCaseString(":status"))[0]->value().getStringView());
+
+    // Verify strict fail-closed is counted.
+    test_server_->waitForCounterGe("http.config_test.stateful_session.failed_closed", 1);
 
     cleanupUpstreamAndDownstream();
   }
@@ -814,6 +830,9 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionHeade
                                    ->value()
                                    .getStringView());
 
+    // Verify fail-open is counted when strict mode is disabled.
+    test_server_->waitForCounterGe("http.config_test.stateful_session.failed_open", 1);
+
     cleanupUpstreamAndDownstream();
   }
 }
@@ -910,8 +929,45 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionHeade
 
     EXPECT_EQ("503", response->headers().getStatusValue());
 
+    // Verify strict fail-closed is counted.
+    test_server_->waitForCounterGe("http.config_test.stateful_session.failed_closed", 1);
+
     cleanupUpstreamAndDownstream();
   }
+}
+
+TEST_F(StatefulSessionIntegrationTest, StatsWithPrefix) {
+  // Configure a stat prefix and verify stats are emitted under it.
+  initializeFilterAndRoute(STATEFUL_SESSION_HEADER_FILTER_WITH_PREFIX, "");
+
+  envoy::config::endpoint::v3::LbEndpoint endpoint;
+  setUpstreamAddress(1, endpoint);
+  const std::string address_string =
+      fmt::format("127.0.0.1:{}", endpoint.endpoint().address().socket_address().port_value());
+  const std::string encoded_address =
+      Envoy::Base64::encode(address_string.data(), address_string.size());
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                 {":path", "/test"},
+                                                 {":scheme", "http"},
+                                                 {":authority", "stateful.session.com"},
+                                                 {"session-header", encoded_address}};
+
+  auto response = codec_client_->makeRequestWithBody(request_headers, 0);
+
+  auto upstream_index = waitForNextUpstreamRequest({0, 1, 2, 3});
+  EXPECT_TRUE(upstream_index.has_value());
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+
+  // Check the routed counter with custom prefix.
+  test_server_->waitForCounterGe("http.config_test.stateful_session.mystats.routed", 1);
+
+  cleanupUpstreamAndDownstream();
 }
 
 TEST_F(StatefulSessionIntegrationTest, StatefulSessionDisabledByRoute) {

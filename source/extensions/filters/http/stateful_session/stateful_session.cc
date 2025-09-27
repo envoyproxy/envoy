@@ -26,6 +26,9 @@ public:
 StatefulSessionConfig::StatefulSessionConfig(const ProtoConfig& config,
                                              Server::Configuration::GenericFactoryContext& context)
     : strict_(config.strict()) {
+  if (!config.stat_prefix().empty()) {
+    stat_prefix_override_ = config.stat_prefix();
+  }
   if (!config.has_session_state()) {
     factory_ = std::make_shared<EmptySessionStateFactory>();
     return;
@@ -51,24 +54,28 @@ PerRouteStatefulSession::PerRouteStatefulSession(
 }
 
 Http::FilterHeadersStatus StatefulSession::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  const StatefulSessionConfig* config = config_.get();
-  auto route_config = Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteStatefulSession>(
-      decoder_callbacks_);
+  // Cache the effective config on first use to avoid repeated resolution.
+  if (effective_config_ == nullptr) {
+    effective_config_ = config_.get();
+    auto route_config = Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteStatefulSession>(
+        decoder_callbacks_);
 
-  if (route_config != nullptr) {
-    if (route_config->disabled()) {
-      return Http::FilterHeadersStatus::Continue;
+    if (route_config != nullptr) {
+      if (route_config->disabled()) {
+        return Http::FilterHeadersStatus::Continue;
+      }
+      effective_config_ = route_config->statefulSessionConfig();
     }
-    config = route_config->statefulSessionConfig();
   }
-  session_state_ = config->createSessionState(headers);
+  session_state_ = effective_config_->createSessionState(headers);
   if (session_state_ == nullptr) {
     return Http::FilterHeadersStatus::Continue;
   }
 
   if (auto upstream_address = session_state_->upstreamAddress(); upstream_address.has_value()) {
     decoder_callbacks_->setUpstreamOverrideHost(
-        std::make_pair(upstream_address.value(), config->isStrict()));
+        std::make_pair(upstream_address.value(), effective_config_->isStrict()));
+    markOverrideAttempted();
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -82,7 +89,20 @@ Http::FilterHeadersStatus StatefulSession::encodeHeaders(Http::ResponseHeaderMap
       upstream_info != nullptr) {
     auto host = upstream_info->upstreamHost();
     if (host != nullptr) {
-      session_state_->onUpdate(host->address()->asStringView(), headers);
+      const bool host_changed = session_state_->onUpdate(host->address()->asStringView(), headers);
+      if (override_attempted_ && !accounted_) {
+        // If an override was attempted, determine the outcome based on whether the host changed.
+        if (host_changed) {
+          if (!effective_config_->isStrict()) {
+            // In non-strict mode, if host changed, it means override failed and fallback occurred.
+            markFailedOpen();
+          }
+        } else {
+          // Host didn't change, meaning the override was successful.
+          markRouted();
+        }
+        accounted_ = true;
+      }
     }
   }
 
