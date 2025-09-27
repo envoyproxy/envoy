@@ -3,6 +3,7 @@
 #include "source/common/common/macros.h"
 #include "source/common/common/utility.h"
 #include "source/common/http/headers.h"
+#include "source/extensions/propagators/xray/xray_propagator.h"
 #include "source/extensions/tracers/xray/localized_sampling.h"
 #include "source/extensions/tracers/xray/tracer.h"
 #include "source/extensions/tracers/xray/xray_configuration.h"
@@ -11,6 +12,8 @@ namespace Envoy {
 namespace Extensions {
 namespace Tracers {
 namespace XRay {
+
+using XRayConstants = Envoy::Extensions::Propagators::XRay::XRayConstants;
 
 namespace {
 constexpr auto DefaultDaemonEndpoint = "127.0.0.1:2000";
@@ -77,7 +80,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config,
 
   // TODO(suniltheta) - how do we factor this into the logic above
   UNREFERENCED_PARAMETER(tracing_decision);
-  const auto header = xRayTraceHeader().get(trace_context);
+  const auto header = XRayConstants::get().X_AMZN_TRACE_ID.get(trace_context);
   absl::optional<bool> should_trace;
   XRayHeader xray_header;
   if (header.has_value()) {
