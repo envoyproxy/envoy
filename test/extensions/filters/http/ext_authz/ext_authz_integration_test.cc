@@ -1917,6 +1917,33 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
   cleanup();
 }
 
+// Verifies that the downstream request fails when the ext_authz response
+// would cause the request headers to exceed their limit.
+TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamRequestFailsOnHeaderLimit) {
+  // Set a low header limit on the HttpConnectionManager. The default request sent by
+  // initiateClientConnection() has 15 headers. The ext_authz response can add one header before
+  // violating this limit.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(16);
+      });
+
+  initializeConfig();
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP2));
+  sendExtAuthzResponse({{"header16", "value"}, {"header17", "value"}}, {}, {}, {}, {}, {}, {}, {});
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("500", response_->headers().getStatusValue());
+  cleanup();
+}
+
 // Regression test for https://github.com/envoyproxy/envoy/issues/17344
 TEST(ExtConfigValidateTest, Validate) {
   Server::TestComponentFactory component_factory;
