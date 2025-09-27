@@ -800,7 +800,7 @@ private:
   bool raised_goaway_ : 1;
   Event::SchedulableCallbackPtr protocol_constraint_violation_callback_;
   Random::RandomGenerator& random_;
-  MonotonicTime last_received_data_time_{};
+  MonotonicTime last_received_data_time_;
   Event::TimerPtr keepalive_send_timer_;
   Event::TimerPtr keepalive_timeout_timer_;
   std::chrono::milliseconds keepalive_interval_;

@@ -810,6 +810,13 @@ void ConnectionImpl::StreamImpl::resetStream(StreamResetReason reason) {
 void ConnectionImpl::StreamImpl::resetStreamWorker(StreamResetReason reason) {
   if (stream_id_ == -1) {
     // Handle the case where client streams are reset before headers are created.
+    // For example, if we send local reply after the stream is created but before
+    // headers are sent, we will end up here.
+    ENVOY_CONN_LOG(trace, "Stream {} reset before headers sent.", parent_.connection_, stream_id_);
+    if (Status status = parent_.onStreamClose(this, 0); !status.ok()) {
+      ENVOY_CONN_LOG(debug, "error invoking onStreamClose: {}", parent_.connection_,
+                     status.message()); // LCOV_EXCL_LINE
+    }
     return;
   }
   if (codec_callbacks_) {
