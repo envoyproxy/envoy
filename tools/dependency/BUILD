@@ -46,7 +46,10 @@ envoy_genjson(
         "-L",
         "tools/dependency",
     ],
-    data = [":cve_utils.jq"],
+    data = [
+        ":cve_utils.jq",
+        ":version.jq",
+    ],
     filter = """
     import "cve_utils" as Utils;
     .[0] as $deps
@@ -146,6 +149,39 @@ sh_binary(
     data = [
         ":build-images",
         "@jq_toolchains//:resolved_toolchain",
+    ],
+    toolchains = ["@jq_toolchains//:resolved_toolchain"],
+)
+
+envoy_genjson(
+    name = "ignored-cves",
+    yaml_srcs = [":cve.yaml"],
+    filter = """
+    .[0].ignored_cves
+    """,
+    visibility = ["//visibility:public"],
+)
+
+sh_binary(
+    name = "cves",
+    srcs = ["cves.sh"],
+    env = {
+        "JQ_BIN": "$(JQ_BIN)",
+        "CPE_DEPS": "$(location :cpe-dependencies)",
+        "JQ_CVE_UTILS": "$(location :cve_utils.jq)",
+        "JQ_CVE_MATCHER": "$(location :cve_matcher.jq)",
+        "JQ_CVE_PARSER": "$(location :cve_parser.jq)",
+        "JQ_VERSION_UTILS": "$(location :version.jq)",
+        "CVES_IGNORED": "$(location :ignored-cves.json)",
+    },
+    data = [
+        "@jq_toolchains//:resolved_toolchain",
+        ":cpe-dependencies",
+        ":cve_utils.jq",
+        ":cve_matcher.jq",
+        ":cve_parser.jq",
+        ":ignored-cves.json",
+        ":version.jq",
     ],
     toolchains = ["@jq_toolchains//:resolved_toolchain"],
 )
