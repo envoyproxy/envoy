@@ -4595,7 +4595,7 @@ virtual_hosts:
   EXPECT_EQ("foo", bar_shadow_policies[0]->runtimeKey());
 }
 
-// Smoke test for request mirror policies with headers. We don't test the header parser internals.
+// Test for request mirror policies with headers - verifies header mutations are applied correctly.
 TEST_F(RouteMatcherTest, RequestMirrorPoliciesWithHeaders) {
   const std::string yaml = R"EOF(
 virtual_hosts:
@@ -4608,17 +4608,19 @@ virtual_hosts:
     route:
       request_mirror_policies:
         - cluster: some_cluster
-          request_headers_to_add:
-            - header:
-                key: x-mirror-test
-                value: mirror-value
-            - header:
-                key: x-mirror-dynamic
-                value: "%REQ(:path)%"
-              append_action: OVERWRITE_IF_EXISTS_OR_ADD
-          request_headers_to_remove:
-            - x-sensitive-header
-            - x-internal-header
+          request_mutations:
+            - append:
+                header:
+                  key: x-mirror-test
+                  value: mirror-value
+                append_action: OVERWRITE_IF_EXISTS_OR_ADD
+            - append:
+                header:
+                  key: x-mirror-dynamic
+                  value: "%REQ(:path)%"
+                append_action: OVERWRITE_IF_EXISTS_OR_ADD
+            - remove: x-sensitive-header
+            - remove: x-internal-header
       cluster: www2
   )EOF";
 
@@ -4630,6 +4632,36 @@ virtual_hosts:
 
   EXPECT_EQ(1, foo_shadow_policies.size());
   EXPECT_EQ("some_cluster", foo_shadow_policies[0]->cluster());
+
+  // Test that header mutations are applied correctly
+  Http::TestRequestHeaderMapImpl headers{{":method", "GET"},
+                                         {":path", "/foo/bar"},
+                                         {":authority", "www.lyft.com"},
+                                         {"x-sensitive-header", "secret-data"},
+                                         {"x-internal-header", "internal-info"},
+                                         {"x-existing-header", "existing-value"}};
+
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+  const Envoy::Formatter::HttpFormatterContext formatter_context{&headers};
+
+  // Apply the shadow policy header transformations
+  foo_shadow_policies[0]->headerEvaluator().evaluateHeaders(headers, formatter_context,
+                                                            stream_info);
+
+  // Verify headers are added correctly
+  EXPECT_TRUE(headers.has("x-mirror-test"));
+  EXPECT_EQ("mirror-value", headers.get_("x-mirror-test"));
+
+  EXPECT_TRUE(headers.has("x-mirror-dynamic"));
+  EXPECT_EQ("/foo/bar", headers.get_("x-mirror-dynamic")); // Should substitute %REQ(:path)%
+
+  // Verify headers are removed correctly
+  EXPECT_FALSE(headers.has("x-sensitive-header"));
+  EXPECT_FALSE(headers.has("x-internal-header"));
+
+  // Verify existing headers are unchanged
+  EXPECT_TRUE(headers.has("x-existing-header"));
+  EXPECT_EQ("existing-value", headers.get_("x-existing-header"));
 }
 
 // Test if the higher level mirror policies are properly applied when routes
