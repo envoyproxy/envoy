@@ -226,7 +226,7 @@ uint32_t ActiveQuicListener::destination(const Network::UdpRecvData& data) const
   if (kernel_worker_routing_) {
     uint32_t expected_worker_index = select_connection_id_worker_(*data.buffer_, worker_index_);
     if (expected_worker_index != worker_index_) {
-      ENVOY_LOG_EVERY_POW_2(error, "Mismacthed worker index. expected {}, actual {}",
+      ENVOY_LOG_EVERY_POW_2(error, "Mismatched worker index. expected {}, actual {}",
                             expected_worker_index, worker_index_);
     }
 
