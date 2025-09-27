@@ -137,6 +137,11 @@ bug_fixes:
     Fixed a bug where premature resets of streams could result in recursive draining and a potential
     stack overflow. Setting a proper ``max_concurrent_streams`` value for HTTP/2 or HTTP/3 could eliminate
     the risk of a stack overflow before this fix.
+- area: http2
+  change: |
+    Fixed a bug where Envoy will leak memory if the HTTP2 stream is reset before the request headers are
+    sent. For example, if one upstream http filter send a local reply after the connection is established but
+    before the request headers are sent, the memory allocated for the stream will not be released.
 - area: listener
   change: |
     Fixed a bug where comparing listeners did not consider the network namespace they were listening in.
