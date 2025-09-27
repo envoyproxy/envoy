@@ -132,6 +132,7 @@ proto_library(
         "//envoy/data/tap/v3:pkg",
         "//envoy/extensions/access_loggers/file/v3:pkg",
         "//envoy/extensions/access_loggers/filters/cel/v3:pkg",
+        "//envoy/extensions/access_loggers/filters/process_ratelimit/v3:pkg",
         "//envoy/extensions/access_loggers/fluentd/v3:pkg",
         "//envoy/extensions/access_loggers/grpc/v3:pkg",
         "//envoy/extensions/access_loggers/open_telemetry/v3:pkg",
