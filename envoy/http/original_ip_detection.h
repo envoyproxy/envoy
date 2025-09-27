@@ -11,7 +11,16 @@
 #include "envoy/server/factory_context.h"
 
 namespace Envoy {
+
+// Forward declaration
+namespace Network {
+class Connection;
+}
+
 namespace Http {
+
+// Forward declaration
+class ConnectionManagerConfig;
 
 struct OriginalIPDetectionParams {
   // The request headers from downstream.
@@ -20,8 +29,10 @@ struct OriginalIPDetectionParams {
   // sanitation after the detect() call so additions made here may be removed before
   // filters have access to headers.
   Http::RequestHeaderMap& request_headers;
-  // The downstream directly connected address.
-  const Network::Address::InstanceConstSharedPtr& downstream_remote_address;
+  // The downstream connection object providing access to all connection properties.
+  Network::Connection& connection;
+  // Configuration for determining internal vs external addresses.
+  const Http::ConnectionManagerConfig& config;
 };
 
 // Parameters to be used for sending a local reply when detection fails.
