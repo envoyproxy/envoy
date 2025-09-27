@@ -162,6 +162,34 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_extension_cc_test_library(
+    name = "ext_proc_integration_common_lib",
+    srcs = ["ext_proc_integration_common.cc"],
+    hdrs = ["ext_proc_integration_common.h"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":logging_test_filter_lib",
+        ":utils_lib",
+        "//source/common/protobuf",
+        "//source/extensions/filters/http/common:pass_through_filter_lib",
+        "//source/extensions/filters/http/ext_proc:config",
+        "//source/extensions/filters/http/set_metadata:config",
+        "//test/common/http:common_lib",
+        "//test/integration:http_integration_lib",
+        "//test/integration/filters:common_lib",
+        "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+        "@com_google_absl//absl/strings",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/set_metadata/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_extension_cc_test(
     name = "ext_proc_integration_test",
     size = "large",  # This test can take a while under tsan.
@@ -184,6 +212,7 @@ envoy_extension_cc_test(
         "skip_on_windows",
     ],
     deps = [
+        ":ext_proc_integration_common_lib",
         ":logging_test_filter_lib",
         ":tracer_test_filter_lib",
         ":utils_lib",
@@ -208,6 +237,132 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
         "@ocp//ocpdiag/core/testing:status_matchers",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "ext_proc_full_duplex_integration_test",
+    size = "large",  # This test can take a while under tsan.
+    srcs = ["ext_proc_full_duplex_integration_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
+    extension_names = [
+        "envoy.filters.http.ext_proc",
+        # TODO(jbohanon) use a test filter here instead of production filter
+        "envoy.filters.http.set_metadata",
+    ],
+    rbe_pool = "4core",
+    shard_count = 8,
+    tags = [
+        "cpu:3",
+        "skip_on_windows",
+    ],
+    deps = [
+        ":ext_proc_integration_common_lib",
+        ":logging_test_filter_lib",
+        ":tracer_test_filter_lib",
+        ":utils_lib",
+        "//source/extensions/filters/http/ext_proc:config",
+        "//source/extensions/filters/http/ext_proc:on_processing_response_interface",
+        "//source/extensions/filters/http/set_metadata:config",
+        "//source/extensions/retry/host/previous_hosts:config",
+        "//test/common/http:common_lib",
+        "//test/integration:http_integration_lib",
+        "//test/integration/filters:common_lib",
+        "//test/integration/filters:stream_info_to_headers_filter_lib",
+        "//test/proto:helloworld_proto_cc_proto",
+        "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/set_metadata/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
+        "@ocp//ocpdiag/core/testing:status_matchers",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "ext_proc_observability_integration_test",
+    size = "large",  # This test can take a while under tsan.
+    srcs = ["ext_proc_observability_integration_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
+    extension_names = [
+        "envoy.filters.http.ext_proc",
+        # TODO(jbohanon) use a test filter here instead of production filter
+        "envoy.filters.http.set_metadata",
+    ],
+    rbe_pool = "4core",
+    shard_count = 8,
+    tags = [
+        "cpu:3",
+        "skip_on_windows",
+    ],
+    deps = [
+        ":ext_proc_integration_common_lib",
+        ":logging_test_filter_lib",
+        ":tracer_test_filter_lib",
+        ":utils_lib",
+        "//source/extensions/filters/http/ext_proc:config",
+        "//source/extensions/filters/http/ext_proc:on_processing_response_interface",
+        "//source/extensions/filters/http/set_metadata:config",
+        "//source/extensions/retry/host/previous_hosts:config",
+        "//test/common/http:common_lib",
+        "//test/integration:http_integration_lib",
+        "//test/integration/filters:common_lib",
+        "//test/integration/filters:stream_info_to_headers_filter_lib",
+        "//test/proto:helloworld_proto_cc_proto",
+        "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/set_metadata/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
+        "@ocp//ocpdiag/core/testing:status_matchers",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "ext_proc_misc_integration_test",
+    srcs = ["ext_proc_misc_integration_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
+    extension_names = [
+        "envoy.filters.http.ext_proc",
+    ],
+    rbe_pool = "4core",
+    tags = [
+        "cpu:3",
+        "skip_on_windows",
+    ],
+    deps = [
+        "//source/extensions/filters/http/ext_proc:config",
+        "//test/common/http:common_lib",
+        "//test/integration:http_integration_lib",
+        "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
 
