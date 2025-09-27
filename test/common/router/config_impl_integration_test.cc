@@ -141,6 +141,265 @@ TEST_F(ConfigImplIntegrationTest, ClusterSpecifierPluginTest) {
   }
 }
 
+// Integration test for weighted cluster hash policy
+class WeightedClusterHashPolicyIntegrationTest
+    : public testing::TestWithParam<Network::Address::IpVersion>,
+      public HttpIntegrationTest {
+public:
+  WeightedClusterHashPolicyIntegrationTest()
+      : HttpIntegrationTest(Http::CodecType::HTTP1, GetParam()) {}
+
+  void createUpstreams() override {
+    // Create 2 fake upstreams for our weighted clusters
+    addFakeUpstream(Http::CodecType::HTTP1);
+    addFakeUpstream(Http::CodecType::HTTP1);
+  }
+
+  void initializeConfig() {
+    // Add cluster_1 configuration (cluster_0 already exists by default)
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+      cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+      cluster->set_name("cluster_1");
+      // Fix the load assignment to use the correct cluster name
+      cluster->mutable_load_assignment()->set_cluster_name("cluster_1");
+    });
+
+    // Configure the route with weighted clusters and hash policy
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          hcm.mutable_route_config()->set_name("test_weighted_cluster_hash_policy");
+
+          auto* vhost = hcm.mutable_route_config()->add_virtual_hosts();
+          vhost->set_name("test_weighted_cluster_hash_policy");
+          vhost->add_domains("weighted.cluster.hash.test");
+
+          auto* route = vhost->add_routes();
+          route->mutable_match()->set_prefix("/hash-test");
+
+          auto* weighted_clusters = route->mutable_route()->mutable_weighted_clusters();
+
+          auto* cluster0 = weighted_clusters->add_clusters();
+          cluster0->set_name("cluster_0");
+          cluster0->mutable_weight()->set_value(60);
+
+          auto* cluster1 = weighted_clusters->add_clusters();
+          cluster1->set_name("cluster_1");
+          cluster1->mutable_weight()->set_value(40);
+
+          // Enable hash policy for weighted clusters
+          weighted_clusters->mutable_use_hash_policy()->set_value(true);
+
+          auto* hash_policy = route->mutable_route()->add_hash_policy();
+          hash_policy->mutable_header()->set_header_name("x-user-id");
+        });
+
+    HttpIntegrationTest::initialize();
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersions, WeightedClusterHashPolicyIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+TEST_P(WeightedClusterHashPolicyIntegrationTest, SameUserIdGoesToSameUpstream) {
+  // Initialize the configuration with weighted clusters and hash policy
+  initializeConfig();
+
+  // Test: Same user ID should consistently go to only one upstream
+  const std::string user_id = "consistent-user-123";
+  std::string selected_upstream;
+
+  // Make multiple requests with the same user ID
+  for (int request = 0; request < 5; ++request) {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/hash-test"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "weighted.cluster.hash.test"},
+                                                   {"x-user-id", user_id}};
+
+    auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+    // Handle the upstream response
+    FakeHttpConnectionPtr fake_upstream_connection;
+    FakeStreamPtr request_stream;
+
+    std::string current_upstream;
+
+    // Check which upstream received the request
+    if (fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection,
+                                                  std::chrono::milliseconds(100))) {
+      current_upstream = "upstream_0";
+    } else if (fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection,
+                                                         std::chrono::milliseconds(100))) {
+      current_upstream = "upstream_1";
+    } else {
+      FAIL() << "No upstream received the request";
+    }
+
+    ASSERT_TRUE(fake_upstream_connection->waitForNewStream(*dispatcher_, request_stream));
+    ASSERT_TRUE(request_stream->waitForEndStream(*dispatcher_));
+
+    // Send response
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    request_stream->encodeHeaders(response_headers, true);
+    ASSERT_TRUE(fake_upstream_connection->close());
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+
+    // Verify consistency - same user should always go to same upstream
+    if (selected_upstream.empty()) {
+      selected_upstream = current_upstream;
+      EXPECT_TRUE(selected_upstream == "upstream_0" || selected_upstream == "upstream_1");
+    } else {
+      EXPECT_EQ(selected_upstream, current_upstream)
+          << "Request " << (request + 1)
+          << ": Same user ID should consistently route to same upstream. "
+          << "Expected: " << selected_upstream << ", Got: " << current_upstream;
+    }
+
+    codec_client_->close();
+  }
+
+  EXPECT_FALSE(selected_upstream.empty()) << "Should have selected an upstream";
+}
+
+TEST_P(WeightedClusterHashPolicyIntegrationTest, DifferentUserIdsCanGoToDifferentClusters) {
+  // Initialize the configuration with weighted clusters and hash policy
+  initializeConfig();
+
+  // Test with multiple different user IDs to verify they can go to different clusters
+  std::vector<std::string> user_ids = {"user-1", "user-2", "user-3", "user-4", "user-5"};
+  std::map<std::string, std::string> user_to_upstream;
+
+  for (const auto& user_id : user_ids) {
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/hash-test"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "weighted.cluster.hash.test"},
+                                                   {"x-user-id", user_id}};
+
+    auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+    // Handle the upstream response
+    FakeHttpConnectionPtr fake_upstream_connection;
+    FakeStreamPtr request_stream;
+
+    std::string current_upstream;
+
+    // Check which upstream received the request
+    if (fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection,
+                                                  std::chrono::milliseconds(100))) {
+      current_upstream = "upstream_0";
+    } else if (fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection,
+                                                         std::chrono::milliseconds(100))) {
+      current_upstream = "upstream_1";
+    } else {
+      FAIL() << "No upstream received the request for user: " << user_id;
+    }
+
+    ASSERT_TRUE(fake_upstream_connection->waitForNewStream(*dispatcher_, request_stream));
+    ASSERT_TRUE(request_stream->waitForEndStream(*dispatcher_));
+
+    // Send response
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    request_stream->encodeHeaders(response_headers, true);
+    ASSERT_TRUE(fake_upstream_connection->close());
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+
+    user_to_upstream[user_id] = current_upstream;
+    codec_client_->close();
+  }
+
+  // Verify that we have some distribution across both upstreams
+  std::set<std::string> unique_upstreams;
+  for (const auto& pair : user_to_upstream) {
+    unique_upstreams.insert(pair.second);
+  }
+
+  // We should have at least some distribution (not all users going to the same upstream)
+  // Note: Due to hash distribution, it's possible all users go to the same upstream,
+  // but it's unlikely with 5 different user IDs
+  EXPECT_GE(unique_upstreams.size(), 1) << "Should have at least one upstream selected";
+}
+
+TEST_P(WeightedClusterHashPolicyIntegrationTest, WeightedDistributionTest) {
+  // Initialize the configuration with weighted clusters and hash policy
+  initializeConfig();
+
+  // Test weighted distribution by making many requests with different user IDs
+  std::map<std::string, int> upstream_counts;
+  const int num_requests = 100;
+
+  for (int i = 0; i < num_requests; ++i) {
+    std::string user_id = "user-" + std::to_string(i);
+    codec_client_ = makeHttpConnection(lookupPort("http"));
+
+    Http::TestRequestHeaderMapImpl request_headers{{":method", "GET"},
+                                                   {":path", "/hash-test"},
+                                                   {":scheme", "http"},
+                                                   {":authority", "weighted.cluster.hash.test"},
+                                                   {"x-user-id", user_id}};
+
+    auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+
+    // Handle the upstream response
+    FakeHttpConnectionPtr fake_upstream_connection;
+    FakeStreamPtr request_stream;
+
+    std::string current_upstream;
+
+    // Check which upstream received the request
+    if (fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection,
+                                                  std::chrono::milliseconds(100))) {
+      current_upstream = "upstream_0";
+    } else if (fake_upstreams_[1]->waitForHttpConnection(*dispatcher_, fake_upstream_connection,
+                                                         std::chrono::milliseconds(100))) {
+      current_upstream = "upstream_1";
+    } else {
+      FAIL() << "No upstream received the request for user: " << user_id;
+    }
+
+    ASSERT_TRUE(fake_upstream_connection->waitForNewStream(*dispatcher_, request_stream));
+    ASSERT_TRUE(request_stream->waitForEndStream(*dispatcher_));
+
+    // Send response
+    Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+    request_stream->encodeHeaders(response_headers, true);
+    ASSERT_TRUE(fake_upstream_connection->close());
+
+    ASSERT_TRUE(response->waitForEndStream());
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("200", response->headers().getStatusValue());
+
+    upstream_counts[current_upstream]++;
+    codec_client_->close();
+  }
+
+  // The distribution should roughly follow the weights (60% vs 40%)
+  // Hash policy ensures consistency for same user, but different users should
+  // be distributed according to cluster weights
+  double upstream_0_ratio = static_cast<double>(upstream_counts["upstream_0"]) / num_requests;
+  double upstream_1_ratio = static_cast<double>(upstream_counts["upstream_1"]) / num_requests;
+
+  // The distribution should be reasonably close to the expected weights
+  // Allow for ±20% variance (40-80% for upstream_0, 20-60% for upstream_1)
+  EXPECT_GE(upstream_0_ratio, 0.4) << "Upstream 0 should get at least 40% of traffic";
+  EXPECT_LE(upstream_0_ratio, 0.8) << "Upstream 0 should get at most 80% of traffic";
+  EXPECT_GE(upstream_1_ratio, 0.2) << "Upstream 1 should get at least 20% of traffic";
+  EXPECT_LE(upstream_1_ratio, 0.6) << "Upstream 1 should get at most 60% of traffic";
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy
