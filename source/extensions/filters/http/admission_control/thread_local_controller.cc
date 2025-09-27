@@ -27,6 +27,8 @@ uint32_t ThreadLocalControllerImpl::averageRps() const {
   return global_data_.requests / secs.count();
 }
 
+uint32_t ThreadLocalControllerImpl::numRequestsInWindow() const { return global_data_.requests; }
+
 void ThreadLocalControllerImpl::maybeUpdateHistoricalData() {
   // Purge stale samples.
   while (!historical_data_.empty() && ageOfOldestSample() >= sampling_window_) {

@@ -19,7 +19,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // [#protodoc-title: Admission Control]
 // [#extension: envoy.filters.http.admission_control]
 
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message AdmissionControl {
   // Default method of specifying what constitutes a successful request. All status codes that
   // indicate a successful request must be explicitly specified if not relying on the default
@@ -96,6 +96,11 @@ message AdmissionControl {
   // will not be rejected, even if the success rate is lower than sr_threshold.
   // Defaults to 0.
   config.core.v3.RuntimeUInt32 rps_threshold = 6;
+
+  // If the number of requests within the sampling window is below this threshold, the request
+  // will not be rejected, even if the success rate is lower than sr_threshold.
+  // Defaults to 0.
+  config.core.v3.RuntimeUInt32 requests_threshold = 8;
 
   // The probability of rejection will never exceed this value, even if the failure rate is rising.
   // Defaults to 80%.
