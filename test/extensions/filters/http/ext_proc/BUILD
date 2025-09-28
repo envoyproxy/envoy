@@ -27,6 +27,54 @@ envoy_extension_cc_test(
     ],
 )
 
+envoy_extension_cc_test_library(
+    name = "filter_test_common_lib",
+    srcs = ["filter_test_common.cc"],
+    hdrs = ["filter_test_common.h"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
+    extension_names = ["envoy.filters.http.ext_proc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":mock_server_lib",
+        ":utils_lib",
+        "//envoy/buffer:buffer_interface",
+        "//envoy/common:optref_lib",
+        "//envoy/grpc:async_client_manager_interface",
+        "//envoy/grpc:status",
+        "//envoy/http:async_client_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/network:connection_interface",
+        "//envoy/network:filter_interface",
+        "//envoy/router:router_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:sidestream_watermark_lib",
+        "//source/common/protobuf",
+        "//source/extensions/filters/common/expr:evaluator_lib",
+        "//source/extensions/filters/http/ext_proc",
+        "//source/extensions/filters/http/ext_proc:client_lib",
+        "//source/extensions/filters/http/ext_proc:on_processing_response_interface",
+        "//test/common/http:common_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/network:connection_mocks",
+        "//test/mocks/router:router_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/mocks/stats:stats_mocks",
+        "//test/mocks/stream_info:stream_info_mocks",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:utility_lib",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
+        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+    ],
+)
+
 envoy_extension_cc_test(
     name = "filter_test",
     size = "small",
@@ -42,6 +90,7 @@ envoy_extension_cc_test(
     shard_count = 8,
     tags = ["skip_on_windows"],
     deps = [
+        ":filter_test_common_lib",
         ":mock_server_lib",
         ":utils_lib",
         "//envoy/http:filter_interface",
@@ -68,6 +117,89 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/http/ext_proc/response_processors/save_processing_response/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "filter_misc_test",
+    size = "small",
+    srcs = ["filter_misc_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
+    extension_names = ["envoy.filters.http.ext_proc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":filter_test_common_lib",
+        "//envoy/grpc:status",
+        "//envoy/http:filter_factory_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/http:header_map_interface",
+        "//envoy/router:router_interface",
+        "//source/common/http:status_lib",
+        "//source/extensions/filters/http/ext_proc",
+        "//test/common/http:conn_manager_impl_test_base_lib",
+        "//test/mocks/http:http_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "filter_observability_test",
+    size = "small",
+    srcs = ["filter_observability_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
+    extension_names = ["envoy.filters.http.ext_proc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":filter_test_common_lib",
+        ":mock_server_lib",
+        ":utils_lib",
+        "//envoy/http:filter_interface",
+        "//envoy/http:header_map_interface",
+        "//source/extensions/filters/http/ext_proc",
+        "//test/common/http:common_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/test_common:utility_lib",
+        "@com_google_absl//absl/types:optional",
+        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "filter_full_duplex_test",
+    size = "small",
+    srcs = ["filter_full_duplex_test.cc"],
+    copts = select({
+        "//bazel:windows_x86_64": [],
+        "//conditions:default": [
+            "-DUSE_CEL_PARSER",
+        ],
+    }),
+    extension_names = ["envoy.filters.http.ext_proc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":filter_test_common_lib",
+        ":mock_server_lib",
+        ":utils_lib",
+        "//envoy/http:filter_factory_interface",
+        "//envoy/http:filter_interface",
+        "//envoy/http:header_map_interface",
+        "//source/common/buffer:buffer_lib",
+        "//source/extensions/filters/http/ext_proc",
+        "//test/common/http:common_lib",
+        "//test/test_common:utility_lib",
+        "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
 )
