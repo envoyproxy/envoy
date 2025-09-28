@@ -1129,6 +1129,8 @@ TEST_F(OAuth2Test, SetBearerTokenWithDisableTokenEncryptionConfig) {
        "OauthExpires=1600;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),
        "BearerToken=access_code;path=/;Max-Age=600;secure;HttpOnly"},
+      // The IdToken and RefreshToken cookies should be unencrypted since token encryption is
+      // disabled.
       {Http::Headers::get().SetCookie.get(),
        "IdToken=some-id-token;path=/;Max-Age=600;secure;HttpOnly"},
       {Http::Headers::get().SetCookie.get(),

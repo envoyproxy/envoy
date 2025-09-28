@@ -762,6 +762,10 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
 // Decrypt the OAuth tokens and updates the OAuth tokens in the request cookies before forwarding
 // the request upstream.
 void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers) const {
+  if (config_->disableTokenEncryption()) {
+    return;
+  }
+
   if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_encrypt_tokens")) {
     return;
   }
@@ -800,6 +804,7 @@ std::string OAuth2Filter::encryptToken(const std::string& token) const {
   if (config_->disableTokenEncryption()) {
     return token;
   }
+
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_encrypt_tokens")) {
     return encrypt(token, config_->hmacSecret(), random_);
   }
@@ -809,10 +814,6 @@ std::string OAuth2Filter::encryptToken(const std::string& token) const {
 std::string OAuth2Filter::decryptToken(const std::string& encrypted_token) const {
   if (encrypted_token.empty()) {
     return EMPTY_STRING;
-  }
-
-  if (config_->disableTokenEncryption()) {
-    return encrypted_token;
   }
 
   DecryptResult decrypt_result = decrypt(encrypted_token, config_->hmacSecret());
