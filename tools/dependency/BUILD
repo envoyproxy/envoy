@@ -1,5 +1,4 @@
 load("@base_pip3//:requirements.bzl", "requirement")
-load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("@envoy_repo//:path.bzl", "PATH")
 load("@rules_python//python:defs.bzl", "py_binary")
 load("@rules_python//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
@@ -10,18 +9,6 @@ load("//tools/python:namespace.bzl", "envoy_py_namespace")
 licenses(["notice"])  # Apache 2
 
 envoy_py_namespace()
-
-bool_flag(
-    name = "preload_cve_data",
-    build_setting_default = False,
-)
-
-config_setting(
-    name = "preloaded_cve_data",
-    flag_values = {
-        ":preload_cve_data": "true",
-    },
-)
 
 # Currently we are unable to check for the libdrdkafka dep
 # this is a workaround to just exclude it from checks for now
@@ -59,18 +46,10 @@ py_console_script_binary(
     name = "check",
     args = [
         "--repository_locations=$(location :filtered-dependencies)",
-        "--cve_config=$(location :cve.yaml)",
-    ] + select({
-        ":preloaded_cve_data": ["--cve_data=$(location :cve_data)"],
-        "//conditions:default": [],
-    }),
+    ],
     data = [
-        ":cve.yaml",
         ":filtered-dependencies",
-    ] + select({
-        ":preloaded_cve_data": [":cve_data"],
-        "//conditions:default": [],
-    }),
+    ],
     pkg = "@base_pip3//envoy_dependency_check",
     script = "envoy.dependency.check",
     visibility = ["//visibility:public"],
@@ -112,20 +91,6 @@ py_console_script_binary(
     pkg = "@base_pip3//envoy_dependency_check",
     script = "envoy.dependency.check",
     deps = [requirement("orjson")],
-)
-
-genrule(
-    name = "cve_data",
-    outs = ["cve_data.json.tar"],
-    cmd = """
-    $(location :cve_download) \
-        --download_cves $@ \
-        --repository_locations=$(location //bazel:all_repository_locations)
-    """,
-    tools = [
-        ":cve_download",
-        "//bazel:all_repository_locations",
-    ],
 )
 
 envoy_genjson(
