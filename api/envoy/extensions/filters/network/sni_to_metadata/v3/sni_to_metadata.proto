@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.sni_to_metadata.v3;
+
+import "envoy/type/matcher/v3/regex.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.sni_to_metadata.v3";
+option java_outer_classname = "SniToMetadataProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/sni_to_metadata/v3;sni_to_metadatav3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: SNI to Metadata Filter]
+
+// Configuration proto schema for ``envoy.extensions.filters.network.sni_to_metadata`` network filter.
+// [#extension: envoy.filters.network.sni_to_metadata]
+message SniToMetadataFilter {
+  // MetadataTarget defines where to store extracted metadata.
+  message MetadataTarget {
+    // The metadata namespace to use when storing the result.
+    // If empty, defaults to ``envoy.filters.network.sni_to_metadata``
+    string metadata_namespace = 1;
+
+    // The metadata key to use when storing the result.
+    string metadata_key = 2 [(validate.rules).string = {min_len: 1}];
+
+    // The metadata value to store. If empty, the entire matched SNI value will be used.
+    // This field supports capture group substitution using numbered groups from the regex pattern.
+    // For example: ``app-\\1-\\2`` where ``\\1`` and ``\\2`` refer to the first and second capture groups (note escaped backslashes).
+    string metadata_value = 3;
+  }
+
+  // ConnectionRule defines a rule for extracting metadata from SNI.
+  message ConnectionRule {
+    // The regex pattern to match against the SNI value.
+    // Supports Google RE2 numbered capture groups.
+    // Example: ``^([^.]+)\.([^.]+)\.([^.]+)\.foo\.example\.com$``
+    // If not specified, the rule will always match and use the entire SNI value.
+    type.matcher.v3.RegexMatcher pattern = 1;
+
+    // List of metadata targets to populate when this rule matches.
+    // Each target can use capture groups from the regex pattern in its metadata_value.
+    // If no pattern is specified, metadata_value will be used as-is or default to the full SNI.
+    repeated MetadataTarget metadata_targets = 2 [(validate.rules).repeated = {min_items: 1}];
+  }
+
+  // List of connection rules to evaluate against the SNI.
+  // Rules are evaluated in order, and the first matching rule will be applied.
+  repeated ConnectionRule connection_rules = 1 [(validate.rules).repeated = {min_items: 1}];
+}
