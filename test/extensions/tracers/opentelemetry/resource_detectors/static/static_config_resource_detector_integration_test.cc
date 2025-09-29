@@ -4,7 +4,7 @@
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "source/common/buffer/zero_copy_input_stream_impl.h"
-#include "source/extensions/tracers/opentelemetry/http_trace_exporter.h"
+#include "source/extensions/common/opentelemetry/exporters/otlp/http_trace_exporter.h"
 
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
