@@ -523,5 +523,10 @@ new_features:
   change: |
     Added ``max_downstream_connection_duration_jitter_percentage`` to allow adding a jitter to the max downstream connection duration.
     This can be used to avoid thundering herd problems with many clients being disconnected and possibly reconnecting at the same time.
+- area: sni_to_metadata
+  change: |
+    Added a new SNI-to-Metadata filter that extracts the SNI of the client connection and stores it in the connection dynamic metadata.
+    It is able to conditionally extract based on regex patters as well as extract fields and format the metadata using regex capture groups.
+    See :ref:`SNI-to-Metadata Filter <config_network_filters_sni_to_metadata>` for more details.
 
 deprecated:
