@@ -199,9 +199,7 @@ TEST(UtilityTest, TestVerifySignature) {
 
       auto result = UtilitySingleton::get().verifySignature(hash_func, *crypto, sig, text);
       ASSERT_TRUE(result.ok()) << "Verification failed for " << description << " with " << hash_func
-                               << ": " << result.status();
-      EXPECT_TRUE(*result) << "Verification should succeed for " << description << " with "
-                           << hash_func;
+                               << ": " << result.message();
     }
   }
 
@@ -217,20 +215,20 @@ TEST(UtilityTest, TestVerifySignature) {
   // Test error cases using DER public key
   auto result = UtilitySingleton::get().verifySignature("unknown", *der_crypto, sig, text);
   EXPECT_FALSE(result.ok());
-  EXPECT_EQ("unknown is not supported.", result.status().message());
+  EXPECT_EQ("unknown is not supported.", result.message());
 
   // Test with an empty crypto object
   auto empty_crypto = std::make_unique<PKeyObject>();
   result = UtilitySingleton::get().verifySignature("sha256", *empty_crypto, sig, text);
   EXPECT_FALSE(result.ok());
-  EXPECT_EQ("Failed to initialize digest verify.", result.status().message());
+  EXPECT_EQ("Failed to initialize digest verify.", result.message());
 
   // Test with incorrect data
   auto bad_data = "baddata";
   std::vector<uint8_t> bad_text(bad_data, bad_data + strlen(bad_data));
   result = UtilitySingleton::get().verifySignature("sha256", *der_crypto, sig, bad_text);
   EXPECT_FALSE(result.ok());
-  EXPECT_EQ("Failed to verify digest. Error code: 0", result.status().message());
+  EXPECT_EQ("Failed to verify digest. Error code: 0", result.message());
 
   // Test with incorrect signature
   auto good_data = "hello";
@@ -238,7 +236,7 @@ TEST(UtilityTest, TestVerifySignature) {
   result = UtilitySingleton::get().verifySignature("sha256", *der_crypto, Hex::decode("000000"),
                                                    good_text);
   EXPECT_FALSE(result.ok());
-  EXPECT_EQ("Failed to verify digest. Error code: 0", result.status().message());
+  EXPECT_EQ("Failed to verify digest. Error code: 0", result.message());
 }
 
 TEST(UtilityTest, TestImportPrivateKey) {
@@ -393,7 +391,6 @@ TEST(UtilityTest, TestSign) {
     auto verify_result =
         UtilitySingleton::get().verifySignature(hash_func, *public_crypto, *result, text);
     ASSERT_TRUE(verify_result.ok());
-    EXPECT_TRUE(*verify_result);
 
     // Also verify with PEM format of the same public key (demonstrates format interoperability)
     std::string pem_public_key =
@@ -414,8 +411,7 @@ TEST(UtilityTest, TestSign) {
     auto pem_verify_result =
         UtilitySingleton::get().verifySignature(hash_func, *pem_public_crypto, *result, text);
     ASSERT_TRUE(pem_verify_result.ok())
-        << "PEM verification failed with " << hash_func << ": " << pem_verify_result.status();
-    EXPECT_TRUE(*pem_verify_result) << "PEM verification should succeed with " << hash_func;
+        << "PEM verification failed with " << hash_func << ": " << pem_verify_result.message();
   }
 
   // Test with unknown hash function
@@ -629,7 +625,7 @@ TEST(UtilityTest, TestDeepErrorPaths) {
   auto verify_result =
       UtilitySingleton::get().verifySignature("sha256", *corrupted_key, dummy_sig, test_data);
   EXPECT_FALSE(verify_result.ok())
-      << "Corrupted key should fail verification: " << verify_result.status();
+      << "Corrupted key should fail verification: " << verify_result.message();
 }
 
 TEST(UtilityTest, TestHelperFunctionsCoverage) {
@@ -840,11 +836,10 @@ TEST(UtilityTest, TestOpenSSLErrorConditions) {
   std::vector<uint8_t> empty_signature;
   auto verify_result = impl->verifySignature("sha256", *crypto_ptr, empty_signature, text);
   EXPECT_FALSE(verify_result.ok());
-  EXPECT_EQ(verify_result.status().code(), absl::StatusCode::kInternal);
+  EXPECT_EQ(verify_result.code(), absl::StatusCode::kInternal);
   // Check for either "Failed to verify digest" or "Failed to initialize digest verify"
-  EXPECT_TRUE(verify_result.status().message().find("Failed to verify digest") !=
-                  std::string::npos ||
-              verify_result.status().message().find("Failed to initialize digest verify") !=
+  EXPECT_TRUE(verify_result.message().find("Failed to verify digest") != std::string::npos ||
+              verify_result.message().find("Failed to initialize digest verify") !=
                   std::string::npos);
 }
 
@@ -915,7 +910,7 @@ TEST(UtilityTest, TestSpecificErrorMessages) {
   auto verify_result =
       UtilitySingleton::get().verifySignature("sha256", *empty_crypto, signature, text);
   EXPECT_FALSE(verify_result.ok());
-  EXPECT_EQ("Failed to initialize digest verify.", verify_result.status().message());
+  EXPECT_EQ("Failed to initialize digest verify.", verify_result.message());
 
   // Test with crypto object that has null EVP_PKEY
   auto null_crypto = std::make_unique<PKeyObject>();
@@ -929,7 +924,7 @@ TEST(UtilityTest, TestSpecificErrorMessages) {
   auto null_verify_result =
       UtilitySingleton::get().verifySignature("sha256", *null_crypto, signature, text);
   EXPECT_FALSE(null_verify_result.ok());
-  EXPECT_EQ("Failed to initialize digest verify.", null_verify_result.status().message());
+  EXPECT_EQ("Failed to initialize digest verify.", null_verify_result.message());
 }
 
 TEST(UtilityTest, TestCBSInitializationEdgeCases) {

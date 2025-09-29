@@ -711,11 +711,11 @@ int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
   auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
   auto output = crypto_util.verifySignature(hash, *ptr->second, sig_vec, text_vec);
   if (output.ok()) {
-    lua_pushboolean(state, *output);
+    lua_pushboolean(state, true);
     lua_pushnil(state);
   } else {
     lua_pushboolean(state, false);
-    lua_pushlstring(state, output.status().message().data(), output.status().message().size());
+    lua_pushlstring(state, output.message().data(), output.message().size());
   }
   return 2;
 }

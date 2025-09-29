@@ -14,6 +14,8 @@
 #include "source/common/crypto/crypto_impl.h"
 #include "source/common/crypto/utility.h"
 
+#include "absl/types/span.h"
+
 using proxy_wasm::RegisterForeignFunction;
 using proxy_wasm::WasmForeignFunction;
 
@@ -35,8 +37,8 @@ importPublicKey(Envoy::Common::Crypto::Utility& crypto_util,
     return crypto_util.importPublicKeyPEM(args.public_key_pem());
   } else if (has_der) {
     auto key_str = args.public_key();
-    std::vector<uint8_t> key(key_str.begin(), key_str.end());
-    return crypto_util.importPublicKeyDER(key);
+    return crypto_util.importPublicKeyDER(
+        absl::MakeSpan(reinterpret_cast<const uint8_t*>(key_str.data()), key_str.size()));
   } else {
     return nullptr; // No key provided
   }
@@ -57,8 +59,8 @@ importPrivateKey(Envoy::Common::Crypto::Utility& crypto_util,
     return crypto_util.importPrivateKeyPEM(args.private_key_pem());
   } else if (has_der) {
     auto key_str = args.private_key();
-    std::vector<uint8_t> key(key_str.begin(), key_str.end());
-    return crypto_util.importPrivateKeyDER(key);
+    return crypto_util.importPrivateKeyDER(
+        absl::MakeSpan(reinterpret_cast<const uint8_t*>(key_str.data()), key_str.size()));
   } else {
     return nullptr; // No key provided
   }
@@ -99,24 +101,25 @@ RegisterForeignFunction registerVerifySignatureForeignFunction(
         auto signature_str = args.signature();
         auto text_str = args.text();
 
-        std::vector<uint8_t> signature(signature_str.begin(), signature_str.end());
-        std::vector<uint8_t> text(text_str.begin(), text_str.end());
-
         auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
         auto crypto_ptr = importPublicKey(crypto_util, args);
         if (!crypto_ptr) {
           return WasmResult::BadArgument;
         }
 
-        auto output = crypto_util.verifySignature(hash, *crypto_ptr, signature, text);
+        auto output = crypto_util.verifySignature(
+            hash, *crypto_ptr,
+            absl::MakeSpan(reinterpret_cast<const uint8_t*>(signature_str.data()),
+                           signature_str.size()),
+            absl::MakeSpan(reinterpret_cast<const uint8_t*>(text_str.data()), text_str.size()));
 
         envoy::source::extensions::common::wasm::VerifySignatureResult verification_result;
         if (output.ok()) {
-          verification_result.set_result(*output);
+          verification_result.set_result(true);
           verification_result.set_error("");
         } else {
           verification_result.set_result(false);
-          verification_result.set_error(output.status().message());
+          verification_result.set_error(output.message());
         }
 
         auto size = verification_result.ByteSizeLong();
@@ -136,15 +139,15 @@ RegisterForeignFunction registerSignForeignFunction(
         const auto& hash = args.hash_function();
         auto text_str = args.text();
 
-        std::vector<uint8_t> text(text_str.begin(), text_str.end());
-
         auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
         auto crypto_ptr = importPrivateKey(crypto_util, args);
         if (!crypto_ptr) {
           return WasmResult::BadArgument;
         }
 
-        auto output = crypto_util.sign(hash, *crypto_ptr, text);
+        auto output = crypto_util.sign(
+            hash, *crypto_ptr,
+            absl::MakeSpan(reinterpret_cast<const uint8_t*>(text_str.data()), text_str.size()));
 
         envoy::source::extensions::common::wasm::SignResult signing_result;
         if (output.ok()) {

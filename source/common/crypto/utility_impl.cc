@@ -5,6 +5,7 @@
 
 #include "absl/strings/ascii.h"
 #include "absl/strings/str_cat.h"
+#include "absl/types/span.h"
 #include "openssl/pem.h"
 
 namespace Envoy {
@@ -25,7 +26,7 @@ std::vector<uint8_t> UtilityImpl::getSha256Digest(const Buffer::Instance& buffer
   return digest;
 }
 
-std::vector<uint8_t> UtilityImpl::getSha256Hmac(const std::vector<uint8_t>& key,
+std::vector<uint8_t> UtilityImpl::getSha256Hmac(absl::Span<const uint8_t> key,
                                                 absl::string_view message) {
   std::vector<uint8_t> hmac(SHA256_DIGEST_LENGTH);
   const auto ret =
@@ -35,21 +36,16 @@ std::vector<uint8_t> UtilityImpl::getSha256Hmac(const std::vector<uint8_t>& key,
   return hmac;
 }
 
-absl::StatusOr<bool> UtilityImpl::verifySignature(absl::string_view hash, PKeyObject& key,
-                                                  const std::vector<uint8_t>& signature,
-                                                  const std::vector<uint8_t>& text) {
-  // Verify cryptographic signature using a public key
-  // The key must be imported via importPublicKeyPEM() or importPublicKeyDER()
-  // Step 1: initialize EVP_MD_CTX
+absl::Status UtilityImpl::verifySignature(absl::string_view hash_function, PKeyObject& key,
+                                          absl::Span<const uint8_t> signature,
+                                          absl::Span<const uint8_t> text) {
   bssl::ScopedEVP_MD_CTX ctx;
 
-  // Step 2: initialize EVP_MD
-  const EVP_MD* md = getHashFunction(hash);
+  const EVP_MD* md = getHashFunction(hash_function);
 
   if (md == nullptr) {
-    return absl::InvalidArgumentError(absl::StrCat(hash, " is not supported."));
+    return absl::InvalidArgumentError(absl::StrCat(hash_function, " is not supported."));
   }
-  // Step 3: initialize EVP_DigestVerify
   EVP_PKEY* pkey = key.getEVP_PKEY();
 
   if (pkey == nullptr) {
@@ -61,25 +57,24 @@ absl::StatusOr<bool> UtilityImpl::verifySignature(absl::string_view hash, PKeyOb
     return absl::InternalError("Failed to initialize digest verify.");
   }
 
-  // Step 4: verify signature
   ok = EVP_DigestVerify(ctx.get(), signature.data(), signature.size(), text.data(), text.size());
 
-  // Step 5: check result
   if (ok == 1) {
-    return true;
+    return absl::OkStatus();
   }
 
   return absl::InternalError(absl::StrCat("Failed to verify digest. Error code: ", ok));
 }
 
-absl::StatusOr<std::vector<uint8_t>> UtilityImpl::sign(absl::string_view hash, PKeyObject& key,
-                                                       const std::vector<uint8_t>& text) {
+absl::StatusOr<std::vector<uint8_t>> UtilityImpl::sign(absl::string_view hash_function,
+                                                       PKeyObject& key,
+                                                       absl::Span<const uint8_t> text) {
   bssl::ScopedEVP_MD_CTX ctx;
 
-  const EVP_MD* md = getHashFunction(hash);
+  const EVP_MD* md = getHashFunction(hash_function);
 
   if (md == nullptr) {
-    return absl::InvalidArgumentError(absl::StrCat(hash, " is not supported."));
+    return absl::InvalidArgumentError(absl::StrCat(hash_function, " is not supported."));
   }
 
   EVP_PKEY* pkey = key.getEVP_PKEY();
@@ -123,7 +118,7 @@ PKeyObjectPtr importKeyPEM(absl::string_view key, ParseFunction parse_func) {
 }
 
 template <typename KeyObjectType, typename ParseFunction>
-PKeyObjectPtr importKeyDER(const std::vector<uint8_t>& key, ParseFunction parse_func) {
+PKeyObjectPtr importKeyDER(absl::Span<const uint8_t> key, ParseFunction parse_func) {
   // DER format: Use DER parsing
   CBS cbs({key.data(), key.size()});
   return std::make_unique<KeyObjectType>(parse_func(&cbs));
@@ -134,7 +129,7 @@ PKeyObjectPtr UtilityImpl::importPublicKeyPEM(absl::string_view key) {
   return importKeyPEM<PKeyObject>(key, PEM_read_bio_PUBKEY);
 }
 
-PKeyObjectPtr UtilityImpl::importPublicKeyDER(const std::vector<uint8_t>& key) {
+PKeyObjectPtr UtilityImpl::importPublicKeyDER(absl::Span<const uint8_t> key) {
   return importKeyDER<PKeyObject>(key, EVP_parse_public_key);
 }
 
@@ -142,7 +137,7 @@ PKeyObjectPtr UtilityImpl::importPrivateKeyPEM(absl::string_view key) {
   return importKeyPEM<PKeyObject>(key, PEM_read_bio_PrivateKey);
 }
 
-PKeyObjectPtr UtilityImpl::importPrivateKeyDER(const std::vector<uint8_t>& key) {
+PKeyObjectPtr UtilityImpl::importPrivateKeyDER(absl::Span<const uint8_t> key) {
   return importKeyDER<PKeyObject>(key, EVP_parse_private_key);
 }
 
