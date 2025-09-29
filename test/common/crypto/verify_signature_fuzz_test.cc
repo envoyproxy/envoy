@@ -1,9 +1,10 @@
 #include "source/common/common/hex.h"
 #include "source/common/crypto/utility.h"
 
-#include "absl/types/span.h"
 #include "test/common/crypto/verify_signature_fuzz.pb.validate.h"
 #include "test/fuzz/fuzz_runner.h"
+
+#include "absl/types/span.h"
 
 namespace Envoy {
 namespace Common {

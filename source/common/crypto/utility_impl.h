@@ -3,12 +3,11 @@
 #include "source/common/crypto/crypto_impl.h"
 #include "source/common/crypto/utility.h"
 
+#include "absl/types/span.h"
 #include "openssl/bio.h"
 #include "openssl/bytestring.h"
 #include "openssl/hmac.h"
 #include "openssl/sha.h"
-
-#include "absl/types/span.h"
 
 namespace Envoy {
 namespace Common {
