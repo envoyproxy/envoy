@@ -32,6 +32,7 @@ envoy_extension_cc_test(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
+        "//source/extensions/propagators/w3c/tracecontext:tracecontext_propagator_lib",
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
         "//test/mocks:common_lib",
         "//test/mocks/http:http_mocks",

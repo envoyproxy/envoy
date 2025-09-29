@@ -42,6 +42,7 @@ envoy_extension_cc_test(
         "//source/common/http:headers_lib",
         "//source/common/http:message_lib",
         "//source/common/runtime:runtime_lib",
+        "//source/extensions/propagators/w3c/tracecontext:tracecontext_propagator_lib",
         "//source/extensions/tracers/fluentd:config",
         "//source/extensions/tracers/fluentd:fluentd_tracer_lib",
         "//test/mocks/http:http_mocks",
