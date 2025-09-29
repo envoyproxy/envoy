@@ -97,6 +97,16 @@ message HeaderMutation {
     type.matcher.v3.StringMatcher key_matcher = 1 [(validate.rules).message = {required: true}];
   }
 
+  message RegexCopy {
+    string source_header = 1
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+
+    string target_header = 2
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
+
+    type.matcher.v3.RegexMatchAndSubstitute expression = 3;
+  }
+
   oneof action {
     option (validate.required) = true;
 
@@ -109,5 +119,7 @@ message HeaderMutation {
 
     // Remove the header if the key matches the specified string matcher.
     RemoveOnMatch remove_on_match = 3;
+
+    RegexCopy regex_copy = 4;
   }
 }

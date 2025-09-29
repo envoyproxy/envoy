@@ -84,6 +84,34 @@ private:
   const Matchers::StringMatcherImpl key_matcher_;
 };
 
+class RegexCopyMutation : public HeaderEvaluator {
+public:
+  RegexCopyMutation(const std::string& source_header_name, const std::string& target_header_name,
+                    Regex::CompiledMatcherPtr& matcher, const std::string substitution)
+      : source_header_name_(source_header_name), target_header_name_(target_header_name),
+        substitution_(substitution) {
+    matcher_ = std::move(matcher);
+  }
+
+  void evaluateHeaders(Http::HeaderMap& headers, const Formatter::HttpFormatterContext&,
+                       const StreamInfo::StreamInfo&) const override {
+    auto result = headers.get(source_header_name_);
+    if (result.empty()) {
+      return;
+    }
+    auto header_value = result[0]->value().getStringView();
+    auto new_value = matcher_->replaceAll(header_value, substitution_);
+
+    headers.setCopy(target_header_name_, new_value);
+  }
+
+private:
+  Envoy::Http::LowerCaseString source_header_name_;
+  Envoy::Http::LowerCaseString target_header_name_;
+  Regex::CompiledMatcherPtr matcher_;
+  std::string substitution_;
+};
+
 } // namespace
 
 absl::StatusOr<std::unique_ptr<HeaderMutations>>
@@ -115,6 +143,14 @@ HeaderMutations::HeaderMutations(const ProtoHeaderMutatons& header_mutations,
       header_mutations_.emplace_back(std::make_unique<RemoveOnMatchMutation>(
           mutation.remove_on_match().key_matcher(), context));
       break;
+    case envoy::config::common::mutation_rules::v3::HeaderMutation::ActionCase::kRegexCopy: {
+      auto result = Regex::Utility::parseRegex(mutation.regex_copy().expression().pattern(),
+                                               context.regexEngine());
+      SET_AND_RETURN_IF_NOT_OK(result.status(), creation_status);
+      header_mutations_.emplace_back(std::make_unique<RegexCopyMutation>(
+          mutation.regex_copy().source_header(), mutation.regex_copy().target_header(), (*result),
+          mutation.regex_copy().expression().substitution()));
+    }; break;
     default:
       PANIC_DUE_TO_PROTO_UNSET;
     }
