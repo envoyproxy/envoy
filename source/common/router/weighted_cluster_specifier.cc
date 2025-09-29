@@ -320,7 +320,7 @@ RouteConstSharedPtr WeightedClusterSpecifierPlugin::route(RouteEntryAndRouteCons
                                                           const Http::RequestHeaderMap& headers,
                                                           const StreamInfo::StreamInfo& stream_info,
                                                           uint64_t random) const {
-  return pickWeightedCluster(std::move(parent), headers, random, &stream_info);
+  return pickWeightedCluster(std::move(parent), headers, &stream_info, random);
 }
 
 absl::Status
