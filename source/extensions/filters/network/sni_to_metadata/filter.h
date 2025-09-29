@@ -20,6 +20,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace SniToMetadata {
 
+using FilterConfig =
+    envoy::extensions::filters::network::sni_to_metadata::v3::SniToMetadataFilter;
+
 /**
  * Represents a compiled connection rule with optional regex matcher and metadata targets.
  */
@@ -29,7 +32,7 @@ struct CompiledConnectionRule {
 
   // List of metadata targets to populate when this rule matches
   std::vector<
-      envoy::extensions::filters::network::sni_to_metadata::v3::SniToMetadataFilter::MetadataTarget>
+      FilterConfig::MetadataTarget>
       metadata_targets;
 };
 
@@ -38,8 +41,9 @@ struct CompiledConnectionRule {
  */
 class Config {
 public:
-  Config(const envoy::extensions::filters::network::sni_to_metadata::v3::SniToMetadataFilter& config,
-         Regex::Engine& regex_engine);
+  Config(const FilterConfig& config,
+         Regex::Engine& regex_engine,
+         absl::Status& creation_status);
 
   const std::vector<CompiledConnectionRule>& compiledRules() const { return compiled_rules_; }
 

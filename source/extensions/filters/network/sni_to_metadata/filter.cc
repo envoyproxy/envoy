@@ -17,8 +17,9 @@ namespace NetworkFilters {
 namespace SniToMetadata {
 
 Config::Config(
-    const envoy::extensions::filters::network::sni_to_metadata::v3::SniToMetadataFilter& config,
-    Regex::Engine& regex_engine) {
+    const FilterConfig& config,
+    Regex::Engine& regex_engine,
+    absl::Status& creation_status) {
   // Compile all connection rules
   for (const auto& rule_config : config.connection_rules()) {
     CompiledConnectionRule compiled_rule;
@@ -26,7 +27,7 @@ Config::Config(
     // Compile the regex pattern if one is specified
     if (rule_config.has_pattern()) {
       auto regex_result = Regex::Utility::parseRegex(rule_config.pattern(), regex_engine);
-      THROW_IF_NOT_OK_REF(regex_result.status());
+      SET_AND_RETURN_IF_NOT_OK(regex_result.status(), creation_status);
       compiled_rule.regex_matcher = std::move(regex_result.value());
     }
     // If no pattern is specified, regex_matcher remains nullptr

@@ -20,9 +20,11 @@ namespace SniToMetadata {
 class SniToMetadataFilterTest : public testing::Test {
 public:
   void setUpFilter(
-      const envoy::extensions::filters::network::sni_to_metadata::v3::SniToMetadataFilter& config) {
+      const FilterConfig& config) {
+    absl::Status creation_status = absl::OkStatus();
     auto config_shared =
-        std::make_shared<Config>(config, context_.serverFactoryContext().regexEngine());
+        std::make_shared<Config>(config, context_.serverFactoryContext().regexEngine(), creation_status);
+    EXPECT_TRUE(creation_status.ok());
     filter_ = std::make_unique<Filter>(config_shared);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
 
@@ -33,8 +35,8 @@ public:
   }
 
   // Helper to create a basic config with a single rule
-  envoy::extensions::filters::network::sni_to_metadata::v3::SniToMetadataFilter createBasicConfig() {
-    envoy::extensions::filters::network::sni_to_metadata::v3::SniToMetadataFilter config;
+  FilterConfig createBasicConfig() {
+    FilterConfig config;
 
     auto* rule = config.add_connection_rules();
     auto* pattern = rule->mutable_pattern();
@@ -83,7 +85,7 @@ TEST_F(SniToMetadataFilterTest, SuccessfulSniExtractionWithCaptureGroups) {
 
 // Test multiple metadata targets with different capture groups
 TEST_F(SniToMetadataFilterTest, MultipleCaptureGroupsInDifferentTargets) {
-  envoy::extensions::filters::network::sni_to_metadata::v3::SniToMetadataFilter config;
+  FilterConfig config;
 
   auto* rule = config.add_connection_rules();
   auto* pattern = rule->mutable_pattern();
@@ -178,7 +180,7 @@ TEST_F(SniToMetadataFilterTest, SniDoesNotMatchPattern) {
 
 // Test multiple rules with first matching rule applied
 TEST_F(SniToMetadataFilterTest, MultipleRulesFirstMatchWins) {
-  envoy::extensions::filters::network::sni_to_metadata::v3::SniToMetadataFilter config;
+  FilterConfig config;
 
   // First rule: matches example.com pattern
   auto* rule1 = config.add_connection_rules();
@@ -223,7 +225,7 @@ TEST_F(SniToMetadataFilterTest, MultipleRulesFirstMatchWins) {
 
 // Test metadata target without metadata_value uses full SNI
 TEST_F(SniToMetadataFilterTest, NoMetadataValueUsesFullSni) {
-  envoy::extensions::filters::network::sni_to_metadata::v3::SniToMetadataFilter config;
+  FilterConfig config;
 
   auto* rule = config.add_connection_rules();
   auto* pattern = rule->mutable_pattern();
@@ -256,7 +258,7 @@ TEST_F(SniToMetadataFilterTest, NoMetadataValueUsesFullSni) {
 
 // Test default metadata namespace when not specified
 TEST_F(SniToMetadataFilterTest, DefaultMetadataNamespace) {
-  envoy::extensions::filters::network::sni_to_metadata::v3::SniToMetadataFilter config;
+  FilterConfig config;
 
   auto* rule = config.add_connection_rules();
   auto* pattern = rule->mutable_pattern();
@@ -324,7 +326,7 @@ TEST_F(SniToMetadataFilterTest, OnlyProcessOncePerConnection) {
 
 // Test complex regex patterns
 TEST_F(SniToMetadataFilterTest, ComplexRegexPatterns) {
-  envoy::extensions::filters::network::sni_to_metadata::v3::SniToMetadataFilter config;
+  FilterConfig config;
 
   auto* rule = config.add_connection_rules();
   auto* pattern = rule->mutable_pattern();
@@ -374,7 +376,7 @@ TEST_F(SniToMetadataFilterTest, ComplexRegexPatterns) {
 
 // Test rule without pattern captures full SNI
 TEST_F(SniToMetadataFilterTest, NoPatternCapturesFullSni) {
-  envoy::extensions::filters::network::sni_to_metadata::v3::SniToMetadataFilter config;
+  FilterConfig config;
 
   auto* rule = config.add_connection_rules();
   // No pattern specified - should always match
@@ -405,7 +407,7 @@ TEST_F(SniToMetadataFilterTest, NoPatternCapturesFullSni) {
 
 // Test rule without pattern uses static metadata value
 TEST_F(SniToMetadataFilterTest, NoPatternWithStaticValue) {
-  envoy::extensions::filters::network::sni_to_metadata::v3::SniToMetadataFilter config;
+  FilterConfig config;
 
   auto* rule = config.add_connection_rules();
   // No pattern specified - should always match
@@ -444,7 +446,7 @@ TEST_F(SniToMetadataFilterTest, NoPatternWithStaticValue) {
 
 // Test mixed rules: one with pattern, one without
 TEST_F(SniToMetadataFilterTest, MixedRulesPatternAndNoPattern) {
-  envoy::extensions::filters::network::sni_to_metadata::v3::SniToMetadataFilter config;
+  FilterConfig config;
 
   // First rule: no pattern (should always match, but we want it to not match this SNI)
   auto* rule1 = config.add_connection_rules();
@@ -492,7 +494,7 @@ TEST_F(SniToMetadataFilterTest, MixedRulesPatternAndNoPattern) {
 TEST_F(SniToMetadataFilterTest, InvalidRegexReturnsError) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  envoy::extensions::filters::network::sni_to_metadata::v3::SniToMetadataFilter config;
+  FilterConfig config;
   auto* rule = config.add_connection_rules();
   auto* pattern = rule->mutable_pattern();
   pattern->mutable_google_re2();
@@ -504,12 +506,10 @@ TEST_F(SniToMetadataFilterTest, InvalidRegexReturnsError) {
   target->set_metadata_value("\\1");
 
   // This should fail to create the config
-  EXPECT_THROW(
-      {
+  absl::Status creation_status = absl::OkStatus();
         auto config_shared =
-            std::make_shared<Config>(config, context.serverFactoryContext().regexEngine());
-      },
-      EnvoyException);
+            std::make_shared<Config>(config, context.serverFactoryContext().regexEngine(), creation_status);
+  EXPECT_FALSE(creation_status.ok());
 }
 
 } // namespace SniToMetadata

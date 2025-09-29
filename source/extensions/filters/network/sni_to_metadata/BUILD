@@ -15,10 +15,10 @@ envoy_cc_library(
     hdrs = ["config.h"],
     deps = [
         ":filter_lib",
-        "@envoy_api//envoy/extensions/filters/network/sni_to_metadata/v3:pkg_cc_proto",
-        "//envoy/registry",
         "//source/common/common:logger_lib",
+        "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
+        "@envoy_api//envoy/extensions/filters/network/sni_to_metadata/v3:pkg_cc_proto",
     ],
 )
 

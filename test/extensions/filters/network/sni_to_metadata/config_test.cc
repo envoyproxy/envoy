@@ -59,8 +59,9 @@ TEST(SniToMetadataFilterConfigTest, InvalidRegexFails) {
   target->set_metadata_namespace("test.namespace");
   target->set_metadata_value("\\1");
 
-  // This should throw due to invalid regex
-  EXPECT_THROW(auto result = factory.createFilterFactoryFromProto(config, context), EnvoyException);
+  // This should fail to create the config
+  auto result = factory.createFilterFactoryFromProto(config, context);
+  EXPECT_FALSE(result.ok());
 }
 
 // Test valid config with multiple rules and targets
