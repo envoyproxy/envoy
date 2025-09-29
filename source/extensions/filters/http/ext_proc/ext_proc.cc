@@ -1637,7 +1637,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     ENVOY_STREAM_LOG(warn, "Spurious response message {} received on gRPC stream",
                      *decoder_callbacks_, static_cast<int>(response->response_case()));
     if (failureModeAllow() || !Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.ext_proc_fail_close_spurious_resp")) {
+                                  "envoy.reloadable_features.ext_proc_fail_close_spurious_resp")) {
       // When a message is received out of order,and fail open is configured,
       // ignore it and also ignore the stream for the rest of this filter
       // instance's lifetime to protect us from a malformed server.
