@@ -874,6 +874,11 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       request_headers_->setPath(new_path);
     }
 
+    if (request_headers_->size() > request_headers_->maxHeadersCount()) {
+      rejectResponse();
+      return;
+    }
+
     if (cluster_) {
       config_->incCounter(cluster_->statsScope(), config_->ext_authz_ok_);
     }

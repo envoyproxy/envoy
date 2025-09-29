@@ -176,7 +176,7 @@ private:
   virtual HashingLoadBalancerSharedPtr
   createLoadBalancer(const NormalizedHostWeightVector& normalized_host_weights,
                      double min_normalized_weight, double max_normalized_weight) PURE;
-  absl::Status refresh();
+  void refresh();
 
   std::shared_ptr<LoadBalancerFactoryImpl> factory_;
   const bool locality_weighted_balancing_{};
@@ -188,6 +188,8 @@ public:
   TypedHashLbConfigBase() = default;
   TypedHashLbConfigBase(absl::Span<const HashPolicyProto* const> hash_policy,
                         Regex::Engine& regex_engine, absl::Status& creation_status);
+
+  absl::Status validateEndpoints(const PriorityState& priorities) const override;
 
   HashPolicySharedPtr hash_policy_;
 };

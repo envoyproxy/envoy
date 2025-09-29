@@ -28,6 +28,14 @@ using testing::Invoke;
 using testing::Return;
 using testing::Unused;
 
+// Async RPC clients include resetting all active streams on destruction. This
+// mock extends the base mock to include mocking the reset.
+class MockAsyncClientWithReset : public Grpc::MockAsyncClient {
+public:
+  MOCK_METHOD(void, resetActiveStreams, ());
+  ~MockAsyncClientWithReset() override { resetActiveStreams(); }
+};
+
 // Used to mock a local rate limit client entirely.
 class MockRateLimitClient : public RateLimitClient {
 public:
@@ -42,6 +50,20 @@ public:
   MOCK_METHOD(std::shared_ptr<CachedBucket>, getBucket, (size_t id), (override));
 };
 
+// Support the other method of creating a RLQS streaming client.
+class FakeClientFactory : public Grpc::AsyncClientFactory {
+public:
+  FakeClientFactory(Grpc::RawAsyncClientPtr async_client)
+      : async_client_(std::move(async_client)) {}
+  ~FakeClientFactory() override = default;
+  absl::StatusOr<Grpc::RawAsyncClientPtr> createUncachedRawAsyncClient() override {
+    return std::move(async_client_);
+  }
+
+private:
+  Grpc::RawAsyncClientPtr async_client_ = nullptr;
+};
+
 // Used when creating a "real" global rate limit client with mocked, underlying
 // interfaces.
 class RateLimitTestClient {
@@ -51,6 +73,14 @@ public:
     config_with_hash_key_ = Grpc::GrpcServiceConfigWithHashKey(grpc_service_);
   }
 
+  void expectClientReset() {
+    EXPECT_CALL(*async_client_, resetActiveStreams()).WillOnce([&]() {
+      if (stream_callbacks_ != nullptr) {
+        stream_.resetStream();
+      }
+    });
+  }
+
   void expectClientCreation() {
     EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
                 getOrCreateRawAsyncClientWithHashKey(_, _, _))
@@ -58,9 +88,23 @@ public:
         .WillRepeatedly(Invoke(this, &RateLimitTestClient::mockCreateAsyncClient));
   }
 
+  void expectClientCreationWithFactory() {
+    EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
+                factoryForGrpcService(_, _, _))
+        .Times(testing::AtLeast(1))
+        .WillRepeatedly(Invoke(this, &RateLimitTestClient::mockCreateAsyncClientFactory));
+  }
+
   void failClientCreation() {
     EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
-                getOrCreateRawAsyncClientWithHashKey(_, _, _))
+                factoryForGrpcService(_, _, _))
+        .Times(testing::AtLeast(1))
+        .WillRepeatedly([]() { return absl::InternalError("Mock client creation failure"); });
+  }
+
+  void failClientCreationWithFactory() {
+    EXPECT_CALL(context_.server_factory_context_.cluster_manager_.async_client_manager_,
+                factoryForGrpcService(_, _, _))
         .Times(testing::AtLeast(1))
         .WillRepeatedly([]() { return absl::InternalError("Mock client creation failure"); });
   }
@@ -136,12 +180,22 @@ public:
 
   void expectTimeSource() {}
 
+  Grpc::AsyncClientFactoryPtr mockCreateAsyncClientFactory(Unused, Unused, Unused) {
+    std::unique_ptr<MockAsyncClientWithReset> async_client =
+        std::make_unique<MockAsyncClientWithReset>();
+    async_client_ = async_client.get();
+    expectClientReset();
+    return std::make_unique<FakeClientFactory>(std::move(async_client));
+  }
+
   Grpc::RawAsyncClientSharedPtr mockCreateAsyncClient(Unused, Unused, Unused) {
-    if (async_client_ != nullptr) {
-      return async_client_;
+    if (owned_async_client_ != nullptr) {
+      return owned_async_client_;
     }
-    async_client_ = std::make_shared<Grpc::MockAsyncClient>();
-    return async_client_;
+    owned_async_client_ = std::make_shared<MockAsyncClientWithReset>();
+    async_client_ = owned_async_client_.get();
+    expectClientReset();
+    return owned_async_client_;
   }
 
   void setStreamStartToFail(int fail_starts) { fail_starts_ = fail_starts; }
@@ -162,7 +216,8 @@ public:
 
   Grpc::GrpcServiceConfigWithHashKey config_with_hash_key_;
   envoy::config::core::v3::GrpcService grpc_service_;
-  std::shared_ptr<Grpc::MockAsyncClient> async_client_ = nullptr;
+  std::shared_ptr<MockAsyncClientWithReset> owned_async_client_ = nullptr;
+  MockAsyncClientWithReset* async_client_ = nullptr;
   Grpc::MockAsyncStream stream_;
   NiceMock<StreamInfo::MockStreamInfo> stream_info_;
   Grpc::RawAsyncStreamCallbacks* stream_callbacks_;

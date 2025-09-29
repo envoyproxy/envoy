@@ -279,6 +279,16 @@ on_no_match:
         .WillByDefault(ReturnPointee(req_info_.downstream_connection_info_provider_));
   }
 
+  void setLocalAddressWithNetworkNamespace(const std::string& network_namespace_path,
+                                           uint16_t port = 123) {
+    address_ = std::make_shared<Network::Address::Ipv4Instance>(
+        "127.0.0.1", port, nullptr, absl::make_optional(std::string(network_namespace_path)));
+
+    req_info_.downstream_connection_info_provider_->setLocalAddress(address_);
+    ON_CALL(connection_.stream_info_, downstreamAddressProvider())
+        .WillByDefault(ReturnPointee(req_info_.downstream_connection_info_provider_));
+  }
+
   void checkAccessLogMetadata(LogResult expected) {
     if (expected != LogResult::Undecided) {
       auto filter_meta = req_info_.dynamicMetadata().filter_metadata().at(
@@ -966,6 +976,100 @@ TEST_F(RoleBasedAccessControlFilterTest, MatcherDenied) {
       filter_meta.fields().at("shadow_rules_prefix_shadow_effective_policy_id").string_value());
   EXPECT_EQ("rbac_access_denied_matched_policy[none]", callbacks_.details());
   checkAccessLogMetadata(LogResult::Undecided);
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, MatcherNetworkNamespaceAllowed) {
+  envoy::extensions::filters::http::rbac::v3::RBAC config;
+
+  const std::string matcher_yaml = R"EOF(
+matcher_list:
+  matchers:
+  - predicate:
+      single_predicate:
+        input:
+          name: envoy.matching.inputs.network_namespace
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.NetworkNamespaceInput
+        value_match:
+          exact: "/var/run/netns/http_ns1"
+    on_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+          name: allow_ns
+          action: ALLOW
+on_no_match:
+  action:
+    name: action
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+      name: deny_all
+      action: DENY
+)EOF";
+
+  xds::type::matcher::v3::Matcher matcher;
+  TestUtility::loadFromYaml(matcher_yaml, matcher);
+  *config.mutable_matcher() = matcher;
+  config.set_shadow_rules_stat_prefix("shadow_rules_prefix_");
+
+  setupConfig(std::make_shared<RoleBasedAccessControlFilterConfig>(
+      config, "test", *stats_store_.rootScope(), context_,
+      ProtobufMessage::getStrictValidationVisitor()));
+
+  setLocalAddressWithNetworkNamespace("/var/run/netns/http_ns1", 123);
+  setMetadata();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().denied_.value());
+}
+
+TEST_F(RoleBasedAccessControlFilterTest, MatcherNetworkNamespaceDenied) {
+  envoy::extensions::filters::http::rbac::v3::RBAC config;
+
+  const std::string matcher_yaml = R"EOF(
+matcher_list:
+  matchers:
+  - predicate:
+      single_predicate:
+        input:
+          name: envoy.matching.inputs.network_namespace
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.NetworkNamespaceInput
+        value_match:
+          exact: "/var/run/netns/http_ns1"
+    on_match:
+      action:
+        name: action
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+          name: allow_ns
+          action: ALLOW
+on_no_match:
+  action:
+    name: action
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.rbac.v3.Action
+      name: deny_all
+      action: DENY
+)EOF";
+
+  xds::type::matcher::v3::Matcher matcher;
+  TestUtility::loadFromYaml(matcher_yaml, matcher);
+  *config.mutable_matcher() = matcher;
+  config.set_shadow_rules_stat_prefix("shadow_rules_prefix_");
+
+  setupConfig(std::make_shared<RoleBasedAccessControlFilterConfig>(
+      config, "test", *stats_store_.rootScope(), context_,
+      ProtobufMessage::getStrictValidationVisitor()));
+
+  setLocalAddressWithNetworkNamespace("/var/run/netns/other", 123);
+  setMetadata();
+
+  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers_, false));
+  EXPECT_EQ(0U, config_->stats().allowed_.value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
 }
 
 TEST_F(RoleBasedAccessControlFilterTest, MatcherRouteLocalOverride) {

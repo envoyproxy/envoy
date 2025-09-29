@@ -230,6 +230,32 @@ TEST_F(EnvoyGoogleLessMockedAsyncClientImplTest, TestOverflow) {
   EXPECT_TRUE(grpc_stream->isAboveWriteBufferHighWatermark());
 }
 
+TEST_F(EnvoyGoogleLessMockedAsyncClientImplTest, AsyncRequestDetach) {
+  // Set an (unreasonably) low byte limit.
+  auto* google_grpc = config_.mutable_google_grpc();
+  google_grpc->mutable_per_stream_buffer_limit_bytes()->set_value(1);
+  initialize();
+
+  NiceMock<MockAsyncRequestCallbacks<helloworld::HelloReply>> grpc_callbacks;
+
+  Http::AsyncClient::RequestOptions request_options;
+  auto parent_span = std::make_shared<Tracing::NullSpan>();
+  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+  request_options.setParentSpan(*parent_span);
+  request_options.setParentContext(Http::AsyncClient::ParentContext{&stream_info});
+
+  helloworld::HelloRequest request_msg;
+  auto grpc_request = grpc_client_->send(*method_descriptor_, request_msg, grpc_callbacks,
+                                         *parent_span, request_options);
+  EXPECT_FALSE(grpc_request == nullptr);
+
+  // Detach the request. No big sense for google async client but just test the code path.
+  grpc_request->detach();
+
+  grpc_request->cancel();
+}
+
 } // namespace
 } // namespace Grpc
 } // namespace Envoy

@@ -9,6 +9,7 @@ import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/proxy_protocol.proto";
 import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
 import "envoy/type/v3/hash_policy.proto";
+import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -28,7 +29,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // TCP Proxy :ref:`configuration overview <config_network_filters_tcp_proxy>`.
 // [#extension: envoy.filters.network.tcp_proxy]
 
-// [#next-free-field: 20]
+// [#next-free-field: 21]
 message TcpProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
@@ -246,6 +247,12 @@ message TcpProxy {
   // is reached the connection will be closed. Duration must be at least 1ms.
   google.protobuf.Duration max_downstream_connection_duration = 13
       [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+  // Percentage-based jitter for max_downstream_connection_duration. The jitter will increase
+  // the max_downstream_connection_duration by some random duration up to the provided percentage.
+  // This field is ignored if max_downstream_connection_duration is not set.
+  // If not set, no jitter will be added.
+  type.v3.Percent max_downstream_connection_duration_jitter_percentage = 20;
 
   // Note that if both this field and :ref:`access_log_flush_interval
   // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.access_log_flush_interval>`
