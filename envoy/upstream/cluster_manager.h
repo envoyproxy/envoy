@@ -350,6 +350,16 @@ public:
   virtual OptRef<const Cluster> getActiveCluster(const std::string& cluster_name) const PURE;
 
   /**
+   * Receives a cluster name and returns an active or warming cluster (if found).
+   * @param cluster_name the name of the cluster.
+   * @return OptRef<const Cluster> A reference to the cluster if found, and nullopt otherwise.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual OptRef<const Cluster>
+  getActiveOrWarmingCluster(const std::string& cluster_name) const PURE;
+
+  /**
    * Returns true iff the given cluster name is known in the cluster-manager
    * (either as active or as warming).
    * @param cluster_name the name of the cluster.
