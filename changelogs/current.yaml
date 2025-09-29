@@ -108,6 +108,10 @@ minor_behavior_changes:
     Cap the frame size for streamed grpc at 1MB. Without this change there was a small chance
     that if a request streamed in sufficiently faster than it was processed, a frame larger than
     4MB could be encoded, which most upstream grpc services would, by default, treat as an error.
+- area: ext_authz
+  change: |
+    Check the request header count after applying mutations is <= the configured limit and reject
+    the response if not.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -294,6 +298,17 @@ removed_config_or_runtime:
     Removed runtime guard ``envoy.reloadable_features.proxy_104`` and legacy code paths.
 
 new_features:
+- area: router
+  change: |
+    Added :ref:`use_hash_policy <envoy_v3_api_field_config.route.v3.WeightedCluster.use_hash_policy>`
+    field to :ref:`WeightedCluster <envoy_v3_api_msg_config.route.v3.WeightedCluster>` to enable
+    route-level hash policies for weighted cluster selection. When set to ``true``,
+    the existing route-level :ref:`hash_policy
+    <envoy_v3_api_field_config.route.v3.RouteAction.hash_policy>`
+    will be used for consistent hashing between weighted clusters, ensuring that requests
+    with the same hash value (e.g., same session ID, user ID, etc.) will consistently be
+    routed to the same weighted cluster, enabling session affinity and consistent load
+    balancing behavior.
 - area: stats
   change: |
     Added support to remove unused metrics from memory for extensions that
