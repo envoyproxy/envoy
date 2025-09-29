@@ -45,7 +45,7 @@ bool MappedAttributeBuilder::modifyRequest(
       dynamic_cast<const Http::ResponseHeaderMap*>(params.response_headers),
       dynamic_cast<const Http::ResponseTrailerMap*>(params.response_trailers));
 
-  auto req_attributes = expression_manager_.evaluateRequestAttributes(*activation_ptr);
+  const auto req_attributes = expression_manager_.evaluateRequestAttributes(*activation_ptr);
 
   Protobuf::Struct& remapped_attributes =
       (*request.mutable_attributes())["envoy.filters.http.ext_proc"];
