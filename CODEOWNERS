@@ -102,6 +102,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 # HTTP caching extension
 /*/extensions/filters/http/cache @toddmgreer @ravenblackx @penguingao @mpwarres @capoferro
 /*/extensions/http/cache/simple_http_cache @toddmgreer @ravenblackx @penguingao @mpwarres @capoferro
+/*/extensions/filters/http/cache_v2 @toddmgreer @ravenblackx @penguingao @mpwarres @capoferro
+/*/extensions/http/cache_v2/simple_http_cache @toddmgreer @ravenblackx @penguingao @mpwarres @capoferro
 # AWS common signing components
 /*/extensions/common/aws @mattklein123 @nbaws @niax
 # adaptive concurrency limit extension.
@@ -249,6 +251,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/common/async_files @mattklein123 @ravenblackx
 /*/extensions/filters/http/file_system_buffer @mattklein123 @ravenblackx
 /*/extensions/http/cache/file_system_http_cache @ggreenway @ravenblackx
+/*/extensions/http/cache_v2/file_system_http_cache @ggreenway @ravenblackx
 # Google Cloud Platform Authentication Filter
 /*/extensions/filters/http/gcp_authn @tyxia @yanavlasov
 # DNS resolution
