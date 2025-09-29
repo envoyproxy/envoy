@@ -65,7 +65,7 @@ ShareProviderManagerSharedPtr ShareProviderManager::singleton(Event::Dispatcher&
         if (!local_cluster_name.has_value()) {
           return nullptr;
         }
-        auto cluster = cm.clusters().getCluster(local_cluster_name.value());
+        auto cluster = cm.getActiveOrWarmingCluster(local_cluster_name.value());
         if (!cluster.has_value()) {
           return nullptr;
         }
