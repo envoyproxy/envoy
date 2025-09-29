@@ -64,12 +64,12 @@ void StderrSinkDelegate::flush() {
 }
 
 void DelegatingLogSink::set_formatter(std::unique_ptr<spdlog::formatter> formatter) {
-  absl::MutexLock lock(&format_mutex_);
+  absl::MutexLock lock(format_mutex_);
   formatter_ = std::move(formatter);
 }
 
 void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
-  absl::ReleasableMutexLock lock(&format_mutex_);
+  absl::ReleasableMutexLock lock(format_mutex_);
   absl::string_view msg_view = absl::string_view(msg.payload.data(), msg.payload.size());
 
   // This memory buffer must exist in the scope of the entire function,
@@ -95,7 +95,7 @@ void DelegatingLogSink::log(const spdlog::details::log_msg& msg) {
   // protection is really only needed in tests. It would be nice to figure out a test-only
   // mechanism for this that does not require extra locking that we don't explicitly need in the
   // prod code.
-  absl::ReaderMutexLock sink_lock(&sink_mutex_);
+  absl::ReaderMutexLock sink_lock(sink_mutex_);
   log_to_sink(*sink_);
 }
 
@@ -120,13 +120,13 @@ DelegatingLogSinkSharedPtr DelegatingLogSink::init() {
 }
 
 void DelegatingLogSink::flush() {
-  absl::ReaderMutexLock lock(&sink_mutex_);
+  absl::ReaderMutexLock lock(sink_mutex_);
   sink_->flush();
 }
 
 void DelegatingLogSink::logWithStableName(absl::string_view stable_name, absl::string_view level,
                                           absl::string_view component, absl::string_view message) {
-  absl::ReaderMutexLock sink_lock(&sink_mutex_);
+  absl::ReaderMutexLock sink_lock(sink_mutex_);
   sink_->logWithStableName(stable_name, level, component, message);
 }
 

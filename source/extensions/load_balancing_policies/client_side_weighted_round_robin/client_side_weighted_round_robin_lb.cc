@@ -71,7 +71,6 @@ ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLb::WorkerLocalLb(
           refresh(host_set->priority());
         }
       }
-      return absl::OkStatus();
     });
   }
 }
@@ -178,7 +177,7 @@ void ClientSideWeightedRoundRobinLoadBalancer::addClientSideLbPolicyDataToHosts(
 }
 
 absl::Status ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData::onOrcaLoadReport(
-    const Upstream::OrcaLoadReport& report) {
+    const Upstream::OrcaLoadReport& report, const StreamInfo::StreamInfo&) {
   ASSERT(report_handler_ != nullptr);
   return report_handler_->updateClientSideDataFromOrcaLoadReport(report, *this);
 }
@@ -266,7 +265,7 @@ Upstream::LoadBalancerPtr ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalL
 void ClientSideWeightedRoundRobinLoadBalancer::WorkerLocalLbFactory::applyWeightsToAllWorkers() {
   tls_->runOnAllThreads([](OptRef<ThreadLocalShim> tls_shim) -> void {
     if (tls_shim.has_value()) {
-      auto status = tls_shim->apply_weights_cb_helper_.runCallbacks();
+      tls_shim->apply_weights_cb_helper_.runCallbacks();
     }
   });
 }
@@ -303,10 +302,9 @@ absl::Status ClientSideWeightedRoundRobinLoadBalancer::initialize() {
 
   // Setup a callback to receive priority set updates.
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
-      [this](uint32_t, const HostVector& hosts_added, const HostVector&) -> absl::Status {
+      [this](uint32_t, const HostVector& hosts_added, const HostVector&) {
         addClientSideLbPolicyDataToHosts(hosts_added);
         updateWeightsOnMainThread();
-        return absl::OkStatus();
       });
 
   weight_calculation_timer_->enableTimer(weight_update_period_);
