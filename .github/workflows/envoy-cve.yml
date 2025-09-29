@@ -1,0 +1,35 @@
+name: Envoy/CVE
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+  - cron: '0 8 * * *'
+  workflow_dispatch:
+    inputs:
+      task:
+        description: Select a task
+        required: true
+        default: bazel
+        type: choice
+        options:
+        - fetch
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+
+jobs:
+  fetch:
+    secrets:
+      gcs-cve-key: ${{ secrets.GCS_CVE_WRITE_KEY }}
+    if: >-
+      ((github.event_name == 'workflow_dispatch'
+        && inputs.task == 'fetch')
+       || (github.repository == 'envoyproxy/envoy'
+           && github.event_name == 'schedule'))
+    uses: ./.github/workflows/_cve_fetch.yml
+    with:
+      scheduled: ${{ github.event_name == 'schedule' }}
