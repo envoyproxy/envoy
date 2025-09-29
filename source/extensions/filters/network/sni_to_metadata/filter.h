@@ -1,17 +1,16 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/network/filter.h"
+#include "envoy/extensions/filters/network/sni_to_metadata/v3/sni_to_metadata.pb.h"
 #include "envoy/network/connection.h"
+#include "envoy/network/filter.h"
 
 #include "source/common/common/logger.h"
 #include "source/common/common/regex.h"
-
-#include "envoy/extensions/filters/network/sni_to_metadata/v3/sni_to_metadata.pb.h"
 
 #include "absl/strings/string_view.h"
 
@@ -20,8 +19,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace SniToMetadata {
 
-using FilterConfig =
-    envoy::extensions::filters::network::sni_to_metadata::v3::SniToMetadataFilter;
+using FilterConfig = envoy::extensions::filters::network::sni_to_metadata::v3::SniToMetadataFilter;
 
 /**
  * Represents a compiled connection rule with optional regex matcher and metadata targets.
@@ -31,9 +29,7 @@ struct CompiledConnectionRule {
   Regex::CompiledMatcherPtr regex_matcher;
 
   // List of metadata targets to populate when this rule matches
-  std::vector<
-      FilterConfig::MetadataTarget>
-      metadata_targets;
+  std::vector<FilterConfig::MetadataTarget> metadata_targets;
 };
 
 /**
@@ -41,9 +37,7 @@ struct CompiledConnectionRule {
  */
 class Config {
 public:
-  Config(const FilterConfig& config,
-         Regex::Engine& regex_engine,
-         absl::Status& creation_status);
+  Config(const FilterConfig& config, Regex::Engine& regex_engine, absl::Status& creation_status);
 
   const std::vector<CompiledConnectionRule>& compiledRules() const { return compiled_rules_; }
 

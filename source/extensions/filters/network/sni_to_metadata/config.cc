@@ -2,8 +2,8 @@
 
 #include "envoy/registry/registry.h"
 
-#include "source/extensions/filters/network/sni_to_metadata/filter.h"
 #include "source/common/protobuf/utility.h"
+#include "source/extensions/filters/network/sni_to_metadata/filter.h"
 
 #include "absl/strings/str_cat.h"
 
@@ -13,16 +13,15 @@ namespace NetworkFilters {
 namespace SniToMetadata {
 
 SniToMetadataFilterFactory::SniToMetadataFilterFactory()
-    : Common::ExceptionFreeFactoryBase<FilterConfig>(
-          NetworkFilterNames::get().SniToMetadata) {}
+    : Common::ExceptionFreeFactoryBase<FilterConfig>(NetworkFilterNames::get().SniToMetadata) {}
 
-absl::StatusOr<Network::FilterFactoryCb> SniToMetadataFilterFactory::createFilterFactoryFromProtoTyped(
-    const FilterConfig& config,
-    Server::Configuration::FactoryContext& context) {
+absl::StatusOr<Network::FilterFactoryCb>
+SniToMetadataFilterFactory::createFilterFactoryFromProtoTyped(
+    const FilterConfig& config, Server::Configuration::FactoryContext& context) {
 
   absl::Status creation_status = absl::OkStatus();
-  ConfigSharedPtr filter_config =
-      std::make_shared<Config>(config, context.serverFactoryContext().regexEngine(), creation_status);
+  ConfigSharedPtr filter_config = std::make_shared<Config>(
+      config, context.serverFactoryContext().regexEngine(), creation_status);
 
   RETURN_IF_NOT_OK_REF(creation_status);
 

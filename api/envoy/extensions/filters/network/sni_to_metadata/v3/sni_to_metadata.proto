@@ -37,7 +37,7 @@ message SniToMetadataFilter {
   message ConnectionRule {
     // The regex pattern to match against the SNI value.
     // Supports Google RE2 numbered capture groups.
-    // Example: ``^([^.]+)\.([^.]+)\.([^.]+)\.foo\.example\.com$``
+    // Example: ``^([^.]+)\.([^.]+)\.([^.]+)\.example\.com$``
     // If not specified, the rule will always match and use the entire SNI value.
     type.matcher.v3.RegexMatcher pattern = 1;
 

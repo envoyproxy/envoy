@@ -13,21 +13,19 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace SniToMetadata {
 
-using FilterConfig =
-    envoy::extensions::filters::network::sni_to_metadata::v3::SniToMetadataFilter;
+using FilterConfig = envoy::extensions::filters::network::sni_to_metadata::v3::SniToMetadataFilter;
 
 /**
  * Config registration for the SNI to metadata filter. @see NamedNetworkFilterConfigFactory.
  */
-class SniToMetadataFilterFactory
-    : public Common::ExceptionFreeFactoryBase<FilterConfig> {
+class SniToMetadataFilterFactory : public Common::ExceptionFreeFactoryBase<FilterConfig> {
 public:
   SniToMetadataFilterFactory();
 
 private:
-  absl::StatusOr<Network::FilterFactoryCb> createFilterFactoryFromProtoTyped(
-      const FilterConfig& config,
-      Server::Configuration::FactoryContext& context) override;
+  absl::StatusOr<Network::FilterFactoryCb>
+  createFilterFactoryFromProtoTyped(const FilterConfig& config,
+                                    Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace SniToMetadata

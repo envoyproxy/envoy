@@ -2,11 +2,11 @@
 
 #include <string>
 
-#include "source/common/protobuf/protobuf.h"
+#include "envoy/common/exception.h"
+
 #include "source/common/common/regex.h"
 #include "source/common/common/utility.h"
-
-#include "envoy/common/exception.h"
+#include "source/common/protobuf/protobuf.h"
 
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
@@ -16,10 +16,8 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace SniToMetadata {
 
-Config::Config(
-    const FilterConfig& config,
-    Regex::Engine& regex_engine,
-    absl::Status& creation_status) {
+Config::Config(const FilterConfig& config, Regex::Engine& regex_engine,
+               absl::Status& creation_status) {
   // Compile all connection rules
   for (const auto& rule_config : config.connection_rules()) {
     CompiledConnectionRule compiled_rule;
@@ -121,10 +119,11 @@ bool Filter::applyConnectionRule(const CompiledConnectionRule& rule, absl::strin
 
       // Store in dynamic metadata
       Protobuf::Struct& metadata = (*callbacks_->connection()
-                                            .streamInfo()
-                                            .dynamicMetadata()
-                                            .mutable_filter_metadata())[effective_namespace];
-      (*metadata.mutable_fields())[target.metadata_key()].set_string_value(std::move(metadata_value));
+                                         .streamInfo()
+                                         .dynamicMetadata()
+                                         .mutable_filter_metadata())[effective_namespace];
+      (*metadata.mutable_fields())[target.metadata_key()].set_string_value(
+          std::move(metadata_value));
 
       metadata_applied = true;
     }

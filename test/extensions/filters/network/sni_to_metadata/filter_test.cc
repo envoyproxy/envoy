@@ -1,8 +1,8 @@
 #include "source/extensions/filters/network/sni_to_metadata/filter.h"
 
 #include "test/mocks/network/mocks.h"
-#include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/mocks/stream_info/mocks.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -19,11 +19,10 @@ namespace SniToMetadata {
 
 class SniToMetadataFilterTest : public testing::Test {
 public:
-  void setUpFilter(
-      const FilterConfig& config) {
+  void setUpFilter(const FilterConfig& config) {
     absl::Status creation_status = absl::OkStatus();
-    auto config_shared =
-        std::make_shared<Config>(config, context_.serverFactoryContext().regexEngine(), creation_status);
+    auto config_shared = std::make_shared<Config>(
+        config, context_.serverFactoryContext().regexEngine(), creation_status);
     EXPECT_TRUE(creation_status.ok());
     filter_ = std::make_unique<Filter>(config_shared);
     filter_->initializeReadFilterCallbacks(filter_callbacks_);
@@ -507,8 +506,8 @@ TEST_F(SniToMetadataFilterTest, InvalidRegexReturnsError) {
 
   // This should fail to create the config
   absl::Status creation_status = absl::OkStatus();
-        auto config_shared =
-            std::make_shared<Config>(config, context.serverFactoryContext().regexEngine(), creation_status);
+  auto config_shared = std::make_shared<Config>(
+      config, context.serverFactoryContext().regexEngine(), creation_status);
   EXPECT_FALSE(creation_status.ok());
 }
 

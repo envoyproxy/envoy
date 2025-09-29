@@ -2,7 +2,6 @@ load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
     "envoy_extension_package",
-    "envoy_proto_library",
 )
 
 licenses(["notice"])  # Apache 2
@@ -27,13 +26,13 @@ envoy_cc_library(
     srcs = ["filter.cc"],
     hdrs = ["filter.h"],
     deps = [
-        "@envoy_api//envoy/extensions/filters/network/sni_to_metadata/v3:pkg_cc_proto",
-        "//envoy/network:filter_interface",
         "//envoy/network:connection_interface",
-        "//source/common/protobuf",
-        "//source/common/common:regex_lib",
+        "//envoy/network:filter_interface",
         "//source/common/common:logger_lib",
+        "//source/common/common:regex_lib",
+        "//source/common/protobuf",
         "@com_google_absl//absl/strings",
         "@com_googlesource_code_re2//:re2",
+        "@envoy_api//envoy/extensions/filters/network/sni_to_metadata/v3:pkg_cc_proto",
     ],
 )
