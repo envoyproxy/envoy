@@ -319,7 +319,7 @@ message ExtAuthz {
   // the body will be truncated to ``max_denied_response_body_bytes`` before being sent to the
   // downstream client.
   //
-  // If this field is not set or is set to `0`, no truncation will occur, and the entire
+  // If this field is not set or is set to 0, no truncation will occur, and the entire
   // denied response body will be forwarded.
   uint32 max_denied_response_body_bytes = 30;
 }
