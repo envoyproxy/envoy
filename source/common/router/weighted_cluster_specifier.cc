@@ -213,12 +213,12 @@ RouteConstSharedPtr WeightedClusterSpecifierPlugin::pickWeightedCluster(
   absl::optional<uint64_t> hash_value;
 
   // Only use hash policy if explicitly enabled via use_hash_policy field
-  if (use_hash_policy_ && stream_info != nullptr) {
+  if (use_hash_policy_) {
     const auto* route_hash_policy = parent->hashPolicy();
     if (route_hash_policy != nullptr) {
       hash_value = route_hash_policy->generateHash(
           OptRef<const Http::RequestHeaderMap>(headers),
-          OptRef<const StreamInfo::StreamInfo>(*stream_info), nullptr);
+          OptRef<const StreamInfo::StreamInfo>(stream_info), nullptr);
     }
   }
 
