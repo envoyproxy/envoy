@@ -119,7 +119,8 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
                              StreamInfo::FilterState::LifeSpan::FilterChain)),
       tracing_config_(Tracing::EgressConfig::get()), local_reply_(*parent.local_reply_),
       account_(options.account_), buffer_limit_(options.buffer_limit_), send_xff_(options.send_xff),
-      send_internal_(options.send_internal) {
+      send_internal_(options.send_internal),
+      upstream_override_host_(options.upstream_override_host_) {
   auto retry_policy = createRetryPolicy(options, parent.factory_context_, creation_status);
 
   // A field initialization may set the creation-status as unsuccessful.
