@@ -1,12 +1,10 @@
 #pragma once
 
 #include <memory>
-#include <string>
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/extensions/filters/network/sni_to_metadata/v3/sni_to_metadata.pb.h"
-#include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 
 #include "source/common/common/logger.h"

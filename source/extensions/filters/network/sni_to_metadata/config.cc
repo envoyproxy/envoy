@@ -2,10 +2,8 @@
 
 #include "envoy/registry/registry.h"
 
-#include "source/common/protobuf/utility.h"
 #include "source/extensions/filters/network/sni_to_metadata/filter.h"
-
-#include "absl/strings/str_cat.h"
+#include "source/extensions/filters/network/well_known_names.h"
 
 namespace Envoy {
 namespace Extensions {
