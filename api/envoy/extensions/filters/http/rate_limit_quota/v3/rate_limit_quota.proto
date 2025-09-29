@@ -224,6 +224,7 @@ message RateLimitQuotaBucketSettings {
   }
 
   // Customize the deny response to the requests over the rate limit.
+  // [#next-free-field: 6]
   message DenyResponseSettings {
     // HTTP response code to deny for HTTP requests (gRPC excluded).
     // Defaults to 429 (:ref:`StatusCode.TooManyRequests<envoy_v3_api_enum_value_type.v3.StatusCode.TooManyRequests>`).
