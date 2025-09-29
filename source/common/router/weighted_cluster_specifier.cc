@@ -209,7 +209,7 @@ private:
 // Returns selected cluster, or nullptr if weighted configuration is invalid.
 RouteConstSharedPtr WeightedClusterSpecifierPlugin::pickWeightedCluster(
     RouteEntryAndRouteConstSharedPtr parent, const Http::RequestHeaderMap& headers,
-    const StreamInfo::StreamInfo* stream_info, const uint64_t random_value) const {
+    const StreamInfo::StreamInfo& stream_info, const uint64_t random_value) const {
   absl::optional<uint64_t> hash_value;
 
   // Only use hash policy if explicitly enabled via use_hash_policy field
@@ -320,7 +320,7 @@ RouteConstSharedPtr WeightedClusterSpecifierPlugin::route(RouteEntryAndRouteCons
                                                           const Http::RequestHeaderMap& headers,
                                                           const StreamInfo::StreamInfo& stream_info,
                                                           uint64_t random) const {
-  return pickWeightedCluster(std::move(parent), headers, &stream_info, random);
+  return pickWeightedCluster(std::move(parent), headers, stream_info, random);
 }
 
 absl::Status

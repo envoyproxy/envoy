@@ -221,11 +221,12 @@ new_features:
   change: |
     Added :ref:`use_hash_policy <envoy_v3_api_field_config.route.v3.WeightedCluster.use_hash_policy>`
     field to :ref:`WeightedCluster <envoy_v3_api_msg_config.route.v3.WeightedCluster>` to enable
-    route-level hash policies for weighted cluster selection. When set to ``true``, 
-    the existing route-level :ref:`hash_policy <envoy_v3_api_field_config.route.v3.RouteAction.hash_policy>`
-    will be used for consistent hashing between weighted clusters, ensuring that requests 
-    with the same hash value (e.g., same session ID, user ID, etc.) will consistently be 
-    routed to the same weighted cluster, enabling session affinity and consistent load 
+    route-level hash policies for weighted cluster selection. When set to ``true``,
+    the existing route-level :ref:`hash_policy
+    <envoy_v3_api_field_config.route.v3.RouteAction.hash_policy>`
+    will be used for consistent hashing between weighted clusters, ensuring that requests
+    with the same hash value (e.g., same session ID, user ID, etc.) will consistently be
+    routed to the same weighted cluster, enabling session affinity and consistent load
     balancing behavior.
 - area: stats
   change: |
