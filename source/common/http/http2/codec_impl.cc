@@ -22,6 +22,7 @@
 #include "source/common/http/headers.h"
 #include "source/common/http/http2/codec_stats.h"
 #include "source/common/http/utility.h"
+#include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "absl/cleanup/cleanup.h"
@@ -865,7 +866,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
       stream_error_on_invalid_http_messaging_(
           http2_options.override_stream_error_on_invalid_http_message().value()),
       protocol_constraints_(stats, http2_options), dispatching_(false), raised_goaway_(false),
-      random_(random_generator),
+      graceful_goaway_in_progress_(false), random_(random_generator),
       last_received_data_time_(connection_.dispatcher().timeSource().monotonicTime()) {
   if (http2_options.has_use_oghttp2_codec()) {
     use_oghttp2_library_ = http2_options.use_oghttp2_codec().value();
@@ -889,6 +890,14 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
 
     // This call schedules the initial interval, with jitter.
     onKeepaliveResponse();
+  }
+
+  // Initialize graceful GOAWAY timeout
+  graceful_goaway_timeout_ = std::chrono::milliseconds(
+      PROTOBUF_GET_MS_OR_DEFAULT(http2_options, graceful_goaway_timeout, 0));
+  if (graceful_goaway_timeout_.count() > 0) {
+    graceful_goaway_timer_ =
+        connection.dispatcher().createTimer([this]() { onGracefulGoAwayTimeout(); });
   }
 }
 
@@ -941,6 +950,18 @@ void ConnectionImpl::onKeepaliveResponseTimeout() {
   stats_.keepalive_timeout_.inc();
   connection_.close(Network::ConnectionCloseType::NoFlush,
                     StreamInfo::LocalCloseReasons::get().Http2PingTimeout);
+}
+
+void ConnectionImpl::onGracefulGoAwayTimeout() {
+  // Send final GOAWAY with actual highest received stream ID
+  if (graceful_goaway_in_progress_) {
+    ENVOY_CONN_LOG(debug, "Graceful GOAWAY timeout reached, sending final GOAWAY", connection_);
+    graceful_goaway_in_progress_ = false;
+    adapter_->SubmitGoAway(adapter_->GetHighestReceivedStreamId(),
+                           http2::adapter::Http2ErrorCode::HTTP2_NO_ERROR, "");
+    stats_.goaway_sent_.inc();
+    sendPendingFramesAndHandleError();
+  }
 }
 
 bool ConnectionImpl::slowContainsStreamId(int32_t stream_id) const {
@@ -1043,6 +1064,29 @@ void ConnectionImpl::goAway() {
   if (sendPendingFramesAndHandleError()) {
     // Intended to check through coverage that this error case is tested
     return;
+  }
+}
+
+void ConnectionImpl::goAwayGraceful() {
+  // If graceful GOAWAY is not configured or already in progress, fallback to immediate GOAWAY
+  if (graceful_goaway_timeout_.count() == 0 || graceful_goaway_in_progress_) {
+    goAway();
+    return;
+  }
+
+  // Send initial GOAWAY with max stream ID (2^31-1) to signal graceful shutdown
+  graceful_goaway_in_progress_ = true;
+  adapter_->SubmitGoAway(0x7FFFFFFF, http2::adapter::Http2ErrorCode::HTTP2_NO_ERROR, "");
+  stats_.goaway_graceful_sent_.inc();
+
+  if (sendPendingFramesAndHandleError()) {
+    // Intended to check through coverage that this error case is tested
+    return;
+  }
+
+  // Start timer for final GOAWAY
+  if (graceful_goaway_timer_) {
+    graceful_goaway_timer_->enableTimer(graceful_goaway_timeout_);
   }
 }
 
@@ -2030,7 +2074,7 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
      << DUMP_MEMBER(max_headers_count_) << DUMP_MEMBER(per_stream_buffer_limit_)
      << DUMP_MEMBER(allow_metadata_) << DUMP_MEMBER(stream_error_on_invalid_http_messaging_)
      << DUMP_MEMBER(is_outbound_flood_monitored_control_frame_) << DUMP_MEMBER(dispatching_)
-     << DUMP_MEMBER(raised_goaway_) << DUMP_MEMBER(pending_deferred_reset_streams_.size()) << '\n';
+     << DUMP_MEMBER(raised_goaway_) << DUMP_MEMBER(graceful_goaway_in_progress_) << DUMP_MEMBER(pending_deferred_reset_streams_.size()) << '\n';
 
   // Dump the protocol constraints
   DUMP_DETAILS(&protocol_constraints_);

@@ -775,7 +775,15 @@ void ConnectionManagerImpl::onConnectionDurationTimeout() {
 
 void ConnectionManagerImpl::onDrainTimeout() {
   ASSERT(drain_state_ != DrainState::NotDraining);
-  codec_->goAway();
+
+  // Try graceful GOAWAY for HTTP/2 connections, fallback to regular GOAWAY
+  auto* http2_conn = dynamic_cast<Http2::ConnectionImpl*>(codec_.get());
+  if (http2_conn != nullptr) {
+    http2_conn->goAwayGraceful();
+  } else {
+    codec_->goAway();
+  }
+
   drain_state_ = DrainState::Closing;
   checkForDeferredClose(false);
 }
@@ -786,7 +794,15 @@ void ConnectionManagerImpl::sendGoAwayAndClose() {
   if (go_away_sent_) {
     return;
   }
-  codec_->goAway();
+
+  // Try graceful GOAWAY for HTTP/2 connections, fallback to regular GOAWAY
+  auto* http2_conn = dynamic_cast<Http2::ConnectionImpl*>(codec_.get());
+  if (http2_conn != nullptr) {
+    http2_conn->goAwayGraceful();
+  } else {
+    codec_->goAway();
+  }
+
   go_away_sent_ = true;
   doConnectionClose(Network::ConnectionCloseType::FlushWriteAndDelay, absl::nullopt,
                     "forced_goaway");

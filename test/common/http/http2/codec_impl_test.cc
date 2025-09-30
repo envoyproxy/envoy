@@ -655,6 +655,88 @@ TEST_P(Http2CodecImplTest, ShutdownNotice) {
   driveToCompletion();
 }
 
+TEST_P(Http2CodecImplTest, GracefulGoAwayBasicFunctionality) {
+  // Configure graceful GOAWAY timeout of 100ms
+  server_http2_options_.mutable_graceful_goaway_timeout()->set_seconds(0);
+  server_http2_options_.mutable_graceful_goaway_timeout()->set_nanos(100 * 1000 * 1000); // 100ms
+
+  auto graceful_goaway_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
+  EXPECT_CALL(*graceful_goaway_timer, enableTimer(std::chrono::milliseconds(100), _));
+
+  initialize();
+
+  // Test basic functionality - just verify the method exists and stats work
+  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_graceful_sent").value());
+  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
+
+  // Allow GOAWAY callbacks to be called (these happen automatically when frames are processed)
+  EXPECT_CALL(client_callbacks_, onGoAway(_))
+      .Times(AtLeast(1));
+
+  server_->goAwayGraceful();
+  driveToCompletion();
+
+  // Verify graceful GOAWAY was sent (stats should increment)
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_graceful_sent").value());
+  EXPECT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
+
+  // Trigger timeout and final GOAWAY
+  graceful_goaway_timer->invokeCallback();
+  driveToCompletion();
+
+  // Verify final GOAWAY was sent
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_graceful_sent").value());
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
+}
+
+TEST_P(Http2CodecImplTest, GracefulGoAwayFallbackWhenTimeoutZero) {
+  // Configure graceful GOAWAY timeout of 0 (disabled)
+  server_http2_options_.mutable_graceful_goaway_timeout()->set_seconds(0);
+  server_http2_options_.mutable_graceful_goaway_timeout()->set_nanos(0);
+  initialize();
+
+  // Should fallback to immediate GOAWAY
+  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_graceful_sent").value());
+  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
+
+  EXPECT_CALL(client_callbacks_, onGoAway(_))
+      .Times(AtLeast(1));
+  server_->goAwayGraceful();
+  driveToCompletion();
+
+  // Verify immediate GOAWAY was sent (no graceful GOAWAY)
+  EXPECT_EQ(0, server_stats_store_.counter("http2.goaway_graceful_sent").value());
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
+}
+
+TEST_P(Http2CodecImplTest, GracefulGoAwayAlreadyInProgress) {
+  // Configure graceful GOAWAY timeout of 100ms
+  server_http2_options_.mutable_graceful_goaway_timeout()->set_seconds(0);
+  server_http2_options_.mutable_graceful_goaway_timeout()->set_nanos(100 * 1000 * 1000); // 100ms
+
+  auto graceful_goaway_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
+  EXPECT_CALL(*graceful_goaway_timer, enableTimer(std::chrono::milliseconds(100), _));
+
+  initialize();
+
+  // First graceful GOAWAY call
+  EXPECT_CALL(client_callbacks_, onGoAway(_))
+      .Times(AtLeast(1));
+  server_->goAwayGraceful();
+  driveToCompletion();
+
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_graceful_sent").value());
+  EXPECT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
+
+  // Second graceful GOAWAY call should fallback to immediate GOAWAY
+  server_->goAwayGraceful();
+  driveToCompletion();
+
+  // Should have sent immediate GOAWAY
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_graceful_sent").value());
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
+}
+
 TEST_P(Http2CodecImplTest, ProtocolErrorForTest) {
   initialize();
   EXPECT_EQ(absl::nullopt, request_encoder_->http1StreamEncoderOptions());
