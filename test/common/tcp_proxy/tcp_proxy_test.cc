@@ -13,6 +13,7 @@
 #include "envoy/extensions/upstreams/tcp/generic/v3/generic_connection_pool.pb.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/common/base64.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/application_protocol.h"
 #include "source/common/network/proxy_protocol_filter_state.h"
@@ -2172,7 +2173,7 @@ TEST_P(TcpProxyTest, MaxDownstreamConnectionDurationWithJitterPercentage) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 }
 
-// Test that the proxy protocol TLV is set.
+// Test that the proxy protocol TLV with static value is set.
 TEST_P(TcpProxyTest, SetTLV) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   auto* tlv = config.add_proxy_protocol_tlvs();
@@ -2200,6 +2201,118 @@ TEST_P(TcpProxyTest, SetTLV) {
   ASSERT_EQ(1, upstream_tlvs.size());
   EXPECT_EQ(0xF1, upstream_tlvs[0].type);
   EXPECT_EQ("tst", std::string(upstream_tlvs[0].value.begin(), upstream_tlvs[0].value.end()));
+}
+
+// Test that the proxy protocol TLV with dynamic format string is evaluated and Base64-encoded.
+TEST_P(TcpProxyTest, SetDynamicTLVWithMetadata) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv = config.add_proxy_protocol_tlvs();
+  tlv->set_type(0xF2);
+  tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string(
+      "%DYNAMIC_METADATA(envoy.test:key)%");
+
+  // Set dynamic metadata on the connection streamInfo directly.
+  filter_callbacks_.connection_.stream_info_.metadata_.mutable_filter_metadata()->insert(
+      {"envoy.test", Protobuf::Struct()});
+  auto& test_struct = (*filter_callbacks_.connection_.stream_info_.metadata_
+                            .mutable_filter_metadata())["envoy.test"];
+  (*test_struct.mutable_fields())["key"].set_string_value("test_value");
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  // Verify the downstream TLV is set with Base64-encoded formatted value.
+  auto& downstream_info = filter_callbacks_.connection_.streamInfo();
+  auto header =
+      downstream_info.filterState()->getDataReadOnly<Envoy::Network::ProxyProtocolFilterState>(
+          Envoy::Network::ProxyProtocolFilterState::key());
+  ASSERT_TRUE(header != nullptr);
+  auto& tlvs = header->value().tlv_vector_;
+  ASSERT_EQ(1, tlvs.size());
+  EXPECT_EQ(0xF2, tlvs[0].type);
+
+  // The formatter outputs "test_value" (no newline for text_format_source), which should be
+  // Base64-encoded.
+  const std::string expected_value = Base64::encode("test_value");
+  EXPECT_EQ(expected_value, std::string(tlvs[0].value.begin(), tlvs[0].value.end()));
+
+  // Verify the upstream TLV is set.
+  const auto upstream_header = filter_->upstreamTransportSocketOptions()->proxyProtocolOptions();
+  ASSERT_TRUE(upstream_header.has_value());
+  const auto& upstream_tlvs = upstream_header->tlv_vector_;
+  ASSERT_EQ(1, upstream_tlvs.size());
+  EXPECT_EQ(0xF2, upstream_tlvs[0].type);
+  EXPECT_EQ(expected_value,
+            std::string(upstream_tlvs[0].value.begin(), upstream_tlvs[0].value.end()));
+}
+
+// Test that the proxy protocol TLV with dynamic format string for downstream address works.
+TEST_P(TcpProxyTest, SetDynamicTLVWithDownstreamAddress) {
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      *Network::Utility::resolveUrl("tcp://1.1.1.2:20000"));
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      *Network::Utility::resolveUrl("tcp://1.1.1.1:40000"));
+
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv = config.add_proxy_protocol_tlvs();
+  tlv->set_type(0xF3);
+  tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string(
+      "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%");
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  // Verify the downstream TLV is set with Base64-encoded formatted value.
+  auto& downstream_info = filter_callbacks_.connection_.streamInfo();
+  auto header =
+      downstream_info.filterState()->getDataReadOnly<Envoy::Network::ProxyProtocolFilterState>(
+          Envoy::Network::ProxyProtocolFilterState::key());
+  ASSERT_TRUE(header != nullptr);
+  auto& tlvs = header->value().tlv_vector_;
+  ASSERT_EQ(1, tlvs.size());
+  EXPECT_EQ(0xF3, tlvs[0].type);
+
+  // The formatter outputs "1.1.1.1" (no newline for text_format_source), which should be
+  // Base64-encoded.
+  const std::string expected_value = Base64::encode("1.1.1.1");
+  EXPECT_EQ(expected_value, std::string(tlvs[0].value.begin(), tlvs[0].value.end()));
+}
+
+// Test that both static and dynamic TLVs can be combined.
+TEST_P(TcpProxyTest, SetMixedStaticAndDynamicTLVs) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+
+  // Add a static TLV.
+  auto* static_tlv = config.add_proxy_protocol_tlvs();
+  static_tlv->set_type(0xF1);
+  static_tlv->set_value("static_value");
+
+  // Add a dynamic TLV.
+  auto* dynamic_tlv = config.add_proxy_protocol_tlvs();
+  dynamic_tlv->set_type(0xF2);
+  dynamic_tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string(
+      "dynamic_value");
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  // Verify both TLVs are set.
+  auto& downstream_info = filter_callbacks_.connection_.streamInfo();
+  auto header =
+      downstream_info.filterState()->getDataReadOnly<Envoy::Network::ProxyProtocolFilterState>(
+          Envoy::Network::ProxyProtocolFilterState::key());
+  ASSERT_TRUE(header != nullptr);
+  auto& tlvs = header->value().tlv_vector_;
+  ASSERT_EQ(2, tlvs.size());
+
+  // Static TLV is first.
+  EXPECT_EQ(0xF1, tlvs[0].type);
+  EXPECT_EQ("static_value", std::string(tlvs[0].value.begin(), tlvs[0].value.end()));
+
+  // Dynamic TLV is second and Base64-encoded.
+  EXPECT_EQ(0xF2, tlvs[1].type);
+  const std::string expected_dynamic_value = Base64::encode("dynamic_value");
+  EXPECT_EQ(expected_dynamic_value, std::string(tlvs[1].value.begin(), tlvs[1].value.end()));
 }
 
 INSTANTIATE_TEST_SUITE_P(WithOrWithoutUpstream, TcpProxyTest, ::testing::Bool());
