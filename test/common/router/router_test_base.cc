@@ -91,72 +91,6 @@ AssertionResult RouterTestBase::verifyHostUpstreamStats(uint64_t success, uint64
   return AssertionSuccess();
 }
 
-void RouterTestBase::verifyMetadataMatchCriteriaFromRequest(bool route_entry_has_match) {
-  Protobuf::Struct request_struct, route_struct;
-  Protobuf::Value val;
-
-  // Populate metadata like StreamInfo.setDynamicMetadata() would.
-  auto& fields_map = *request_struct.mutable_fields();
-  val.set_string_value("v3.1");
-  fields_map["version"] = val;
-  val.set_string_value("devel");
-  fields_map["stage"] = val;
-  (*callbacks_.stream_info_.metadata_
-        .mutable_filter_metadata())[Envoy::Config::MetadataFilters::get().ENVOY_LB] =
-      request_struct;
-
-  // Populate route entry's metadata which will be overridden.
-  val.set_string_value("v3.0");
-  fields_map = *request_struct.mutable_fields();
-  fields_map["version"] = val;
-  MetadataMatchCriteriaImpl route_entry_matches(route_struct);
-
-  if (route_entry_has_match) {
-    ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria())
-        .WillByDefault(Return(&route_entry_matches));
-  } else {
-    ON_CALL(callbacks_.route_->route_entry_, metadataMatchCriteria())
-        .WillByDefault(Return(nullptr));
-  }
-
-  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
-      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
-                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
-        auto match = context->metadataMatchCriteria()->metadataMatchCriteria();
-        EXPECT_EQ(match.size(), 2);
-        auto it = match.begin();
-
-        // Note: metadataMatchCriteria() keeps its entries sorted, so the order for checks
-        // below matters.
-
-        // `stage` was only set by the request, not by the route entry.
-        EXPECT_EQ((*it)->name(), "stage");
-        EXPECT_EQ((*it)->value().value().string_value(), "devel");
-        it++;
-
-        // `version` should be what came from the request, overriding the route entry.
-        EXPECT_EQ((*it)->name(), "version");
-        EXPECT_EQ((*it)->value().value().string_value(), "v3.1");
-
-        // When metadataMatchCriteria() is computed from dynamic metadata, the result should
-        // be cached.
-        EXPECT_EQ(context->metadataMatchCriteria(), context->metadataMatchCriteria());
-
-        return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
-      }));
-  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
-      .WillOnce(Return(&cancellable_));
-  expectResponseTimerCreate();
-
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_->decodeHeaders(headers, true);
-
-  // When the router filter gets reset we should cancel the pool request.
-  EXPECT_CALL(cancellable_, cancel(_));
-  router_->onDestroy();
-}
-
 void RouterTestBase::verifyAttemptCountInRequestBasic(bool set_include_attempt_count_in_request,
                                                       absl::optional<int> preset_count,
                                                       int expected_count) {
@@ -319,11 +253,11 @@ void RouterTestBase::setConnectionMetadata(const std::string& yaml_content) {
 }
 
 void RouterTestBase::setRequestMetadata(const std::map<std::string, std::string>& fields) {
-  ProtobufWkt::Struct request_struct;
+  Protobuf::Struct request_struct;
   auto& fields_map = *request_struct.mutable_fields();
 
   for (const auto& [key, value] : fields) {
-    ProtobufWkt::Value val;
+    Protobuf::Value val;
     val.set_string_value(value);
     fields_map[key] = val;
   }

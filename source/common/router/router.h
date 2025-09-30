@@ -372,7 +372,7 @@ public:
       return metadata_match_.get();
     }
 
-    absl::optional<ProtobufWkt::Struct> connection_metadata;
+    absl::optional<Protobuf::Struct> connection_metadata;
     const auto& connection_fm =
         downstreamConnection()->streamInfo().dynamicMetadata().filter_metadata();
     if (const auto it = connection_fm.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -380,7 +380,7 @@ public:
       connection_metadata = it->second;
     }
 
-    absl::optional<ProtobufWkt::Struct> request_metadata;
+    absl::optional<Protobuf::Struct> request_metadata;
     const auto& request_fm = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
     if (const auto it = request_fm.find(Envoy::Config::MetadataFilters::get().ENVOY_LB);
         it != request_fm.end()) {
