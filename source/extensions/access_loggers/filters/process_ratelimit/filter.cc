@@ -16,20 +16,22 @@ ProcessRateLimitFilter::ProcessRateLimitFilter(
     const envoy::extensions::access_loggers::filters::process_ratelimit::v3::ProcessRateLimitFilter&
         config)
     : cancel_cb_(std::make_shared<bool>(false)) {
+  auto setter =
+      [this, cancel_cb = std::shared_ptr<bool>(cancel_cb_)](
+          Envoy::Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterSharedPtr limiter)
+      -> void {
+    ENVOY_LOG_MISC(debug, "setter called");
+    if (*cancel_cb) {
+      return;
+    }
+    ENVOY_BUG(limiter != nullptr, "limiter shouldn't be null if the `limiter` is set from "
+                                  "callback.");
+
+    rate_limiter_->setLimiter(limiter);
+  };
   rate_limiter_ = Envoy::Extensions::Filters::Common::LocalRateLimit::RateLimiterProviderSingleton::
-      getRateLimiter(
-          context, config.dynamic_config().resource_name(), config.dynamic_config().config_source(),
-          [this, cancel_cb = std::shared_ptr<bool>(cancel_cb_)](
-              std::shared_ptr<
-                  Envoy::Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterImpl>
-                  limiter) -> void {
-            if (*cancel_cb) {
-              return;
-            }
-            ENVOY_BUG(limiter != nullptr, "limiter should be null if the `limiter` is set from "
-                                          "callback.");
-            rate_limiter_->setLimiter(limiter);
-          });
+      getRateLimiter(context, config.dynamic_config().resource_name(),
+                     config.dynamic_config().config_source(), std::move(setter));
 }
 
 ProcessRateLimitFilter::~ProcessRateLimitFilter() { *cancel_cb_ = true; }
@@ -38,7 +40,8 @@ bool ProcessRateLimitFilter::evaluate(const Formatter::HttpFormatterContext&,
                                       const StreamInfo::StreamInfo&) const {
   ENVOY_BUG(rate_limiter_->getLimiter() != nullptr,
             "rate_limiter_.limiter_ should be already set in init callback.");
-  return rate_limiter_->getLimiter()->requestAllowed({}).allowed;
+  auto limiter = rate_limiter_->getLimiter();
+  return limiter->requestAllowed({}).allowed;
 }
 
 } // namespace ProcessRateLimit

@@ -34,23 +34,38 @@ RateLimiterProviderSingleton::RateLimiterWrapperPtr RateLimiterProviderSingleton
 
   // Find the subscription for the given key.
   auto it = provider->subscriptions_.find(key);
+  TokenBucketSubscriptionSharedPtr subscription = nullptr;
   if (it == provider->subscriptions_.end()) {
     // If the subscription doesn't exist, create a new one.
-    auto subscription = std::make_unique<TokenBucketSubscription>(*provider, key);
-    it = provider->subscriptions_.emplace(key, std::move(subscription)).first;
+    subscription = std::make_shared<TokenBucketSubscription>(*provider, key);
+    it = provider->subscriptions_.emplace(key, subscription).first;
+  } else {
+    auto exist_subscription = it->second.lock();
+    ENVOY_BUG(exist_subscription != nullptr,
+              fmt::format("subscription for {} should not be null since it should be "
+                          "cleaned up when the last wrapper is destroyed",
+                          key));
+    subscription = exist_subscription;
   }
 
-  auto& subscription = it->second;
+  subscription->addSetter(std::move(callback));
 
   // If the limiter is already created, return it.
   if (auto limiter = subscription->getLimiter()) {
-    return std::make_unique<RateLimiterWrapper>(provider, limiter);
+    return std::make_unique<RateLimiterWrapper>(provider, subscription, limiter);
+  }
+
+  if (!subscription->init_target_) {
+    // This is the case when the corresponding resource is removed and the
+    // subscription need a new init target to wait for a new resource.
+    subscription->init_target_ =
+        std::make_unique<Init::TargetImpl>(fmt::format("RateLimitConfigCallback-{}", key), []() {});
+    factory_context.initManager().add(*subscription->init_target_);
   }
 
   // Otherwise, return a wrapper with a null limiter. The limiter will be
   // set when the config is received.
-  subscription->addSetter(std::move(callback));
-  return std::make_unique<RateLimiterWrapper>(provider, nullptr);
+  return std::make_unique<RateLimiterWrapper>(provider, subscription, nullptr);
 }
 
 std::shared_ptr<LocalRateLimiterImpl>
@@ -72,8 +87,8 @@ RateLimiterProviderSingleton::TokenBucketSubscription::TokenBucketSubscription(
     RateLimiterProviderSingleton& parent, absl::string_view resource_name)
     : Config::SubscriptionBase<envoy::type::v3::TokenBucketConfig>(
           parent.factory_context_.messageValidationVisitor(), "name"),
-      parent_(parent),
-      init_target_(std::make_unique<Init::TargetImpl>("RateLimitConfigCallback", []() {})),
+      parent_(parent), init_target_(std::make_unique<Init::TargetImpl>(
+                           fmt::format("RateLimitConfigCallback-{}", resource_name), []() {})),
       resource_name_(resource_name), token_bucket_config_hash_(0) {
   parent_.factory_context_.initManager().add(*init_target_);
   subscription_ = THROW_OR_RETURN_VALUE(
@@ -84,30 +99,28 @@ RateLimiterProviderSingleton::TokenBucketSubscription::TokenBucketSubscription(
   subscription_->start({resource_name_});
 }
 
+RateLimiterProviderSingleton::TokenBucketSubscription::~TokenBucketSubscription() {
+  parent_.subscriptions_.erase(resource_name_);
+}
+
 void RateLimiterProviderSingleton::TokenBucketSubscription::handleAddedResource(
     const Config::DecodedResourceRef& resource) {
   const auto& config =
       dynamic_cast<const envoy::type::v3::TokenBucketConfig&>(resource.get().resource());
-  // Update the config.
   size_t new_hash = MessageUtil::hash(config);
   // If the config is the same, no op.
   if (new_hash == token_bucket_config_hash_) {
     return;
   }
+
+  // Update the config and hash and reset the limiter.
   config_ = config;
   token_bucket_config_hash_ = new_hash;
-  limiter_.reset();
-
-  // If limiter is not created, create a new limiter and set it.
-  auto limiter = limiter_.lock();
-  if (limiter == nullptr) {
-    limiter = createRateLimiterImpl(config.token_bucket(),
-                                    parent_.factory_context_.mainThreadDispatcher());
-  }
-
-  limiter_ = limiter;
+  auto new_limiter =
+      createRateLimiterImpl(config.token_bucket(), parent_.factory_context_.mainThreadDispatcher());
+  limiter_ = new_limiter;
   for (auto& setter : setters_) {
-    setter(limiter);
+    setter(new_limiter);
   }
 
   // Mark ready only once.
@@ -115,8 +128,17 @@ void RateLimiterProviderSingleton::TokenBucketSubscription::handleAddedResource(
 }
 
 void RateLimiterProviderSingleton::TokenBucketSubscription::handleRemovedResource(
-    absl::string_view resource) {
-  parent_.subscriptions_.erase(resource);
+    absl::string_view) {
+  // We simply reset the config and limiter here. The existing rate limiter will
+  // continue to work before the new config is received.
+  config_.reset();
+  token_bucket_config_hash_ = 0;
+  limiter_.reset();
+
+  // Reset the init target as we are now waiting for a new resource.
+  for (auto& setter : setters_) {
+    setter(parent_.fallback_always_deny_limiter_);
+  }
 }
 
 absl::Status RateLimiterProviderSingleton::TokenBucketSubscription::onConfigUpdate(
@@ -160,6 +182,7 @@ absl::Status RateLimiterProviderSingleton::TokenBucketSubscription::onConfigUpda
 
   return absl::OkStatus();
 }
+
 } // namespace LocalRateLimit
 } // namespace Common
 } // namespace Filters

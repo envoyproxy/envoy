@@ -505,6 +505,7 @@ new_features:
     This can be used to avoid thundering herd problems with many clients being disconnected and possibly reconnecting at the same time.
 - area: access_log
   change: |
-    Support process-level rate limiting on access log.
+    Support process-level rate limiting on access log emission by
+    :ref:`ProcessRateLimitFilter <envoy_v3_api_field_extensions.access_loggers.filters.v3.process_ratelimit.ProcessRateLimitFilter>`.
 
 deprecated:
