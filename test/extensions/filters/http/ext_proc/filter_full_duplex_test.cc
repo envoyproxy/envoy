@@ -369,7 +369,9 @@ TEST_F(HttpFilterTest, DuplexStreamedBodyProcessingTestWithFilterConfigMissing) 
   filter_->onDestroy();
 }
 
-TEST_F(HttpFilterTest, SendNormalBodyMutationTestWithFilterConfigDuplexStreamed) {
+// For FULL_DUPLEX_STREAMED mode, if data is already sent, even fail open
+// is configured, Envoy still does fail close.
+TEST_F(HttpFilterTest, FullDuplexFailCloseWithDataOutbound) {
   initialize(R"EOF(
   grpc_service:
     envoy_grpc:
@@ -405,10 +407,73 @@ TEST_F(HttpFilterTest, SendNormalBodyMutationTestWithFilterConfigDuplexStreamed)
         auto* body_mut = resp.mutable_response()->mutable_body_mutation();
         body_mut->set_body("AAA");
       },
-      true);
+      false);
 
-  // Verify spurious message is received.
-  EXPECT_EQ(config_->stats().spurious_msgs_received_.value(), 1);
+  // Fail close with spurious messages received.
+  EXPECT_EQ(1, config_->stats().spurious_msgs_received_.value());
+  EXPECT_EQ(0, config_->stats().failure_mode_allowed_.value());
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, FullDuplexFailOpenWithoutDataOutbound) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  failure_mode_allow: true
+  processing_mode:
+    response_body_mode: "FULL_DUPLEX_STREAMED"
+    response_trailer_mode: "SEND"
+  )EOF");
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, absl::nullopt);
+
+  response_headers_.addCopy(LowerCaseString(":status"), "200");
+  response_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  bool encoding_watermarked = false;
+  setUpEncodingWatermarking(encoding_watermarked);
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->encodeHeaders(response_headers_, false));
+  processResponseHeaders(false, absl::nullopt);
+
+  // Fail open with gRPC error messages received.
+  stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error_message");
+  EXPECT_EQ(1, config_->stats().failure_mode_allowed_.value());
+  EXPECT_EQ(1, config_->stats().streams_failed_.value());
+  filter_->onDestroy();
+}
+
+TEST_F(HttpFilterTest, FullDuplexFailCloseWithDataInbound) {
+  initialize(R"EOF(
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  failure_mode_allow: true
+  processing_mode:
+    request_body_mode: "FULL_DUPLEX_STREAMED"
+    request_trailer_mode: "SEND"
+  )EOF");
+
+  // Create synthetic HTTP request
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  request_headers_.addCopy(LowerCaseString("content-type"), "text/plain");
+
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  processRequestHeaders(false, absl::nullopt);
+  Buffer::OwnedImpl req_data("foo");
+  EXPECT_EQ(FilterDataStatus::Continue, filter_->decodeData(req_data, false));
+
+  // Fail close with gRPC error messages received.
+  stream_callbacks_->onGrpcError(Grpc::Status::Internal, "error_message");
+  EXPECT_EQ(0, config_->stats().failure_mode_allowed_.value());
+  EXPECT_EQ(1, config_->stats().streams_failed_.value());
   filter_->onDestroy();
 }
 
