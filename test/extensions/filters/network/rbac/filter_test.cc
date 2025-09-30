@@ -13,6 +13,7 @@
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/server/factory_context.h"
+#include "test/test_common/test_runtime.h"
 
 #include "xds/type/matcher/v3/matcher.pb.h"
 
@@ -29,12 +30,15 @@ namespace RBACFilter {
 class RoleBasedAccessControlNetworkFilterTest : public testing::Test {
 public:
   static void SetUpTestSuite() {
-    // Set debug log level to ensure coverage of debug log statements
+    // Set debug log level to ensure coverage of debug log statements.
     Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
   }
 
   RoleBasedAccessControlNetworkFilterTest() {
-    // No per-logger log level setting needed
+    // Set runtime guard to default (enabled).
+    ON_CALL(context_.runtime_loader_.snapshot_,
+            runtimeFeatureEnabled("envoy.reloadable_features.rbac_enforce_on_transport_ready"))
+        .WillByDefault(Return(true));
   }
 
   void
@@ -345,7 +349,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, Denied) {
   setDestinationPort(456);
   setMetadata();
 
-  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _)).Times(2);
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
 
   // Call onData() twice, should only increase stats once.
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
@@ -480,7 +484,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherDenied) {
   setDestinationPort(456);
   setMetadata();
 
-  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _)).Times(2);
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
 
   // Call onData() twice, should only increase stats once.
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
@@ -596,7 +600,7 @@ on_no_match:
 
   setLocalAddressWithNetworkNamespace("/var/run/netns/other", 123);
 
-  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _)).Times(2);
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
 
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data_, false));
@@ -649,7 +653,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowNoChangeLog) {
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
 
-  // Check that Allow action does not set access log metadata
+  // Check that Allow action does not set access log metadata.
   EXPECT_EQ(stream_info_.dynamicMetadata().filter_metadata().end(),
             stream_info_.dynamicMetadata().filter_metadata().find(
                 Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace));
@@ -699,7 +703,7 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, MatcherAllowNoChangeLog) {
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
 
-  // Check that Allow action does not set access log metadata
+  // Check that Allow action does not set access log metadata.
   EXPECT_EQ(stream_info_.dynamicMetadata().filter_metadata().end(),
             stream_info_.dynamicMetadata().filter_metadata().find(
                 Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().CommonNamespace));
@@ -710,10 +714,10 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, DebugLogLevel) {
   setDestinationPort(123);
   setRequestedServerName("www.cncf.io");
 
-  // Force debug level on
+  // Force debug level on.
   Envoy::Logger::Registry::setLogLevel(spdlog::level::debug);
 
-  // Mock SSL setup
+  // Mock SSL setup.
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   std::vector<std::string> uri_sans{"uri-san-value"};
   std::vector<std::string> dns_sans{"dns-san-value"};
@@ -723,13 +727,131 @@ TEST_F(RoleBasedAccessControlNetworkFilterTest, DebugLogLevel) {
   ON_CALL(*connection_info, subjectPeerCertificate()).WillByDefault(ReturnRef(subject_str));
   ON_CALL(callbacks_.connection_, ssl()).WillByDefault(Return(connection_info));
 
-  // Call onData to trigger the debug log code path
+  // Call onData to trigger the debug log code path.
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
-  // Explicitly verify any counters that would be affected by this code path
+  // Explicitly verify any counters that would be affected by this code path.
   EXPECT_EQ(1U, config_->stats().allowed_.value());
   EXPECT_EQ(0U, config_->stats().denied_.value());
+}
+
+// Tests authorization enforcement when transport socket is ready.
+TEST_F(RoleBasedAccessControlNetworkFilterTest, AllowedOnTransportReadyWithConnectedEvent) {
+  setupPolicy();
+  setDestinationPort(123);
+
+  EXPECT_CALL(callbacks_.connection_, readDisable(true));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_CALL(callbacks_.connection_, readDisable(false));
+  filter_->onEvent(Network::ConnectionEvent::Connected);
+
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().denied_.value());
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+}
+
+TEST_F(RoleBasedAccessControlNetworkFilterTest, DeniedOnTransportReadyWithConnectedEvent) {
+  setupPolicy();
+  setDestinationPort(456);
+
+  EXPECT_CALL(callbacks_.connection_, readDisable(true));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  filter_->onEvent(Network::ConnectionEvent::Connected);
+
+  EXPECT_EQ(0U, config_->stats().allowed_.value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+}
+
+TEST_F(RoleBasedAccessControlNetworkFilterTest, FallbackToOnDataWhenConnectedNotRaised) {
+  setupPolicy();
+  setDestinationPort(123);
+
+  EXPECT_CALL(callbacks_.connection_, readDisable(true));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+  EXPECT_EQ(0U, config_->stats().denied_.value());
+}
+
+TEST_F(RoleBasedAccessControlNetworkFilterTest, ConnectedEventBeforeOnNewConnection) {
+  setupPolicy();
+  setDestinationPort(123);
+
+  filter_->onEvent(Network::ConnectionEvent::Connected);
+  EXPECT_EQ(0U, config_->stats().allowed_.value());
+
+  EXPECT_CALL(callbacks_.connection_, readDisable(true));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+}
+
+TEST_F(RoleBasedAccessControlNetworkFilterTest, DelayDeniedOnTransportReady) {
+  int64_t delay_deny_duration_ms = 500;
+  setupPolicy(true /* with_policy */, false /* continuous */, envoy::config::rbac::v3::RBAC::ALLOW,
+              delay_deny_duration_ms);
+  setDestinationPort(456);
+
+  EXPECT_CALL(callbacks_.connection_, readDisable(true));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  Event::MockTimer* delay_timer =
+      new NiceMock<Event::MockTimer>(&callbacks_.connection_.dispatcher_);
+  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(delay_deny_duration_ms), _));
+  EXPECT_CALL(callbacks_.connection_, readDisable(true));
+
+  filter_->onEvent(Network::ConnectionEvent::Connected);
+
+  EXPECT_EQ(0U, config_->stats().allowed_.value());
+  EXPECT_EQ(1U, config_->stats().denied_.value());
+
+  EXPECT_CALL(callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush, _));
+  delay_timer->invokeCallback();
+}
+
+TEST_F(RoleBasedAccessControlNetworkFilterTest, ContinuousEnforcementOnTransportReady) {
+  setupPolicy(true /* with_policy */, true /* continuous */);
+  setDestinationPort(123);
+
+  EXPECT_CALL(callbacks_.connection_, readDisable(true));
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  EXPECT_CALL(callbacks_.connection_, readDisable(false));
+  filter_->onEvent(Network::ConnectionEvent::Connected);
+
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(2U, config_->stats().allowed_.value());
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(3U, config_->stats().allowed_.value());
+}
+
+// Test legacy behavior when runtime guard is disabled.
+TEST_F(RoleBasedAccessControlNetworkFilterTest, RuntimeGuardDisabledUsesOnData) {
+  EXPECT_CALL(context_.runtime_loader_.snapshot_,
+              runtimeFeatureEnabled("envoy.reloadable_features.rbac_enforce_on_transport_ready"))
+      .WillRepeatedly(Return(false));
+
+  setupPolicy();
+  setDestinationPort(123);
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
+
+  filter_->onEvent(Network::ConnectionEvent::Connected);
+  EXPECT_EQ(0U, config_->stats().allowed_.value());
+
+  EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data_, false));
+  EXPECT_EQ(1U, config_->stats().allowed_.value());
 }
 
 } // namespace RBACFilter

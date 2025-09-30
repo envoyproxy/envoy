@@ -368,6 +368,80 @@ typed_config:
   EXPECT_EQ(1U, test_server_->counter("tcp.rbac.denied")->value());
 }
 
+TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, AllowedWithEnforceOnTransportReady) {
+  initializeFilter(R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
+  stat_prefix: tcp.
+  rules:
+    policies:
+      "allow_all":
+        permissions:
+          - any: true
+        principals:
+          - any: true
+)EOF");
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write("hello"));
+  ASSERT_TRUE(tcp_client->connected());
+  tcp_client->close();
+
+  test_server_->waitForCounterGe("tcp.rbac.allowed", 1);
+  EXPECT_EQ(0U, test_server_->counter("tcp.rbac.denied")->value());
+}
+
+TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, DeniedWithEnforceOnTransportReady) {
+  initializeFilter(R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
+  stat_prefix: tcp.
+  rules:
+    policies:
+      "deny_all":
+        permissions:
+          - any: true
+        principals:
+          - not_id:
+              any: true
+)EOF");
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  tcp_client->waitForDisconnect();
+
+  EXPECT_EQ(0U, test_server_->counter("tcp.rbac.allowed")->value());
+  EXPECT_EQ(1U, test_server_->counter("tcp.rbac.denied")->value());
+}
+
+TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, DelayDeniedWithEnforceOnTransportReady) {
+  initializeFilter(R"EOF(
+name: rbac
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.rbac.v3.RBAC
+  stat_prefix: tcp.
+  rules:
+    policies:
+      "deny_all":
+        permissions:
+          - any: true
+        principals:
+          - not_id:
+              any: true
+  delay_deny: 5s
+)EOF");
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->connected());
+
+  timeSystem().advanceTimeWait(std::chrono::seconds(3));
+  ASSERT_TRUE(tcp_client->connected());
+
+  timeSystem().advanceTimeWait(std::chrono::seconds(6));
+  tcp_client->waitForDisconnect();
+
+  EXPECT_EQ(0U, test_server_->counter("tcp.rbac.allowed")->value());
+  EXPECT_EQ(1U, test_server_->counter("tcp.rbac.denied")->value());
+}
+
 } // namespace RBAC
 } // namespace NetworkFilters
 } // namespace Extensions
