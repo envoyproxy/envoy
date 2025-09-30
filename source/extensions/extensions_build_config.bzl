@@ -148,6 +148,7 @@ EXTENSIONS = {
     "envoy.filters.http.basic_auth":                    "//source/extensions/filters/http/basic_auth:config",
     "envoy.filters.http.buffer":                        "//source/extensions/filters/http/buffer:config",
     "envoy.filters.http.cache":                         "//source/extensions/filters/http/cache:config",
+    "envoy.filters.http.cache_v2":                      "//source/extensions/filters/http/cache_v2:config",
     "envoy.filters.http.cdn_loop":                      "//source/extensions/filters/http/cdn_loop:config",
     "envoy.filters.http.compressor":                    "//source/extensions/filters/http/compressor:config",
     "envoy.filters.http.cors":                          "//source/extensions/filters/http/cors:config",
@@ -223,6 +224,7 @@ EXTENSIONS = {
     "envoy.filters.network.echo":                                 "//source/extensions/filters/network/echo:config",
     "envoy.filters.network.ext_authz":                            "//source/extensions/filters/network/ext_authz:config",
     "envoy.filters.network.ext_proc":                             "//source/extensions/filters/network/ext_proc:config",
+    "envoy.filters.network.reverse_tunnel":                       "//source/extensions/filters/network/reverse_tunnel:config",
     "envoy.filters.network.http_connection_manager":              "//source/extensions/filters/network/http_connection_manager:config",
     "envoy.filters.network.local_ratelimit":                      "//source/extensions/filters/network/local_ratelimit:config",
     "envoy.filters.network.mongo_proxy":                          "//source/extensions/filters/network/mongo_proxy:config",
@@ -343,8 +345,10 @@ EXTENSIONS = {
     #
     # CacheFilter plugins
     #
-    "envoy.extensions.http.cache.file_system_http_cache": "//source/extensions/http/cache/file_system_http_cache:config",
-    "envoy.extensions.http.cache.simple":               "//source/extensions/http/cache/simple_http_cache:config",
+    "envoy.extensions.http.cache.file_system_http_cache":    "//source/extensions/http/cache/file_system_http_cache:config",
+    "envoy.extensions.http.cache.simple":                    "//source/extensions/http/cache/simple_http_cache:config",
+    "envoy.extensions.http.cache_v2.file_system_http_cache": "//source/extensions/http/cache_v2/file_system_http_cache:config",
+    "envoy.extensions.http.cache_v2.simple":                 "//source/extensions/http/cache_v2/simple_http_cache:config",
 
     #
     # Internal redirect predicates

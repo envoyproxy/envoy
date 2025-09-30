@@ -24,7 +24,7 @@ Buffer::InstancePtr ReverseConnectionUtility::createPingResponse() {
 bool ReverseConnectionUtility::sendPingResponse(Network::Connection& connection) {
   auto ping_buffer = createPingResponse();
   connection.write(*ping_buffer, false);
-  ENVOY_LOG(debug, "Reverse connection utility: sent RPING response on connection {}",
+  ENVOY_LOG(trace, "Reverse connection utility: sent RPING response on connection {}.",
             connection.id());
   return true;
 }
@@ -33,10 +33,10 @@ Api::IoCallUint64Result ReverseConnectionUtility::sendPingResponse(Network::IoHa
   auto ping_buffer = createPingResponse();
   Api::IoCallUint64Result result = io_handle.write(*ping_buffer);
   if (result.ok()) {
-    ENVOY_LOG(trace, "Reverse connection utility: sent RPING response, bytes: {}",
+    ENVOY_LOG(trace, "Reverse connection utility: sent RPING response. bytes: {}.",
               result.return_value_);
   } else {
-    ENVOY_LOG(trace, "Reverse connection utility: failed to send RPING response, error: {}",
+    ENVOY_LOG(trace, "Reverse connection utility: failed to send RPING response. error: {}.",
               result.err_->getErrorDetails());
   }
   return result;
@@ -47,14 +47,14 @@ bool ReverseConnectionUtility::handlePingMessage(absl::string_view data,
   if (!isPingMessage(data)) {
     return false;
   }
-  ENVOY_LOG(debug, "Reverse connection utility: received RPING on connection {}, echoing back",
+  ENVOY_LOG(trace, "Reverse connection utility: received RPING on connection {}; echoing back.",
             connection.id());
   return sendPingResponse(connection);
 }
 
 bool ReverseConnectionUtility::extractPingFromHttpData(absl::string_view http_data) {
   if (http_data.find(PING_MESSAGE) != absl::string_view::npos) {
-    ENVOY_LOG(debug, "Reverse connection utility: found RPING in HTTP data");
+    ENVOY_LOG(trace, "Reverse connection utility: found RPING in HTTP data.");
     return true;
   }
   return false;

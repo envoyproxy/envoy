@@ -582,6 +582,10 @@ private:
 
   void encodeProtocolConfig(envoy::service::ext_proc::v3::ProcessingRequest& req);
 
+  // For FULL_DUPLEX_STREAMED body mode, once the data is received and sent to
+  // the ext_proc server, Envoy only supports fail close.
+  bool failureModeAllow() const;
+
   const FilterConfigSharedPtr config_;
   const ClientBasePtr client_;
   const ExtProcFilterStats& stats_;

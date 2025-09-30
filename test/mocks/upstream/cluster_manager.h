@@ -44,6 +44,8 @@ public:
               (const envoy::config::bootstrap::v3::Bootstrap& bootstrap));
   MOCK_METHOD(ClusterInfoMaps, clusters, (), (const));
   MOCK_METHOD(OptRef<const Cluster>, getActiveCluster, (const std::string& cluster_name), (const));
+  MOCK_METHOD(OptRef<const Cluster>, getActiveOrWarmingCluster, (const std::string& cluster_name),
+              (const));
   MOCK_METHOD(bool, hasCluster, (const std::string& cluster_name), (const));
   MOCK_METHOD(bool, hasActiveClusters, (), (const));
 
