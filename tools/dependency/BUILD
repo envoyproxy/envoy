@@ -86,13 +86,6 @@ py_binary(
     deps = [":validate"],
 )
 
-py_console_script_binary(
-    name = "cve_download",
-    pkg = "@base_pip3//envoy_dependency_check",
-    script = "envoy.dependency.check",
-    deps = [requirement("orjson")],
-)
-
 envoy_genjson(
     name = "build-images",
     filter = """
@@ -113,4 +106,37 @@ sh_binary(
         "@jq_toolchains//:resolved_toolchain",
     ],
     toolchains = ["@jq_toolchains//:resolved_toolchain"],
+)
+
+envoy_genjson(
+    name = "start-year",
+    filter = """
+    .[0].start_year
+    """,
+    visibility = ["//visibility:public"],
+    yaml_srcs = [":cve.yaml"],
+)
+
+py_binary(
+    name = "cve_fetch",
+    srcs = ["cve_fetch.py"],
+    deps = [
+        requirement("aiohttp"),
+        requirement("aio.run.runner"),
+    ],
+)
+
+sh_binary(
+    name = "cve_update",
+    srcs = ["cve_update.sh"],
+    data = [
+        ":cve_fetch",
+        ":start-year",
+    ],
+    env = {
+        "FETCHER": "$(location :cve_fetch)",
+        "START_YEAR_PATH": "$(location :start-year)",
+        # NOTE: usage of PATH means this _must_ be run locally
+        "CVE_DATA_PATH": "%s/tools/dependency/cve_data" % PATH,
+    },
 )

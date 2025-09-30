@@ -2809,6 +2809,42 @@ TEST_F(HttpFilterTest, OutOfOrderFailClose) {
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
 }
 
+TEST_F(HttpFilterTest, OutOfOrderPerRouteOverrideFailOpen) {
+  // Filter is configured with fail-close.
+  initialize(R"EOF(
+  failure_mode_allow: false
+  grpc_service:
+    envoy_grpc:
+      cluster_name: "ext_proc_server"
+  )EOF");
+  // Per-route overrides config to fail-open.
+  ExtProcPerRoute route_proto;
+  route_proto.mutable_overrides()->mutable_failure_mode_allow()->set_value(true);
+  FilterConfigPerRoute route_config(route_proto);
+  EXPECT_CALL(decoder_callbacks_, perFilterConfigs())
+      .WillRepeatedly(
+          testing::Invoke([&]() -> Router::RouteSpecificFilterConfigs { return {&route_config}; }));
+
+  HttpTestUtility::addDefaultHeaders(request_headers_);
+  request_headers_.setMethod("POST");
+  EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
+  ASSERT_TRUE(last_request_.has_request_headers());
+
+  // Return an out-of-order message. Spurious message stats counter
+  // and failure_mode_allow stats counter are both incremented by 1.
+  std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
+  resp1->mutable_request_body();
+  stream_callbacks_->onReceiveMessage(std::move(resp1));
+  filter_->onDestroy();
+
+  EXPECT_EQ(1, config_->stats().streams_started_.value());
+  EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
+  EXPECT_EQ(1, config_->stats().spurious_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().failure_mode_allowed_.value());
+  EXPECT_EQ(0, config_->stats().stream_msgs_received_.value());
+  EXPECT_EQ(1, config_->stats().streams_closed_.value());
+}
+
 // When merging two configurations, ensure that the second processing mode
 // overrides the first.
 TEST(OverrideTest, OverrideProcessingMode) {
