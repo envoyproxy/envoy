@@ -89,6 +89,7 @@ involves duplicating the full route config into an internal listener (unfortunat
 .. literalinclude:: _include/http-cache-v2-configuration-internal-listener.yaml
    :language: yaml
    :start-at: http_filters:
+   :end-at: server_listener_name: cache_internal_listener
    :linenos:
    :lineno-match:
    :caption: :download:`http-cache-v2-configuration-internal-listener.yaml <_include/http-cache-v2-configuration-internal-listener.yaml>`
