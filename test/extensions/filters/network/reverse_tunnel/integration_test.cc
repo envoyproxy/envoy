@@ -106,7 +106,8 @@ typed_config:
 
   void addReverseTunnelFilter(bool auto_close_connections = false,
                               const std::string& request_path = "/reverse_connections/request",
-                              const std::string& request_method = "GET") {
+                              const std::string& request_method = "GET",
+                              const std::string& validation_config = "") {
     const std::string filter_config =
         fmt::format(R"EOF(
         name: envoy.filters.network.reverse_tunnel
@@ -116,9 +117,10 @@ typed_config:
             seconds: 300
           auto_close_connections: {}
           request_path: "{}"
-          request_method: {}
+          request_method: {}{}
 )EOF",
-                    auto_close_connections ? "true" : "false", request_path, request_method);
+                    auto_close_connections ? "true" : "false", request_path, request_method,
+                    validation_config.empty() ? "" : "\n" + validation_config);
 
     config_helper_.addConfigModifier(
         [filter_config](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -478,6 +480,203 @@ TEST_P(ReverseTunnelFilterIntegrationTest, EndToEndReverseConnectionHandshake) {
   // Wait for listeners to be stopped, which triggers ReverseConnectionIOHandle cleanup.
   test_server_->waitForCounterEq("listener_manager.listener_stopped",
                                  2); // 2 listeners in this test
+}
+
+// Test validation with static expected values - success case.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithStaticValuesSuccess) {
+  const std::string validation_config = R"(
+          validation:
+            node_id_format: "test-node"
+            cluster_id_format: "test-cluster"
+            emit_dynamic_metadata: true)";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  std::string http_request = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "test-node", "test-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(http_request));
+  tcp_client->waitForData("HTTP/1.1 200 OK");
+  tcp_client->close();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+}
+
+// Test validation with static expected values - failure case.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithStaticValuesFailure) {
+  const std::string validation_config = R"(
+          validation:
+            node_id_format: "expected-node"
+            cluster_id_format: "expected-cluster")";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  std::string http_request = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "wrong-node", "wrong-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(http_request));
+  tcp_client->waitForData("HTTP/1.1 403 Forbidden");
+  tcp_client->waitForDisconnect();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+}
+
+// Test validation with only node_id validation.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationOnlyNodeId) {
+  const std::string validation_config = R"(
+          validation:
+            node_id_format: "expected-node")";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  // Success: node_id matches, cluster_id ignored.
+  std::string http_request_pass = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "expected-node", "any-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client1 = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client1->write(http_request_pass));
+  tcp_client1->waitForData("HTTP/1.1 200 OK");
+  tcp_client1->close();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+
+  // Failure: node_id doesn't match.
+  std::string http_request_fail = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "wrong-node", "any-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client2->write(http_request_fail));
+  tcp_client2->waitForData("HTTP/1.1 403 Forbidden");
+  tcp_client2->waitForDisconnect();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+}
+
+// Test validation with only cluster_id validation.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationOnlyClusterId) {
+  const std::string validation_config = R"(
+          validation:
+            cluster_id_format: "expected-cluster")";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  // Success: cluster_id matches, node_id ignored.
+  std::string http_request_pass = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "any-node", "expected-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client1 = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client1->write(http_request_pass));
+  tcp_client1->waitForData("HTTP/1.1 200 OK");
+  tcp_client1->close();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+
+  // Failure: cluster_id doesn't match.
+  std::string http_request_fail = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "any-node", "wrong-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client2->write(http_request_fail));
+  tcp_client2->waitForData("HTTP/1.1 403 Forbidden");
+  tcp_client2->waitForDisconnect();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+}
+
+// Test validation with empty format strings - validation is skipped.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithEmptyFormatters) {
+  const std::string validation_config = R"(
+          validation:
+            node_id_format: ""
+            cluster_id_format: "")";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  // Should succeed since no validation is configured.
+  std::string http_request = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "any-node", "any-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(http_request));
+  tcp_client->waitForData("HTTP/1.1 200 OK");
+  tcp_client->close();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+}
+
+// Test validation with dynamic metadata emission.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithDynamicMetadataEmission) {
+  const std::string validation_config = R"(
+          validation:
+            node_id_format: "test-node"
+            cluster_id_format: "test-cluster"
+            emit_dynamic_metadata: true
+            dynamic_metadata_namespace: "envoy.test.reverse_tunnel")";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  std::string http_request = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "test-node", "test-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(http_request));
+  tcp_client->waitForData("HTTP/1.1 200 OK");
+  tcp_client->close();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+}
+
+// Test validation with multiple formatters in format string.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithComplexFormatString) {
+  const std::string validation_config = R"(
+          validation:
+            node_id_format: "prefix-%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%-suffix"
+            emit_dynamic_metadata: false)";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  // This should fail since node_id won't match the complex format string.
+  std::string http_request = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "simple-node", "test-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(http_request));
+  tcp_client->waitForData("HTTP/1.1 403 Forbidden");
+  tcp_client->waitForDisconnect();
+
+  // Ensure the validation_failed counter is updated.
+  test_server_->waitForCounterExists("reverse_tunnel.handshake.validation_failed");
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+}
+
+// Test validation passes when formatter returns empty and actual value is empty.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithBothValuesMatching) {
+  const std::string validation_config = R"(
+          validation:
+            node_id_format: "match-node"
+            cluster_id_format: "match-cluster")";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  std::string http_request = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "match-node", "match-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(http_request));
+  tcp_client->waitForData("HTTP/1.1 200 OK");
+  tcp_client->close();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
 }
 
 } // namespace
