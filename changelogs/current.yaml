@@ -110,8 +110,8 @@ minor_behavior_changes:
     4MB could be encoded, which most upstream grpc services would, by default, treat as an error.
 - area: ext_authz
   change: |
-    Check the request header count after applying mutations is <= the configured limit and reject
-    the response if not.
+    Check the request header count & size in kb after applying mutations is <= the configured limits
+    and reject the response if not.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
