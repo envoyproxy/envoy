@@ -187,9 +187,9 @@ public:
                             Http2Impl http2_implementation)
       : client_settings_(client_settings), server_settings_(server_settings),
         http2_implementation_(http2_implementation) {
-    // Make sure we explicitly test for stream flush timer creation.
-    EXPECT_CALL(client_connection_.dispatcher_, createTimer_(_)).Times(0);
-    EXPECT_CALL(server_connection_.dispatcher_, createTimer_(_)).Times(0);
+    // Allow graceful GOAWAY timer creation (default 1000ms timeout creates timer)
+    EXPECT_CALL(client_connection_.dispatcher_, createTimer_(_)).Times(testing::AtMost(1));
+    EXPECT_CALL(server_connection_.dispatcher_, createTimer_(_)).Times(testing::AtMost(1));
   }
   virtual ~Http2CodecImplTestFixture() {
     client_connection_.dispatcher_.clearDeferredDeleteList();
@@ -670,8 +670,7 @@ TEST_P(Http2CodecImplTest, GracefulGoAwayBasicFunctionality) {
   ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
 
   // Allow GOAWAY callbacks to be called (these happen automatically when frames are processed)
-  EXPECT_CALL(client_callbacks_, onGoAway(_))
-      .Times(AtLeast(1));
+  EXPECT_CALL(client_callbacks_, onGoAway(_)).Times(AtLeast(1));
 
   server_->goAwayGraceful();
   driveToCompletion();
@@ -699,8 +698,7 @@ TEST_P(Http2CodecImplTest, GracefulGoAwayFallbackWhenTimeoutZero) {
   ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_graceful_sent").value());
   ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
 
-  EXPECT_CALL(client_callbacks_, onGoAway(_))
-      .Times(AtLeast(1));
+  EXPECT_CALL(client_callbacks_, onGoAway(_)).Times(AtLeast(1));
   server_->goAwayGraceful();
   driveToCompletion();
 
@@ -720,8 +718,7 @@ TEST_P(Http2CodecImplTest, GracefulGoAwayAlreadyInProgress) {
   initialize();
 
   // First graceful GOAWAY call
-  EXPECT_CALL(client_callbacks_, onGoAway(_))
-      .Times(AtLeast(1));
+  EXPECT_CALL(client_callbacks_, onGoAway(_)).Times(AtLeast(1));
   server_->goAwayGraceful();
   driveToCompletion();
 
@@ -1554,7 +1551,7 @@ TEST_P(Http2CodecImplTest, DumpsStreamlessConnectionWithoutAllocatingMemory) {
           "max_headers_kb_: 60, max_headers_count_: 100, "
           "per_stream_buffer_limit_: 16777216, allow_metadata_: 0, "
           "stream_error_on_invalid_http_messaging_: 0, is_outbound_flood_monitored_control_frame_: "
-          "0, dispatching_: 0, raised_goaway_: 0, "
+          "0, dispatching_: 0, raised_goaway_: 0, graceful_goaway_in_progress_: 0, "
           "pending_deferred_reset_streams_.size(): 0\n"
           "  &protocol_constraints_: \n"
           "    ProtocolConstraints"));

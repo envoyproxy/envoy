@@ -539,5 +539,14 @@ new_features:
   change: |
     Added ``max_downstream_connection_duration_jitter_percentage`` to allow adding a jitter to the max downstream connection duration.
     This can be used to avoid thundering herd problems with many clients being disconnected and possibly reconnecting at the same time.
+- area: http2
+  change: |
+    Enabled graceful HTTP/2 GOAWAY shutdown by default with a 1-second timeout. The
+    :ref:`graceful_goaway_timeout <envoy_v3_api_field_config.core.v3.Http2ProtocolOptions.graceful_goaway_timeout>`
+    field now defaults to 1000ms (1 second) instead of 0 (disabled). This allows in-flight
+    requests to complete gracefully during connection shutdown by sending an initial GOAWAY
+    with max stream ID, waiting for the timeout, then sending a final GOAWAY. Set to 0 to
+    disable graceful shutdown. This feature can be disabled using the runtime guard
+    ``envoy.reloadable_features.http2_graceful_goaway``.
 
 deprecated:

@@ -894,7 +894,7 @@ ConnectionImpl::ConnectionImpl(Network::Connection& connection, CodecStats& stat
 
   // Initialize graceful GOAWAY timeout
   graceful_goaway_timeout_ = std::chrono::milliseconds(
-      PROTOBUF_GET_MS_OR_DEFAULT(http2_options, graceful_goaway_timeout, 0));
+      PROTOBUF_GET_MS_OR_DEFAULT(http2_options, graceful_goaway_timeout, 1000));
   if (graceful_goaway_timeout_.count() > 0) {
     graceful_goaway_timer_ =
         connection.dispatcher().createTimer([this]() { onGracefulGoAwayTimeout(); });
@@ -1068,6 +1068,12 @@ void ConnectionImpl::goAway() {
 }
 
 void ConnectionImpl::goAwayGraceful() {
+  // If graceful GOAWAY is disabled by runtime guard, fallback to immediate GOAWAY
+  if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_graceful_goaway")) {
+    goAway();
+    return;
+  }
+
   // If graceful GOAWAY is not configured or already in progress, fallback to immediate GOAWAY
   if (graceful_goaway_timeout_.count() == 0 || graceful_goaway_in_progress_) {
     goAway();
@@ -2074,7 +2080,8 @@ void ConnectionImpl::dumpState(std::ostream& os, int indent_level) const {
      << DUMP_MEMBER(max_headers_count_) << DUMP_MEMBER(per_stream_buffer_limit_)
      << DUMP_MEMBER(allow_metadata_) << DUMP_MEMBER(stream_error_on_invalid_http_messaging_)
      << DUMP_MEMBER(is_outbound_flood_monitored_control_frame_) << DUMP_MEMBER(dispatching_)
-     << DUMP_MEMBER(raised_goaway_) << DUMP_MEMBER(graceful_goaway_in_progress_) << DUMP_MEMBER(pending_deferred_reset_streams_.size()) << '\n';
+     << DUMP_MEMBER(raised_goaway_) << DUMP_MEMBER(graceful_goaway_in_progress_)
+     << DUMP_MEMBER(pending_deferred_reset_streams_.size()) << '\n';
 
   // Dump the protocol constraints
   DUMP_DETAILS(&protocol_constraints_);
