@@ -5,6 +5,8 @@
 #include "envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3/mapped_attribute_builder.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "source/extensions/filters/http/well_known_names.h"
+
 namespace Envoy {
 namespace Http {
 namespace ExternalProcessing {
@@ -48,13 +50,15 @@ bool MappedAttributeBuilder::modifyRequest(
   const auto req_attributes = expression_manager_.evaluateRequestAttributes(*activation_ptr);
 
   Protobuf::Struct& remapped_attributes =
-      (*request.mutable_attributes())["envoy.filters.http.ext_proc"];
+      (*request.mutable_attributes())[Extensions::HttpFilters::HttpFilterNames::get()
+                                          .ExternalProcessing];
   remapped_attributes.clear_fields();
   for (const auto& pair : config_.mapped_request_attributes()) {
     const std::string& key = pair.first;
     const std::string& cel_expr_string = pair.second;
-    if (req_attributes.fields().contains(cel_expr_string)) {
-      (*remapped_attributes.mutable_fields())[key] = req_attributes.fields().at(cel_expr_string);
+    auto it = req_attributes.fields().find(cel_expr_string);
+    if (it != req_attributes.fields().end()) {
+      (*remapped_attributes.mutable_fields())[key] = it->second;
     }
   }
 

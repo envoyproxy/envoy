@@ -24,9 +24,9 @@ option (xds.annotations.v3.file_status).work_in_progress = true;
 //
 // If a given CEL expression fails to eval, it will not be present in the attributes struct.
 //
-// If this extension is configured, then the :ref:`ProcessingRequest
+// If this extension is configured, then the original :ref:`ProcessingRequest
 // <envoy_v3_api_msg_service.ext_proc.v3.ProcessingRequest>`'s ``request_attributes`` are ignored,
-// and all attributes should be passed via this extension.
+// and all attributes should be explicitly set via this extension.
 //
 // An example configuration may look like so:
 //

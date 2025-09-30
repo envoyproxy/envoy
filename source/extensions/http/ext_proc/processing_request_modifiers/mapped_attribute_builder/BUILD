@@ -23,6 +23,7 @@ envoy_cc_extension(
         "//envoy/server:factory_context_interface",
         "//envoy/stream_info:stream_info_interface",
         "//source/extensions/filters/common/expr:evaluator_lib",
+        "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/ext_proc:matching_utils_lib",
         "//source/extensions/filters/http/ext_proc:processing_request_modifier_interface",
         "@com_google_absl//absl/strings:string_view",
