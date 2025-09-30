@@ -24,6 +24,7 @@ envoy_cc_library(
         ":client_lib",
         ":matching_utils_lib",
         ":mutation_utils_lib",
+        ":processing_effect",
         ":on_processing_response_interface",
         "//envoy/event:timer_interface",
         "//envoy/http:filter_interface",
@@ -125,4 +126,10 @@ envoy_cc_library(
         "//source/common/stats:symbol_table_lib",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
     ],
+)
+
+envoy_cc_library(
+    name = "processing_effect",
+    hdrs = ["processing_effect.h"],
+    tags = ["skip_on_windows"],
 )

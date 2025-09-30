@@ -15,6 +15,7 @@
 #include "source/extensions/filters/http/ext_proc/http_client/http_client_impl.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
+#include "source/extensions/filters/http/ext_proc/processing_effect.h"
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
@@ -71,6 +72,12 @@ constexpr absl::string_view ResponseTrailerLatencyUsField = "response_trailer_la
 constexpr absl::string_view ResponseTrailerCallStatusField = "response_trailer_call_status";
 constexpr absl::string_view BytesSentField = "bytes_sent";
 constexpr absl::string_view BytesReceivedField = "bytes_received";
+constexpr absl::string_view RequestHeaderProcessingEffectField = "request_header_processing_effect";
+constexpr absl::string_view ResponseHeaderProcessingEffectField = "response_header_processing_effect";
+constexpr absl::string_view RequestBodyProcessingEffectField = "request_body_processing_effect";
+constexpr absl::string_view ResponseBodyProcessingEffectField = "response_body_processing_effect";
+constexpr absl::string_view RequestTrailerProcessingEffectField = "request_trailer_processing_effect";
+constexpr absl::string_view ResponseTrailerProcessingEffectField = "response_trailer_processing_effect";
 
 absl::optional<ProcessingMode> initProcessingMode(const ExtProcPerRoute& config) {
   if (!config.disabled() && config.has_overrides() && config.overrides().has_processing_mode()) {
@@ -269,16 +276,30 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       [](Envoy::Event::Dispatcher&) { return std::make_shared<ThreadLocalStreamManager>(); });
 }
 
+std::string processingEffectToString(ProcessingEffect::Effect processing_effect) {
+  switch (processing_effect) {
+    case ProcessingEffect::Effect::None:
+      return "none";
+    case ProcessingEffect::Effect::ContentModified:
+      return "content_modified";
+    case ProcessingEffect::Effect::ImmediateResponse:
+      return "immediate_response";
+    case ProcessingEffect::Effect::ContinueAndReplace:
+      return "continue_and_replace";
+  }
+}
+
 void ExtProcLoggingInfo::recordGrpcCall(
     std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
     ProcessorState::CallbackState callback_state,
-    envoy::config::core::v3::TrafficDirection traffic_direction) {
+    envoy::config::core::v3::TrafficDirection traffic_direction,
+    ProcessingEffect::Effect processing_effect) {
   ASSERT(callback_state != ProcessorState::CallbackState::Idle);
 
   // Record the gRPC call stats for the header.
   if (callback_state == ProcessorState::CallbackState::HeadersCallback) {
     if (grpcCalls(traffic_direction).header_stats_ == nullptr) {
-      grpcCalls(traffic_direction).header_stats_ = std::make_unique<GrpcCall>(latency, call_status);
+      grpcCalls(traffic_direction).header_stats_ = std::make_unique<GrpcCall>(latency, call_status, processing_effect);
     }
     return;
   }
@@ -287,7 +308,7 @@ void ExtProcLoggingInfo::recordGrpcCall(
   if (callback_state == ProcessorState::CallbackState::TrailersCallback) {
     if (grpcCalls(traffic_direction).trailer_stats_ == nullptr) {
       grpcCalls(traffic_direction).trailer_stats_ =
-          std::make_unique<GrpcCall>(latency, call_status);
+          std::make_unique<GrpcCall>(latency, call_status, processing_effect);
     }
     return;
   }
@@ -295,7 +316,7 @@ void ExtProcLoggingInfo::recordGrpcCall(
   // Record the gRPC call stats for the bodies.
   if (grpcCalls(traffic_direction).body_stats_ == nullptr) {
     grpcCalls(traffic_direction).body_stats_ =
-        std::make_unique<GrpcCallBody>(1, call_status, latency, latency, latency);
+        std::make_unique<GrpcCallBody>(1, call_status, latency, latency, latency, processing_effect);
   } else {
     auto& body_stats = grpcCalls(traffic_direction).body_stats_;
     body_stats->call_count_++;
@@ -335,6 +356,8 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
     (*struct_msg->mutable_fields())[RequestHeaderCallStatusField].set_number_value(
         static_cast<double>(
             static_cast<int>(decoding_processor_grpc_calls_.header_stats_->call_status_)));
+    (*struct_msg->mutable_fields())[RequestHeaderProcessingEffectField].set_number_value(
+        static_cast<int>(decoding_processor_grpc_calls_.header_stats_->processing_effect_));
   }
   if (decoding_processor_grpc_calls_.body_stats_) {
     (*struct_msg->mutable_fields())[RequestBodyCallCountField].set_number_value(
@@ -346,6 +369,8 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
     (*struct_msg->mutable_fields())[RequestBodyLastCallStatusField].set_number_value(
         static_cast<double>(
             static_cast<int>(decoding_processor_grpc_calls_.body_stats_->last_call_status_)));
+    (*struct_msg->mutable_fields())[RequestBodyProcessingEffectField].set_number_value(
+        static_cast<int>(decoding_processor_grpc_calls_.body_stats_->processing_effect_));
   }
   if (decoding_processor_grpc_calls_.trailer_stats_) {
     (*struct_msg->mutable_fields())[RequestTrailerLatencyUsField].set_number_value(
@@ -353,6 +378,8 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
     (*struct_msg->mutable_fields())[RequestTrailerCallStatusField].set_number_value(
         static_cast<double>(
             static_cast<int>(decoding_processor_grpc_calls_.trailer_stats_->call_status_)));
+    (*struct_msg->mutable_fields())[RequestTrailerProcessingEffectField].set_number_value(
+        static_cast<int>(decoding_processor_grpc_calls_.trailer_stats_->processing_effect_));
   }
   if (encoding_processor_grpc_calls_.header_stats_) {
     (*struct_msg->mutable_fields())[ResponseHeaderLatencyUsField].set_number_value(
@@ -360,6 +387,8 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
     (*struct_msg->mutable_fields())[ResponseHeaderCallStatusField].set_number_value(
         static_cast<double>(
             static_cast<int>(encoding_processor_grpc_calls_.header_stats_->call_status_)));
+    (*struct_msg->mutable_fields())[ResponseHeaderProcessingEffectField].set_number_value(
+        static_cast<int>(encoding_processor_grpc_calls_.header_stats_->processing_effect_));
   }
   if (encoding_processor_grpc_calls_.body_stats_) {
     (*struct_msg->mutable_fields())[ResponseBodyCallCountField].set_number_value(
@@ -371,6 +400,8 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
     (*struct_msg->mutable_fields())[ResponseBodyLastCallStatusField].set_number_value(
         static_cast<double>(
             static_cast<int>(encoding_processor_grpc_calls_.body_stats_->last_call_status_)));
+    (*struct_msg->mutable_fields())[ResponseBodyProcessingEffectField].set_number_value(
+        static_cast<int>(encoding_processor_grpc_calls_.body_stats_->processing_effect_));
   }
   if (encoding_processor_grpc_calls_.trailer_stats_) {
     (*struct_msg->mutable_fields())[ResponseTrailerLatencyUsField].set_number_value(
@@ -378,6 +409,8 @@ ProtobufTypes::MessagePtr ExtProcLoggingInfo::serializeAsProto() const {
     (*struct_msg->mutable_fields())[ResponseTrailerCallStatusField].set_number_value(
         static_cast<double>(
             static_cast<int>(encoding_processor_grpc_calls_.trailer_stats_->call_status_)));
+    (*struct_msg->mutable_fields())[ResponseTrailerProcessingEffectField].set_number_value(
+        static_cast<int>(encoding_processor_grpc_calls_.trailer_stats_->processing_effect_));
   }
   (*struct_msg->mutable_fields())[BytesSentField].set_number_value(
       static_cast<double>(bytes_sent_));
@@ -393,34 +426,40 @@ absl::optional<std::string> ExtProcLoggingInfo::serializeAsString() const {
   if (decoding_processor_grpc_calls_.header_stats_) {
     parts.push_back(
         absl::StrCat("rh:", decoding_processor_grpc_calls_.header_stats_->latency_.count(), ":",
-                     static_cast<int>(decoding_processor_grpc_calls_.header_stats_->call_status_)));
+                     static_cast<int>(decoding_processor_grpc_calls_.header_stats_->call_status_),
+                     ":", processingEffectToString(decoding_processor_grpc_calls_.header_stats_->processing_effect_)));
   }
   if (decoding_processor_grpc_calls_.body_stats_) {
     parts.push_back(absl::StrCat(
         "rb:", decoding_processor_grpc_calls_.body_stats_->call_count_, ":",
         decoding_processor_grpc_calls_.body_stats_->total_latency_.count(), ":",
-        static_cast<int>(decoding_processor_grpc_calls_.body_stats_->last_call_status_)));
+        static_cast<int>(decoding_processor_grpc_calls_.body_stats_->last_call_status_),
+        ":", processingEffectToString(decoding_processor_grpc_calls_.body_stats_->processing_effect_)));
   }
   if (decoding_processor_grpc_calls_.trailer_stats_) {
     parts.push_back(absl::StrCat(
         "rt:", decoding_processor_grpc_calls_.trailer_stats_->latency_.count(), ":",
-        static_cast<int>(decoding_processor_grpc_calls_.trailer_stats_->call_status_)));
+        static_cast<int>(decoding_processor_grpc_calls_.trailer_stats_->call_status_),
+        ":", processingEffectToString(decoding_processor_grpc_calls_.trailer_stats_->processing_effect_)));
   }
   if (encoding_processor_grpc_calls_.header_stats_) {
     parts.push_back(
         absl::StrCat("sh:", encoding_processor_grpc_calls_.header_stats_->latency_.count(), ":",
-                     static_cast<int>(encoding_processor_grpc_calls_.header_stats_->call_status_)));
+                     static_cast<int>(encoding_processor_grpc_calls_.header_stats_->call_status_),
+                     ":", processingEffectToString(encoding_processor_grpc_calls_.header_stats_->processing_effect_)));
   }
   if (encoding_processor_grpc_calls_.body_stats_) {
     parts.push_back(absl::StrCat(
         "sb:", encoding_processor_grpc_calls_.body_stats_->call_count_, ":",
         encoding_processor_grpc_calls_.body_stats_->total_latency_.count(), ":",
-        static_cast<int>(encoding_processor_grpc_calls_.body_stats_->last_call_status_)));
+        static_cast<int>(encoding_processor_grpc_calls_.body_stats_->last_call_status_),
+        ":", processingEffectToString(encoding_processor_grpc_calls_.body_stats_->processing_effect_)));
   }
   if (encoding_processor_grpc_calls_.trailer_stats_) {
     parts.push_back(absl::StrCat(
         "st:", encoding_processor_grpc_calls_.trailer_stats_->latency_.count(), ":",
-        static_cast<int>(encoding_processor_grpc_calls_.trailer_stats_->call_status_)));
+        static_cast<int>(encoding_processor_grpc_calls_.trailer_stats_->call_status_),
+        ":", processingEffectToString(encoding_processor_grpc_calls_.trailer_stats_->processing_effect_)));
   }
   parts.push_back(absl::StrCat("bs:", bytes_sent_));
   parts.push_back(absl::StrCat("br:", bytes_received_));
@@ -436,6 +475,9 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   if (field_name == RequestHeaderCallStatusField && decoding_processor_grpc_calls_.header_stats_) {
     return static_cast<int64_t>(decoding_processor_grpc_calls_.header_stats_->call_status_);
   }
+  if (field_name == RequestHeaderProcessingEffectField && decoding_processor_grpc_calls_.header_stats_) {
+    return static_cast<int64_t>(decoding_processor_grpc_calls_.header_stats_->processing_effect_);
+  }
   if (field_name == RequestBodyCallCountField && decoding_processor_grpc_calls_.body_stats_) {
     return static_cast<int64_t>(decoding_processor_grpc_calls_.body_stats_->call_count_);
   }
@@ -448,6 +490,9 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   if (field_name == RequestBodyLastCallStatusField && decoding_processor_grpc_calls_.body_stats_) {
     return static_cast<int64_t>(decoding_processor_grpc_calls_.body_stats_->last_call_status_);
   }
+  if (field_name == RequestBodyProcessingEffectField && decoding_processor_grpc_calls_.body_stats_) {
+    return static_cast<int64_t>(decoding_processor_grpc_calls_.body_stats_->processing_effect_);
+  }
   if (field_name == RequestTrailerLatencyUsField && decoding_processor_grpc_calls_.trailer_stats_) {
     return static_cast<int64_t>(decoding_processor_grpc_calls_.trailer_stats_->latency_.count());
   }
@@ -455,11 +500,17 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
       decoding_processor_grpc_calls_.trailer_stats_) {
     return static_cast<int64_t>(decoding_processor_grpc_calls_.trailer_stats_->call_status_);
   }
+  if (field_name == RequestTrailerProcessingEffectField && decoding_processor_grpc_calls_.trailer_stats_) {
+    return static_cast<int64_t>(decoding_processor_grpc_calls_.trailer_stats_->processing_effect_);
+  }
   if (field_name == ResponseHeaderLatencyUsField && encoding_processor_grpc_calls_.header_stats_) {
     return static_cast<int64_t>(encoding_processor_grpc_calls_.header_stats_->latency_.count());
   }
   if (field_name == ResponseHeaderCallStatusField && encoding_processor_grpc_calls_.header_stats_) {
     return static_cast<int64_t>(encoding_processor_grpc_calls_.header_stats_->call_status_);
+  }
+  if (field_name == ResponseHeaderProcessingEffectField && encoding_processor_grpc_calls_.header_stats_) {
+    return static_cast<int64_t>(encoding_processor_grpc_calls_.header_stats_->processing_effect_);
   }
   if (field_name == ResponseBodyCallCountField && encoding_processor_grpc_calls_.body_stats_) {
     return static_cast<int64_t>(encoding_processor_grpc_calls_.body_stats_->call_count_);
@@ -473,6 +524,9 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   if (field_name == ResponseBodyLastCallStatusField && encoding_processor_grpc_calls_.body_stats_) {
     return static_cast<int64_t>(encoding_processor_grpc_calls_.body_stats_->last_call_status_);
   }
+  if (field_name == ResponseBodyProcessingEffectField && encoding_processor_grpc_calls_.body_stats_) {
+    return static_cast<int64_t>(encoding_processor_grpc_calls_.body_stats_->processing_effect_);
+  }
   if (field_name == ResponseTrailerLatencyUsField &&
       encoding_processor_grpc_calls_.trailer_stats_) {
     return static_cast<int64_t>(encoding_processor_grpc_calls_.trailer_stats_->latency_.count());
@@ -480,6 +534,9 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   if (field_name == ResponseTrailerCallStatusField &&
       encoding_processor_grpc_calls_.trailer_stats_) {
     return static_cast<int64_t>(encoding_processor_grpc_calls_.trailer_stats_->call_status_);
+  }
+  if (field_name == ResponseTrailerProcessingEffectField && encoding_processor_grpc_calls_.trailer_stats_) {
+    return static_cast<int64_t>(encoding_processor_grpc_calls_.trailer_stats_->processing_effect_);
   }
   if (field_name == BytesSentField) {
     return static_cast<int64_t>(bytes_sent_);
@@ -575,8 +632,7 @@ void Filter::onError() {
   } else {
     // Return an error and stop processing the current stream.
     processing_complete_ = true;
-    decoding_state_.onFinishProcessorCall(Grpc::Status::Aborted);
-    encoding_state_.onFinishProcessorCall(Grpc::Status::Aborted);
+    onFinishProcessorCalls(Grpc::Status::Aborted, ProcessingEffect::Effect::ImmediateResponse);
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(
         static_cast<StatusCode>(static_cast<uint32_t>(config_->statusOnError())));
@@ -1455,7 +1511,7 @@ void Filter::handleErrorResponse(absl::Status processing_status) {
   ENVOY_STREAM_LOG(debug, "Sending immediate response: {}", *decoder_callbacks_,
                    processing_status.message());
   processing_complete_ = true;
-  onFinishProcessorCalls(processing_status.raw_code());
+  onFinishProcessorCalls(processing_status.raw_code(), ProcessingEffect::Effect::ImmediateResponse);
   closeStream();
   ImmediateResponse invalid_mutation_response;
   invalid_mutation_response.mutable_status()->set_code(
@@ -1596,7 +1652,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       // receive this message.
       ENVOY_STREAM_LOG(debug, "Sending immediate response", *decoder_callbacks_);
       processing_complete_ = true;
-      onFinishProcessorCalls(Grpc::Status::Ok);
+      onFinishProcessorCalls(Grpc::Status::Ok, ProcessingEffect::Effect::ImmediateResponse);
       if (config_->gracefulGrpcClose()) {
         halfCloseAndWaitForRemoteClose();
       } else {
@@ -1665,7 +1721,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
     processing_complete_ = true;
     // Since the stream failed, there is no need to handle timeouts, so
     // make sure that they do not fire now.
-    onFinishProcessorCalls(status);
+    onFinishProcessorCalls(status, ProcessingEffect::Effect::ImmediateResponse);
     closeStream();
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(
@@ -1707,8 +1763,7 @@ void Filter::onMessageTimeout() {
     // Return an error and stop processing the current stream.
     processing_complete_ = true;
     closeStream();
-    decoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
-    encoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
+    onFinishProcessorCalls(Grpc::Status::DeadlineExceeded, ProcessingEffect::Effect::ImmediateResponse);
     ImmediateResponse errorResponse;
     errorResponse.mutable_status()->set_code(StatusCode::GatewayTimeout);
     errorResponse.set_details(absl::StrFormat("%s_per-message_timeout_exceeded", ErrorPrefix));
@@ -1725,9 +1780,9 @@ void Filter::clearAsyncState(Grpc::Status::GrpcStatus call_status) {
 
 // Regardless of the current state, ensure that the timers won't fire
 // again.
-void Filter::onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status) {
-  decoding_state_.onFinishProcessorCall(call_status);
-  encoding_state_.onFinishProcessorCall(call_status);
+void Filter::onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status, ProcessingEffect::Effect processing_effect) {
+  decoding_state_.onFinishProcessorCall(call_status, processing_effect);
+  encoding_state_.onFinishProcessorCall(call_status, processing_effect);
 }
 
 void Filter::sendImmediateResponse(const ImmediateResponse& response) {

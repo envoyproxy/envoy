@@ -28,6 +28,7 @@
 #include "source/extensions/filters/http/ext_proc/client_impl.h"
 #include "source/extensions/filters/http/ext_proc/matching_utils.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
+#include "source/extensions/filters/http/ext_proc/processing_effect.h"
 #include "source/extensions/filters/http/ext_proc/processor_state.h"
 
 namespace Envoy {
@@ -64,10 +65,12 @@ public:
 
   // gRPC call stats for headers and trailers.
   struct GrpcCall {
-    GrpcCall(const std::chrono::microseconds latency, const Grpc::Status::GrpcStatus call_status)
-        : latency_(latency), call_status_(call_status) {}
+    GrpcCall(const std::chrono::microseconds latency, const Grpc::Status::GrpcStatus call_status,
+             const ProcessingEffect::Effect processing_effect = ProcessingEffect::Effect::None)
+        : latency_(latency), call_status_(call_status), processing_effect_(processing_effect) {}
     const std::chrono::microseconds latency_;
     const Grpc::Status::GrpcStatus call_status_;
+    const ProcessingEffect::Effect processing_effect_;
   };
 
   // gRPC call stats for body.
@@ -75,14 +78,15 @@ public:
     GrpcCallBody(const uint32_t call_count, const Grpc::Status::GrpcStatus call_status,
                  const std::chrono::microseconds total_latency,
                  const std::chrono::microseconds max_latency,
-                 const std::chrono::microseconds min_latency)
+                 const std::chrono::microseconds min_latency, const ProcessingEffect::Effect processing_effect = ProcessingEffect::Effect::None)
         : call_count_(call_count), last_call_status_(call_status), total_latency_(total_latency),
-          max_latency_(max_latency), min_latency_(min_latency) {}
+          max_latency_(max_latency), min_latency_(min_latency), processing_effect_(processing_effect) {}
     uint32_t call_count_;
     Grpc::Status::GrpcStatus last_call_status_;
     std::chrono::microseconds total_latency_;
     std::chrono::microseconds max_latency_;
     std::chrono::microseconds min_latency_;
+    const ProcessingEffect::Effect processing_effect_;
   };
 
   struct GrpcCallStats {
@@ -95,7 +99,8 @@ public:
 
   void recordGrpcCall(std::chrono::microseconds latency, Grpc::Status::GrpcStatus call_status,
                       ProcessorState::CallbackState callback_state,
-                      envoy::config::core::v3::TrafficDirection traffic_direction);
+                      envoy::config::core::v3::TrafficDirection traffic_direction,
+                      ProcessingEffect::Effect processing_effect = ProcessingEffect::Effect::None);
   void setBytesSent(uint64_t bytes_sent) { bytes_sent_ = bytes_sent; }
   void setBytesReceived(uint64_t bytes_received) { bytes_received_ = bytes_received; }
   void setClusterInfo(absl::optional<Upstream::ClusterInfoConstSharedPtr> cluster_info) {
@@ -536,7 +541,8 @@ private:
   void closeStream();
   void halfCloseAndWaitForRemoteClose();
 
-  void onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status);
+  void onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status,
+                              ProcessingEffect::Effect processing_effect = ProcessingEffect::Effect::None);
   void clearAsyncState(Grpc::Status::GrpcStatus call_status = Grpc::Status::Aborted);
   void sendImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse& response);
 

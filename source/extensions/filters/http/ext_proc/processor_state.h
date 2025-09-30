@@ -14,6 +14,7 @@
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/logger.h"
+#include "source/extensions/filters/http/ext_proc/processing_effect.h"
 
 #include "absl/status/status.h"
 #include "matching_utils.h"
@@ -149,6 +150,7 @@ public:
   void onStartProcessorCall(Event::TimerCb cb, std::chrono::milliseconds timeout,
                             CallbackState callback_state);
   void onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
+                             ProcessingEffect::Effect processing_effect = ProcessingEffect::Effect::None,
                              CallbackState next_state = CallbackState::Idle);
   void stopMessageTimer();
   bool restartMessageTimer(const uint32_t message_timeout_ms);
