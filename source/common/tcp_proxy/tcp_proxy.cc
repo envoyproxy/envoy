@@ -330,14 +330,25 @@ Config::SharedConfig::parseTLVs(absl::Span<const envoy::config::core::v3::TlvEnt
   for (const auto& tlv : tlvs) {
     const uint8_t tlv_type = static_cast<uint8_t>(tlv->type());
 
-    switch (tlv->value_specifier_case()) {
-    case envoy::config::core::v3::TlvEntry::ValueSpecifierCase::kValue: {
+    // Validate that only one of value or format_string is set.
+    const bool has_value = !tlv->value().empty();
+    const bool has_format_string = tlv->has_format_string();
+
+    if (has_value && has_format_string) {
+      throw EnvoyException(
+          "Invalid TLV configuration: only one of 'value' or 'format_string' may be set.");
+    }
+
+    if (!has_value && !has_format_string) {
+      throw EnvoyException(
+          "Invalid TLV configuration: one of 'value' or 'format_string' must be set.");
+    }
+
+    if (has_value) {
       // Static TLV value.
       tlv_vector.push_back(
           {tlv_type, std::vector<unsigned char>(tlv->value().begin(), tlv->value().end())});
-      break;
-    }
-    case envoy::config::core::v3::TlvEntry::ValueSpecifierCase::kFormatString: {
+    } else {
       // Dynamic TLV value using formatter.
       auto formatter_or_error =
           Formatter::SubstitutionFormatStringUtils::fromProtoConfig(tlv->format_string(), context);
@@ -346,11 +357,6 @@ Config::SharedConfig::parseTLVs(absl::Span<const envoy::config::core::v3::TlvEnt
                                           formatter_or_error.status().ToString()));
       }
       dynamic_tlvs.push_back({tlv_type, std::move(*formatter_or_error)});
-      break;
-    }
-    case envoy::config::core::v3::TlvEntry::ValueSpecifierCase::VALUE_SPECIFIER_NOT_SET:
-      // This should not happen due to proto validation.
-      PANIC("TLV value_specifier not set");
     }
   }
   return tlv_vector;

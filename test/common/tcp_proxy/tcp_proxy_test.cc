@@ -2315,6 +2315,42 @@ TEST_P(TcpProxyTest, SetMixedStaticAndDynamicTLVs) {
   EXPECT_EQ(expected_dynamic_value, std::string(tlvs[1].value.begin(), tlvs[1].value.end()));
 }
 
+// Test that setting both value and format_string throws an error.
+TEST_P(TcpProxyTest, SetTLVWithBothValueAndFormatStringFails) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv = config.add_proxy_protocol_tlvs();
+  tlv->set_type(0xF1);
+  tlv->set_value("test");
+  tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string("test");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      configure(config), EnvoyException,
+      "Invalid TLV configuration: only one of 'value' or 'format_string' may be set.");
+}
+
+// Test that setting neither value nor format_string throws an error.
+TEST_P(TcpProxyTest, SetTLVWithNeitherValueNorFormatStringFails) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv = config.add_proxy_protocol_tlvs();
+  tlv->set_type(0xF1);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      configure(config), EnvoyException,
+      "Invalid TLV configuration: one of 'value' or 'format_string' must be set.");
+}
+
+// Test that an invalid format string throws an error.
+TEST_P(TcpProxyTest, SetTLVWithInvalidFormatStringFails) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv = config.add_proxy_protocol_tlvs();
+  tlv->set_type(0xF1);
+  tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string(
+      "%INVALID_COMMAND%");
+
+  EXPECT_THROW_WITH_REGEX(configure(config), EnvoyException,
+                          "Failed to parse TLV format string:.*");
+}
+
 INSTANTIATE_TEST_SUITE_P(WithOrWithoutUpstream, TcpProxyTest, ::testing::Bool());
 
 TEST(PerConnectionCluster, ObjectFactory) {
