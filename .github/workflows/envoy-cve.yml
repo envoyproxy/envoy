@@ -14,6 +14,7 @@ on:
         default: bazel
         type: choice
         options:
+        - scan
         - fetch
 
 concurrency:
@@ -33,3 +34,10 @@ jobs:
     uses: ./.github/workflows/_cve_fetch.yml
     with:
       scheduled: ${{ github.event_name == 'schedule' }}
+  scan:
+    secrets:
+      gcs-cve-key: ${{ secrets.GCS_CVE_KEY }}
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      && inputs.task == 'scan'
+    uses: ./.github/workflows/_cve_scan.yml
