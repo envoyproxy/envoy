@@ -1,0 +1,45 @@
+name: Dependency/Fetch CVE data
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    secrets:
+      gcs-cve-key:
+        required: true
+    inputs:
+      cve-data-path:
+        default: tools/dependency/cve_data
+        type: string
+      scheduled:
+        default: false
+        type: boolean
+
+
+jobs:
+  cve-data:
+    name: Scan dependencies for CVEs
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+    - name: Set vars
+      id: vars
+      run: |
+        echo "cve-data-path=${{ inputs.cve-data-path }}" > $GITHUB_OUTPUT
+    - uses: envoyproxy/toolshed/gh-actions/gcp/setup@actions-v0.3.25
+      name: Setup GCP
+      with:
+        key: ${{ secrets.gcs-cve-key }}
+    - name: Create CVE data directory
+      run: |
+        mkdir -p ${{ steps.vars.outputs.cve-data-path }}
+    - name: Download (sync) from GCS bucket
+      run: |
+        gsutil -mq rsync \
+          "gs://${{ vars.GCS_CVE_BUCKET }}" \
+          "${{ steps.vars.outputs.cve-data-path }}"
+    - name: Run CVE dependency scanner
+      run: |
+        bazel test --config=ci //tools/dependency:cve_test
