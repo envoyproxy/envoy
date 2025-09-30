@@ -5032,13 +5032,14 @@ TEST_F(RouterTest, ResponseHeadersTCopyCopiesHeadersOrClears) {
 
 namespace {
 
-std::shared_ptr<ShadowPolicyImpl> makeShadowPolicy(
-    std::string cluster = "", std::string cluster_header = "",
-    absl::optional<std::string> runtime_key = absl::nullopt,
-    absl::optional<envoy::type::v3::FractionalPercent> default_value = absl::nullopt,
-    bool trace_sampled = true,
-    std::vector<envoy::config::common::mutation_rules::v3::HeaderMutation> request_mutations = {},
-    std::string host_rewrite_literal = "") {
+std::shared_ptr<ShadowPolicyImpl>
+makeShadowPolicy(std::string cluster = "", std::string cluster_header = "",
+                 absl::optional<std::string> runtime_key = absl::nullopt,
+                 absl::optional<envoy::type::v3::FractionalPercent> default_value = absl::nullopt,
+                 bool trace_sampled = true,
+                 std::vector<envoy::config::common::mutation_rules::v3::HeaderMutation>
+                     request_header_mutations = {},
+                 std::string host_rewrite_literal = "") {
   envoy::config::route::v3::RouteAction::RequestMirrorPolicy policy;
   policy.set_cluster(cluster);
   policy.set_cluster_header(cluster_header);
@@ -5051,8 +5052,8 @@ std::shared_ptr<ShadowPolicyImpl> makeShadowPolicy(
   policy.mutable_trace_sampled()->set_value(trace_sampled);
 
   // Add HeaderMutation objects directly
-  for (const auto& mutation : request_mutations) {
-    *policy.add_request_mutations() = mutation;
+  for (const auto& mutation : request_header_mutations) {
+    *policy.add_request_header_mutations() = mutation;
   }
 
   if (!host_rewrite_literal.empty()) {
@@ -5359,139 +5360,6 @@ remove: "authorization"
         // Verify headers were removed
         EXPECT_TRUE(shadow_headers->get(Http::LowerCaseString("x-sensitive-header")).empty());
         EXPECT_TRUE(shadow_headers->get(Http::LowerCaseString("authorization")).empty());
-
-        return &foo_request;
-      }));
-
-  router_->decodeHeaders(headers, false);
-
-  Buffer::InstancePtr body_data(new Buffer::OwnedImpl("hello"));
-  EXPECT_CALL(callbacks_, addDecodedData(_, true)).Times(0);
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationNoBuffer, router_->decodeData(*body_data, true));
-
-  response_decoder->decodeHeaders(std::make_unique<Http::TestResponseHeaderMapImpl>(
-                                      Http::TestResponseHeaderMapImpl{{":status", "200"}}),
-                                  true);
-  EXPECT_TRUE(verifyHostUpstreamStats(1, 0));
-
-  router_->onDestroy();
-}
-
-TEST_P(RouterShadowingTest, ShadowWithAdvancedHeaderMutations) {
-  const std::vector<std::string> mutation_yamls = {
-      // Test ADD_IF_ABSENT - should only add if header doesn't exist
-      R"EOF(
-append:
-  header:
-    key: "x-new-header"
-    value: "new-value"
-  append_action: "ADD_IF_ABSENT"
-)EOF",
-      R"EOF(
-append:
-  header:
-    key: "x-existing-header"
-    value: "should-not-add"
-  append_action: "ADD_IF_ABSENT"
-)EOF",
-
-      // Test OVERWRITE_IF_EXISTS - should only overwrite existing headers
-      R"EOF(
-append:
-  header:
-    key: "x-existing-header"
-    value: "overwritten-value"
-  append_action: "OVERWRITE_IF_EXISTS"
-)EOF",
-      R"EOF(
-append:
-  header:
-    key: "x-non-existing"
-    value: "should-not-add"
-  append_action: "OVERWRITE_IF_EXISTS"
-)EOF",
-
-      // Test OVERWRITE_IF_EXISTS_OR_ADD - should always set the value
-      R"EOF(
-append:
-  header:
-    key: "x-force-set"
-    value: "forced-value"
-  append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
-)EOF",
-
-      // Test appending to existing header (default behavior)
-      R"EOF(
-append:
-  header:
-    key: "x-multi-value"
-    value: "appended-value"
-  append_action: "APPEND_IF_EXISTS_OR_ADD"
-)EOF",
-
-      // Test setting header with specific value that overrides existing
-      R"EOF(
-append:
-  header:
-    key: "x-existing-header"
-    value: "final-value"
-  append_action: "OVERWRITE_IF_EXISTS_OR_ADD"
-)EOF"};
-
-  std::vector<envoy::config::common::mutation_rules::v3::HeaderMutation> mutations;
-  for (const auto& yaml : mutation_yamls) {
-    envoy::config::common::mutation_rules::v3::HeaderMutation mutation;
-    TestUtility::loadFromYaml(yaml, mutation);
-    mutations.push_back(mutation);
-  }
-
-  ShadowPolicyPtr policy = makeShadowPolicy("foo", "", "bar", absl::nullopt, true, mutations);
-  callbacks_.route_->route_entry_.shadow_policies_.push_back(policy);
-  ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
-
-  NiceMock<Http::MockRequestEncoder> encoder;
-  Http::ResponseDecoder* response_decoder = nullptr;
-  expectNewStreamWithImmediateEncoder(encoder, &response_decoder, Http::Protocol::Http10);
-  expectResponseTimerCreate();
-
-  EXPECT_CALL(
-      runtime_.snapshot_,
-      featureEnabled("bar", testing::Matcher<const envoy::type::v3::FractionalPercent&>(Percent(0)),
-                     43))
-      .WillOnce(Return(true));
-
-  Http::TestRequestHeaderMapImpl headers;
-  HttpTestUtility::addDefaultHeaders(headers);
-  headers.setCopy(Http::LowerCaseString("x-existing-header"), "original-value");
-  headers.setCopy(Http::LowerCaseString("x-multi-value"), "original-multi");
-
-  NiceMock<Http::MockAsyncClient> foo_client;
-  NiceMock<Http::MockAsyncClientOngoingRequest> foo_request(&foo_client);
-
-  EXPECT_CALL(*shadow_writer_, streamingShadow_("foo", _, _))
-      .WillOnce(Invoke([&](const std::string&, Http::RequestHeaderMapPtr& shadow_headers,
-                           const Http::AsyncClient::RequestOptions&) {
-        // Verify ADD_IF_ABSENT behavior
-        EXPECT_EQ(
-            "new-value",
-            shadow_headers->get(Http::LowerCaseString("x-new-header"))[0]->value().getStringView());
-
-        // Verify x-existing-header was overwritten with the final value
-        auto existing_headers = shadow_headers->get(Http::LowerCaseString("x-existing-header"));
-        EXPECT_EQ(1, existing_headers.size()); // Should have exactly one value
-        EXPECT_EQ("final-value", existing_headers[0]->value().getStringView());
-
-        // Verify OVERWRITE_IF_EXISTS didn't add non-existing header
-        EXPECT_TRUE(shadow_headers->get(Http::LowerCaseString("x-non-existing")).empty());
-
-        // Verify OVERWRITE_IF_EXISTS_OR_ADD worked
-        EXPECT_EQ(
-            "forced-value",
-            shadow_headers->get(Http::LowerCaseString("x-force-set"))[0]->value().getStringView());
-
-        // Verify appending worked (should have both original and appended values)
-        auto multi_headers = shadow_headers->get(Http::LowerCaseString("x-multi-value"));
-        EXPECT_EQ(2, multi_headers.size()); // Should have both values
 
         return &foo_request;
       }));

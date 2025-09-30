@@ -333,9 +333,9 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config,
                                               : absl::nullopt;
 
   // Create HeaderMutations directly from HeaderMutation rules
-  if (!config.request_mutations().empty()) {
+  if (!config.request_header_mutations().empty()) {
     auto mutations_or_error =
-        Http::HeaderMutations::create(config.request_mutations(), factory_context);
+        Http::HeaderMutations::create(config.request_header_mutations(), factory_context);
     SET_AND_RETURN_IF_NOT_OK(mutations_or_error.status(), creation_status);
     request_header_mutations_ = std::move(mutations_or_error.value());
   }

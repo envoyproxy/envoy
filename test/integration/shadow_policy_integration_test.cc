@@ -1047,23 +1047,23 @@ TEST_P(ShadowPolicyIntegrationTest, ShadowWithHeaderManipulation) {
                                   ->mutable_request_mirror_policies(0);
 
         // Add headers to the shadow request using HeaderMutation
-        auto* mutation1 = mirror_policy->add_request_mutations();
+        auto* mutation1 = mirror_policy->add_request_header_mutations();
         auto* append1 = mutation1->mutable_append();
         append1->mutable_header()->set_key("x-mirror-test");
         append1->mutable_header()->set_value("mirror-value");
         append1->set_append_action(
             envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
 
-        auto* mutation2 = mirror_policy->add_request_mutations();
+        auto* mutation2 = mirror_policy->add_request_header_mutations();
         auto* append2 = mutation2->mutable_append();
         append2->mutable_header()->set_key("x-mirror-static");
         append2->mutable_header()->set_value("static-value");
 
         // Remove sensitive headers from the shadow request using HeaderMutation
-        auto* mutation3 = mirror_policy->add_request_mutations();
+        auto* mutation3 = mirror_policy->add_request_header_mutations();
         mutation3->set_remove("x-sensitive-header");
 
-        auto* mutation4 = mirror_policy->add_request_mutations();
+        auto* mutation4 = mirror_policy->add_request_header_mutations();
         mutation4->set_remove("authorization");
 
         mirror_policy->set_host_rewrite_literal("shadow-target.example.com");
