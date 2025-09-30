@@ -35,7 +35,6 @@ message ProxyProtocolPassThroughTLVs {
 }
 
 // Represents a single Type-Length-Value (TLV) entry.
-// [#next-free-field: 4]
 message TlvEntry {
   // The type of the TLV. Must be a uint8 (0-255) as per the Proxy Protocol v2 specification.
   uint32 type = 1 [(validate.rules).uint32 = {lt: 256}];
