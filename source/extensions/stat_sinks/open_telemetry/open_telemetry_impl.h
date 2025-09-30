@@ -44,8 +44,10 @@ class MetricAggregator : public Logger::Loggable<Logger::Id::stats> {
 public:
   using AttributesMap = absl::flat_hash_map<std::string, std::string>;
 
-  explicit MetricAggregator(bool enable_metric_aggregation)
-      : enable_metric_aggregation_(enable_metric_aggregation) {}
+  explicit MetricAggregator(bool enable_metric_aggregation, int64_t snapshot_time_ns,
+                            int64_t start_time_unix_nano)
+      : enable_metric_aggregation_(enable_metric_aggregation), snapshot_time_ns_(snapshot_time_ns),
+        start_time_unix_nano_(start_time_unix_nano) {}
 
   // Key used to group data points by their attributes.
   struct DataPointKey {
@@ -72,15 +74,13 @@ public:
   // Adds a gauge metric data point. Aggregates by summing if a point with the
   // same attributes exists.
   void addGauge(
-      absl::string_view metric_name, int64_t value, int64_t snapshot_time_ns,
-      int64_t start_time_unix_nano,
+      absl::string_view metric_name, int64_t value,
       const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes);
 
   // Adds a counter metric data point. Aggregates by summing the delta or value
   // based on temporality if a point with the same attributes exists.
   void addCounter(
-      absl::string_view metric_name, uint64_t value, uint64_t delta, int64_t snapshot_time_ns,
-      int64_t start_time_unix_nano,
+      absl::string_view metric_name, uint64_t value, uint64_t delta,
       ::opentelemetry::proto::metrics::v1::AggregationTemporality temporality,
       const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes);
 
@@ -88,8 +88,7 @@ public:
   // with the same attributes and compatible bounds exists.
   void addHistogram(
       absl::string_view stat_name, absl::string_view metric_name,
-      const Stats::HistogramStatistics& stats, int64_t snapshot_time_ns,
-      int64_t start_time_unix_nano,
+      const Stats::HistogramStatistics& stats,
       ::opentelemetry::proto::metrics::v1::AggregationTemporality temporality,
       const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes);
 
@@ -109,10 +108,12 @@ private:
 
   // Sets common fields for a NumberDataPoint.
   void setCommonNumberDataPoint(
-      ::opentelemetry::proto::metrics::v1::NumberDataPoint& data_point, int64_t snapshot_time_ns,
+      ::opentelemetry::proto::metrics::v1::NumberDataPoint& data_point,
       const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes);
 
-  bool enable_metric_aggregation_;
+  const bool enable_metric_aggregation_;
+  const int64_t snapshot_time_ns_;
+  const int64_t start_time_unix_nano_;
   absl::flat_hash_map<std::string, MetricData> metrics_;
 
   // Currently, the metrics without defined in `custom_metric_conversions` won't be aggregated and
@@ -176,7 +177,7 @@ public:
   OtlpMetricsFlusherImpl(
       const OtlpOptionsSharedPtr config, std::function<bool(const Stats::Metric&)> predicate =
                                              [](const auto& metric) { return metric.used(); })
-      : config_(config), predicate_(predicate) {};
+      : config_(config), predicate_(predicate) {}
 
   MetricsExportRequestPtr flush(Stats::MetricSnapshot& snapshot,
                                 int64_t last_flush_time_ns) const override;
@@ -184,16 +185,16 @@ public:
 private:
 private:
   template <class StatType>
-  const SinkConfig::ConversionAction* getMetricConfig(const StatType& stat) const;
+  OptRef<const SinkConfig::ConversionAction> getMetricConfig(const StatType& stat) const;
 
   template <class StatType>
   std::string getMetricName(const StatType& stat,
-                            const SinkConfig::ConversionAction* conversion_config) const;
+                            OptRef<const SinkConfig::ConversionAction> conversion_config) const;
 
   template <class StatType>
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
   getCombinedAttributes(const StatType& stat,
-                        const SinkConfig::ConversionAction* conversion_config) const;
+                        OptRef<const SinkConfig::ConversionAction> conversion_config) const;
   template <class GaugeType>
   void addGaugeDataPoint(opentelemetry::proto::metrics::v1::Metric& metric,
                          const GaugeType& gauge_stat, int64_t snapshot_time_ns) const;
@@ -285,7 +286,6 @@ private:
   const OpenTelemetryGrpcMetricsExporterSharedPtr metrics_exporter_;
   int64_t last_flush_time_ns_;
 };
-
 } // namespace OpenTelemetry
 } // namespace StatSinks
 } // namespace Extensions

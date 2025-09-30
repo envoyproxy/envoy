@@ -32,23 +32,22 @@ MetricAggregator::MetricData& MetricAggregator::getOrCreateMetric(absl::string_v
 }
 
 void MetricAggregator::setCommonNumberDataPoint(
-    NumberDataPoint& data_point, int64_t snapshot_time_ns,
+    NumberDataPoint& data_point,
     const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes) {
-  data_point.set_time_unix_nano(snapshot_time_ns);
+  data_point.set_time_unix_nano(snapshot_time_ns_);
   data_point.mutable_attributes()->CopyFrom(attributes);
 }
 
 void MetricAggregator::addGauge(
-    absl::string_view metric_name, int64_t value, int64_t snapshot_time_ns,
-    int64_t start_time_unix_nano,
+    absl::string_view metric_name, int64_t value,
     const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes) {
   if (!enable_metric_aggregation_) {
     Metric metric;
     metric.set_name(metric_name);
     NumberDataPoint* data_point = metric.mutable_gauge()->add_data_points();
-    setCommonNumberDataPoint(*data_point, snapshot_time_ns, attributes);
+    setCommonNumberDataPoint(*data_point, attributes);
     data_point->set_as_int(value);
-    data_point->set_start_time_unix_nano(start_time_unix_nano);
+    data_point->set_start_time_unix_nano(start_time_unix_nano_);
     non_aggregated_metrics_.push_back(std::move(metric));
     return;
   }
@@ -61,7 +60,7 @@ void MetricAggregator::addGauge(
     // If the data point exists, update it and return.
     NumberDataPoint* data_point = it->second;
     // Update time for the existing data point.
-    data_point->set_time_unix_nano(snapshot_time_ns);
+    data_point->set_time_unix_nano(snapshot_time_ns_);
 
     // Multiple stats are mapped to the same metric and we
     // aggregate by summing the new value to the existing one.
@@ -72,14 +71,14 @@ void MetricAggregator::addGauge(
   // If the data point does not exist, create a new one.
   NumberDataPoint* data_point = metric_data.metric.mutable_gauge()->add_data_points();
   metric_data.gauge_points[key] = data_point;
-  setCommonNumberDataPoint(*data_point, snapshot_time_ns, attributes);
+  setCommonNumberDataPoint(*data_point, attributes);
   data_point->set_as_int(value);
-  data_point->set_start_time_unix_nano(start_time_unix_nano);
+  data_point->set_start_time_unix_nano(start_time_unix_nano_);
 }
 
 void MetricAggregator::addCounter(
-    absl::string_view metric_name, uint64_t value, uint64_t delta, int64_t snapshot_time_ns,
-    int64_t start_time_unix_nano, AggregationTemporality temporality,
+    absl::string_view metric_name, uint64_t value, uint64_t delta,
+    AggregationTemporality temporality,
     const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes) {
   if (!enable_metric_aggregation_) {
     Metric metric;
@@ -87,8 +86,8 @@ void MetricAggregator::addCounter(
     metric.mutable_sum()->set_is_monotonic(true);
     metric.mutable_sum()->set_aggregation_temporality(temporality);
     NumberDataPoint* data_point = metric.mutable_sum()->add_data_points();
-    data_point->set_start_time_unix_nano(start_time_unix_nano);
-    setCommonNumberDataPoint(*data_point, snapshot_time_ns, attributes);
+    data_point->set_start_time_unix_nano(start_time_unix_nano_);
+    setCommonNumberDataPoint(*data_point, attributes);
     data_point->set_as_int(
         (temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta : value);
     non_aggregated_metrics_.push_back(std::move(metric));
@@ -101,7 +100,7 @@ void MetricAggregator::addCounter(
   if (it != metric_data.counter_points.end()) {
     // If the data point exists, update it and return.
     NumberDataPoint* data_point = it->second;
-    data_point->set_time_unix_nano(snapshot_time_ns);
+    data_point->set_time_unix_nano(snapshot_time_ns_);
 
     // For DELTA, add the change since the last export. For CUMULATIVE, add the
     // total value.
@@ -116,25 +115,24 @@ void MetricAggregator::addCounter(
   metric_data.metric.mutable_sum()->set_is_monotonic(true);
   metric_data.metric.mutable_sum()->set_aggregation_temporality(temporality);
   metric_data.counter_points[key] = data_point;
-  data_point->set_start_time_unix_nano(start_time_unix_nano);
-  setCommonNumberDataPoint(*data_point, snapshot_time_ns, attributes);
+  data_point->set_start_time_unix_nano(start_time_unix_nano_);
+  setCommonNumberDataPoint(*data_point, attributes);
   data_point->set_as_int(
       (temporality == AggregationTemporality::AGGREGATION_TEMPORALITY_DELTA) ? delta : value);
 }
 
 void MetricAggregator::addHistogram(
     absl::string_view stat_name, absl::string_view metric_name,
-    const Stats::HistogramStatistics& stats, int64_t snapshot_time_ns, int64_t start_time_unix_nano,
-    AggregationTemporality temporality,
+    const Stats::HistogramStatistics& stats, AggregationTemporality temporality,
     const Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>& attributes) {
   if (!enable_metric_aggregation_) {
     Metric metric;
     metric.set_name(metric_name);
     metric.mutable_histogram()->set_aggregation_temporality(temporality);
     HistogramDataPoint* data_point = metric.mutable_histogram()->add_data_points();
-    data_point->set_time_unix_nano(snapshot_time_ns);
+    data_point->set_time_unix_nano(snapshot_time_ns_);
     data_point->mutable_attributes()->CopyFrom(attributes);
-    data_point->set_start_time_unix_nano(start_time_unix_nano);
+    data_point->set_start_time_unix_nano(start_time_unix_nano_);
 
     data_point->set_count(stats.sampleCount());
     data_point->set_sum(stats.sampleSum());
@@ -155,18 +153,19 @@ void MetricAggregator::addHistogram(
   if (it != metric_data.histogram_points.end()) {
     // If the data point exists, update it and return.
     HistogramDataPoint* data_point = it->second;
-    // Update time.
-    data_point->set_time_unix_nano(snapshot_time_ns);
-
-    // Aggregate count and sum.
-    data_point->set_count(data_point->count() + stats.sampleCount());
-    data_point->set_sum(data_point->sum() + stats.sampleSum());
-
-    // Aggregate bucket_counts. Assuming compatible bounds.
     std::vector<uint64_t> new_bucket_counts = stats.computeDisjointBuckets();
     if (static_cast<size_t>(data_point->explicit_bounds_size()) ==
             stats.supportedBuckets().size() &&
         static_cast<size_t>(data_point->bucket_counts_size()) == new_bucket_counts.size() + 1) {
+
+      // Update time.
+      data_point->set_time_unix_nano(snapshot_time_ns_);
+
+      // Aggregate count and sum.
+      data_point->set_count(data_point->count() + stats.sampleCount());
+      data_point->set_sum(data_point->sum() + stats.sampleSum());
+
+      // Aggregate bucket_counts.
       for (size_t i = 0; i < new_bucket_counts.size(); ++i) {
         data_point->set_bucket_counts(i, data_point->bucket_counts(i) + new_bucket_counts[i]);
       }
@@ -185,9 +184,9 @@ void MetricAggregator::addHistogram(
   metric_data.metric.mutable_histogram()->set_aggregation_temporality(temporality);
   metric_data.histogram_points[key] = data_point;
   // Set common fields directly here
-  data_point->set_time_unix_nano(snapshot_time_ns);
+  data_point->set_time_unix_nano(snapshot_time_ns_);
   data_point->mutable_attributes()->CopyFrom(attributes);
-  data_point->set_start_time_unix_nano(start_time_unix_nano);
+  data_point->set_start_time_unix_nano(start_time_unix_nano_);
 
   data_point->set_count(stats.sampleCount());
   data_point->set_sum(stats.sampleSum());
@@ -288,20 +287,22 @@ void OpenTelemetryGrpcMetricsExporterImpl::onFailure(Grpc::Status::GrpcStatus re
 }
 
 template <class StatType>
-const SinkConfig::ConversionAction*
+OptRef<const SinkConfig::ConversionAction>
 OtlpMetricsFlusherImpl::getMetricConfig(const StatType& stat) const {
   Stats::StatMatchingDataImpl<StatType> data(stat);
   const ::Envoy::Matcher::MatchResult result =
       Envoy::Matcher::evaluateMatch<Stats::StatMatchingData>(*config_->matcher(), data);
   ASSERT(result.isComplete());
-  return result.isMatch() ? result.action()->getTyped<OnMatchAction>().config() : nullptr;
+  if (!result.isMatch()) {
+    return {};
+  }
+  return {*result.action()->getTyped<OnMatchAction>().config()};
 }
 
 template <class StatType>
-std::string
-OtlpMetricsFlusherImpl::getMetricName(const StatType& stat,
-                                      const SinkConfig::ConversionAction* conversion_config) const {
-  if (conversion_config != nullptr) {
+std::string OtlpMetricsFlusherImpl::getMetricName(
+    const StatType& stat, OptRef<const SinkConfig::ConversionAction> conversion_config) const {
+  if (conversion_config.has_value()) {
     return conversion_config->metric_name();
   }
   return absl::StrCat(config_->statPrefix(),
@@ -311,7 +312,7 @@ OtlpMetricsFlusherImpl::getMetricName(const StatType& stat,
 template <class StatType>
 Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue>
 OtlpMetricsFlusherImpl::getCombinedAttributes(
-    const StatType& stat, const SinkConfig::ConversionAction* conversion_config) const {
+    const StatType& stat, OptRef<const SinkConfig::ConversionAction> conversion_config) const {
   Protobuf::RepeatedPtrField<opentelemetry::proto::common::v1::KeyValue> attributes;
   if (config_->emitTagsAsAttributes()) {
     for (const auto& tag : stat.tags()) {
@@ -320,7 +321,7 @@ OtlpMetricsFlusherImpl::getCombinedAttributes(
       attribute->mutable_value()->set_string_value(tag.value_);
     }
   }
-  if (conversion_config != nullptr) {
+  if (conversion_config.has_value()) {
     for (const auto& attr : conversion_config->static_metric_labels()) {
       *attributes.Add() = attr;
     }
@@ -331,29 +332,27 @@ OtlpMetricsFlusherImpl::getCombinedAttributes(
 MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& snapshot,
                                                       int64_t last_flush_time_ns) const {
   auto request = std::make_unique<MetricsExportRequest>();
-  MetricAggregator aggregator = MetricAggregator(config_->enableMetricAggregation());
-
-  int64_t snapshot_time_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                                 snapshot.snapshotTime().time_since_epoch())
-                                 .count();
-  int64_t start_time_unix_nano = last_flush_time_ns;
+  MetricAggregator aggregator =
+      MetricAggregator(config_->enableMetricAggregation(),
+                       std::chrono::duration_cast<std::chrono::nanoseconds>(
+                           snapshot.snapshotTime().time_since_epoch())
+                           .count(),
+                       last_flush_time_ns);
 
   // Process Gauges
   for (const auto& gauge : snapshot.gauges()) {
     if (predicate_(gauge)) {
-      const auto* metric_config = getMetricConfig(gauge.get());
+      auto metric_config = getMetricConfig(gauge.get());
       const std::string metric_name = getMetricName(gauge.get(), metric_config);
       auto attributes = getCombinedAttributes(gauge.get(), metric_config);
-      aggregator.addGauge(metric_name, gauge.get().value(), snapshot_time_ns, start_time_unix_nano,
-                          attributes);
+      aggregator.addGauge(metric_name, gauge.get().value(), attributes);
     };
   }
   for (const auto& gauge : snapshot.hostGauges()) {
-    const auto* metric_config = getMetricConfig(gauge);
+    auto metric_config = getMetricConfig(gauge);
     const std::string metric_name = getMetricName(gauge, metric_config);
     auto attributes = getCombinedAttributes(gauge, metric_config);
-    aggregator.addGauge(metric_name, gauge.value(), snapshot_time_ns, start_time_unix_nano,
-                        attributes);
+    aggregator.addGauge(metric_name, gauge.value(), attributes);
   }
 
   // Process Counters
@@ -363,20 +362,19 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& sna
           : AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE;
   for (const auto& counter : snapshot.counters()) {
     if (predicate_(counter.counter_)) {
-      const auto* metric_config = getMetricConfig(counter.counter_.get());
+      auto metric_config = getMetricConfig(counter.counter_.get());
       const std::string metric_name = getMetricName(counter.counter_.get(), metric_config);
       auto attributes = getCombinedAttributes(counter.counter_.get(), metric_config);
       aggregator.addCounter(metric_name, counter.counter_.get().value(), counter.delta_,
-                            snapshot_time_ns, start_time_unix_nano, counter_temporality,
-                            attributes);
+                            counter_temporality, attributes);
     }
   }
   for (const auto& counter : snapshot.hostCounters()) {
-    const auto* metric_config = getMetricConfig(counter);
+    auto metric_config = getMetricConfig(counter);
     const std::string metric_name = getMetricName(counter, metric_config);
     auto attributes = getCombinedAttributes(counter, metric_config);
-    aggregator.addCounter(metric_name, counter.value(), counter.delta(), snapshot_time_ns,
-                          start_time_unix_nano, counter_temporality, attributes);
+    aggregator.addCounter(metric_name, counter.value(), counter.delta(), counter_temporality,
+                          attributes);
   }
 
   // Process Histograms
@@ -386,15 +384,14 @@ MetricsExportRequestPtr OtlpMetricsFlusherImpl::flush(Stats::MetricSnapshot& sna
           : AggregationTemporality::AGGREGATION_TEMPORALITY_CUMULATIVE;
   for (const auto& histogram : snapshot.histograms()) {
     if (predicate_(histogram)) {
-      const auto* metric_config = getMetricConfig(histogram.get());
+      auto metric_config = getMetricConfig(histogram.get());
       const std::string metric_name = getMetricName(histogram.get(), metric_config);
       auto attributes = getCombinedAttributes(histogram.get(), metric_config);
       const Stats::HistogramStatistics& histogram_stats =
           config_->reportHistogramsAsDeltas() ? histogram.get().intervalStatistics()
                                               : histogram.get().cumulativeStatistics();
       aggregator.addHistogram(histogram.get().name(), metric_name, histogram_stats,
-                              snapshot_time_ns, start_time_unix_nano, histogram_temporality,
-                              attributes);
+                              histogram_temporality, attributes);
     }
   }
   // Add all aggregated metrics to the request.
