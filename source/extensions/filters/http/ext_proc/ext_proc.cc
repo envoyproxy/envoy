@@ -286,6 +286,8 @@ std::string processingEffectToString(ProcessingEffect::Effect processing_effect)
       return "immediate_response";
     case ProcessingEffect::Effect::ContinueAndReplace:
       return "continue_and_replace";
+    default:
+      return "unknown";
   }
 }
 

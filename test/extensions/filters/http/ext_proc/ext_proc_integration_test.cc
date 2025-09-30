@@ -4613,7 +4613,13 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoAppliedMutations) {
   handleUpstreamRequestWithTrailer();
 
   processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
-  processResponseBodyMessage(*grpc_upstreams_[0], false, absl::nullopt);
+  processResponseBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody&, BodyResponse& body_resp) {
+          auto* body_mut = body_resp.mutable_response()->mutable_header_mutation();
+          auto* mut1 = body_mut->add_set_headers();
+          mut1->mutable_append()->set_value(false);
+          mut1->mutable_header()->set_key("x-new-header");
+          mut1->mutable_header()->set_raw_value("new");
+          return true;});
   processResponseTrailersMessage(*grpc_upstreams_[0], false, [](const HttpTrailers&, TrailersResponse& trailers_resp) {
         // The response does not really matter, it just needs to be non-empty.
         auto response_trailer_mutation = trailers_resp.mutable_header_mutation();
@@ -4648,7 +4654,7 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoAppliedMutations) {
 
   auto field_response_body_effect = json_log->getString("field_response_body_effect");
   EXPECT_TRUE(field_response_body_effect.ok());
-  EXPECT_EQ(*field_response_body_effect, "0");
+  EXPECT_EQ(*field_response_body_effect, "1");
 
   auto field_response_trailer_effect = json_log->getString("field_response_trailer_effect");
   EXPECT_TRUE(field_response_trailer_effect.ok());
