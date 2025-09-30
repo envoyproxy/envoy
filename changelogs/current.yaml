@@ -112,6 +112,11 @@ minor_behavior_changes:
   change: |
     Check the request header count after applying mutations is <= the configured limit and reject
     the response if not.
+- area: ext_proc
+  change: |
+    Added new logging bit processing_effect to ExtProcLoggingInfo Filter State to track mutation events per GRPC call. Proccessing_event 
+    can be either None, ContentModified, ContinueAndReplace or ImmediateResponse. The default is None except processing mode 
+    FULL_DUPLEX_STREAMED whose defualt is Content Modified.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
