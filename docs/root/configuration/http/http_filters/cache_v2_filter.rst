@@ -49,7 +49,16 @@ For HTTP Responses:
 HTTP Cache delegates the actual storage of HTTP responses to implementations of the ``HttpCache`` interface. These implementations can
 cover all points on the spectrum of persistence, performance, and distribution, from local RAM caches to globally distributed
 persistent caches. They can be fully custom caches, or wrappers/adapters around local or remote open-source or proprietary caches.
-Currently the only available cache storage implementation is :ref:`SimpleHTTPCache <envoy_v3_api_msg_extensions.http.cache_v2.simple_http_cache.v3.SimpleHttpCacheV2Config>`.
+Built-in cache storage backends include :ref:`SimpleHttpCacheV2Config <envoy_v3_api_msg_extensions.http.cache_v2.simple_http_cache.v3.SimpleHttpCacheV2Config>`
+(in-memory) and :ref:`FileSystemHttpCacheV2Config <envoy_v3_api_msg_extensions.http.cache_v2.file_system_http_cache.v3.FileSystemHttpCacheV2Config>` (persistent; LRU).
+
+Architecture and extension points
+---------------------------------
+
+Envoy’s HTTP caching is split into:
+
+* **HTTP Cache filter** (extension name ``envoy.filters.http.cache_v2``, category ``envoy.filters.http``) — configured via ``CacheV2Config`` to apply HTTP caching semantics.
+* **Cache storage backends** (extension category ``envoy.http.cache_v2``) — the filter delegates object storage/retrieval to a backend, selected via a nested ``typed_config`` in ``CacheV2Config``.
 
 Example configuration
 ---------------------
@@ -63,21 +72,40 @@ Example filter configuration with a ``SimpleHttpCache`` cache implementation:
    :lineno-start: 29
    :caption: :download:`http-cache-v2-configuration.yaml <_include/http-cache-v2-configuration.yaml>`
 
+Example filter configuration with a ``FileSystemHttpCacheV2`` cache implementation:
+
+.. literalinclude:: _include/http-cache-v2-configuration-fs.yaml
+   :language: yaml
+   :start-at: http_filters:
+   :end-before: envoy.filters.http.router
+   :linenos:
+   :lineno-match:
+   :caption: :download:`http-cache-v2-configuration-fs.yaml <_include/http-cache-v2-configuration-fs.yaml>`
+
+
 The more complicated filter chain configuration required if mutations occur upstream of the cache filter
 involves duplicating the full route config into an internal listener (unfortunately this is currently unavoidable):
 
 .. literalinclude:: _include/http-cache-v2-configuration-internal-listener.yaml
    :language: yaml
-   :lines: 38-113
+   :start-at: http_filters:
+   :end-at: server_listener_name: cache_internal_listener
    :linenos:
-   :lineno-start: 38
+   :lineno-match:
    :caption: :download:`http-cache-v2-configuration-internal-listener.yaml <_include/http-cache-v2-configuration-internal-listener.yaml>`
 
 .. TODO(ravenblackx): Add sandbox and link it below, similar to what cache_filter does.
 
-.. TODO(ravenblackx): Update the docs like the recent update to the old cache docs.
-
 .. seealso::
+
+   :ref:`HTTP CacheV2 filter (proto file) <envoy_v3_api_file_envoy/extensions/filters/http/cache_v2/v3/cache.proto>`
+      ``CacheV2Config`` API reference.
+
+   :ref:`In-memory storage backend <envoy_v3_api_file_envoy/extensions/http/cache_v2/simple_http_cache/v3/config.proto>`
+      ``SimpleHttpCacheV2Config`` API reference.
+
+   :ref:`Persistent on-disk storage backend <config_http_caches_v2_file_system_http_cache>`
+      Docs page for File System Http Cache; links to ``FileSystemHttpCacheConfig`` API reference.
 
    :ref:`Old cache filter <config_http_filters_cache>`
       The deprecated cache filter.
