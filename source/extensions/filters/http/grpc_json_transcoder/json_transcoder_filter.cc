@@ -605,8 +605,8 @@ Http::FilterDataStatus JsonTranscoderFilter::decodeData(Buffer::Instance& data, 
       Buffer::OwnedImpl remaining_request_data;
       remaining_request_data.move(request_data_);
       while (remaining_request_data.length() > 0) {
-        uint64_t piece_size =
-            std::min(remaining_request_data.length(), JsonTranscoderConfig::MaxStreamedPieceSize);
+        uint64_t piece_size = std::min<uint64_t>(remaining_request_data.length(),
+                                                 JsonTranscoderConfig::MaxStreamedPieceSize);
         request_data_.move(remaining_request_data, piece_size);
         maybeSendHttpBodyRequestMessage(&data);
       }
