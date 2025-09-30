@@ -722,7 +722,6 @@ pub trait EnvoyHttpFilter {
   /// The trailers are passed as a list of key-value pairs.
   fn send_response_trailers<'a>(&mut self, trailers: Vec<(&'a str, &'a [u8])>);
 
-
   /// Get the number-typed metadata value with the given key.
   /// Use the `source` parameter to specify which metadata to use.
   /// If the metadata is not found or is the wrong type, this returns `None`.

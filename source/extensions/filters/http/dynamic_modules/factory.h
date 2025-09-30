@@ -32,7 +32,7 @@ public:
 
   bool isTerminalFilterByProtoTyped(const FilterConfig& proto_config,
                                     Server::Configuration::ServerFactoryContext&) override {
-    return proto_config.dynamic_module_config().terminal_filter();
+    return proto_config.terminal_filter();
   }
 };
 using UpstreamDynamicModuleConfigFactory = DynamicModuleConfigFactory;

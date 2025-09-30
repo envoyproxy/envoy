@@ -1302,7 +1302,8 @@ void envoy_dynamic_module_callback_http_send_response(
 
 /**
  * envoy_dynamic_module_callback_http_send_response_headers is called by the module to send the
- * response headers to the downstream, optionally ending the stream.
+ * response headers to the downstream, optionally ending the stream. Necessary pseudo headers
+ * such as :status should be present.
  *
  * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
  * corresponding HTTP filter.

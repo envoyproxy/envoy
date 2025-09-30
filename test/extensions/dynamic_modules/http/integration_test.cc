@@ -628,8 +628,8 @@ public:
               '@type': type.googleapis.com/envoy.extensions.filters.http.dynamic_modules.v3.DynamicModuleFilter
               dynamic_module_config:
                 name: http_integration_test
-                terminal_filter: true
               filter_name: streaming_terminal_filter
+              terminal_filter: true
           route_config:
             virtual_hosts:
             - domains:

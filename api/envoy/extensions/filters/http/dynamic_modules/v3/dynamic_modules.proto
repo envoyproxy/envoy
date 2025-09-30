@@ -3,15 +3,13 @@ syntax = "proto3";
 package envoy.extensions.filters.http.dynamic_modules.v3;
 
 import "envoy/extensions/dynamic_modules/v3/dynamic_modules.proto";
-
 import "google/protobuf/any.proto";
-
 import "udpa/annotations/status.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.filters.http.dynamic_modules.v3";
-option java_outer_classname = "DynamicModulesProto";
-option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/dynamic_modules/v3;dynamic_modulesv3";
+option java_multiple_files = true;
+option java_outer_classname = "DynamicModulesProto";
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.dynamic_modules.v3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: HTTP filter for dynamic modules]
@@ -22,6 +20,10 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 //
 // A module can be loaded by multiple HTTP filters, hence the program can be structured in a way that
 // the module is loaded only once and shared across multiple filters providing multiple functionalities.
+//
+// A dynamic module can opt into being a terminal filter with no upstream by setting ``terminal_filter`` to
+// true in the configuration. A terminal dynamic module can use ``send_`` ABI methods to send response headers,
+// body and trailers to the downstream.
 message DynamicModuleFilter {
   // Specifies the shared-object level configuration.
   envoy.extensions.dynamic_modules.v3.DynamicModuleConfig dynamic_module_config = 1;
@@ -58,6 +60,10 @@ message DynamicModuleFilter {
   //    value: aGVsbG8= # echo -n "hello" | base64
   //
   google.protobuf.Any filter_config = 3;
+
+  // Set true if the dynamic module is a terminal filter to use without an upstream.
+  // The dynamic module is responsible for creating and sending the response to downstream.
+  bool terminal_filter = 4;
 }
 
 // Configuration of the HTTP per-route filter for dynamic modules. This filter allows loading shared object files

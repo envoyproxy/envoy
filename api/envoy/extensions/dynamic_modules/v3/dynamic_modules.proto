@@ -36,10 +36,6 @@ message DynamicModuleConfig {
   // command line options.
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
-  // Set true if the dynamic module is a terminal filter to use without an upstream.
-  // The dynamic module is responsible for creating and sending the response to downstream.
-  bool terminal_filter = 2;
-
   // Set true to prevent the module from being unloaded with dlclose.
   // This is useful for modules that have global state that should not be unloaded.
   // A module is closed when no more references to it exist in the process. For example,
