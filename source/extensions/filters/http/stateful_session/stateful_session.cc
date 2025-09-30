@@ -24,11 +24,17 @@ public:
 } // namespace
 
 StatefulSessionConfig::StatefulSessionConfig(const ProtoConfig& config,
-                                             Server::Configuration::GenericFactoryContext& context)
+                                             Server::Configuration::GenericFactoryContext& context,
+                                             const std::string& stats_prefix, Stats::Scope& scope)
     : strict_(config.strict()) {
+  // Only construct stats if stat_prefix is explicitly set.
   if (!config.stat_prefix().empty()) {
-    stat_prefix_override_ = config.stat_prefix();
+    const std::string final_prefix =
+        absl::StrCat(stats_prefix, "stateful_session.", config.stat_prefix(), ".");
+    stats_ = std::make_shared<StatefulSessionFilterStats>(StatefulSessionFilterStats{
+        ALL_STATEFUL_SESSION_FILTER_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))});
   }
+
   if (!config.has_session_state()) {
     factory_ = std::make_shared<EmptySessionStateFactory>();
     return;
@@ -50,22 +56,21 @@ PerRouteStatefulSession::PerRouteStatefulSession(
     disabled_ = true;
     return;
   }
-  config_ = std::make_shared<StatefulSessionConfig>(config.stateful_session(), context);
+  // Per-route configs don't generate stats, so pass empty prefix and scope from context.
+  config_ = std::make_shared<StatefulSessionConfig>(config.stateful_session(), context, "",
+                                                    context.scope());
 }
 
 Http::FilterHeadersStatus StatefulSession::decodeHeaders(Http::RequestHeaderMap& headers, bool) {
-  // Cache the effective config on first use to avoid repeated resolution.
-  if (effective_config_ == nullptr) {
-    effective_config_ = config_.get();
-    auto route_config = Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteStatefulSession>(
-        decoder_callbacks_);
+  effective_config_ = config_.get();
+  auto route_config = Http::Utility::resolveMostSpecificPerFilterConfig<PerRouteStatefulSession>(
+      decoder_callbacks_);
 
-    if (route_config != nullptr) {
-      if (route_config->disabled()) {
-        return Http::FilterHeadersStatus::Continue;
-      }
-      effective_config_ = route_config->statefulSessionConfig();
+  if (route_config != nullptr) {
+    if (route_config->disabled()) {
+      return Http::FilterHeadersStatus::Continue;
     }
+    effective_config_ = route_config->statefulSessionConfig();
   }
   session_state_ = effective_config_->createSessionState(headers);
   if (session_state_ == nullptr) {

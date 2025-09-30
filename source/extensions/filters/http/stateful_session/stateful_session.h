@@ -11,6 +11,7 @@
 #include "envoy/upstream/load_balancer.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/common/utility.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 #include "absl/strings/string_view.h"
@@ -42,7 +43,8 @@ struct StatefulSessionFilterStats {
 class StatefulSessionConfig {
 public:
   StatefulSessionConfig(const ProtoConfig& config,
-                        Server::Configuration::GenericFactoryContext& context);
+                        Server::Configuration::GenericFactoryContext& context,
+                        const std::string& stats_prefix, Stats::Scope& scope);
 
   Http::SessionStatePtr createSessionState(Http::RequestHeaderMap& headers) const {
     ASSERT(factory_ != nullptr);
@@ -51,16 +53,12 @@ public:
 
   bool isStrict() const { return strict_; }
 
-  const std::string& statPrefixOverride() const { return stat_prefix_override_; }
-
-  void setStats(const std::shared_ptr<StatefulSessionFilterStats>& stats) { stats_ = stats; }
-  const std::shared_ptr<StatefulSessionFilterStats>& stats() const { return stats_; }
+  OptRef<StatefulSessionFilterStats> stats() { return makeOptRefFromPtr(stats_.get()); }
 
 private:
   Http::SessionStateFactorySharedPtr factory_;
   bool strict_{false};
-  std::string stat_prefix_override_{};
-  std::shared_ptr<StatefulSessionFilterStats> stats_{};
+  std::shared_ptr<StatefulSessionFilterStats> stats_;
 };
 using StatefulSessionConfigSharedPtr = std::shared_ptr<StatefulSessionConfig>;
 
@@ -81,9 +79,7 @@ using PerRouteStatefulSessionConfigSharedPtr = std::shared_ptr<PerRouteStatefulS
 class StatefulSession : public Http::PassThroughFilter,
                         public Logger::Loggable<Logger::Id::filter> {
 public:
-  StatefulSession(StatefulSessionConfigSharedPtr config,
-                  std::shared_ptr<StatefulSessionFilterStats> stats)
-      : config_(std::move(config)), stats_(std::move(stats)) {}
+  StatefulSession(StatefulSessionConfigSharedPtr config) : config_(std::move(config)) {}
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::RequestHeaderMap& headers, bool) override;
@@ -108,28 +104,33 @@ public:
 private:
   void markOverrideAttempted() { override_attempted_ = true; }
   void markRouted() {
-    if (override_attempted_ && stats_ != nullptr) {
-      stats_->routed_.inc();
+    if (override_attempted_ && effective_config_ != nullptr) {
+      if (auto stats = effective_config_->stats(); stats.has_value()) {
+        stats->routed_.inc();
+      }
     }
   }
   void markFailedClosed() {
-    if (override_attempted_ && stats_ != nullptr) {
-      stats_->failed_closed_.inc();
+    if (override_attempted_ && effective_config_ != nullptr) {
+      if (auto stats = effective_config_->stats(); stats.has_value()) {
+        stats->failed_closed_.inc();
+      }
     }
   }
   void markFailedOpen() {
-    if (override_attempted_ && stats_ != nullptr) {
-      stats_->failed_open_.inc();
+    if (override_attempted_ && effective_config_ != nullptr) {
+      if (auto stats = effective_config_->stats(); stats.has_value()) {
+        stats->failed_open_.inc();
+      }
     }
   }
 
   Http::SessionStatePtr session_state_;
   StatefulSessionConfigSharedPtr config_;
-  std::shared_ptr<StatefulSessionFilterStats> stats_;
   bool override_attempted_{false};
   bool accounted_{false};
   // Cached route config to avoid repeated resolution and dynamic_cast issues in tests.
-  const StatefulSessionConfig* effective_config_{nullptr};
+  StatefulSessionConfig* effective_config_{nullptr};
 };
 
 } // namespace StatefulSession

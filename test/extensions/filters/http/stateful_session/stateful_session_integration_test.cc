@@ -393,9 +393,6 @@ TEST_F(StatefulSessionIntegrationTest,
         "503",
         response->headers().get(Http::LowerCaseString(":status"))[0]->value().getStringView());
 
-    // Verify strict fail-closed is counted.
-    test_server_->waitForCounterGe("http.config_test.stateful_session.failed_closed", 1);
-
     cleanupUpstreamAndDownstream();
   }
 }
@@ -830,9 +827,6 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionHeade
                                    ->value()
                                    .getStringView());
 
-    // Verify fail-open is counted when strict mode is disabled.
-    test_server_->waitForCounterGe("http.config_test.stateful_session.failed_open", 1);
-
     cleanupUpstreamAndDownstream();
   }
 }
@@ -928,9 +922,6 @@ TEST_F(StatefulSessionIntegrationTest, DownstreamRequestWithStatefulSessionHeade
     EXPECT_TRUE(response->complete());
 
     EXPECT_EQ("503", response->headers().getStatusValue());
-
-    // Verify strict fail-closed is counted.
-    test_server_->waitForCounterGe("http.config_test.stateful_session.failed_closed", 1);
 
     cleanupUpstreamAndDownstream();
   }

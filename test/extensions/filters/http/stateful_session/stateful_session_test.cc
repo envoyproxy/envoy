@@ -35,15 +35,10 @@ public:
     TestUtility::loadFromYaml(std::string(config), proto_config);
     Envoy::Server::GenericFactoryContextImpl generic_context(context_);
 
-    config_ = std::make_shared<StatefulSessionConfig>(proto_config, generic_context);
+    config_ = std::make_shared<StatefulSessionConfig>(proto_config, generic_context, "",
+                                                      context_.scope());
 
-    // Build shared stats like the factory would.
-    const std::string final_prefix =
-        absl::StrCat("", "stateful_session.", config_->statPrefixOverride());
-    auto stats = std::make_shared<StatefulSessionFilterStats>(StatefulSessionFilterStats{
-        ALL_STATEFUL_SESSION_FILTER_STATS(POOL_COUNTER_PREFIX(context_.scope(), final_prefix))});
-    config_->setStats(stats);
-    filter_ = std::make_shared<StatefulSession>(config_, stats);
+    filter_ = std::make_shared<StatefulSession>(config_);
     filter_->setDecoderFilterCallbacks(decoder_callbacks_);
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
 
@@ -223,9 +218,9 @@ TEST_F(StatefulSessionTest, NullSessionState) {
 
 TEST(EmpytProtoConfigTest, EmpytProtoConfigTest) {
   ProtoConfig empty_proto_config;
-  testing::NiceMock<Server::Configuration::MockGenericFactoryContext> generic_context;
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  StatefulSessionConfig config(empty_proto_config, generic_context);
+  StatefulSessionConfig config(empty_proto_config, context, "", context.scope());
 
   Http::TestRequestHeaderMapImpl request_headers{
       {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};
@@ -234,7 +229,14 @@ TEST(EmpytProtoConfigTest, EmpytProtoConfigTest) {
 
 // Test stats functionality.
 TEST_F(StatefulSessionTest, StatsRouted) {
-  initialize(ConfigYaml);
+  const std::string config_with_stats = R"EOF(
+session_state:
+  name: envoy.http.stateful_session.mock
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Struct
+stat_prefix: "test"
+)EOF";
+  initialize(config_with_stats);
   Http::TestRequestHeaderMapImpl request_headers{
       {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
@@ -246,9 +248,9 @@ TEST_F(StatefulSessionTest, StatsRouted) {
       .WillOnce(Return(absl::make_optional<absl::string_view>("127.0.0.1:8080")));
 
   // Initial stats should be zero.
-  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.routed").value());
-  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.failed_open").value());
-  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.failed_closed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.routed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_open").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_closed").value());
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
@@ -257,13 +259,20 @@ TEST_F(StatefulSessionTest, StatsRouted) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
 
   // Verify routed counter incremented.
-  EXPECT_EQ(1, context_.scope().counterFromString("stateful_session.routed").value());
-  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.failed_open").value());
-  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.failed_closed").value());
+  EXPECT_EQ(1, context_.scope().counterFromString("stateful_session.test.routed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_open").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_closed").value());
 }
 
 TEST_F(StatefulSessionTest, StatsFailedOpen) {
-  initialize(ConfigYaml);
+  const std::string config_with_stats = R"EOF(
+session_state:
+  name: envoy.http.stateful_session.mock
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Struct
+stat_prefix: "test"
+)EOF";
+  initialize(config_with_stats);
   Http::TestRequestHeaderMapImpl request_headers{
       {":path", "/"}, {":method", "GET"}, {":authority", "test.com"}};
   Http::TestResponseHeaderMapImpl response_headers{{":status", "200"}};
@@ -275,9 +284,9 @@ TEST_F(StatefulSessionTest, StatsFailedOpen) {
       .WillOnce(Return(absl::make_optional<absl::string_view>("127.0.0.1:8080")));
 
   // Initial stats should be zero.
-  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.routed").value());
-  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.failed_open").value());
-  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.failed_closed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.routed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_open").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_closed").value());
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
@@ -286,9 +295,9 @@ TEST_F(StatefulSessionTest, StatsFailedOpen) {
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
 
   // Verify failed_open counter incremented.
-  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.routed").value());
-  EXPECT_EQ(1, context_.scope().counterFromString("stateful_session.failed_open").value());
-  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.failed_closed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.routed").value());
+  EXPECT_EQ(1, context_.scope().counterFromString("stateful_session.test.failed_open").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_closed").value());
 }
 
 TEST_F(StatefulSessionTest, StatsFailedClosed) {
@@ -298,6 +307,7 @@ session_state:
   typed_config:
     "@type": type.googleapis.com/google.protobuf.Struct
 strict: true
+stat_prefix: "test"
 )EOF";
 
   initialize(strict_config);
@@ -311,9 +321,9 @@ strict: true
       .WillOnce(Return(absl::make_optional<absl::string_view>("127.0.0.1:8080")));
 
   // Initial stats should be zero.
-  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.routed").value());
-  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.failed_open").value());
-  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.failed_closed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.routed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_open").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_closed").value());
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
@@ -322,9 +332,9 @@ strict: true
   filter_->onLocalReply(local_reply_data);
 
   // Verify failed_closed counter incremented.
-  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.routed").value());
-  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.failed_open").value());
-  EXPECT_EQ(1, context_.scope().counterFromString("stateful_session.failed_closed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.routed").value());
+  EXPECT_EQ(0, context_.scope().counterFromString("stateful_session.test.failed_open").value());
+  EXPECT_EQ(1, context_.scope().counterFromString("stateful_session.test.failed_closed").value());
 }
 
 TEST_F(StatefulSessionTest, StatsWithCustomPrefix) {
