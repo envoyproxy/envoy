@@ -110,8 +110,8 @@ minor_behavior_changes:
     4MB could be encoded, which most upstream grpc services would, by default, treat as an error.
 - area: ext_authz
   change: |
-    Check the request header count after applying mutations is <= the configured limit and reject
-    the response if not.
+    Check the request header count & size in kb after applying mutations is <= the configured limits
+    and reject the response if not.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -413,6 +413,11 @@ new_features:
   change: |
     Added support for resource attributes. The stat sink will use the resource attributes configured for the OpenTelemetry tracer via
     :ref:`resource_detectors <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.resource_detectors>`.
+- area: otlp_stat_sink
+  change: |
+    Added support for :ref:`custom_metric_conversions
+    <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.custom_metric_conversions>`. This allows renaming stats,
+    adding static labels, and aggregating multiple stats into generated metrics.
 - area: lua
   change: |
     Added ``virtualHost()`` to the Stream handle API, allowing Lua scripts to retrieve virtual host information. So far, the only method
