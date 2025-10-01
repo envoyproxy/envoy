@@ -33,6 +33,7 @@ filters.
   set_filter_state
   sni_cluster_filter
   sni_dynamic_forward_proxy_filter
+  sni_to_metadata_filter
   tcp_proxy_filter
   thrift_proxy_filter
   wasm_filter

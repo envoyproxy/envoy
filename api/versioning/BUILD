@@ -191,6 +191,7 @@ proto_library(
         "//envoy/extensions/filters/network/set_filter_state/v3:pkg",
         "//envoy/extensions/filters/network/sni_cluster/v3:pkg",
         "//envoy/extensions/filters/network/sni_dynamic_forward_proxy/v3:pkg",
+        "//envoy/extensions/filters/network/sni_to_metadata/v3:pkg",
         "//envoy/extensions/filters/network/tcp_proxy/v3:pkg",
         "//envoy/extensions/filters/network/thrift_proxy/filters/header_to_metadata/v3:pkg",
         "//envoy/extensions/filters/network/thrift_proxy/filters/payload_to_metadata/v3:pkg",

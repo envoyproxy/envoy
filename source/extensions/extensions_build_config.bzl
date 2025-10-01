@@ -236,6 +236,7 @@ EXTENSIONS = {
     "envoy.filters.network.set_filter_state":                     "//source/extensions/filters/network/set_filter_state:config",
     "envoy.filters.network.sni_cluster":                          "//source/extensions/filters/network/sni_cluster:config",
     "envoy.filters.network.sni_dynamic_forward_proxy":            "//source/extensions/filters/network/sni_dynamic_forward_proxy:config",
+    "envoy.filters.network.sni_to_metadata":                      "//source/extensions/filters/network/sni_to_metadata:config",
     "envoy.filters.network.wasm":                                 "//source/extensions/filters/network/wasm:config",
     "envoy.filters.network.zookeeper_proxy":                      "//source/extensions/filters/network/zookeeper_proxy:config",
     "envoy.filters.network.generic_proxy":                        "//source/extensions/filters/network/generic_proxy:config",

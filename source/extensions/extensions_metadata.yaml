@@ -804,6 +804,13 @@ envoy.filters.network.sni_dynamic_forward_proxy:
   status: alpha
   type_urls:
   - envoy.extensions.filters.network.sni_dynamic_forward_proxy.v3.FilterConfig
+envoy.filters.network.sni_to_metadata:
+  categories:
+  - envoy.filters.network
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.network.sni_to_metadata.v3.SniToMetadataFilter
 envoy.filters.network.tcp_proxy:
   categories:
   - envoy.filters.network

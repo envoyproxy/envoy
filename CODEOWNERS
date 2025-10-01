@@ -69,6 +69,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/filters/network/sni_cluster @rshriram @ggreenway
 # sni_dynamic_forward_proxy extension
 /*/extensions/filters/network/sni_dynamic_forward_proxy @rshriram @UNOWNED
+# sni_to_metadata extension
+/*/extensions/filters/network/sni_to_metadata @bplotnick @kbaichoo
 # tracers.datadog extension
 /*/extensions/tracers/datadog @dmehala @mattklein123
 # tracers.xray extension
