@@ -1027,13 +1027,13 @@ fields {
   checkSerializedData<apikeys::ApiKey>(*response_data, {response});
 }
 
-TEST_F(FilterTestExtractOk, ExtractSizeRepeatedComplexField) {
+TEST_F(FilterTestExtractOk, ExtractCardinalityRepeatedComplexField) {
   setUp(R"pb(
     mode: FIRST_AND_LAST
     extraction_by_method: {
       key: "apikeys.ApiKeys.ListApiKeys"
       value: {
-        response_extraction_by_field: { key: "keys" value: EXTRACT_SIZE }
+        response_extraction_by_field: { key: "keys" value: EXTRACT_REPEATED_CARDINALITY }
       }
     })pb");
 
@@ -1096,13 +1096,13 @@ TEST_F(FilterTestExtractOk, ExtractSizeRepeatedComplexField) {
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data, true));
 }
 
-TEST_F(FilterTestExtractOk, ExtractSizeRepeatedStringField) {
+TEST_F(FilterTestExtractOk, ExtractCardinalityRepeatedStringField) {
   setUp(R"pb(
     mode: FIRST_AND_LAST
     extraction_by_method: {
       key: "apikeys.ApiKeys.CreateApiKey"
       value: {
-        response_extraction_by_field: { key: "repeated_string_field" value: EXTRACT_SIZE }
+        response_extraction_by_field: { key: "repeated_string_field" value: EXTRACT_REPEATED_CARDINALITY }
       }
     })pb");
 
@@ -1166,13 +1166,13 @@ TEST_F(FilterTestExtractOk, ExtractSizeRepeatedStringField) {
   EXPECT_EQ(Envoy::Http::FilterDataStatus::Continue, filter_->encodeData(*response_data, true));
 }
 
-TEST_F(FilterTestExtractOk, ExtractSizeNonRepeatedField) {
+TEST_F(FilterTestExtractOk, ExtractCardinalityNonRepeatedField) {
   setUp(R"pb(
     mode: FIRST_AND_LAST
     extraction_by_method: {
       key: "apikeys.ApiKeys.CreateApiKey"
       value: {
-        response_extraction_by_field: { key: "name" value: EXTRACT_SIZE }
+        response_extraction_by_field: { key: "name" value: EXTRACT_REPEATED_CARDINALITY }
       }
     })pb");
 

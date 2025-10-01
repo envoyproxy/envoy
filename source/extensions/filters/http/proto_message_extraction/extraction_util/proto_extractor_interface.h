@@ -18,7 +18,7 @@ namespace ProtoMessageExtraction {
 enum class ExtractedMessageDirective {
   EXTRACT_REDACT,
   EXTRACT,
-  EXTRACT_SIZE,
+  EXTRACT_REPEATED_CARDINALITY,
 };
 
 using FieldPathToExtractType =

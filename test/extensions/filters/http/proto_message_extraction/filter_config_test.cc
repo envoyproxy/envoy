@@ -202,13 +202,13 @@ TEST_F(FilterConfigTestOk, RepeatedField) {
   EXPECT_NE(filter_config_->findExtractor("apikeys.ApiKeys.CreateApiKey"), nullptr);
 }
 
-TEST_F(FilterConfigTestOk, ExtractSize) {
+TEST_F(FilterConfigTestOk, ExtractRepeatedCardinality) {
   parseConfigProto(R"pb(
     mode: FIRST_AND_LAST
     extraction_by_method: {
       key: "apikeys.ApiKeys.CreateApiKey"
       value: {
-        response_extraction_by_field: { key: "repeated_string_field" value: EXTRACT_SIZE }
+        response_extraction_by_field: { key: "repeated_string_field" value: EXTRACT_REPEATED_CARDINALITY }
       }
     })pb");
   *proto_config_.mutable_data_source()->mutable_inline_bytes() =
@@ -415,13 +415,13 @@ TEST_F(FilterConfigTestException, RedactNonLeafField) {
           R"(couldn't init extractor for method `apikeys.ApiKeys.CreateApiKey`: leaf node 'key' must be numerical/string or timestamp type)"));
 }
 
-TEST_F(FilterConfigTestException, RequestExtractSize) {
+TEST_F(FilterConfigTestException, RequestExtractRepeatedCardinality) {
   parseConfigProto(R"pb(
     mode: FIRST_AND_LAST
     extraction_by_method: {
       key: "apikeys.ApiKeys.CreateApiKey"
       value: {
-        request_extraction_by_field: { key: "repeated_supported_types.string" value: EXTRACT_SIZE }
+        request_extraction_by_field: { key: "repeated_supported_types.string" value: EXTRACT_REPEATED_CARDINALITY }
       }
     })pb");
   *proto_config_.mutable_data_source()->mutable_inline_bytes() =
@@ -434,17 +434,17 @@ TEST_F(FilterConfigTestException, RequestExtractSize) {
                                      *api_),
       EnvoyException,
       testing::HasSubstr(
-          R"(method `apikeys.ApiKeys.CreateApiKey`: EXTRACT_SIZE is not supported for request fields.)"));
+          R"(method `apikeys.ApiKeys.CreateApiKey`: EXTRACT_REPEATED_CARDINALITY is not supported for request fields.)"));
 }
 
-TEST_F(FilterConfigTestException, MultipleResponseExtractSize) {
+TEST_F(FilterConfigTestException, MultipleResponseExtractRepeatedCardinality) {
   parseConfigProto(R"pb(
     mode: FIRST_AND_LAST
     extraction_by_method: {
       key: "apikeys.ApiKeys.CreateApiKey"
       value: {
-        response_extraction_by_field: { key: "repeated_string_field" value: EXTRACT_SIZE }
-        response_extraction_by_field: { key: "another_repeated_field" value: EXTRACT_SIZE }
+        response_extraction_by_field: { key: "repeated_string_field" value: EXTRACT_REPEATED_CARDINALITY }
+        response_extraction_by_field: { key: "another_repeated_field" value: EXTRACT_REPEATED_CARDINALITY }
       }
     })pb");
   *proto_config_.mutable_data_source()->mutable_inline_bytes() =
@@ -457,7 +457,7 @@ TEST_F(FilterConfigTestException, MultipleResponseExtractSize) {
                                      *api_),
       EnvoyException,
       testing::HasSubstr(
-          R"(method `apikeys.ApiKeys.CreateApiKey`: only one field can be tagged with EXTRACT_SIZE for response.)"));
+          R"(method `apikeys.ApiKeys.CreateApiKey`: only one field can be tagged with EXTRACT_REPEATED_CARDINALITY for response.)"));
 }
 
 TEST(FilterFactoryCreatorTest, Constructor) {

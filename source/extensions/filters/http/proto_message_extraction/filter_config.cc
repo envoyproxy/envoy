@@ -60,23 +60,25 @@ void FilterConfig::initExtractors(ExtractorFactory& extractor_factory) {
 
     for (const auto& request_field : it.second.request_extraction_by_field()) {
       if (request_field.second == ::envoy::extensions::filters::http::proto_message_extraction::v3::
-                                      MethodExtraction::EXTRACT_SIZE) {
+                                      MethodExtraction::EXTRACT_REPEATED_CARDINALITY) {
         throw EnvoyException(fmt::format(
-            "method `{}`: EXTRACT_SIZE is not supported for request fields.", it.first));
+            "method `{}`: EXTRACT_REPEATED_CARDINALITY is not supported for request fields.",
+            it.first));
       }
     }
 
-    int response_extract_size_count = 0;
+    int response_extract_cardinality_count = 0;
     for (const auto& response_field : it.second.response_extraction_by_field()) {
       if (response_field.second == ::envoy::extensions::filters::http::proto_message_extraction::
-                                       v3::MethodExtraction::EXTRACT_SIZE) {
-        response_extract_size_count++;
+                                       v3::MethodExtraction::EXTRACT_REPEATED_CARDINALITY) {
+        response_extract_cardinality_count++;
       }
     }
 
-    if (response_extract_size_count > 1) {
-      throw EnvoyException(fmt::format(
-          "method `{}`: only one field can be tagged with EXTRACT_SIZE for response.", it.first));
+    if (response_extract_cardinality_count > 1) {
+      throw EnvoyException(fmt::format("method `{}`: only one field can be tagged with "
+                                       "EXTRACT_REPEATED_CARDINALITY for response.",
+                                       it.first));
     }
 
     auto extractor = extractor_factory.createExtractor(

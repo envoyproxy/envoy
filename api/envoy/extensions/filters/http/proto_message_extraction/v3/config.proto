@@ -261,8 +261,9 @@ message MethodExtraction {
     EXTRACT_REDACT = 2;
 
     // Extract a repeated top-level field and record its number of entries in
-    // the extraction result.
-    EXTRACT_SIZE = 3;
+    // the extraction result. Can be applied to at most one field in the
+    // response, and cannot be applied to any fields in the request.
+    EXTRACT_REPEATED_CARDINALITY = 3;
   }
 
   // The mapping of field path to its ExtractDirective for request messages
