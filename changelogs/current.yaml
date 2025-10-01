@@ -544,5 +544,9 @@ new_features:
   change: |
     Added ``max_downstream_connection_duration_jitter_percentage`` to allow adding a jitter to the max downstream connection duration.
     This can be used to avoid thundering herd problems with many clients being disconnected and possibly reconnecting at the same time.
+- area: http
+  change: |
+    Added ``setUpstreamOverrideHost`` method to AsyncClient StreamOptions to enable direct host routing
+    that bypasses load balancer selection.
 
 deprecated:
