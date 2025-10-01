@@ -77,8 +77,14 @@ public:
   }
 
 protected:
-  ResponseDecoderWrapper(ResponseDecoder& inner)
-      : inner_handle_(inner.createResponseDecoderHandle()), inner_(&inner) {}
+  ResponseDecoderWrapper(ResponseDecoder& inner) : inner_(&inner) {}
+
+  /**
+   * @param inner_handle refers a response decoder which may have already died at
+   * this point. Following access to the decoder will check its liveliness.
+   */
+  ResponseDecoderWrapper(ResponseDecoderHandlePtr inner_handle)
+      : inner_handle_(std::move(inner_handle)) {}
 
   /**
    * Consumers of the wrapper generally want to know when a decode is complete. This is called
@@ -92,7 +98,7 @@ protected:
 
 private:
   Http::ResponseDecoder* getInnerDecoder() const {
-    if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.use_response_decoder_handle")) {
+    if (inner_handle_ == nullptr) {
       return inner_;
     }
     if (inner_handle_) {

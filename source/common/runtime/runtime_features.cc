@@ -57,6 +57,7 @@ RUNTIME_GUARD(envoy_reloadable_features_jwt_fetcher_use_scheme_from_uri);
 RUNTIME_GUARD(envoy_reloadable_features_no_extension_lookup_by_name);
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_cleanup_cookies);
 RUNTIME_GUARD(envoy_reloadable_features_oauth2_encrypt_tokens);
+RUNTIME_GUARD(envoy_reloadable_features_odcds_over_ads_fix);
 RUNTIME_GUARD(envoy_reloadable_features_original_dst_rely_on_idle_timeout);
 RUNTIME_GUARD(envoy_reloadable_features_original_src_fix_port_exhaustion);
 RUNTIME_GUARD(envoy_reloadable_features_prefix_map_matcher_resume_after_subtree_miss);
@@ -75,6 +76,7 @@ RUNTIME_GUARD(envoy_reloadable_features_safe_http2_options);
 RUNTIME_GUARD(envoy_reloadable_features_skip_dns_lookup_for_proxied_requests);
 RUNTIME_GUARD(envoy_reloadable_features_skip_ext_proc_on_local_reply);
 RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_retry_on_different_event_loop);
+RUNTIME_GUARD(envoy_reloadable_features_tcp_proxy_set_idle_timer_immediately_on_new_connection);
 RUNTIME_GUARD(envoy_reloadable_features_test_feature_true);
 RUNTIME_GUARD(envoy_reloadable_features_trace_refresh_after_route_refresh);
 RUNTIME_GUARD(envoy_reloadable_features_udp_set_do_not_fragment);
@@ -84,6 +86,7 @@ RUNTIME_GUARD(envoy_reloadable_features_use_response_decoder_handle);
 RUNTIME_GUARD(envoy_reloadable_features_validate_connect);
 RUNTIME_GUARD(envoy_reloadable_features_validate_upstream_headers);
 RUNTIME_GUARD(envoy_reloadable_features_websocket_allow_4xx_5xx_through_filter_chain);
+RUNTIME_GUARD(envoy_reloadable_features_websocket_enable_timeout_on_upgrade_response);
 RUNTIME_GUARD(envoy_reloadable_features_xds_failover_to_primary_enabled);
 
 RUNTIME_GUARD(envoy_restart_features_move_locality_schedulers_to_lb);
@@ -165,6 +168,10 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_ext_proc_graceful_grpc_close);
 
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_getaddrinfo_no_ai_flags);
 
+// Flag to remove legacy route formatter support in header parser
+// Flip to true after two release periods.
+FALSE_RUNTIME_GUARD(envoy_reloadable_features_remove_legacy_route_formatter);
+
 // TODO(grnmeira):
 // Enables the new DNS implementation, a merged implementation of
 // strict and logical DNS clusters. This new implementation will
@@ -175,6 +182,9 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_enable_new_dns_implementation);
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_reverse_conn_force_local_reply);
 // RELEASE_ASSERT when upstream stream detects UAF of downstream response decoder instance.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_abort_when_accessing_dead_decoder);
+// TODO(pradeepcrao): Create a config option to enable this instead after
+// testing.
+FALSE_RUNTIME_GUARD(envoy_restart_features_use_cached_grpc_client_for_xds);
 // Block of non-boolean flags. Use of int flags is deprecated. Do not add more.
 ABSL_FLAG(uint64_t, re2_max_program_size_error_level, 100, ""); // NOLINT
 ABSL_FLAG(uint64_t, re2_max_program_size_warn_level,            // NOLINT

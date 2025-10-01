@@ -35,6 +35,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # external processing filter
 /*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @yanavlasov @yanjunxiang-google
 /*/extensions/filters/common/mutation_rules @gbrail @tyxia @mattklein123 @yanavlasov
+/*/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder @mbadov @stevenzzzz @adisuissa
 /*/extensions/http/ext_proc/response_processors/save_processing_response @pradeepcrao @botengyao @yanjunxiang-google
 /*/extensions/filters/network/ext_proc @botengyao @yanavlasov
 # jwt_authn http filter extension
@@ -102,6 +103,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 # HTTP caching extension
 /*/extensions/filters/http/cache @toddmgreer @ravenblackx @penguingao @mpwarres @capoferro
 /*/extensions/http/cache/simple_http_cache @toddmgreer @ravenblackx @penguingao @mpwarres @capoferro
+/*/extensions/filters/http/cache_v2 @toddmgreer @ravenblackx @penguingao @mpwarres @capoferro
+/*/extensions/http/cache_v2/simple_http_cache @toddmgreer @ravenblackx @penguingao @mpwarres @capoferro
 # AWS common signing components
 /*/extensions/common/aws @mattklein123 @nbaws @niax
 # adaptive concurrency limit extension.
@@ -169,6 +172,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # support for on-demand VHDS requests
 /*/extensions/filters/http/on_demand @dmitri-d @yanavlasov @kyessenov
 /*/extensions/filters/network/connection_limit @mattklein123 @delong-coder
+/*/extensions/filters/network/reverse_tunnel @agrawroh @basundhara-c @botengyao @yanavlasov
 /*/extensions/filters/http/aws_request_signing @mattklein123 @marcomagdy @nbaws @niax
 /*/extensions/filters/http/aws_lambda @mattklein123 @marcomagdy @nbaws @niax
 /*/extensions/filters/http/buffer @adisuissa @mattklein123
@@ -197,6 +201,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/matching/input_matchers/metadata @vikaschoudhary16 @kyessenov
 # environment generic input
 /*/extensions/matching/common_inputs/environment @donyu @mattklein123
+# network common inputs
+/*/extensions/matching/common_inputs/network @agrawroh @kyessenov @wbpcode
 # format string matching
 /*/extensions/matching/actions/format_string @kyessenov @cpakulski
 # CEL data input
@@ -235,6 +241,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 # Formatters
 /*/extensions/formatter/metadata @cpakulski @ravenblackx @nezdolik
 /*/extensions/formatter/cel @kyessenov @zirain
+/*/extensions/formatter/xfcc_value @wbpcode @vikaschoudhary16
 # IP address input matcher
 /*/extensions/matching/input_matchers/ip @aguinet @mattklein123
 # Key Value store
@@ -245,6 +252,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/common/async_files @mattklein123 @ravenblackx
 /*/extensions/filters/http/file_system_buffer @mattklein123 @ravenblackx
 /*/extensions/http/cache/file_system_http_cache @ggreenway @ravenblackx
+/*/extensions/http/cache_v2/file_system_http_cache @ggreenway @ravenblackx
 # Google Cloud Platform Authentication Filter
 /*/extensions/filters/http/gcp_authn @tyxia @yanavlasov
 # DNS resolution

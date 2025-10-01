@@ -25,6 +25,7 @@ envoy_cc_library(
         ":matching_utils_lib",
         ":mutation_utils_lib",
         ":on_processing_response_interface",
+        ":processing_request_modifier_interface",
         "//envoy/event:timer_interface",
         "//envoy/http:filter_interface",
         "//envoy/http:header_map_interface",
@@ -113,6 +114,19 @@ envoy_cc_library(
             ],
         },
     ),
+)
+
+envoy_cc_library(
+    name = "processing_request_modifier_interface",
+    hdrs = ["processing_request_modifier.h"],
+    tags = ["skip_on_windows"],
+    deps = [
+        ":matching_utils_lib",
+        "//envoy/config:typed_config_interface",
+        "//envoy/server:factory_context_interface",
+        "//source/common/protobuf",
+        "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(

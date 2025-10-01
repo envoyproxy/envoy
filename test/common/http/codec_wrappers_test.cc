@@ -13,6 +13,8 @@ class MockResponseDecoderWrapper : public ResponseDecoderWrapper {
 public:
   explicit MockResponseDecoderWrapper(MockResponseDecoder& inner_decoder)
       : ResponseDecoderWrapper(inner_decoder) {}
+  explicit MockResponseDecoderWrapper(ResponseDecoderHandlePtr handle)
+      : ResponseDecoderWrapper(std::move(handle)) {}
   void onDecodeComplete() override {}
   void onPreDecodeComplete() override {}
 };
@@ -30,7 +32,7 @@ TEST(MockResponseDecoderWrapper, decoderDestroyedBeforeDecoding) {
   TestScopedRuntime runtime;
   runtime.mergeValues({{"envoy.reloadable_features.abort_when_accessing_dead_decoder", "false"}});
   auto inner_decoder = std::make_unique<MockResponseDecoder>();
-  MockResponseDecoderWrapper wrapper(*inner_decoder);
+  MockResponseDecoderWrapper wrapper(inner_decoder->createResponseDecoderHandle());
 
   inner_decoder.reset();
 

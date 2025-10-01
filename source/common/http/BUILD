@@ -638,6 +638,7 @@ envoy_cc_library(
         ":header_map_lib",
         ":utility_lib",
         "//envoy/http:header_evaluator",
+        "//source/common/common:matchers_lib",
         "//source/common/router:header_parser_lib",
         "@envoy_api//envoy/config/common/mutation_rules/v3:pkg_cc_proto",
     ],

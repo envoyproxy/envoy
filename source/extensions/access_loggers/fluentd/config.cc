@@ -33,7 +33,7 @@ getAccessLoggerCacheSingleton(Server::Configuration::ServerFactoryContext& conte
 
 AccessLog::InstanceSharedPtr FluentdAccessLogFactory::createAccessLogInstance(
     const Protobuf::Message& config, AccessLog::FilterPtr&& filter,
-    Server::Configuration::FactoryContext& context,
+    Server::Configuration::GenericFactoryContext& context,
     std::vector<Formatter::CommandParserPtr>&& command_parsers) {
   const auto& proto_config = MessageUtil::downcastAndValidate<
       const envoy::extensions::access_loggers::fluentd::v3::FluentdAccessLogConfig&>(
