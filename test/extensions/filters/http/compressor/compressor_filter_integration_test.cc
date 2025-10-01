@@ -1,8 +1,10 @@
 #include "envoy/event/timer.h"
+#include "envoy/extensions/compression/brotli/compressor/v3/brotli.pb.h"
 #include "envoy/extensions/compression/gzip/compressor/v3/gzip.pb.h"
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/compression/brotli/decompressor/brotli_decompressor_impl.h"
 #include "source/extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 
 #include "test/integration/http_integration.h"
@@ -498,21 +500,21 @@ TEST_P(CompressorIntegrationTest, PerRouteEnable) {
                                                           {"content-type", "text/xml"}});
 }
 
-// Test per-route compressor library override.
+// Test per-route compressor library override with brotli.
 TEST_P(CompressorIntegrationTest, PerRouteCompressorLibraryOverride) {
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              cm) {
         auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
         auto* route = vh->mutable_routes()->Mutable(0);
-        route->mutable_match()->set_path("/gzip-per-route");
+        route->mutable_match()->set_path("/brotli-per-route");
 
         envoy::extensions::filters::http::compressor::v3::CompressorPerRoute per_route;
-        // Override the compressor library to use a different one.
+        // Override the compressor library to use brotli instead of gzip.
         auto* compressor_lib = per_route.mutable_overrides()->mutable_compressor_library();
         compressor_lib->set_name("brotli");
         compressor_lib->mutable_typed_config()->set_type_url(
-            "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip");
+            "type.googleapis.com/envoy.extensions.compression.brotli.compressor.v3.Brotli");
         compressor_lib->mutable_typed_config()->set_value("{}");
 
         Any cfg_any;
@@ -526,7 +528,7 @@ TEST_P(CompressorIntegrationTest, PerRouteCompressorLibraryOverride) {
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
         compressor_library:
-          name: testlib
+          name: gzip-default
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
         response_direction_config:
@@ -538,15 +540,13 @@ TEST_P(CompressorIntegrationTest, PerRouteCompressorLibraryOverride) {
               - application/json
     )EOF");
 
-  // Request to /gzip-per-route route should use the per-route compressor library.
-  // Since both are gzip in this test, we verify the structure but not actual compression
-  // difference.
+  // Request to /brotli-per-route should use brotli compression (per-route override).
   auto response = sendRequestAndWaitForResponse(
       Http::TestRequestHeaderMapImpl{{":method", "GET"},
-                                     {":path", "/gzip-per-route"},
+                                     {":path", "/brotli-per-route"},
                                      {":scheme", "http"},
                                      {":authority", "host"},
-                                     {"accept-encoding", "gzip"}},
+                                     {"accept-encoding", "br, gzip"}},
       0,
       Http::TestResponseHeaderMapImpl{
           {":status", "200"}, {"content-length", "40"}, {"content-type", "text/html"}},
@@ -554,12 +554,11 @@ TEST_P(CompressorIntegrationTest, PerRouteCompressorLibraryOverride) {
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
-  // Should be compressed since both main and per-route configs use gzip.
+  // Should be compressed with brotli (not gzip), validating the per-route override works.
   Http::HeaderMap::GetResult content_encoding =
       response->headers().get(Http::CustomHeaders::get().ContentEncoding);
   ASSERT_FALSE(content_encoding.empty());
-  EXPECT_EQ(Http::CustomHeaders::get().ContentEncodingValues.Gzip,
-            content_encoding[0]->value().getStringView());
+  EXPECT_EQ("br", content_encoding[0]->value().getStringView());
 }
 
 // Test that per-route compressor library config creation works with various libraries.

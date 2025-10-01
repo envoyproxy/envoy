@@ -218,10 +218,8 @@ CompressorPerRouteFilterConfig::CompressorPerRouteFilterConfig(
           Registry::FactoryRegistry<
               Compression::Compressor::NamedCompressorLibraryConfigFactory>::getFactoryByType(type);
       if (config_factory == nullptr) {
-        ENVOY_LOG(error,
-                  "Didn't find a registered implementation for per-route compressor type: '{}'",
-                  type);
-        break;
+        throw EnvoyException(fmt::format(
+            "Didn't find a registered implementation for per-route compressor type: '{}'", type));
       }
       ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
           config.overrides().compressor_library().typed_config(),
