@@ -50,13 +50,6 @@ struct CpuFiles {
 };
 
 /**
- * CPU limit result from reading actual cgroup files.
- */
-struct CpuLimitResult {
-  double cpu_ratio = 0.0; // CPU limit as float64 ratio
-};
-
-/**
  * Utility class for detecting CPU limits from cgroup subsystem.
  */
 class CgroupCpuUtil {
@@ -73,42 +66,12 @@ public:
 
 private:
   /**
-   * Reads CPU limit from cgroup v2 cpu.max file with hierarchy scanning.
-   * @param mount_point The cgroup mount point (from discoverCgroupMount).
-   * @param fs Filesystem instance.
-   * @return CPU limit or absl::nullopt if not available/unlimited.
-   */
-  static absl::optional<uint32_t> getCgroupV2CpuLimit(const std::string& mount_point,
-                                                      Filesystem::Instance& fs);
-
-  /**
-   * Reads CPU limit from cgroup v1 cpu.cfs_quota_us and cpu.cfs_period_us with hierarchy scanning.
-   * @param mount_point The cgroup mount point (from discoverCgroupMount).
-   * @param fs Filesystem instance.
-   * @return CPU limit or absl::nullopt if not available/unlimited.
-   */
-  static absl::optional<uint32_t> getCgroupV1CpuLimit(const std::string& mount_point,
-                                                      Filesystem::Instance& fs);
-
-  /**
-   * Reads CPU limit from a specific cgroup v2 path.
-   * @param fs Filesystem instance.
-   * @param cpu_max_path Path to cpu.max file.
-   * @return CPU limit or absl::nullopt if not available/unlimited.
-   */
-  static absl::optional<uint32_t> readCgroupV2CpuLimit(Filesystem::Instance& fs,
-                                                       const std::string& cpu_max_path);
-
-  /**
    * Reads CPU limit from specific cgroup v1 paths.
    * @param fs Filesystem instance.
    * @param quota_path Path to cpu.cfs_quota_us file.
    * @param period_path Path to cpu.cfs_period_us file.
    * @return CPU limit or absl::nullopt if not available/unlimited.
    */
-  static absl::optional<uint32_t> readCgroupV1CpuLimit(Filesystem::Instance& fs,
-                                                       const std::string& quota_path,
-                                                       const std::string& period_path);
 
   // Validates cgroup file content following Go's strict requirements:
   // - Content must end with newline (matching Go's validation)
@@ -137,7 +100,7 @@ private:
   /**
    * Parses a single line from /proc/self/mountinfo to extract cgroup mount point.
    * Format: mountID parentID major:minor root mountPoint options - fsType source superOptions
-   * We extract field 5 (mount point) for cgroup/cgroup2 filesystems only.
+   * We extract field 5 (mount point) for cgroup/cgroup2 filesystem only.
    * @param line Single line from /proc/self/mountinfo
    * @return Mount point string if line contains cgroup filesystem, nullopt if not a cgroup line.
    */
@@ -204,24 +167,24 @@ private:
    *        Handle special cases (v1: quota=-1, v2: quota="max" means no limit)
    * @param cpu_files Cached file paths from step 4.
    * @param fs Filesystem instance.
-   * @return CpuLimitResult with CPU limit as float64 ratio, nullopt if unlimited/invalid.
+   * @return CPU limit as float64 ratio, nullopt if unlimited/invalid.
    */
-  static absl::optional<CpuLimitResult> readActualLimits(const CpuFiles& cpu_files,
-                                                         Filesystem::Instance& fs);
+  static absl::optional<double> readActualLimits(const CpuFiles& cpu_files,
+                                                 Filesystem::Instance& fs);
 
   /**
    * Reads actual CPU limits from cgroup v1 files with quota/period parsing.
    * @param cpu_files Cached file content from v1 files.
-   * @return CpuLimitResult with CPU limit as float64 ratio, nullopt if unlimited/invalid.
+   * @return CPU limit as float64 ratio, nullopt if unlimited/invalid.
    */
-  static absl::optional<CpuLimitResult> readActualLimitsV1(const CpuFiles& cpu_files);
+  static absl::optional<double> readActualLimitsV1(const CpuFiles& cpu_files);
 
   /**
    * Reads actual CPU limits from cgroup v2 files with "quota period" parsing.
    * @param cpu_files Cached file content from v2 files.
-   * @return CpuLimitResult with CPU limit as float64 ratio, nullopt if unlimited/invalid.
+   * @return CPU limit as float64 ratio, nullopt if unlimited/invalid.
    */
-  static absl::optional<CpuLimitResult> readActualLimitsV2(const CpuFiles& cpu_files);
+  static absl::optional<double> readActualLimitsV2(const CpuFiles& cpu_files);
 
   // Cgroup v2 paths
   static constexpr absl::string_view CGROUP_V2_CPU_MAX = "/sys/fs/cgroup/cpu.max";
@@ -247,17 +210,6 @@ private:
  */
 class CgroupCpuUtil::TestUtil {
 public:
-  static absl::optional<uint32_t> readCgroupV2CpuLimit(Filesystem::Instance& fs,
-                                                       const std::string& cpu_max_path) {
-    return CgroupCpuUtil::readCgroupV2CpuLimit(fs, cpu_max_path);
-  }
-
-  static absl::optional<uint32_t> readCgroupV1CpuLimit(Filesystem::Instance& fs,
-                                                       const std::string& quota_path,
-                                                       const std::string& period_path) {
-    return CgroupCpuUtil::readCgroupV1CpuLimit(fs, quota_path, period_path);
-  }
-
   static absl::optional<CgroupPathInfo> getCurrentCgroupPath(Filesystem::Instance& fs) {
     return CgroupCpuUtil::getCurrentCgroupPath(fs);
   }
@@ -290,11 +242,11 @@ public:
     return CgroupCpuUtil::accessCgroupV2Files(cgroup_info, fs);
   }
 
-  static absl::optional<CpuLimitResult> readActualLimitsV1(const CpuFiles& cpu_files) {
+  static absl::optional<double> readActualLimitsV1(const CpuFiles& cpu_files) {
     return CgroupCpuUtil::readActualLimitsV1(cpu_files);
   }
 
-  static absl::optional<CpuLimitResult> readActualLimitsV2(const CpuFiles& cpu_files) {
+  static absl::optional<double> readActualLimitsV2(const CpuFiles& cpu_files) {
     return CgroupCpuUtil::readActualLimitsV2(cpu_files);
   }
 };

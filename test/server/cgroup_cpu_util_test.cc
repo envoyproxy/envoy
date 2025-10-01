@@ -70,207 +70,6 @@ protected:
 };
 
 // =============================================================================
-// Test: readCgroupV2CpuLimit
-// =============================================================================
-
-TEST_F(CgroupCpuUtilTest, ReadCgroupV2CpuLimit_Disabled) {
-  // Using fs_ member variable
-  fs_.setFileContents("/sys/fs/cgroup/cpu.max", "max 100000\n");
-
-  auto result = CgroupCpuUtil::TestUtil::readCgroupV2CpuLimit(fs_, "/sys/fs/cgroup/cpu.max");
-  EXPECT_FALSE(result.has_value()); // Unlimited = nullopt
-}
-
-TEST_F(CgroupCpuUtilTest, ReadCgroupV2CpuLimit_5CPUs) {
-  // Using fs_ member variable
-  fs_.setFileContents("/sys/fs/cgroup/cpu.max", "500000 100000\n");
-
-  auto result = CgroupCpuUtil::TestUtil::readCgroupV2CpuLimit(fs_, "/sys/fs/cgroup/cpu.max");
-  ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result.value(), 5); // 500000/100000 = 5.0, ceil = 5
-}
-
-TEST_F(CgroupCpuUtilTest, ReadCgroupV2CpuLimit_HalfCPU) {
-  // Using fs_ member variable
-  fs_.setFileContents("/sys/fs/cgroup/cpu.max", "50000 100000\n");
-
-  auto result = CgroupCpuUtil::TestUtil::readCgroupV2CpuLimit(fs_, "/sys/fs/cgroup/cpu.max");
-  ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result.value(), 1); // 50000/100000 = 0.5, ceil = 1
-}
-
-TEST_F(CgroupCpuUtilTest, ReadCgroupV2CpuLimit_TwoAndHalfCPUs) {
-  // Using fs_ member variable
-  fs_.setFileContents("/sys/fs/cgroup/cpu.max", "250000 100000\n");
-
-  auto result = CgroupCpuUtil::TestUtil::readCgroupV2CpuLimit(fs_, "/sys/fs/cgroup/cpu.max");
-  ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result.value(), 3); // 250000/100000 = 2.5, ceil = 3
-}
-
-TEST_F(CgroupCpuUtilTest, ReadCgroupV2CpuLimit_MaxInt64) {
-  // Using fs_ member variable
-  fs_.setFileContents("/sys/fs/cgroup/cpu.max", "9223372036854775807 9223372036854775807\n");
-
-  auto result = CgroupCpuUtil::TestUtil::readCgroupV2CpuLimit(fs_, "/sys/fs/cgroup/cpu.max");
-  ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result.value(), 1); // Equal values = 1.0, ceil = 1
-}
-
-TEST_F(CgroupCpuUtilTest, ReadCgroupV2CpuLimit_MissingNewline) {
-  // Using fs_ member variable - strict validation requires newline
-  fs_.setFileContents("/sys/fs/cgroup/cpu.max", "500000 100000");
-
-  // Should fail validation for missing newline
-  auto result = CgroupCpuUtil::TestUtil::readCgroupV2CpuLimit(fs_, "/sys/fs/cgroup/cpu.max");
-  EXPECT_FALSE(result.has_value()) << "Should fail validation for missing newline";
-}
-
-TEST_F(CgroupCpuUtilTest, ReadCgroupV2CpuLimit_MalformedV1Format) {
-  // Using fs_ member variable
-  fs_.setFileContents("/sys/fs/cgroup/cpu.max", "500000\n");
-
-  EXPECT_LOG_CONTAINS("warn", "Malformed cgroup v2 cpu.max file", {
-    auto result = CgroupCpuUtil::TestUtil::readCgroupV2CpuLimit(fs_, "/sys/fs/cgroup/cpu.max");
-    EXPECT_FALSE(result.has_value()); // Wrong format
-  });
-}
-
-TEST_F(CgroupCpuUtilTest, ReadCgroupV2CpuLimit_QuotaNotANumber) {
-  // Using fs_ member variable
-  fs_.setFileContents("/sys/fs/cgroup/cpu.max", "500000us 100000\n");
-
-  EXPECT_LOG_CONTAINS("warn", "Failed to parse cgroup v2 cpu.max file", {
-    auto result = CgroupCpuUtil::TestUtil::readCgroupV2CpuLimit(fs_, "/sys/fs/cgroup/cpu.max");
-    EXPECT_FALSE(result.has_value()); // Parse error
-  });
-}
-
-TEST_F(CgroupCpuUtilTest, ReadCgroupV2CpuLimit_PeriodNotANumber) {
-  // Using fs_ member variable
-  fs_.setFileContents("/sys/fs/cgroup/cpu.max", "500000 100000us\n");
-
-  EXPECT_LOG_CONTAINS("warn", "Failed to parse cgroup v2 cpu.max file", {
-    auto result = CgroupCpuUtil::TestUtil::readCgroupV2CpuLimit(fs_, "/sys/fs/cgroup/cpu.max");
-    EXPECT_FALSE(result.has_value()); // Parse error
-  });
-}
-
-TEST_F(CgroupCpuUtilTest, ReadCgroupV2CpuLimit_ZeroPeriod) {
-  // Using fs_ member variable
-  fs_.setFileContents("/sys/fs/cgroup/cpu.max", "500000 0\n");
-
-  EXPECT_LOG_CONTAINS("warn", "Invalid cgroup v2 cpu.max file", {
-    auto result = CgroupCpuUtil::TestUtil::readCgroupV2CpuLimit(fs_, "/sys/fs/cgroup/cpu.max");
-    EXPECT_FALSE(result.has_value()); // Division by zero protection
-  });
-}
-
-// =============================================================================
-// Test: readCgroupV1CpuLimit
-// =============================================================================
-
-TEST_F(CgroupCpuUtilTest, ReadCgroupV1CpuLimit_Disabled) {
-  // Using fs_ member variable
-  fs_.setFileContents("/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "-1\n");
-  fs_.setFileContents("/sys/fs/cgroup/cpu/cpu.cfs_period_us", "100000\n");
-
-  auto result = CgroupCpuUtil::TestUtil::readCgroupV1CpuLimit(
-      fs_, "/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "/sys/fs/cgroup/cpu/cpu.cfs_period_us");
-  EXPECT_FALSE(result.has_value()); // -1 = unlimited
-}
-
-TEST_F(CgroupCpuUtilTest, ReadCgroupV1CpuLimit_5CPUs) {
-  // Using fs_ member variable
-  fs_.setFileContents("/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "500000\n");
-  fs_.setFileContents("/sys/fs/cgroup/cpu/cpu.cfs_period_us", "100000\n");
-
-  auto result = CgroupCpuUtil::TestUtil::readCgroupV1CpuLimit(
-      fs_, "/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "/sys/fs/cgroup/cpu/cpu.cfs_period_us");
-  ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result.value(), 5); // 500000/100000 = 5.0, ceil = 5
-}
-
-TEST_F(CgroupCpuUtilTest, ReadCgroupV1CpuLimit_HalfCPU) {
-  // Using fs_ member variable
-  fs_.setFileContents("/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "50000\n");
-  fs_.setFileContents("/sys/fs/cgroup/cpu/cpu.cfs_period_us", "100000\n");
-
-  auto result = CgroupCpuUtil::TestUtil::readCgroupV1CpuLimit(
-      fs_, "/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "/sys/fs/cgroup/cpu/cpu.cfs_period_us");
-  ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result.value(), 1); // 50000/100000 = 0.5, ceil = 1
-}
-
-TEST_F(CgroupCpuUtilTest, ReadCgroupV1CpuLimit_MaxInt64) {
-  // Using fs_ member variable
-  fs_.setFileContents("/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "9223372036854775807\n");
-  fs_.setFileContents("/sys/fs/cgroup/cpu/cpu.cfs_period_us", "100000\n");
-
-  auto result = CgroupCpuUtil::TestUtil::readCgroupV1CpuLimit(
-      fs_, "/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "/sys/fs/cgroup/cpu/cpu.cfs_period_us");
-  ASSERT_TRUE(result.has_value());
-  // Large value should still parse and calculate correctly
-}
-
-TEST_F(CgroupCpuUtilTest, ReadCgroupV1CpuLimit_MissingNewline) {
-  // Using fs_ member variable - strict validation requires newline
-  fs_.setFileContents("/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "500000");
-  fs_.setFileContents("/sys/fs/cgroup/cpu/cpu.cfs_period_us", "100000");
-
-  // Should fail validation for missing newline
-  auto result = CgroupCpuUtil::TestUtil::readCgroupV1CpuLimit(
-      fs_, "/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "/sys/fs/cgroup/cpu/cpu.cfs_period_us");
-  EXPECT_FALSE(result.has_value()) << "Should fail validation for missing newline";
-}
-
-TEST_F(CgroupCpuUtilTest, ReadCgroupV1CpuLimit_NotANumber) {
-  // Using fs_ member variable
-  fs_.setFileContents("/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "123max\n");
-  fs_.setFileContents("/sys/fs/cgroup/cpu/cpu.cfs_period_us", "100000\n");
-
-  EXPECT_LOG_CONTAINS("warn", "Failed to parse cgroup v1 CPU files", {
-    auto result = CgroupCpuUtil::TestUtil::readCgroupV1CpuLimit(
-        fs_, "/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "/sys/fs/cgroup/cpu/cpu.cfs_period_us");
-    EXPECT_FALSE(result.has_value()); // Parse error
-  });
-}
-
-TEST_F(CgroupCpuUtilTest, ReadCgroupV1CpuLimit_V2Format) {
-  // Using fs_ member variable
-  fs_.setFileContents("/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "1000 5000\n");
-  fs_.setFileContents("/sys/fs/cgroup/cpu/cpu.cfs_period_us", "100000\n");
-
-  auto result = CgroupCpuUtil::TestUtil::readCgroupV1CpuLimit(
-      fs_, "/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "/sys/fs/cgroup/cpu/cpu.cfs_period_us");
-  EXPECT_FALSE(result.has_value()); // Wrong format for v1
-}
-
-TEST_F(CgroupCpuUtilTest, ReadCgroupV1CpuLimit_ZeroQuota) {
-  // Using fs_ member variable
-  fs_.setFileContents("/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "0\n");
-  fs_.setFileContents("/sys/fs/cgroup/cpu/cpu.cfs_period_us", "100000\n");
-
-  EXPECT_LOG_CONTAINS("warn", "Invalid cgroup v1 CPU values", {
-    auto result = CgroupCpuUtil::TestUtil::readCgroupV1CpuLimit(
-        fs_, "/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "/sys/fs/cgroup/cpu/cpu.cfs_period_us");
-    EXPECT_FALSE(result.has_value()); // Invalid: quota <= 0
-  });
-}
-
-TEST_F(CgroupCpuUtilTest, ReadCgroupV1CpuLimit_ZeroPeriod) {
-  // Using fs_ member variable
-  fs_.setFileContents("/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "100000\n");
-  fs_.setFileContents("/sys/fs/cgroup/cpu/cpu.cfs_period_us", "0\n");
-
-  EXPECT_LOG_CONTAINS("warn", "Invalid cgroup v1 CPU values", {
-    auto result = CgroupCpuUtil::TestUtil::readCgroupV1CpuLimit(
-        fs_, "/sys/fs/cgroup/cpu/cpu.cfs_quota_us", "/sys/fs/cgroup/cpu/cpu.cfs_period_us");
-    EXPECT_FALSE(result.has_value()); // Invalid: period <= 0
-  });
-}
-
-// =============================================================================
 // Test: getCurrentCgroupPath
 // =============================================================================
 
@@ -741,8 +540,8 @@ TEST_F(CgroupCpuUtilTest, ReadActualLimitsV1_Success) {
 
   auto result = CgroupCpuUtil::TestUtil::readActualLimitsV1(cpu_files);
 
-  ASSERT_TRUE(result.has_value());          // Valid result
-  EXPECT_DOUBLE_EQ(result->cpu_ratio, 1.5); // 150000/100000 = 1.5
+  ASSERT_TRUE(result.has_value());       // Valid result
+  EXPECT_DOUBLE_EQ(result.value(), 1.5); // 150000/100000 = 1.5
 }
 
 TEST_F(CgroupCpuUtilTest, ReadActualLimitsV1_Unlimited) {
@@ -819,7 +618,7 @@ TEST_F(CgroupCpuUtilTest, ReadActualLimitsV1_WhitespaceHandling) {
   auto result = CgroupCpuUtil::TestUtil::readActualLimitsV1(cpu_files);
 
   ASSERT_TRUE(result.has_value()); // Valid result
-  EXPECT_DOUBLE_EQ(result->cpu_ratio, 1.5);
+  EXPECT_DOUBLE_EQ(result.value(), 1.5);
 }
 
 // =============================================================================
@@ -835,8 +634,8 @@ TEST_F(CgroupCpuUtilTest, ReadActualLimitsV2_Success) {
 
   auto result = CgroupCpuUtil::TestUtil::readActualLimitsV2(cpu_files);
 
-  ASSERT_TRUE(result.has_value());          // Valid result
-  EXPECT_DOUBLE_EQ(result->cpu_ratio, 2.5); // 250000/100000 = 2.5
+  ASSERT_TRUE(result.has_value());       // Valid result
+  EXPECT_DOUBLE_EQ(result.value(), 2.5); // 250000/100000 = 2.5
 }
 
 TEST_F(CgroupCpuUtilTest, ReadActualLimitsV2_Unlimited) {
@@ -913,7 +712,7 @@ TEST_F(CgroupCpuUtilTest, ReadActualLimitsV2_WhitespaceHandling) {
   auto result = CgroupCpuUtil::TestUtil::readActualLimitsV2(cpu_files);
 
   ASSERT_TRUE(result.has_value()); // Valid result
-  EXPECT_DOUBLE_EQ(result->cpu_ratio, 2.5);
+  EXPECT_DOUBLE_EQ(result.value(), 2.5);
 }
 
 TEST_F(CgroupCpuUtilTest, ReadActualLimitsV2_EmptyParts) {
