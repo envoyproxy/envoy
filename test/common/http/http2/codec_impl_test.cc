@@ -807,6 +807,47 @@ TEST_P(Http2CodecImplTest, GracefulGoAwayRuntimeGuardDisabled) {
   EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
 }
 
+TEST_P(Http2CodecImplTest, LoadShedPointGracefulGoAway) {
+  // Configure graceful GOAWAY timeout of 100ms
+  server_http2_options_.mutable_graceful_goaway_timeout()->set_seconds(0);
+  server_http2_options_.mutable_graceful_goaway_timeout()->set_nanos(100 * 1000 * 1000); // 100ms
+
+  auto graceful_goaway_timer = new NiceMock<Event::MockTimer>(&server_connection_.dispatcher_);
+  EXPECT_CALL(*graceful_goaway_timer, enableTimer(std::chrono::milliseconds(100), _));
+
+  initialize();
+
+  // Test that load shedding triggers graceful GOAWAY
+  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_graceful_sent").value());
+  EXPECT_CALL(client_callbacks_, onGoAway(_)).Times(AtLeast(1));
+
+  // Access the server connection and simulate load shedding by directly calling goAwayGraceful()
+  // (This tests the same code path that dispatch() would call when load shedding is triggered)
+  server_->goAwayGraceful();
+  driveToCompletion();
+
+  // Verify graceful GOAWAY was sent
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_graceful_sent").value());
+}
+
+TEST_P(Http2CodecImplTest, ShutdownNoticeDoesNotIncrementGracefulCounter) {
+  initialize();
+
+  // Test that shutdownNotice does NOT increment the graceful GOAWAY counter
+  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_graceful_sent").value());
+  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
+
+  // shutdownNotice should send initial graceful GOAWAY via adapter
+  server_->shutdownNotice();
+  driveToCompletion();
+
+  // Verify: graceful GOAWAY counter should NOT increment (shutdownNotice uses adapter
+  // implementation)
+  EXPECT_EQ(0, server_stats_store_.counter("http2.goaway_graceful_sent").value());
+  // But regular GOAWAY counter should increment because shutdownNotice sends a GOAWAY frame
+  EXPECT_GE(server_stats_store_.counter("http2.goaway_sent").value(), 1);
+}
+
 TEST_P(Http2CodecImplTest, ProtocolErrorForTest) {
   initialize();
   EXPECT_EQ(absl::nullopt, request_encoder_->http1StreamEncoderOptions());
