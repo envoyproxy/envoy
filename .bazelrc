@@ -554,6 +554,8 @@ common:remote-envoy-engflow --config=rbe-envoy-engflow
 common:remote-cache-envoy-engflow --config=common-envoy-engflow
 common:remote-cache-envoy-engflow --config=cache-envoy-engflow
 
+common:cves --//tools/dependency:cve-data=//tools/dependency:cve-data-dir
+
 #############################################################################
 # debug: Various Bazel debugging flags
 #############################################################################
