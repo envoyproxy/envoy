@@ -798,8 +798,7 @@ TEST_P(Http2CodecImplTest, GracefulGoAwayRuntimeGuardDisabled) {
   ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_graceful_sent").value());
   ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
 
-  EXPECT_CALL(client_callbacks_, onGoAway(_))
-      .Times(AtLeast(1));
+  EXPECT_CALL(client_callbacks_, onGoAway(_)).Times(AtLeast(1));
   server_->goAwayGraceful();
   driveToCompletion();
 
