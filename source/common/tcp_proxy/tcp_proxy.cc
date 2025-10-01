@@ -19,7 +19,6 @@
 
 #include "source/common/access_log/access_log_impl.h"
 #include "source/common/common/assert.h"
-#include "source/common/common/base64.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/enum_to_int.h"
 #include "source/common/common/fmt.h"
@@ -345,7 +344,10 @@ Config::SharedConfig::parseTLVs(absl::Span<const envoy::config::core::v3::TlvEnt
     }
 
     if (has_value) {
-      // Static TLV value.
+      // Static TLV value must be at least one byte long.
+      if (tlv->value().size() < 1) {
+        throw EnvoyException("Invalid TLV configuration: 'value' must be at least one byte long.");
+      }
       tlv_vector.push_back(
           {tlv_type, std::vector<unsigned char>(tlv->value().begin(), tlv->value().end())});
     } else {
@@ -370,12 +372,9 @@ Config::SharedConfig::evaluateDynamicTLVs(const StreamInfo::StreamInfo& stream_i
   for (const auto& tlv_formatter : dynamic_tlv_formatters_) {
     const std::string formatted_value = tlv_formatter.formatter->formatWithContext({}, stream_info);
 
-    // Base64-encode the formatted value.
-    const std::string encoded_value = Base64::encode(formatted_value);
-
-    // Convert to bytes and add to result.
+    // Convert formatted string to bytes and add to result.
     result.push_back({tlv_formatter.type,
-                      std::vector<unsigned char>(encoded_value.begin(), encoded_value.end())});
+                      std::vector<unsigned char>(formatted_value.begin(), formatted_value.end())});
   }
 
   return result;
