@@ -436,6 +436,13 @@ new_features:
     to the ``ext_proc`` HTTP filter. This allows configuring the HTTP status code returned to the downstream
     client when communication with the external processor fails (e.g., gRPC error). Previously, these cases returned a
     fixed ``500``.
+- area: ext_proc
+  change: |
+    Introduced a new
+    :ref:`ProcessingRequestModifier <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_request_modifier>`
+    config and corresponding interface to enable modifying the ``ProcessingRequest`` before it is sent on the wire. Sample use cases include
+    modifying attribute and metadata keys to abstract away filter details. If the config is not set, then there is no behavior change.
+    Supports per-route overrides.
 - area: tracing
   change: |
     Added :ref:`trace_context_option <envoy_v3_api_field_config.trace.v3.ZipkinConfig.trace_context_option>` enum
