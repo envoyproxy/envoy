@@ -734,6 +734,55 @@ TEST_P(Http2CodecImplTest, GracefulGoAwayAlreadyInProgress) {
   EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
 }
 
+TEST_P(Http2CodecImplTest, GracefulGoAwayCausesOutboundFlood) {
+  // Configure graceful GOAWAY timeout of 100ms
+  server_http2_options_.mutable_graceful_goaway_timeout()->set_seconds(0);
+  server_http2_options_.mutable_graceful_goaway_timeout()->set_nanos(100 * 1000 * 1000); // 100ms
+
+  initialize();
+
+  TestRequestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(_, false));
+  EXPECT_TRUE(request_encoder_->encodeHeaders(request_headers, false).ok());
+  driveToCompletion();
+
+  int frame_count = 0;
+  Buffer::OwnedImpl buffer;
+  ON_CALL(server_connection_, write(_, _))
+      .WillByDefault(Invoke([&buffer, &frame_count](Buffer::Instance& frame, bool) {
+        ++frame_count;
+        buffer.move(frame);
+      }));
+
+  auto* violation_callback =
+      new NiceMock<Event::MockSchedulableCallback>(&server_connection_.dispatcher_);
+
+  TestResponseHeaderMapImpl response_headers{{":status", "200"}};
+  response_encoder_->encodeHeaders(response_headers, false);
+  // Account for the single HEADERS frame above
+  for (uint32_t i = 0; i < CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES - 1; ++i) {
+    Buffer::OwnedImpl data("0");
+    EXPECT_NO_THROW(response_encoder_->encodeData(data, false));
+  }
+  EXPECT_NO_THROW(driveToCompletion());
+
+  EXPECT_FALSE(violation_callback->enabled_);
+
+  // Test graceful goaway with outbound flood - should trigger error path
+  server_->goAwayGraceful();
+  driveToCompletion();
+
+  EXPECT_TRUE(violation_callback->enabled_);
+  EXPECT_CALL(server_connection_, close(Envoy::Network::ConnectionCloseType::NoFlush, _));
+  violation_callback->invokeCallback();
+
+  EXPECT_EQ(frame_count, CommonUtility::OptionsLimits::DEFAULT_MAX_OUTBOUND_FRAMES + 1);
+  EXPECT_EQ(1, server_stats_store_.counter("http2.outbound_flood").value());
+  // Verify graceful GOAWAY stat was incremented before the error
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_graceful_sent").value());
+}
+
 TEST_P(Http2CodecImplTest, ProtocolErrorForTest) {
   initialize();
   EXPECT_EQ(absl::nullopt, request_encoder_->http1StreamEncoderOptions());
