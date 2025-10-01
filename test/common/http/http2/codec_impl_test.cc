@@ -783,6 +783,31 @@ TEST_P(Http2CodecImplTest, GracefulGoAwayCausesOutboundFlood) {
   EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_graceful_sent").value());
 }
 
+TEST_P(Http2CodecImplTest, GracefulGoAwayRuntimeGuardDisabled) {
+  // Configure graceful GOAWAY timeout of 100ms
+  server_http2_options_.mutable_graceful_goaway_timeout()->set_seconds(0);
+  server_http2_options_.mutable_graceful_goaway_timeout()->set_nanos(100 * 1000 * 1000); // 100ms
+
+  // Disable the runtime feature
+  TestScopedRuntime scoped_runtime;
+  scoped_runtime.mergeValues({{"envoy.reloadable_features.http2_graceful_goaway", "false"}});
+
+  initialize();
+
+  // Should fallback to immediate GOAWAY when runtime feature is disabled
+  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_graceful_sent").value());
+  ASSERT_EQ(0, server_stats_store_.counter("http2.goaway_sent").value());
+
+  EXPECT_CALL(client_callbacks_, onGoAway(_))
+      .Times(AtLeast(1));
+  server_->goAwayGraceful();
+  driveToCompletion();
+
+  // Verify immediate GOAWAY was sent (no graceful GOAWAY due to runtime guard)
+  EXPECT_EQ(0, server_stats_store_.counter("http2.goaway_graceful_sent").value());
+  EXPECT_EQ(1, server_stats_store_.counter("http2.goaway_sent").value());
+}
+
 TEST_P(Http2CodecImplTest, ProtocolErrorForTest) {
   initialize();
   EXPECT_EQ(absl::nullopt, request_encoder_->http1StreamEncoderOptions());
