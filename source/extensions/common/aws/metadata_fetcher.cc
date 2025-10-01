@@ -1,5 +1,7 @@
 #include "source/extensions/common/aws/metadata_fetcher.h"
 
+#include <memory>
+
 #include "source/common/common/enum_to_int.h"
 #include "source/common/http/message_impl.h"
 #include "source/common/http/utility.h"
@@ -13,19 +15,23 @@ namespace {
 
 class MetadataFetcherImpl : public MetadataFetcher,
                             public Logger::Loggable<Logger::Id::aws>,
-                            public Http::AsyncClient::Callbacks {
+                            public Http::AsyncClient::Callbacks,
+                            public std::enable_shared_from_this<MetadataFetcherImpl> {
 
 public:
   MetadataFetcherImpl(Upstream::ClusterManager& cm, absl::string_view cluster_name)
       : cm_(cm), cluster_name_(std::string(cluster_name)) {}
 
-  ~MetadataFetcherImpl() override { MetadataFetcherImpl::cancel(); }
+  ~MetadataFetcherImpl() override { cancel(); }
 
   void cancel() override {
-    if (request_ && !complete_) {
+    if (request_.has_value() && !complete_.load()) {
       request_->cancel();
       ENVOY_LOG(debug, "fetch AWS Metadata [cluster = {}]: cancelled", cluster_name_);
     }
+
+    receiver_.reset();
+    complete_.store(true);
     reset();
   }
 
@@ -45,7 +51,7 @@ public:
   void fetch(Http::RequestMessage& message, Tracing::Span& parent_span,
              MetadataFetcher::MetadataReceiver& receiver) override {
     ASSERT(!request_);
-    complete_ = false;
+    complete_.store(false);
     receiver_ = makeOptRef(receiver);
 
     // Stop processing if we are shutting down
@@ -56,7 +62,7 @@ public:
     const auto thread_local_cluster = cm_.getThreadLocalCluster(cluster_name_);
     if (thread_local_cluster == nullptr) {
       ENVOY_LOG(error, "{} AWS Metadata failed: [cluster = {}] not found", __func__, cluster_name_);
-      complete_ = true;
+      complete_.store(true);
       receiver_->onMetadataError(MetadataFetcher::MetadataReceiver::Failure::MissingConfig);
       reset();
       return;
@@ -122,14 +128,19 @@ public:
 
     options.setRetryPolicy(route_retry_policy);
     options.setBufferBodyForRetry(true);
+    // Keep object alive during async operation
+    self_ref_ = shared_from_this();
     request_ = makeOptRefFromPtr(
         thread_local_cluster->httpAsyncClient().send(std::move(messagePtr), *this, options));
   }
 
   // HTTP async receive method on success.
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& response) override {
-    ASSERT(receiver_);
-    complete_ = true;
+    // Safe early exit if object is being destroyed
+    if (!receiver_ || complete_.load()) {
+      return;
+    }
+    complete_.store(true);
     const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
     if (status_code == enumToInt(Http::Code::OK) ||
         (status_code == enumToInt(Http::Code::Created))) {
@@ -159,10 +170,13 @@ public:
   // HTTP async receive method on failure.
   void onFailure(const Http::AsyncClient::Request&,
                  Http::AsyncClient::FailureReason reason) override {
-    ASSERT(receiver_);
+    // Safe early exit if object is being destroyed
+    if (!receiver_ || complete_.load()) {
+      return;
+    }
     ENVOY_LOG(debug, "{}: fetch AWS Metadata [cluster = {}]: network error {}", __func__,
               cluster_name_, enumToInt(reason));
-    complete_ = true;
+    complete_.store(true);
     receiver_->onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network);
     reset();
   }
@@ -171,19 +185,43 @@ public:
   void onBeforeFinalizeUpstreamSpan(Tracing::Span&, const Http::ResponseHeaderMap*) override {}
 
 private:
-  bool complete_{};
+  std::atomic<bool> complete_{false};
   Upstream::ClusterManager& cm_;
   const std::string cluster_name_;
   OptRef<MetadataFetcher::MetadataReceiver> receiver_;
   OptRef<Http::AsyncClient::Request> request_;
+  std::shared_ptr<MetadataFetcherImpl> self_ref_; // Keep self alive during async ops
 
-  void reset() { request_.reset(); }
+  void reset() {
+    request_.reset();
+    self_ref_.reset(); // Release self-reference when operation completes
+  }
 };
 } // namespace
 
+// Wrapper to maintain unique_ptr API while using shared_ptr internally
+class MetadataFetcherWrapper : public MetadataFetcher {
+public:
+  explicit MetadataFetcherWrapper(std::shared_ptr<MetadataFetcherImpl> impl)
+      : impl_(std::move(impl)) {}
+
+  void cancel() override { impl_->cancel(); }
+  absl::string_view failureToString(MetadataReceiver::Failure reason) override {
+    return impl_->failureToString(reason);
+  }
+  void fetch(Http::RequestMessage& message, Tracing::Span& parent_span,
+             MetadataReceiver& receiver) override {
+    impl_->fetch(message, parent_span, receiver);
+  }
+
+private:
+  std::shared_ptr<MetadataFetcherImpl> impl_;
+};
+
 MetadataFetcherPtr MetadataFetcher::create(Upstream::ClusterManager& cm,
                                            absl::string_view cluster_name) {
-  return std::make_unique<MetadataFetcherImpl>(cm, cluster_name);
+  auto impl = std::make_shared<MetadataFetcherImpl>(cm, cluster_name);
+  return std::make_unique<MetadataFetcherWrapper>(std::move(impl));
 }
 } // namespace Aws
 } // namespace Common

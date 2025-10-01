@@ -329,6 +329,105 @@ TEST_F(MetadataFetcherTest, TestDestructionFromWorkerThread) {
   EXPECT_TRUE(destruction_completed);
 }
 
+TEST_F(MetadataFetcherTest, TestCallbacksSafeAfterDestruction) {
+  setupFetcher();
+  Http::RequestMessageImpl message;
+  MockMetadataReceiver receiver;
+
+  EXPECT_CALL(receiver, onMetadataSuccess(testing::_)).Times(testing::AtMost(1));
+  EXPECT_CALL(receiver, onMetadataError(_)).Times(testing::AtMost(1));
+
+  Http::AsyncClient::Callbacks* captured_callback = nullptr;
+  Http::MockAsyncClientRequest request(&(mock_factory_ctx_.server_factory_context_.cluster_manager_
+                                             .thread_local_cluster_.async_client_));
+
+  EXPECT_CALL(mock_factory_ctx_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                  .async_client_,
+              send_(_, _, _))
+      .WillOnce(
+          Invoke([&captured_callback, &request](
+                     Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            captured_callback = &cb;
+            return &request;
+          }));
+
+  // Start fetch to capture callback
+  fetcher_->fetch(message, parent_span_, receiver);
+  ASSERT_NE(captured_callback, nullptr);
+
+  // Destroy fetcher - callbacks should still work due to shared ownership
+  fetcher_.reset();
+
+  auto response = std::make_unique<Http::ResponseMessageImpl>();
+  response->headers().setStatus(200);
+  response->body().add("test_body");
+
+  captured_callback->onSuccess(request, std::move(response));
+  captured_callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
+
+  SUCCEED();
+}
+
+TEST_F(MetadataFetcherTest, TestRaceConditionWithThreadedCallbacks) {
+  setupFetcher();
+  Http::RequestMessageImpl message;
+  MockMetadataReceiver receiver;
+
+  EXPECT_CALL(receiver, onMetadataSuccess(testing::_)).Times(testing::AtMost(1));
+
+  Http::AsyncClient::Callbacks* captured_callback = nullptr;
+  Http::MockAsyncClientRequest request(&(mock_factory_ctx_.server_factory_context_.cluster_manager_
+                                             .thread_local_cluster_.async_client_));
+
+  EXPECT_CALL(mock_factory_ctx_.server_factory_context_.cluster_manager_.thread_local_cluster_
+                  .async_client_,
+              send_(_, _, _))
+      .WillOnce(
+          Invoke([&captured_callback, &request](
+                     Http::RequestMessagePtr&, Http::AsyncClient::Callbacks& cb,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            captured_callback = &cb;
+            return &request;
+          }));
+
+  fetcher_->fetch(message, parent_span_, receiver);
+  ASSERT_NE(captured_callback, nullptr);
+
+  // Simulate race condition: destroy fetcher first, then fire callback
+  std::atomic<bool> callback_completed{false};
+  std::atomic<bool> destruction_completed{false};
+
+  Thread::ThreadPtr destruction_thread =
+      Thread::threadFactoryForTest().createThread([this, &destruction_completed]() {
+        Thread::SkipAsserts skip;
+
+        // Destroy fetcher - shared ownership should keep object alive until callback completes
+        this->fetcher_.reset();
+        destruction_completed.store(true);
+      });
+
+  Thread::ThreadPtr callback_thread = Thread::threadFactoryForTest().createThread(
+      [&captured_callback, &request, &callback_completed]() {
+        Thread::SkipAsserts skip;
+
+        // Fire callback - this should NOT crash even if destructor has run
+        auto response = std::make_unique<Http::ResponseMessageImpl>();
+        response->headers().setStatus(200);
+        response->body().add("test_body");
+        captured_callback->onSuccess(request, std::move(response));
+
+        callback_completed.store(true);
+      });
+
+  // Wait for destruction first, then callback
+  destruction_thread->join();
+  callback_thread->join();
+
+  EXPECT_TRUE(destruction_completed.load());
+  EXPECT_TRUE(callback_completed.load());
+}
+
 } // namespace Aws
 } // namespace Common
 } // namespace Extensions

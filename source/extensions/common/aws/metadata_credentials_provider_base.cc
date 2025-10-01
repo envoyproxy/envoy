@@ -33,15 +33,7 @@ MetadataCredentialsProviderBase::MetadataCredentialsProviderBase(
 
 MetadataCredentialsProviderBase::~MetadataCredentialsProviderBase() {
   if (metadata_fetcher_) {
-    if (context_.mainThreadDispatcher().isThreadSafe()) {
-      // If we're on the main thread, cancel directly
-      metadata_fetcher_->cancel();
-      metadata_fetcher_.reset();
-    } else {
-      auto fetcher = std::move(metadata_fetcher_);
-      context_.mainThreadDispatcher().post(
-          [fetcher = std::move(fetcher)]() mutable { fetcher->cancel(); });
-    }
+    metadata_fetcher_->cancel();
   }
 }
 
