@@ -2464,7 +2464,7 @@ TEST_P(ExtProcIntegrationTest, BufferBodyOverridePostWithEmptyBodyBufferedPartia
     EXPECT_EQ(body.body().size(), 0);
     return true;
   });
-  
+
   handleUpstreamRequest();
   processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
   verifyDownstreamResponse(*response, 200);
@@ -4604,23 +4604,30 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoAppliedMutations) {
         mut1->mutable_header()->set_raw_value("new");
         return true;
       });
-  processRequestBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody&, BodyResponse& body_resp) {
-          auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
-          body_mut->set_body("Hello, World!");
-          return true;});
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody&, BodyResponse& body_resp) {
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("Hello, World!");
+        return true;
+      });
   processRequestTrailersMessage(*grpc_upstreams_[0], false, absl::nullopt);
 
   handleUpstreamRequestWithTrailer();
 
   processResponseHeadersMessage(*grpc_upstreams_[0], false, absl::nullopt);
-  processResponseBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody&, BodyResponse& body_resp) {
-          auto* body_mut = body_resp.mutable_response()->mutable_header_mutation();
-          auto* mut1 = body_mut->add_set_headers();
-          mut1->mutable_append()->set_value(false);
-          mut1->mutable_header()->set_key("x-new-header");
-          mut1->mutable_header()->set_raw_value("new");
-          return true;});
-  processResponseTrailersMessage(*grpc_upstreams_[0], false, [](const HttpTrailers&, TrailersResponse& trailers_resp) {
+  processResponseBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody&, BodyResponse& body_resp) {
+        auto* head_mut = body_resp.mutable_response()->mutable_header_mutation();
+        auto* mut1 = head_mut->add_set_headers();
+        mut1->mutable_append()->set_value(false);
+        mut1->mutable_header()->set_key("x-new-header");
+        mut1->mutable_header()->set_raw_value("new");
+        auto* body_mut = body_resp.mutable_response()->mutable_body_mutation();
+        body_mut->set_body("Goodbye, World!");
+        return true;
+      });
+  processResponseTrailersMessage(
+      *grpc_upstreams_[0], false, [](const HttpTrailers&, TrailersResponse& trailers_resp) {
         // The response does not really matter, it just needs to be non-empty.
         auto response_trailer_mutation = trailers_resp.mutable_header_mutation();
         auto* mut1 = response_trailer_mutation->add_set_headers();

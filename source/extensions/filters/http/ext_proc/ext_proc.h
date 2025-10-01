@@ -78,9 +78,11 @@ public:
     GrpcCallBody(const uint32_t call_count, const Grpc::Status::GrpcStatus call_status,
                  const std::chrono::microseconds total_latency,
                  const std::chrono::microseconds max_latency,
-                 const std::chrono::microseconds min_latency, const ProcessingEffect::Effect processing_effect = ProcessingEffect::Effect::None)
+                 const std::chrono::microseconds min_latency,
+                 const ProcessingEffect::Effect processing_effect = ProcessingEffect::Effect::None)
         : call_count_(call_count), last_call_status_(call_status), total_latency_(total_latency),
-          max_latency_(max_latency), min_latency_(min_latency), processing_effect_(processing_effect) {}
+          max_latency_(max_latency), min_latency_(min_latency),
+          processing_effect_(processing_effect) {}
     uint32_t call_count_;
     Grpc::Status::GrpcStatus last_call_status_;
     std::chrono::microseconds total_latency_;
@@ -541,8 +543,9 @@ private:
   void closeStream();
   void halfCloseAndWaitForRemoteClose();
 
-  void onFinishProcessorCalls(Grpc::Status::GrpcStatus call_status,
-                              ProcessingEffect::Effect processing_effect = ProcessingEffect::Effect::None);
+  void onFinishProcessorCalls(
+      Grpc::Status::GrpcStatus call_status,
+      ProcessingEffect::Effect processing_effect = ProcessingEffect::Effect::None);
   void clearAsyncState(Grpc::Status::GrpcStatus call_status = Grpc::Status::Aborted);
   void sendImmediateResponse(const envoy::service::ext_proc::v3::ImmediateResponse& response);
 

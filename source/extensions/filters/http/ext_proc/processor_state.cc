@@ -51,8 +51,8 @@ void ProcessorState::onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
         filter_callbacks_->dispatcher().timeSource().monotonicTime() - call_start_time_.value());
     ExtProcLoggingInfo* logging_info = filter_.loggingInfo();
     if (logging_info != nullptr) {
-      logging_info->recordGrpcCall(duration, call_status, callback_state_,
-                                   trafficDirection(), processing_effect);
+      logging_info->recordGrpcCall(duration, call_status, callback_state_, trafficDirection(),
+                                   processing_effect);
     }
     call_start_time_ = absl::nullopt;
   }
@@ -173,7 +173,8 @@ absl::Status ProcessorState::handleHeadersResponse(const HeadersResponse& respon
   }
 
   clearRouteCache(common_response);
-  onFinishProcessorCall(Grpc::Status::Ok, processing_effect, getCallbackStateAfterHeaderResp(common_response));
+  onFinishProcessorCall(Grpc::Status::Ok, processing_effect,
+                        getCallbackStateAfterHeaderResp(common_response));
 
   if (common_response.status() == CommonResponse::CONTINUE_AND_REPLACE) {
     return handleHeaderContinueAndReplace(response);
@@ -614,7 +615,8 @@ bool ProcessorState::handleDuplexStreamedBodyResponse(const CommonResponse& comm
     // Set the state to CallbackState::StreamedBodyCallback to wait for more bodies.
     // However, this could be the last chunk of body, and trailers are right after it.
     // The function to handle trailers response needs to consider this.
-    onFinishProcessorCall(Grpc::Status::Ok, ProcessingEffect::Effect::ContentModified, CallbackState::StreamedBodyCallback);
+    onFinishProcessorCall(Grpc::Status::Ok, ProcessingEffect::Effect::ContentModified,
+                          CallbackState::StreamedBodyCallback);
   }
   // If end_of_stream is true, Envoy should continue the filter chain operations.
   return end_of_stream;

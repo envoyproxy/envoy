@@ -149,9 +149,10 @@ public:
 
   void onStartProcessorCall(Event::TimerCb cb, std::chrono::milliseconds timeout,
                             CallbackState callback_state);
-  void onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
-                             ProcessingEffect::Effect processing_effect = ProcessingEffect::Effect::None,
-                             CallbackState next_state = CallbackState::Idle);
+  void
+  onFinishProcessorCall(Grpc::Status::GrpcStatus call_status,
+                        ProcessingEffect::Effect processing_effect = ProcessingEffect::Effect::None,
+                        CallbackState next_state = CallbackState::Idle);
   void stopMessageTimer();
   bool restartMessageTimer(const uint32_t message_timeout_ms);
 
