@@ -259,6 +259,7 @@ proto_library(
         "//envoy/extensions/matching/common_inputs/environment_variable/v3:pkg",
         "//envoy/extensions/matching/common_inputs/network/v3:pkg",
         "//envoy/extensions/matching/common_inputs/ssl/v3:pkg",
+        "//envoy/extensions/matching/common_inputs/stats/v3:pkg",
         "//envoy/extensions/matching/input_matchers/consistent_hashing/v3:pkg",
         "//envoy/extensions/matching/input_matchers/ip/v3:pkg",
         "//envoy/extensions/matching/input_matchers/metadata/v3:pkg",
