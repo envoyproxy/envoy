@@ -684,5 +684,20 @@ public:
   }
 };
 
+// Test that deprecated --allow-unknown-fields warning is logged when skip_deprecated_logs is false
+TEST_F(OptionsImplTest, DeprecatedAllowUnknownFieldsWarningWhenNotSkipped) {
+  EXPECT_LOG_CONTAINS(
+      "warn", "--allow-unknown-fields is deprecated, use --allow-unknown-static-fields instead.",
+      createOptionsImpl("envoy --allow-unknown-fields"));
+}
+
+// Test that deprecated --allow-unknown-fields warning is suppressed when skip_deprecated_logs is
+// true
+TEST_F(OptionsImplTest, DeprecatedAllowUnknownFieldsWarningWhenSkipped) {
+  EXPECT_LOG_NOT_CONTAINS(
+      "warn", "--allow-unknown-fields is deprecated, use --allow-unknown-static-fields instead.",
+      createOptionsImpl("envoy --allow-unknown-fields --skip-deprecated-logs"));
+}
+
 } // namespace
 } // namespace Envoy

@@ -138,7 +138,7 @@ def envoy_cmake(
         if pdb_name == "":
             pdb_name = name
 
-        copy_command = "cp {cmake_files_dir}/{pdb_name}.dir/{pdb_name}.pdb $INSTALLDIR/lib/{pdb_name}.pdb".format(cmake_files_dir = cmake_files_dir, pdb_name = pdb_name)
+        copy_command = "cp {cmake_files_dir}/{pdb_name}.dir/{pdb_name}.pdb $$INSTALLDIR/lib/{pdb_name}.pdb".format(cmake_files_dir = cmake_files_dir, pdb_name = pdb_name)
         if postfix_script != "":
             copy_command = copy_command + " && " + postfix_script
 

@@ -258,7 +258,8 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
           createOnProcessingResponseCb(config, context, stats_prefix)),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()),
       remote_close_timeout_(context.runtime().snapshot().getInteger(
-          RemoteCloseTimeout, DefaultRemoteCloseTimeoutMilliseconds)) {
+          RemoteCloseTimeout, DefaultRemoteCloseTimeoutMilliseconds)),
+      status_on_error_(toErrorCode(config.status_on_error().code())) {
 
   if (config.disable_clear_route_cache()) {
     route_cache_action_ = ExternalProcessor::RETAIN;
@@ -565,7 +566,7 @@ void Filter::onError() {
     return;
   }
 
-  if (failure_mode_allow_) {
+  if (failureModeAllow()) {
     // The user would like a none-200-ok response to not cause message processing to fail.
     // Close the external processing.
     processing_complete_ = true;
@@ -577,7 +578,8 @@ void Filter::onError() {
     decoding_state_.onFinishProcessorCall(Grpc::Status::Aborted);
     encoding_state_.onFinishProcessorCall(Grpc::Status::Aborted);
     ImmediateResponse errorResponse;
-    errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
+    errorResponse.mutable_status()->set_code(
+        static_cast<StatusCode>(static_cast<uint32_t>(config_->statusOnError())));
     errorResponse.set_details(absl::StrCat(ErrorPrefix, "_HTTP_ERROR"));
     sendImmediateResponse(errorResponse);
   }
@@ -974,6 +976,16 @@ void Filter::encodeProtocolConfig(ProcessingRequest& req) {
     ENVOY_STREAM_LOG(debug, "Filter protocol configurations encoded {}", *decoder_callbacks_,
                      protocol_config->DebugString());
   }
+}
+
+bool Filter::failureModeAllow() const {
+  if ((decoding_state_.bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED &&
+       decoding_state_.bodyReceived()) ||
+      (encoding_state_.bodyMode() == ProcessingMode::FULL_DUPLEX_STREAMED &&
+       encoding_state_.bodyReceived())) {
+    return false;
+  }
+  return failure_mode_allow_;
 }
 
 ProcessingRequest Filter::buildHeaderRequest(ProcessorState& state,
@@ -1456,7 +1468,8 @@ void Filter::handleErrorResponse(absl::Status processing_status) {
   onFinishProcessorCalls(processing_status.raw_code());
   closeStream();
   ImmediateResponse invalid_mutation_response;
-  invalid_mutation_response.mutable_status()->set_code(StatusCode::InternalServerError);
+  invalid_mutation_response.mutable_status()->set_code(
+      static_cast<StatusCode>(static_cast<uint32_t>(config_->statusOnError())));
   invalid_mutation_response.set_details(std::string(processing_status.message()));
   sendImmediateResponse(invalid_mutation_response);
 }
@@ -1623,9 +1636,8 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
     stats_.spurious_msgs_received_.inc();
     ENVOY_STREAM_LOG(warn, "Spurious response message {} received on gRPC stream",
                      *decoder_callbacks_, static_cast<int>(response->response_case()));
-    if (config_->failureModeAllow() ||
-        !Runtime::runtimeFeatureEnabled(
-            "envoy.reloadable_features.ext_proc_fail_close_spurious_resp")) {
+    if (failureModeAllow() || !Runtime::runtimeFeatureEnabled(
+                                  "envoy.reloadable_features.ext_proc_fail_close_spurious_resp")) {
       // When a message is received out of order,and fail open is configured,
       // ignore it and also ignore the stream for the rest of this filter
       // instance's lifetime to protect us from a malformed server.
@@ -1654,7 +1666,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
     return;
   }
 
-  if (failure_mode_allow_) {
+  if (failureModeAllow()) {
     onGrpcCloseWithStatus(status);
     stats_.failure_mode_allowed_.inc();
 
@@ -1665,7 +1677,8 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
     onFinishProcessorCalls(status);
     closeStream();
     ImmediateResponse errorResponse;
-    errorResponse.mutable_status()->set_code(StatusCode::InternalServerError);
+    errorResponse.mutable_status()->set_code(
+        static_cast<StatusCode>(static_cast<uint32_t>(config_->statusOnError())));
     errorResponse.set_details(
         absl::StrFormat("%s_gRPC_error_%i{%s}", ErrorPrefix, status, message));
     sendImmediateResponse(errorResponse);
@@ -1689,7 +1702,7 @@ void Filter::onMessageTimeout() {
   ENVOY_STREAM_LOG(debug, "message timeout reached", *decoder_callbacks_);
   logStreamInfo();
   stats_.message_timeouts_.inc();
-  if (failure_mode_allow_) {
+  if (failureModeAllow()) {
     // The user would like a timeout to not cause message processing to fail.
     // However, we don't know if the external processor will send a response later,
     // and we can't wait any more. So, as we do for a spurious message, ignore
@@ -1706,7 +1719,6 @@ void Filter::onMessageTimeout() {
     decoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     encoding_state_.onFinishProcessorCall(Grpc::Status::DeadlineExceeded);
     ImmediateResponse errorResponse;
-
     errorResponse.mutable_status()->set_code(StatusCode::GatewayTimeout);
     errorResponse.set_details(absl::StrFormat("%s_per-message_timeout_exceeded", ErrorPrefix));
     sendImmediateResponse(errorResponse);

@@ -101,7 +101,7 @@ void leastRequestLBWeightTest(LRLBTestParams params) {
       updateHostsParams(updated_hosts, updated_locality_hosts,
                         std::make_shared<const HealthyHostVector>(*updated_hosts),
                         updated_locality_hosts),
-      {}, hosts, {}, random.random(), absl::nullopt);
+      {}, hosts, {}, absl::nullopt);
 
   Stats::IsolatedStoreImpl stats_store;
   ClusterLbStatNames stat_names(stats_store.symbolTable());
@@ -264,7 +264,7 @@ public:
           updateHostsParams(originating_hosts, per_zone_local_shared,
                             std::make_shared<const HealthyHostVector>(*originating_hosts),
                             per_zone_local_shared),
-          {}, empty_vector_, empty_vector_, random_.random(), absl::nullopt);
+          {}, empty_vector_, empty_vector_, absl::nullopt);
 
       HostConstSharedPtr selected = lb.chooseHost(nullptr).host;
       hits[selected->address()->asString()]++;

@@ -11,6 +11,7 @@ envoy_extension_package()
 envoy_cc_extension(
     name = "reverse_tunnel_acceptor_includes",
     hdrs = [
+        "reverse_connection_io_handle.h",
         "reverse_tunnel_acceptor.h",
         "reverse_tunnel_acceptor_extension.h",
     ],
@@ -33,6 +34,7 @@ envoy_cc_extension(
 envoy_cc_extension(
     name = "reverse_tunnel_acceptor_lib",
     srcs = [
+        "reverse_connection_io_handle.cc",
         "reverse_tunnel_acceptor.cc",
         "reverse_tunnel_acceptor_extension.cc",
     ],
