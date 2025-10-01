@@ -285,6 +285,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "cgroup_cpu_util_test",
+    srcs = ["cgroup_cpu_util_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/filesystem:filesystem_lib",
+        "//source/server:cgroup_cpu_util_lib",
+        "//test/mocks/filesystem:filesystem_mocks",
+        "//test/test_common:logging_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "overload_manager_impl_test",
     srcs = ["overload_manager_impl_test.cc"],
     rbe_pool = "6gig",
