@@ -344,6 +344,13 @@ new_features:
     Added support for generating and propagating a request ID on synthesized upstream HTTP requests when tunneling requests.
     It can be configured using :ref:`request_id_extension
     <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.request_id_extension>`.
+- area: http
+  change: |
+    Added support for per-route compressor library override in the HTTP compressor filter.
+    Routes can now specify a different compressor library (e.g., gzip, brotli) via the
+    :ref:`compressor_library <envoy_v3_api_field_extensions.filters.http.compressor.v3.CompressorOverrides.compressor_library>`
+    field in the per-route configuration. This allows different routes to use different
+    compression algorithms and settings while maintaining the same filter configuration.
 - area: router_check_tool
   change: |
     Added support for testing routes with :ref:`dynamic metadata matchers <envoy_v3_api_field_config.route.v3.RouteMatch.dynamic_metadata>`
