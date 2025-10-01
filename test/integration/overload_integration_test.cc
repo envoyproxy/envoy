@@ -1206,7 +1206,7 @@ TEST_P(LoadShedPointIntegrationTest, Http2ServerDispatchSendsGoAwayAndClosesConn
   // The downstream should receive the GOAWAY and the connection should be closed.
   ASSERT_TRUE(codec_client_->waitForDisconnect());
   EXPECT_TRUE(codec_client_->sawGoAway());
-  test_server_->waitForCounterEq("http2.goaway_sent", 1);
+  test_server_->waitForCounterEq("http2.goaway_graceful_sent", 1);
   test_server_->waitForCounterEq("http.config_test.downstream_rq_overload_close", 1);
 
   // The second request will not complete.
