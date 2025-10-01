@@ -155,8 +155,26 @@ envoy_genjson(
 )
 
 filegroup(
-    name = "cve-data",
+    name = "cve-data-dir",
     srcs = glob(["cve_data/*.json"]),
+    visibility = ["//visibility:public"],
+)
+
+genrule(
+    name = "placeholder",
+    outs = ["PLACEHOLDER.txt"],
+    cmd = "echo '' > $@",
+)
+
+filegroup(
+    name = "empty-directory",
+    srcs = [":placeholder"],  # default fallback
+    visibility = ["//visibility:public"],
+)
+
+label_flag(
+    name = "cve-data",
+    build_setting_default = ":empty-directory",
     visibility = ["//visibility:public"],
 )
 
@@ -195,6 +213,18 @@ genrule(
     export JQ_VERSION_UTILS="$(location :version.jq)"
     export CVES_IGNORED="$(location :ignored-cves.json)"
     export CVES="$(locations :cve-data)"
+    read -ra CVELIST <<< "$$CVES"
+    HAS_JSON=false
+    for f in "$${CVELIST[@]}"; do
+        if [[ "$$f" == *.json ]]; then
+            HAS_JSON=true
+            break
+        fi
+    done
+    if [[ "$$HAS_JSON" != true ]]; then
+        echo "No CVE data set, perhaps use --config=cves?" >&2
+        exit 1
+    fi
     $(location :cves) \
       > $@ || :
     """,
