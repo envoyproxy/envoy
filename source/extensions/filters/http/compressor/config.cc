@@ -86,6 +86,19 @@ CompressorFilterFactory::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::compressor::v3::CompressorPerRoute& proto_config,
     Server::Configuration::ServerFactoryContext& context,
     ProtobufMessage::ValidationVisitor& validator) {
+  // Validate per-route compressor library configuration before creating the config object.
+  if (proto_config.has_overrides() && proto_config.overrides().has_compressor_library()) {
+    const std::string type{TypeUtil::typeUrlToDescriptorFullName(
+        proto_config.overrides().compressor_library().typed_config().type_url())};
+    Compression::Compressor::NamedCompressorLibraryConfigFactory* const config_factory =
+        Registry::FactoryRegistry<
+            Compression::Compressor::NamedCompressorLibraryConfigFactory>::getFactoryByType(type);
+    if (config_factory == nullptr) {
+      return absl::InvalidArgumentError(fmt::format(
+          "Didn't find a registered implementation for per-route compressor type: '{}'", type));
+    }
+  }
+
   // Create a temporary factory context that wraps the generic factory context.
   // Other filters commonly use GenericFactoryContextImpl for per-route config construction.
   // Since the compressor library factory requires a FactoryContext, adapt GenericFactoryContextImpl

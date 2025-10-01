@@ -211,16 +211,16 @@ CompressorPerRouteFilterConfig::CompressorPerRouteFilterConfig(
     }
 
     // Handle per-route compressor library configuration.
+    // Note: Validation of the compressor library type is done in config.cc before this
+    // constructor is called, so we can assume the factory exists.
     if (config.overrides().has_compressor_library()) {
       const std::string type{TypeUtil::typeUrlToDescriptorFullName(
           config.overrides().compressor_library().typed_config().type_url())};
       Compression::Compressor::NamedCompressorLibraryConfigFactory* const config_factory =
           Registry::FactoryRegistry<
               Compression::Compressor::NamedCompressorLibraryConfigFactory>::getFactoryByType(type);
-      if (config_factory == nullptr) {
-        throw EnvoyException(fmt::format(
-            "Didn't find a registered implementation for per-route compressor type: '{}'", type));
-      }
+      ASSERT(config_factory != nullptr,
+             "Compressor library type should have been validated in config.cc");
       ProtobufTypes::MessagePtr message = Config::Utility::translateAnyToFactoryConfig(
           config.overrides().compressor_library().typed_config(),
           context.messageValidationVisitor(), *config_factory);
