@@ -9,9 +9,9 @@ namespace HttpFilters {
 namespace ExternalProcessing {
 
 class ProcessingEffect {
- public:
+public:
   // The processing effect that was applied by the external processor.
-  enum class Effect: char {
+  enum class Effect : char {
     // No processing effect.
     None,
     // The processor response sent a mutation that modified the body or headers.
@@ -26,7 +26,7 @@ class ProcessingEffect {
     ContinueAndReplace
   };
 };
-}  // namespace ExternalProcessing
-}  // namespace HttpFilters
-}  // namespace Extensions
-}  // namespace Envoy
+} // namespace ExternalProcessing
+} // namespace HttpFilters
+} // namespace Extensions
+} // namespace Envoy
