@@ -2467,5 +2467,167 @@ TEST_F(AsyncClientImplUnitTest, NullVirtualHost) {
   EXPECT_EQ(std::numeric_limits<uint64_t>::max(), vhost_.requestBodyBufferLimit());
 }
 
+TEST_F(AsyncClientImplTest, UpstreamOverrideHost) {
+  Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
+  Upstream::LoadBalancerContext::OverrideHost override_host{"192.168.1.100:8080", true};
+
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
+        // Verify that the upstream override host is passed through the load balancer context
+        auto retrieved_override = context->overrideHostToSelect();
+        EXPECT_TRUE(retrieved_override.has_value());
+        EXPECT_EQ(retrieved_override->first, "192.168.1.100:8080");
+        EXPECT_EQ(retrieved_override->second, true);
+        return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
+      }));
+
+  // Verify that the load balancer queries for the upstream override host
+  EXPECT_CALL(cm_.thread_local_cluster_, chooseHost(_))
+      .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) {
+        // The load balancer should call overrideHostToSelect() to get the override
+        auto retrieved_override = context->overrideHostToSelect();
+        EXPECT_TRUE(retrieved_override.has_value());
+        EXPECT_EQ(retrieved_override->first, "192.168.1.100:8080");
+        EXPECT_EQ(retrieved_override->second, true);
+        return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
+      }));
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+                           const ConnectionPool::Instance::StreamOptions&) {
+        callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                              stream_info_, {});
+        response_decoder_ = &decoder;
+        return nullptr;
+      }));
+
+  TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), true));
+
+  expectResponseHeaders(stream_callbacks_, 200, false);
+  EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), true));
+  EXPECT_CALL(stream_callbacks_, onComplete());
+
+  AsyncClient::StreamOptions options;
+  options.setUpstreamOverrideHost(override_host);
+  AsyncClient::Stream* stream = client_.start(stream_callbacks_, options);
+
+  stream->sendHeaders(headers, false);
+  stream->sendData(*body, true);
+
+  response_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeData(*body, true);
+}
+
+TEST_F(AsyncClientImplTest, UpstreamOverrideHostNotStrict) {
+  Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
+  Upstream::LoadBalancerContext::OverrideHost override_host{"example.com:8080", false};
+
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
+        // Verify that the non-strict upstream override host is passed correctly
+        auto retrieved_override = context->overrideHostToSelect();
+        EXPECT_TRUE(retrieved_override.has_value());
+        EXPECT_EQ(retrieved_override->first, "example.com:8080");
+        EXPECT_EQ(retrieved_override->second, false);
+        return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
+      }));
+
+  // Verify that the load balancer queries for the non-strict upstream override host
+  EXPECT_CALL(cm_.thread_local_cluster_, chooseHost(_))
+      .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) {
+        // The load balancer should call overrideHostToSelect() to get the override
+        auto retrieved_override = context->overrideHostToSelect();
+        EXPECT_TRUE(retrieved_override.has_value());
+        EXPECT_EQ(retrieved_override->first, "example.com:8080");
+        EXPECT_EQ(retrieved_override->second, false);
+        return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
+      }));
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+                           const ConnectionPool::Instance::StreamOptions&) {
+        callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                              stream_info_, {});
+        response_decoder_ = &decoder;
+        return nullptr;
+      }));
+
+  TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), true));
+
+  expectResponseHeaders(stream_callbacks_, 200, false);
+  EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), true));
+  EXPECT_CALL(stream_callbacks_, onComplete());
+
+  AsyncClient::StreamOptions options;
+  options.setUpstreamOverrideHost(override_host);
+  AsyncClient::Stream* stream = client_.start(stream_callbacks_, options);
+
+  stream->sendHeaders(headers, false);
+  stream->sendData(*body, true);
+
+  response_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeData(*body, true);
+}
+
+TEST_F(AsyncClientImplTest, NoUpstreamOverrideHost) {
+  Buffer::InstancePtr body{new Buffer::OwnedImpl("test body")};
+
+  EXPECT_CALL(cm_.thread_local_cluster_, httpConnPool(_, _, _, _))
+      .WillOnce(Invoke([&](Upstream::HostConstSharedPtr, Upstream::ResourcePriority,
+                           absl::optional<Http::Protocol>, Upstream::LoadBalancerContext* context) {
+        // Verify that no upstream override host is set when not specified
+        auto retrieved_override = context->overrideHostToSelect();
+        EXPECT_FALSE(retrieved_override.has_value());
+        return Upstream::HttpPoolData([]() {}, &cm_.thread_local_cluster_.conn_pool_);
+      }));
+
+  // Verify that the load balancer queries for override host and gets nullopt
+  EXPECT_CALL(cm_.thread_local_cluster_, chooseHost(_))
+      .WillOnce(Invoke([&](Upstream::LoadBalancerContext* context) {
+        // The load balancer should call overrideHostToSelect() but get nullopt
+        auto retrieved_override = context->overrideHostToSelect();
+        EXPECT_FALSE(retrieved_override.has_value());
+        return Upstream::HostSelectionResponse{cm_.thread_local_cluster_.lb_.host_};
+      }));
+
+  EXPECT_CALL(cm_.thread_local_cluster_.conn_pool_, newStream(_, _, _))
+      .WillOnce(Invoke([&](ResponseDecoder& decoder, ConnectionPool::Callbacks& callbacks,
+                           const ConnectionPool::Instance::StreamOptions&) {
+        callbacks.onPoolReady(stream_encoder_, cm_.thread_local_cluster_.conn_pool_.host_,
+                              stream_info_, {});
+        response_decoder_ = &decoder;
+        return nullptr;
+      }));
+
+  TestRequestHeaderMapImpl headers;
+  HttpTestUtility::addDefaultHeaders(headers);
+  EXPECT_CALL(stream_encoder_, encodeHeaders(HeaderMapEqualRef(&headers), false));
+  EXPECT_CALL(stream_encoder_, encodeData(BufferEqual(body.get()), true));
+
+  expectResponseHeaders(stream_callbacks_, 200, false);
+  EXPECT_CALL(stream_callbacks_, onData(BufferEqual(body.get()), true));
+  EXPECT_CALL(stream_callbacks_, onComplete());
+
+  AsyncClient::StreamOptions options;
+  AsyncClient::Stream* stream = client_.start(stream_callbacks_, options);
+
+  stream->sendHeaders(headers, false);
+  stream->sendData(*body, true);
+
+  response_decoder_->decodeHeaders(
+      ResponseHeaderMapPtr(new TestResponseHeaderMapImpl{{":status", "200"}}), false);
+  response_decoder_->decodeData(*body, true);
+}
+
 } // namespace Http
 } // namespace Envoy

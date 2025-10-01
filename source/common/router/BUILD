@@ -130,6 +130,7 @@ envoy_cc_library(
         "//envoy/router:cluster_specifier_plugin_interface",
         "//envoy/server:factory_context_interface",
         "//source/common/config:well_known_names",
+        "//source/common/http:hash_policy_lib",
     ],
 )
 
@@ -350,7 +351,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "upstream_to_downstream_impl_base",
-    srcs = [
+    hdrs = [
         "upstream_to_downstream_impl_base.h",
     ],
     deps = [
