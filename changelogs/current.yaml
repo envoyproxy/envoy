@@ -110,8 +110,8 @@ minor_behavior_changes:
     4MB could be encoded, which most upstream grpc services would, by default, treat as an error.
 - area: ext_authz
   change: |
-    Check the request header count after applying mutations is <= the configured limit and reject
-    the response if not.
+    Check the request header count & size in kb after applying mutations is <= the configured limits
+    and reject the response if not.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -413,6 +413,11 @@ new_features:
   change: |
     Added support for resource attributes. The stat sink will use the resource attributes configured for the OpenTelemetry tracer via
     :ref:`resource_detectors <envoy_v3_api_field_config.trace.v3.OpenTelemetryConfig.resource_detectors>`.
+- area: otlp_stat_sink
+  change: |
+    Added support for :ref:`custom_metric_conversions
+    <envoy_v3_api_field_extensions.stat_sinks.open_telemetry.v3.SinkConfig.custom_metric_conversions>`. This allows renaming stats,
+    adding static labels, and aggregating multiple stats into generated metrics.
 - area: lua
   change: |
     Added ``virtualHost()`` to the Stream handle API, allowing Lua scripts to retrieve virtual host information. So far, the only method
@@ -431,6 +436,13 @@ new_features:
     to the ``ext_proc`` HTTP filter. This allows configuring the HTTP status code returned to the downstream
     client when communication with the external processor fails (e.g., gRPC error). Previously, these cases returned a
     fixed ``500``.
+- area: ext_proc
+  change: |
+    Introduced a new
+    :ref:`ProcessingRequestModifier <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_request_modifier>`
+    config and corresponding interface to enable modifying the ``ProcessingRequest`` before it is sent on the wire. Sample use cases include
+    modifying attribute and metadata keys to abstract away filter details. If the config is not set, then there is no behavior change.
+    Supports per-route overrides.
 - area: tracing
   change: |
     Added :ref:`trace_context_option <envoy_v3_api_field_config.trace.v3.ZipkinConfig.trace_context_option>` enum
@@ -539,5 +551,9 @@ new_features:
   change: |
     Added ``max_downstream_connection_duration_jitter_percentage`` to allow adding a jitter to the max downstream connection duration.
     This can be used to avoid thundering herd problems with many clients being disconnected and possibly reconnecting at the same time.
+- area: http
+  change: |
+    Added ``setUpstreamOverrideHost`` method to AsyncClient StreamOptions to enable direct host routing
+    that bypasses load balancer selection.
 
 deprecated:

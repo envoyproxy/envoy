@@ -6,7 +6,7 @@ licenses(["notice"])  # Apache 2
 # BoringSSL build as described in the Security Policy for BoringCrypto module "update stream":
 # https://boringssl.googlesource.com/boringssl/+/refs/heads/main/crypto/fipsmodule/FIPS.md#update-stream
 
-FIPS_GO_VERSION = "go1.24.2"
+FIPS_GO_VERSION = "go1.24.4"
 
 FIPS_NINJA_VERSION = "1.10.2"
 
