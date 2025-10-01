@@ -129,13 +129,13 @@ typed_config:
   }
 
   void stripConnectUpgradeAndRespond(bool include_content_length = false) {
-    // Strip the CONNECT upgrade - expect RFC 9110 compliant request with Host header
+    // Strip the CONNECT upgrade - expect RFC 9110 compliant request with Host header.
     std::string prefix_data;
     const std::string hostname(default_request_headers_.getHostValue());
     const std::string port = Http::HeaderUtility::hostHasPort(hostname) ? "" : ":443";
     ASSERT_TRUE(fake_upstream_connection_->waitForInexactRawData("\r\n\r\n", prefix_data));
 
-    // Verify the CONNECT request format is RFC 9110 compliant with Host header
+    // Verify the CONNECT request format is RFC 9110 compliant with Host header.
     std::string expected_connect = absl::StrCat("CONNECT ", hostname, port, " HTTP/1.1\r\n",
                                                 "Host: ", hostname, port, "\r\n\r\n");
     EXPECT_EQ(expected_connect, prefix_data);

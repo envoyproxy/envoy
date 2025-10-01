@@ -29,7 +29,7 @@ bool UpstreamHttp11ConnectSocket::isValidConnectResponse(absl::string_view respo
          parser.headersComplete() && parser.parser().statusCode() == Http::Code::OK;
 }
 
-// Helper method to create a properly formatted CONNECT request with Host header
+// Helper method to create a properly formatted CONNECT request with Host header.
 std::string UpstreamHttp11ConnectSocket::formatConnectRequest(absl::string_view target) {
   return absl::StrCat("CONNECT ", target, " HTTP/1.1\r\n", "Host: ", target, "\r\n\r\n");
 }
@@ -49,10 +49,10 @@ UpstreamHttp11ConnectSocket::UpstreamHttp11ConnectSocket(
 
       if (!Runtime::runtimeFeatureEnabled(
               "envoy.reloadable_features.http_11_proxy_connect_legacy_format")) {
-        // RFC 9110 compliant CONNECT format that includes Host header
+        // RFC 9110 compliant CONNECT format that includes Host header.
         header_buffer_.add(formatConnectRequest(target));
       } else {
-        // Legacy behavior: no Host header for backward compatibility
+        // Legacy behavior: no Host header for backward compatibility.
         header_buffer_.add(absl::StrCat("CONNECT ", target, " HTTP/1.1\r\n\r\n"));
       }
       need_to_strip_connect_response_ = true;
@@ -72,7 +72,7 @@ UpstreamHttp11ConnectSocket::UpstreamHttp11ConnectSocket(
     if (has_proxy_addr) {
       if (!Runtime::runtimeFeatureEnabled(
               "envoy.reloadable_features.http_11_proxy_connect_legacy_format")) {
-        // Prefer <host-name>:<port> for RFC 9110 compliance, unless URI is <host-ip>:<port>
+        // Prefer <host-name>:<port> for RFC 9110 compliance, unless URI is <host-ip>:<port>.
         std::string target;
         if (!host->hostname().empty()) {
           const uint32_t port = host->address()->ip()->port();
@@ -82,7 +82,7 @@ UpstreamHttp11ConnectSocket::UpstreamHttp11ConnectSocket(
         }
         header_buffer_.add(formatConnectRequest(target));
       } else {
-        // Legacy behavior: <host-ip>:<port> format, no Host header for backward compatibility
+        // Legacy behavior: <host-ip>:<port> format, no Host header for backward compatibility.
         header_buffer_.add(
             absl::StrCat("CONNECT ", host->address()->asStringView(), " HTTP/1.1\r\n\r\n"));
       }

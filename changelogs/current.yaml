@@ -1,6 +1,12 @@
 date: Pending
 
 behavior_changes:
+- area: http_11_proxy
+  change: |
+    HTTP/1.1 proxy transport socket now generates RFC 9110 compliant CONNECT requests that include a Host header by default.
+    When proxy address is configured via endpoint metadata, the transport socket now prefers hostname:port format over IP:port
+    when hostname is available. The legacy behavior (CONNECT without Host header) can be restored by setting the runtime flag
+    ``envoy.reloadable_features.http_11_proxy_connect_legacy_format`` to ``true``.
 - area: response_decoder
   change: |
     Updated EnvoyQuicClientStream and ResponseDecoderWrapper to use a handle to access the response decoder
