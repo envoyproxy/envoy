@@ -100,21 +100,39 @@ RedisCluster::RedisCluster(
   }
 
   // Register the cluster callback using weak_ptr to avoid use-after-free
+  // Also capture a pointer to is_destroying_ to check destruction state
   std::weak_ptr<RedisDiscoverySession> weak_session = redis_discovery_session_;
+  std::atomic<bool>* is_destroying_ptr = &is_destroying_;
   registration_handle_ = refresh_manager_->registerCluster(
       cluster_name_, redirect_refresh_interval_, redirect_refresh_threshold_,
-      failure_refresh_threshold_, host_degraded_refresh_threshold_, [weak_session]() {
+      failure_refresh_threshold_, host_degraded_refresh_threshold_,
+      [weak_session, is_destroying_ptr]() {
+        // Check if cluster is being destroyed first
+        if (is_destroying_ptr->load(std::memory_order_acquire)) {
+          return;
+        }
         // Try to lock the weak pointer to ensure the session is still alive
         auto session = weak_session.lock();
         if (session && session->resolve_timer_) {
           session->resolve_timer_->enableTimer(std::chrono::milliseconds(0));
         }
       });
+
+  // Initialize the session after construction is complete so it can use shared_from_this()
+  redis_discovery_session_->initialize();
 }
 
 RedisCluster::~RedisCluster() {
   // Set flag to prevent any callbacks from executing during destruction
-  is_destroying_.store(true);
+  // Use memory_order_release to ensure this write is visible to callbacks
+  is_destroying_.store(true, std::memory_order_release);
+
+  // CRITICAL: Set the session's parent_destroyed_ flag BEFORE resetting the session.
+  // This allows callbacks with shared_from_this() to safely check if parent is destroyed
+  // without accessing the parent object itself (which may be destroyed).
+  if (redis_discovery_session_) {
+    redis_discovery_session_->parent_destroyed_.store(true, std::memory_order_release);
+  }
 
   // Reset redis_discovery_session_ before other members are destroyed
   // to ensure any pending callbacks from refresh_manager_ don't access it.
@@ -124,6 +142,11 @@ RedisCluster::~RedisCluster() {
   // Also clear DNS discovery targets to prevent their callbacks from
   // accessing the destroyed cluster.
   dns_discovery_resolve_targets_.clear();
+  
+  // Reset the registration handle LAST to ensure no new callbacks are scheduled
+  // while we're cleaning up. Any callbacks already scheduled will check is_destroying_
+  // and return early.
+  registration_handle_.reset();
 }
 
 void RedisCluster::startPreInit() {
@@ -254,6 +277,10 @@ RedisCluster::DnsDiscoveryResolveTarget::~DnsDiscoveryResolveTarget() {
 void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
   ENVOY_LOG(trace, "starting async DNS resolution for {}", dns_address_);
 
+  if (parent_.is_destroying_.load(std::memory_order_acquire) || !parent_.dns_resolver_) {
+    return;
+  }
+
   active_query_ = parent_.dns_resolver_->resolve(
       dns_address_, parent_.dns_lookup_family_,
       [this](Network::DnsResolver::ResolutionStatus status, absl::string_view,
@@ -261,26 +288,34 @@ void RedisCluster::DnsDiscoveryResolveTarget::startResolveDns() {
         active_query_ = nullptr;
         ENVOY_LOG(trace, "async DNS resolution complete for {}", dns_address_);
         if (status == Network::DnsResolver::ResolutionStatus::Failure || response.empty()) {
-          if (status == Network::DnsResolver::ResolutionStatus::Failure) {
-            parent_.info_->configUpdateStats().update_failure_.inc();
-          } else {
-            parent_.info_->configUpdateStats().update_empty_.inc();
+          auto info = parent_.info_;
+          if (info) {
+            if (status == Network::DnsResolver::ResolutionStatus::Failure) {
+              info->configUpdateStats().update_failure_.inc();
+            } else {
+              info->configUpdateStats().update_empty_.inc();
+            }
           }
 
           if (!resolve_timer_) {
-            resolve_timer_ = parent_.dispatcher_.createTimer([this]() -> void {
-              // Check if the parent cluster is being destroyed
-              if (parent_.is_destroying_.load()) {
-                return;
-              }
-              startResolveDns();
-            });
+            resolve_timer_ =
+                parent_.dispatcher_.createTimer([this]() -> void {
+                  // Check if the parent cluster is being destroyed
+                  if (parent_.is_destroying_.load()) {
+                    return;
+                  }
+                  startResolveDns();
+                });
           }
           // if the initial dns resolved to empty, we'll skip the redis discovery phase and
           // treat it as an empty cluster.
           parent_.onPreInitComplete();
           resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
         } else {
+          // Check if the parent cluster is being destroyed
+          if (parent_.is_destroying_.load(std::memory_order_acquire)) {
+            return;
+          }
           // Once the DNS resolve the initial set of addresses, call startResolveRedis on
           // the RedisDiscoverySession. The RedisDiscoverySession will using the "cluster
           // slots" command for service discovery and slot allocation. All subsequent
@@ -297,17 +332,22 @@ RedisCluster::RedisDiscoverySession::RedisDiscoverySession(
     Envoy::Extensions::Clusters::Redis::RedisCluster& parent,
     NetworkFilters::Common::Redis::Client::ClientFactory& client_factory)
     : parent_(parent), dispatcher_(parent.dispatcher_),
-      resolve_timer_(parent.dispatcher_.createTimer([this]() -> void {
-        // Check if the parent cluster is being destroyed
-        if (parent_.is_destroying_.load()) {
-          return;
-        }
-        startResolveRedis();
-      })),
+      resolve_timer_(nullptr),
       client_factory_(client_factory), buffer_timeout_(0),
       redis_command_stats_(
           NetworkFilters::Common::Redis::RedisCommandStats::createRedisCommandStats(
               parent_.info()->statsScope().symbolTable())) {}
+
+void RedisCluster::RedisDiscoverySession::initialize() {
+  // Create timer with shared_from_this() to keep session alive during callbacks
+  auto self = shared_from_this();
+  resolve_timer_ = dispatcher_.createTimer([self]() -> void {
+    if (!self->isParentAlive()) {
+      return;
+    }
+    self->startResolveRedis();
+  });
+}
 
 // Convert the cluster slot IP/Port response to an address, return null if the response
 // does not match the expected type.
@@ -336,6 +376,10 @@ RedisCluster::RedisDiscoverySession::~RedisDiscoverySession() {
 void RedisCluster::RedisDiscoveryClient::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
+    // Check if the parent cluster is being destroyed
+    if (parent_.parent_.is_destroying_.load(std::memory_order_acquire)) {
+      return;
+    }
     auto client_to_delete = parent_.client_map_.find(host_);
     ASSERT(client_to_delete != parent_.client_map_.end());
     parent_.dispatcher_.deferredDelete(std::move(client_to_delete->second->client_));
@@ -356,11 +400,17 @@ void RedisCluster::RedisDiscoverySession::registerDiscoveryAddress(
 }
 
 void RedisCluster::RedisDiscoverySession::startResolveRedis() {
-  parent_.info_->configUpdateStats().update_attempt_.inc();
+  // Use helper to safely get parent info (returns nullptr if parent is being destroyed)
+  auto info = parentInfo();
+  if (!info) {
+    return;
+  }
+  
+  info->configUpdateStats().update_attempt_.inc();
   // If a resolution is currently in progress, skip it.
   if (current_request_) {
     ENVOY_LOG(debug, "redis cluster slot request is already in progress for '{}'",
-              parent_.info_->name());
+              info ? info->name() : "unknown");
     return;
   }
 
@@ -393,24 +443,34 @@ void RedisCluster::RedisDiscoverySession::startResolveRedis() {
   if (!client) {
     client = std::make_unique<RedisDiscoveryClient>(*this);
     client->host_ = current_host_address_;
+    // Get parent info again in case parent was destroyed between checks
+    auto parent_info = parentInfo();
+    if (!parent_info) {
+      return;
+    }
     // std::nullopt here disables AWS IAM authentication in redis client which is not supported by
     // redis cluster implementation
     client->client_ = client_factory_.create(
-        host, dispatcher_, shared_from_this(), redis_command_stats_, parent_.info()->statsScope(),
+        host, dispatcher_, shared_from_this(), redis_command_stats_, parent_info->statsScope(),
         parent_.auth_username_, parent_.auth_password_, false, std::nullopt, std::nullopt,
         Extensions::NetworkFilters::Common::Redis::RespProtocolVersion::Resp2, std::nullopt);
     client->client_->addConnectionCallbacks(*client);
   }
-  ENVOY_LOG(debug, "executing redis cluster slot request for '{}'", parent_.info_->name());
+  ENVOY_LOG(debug, "executing redis cluster slot request for '{}'", 
+            info ? info->name() : "unknown");
   current_request_ = client->client_->makeRequest(ClusterSlotsRequest::instance_, *this);
 }
 
 void RedisCluster::RedisDiscoverySession::updateDnsStats(
     Network::DnsResolver::ResolutionStatus status, bool empty_response) {
+  auto info = parentInfo();
+  if (!info) {
+    return;
+  }
   if (status == Network::DnsResolver::ResolutionStatus::Failure) {
-    parent_.info_->configUpdateStats().update_failure_.inc();
+    info->configUpdateStats().update_failure_.inc();
   } else if (empty_response) {
-    parent_.info_->configUpdateStats().update_empty_.inc();
+    info->configUpdateStats().update_empty_.inc();
   }
 }
 
@@ -431,6 +491,10 @@ void RedisCluster::RedisDiscoverySession::updateDnsStats(
 void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
     ClusterSlotsSharedPtr&& slots,
     std::shared_ptr<std::uint64_t> hostname_resolution_required_cnt) {
+  if (!isParentAlive() || !parent_.dns_resolver_) {
+    return;
+  }
+  
   for (uint64_t slot_idx = 0; slot_idx < slots->size(); slot_idx++) {
     auto& slot = (*slots)[slot_idx];
     if (slot.primary() == nullptr) {
@@ -442,6 +506,10 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
           [this, slot_idx, slots, hostname_resolution_required_cnt](
               Network::DnsResolver::ResolutionStatus status, absl::string_view,
               std::list<Network::DnsResponse>&& response) -> void {
+            if (!isParentAlive()) {
+              return;
+            }
+            
             auto& slot = (*slots)[slot_idx];
             ENVOY_LOG(
                 debug,
@@ -489,6 +557,10 @@ void RedisCluster::RedisDiscoverySession::resolveClusterHostnames(
 void RedisCluster::RedisDiscoverySession::resolveReplicas(
     ClusterSlotsSharedPtr slots, std::size_t index,
     std::shared_ptr<std::uint64_t> hostname_resolution_required_cnt) {
+  if (!isParentAlive() || !parent_.dns_resolver_) {
+    return;
+  }
+  
   auto& slot = (*slots)[index];
   if (slot.replicas_to_resolve_.empty()) {
     if (*hostname_resolution_required_cnt == 0) {
@@ -505,6 +577,11 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(
         [this, index, slots, replica_idx, hostname_resolution_required_cnt](
             Network::DnsResolver::ResolutionStatus status, absl::string_view,
             std::list<Network::DnsResponse>&& response) -> void {
+          // Check if the parent cluster is being destroyed before accessing any parent members
+          if (parent_.is_destroying_.load(std::memory_order_acquire)) {
+            return;
+          }
+          
           auto& slot = (*slots)[index];
           auto& replica = slot.replicas_to_resolve_[replica_idx];
           ENVOY_LOG(debug, "async DNS resolution complete for replica address {}", replica.first);
@@ -533,17 +610,28 @@ void RedisCluster::RedisDiscoverySession::resolveReplicas(
 
 void RedisCluster::RedisDiscoverySession::finishClusterHostnameResolution(
     ClusterSlotsSharedPtr slots) {
+  if (!isParentAlive()) {
+    return;
+  }
   if (parent_.enable_zone_discovery_) {
     startZoneDiscovery(std::move(slots));
-  } else {
-    parent_.onClusterSlotUpdate(std::move(slots));
+    return;
+  }
+  parent_.onClusterSlotUpdate(std::move(slots));
+  if (resolve_timer_) {
     resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
   }
 }
 
 void RedisCluster::RedisDiscoverySession::onResponse(
     NetworkFilters::Common::Redis::RespValuePtr&& value) {
-  ENVOY_LOG(debug, "redis cluster slot request for '{}' succeeded", parent_.info_->name());
+  auto info = parentInfo();
+  if (!info) {
+    current_request_ = nullptr;
+    return;
+  }
+  ENVOY_LOG(debug, "redis cluster slot request for '{}' succeeded", 
+            info ? info->name() : "unknown");
   current_request_ = nullptr;
 
   const uint32_t SlotRangeStart = 0;
@@ -640,8 +728,10 @@ void RedisCluster::RedisDiscoverySession::onResponse(
     // All slots addresses were represented by IP/Port pairs.
     if (parent_.enable_zone_discovery_) {
       startZoneDiscovery(std::move(cluster_slots));
-    } else {
-      parent_.onClusterSlotUpdate(std::move(cluster_slots));
+      return;
+    }
+    parent_.onClusterSlotUpdate(std::move(cluster_slots));
+    if (resolve_timer_) {
       resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
     }
   }
@@ -673,20 +763,36 @@ bool RedisCluster::RedisDiscoverySession::validateCluster(
 
 void RedisCluster::RedisDiscoverySession::onUnexpectedResponse(
     const NetworkFilters::Common::Redis::RespValuePtr& value) {
+  // Check if the parent cluster is being destroyed before accessing any parent members
+  auto info = parentInfo();
+  if (!info) {
+    return;
+  }
+  
   ENVOY_LOG(warn, "Unexpected response to cluster slot command: {}", value->toString());
-  this->parent_.info_->configUpdateStats().update_failure_.inc();
-  resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
+  info->configUpdateStats().update_failure_.inc();
+  if (resolve_timer_) {
+    resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
+  }
 }
 
 void RedisCluster::RedisDiscoverySession::onFailure() {
-  ENVOY_LOG(debug, "redis cluster slot request for '{}' failed", parent_.info_->name());
   current_request_ = nullptr;
+  
+  auto info = parentInfo();
+  if (!info) {
+    return;
+  }
+  
+  ENVOY_LOG(debug, "redis cluster slot request for '{}' failed", info->name());
   if (!current_host_address_.empty()) {
     auto client_to_delete = client_map_.find(current_host_address_);
     client_to_delete->second->client_->close();
   }
-  parent_.info()->configUpdateStats().update_failure_.inc();
-  resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
+  info->configUpdateStats().update_failure_.inc();
+  if (resolve_timer_) {
+    resolve_timer_->enableTimer(parent_.cluster_refresh_rate_);
+  }
 }
 
 // ZoneDiscoveryCallback implementation

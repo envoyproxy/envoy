@@ -267,6 +267,9 @@ private:
 
     ~RedisDiscoverySession() override;
 
+    // Initialize timer - must be called after construction since it uses shared_from_this()
+    void initialize();
+
     void registerDiscoveryAddress(std::list<Network::DnsResponse>&& response, const uint32_t port);
 
     // Start discovery against a random host from existing hosts
@@ -319,6 +322,28 @@ private:
     void finishClusterHostnameResolution(ClusterSlotsSharedPtr slots);
     void updateDnsStats(Network::DnsResolver::ResolutionStatus status, bool empty_response);
 
+  private:
+    friend class RedisCluster;
+    friend struct RedisCluster::DnsDiscoveryResolveTarget;
+    friend struct RedisDiscoveryClient;
+    // Thread-safe check if parent cluster is being destroyed.
+    // Returns true if it's safe to proceed with parent operations.
+    // NOTE: We check our own flag instead of parent_.is_destroying_ because
+    // parent_ is a reference that becomes dangling after parent is destroyed.
+    bool isParentAlive() const {
+      return !parent_destroyed_.load(std::memory_order_acquire);
+    }
+
+    // Thread-safe accessor for parent cluster info.
+    // Returns nullptr if parent is being destroyed or info is not available.
+    // This encapsulates the safety checks needed when accessing parent state from callbacks.
+    Upstream::ClusterInfoConstSharedPtr parentInfo() const {
+      if (!isParentAlive()) {
+        return nullptr;
+      }
+      return parent_.info_;
+    }
+
     RedisCluster& parent_;
     Event::Dispatcher& dispatcher_;
     std::string current_host_address_;
@@ -340,6 +365,11 @@ private:
                         Extensions::NetworkFilters::Common::Redis::Client::PoolRequest*>
         zone_requests_;
     HostZoneMap discovered_zones_; // address -> zone mapping from INFO responses
+
+    // Flag set by parent's destructor to signal that parent is being destroyed.
+    // Callbacks check this flag (owned by session) instead of accessing parent's flag
+    // to avoid use-after-free when parent is destroyed but callbacks are still queued.
+    std::atomic<bool> parent_destroyed_{false};
   };
 
   Upstream::ClusterManager& cluster_manager_;
