@@ -191,10 +191,3 @@ TEST(EngineTest, TerminateWithoutWaitingForOnEngineRunning) {
 }
 
 } // namespace Envoy
-
-extern "C" void __cxa_pure_virtual() {
-  Envoy::Assert::EnvoyBugStackTrace st;
-  st.capture();
-  st.logStackTrace();
-  ::abort();
-}
