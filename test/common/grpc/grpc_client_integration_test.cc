@@ -803,10 +803,10 @@ public:
     return config;
   }
 
-  std::string access_token_value_{};
-  std::string access_token_value_2_{};
-  std::string refresh_token_value_{};
-  std::string credentials_factory_name_{};
+  std::string access_token_value_;
+  std::string access_token_value_2_;
+  std::string refresh_token_value_;
+  std::string credentials_factory_name_;
 };
 
 // Parameterize the loopback test server socket address and gRPC client type.

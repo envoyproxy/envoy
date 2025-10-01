@@ -126,7 +126,7 @@ message OAuth2Credentials {
 
 // OAuth config
 //
-// [#next-free-field: 26]
+// [#next-free-field: 27]
 message OAuth2Config {
   enum AuthType {
     // The ``client_id`` and ``client_secret`` will be sent in the URL encoded request body.
@@ -254,6 +254,11 @@ message OAuth2Config {
   // If not specified, defaults to ``600s`` (10 minutes), which should provide sufficient time
   // for users to complete the OAuth2 authorization flow.
   google.protobuf.Duration code_verifier_token_expires_in = 25;
+
+  // Disable token encryption. When set to true, both the access token and the ID token will be stored in plain text.
+  // This option should only be used in secure environments where token encryption is not required.
+  // Default is false (tokens are encrypted).
+  bool disable_token_encryption = 26;
 }
 
 // Filter config.

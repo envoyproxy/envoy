@@ -6,6 +6,7 @@
 
 #include "source/common/common/macros.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
+#include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
 
 #include "test/integration/ads_integration.h"
 #include "test/integration/integration.h"
@@ -156,6 +157,13 @@ public:
 
     // Change the port for each of the discovery host in cluster_0.
     config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      // Add default DNS resolver config.
+      auto* typed_dns_resolver_config = bootstrap.mutable_typed_dns_resolver_config();
+      typed_dns_resolver_config->set_name("envoy.network.dns_resolver.getaddrinfo");
+      envoy::extensions::network::dns_resolver::getaddrinfo::v3::GetAddrInfoDnsResolverConfig
+          config;
+      typed_dns_resolver_config->mutable_typed_config()->PackFrom(config);
+
       uint32_t upstream_idx = 0;
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
       if (version_ == Network::Address::IpVersion::v4) {

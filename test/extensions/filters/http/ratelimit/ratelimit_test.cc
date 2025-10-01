@@ -423,6 +423,7 @@ TEST_F(HttpRateLimitFilterTest, OkResponseWithAdditionalHitsAddend) {
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
             request_callbacks_ = &callbacks;
           })));
+  EXPECT_CALL(*client_, detach());
   filter_->onDestroy();
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr,
                                nullptr, "", nullptr);
@@ -2038,6 +2039,7 @@ TEST_F(HttpRateLimitFilterTest, PerRouteRateLimitsAndOnStreamDone) {
             EXPECT_EQ("header-value", descriptors[0].entries_[0].value_);
             EXPECT_EQ(789, descriptors[0].hits_addend_.value());
           }));
+  EXPECT_CALL(*client_, detach());
   filter_->onDestroy();
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr,
                                std::make_unique<Http::TestResponseHeaderMapImpl>(), nullptr, "",
@@ -2259,6 +2261,7 @@ TEST_F(HttpRateLimitFilterTest, InlinedRateLimitActionOnStreamDone) {
             EXPECT_EQ("generic_key", descriptors[0].entries_[0].key_);
             EXPECT_EQ("generic-key", descriptors[0].entries_[0].value_);
           }));
+  EXPECT_CALL(*client_, detach());
   filter_->onDestroy();
 
   request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr,

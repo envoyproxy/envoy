@@ -48,12 +48,12 @@ public:
       quic::QuicPacketWriter& writer, quic::QuicSocketAddress self_address,
       quic::QuicSocketAddress peer_address, const quic::ParsedQuicVersionVector& supported_versions,
       Network::Socket& listen_socket, quic::ConnectionIdGeneratorInterface& generator)
-      : EnvoyQuicServerConnection(
-            quic::test::TestConnectionId(), self_address, peer_address, helper, alarm_factory,
-            &writer, /*owns_writer=*/false, supported_versions,
-            createServerConnectionSocket(listen_socket.ioHandle(), self_address, peer_address,
-                                         "example.com", "h3-29"),
-            generator, nullptr) {}
+      : EnvoyQuicServerConnection(quic::test::TestConnectionId(), self_address, peer_address,
+                                  helper, alarm_factory, &writer, supported_versions,
+                                  createServerConnectionSocket(listen_socket.ioHandle(),
+                                                               self_address, peer_address,
+                                                               "example.com", "h3-29"),
+                                  generator, nullptr) {}
 
   Network::Connection::ConnectionStats& connectionStats() const {
     return QuicNetworkConnection::connectionStats();

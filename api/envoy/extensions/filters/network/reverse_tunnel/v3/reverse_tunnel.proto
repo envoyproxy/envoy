@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.reverse_tunnel.v3;
+
+import "envoy/config/core/v3/base.proto";
+
+import "google/protobuf/duration.proto";
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.reverse_tunnel.v3";
+option java_outer_classname = "ReverseTunnelProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/reverse_tunnel/v3;reverse_tunnelv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Reverse Tunnel Network Filter]
+// Reverse Tunnel Network Filter :ref:`configuration overview <config_network_filters_reverse_tunnel>`.
+// [#extension: envoy.filters.network.reverse_tunnel]
+
+// Configuration for the reverse tunnel network filter.
+// This filter handles reverse tunnel connection acceptance and rejection by processing
+// HTTP requests where required identification values are provided via HTTP headers.
+message ReverseTunnel {
+  // Ping interval for health checks on established reverse tunnel connections.
+  // If not specified, defaults to 2 seconds.
+  google.protobuf.Duration ping_interval = 1 [(validate.rules).duration = {
+    lte {seconds: 300}
+    gte {nanos: 1000000}
+  }];
+
+  // Whether to automatically close connections after processing reverse tunnel requests.
+  // When set to true, connections are closed after acceptance or rejection.
+  // When set to false, connections remain open for potential reuse. Defaults to false.
+  bool auto_close_connections = 2;
+
+  // HTTP path to match for reverse tunnel requests.
+  // If not specified, defaults to "/reverse_connections/request".
+  string request_path = 3 [(validate.rules).string = {min_len: 1 max_len: 255 ignore_empty: true}];
+
+  // HTTP method to match for reverse tunnel requests.
+  // If not specified (``METHOD_UNSPECIFIED``), this defaults to ``GET``.
+  config.core.v3.RequestMethod request_method = 4 [(validate.rules).enum = {defined_only: true}];
+}
