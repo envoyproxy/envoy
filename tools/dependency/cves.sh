@@ -31,6 +31,17 @@ JQ_VERSION_LIBDIR="$(dirname "$JQ_VERSION_UTILS")"
 
 read -ra CVES <<< "$CVES"
 
+for f in "${CVES[@]}"; do
+    if [[ "$f" == *.json ]]; then
+        HAS_JSON=true
+        break
+    fi
+done
+if [[ "$HAS_JSON" != true ]]; then
+    echo "No CVE data set, perhaps use --config=cves?" >&2
+    exit 1
+fi
+
 parse_cves () {
     # Stream the cves checking against the deps and then slurp the results into a single json object
     # cat "${CVEPATH}/"*.json \
