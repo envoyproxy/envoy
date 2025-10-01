@@ -7,7 +7,9 @@ import "envoy/config/core/v3/backoff.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/config_source.proto";
 import "envoy/config/core/v3/proxy_protocol.proto";
+import "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.proto";
 import "envoy/type/v3/hash_policy.proto";
+import "envoy/type/v3/percent.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -27,7 +29,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // TCP Proxy :ref:`configuration overview <config_network_filters_tcp_proxy>`.
 // [#extension: envoy.filters.network.tcp_proxy]
 
-// [#next-free-field: 20]
+// [#next-free-field: 21]
 message TcpProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
@@ -67,7 +69,7 @@ message TcpProxy {
   // Configuration for tunneling TCP over other transports or application layers.
   // Tunneling is supported over both HTTP/1.1 and HTTP/2. Upstream protocol is
   // determined by the cluster configuration.
-  // [#next-free-field: 7]
+  // [#next-free-field: 8]
   message TunnelingConfig {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.TunnelingConfig";
@@ -116,6 +118,19 @@ message TcpProxy {
     // Save the response trailers to the downstream info filter state for consumption
     // by the network filters. The filter state key is ``envoy.tcp_proxy.propagate_response_trailers``.
     bool propagate_response_trailers = 6;
+
+    // The configuration of the request ID extension used for generation, validation, and
+    // associated tracing operations when tunneling.
+    //
+    // If this field is set, a request ID is generated using the specified extension. If
+    // this field is not set, no request ID is generated.
+    //
+    // When a request ID is generated, it is also stored in the downstream connection's
+    // dynamic metadata under the namespace ``envoy.filters.network.tcp_proxy`` with the key
+    // ``tunnel_request_id`` to allow emission from TCP proxy access logs via the
+    // ``%DYNAMIC_METADATA(envoy.filters.network.tcp_proxy:tunnel_request_id)%`` formatter.
+    // [#extension-category: envoy.request_id]
+    http_connection_manager.v3.RequestIDExtension request_id_extension = 7;
   }
 
   message OnDemand {
@@ -232,6 +247,12 @@ message TcpProxy {
   // is reached the connection will be closed. Duration must be at least 1ms.
   google.protobuf.Duration max_downstream_connection_duration = 13
       [(validate.rules).duration = {gte {nanos: 1000000}}];
+
+  // Percentage-based jitter for max_downstream_connection_duration. The jitter will increase
+  // the max_downstream_connection_duration by some random duration up to the provided percentage.
+  // This field is ignored if max_downstream_connection_duration is not set.
+  // If not set, no jitter will be added.
+  type.v3.Percent max_downstream_connection_duration_jitter_percentage = 20;
 
   // Note that if both this field and :ref:`access_log_flush_interval
   // <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TcpAccessLogOptions.access_log_flush_interval>`

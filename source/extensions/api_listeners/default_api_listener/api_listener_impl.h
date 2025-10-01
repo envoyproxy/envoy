@@ -118,6 +118,7 @@ protected:
       void removeConnectionCallbacks(Network::ConnectionCallbacks& cb) override {
         callbacks_.remove(&cb);
       }
+      const Network::ConnectionSocketPtr& getSocket() const override { PANIC("not implemented"); }
       void addBytesSentCallback(Network::Connection::BytesSentCb) override {
         IS_ENVOY_BUG("Unexpected function call");
       }

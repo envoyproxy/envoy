@@ -475,18 +475,6 @@ public:
   virtual LocalityWeightsConstSharedPtr localityWeights() const PURE;
 
   /**
-   * @return next locality index to route to if performing locality weighted balancing
-   * against healthy hosts.
-   */
-  virtual absl::optional<uint32_t> chooseHealthyLocality() PURE;
-
-  /**
-   * @return next locality index to route to if performing locality weighted balancing
-   * against degraded hosts.
-   */
-  virtual absl::optional<uint32_t> chooseDegradedLocality() PURE;
-
-  /**
    * @return uint32_t the priority of this host set.
    */
   virtual uint32_t priority() const PURE;
@@ -511,10 +499,10 @@ using HostSetPtr = std::unique_ptr<HostSet>;
 class PrioritySet {
 public:
   using MemberUpdateCb =
-      std::function<absl::Status(const HostVector& hosts_added, const HostVector& hosts_removed)>;
+      std::function<void(const HostVector& hosts_added, const HostVector& hosts_removed)>;
 
-  using PriorityUpdateCb = std::function<absl::Status(
-      uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed)>;
+  using PriorityUpdateCb = std::function<void(uint32_t priority, const HostVector& hosts_added,
+                                              const HostVector& hosts_removed)>;
 
   virtual ~PrioritySet() = default;
 
@@ -578,7 +566,6 @@ public:
    * @param locality_weights supplies a map from locality to associated weight.
    * @param hosts_added supplies the hosts added since the last update.
    * @param hosts_removed supplies the hosts removed since the last update.
-   * @param seed a random number to initialize the locality load-balancing algorithm.
    * @param weighted_priority_health if present, overwrites the current weighted_priority_health.
    * @param overprovisioning_factor if present, overwrites the current overprovisioning_factor.
    * @param cross_priority_host_map read only cross-priority host map which is created in the main
@@ -587,7 +574,7 @@ public:
   virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                            LocalityWeightsConstSharedPtr locality_weights,
                            const HostVector& hosts_added, const HostVector& hosts_removed,
-                           uint64_t seed, absl::optional<bool> weighted_priority_health,
+                           absl::optional<bool> weighted_priority_health,
                            absl::optional<uint32_t> overprovisioning_factor,
                            HostMapConstSharedPtr cross_priority_host_map = nullptr) PURE;
 
@@ -611,7 +598,7 @@ public:
     virtual void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                              LocalityWeightsConstSharedPtr locality_weights,
                              const HostVector& hosts_added, const HostVector& hosts_removed,
-                             uint64_t seed, absl::optional<bool> weighted_priority_health,
+                             absl::optional<bool> weighted_priority_health,
                              absl::optional<uint32_t> overprovisioning_factor) PURE;
   };
 
