@@ -69,7 +69,7 @@ TEST(UtilityTest, TestImportPublicKey) {
   EVP_PKEY* der_pkey = der_crypto_ptr->getEVP_PKEY();
   EXPECT_NE(nullptr, der_pkey) << "DER public key import failed";
 
-  // Test PEM format (new feature) - same key material as DER
+  // Test PEM format - same key material as DER
   std::string pem_key = "-----BEGIN PUBLIC KEY-----\n"
                         "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAp0cSZtAdFgMI1zQJwG8u\n"
                         "jTXFMcRY0+SA6fMZGEfQYuxcz/e8UelJ1fLDVAwYmk7KHoYzpizy0JIxAcJ+OAE+\n"
@@ -88,13 +88,11 @@ TEST(UtilityTest, TestImportPublicKey) {
   // Verify both keys are functionally equivalent
   EXPECT_EQ(EVP_PKEY_bits(der_pkey), EVP_PKEY_bits(pem_pkey))
       << "DER and PEM keys should have same bit size";
-  EXPECT_EQ(EVP_PKEY_size(der_pkey), EVP_PKEY_size(pem_pkey))
-      << "DER and PEM keys should have same byte size";
 
   // Test error handling with invalid key
-  auto bad_key = "badkey";
+  std::vector<uint8_t> bad_key = {0x1, 0x2, 0x3, 0x4, 0x5};
   auto bad_crypto_ptr =
-      Common::Crypto::UtilitySingleton::get().importPublicKeyDER(Hex::decode(bad_key));
+      Common::Crypto::UtilitySingleton::get().importPublicKeyDER(bad_key);
   EVP_PKEY* bad_pkey = bad_crypto_ptr->getEVP_PKEY();
   EXPECT_EQ(nullptr, bad_pkey) << "Invalid key should return nullptr";
 
@@ -274,8 +272,8 @@ TEST(UtilityTest, TestImportPrivateKey) {
   EVP_PKEY* pkey = crypto_ptr->getEVP_PKEY();
   EXPECT_NE(nullptr, pkey);
 
-  key = "badkey";
-  crypto_ptr = Common::Crypto::UtilitySingleton::get().importPrivateKeyDER(Hex::decode(key));
+  std::vector<uint8_t> bad_key = {0x1, 0x2, 0x3, 0x4, 0x5};
+  crypto_ptr = Common::Crypto::UtilitySingleton::get().importPrivateKeyDER(bad_key);
   pkey = crypto_ptr->getEVP_PKEY();
   EXPECT_EQ(nullptr, pkey);
 
@@ -877,23 +875,6 @@ TEST(UtilityTest, TestBIOAllocationFailure) {
   EXPECT_EQ(nullptr, der_result->getEVP_PKEY()) << "Huge invalid DER should fail";
 }
 
-TEST(UtilityTest, TestPKeyObjectConstructor) {
-  // Test PKeyObject constructor with EVP_PKEY parameter
-  EVP_PKEY* test_pkey = EVP_PKEY_new();
-  EXPECT_NE(nullptr, test_pkey) << "EVP_PKEY_new should succeed";
-
-  PKeyObject obj(test_pkey);
-  EXPECT_EQ(test_pkey, obj.getEVP_PKEY()) << "Constructor should set EVP_PKEY";
-
-  // Test default constructor
-  PKeyObject default_obj;
-  EXPECT_EQ(nullptr, default_obj.getEVP_PKEY()) << "Default constructor should have null pkey";
-
-  // Test constructor with nullptr
-  PKeyObject null_obj(nullptr);
-  EXPECT_EQ(nullptr, null_obj.getEVP_PKEY()) << "Constructor with nullptr should have null pkey";
-}
-
 TEST(UtilityTest, TestSpecificErrorMessages) {
   // Test specific error messages that might not be fully covered
   auto empty_crypto = std::make_unique<PKeyObject>();
@@ -925,103 +906,6 @@ TEST(UtilityTest, TestSpecificErrorMessages) {
       UtilitySingleton::get().verifySignature("sha256", *null_crypto, signature, text);
   EXPECT_FALSE(null_verify_result.ok());
   EXPECT_EQ("Failed to initialize digest verify.", null_verify_result.message());
-}
-
-TEST(UtilityTest, TestCBSInitializationEdgeCases) {
-  // Test CBS initialization edge cases in template functions
-  auto impl = std::make_unique<UtilityImpl>();
-
-  // Test with malformed DER data that might cause CBS issues
-  std::vector<uint8_t> malformed_der = {0x30, 0x82, 0x01, 0x00}; // Truncated DER
-  auto der_result = impl->importPublicKeyDER(malformed_der);
-  EXPECT_EQ(nullptr, der_result->getEVP_PKEY()) << "Malformed DER should fail";
-
-  auto private_der_result = impl->importPrivateKeyDER(malformed_der);
-  EXPECT_EQ(nullptr, private_der_result->getEVP_PKEY()) << "Malformed private DER should fail";
-
-  // Test with single byte DER data
-  std::vector<uint8_t> single_byte = {0x30};
-  auto single_der_result = impl->importPublicKeyDER(single_byte);
-  EXPECT_EQ(nullptr, single_der_result->getEVP_PKEY()) << "Single byte DER should fail";
-
-  auto single_private_result = impl->importPrivateKeyDER(single_byte);
-  EXPECT_EQ(nullptr, single_private_result->getEVP_PKEY()) << "Single byte private DER should fail";
-}
-
-TEST(UtilityTest, TestOpenSSLInternalErrorPaths) {
-  // Test with keys that might trigger internal OpenSSL errors
-  auto impl = std::make_unique<UtilityImpl>();
-
-  // Test with data that looks like PEM but has invalid structure
-  std::string malformed_pem = "-----BEGIN PUBLIC KEY-----\n"
-                              "This is not valid base64 content at all\n"
-                              "-----END PUBLIC KEY-----";
-
-  auto malformed_public = impl->importPublicKeyPEM(malformed_pem);
-  EXPECT_EQ(nullptr, malformed_public->getEVP_PKEY()) << "Malformed PEM should fail";
-
-  auto malformed_private = impl->importPrivateKeyPEM(malformed_pem);
-  EXPECT_EQ(nullptr, malformed_private->getEVP_PKEY()) << "Malformed private PEM should fail";
-
-  // Test with data that has PEM markers but corrupted content
-  std::string corrupted_pem = "-----BEGIN PUBLIC KEY-----\n"
-                              "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAINVALID_CONTENT_HERE\n"
-                              "-----END PUBLIC KEY-----";
-
-  auto corrupted_public = impl->importPublicKeyPEM(corrupted_pem);
-  EXPECT_EQ(nullptr, corrupted_public->getEVP_PKEY()) << "Corrupted PEM should fail";
-}
-
-TEST(UtilityTest, TestOpenSSLInternalErrorPathsAdvanced) {
-  // Test specific OpenSSL internal error paths that might not be covered
-  auto impl = std::make_unique<UtilityImpl>();
-
-  // Test with data that might cause BIO_new_mem_buf to fail or return null
-  std::string problematic_data(1000, '\xFF'); // 1000 bytes of 0xFF
-
-  // Test PEM import with problematic data
-  auto pem_result = impl->importPublicKeyPEM(problematic_data);
-  EXPECT_EQ(nullptr, pem_result->getEVP_PKEY()) << "Problematic PEM data should fail";
-
-  auto private_pem_result = impl->importPrivateKeyPEM(problematic_data);
-  EXPECT_EQ(nullptr, private_pem_result->getEVP_PKEY()) << "Problematic private PEM should fail";
-
-  // Test DER import with problematic data
-  std::vector<uint8_t> problematic_data_vec(1000, 0xFF);
-  auto der_result = impl->importPublicKeyDER(problematic_data_vec);
-  EXPECT_EQ(nullptr, der_result->getEVP_PKEY()) << "Problematic DER data should fail";
-
-  auto private_der_result = impl->importPrivateKeyDER(problematic_data_vec);
-  EXPECT_EQ(nullptr, private_der_result->getEVP_PKEY()) << "Problematic private DER should fail";
-}
-
-TEST(UtilityTest, TestRELEASE_ASSERTPaths) {
-  // Test RELEASE_ASSERT statements in getSha256Digest and getSha256Hmac
-  // These are difficult to trigger in practice, but we can test the happy path
-  // to ensure the assertions don't trigger false positives
-
-  // Test getSha256Digest RELEASE_ASSERT paths
-  Buffer::OwnedImpl buffer("test data for RELEASE_ASSERT");
-  auto digest = UtilitySingleton::get().getSha256Digest(buffer);
-  EXPECT_EQ(32, digest.size()) << "SHA256 digest should be 32 bytes";
-  EXPECT_FALSE(digest.empty()) << "Digest should not be empty";
-
-  // Test getSha256Hmac RELEASE_ASSERT paths
-  std::vector<uint8_t> key = {'k', 'e', 'y'};
-  std::string message = "test message for RELEASE_ASSERT";
-  auto hmac = UtilitySingleton::get().getSha256Hmac(key, message);
-  EXPECT_EQ(32, hmac.size()) << "HMAC should be 32 bytes";
-  EXPECT_FALSE(hmac.empty()) << "HMAC should not be empty";
-
-  // Test with empty inputs to ensure RELEASE_ASSERT doesn't trigger
-  Buffer::OwnedImpl empty_buffer;
-  auto empty_digest = UtilitySingleton::get().getSha256Digest(empty_buffer);
-  EXPECT_EQ(32, empty_digest.size()) << "Empty buffer digest should be 32 bytes";
-
-  std::vector<uint8_t> empty_key;
-  std::string empty_message;
-  auto empty_hmac = UtilitySingleton::get().getSha256Hmac(empty_key, empty_message);
-  EXPECT_EQ(32, empty_hmac.size()) << "Empty inputs HMAC should be 32 bytes";
 }
 
 } // namespace

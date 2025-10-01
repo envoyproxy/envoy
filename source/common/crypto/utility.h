@@ -16,9 +16,6 @@ namespace Envoy {
 namespace Common {
 namespace Crypto {
 
-class PKeyObject;
-using PKeyObjectPtr = std::unique_ptr<PKeyObject>;
-
 class Utility {
 public:
   virtual ~Utility() = default;
