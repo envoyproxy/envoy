@@ -42,4 +42,4 @@ jobs:
           "${{ steps.vars.outputs.cve-data-path }}"
     - name: Run CVE dependency scanner
       run: |
-        bazel test --config=ci //tools/dependency:cve_test
+        bazel test --config=ci --config=cves //tools/dependency:cve_test
