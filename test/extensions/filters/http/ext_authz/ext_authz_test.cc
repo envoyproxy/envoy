@@ -5348,19 +5348,19 @@ TEST_F(HttpFilterTest, DeniedResponseLocalReplyExceedsLimit) {
       }));
 
   EXPECT_CALL(decoder_filter_callbacks_, sendLocalReply(_, _, _, _, _))
-      .WillOnce(Invoke([&](Http::Code, absl::string_view,
-                           std::function<void(Http::ResponseHeaderMap& headers)> modify_headers,
-                           const absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
-        Http::TestResponseHeaderMapImpl response_headers({}, /*max_headers_kb=*/99999,
-                                                         /*max_headers_count=*/2);
-        if (modify_headers) {
-          modify_headers(response_headers);
-        }
-        EXPECT_EQ(response_headers.size(), 2);
-        EXPECT_TRUE(response_headers.has("key1"));
-        EXPECT_TRUE(response_headers.has("key2"));
-        EXPECT_FALSE(response_headers.has("key3"));
-      }));
+      .WillOnce(
+          Invoke([&](Http::Code, absl::string_view,
+                     std::function<void(Http::ResponseHeaderMap & headers)> modify_headers,
+                     const absl::optional<Grpc::Status::GrpcStatus>, absl::string_view) -> void {
+            Http::TestResponseHeaderMapImpl response_headers({}, 99999, /*max_headers_count=*/2);
+            if (modify_headers) {
+              modify_headers(response_headers);
+            }
+            EXPECT_EQ(response_headers.size(), 2);
+            EXPECT_TRUE(response_headers.has("key1"));
+            EXPECT_TRUE(response_headers.has("key2"));
+            EXPECT_FALSE(response_headers.has("key3"));
+          }));
 
   EXPECT_EQ(Http::FilterHeadersStatus::StopAllIterationAndWatermark,
             filter_->decodeHeaders(request_headers_, true));
