@@ -5,10 +5,9 @@
 #include "source/common/network/socket_impl.h"
 
 #include "test/mocks/http/mocks.h"
+#include "test/mocks/server/server_factory_context.h"
 #include "test/mocks/tracing/mocks.h"
-#include "test/mocks/upstream/cluster_manager.h"
 #include "test/proto/helloworld.pb.h"
-#include "test/test_common/test_time.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -34,18 +33,20 @@ public:
     auto& initial_metadata_entry = *config.mutable_initial_metadata()->Add();
     initial_metadata_entry.set_key("downstream-local-address");
     initial_metadata_entry.set_value("%DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT%");
+    config.mutable_retry_policy()->mutable_num_retries()->set_value(3);
+    *config.mutable_retry_policy()->mutable_retry_on() = "5xx";
 
-    grpc_client_ = *AsyncClientImpl::create(cm_, config, test_time_.timeSystem());
+    grpc_client_ = *AsyncClientImpl::create(config, context_);
     cm_.initializeThreadLocalClusters({"test_cluster"});
     ON_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillByDefault(ReturnRef(http_client_));
   }
 
+  NiceMock<Server::Configuration::MockServerFactoryContext> context_;
+  NiceMock<Upstream::MockClusterManager>& cm_{context_.cluster_manager_};
   envoy::config::core::v3::GrpcService config;
   const Protobuf::MethodDescriptor* method_descriptor_;
   NiceMock<Http::MockAsyncClient> http_client_;
-  NiceMock<Upstream::MockClusterManager> cm_;
   AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> grpc_client_;
-  DangerousDeprecatedTestTime test_time_;
 };
 
 TEST_F(EnvoyAsyncClientImplTest, ThreadSafe) {
@@ -60,12 +61,70 @@ TEST_F(EnvoyAsyncClientImplTest, ThreadSafe) {
   thread->join();
 }
 
+TEST_F(EnvoyAsyncClientImplTest, ParsedRetryPolicyWillBeUsed) {
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  StreamInfo::StreamInfoImpl stream_info{context_.time_system_, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream;
+  ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
+
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions& opts) {
+            http_callbacks = &callbacks;
+            EXPECT_NE(opts.parsed_retry_policy, nullptr);
+            EXPECT_EQ(opts.parsed_retry_policy->numRetries(), 3);
+            return &http_stream;
+          }));
+
+  EXPECT_CALL(http_stream, sendHeaders(_, _))
+      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks, Http::AsyncClient::StreamOptions());
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
+TEST_F(EnvoyAsyncClientImplTest, ParsedRetryPolicyWillBeOverrideByCallerOptions) {
+  NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
+  Http::AsyncClient::StreamCallbacks* http_callbacks;
+
+  StreamInfo::StreamInfoImpl stream_info{context_.time_system_, nullptr,
+                                         StreamInfo::FilterState::LifeSpan::FilterChain};
+  NiceMock<Http::MockAsyncClientStream> http_stream;
+  ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
+
+  EXPECT_CALL(http_client_, start(_, _))
+      .WillOnce(
+          Invoke([&http_callbacks, &http_stream](Http::AsyncClient::StreamCallbacks& callbacks,
+                                                 const Http::AsyncClient::StreamOptions& opts) {
+            http_callbacks = &callbacks;
+            EXPECT_EQ(opts.parsed_retry_policy, nullptr);
+            EXPECT_TRUE(opts.retry_policy.has_value());
+            EXPECT_EQ(opts.retry_policy->num_retries().value(), 5);
+            return &http_stream;
+          }));
+
+  envoy::config::route::v3::RetryPolicy caller_retry_policy;
+  caller_retry_policy.mutable_num_retries()->set_value(5);
+  *caller_retry_policy.mutable_retry_on() = "5xx";
+
+  EXPECT_CALL(http_stream, sendHeaders(_, _))
+      .WillOnce(Invoke([&http_callbacks](Http::HeaderMap&, bool) { http_callbacks->onReset(); }));
+  auto grpc_stream =
+      grpc_client_->start(*method_descriptor_, grpc_callbacks,
+                          Http::AsyncClient::StreamOptions().setRetryPolicy(caller_retry_policy));
+  EXPECT_EQ(grpc_stream, nullptr);
+}
+
 // Validates that the host header is the cluster name in grpc config.
 TEST_F(EnvoyAsyncClientImplTest, HostIsClusterNameByDefault) {
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
 
-  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+  StreamInfo::StreamInfoImpl stream_info{context_.time_system_, nullptr,
                                          StreamInfo::FilterState::LifeSpan::FilterChain};
   NiceMock<Http::MockAsyncClientStream> http_stream;
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
@@ -94,7 +153,7 @@ TEST_F(EnvoyAsyncClientImplTest, HttpRcdReportedInGrpcErrorMessage) {
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
 
-  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+  StreamInfo::StreamInfoImpl stream_info{context_.time_system_, nullptr,
                                          StreamInfo::FilterState::LifeSpan::FilterChain};
   NiceMock<Http::MockAsyncClientStream> http_stream;
   ON_CALL(testing::Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
@@ -122,13 +181,13 @@ TEST_F(EnvoyAsyncClientImplTest, HostIsOverrideByConfig) {
   config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
   config.mutable_envoy_grpc()->set_authority("demo.com");
 
-  grpc_client_ = *AsyncClientImpl::create(cm_, config, test_time_.timeSystem());
+  grpc_client_ = *AsyncClientImpl::create(config, context_);
   EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
 
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
 
-  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+  StreamInfo::StreamInfoImpl stream_info{context_.time_system_, nullptr,
                                          StreamInfo::FilterState::LifeSpan::FilterChain};
   NiceMock<Http::MockAsyncClientStream> http_stream;
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
@@ -165,13 +224,13 @@ TEST_F(EnvoyAsyncClientImplTest, BinaryMetadataInClientInitialMetadataIsBase64Es
   initial_metadata_entry->set_key("hello-world-in-japanese-bin");
   initial_metadata_entry->set_value("こんにちは 世界");
 
-  grpc_client_ = *AsyncClientImpl::create(cm_, config, test_time_.timeSystem());
+  grpc_client_ = *AsyncClientImpl::create(config, context_);
   EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
 
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
 
-  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+  StreamInfo::StreamInfoImpl stream_info{context_.time_system_, nullptr,
                                          StreamInfo::FilterState::LifeSpan::FilterChain};
   NiceMock<Http::MockAsyncClientStream> http_stream;
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
@@ -219,13 +278,13 @@ TEST_F(EnvoyAsyncClientImplTest, BinMetadataInServerInitialMetadataAreNotUnescap
   envoy::config::core::v3::GrpcService config;
   config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
   config.mutable_envoy_grpc()->set_authority("demo.com");
-  grpc_client_ = *AsyncClientImpl::create(cm_, config, test_time_.timeSystem());
+  grpc_client_ = *AsyncClientImpl::create(config, context_);
   EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
 
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
 
-  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+  StreamInfo::StreamInfoImpl stream_info{context_.time_system_, nullptr,
                                          StreamInfo::FilterState::LifeSpan::FilterChain};
   NiceMock<Http::MockAsyncClientStream> http_stream;
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
@@ -274,13 +333,13 @@ TEST_F(EnvoyAsyncClientImplTest, BinMetadataInServerTrailinglMetadataAreNotUnesc
   envoy::config::core::v3::GrpcService config;
   config.mutable_envoy_grpc()->set_cluster_name("test_cluster");
   config.mutable_envoy_grpc()->set_authority("demo.com");
-  grpc_client_ = *AsyncClientImpl::create(cm_, config, test_time_.timeSystem());
+  grpc_client_ = *AsyncClientImpl::create(config, context_);
   EXPECT_CALL(cm_.thread_local_cluster_, httpAsyncClient()).WillRepeatedly(ReturnRef(http_client_));
 
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
 
-  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+  StreamInfo::StreamInfoImpl stream_info{context_.time_system_, nullptr,
                                          StreamInfo::FilterState::LifeSpan::FilterChain};
   NiceMock<Http::MockAsyncClientStream> http_stream;
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
@@ -328,7 +387,7 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitialized) {
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
 
-  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+  StreamInfo::StreamInfoImpl stream_info{context_.time_system_, nullptr,
                                          StreamInfo::FilterState::LifeSpan::FilterChain};
   NiceMock<Http::MockAsyncClientStream> http_stream;
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
@@ -353,7 +412,7 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitialized) {
   // Prepare the parent context of this call.
   auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
       std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address), nullptr);
-  StreamInfo::StreamInfoImpl parent_stream_info{test_time_.timeSystem(), connection_info_provider,
+  StreamInfo::StreamInfoImpl parent_stream_info{context_.time_system_, connection_info_provider,
                                                 StreamInfo::FilterState::LifeSpan::FilterChain};
   Http::AsyncClient::ParentContext parent_context{&parent_stream_info};
 
@@ -369,7 +428,7 @@ TEST_F(EnvoyAsyncClientImplTest, MetadataIsInitializedWithoutStreamInfo) {
   NiceMock<MockAsyncStreamCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
 
-  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+  StreamInfo::StreamInfoImpl stream_info{context_.time_system_, nullptr,
                                          StreamInfo::FilterState::LifeSpan::FilterChain};
   NiceMock<Http::MockAsyncClientStream> http_stream;
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
@@ -448,7 +507,7 @@ TEST_F(EnvoyAsyncClientImplTest, RequestHttpStartFail) {
 TEST_F(EnvoyAsyncClientImplTest, StreamHttpSendHeadersFail) {
   MockAsyncStreamCallbacks<helloworld::HelloReply> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
-  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+  StreamInfo::StreamInfoImpl stream_info{context_.time_system_, nullptr,
                                          StreamInfo::FilterState::LifeSpan::FilterChain};
   NiceMock<Http::MockAsyncClientStream> http_stream;
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
@@ -478,7 +537,7 @@ TEST_F(EnvoyAsyncClientImplTest, StreamHttpSendHeadersFail) {
 TEST_F(EnvoyAsyncClientImplTest, RequestHttpSendHeadersFail) {
   MockAsyncRequestCallbacks<helloworld::HelloReply> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
-  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+  StreamInfo::StreamInfoImpl stream_info{context_.time_system_, nullptr,
                                          StreamInfo::FilterState::LifeSpan::FilterChain};
   NiceMock<Http::MockAsyncClientStream> http_stream;
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
@@ -533,7 +592,7 @@ TEST_F(EnvoyAsyncClientImplTest, AsyncRequestDetach) {
   NiceMock<MockAsyncRequestCallbacks<helloworld::HelloReply>> grpc_callbacks;
   Http::AsyncClient::StreamCallbacks* http_callbacks;
 
-  StreamInfo::StreamInfoImpl stream_info{test_time_.timeSystem(), nullptr,
+  StreamInfo::StreamInfoImpl stream_info{context_.time_system_, nullptr,
                                          StreamInfo::FilterState::LifeSpan::FilterChain};
   NiceMock<Http::MockAsyncClientStream> http_stream;
   ON_CALL(Const(http_stream), streamInfo()).WillByDefault(ReturnRef(stream_info));
@@ -555,7 +614,7 @@ TEST_F(EnvoyAsyncClientImplTest, AsyncRequestDetach) {
   auto connection_info_provider = std::make_shared<Network::ConnectionInfoSetterImpl>(
       std::make_shared<Network::Address::Ipv4Instance>(expected_downstream_local_address), nullptr);
 
-  StreamInfo::StreamInfoImpl parent_stream_info{test_time_.timeSystem(), connection_info_provider,
+  StreamInfo::StreamInfoImpl parent_stream_info{context_.time_system_, connection_info_provider,
                                                 StreamInfo::FilterState::LifeSpan::FilterChain};
   Http::AsyncClient::ParentContext parent_context{&parent_stream_info};
   testing::NiceMock<Http::MockSidestreamWatermarkCallbacks> watermark_callbacks;

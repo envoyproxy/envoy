@@ -370,6 +370,7 @@ envoy_cc_test(
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/health_checkers/http:health_checker_lib",
+        "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/tracers/zipkin:config",
         "//source/server:process_context_lib",
         "//source/server:server_lib",

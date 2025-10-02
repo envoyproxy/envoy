@@ -23,6 +23,7 @@
 #include "source/common/common/logger.h"
 #include "source/common/config/well_known_names.h"
 #include "source/common/http/filter_manager.h"
+#include "source/common/router/upstream_to_downstream_impl_base.h"
 #include "source/common/stream_info/stream_info_impl.h"
 #include "source/common/tracing/null_span_impl.h"
 #include "source/extensions/filters/http/common/factory_base.h"
@@ -64,7 +65,7 @@ class UpstreamCodecFilter;
  *
  */
 class UpstreamRequest : public Logger::Loggable<Logger::Id::router>,
-                        public UpstreamToDownstream,
+                        public UpstreamToDownstreamImplBase,
                         public LinkedObject<UpstreamRequest>,
                         public GenericConnectionPoolCallbacks,
                         public Event::DeferredDeletable {

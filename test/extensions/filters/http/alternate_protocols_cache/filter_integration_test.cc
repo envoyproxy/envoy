@@ -247,6 +247,61 @@ TEST_P(FilterIntegrationTest, AltSvcCachedH3Slow) {
                                100);
 }
 
+TEST_P(FilterIntegrationTest, AltSvcCachedH3SlowTillH2Finishes) {
+#ifdef WIN32
+  GTEST_SKIP() << "Skipping on Windows";
+#endif
+  // Start with the alt-svc header in the cache.
+  write_alt_svc_to_file_ = true;
+
+  const uint64_t request_size = 0;
+  const uint64_t response_size = 0;
+  const std::chrono::milliseconds timeout = TestUtility::DefaultTimeout;
+
+  initialize();
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+
+  absl::Notification block_until_notify;
+  // Block the H3 upstream so it can't process packets.
+  fake_upstreams_[1]->runOnDispatcherThread([&] { block_until_notify.WaitForNotification(); });
+
+  ASSERT(codec_client_ != nullptr);
+  // Send the request to Envoy.
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  // The request should fail over to the HTTP/2 upstream (index 0) as the H3 upstream is wedged.
+  waitForNextUpstreamRequest(0);
+  // Finish the response over HTTP/2.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+  // Wait for the response to be read by the codec client.
+  ASSERT_TRUE(response->waitForEndStream(timeout));
+  checkSimpleRequestSuccess(request_size, response_size, response.get());
+
+  // Now unblock the HTTP/3 server and wait for the connection to be established.
+  block_until_notify.Notify();
+  FakeHttpConnectionPtr h3_connection;
+  waitForNextUpstreamConnection(std::vector<uint64_t>{1}, TestUtility::DefaultTimeout,
+                                h3_connection);
+  // Of the 100 connection pools configured, the grid registers as taking up one.
+  test_server_->waitForGaugeEq("cluster.cluster_0.circuit_breakers.default.remaining_cx_pools", 99);
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_http3_total", 1);
+
+  // An upstream HTTP/3 stream should be created without crash, and the created stream will be
+  // reset.
+  FakeStreamPtr upstream_request2;
+  ASSERT_TRUE(h3_connection->waitForNewStream(*dispatcher_, upstream_request2));
+  ASSERT_TRUE(upstream_request2->waitForReset());
+
+  // Now close the HTTP/3 connection to make sure it doesn't cause problems for the
+  // downstream stream.
+  ASSERT_TRUE(h3_connection->close());
+  test_server_->waitForCounterEq("cluster.cluster_0.upstream_cx_destroy", 1);
+
+  cleanupUpstreamAndDownstream();
+  // Wait for the grid to be torn down to make sure it is not problematic.
+  test_server_->waitForGaugeEq("cluster.cluster_0.circuit_breakers.default.remaining_cx_pools",
+                               100);
+}
+
 // TODO(32151): Figure out why it's flaky and re-enable.
 TEST_P(FilterIntegrationTest, DISABLED_AltSvcCachedH2Slow) {
 #ifdef WIN32

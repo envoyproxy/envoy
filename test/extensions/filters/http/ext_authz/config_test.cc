@@ -31,15 +31,13 @@ namespace ExtAuthz {
 
 using testing::NiceMock;
 using testing::Return;
-using testing::ReturnRef;
 
 class TestAsyncClientManagerImpl : public Grpc::AsyncClientManagerImpl {
 public:
-  TestAsyncClientManagerImpl(Upstream::ClusterManager& cm, ThreadLocal::Instance& tls,
+  TestAsyncClientManagerImpl(const Bootstrap::GrpcAsyncClientManagerConfig& config,
                              Server::Configuration::CommonFactoryContext& context,
-                             const Grpc::StatNames& stat_names,
-                             const Bootstrap::GrpcAsyncClientManagerConfig& config)
-      : Grpc::AsyncClientManagerImpl(cm, tls, context, stat_names, config) {}
+                             const Grpc::StatNames& stat_names)
+      : Grpc::AsyncClientManagerImpl(config, context, stat_names) {}
   absl::StatusOr<Grpc::AsyncClientFactoryPtr>
   factoryForGrpcService(const envoy::config::core::v3::GrpcService&, Stats::Scope&, bool) override {
     return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
@@ -56,8 +54,7 @@ public:
     ON_CALL(context_.server_factory_context_, api()).WillByDefault(testing::ReturnRef(api()));
     runOnMainBlocking([&]() {
       async_client_manager_ = std::make_unique<TestAsyncClientManagerImpl>(
-          context_.server_factory_context_.cluster_manager_, tls(),
-          context_.server_factory_context_, stat_names_, Bootstrap::GrpcAsyncClientManagerConfig());
+          Bootstrap::GrpcAsyncClientManagerConfig(), context_.server_factory_context_, stat_names_);
     });
   }
 
