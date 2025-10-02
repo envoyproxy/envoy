@@ -337,8 +337,7 @@ ClusterManagerImpl::ClusterManagerImpl(const envoy::config::bootstrap::v3::Boots
         });
   }
   async_client_manager_ = std::make_unique<Grpc::AsyncClientManagerImpl>(
-      *this, context.threadLocal(), context, context.grpcContext().statNames(),
-      bootstrap.grpc_async_client_manager_config());
+      bootstrap.grpc_async_client_manager_config(), context, context.grpcContext().statNames());
   const auto& cm_config = bootstrap.cluster_manager();
   if (cm_config.has_outlier_detection()) {
     const std::string event_log_file_path = cm_config.outlier_detection().event_log_path();
@@ -506,11 +505,26 @@ absl::Status ClusterManagerImpl::initializeSecondaryClusters(
 
     absl::Status status = Config::Utility::checkTransportVersion(load_stats_config);
     RETURN_IF_NOT_OK(status);
-    auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
-        *async_client_manager_, load_stats_config, *stats_.rootScope(), false, 0, false);
-    RETURN_IF_NOT_OK_REF(factory_or_error.status());
-    absl::StatusOr<Grpc::RawAsyncClientSharedPtr> client_or_error =
-        factory_or_error.value()->createUncachedRawAsyncClient();
+    absl::StatusOr<Grpc::RawAsyncClientSharedPtr> client_or_error;
+    if (Runtime::runtimeFeatureEnabled("envoy.restart_features.use_cached_grpc_client_for_xds")) {
+      absl::StatusOr<Envoy::OptRef<const envoy::config::core::v3::GrpcService>> maybe_grpc_service =
+          Envoy::Config::Utility::getGrpcConfigFromApiConfigSource(load_stats_config,
+                                                                   /*grpc_service_idx*/ 0,
+                                                                   /*xdstp_config_source*/ false);
+      RETURN_IF_NOT_OK_REF(maybe_grpc_service.status());
+      if (maybe_grpc_service.value().has_value()) {
+        client_or_error = async_client_manager_->getOrCreateRawAsyncClientWithHashKey(
+            Grpc::GrpcServiceConfigWithHashKey(*maybe_grpc_service.value()), *stats_.rootScope(),
+            /*skip_cluster_check*/ false);
+      } else {
+        return absl::InvalidArgumentError("Invalid grpc service.");
+      }
+    } else {
+      auto factory_or_error = Config::Utility::factoryForGrpcApiConfigSource(
+          *async_client_manager_, load_stats_config, *stats_.rootScope(), false, 0, false);
+      RETURN_IF_NOT_OK_REF(factory_or_error.status());
+      client_or_error = factory_or_error.value()->createUncachedRawAsyncClient();
+    }
     RETURN_IF_NOT_OK_REF(client_or_error.status());
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
         local_info_, *this, *stats_.rootScope(), std::move(client_or_error.value()), dispatcher_);

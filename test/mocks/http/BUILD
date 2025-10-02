@@ -104,6 +104,7 @@ envoy_cc_mock(
     hdrs = ["stream_decoder.h"],
     deps = [
         "//envoy/http:codec_interface",
+        "//source/common/http:response_decoder_impl_base",
     ],
 )
 

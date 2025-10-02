@@ -66,7 +66,7 @@ private:
 class ReverseTunnelAcceptorExtension
     : public Envoy::Network::SocketInterfaceExtension,
       public Envoy::Logger::Loggable<Envoy::Logger::Id::connection> {
-  // Friend class for testing
+  // Friend class for testing.
   friend class ReverseTunnelAcceptorExtensionTest;
 
 public:
@@ -87,6 +87,10 @@ public:
               stat_prefix_);
     stat_prefix_ =
         PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "upstream_reverse_connection");
+    // Configure ping miss threshold (minimum 1).
+    const uint32_t cfg_threshold =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, ping_failure_threshold, 3);
+    ping_failure_threshold_ = std::max<uint32_t>(1, cfg_threshold);
     // Ensure the socket interface has a reference to this extension early, so stats can be
     // recorded even before onServerInitialized().
     if (socket_interface_ != nullptr) {
@@ -113,6 +117,11 @@ public:
    * @return reference to the stat prefix string.
    */
   const std::string& statPrefix() const { return stat_prefix_; }
+
+  /**
+   * @return the configured miss threshold for ping health-checks.
+   */
+  uint32_t pingFailureThreshold() const { return ping_failure_threshold_; }
 
   /**
    * Synchronous version for admin API endpoints that require immediate response on reverse
@@ -174,6 +183,7 @@ private:
   std::unique_ptr<ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>> tls_slot_;
   ReverseTunnelAcceptor* socket_interface_;
   std::string stat_prefix_;
+  uint32_t ping_failure_threshold_{3};
 };
 
 } // namespace ReverseConnection
