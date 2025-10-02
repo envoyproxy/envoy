@@ -61,6 +61,12 @@ minor_behavior_changes:
     In test code for external extensions, matchers ``Http::HeaderValueOf``, ``HasHeader``, and ``HeaderHasValueRef``
     must be replaced with ``ContainsHeader``.
     Any uses of matcher ``HeaderHasValue(...)`` should be replaced with ``::testing::Pointee(ContainsHeader(...))``.
+- area: thrift
+  change: |
+    :ref:`field_selector<envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.field_selector>`
+    takes precedence over :ref:`field<envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.field>`
+    if both set. Not that :ref:`field_selector<envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.field_selector>`
+    was in wip status.
 - area: generic_proxy
   change: |
     Generic proxy codec adds the same buffer limit as the connection buffer limit. If the buffer limit is
@@ -338,6 +344,13 @@ new_features:
     Added support for generating and propagating a request ID on synthesized upstream HTTP requests when tunneling requests.
     It can be configured using :ref:`request_id_extension
     <envoy_v3_api_field_extensions.filters.network.tcp_proxy.v3.TcpProxy.TunnelingConfig.request_id_extension>`.
+- area: http
+  change: |
+    Added support for per-route compressor library override in the HTTP compressor filter.
+    Routes can now specify a different compressor library (e.g., gzip, brotli) via the
+    :ref:`compressor_library <envoy_v3_api_field_extensions.filters.http.compressor.v3.CompressorOverrides.compressor_library>`
+    field in the per-route configuration. This allows different routes to use different
+    compression algorithms and settings while maintaining the same filter configuration.
 - area: router_check_tool
   change: |
     Added support for testing routes with :ref:`dynamic metadata matchers <envoy_v3_api_field_config.route.v3.RouteMatch.dynamic_metadata>`
@@ -436,6 +449,13 @@ new_features:
     to the ``ext_proc`` HTTP filter. This allows configuring the HTTP status code returned to the downstream
     client when communication with the external processor fails (e.g., gRPC error). Previously, these cases returned a
     fixed ``500``.
+- area: ext_proc
+  change: |
+    Introduced a new
+    :ref:`ProcessingRequestModifier <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.processing_request_modifier>`
+    config and corresponding interface to enable modifying the ``ProcessingRequest`` before it is sent on the wire. Sample use cases include
+    modifying attribute and metadata keys to abstract away filter details. If the config is not set, then there is no behavior change.
+    Supports per-route overrides.
 - area: tracing
   change: |
     Added :ref:`trace_context_option <envoy_v3_api_field_config.trace.v3.ZipkinConfig.trace_context_option>` enum
@@ -531,6 +551,10 @@ new_features:
     Envoy to scale the periodic timer for flushing downstream responses based on resource pressure.
     The new timer can be configured via the
     :ref:`ScaleTimersOverloadActionConfig <envoy_v3_api_msg_config.overload.v3.ScaleTimersOverloadActionConfig>`.
+- area: thrift
+  change: |
+    Support :ref:`field_selector<envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.field_selector>`
+    to extract specified fields in thrift body for thrift_to_metadata http filter.
 - area: dynamic_modules
   change: |
     Added support for counters, gauges, histograms, and their vector variants to the dynamic modules API.

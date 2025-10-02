@@ -13,12 +13,12 @@ option java_multiple_files = true;
 option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/v3;upstream_socket_interfacev3";
 option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
-// [#protodoc-title: Bootstrap settings for upstream reverse connection socket interface]
+// [#protodoc-title: Upstream reverse connection socket interface]
 // [#extension: envoy.bootstrap.reverse_tunnel.upstream_socket_interface]
 
 // Configuration for the upstream reverse connection socket interface.
 message UpstreamReverseConnectionSocketInterface {
-  // Stat prefix to be used for upstream reverse connection socket interface stats.
+  // Stat prefix for upstream reverse connection socket interface stats.
   string stat_prefix = 1;
 
   // Number of consecutive ping failures before an idle reverse connection socket is marked dead.
