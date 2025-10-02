@@ -69,8 +69,6 @@ message KeyValuePair {
 }
 
 message FieldSelector {
-  option (xds.annotations.v3.message_status).work_in_progress = true;
-
   // field name to log
   string name = 1 [(validate.rules).string = {min_len: 1}];
 
@@ -83,7 +81,9 @@ message FieldSelector {
 
 // [#next-free-field: 6]
 message Rule {
-  // The field to match on. If set, takes precedence over field_selector.
+  // The field to match on.
+  // :ref:`field_selector<envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.field_selector>`
+  // takes precedence if both are set.
   Field field = 1;
 
   // Specifies that a match will be performed on the value of a field in the thrift body.
@@ -123,11 +123,11 @@ message Rule {
   //      bool bar(1: i32 id, 2: Info info);
   //    }
   //
-  FieldSelector field_selector = 2 [(xds.annotations.v3.field_status).work_in_progress = true];
+  FieldSelector field_selector = 2;
 
   // If specified, :ref:`field_selector<envoy_v3_api_field_extensions.filters.http.thrift_to_metadata.v3.Rule.field_selector>`
   // will be used to extract the field value *only* on the thrift message with method name.
-  string method_name = 3 [(xds.annotations.v3.field_status).work_in_progress = true];
+  string method_name = 3;
 
   // The key-value pair to set in the *filter metadata* if the field is present
   // in *thrift metadata*.

@@ -87,6 +87,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/udp_packet_writer/ @danzh2010 @ryantheoptimist
 # redis cluster extension
 /*/extensions/clusters/redis @msukalski @henryyyang @mattklein123
+# reverse conn cluster extension
+/*/extensions/clusters/reverse_connection @agrawroh @basundhara-c @botengyao @yanavlasov
 /*/extensions/common/redis @msukalski @henryyyang @mattklein123
 /*/extensions/health_checkers/redis @mattklein123 @UNOWNED
 /*/extensions/filters/network/redis_proxy @mattklein123 @UNOWNED
