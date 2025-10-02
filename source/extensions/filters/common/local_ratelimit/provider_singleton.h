@@ -71,11 +71,11 @@ public:
   private:
     // The `provider_` holds the ownership of this singleton by shared
     // pointer, as the rate limiter map singleton isn't pinned and is
-    // shared among all the access log rate limit filters. It makes sure the
-    // singleton lives as long as there are access loggers using it and be
-    // deleted when no access logger is using it.
+    // shared among all the access log rate limit filters.
     RateLimiterProviderSingletonSharedPtr provider_;
 
+    // The `subscription_` holds the ownership of the subscription to the token
+    // bucket resource by shared pointer.
     TokenBucketSubscriptionSharedPtr subscription_;
 
     // The `limiter_` holds the ownership of the rate limiter(with the
