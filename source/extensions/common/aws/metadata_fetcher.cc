@@ -32,7 +32,8 @@ public:
 
     receiver_.reset();
     complete_.store(true);
-    reset();
+    request_.reset();
+    self_ref_.reset();
   }
 
   absl::string_view failureToString(MetadataFetcher::MetadataReceiver::Failure reason) override {
@@ -64,7 +65,8 @@ public:
       ENVOY_LOG(error, "{} AWS Metadata failed: [cluster = {}] not found", __func__, cluster_name_);
       complete_.store(true);
       receiver_->onMetadataError(MetadataFetcher::MetadataReceiver::Failure::MissingConfig);
-      reset();
+      request_.reset();
+      self_ref_.reset();
       return;
     }
 
@@ -200,7 +202,7 @@ private:
 
   void reset() {
     request_.reset();
-    self_ref_.reset(); // Release self-reference when operation completes
+    self_ref_.reset();
   }
 };
 } // namespace
