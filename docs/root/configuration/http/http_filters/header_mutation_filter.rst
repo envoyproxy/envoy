@@ -8,7 +8,6 @@ Header Mutation
 
 This filter can add, remove, append, or update HTTP headers and trailers. It can be placed anywhere in the HTTP filter chain and used as a downstream or upstream HTTP filter. The filter can be configured to apply mutations to the request, the response, or both.
 
-
 In most cases, this filter is a more flexible alternative to the ``request_headers_to_add``, ``request_headers_to_remove``,
 ``response_headers_to_add``, and ``response_headers_to_remove`` fields in the :ref:`route configuration <envoy_v3_api_msg_config.route.v3.RouteConfiguration>`.
 
@@ -40,7 +39,10 @@ Security Considerations
 
   When filters later in the chain clear the route cache, mutations performed by this filter may affect subsequent route selection. Review the implications carefully when header or query parameter mutations influence routing. See :ref:`Filter route mutation security considerations <arch_overview_http_filters_route_mutation>`.
 
-Reference
----------
+.. seealso::
 
-The full set of supported features and configuration options is available in the :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.HeaderMutation>`.
+   :ref:`Header Mutation filter (proto file) <envoy_v3_api_file_envoy/extensions/filters/http/header_mutation/v3/header_mutation.proto>`
+      ``HeaderMutation`` API reference.
+
+   :ref:`v3 API reference <envoy_v3_api_msg_extensions.filters.http.header_mutation.v3.HeaderMutation>`
+      Configuration message reference.
