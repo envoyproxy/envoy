@@ -110,7 +110,7 @@ message ProcessingMode {
     FULL_DUPLEX_STREAMED = 4;
 
     // [#not-implemented-hide:]
-    // A mode for gRPC traffic.  This is similar to ``FULL_DUPLEX_STREAMED``,
+    // A mode for gRPC traffic. This is similar to ``FULL_DUPLEX_STREAMED``,
     // except that instead of sending raw chunks of the HTTP/2 DATA frames,
     // the ext_proc client will de-frame the individual gRPC messages inside
     // the HTTP/2 DATA frames, and as each message is de-framed, it will be
