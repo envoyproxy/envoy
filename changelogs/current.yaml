@@ -571,7 +571,7 @@ new_features:
 - area: access_log
   change: |
     Support process-level rate limiting on access log emission by
-    :ref:`ProcessRateLimitFilter <envoy_v3_api_field_extensions.access_loggers.filters.v3.process_ratelimit.ProcessRateLimitFilter>`.
+    :ref:`ProcessRateLimitFilter <envoy_v3_api_msg_extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter>`.
 - area: http
   change: |
     Added ``setUpstreamOverrideHost`` method to AsyncClient StreamOptions to enable direct host routing

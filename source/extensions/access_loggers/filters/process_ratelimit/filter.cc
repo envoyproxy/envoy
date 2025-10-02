@@ -28,6 +28,10 @@ ProcessRateLimitFilter::ProcessRateLimitFilter(
 
     rate_limiter_->setLimiter(limiter);
   };
+
+  if (!config.has_dynamic_config()) {
+    ExceptionUtil::throwEnvoyException("`dynamic_config` is required.");
+  }
   rate_limiter_ = Envoy::Extensions::Filters::Common::LocalRateLimit::RateLimiterProviderSingleton::
       getRateLimiter(context, config.dynamic_config().resource_name(),
                      config.dynamic_config().config_source(), std::move(setter));

@@ -150,6 +150,24 @@ token_bucket:
   NiceMock<Init::ExpectableWatcherImpl> init_watcher_;
 };
 
+TEST_F(AccessLogImplTestWithRateLimitFilter, InvalidConfigWithEmptyDynamicConfig) {
+  const std::string invalid_access_log = R"EOF(
+name: accesslog
+filter:
+  extension_filter:
+    name: local_ratelimit_extension_filter
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.filters.process_ratelimit.v3.ProcessRateLimitFilter
+      dynamic_config:
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+  path: /dev/null
+  )EOF";
+  EXPECT_THROW(AccessLog::AccessLogFactory::fromProto(parseAccessLogFromV3Yaml(invalid_access_log),
+                                                      context_),
+               EnvoyException);
+}
+
 TEST_F(AccessLogImplTestWithRateLimitFilter, FilterDestructedBeforeCallback) {
   AccessLog::InstanceSharedPtr log1 = AccessLog::AccessLogFactory::fromProto(
       parseAccessLogFromV3Yaml(default_access_log_), context_);
