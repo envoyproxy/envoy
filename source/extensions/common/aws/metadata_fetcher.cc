@@ -209,9 +209,9 @@ private:
     self_ref_.reset();
   }
 };
-} // namespace
+}
 
-// Wrapper to maintain unique_ptr API while using shared_ptr internally
+// TODO(nbaws): Change api to return shared_ptr and remove wrapper
 class MetadataFetcherWrapper : public MetadataFetcher {
 public:
   explicit MetadataFetcherWrapper(std::shared_ptr<MetadataFetcherImpl> impl)
