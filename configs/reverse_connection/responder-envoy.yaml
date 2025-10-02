@@ -51,6 +51,37 @@ static_resources:
                 route:
                   cluster: reverse_connection_cluster
           http_filters:
+          # The Lua filter is used to extract the host ID from the headers and set it in the x-computed-host-id header.
+          # This header is then used by the reverse connection cluster to look up a socket.
+          # The reverse connection cluster checks if there are cached sockets for this host.
+          - name: envoy.filters.http.lua
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+              inline_code: |
+                function envoy_on_request(request_handle)
+                  local headers = request_handle:headers()
+                  local node_id = headers:get("x-node-id")
+                  local cluster_id = headers:get("x-cluster-id")
+
+                  local host_id = ""
+
+                  -- Priority 1: x-node-id header
+                  if node_id then
+                    host_id = node_id
+                    request_handle:logInfo("Using x-node-id as host_id: " .. host_id)
+                  -- Priority 2: x-cluster-id header
+                  elseif cluster_id then
+                    host_id = cluster_id
+                    request_handle:logInfo("Using x-cluster-id as host_id: " .. host_id)
+                  else
+                    request_handle:logError("No valid headers found: x-node-id or x-cluster-id")
+                    -- Don't set x-computed-host-id, which will cause cluster matching to fail
+                    return
+                  end
+
+                  -- Set the computed host ID for the reverse connection cluster
+                  headers:add("x-computed-host-id", host_id)
+                end
           - name: envoy.filters.http.router
             typed_config:
               "@type": >-
@@ -58,41 +89,27 @@ static_resources:
 
   # Cluster used to write requests to cached sockets
   clusters:
-  # TODO: Re-enable when reverse_connection cluster extension is merged
-  # - name: reverse_connection_cluster
-  #   connect_timeout: 200s
-  #   lb_policy: CLUSTER_PROVIDED
-  #   cluster_type:
-  #     name: envoy.clusters.reverse_connection
-  #     typed_config:
-  #       "@type": >-
-  #         type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
-  #       # The following headers are expected in downstream requests
-  #       # to be sent over reverse connections
-  #       http_header_names:
-  #       - x-remote-node-id  # Should be set to downstream-node
-  #       - x-dst-cluster-uuid  # Should be set to downstream
-  #   typed_extension_protocol_options:
-  #     envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-  #       "@type": >-
-  #         type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-  #       explicit_http_config:
-  #         # Right the moment, reverse connections are supported over HTTP/2 only
-  #         http2_protocol_options: {}
-
-  # Temporary dummy cluster for config validation (remove when reverse_connection is merged).
   - name: reverse_connection_cluster
-    type: STATIC
-    connect_timeout: 30s
-    load_assignment:
-      cluster_name: dummy_cluster
-      endpoints:
-      - lb_endpoints:
-        - endpoint:
-            address:
-              socket_address:
-                address: 127.0.0.1
-                port_value: 80
+    connect_timeout: 200s
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": >-
+          type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 60s
+        # This is the actual host ID that will be used by the reverse connection cluster to look up a socket.
+        # The reverse connection cluster checks if there are cached sockets for this cluster, if so, it will
+        # use the socket. Otherwise, it assumes this is a downstream node and looks for cached sockets with
+        # this as the node instead.
+        host_id_format: "%REQ(x-computed-host-id)%"
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": >-
+          type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          # Right the moment, reverse connections are supported over HTTP/2 only.
+          http2_protocol_options: {}
 
 admin:
   access_log_path: "/dev/stdout"

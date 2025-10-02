@@ -249,14 +249,14 @@ Reverse tunnels use a handshake protocol to establish authenticated connections 
 downstream and upstream Envoy instances. The handshake has the following steps:
 
 1. **Connection Initiation**: Initiator Envoy initiates TCP connections to each host of the upstream cluster,
-and writes the handshake request on it over HTTP.
+   and writes the handshake request on it over HTTP.
 2. **Identity Exchange**: The downstream Envoy's reverse tunnel handshake contains identity information (node ID, cluster ID, tenant ID) sent as HTTP headers. The reverse tunnel network filter expects the following headers:
 
    * ``x-envoy-reverse-tunnel-node-id``: Unique identifier for the downstream node (e.g., "on-prem-node")
    * ``x-envoy-reverse-tunnel-cluster-id``: Cluster name of the downstream Envoy (e.g., "on-prem")
    * ``x-envoy-reverse-tunnel-tenant-id``: Tenant identifier for multi-tenant deployments (e.g., "on-prem")
 
-   These identify values are obtained from the reverse tunnel listener address and the headers are automatically added by the reverse tunnel downstream socket interface during the handshake process.
+   These identity values are obtained from the reverse tunnel listener address and the headers are automatically added by the reverse tunnel downstream socket interface during the handshake process.
 
 3. **Validation/Authentication**: The upstream Envoy performs the following validation checks on receiving the handshake request:
 
@@ -269,6 +269,7 @@ and writes the handshake request on it over HTTP.
      - ``x-envoy-reverse-tunnel-tenant-id``
 
    If any validation fails, the request is rejected with appropriate HTTP error codes (404 for method/path mismatch, 400 for missing headers).
+
 4. **Connection Establishment**: Post a successful handshake, the upstream Envoy stores the TCP socket mapped to the downstream node ID.
 
 .. _config_reverse_connection_cluster:
@@ -278,7 +279,8 @@ Reverse Connection Cluster
 
 Each downstream node reachable from upstream Envoy via reverse connections needs to be configured with a reverse connection cluster. When a data request arrives at the upstream Envoy, this cluster uses cached "reverse connections" instead of creating new forward connections.
 
-.. code-block:: yaml
+.. validated-code-block:: yaml
+  :type-name: envoy.config.cluster.v3.Cluster
 
   name: reverse_connection_cluster
   connect_timeout: 200s
@@ -286,10 +288,9 @@ Each downstream node reachable from upstream Envoy via reverse connections needs
   cluster_type:
     name: envoy.clusters.reverse_connection
     typed_config:
-      "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.RevConClusterConfig
-      http_header_names:
-      - x-remote-node-id     # Should be set to "downstream-node"
-      - x-dst-cluster-uuid   # Should be set to "downstream-cluster"
+      "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+      cleanup_interval: 60s
+      host_id_format: "%REQ(x-computed-host-id)%"
   typed_extension_protocol_options:
     envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
       "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
@@ -299,19 +300,25 @@ Each downstream node reachable from upstream Envoy via reverse connections needs
 The reverse connection cluster configuration specifies:
 
 * **Load balancing policy**: ``CLUSTER_PROVIDED`` allows the custom cluster to manage load balancing
-* **Header Resolution Strategy**: The cluster follows a tiered approach to identify the target downstream node:
+* **Host ID Format**: Uses Envoy's formatter system to extract the target downstream node identifier from request context. The ``host_id_format`` field supports:
 
-  1. **Configured Headers**: First checks for headers specified in ``http_header_names`` configuration. If not configured, defaults to ``x-envoy-dst-node-uuid`` and ``x-envoy-dst-cluster-uuid``
-  2. **Host Header**: If no configured headers are found, extracts UUID from the Host header in format ``<uuid>.tcpproxy.envoy.remote:<port>``
-  3. **SNI (Server Name Indication)**: If Host header extraction fails, extracts UUID from SNI in format ``<uuid>.tcpproxy.envoy.remote``
+  - ``%REQ(header-name)%``: Extract value from request header
+  - ``%DYNAMIC_METADATA(namespace:key)%``: Extract value from dynamic metadata
+  - ``%FILTER_STATE(key)%``: Extract value from filter state
+  - ``%DOWNSTREAM_REMOTE_ADDRESS%``: Use downstream connection address
+  - Plain text and combinations of the above
+
+An example of how to process headers and set the UUID is described in the :ref:`config_reverse_connection_egress_listener` section.
+
 * **Protocol**: Only HTTP/2 is supported for reverse connections
 * **Host Reuse**: Once a host is created for a specific downstream node ID, it is cached and reused for all subsequent requests to that node. Each such request is multiplexed as a new stream on the existing HTTP/2 connection.
 
+.. _config_reverse_connection_egress_listener:
 
 Egress Listener for Data Traffic
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Add an egress listener on upstream envoy that accepts data traffic and routes it to the reverse connection cluster.
+Add an egress listener on upstream envoy that accepts data traffic and routes it to the reverse connection cluster. This listener includes header processing logic to determine the target downstream node:
 
 .. validated-code-block:: yaml
   :type-name: envoy.config.listener.v3.Listener
@@ -326,6 +333,7 @@ Add an egress listener on upstream envoy that accepts data traffic and routes it
     - name: envoy.filters.network.http_connection_manager
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+        stat_prefix: egress_http
         route_config:
           virtual_hosts:
           - name: backend
@@ -335,6 +343,89 @@ Add an egress listener on upstream envoy that accepts data traffic and routes it
                 prefix: "/downstream_service"
               route:
                 cluster: reverse_connection_cluster  # Routes to initiator via reverse tunnel
+        http_filters:
+        # Lua filter processes headers and sets computed host ID
+        - name: envoy.filters.http.lua
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+            inline_code: |
+              function envoy_on_request(request_handle)
+                local headers = request_handle:headers()
+                local node_id = headers:get("x-node-id")
+                local cluster_id = headers:get("x-cluster-id")
+                local host_header = headers:get("host")
+                
+                local host_id = ""
+                
+                -- Priority 1: x-node-id header
+                if node_id then
+                  host_id = node_id
+                  request_handle:logInfo("Using x-node-id as host_id: " .. host_id)
+                -- Priority 2: x-cluster-id header
+                elseif cluster_id then
+                  host_id = cluster_id
+                  request_handle:logInfo("Using x-cluster-id as host_id: " .. host_id)
+                -- Priority 3: Extract UUID from Host header (uuid.tcpproxy.envoy.remote)
+                elseif host_header then
+                  local uuid = string.match(host_header, "^([^%.]+)%.tcpproxy%.envoy%.remote$")
+                  if uuid then
+                    host_id = uuid
+                    request_handle:logInfo("Extracted UUID from Host header as host_id: " .. host_id)
+                  else
+                    request_handle:logError("Host header format invalid. Expected: uuid.tcpproxy.envoy.remote, got: " .. host_header)
+                    -- Don't set x-computed-host-id, which will cause cluster matching to fail
+                    return
+                  end
+                else
+                  request_handle:logError("No valid headers found: x-node-id, x-cluster-id, or Host")
+                  -- Don't set x-computed-host-id, which will cause cluster matching to fail
+                  return
+                end
+                
+                -- Set the computed host ID for the reverse connection cluster
+                headers:add("x-computed-host-id", host_id)
+              end
+        - name: envoy.filters.http.router
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+The egress listener includes a Lua filter that implements flexible header-based routing to determine which downstream node to route requests to. The filter checks multiple headers sequentially and sets a computed host ID for the reverse connection cluster, which is then used to look up a socket.
+
+Header Processing Priority:
+
+1. **x-node-id header**: Highest priority - uses the value directly
+2. **x-cluster-id header**: Fallback - uses when x-node-id is not present  
+3. **Host header**: Second fallback - extracts UUID from format ``uuid.tcpproxy.envoy.remote``
+4. **None found**: Logs error and fails cluster matching
+
+Example Request Flow:
+
+1. **Request with node ID**:
+   
+   .. code-block:: http
+   
+     GET /downstream_service HTTP/1.1
+     x-node-id: example-node
+   
+   Result: ``host_id = "example-node"``
+
+2. **Request with cluster ID** (fallback):
+   
+   .. code-block:: http
+   
+     GET /downstream_service HTTP/1.1  
+     x-cluster-id: example-cluster
+   
+   Result: ``host_id = "example-cluster"``
+
+3. **Request with Host header** (second fallback):
+   
+   .. code-block:: http
+   
+     GET /downstream_service HTTP/1.1
+     Host: example-uuid.tcpproxy.envoy.remote
+   
+   Result: ``host_id = "example-uuid"``
 
 .. _config_reverse_connection_stats:
 
@@ -377,15 +468,16 @@ Where ``<state>`` can be one of:
    unknown, Gauge, Number of connections in unknown state (fallback)
 
 For example, with ``stat_prefix: "downstream_rc"``:
-- ``downstream_rc.host.192.168.1.1.connecting`` - connections being established to host 192.168.1.1
-- ``downstream_rc.cluster.upstream-cluster.connected`` - established connections to upstream-cluster
+
+* ``downstream_rc.host.192.168.1.1.connecting`` - connections being established to host 192.168.1.1
+* ``downstream_rc.cluster.upstream-cluster.connected`` - established connections to upstream-cluster
 
 **Upstream Socket Interface:**
 
 The upstream reverse tunnel extension emits node-level and cluster-level statistics for accepted connections. The stat names follow the pattern:
 
-- Node-level: ``reverse_connections.nodes.<node_id>``
-- Cluster-level: ``reverse_connections.clusters.<cluster_id>``
+* Node-level: ``reverse_connections.nodes.<node_id>``
+* Cluster-level: ``reverse_connections.clusters.<cluster_id>``
 
 .. csv-table::
    :header: Name, Type, Description
@@ -395,8 +487,9 @@ The upstream reverse tunnel extension emits node-level and cluster-level statist
    reverse_connections.clusters.<cluster_id>, Gauge, Number of active connections from downstream cluster
 
 For example:
-- ``reverse_connections.nodes.node-1`` - active connections from downstream node "node-1"
-- ``reverse_connections.clusters.downstream-cluster`` - active connections from downstream cluster "downstream-cluster"
+
+* ``reverse_connections.nodes.node-1`` - active connections from downstream node "node-1"
+* ``reverse_connections.clusters.downstream-cluster`` - active connections from downstream cluster "downstream-cluster"
 
 .. _config_reverse_connection_security:
 
