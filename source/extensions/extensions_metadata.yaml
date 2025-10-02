@@ -89,6 +89,13 @@ envoy.bootstrap.reverse_tunnel.upstream_socket_interface:
   status: wip
   type_urls:
   - envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface
+envoy.clusters.reverse_connection:
+  categories:
+  - envoy.clusters
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
 envoy.extensions.http.cache.file_system_http_cache:
   categories:
   - envoy.http.cache
@@ -1882,6 +1889,13 @@ envoy.http.custom_response.local_response_policy:
   status: wip
   type_urls:
   - envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+envoy.http.ext_proc.processing_request_modifiers.mapped_attribute_builder:
+  categories:
+  - envoy.http.ext_proc.processing_request_modifiers
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.http.ext_proc.processing_request_modifiers.mapped_attribute_builder.v3.MappedAttributeBuilder
 envoy.http.ext_proc.response_processors.save_processing_response:
   categories:
   - envoy.http.ext_proc.response_processors
