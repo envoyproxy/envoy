@@ -134,6 +134,10 @@ public:
     self_ref_ = shared_from_this();
     request_ = makeOptRefFromPtr(
         thread_local_cluster->httpAsyncClient().send(std::move(messagePtr), *this, options));
+
+    if (!request_) {
+      self_ref_.reset();
+    }
   }
 
   // HTTP async receive method on success.
