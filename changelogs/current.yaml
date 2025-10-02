@@ -118,6 +118,10 @@ minor_behavior_changes:
   change: |
     Check the request header count & size in kb after applying mutations is <= the configured limits
     and reject the response if not.
+- area: ext_authz
+  change: |
+    Check the response header count is < the configured limits before applying mutations and don't
+    add new headers if not.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
