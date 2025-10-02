@@ -1131,13 +1131,6 @@ TEST_P(LoadShedPointIntegrationTest, Http1ServerDispatchAbortClosesConnectionWhe
 TEST_P(LoadShedPointIntegrationTest, Http2ServerDispatchSendsGoAwayCompletingPendingRequests) {
   // Test that when HTTP2 server enters overload state during request dispatch,
   // it sends GOAWAY frames while allowing pending requests to complete gracefully.
-  //
-  // NOTE: This test demonstrates a potential RFC 7540 violation. Per RFC 7540 Section 6.8,
-  // after sending GOAWAY, the server should ignore frames on streams with identifiers
-  // higher than the last stream ID in the GOAWAY frame. However, Envoy's current
-  // implementation in ServerConnectionImpl::onBeginHeaders() may still create new
-  // streams without checking GOAWAY state, violating this requirement.
-  // Test only applies to HTTP2.
   if (downstreamProtocol() != Http::CodecClient::Type::HTTP2) {
     return;
   }
@@ -1181,6 +1174,12 @@ TEST_P(LoadShedPointIntegrationTest, Http2ServerDispatchSendsGoAwayCompletingPen
   // Wait for the server to send the graceful GOAWAY
   test_server_->waitForCounterEq("http2.goaway_graceful_sent", 1);
 
+  // NOTE: After sending GOAWAY, the server should ignore frames on streams with identifiers
+  // higher than the last stream ID in the GOAWAY frame. However, Envoy's current
+  // implementation in ServerConnectionImpl::onBeginHeaders() may still create new
+  // streams without checking GOAWAY state. oghttp2 may continue the request and ignore
+  // goaway while nghttp2 is stricter leading to different results for these adaptors.
+  // Thus we check if the stream has ended first.
   bool second_request_completed = second_request_decoder->waitForEndStream();
   if (second_request_completed) {
     EXPECT_TRUE(second_request_decoder->complete());
@@ -1188,17 +1187,11 @@ TEST_P(LoadShedPointIntegrationTest, Http2ServerDispatchSendsGoAwayCompletingPen
     EXPECT_TRUE(second_request_decoder->reset());
   }
 
-  // The client should eventually see the GOAWAY frame
-  EXPECT_TRUE(codec_client_->sawGoAway());
-
   // Wait for the graceful GOAWAY timeout to expire and final GOAWAY to be sent
   test_server_->waitForCounterEq("http2.goaway_sent", 1);
 
   // Verify the client eventually receives the GOAWAY
   EXPECT_TRUE(codec_client_->sawGoAway());
-
-  // Clean up properly
-  cleanupUpstreamAndDownstream();
 
   updateResource(0.80);
   test_server_->waitForGaugeEq(
