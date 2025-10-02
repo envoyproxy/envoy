@@ -91,8 +91,7 @@ TEST(UtilityTest, TestImportPublicKey) {
 
   // Test error handling with invalid key
   std::vector<uint8_t> bad_key = {0x1, 0x2, 0x3, 0x4, 0x5};
-  auto bad_crypto_ptr =
-      Common::Crypto::UtilitySingleton::get().importPublicKeyDER(bad_key);
+  auto bad_crypto_ptr = Common::Crypto::UtilitySingleton::get().importPublicKeyDER(bad_key);
   EVP_PKEY* bad_pkey = bad_crypto_ptr->getEVP_PKEY();
   EXPECT_EQ(nullptr, bad_pkey) << "Invalid key should return nullptr";
 
@@ -632,32 +631,47 @@ TEST(UtilityTest, ImportPrivateKeyPEM_WithMalformedBase64_Fails) {
   EXPECT_EQ(nullptr, result->getEVP_PKEY()) << "Malformed private PEM should fail";
 }
 
-TEST(UtilityTest, TestEdgeCasesAndMissingCoverage) {
-  // Test edge cases and missing coverage areas
+TEST(UtilityTest, ImportPublicKeyPEMWithEmptyInput) {
   auto impl = std::make_unique<UtilityImpl>();
 
-  // Test with empty data
   std::string empty;
   auto empty_pem = impl->importPublicKeyPEM(empty);
   EXPECT_EQ(nullptr, empty_pem->getEVP_PKEY()) << "Empty PEM should fail";
+}
+
+TEST(UtilityTest, ImportPublicKeyDERWithEmptyInput) {
+  auto impl = std::make_unique<UtilityImpl>();
 
   std::vector<uint8_t> empty_vec;
   auto empty_der = impl->importPublicKeyDER(empty_vec);
   EXPECT_EQ(nullptr, empty_der->getEVP_PKEY()) << "Empty DER should fail";
+}
+
+TEST(UtilityTest, ImportPublicKeyPEMWithInvalidFormat) {
+  auto impl = std::make_unique<UtilityImpl>();
 
   // Test with single character
   std::string single = "A";
   auto single_pem = impl->importPublicKeyPEM(single);
   EXPECT_EQ(nullptr, single_pem->getEVP_PKEY()) << "Single char PEM should fail";
 
-  std::vector<uint8_t> single_vec = {'A'};
-  auto single_der = impl->importPublicKeyDER(single_vec);
-  EXPECT_EQ(nullptr, single_der->getEVP_PKEY()) << "Single char DER should fail";
-
-  // Test with invalid PEM format
+  // Test with invalid PEM format (missing newlines)
   std::string invalid_pem = "-----BEGIN PUBLIC KEY-----CONTENT-----END PUBLIC KEY-----";
   auto invalid_pem_result = impl->importPublicKeyPEM(invalid_pem);
   EXPECT_EQ(nullptr, invalid_pem_result->getEVP_PKEY()) << "Invalid PEM should fail";
+}
+
+TEST(UtilityTest, ImportPublicKeyDERWithInvalidFormat) {
+  auto impl = std::make_unique<UtilityImpl>();
+
+  // Test with single character
+  std::vector<uint8_t> single_vec = {'A'};
+  auto single_der = impl->importPublicKeyDER(single_vec);
+  EXPECT_EQ(nullptr, single_der->getEVP_PKEY()) << "Single char DER should fail";
+}
+
+TEST(UtilityTest, ImportPublicKeyPEMWithValidFormat) {
+  auto impl = std::make_unique<UtilityImpl>();
 
   // Test with valid PEM format
   std::string valid_pem = "-----BEGIN PUBLIC KEY-----\n"
@@ -671,6 +685,10 @@ TEST(UtilityTest, TestEdgeCasesAndMissingCoverage) {
                           "-----END PUBLIC KEY-----";
   auto valid_pem_result = impl->importPublicKeyPEM(valid_pem);
   EXPECT_NE(nullptr, valid_pem_result->getEVP_PKEY()) << "Valid PEM should succeed";
+}
+
+TEST(UtilityTest, ImportKeysDERWithInvalidData) {
+  auto impl = std::make_unique<UtilityImpl>();
 
   // Test DER import functions with various invalid inputs
   std::vector<uint8_t> invalid_der = {0x30, 0x01, 0x02}; // Invalid DER
