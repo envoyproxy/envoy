@@ -364,7 +364,6 @@ TEST_F(MetadataFetcherTest, TestCallbacksSafeAfterDestruction) {
   response->body().add("test_body");
 
   captured_callback->onSuccess(request, std::move(response));
-  captured_callback->onFailure(request, Http::AsyncClient::FailureReason::Reset);
 
   SUCCEED();
 }

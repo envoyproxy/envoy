@@ -136,6 +136,9 @@ public:
 
   // HTTP async receive method on success.
   void onSuccess(const Http::AsyncClient::Request&, Http::ResponseMessagePtr&& response) override {
+    // Capture self-reference immediately to keep object alive during method execution
+    auto self_ref = std::move(self_ref_);
+
     // Safe early exit if object is being destroyed
     if (!receiver_ || complete_.load()) {
       return;
@@ -164,12 +167,15 @@ public:
       }
       receiver_->onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network);
     }
-    reset();
+    request_.reset();
   }
 
   // HTTP async receive method on failure.
   void onFailure(const Http::AsyncClient::Request&,
                  Http::AsyncClient::FailureReason reason) override {
+    // Capture self-reference immediately to keep object alive during method execution
+    auto self_ref = std::move(self_ref_);
+
     // Safe early exit if object is being destroyed
     if (!receiver_ || complete_.load()) {
       return;
@@ -178,7 +184,7 @@ public:
               cluster_name_, enumToInt(reason));
     complete_.store(true);
     receiver_->onMetadataError(MetadataFetcher::MetadataReceiver::Failure::Network);
-    reset();
+    request_.reset();
   }
 
   // TODO(suniltheta): Add metadata fetch status into the span like it is done on ext_authz filter.
