@@ -13,6 +13,7 @@
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/stream_info/stream_info.h"
 #include "envoy/tracing/tracer.h"
+#include "envoy/upstream/load_balancer.h"
 
 #include "source/common/protobuf/protobuf.h"
 
@@ -392,6 +393,11 @@ public:
       remote_close_timeout = timeout;
       return *this;
     }
+    StreamOptions&
+    setUpstreamOverrideHost(const Upstream::LoadBalancerContext::OverrideHost& host) {
+      upstream_override_host_ = host;
+      return *this;
+    }
 
     // For gmock test
     bool operator==(const StreamOptions& src) const {
@@ -461,6 +467,9 @@ public:
     // This callback is invoked when AsyncStream object is deleted.
     // Test only use to validate deferred deletion.
     std::function<void()> on_delete_callback_for_test_only;
+
+    // Optional upstream override host for bypassing load balancer selection
+    absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstream_override_host_;
   };
 
   /**

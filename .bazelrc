@@ -562,6 +562,8 @@ common:remote-envoy-engflow --config=rbe-envoy-engflow
 common:remote-cache-envoy-engflow --config=common-envoy-engflow
 common:remote-cache-envoy-engflow --config=cache-envoy-engflow
 
+common:cves --//tools/dependency:cve-data=//tools/dependency:cve-data-dir
+
 # Specifies the rustfmt.toml for all rustfmt_test targets.
 build --@rules_rust//rust/settings:rustfmt.toml=@envoy//:rustfmt.toml
 

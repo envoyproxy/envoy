@@ -2,8 +2,10 @@
 
 #include "envoy/compression/compressor/factory.h"
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
+#include "envoy/server/factory_context.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "source/common/common/logger.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/runtime/runtime_protos.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
@@ -153,6 +155,9 @@ public:
   bool chooseFirst() const { return choose_first_; };
   const RequestDirectionConfig& requestDirectionConfig() { return request_direction_config_; }
   const ResponseDirectionConfig& responseDirectionConfig() { return response_direction_config_; }
+  const Envoy::Compression::Compressor::CompressorFactory& compressorFactory() const {
+    return *compressor_factory_;
+  }
 
 private:
   const std::string common_stats_prefix_;
@@ -165,25 +170,40 @@ private:
 };
 using CompressorFilterConfigSharedPtr = std::shared_ptr<CompressorFilterConfig>;
 
-class CompressorPerRouteFilterConfig : public Router::RouteSpecificFilterConfig {
+class CompressorPerRouteFilterConfig : public Router::RouteSpecificFilterConfig,
+                                       public Logger::Loggable<Logger::Id::filter> {
 public:
   CompressorPerRouteFilterConfig(
-      const envoy::extensions::filters::http::compressor::v3::CompressorPerRoute& config);
+      const envoy::extensions::filters::http::compressor::v3::CompressorPerRoute& config,
+      Server::Configuration::FactoryContext& context);
 
   // If a value is present, that value overrides
   // ResponseDirectionConfig::compressionEnabled.
   absl::optional<bool> responseCompressionEnabled() const { return response_compression_enabled_; }
   absl::optional<bool> removeAcceptEncodingHeader() const { return remove_accept_encoding_header_; }
 
+  // Returns the per-route compressor factory if configured, nullptr otherwise.
+  const Envoy::Compression::Compressor::CompressorFactory* compressorFactory() const {
+    return compressor_factory_.get();
+  }
+
+  // Returns the content encoding for the per-route compressor if configured.
+  absl::optional<std::string> contentEncoding() const {
+    return compressor_factory_ ? absl::make_optional(compressor_factory_->contentEncoding())
+                               : absl::nullopt;
+  }
+
 private:
   absl::optional<bool> response_compression_enabled_;
   absl::optional<bool> remove_accept_encoding_header_;
+  Envoy::Compression::Compressor::CompressorFactoryPtr compressor_factory_;
 };
 
 /**
  * A filter that compresses data dispatched from the upstream upon client request.
  */
-class CompressorFilter : public Http::PassThroughFilter {
+class CompressorFilter : public Http::PassThroughFilter,
+                         public Logger::Loggable<Logger::Id::filter> {
 public:
   explicit CompressorFilter(const CompressorFilterConfigSharedPtr config);
 
@@ -200,7 +220,15 @@ public:
   Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::ResponseTrailerMap&) override;
 
+  // Grant testing peer access.
+  friend class CompressorFilterTestingPeer;
+
 private:
+  // Initialize and cache the most specific per-route config only once for this stream.
+  // Subsequent accesses should use the cached pointer to avoid any inconsistencies if
+  // the route is refreshed mid-stream.
+  void initPerRouteConfig();
+
   bool compressionEnabled(const CompressorFilterConfig::ResponseDirectionConfig& config,
                           const CompressorPerRouteFilterConfig* per_route_config) const;
   bool removeAcceptEncodingHeader(const CompressorFilterConfig::ResponseDirectionConfig& config,
@@ -234,10 +262,19 @@ private:
   std::unique_ptr<EncodingDecision> chooseEncoding(const Http::ResponseHeaderMap& headers) const;
   bool shouldCompress(const EncodingDecision& decision) const;
 
+  // Returns the appropriate compressor factory for the current route.
+  // Checks for per-route config first, then falls back to main config.
+  Envoy::Compression::Compressor::CompressorFactory& getCompressorFactory() const;
+
+  // Returns the appropriate content encoding for the current route.
+  std::string getContentEncoding() const;
+
   Envoy::Compression::Compressor::CompressorPtr response_compressor_;
   Envoy::Compression::Compressor::CompressorPtr request_compressor_;
   const CompressorFilterConfigSharedPtr config_;
   std::unique_ptr<std::string> accept_encoding_;
+  // Cached per-route configuration pointer, initialized once per stream.
+  const CompressorPerRouteFilterConfig* per_route_config_{};
 };
 
 } // namespace Compressor

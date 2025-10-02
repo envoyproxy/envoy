@@ -1882,6 +1882,13 @@ envoy.http.custom_response.local_response_policy:
   status: wip
   type_urls:
   - envoy.extensions.http.custom_response.local_response_policy.v3.LocalResponsePolicy
+envoy.http.ext_proc.processing_request_modifiers.mapped_attribute_builder:
+  categories:
+  - envoy.http.ext_proc.processing_request_modifiers
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.http.ext_proc.processing_request_modifiers.mapped_attribute_builder.v3.MappedAttributeBuilder
 envoy.http.ext_proc.response_processors.save_processing_response:
   categories:
   - envoy.http.ext_proc.response_processors

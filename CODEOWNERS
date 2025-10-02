@@ -35,6 +35,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # external processing filter
 /*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @yanavlasov @yanjunxiang-google
 /*/extensions/filters/common/mutation_rules @gbrail @tyxia @mattklein123 @yanavlasov
+/*/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder @mbadov @stevenzzzz @adisuissa
 /*/extensions/http/ext_proc/response_processors/save_processing_response @pradeepcrao @botengyao @yanjunxiang-google
 /*/extensions/filters/network/ext_proc @botengyao @yanavlasov
 # jwt_authn http filter extension
