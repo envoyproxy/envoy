@@ -499,10 +499,10 @@ using HostSetPtr = std::unique_ptr<HostSet>;
 class PrioritySet {
 public:
   using MemberUpdateCb =
-      std::function<absl::Status(const HostVector& hosts_added, const HostVector& hosts_removed)>;
+      std::function<void(const HostVector& hosts_added, const HostVector& hosts_removed)>;
 
-  using PriorityUpdateCb = std::function<absl::Status(
-      uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed)>;
+  using PriorityUpdateCb = std::function<void(uint32_t priority, const HostVector& hosts_added,
+                                              const HostVector& hosts_removed)>;
 
   virtual ~PrioritySet() = default;
 

@@ -130,7 +130,9 @@ MockListenerFilterCallbacks::~MockListenerFilterCallbacks() = default;
 MockListenerFilterManager::MockListenerFilterManager() = default;
 MockListenerFilterManager::~MockListenerFilterManager() = default;
 
-MockFilterChain::MockFilterChain() = default;
+MockFilterChain::MockFilterChain() {
+  ON_CALL(*this, filterChainInfo()).WillByDefault(ReturnRef(filter_chain_info_));
+}
 MockFilterChain::~MockFilterChain() = default;
 
 MockFilterChainInfo::MockFilterChainInfo() {

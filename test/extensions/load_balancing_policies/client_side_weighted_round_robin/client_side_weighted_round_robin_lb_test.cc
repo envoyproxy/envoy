@@ -7,6 +7,7 @@
 #include "source/extensions/load_balancing_policies/client_side_weighted_round_robin/client_side_weighted_round_robin_lb.h"
 
 #include "test/extensions/load_balancing_policies/common/load_balancer_impl_base_test.h"
+#include "test/mocks/stream_info/mocks.h"
 
 #include "gmock/gmock.h"
 
@@ -60,7 +61,8 @@ public:
   absl::Status updateClientSideDataFromOrcaLoadReport(
       const xds::data::orca::v3::OrcaLoadReport& orca_load_report,
       ClientSideWeightedRoundRobinLoadBalancer::ClientSideHostLbPolicyData& client_side_data) {
-    return client_side_data.onOrcaLoadReport(orca_load_report);
+    Envoy::StreamInfo::MockStreamInfo mock_stream_info;
+    return client_side_data.onOrcaLoadReport(orca_load_report, mock_stream_info);
   }
 
   void setHostClientSideWeight(HostSharedPtr& host, uint32_t weight,
@@ -275,6 +277,7 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ChooseHostWithClientSideWei
 
   hostSet().runCallbacks({}, {});
   simTime().setMonotonicTime(MonotonicTime(std::chrono::seconds(5)));
+  Envoy::StreamInfo::MockStreamInfo mock_stream_info;
   for (const auto& host_ptr : hostSet().hosts_) {
     HostConstSharedPtr host = lb_->chooseHost(&lb_context_).host;
     // Hosts have equal weights, so chooseHost returns the current host.
@@ -283,7 +286,8 @@ TEST_P(ClientSideWeightedRoundRobinLoadBalancerTest, ChooseHostWithClientSideWei
     xds::data::orca::v3::OrcaLoadReport orca_load_report;
     orca_load_report.set_rps_fractional(1000);
     orca_load_report.set_application_utilization(0.5);
-    EXPECT_EQ(host->lbPolicyData()->onOrcaLoadReport(orca_load_report), absl::OkStatus());
+    EXPECT_EQ(host->lbPolicyData()->onOrcaLoadReport(orca_load_report, mock_stream_info),
+              absl::OkStatus());
     EXPECT_EQ(host->weight(), 1);
   }
   // Update weights on hosts.

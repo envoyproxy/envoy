@@ -10,7 +10,7 @@ void ThreadSynchronizer::enable() {
 
 ThreadSynchronizer::SynchronizerEntry&
 ThreadSynchronizer::getOrCreateEntry(absl::string_view event_name) {
-  absl::MutexLock lock(&data_->mutex_);
+  absl::MutexLock lock(data_->mutex_);
   auto& existing_entry = data_->entries_[event_name];
   if (existing_entry == nullptr) {
     ENVOY_LOG(debug, "thread synchronizer: creating entry: {}", event_name);
@@ -21,7 +21,7 @@ ThreadSynchronizer::getOrCreateEntry(absl::string_view event_name) {
 
 void ThreadSynchronizer::waitOnWorker(absl::string_view event_name) {
   SynchronizerEntry& entry = getOrCreateEntry(event_name);
-  absl::MutexLock lock(&entry.mutex_);
+  absl::MutexLock lock(entry.mutex_);
   ENVOY_LOG(debug, "thread synchronizer: waiting on next {}", event_name);
   ASSERT(!entry.wait_on_);
   entry.wait_on_ = true;
@@ -29,7 +29,7 @@ void ThreadSynchronizer::waitOnWorker(absl::string_view event_name) {
 
 void ThreadSynchronizer::syncPointWorker(absl::string_view event_name) {
   SynchronizerEntry& entry = getOrCreateEntry(event_name);
-  absl::MutexLock lock(&entry.mutex_);
+  absl::MutexLock lock(entry.mutex_);
 
   // See if we are ignoring waits. If so, just return.
   if (!entry.wait_on_) {
@@ -62,7 +62,7 @@ void ThreadSynchronizer::syncPointWorker(absl::string_view event_name) {
 
 void ThreadSynchronizer::barrierOnWorker(absl::string_view event_name) {
   SynchronizerEntry& entry = getOrCreateEntry(event_name);
-  absl::MutexLock lock(&entry.mutex_);
+  absl::MutexLock lock(entry.mutex_);
   ENVOY_LOG(debug, "thread synchronizer: barrier on {}", event_name);
   while (!entry.mutex_.AwaitWithTimeout(absl::Condition(&entry.at_barrier_), absl::Seconds(10))) {
     ENVOY_LOG(warn, "thread synchronizer: barrier on {} stuck for 10 seconds", event_name);
@@ -72,7 +72,7 @@ void ThreadSynchronizer::barrierOnWorker(absl::string_view event_name) {
 
 void ThreadSynchronizer::signalWorker(absl::string_view event_name) {
   SynchronizerEntry& entry = getOrCreateEntry(event_name);
-  absl::MutexLock lock(&entry.mutex_);
+  absl::MutexLock lock(entry.mutex_);
   ASSERT(!entry.signaled_);
   ENVOY_LOG(debug, "thread synchronizer: signaling {}", event_name);
   entry.signaled_ = true;

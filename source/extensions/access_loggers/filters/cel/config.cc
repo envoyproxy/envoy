@@ -16,7 +16,7 @@ namespace CEL {
 
 Envoy::AccessLog::FilterPtr CELAccessLogExtensionFilterFactory::createFilter(
     const envoy::config::accesslog::v3::ExtensionFilter& config,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::GenericFactoryContext& context) {
 
   auto factory_config =
       Config::Utility::translateToFactoryConfig(config, context.messageValidationVisitor(), *this);

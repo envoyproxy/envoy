@@ -14,6 +14,7 @@ load("@fuzzing_pip3//:requirements.bzl", pip_fuzzing_dependencies = "install_dep
 load("@io_bazel_rules_go//go:deps.bzl", "go_download_sdk", "go_register_toolchains", "go_rules_dependencies")
 load("@proxy_wasm_rust_sdk//bazel:dependencies.bzl", "proxy_wasm_rust_sdk_dependencies")
 load("@rules_buf//buf:repositories.bzl", "rules_buf_toolchains")
+load("@rules_cc//cc:extensions.bzl", "compatibility_proxy_repo")
 load("@rules_foreign_cc//foreign_cc:repositories.bzl", "rules_foreign_cc_dependencies")
 load("@rules_fuzzing//fuzzing:repositories.bzl", "rules_fuzzing_dependencies")
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
@@ -38,6 +39,7 @@ def envoy_dependency_imports(
         yq_version = YQ_VERSION,
         buf_sha = BUF_SHA,
         buf_version = BUF_VERSION):
+    compatibility_proxy_repo()
     rules_foreign_cc_dependencies()
     go_rules_dependencies()
     go_register_toolchains(go_version)

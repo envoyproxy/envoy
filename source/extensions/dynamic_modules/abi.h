@@ -1365,6 +1365,22 @@ bool envoy_dynamic_module_callback_http_drain_request_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t number_of_bytes);
 
 /**
+ * envoy_dynamic_module_callback_http_inject_request_body is called by the module to
+ * inject the given request data directly into the filter stream. This method should only be called
+ * from a scheduled event.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param data is the pointer to the buffer of the data to be injected.
+ * @param length is the length of the data.
+ * @param end_stream is true if this is the last data to be injected.
+ * @return true if the body is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_inject_request_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr data, size_t length, bool end_stream);
+
+/**
  * This is the same as envoy_dynamic_module_callback_http_get_request_body_vector, but for the
  * response body. See the comments on envoy_dynamic_module_callback_http_get_request_body_vector
  * for more details.
@@ -1396,6 +1412,22 @@ bool envoy_dynamic_module_callback_http_append_response_body(
  */
 bool envoy_dynamic_module_callback_http_drain_response_body(
     envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr, size_t number_of_bytes);
+
+/**
+ * envoy_dynamic_module_callback_http_inject_response_body is called by the module to
+ * inject the given response data directly into the filter stream. This method should only be called
+ * from a scheduled event.
+ *
+ * @param filter_envoy_ptr is the pointer to the DynamicModuleHttpFilter object of the
+ * corresponding HTTP filter.
+ * @param data is the pointer to the buffer of the data to be injected.
+ * @param length is the length of the data.
+ * @param end_stream is true if this is the last data to be injected.
+ * @return true if the body is available, false otherwise.
+ */
+bool envoy_dynamic_module_callback_http_inject_response_body(
+    envoy_dynamic_module_type_http_filter_envoy_ptr filter_envoy_ptr,
+    envoy_dynamic_module_type_buffer_module_ptr data, size_t length, bool end_stream);
 
 // ---------------------------- Metadata Callbacks -----------------------------
 
