@@ -547,7 +547,6 @@ BaseIntegrationTest::waitForAccessLogEntries(const std::string& filename,
     contents = TestEnvironment::readFileToStringForTest(filename);
     entries = absl::StrSplit(contents, '\n', absl::SkipEmpty());
     if (min_entries.has_value() && entries.size() >= min_entries.value()) {
-      ENVOY_LOG_MISC(info, "seen content: {}", contents);
       return entries;
     }
     if (i % 25 == 0 && client_connection != nullptr) {

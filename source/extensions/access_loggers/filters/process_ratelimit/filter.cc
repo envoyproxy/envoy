@@ -20,7 +20,6 @@ ProcessRateLimitFilter::ProcessRateLimitFilter(
       [this, cancel_cb = std::shared_ptr<bool>(cancel_cb_)](
           Envoy::Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterSharedPtr limiter)
       -> void {
-    ENVOY_LOG_MISC(debug, "setter called");
     if (*cancel_cb) {
       return;
     }
