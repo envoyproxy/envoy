@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/common/optref.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/typed_metadata.h"
@@ -40,7 +41,7 @@ public:
   static absl::StatusOr<std::unique_ptr<TransportSocketMatcherImpl>> create(
       const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
           socket_matches,
-      const xds::type::matcher::v3::Matcher* transport_socket_matcher,
+      OptRef<const xds::type::matcher::v3::Matcher> transport_socket_matcher,
       Server::Configuration::TransportSocketFactoryContext& factory_context,
       Network::UpstreamTransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope);
 
@@ -98,7 +99,7 @@ protected:
   TransportSocketMatcherImpl(
       const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
           socket_matches,
-      const xds::type::matcher::v3::Matcher* transport_socket_matcher,
+      OptRef<const xds::type::matcher::v3::Matcher> transport_socket_matcher,
       Server::Configuration::TransportSocketFactoryContext& factory_context,
       Network::UpstreamTransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope,
       absl::Status& creation_status);
@@ -123,7 +124,7 @@ private:
    * @param creation_status reference to store creation status.
    */
   void setupTransportSocketMatcher(
-      const xds::type::matcher::v3::Matcher* transport_socket_matcher,
+      OptRef<const xds::type::matcher::v3::Matcher> transport_socket_matcher,
       const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
           socket_matches,
       Server::Configuration::TransportSocketFactoryContext& factory_context,

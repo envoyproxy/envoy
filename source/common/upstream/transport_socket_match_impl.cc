@@ -30,7 +30,7 @@ absl::StatusOr<std::unique_ptr<TransportSocketMatcherImpl>> TransportSocketMatch
 absl::StatusOr<std::unique_ptr<TransportSocketMatcherImpl>> TransportSocketMatcherImpl::create(
     const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
         socket_matches,
-    const xds::type::matcher::v3::Matcher* transport_socket_matcher,
+    OptRef<const xds::type::matcher::v3::Matcher> transport_socket_matcher,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Network::UpstreamTransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope) {
   absl::Status creation_status = absl::OkStatus();
@@ -69,14 +69,14 @@ TransportSocketMatcherImpl::TransportSocketMatcherImpl(
 TransportSocketMatcherImpl::TransportSocketMatcherImpl(
     const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
         socket_matches,
-    const xds::type::matcher::v3::Matcher* transport_socket_matcher,
+    OptRef<const xds::type::matcher::v3::Matcher> transport_socket_matcher,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Network::UpstreamTransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope,
     absl::Status& creation_status)
     : stats_scope_(stats_scope),
       default_match_("default", std::move(default_factory), generateStats("default")) {
   // Setup transport socket matcher if provided.
-  if (transport_socket_matcher) {
+  if (transport_socket_matcher.has_value()) {
     setupTransportSocketMatcher(transport_socket_matcher, socket_matches, factory_context,
                                 creation_status);
     if (!creation_status.ok()) {
@@ -212,7 +212,7 @@ TransportSocketMatcher::MatchData TransportSocketMatcherImpl::resolveUsingMatche
 }
 
 void TransportSocketMatcherImpl::setupTransportSocketMatcher(
-    const xds::type::matcher::v3::Matcher* transport_socket_matcher,
+    OptRef<const xds::type::matcher::v3::Matcher> transport_socket_matcher,
     const Protobuf::RepeatedPtrField<envoy::config::cluster::v3::Cluster::TransportSocketMatch>&
         socket_matches,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
@@ -244,7 +244,7 @@ void TransportSocketMatcherImpl::setupTransportSocketMatcher(
   }
 
   // Construct matcher if present in the cluster configuration.
-  if (transport_socket_matcher != nullptr) {
+  if (transport_socket_matcher.has_value()) {
     // Create a custom match tree factory that uses direct socket name extraction
     // instead of the standard action factory registry lookup.
     class TransportSocketMatchTreeFactory {
@@ -364,7 +364,7 @@ void TransportSocketMatcherImpl::setupTransportSocketMatcher(
     absl::Status tree_status;
     TransportSocketMatchTreeFactory factory(factory_context.serverFactoryContext(),
                                             validation_visitor, tree_status);
-    matcher_ = factory.create(*transport_socket_matcher);
+    matcher_ = factory.create(transport_socket_matcher.ref());
     if (!tree_status.ok()) {
       creation_status = tree_status;
       return;

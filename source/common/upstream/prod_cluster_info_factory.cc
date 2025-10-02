@@ -22,9 +22,10 @@ ProdClusterInfoFactory::createClusterInfo(const CreateClusterInfoParams& params)
   Network::UpstreamTransportSocketFactoryPtr socket_factory = THROW_OR_RETURN_VALUE(
       Upstream::createTransportSocketFactory(params.cluster_, factory_context),
       Network::UpstreamTransportSocketFactoryPtr);
-  const auto* matcher = params.cluster_.has_transport_socket_matcher()
-                            ? &params.cluster_.transport_socket_matcher()
-                            : nullptr;
+  OptRef<const xds::type::matcher::v3::Matcher> matcher;
+  if (params.cluster_.has_transport_socket_matcher()) {
+    matcher = makeOptRefFromPtr(&params.cluster_.transport_socket_matcher());
+  }
   auto socket_matcher = THROW_OR_RETURN_VALUE(
       TransportSocketMatcherImpl::create(params.cluster_.transport_socket_matches(), matcher,
                                          factory_context, socket_factory, *scope),

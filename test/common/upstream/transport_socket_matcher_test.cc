@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/common/optref.h"
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/core/v3/base.pb.validate.h"
@@ -289,8 +290,9 @@ matcher_tree:
                             matcher);
 
   // Create matcher instance with xDS configuration.
-  matcher_ = TransportSocketMatcherImpl::create(matches, &matcher, mock_factory_context_,
-                                                mock_default_factory_, *stats_scope_)
+  matcher_ = TransportSocketMatcherImpl::create(matches, makeOptRefFromPtr(&matcher),
+                                                mock_factory_context_, mock_default_factory_,
+                                                *stats_scope_)
                  .value();
 
   // Endpoint metadata selects tls.
@@ -366,8 +368,9 @@ on_no_match:
 )EOF",
                             matcher);
 
-  matcher_ = TransportSocketMatcherImpl::create(matches, &matcher, mock_factory_context_,
-                                                mock_default_factory_, *stats_scope_)
+  matcher_ = TransportSocketMatcherImpl::create(matches, makeOptRefFromPtr(&matcher),
+                                                mock_factory_context_, mock_default_factory_,
+                                                *stats_scope_)
                  .value();
 
   // Connection info provider with requested server name.
@@ -440,8 +443,9 @@ on_no_match:
 )EOF",
                             matcher);
 
-  matcher_ = TransportSocketMatcherImpl::create(matches, &matcher, mock_factory_context_,
-                                                mock_default_factory_, *stats_scope_)
+  matcher_ = TransportSocketMatcherImpl::create(matches, makeOptRefFromPtr(&matcher),
+                                                mock_factory_context_, mock_default_factory_,
+                                                *stats_scope_)
                  .value();
 
   // Remote loopback source IP -> TLS.
@@ -668,8 +672,9 @@ matcher_tree:
 )EOF",
                             matcher);
 
-  matcher_ = TransportSocketMatcherImpl::create(matches, &matcher, mock_factory_context_,
-                                                mock_default_factory_, *stats_scope_)
+  matcher_ = TransportSocketMatcherImpl::create(matches, makeOptRefFromPtr(&matcher),
+                                                mock_factory_context_, mock_default_factory_,
+                                                *stats_scope_)
                  .value();
 
   // Because factories created from the map do not support ALPN, the overall answer is false.
@@ -735,8 +740,9 @@ matcher_tree:
 )EOF",
                             matcher);
 
-  matcher_ = TransportSocketMatcherImpl::create(matches, &matcher, mock_factory_context_,
-                                                mock_default_factory_, *stats_scope_)
+  matcher_ = TransportSocketMatcherImpl::create(matches, makeOptRefFromPtr(&matcher),
+                                                mock_factory_context_, mock_default_factory_,
+                                                *stats_scope_)
                  .value();
 
   auto* impl = dynamic_cast<TransportSocketMatcherImpl*>(matcher_.get());
@@ -763,8 +769,9 @@ transport_socket:
 
   // Matcher with MATCHER_TYPE_NOT_SET triggers AnyMatcher path -> default.
   xds::type::matcher::v3::Matcher matcher; // left empty intentionally
-  auto result_or = TransportSocketMatcherImpl::create(matches, &matcher, mock_factory_context_,
-                                                      mock_default_factory_, *stats_scope_);
+  auto result_or = TransportSocketMatcherImpl::create(matches, makeOptRefFromPtr(&matcher),
+                                                      mock_factory_context_, mock_default_factory_,
+                                                      *stats_scope_);
   ASSERT_TRUE(result_or.ok()) << result_or.status();
   matcher_ = std::move(*result_or);
 
@@ -788,8 +795,9 @@ transport_socket:
 )EOF",
                               *m);
     xds::type::matcher::v3::Matcher matcher; // any matcher present triggers setup path
-    auto created = TransportSocketMatcherImpl::create(matches, &matcher, mock_factory_context_,
-                                                      mock_default_factory_, *stats_scope_);
+    auto created = TransportSocketMatcherImpl::create(matches, makeOptRefFromPtr(&matcher),
+                                                      mock_factory_context_, mock_default_factory_,
+                                                      *stats_scope_);
     EXPECT_FALSE(created.ok());
     EXPECT_TRUE(absl::IsInvalidArgument(created.status())) << created.status();
   }
@@ -821,8 +829,9 @@ transport_socket:
                               *m2);
 
     xds::type::matcher::v3::Matcher matcher; // triggers setup path
-    auto created = TransportSocketMatcherImpl::create(matches, &matcher, mock_factory_context_,
-                                                      mock_default_factory_, *stats_scope_);
+    auto created = TransportSocketMatcherImpl::create(matches, makeOptRefFromPtr(&matcher),
+                                                      mock_factory_context_, mock_default_factory_,
+                                                      *stats_scope_);
     EXPECT_FALSE(created.ok());
     EXPECT_TRUE(absl::IsInvalidArgument(created.status())) << created.status();
   }
@@ -861,8 +870,9 @@ matcher_tree:
 )EOF",
                             matcher);
 
-  auto created = TransportSocketMatcherImpl::create(matches, &matcher, mock_factory_context_,
-                                                    mock_default_factory_, *stats_scope_);
+  auto created = TransportSocketMatcherImpl::create(matches, makeOptRefFromPtr(&matcher),
+                                                    mock_factory_context_, mock_default_factory_,
+                                                    *stats_scope_);
   ASSERT_TRUE(created.ok()) << created.status();
   matcher_ = std::move(*created);
   auto& factory = matcher_->resolve(nullptr, nullptr).factory_;
@@ -903,8 +913,9 @@ matcher_tree:
 )EOF",
                             matcher);
 
-  auto created = TransportSocketMatcherImpl::create(matches, &matcher, mock_factory_context_,
-                                                    mock_default_factory_, *stats_scope_);
+  auto created = TransportSocketMatcherImpl::create(matches, makeOptRefFromPtr(&matcher),
+                                                    mock_factory_context_, mock_default_factory_,
+                                                    *stats_scope_);
   ASSERT_TRUE(created.ok()) << created.status();
   matcher_ = std::move(*created);
   auto& factory = matcher_->resolve(nullptr, nullptr).factory_;
