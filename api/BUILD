@@ -210,6 +210,7 @@ proto_library(
         "//envoy/extensions/filters/http/kill_request/v3:pkg",
         "//envoy/extensions/filters/http/local_ratelimit/v3:pkg",
         "//envoy/extensions/filters/http/lua/v3:pkg",
+        "//envoy/extensions/filters/http/mcp/v3:pkg",
         "//envoy/extensions/filters/http/oauth2/v3:pkg",
         "//envoy/extensions/filters/http/on_demand/v3:pkg",
         "//envoy/extensions/filters/http/original_src/v3:pkg",

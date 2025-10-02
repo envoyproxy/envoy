@@ -52,6 +52,7 @@ HTTP filters
   language_filter
   local_rate_limit_filter
   lua_filter
+  mcp_filter
   oauth2_filter
   on_demand_updates_filter
   original_src_filter
