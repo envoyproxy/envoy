@@ -50,6 +50,9 @@ namespace LocalRateLimit {
 // 7. When the configuration is updated via xDS, the TokenBucketSubscription
 //    updates the shared LocalRateLimiterImpl instance, affecting all filters
 //    using it.
+// 8. When the configuration is removed via xDS, the TokenBucketSubscription
+//    resets the shared LocalRateLimiterImpl instance to an AlwaysDeny limiter.
+//    This prevents new filters from using the old limiter.
 class RateLimiterProviderSingleton;
 using RateLimiterProviderSingletonSharedPtr = std::shared_ptr<RateLimiterProviderSingleton>;
 class RateLimiterProviderSingleton : public Singleton::Instance {
