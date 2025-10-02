@@ -27,8 +27,7 @@ using McpFilterConfigSharedPtr = std::shared_ptr<McpFilterConfig>;
 /**
  * HTTP MCP filter implementation.
  */
-class McpFilter : public Http::PassThroughFilter,
-                  public Logger::Loggable<Logger::Id::filter> {
+class McpFilter : public Http::PassThroughFilter, public Logger::Loggable<Logger::Id::filter> {
 public:
   explicit McpFilter(McpFilterConfigSharedPtr config) : config_(config) {}
 
@@ -37,7 +36,7 @@ public:
                                           bool end_stream) override;
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
 
-  // Http::StreamEncoderFilter  
+  // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
                                           bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;

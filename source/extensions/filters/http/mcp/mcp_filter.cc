@@ -7,8 +7,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Mcp {
 
-Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap&,
-                                                   bool) {
+Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap&, bool) {
   // TODO: Implement MCP request header processing
   return Http::FilterHeadersStatus::Continue;
 }
@@ -18,14 +17,13 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance&, bool) {
   return Http::FilterDataStatus::Continue;
 }
 
-Http::FilterHeadersStatus McpFilter::encodeHeaders(Http::ResponseHeaderMap&,
-                                                   bool) {
+Http::FilterHeadersStatus McpFilter::encodeHeaders(Http::ResponseHeaderMap&, bool) {
   // TODO: Implement MCP response header processing
   return Http::FilterHeadersStatus::Continue;
 }
 
 Http::FilterDataStatus McpFilter::encodeData(Buffer::Instance&, bool) {
-  // TODO: Implement MCP response data processing  
+  // TODO: Implement MCP response data processing
   return Http::FilterDataStatus::Continue;
 }
 
