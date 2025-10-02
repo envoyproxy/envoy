@@ -110,10 +110,11 @@ message ProcessingMode {
     FULL_DUPLEX_STREAMED = 4;
 
     // [#not-implemented-hide:]
-    // gRPC traffic. In this mode, the ext_proc client will de-frame the
-    // individual gRPC messages inside the HTTP/2 DATA frames, and as each
-    // message is de-framed, it will be sent to the ext_proc server as a
-    // :ref:`request_body
+    // A mode for gRPC traffic.  This is similar to ``FULL_DUPLEX_STREAMED``,
+    // except that instead of sending raw chunks of the HTTP/2 DATA frames,
+    // the ext_proc client will de-frame the individual gRPC messages inside
+    // the HTTP/2 DATA frames, and as each message is de-framed, it will be
+    // sent to the ext_proc server as a :ref:`request_body
     // <envoy_v3_api_field_service.ext_proc.v3.ProcessingRequest.request_body>`
     // or :ref:`response_body
     // <envoy_v3_api_field_service.ext_proc.v3.ProcessingRequest.response_body>`.
