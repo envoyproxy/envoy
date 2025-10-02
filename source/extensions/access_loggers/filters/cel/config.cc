@@ -33,13 +33,11 @@ Envoy::AccessLog::FilterPtr CELAccessLogExtensionFilterFactory::createFilter(
   }
 
   // Use the CEL configuration from the filter if available.
-  Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder;
-  if (cel_config.has_cel_config()) {
-    builder = Extensions::Filters::Common::Expr::getBuilder(context.serverFactoryContext(),
-                                                            cel_config.cel_config());
-  } else {
-    builder = Extensions::Filters::Common::Expr::getBuilder(context.serverFactoryContext());
-  }
+  auto config_ref = cel_config.has_cel_config()
+                        ? Envoy::makeOptRef(cel_config.cel_config())
+                        : Envoy::OptRef<const envoy::config::core::v3::CelExpressionConfig>{};
+  auto builder =
+      Extensions::Filters::Common::Expr::getBuilder(context.serverFactoryContext(), config_ref);
 
   return std::make_unique<CELAccessLogExtensionFilter>(context.serverFactoryContext().localInfo(),
                                                        builder, parse_status.value().expr());

@@ -3,12 +3,12 @@
 #include "envoy/common/exception.h"
 #include "envoy/singleton/manager.h"
 
+#include "source/common/protobuf/utility.h"
 #include "source/common/runtime/runtime_features.h"
 
 #include "extensions/regex_functions.h"
 #include "extensions/strings.h"
 
-#include "absl/hash/hash.h"
 #include "cel/expr/syntax.pb.h"
 #include "eval/public/builtin_func_registrar.h"
 #include "eval/public/cel_expr_builder_factory.h"
@@ -104,7 +104,7 @@ ActivationPtr createActivation(const LocalInfo::LocalInfo* local_info,
 }
 
 BuilderPtr createBuilder(Protobuf::Arena* arena,
-                         const envoy::config::core::v3::CelExpressionConfig* config) {
+                         OptRef<const envoy::config::core::v3::CelExpressionConfig> config) {
   ASSERT_IS_MAIN_OR_TEST_THREAD();
   google::api::expr::runtime::InterpreterOptions options;
 
@@ -117,7 +117,7 @@ BuilderPtr createBuilder(Protobuf::Arena* arena,
   // Resolve options from configuration or fall back to security-oriented defaults.
   bool enable_string_functions = false;
   bool enable_constant_folding = false;
-  if (config != nullptr) {
+  if (config.has_value()) {
     options.enable_string_conversion = config->enable_string_conversion();
     options.enable_string_concat = config->enable_string_concat();
     enable_string_functions = config->enable_string_functions();
@@ -167,53 +167,50 @@ BuilderPtr createBuilder(Protobuf::Arena* arena,
 
 // Nested map to store builders for different configurations.
 // The outer map is a singleton, and the inner map stores builders by configuration hash.
-class BuilderCache : public Singleton::Instance {
+class BuilderCache : public Singleton::Instance, public std::enable_shared_from_this<BuilderCache> {
 public:
   using ConfigHash = size_t;
 
   BuilderInstanceSharedConstPtr
-  getOrCreateBuilder(const envoy::config::core::v3::CelExpressionConfig* config) {
+  getOrCreateBuilder(OptRef<const envoy::config::core::v3::CelExpressionConfig> config) {
+    ASSERT_IS_MAIN_OR_TEST_THREAD();
+
     ConfigHash hash = 0;
-    if (config) {
-      // Create a simple hash based on the configuration values.
-      hash = absl::HashOf(config->enable_string_conversion(), config->enable_string_concat(),
-                          config->enable_string_functions(), config->enable_constant_folding());
+    if (config.has_value()) {
+      // Use MessageUtil::hash for proto hashing.
+      hash = MessageUtil::hash(config.ref());
     }
 
-    absl::MutexLock lock(&mutex_);
     auto it = builders_.find(hash);
     if (it != builders_.end()) {
-      return it->second;
+      auto locked_builder = it->second.lock();
+      if (locked_builder) {
+        return locked_builder;
+      }
     }
 
     // Create new builder with the configuration.
     auto builder = createBuilder(nullptr, config);
-    auto instance = std::make_shared<BuilderInstance>(std::move(builder));
+    auto instance = std::make_shared<BuilderInstance>(std::move(builder), shared_from_this());
+    // Store as weak_ptr to avoid circular references.
+    // TODO(envoy): Add periodic cleanup of expired weak_ptr entries.
     builders_[hash] = instance;
     return instance;
   }
 
 private:
-  absl::Mutex mutex_;
-  absl::flat_hash_map<ConfigHash, BuilderInstanceSharedConstPtr> builders_ ABSL_GUARDED_BY(mutex_);
+  absl::flat_hash_map<ConfigHash, std::weak_ptr<const BuilderInstance>> builders_;
 };
 
 SINGLETON_MANAGER_REGISTRATION(builder_cache);
 
-BuilderInstanceSharedConstPtr getBuilder(Server::Configuration::CommonFactoryContext& context) {
-  auto cache = context.singletonManager().getTyped<BuilderCache>(
-      SINGLETON_MANAGER_REGISTERED_NAME(builder_cache),
-      [] { return std::make_shared<BuilderCache>(); });
-  return cache->getOrCreateBuilder(nullptr);
-}
-
 BuilderInstanceSharedConstPtr
 getBuilder(Server::Configuration::CommonFactoryContext& context,
-           const envoy::config::core::v3::CelExpressionConfig& config) {
+           OptRef<const envoy::config::core::v3::CelExpressionConfig> config) {
   auto cache = context.singletonManager().getTyped<BuilderCache>(
       SINGLETON_MANAGER_REGISTERED_NAME(builder_cache),
       [] { return std::make_shared<BuilderCache>(); });
-  return cache->getOrCreateBuilder(&config);
+  return cache->getOrCreateBuilder(config);
 }
 
 BuilderInstanceSharedConstPtr
@@ -225,55 +222,46 @@ getBuilderWithArenaOptimization(Server::Configuration::CommonFactoryContext& con
     return getArenaOptimizedBuilder(arena, config);
   }
   // Otherwise fall-back to the cached builder.
-  return getBuilder(context, config);
+  return getBuilder(context, makeOptRef(config));
 }
-
-namespace {
-
-// Helper function to get error message for invalid arena optimization request.
-const std::string& getArenaOptimizationErrorMessage() {
-  CONSTRUCT_ON_FIRST_USE(std::string,
-                         "Arena-optimized builder requires both arena and enable_constant_folding");
-}
-
-} // namespace
 
 // Creates an arena-optimized builder for performance-critical scenarios.
 // This bypasses caching to enable constant folding with arena.
 BuilderInstanceSharedConstPtr
 getArenaOptimizedBuilder(Protobuf::Arena* arena,
                          const envoy::config::core::v3::CelExpressionConfig& config) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+
   if (arena == nullptr || !config.enable_constant_folding()) {
-    throw CelException(getArenaOptimizationErrorMessage());
+    return nullptr;
   }
 
-  auto builder = createBuilder(arena, &config);
-  return std::make_shared<BuilderInstance>(std::move(builder));
+  auto builder = createBuilder(arena, makeOptRef(config));
+  // Arena-optimized builders don't need BuilderCache reference since they're not cached.
+  return std::make_shared<BuilderInstance>(std::move(builder), nullptr);
 }
 
 absl::StatusOr<CompiledExpression>
 CompiledExpression::Create(Server::Configuration::CommonFactoryContext& context,
                            const cel::expr::Expr& expr,
-                           const envoy::config::core::v3::CelExpressionConfig* config) {
-  BuilderInstanceSharedConstPtr builder;
-  if (config) {
-    builder = getBuilder(context, *config);
-  } else {
-    builder = getBuilder(context);
-  }
+                           OptRef<const envoy::config::core::v3::CelExpressionConfig> config) {
+  auto builder = getBuilder(context, config);
   return Create(builder, expr);
 }
 
 absl::StatusOr<CompiledExpression>
 CompiledExpression::CreateWithArena(Protobuf::Arena* arena, const cel::expr::Expr& expr,
                                     const envoy::config::core::v3::CelExpressionConfig& config) {
-  if (arena != nullptr && config.enable_constant_folding()) {
-    // Use arena-optimized builder for performance.
-    auto builder = getArenaOptimizedBuilder(arena, config);
-    return Create(builder, expr);
-  } else {
-    throw CelException(getArenaOptimizationErrorMessage());
+  if (arena == nullptr || !config.enable_constant_folding()) {
+    return absl::InvalidArgumentError(
+        "Arena-optimized builder requires both arena and enable_constant_folding");
   }
+
+  auto builder = getArenaOptimizedBuilder(arena, config);
+  if (!builder) {
+    return absl::InvalidArgumentError("Failed to create arena-optimized builder");
+  }
+  return Create(builder, expr);
 }
 
 absl::StatusOr<CompiledExpression>

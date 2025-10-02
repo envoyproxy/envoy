@@ -207,17 +207,19 @@ public:
         expr_([&]() -> absl::optional<Expr::CompiledExpression> {
           if (policy.has_condition()) {
             // Use the CEL configuration from the policy if available.
-            const envoy::config::core::v3::CelExpressionConfig* config =
-                policy.has_cel_config() ? &policy.cel_config() : nullptr;
-            absl::StatusOr<Expr::CompiledExpression> compiled =
-                config != nullptr ? ([&]() {
-                  // Use arena-optimized builder when configuration allows constant folding.
-                  auto builder =
-                      Expr::getBuilderWithArenaOptimization(context, *config, arena_.get());
-                  return Expr::CompiledExpression::Create(builder, policy.condition());
-                })()
-                                  : Expr::CompiledExpression::Create(Expr::getBuilder(context),
-                                                                     policy.condition());
+            auto config_ref =
+                policy.has_cel_config()
+                    ? Envoy::makeOptRef(policy.cel_config())
+                    : Envoy::OptRef<const envoy::config::core::v3::CelExpressionConfig>{};
+
+            // Get the appropriate builder based on configuration.
+            auto builder =
+                (policy.has_cel_config() && policy.cel_config().enable_constant_folding())
+                    ? Expr::getBuilderWithArenaOptimization(context, policy.cel_config(),
+                                                            arena_.get())
+                    : Expr::getBuilder(context, config_ref);
+
+            auto compiled = Expr::CompiledExpression::Create(builder, policy.condition());
             if (!compiled.ok()) {
               throw Expr::CelException(
                   absl::StrCat("failed to create an expression: ", compiled.status().message()));

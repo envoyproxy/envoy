@@ -20,8 +20,8 @@ namespace {
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::common::expr::EvaluatorTestCase& input) {
   // Create builder without constant folding.
-  static auto builder_ptr = Expr::createBuilder(nullptr);
-  static auto builder = std::make_shared<BuilderInstance>(std::move(builder_ptr));
+  static auto builder_ptr = Expr::createBuilder(nullptr, {});
+  static auto builder = std::make_shared<BuilderInstance>(std::move(builder_ptr), nullptr);
   MockTimeSystem time_source;
   std::unique_ptr<TestStreamInfo> stream_info;
 

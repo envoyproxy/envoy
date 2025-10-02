@@ -214,7 +214,7 @@ TEST_F(CelConfigTest, CreateWithConfig) {
   call_expr->add_args()->mutable_const_expr()->set_string_value("we");
 
   // Create expression with configuration.
-  auto compiled = CompiledExpression::Create(context_, replace_expr, &config);
+  auto compiled = CompiledExpression::Create(context_, replace_expr, makeOptRef(config));
   ASSERT_TRUE(compiled.ok());
 
   auto activation = createActivation(nullptr, *stream_info_, nullptr, nullptr, nullptr);

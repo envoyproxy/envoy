@@ -82,9 +82,11 @@ using ::Envoy::Http::TestResponseTrailerMapImpl;
 using ::Envoy::Http::ExternalProcessing::SaveProcessingResponseFactory;
 using ::Envoy::Http::ExternalProcessing::SaveProcessingResponseFilterState;
 
+using ::testing::AnyNumber;
 using ::testing::Eq;
 using ::testing::Invoke;
 using ::testing::Return;
+using ::testing::ReturnRef;
 using ::testing::Unused;
 
 using namespace std::chrono_literals;
@@ -136,11 +138,11 @@ protected:
     if (!yaml.empty()) {
       TestUtility::loadFromYaml(yaml, proto_config);
     }
-    auto builder_ptr = Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr);
-    auto builder = std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
-        std::move(builder_ptr));
+    auto builder_ptr = Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr, {});
+    builder_ = std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
+        std::move(builder_ptr), nullptr);
     config_ = std::make_shared<FilterConfig>(proto_config, 200ms, 10000, *stats_store_.rootScope(),
-                                             "", is_upstream_filter, builder, factory_context_);
+                                             "", is_upstream_filter, builder_, factory_context_);
     filter_ = std::make_unique<Filter>(config_, std::move(client_));
     filter_->setEncoderFilterCallbacks(encoder_callbacks_);
     EXPECT_CALL(encoder_callbacks_, encoderBufferLimit()).WillRepeatedly(Return(BufferSize));
@@ -661,6 +663,7 @@ protected:
   envoy::config::core::v3::Metadata dynamic_metadata_;
   testing::NiceMock<Network::MockConnection> connection_;
   NiceMock<Server::Configuration::MockServerFactoryContext> factory_context_;
+  Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder_;
 };
 
 // Using the default configuration, test the filter with a processor that
@@ -3481,7 +3484,9 @@ TEST_F(HttpFilterTest, OutOfOrderFailClose) {
 class OverrideTest : public testing::Test {
 protected:
   void SetUp() override {
-    builder_ = Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr);
+    auto builder_ptr = Envoy::Extensions::Filters::Common::Expr::createBuilder(nullptr, {});
+    builder_ = std::make_shared<Envoy::Extensions::Filters::Common::Expr::BuilderInstance>(
+        std::move(builder_ptr), nullptr);
   }
 
   Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder_;
