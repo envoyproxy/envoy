@@ -21,7 +21,7 @@ public:
     // An immediate response was sent.
     ImmediateResponse,
     // The processor response sent a mutation that sent status code
-    // CONTINUE_AND_REPLACE to process body mutatins.
+    // CONTINUE_AND_REPLACE to process body mutations.
     // This is only used for header requests/responses.
     ContinueAndReplace
   };

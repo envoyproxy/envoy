@@ -4552,7 +4552,7 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoGRPCTimeout) {
   EXPECT_EQ(*field_request_header_status, "4");
 }
 
-// Test that the filter state is applied with mutations from the external processor.  This test
+// Test that the filter state is applied with mutations from the external processor. This test
 // covers all processing phases.
 TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoAppliedMutations) {
   proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
@@ -4769,6 +4769,47 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoImmediateResponse) {
   auto field_request_body_effect = json_log->getString("field_request_body_effect");
   EXPECT_TRUE(field_request_body_effect.ok());
   EXPECT_EQ(*field_request_body_effect, "2");
+  cleanupUpstreamAndDownstream();
+}
+
+TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoInvalidMutation) {
+  auto access_log_path = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+  proto_config_.mutable_processing_mode()->set_request_header_mode(ProcessingMode::SEND);
+  proto_config_.mutable_mutation_rules()->mutable_disallow_is_error()->set_value(true);
+
+  config_helper_.addConfigModifier([&](HttpConnectionManager& cm) {
+    auto* access_log = cm.add_access_log();
+    access_log->set_name("accesslog");
+    envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+    access_log_config.set_path(access_log_path);
+    auto* json_format = access_log_config.mutable_log_format()->mutable_json_format();
+    (*json_format->mutable_fields())["field_request_header_effect"].set_string_value(
+        "%FILTER_STATE(envoy.filters.http.ext_proc:FIELD:request_header_processing_effect)%");
+    access_log->mutable_typed_config()->PackFrom(access_log_config);
+  });
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+
+  auto response = sendDownstreamRequestWithBody("some_body", absl::nullopt);
+
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders&, HeadersResponse& headers_resp) {
+        // Attempt an invalid mutation
+        auto* mut = headers_resp.mutable_response()->mutable_header_mutation()->add_set_headers();
+        mut->mutable_header()->set_key(":scheme");
+        mut->mutable_header()->set_raw_value("https");
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 500);
+
+  std::string log_result = waitForAccessLog(access_log_path, 0, true);
+  auto json_log = Json::Factory::loadFromString(log_result).value();
+  auto field_request_header_effect = json_log->getString("field_request_header_effect");
+  EXPECT_TRUE(field_request_header_effect.ok());
+  // 2 corresponds to IMMEDIATE_RESPONSE
+  EXPECT_EQ(*field_request_header_effect, "2");
+
   cleanupUpstreamAndDownstream();
 }
 
