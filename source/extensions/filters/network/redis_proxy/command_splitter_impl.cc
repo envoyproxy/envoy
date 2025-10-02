@@ -1,6 +1,8 @@
 #include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
+#include "source/extensions/filters/network/redis_proxy/cluster_response_handler.h"
 
 #include <cstdint>
+#include <chrono>
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
@@ -15,6 +17,51 @@ namespace {
 // null_pool_callbacks is used for requests that must be filtered and not redirected such as
 // "asking".
 ConnPool::DoNothingPoolCallbacks null_pool_callbacks;
+
+/**
+ * Generic validation for commands with subcommand restrictions
+ * @param command the command name (e.g., "cluster", "randomkey")
+ * @param incoming_request the incoming request array
+ * @param command_stats statistics to update on error
+ * @param callbacks callbacks to send error responses
+ * @return true if valid, false if invalid (error already sent)
+ */
+bool validateCommandSubcommands(const std::string& command,
+                               const Common::Redis::RespValue& incoming_request,
+                               CommandStats& command_stats, SplitCallbacks& callbacks) {
+  const Common::Redis::CommandSubcommandMap& validation_map = 
+      Common::Redis::SupportedCommands::commandSubcommandValidationMap();
+  
+  // If command is not in validation map, all subcommands are allowed
+  // This handles commands like "randomkey" that don't have subcommand restrictions
+  auto it = validation_map.find(command);
+  if (it == validation_map.end()) {
+    return true; // No validation needed - all forms of the command are supported
+  }
+  
+  // Command is in validation map, so it has subcommand restrictions
+  // Ensure it has at least one subcommand argument
+  if (incoming_request.asArray().size() < 2) {
+    command_stats.error_.inc();
+    callbacks.onResponse(Common::Redis::Utility::makeError(
+        fmt::format("ERR wrong number of arguments for '{}' command", command)));
+    return false;
+  }
+  
+  // Validate the subcommand against the allowlist
+  const std::string subcommand = absl::AsciiStrToLower(incoming_request.asArray()[1].asString());
+  const auto& allowed_subcommands = it->second;
+  
+  if (allowed_subcommands.find(subcommand) == allowed_subcommands.end()) {
+    command_stats.error_.inc();
+    callbacks.onResponse(Common::Redis::Utility::makeError(
+        fmt::format("ERR {} subcommand '{}' is not supported", 
+                    command, incoming_request.asArray()[1].asString())));
+    return false;
+  }
+  
+  return true;
+}
 
 /**
  * Make request and maybe mirror the request based on the mirror policies of the route.
@@ -715,6 +762,146 @@ void SelectRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_
   }
 }
 
+SplitRequestPtr RandomShardRequest::create(Router& router,
+                                          Common::Redis::RespValuePtr&& incoming_request,
+                                          SplitCallbacks& callbacks, CommandStats& command_stats,
+                                          TimeSource& time_source, bool delay_command_latency,
+                                          const StreamInfo::StreamInfo& stream_info) {
+  // Use default key (empty string) for routing since these commands aren't tied to specific keys
+  const auto route = router.upstreamPool("", stream_info);
+  if (!route) {
+    command_stats.error_.inc();
+    callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
+    return nullptr;
+  }
+
+  const std::string command = absl::AsciiStrToLower(incoming_request->asArray()[0].asString());
+  
+  // Validate commands with subcommand restrictions
+  if (!validateCommandSubcommands(command, *incoming_request, command_stats, callbacks)) {
+    return nullptr; // Error already sent by validation function
+  }
+  
+  uint32_t shard_size = route->upstream(command)->shardSize();
+  if (shard_size == 0) {
+    command_stats.error_.inc();
+    callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
+    return nullptr;
+  }
+
+  std::unique_ptr<RandomShardRequest> request_ptr{
+      new RandomShardRequest(callbacks, command_stats, time_source, delay_command_latency)};
+
+  // Set up for single shard request - only one pending response
+  request_ptr->num_pending_responses_ = 1;
+  request_ptr->pending_requests_.reserve(1);
+
+  // Select a random shard index using time-based pseudo-randomness
+  // This provides good distribution without needing access to RandomGenerator
+  auto now = std::chrono::duration_cast<std::chrono::microseconds>(
+      time_source.systemTime().time_since_epoch()).count();
+  uint32_t random_shard_index = static_cast<uint32_t>(now) % shard_size;
+
+  // Create single pending request with the random shard index
+  request_ptr->pending_requests_.emplace_back(*request_ptr, random_shard_index);
+  PendingRequest& pending_request = request_ptr->pending_requests_.back();
+
+  Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
+  ENVOY_LOG(debug, "random shard request to shard index {}: {}", random_shard_index, base_request->toString());
+
+  // Send request to the randomly selected shard
+  pending_request.handle_ = makeFragmentedRequestToShard(
+      route, command, random_shard_index, *base_request, pending_request, callbacks.transaction());
+
+  if (!pending_request.handle_) {
+    pending_request.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
+  }
+
+  if (request_ptr->num_pending_responses_ > 0) {
+    return request_ptr;
+  }
+
+  return nullptr;
+}
+
+void RandomShardRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) {
+  
+  pending_requests_[0].handle_ = nullptr; // We only have one request at pending_requests_[0]
+
+  // For random shard requests, we simply forward the response directly
+  // No aggregation or special processing needed
+  ASSERT(num_pending_responses_ > 0);
+  // index is the shard_index that responded (can be any value 0 to shard_size-1)
+  ENVOY_LOG(debug, "random shard response from shard {}: '{}'", index, value->toString());
+  
+  updateStats(value->type() != Common::Redis::RespType::Error);
+  callbacks_.onResponse(std::move(value));
+}
+
+SplitRequestPtr ClusterScopeCmdRequest::create(Router& router,
+                                              Common::Redis::RespValuePtr&& incoming_request,
+                                              SplitCallbacks& callbacks, CommandStats& command_stats,
+                                              TimeSource& time_source, bool delay_command_latency,
+                                              const StreamInfo::StreamInfo& stream_info) {
+
+  const std::string command =  absl::AsciiStrToLower(incoming_request->asArray()[0].asString());
+
+  // Use a default key (empty string) for routing  cluster scope commands
+  // are not tied to specific keys. This relies on having a catch_all_route configured and no prefix set as "".
+  uint32_t shard_size = 0;
+
+  const auto route = router.upstreamPool("", stream_info);
+  if ( !route ) {
+    ENVOY_LOG(error, "route not found: '{}'", incoming_request->toString());
+    callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
+    return nullptr;
+  }
+
+  shard_size = route ? route->upstream(command)->shardSize() : 0;
+  if (shard_size == 0) {
+    command_stats.error_.inc();
+    callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
+    return nullptr;
+  }
+
+  std::unique_ptr<ClusterScopeCmdRequest> request_ptr{
+      new ClusterScopeCmdRequest(callbacks, command_stats, time_source, delay_command_latency)};
+  
+  // Initialize the response handler based on the incoming request and shard size
+  if (!request_ptr->initializeResponseHandler(*incoming_request, shard_size)) {
+    command_stats.error_.inc();
+    callbacks.onResponse(Common::Redis::Utility::makeError(
+        "ERR unsupported cluster scope command or invalid arguments"));
+    return nullptr;
+  }
+  
+  request_ptr->num_pending_responses_ = shard_size;
+  request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
+
+  Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
+  for (uint32_t shard_index = 0; shard_index < shard_size; shard_index++) {
+    request_ptr->pending_requests_.emplace_back(*request_ptr, shard_index);
+    PendingRequest& pending_request = request_ptr->pending_requests_.back();
+
+    // Send the same request to all shards
+    pending_request.handle_ = makeFragmentedRequest(
+        route, command, "", *base_request, pending_request, callbacks.transaction());
+
+    if (!pending_request.handle_) {
+      ENVOY_LOG(error, "{}:failed to create request handle for shard index {}: '{}'", __func__, shard_index, base_request->toString());
+      pending_request.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
+    }
+  }
+
+  if (delay_command_latency) {
+    std::unique_ptr<SplitRequestDelayFault> delay_fault_ptr{
+        new SplitRequestDelayFault(std::move(request_ptr), callbacks, time_source)};
+    return delay_fault_ptr;
+  } else {
+    return request_ptr;
+  }
+}
+
 SplitRequestPtr
 SplitKeysSumResultRequest::create(Router& router, Common::Redis::RespValuePtr&& incoming_request,
                                   SplitCallbacks& callbacks, CommandStats& command_stats,
@@ -1001,8 +1188,9 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
     : router_(std::move(router)), simple_command_handler_(*router_),
       eval_command_handler_(*router_), mget_handler_(*router_), mset_handler_(*router_),
       keys_handler_(*router_), scan_handler_(*router_), info_handler_(*router_),
-      select_handler_(*router_), role_handler_(*router_), split_keys_sum_result_handler_(*router_),
-      transaction_handler_(*router_),
+      select_handler_(*router_), role_handler_(*router_), random_shard_handler_(*router_),
+      split_keys_sum_result_handler_(*router_), transaction_handler_(*router_),
+      cluster_scope_handler_(*router_),
       stats_{ALL_COMMAND_SPLITTER_STATS(POOL_COUNTER_PREFIX(scope, stat_prefix + "splitter."))},
       time_source_(time_source), fault_manager_(std::move(fault_manager)),
       custom_commands_(std::move(custom_commands)) {
@@ -1040,8 +1228,16 @@ InstanceImpl::InstanceImpl(RouterPtr&& router, Stats::Scope& scope, const std::s
   addHandler(scope, stat_prefix, Common::Redis::SupportedCommands::role(), latency_in_micros,
              role_handler_);
 
+  for (const std::string& command : Common::Redis::SupportedCommands::randomShardCommands()) {
+    addHandler(scope, stat_prefix, command, latency_in_micros, random_shard_handler_);
+  }
+
   for (const std::string& command : Common::Redis::SupportedCommands::transactionCommands()) {
     addHandler(scope, stat_prefix, command, latency_in_micros, transaction_handler_);
+  }
+
+  for (const std::string& command : Common::Redis::SupportedCommands::ClusterScopeCommands()) {
+    addHandler(scope, stat_prefix, command, latency_in_micros, cluster_scope_handler_);
   }
 
   for (const std::string& command : custom_commands_) {
