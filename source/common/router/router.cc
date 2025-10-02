@@ -2340,7 +2340,8 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
   if (host_lb_policy_data.has_value()) {
     ENVOY_LOG(trace, "orca_load_report for {} report = {}", upstream_host->address()->asString(),
               (*orca_load_report).DebugString());
-    const absl::Status status = host_lb_policy_data->onOrcaLoadReport(*orca_load_report);
+    const absl::Status status =
+        host_lb_policy_data->onOrcaLoadReport(*orca_load_report, callbacks_->streamInfo());
     if (!status.ok()) {
       ENVOY_STREAM_LOG(error, "Failed to invoke OrcaLoadReportCallbacks: {}", *callbacks_,
                        status.message());

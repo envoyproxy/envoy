@@ -15,6 +15,7 @@ HTTP filters
   basic_auth_filter
   buffer_filter
   cache_filter
+  cache_v2_filter
   cdn_loop_filter
   checksum_filter
   compressor_filter

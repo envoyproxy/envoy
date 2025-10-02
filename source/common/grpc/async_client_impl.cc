@@ -43,34 +43,36 @@ void base64EscapeBinHeaders(Http::RequestHeaderMap& headers) {
 } // namespace
 
 absl::StatusOr<std::unique_ptr<AsyncClientImpl>>
-AsyncClientImpl::create(Upstream::ClusterManager& cm,
-                        const envoy::config::core::v3::GrpcService& config,
-                        TimeSource& time_source) {
+AsyncClientImpl::create(const envoy::config::core::v3::GrpcService& config,
+                        Server::Configuration::CommonFactoryContext& context) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::unique_ptr<AsyncClientImpl>(
-      new AsyncClientImpl(cm, config, time_source, creation_status));
+  auto ret =
+      std::unique_ptr<AsyncClientImpl>(new AsyncClientImpl(config, context, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
-AsyncClientImpl::AsyncClientImpl(Upstream::ClusterManager& cm,
-                                 const envoy::config::core::v3::GrpcService& config,
-                                 TimeSource& time_source, absl::Status& creation_status)
+AsyncClientImpl::AsyncClientImpl(const envoy::config::core::v3::GrpcService& config,
+                                 Server::Configuration::CommonFactoryContext& context,
+                                 absl::Status& creation_status)
     : max_recv_message_length_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.envoy_grpc(), max_receive_message_length, 0)),
-      skip_envoy_headers_(config.envoy_grpc().skip_envoy_headers()), cm_(cm),
+      skip_envoy_headers_(config.envoy_grpc().skip_envoy_headers()), cm_(context.clusterManager()),
       remote_cluster_name_(config.envoy_grpc().cluster_name()),
-      host_name_(config.envoy_grpc().authority()), time_source_(time_source),
-      retry_policy_(
-          config.has_retry_policy()
-              ? absl::optional<envoy::config::route::v3::
-                                   RetryPolicy>{Http::Utility::convertCoreToRouteRetryPolicy(
-                    config.retry_policy(), "")}
-              : absl::nullopt) {
+      host_name_(config.envoy_grpc().authority()), time_source_(context.timeSource()) {
   auto parser_or_error = Router::HeaderParser::configure(
       config.initial_metadata(),
       envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD);
   SET_AND_RETURN_IF_NOT_OK(parser_or_error.status(), creation_status);
+
+  if (config.has_retry_policy()) {
+    auto route_policy = Http::Utility::convertCoreToRouteRetryPolicy(config.retry_policy(), "");
+    auto policy_or_error = Router::RetryPolicyImpl::create(
+        route_policy, ProtobufMessage::getNullValidationVisitor(), context);
+    SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
+    retry_policy_ = std::move(*policy_or_error);
+  }
+
   metadata_parser_ = std::move(*parser_or_error);
 }
 
@@ -123,8 +125,9 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, absl::string_view serv
     : parent_(parent), service_full_name_(service_full_name), method_name_(method_name),
       callbacks_(callbacks), options_(options) {
   // Apply parent retry policy if no per-stream override.
-  if (!options.retry_policy.has_value() && parent_.retryPolicy().has_value()) {
-    options_.setRetryPolicy(*parent_.retryPolicy());
+  if (!options.retry_policy.has_value() && options.parsed_retry_policy == nullptr &&
+      parent_.retryPolicy() != nullptr) {
+    options_.setRetryPolicy(parent_.retryPolicy());
   }
 
   // Apply parent `skip_envoy_headers_` setting from configuration, if no per-stream

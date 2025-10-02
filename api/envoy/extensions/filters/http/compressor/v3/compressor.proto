@@ -172,6 +172,10 @@ message ResponseDirectionOverrides {
 message CompressorOverrides {
   // If present, response compression is enabled.
   ResponseDirectionOverrides response_direction_config = 1;
+
+  // A compressor library to use for compression. If specified, this overrides
+  // the filter-level ``compressor_library`` configuration for this route.
+  config.core.v3.TypedExtensionConfig compressor_library = 2;
 }
 
 message CompressorPerRoute {
