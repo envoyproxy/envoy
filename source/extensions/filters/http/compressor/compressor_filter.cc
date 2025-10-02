@@ -192,7 +192,7 @@ void CompressorFilter::initPerRouteConfig() {
 
 CompressorPerRouteFilterConfig::CompressorPerRouteFilterConfig(
     const envoy::extensions::filters::http::compressor::v3::CompressorPerRoute& config,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::GenericFactoryContext& context) {
   switch (config.override_case()) {
   case CompressorPerRoute::kDisabled:
     response_compression_enabled_ = false;

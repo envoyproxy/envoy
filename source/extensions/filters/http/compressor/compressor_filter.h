@@ -175,7 +175,7 @@ class CompressorPerRouteFilterConfig : public Router::RouteSpecificFilterConfig,
 public:
   CompressorPerRouteFilterConfig(
       const envoy::extensions::filters::http::compressor::v3::CompressorPerRoute& config,
-      Server::Configuration::FactoryContext& context);
+      Server::Configuration::GenericFactoryContext& context);
 
   // If a value is present, that value overrides
   // ResponseDirectionConfig::compressionEnabled.
