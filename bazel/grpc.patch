@@ -1,8 +1,8 @@
 diff --git a/BUILD b/BUILD
-index 06b69411a8..05cd878ae8 100644
+index fdc12602ed..617ad884cf 100644
 --- a/BUILD
 +++ b/BUILD
-@@ -29,7 +29,7 @@ licenses(["reciprocal"])
+@@ -33,7 +33,7 @@ package(
      default_visibility = ["//visibility:public"],
      features = [
          "-parse_headers",
@@ -11,11 +11,24 @@ index 06b69411a8..05cd878ae8 100644
      ],
  )
  
+diff --git a/bazel/generate_cc.bzl b/bazel/generate_cc.bzl
+index a2c7f3a1bb..cd023ebb06 100644
+--- a/bazel/generate_cc.bzl
++++ b/bazel/generate_cc.bzl
+@@ -134,7 +134,7 @@ def generate_cc_impl(ctx):
+ 
+     # Include the output directory so that protoc puts the generated code in the
+     # right directory.
+-    arguments.append("--proto_path={0}{1}".format(dir_out, proto_root))
++    arguments.append("--proto_path={0}".format(dir_out))
+     arguments += [_get_srcs_file_path(proto) for proto in protos]
+ 
+     # create a list of well known proto files if the argument is non-None
 diff --git a/src/core/BUILD b/src/core/BUILD
-index 1bb970e049..81265483e9 100644
+index 1acce192d0..c7c92db880 100644
 --- a/src/core/BUILD
 +++ b/src/core/BUILD
-@@ -24,7 +24,7 @@ licenses(["reciprocal"])
+@@ -25,7 +25,7 @@ licenses(["reciprocal"])
  package(
      default_visibility = ["//:__subpackages__"],
      features = [
@@ -24,15 +37,39 @@ index 1bb970e049..81265483e9 100644
      ],
  )
  
-diff --git a/src/core/lib/promise/detail/promise_like.h b/src/core/lib/promise/detail/promise_like.h
---- a/src/core/lib/promise/detail/promise_like.h	2024-04-18 19:47:19.524155042 +0000
-+++ b/src/core/lib/promise/detail/promise_like.h	2024-04-18 23:40:29.050761807 +0000
-@@ -71,7 +71,7 @@
+diff --git a/third_party/BUILD b/third_party/BUILD
+index 77cb52d0fc..596b348ccd 100644
+--- a/third_party/BUILD
++++ b/third_party/BUILD
+@@ -18,19 +18,19 @@ package(default_visibility = ["//:__subpackages__"])
  
- template <typename F>
- class PromiseLike<F, absl::enable_if_t<!std::is_void<
--                         typename std::result_of<F()>::type>::value>> {
-+                         typename std::invoke_result<F>::type>::value>> {
-  private:
-   GPR_NO_UNIQUE_ADDRESS F f_;
+ alias(
+     name = "libssl",
+-    actual = "@boringssl//:ssl",
++    actual = "@envoy//bazel:boringssl",
+     tags = ["manual"],
+ )
+ 
+ alias(
+     name = "libcrypto",
+-    actual = "@boringssl//:crypto",
++    actual = "@envoy//bazel:boringcrypto",
+     tags = ["manual"],
+ )
+ 
+ alias(
+     name = "madler_zlib",
+-    actual = "@zlib//:zlib",
++    actual = "@envoy//bazel/foreign_cc:zlib",
+     tags = ["manual"],
+ )
+ 
+@@ -61,7 +61,7 @@ alias(
+ 
+ alias(
+     name = "cares",
+-    actual = "@com_github_cares_cares//:ares",
++    actual = "@envoy//bazel/foreign_cc:ares",
+     tags = ["manual"],
+ )
  
