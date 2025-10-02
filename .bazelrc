@@ -110,6 +110,7 @@ build:gcc --copt=-fno-debug-types-section
 # And in all cases the reports appear to be clear false positives.
 build:gcc --copt=-Wno-error=restrict
 build:gcc --copt=-Wno-error=uninitialized
+build:gcc --copt=-Wno-error=attributes
 build:gcc --cxxopt=-Wno-missing-requires
 # We need this because -Wno-missing-requires options is rather new
 # in GCC, so flags -Wno-missing-requires exists in GCC 12, but does
