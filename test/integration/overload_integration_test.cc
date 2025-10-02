@@ -1178,7 +1178,7 @@ TEST_P(LoadShedPointIntegrationTest, Http2ServerDispatchSendsGoAwayCompletingPen
   // higher than the last stream ID in the GOAWAY frame. However, Envoy's current
   // implementation in ServerConnectionImpl::onBeginHeaders() may still create new
   // streams without checking GOAWAY state. oghttp2 may continue the request and ignore
-  // goaway while nghttp2 is stricter leading to different results for these adaptors.
+  // goaway while nghttp2 is stricter and does a reset leading to different results.
   // Thus we check if the stream has ended first.
   bool second_request_completed = second_request_decoder->waitForEndStream();
   if (second_request_completed) {
