@@ -92,6 +92,7 @@ envoy_extension_cc_test(
     deps = [
         ":filter_test_common_lib",
         ":mock_server_lib",
+        ":test_processing_request_modifier_lib",
         ":utils_lib",
         "//envoy/http:filter_interface",
         "//envoy/network:filter_interface",
@@ -103,6 +104,7 @@ envoy_extension_cc_test(
         "//source/common/stats:isolated_store_lib",
         "//source/extensions/filters/http/ext_proc",
         "//source/extensions/filters/http/ext_proc:on_processing_response_interface",
+        "//source/extensions/filters/http/ext_proc:processing_request_modifier_interface",
         "//source/extensions/http/ext_proc/response_processors/save_processing_response:save_processing_response_lib",
         "//test/common/http:common_lib",
         "//test/common/http:conn_manager_impl_test_base_lib",
@@ -201,6 +203,34 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
         "@com_google_absl//absl/types:optional",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "mapped_attribute_builder_test",
+    size = "small",
+    srcs = ["mapped_attribute_builder_test.cc"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    rbe_pool = "6gig",
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/common/network:address_lib",
+        "//source/common/router:string_accessor_lib",
+        "//source/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder:mapped_attribute_builder_lib",
+        "//test/mocks/server:server_factory_context_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test_library(
+    name = "test_processing_request_modifier_lib",
+    srcs = ["test_processing_request_modifier.cc"],
+    hdrs = ["test_processing_request_modifier.h"],
+    extension_names = ["envoy.filters.http.ext_proc"],
+    tags = ["skip_on_windows"],
+    deps = [
+        "//source/extensions/filters/http/ext_proc:processing_request_modifier_interface",
     ],
 )
 
@@ -333,6 +363,7 @@ envoy_extension_cc_test(
         ],
     }),
     extension_names = [
+        "envoy.http.ext_proc.processing_request_modifiers.mapped_attribute_builder",
         "envoy.filters.http.ext_proc",
         # TODO(jbohanon) use a test filter here instead of production filter
         "envoy.filters.http.set_metadata",
@@ -351,6 +382,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ext_proc:config",
         "//source/extensions/filters/http/ext_proc:on_processing_response_interface",
         "//source/extensions/filters/http/set_metadata:config",
+        "//source/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder:mapped_attribute_builder_lib",
         "//source/extensions/retry/host/previous_hosts:config",
         "//test/common/http:common_lib",
         "//test/integration:http_integration_lib",
@@ -366,6 +398,7 @@ envoy_extension_cc_test(
         "@envoy_api//envoy/extensions/filters/http/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/set_metadata/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/http/upstream_codec/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/ext_proc/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/v3:pkg_cc_proto",
         "@ocp//ocpdiag/core/testing:status_matchers",
