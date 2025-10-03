@@ -42,6 +42,15 @@ behavior_changes:
 
 minor_behavior_changes:
 # *Changes that may cause incompatibilities for some users, but should not for most*
+- area: rbac
+  change: |
+    The RBAC network filter now enforces authorization when the transport socket is ready
+    (e.g., after TLS handshake completes), preventing upstream connection establishment before
+    authorization. This provides better security by ensuring authorization decisions are made
+    with complete connection information. For connections without TLS or when the transport
+    socket does not emit a Connected event, the filter falls back to enforcing authorization
+    when the first data byte arrives. This behavior can be temporarily reverted by setting the
+    runtime guard ``envoy.reloadable_features.rbac_enforce_on_transport_ready`` to ``false``.
 - area: tap
   change: |
     Previously, streamed trace buffered data was only flushed when it reached the configured size.

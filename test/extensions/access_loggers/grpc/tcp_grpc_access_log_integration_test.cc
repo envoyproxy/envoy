@@ -420,8 +420,13 @@ tcp_logs:
 }
 
 #if defined(USE_CEL)
-// Test RBAC.
+// Test RBAC with legacy behavior which is enforced on data.
+// This test verifies that upstream connections are established before RBAC denial.
 TEST_P(TcpGrpcAccessLogIntegrationTest, RBACAccessLogFlow) {
+  // Disable enforce_on_transport_ready to test legacy behavior where upstream
+  // connection is established before RBAC denial.
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.rbac_enforce_on_transport_ready",
+                                    "false");
   config_helper_.addNetworkFilter(R"EOF(
 name: envoy.filters.network.rbac
 typed_config:

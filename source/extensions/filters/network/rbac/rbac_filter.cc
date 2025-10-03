@@ -70,13 +70,56 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(
           proto_config, context, validation_visitor, action_validation_visitor_)),
       enforcement_type_(proto_config.enforcement_type()),
-      delay_deny_ms_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, delay_deny, 0)) {}
+      delay_deny_ms_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, delay_deny, 0)),
+      runtime_(context.runtime()) {}
+
+Network::FilterStatus RoleBasedAccessControlFilter::onNewConnection() {
+  has_connection_established_ = true;
+
+  // Stop reading until authorization completes to prevent upstream connection establishment.
+  if (config_->enforceOnTransportReady()) {
+    authorization_pending_ = true;
+    callbacks_->connection().readDisable(true);
+  }
+
+  return Network::FilterStatus::Continue;
+}
 
 Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bool) {
   if (is_delay_denied_) {
     return Network::FilterStatus::StopIteration;
   }
 
+  // If authorization is pending, run it now as fallback for transport sockets
+  // that don't raise Connected event.
+  if (authorization_pending_) {
+    authorization_pending_ = false;
+    if (!runAuthorization()) {
+      return Network::FilterStatus::StopIteration;
+    }
+    return Network::FilterStatus::Continue;
+  }
+
+  // For ONE_TIME_ON_FIRST_BYTE enforcement, authorization may have already completed
+  // in onEvent(Connected). Skip re-running but check for denial.
+  if (config_->enforceOnTransportReady() && engine_result_ != Unknown &&
+      config_->enforcementType() ==
+          envoy::extensions::filters::network::rbac::v3::RBAC::ONE_TIME_ON_FIRST_BYTE) {
+    if (engine_result_ == Deny || is_delay_denied_) {
+      return Network::FilterStatus::StopIteration;
+    }
+    return Network::FilterStatus::Continue;
+  }
+
+  // Run authorization for first call or CONTINUOUS enforcement.
+  if (!runAuthorization()) {
+    return Network::FilterStatus::StopIteration;
+  }
+
+  return Network::FilterStatus::Continue;
+}
+
+bool RoleBasedAccessControlFilter::runAuthorization() {
   if (ENVOY_LOG_CHECK_LEVEL(debug)) {
     const auto& connection = callbacks_->connection();
     const auto& stream_info = connection.streamInfo();
@@ -105,8 +148,9 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
   }
 
   std::string log_policy_id = "none";
-  // When the enforcement type is continuous always do the RBAC checks. If it is a one-time check,
-  // run the check once and skip it for later onData calls.
+
+  // When the enforcement type is continuous, always do the RBAC checks.
+  // For one-time check, only run if not already evaluated.
   if (config_->enforcementType() ==
       envoy::extensions::filters::network::rbac::v3::RBAC::CONTINUOUS) {
     shadow_engine_result_ =
@@ -129,7 +173,7 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
   }
 
   if (engine_result_ == Allow) {
-    return Network::FilterStatus::Continue;
+    return true;
   } else if (engine_result_ == Deny) {
     callbacks_->connection().streamInfo().setConnectionTerminationDetails(
         Filters::Common::RBAC::responseDetail(log_policy_id));
@@ -146,11 +190,11 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
     } else {
       closeConnection();
     }
-    return Network::FilterStatus::StopIteration;
+    return false;
   }
 
   ENVOY_LOG(debug, "no engine, allowed by default");
-  return Network::FilterStatus::Continue;
+  return true;
 }
 
 void RoleBasedAccessControlFilter::closeConnection() const {
@@ -168,6 +212,16 @@ void RoleBasedAccessControlFilter::onEvent(Network::ConnectionEvent event) {
   if (event == Network::ConnectionEvent::RemoteClose ||
       event == Network::ConnectionEvent::LocalClose) {
     resetTimerState();
+  } else if (event == Network::ConnectionEvent::Connected) {
+    // Run authorization when transport is ready if onNewConnection was called
+    // and authorization is still pending.
+    if (config_->enforceOnTransportReady() && has_connection_established_ &&
+        authorization_pending_) {
+      authorization_pending_ = false;
+      if (runAuthorization()) {
+        callbacks_->connection().readDisable(false);
+      }
+    }
   }
 }
 
@@ -189,7 +243,7 @@ RoleBasedAccessControlFilter::checkEngine(Filters::Common::RBAC::EnforcementMode
     return Result{None, "none"};
   }
 
-  // Check authorization decision and do Action operations
+  // Check authorization decision and do Action operations.
   std::string effective_policy_id;
   bool allowed = engine->handleAction(callbacks_->connection(),
                                       callbacks_->connection().streamInfo(), &effective_policy_id);
