@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <fstream>
+#include <ostream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -21,6 +22,7 @@
 #include "source/common/common/assert.h"
 #include "source/common/common/empty_string.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/matchers.h"
 #include "source/common/common/mutex_tracer_impl.h"
 #include "source/common/common/utility.h"
 #include "source/common/formatter/substitution_formatter.h"
@@ -314,6 +316,10 @@ bool AdminImpl::createFilterChain(Http::FilterChainManager& manager,
   return true;
 }
 
+void AdminImpl::addAllowListedRoute(Matchers::StringMatcherPtr matcher) {
+  allow_listed_routes_.emplace_back(std::move(matcher));
+}
+
 namespace {
 // Implements a chunked request for static text.
 class StaticTextRequest : public Admin::Request {
@@ -391,6 +397,13 @@ Admin::RequestPtr AdminImpl::makeRequest(AdminStream& admin_stream) const {
   std::string::size_type query_index = path_and_query.find('?');
   if (query_index == std::string::npos) {
     query_index = path_and_query.size();
+  }
+  if (!allow_listed_routes_.empty() && !acceptTargetRoute(path_and_query)) {
+    ENVOY_LOG(info, fmt::format("Admin Allow list filter check for {} failed not allowed",
+                                path_and_query));
+    Buffer::OwnedImpl error_response;
+    error_response.add(fmt::format("request to route {} not allowed", path_and_query));
+    return Admin::makeStaticTextRequest(error_response, Http::Code::Forbidden);
   }
 
   for (const UrlHandler& handler : handlers_) {
@@ -509,13 +522,14 @@ bool AdminImpl::removeHandler(const std::string& prefix) {
 
 Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_view method,
                               Http::ResponseHeaderMap& response_headers, std::string& body) {
+
+  Buffer::OwnedImpl response;
   AdminFilter filter(*this);
 
   auto request_headers = Http::RequestHeaderMapImpl::create();
   request_headers->setMethod(method);
   request_headers->setPath(path_and_query);
   filter.decodeHeaders(*request_headers, false);
-  Buffer::OwnedImpl response;
 
   Http::Code code = runCallback(response_headers, response, filter);
   Utility::populateFallbackResponseHeaders(code, response_headers);
