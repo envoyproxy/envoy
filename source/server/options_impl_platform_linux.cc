@@ -9,6 +9,9 @@
 #include <thread>
 
 #include "source/common/api/os_sys_calls_impl_linux.h"
+#include "source/common/filesystem/filesystem_impl.h"
+#include "source/common/runtime/runtime_features.h"
+#include "source/server/cgroup_cpu_util.h"
 #include "source/server/options_impl_platform.h"
 
 namespace Envoy {
@@ -39,7 +42,19 @@ uint32_t OptionsImplPlatformLinux::getCpuAffinityCount(unsigned int hw_threads) 
 
 uint32_t OptionsImplPlatform::getCpuCount() {
   unsigned int hw_threads = std::max(1U, std::thread::hardware_concurrency());
-  return OptionsImplPlatformLinux::getCpuAffinityCount(hw_threads);
+  uint32_t affinity_count = OptionsImplPlatformLinux::getCpuAffinityCount(hw_threads);
+
+  uint32_t cgroup_limit = hw_threads; // Fallback to hw_threads if cgroup detection fails
+  if (Runtime::runtimeFeatureEnabled("envoy.restart_features.enable_cgroup_cpu_detection")) {
+    Filesystem::InstanceImpl fs;
+    absl::optional<uint32_t> detected_limit = CgroupCpuUtil::getCpuLimit(fs);
+    if (detected_limit.has_value()) {
+      cgroup_limit = detected_limit.value();
+    }
+  }
+
+  uint32_t effective_count = std::min({hw_threads, affinity_count, cgroup_limit});
+  return std::max(1U, effective_count);
 }
 
 } // namespace Envoy

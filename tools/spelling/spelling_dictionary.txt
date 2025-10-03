@@ -401,6 +401,7 @@ RAII
 RANLUX
 RBAC
 RDN
+RDONLY
 RDS
 README
 RECVDSTADDR
@@ -664,6 +665,7 @@ circllhist
 clientcert
 cloneable
 cloneability
+CLOEXEC
 cmd
 cmsghdr
 codebase
@@ -1027,7 +1029,9 @@ mmap
 mmdb
 mmsg
 mmsghdr
+modularized
 mongo
+mountinfo
 moveable
 msec
 msg
@@ -1210,6 +1214,7 @@ readded
 readonly
 readv
 realloc
+reallocations
 rebalanced
 rebalancer
 rebalancing
@@ -1245,6 +1250,7 @@ reinitializations
 reinitialize
 reinitializes
 rele
+relatime
 releasor
 reloadable
 remoting
@@ -1417,6 +1423,7 @@ sys
 syscall
 syscalls
 sysctl
+systemd
 sysroot
 sz
 tchar
@@ -1589,3 +1596,7 @@ NXDOMAIN
 DNAT
 RSP
 EWMA
+CFS
+CPUSET
+TASKSET
+hw
