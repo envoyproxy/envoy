@@ -86,7 +86,7 @@ RateLimiterProviderSingleton::TokenBucketSubscription::getLimiter() {
 RateLimiterProviderSingleton::TokenBucketSubscription::TokenBucketSubscription(
     RateLimiterProviderSingleton& parent, absl::string_view resource_name)
     : Config::SubscriptionBase<envoy::type::v3::TokenBucket>(
-          parent.factory_context_.messageValidationVisitor(), "name"),
+          parent.factory_context_.messageValidationVisitor(), ""),
       parent_(parent), init_target_(std::make_unique<Init::TargetImpl>(
                            fmt::format("RateLimitConfigCallback-{}", resource_name), []() {})),
       resource_name_(resource_name), token_bucket_config_hash_(0) {

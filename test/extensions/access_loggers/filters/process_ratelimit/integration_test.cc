@@ -49,7 +49,6 @@ resources:
   version: "100"
   resource:
     "@type": type.googleapis.com/envoy.type.v3.TokenBucket
-    name: "token_bucket_name"
     max_tokens: 3
     tokens_per_fill: 1
     fill_interval:

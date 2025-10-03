@@ -36,9 +36,4 @@ message TokenBucket {
     required: true
     gt {}
   }];
-
-  // The name of the token bucket resource. It is required when the token
-  // buckets are provided via xDS resources and used in the singleton case, like
-  // in the process rate limit access logger filter.
-  string name = 4;
 }
