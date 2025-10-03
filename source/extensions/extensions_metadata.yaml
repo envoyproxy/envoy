@@ -89,6 +89,13 @@ envoy.bootstrap.reverse_tunnel.upstream_socket_interface:
   status: wip
   type_urls:
   - envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface
+envoy.clusters.reverse_connection:
+  categories:
+  - envoy.clusters
+  security_posture: unknown
+  status: wip
+  type_urls:
+  - envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
 envoy.extensions.http.cache.file_system_http_cache:
   categories:
   - envoy.http.cache
@@ -543,6 +550,13 @@ envoy.filters.http.lua:
   type_urls:
   - envoy.extensions.filters.http.lua.v3.Lua
   - envoy.extensions.filters.http.lua.v3.LuaPerRoute
+envoy.filters.http.mcp:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.mcp.v3.Mcp
 envoy.filters.http.oauth2:
   categories:
   - envoy.filters.http

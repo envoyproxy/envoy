@@ -62,9 +62,9 @@ public:
   TestNoopCompressorLibraryFactory() = default;
 
 private:
-  Envoy::Compression::Compressor::CompressorFactoryPtr
-  createCompressorFactoryFromProto(const Protobuf::Message& /*config*/,
-                                   Server::Configuration::FactoryContext& /*context*/) override {
+  Envoy::Compression::Compressor::CompressorFactoryPtr createCompressorFactoryFromProto(
+      const Protobuf::Message& /*config*/,
+      Server::Configuration::GenericFactoryContext& /*context*/) override {
     return std::make_unique<TestNoopCompressorFactory>();
   }
 
@@ -97,7 +97,7 @@ TEST(CompressorFilterFactoryTests, RegisteredCompressorLibraryConfig) {
   EXPECT_TRUE(cb_or.status().ok());
 }
 
-// Factory that touches drainDecision() and listenerInfo() on FactoryContext to cover wrapper.
+// Factory that accesses GenericFactoryContext methods.
 class TestCheckingCompressorLibraryFactory
     : public Envoy::Compression::Compressor::NamedCompressorLibraryConfigFactory {
 public:
@@ -105,21 +105,11 @@ public:
 
   Envoy::Compression::Compressor::CompressorFactoryPtr
   createCompressorFactoryFromProto(const Protobuf::Message& /*config*/,
-                                   Server::Configuration::FactoryContext& context) override {
+                                   Server::Configuration::GenericFactoryContext& context) override {
     (void)context.serverFactoryContext();
     (void)context.messageValidationVisitor();
     (void)context.initManager();
     (void)context.scope();
-    (void)context.listenerScope();
-    (void)context.drainDecision().drainClose(Network::DrainDirection::All);
-    (void)context.drainDecision().addOnDrainCloseCb(
-        Network::DrainDirection::All, [](std::chrono::milliseconds) { return absl::OkStatus(); });
-    const auto& info = context.listenerInfo();
-    (void)info.metadata();
-    (void)info.typedMetadata();
-    (void)info.direction();
-    (void)info.isQuic();
-    (void)info.shouldBypassOverloadManager();
 
     return std::make_unique<TestNoopCompressorFactory>();
   }
@@ -128,17 +118,17 @@ public:
     return std::make_unique<::test::mock_compressor_library::Registered>();
   }
 
-  std::string name() const override { return "test.mock.check"; }
+  std::string name() const override { return "test.mock.checking"; }
   std::string category() const override { return "envoy.compression.compressor"; }
 };
 
-TEST(CompressorFilterFactoryTests, PerRouteWrapperCoversDrainAndListenerInfo) {
+TEST(CompressorFilterFactoryTests, PerRouteWithGenericFactoryContext) {
   // Per-route config with a typed compressor_library using the checking factory.
   const std::string yaml_string = R"EOF(
   overrides:
     response_direction_config: {}
     compressor_library:
-      name: test.mock.check
+      name: test.mock.checking
       typed_config:
         "@type": type.googleapis.com/test.mock_compressor_library.Registered
   )EOF";
@@ -168,7 +158,7 @@ TEST(CompressorFilterFactoryTests, EmptyPerRouteConfig) {
       ProtoValidationException);
 }
 
-TEST(CompressorFilterFactoryTests, PerRouteWrapperBuilds) {
+TEST(CompressorFilterFactoryTests, PerRouteWithGenericContextBuilds) {
   // Provide a minimally valid per-route proto: set overrides with empty response_direction_config
   envoy::extensions::filters::http::compressor::v3::CompressorPerRoute per_route;
   per_route.mutable_overrides()->mutable_response_direction_config();
@@ -177,7 +167,7 @@ TEST(CompressorFilterFactoryTests, PerRouteWrapperBuilds) {
   auto cfg_or = factory.createRouteSpecificFilterConfig(per_route, context,
                                                         context.messageValidationVisitor());
   EXPECT_TRUE(cfg_or.status().ok());
-  // No further assertions; this exercises the GenericFactoryContext wrapper path.
+  // No further assertions; this exercises the GenericFactoryContext path.
 }
 
 } // namespace

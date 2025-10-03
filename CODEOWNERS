@@ -87,6 +87,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/udp_packet_writer/ @danzh2010 @ryantheoptimist
 # redis cluster extension
 /*/extensions/clusters/redis @msukalski @henryyyang @mattklein123
+# reverse conn cluster extension
+/*/extensions/clusters/reverse_connection @agrawroh @basundhara-c @botengyao @yanavlasov
 /*/extensions/common/redis @msukalski @henryyyang @mattklein123
 /*/extensions/health_checkers/redis @mattklein123 @UNOWNED
 /*/extensions/filters/network/redis_proxy @mattklein123 @UNOWNED
@@ -229,6 +231,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/http/basic_auth @zhaohuabing @wbpcode
 # HTTP API Key Auth
 /*/extensions/filters/http/api_key_auth @wbpcode @sanposhiho
+# HTTP MCP filter
+/*/extensions/filters/http/mcp @botengyao @yanavlasov
 # Original IP detection
 /*/extensions/http/original_ip_detection/custom_header @ryantheoptimist @mattklein123
 /*/extensions/http/original_ip_detection/xff @yanavlasov @mattklein123
