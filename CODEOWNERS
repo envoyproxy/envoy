@@ -231,6 +231,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/http/basic_auth @zhaohuabing @wbpcode
 # HTTP API Key Auth
 /*/extensions/filters/http/api_key_auth @wbpcode @sanposhiho
+# HTTP MCP filter
+/*/extensions/filters/http/mcp @botengyao @yanavlasov
 # Original IP detection
 /*/extensions/http/original_ip_detection/custom_header @ryantheoptimist @mattklein123
 /*/extensions/http/original_ip_detection/xff @yanavlasov @mattklein123
