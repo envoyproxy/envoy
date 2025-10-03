@@ -40,7 +40,6 @@ public:
 
 class ProcessingRequestModifierFactory : public Config::TypedFactory {
 public:
-
   /**
    * Creates a new attribute builder based on the type supplied by the config.
    *
