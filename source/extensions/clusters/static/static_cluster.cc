@@ -12,7 +12,7 @@ StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& 
     : ClusterImplBase(cluster, context, creation_status) {
   SET_AND_RETURN_IF_NOT_OK(creation_status, creation_status);
   priority_state_manager_ = std::make_unique<PriorityStateManager>(
-      *this, context.serverFactoryContext().localInfo(), nullptr, random_);
+      *this, context.serverFactoryContext().localInfo(), nullptr);
   const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment =
       cluster.load_assignment();
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
@@ -20,7 +20,6 @@ StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& 
   weighted_priority_health_ = cluster_load_assignment.policy().weighted_priority_health();
 
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
-    THROW_IF_NOT_OK(validateEndpointsForZoneAwareRouting(locality_lb_endpoint));
     priority_state_manager_->initializePriorityFor(locality_lb_endpoint);
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       std::vector<Network::Address::InstanceConstSharedPtr> address_list;
@@ -47,6 +46,9 @@ StaticClusterImpl::StaticClusterImpl(const envoy::config::cluster::v3::Cluster& 
           address_list, locality_lb_endpoint, lb_endpoint);
     }
   }
+
+  THROW_IF_NOT_OK(validateEndpoints(cluster_load_assignment.endpoints(),
+                                    priority_state_manager_->priorityState()));
 }
 
 void StaticClusterImpl::startPreInit() {

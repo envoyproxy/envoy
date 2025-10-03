@@ -12,6 +12,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/http/http1/codec_impl.h"
+#include "source/common/http/response_decoder_impl_base.h"
 #include "source/common/network/filter_impl.h"
 
 namespace Envoy {
@@ -49,7 +50,7 @@ private:
 class RCConnectionWrapper : public Network::ConnectionCallbacks,
                             public Event::DeferredDeletable,
                             public Logger::Loggable<Logger::Id::main>,
-                            public Http::ResponseDecoder,
+                            public Http::ResponseDecoderImplBase,
                             public Http::ConnectionCallbacks {
   friend class SimpleConnReadFilterTest;
 
@@ -148,6 +149,7 @@ private:
   std::string connection_key_;
   bool http_handshake_sent_{false};
   bool handshake_completed_{false};
+  bool shutdown_called_{false};
 
 public:
   // Dispatch incoming bytes to HTTP/1 codec.

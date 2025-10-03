@@ -43,7 +43,7 @@ absl::StatusOr<Http::FilterFactoryCb> DynamicModuleConfigFactory::createFilterFa
   return [config = filter_config.value()](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     auto filter =
         std::make_shared<Envoy::Extensions::DynamicModules::HttpFilters::DynamicModuleHttpFilter>(
-            config);
+            config, config->stats_scope_->symbolTable());
     filter->initializeInModuleFilter();
     callbacks.addStreamFilter(filter);
   };

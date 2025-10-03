@@ -252,7 +252,7 @@ private:
   void setUpstreamOverrideHost(Upstream::LoadBalancerContext::OverrideHost) override {}
   absl::optional<Upstream::LoadBalancerContext::OverrideHost>
   upstreamOverrideHost() const override {
-    return absl::nullopt;
+    return upstream_override_host_;
   }
   bool shouldLoadShed() const override { return false; }
   absl::string_view filterConfigName() const override { return ""; }
@@ -278,7 +278,7 @@ private:
   Tracing::NullSpan active_span_;
   const Tracing::Config& tracing_config_;
   const LocalReply::LocalReply& local_reply_;
-  Router::RetryPolicyConstSharedPtr retry_policy_;
+  Router::RouteConstSharedPtr parent_route_;
   std::shared_ptr<NullRouteImpl> route_;
   uint32_t high_watermark_calls_{};
   bool local_closed_{};
@@ -294,6 +294,9 @@ private:
   bool send_xff_{true};
   bool send_internal_{true};
   bool router_destroyed_{false};
+
+  // Upstream override host for bypassing load balancer selection
+  absl::optional<Upstream::LoadBalancerContext::OverrideHost> upstream_override_host_;
 
   friend class AsyncClientImpl;
   friend class AsyncClientImplUnitTest;

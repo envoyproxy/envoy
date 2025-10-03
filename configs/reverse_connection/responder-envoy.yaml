@@ -1,0 +1,130 @@
+---
+node:
+  id: upstream-node
+  cluster: upstream-cluster
+
+# Enable reverse connection bootstrap extension
+bootstrap_extensions:
+- name: envoy.bootstrap.reverse_tunnel.upstream_socket_interface
+  typed_config:
+    "@type": >-
+      type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface
+    stat_prefix: "upstream_reverse_connection"
+
+static_resources:
+  listeners:
+  # Accepts reverse tunnel requests
+  - name: rev_conn_api_listener
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 9000
+    filter_chains:
+    - filters:
+      - name: envoy.filters.network.reverse_tunnel
+        typed_config:
+          "@type": >-
+            type.googleapis.com/envoy.extensions.filters.network.reverse_tunnel.v3.ReverseTunnel
+          ping_interval: 2s
+
+  # Listener that will route the downstream request to the reverse connection cluster
+  - name: egress_listener
+    address:
+      socket_address:
+        address: 0.0.0.0
+        port_value: 8085
+    filter_chains:
+    - filters:
+      - name: envoy.http_connection_manager
+        typed_config:
+          "@type": >-
+            type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+          stat_prefix: egress_http
+          route_config:
+            virtual_hosts:
+            - name: backend
+              domains:
+              - "*"
+              routes:
+              - match:
+                  prefix: "/downstream_service"
+                route:
+                  cluster: reverse_connection_cluster
+          http_filters:
+          # The Lua filter is used to extract the host ID from the headers and set it in the x-computed-host-id header.
+          # This header is then used by the reverse connection cluster to look up a socket.
+          # The reverse connection cluster checks if there are cached sockets for this host.
+          - name: envoy.filters.http.lua
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+              inline_code: |
+                function envoy_on_request(request_handle)
+                  local headers = request_handle:headers()
+                  local node_id = headers:get("x-node-id")
+                  local cluster_id = headers:get("x-cluster-id")
+
+                  local host_id = ""
+
+                  -- Priority 1: x-node-id header
+                  if node_id then
+                    host_id = node_id
+                    request_handle:logInfo("Using x-node-id as host_id: " .. host_id)
+                  -- Priority 2: x-cluster-id header
+                  elseif cluster_id then
+                    host_id = cluster_id
+                    request_handle:logInfo("Using x-cluster-id as host_id: " .. host_id)
+                  else
+                    request_handle:logError("No valid headers found: x-node-id or x-cluster-id")
+                    -- Don't set x-computed-host-id, which will cause cluster matching to fail
+                    return
+                  end
+
+                  -- Set the computed host ID for the reverse connection cluster
+                  headers:add("x-computed-host-id", host_id)
+                end
+          - name: envoy.filters.http.router
+            typed_config:
+              "@type": >-
+                type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+
+  # Cluster used to write requests to cached sockets
+  clusters:
+  - name: reverse_connection_cluster
+    connect_timeout: 200s
+    lb_policy: CLUSTER_PROVIDED
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": >-
+          type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 60s
+        # This is the actual host ID that will be used by the reverse connection cluster to look up a socket.
+        # The reverse connection cluster checks if there are cached sockets for this cluster, if so, it will
+        # use the socket. Otherwise, it assumes this is a downstream node and looks for cached sockets with
+        # this as the node instead.
+        host_id_format: "%REQ(x-computed-host-id)%"
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": >-
+          type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          # Right the moment, reverse connections are supported over HTTP/2 only.
+          http2_protocol_options: {}
+
+admin:
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "/dev/stdout"
+  address:
+    socket_address:
+      address: 0.0.0.0
+      port_value: 8888
+
+layered_runtime:
+  layers:
+  - name: layer
+    static_layer:
+      re2.max_program_size.error_level: 1000
+      envoy.reloadable_features.reverse_conn_force_local_reply: true

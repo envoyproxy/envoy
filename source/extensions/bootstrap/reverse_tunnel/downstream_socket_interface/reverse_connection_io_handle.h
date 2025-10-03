@@ -291,6 +291,12 @@ public:
 
 private:
   /**
+   * Get time source for consistent time operations.
+   * @return reference to the time source
+   */
+  TimeSource& getTimeSource() const;
+
+  /**
    * @return reference to the thread-local dispatcher
    */
   Event::Dispatcher& getThreadLocalDispatcher() const;

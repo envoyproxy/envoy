@@ -461,7 +461,8 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
   auto policy_or_error =
       buildRetryPolicy(vhost->retryPolicy(), route.route(), validator, factory_context);
   SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
-  retry_policy_ = std::move(policy_or_error.value());
+  retry_policy_ = policy_or_error.value() != nullptr ? std::move(policy_or_error.value())
+                                                     : RetryPolicyImpl::DefaultRetryPolicy;
 
   if (route.has_direct_response() && route.direct_response().has_body()) {
     auto provider_or_error = Envoy::Config::DataSource::DataSourceProvider::create(
@@ -1013,8 +1014,8 @@ std::unique_ptr<HedgePolicyImpl> RouteEntryImplBase::buildHedgePolicy(
   return nullptr;
 }
 
-absl::StatusOr<std::unique_ptr<RetryPolicyImpl>> RouteEntryImplBase::buildRetryPolicy(
-    RetryPolicyConstOptRef vhost_retry_policy,
+absl::StatusOr<RetryPolicyConstSharedPtr> RouteEntryImplBase::buildRetryPolicy(
+    const RetryPolicyConstSharedPtr& vhost_retry_policy,
     const envoy::config::route::v3::RouteAction& route_config,
     ProtobufMessage::ValidationVisitor& validation_visitor,
     Server::Configuration::CommonFactoryContext& factory_context) const {
@@ -1024,13 +1025,9 @@ absl::StatusOr<std::unique_ptr<RetryPolicyImpl>> RouteEntryImplBase::buildRetryP
                                    factory_context);
   }
 
-  // If not, we fallback to the virtual host policy if there is one.
-  if (vhost_retry_policy.has_value()) {
-    return RetryPolicyImpl::create(*vhost_retry_policy, validation_visitor, factory_context);
-  }
-
-  // Otherwise, an empty policy will do.
-  return nullptr;
+  // If not, we fallback to the virtual host policy if there is one. Note the
+  // virtual host policy may be nullptr.
+  return vhost_retry_policy;
 }
 
 absl::StatusOr<std::unique_ptr<InternalRedirectPolicyImpl>>
@@ -1462,8 +1459,10 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
 
   // Retry and Hedge policies must be set before routes, since they may use them.
   if (virtual_host.has_retry_policy()) {
-    retry_policy_ = std::make_unique<envoy::config::route::v3::RetryPolicy>();
-    retry_policy_->CopyFrom(virtual_host.retry_policy());
+    auto policy_or_error =
+        RetryPolicyImpl::create(virtual_host.retry_policy(), validator, factory_context);
+    SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
+    retry_policy_ = std::move(policy_or_error.value());
   }
   if (virtual_host.has_hedge_policy()) {
     hedge_policy_ = std::make_unique<envoy::config::route::v3::HedgePolicy>();

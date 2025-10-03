@@ -73,11 +73,10 @@ public:
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
   }
 
-  void writeMessage(Buffer::OwnedImpl& buffer,
+  void writeMessage(Buffer::OwnedImpl& buffer, MessageType message_type = MessageType::Call,
                     absl::optional<ReplyType> reply_type = absl::nullopt) {
     TransportType transport_type = TransportType::Unframed;
     ProtocolType protocol_type = ProtocolType::Binary;
-    MessageType message_type = MessageType::Call;
 
     Buffer::OwnedImpl proto_buffer;
     ProtocolConverterSharedPtr protocol_converter = std::make_shared<ProtocolConverter>();
@@ -91,12 +90,13 @@ public:
     metadata->setSequenceId(1234);
 
     protocol_converter->messageBegin(metadata);
-    protocol_converter->structBegin("");
+    protocol_converter->structBegin("wrapper");
     int16_t field_id = 0;
     FieldType field_type_string = FieldType::String;
     FieldType field_type_struct = FieldType::Struct;
     FieldType field_type_stop = FieldType::Stop;
     if (message_type == MessageType::Reply || message_type == MessageType::Exception) {
+      ASSERT(reply_type.has_value());
       if (reply_type.value() == ReplyType::Success) {
         field_id = 0;
         protocol_converter->fieldBegin("", field_type_string, field_id);
@@ -118,8 +118,20 @@ public:
         protocol_converter->fieldEnd();
       }
     }
+    field_id = 1;
+    FieldType field_type_i64 = FieldType::I64;
+    protocol_converter->fieldBegin("first_field", field_type_i64, field_id);
+    int64_t i64_value = 1;
+    protocol_converter->int64Value(i64_value);
+    protocol_converter->fieldEnd();
+    field_id = 2;
+    protocol_converter->fieldBegin("second_field", field_type_string, field_id);
+    std::string string_value = "string_value";
+    protocol_converter->stringValue(string_value);
+    protocol_converter->fieldEnd();
+
     field_id = 0;
-    protocol_converter->fieldBegin("", field_type_stop, field_id);
+    protocol_converter->fieldBegin("", field_type_stop, field_id); // wrapper stop field
     protocol_converter->structEnd();
     protocol_converter->messageEnd();
 
@@ -148,6 +160,16 @@ typed_config:
       metadata_namespace: envoy.lb
       key: method_name
       value: "unknown"
+  - field_selector:
+      id: 2
+      name: second_field
+    on_present:
+      metadata_namespace: envoy.lb
+      key: second_field
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: second_field
+      value: "unknown"
   response_rules:
   - field: MESSAGE_TYPE
     on_present:
@@ -160,6 +182,16 @@ typed_config:
       key: response_reply_type
     on_missing:
       key: response_reply_type
+      value: "unknown"
+  - field_selector:
+      id: 2
+      name: second_field
+    on_present:
+      metadata_namespace: envoy.lb
+      key: second_field
+    on_missing:
+      metadata_namespace: envoy.lb
+      key: second_field
       value: "unknown"
 )EOF";
 
@@ -188,7 +220,7 @@ TEST_P(ThriftToMetadataIntegrationTest, Basic) {
   initializeFilter();
 
   writeMessage(rq_buffer_);
-  writeMessage(resp_buffer_, ReplyType::Success);
+  writeMessage(resp_buffer_, MessageType::Reply, ReplyType::Success);
   runTest(rq_headers_, rq_buffer_.toString(), resp_headers_, resp_buffer_.toString());
 
   EXPECT_EQ(1UL, test_server_->counter("thrift_to_metadata.rq.success")->value());
@@ -206,7 +238,7 @@ TEST_P(ThriftToMetadataIntegrationTest, BasicOneChunk) {
   initializeFilter();
 
   writeMessage(rq_buffer_);
-  writeMessage(resp_buffer_, ReplyType::Success);
+  writeMessage(resp_buffer_, MessageType::Reply, ReplyType::Success);
   runTest(rq_headers_, rq_buffer_.toString(), resp_headers_, resp_buffer_.toString(), 1);
 
   EXPECT_EQ(1UL, test_server_->counter("thrift_to_metadata.rq.success")->value());
@@ -224,7 +256,7 @@ TEST_P(ThriftToMetadataIntegrationTest, Trailer) {
   initializeFilter();
 
   writeMessage(rq_buffer_);
-  writeMessage(resp_buffer_, ReplyType::Success);
+  writeMessage(resp_buffer_, MessageType::Reply, ReplyType::Success);
   runTest(rq_headers_, rq_buffer_.toString(), resp_headers_, resp_buffer_.toString(), 5, true);
 
   EXPECT_EQ(1UL, test_server_->counter("thrift_to_metadata.rq.success")->value());
@@ -250,7 +282,7 @@ TEST_P(ThriftToMetadataIntegrationTest, MismatchedContentType) {
                                                {"Content-Type", "application/x-haha"}};
 
   writeMessage(rq_buffer_);
-  writeMessage(resp_buffer_, ReplyType::Success);
+  writeMessage(resp_buffer_, MessageType::Reply, ReplyType::Success);
   runTest(rq_headers, rq_buffer_.toString(), resp_headers, resp_buffer_.toString());
 
   EXPECT_EQ(0UL, test_server_->counter("thrift_to_metadata.rq.success")->value());

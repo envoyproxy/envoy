@@ -1,0 +1,23 @@
+static_resources {
+  listeners {
+    name: "\'"
+    address {
+      socket_address {
+        protocol: UDP
+        address: "127.0.0.1"
+        port_value: 0
+        network_namespace_filepath: ":"
+      }
+    }
+    socket_options {
+      int_value: 59
+      type {
+        datagram {
+        }
+      }
+    }
+    fcds_config {
+      name: " "
+    }
+  }
+}

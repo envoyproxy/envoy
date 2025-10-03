@@ -18,14 +18,6 @@
 namespace Envoy {
 namespace Http {
 
-namespace {
-Router::RetryPolicyConstSharedPtr sharedEmptyRetryPolicy() {
-  static Router::RetryPolicyConstSharedPtr empty_policy =
-      std::make_shared<Router::RetryPolicyImpl>();
-  return empty_policy;
-}
-} // namespace
-
 const absl::string_view AsyncClientImpl::ResponseBufferLimit = "http.async_response_buffer_limit";
 
 AsyncClientImpl::AsyncClientImpl(Upstream::ClusterInfoConstSharedPtr cluster,
@@ -107,10 +99,10 @@ createRetryPolicy(const AsyncClient::StreamOptions& options,
         options.retry_policy.value(), ProtobufMessage::getNullValidationVisitor(), context);
     creation_status = policy_or_error.status();
     return policy_or_error.status().ok() ? std::move(policy_or_error.value())
-                                         : sharedEmptyRetryPolicy();
+                                         : Router::RetryPolicyImpl::DefaultRetryPolicy;
   }
   return options.parsed_retry_policy != nullptr ? options.parsed_retry_policy
-                                                : sharedEmptyRetryPolicy();
+                                                : Router::RetryPolicyImpl::DefaultRetryPolicy;
 }
 
 AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
@@ -126,9 +118,11 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
                        : std::make_shared<StreamInfo::FilterStateImpl>(
                              StreamInfo::FilterState::LifeSpan::FilterChain)),
       tracing_config_(Tracing::EgressConfig::get()), local_reply_(*parent.local_reply_),
-      retry_policy_(createRetryPolicy(options, parent.factory_context_, creation_status)),
       account_(options.account_), buffer_limit_(options.buffer_limit_), send_xff_(options.send_xff),
-      send_internal_(options.send_internal) {
+      send_internal_(options.send_internal),
+      upstream_override_host_(options.upstream_override_host_) {
+  auto retry_policy = createRetryPolicy(options, parent.factory_context_, creation_status);
+
   // A field initialization may set the creation-status as unsuccessful.
   // In that case return immediately.
   if (!creation_status.ok()) {
@@ -138,9 +132,11 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
   const Router::MetadataMatchCriteria* metadata_matching_criteria = nullptr;
   if (options.parent_context.stream_info != nullptr) {
     stream_info_.setParentStreamInfo(*options.parent_context.stream_info);
-    const auto route = options.parent_context.stream_info->route();
-    if (route != nullptr) {
-      const auto* route_entry = route->routeEntry();
+    // Keep the parent root to ensure the metadata_matching_criteria will not become
+    // dangling pointer once the parent downstream request is gone.
+    parent_route_ = options.parent_context.stream_info->route();
+    if (parent_route_ != nullptr) {
+      const auto* route_entry = parent_route_->routeEntry();
       if (route_entry != nullptr) {
         metadata_matching_criteria = route_entry->metadataMatchCriteria();
       }
@@ -148,7 +144,7 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
   }
 
   auto route_or_error = NullRouteImpl::create(
-      parent_.cluster_->name(), *retry_policy_, parent_.factory_context_.regexEngine(),
+      parent_.cluster_->name(), std::move(retry_policy), parent_.factory_context_.regexEngine(),
       options.timeout, options.hash_policy, metadata_matching_criteria);
   SET_AND_RETURN_IF_NOT_OK(route_or_error.status(), creation_status);
   route_ = std::move(*route_or_error);

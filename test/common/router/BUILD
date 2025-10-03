@@ -391,6 +391,7 @@ envoy_cc_test_library(
         "//test/mocks/network:network_mocks",
         "//test/mocks/router:router_mocks",
         "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:factory_context_mocks",
         "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:cluster_manager_mocks",
@@ -464,6 +465,17 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "router_outlier_detection_test",
+    srcs = ["router_outlier_detection_test.cc"],
+    deps = [
+        ":router_test_base_lib",
+        "//source/common/router:router_lib",
+        "//test/mocks/server:factory_context_mocks",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "shadow_writer_impl_test",
     srcs = ["shadow_writer_impl_test.cc"],
     rbe_pool = "6gig",
@@ -490,6 +502,7 @@ envoy_cc_test(
         "//test/common/stream_info:test_int_accessor_lib",
         "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
+        "//test/mocks/server:server_factory_context_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:host_mocks",

@@ -198,6 +198,9 @@ public:
 
 using ResetHeaderParserSharedPtr = std::shared_ptr<ResetHeaderParser>;
 
+class RetryPolicy;
+using RetryPolicyConstSharedPtr = std::shared_ptr<const RetryPolicy>;
+
 /**
  * Route level retry policy.
  */
@@ -310,8 +313,6 @@ public:
    */
   virtual std::chrono::milliseconds resetMaxInterval() const PURE;
 };
-
-using RetryPolicyConstSharedPtr = std::shared_ptr<const RetryPolicy>;
 
 /**
  * RetryStatus whether request should be retried or not.
@@ -985,7 +986,7 @@ public:
    * @return const RetryPolicy& the retry policy for the route. All routes have a retry policy even
    *         if it is empty and does not allow retries.
    */
-  virtual const RetryPolicy& retryPolicy() const PURE;
+  virtual const RetryPolicyConstSharedPtr& retryPolicy() const PURE;
 
   /**
    * @return const InternalRedirectPolicy& the internal redirect policy for the route. All routes
