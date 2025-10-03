@@ -54,6 +54,13 @@ Http::Code ServerInfoHandler::handlerMemory(Http::ResponseHeaderMap& response_he
   return Http::Code::OK;
 }
 
+Http::Code ServerInfoHandler::handleMemoryTcmallocStats(Http::ResponseHeaderMap& response_headers,
+                                                        Buffer::Instance& response, AdminStream&) {
+  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
+  response.add(Memory::Stats::dumpStats());
+  return Http::Code::OK;
+}
+
 Http::Code ServerInfoHandler::handlerReady(Http::ResponseHeaderMap&, Buffer::Instance& response,
                                            AdminStream&) {
   const envoy::admin::v3::ServerInfo::State state =

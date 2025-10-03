@@ -584,5 +584,8 @@ new_features:
     Added :ref:`outlier_detection<envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.outlier_detection>`
     to cluster's http protocol options to allow defining via an http matcher whether a response should be treated
     as error or as success by outlier detection.
+- area: admin
+  change: |
+    Added ``/memory/tcmalloc`` admin endpoint that provides TCMalloc memory statistics.
 
 deprecated:
