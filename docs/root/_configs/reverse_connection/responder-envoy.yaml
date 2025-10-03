@@ -110,10 +110,3 @@ static_resources:
         explicit_http_config:
           # Right the moment, reverse connections are supported over HTTP/2 only.
           http2_protocol_options: {}
-
-layered_runtime:
-  layers:
-  - name: layer
-    static_layer:
-      re2.max_program_size.error_level: 1000
-      envoy.reloadable_features.reverse_conn_force_local_reply: true
