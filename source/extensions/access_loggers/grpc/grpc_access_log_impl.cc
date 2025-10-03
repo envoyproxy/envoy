@@ -48,6 +48,14 @@ void GrpcAccessLoggerImpl::initMessage() {
   identifier->set_log_name(log_name_);
 }
 
+uint32_t GrpcAccessLoggerImpl::countLogEntries() const {
+  uint32_t count = 0;
+  if (message_.has_http_logs()) {
+    count += message_.http_logs().log_entry_size();
+  }
+  return count;
+}
+
 GrpcAccessLoggerCacheImpl::GrpcAccessLoggerCacheImpl(Grpc::AsyncClientManager& async_client_manager,
                                                      Stats::Scope& scope,
                                                      ThreadLocal::SlotAllocator& tls,
