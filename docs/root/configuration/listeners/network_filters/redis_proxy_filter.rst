@@ -121,6 +121,27 @@ As noted in the :ref:`architecture overview <arch_overview_redis>`, when Envoy s
    :lineno-start: 11
    :caption: :download:`redis-dns-lookups.yaml <_include/redis-dns-lookups.yaml>`
 
+.. _config_network_filters_redis_proxy_upstream_auth:
+
+Upstream Redis Authentication
+-----------------------------
+
+The Redis proxy filter supports authenticating to upstream Redis clusters. If there are multiple upstream clusters configured, they can use either the same
+username and password or separate ones per cluster if each credential can be linked to the relevant cluster, and the proxy filter will authenticate
+appropriately to them.
+
+To use the same username and password for all upstream clusters, the top-level `auth_username` and `auth_password` in `RedisProtocolOptions` should be used.
+
+To use separate credentials for each upstream cluster, then the top-level `credentials` field in `RedisProtocolOptions` should be used. The `address` field
+is used to link this credential to individual upstream endpoint in `load_assignment.endpoints.lb_endpoints.endpoint`. The values for the `address` in both
+locations should be the same. Only socket addresses are supported in this mode.
+
+.. literalinclude:: _include/redis-upstream-auth.yaml
+    :language: yaml
+    :lines: 19-73
+    :linenos:
+    :lineno-start: 19
+    :caption: :download:`redis-upstream-auth.yaml <_include/redis-upstream-auth.yaml>`
 
 .. _config_network_filters_redis_proxy_aws_iam:
 
@@ -130,7 +151,7 @@ AWS IAM Authentication
 The redis proxy filter supports authentication with AWS IAM credentials, to ElastiCache and MemoryDB instances. To configure AWS IAM Authentication,
 additional fields are provided in the cluster redis settings.
 If `region` is not specified, the region will be deduced using the region provider chain as described in  :ref:`config_http_filters_aws_request_signing_region`.
-`cache_name` is required and is set to the name of your cache. Both `auth_usernam` and `cache_name` are used when calculating the IAM authentication token.
+`cache_name` is required and is set to the name of your cache. Both `auth_username` and `cache_name` are used when calculating the IAM authentication token.
 `auth_password` is not used in AWS IAM configuration and the password value is automatically calculated by envoy.
 In your upstream cluster, the `auth_username` field must be configured with the user that has been added to your cache, as per
 `Setup <https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/auth-iam.html#auth-iam-setup>`_. Different upstreams may use different usernames and different

@@ -66,15 +66,16 @@ void InstanceImpl::init() {
   // That may be shorter than the tls callback if the listener is torn down shortly after it is
   // created. We use a weak pointer to make sure this object outlives the tls callbacks.
   std::weak_ptr<InstanceImpl> this_weak_ptr = this->shared_from_this();
-  tls_->set([this_weak_ptr](
-                Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    if (auto this_shared_ptr = this_weak_ptr.lock()) {
-      return std::make_shared<ThreadLocalPool>(
-          this_shared_ptr, dispatcher, this_shared_ptr->cluster_name_, this_shared_ptr->dns_cache_,
-          this_shared_ptr->aws_iam_config_, this_shared_ptr->aws_iam_authenticator_);
-    }
-    return nullptr;
-  });
+  tls_->set(
+      [this_weak_ptr](Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+        if (auto this_shared_ptr = this_weak_ptr.lock()) {
+          return std::make_shared<ThreadLocalPool>(
+              this_shared_ptr, dispatcher, this_shared_ptr->cluster_name_, this_shared_ptr->api_,
+              this_shared_ptr->dns_cache_, this_shared_ptr->aws_iam_config_,
+              this_shared_ptr->aws_iam_authenticator_);
+        }
+        return nullptr;
+      });
 }
 
 uint16_t InstanceImpl::shardSize() { return tls_->getTyped<ThreadLocalPool>().shardSize(); }
@@ -109,11 +110,11 @@ InstanceImpl::makeRequestToShard(uint16_t shard_index, RespVariant&& request,
 
 InstanceImpl::ThreadLocalPool::ThreadLocalPool(
     std::shared_ptr<InstanceImpl> parent, Event::Dispatcher& dispatcher, std::string cluster_name,
-    const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
+    Api::Api& api, const Extensions::Common::DynamicForwardProxy::DnsCacheSharedPtr& dns_cache,
     absl::optional<envoy::extensions::filters::network::redis_proxy::v3::AwsIam> aws_iam_config,
     absl::optional<Common::Redis::AwsIamAuthenticator::AwsIamAuthenticatorSharedPtr>
         aws_iam_authenticator)
-    : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)),
+    : parent_(parent), dispatcher_(dispatcher), cluster_name_(std::move(cluster_name)), api_(api),
       dns_cache_(dns_cache),
       drain_timer_(dispatcher.createTimer([this]() -> void { drainClients(); })),
       client_factory_(parent->client_factory_), config_(parent->config_),
@@ -165,8 +166,8 @@ void InstanceImpl::ThreadLocalPool::onClusterAddOrUpdateNonVirtual(
   cluster_ = &cluster;
   // Update username and password when cluster updates. authPassword is ignored by the client when
   // AWS IAM Authentication is enabled.
-  auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), shared_parent->api_);
-  auth_password_ = ProtocolOptionsConfigImpl::authPassword(cluster_->info(), shared_parent->api_);
+  auth_username_ = ProtocolOptionsConfigImpl::authUsername(cluster_->info(), api_);
+  auth_password_ = ProtocolOptionsConfigImpl::authPassword(cluster_->info(), api_);
   ASSERT(host_set_member_update_cb_handle_ == nullptr);
   host_set_member_update_cb_handle_ = cluster_->prioritySet().addMemberUpdateCb(
       [this](const std::vector<Upstream::HostSharedPtr>& hosts_added,
@@ -282,11 +283,14 @@ InstanceImpl::ThreadLocalPool::threadLocalActiveClient(Upstream::HostConstShared
     if (config_->connectionRateLimitEnabled() && rate_limiter->consume(1, false) == 0) {
       redis_cluster_stats_.connection_rate_limited_.inc();
     } else {
+      ASSERT(cluster_ != nullptr);
+      const auto credentials =
+          ProtocolOptionsConfigImpl::authCredentials(cluster_->info(), api_, host);
       client = std::make_unique<ThreadLocalActiveClient>(*this);
       client->host_ = host;
       client->redis_client_ = client_factory_.create(
-          host, dispatcher_, config_, redis_command_stats_, *(stats_scope_), auth_username_,
-          auth_password_, false, aws_iam_config_, aws_iam_authenticator_);
+          host, dispatcher_, config_, redis_command_stats_, *(stats_scope_), credentials.username,
+          credentials.password, false, aws_iam_config_, aws_iam_authenticator_);
 
       client->redis_client_->addConnectionCallbacks(*client);
     }
@@ -330,7 +334,6 @@ InstanceImpl::ThreadLocalPool::makeRequest(const std::string& key, RespVariant&&
   Clusters::Redis::RedisLoadBalancerContextImpl lb_context(
       key, config_->enableHashtagging(), is_redis_cluster_, getRequest(request),
       transaction.active_ ? Common::Redis::Client::ReadPolicy::Primary : config_->readPolicy());
-
   Upstream::HostConstSharedPtr host = Upstream::LoadBalancer::onlyAllowSynchronousHostSelection(
       cluster_->loadBalancer().chooseHost(&lb_context));
   if (!host) {
@@ -447,9 +450,14 @@ InstanceImpl::ThreadLocalPool::makeRequestToHost(Upstream::HostConstSharedPtr& h
   uint32_t client_idx = transaction.current_client_idx_;
   // If there is an active transaction, establish a new connection if necessary.
   if (transaction.active_ && !transaction.connection_established_) {
-    transaction.clients_[client_idx] = client_factory_.create(
-        host, dispatcher_, config_, redis_command_stats_, *(stats_scope_), auth_username_,
-        auth_password_, true, aws_iam_config_, aws_iam_authenticator_);
+    ASSERT(cluster_ != nullptr);
+    const auto auth_credentials =
+        ProtocolOptionsConfigImpl::authCredentials(cluster_->info(), api_, host);
+
+    transaction.clients_[client_idx] =
+        client_factory_.create(host, dispatcher_, config_, redis_command_stats_, *(stats_scope_),
+                               auth_credentials.username, auth_credentials.password, true,
+                               aws_iam_config_, aws_iam_authenticator_);
     if (transaction.connection_cb_) {
       transaction.clients_[client_idx]->addConnectionCallbacks(*transaction.connection_cb_);
     }

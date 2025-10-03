@@ -4,6 +4,7 @@
 #include "envoy/service/redis_auth/v3/redis_external_auth.pb.h"
 
 #include "source/common/common/fmt.h"
+#include "source/common/common/random_generator.h"
 #include "source/extensions/filters/network/common/redis/fault_impl.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
@@ -516,6 +517,68 @@ static_resources:
 )EOF",
                 Platform::null_device_path);
 
+// The `typed_extension_protocol_options` is modified significantly in the test that uses this
+// config.
+const std::string CONFIG_WITH_SEPARATE_AUTH_PASSWORDS = fmt::format(R"EOF(
+admin:
+  access_log:
+  - name: envoy.access_loggers.file
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
+      path: "{}"
+  address:
+    socket_address:
+      address: 127.0.0.1
+      port_value: 0
+static_resources:
+  clusters:
+    - name: cluster_0
+      type: STATIC
+      typed_extension_protocol_options:
+        envoy.filters.network.redis_proxy:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions
+          auth_username: {{ inline_string: default_endpoint_username }}
+          auth_password: {{ inline_string: default_endpoint_password }}
+      lb_policy: RING_HASH
+      load_assignment:
+        cluster_name: cluster_0
+        endpoints:
+          - lb_endpoints:
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 0
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 0
+            - endpoint:
+                address:
+                  socket_address:
+                    address: 127.0.0.1
+                    port_value: 0
+  listeners:
+    name: listener_0
+    address:
+      socket_address:
+        address: 127.0.0.1
+        port_value: 0
+    filter_chains:
+      filters:
+        name: redis
+        typed_config:
+          "@type": type.googleapis.com/envoy.extensions.filters.network.redis_proxy.v3.RedisProxy
+          stat_prefix: redis_stats
+          settings:
+            op_timeout: 5s
+          prefix_routes:
+            catch_all_route:
+              cluster: cluster_0
+)EOF",
+                                                                    Platform::null_device_path);
+
 // This is a configuration with fault injection enabled.
 const std::string CONFIG_WITH_FAULT_INJECTION = CONFIG + R"EOF(
           faults:
@@ -673,6 +736,28 @@ public:
                                      const std::string& auth_username = "",
                                      const std::string& auth_password = "");
 
+  /**
+   * Similar to ``roundtripToUpstreamStep`` but sends a request and then determines which upstream
+   * actually handled it, and responds from that upstream. All the vectors must be the same length.
+   * @param fake_upstreams a handle to the servers that may respond to the request.
+   * @param request supplies Redis client data to transmit to the Redis server.
+   * @param response supplies Redis server data to transmit to the client.
+   * @param redis_client a handle to the fake redis client that sends the request.
+   * @param fake_upstream_connections supplies a handle to the connections from the proxy to the
+   * fake servers. Each entry may be null if a connection has not yet been established.
+   * @param auth_username supplies the fake upstreams' server username.
+   * @param auth_password supplies the fake upstreams' server password.
+   * @param matched_upstream_index output param that indicates which of the upstreams handled the
+   * request.
+   */
+  void roundtripToSomeUpstreamStep(const std::vector<FakeUpstreamPtr>& fake_upstreams,
+                                   const std::string& request, const std::string& response,
+                                   IntegrationTcpClientPtr& redis_client,
+                                   std::vector<FakeRawConnectionPtr>& fake_upstream_connections,
+                                   const std::vector<std::string>& auth_usernames,
+                                   const std::vector<std::string>& auth_passwords,
+                                   absl::optional<uint64_t>& matched_upstream_index);
+
 protected:
   const int num_upstreams_;
   const Network::Address::IpVersion version_;
@@ -754,6 +839,12 @@ class RedisProxyWithRoutesAndAuthPasswordsIntegrationTest : public RedisProxyInt
 public:
   RedisProxyWithRoutesAndAuthPasswordsIntegrationTest()
       : RedisProxyIntegrationTest(CONFIG_WITH_ROUTES_AND_AUTH_PASSWORDS, 3) {}
+};
+
+class RedisProxyWithSeparateAuthPasswordsIntegrationTest : public RedisProxyIntegrationTest {
+public:
+  RedisProxyWithSeparateAuthPasswordsIntegrationTest()
+      : RedisProxyIntegrationTest(CONFIG_WITH_SEPARATE_AUTH_PASSWORDS, 3) {}
 };
 
 class RedisProxyWithMirrorsIntegrationTest : public RedisProxyIntegrationTest {
@@ -897,6 +988,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithRoutesAndAuthPasswordsIntegra
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithSeparateAuthPasswordsIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisProxyWithMirrorsIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -971,6 +1066,59 @@ void RedisProxyIntegrationTest::expectUpstreamRequestResponse(
   }
 
   EXPECT_TRUE(fake_upstream_connection->write(response));
+}
+
+void RedisProxyIntegrationTest::roundtripToSomeUpstreamStep(
+    const std::vector<FakeUpstreamPtr>& fake_upstreams, const std::string& request,
+    const std::string& response, IntegrationTcpClientPtr& redis_client,
+    std::vector<FakeRawConnectionPtr>& fake_upstream_connections,
+    const std::vector<std::string>& auth_usernames, const std::vector<std::string>& auth_passwords,
+    absl::optional<uint64_t>& matched_upstream_index) {
+  redis_client->clearData();
+  for (auto& fake_upstream_connection : fake_upstream_connections) {
+    if (fake_upstream_connection != nullptr) {
+      fake_upstream_connection->clearData();
+    }
+  }
+
+  ASSERT_TRUE(redis_client->write(request));
+
+  Event::TestTimeSystem::RealTimeBound bound(TestUtility::DefaultTimeout);
+  while (bound.withinBound()) {
+    for (uint64_t i = 0; i < fake_upstreams.size(); ++i) {
+      std::string proxy_to_server;
+      if (fake_upstream_connections[i] == nullptr) {
+        if (auto result = fake_upstreams[i]->waitForRawConnection(fake_upstream_connections[i],
+                                                                  std::chrono::milliseconds(5));
+            !result) {
+          continue;
+        }
+        std::string auth_command =
+            makeBulkStringArray({"auth", auth_usernames[i], auth_passwords[i]});
+        if (auto result = fake_upstream_connections[i]->waitForData(
+                auth_command.size() + request.size(), &proxy_to_server,
+                std::chrono::milliseconds(5));
+            !result) {
+          continue;
+        }
+        EXPECT_EQ(auth_command + request, proxy_to_server);
+        const std::string ok = "+OK\r\n";
+        EXPECT_TRUE(fake_upstream_connections[i]->write(ok));
+      } else {
+        if (auto result = fake_upstream_connections[i]->waitForData(
+                request.size(), &proxy_to_server, std::chrono::milliseconds(5));
+            !result) {
+          continue;
+        }
+        EXPECT_EQ(request, proxy_to_server);
+      }
+      EXPECT_TRUE(fake_upstream_connections[i]->write(response));
+      redis_client->waitForData(response);
+      EXPECT_EQ(response, redis_client->data());
+      matched_upstream_index = i;
+      return;
+    }
+  }
 }
 
 void RedisProxyIntegrationTest::simpleRoundtripToUpstream(FakeUpstreamPtr& upstream,
@@ -1637,6 +1785,73 @@ TEST_P(RedisProxyWithRoutesAndAuthPasswordsAwsIamNoAuthUsernameIntegrationTest,
 
   EXPECT_TRUE(fake_upstream_connection->close());
   redis_client->close();
+}
+
+// This test verifies that correct credentials are used for each upstream server.
+TEST_P(RedisProxyWithSeparateAuthPasswordsIntegrationTest, TransparentAuthentication) {
+  const std::vector<std::string> endpoint_usernames = {"endpoint_0_username", "endpoint_1_username",
+                                                       "endpoint_2_username"};
+  const std::vector<std::string> endpoint_passwords = {"endpoint_0_password", "endpoint_1_password",
+                                                       "endpoint_2_password"};
+
+  config_helper_.addConfigModifier([this, &endpoint_usernames, &endpoint_passwords](
+                                       envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    Envoy::Protobuf::Any& redis_proxy_config_any = bootstrap.mutable_static_resources()
+                                                       ->mutable_clusters(0)
+                                                       ->mutable_typed_extension_protocol_options()
+                                                       ->at("envoy.filters.network.redis_proxy");
+    envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions redis_proxy_config;
+    ASSERT_TRUE(redis_proxy_config_any.UnpackTo(&redis_proxy_config));
+
+    // The credentials need to be set here instead of the config string at the top because the
+    // address changes depending on whether the test is run for IPv4 or IPv6, and the port changes
+    // on each run. And then it seems like the username and password being set here is simpler and
+    // less error-prone then specifying the strings in multiple places.
+    for (int i = 0; i < 3; ++i) {
+      auto* credential = redis_proxy_config.add_credentials();
+      auto* socket_address = credential->mutable_address()->mutable_socket_address();
+      socket_address->set_address(fake_upstreams_[i]->localAddress()->ip()->addressAsString());
+      socket_address->set_port_value(fake_upstreams_[i]->localAddress()->ip()->port());
+      credential->mutable_auth_username()->set_inline_string(endpoint_usernames[i]);
+      credential->mutable_auth_password()->set_inline_string(endpoint_passwords[i]);
+    }
+
+    ASSERT_TRUE(redis_proxy_config_any.PackFrom(
+        redis_proxy_config,
+        "type.googleapis.com/"
+        "envoy.extensions.filters.network.redis_proxy.v3.RedisProtocolOptions"));
+  });
+
+  initialize();
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  std::vector<FakeRawConnectionPtr> fake_upstream_connections;
+  fake_upstream_connections.resize(3);
+  absl::flat_hash_set<uint64_t> indices = {0, 1, 2};
+  const std::string response = "$3\r\nbar\r\n";
+
+  // The key to upstream assignment changes on each test run because the ports are not fixed. So we
+  // iterate a lot to hopefully hit all upstreams.
+  for (int i = 0; i < 100; ++i) {
+    const std::string request = makeBulkStringArray({"get", Envoy::Random::RandomUtility::uuid()});
+    absl::optional<uint64_t> upstream_index;
+    roundtripToSomeUpstreamStep(fake_upstreams_, request, response, redis_client,
+                                fake_upstream_connections, endpoint_usernames, endpoint_passwords,
+                                upstream_index);
+    ASSERT(upstream_index.has_value());
+    indices.erase(upstream_index.value());
+    if (indices.empty()) {
+      break;
+    }
+  }
+
+  ASSERT(indices.empty());
+  redis_client->close();
+  for (auto& fake_upstream_connection : fake_upstream_connections) {
+    if (fake_upstream_connection != nullptr) {
+      EXPECT_TRUE(fake_upstream_connection->close());
+    }
+  }
 }
 
 TEST_P(RedisProxyWithMirrorsIntegrationTest, MirroredCatchAllRequest) {
