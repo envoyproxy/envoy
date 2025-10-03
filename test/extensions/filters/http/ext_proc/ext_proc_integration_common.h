@@ -177,6 +177,7 @@ protected:
   void serverSendBodyRespDuplexStreamed(uint32_t total_resp_body_msg, bool end_of_stream = true,
                                         bool response = false, absl::string_view body_sent = "");
   void serverSendTrailerRespDuplexStreamed();
+  void prependExprocCompositeFilter();
 
   std::unique_ptr<SimpleFilterConfig<DynamicMetadataToHeadersFilter>> simple_filter_config_;
   std::unique_ptr<
@@ -195,6 +196,7 @@ protected:
   TestScopedRuntime scoped_runtime_;
   // Number of grpc upstreams in the test.
   int grpc_upstream_count_ = 2;
+  bool composite_test_ = false;
 };
 
 } // namespace ExternalProcessing

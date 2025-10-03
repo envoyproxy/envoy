@@ -4635,6 +4635,68 @@ TEST_P(ExtProcIntegrationTest, ExtProcLoggingInfoGRPCTimeout) {
   EXPECT_EQ(*field_request_header_status, "4");
 }
 
+// Test when ext_proc filter is nested inside a composite filter, the access_log filter
+// uses the composite filter name to retrieve the ext_proc filter state values.
+TEST_P(ExtProcIntegrationTest, AccessLogExtProcInCompositeFilter) {
+  // Adding the composite/ext_proc filter configuration.
+  composite_test_ = true;
+  std::string tunnel_access_log_path_;
+  initializeConfig();
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* access_log = hcm.add_access_log();
+        access_log->set_name("envoy.access_loggers.file");
+        envoy::extensions::access_loggers::file::v3::FileAccessLog access_log_config;
+        tunnel_access_log_path_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
+        access_log_config.set_path(tunnel_access_log_path_);
+        // "composite" is the composite filter name.
+        access_log_config.mutable_log_format()->mutable_text_format_source()->set_inline_string(
+            "%FILTER_STATE(composite:TYPED)%\n");
+        access_log->mutable_typed_config()->PackFrom(access_log_config);
+      });
+  HttpIntegrationTest::initialize();
+  // Adding the match-header so the HTTP request hits the ext_proc filter path.
+  auto response = sendDownstreamRequest(
+      [](Http::HeaderMap& headers) { headers.addCopy(LowerCaseString("match-header"), "match"); });
+
+  processRequestHeadersMessage(
+      *grpc_upstreams_[0], true, [](const HttpHeaders& headers, HeadersResponse& headers_resp) {
+        Http::TestRequestHeaderMapImpl expected_request_headers{
+            {":scheme", "http"}, {":method", "GET"},        {"host", "host"},
+            {":path", "/"},      {"match-header", "match"}, {"x-forwarded-proto", "http"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_request_headers));
+
+        auto response_header_mutation = headers_resp.mutable_response()->mutable_header_mutation();
+        response_header_mutation->add_remove_headers("match-header");
+        return true;
+      });
+
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+
+  EXPECT_THAT(upstream_request_->headers(), Not(ContainsHeader("match-header", _)));
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, false);
+  upstream_request_->encodeData(100, true);
+
+  processResponseHeadersMessage(
+      *grpc_upstreams_[0], false, [](const HttpHeaders& headers, HeadersResponse&) {
+        Http::TestRequestHeaderMapImpl expected_response_headers{{":status", "200"}};
+        EXPECT_THAT(headers.headers(), HeaderProtosEqual(expected_response_headers));
+        return true;
+      });
+
+  verifyDownstreamResponse(*response, 200);
+
+  const std::string log_content = waitForAccessLog(tunnel_access_log_path_);
+  EXPECT_FALSE(log_content.empty());
+  EXPECT_THAT(log_content, testing::HasSubstr("request_header_call_status"));
+  EXPECT_THAT(log_content, testing::HasSubstr("request_header_latency_us"));
+  EXPECT_THAT(log_content, testing::HasSubstr("response_header_call_status"));
+  EXPECT_THAT(log_content, testing::HasSubstr("response_header_latency_us"));
+}
+
 } // namespace ExternalProcessing
 } // namespace HttpFilters
 } // namespace Extensions

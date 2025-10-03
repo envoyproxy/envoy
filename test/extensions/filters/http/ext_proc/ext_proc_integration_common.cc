@@ -82,13 +82,18 @@ void ExtProcIntegrationTest::initializeConfig(
     }
 
     std::string ext_proc_filter_name = "envoy.filters.http.ext_proc";
-    if (config_option.downstream_filter) {
-      // Construct a configuration proto for our filter and then re-write it
-      // to JSON so that we can add it to the overall config
-      envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter ext_proc_filter;
-      ext_proc_filter.set_name(ext_proc_filter_name);
-      ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
-      config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
+    if (composite_test_) {
+      prependExprocCompositeFilter();
+    } else {
+      if (config_option.downstream_filter) {
+        // Construct a configuration proto for our filter and then re-write it
+        // to JSON so that we can add it to the overall config
+        envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter
+            ext_proc_filter;
+        ext_proc_filter.set_name(ext_proc_filter_name);
+        ext_proc_filter.mutable_typed_config()->PackFrom(proto_config_);
+        config_helper_.prependFilter(MessageUtil::getJsonStringFromMessageOrError(ext_proc_filter));
+      }
     }
 
     // Add set_metadata filter to inject dynamic metadata used for testing
@@ -831,6 +836,42 @@ void ExtProcIntegrationTest::serverSendTrailerRespDuplexStreamed() {
   header->set_key("x-new-trailer");
   header->set_raw_value("new");
   processor_stream_->sendGrpcMessage(response_trailer);
+}
+
+void ExtProcIntegrationTest::prependExprocCompositeFilter() {
+  config_helper_.prependFilter(absl::StrFormat(R"EOF(
+      name: composite
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.common.matching.v3.ExtensionWithMatcher
+        extension_config:
+          name: composite
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.Composite
+        xds_matcher:
+          matcher_tree:
+            input:
+              name: request-headers
+              typed_config:
+                "@type": type.googleapis.com/envoy.type.matcher.v3.HttpRequestHeaderMatchInput
+                header_name: match-header
+            exact_match_map:
+              map:
+                match:
+                  action:
+                    name: composite-action
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.composite.v3.ExecuteFilterAction
+                      typed_config:
+                        name: envoy.filters.http.ext_proc
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.filters.http.ext_proc.v3.ExternalProcessor
+                          grpc_service:
+                            envoy_grpc:
+                              cluster_name: ext_proc_server_0
+                            timeout: 300s
+
+    )EOF"),
+                               true);
 }
 
 } // namespace ExternalProcessing
