@@ -17,6 +17,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "//envoy/http:original_ip_detection_interface",
+        "//source/common/http:conn_manager_config_interface",
         "//source/common/http:utility_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/protobuf",
