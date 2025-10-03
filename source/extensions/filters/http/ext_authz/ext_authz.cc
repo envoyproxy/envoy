@@ -479,6 +479,11 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     ENVOY_STREAM_LOG(
         trace, "ext_authz filter added header(s) to the encoded response:", *encoder_callbacks_);
     for (const auto& [key, value] : response_headers_to_add_) {
+      if (headers.size() >= headers.maxHeadersCount()) {
+        ENVOY_STREAM_LOG(trace, "Cannot add new response header, header map is full.",
+                         *encoder_callbacks_);
+        break;
+      }
       ENVOY_STREAM_LOG(trace, "'{}':'{}'", *encoder_callbacks_, key.get(), value);
       headers.addCopy(key, value);
     }
@@ -488,6 +493,13 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     ENVOY_STREAM_LOG(
         trace, "ext_authz filter set header(s) to the encoded response:", *encoder_callbacks_);
     for (const auto& [key, value] : response_headers_to_set_) {
+      if (headers.get(key).empty() && headers.size() >= headers.maxHeadersCount()) {
+        ENVOY_STREAM_LOG(trace, "Cannot add new response header, header map is full.",
+                         *encoder_callbacks_);
+        // Continue because there could be other existing headers that can be set without increasing
+        // the number of headers.
+        continue;
+      }
       ENVOY_STREAM_LOG(trace, "'{}':'{}'", *encoder_callbacks_, key.get(), value);
       headers.setCopy(key, value);
     }
@@ -497,6 +509,11 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::ResponseHeaderMap& headers
     for (const auto& [key, value] : response_headers_to_add_if_absent_) {
       ENVOY_STREAM_LOG(trace, "'{}':'{}'", *encoder_callbacks_, key.get(), value);
       if (auto header_entry = headers.get(key); header_entry.empty()) {
+        if (headers.size() >= headers.maxHeadersCount()) {
+          ENVOY_STREAM_LOG(warn, "Cannot add new response header, header map is full.",
+                           *encoder_callbacks_);
+          break;
+        }
         ENVOY_STREAM_LOG(trace, "ext_authz filter added header(s) to the encoded response:",
                          *encoder_callbacks_);
         headers.addCopy(key, value);
@@ -929,8 +946,8 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
         StreamInfo::CoreResponseFlag::UnauthorizedExternalService);
     decoder_callbacks_->sendLocalReply(
         response->status_code, response->body,
-        [&headers = response->headers_to_set,
-         &callbacks = *decoder_callbacks_](Http::HeaderMap& response_headers) -> void {
+        [&headers = response->headers_to_set, &callbacks = *decoder_callbacks_,
+         this](Http::HeaderMap& response_headers) -> void {
           ENVOY_STREAM_LOG(trace,
                            "ext_authz filter added header(s) to the local response:", callbacks);
           // Firstly, remove all headers requested by the ext_authz filter, to ensure that they will
@@ -941,6 +958,11 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
           // Then set all of the requested headers, allowing the same header to be set multiple
           // times, e.g. `Set-Cookie`.
           for (const auto& [key, value] : headers) {
+            if (response_headers.size() >= response_headers.maxHeadersCount()) {
+              ENVOY_STREAM_LOG(trace, "Cannot add new response header, header map is full.",
+                               *encoder_callbacks_);
+              break;
+            }
             ENVOY_STREAM_LOG(trace, " '{}':'{}'", callbacks, key, value);
             response_headers.addCopy(Http::LowerCaseString(key), value);
           }
