@@ -232,13 +232,6 @@ std::function<std::unique_ptr<ProcessingRequestModifier>()> createProcessingRequ
 // set of rules for that purpose.
 class ImmediateMutationChecker {
 public:
-  ImmediateMutationChecker(Regex::Engine& regex_engine) {
-    HeaderMutationRules rules;
-    rules.mutable_allow_all_routing()->set_value(true);
-    rules.mutable_allow_envoy()->set_value(true);
-    rule_checker_ = std::make_unique<Checker>(rules, regex_engine);
-  }
-
   const Checker& checker() const { return *rule_checker_; }
 
 private:
