@@ -188,7 +188,8 @@ Config::SharedConfig::SharedConfig(
   }
 
   if (!config.proxy_protocol_tlvs().empty()) {
-    proxy_protocol_tlvs_ = parseTLVs(config.proxy_protocol_tlvs());
+    proxy_protocol_tlvs_ =
+        parseTLVs(config.proxy_protocol_tlvs(), context, dynamic_tlv_formatters_);
   }
 }
 
@@ -321,13 +322,62 @@ TcpProxyStats Config::SharedConfig::generateStats(Stats::Scope& scope) {
 }
 
 Network::ProxyProtocolTLVVector
-Config::SharedConfig::parseTLVs(absl::Span<const envoy::config::core::v3::TlvEntry* const> tlvs) {
+Config::SharedConfig::parseTLVs(absl::Span<const envoy::config::core::v3::TlvEntry* const> tlvs,
+                                Server::Configuration::GenericFactoryContext& context,
+                                std::vector<TlvFormatter>& dynamic_tlvs) {
   Network::ProxyProtocolTLVVector tlv_vector;
   for (const auto& tlv : tlvs) {
-    tlv_vector.push_back({static_cast<uint8_t>(tlv->type()),
-                          std::vector<unsigned char>(tlv->value().begin(), tlv->value().end())});
+    const uint8_t tlv_type = static_cast<uint8_t>(tlv->type());
+
+    // Validate that only one of value or format_string is set.
+    const bool has_value = !tlv->value().empty();
+    const bool has_format_string = tlv->has_format_string();
+
+    if (has_value && has_format_string) {
+      throw EnvoyException(
+          "Invalid TLV configuration: only one of 'value' or 'format_string' may be set.");
+    }
+
+    if (!has_value && !has_format_string) {
+      throw EnvoyException(
+          "Invalid TLV configuration: one of 'value' or 'format_string' must be set.");
+    }
+
+    if (has_value) {
+      // Static TLV value must be at least one byte long.
+      if (tlv->value().size() < 1) {
+        throw EnvoyException("Invalid TLV configuration: 'value' must be at least one byte long.");
+      }
+      tlv_vector.push_back(
+          {tlv_type, std::vector<unsigned char>(tlv->value().begin(), tlv->value().end())});
+    } else {
+      // Dynamic TLV value using formatter.
+      auto formatter_or_error =
+          Formatter::SubstitutionFormatStringUtils::fromProtoConfig(tlv->format_string(), context);
+      if (!formatter_or_error.ok()) {
+        throw EnvoyException(absl::StrCat("Failed to parse TLV format string: ",
+                                          formatter_or_error.status().ToString()));
+      }
+      dynamic_tlvs.push_back({tlv_type, std::move(*formatter_or_error)});
+    }
   }
   return tlv_vector;
+}
+
+Network::ProxyProtocolTLVVector
+Config::SharedConfig::evaluateDynamicTLVs(const StreamInfo::StreamInfo& stream_info) const {
+  Network::ProxyProtocolTLVVector result = proxy_protocol_tlvs_;
+
+  // Evaluate dynamic TLV formatters.
+  for (const auto& tlv_formatter : dynamic_tlv_formatters_) {
+    const std::string formatted_value = tlv_formatter.formatter->formatWithContext({}, stream_info);
+
+    // Convert formatted string to bytes and add to result.
+    result.push_back({tlv_formatter.type,
+                      std::vector<unsigned char>(formatted_value.begin(), formatted_value.end())});
+  }
+
+  return result;
 }
 
 void Filter::initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) {
@@ -584,12 +634,13 @@ Network::FilterStatus Filter::establishUpstreamConnection() {
   auto& filter_state = downstream_connection.streamInfo().filterState();
   if (!filter_state->hasData<Network::ProxyProtocolFilterState>(
           Network::ProxyProtocolFilterState::key())) {
+    // Evaluate dynamic TLVs with the connection's stream info.
+    const auto tlvs = config_->sharedConfig()->evaluateDynamicTLVs(getStreamInfo());
     filter_state->setData(
         Network::ProxyProtocolFilterState::key(),
         std::make_shared<Network::ProxyProtocolFilterState>(Network::ProxyProtocolData{
             downstream_connection.connectionInfoProvider().remoteAddress(),
-            downstream_connection.connectionInfoProvider().localAddress(),
-            config_->proxyProtocolTLVs()}),
+            downstream_connection.connectionInfoProvider().localAddress(), tlvs}),
         StreamInfo::FilterState::StateType::ReadOnly,
         StreamInfo::FilterState::LifeSpan::Connection);
   }
