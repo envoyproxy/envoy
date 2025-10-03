@@ -49,7 +49,6 @@ message OnDemand {
   // process. When the discovery is finished (successfully or not), the
   // request will be resumed for further processing.
   OnDemandCds odcds = 1;
-
 }
 
 // Per-route configuration for On Demand Discovery.
