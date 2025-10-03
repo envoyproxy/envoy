@@ -10,6 +10,7 @@
 #include "source/common/quic/envoy_quic_proof_verifier.h"
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_filter_manager_connection_impl.h"
+#include "source/common/quic/quic_network_connectivity_observer_impl.h"
 
 namespace Envoy {
 namespace Quic {
@@ -311,7 +312,7 @@ std::vector<std::string> EnvoyQuicClientSession::GetAlpnsToOffer() const {
 
 void EnvoyQuicClientSession::registerNetworkObserver(EnvoyQuicNetworkObserverRegistry& registry) {
   if (network_connectivity_observer_ == nullptr) {
-    network_connectivity_observer_ = std::make_unique<QuicNetworkConnectivityObserver>(*this);
+    network_connectivity_observer_ = std::make_unique<QuicNetworkConnectivityObserverImpl>(*this);
   }
   registry.registerObserver(*network_connectivity_observer_);
   registry_ = makeOptRef(registry);
