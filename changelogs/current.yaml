@@ -534,6 +534,14 @@ new_features:
     :ref:`stream_flush_timeout
     <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.stream_flush_timeout>`
     to allow for configuring a stream flush timeout independently from the stream idle timeout.
+- area: upstream
+  change: |
+    Added :ref:`transport_socket_matcher
+    <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matcher>` to clusters. This matcher
+    uses the generic xDS matcher framework to select a named transport socket from
+    :ref:`transport_socket_matches
+    <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>` based on connection
+    attributes such as destination/source IP and port, SNI, ALPN, and dynamic metadata.
 - area: http
   change: |
     Added support for header removal based on header key matching. The new
