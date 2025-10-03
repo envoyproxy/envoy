@@ -251,7 +251,8 @@ credentials:
       std::make_shared<NiceMock<Upstream::MockHost>>();
   const Network::Address::InstanceConstSharedPtr instance =
       *Network::Utility::resolveUrl("tcp://127.0.0.1:1234");
-  ON_CALL(*host, hostname()).WillByDefault(ReturnRef("address2"));
+  const std::string hostname = "address2";
+  ON_CALL(*host, hostname()).WillByDefault(ReturnRef(hostname));
   ON_CALL(*host, address()).WillByDefault(Return(instance));
   const auto credentials = config.authCredentials(api, host);
   EXPECT_EQ("default_username", credentials.username);
@@ -299,7 +300,8 @@ credentials:
       std::make_shared<NiceMock<Upstream::MockHost>>();
   const Network::Address::InstanceConstSharedPtr instance1 =
       *Network::Utility::resolveUrl("tcp://127.0.0.1:1234");
-  ON_CALL(*host1, hostname()).WillByDefault(ReturnRef("address1"));
+  const std::string hostname1 = "address1";
+  ON_CALL(*host1, hostname()).WillByDefault(ReturnRef(hostname1));
   ON_CALL(*host1, address()).WillByDefault(Return(instance1));
   const auto credentials1 = config.authCredentials(api, host1);
   EXPECT_EQ("address1_username", credentials1.username);
@@ -309,7 +311,8 @@ credentials:
       std::make_shared<NiceMock<Upstream::MockHost>>();
   const Network::Address::InstanceConstSharedPtr instance2 =
       *Network::Utility::resolveUrl("tcp://127.0.0.2:1234");
-  ON_CALL(*host2, hostname()).WillByDefault(ReturnRef("address2"));
+  const std::string hostname2 = "address2";
+  ON_CALL(*host2, hostname()).WillByDefault(ReturnRef(hostname2));
   ON_CALL(*host2, address()).WillByDefault(Return(instance2));
   const auto credentials2 = config.authCredentials(api, host2);
   EXPECT_EQ("address2_username", credentials2.username);
@@ -319,7 +322,7 @@ credentials:
       std::make_shared<NiceMock<Upstream::MockHost>>();
   const Network::Address::InstanceConstSharedPtr instance3 =
       *Network::Utility::resolveUrl("tcp://127.0.0.2:2345");
-  ON_CALL(*host3, hostname()).WillByDefault(ReturnRef("address2"));
+  ON_CALL(*host3, hostname()).WillByDefault(ReturnRef(hostname2));
   ON_CALL(*host3, address()).WillByDefault(Return(instance3));
   const auto credentials3 = config.authCredentials(api, host3);
   EXPECT_EQ("address2_2_username", credentials3.username);
@@ -330,7 +333,8 @@ credentials:
   const Network::Address::InstanceConstSharedPtr instance9 =
       *Network::Utility::resolveUrl("tcp://127.0.0.9:1234");
   const auto credentials9 = config.authCredentials(api, host9);
-  ON_CALL(*host9, hostname()).WillByDefault(ReturnRef("address9"));
+  const std::string hostname9 = "address9";
+  ON_CALL(*host9, hostname()).WillByDefault(ReturnRef(hostname9));
   ON_CALL(*host9, address()).WillByDefault(Return(instance9));
 
   // Ensure that the defaults are used if the host is not found.
@@ -371,7 +375,7 @@ credentials:
       std::make_shared<NiceMock<Upstream::MockHost>>();
   const Network::Address::InstanceConstSharedPtr instance1 =
       *Network::Utility::resolveUrl("tcp://127.0.0.1:1234");
-  ON_CALL(*host1, hostname()).WillByDefault(ReturnRef(""));
+  ON_CALL(*host1, hostname()).WillByDefault(ReturnRef(EMPTY_STRING));
   ON_CALL(*host1, address()).WillByDefault(Return(instance1));
   const auto credentials1 = config.authCredentials(api, host1);
   EXPECT_EQ("address1_username", credentials1.username);
@@ -381,7 +385,7 @@ credentials:
       std::make_shared<NiceMock<Upstream::MockHost>>();
   const Network::Address::InstanceConstSharedPtr instance2 =
       *Network::Utility::resolveUrl("tcp://[::1]:1234");
-  ON_CALL(*host2, hostname()).WillByDefault(ReturnRef(""));
+  ON_CALL(*host2, hostname()).WillByDefault(ReturnRef(EMPTY_STRING));
   ON_CALL(*host2, address()).WillByDefault(Return(instance2));
   const auto credentials2 = config.authCredentials(api, host2);
   EXPECT_EQ("address2_username", credentials2.username);
@@ -391,7 +395,7 @@ credentials:
       std::make_shared<NiceMock<Upstream::MockHost>>();
   const Network::Address::InstanceConstSharedPtr instance9 =
       *Network::Utility::resolveUrl("tcp://127.0.0.9:1234");
-  ON_CALL(*host9, hostname()).WillByDefault(ReturnRef(""));
+  ON_CALL(*host9, hostname()).WillByDefault(ReturnRef(EMPTY_STRING));
   ON_CALL(*host9, address()).WillByDefault(Return(instance9));
 
   // Ensure that the defaults are used if the host is not found.
