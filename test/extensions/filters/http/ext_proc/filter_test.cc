@@ -4045,8 +4045,6 @@ TEST_F(HttpFilterTest, ClearRouteCacheHeaderMutationUpstreamIgnored) {
   EXPECT_EQ(config_->stats().streams_closed_.value(), 1);
 }
 
-// When ext_proc filter is in upstream filter chain, do not sending local
-// reply to downstream in case immediate response is received.
 TEST_F(HttpFilterTest, PostAndRespondImmediatelyUpstream) {
   initialize(R"EOF(
   grpc_service:
@@ -4058,12 +4056,12 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyUpstream) {
   EXPECT_EQ(filter_->decodeHeaders(request_headers_, false), FilterHeadersStatus::StopIteration);
   test_time_->advanceTimeWait(std::chrono::microseconds(10));
   TestResponseHeaderMapImpl immediate_response_headers;
-  ON_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::BadRequest, "Bad request", _,
-                                             Eq(absl::nullopt), "Got_a_bad_request"))
-      .WillByDefault(Invoke([&immediate_response_headers](
-                                Unused, Unused,
-                                std::function<void(ResponseHeaderMap & headers)> modify_headers,
-                                Unused, Unused) { modify_headers(immediate_response_headers); }));
+  EXPECT_CALL(encoder_callbacks_, sendLocalReply(::Envoy::Http::Code::BadRequest, "Bad request", _,
+                                                 Eq(absl::nullopt), "Got_a_bad_request"))
+      .WillOnce(Invoke([&immediate_response_headers](
+                           Unused, Unused,
+                           std::function<void(ResponseHeaderMap & headers)> modify_headers, Unused,
+                           Unused) { modify_headers(immediate_response_headers); }));
   std::unique_ptr<ProcessingResponse> resp1 = std::make_unique<ProcessingResponse>();
   auto* immediate_response = resp1->mutable_immediate_response();
   immediate_response->mutable_status()->set_code(envoy::type::v3::StatusCode::BadRequest);
@@ -4074,12 +4072,15 @@ TEST_F(HttpFilterTest, PostAndRespondImmediatelyUpstream) {
   hdr1->mutable_append()->set_value(false);
   hdr1->mutable_header()->set_key("content-type");
   hdr1->mutable_header()->set_raw_value("text/plain");
+  auto* hdr2 = immediate_headers->add_set_headers();
+  hdr2->mutable_append()->set_value(true);
+  hdr2->mutable_header()->set_key("foo");
+  hdr2->mutable_header()->set_raw_value("bar");
   stream_callbacks_->onReceiveMessage(std::move(resp1));
-  TestResponseHeaderMapImpl expected_response_headers{};
-  // Send local reply never happened.
+
+  TestResponseHeaderMapImpl expected_response_headers{{"content-type", "text/plain"},
+                                                      {"foo", "bar"}};
   EXPECT_THAT(&immediate_response_headers, HeaderMapEqualIgnoreOrder(&expected_response_headers));
-  // The send immediate response counter is increased.
-  EXPECT_EQ(config_->stats().send_immediate_resp_upstream_ignored_.value(), 1);
   EXPECT_EQ(config_->stats().streams_started_.value(), 1);
   EXPECT_EQ(config_->stats().stream_msgs_sent_.value(), 1);
   EXPECT_EQ(config_->stats().stream_msgs_received_.value(), 1);
