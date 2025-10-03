@@ -27,7 +27,8 @@ public:
       if (!cm_.isShutdown()) {
         const auto thread_local_cluster = cm_.getThreadLocalCluster(cluster_name_);
         if (thread_local_cluster != nullptr) {
-          thread_local_cluster->httpAsyncClient().dispatcher().post([this]() { cancel(); });
+          thread_local_cluster->httpAsyncClient().dispatcher().post(
+              [self_ref = self_ref_]() { self_ref->cancel(); });
           return;
         }
       }
