@@ -30,7 +30,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 30]
+// [#next-free-field: 31]
 message ExtAuthz {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ext_authz.v3.ExtAuthz";
@@ -311,6 +311,17 @@ message ExtAuthz {
   // Field ``latency_us`` is exposed for CEL and logging when using gRPC or HTTP service.
   // Fields ``bytesSent`` and ``bytesReceived`` are exposed for CEL and logging only when using gRPC service.
   bool emit_filter_state_stats = 29;
+
+  // Sets the maximum size (in bytes) of the response body that the filter will send downstream
+  // when a request is denied by the external authorization service.
+  //
+  // If the authorization server returns a response body larger than this configured limit,
+  // the body will be truncated to ``max_denied_response_body_bytes`` before being sent to the
+  // downstream client.
+  //
+  // If this field is not set or is set to 0, no truncation will occur, and the entire
+  // denied response body will be forwarded.
+  uint32 max_denied_response_body_bytes = 30;
 }
 
 // Configuration for buffering the request data.
