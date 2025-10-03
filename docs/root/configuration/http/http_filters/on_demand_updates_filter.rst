@@ -43,8 +43,8 @@ Per-route configuration limitations
    requests with body data cannot use stream recreation because it would lose the buffered request body.
    This creates inconsistent behavior where:
 
-   - Bodyless requests (``GET``, ``HEAD``, etc.) receive per-route config overrides ✓
-   - Requests with body (``POST``, ``PUT``, etc.) do NOT receive per-route config overrides ✗
+   - Bodyless requests (``GET``, ``HEAD``, etc.) receive per-route config overrides (YES)
+   - Requests with body (``POST``, ``PUT``, etc.) do NOT receive per-route config overrides (NO)
 
 The filter provides a configuration option ``allow_body_data_loss_for_per_route_config`` to control this behavior:
 
