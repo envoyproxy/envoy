@@ -34,7 +34,7 @@ the on demand CDS for requests using this virtual host or route. Conversely,
 if :ref:`odcds <envoy_v3_api_field_extensions.filters.http.on_demand.v3.OnDemand.odcds>` is specified,
 on demand CDS is enabled for requests using this virtual host or route.
 
-Per-Route configuration limitations
+Per-route configuration limitations
 ------------------------------------
 
 .. warning::
@@ -43,8 +43,8 @@ Per-Route configuration limitations
    requests with body data cannot use stream recreation because it would lose the buffered request body.
    This creates inconsistent behavior where:
 
-   - Bodyless requests (GET, HEAD, etc.) receive per-route config overrides ✓
-   - Requests with body (POST, PUT, etc.) do NOT receive per-route config overrides ✗
+   - Bodyless requests (``GET``, ``HEAD``, etc.) receive per-route config overrides ✓
+   - Requests with body (``POST``, ``PUT``, etc.) do NOT receive per-route config overrides ✗
 
 The filter provides a configuration option ``allow_body_data_loss_for_per_route_config`` to control this behavior:
 
@@ -66,26 +66,21 @@ Example Configuration
 
 Basic configuration with default behavior (preserves request body, may not apply per-route overrides):
 
-.. code-block:: yaml
-
-  name: envoy.filters.http.on_demand
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
-    odcds:
-      source:
-        ads: {}
-      timeout: 5s
-    # allow_body_data_loss_for_per_route_config: false  # Default
+.. literalinclude:: /_configs/on_demand/basic-config.yaml
+    :language: yaml
+    :linenos:
+    :caption: Basic on-demand filter configuration
 
 Configuration allowing body data loss for consistent per-route behavior:
 
-.. code-block:: yaml
+.. literalinclude:: /_configs/on_demand/allow-body-loss-config.yaml
+    :language: yaml
+    :linenos:
+    :caption: Configuration with body data loss allowed
 
-  name: envoy.filters.http.on_demand
-  typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
-    odcds:
-      source:
-        ads: {}
-      timeout: 5s
-    allow_body_data_loss_for_per_route_config: true  # WARNING: May lose request body data!
+Complete example showing the filter in an HTTP connection manager context:
+
+.. literalinclude:: /_configs/on_demand/complete-config.yaml
+    :language: yaml
+    :linenos:
+    :caption: Complete Envoy configuration with on-demand filter
