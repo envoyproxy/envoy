@@ -22,7 +22,21 @@ public:
   MetadataFetcherImpl(Upstream::ClusterManager& cm, absl::string_view cluster_name)
       : cm_(cm), cluster_name_(std::string(cluster_name)) {}
 
-  ~MetadataFetcherImpl() override { cancel(); }
+  ~MetadataFetcherImpl() override {
+    if (request_.has_value() && !complete_.load()) {
+      if (!cm_.isShutdown()) {
+        const auto thread_local_cluster = cm_.getThreadLocalCluster(cluster_name_);
+        if (thread_local_cluster != nullptr) {
+          thread_local_cluster->httpAsyncClient().dispatcher().post([this]() { cancel(); });
+          return;
+        }
+      }
+    }
+    receiver_.reset();
+    complete_.store(true);
+    request_.reset();
+    self_ref_.reset();
+  }
 
   void cancel() override {
     if (request_.has_value() && !complete_.load()) {
@@ -209,7 +223,7 @@ private:
     self_ref_.reset();
   }
 };
-}
+} // namespace
 
 // TODO(nbaws): Change api to return shared_ptr and remove wrapper
 class MetadataFetcherWrapper : public MetadataFetcher {
