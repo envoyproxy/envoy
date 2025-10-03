@@ -17,6 +17,8 @@ using ::testing::Return;
 using ::testing::ReturnRef;
 using ::testing::UnorderedElementsAreArray;
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 namespace Upstream {
 namespace {

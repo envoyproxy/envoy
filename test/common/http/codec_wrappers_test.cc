@@ -6,6 +6,8 @@
 
 using testing::_;
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 namespace Http {
 

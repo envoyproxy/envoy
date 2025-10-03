@@ -17,6 +17,8 @@
 
 using testing::HasSubstr;
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 namespace {
 

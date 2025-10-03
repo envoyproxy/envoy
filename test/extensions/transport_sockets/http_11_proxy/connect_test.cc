@@ -29,6 +29,8 @@ using testing::Optional;
 using testing::Return;
 using testing::ReturnRef;
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {

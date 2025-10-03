@@ -10,6 +10,7 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "absl/synchronization/mutex.h"
+#include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -39,6 +40,18 @@ private:
   FineGrainLogLevelMap previous_fine_grain_levels_;
 };
 
+class LogEnvironment;
+
+/** RAII to register a log expectation. */
+class LogExpectation {
+public:
+  LogExpectation(LogEnvironment* log_env,
+                 absl::AnyInvocable<void(Logger::Logger::Levels, const std::string&)> on_log);
+  ~LogExpectation();
+  LogEnvironment* log_env_;
+  absl::AnyInvocable<void(Logger::Logger::Levels, const std::string&)> on_log_;
+};
+
 /**
  * Records log messages in a vector<string>, forwarding them to the previous
  * delegate. This is useful for unit-testing log messages while still being able
@@ -58,15 +71,49 @@ public:
   void log(absl::string_view msg, const spdlog::details::log_msg& log_msg) override;
   void flush() override;
 
-  const std::vector<std::string> messages() const {
-    absl::MutexLock ml(&mtx_);
-    std::vector<std::string> copy(messages_);
-    return copy;
-  }
+  const std::vector<std::string> messages() const;
+  void start();
+  void stop();
+  void addExpectation(LogExpectation* exp);
+  void removeExpectation(LogExpectation* exp);
 
 private:
   mutable absl::Mutex mtx_;
   std::vector<std::string> messages_ ABSL_GUARDED_BY(mtx_);
+  std::atomic<bool> enabled_{false};
+
+  absl::Mutex exp_mtx_;
+  absl::flat_hash_set<LogExpectation*> expectations_ ABSL_GUARDED_BY(exp_mtx_);
+};
+
+class LogEnvironment : public ::testing::Environment {
+public:
+  void SetUp() override {
+    Envoy::Logger::DelegatingLogSinkSharedPtr sink_ptr = Envoy::Logger::Registry::getSink();
+    log_recorder_ = std::make_unique<Envoy::LogRecordingSink>(sink_ptr);
+  }
+
+  void TearDown() override { log_recorder_.reset(); }
+
+  std::unique_ptr<LogRecordingSink> log_recorder_;
+};
+
+#define LOG_RECORDER_NAME log_env
+
+#define SETUP_LOG_RECORDER                                                                         \
+  ::Envoy::LogEnvironment* const LOG_RECORDER_NAME = static_cast<::Envoy::LogEnvironment*>(        \
+      ::testing::AddGlobalTestEnvironment(new ::Envoy::LogEnvironment));
+
+class StartStopRecording {
+public:
+  explicit StartStopRecording(LogEnvironment* log_env) : log_env_(log_env) {
+    log_env->log_recorder_->start();
+  }
+  const std::vector<std::string> messages() const { return log_env_->log_recorder_->messages(); }
+  ~StartStopRecording() { log_env_->log_recorder_->stop(); }
+
+private:
+  LogEnvironment* log_env_;
 };
 
 using StringPair = std::pair<std::string, std::string>;
@@ -102,9 +149,9 @@ using ExpectedLogMessages = std::vector<StringPair>;
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
     Envoy::Logger::DelegatingLogSinkSharedPtr sink_ptr = Envoy::Logger::Registry::getSink();       \
     sink_ptr->setShouldEscape(escaped);                                                            \
-    Envoy::LogRecordingSink log_recorder(sink_ptr);                                                \
+    ::Envoy::StartStopRecording recording(LOG_RECORDER_NAME);                                      \
     stmt;                                                                                          \
-    auto messages = log_recorder.messages();                                                       \
+    auto messages = recording.messages();                                                          \
     if (messages.empty()) {                                                                        \
       FAIL() << "Expected message(s), but NONE was recorded.";                                     \
     }                                                                                              \
@@ -142,9 +189,9 @@ using ExpectedLogMessages = std::vector<StringPair>;
 #define EXPECT_LOG_NOT_CONTAINS(loglevel, substr, stmt)                                            \
   do {                                                                                             \
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
-    Envoy::LogRecordingSink log_recorder(Envoy::Logger::Registry::getSink());                      \
+    ::Envoy::StartStopRecording recording(LOG_RECORDER_NAME);                                      \
     stmt;                                                                                          \
-    auto messages = log_recorder.messages();                                                       \
+    auto messages = recording.messages();                                                          \
     for (const std::string& message : messages) {                                                  \
       if ((message.find(substr) != std::string::npos) &&                                           \
           (message.find(loglevel) != std::string::npos)) {                                         \
@@ -173,9 +220,9 @@ using ExpectedLogMessages = std::vector<StringPair>;
 #define EXPECT_LOG_CONTAINS_N_TIMES(loglevel, substr, expected_occurrences, stmt)                  \
   do {                                                                                             \
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
-    Envoy::LogRecordingSink log_recorder(Envoy::Logger::Registry::getSink());                      \
+    ::Envoy::StartStopRecording recording(LOG_RECORDER_NAME);                                      \
     stmt;                                                                                          \
-    auto messages = log_recorder.messages();                                                       \
+    auto messages = recording.messages();                                                          \
     uint64_t actual_occurrences = 0;                                                               \
     for (const std::string& message : messages) {                                                  \
       if ((message.find(substr) != std::string::npos) &&                                           \
@@ -198,8 +245,9 @@ using ExpectedLogMessages = std::vector<StringPair>;
   do {                                                                                             \
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
     Envoy::LogRecordingSink log_recorder(Envoy::Logger::Registry::getSink());                      \
+    ::Envoy::StartStopRecording recording(LOG_RECORDER_NAME);                                      \
     stmt;                                                                                          \
-    const std::vector<std::string> logs = log_recorder.messages();                                 \
+    auto logs = recording.messages();                                                              \
     ASSERT_EQ(0, logs.size()) << " Logs:\n   " << absl::StrJoin(logs, "   ");                      \
   } while (false)
 
@@ -211,10 +259,10 @@ using ExpectedLogMessages = std::vector<StringPair>;
     Envoy::Logger::DelegatingLogSinkSharedPtr sink_ptr = Envoy::Logger::Registry::getSink();       \
     std::string loglevel = loglevel_raw;                                                           \
     std::string substr = substr_raw;                                                               \
-    Envoy::LogRecordingSink log_recorder(sink_ptr);                                                \
+    ::Envoy::StartStopRecording recording(LOG_RECORDER_NAME);                                      \
     stmt;                                                                                          \
     while (true) {                                                                                 \
-      auto messages = log_recorder.messages();                                                     \
+      auto messages = recording.messages();                                                        \
       if (messages.empty()) {                                                                      \
         continue;                                                                                  \
       }                                                                                            \

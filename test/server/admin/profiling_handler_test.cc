@@ -3,6 +3,8 @@
 #include "test/server/admin/admin_instance.h"
 #include "test/test_common/logging.h"
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 namespace Server {
 

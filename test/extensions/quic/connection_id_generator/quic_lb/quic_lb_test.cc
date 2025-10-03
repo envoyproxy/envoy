@@ -7,6 +7,8 @@
 #include "quiche/quic/platform/api/quic_test.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 namespace Quic {
 namespace Extensions {

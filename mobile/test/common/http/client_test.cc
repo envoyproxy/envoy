@@ -30,6 +30,8 @@ using testing::ReturnRef;
 using testing::SaveArg;
 using testing::WithArg;
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 namespace Http {
 

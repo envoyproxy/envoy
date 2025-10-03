@@ -40,6 +40,8 @@ using testing::ReturnRef;
 using testing::StrEq;
 using testing::WithArgs;
 
+SETUP_LOG_RECORDER;
+
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
