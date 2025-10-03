@@ -36,14 +36,9 @@ message TokenBucket {
     required: true
     gt {}
   }];
-}
 
-// The token bucket as a resource config.
-message TokenBucketConfig {
-  // Required.The name of the token bucket. Used to identify the token bucket in
-  // access log rate limit filter.
-  string name = 1 [(validate.rules).string = {min_len: 1}];
-
-  // Required. The token bucket configuration.
-  TokenBucket token_bucket = 2 [(validate.rules).message = {required: true}];
+  // The name of the token bucket resource. It is required when the token
+  // buckets are provided via xDS resources and used in the singleton case, like
+  // in the process rate limit access logger filter.
+  string name = 4;
 }

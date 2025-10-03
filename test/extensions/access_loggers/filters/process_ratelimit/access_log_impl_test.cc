@@ -121,14 +121,13 @@ typed_config:
   path: /dev/null
   )EOF";
 
-  const envoy::type::v3::TokenBucketConfig token_bucket_ =
-      TestUtility::parseYaml<envoy::type::v3::TokenBucketConfig>(R"EOF(
+  const envoy::type::v3::TokenBucket token_bucket_ =
+      TestUtility::parseYaml<envoy::type::v3::TokenBucket>(R"EOF(
 name: "token_bucket_name"
-token_bucket:
-  max_tokens: 1
-  tokens_per_fill: 1
-  fill_interval:
-    seconds: 1
+max_tokens: 1
+tokens_per_fill: 1
+fill_interval:
+  seconds: 1
 )EOF");
 
   NiceMock<MockTimeSystem> time_source_;
@@ -268,7 +267,7 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, SharedTokenBucketInitSeparately) {
   expectWritesAndLog(log1, /*expect_write_times=*/0, /*log_call_times=*/1);
 }
 
-TEST_F(AccessLogImplTestWithRateLimitFilter, TokenBucketConfigUpdatedUnderSameResourceName) {
+TEST_F(AccessLogImplTestWithRateLimitFilter, TokenBucketUpdatedUnderSameResourceName) {
   AccessLog::InstanceSharedPtr log1 = AccessLog::AccessLogFactory::fromProto(
       parseAccessLogFromV3Yaml(default_access_log_), context_);
   context_.server_factory_context_.init_manager_.initialize(init_watcher_);
@@ -280,14 +279,13 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, TokenBucketConfigUpdatedUnderSameRe
   EXPECT_TRUE(callbackss_["token_bucket_name"]->onConfigUpdate(decoded_resources.refvec_, "").ok());
   expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/2);
 
-  const auto decoded_resources_2 = TestUtility::decodeResources(
-      {TestUtility::parseYaml<envoy::type::v3::TokenBucketConfig>(R"EOF(
+  const auto decoded_resources_2 =
+      TestUtility::decodeResources({TestUtility::parseYaml<envoy::type::v3::TokenBucket>(R"EOF(
 name: "token_bucket_name"
-token_bucket:
-  max_tokens: 2
-  tokens_per_fill: 2
-  fill_interval:
-    seconds: 1
+max_tokens: 2
+tokens_per_fill: 2
+fill_interval:
+  seconds: 1
 )EOF")});
   EXPECT_TRUE(
       callbackss_["token_bucket_name"]->onConfigUpdate(decoded_resources_2.refvec_, "").ok());
@@ -322,13 +320,12 @@ TEST_F(AccessLogImplTestWithRateLimitFilter, RemoveAndAddResource) {
   expectWritesAndLog(log1, /*expect_write_times=*/0, /*log_call_times=*/1);
 
   // 3. Add the resource back.
-  auto new_token_bucket = TestUtility::parseYaml<envoy::type::v3::TokenBucketConfig>(R"EOF(
+  auto new_token_bucket = TestUtility::parseYaml<envoy::type::v3::TokenBucket>(R"EOF(
 name: "token_bucket_name"
-token_bucket:
-  max_tokens: 3
-  tokens_per_fill: 3
-  fill_interval:
-    seconds: 3
+max_tokens: 3
+tokens_per_fill: 3
+fill_interval:
+  seconds: 3
 )EOF");
   decoded_resources = TestUtility::decodeResources({new_token_bucket});
   EXPECT_TRUE(

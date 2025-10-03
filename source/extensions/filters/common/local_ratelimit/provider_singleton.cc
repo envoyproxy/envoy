@@ -75,8 +75,8 @@ RateLimiterProviderSingleton::TokenBucketSubscription::getLimiter() {
     return limiter;
   }
   if (config_.has_value()) {
-    limiter = createRateLimiterImpl(config_->token_bucket(),
-                                    parent_.factory_context_.mainThreadDispatcher());
+    limiter =
+        createRateLimiterImpl(config_.value(), parent_.factory_context_.mainThreadDispatcher());
     limiter_ = limiter;
     return limiter;
   }
@@ -85,7 +85,7 @@ RateLimiterProviderSingleton::TokenBucketSubscription::getLimiter() {
 
 RateLimiterProviderSingleton::TokenBucketSubscription::TokenBucketSubscription(
     RateLimiterProviderSingleton& parent, absl::string_view resource_name)
-    : Config::SubscriptionBase<envoy::type::v3::TokenBucketConfig>(
+    : Config::SubscriptionBase<envoy::type::v3::TokenBucket>(
           parent.factory_context_.messageValidationVisitor(), "name"),
       parent_(parent), init_target_(std::make_unique<Init::TargetImpl>(
                            fmt::format("RateLimitConfigCallback-{}", resource_name), []() {})),
@@ -105,8 +105,7 @@ RateLimiterProviderSingleton::TokenBucketSubscription::~TokenBucketSubscription(
 
 void RateLimiterProviderSingleton::TokenBucketSubscription::handleAddedResource(
     const Config::DecodedResourceRef& resource) {
-  const auto& config =
-      dynamic_cast<const envoy::type::v3::TokenBucketConfig&>(resource.get().resource());
+  const auto& config = dynamic_cast<const envoy::type::v3::TokenBucket&>(resource.get().resource());
   size_t new_hash = MessageUtil::hash(config);
   // If the config is the same, no op.
   if (new_hash == token_bucket_config_hash_) {
@@ -116,8 +115,7 @@ void RateLimiterProviderSingleton::TokenBucketSubscription::handleAddedResource(
   // Update the config and hash and reset the limiter.
   config_ = config;
   token_bucket_config_hash_ = new_hash;
-  auto new_limiter =
-      createRateLimiterImpl(config.token_bucket(), parent_.factory_context_.mainThreadDispatcher());
+  auto new_limiter = createRateLimiterImpl(config, parent_.factory_context_.mainThreadDispatcher());
   limiter_ = new_limiter;
   for (auto& setter : setters_) {
     setter(new_limiter);

@@ -41,7 +41,7 @@ namespace LocalRateLimit {
 // 3. It looks up or creates a TokenBucketSubscription for the given resource
 //    name.
 // 4. The TokenBucketSubscription establishes an xDS subscription to fetch the
-//    envoy::type::v3::TokenBucketConfig.
+//    envoy::type::v3::TokenBucket.
 // 5. Upon receiving the configuration, the TokenBucketSubscription creates or
 //    updates a shared LocalRateLimiterImpl instance.
 // 6. The getRateLimiter method returns a RateLimiterWrapper, which provides
@@ -97,7 +97,7 @@ public:
         scope_(factory_context.scope().createScope("local_ratelimit_discovery")),
         fallback_always_deny_limiter_(std::make_shared<AlwaysDenyLocalRateLimiter>()) {}
 
-  class TokenBucketSubscription : Config::SubscriptionBase<envoy::type::v3::TokenBucketConfig> {
+  class TokenBucketSubscription : Config::SubscriptionBase<envoy::type::v3::TokenBucket> {
   public:
     explicit TokenBucketSubscription(RateLimiterProviderSingleton& parent,
                                      absl::string_view resource_name);
@@ -129,7 +129,7 @@ public:
     std::string resource_name_;
     Config::SubscriptionPtr subscription_;
     std::vector<SetRateLimiterCb> setters_;
-    absl::optional<envoy::type::v3::TokenBucketConfig> config_;
+    absl::optional<envoy::type::v3::TokenBucket> config_;
     std::weak_ptr<LocalRateLimiterImpl> limiter_;
     size_t token_bucket_config_hash_;
   };
