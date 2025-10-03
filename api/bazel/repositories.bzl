@@ -54,6 +54,12 @@ def api_dependencies():
     external_http_archive(
         name = "com_github_chrusty_protoc_gen_jsonschema",
     )
+    external_http_archive(
+        name = "envoy_toolshed",
+    )
+    external_http_archive(
+        name = "com_google_protobuf",
+    )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
