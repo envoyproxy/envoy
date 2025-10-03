@@ -747,7 +747,7 @@ public:
    * fake servers. Each entry may be null if a connection has not yet been established.
    * @param auth_username supplies the fake upstreams' server username.
    * @param auth_password supplies the fake upstreams' server password.
-   * @param matched_upstream_index outparam that indicates which of the upstreams handled the
+   * @param matched_upstream_index output param that indicates which of the upstreams handled the
    * request.
    */
   void roundtripToSomeUpstreamStep(const std::vector<FakeUpstreamPtr>& fake_upstreams,
@@ -1796,10 +1796,10 @@ TEST_P(RedisProxyWithSeparateAuthPasswordsIntegrationTest, TransparentAuthentica
 
   config_helper_.addConfigModifier([this, &endpoint_usernames, &endpoint_passwords](
                                        envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    google::protobuf::Any& redis_proxy_config_any = bootstrap.mutable_static_resources()
-                                                        ->mutable_clusters(0)
-                                                        ->mutable_typed_extension_protocol_options()
-                                                        ->at("envoy.filters.network.redis_proxy");
+    Envoy::Protobuf::Any& redis_proxy_config_any = bootstrap.mutable_static_resources()
+                                                       ->mutable_clusters(0)
+                                                       ->mutable_typed_extension_protocol_options()
+                                                       ->at("envoy.filters.network.redis_proxy");
     envoy::extensions::filters::network::redis_proxy::v3::RedisProtocolOptions redis_proxy_config;
     ASSERT_TRUE(redis_proxy_config_any.UnpackTo(&redis_proxy_config));
 

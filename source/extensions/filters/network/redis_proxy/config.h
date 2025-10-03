@@ -70,10 +70,9 @@ public:
         credential.ok() ? credential->first : auth_username_;
     const envoy::config::core::v3::DataSource& auth_password =
         credential.ok() ? credential->second : auth_password_;
-    return Credentials{.username = THROW_OR_RETURN_VALUE(
-                           Config::DataSource::read(auth_username, true, api), std::string),
-                       .password = THROW_OR_RETURN_VALUE(
-                           Config::DataSource::read(auth_password, true, api), std::string)};
+    return Credentials{
+        THROW_OR_RETURN_VALUE(Config::DataSource::read(auth_username, true, api), std::string),
+        THROW_OR_RETURN_VALUE(Config::DataSource::read(auth_password, true, api), std::string)};
   }
 
   // Returns a <username, password> credential pair for the default credentials for the cluster.
@@ -91,7 +90,7 @@ public:
     if (options) {
       return options->authCredentials(api, host);
     }
-    return Credentials{.username = EMPTY_STRING, .password = EMPTY_STRING};
+    return Credentials{EMPTY_STRING, EMPTY_STRING};
   }
 
   // Returns the default username for the cluster.
