@@ -5,6 +5,7 @@ cc_library(
     srcs = ["src/circllhist.c"],
     hdrs = [
         "src/circllhist.h",
+        "src/cdflib.h",
     ],
     copts = select({
         "@envoy//bazel:windows_x86_64": ["-DWIN32"],
