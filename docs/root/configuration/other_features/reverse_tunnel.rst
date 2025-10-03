@@ -38,6 +38,8 @@ Initiator Configuration (Downstream Envoy)
 
 The initiator Envoy (downstream) requires the following configuration components to establish reverse tunnels:
 
+.. _config_reverse_tunnel_upstream_socket_interface:
+
 Downstream Socket Interface
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -52,6 +54,8 @@ Downstream Socket Interface
       stat_prefix: "downstream_reverse_connection"
 
 This extension enables the initiator to initiate and manage reverse tunnels to the responder Envoy.
+
+.. _config_reverse_tunnel_listener:
 
 Reverse Tunnel Listener
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -99,6 +103,22 @@ The special ``rc://`` address format encodes:
 * ``src_tenant_id``: "downstream-tenant" - Tenant identifier
 * ``remote_cluster``: "upstream-cluster" - Name of the upstream cluster to connect to
 * ``connection_count``: "1" - Number of reverse connections to establish
+
+**Identifier Definitions:**
+
+* **src_node_id**: A unique identifier for this specific node. Each node must have a unique src_node_id across
+  the entire system to ensure proper routing and connection management.
+* **src_cluster_id**: An identifier for a logical group of nodes. Multiple nodes can belong to the same cluster,
+  allowing data requests to be sent using the src_cluster_id and routed to any available node within that cluster.
+  The src_cluster_id must be different from any src_node_id to avoid routing conflicts.
+* **src_tenant_id**: Used in multi-tenant environments to isolate traffic and resources between different tenants
+  or organizational units.
+
+**Identifier Rules:**
+
+* Each node should have a unique src_node_id
+* The src_cluster_id should not be the same as any src_node_id
+* Nodes in the same cluster share the same src_cluster_id but have different src_node_id values
 
 The 'downstream-service' cluster is the service behind initiator envoy that will be accessed via reverse tunnels
 from behind the responder envoy.
@@ -209,8 +229,10 @@ Responder Configuration (Upstream Envoy)
 
 The responder Envoy (upstream) requires the following configuration components to accept reverse tunnels:
 
-Bootstrap Extension for Socket Interface
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. _config_reverse_tunnel_upstream_socket_interface:
+
+Upstream Socket Interface
+~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. validated-code-block:: yaml
   :type-name: envoy.config.bootstrap.v3.Bootstrap
@@ -223,6 +245,8 @@ Bootstrap Extension for Socket Interface
       stat_prefix: "upstream_reverse_connection"
 
 This extension enables the responder to accept and manage reverse connections from initiator Envoys.
+
+.. _config_reverse_tunnel_network_filter:
 
 Reverse Tunnel Network Filter
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -246,42 +270,6 @@ reverse tunnel requests:
         ping_interval: 2s
 
 The ``envoy.filters.network.reverse_tunnel`` network filter handles the reverse tunnel handshake protocol and connection acceptance.
-
-.. _config_reverse_connection_handshake:
-
-Handshake Protocol
-~~~~~~~~~~~~~~~~~~
-
-Reverse tunnels use a handshake protocol to establish authenticated connections between
-downstream and upstream Envoy instances. The handshake has the following steps:
-
-1. **Connection Initiation**: Initiator Envoy initiates TCP connections to each host of the upstream cluster,
-   and writes the handshake request on it over HTTP.
-2. **Identity Exchange**: The downstream Envoy's reverse tunnel handshake contains identity information
-   (node ID, cluster ID, tenant ID) sent as HTTP headers. The reverse tunnel network filter expects the
-   following headers:
-
-   * ``x-envoy-reverse-tunnel-node-id``: Unique identifier for the downstream node (e.g., "on-prem-node")
-   * ``x-envoy-reverse-tunnel-cluster-id``: Cluster name of the downstream Envoy (e.g., "on-prem")
-   * ``x-envoy-reverse-tunnel-tenant-id``: Tenant identifier for multi-tenant deployments (e.g., "on-prem")
-
-   These identity values are obtained from the reverse tunnel listener address and the headers are
-   automatically added by the reverse tunnel downstream socket interface during the handshake process.
-
-3. **Validation/Authentication**: The upstream Envoy performs the following validation checks on receiving the handshake request:
-
-   * **HTTP Method Validation**: Verifies the request method matches the configured method (defaults to ``GET``)
-   * **HTTP Path Validation**: Verifies the request path matches the configured path (defaults to ``/reverse_connections/request``)
-   * **Required Headers Validation**: Ensures all three required identity headers are present:
-
-     - ``x-envoy-reverse-tunnel-node-id``
-     - ``x-envoy-reverse-tunnel-cluster-id``
-     - ``x-envoy-reverse-tunnel-tenant-id``
-
-   If any validation fails, the request is rejected with appropriate HTTP error codes
-   (404 for method/path mismatch, 400 for missing headers).
-
-4. **Connection Establishment**: Post a successful handshake, the upstream Envoy stores the TCP socket mapped to the downstream node ID.
 
 .. _config_reverse_connection_cluster:
 
@@ -411,7 +399,7 @@ The egress listener includes a Lua filter that implements flexible header-based 
 downstream node to route requests to. The filter checks multiple headers sequentially and sets a computed
 host ID for the reverse connection cluster, which is then used to look up a socket.
 
-Header Processing Priority:
+Header Processing for Reverse Tunnel Data Traffic:
 
 1. **x-node-id header**: Highest priority - uses the value directly
 2. **x-cluster-id header**: Fallback - uses when x-node-id is not present
