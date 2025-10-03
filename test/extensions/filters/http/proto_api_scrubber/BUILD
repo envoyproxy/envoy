@@ -49,3 +49,13 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
     ],
 )
+
+envoy_cc_test(
+    name = "field_checker_test",
+    srcs = ["field_checker_test.cc"],
+    deps = [
+        "//source/extensions/filters/http/proto_api_scrubber/scrubbing_util",
+        "//test/test_common:environment_lib",
+        "//test/test_common:utility_lib",
+    ],
+)
