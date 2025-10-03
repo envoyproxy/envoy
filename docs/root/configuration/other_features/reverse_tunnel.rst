@@ -113,8 +113,7 @@ The special ``rc://`` address format encodes:
 * **src_node_id**: A unique identifier for this specific node. Each node must have a unique src_node_id across
   the entire system to ensure proper routing and connection management.
 * **src_cluster_id**: An identifier for a logical group of nodes. Multiple nodes can belong to the same cluster,
-  allowing data requests to be sent using the src_cluster_id and routed to any available node within that cluster.
-  The src_cluster_id must be different from any src_node_id to avoid routing conflicts.
+  allowing data requests to be sent using the src_cluster_id and load balanced between nodes within that cluster.
 * **src_tenant_id**: Used in multi-tenant environments to isolate traffic and resources between different tenants
   or organizational units.
 
@@ -168,7 +167,7 @@ added via CDS.
 Multiple Cluster Support
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To initiate reverse tunnels to multiple upstream clusters, each such cluster needs to be configured under an additional address section.
+To initiate reverse tunnels to multiple upstream clusters, each such cluster needs to be configured under the additional_addresses section.
 
 .. validated-code-block:: yaml
   :type-name: envoy.config.listener.v3.Listener
@@ -255,7 +254,7 @@ This extension enables the responder to accept and manage reverse connections fr
 Reverse Tunnel Network Filter
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The reverse tunnel network filter implements the reverse tunnel handshake protocol and accepts or rejects
+The ``envoy.filters.network.reverse_tunnel`` network filter implements the reverse tunnel handshake protocol and accepts or rejects
 reverse tunnel requests:
 
 .. validated-code-block:: yaml
@@ -273,8 +272,6 @@ reverse tunnel requests:
         "@type": type.googleapis.com/envoy.extensions.filters.network.reverse_tunnel.v3.ReverseTunnel
         ping_interval: 2s
 
-The ``envoy.filters.network.reverse_tunnel`` network filter handles the reverse tunnel handshake protocol and connection acceptance.
-
 .. _config_reverse_connection_cluster:
 
 Reverse Connection Cluster
@@ -282,7 +279,10 @@ Reverse Connection Cluster
 
 Each downstream node reachable from upstream Envoy via reverse connections needs to be configured with a
 reverse connection cluster. When a data request arrives at the upstream Envoy, this cluster uses cached
-"reverse connections" instead of creating new forward connections.
+reverse connections instead of creating new forward connections.
+
+For each such data request, a "host_id" is specified or computed from the request headers; this "host_id"
+represents the downstream node that the request should be routed to.
 
 .. validated-code-block:: yaml
   :type-name: envoy.config.cluster.v3.Cluster
@@ -317,9 +317,9 @@ The reverse connection cluster configuration specifies:
 An example of how to process headers and set the host ID is described in the
 :ref:`config_reverse_connection_egress_listener` section.
 
-* **Protocol**: Only HTTP/2 is supported for reverse connections
+* **Protocol**: Only HTTP/2 is supported for reverse connections.
 * **Host Reuse**: Once a host is created for a specific downstream node ID, it is cached and reused for all
-  subsequent requests to that node. Each such request is multiplexed as a new stream on the existing
+  subsequent requests to that node. Therefore, each data request is multiplexed as a new stream on the existing
   HTTP/2 connection.
 
 .. _config_reverse_connection_egress_listener:
@@ -328,7 +328,8 @@ Egress Listener for Data Traffic
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Add an egress listener on upstream Envoy that accepts data traffic and routes it to the reverse connection
-cluster. This listener includes header processing logic to determine the target downstream node:
+cluster. This listener includes header processing logic to determine the target downstream node or "host_id"
+to use for the data request.
 
 .. validated-code-block:: yaml
   :type-name: envoy.config.listener.v3.Listener
@@ -375,14 +376,14 @@ cluster. This listener includes header processing logic to determine the target 
                 elseif cluster_id then
                   host_id = cluster_id
                   request_handle:logInfo("Using x-cluster-id as host_id: " .. host_id)
-                -- Priority 3: Extract UUID from Host header (uuid.tcpproxy.envoy.remote)
+                -- Priority 3: Extract UUID from Host header (uuid.example.domain)
                 elseif host_header then
-                  local uuid = string.match(host_header, "^([^%.]+)%.tcpproxy%.envoy%.remote$")
+                  local uuid = string.match(host_header, "^([^%.]+)%.example%.domain$")
                   if uuid then
                     host_id = uuid
                     request_handle:logInfo("Extracted UUID from Host header as host_id: " .. host_id)
                   else
-                    request_handle:logError("Host header format invalid. Expected: uuid.tcpproxy.envoy.remote, got: " .. host_header)
+                    request_handle:logError("Host header format invalid. Expected: uuid.example.domain, got: " .. host_header)
                     -- Don't set x-computed-host-id, which will cause cluster matching to fail
                     return
                   end
@@ -399,15 +400,17 @@ cluster. This listener includes header processing logic to determine the target 
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
-The egress listener includes a Lua filter that implements flexible header-based routing to determine which
-downstream node to route requests to. The filter checks multiple headers sequentially and sets a computed
-host ID for the reverse connection cluster, which is then used to look up a socket.
+The egress listener includes a Lua filter as an example of how to implement flexible header-based routing
+to determine which downstream node to route requests to. This is just one of many possible approaches for
+computing the "host_id" from request headers—other options include using different HTTP filters,
+custom formatters, or direct header mapping. The Lua filter example checks multiple headers sequentially
+and sets a computed host ID for the reverse connection cluster, which is then used to look up a socket.
 
-Header Processing for Reverse Tunnel Data Traffic:
+In the example above, the following headers are checked in order of priority:
 
-1. **x-node-id header**: Highest priority - uses the value directly
-2. **x-cluster-id header**: Fallback - used when x-node-id is not present
-3. **Host header**: Second fallback - extracts UUID from format ``uuid.tcpproxy.envoy.remote``
+1. **x-node-id header**: Highest priority—uses the value directly
+2. **x-cluster-id header**: Fallback—used when x-node-id is not present
+3. **Host header**: Second fallback—extracts UUID from format ``uuid.example.domain``
 4. **None found**: Logs error and fails cluster matching
 
 Example Request Flow:
@@ -435,7 +438,7 @@ Example Request Flow:
    .. code-block:: http
 
      GET /downstream_service HTTP/1.1
-     Host: example-uuid.tcpproxy.envoy.remote
+     Host: example-uuid.example.domain
 
    Result: ``host_id = "example-uuid"``
 
