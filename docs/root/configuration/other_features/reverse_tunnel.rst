@@ -38,7 +38,7 @@ Initiator Configuration (Downstream Envoy)
 
 The initiator Envoy (downstream) requires the following configuration components to establish reverse tunnels:
 
-.. _config_reverse_tunnel_upstream_socket_interface:
+.. _config_reverse_tunnel_downstream_socket_interface:
 
 Downstream Socket Interface
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
