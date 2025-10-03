@@ -34,7 +34,7 @@ the on demand CDS for requests using this virtual host or route. Conversely,
 if :ref:`odcds <envoy_v3_api_field_extensions.filters.http.on_demand.v3.OnDemand.odcds>` is specified,
 on demand CDS is enabled for requests using this virtual host or route.
 
-Per-Route Configuration Limitations
+Per-Route configuration limitations
 ------------------------------------
 
 .. warning::
