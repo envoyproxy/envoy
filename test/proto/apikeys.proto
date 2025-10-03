@@ -12,6 +12,10 @@ service ApiKeys {
 
   rpc CreateApiKeyInStream(stream CreateApiKeyRequest) returns (ApiKey) {
   }
+
+  // Lists API keys.
+  rpc ListApiKeys(ListApiKeysRequest) returns (ListApiKeysResponse) {
+  }
 }
 
 // Message for an API key.
@@ -36,6 +40,10 @@ message ApiKey {
 
   // The expiration time of the key
   google.protobuf.Timestamp expire_time = 8;
+
+  repeated string repeated_string_field = 9;
+
+  repeated string another_repeated_field = 10;
 }
 
 message SupportedTypes {
@@ -114,4 +122,15 @@ message CreateApiKeyRequest {
   UnsupportedTypes unsupported_types = 5;
 
   google.protobuf.ListValue repeated_intermediate = 6;
+}
+
+message ListApiKeysRequest {
+  string parent = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListApiKeysResponse {
+  repeated ApiKey keys = 1;
+  string next_page_token = 2;
 }
