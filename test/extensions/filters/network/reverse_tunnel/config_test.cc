@@ -155,6 +155,162 @@ request_method: PUT
   cb(filter_manager);
 }
 
+TEST(ReverseTunnelFilterConfigFactoryTest, ConfigurationWithValidation) {
+  ReverseTunnelFilterConfigFactory factory;
+
+  const std::string yaml_string = R"EOF(
+ping_interval:
+  seconds: 5
+auto_close_connections: false
+request_path: "/reverse_connections/request"
+request_method: GET
+validation:
+  node_id_format: "expected-node-id"
+  cluster_id_format: "expected-cluster-id"
+  emit_dynamic_metadata: true
+  dynamic_metadata_namespace: "envoy.filters.network.reverse_tunnel"
+)EOF";
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto result = factory.createFilterFactoryFromProto(proto_config, context);
+  ASSERT_TRUE(result.ok());
+  Network::FilterFactoryCb cb = result.value();
+
+  EXPECT_TRUE(cb != nullptr);
+
+  Network::MockFilterManager filter_manager;
+  EXPECT_CALL(filter_manager, addReadFilter(_));
+  cb(filter_manager);
+}
+
+TEST(ReverseTunnelFilterConfigFactoryTest, ConfigurationWithStaticValidation) {
+  ReverseTunnelFilterConfigFactory factory;
+
+  const std::string yaml_string = R"EOF(
+request_path: "/reverse_connections/request"
+request_method: GET
+validation:
+  node_id_format: "expected-static-node"
+  cluster_id_format: "expected-static-cluster"
+)EOF";
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto result = factory.createFilterFactoryFromProto(proto_config, context);
+  ASSERT_TRUE(result.ok());
+  Network::FilterFactoryCb cb = result.value();
+
+  EXPECT_TRUE(cb != nullptr);
+
+  Network::MockFilterManager filter_manager;
+  EXPECT_CALL(filter_manager, addReadFilter(_));
+  cb(filter_manager);
+}
+
+TEST(ReverseTunnelFilterConfigFactoryTest, ConfigurationWithMetadataEmission) {
+  ReverseTunnelFilterConfigFactory factory;
+
+  const std::string yaml_string = R"EOF(
+request_path: "/reverse_connections/request"
+request_method: GET
+validation:
+  node_id_format: "test-node"
+  cluster_id_format: "test-cluster"
+  emit_dynamic_metadata: true
+  dynamic_metadata_namespace: "custom.namespace"
+)EOF";
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto result = factory.createFilterFactoryFromProto(proto_config, context);
+  ASSERT_TRUE(result.ok());
+  Network::FilterFactoryCb cb = result.value();
+
+  EXPECT_TRUE(cb != nullptr);
+
+  Network::MockFilterManager filter_manager;
+  EXPECT_CALL(filter_manager, addReadFilter(_));
+  cb(filter_manager);
+}
+
+TEST(ReverseTunnelFilterConfigFactoryTest, ConfigurationWithInvalidFormatter) {
+  ReverseTunnelFilterConfigFactory factory;
+
+  const std::string yaml_string = R"EOF(
+request_path: "/reverse_connections/request"
+request_method: GET
+validation:
+  node_id_format: "%INVALID_FORMATTER_COMMAND()%"
+  cluster_id_format: "valid-cluster"
+)EOF";
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  auto result = factory.createFilterFactoryFromProto(proto_config, context);
+  ASSERT_FALSE(result.ok());
+  EXPECT_THAT(result.status().message(), testing::HasSubstr("Failed to parse node_id_format"));
+}
+
+TEST(ReverseTunnelFilterConfigFactoryTest, ConfigurationWithOnlyNodeIdValidation) {
+  ReverseTunnelFilterConfigFactory factory;
+
+  const std::string yaml_string = R"EOF(
+request_path: "/reverse_connections/request"
+request_method: GET
+validation:
+  node_id_format: "expected-node"
+)EOF";
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto result = factory.createFilterFactoryFromProto(proto_config, context);
+  ASSERT_TRUE(result.ok());
+  Network::FilterFactoryCb cb = result.value();
+
+  EXPECT_TRUE(cb != nullptr);
+
+  Network::MockFilterManager filter_manager;
+  EXPECT_CALL(filter_manager, addReadFilter(_));
+  cb(filter_manager);
+}
+
+TEST(ReverseTunnelFilterConfigFactoryTest, ConfigurationWithOnlyClusterIdValidation) {
+  ReverseTunnelFilterConfigFactory factory;
+
+  const std::string yaml_string = R"EOF(
+request_path: "/reverse_connections/request"
+request_method: GET
+validation:
+  cluster_id_format: "expected-cluster"
+)EOF";
+
+  envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  auto result = factory.createFilterFactoryFromProto(proto_config, context);
+  ASSERT_TRUE(result.ok());
+  Network::FilterFactoryCb cb = result.value();
+
+  EXPECT_TRUE(cb != nullptr);
+
+  Network::MockFilterManager filter_manager;
+  EXPECT_CALL(filter_manager, addReadFilter(_));
+  cb(filter_manager);
+}
+
 } // namespace
 } // namespace ReverseTunnel
 } // namespace NetworkFilters

@@ -1,10 +1,14 @@
 #include "source/extensions/filters/network/reverse_tunnel/reverse_tunnel_filter.h"
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/core/v3/substitution_format_string.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/server/overload/overload_manager.h"
 
 #include "source/common/buffer/buffer_impl.h"
+#include "source/common/config/datasource.h"
+#include "source/common/formatter/substitution_format_string.h"
+#include "source/common/formatter/substitution_formatter.h"
 #include "source/common/http/codes.h"
 #include "source/common/http/header_map_impl.h"
 #include "source/common/http/headers.h"
@@ -15,6 +19,7 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
+#include "source/server/generic_factory_context.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,9 +34,59 @@ ReverseTunnelFilter::ReverseTunnelStats::generateStats(const std::string& prefix
 }
 
 // ReverseTunnelFilterConfig implementation.
+absl::StatusOr<std::shared_ptr<ReverseTunnelFilterConfig>> ReverseTunnelFilterConfig::create(
+    const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
+    Server::Configuration::FactoryContext& context) {
+
+  Formatter::FormatterConstSharedPtr node_id_formatter;
+  Formatter::FormatterConstSharedPtr cluster_id_formatter;
+
+  // Create formatters for validation if configured.
+  if (proto_config.has_validation()) {
+    Server::GenericFactoryContextImpl generic_context(context.serverFactoryContext(),
+                                                      context.messageValidationVisitor());
+
+    const auto& validation = proto_config.validation();
+
+    // Create node_id formatter if configured.
+    if (!validation.node_id_format().empty()) {
+      envoy::config::core::v3::SubstitutionFormatString node_id_format_config;
+      node_id_format_config.mutable_text_format_source()->set_inline_string(
+          validation.node_id_format());
+
+      auto formatter_or_error = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
+          node_id_format_config, generic_context);
+      if (!formatter_or_error.ok()) {
+        return absl::InvalidArgumentError(fmt::format("Failed to parse node_id_format: {}",
+                                                      formatter_or_error.status().message()));
+      }
+      node_id_formatter = std::move(formatter_or_error.value());
+    }
+
+    // Create cluster_id formatter if configured.
+    if (!validation.cluster_id_format().empty()) {
+      envoy::config::core::v3::SubstitutionFormatString cluster_id_format_config;
+      cluster_id_format_config.mutable_text_format_source()->set_inline_string(
+          validation.cluster_id_format());
+
+      auto formatter_or_error = Formatter::SubstitutionFormatStringUtils::fromProtoConfig(
+          cluster_id_format_config, generic_context);
+      if (!formatter_or_error.ok()) {
+        return absl::InvalidArgumentError(fmt::format("Failed to parse cluster_id_format: {}",
+                                                      formatter_or_error.status().message()));
+      }
+      cluster_id_formatter = std::move(formatter_or_error.value());
+    }
+  }
+
+  return std::shared_ptr<ReverseTunnelFilterConfig>(new ReverseTunnelFilterConfig(
+      proto_config, std::move(node_id_formatter), std::move(cluster_id_formatter)));
+}
+
 ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
     const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
-    Server::Configuration::FactoryContext&)
+    Formatter::FormatterConstSharedPtr node_id_formatter,
+    Formatter::FormatterConstSharedPtr cluster_id_formatter)
     : ping_interval_(proto_config.has_ping_interval()
                          ? std::chrono::milliseconds(
                                DurationUtil::durationToMilliseconds(proto_config.ping_interval()))
@@ -46,7 +101,77 @@ ReverseTunnelFilterConfig::ReverseTunnelFilterConfig(
           method = envoy::config::core::v3::GET;
         }
         return envoy::config::core::v3::RequestMethod_Name(method);
-      }()) {}
+      }()),
+      node_id_formatter_(std::move(node_id_formatter)),
+      cluster_id_formatter_(std::move(cluster_id_formatter)),
+      emit_dynamic_metadata_(proto_config.has_validation() &&
+                             proto_config.validation().emit_dynamic_metadata()),
+      dynamic_metadata_namespace_(
+          proto_config.has_validation() &&
+                  !proto_config.validation().dynamic_metadata_namespace().empty()
+              ? proto_config.validation().dynamic_metadata_namespace()
+              : "envoy.filters.network.reverse_tunnel") {}
+
+bool ReverseTunnelFilterConfig::validateIdentifiers(
+    absl::string_view node_id, absl::string_view cluster_id,
+    const StreamInfo::StreamInfo& stream_info) const {
+
+  // If no validation configured, pass validation.
+  if (!node_id_formatter_ && !cluster_id_formatter_) {
+    return true;
+  }
+
+  // Validate node_id if formatter is configured.
+  if (node_id_formatter_) {
+    const std::string expected_node_id = node_id_formatter_->formatWithContext({}, stream_info);
+    if (!expected_node_id.empty() && expected_node_id != node_id) {
+      ENVOY_LOG(debug, "reverse_tunnel: node_id validation failed. Expected: '{}', Actual: '{}'",
+                expected_node_id, node_id);
+      return false;
+    }
+  }
+
+  // Validate cluster_id if formatter is configured.
+  if (cluster_id_formatter_) {
+    const std::string expected_cluster_id =
+        cluster_id_formatter_->formatWithContext({}, stream_info);
+    if (!expected_cluster_id.empty() && expected_cluster_id != cluster_id) {
+      ENVOY_LOG(debug, "reverse_tunnel: cluster_id validation failed. Expected: '{}', Actual: '{}'",
+                expected_cluster_id, cluster_id);
+      return false;
+    }
+  }
+
+  return true;
+}
+
+void ReverseTunnelFilterConfig::emitValidationMetadata(absl::string_view node_id,
+                                                       absl::string_view cluster_id,
+                                                       bool validation_passed,
+                                                       StreamInfo::StreamInfo& stream_info) const {
+  if (!emit_dynamic_metadata_) {
+    return;
+  }
+
+  Protobuf::Struct metadata;
+  auto& fields = *metadata.mutable_fields();
+
+  // Emit actual identifiers.
+  fields["node_id"].set_string_value(std::string(node_id));
+  fields["cluster_id"].set_string_value(std::string(cluster_id));
+
+  // Emit validation result.
+  fields["validation_result"].set_string_value(validation_passed ? "allowed" : "denied");
+
+  // Set dynamic metadata on the stream info.
+  stream_info.setDynamicMetadata(dynamic_metadata_namespace_, metadata);
+
+  ENVOY_LOG(trace,
+            "reverse_tunnel: emitted dynamic metadata to namespace '{}': node_id={}, "
+            "cluster_id={}, validation_result={}",
+            dynamic_metadata_namespace_, node_id, cluster_id,
+            validation_passed ? "allowed" : "denied");
+}
 
 // ReverseTunnelFilter implementation.
 ReverseTunnelFilter::ReverseTunnelFilter(ReverseTunnelFilterConfigSharedPtr config,
@@ -190,6 +315,25 @@ void ReverseTunnelFilter::RequestDecoderImpl::processIfComplete(bool end_stream)
   const absl::string_view node_id = node_vals[0]->value().getStringView();
   const absl::string_view cluster_id = cluster_vals[0]->value().getStringView();
   const absl::string_view tenant_id = tenant_vals[0]->value().getStringView();
+
+  // Validate node_id and cluster_id if validation is configured.
+  auto& connection = parent_.read_callbacks_->connection();
+  const bool validation_passed =
+      parent_.config_->validateIdentifiers(node_id, cluster_id, connection.streamInfo());
+
+  // Emit validation metadata if configured.
+  parent_.config_->emitValidationMetadata(node_id, cluster_id, validation_passed,
+                                          connection.streamInfo());
+
+  if (!validation_passed) {
+    parent_.stats_.validation_failed_.inc();
+    ENVOY_CONN_LOG(debug, "reverse_tunnel: validation failed for node '{}', cluster '{}'",
+                   parent_.read_callbacks_->connection(), node_id, cluster_id);
+    sendLocalReply(Http::Code::Forbidden, "Validation failed", nullptr, absl::nullopt,
+                   "reverse_tunnel_validation_failed");
+    parent_.read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    return;
+  }
 
   // Respond with 200 OK.
   auto resp_headers = Http::ResponseHeaderMapImpl::create();
