@@ -94,7 +94,7 @@ TEST_P(McpFilterIntegrationTest, MissingJsonRpcFieldRejected) {
                                      {":scheme", "http"},
                                      {":authority", "host"},
                                      {"content-type", "application/json"}},
-      R"({"method": "test"})"); // Missing 'jsonrpc: "2.0"'
+      R"({"method": "test"})");
 
   ASSERT_TRUE(response->waitForEndStream());
   // The upstream should NOT receive a request.
