@@ -42,16 +42,21 @@ public:
   // Constructs config from extension's proto config.
   OnDemandFilterConfig(
       const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
-      Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor);
+      Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
+      Server::Configuration::ServerFactoryContext& server_context);
   // Constructs config from extension's per-route proto config.
   OnDemandFilterConfig(
       const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,
       Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor);
 
   DecodeHeadersBehavior& decodeHeadersBehavior() const { return *behavior_; }
+  bool allowBodyDataLossForPerRouteConfig() const {
+    return allow_body_data_loss_for_per_route_config_;
+  }
 
 private:
   DecodeHeadersBehaviorPtr behavior_;
+  bool allow_body_data_loss_for_per_route_config_{false};
 };
 
 using OnDemandFilterConfigSharedPtr = std::shared_ptr<OnDemandFilterConfig>;
@@ -97,6 +102,7 @@ private:
   Upstream::ClusterDiscoveryCallbackHandlePtr cluster_discovery_handle_;
   Envoy::Http::FilterHeadersStatus filter_iteration_state_{Http::FilterHeadersStatus::Continue};
   bool decode_headers_active_{false};
+  bool has_body_data_{false};
 };
 
 } // namespace OnDemand
