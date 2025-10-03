@@ -34,7 +34,7 @@ Reverse tunnels require the following extensions:
 
 .. _config_reverse_tunnel_configuration_files:
 
-Configuration Files
+Configuration files
 -------------------
 
 For practical examples and working configurations, see:
@@ -44,31 +44,27 @@ For practical examples and working configurations, see:
 
 .. _config_reverse_tunnel_initiator:
 
-Initiator Configuration (Downstream Envoy)
+Initiator configuration (Downstream Envoy)
 -------------------------------------------
 
 The initiator Envoy (downstream) requires the following configuration components to establish reverse tunnels:
 
 .. _config_reverse_tunnel_downstream_socket_interface:
 
-Downstream Socket Interface
+Downstream socket interface
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. validated-code-block:: yaml
-  :type-name: envoy.config.bootstrap.v3.Bootstrap
-
-  bootstrap_extensions:
-  - name: envoy.bootstrap.reverse_tunnel.downstream_socket_interface
-    typed_config:
-      "@type": >-
-        type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface
-      stat_prefix: "downstream_reverse_connection"
+.. literalinclude:: /configs/reverse_connection/initiator-envoy.yaml
+    :language: yaml
+    :lines: 8-12
+    :linenos:
+    :lineno-start: 8
 
 This extension enables the initiator Envoy to establish and maintain reverse tunnel connections to the responder Envoy.
 
 .. _config_reverse_tunnel_listener:
 
-Reverse Tunnel Listener
+Reverse tunnel listener
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
 The reverse tunnel listener triggers reverse connection initiation to the upstream Envoy and encodes
@@ -76,37 +72,11 @@ identity metadata for the local Envoy instance. The listener's address field use
 format to specify connection parameters, and its route configuration defines which downstream services
 are reachable through the reverse tunnel.
 
-.. validated-code-block:: yaml
-  :type-name: envoy.config.listener.v3.Listener
-
-  name: reverse_conn_listener
-  address:
-    socket_address:
-      # Format: rc://src_node_id:src_cluster_id:src_tenant_id@remote_cluster:connection_count
-      address: "rc://downstream-node:downstream-cluster:downstream-tenant@upstream-cluster:1"
-      port_value: 0
-      # Use custom resolver that can parse reverse connection metadata
-      resolver_name: "envoy.resolvers.reverse_connection"
-  filter_chains:
-  - filters:
-    - name: envoy.filters.network.http_connection_manager
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-        stat_prefix: reverse_conn_listener
-        route_config:
-          virtual_hosts:
-          - name: backend
-            domains:
-            - "*"
-            routes:
-            - match:
-                prefix: '/downstream_service'
-              route:
-                cluster: downstream-service
-        http_filters:
-        - name: envoy.filters.http.router
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+.. literalinclude:: /configs/reverse_connection/initiator-envoy.yaml
+    :language: yaml
+    :lines: 17-50
+    :linenos:
+    :lineno-start: 17
 
 The special ``rc://`` address format encodes connection and identity metadata:
 
@@ -128,54 +98,33 @@ The identifiers serve the following purposes:
 
 The ``downstream-service`` cluster in the example refers to the service behind the initiator Envoy that will be accessed via reverse tunnels from services behind the responder Envoy.
 
-.. validated-code-block:: yaml
-  :type-name: envoy.config.cluster.v3.Cluster
+.. literalinclude:: /configs/reverse_connection/initiator-envoy.yaml
+    :language: yaml
+    :lines: 69-80
+    :linenos:
+    :lineno-start: 69
 
-  name: downstream-service
-  type: STRICT_DNS
-  connect_timeout: 30s
-  load_assignment:
-    cluster_name: downstream-service
-    endpoints:
-    - lb_endpoints:
-      - endpoint:
-          address:
-            socket_address:
-              address: downstream-service
-              port_value: 80
-
-Upstream Cluster
+Upstream cluster
 ~~~~~~~~~~~~~~~~~
 
 Each upstream Envoy to which reverse tunnels should be established requires a cluster configuration.
 This cluster can be defined statically in the bootstrap configuration or added dynamically via the
 :ref:`Cluster Discovery Service (CDS) <config_cluster_manager_cds>`.
 
-.. validated-code-block:: yaml
-  :type-name: envoy.config.cluster.v3.Cluster
+.. literalinclude:: /configs/reverse_connection/initiator-envoy.yaml
+    :language: yaml
+    :lines: 54-65
+    :linenos:
+    :lineno-start: 54
 
-  name: upstream-cluster
-  type: STRICT_DNS
-  connect_timeout: 30s
-  load_assignment:
-    cluster_name: upstream-cluster
-    endpoints:
-    - lb_endpoints:
-      - endpoint:
-          address:
-            socket_address:
-              address: upstream-envoy  # Responder Envoy address
-              port_value: 9000         # Port where responder listens for reverse tunnel requests
-
-Multiple Cluster Support
+Multiple cluster support
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To establish reverse tunnels to multiple upstream clusters simultaneously, use the ``additional_addresses``
 field on the listener. Each address in this list specifies an additional upstream cluster and the number
 of connections to establish to it.
 
-.. validated-code-block:: yaml
-  :type-name: envoy.config.listener.v3.Listener
+.. code-block:: yaml
 
   name: multi_cluster_listener
   address:
@@ -200,14 +149,13 @@ This configuration establishes:
 * 2 connections to ``cluster-a``
 * 3 connections to ``cluster-b``
 
-TLS Configuration
+TLS configuration
 ~~~~~~~~~~~~~~~~~
 
 For secure reverse tunnel establishment, configure a TLS transport socket on the upstream cluster.
 The example below shows mutual TLS (mTLS) configuration with certificate pinning:
 
-.. validated-code-block:: yaml
-  :type-name: envoy.config.cluster.v3.Cluster
+.. code-block:: yaml
 
   name: upstream-cluster
   type: STRICT_DNS
@@ -236,55 +184,42 @@ tunnel operation.
 
 .. _config_reverse_tunnel_responder:
 
-Responder Configuration (Upstream Envoy)
+Responder configuration (upstream Envoy)
 -----------------------------------------
 
 The responder Envoy (upstream) requires the following configuration components to accept reverse tunnels:
 
 .. _config_reverse_tunnel_upstream_socket_interface:
 
-Upstream Socket Interface
+Upstream socket interface
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. validated-code-block:: yaml
-  :type-name: envoy.config.bootstrap.v3.Bootstrap
-
-  bootstrap_extensions:
-  - name: envoy.bootstrap.reverse_tunnel.upstream_socket_interface
-    typed_config:
-      "@type": >-
-        type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface
-      stat_prefix: "upstream_reverse_connection"
+.. literalinclude:: /configs/reverse_connection/responder-envoy.yaml
+    :language: yaml
+    :lines: 8-12
+    :linenos:
+    :lineno-start: 8
 
 This extension enables the responder Envoy to accept and manage incoming reverse tunnel connections from initiator Envoys.
 
 .. _config_reverse_tunnel_network_filter:
 
-Reverse Tunnel Network Filter
+Reverse tunnel network filter
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The ``envoy.filters.network.reverse_tunnel`` network filter implements the reverse tunnel handshake
 protocol. It validates incoming connection requests and accepts or rejects them based on the handshake
 parameters. The filter also manages periodic ping/pong keep-alive messages to maintain tunnel health.
 
-.. validated-code-block:: yaml
-  :type-name: envoy.config.listener.v3.Listener
-
-  name: rev_conn_api_listener
-  address:
-    socket_address:
-      address: 0.0.0.0
-      port_value: 9000  # Port where initiator will connect for tunnel establishment
-  filter_chains:
-  - filters:
-    - name: envoy.filters.network.reverse_tunnel
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.reverse_tunnel.v3.ReverseTunnel
-        ping_interval: 2s
+.. literalinclude:: /configs/reverse_connection/responder-envoy.yaml
+    :language: yaml
+    :lines: 17-28
+    :linenos:
+    :lineno-start: 17
 
 .. _config_reverse_connection_cluster:
 
-Reverse Connection Cluster
+Reverse connection cluster
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The reverse connection cluster is a special cluster type that routes traffic through established reverse
@@ -295,23 +230,11 @@ Each data request must include a ``host_id`` that identifies the target downstre
 specified directly in request headers or computed from them. The cluster extracts the ``host_id`` using
 the configured ``host_id_format`` field and uses it to look up the appropriate reverse tunnel connection.
 
-.. validated-code-block:: yaml
-  :type-name: envoy.config.cluster.v3.Cluster
-
-  name: reverse_connection_cluster
-  connect_timeout: 200s
-  lb_policy: CLUSTER_PROVIDED
-  cluster_type:
-    name: envoy.clusters.reverse_connection
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
-      cleanup_interval: 60s
-      host_id_format: "%REQ(x-computed-host-id)%"
-  typed_extension_protocol_options:
-    envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
-      "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
-      explicit_http_config:
-        http2_protocol_options: {}  # HTTP/2 required for reverse connections
+.. literalinclude:: /configs/reverse_connection/responder-envoy.yaml
+    :language: yaml
+    :lines: 92-112
+    :linenos:
+    :lineno-start: 92
 
 The reverse connection cluster configuration includes several key fields:
 
@@ -342,95 +265,31 @@ The reverse connection cluster configuration includes several key fields:
 
 .. _config_reverse_connection_egress_listener:
 
-Egress Listener for Data Traffic
+Egress listener for data traffic
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 An egress listener on the upstream Envoy accepts data requests and routes them to the reverse connection
 cluster. This listener typically includes header processing logic to extract or compute the ``host_id``
 that identifies the target downstream node for each request.
 
-.. validated-code-block:: yaml
-  :type-name: envoy.config.listener.v3.Listener
-
-  name: egress_listener
-  address:
-    socket_address:
-      address: 0.0.0.0
-      port_value: 8085  # Port for sending requests to initiator services
-  filter_chains:
-  - filters:
-    - name: envoy.filters.network.http_connection_manager
-      typed_config:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
-        stat_prefix: egress_http
-        route_config:
-          virtual_hosts:
-          - name: backend
-            domains: ["*"]
-            routes:
-            - match:
-                prefix: "/downstream_service"
-              route:
-                cluster: reverse_connection_cluster  # Routes to initiator via reverse tunnel
-        http_filters:
-        # Lua filter processes headers and sets computed host ID
-        - name: envoy.filters.http.lua
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
-            inline_code: |
-              function envoy_on_request(request_handle)
-                local headers = request_handle:headers()
-                local node_id = headers:get("x-node-id")
-                local cluster_id = headers:get("x-cluster-id")
-                local host_header = headers:get("host")
-
-                local host_id = ""
-
-                -- Priority 1: x-node-id header
-                if node_id then
-                  host_id = node_id
-                  request_handle:logInfo("Using x-node-id as host_id: " .. host_id)
-                -- Priority 2: x-cluster-id header
-                elseif cluster_id then
-                  host_id = cluster_id
-                  request_handle:logInfo("Using x-cluster-id as host_id: " .. host_id)
-                -- Priority 3: Extract UUID from Host header (uuid.example.domain)
-                elseif host_header then
-                  local uuid = string.match(host_header, "^([^%.]+)%.example%.domain$")
-                  if uuid then
-                    host_id = uuid
-                    request_handle:logInfo("Extracted UUID from Host header as host_id: " .. host_id)
-                  else
-                    request_handle:logError("Host header format invalid. Expected: uuid.example.domain, got: " .. host_header)
-                    -- Don't set x-computed-host-id, which will cause cluster matching to fail
-                    return
-                  end
-                else
-                  request_handle:logError("No valid headers found: x-node-id, x-cluster-id, or Host")
-                  -- Don't set x-computed-host-id, which will cause cluster matching to fail
-                  return
-                end
-
-                -- Set the computed host ID for the reverse connection cluster
-                headers:add("x-computed-host-id", host_id)
-              end
-        - name: envoy.filters.http.router
-          typed_config:
-            "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+.. literalinclude:: /configs/reverse_connection/responder-envoy.yaml
+    :language: yaml
+    :lines: 31-88
+    :linenos:
+    :lineno-start: 31
 
 The example above demonstrates using a :ref:`Lua filter <config_http_filters_lua>` to implement flexible
 header-based routing logic. This is one of several approaches for computing the ``host_id`` from request
 context; alternatives include using other HTTP filters, the ``host_id_format`` field with direct header
-mapping, or custom filter implementations. The Lua filter checks multiple headers in priority order and
+mapping, or custom filter implementations. The Lua filter checks request headers in priority order and
 sets the ``x-computed-host-id`` header, which the reverse connection cluster uses to look up the appropriate
 tunnel connection.
 
 The header priority order is:
 
-1. **x-node-id header**: Highest priority—uses the value directly
-2. **x-cluster-id header**: Fallback—used when x-node-id is not present
-3. **Host header**: Second fallback—extracts UUID from format ``uuid.example.domain``
-4. **None found**: Logs error and fails cluster matching
+1. **x-node-id header**: Highest priority—targets a specific downstream node.
+2. **x-cluster-id header**: Fallback—targets a cluster, allowing load balancing across nodes.
+3. **None found**: Logs an error and fails cluster matching.
 
 **Example request flows:**
 
@@ -441,7 +300,7 @@ The header priority order is:
       GET /downstream_service HTTP/1.1
       x-node-id: example-node
 
-   The filter sets ``host_id = "example-node"``.
+   The filter sets ``host_id = "example-node"`` and routes to that specific node.
 
 2. **Request with cluster ID** (fallback):
 
@@ -450,20 +309,11 @@ The header priority order is:
       GET /downstream_service HTTP/1.1
       x-cluster-id: example-cluster
 
-   The filter sets ``host_id = "example-cluster"``.
-
-3. **Request with Host header** (second fallback):
-
-   .. code-block:: http
-
-      GET /downstream_service HTTP/1.1
-      Host: example-uuid.example.domain
-
-   The filter extracts the UUID and sets ``host_id = "example-uuid"``.
+   The filter sets ``host_id = "example-cluster"`` and routes to any node in that cluster.
 
 .. _config_reverse_connection_security:
 
-Security Considerations
+Security considerations
 -----------------------
 
 Reverse tunnels should be used with appropriate security measures:
