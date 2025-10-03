@@ -97,6 +97,13 @@ public:
    */
   bool encodeRawHeaders() const { return encode_raw_headers_; }
 
+  /**
+   * Returns the retry policy for the authorization service.
+   */
+  const absl::optional<envoy::config::core::v3::RetryPolicy>& retryPolicy() const {
+    return retry_policy_;
+  }
+
 private:
   static MatcherSharedPtr toClientMatchers(const envoy::type::matcher::v3::ListStringMatcher& list,
                                            Server::Configuration::CommonFactoryContext& context);
@@ -122,6 +129,7 @@ private:
   const std::string tracing_name_;
   Router::HeaderParserPtr request_headers_parser_;
   const bool encode_raw_headers_;
+  const absl::optional<envoy::config::core::v3::RetryPolicy> retry_policy_;
 };
 
 using ClientConfigSharedPtr = std::shared_ptr<ClientConfig>;

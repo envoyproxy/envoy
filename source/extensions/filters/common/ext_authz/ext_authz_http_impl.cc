@@ -10,6 +10,7 @@
 #include "source/common/common/matchers.h"
 #include "source/common/http/async_client_impl.h"
 #include "source/common/http/codes.h"
+#include "source/common/http/utility.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/common/ext_authz/check_request_utils.h"
 
@@ -132,7 +133,11 @@ ClientConfig::ClientConfig(const envoy::extensions::filters::http::ext_authz::v3
               config.http_service().authorization_request().headers_to_add(),
               envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
           Router::HeaderParserPtr)),
-      encode_raw_headers_(config.encode_raw_headers()) {}
+      encode_raw_headers_(config.encode_raw_headers()),
+      retry_policy_(config.http_service().has_retry_policy()
+                        ? absl::optional<envoy::config::core::v3::RetryPolicy>(
+                              config.http_service().retry_policy())
+                        : absl::nullopt) {}
 
 ClientConfig::ClientConfig(
     const envoy::extensions::filters::http::ext_authz::v3::HttpService& http_service,
@@ -156,7 +161,11 @@ ClientConfig::ClientConfig(
               http_service.authorization_request().headers_to_add(),
               envoy::config::core::v3::HeaderValueOption::OVERWRITE_IF_EXISTS_OR_ADD),
           Router::HeaderParserPtr)),
-      encode_raw_headers_(encode_raw_headers) {}
+      encode_raw_headers_(encode_raw_headers),
+      retry_policy_(
+          http_service.has_retry_policy()
+              ? absl::optional<envoy::config::core::v3::RetryPolicy>(http_service.retry_policy())
+              : absl::nullopt) {}
 
 MatcherSharedPtr
 ClientConfig::toClientMatchersOnSuccess(const envoy::type::matcher::v3::ListStringMatcher& list,
@@ -304,6 +313,15 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
                        .setSampled(absl::nullopt);
 
     options.setSendXff(false);
+
+    // Apply retry policy if configured.
+    if (config_->retryPolicy().has_value()) {
+      envoy::config::route::v3::RetryPolicy route_retry_policy =
+          Http::Utility::convertCoreToRouteRetryPolicy(config_->retryPolicy().value(),
+                                                       "5xx,gateway-error,connect-failure,reset");
+      options.setRetryPolicy(route_retry_policy);
+      options.setBufferBodyForRetry(true);
+    }
 
     request_ = thread_local_cluster->httpAsyncClient().send(std::move(message), *this, options);
   }
