@@ -29,6 +29,23 @@ message StatefulSession {
   // which allows Envoy to fall back to its load balancing mechanism. In this case, if the requested destination is not
   // found, the request will be routed according to the load balancing algorithm.
   bool strict = 2;
+
+  // Optional additional prefix to use when emitting statistics. This allows distinguishing
+  // emitted statistics between configured ``stateful_session`` filters in an HTTP filter chain. For example:
+  //
+  // .. code-block:: yaml
+  //
+  //   http_filters:
+  //     - name: envoy.filters.http.stateful_session
+  //       typed_config:
+  //         "@type": type.googleapis.com/envoy.extensions.filters.http.stateful_session.v3.StatefulSession
+  //         stat_prefix: foo # This emits stateful_session.foo.routed, stateful_session.foo.failed_open, etc.
+  //     - name: envoy.filters.http.stateful_session
+  //       typed_config:
+  //         "@type": type.googleapis.com/envoy.extensions.filters.http.stateful_session.v3.StatefulSession
+  //         stat_prefix: bar # This emits stateful_session.bar.routed, stateful_session.bar.failed_open, etc.
+  //
+  string stat_prefix = 3;
 }
 
 message StatefulSessionPerRoute {

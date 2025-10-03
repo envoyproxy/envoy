@@ -9,9 +9,11 @@ namespace Http {
 namespace StatefulSession {
 namespace Cookie {
 
-void CookieBasedSessionStateFactory::SessionStateImpl::onUpdate(
+bool CookieBasedSessionStateFactory::SessionStateImpl::onUpdate(
     absl::string_view host_address, Envoy::Http::ResponseHeaderMap& headers) {
-  if (!upstream_address_.has_value() || host_address != upstream_address_.value()) {
+  const bool host_changed =
+      !upstream_address_.has_value() || host_address != upstream_address_.value();
+  if (host_changed) {
     // Build proto message
     envoy::Cookie cookie;
     cookie.set_address(std::string(host_address));
@@ -28,6 +30,7 @@ void CookieBasedSessionStateFactory::SessionStateImpl::onUpdate(
     headers.addReferenceKey(Envoy::Http::Headers::get().SetCookie,
                             factory_.makeSetCookie(encoded_address));
   }
+  return host_changed;
 }
 
 CookieBasedSessionStateFactory::CookieBasedSessionStateFactory(
