@@ -28,8 +28,8 @@ namespace Http3 {
 
 class ActiveClient : public MultiplexedActiveClientBase {
 public:
-  ActiveClient(Http::HttpConnPoolImplBase& parent, Upstream::Host::CreateConnectionData& data,
-               Quic::EnvoyQuicClientSession& session);
+  ActiveClient(Envoy::Http::HttpConnPoolImplBase& parent,
+               Upstream::Host::CreateConnectionData& data);
 
   ~ActiveClient() override {
     if (async_connect_callback_ != nullptr && async_connect_callback_->enabled()) {
@@ -99,8 +99,6 @@ public:
 
   bool hasCreatedStream() const { return has_created_stream_; }
 
-  bool isConnectionErrorTransient() const override;
-
 protected:
   bool supportsEarlyData() const override { return true; }
 
@@ -132,8 +130,6 @@ private:
   Event::SchedulableCallbackPtr async_connect_callback_;
   // True if newStream() is ever called.
   bool has_created_stream_{false};
-  // A handle to the client connection subclass.
-  Quic::EnvoyQuicClientSession& session_;
 };
 
 // An interface to propagate H3 handshake result.
@@ -187,7 +183,7 @@ public:
   // the HTTP3 active client does.
   bool trackStreamCapacity() override { return false; }
 
-  std::unique_ptr<Quic::EnvoyQuicClientSession>
+  std::unique_ptr<Network::ClientConnection>
   createClientConnection(Quic::QuicStatNames& quic_stat_names,
                          OptRef<Http::HttpServerPropertiesCache> rtt_cache, Stats::Scope& scope);
 

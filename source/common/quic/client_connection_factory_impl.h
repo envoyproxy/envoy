@@ -43,7 +43,7 @@ std::unique_ptr<PersistentQuicInfoImpl>
 createPersistentQuicInfoForCluster(Event::Dispatcher& dispatcher,
                                    const Upstream::ClusterInfo& cluster);
 
-std::unique_ptr<EnvoyQuicClientSession> createQuicNetworkConnection(
+std::unique_ptr<Network::ClientConnection> createQuicNetworkConnection(
     Http::PersistentQuicInfo& info, std::shared_ptr<quic::QuicCryptoClientConfig> crypto_config,
     const quic::QuicServerId& server_id, Event::Dispatcher& dispatcher,
     Network::Address::InstanceConstSharedPtr server_addr,

@@ -564,7 +564,7 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
     // Make sure that onStreamClosed won't double count.
     client.remaining_streams_ = 0;
     // The client died.
-    ENVOY_CONN_LOG(debug, "client disconnected, failure reason: {}.", client, failure_reason);
+    ENVOY_CONN_LOG(debug, "client disconnected, failure reason: {}", client, failure_reason);
 
     Envoy::Upstream::reportUpstreamCxDestroy(host_, event);
     const bool incomplete_stream = client.closingWithIncompleteStream();
@@ -577,31 +577,26 @@ void ConnPoolImplBase::onConnectionEvent(ActiveClient& client, absl::string_view
       host_->cluster().trafficStats()->upstream_cx_connect_fail_.inc();
       host_->stats().cx_connect_fail_.inc();
 
-      // If this is a connection close event caused by recoverable error, e.g. network change, do
-      // not regard it as pool failure and keep any existing pending streams waiting for newer
-      // connections.
-      if (!client.isConnectionErrorTransient()) {
-        onConnectFailed(client);
-        // Purge pending streams only if this client doesn't contribute to the local connecting
-        // stream capacity. In other words, the rest clients  would be able to handle all the
-        // pending stream once they are connected.
-        ConnectionPool::PoolFailureReason reason;
-        if (client.timed_out_) {
-          reason = ConnectionPool::PoolFailureReason::Timeout;
-        } else if (event == Network::ConnectionEvent::RemoteClose) {
-          reason = ConnectionPool::PoolFailureReason::RemoteConnectionFailure;
-        } else {
-          reason = ConnectionPool::PoolFailureReason::LocalConnectionFailure;
-        }
-
-        // Raw connect failures should never happen under normal circumstances. If we have an
-        // upstream that is behaving badly, streams can get stuck here in the pending state. If we
-        // see a connect failure, we purge all pending streams so that calling code can determine
-        // what to do with the stream.
-        // NOTE: We move the existing pending streams to a temporary list. This is done so that
-        //       if retry logic submits a new stream to the pool, we don't fail it inline.
-        purgePendingStreams(client.real_host_description_, failure_reason, reason);
+      onConnectFailed(client);
+      // Purge pending streams only if this client doesn't contribute to the local connecting
+      // stream capacity. In other words, the rest clients  would be able to handle all the
+      // pending stream once they are connected.
+      ConnectionPool::PoolFailureReason reason;
+      if (client.timed_out_) {
+        reason = ConnectionPool::PoolFailureReason::Timeout;
+      } else if (event == Network::ConnectionEvent::RemoteClose) {
+        reason = ConnectionPool::PoolFailureReason::RemoteConnectionFailure;
+      } else {
+        reason = ConnectionPool::PoolFailureReason::LocalConnectionFailure;
       }
+
+      // Raw connect failures should never happen under normal circumstances. If we have an
+      // upstream that is behaving badly, streams can get stuck here in the pending state. If we
+      // see a connect failure, we purge all pending streams so that calling code can determine
+      // what to do with the stream.
+      // NOTE: We move the existing pending streams to a temporary list. This is done so that
+      //       if retry logic submits a new stream to the pool, we don't fail it inline.
+      purgePendingStreams(client.real_host_description_, failure_reason, reason);
       // See if we should preconnect based on active connections.
       if (!is_draining_for_deletion_) {
         tryCreateNewConnections();
