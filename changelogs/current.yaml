@@ -443,6 +443,12 @@ new_features:
     :ref:`grpc_service <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.CheckSettings.grpc_service>`
     in the per-route ``check_settings``. Routes without this configuration continue to use the default
     authorization service.
+- area: ext_authz
+  change: |
+    Added support for retry policy in the ``ext_authz`` HTTP filter. The filter now supports
+    :ref:`retry_policy <envoy_v3_api_field_extensions.filters.http.ext_authz.v3.HttpService.retry_policy>`
+    configuration for HTTP authorization servers. When configured, failed requests to the authorization server
+    will be automatically retried according to the specified policy.
 - area: ext_proc
   change: |
     Added :ref:`status_on_error <envoy_v3_api_field_extensions.filters.http.ext_proc.v3.ExternalProcessor.status_on_error>`
