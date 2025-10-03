@@ -351,16 +351,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_network_connectivity_observer_impl_lib",
-    srcs = envoy_select_enable_http3(["quic_network_connectivity_observer_impl.cc"]),
-    hdrs = envoy_select_enable_http3(["quic_network_connectivity_observer_impl.h"]),
-    deps = envoy_select_enable_http3([
-        ":quic_network_connectivity_observer_lib",
-        "//source/common/common:logger_lib",
-    ]),
-)
-
-envoy_cc_library(
     name = "envoy_quic_network_observer_registry_factory_lib",
     hdrs = [
         "envoy_quic_network_observer_registry_factory.h",
