@@ -3,9 +3,6 @@
 #include <string>
 #include <utility>
 
-#include "absl/status/status.h"
-#include "absl/container/flat_hash_map.h"
-
 #include "envoy/api/api.h"
 #include "envoy/config/core/v3/address.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
@@ -14,12 +11,15 @@
 #include "envoy/upstream/upstream.h"
 
 #include "source/common/common/empty_string.h"
-#include "source/common/network/resolver_impl.h"
-#include "source/common/network/address_impl.h"
 #include "source/common/config/datasource.h"
+#include "source/common/network/address_impl.h"
+#include "source/common/network/resolver_impl.h"
 #include "source/extensions/filters/network/common/factory_base.h"
 #include "source/extensions/filters/network/common/redis/client.h"
 #include "source/extensions/filters/network/well_known_names.h"
+
+#include "absl/container/flat_hash_map.h"
+#include "absl/status/status.h"
 
 namespace Envoy {
 namespace Extensions {

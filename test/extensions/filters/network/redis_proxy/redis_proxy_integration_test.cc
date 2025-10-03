@@ -3,8 +3,8 @@
 
 #include "envoy/service/redis_auth/v3/redis_external_auth.pb.h"
 
-#include "source/common/common/random_generator.h"
 #include "source/common/common/fmt.h"
+#include "source/common/common/random_generator.h"
 #include "source/extensions/filters/network/common/redis/fault_impl.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
 #include "source/extensions/network/dns_resolver/getaddrinfo/getaddrinfo.h"
