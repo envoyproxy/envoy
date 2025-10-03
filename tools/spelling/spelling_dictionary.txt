@@ -210,6 +210,7 @@ FUZZER
 FUZZERS
 delims
 dereferencing
+deprioritized
 differentially
 dnsresolvers
 endpos
@@ -976,6 +977,7 @@ linux
 livelock
 liveness
 llvm
+ln
 loc
 localhost
 lockless
