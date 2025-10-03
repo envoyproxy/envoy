@@ -118,6 +118,14 @@ minor_behavior_changes:
     change: |
       Check the request header count & size in kb after applying mutations is <= the configured limits
       and reject the response if not.
+  - area: on_demand
+    change: |
+      Fixed on-demand VHDS (Virtual Host Discovery Service) to properly handle requests with request bodies.
+      Previously, requests with body data (POST, PUT, etc.) would fail with 404 NR responses when triggering
+      on-demand virtual host discovery because the buffered request body was lost during stream processing.
+      This fix ensures request body data is properly preserved during VHDS discovery by avoiding stream recreation
+      when body data is present. Added new bootstrap configuration option ``allow_body_data_loss_for_per_route_config``
+      to control whether requests with bodies should prioritize body preservation or per-route config overrides. Fixes GitHub issue #18741.
 
 bug_fixes:
   # *Changes expected to improve the state of the world and are unlikely to have negative effects*
@@ -203,12 +211,6 @@ bug_fixes:
     change: |
       Fixed a use-after-free (UAF) in DNS cache that can occur when the ``Host`` header is modified between the Dynamic
       Forwarding Proxy and Router filters.
-  - area: testing
-    change: |
-      Fixed compilation errors in on_demand filter tests where ``EXPECT_CALL(server_context, bootstrap())`` was incorrectly
-      trying to mock the ``bootstrap()`` method. The ``MockServerFactoryContext`` class provides a real implementation
-      that returns a reference to the ``bootstrap_`` member variable, not a mock method. Changed to directly assign
-      the bootstrap configuration to ``server_context.bootstrap_`` instead of using ``EXPECT_CALL``.
   - area: release
     change: |
       Fixed the distroless image to ensure nonroot.
