@@ -243,7 +243,7 @@ public:
   ReadyWatcher membership_updated_;
   ReadyWatcher initialized_;
   Event::MockTimer* cleanup_timer_;
-  Common::CallbackHandlePtr priority_update_cb_;
+  ::Envoy::Common::CallbackHandlePtr priority_update_cb_;
   bool init_complete_{false};
 
   // Real thread local slot and registry for reverse connection testing.
