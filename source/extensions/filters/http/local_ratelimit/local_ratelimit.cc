@@ -115,7 +115,7 @@ FilterConfig::FilterConfig(
       always_consume_default_token_bucket_, std::move(share_provider), max_dynamic_descriptors_);
 }
 
-Filters::Common::LocalRateLimit::LocalRateLimiterImpl::Result
+Filters::Common::LocalRateLimit::LocalRateLimiter::Result
 FilterConfig::requestAllowed(absl::Span<const RateLimit::Descriptor> request_descriptors) const {
   return rate_limiter_->requestAllowed(request_descriptors);
 }
