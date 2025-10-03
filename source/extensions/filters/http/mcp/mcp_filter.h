@@ -14,6 +14,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Mcp {
 
+namespace MetadataKeys {
+// Core MCP fields
+constexpr absl::string_view FilterName = "mcp_proxy";
+} // namespace MetadataKeys
+
 /**
  * Configuration for the MCP filter.
  */
@@ -25,9 +30,9 @@ public:
 using McpFilterConfigSharedPtr = std::shared_ptr<McpFilterConfig>;
 
 /**
- * HTTP MCP filter implementation.
+ * MCP proxy implementation.
  */
-class McpFilter : public Http::PassThroughFilter, public Logger::Loggable<Logger::Id::filter> {
+class McpFilter : public Http::PassThroughFilter, public Logger::Loggable<Logger::Id::mcp> {
 public:
   explicit McpFilter(McpFilterConfigSharedPtr config) : config_(config) {}
 
@@ -37,12 +42,23 @@ public:
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override;
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers,
-                                          bool end_stream) override;
-  Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
+  Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap&, bool) override {
+    return Http::FilterHeadersStatus::Continue;
+  };
+  Http::FilterDataStatus encodeData(Buffer::Instance&, bool) override {
+    return Http::FilterDataStatus::Continue;
+  };
+
+  void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
+    decoder_callbacks_ = &callbacks;
+  }
 
 private:
+  void finalizeDynamicMetadata();
   McpFilterConfigSharedPtr config_;
+  Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
+  bool is_json_post_request_{false};
+  std::unique_ptr<google::protobuf::Struct> metadata_;
 };
 
 } // namespace Mcp
