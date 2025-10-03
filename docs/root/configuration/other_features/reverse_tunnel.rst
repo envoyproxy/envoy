@@ -3,6 +3,10 @@
 Reverse Tunnels
 ===============
 
+.. attention::
+
+  The reverse tunnels feature is experimental and is currently under active development.
+
 Envoy supports reverse tunnels that enable establishing persistent connections from downstream Envoy instances
 to upstream Envoy instances without requiring the upstream to be directly reachable from the downstream.
 This feature is particularly useful in scenarios where downstream instances are behind NATs, firewalls,
@@ -16,10 +20,10 @@ used for forwarding traffic from services behind upstream Envoy to downstream se
 
 Reverse tunnels require the following extensions:
 
-1. **Downstream socket interface**: Registered as a bootstrap extension on initiator envoy to initiate and maintain reverse tunnels.
-2. **Upstream socket interface**: Registered as a bootstrap extension on responder envoy to accept and manage reverse tunnels.
+1. **Downstream socket interface**: Registered as a bootstrap extension on initiator Envoy to initiate and maintain reverse tunnels.
+2. **Upstream socket interface**: Registered as a bootstrap extension on responder Envoy to accept and manage reverse tunnels.
 3. **Reverse tunnel network filter**: On responder Envoy to accept reverse tunnel requests.
-4. **Reverse connection cluster**: Added on responder Envoy for each downstream envoy node that needs to be reached through reverse tunnels.
+4. **Reverse connection cluster**: Added on responder Envoy for each downstream Envoy node that needs to be reached through reverse tunnels.
 
 .. _config_reverse_tunnel_configuration_files:
 
@@ -116,12 +120,12 @@ The special ``rc://`` address format encodes:
 
 **Identifier Rules:**
 
-* Each node should have a unique src_node_id
-* The src_cluster_id should not be the same as any src_node_id
-* Nodes in the same cluster share the same src_cluster_id but have different src_node_id values
+* Each node should have a unique src_node_id.
+* The src_cluster_id should not be the same as any src_node_id.
+* Nodes in the same cluster share the same src_cluster_id but have different src_node_id values.
 
-The 'downstream-service' cluster is the service behind initiator envoy that will be accessed via reverse tunnels
-from behind the responder envoy.
+The 'downstream-service' cluster is the service behind initiator Envoy that will be accessed via reverse tunnels
+from behind the responder Envoy.
 
 .. validated-code-block:: yaml
   :type-name: envoy.config.cluster.v3.Cluster
@@ -142,7 +146,7 @@ from behind the responder envoy.
 Upstream Cluster
 ~~~~~~~~~~~~~~~~~
 
-Each upstream envoy to which reverse tunnels should be established needs to be configured with a cluster,
+Each upstream Envoy to which reverse tunnels should be established needs to be configured with a cluster,
 added via CDS.
 
 .. validated-code-block:: yaml
@@ -310,7 +314,7 @@ The reverse connection cluster configuration specifies:
   - ``%DOWNSTREAM_REMOTE_ADDRESS%``: Use downstream connection address
   - Plain text and combinations of the above
 
-An example of how to process headers and set the UUID is described in the
+An example of how to process headers and set the host ID is described in the
 :ref:`config_reverse_connection_egress_listener` section.
 
 * **Protocol**: Only HTTP/2 is supported for reverse connections
@@ -323,7 +327,7 @@ An example of how to process headers and set the UUID is described in the
 Egress Listener for Data Traffic
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Add an egress listener on upstream envoy that accepts data traffic and routes it to the reverse connection
+Add an egress listener on upstream Envoy that accepts data traffic and routes it to the reverse connection
 cluster. This listener includes header processing logic to determine the target downstream node:
 
 .. validated-code-block:: yaml
@@ -402,7 +406,7 @@ host ID for the reverse connection cluster, which is then used to look up a sock
 Header Processing for Reverse Tunnel Data Traffic:
 
 1. **x-node-id header**: Highest priority - uses the value directly
-2. **x-cluster-id header**: Fallback - uses when x-node-id is not present
+2. **x-cluster-id header**: Fallback - used when x-node-id is not present
 3. **Host header**: Second fallback - extracts UUID from format ``uuid.tcpproxy.envoy.remote``
 4. **None found**: Logs error and fails cluster matching
 
@@ -435,72 +439,6 @@ Example Request Flow:
 
    Result: ``host_id = "example-uuid"``
 
-.. _config_reverse_connection_stats:
-
-Statistics
-----------
-
-The reverse tunnel extensions emit the following statistics:
-
-**Reverse Tunnel Filter:**
-
-The reverse tunnel network filter emits handshake-related statistics with the prefix ``reverse_tunnel.handshake.``:
-
-.. csv-table::
-   :header: Name, Type, Description
-   :widths: 1, 1, 2
-
-   reverse_tunnel.handshake.parse_error, Counter, Number of handshake requests with missing required headers
-   reverse_tunnel.handshake.accepted, Counter, Number of successfully accepted reverse tunnel connections
-   reverse_tunnel.handshake.rejected, Counter, Number of rejected reverse tunnel connections
-
-**Downstream Socket Interface:**
-
-The downstream reverse tunnel extension emits both host-level and cluster-level statistics for connection
-states. The stat names follow the pattern:
-
-- Host-level: ``<stat_prefix>.host.<host_address>.<state>``
-- Cluster-level: ``<stat_prefix>.cluster.<cluster_id>.<state>``
-
-Where ``<state>`` can be one of:
-
-.. csv-table::
-   :header: State, Type, Description
-   :widths: 1, 1, 2
-
-   connecting, Gauge, Number of connections currently being established
-   connected, Gauge, Number of successfully established connections
-   failed, Gauge, Number of failed connection attempts
-   recovered, Gauge, Number of connections that recovered from failure
-   backoff, Gauge, Number of hosts currently in backoff state
-   cannot_connect, Gauge, Number of connection attempts that could not be initiated
-   unknown, Gauge, Number of connections in unknown state (fallback)
-
-For example, with ``stat_prefix: "downstream_rc"``:
-
-* ``downstream_rc.host.192.168.1.1.connecting`` - connections being established to host 192.168.1.1
-* ``downstream_rc.cluster.upstream-cluster.connected`` - established connections to upstream-cluster
-
-**Upstream Socket Interface:**
-
-The upstream reverse tunnel extension emits node-level and cluster-level statistics for accepted connections.
-The stat names follow the pattern:
-
-* Node-level: ``reverse_connections.nodes.<node_id>``
-* Cluster-level: ``reverse_connections.clusters.<cluster_id>``
-
-.. csv-table::
-   :header: Name, Type, Description
-   :widths: 1, 1, 2
-
-   reverse_connections.nodes.<node_id>, Gauge, Number of active connections from downstream node
-   reverse_connections.clusters.<cluster_id>, Gauge, Number of active connections from downstream cluster
-
-For example:
-
-* ``reverse_connections.nodes.node-1`` - active connections from downstream node "node-1"
-* ``reverse_connections.clusters.downstream-cluster`` - active connections from downstream cluster "downstream-cluster"
-
 .. _config_reverse_connection_security:
 
 Security Considerations
@@ -510,4 +448,4 @@ Reverse tunnels should be used with appropriate security measures:
 
 * **Authentication**: Implement proper authentication mechanisms for handshake validation as part of the reverse tunnel handshake protocol.
 * **Authorization**: Validate that downstream nodes are authorized to connect to upstream clusters.
-* **TLS**: TLS can be configured for each upstream cluster reverse tunnels are established to.
+* **TLS**: TLS can be configured for each upstream cluster that reverse tunnels are established to.
