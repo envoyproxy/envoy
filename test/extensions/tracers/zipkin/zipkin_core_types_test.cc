@@ -1,6 +1,7 @@
 #include "source/common/common/utility.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/network/utility.h"
+#include "source/extensions/tracers/common/utils/trace.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_constants.h"
 #include "source/extensions/tracers/zipkin/zipkin_core_types.h"
 
@@ -389,26 +390,26 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
           R"({"traceId":"0000000000000000","name":"","id":"0000000000000000"})"),
       span.toStruct(replacements)));
 
-  uint64_t id = Util::generateRandom64(test_time.timeSystem());
+  uint64_t id = Extensions::Tracers::Common::Utils::Trace::generateRandom64(test_time.timeSystem());
   std::string id_hex = Hex::uint64ToHex(id);
   span.setId(id);
   EXPECT_EQ(id, span.id());
   EXPECT_EQ(id_hex, span.idAsHexString());
 
-  id = Util::generateRandom64(test_time.timeSystem());
+  id = Extensions::Tracers::Common::Utils::Trace::generateRandom64(test_time.timeSystem());
   id_hex = Hex::uint64ToHex(id);
   span.setParentId(id);
   EXPECT_EQ(id, span.parentId());
   EXPECT_EQ(id_hex, span.parentIdAsHexString());
   EXPECT_TRUE(span.isSetParentId());
 
-  id = Util::generateRandom64(test_time.timeSystem());
+  id = Extensions::Tracers::Common::Utils::Trace::generateRandom64(test_time.timeSystem());
   id_hex = Hex::uint64ToHex(id);
   span.setTraceId(id);
   EXPECT_EQ(id, span.traceId());
   EXPECT_EQ(id_hex, span.traceIdAsHexString());
 
-  id = Util::generateRandom64(test_time.timeSystem());
+  id = Extensions::Tracers::Common::Utils::Trace::generateRandom64(test_time.timeSystem());
   id_hex = Hex::uint64ToHex(id);
   span.setTraceIdHigh(id);
   EXPECT_EQ(id, span.traceIdHigh());

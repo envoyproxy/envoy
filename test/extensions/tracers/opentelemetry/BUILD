@@ -72,6 +72,8 @@ envoy_extension_cc_test(
     rbe_pool = "6gig",
     deps = [
         "//source/extensions/tracers/opentelemetry:opentelemetry_tracer_lib",
+        "//source/extensions/propagators:propagator_lib",
+        "//test/mocks/api:api_mocks",
         "//test/test_common:status_utility_lib",
         "//test/test_common:utility_lib",
     ],
