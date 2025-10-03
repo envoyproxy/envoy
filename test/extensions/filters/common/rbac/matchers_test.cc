@@ -1782,6 +1782,64 @@ TEST(PolicyMatcher, PolicyMatcherWithAllCelFeaturesEnabled) {
   EXPECT_TRUE(matcher.matches(conn, headers, info));
 }
 
+TEST(PermissionMatcher, AndRulesCreation) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::config::rbac::v3::Permission permission;
+  auto* and_rules = permission.mutable_and_rules();
+  and_rules->add_rules()->set_any(true);
+  and_rules->add_rules()->set_any(true);
+
+  auto matcher =
+      Matcher::create(permission, ProtobufMessage::getStrictValidationVisitor(), factory_context);
+  EXPECT_NE(matcher, nullptr);
+  checkMatcher(*matcher, true);
+}
+
+TEST(PermissionMatcher, NotRuleCreation) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::config::rbac::v3::Permission permission;
+  permission.mutable_not_rule()->set_any(true);
+
+  auto matcher =
+      Matcher::create(permission, ProtobufMessage::getStrictValidationVisitor(), factory_context);
+  EXPECT_NE(matcher, nullptr);
+  checkMatcher(*matcher, false);
+}
+
+TEST(PrincipalMatcher, AndIdsCreation) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::config::rbac::v3::Principal principal;
+  auto* and_ids = principal.mutable_and_ids();
+  and_ids->add_ids()->set_any(true);
+  and_ids->add_ids()->set_any(true);
+
+  auto matcher = Matcher::create(principal, factory_context);
+  EXPECT_NE(matcher, nullptr);
+  checkMatcher(*matcher, true);
+}
+
+TEST(PrincipalMatcher, MetadataCreation) {
+  NiceMock<Server::Configuration::MockServerFactoryContext> factory_context;
+  envoy::config::rbac::v3::Principal principal;
+  auto* metadata_matcher = principal.mutable_metadata();
+  metadata_matcher->set_filter("test.filter");
+  metadata_matcher->add_path()->set_key("test_key");
+  metadata_matcher->mutable_value()->mutable_string_match()->set_exact("test_value");
+
+  auto matcher = Matcher::create(principal, factory_context);
+  EXPECT_NE(matcher, nullptr);
+
+  NiceMock<StreamInfo::MockStreamInfo> info;
+  auto label = MessageUtil::keyValueStruct("test_key", "test_value");
+  envoy::config::core::v3::Metadata metadata;
+  metadata.mutable_filter_metadata()->insert(
+      Protobuf::MapPair<std::string, Protobuf::Struct>("test.filter", label));
+  EXPECT_CALL(Const(info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+
+  checkMatcher(*matcher, true, Envoy::Network::MockConnection(),
+               Envoy::Http::TestRequestHeaderMapImpl(), info);
+}
+
 } // namespace
 } // namespace RBAC
 } // namespace Common
