@@ -10,18 +10,12 @@ QuicNetworkConnectivityObserverImpl::QuicNetworkConnectivityObserverImpl(
     : session_(session) {}
 
 void QuicNetworkConnectivityObserverImpl::onNetworkMadeDefault(NetworkHandle /*network*/) {
-  if (!session_.connection()->connected()) {
-    return;
-  }
-
-  session_.onNetworkMadeDefault();
+  // TODO(danzh) propagate `network` to quic session.
+  (void)session_;
 }
 
-void QuicNetworkConnectivityObserverImpl::onNetworkConnected(NetworkHandle network) {
-  if (!session_.connection()->connected()) {
-    return;
-  }
-  session_.onNetworkConnected(network);
+void QuicNetworkConnectivityObserverImpl::onNetworkConnected(NetworkHandle /*network*/) {
+  (void)session_;
 }
 
 } // namespace Quic

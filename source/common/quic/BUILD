@@ -324,7 +324,8 @@ envoy_cc_library(
         ":envoy_quic_stream_lib",
         ":envoy_quic_utils_lib",
         ":quic_filter_manager_connection_lib",
-        ":quic_network_connectivity_observer_lib",
+        ":quic_network_connectivity_observer_interface",
+        ":envoy_quic_network_observer_registry_factory_lib",
         ":quic_stat_names_lib",
         ":quic_transport_socket_factory_lib",
         "//envoy/http:http_server_properties_cache_interface",
@@ -340,11 +341,10 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_network_connectivity_observer_lib",
-    hdrs = envoy_select_enable_http3([
+    name = "quic_network_connectivity_observer_interface",
+    hdrs = [
         "quic_network_connectivity_observer.h",
-        "envoy_quic_network_observer_registry_factory.h",
-    ]),
+    ],
     deps = envoy_select_enable_http3([
         "//source/common/common:logger_lib",
     ]),
@@ -355,9 +355,10 @@ envoy_cc_library(
     hdrs = [
         "envoy_quic_network_observer_registry_factory.h",
     ],
-    deps = envoy_select_enable_http3([
-        ":envoy_quic_client_session_lib",
-    ]),
+    deps = [
+        ":quic_network_connectivity_observer_interface",
+        "//envoy/event:dispatcher_interface",
+    ],
 )
 
 envoy_cc_library(

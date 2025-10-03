@@ -1,7 +1,4 @@
-#include "envoy_mobile_quic_network_observer_registry_factory.h"
 #include "library/common/network/envoy_mobile_quic_network_observer_registry_factory.h"
-
-#include "source/common/runtime/runtime_features.h"
 
 namespace Envoy {
 namespace Quic {
