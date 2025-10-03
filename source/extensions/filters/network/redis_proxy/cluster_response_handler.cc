@@ -121,6 +121,19 @@ void BaseClusterScopeResponseHandler::handleResponse(Common::Redis::RespValuePtr
   processAllResponses(request);
 }
 
+void BaseClusterScopeResponseHandler::handleFailure(uint32_t shard_index, 
+                                                   ClusterScopeCmdRequest& request) {
+  ENVOY_LOG(debug, "BaseClusterScopeResponseHandler: failure received for shard index: '{}'", shard_index);
+  
+  // Create an error response for the upstream failure using standard error message
+  Common::Redis::RespValuePtr error_response = 
+    Common::Redis::Utility::makeError(Response::get().UpstreamFailure);
+  
+  // Route the error response through the normal response handling flow
+  // This ensures consistent error handling logic and stats tracking
+  handleResponse(std::move(error_response), shard_index, request);
+}
+
 void BaseClusterScopeResponseHandler::storeResponse(Common::Redis::RespValuePtr&& value, 
                                                    uint32_t shard_index, 
                                                    ClusterScopeCmdRequest& request) {

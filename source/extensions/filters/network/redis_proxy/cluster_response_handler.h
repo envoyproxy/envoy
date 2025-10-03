@@ -43,6 +43,20 @@ public:
   void handleResponse(Common::Redis::RespValuePtr&& value, uint32_t shard_index,
                      ClusterScopeCmdRequest& request) final;
 
+  /**
+   * Handle a failure from a shard by converting it to an error response
+   * @param shard_index the shard that failed (same as request index)
+   * @param request the cluster scope request object (has all needed data)
+   */
+  void handleFailure(uint32_t shard_index, ClusterScopeCmdRequest& request) final;
+
+  /**
+   * Handle a failure from a shard
+   * @param shard_index the shard that failed (same as request index)
+   * @param request the cluster scope request object (has all needed data)
+   */
+  void handleFailure(uint32_t shard_index, ClusterScopeCmdRequest& request) final;
+
 protected:
   explicit BaseClusterScopeResponseHandler(uint32_t shard_count) {
     pending_responses_.reserve(shard_count);
