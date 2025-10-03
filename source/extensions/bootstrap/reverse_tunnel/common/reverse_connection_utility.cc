@@ -10,11 +10,10 @@ namespace Bootstrap {
 namespace ReverseConnection {
 
 bool ReverseConnectionUtility::isPingMessage(absl::string_view data) {
-  if (data.empty()) {
+  if (data.size() != PING_MESSAGE.size()) {
     return false;
   }
-  return (data.length() == PING_MESSAGE.length() &&
-          !memcmp(data.data(), PING_MESSAGE.data(), PING_MESSAGE.length()));
+  return ::memcmp(data.data(), PING_MESSAGE.data(), PING_MESSAGE.size()) == 0;
 }
 
 Buffer::InstancePtr ReverseConnectionUtility::createPingResponse() {
@@ -68,7 +67,7 @@ bool PingMessageHandler::processPingMessage(absl::string_view data,
                                             Network::Connection& connection) {
   if (ReverseConnectionUtility::isPingMessage(data)) {
     ++ping_count_;
-    ENVOY_LOG(debug, "Ping handler: processing ping #{} on connection {}", ping_count_,
+    ENVOY_LOG(debug, "reverse_tunnel: processing ping #{} on connection {}", ping_count_,
               connection.id());
     return ReverseConnectionUtility::sendPingResponse(connection);
   }

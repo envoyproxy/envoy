@@ -1,3 +1,4 @@
+#include "ext_proc.h"
 #include "source/extensions/filters/http/ext_proc/ext_proc.h"
 
 #include <functional>
@@ -15,6 +16,7 @@
 #include "source/extensions/filters/http/ext_proc/http_client/http_client_impl.h"
 #include "source/extensions/filters/http/ext_proc/mutation_utils.h"
 #include "source/extensions/filters/http/ext_proc/on_processing_response.h"
+#include "source/extensions/filters/http/ext_proc/processing_request_modifier.h"
 
 #include "absl/strings/str_format.h"
 #include "absl/strings/string_view.h"
@@ -185,6 +187,33 @@ void mergeHeaderValuesField(
   }
 }
 
+template <typename ConfigType>
+std::function<std::unique_ptr<ProcessingRequestModifier>()> createProcessingRequestModifierCb(
+    const ConfigType& config,
+    Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
+    Server::Configuration::CommonFactoryContext& context) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
+  if (!config.has_processing_request_modifier()) {
+    return nullptr;
+  }
+  auto& factory = Envoy::Config::Utility::getAndCheckFactory<ProcessingRequestModifierFactory>(
+      config.processing_request_modifier());
+  auto processing_request_modifier_config = Envoy::Config::Utility::translateAnyToFactoryConfig(
+      config.processing_request_modifier().typed_config(), context.messageValidationVisitor(),
+      factory);
+  if (processing_request_modifier_config == nullptr) {
+    return nullptr;
+  }
+
+  std::shared_ptr<const Protobuf::Message> shared_processing_request_modifier_config =
+      std::move(processing_request_modifier_config);
+  return [&factory, shared_processing_request_modifier_config, builder,
+          &context]() -> std::unique_ptr<ProcessingRequestModifier> {
+    return factory.createProcessingRequestModifier(*shared_processing_request_modifier_config,
+                                                   builder, context);
+  };
+}
+
 // Changes to headers are normally tested against the MutationRules supplied
 // with configuration. When writing an immediate response message, however,
 // we want to support a more liberal set of rules so that filters can create
@@ -254,13 +283,14 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
       expression_manager_(builder, context.localInfo(), config.request_attributes(),
                           config.response_attributes()),
       immediate_mutation_checker_(context.regexEngine()),
+      processing_request_modifier_factory_cb_(
+          createProcessingRequestModifierCb(config, builder, context)),
       on_processing_response_factory_cb_(
           createOnProcessingResponseCb(config, context, stats_prefix)),
       thread_local_stream_manager_slot_(context.threadLocal().allocateSlot()),
       remote_close_timeout_(context.runtime().snapshot().getInteger(
           RemoteCloseTimeout, DefaultRemoteCloseTimeoutMilliseconds)),
       status_on_error_(toErrorCode(config.status_on_error().code())) {
-
   if (config.disable_clear_route_cache()) {
     route_cache_action_ = ExternalProcessor::RETAIN;
   }
@@ -490,7 +520,10 @@ ExtProcLoggingInfo::getField(absl::string_view field_name) const {
   return {};
 }
 
-FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
+FilterConfigPerRoute::FilterConfigPerRoute(
+    const ExtProcPerRoute& config,
+    Extensions::Filters::Common::Expr::BuilderInstanceSharedConstPtr builder,
+    Server::Configuration::CommonFactoryContext& context)
     : disabled_(config.disabled()), processing_mode_(initProcessingMode(config)),
       grpc_service_(initGrpcService(config)),
       grpc_initial_metadata_(config.overrides().grpc_initial_metadata().begin(),
@@ -501,7 +534,9 @@ FilterConfigPerRoute::FilterConfigPerRoute(const ExtProcPerRoute& config)
       failure_mode_allow_(
           config.overrides().has_failure_mode_allow()
               ? absl::optional<bool>(config.overrides().failure_mode_allow().value())
-              : absl::nullopt) {}
+              : absl::nullopt),
+      processing_request_modifier_factory_cb_(
+          createProcessingRequestModifierCb(config.overrides(), builder, context)) {}
 
 FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_specific,
                                            const FilterConfigPerRoute& more_specific)
@@ -521,7 +556,11 @@ FilterConfigPerRoute::FilterConfigPerRoute(const FilterConfigPerRoute& less_spec
                                         : less_specific.untypedReceivingMetadataNamespaces()),
       failure_mode_allow_(more_specific.failureModeAllow().has_value()
                               ? more_specific.failureModeAllow()
-                              : less_specific.failureModeAllow()) {}
+                              : less_specific.failureModeAllow()),
+      processing_request_modifier_factory_cb_(
+          more_specific.processing_request_modifier_factory_cb_
+              ? more_specific.processing_request_modifier_factory_cb_
+              : less_specific.processing_request_modifier_factory_cb_) {}
 
 void Filter::setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) {
   Http::PassThroughFilter::setDecoderFilterCallbacks(callbacks);
@@ -545,8 +584,18 @@ void Filter::setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callb
   watermark_callbacks_.setEncoderFilterCallbacks(&callbacks);
 }
 
-void Filter::sendRequest(ProcessingRequest&& req, bool end_stream) {
-  // Calling the client send function to send the request.
+void Filter::sendRequest(const ProcessorState& state, ProcessingRequest&& req, bool end_stream) {
+  if (processing_request_modifier_) {
+    ProcessingRequestModifier::Params params = {
+        .traffic_direction = state.trafficDirection(),
+        .callbacks = state.callbacks(),
+        .request_headers = state.requestHeaders(),
+        .response_headers = state.responseHeaders(),
+        .response_trailers = state.responseTrailers(),
+    };
+    processing_request_modifier_->modifyRequest(params, req);
+  }
+
   client_->sendRequest(std::move(req), end_stream, filter_callbacks_->streamId(), this, stream_);
 }
 
@@ -721,7 +770,7 @@ FilterHeadersStatus Filter::onHeaders(ProcessorState& state,
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              ProcessorState::CallbackState::HeadersCallback);
   ENVOY_STREAM_LOG(debug, "Sending headers message", *decoder_callbacks_);
-  sendRequest(std::move(req), false);
+  sendRequest(state, std::move(req), false);
   stats_.stream_msgs_sent_.inc();
   state.setPaused(true);
   return FilterHeadersStatus::StopIteration;
@@ -1022,7 +1071,7 @@ Filter::sendHeadersInObservabilityMode(Http::RequestOrResponseHeaderMap& headers
   ProcessingRequest req =
       buildHeaderRequest(state, headers, end_stream, /*observability_mode=*/true);
   ENVOY_STREAM_LOG(debug, "Sending headers message in observability mode", *decoder_callbacks_);
-  sendRequest(std::move(req), false);
+  sendRequest(state, std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 
   return FilterHeadersStatus::Continue;
@@ -1047,7 +1096,7 @@ Http::FilterDataStatus Filter::sendDataInObservabilityMode(Buffer::Instance& dat
     // Set up the the body chunk and send.
     auto req = setupBodyChunk(state, data, end_stream);
     req.set_observability_mode(true);
-    sendRequest(std::move(req), false);
+    sendRequest(state, std::move(req), false);
     stats_.stream_msgs_sent_.inc();
     ENVOY_STREAM_LOG(debug, "Sending body message in ObservabilityMode", *decoder_callbacks_);
   } else if (state.bodyMode() != ProcessingMode::NONE) {
@@ -1249,7 +1298,7 @@ void Filter::sendBodyChunk(ProcessorState& state, ProcessorState::CallbackState 
                            ProcessingRequest& req) {
   state.onStartProcessorCall(std::bind(&Filter::onMessageTimeout, this), config_->messageTimeout(),
                              new_state);
-  sendRequest(std::move(req), false);
+  sendRequest(state, std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 }
 
@@ -1281,7 +1330,7 @@ void Filter::sendTrailers(ProcessorState& state, const Http::HeaderMap& trailers
   }
   encodeProtocolConfig(req);
 
-  sendRequest(std::move(req), false);
+  sendRequest(state, std::move(req), false);
   stats_.stream_msgs_sent_.inc();
 }
 
@@ -1867,6 +1916,12 @@ void Filter::mergePerRouteConfig() {
                      *decoder_callbacks_);
     failure_mode_allow_ = merged_config->failureModeAllow().value();
   }
+
+  if (merged_config->hasProcessingRequestModifierConfig()) {
+    ENVOY_STREAM_LOG(trace, "Setting processing request modifier from per-route configuration",
+                     *decoder_callbacks_);
+    processing_request_modifier_ = merged_config->createProcessingRequestModifier();
+  }
 }
 
 void DeferredDeletableStream::closeStreamOnTimer() {
@@ -1938,6 +1993,13 @@ std::unique_ptr<OnProcessingResponse> FilterConfig::createOnProcessingResponse()
     return nullptr;
   }
   return on_processing_response_factory_cb_();
+}
+
+std::unique_ptr<ProcessingRequestModifier> FilterConfig::createProcessingRequestModifier() const {
+  if (!processing_request_modifier_factory_cb_) {
+    return nullptr;
+  }
+  return processing_request_modifier_factory_cb_();
 }
 
 void Filter::onProcessHeadersResponse(const envoy::service::ext_proc::v3::HeadersResponse& response,

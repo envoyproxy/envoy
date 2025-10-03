@@ -8,9 +8,9 @@ licenses(["notice"])  # Apache 2
 
 FIPS_GO_VERSION = "go1.24.4"
 
-FIPS_NINJA_VERSION = "1.10.2"
+FIPS_NINJA_VERSION = "1.13.1"
 
-FIPS_CMAKE_VERSION = "cmake version 3.22.1"
+FIPS_CMAKE_VERSION = "cmake version 4.1.2"
 
 SUPPORTED_ARCHES = {
     "x86_64": "amd64",
