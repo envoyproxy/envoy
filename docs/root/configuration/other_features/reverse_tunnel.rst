@@ -54,7 +54,7 @@ The initiator Envoy (downstream) requires the following configuration components
 Downstream socket interface
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: /configs/reverse_connection/initiator-envoy.yaml
+.. literalinclude:: ../../../../configs/reverse_connection/initiator-envoy.yaml
     :language: yaml
     :lines: 8-12
     :linenos:
@@ -72,7 +72,7 @@ identity metadata for the local Envoy instance. The listener's address field use
 format to specify connection parameters, and its route configuration defines which downstream services
 are reachable through the reverse tunnel.
 
-.. literalinclude:: /configs/reverse_connection/initiator-envoy.yaml
+.. literalinclude:: ../../../../configs/reverse_connection/initiator-envoy.yaml
     :language: yaml
     :lines: 17-50
     :linenos:
@@ -98,7 +98,7 @@ The identifiers serve the following purposes:
 
 The ``downstream-service`` cluster in the example refers to the service behind the initiator Envoy that will be accessed via reverse tunnels from services behind the responder Envoy.
 
-.. literalinclude:: /configs/reverse_connection/initiator-envoy.yaml
+.. literalinclude:: ../../../../configs/reverse_connection/initiator-envoy.yaml
     :language: yaml
     :lines: 69-80
     :linenos:
@@ -111,7 +111,7 @@ Each upstream Envoy to which reverse tunnels should be established requires a cl
 This cluster can be defined statically in the bootstrap configuration or added dynamically via the
 :ref:`Cluster Discovery Service (CDS) <config_cluster_manager_cds>`.
 
-.. literalinclude:: /configs/reverse_connection/initiator-envoy.yaml
+.. literalinclude:: ../../../../configs/reverse_connection/initiator-envoy.yaml
     :language: yaml
     :lines: 54-65
     :linenos:
@@ -194,7 +194,7 @@ The responder Envoy (upstream) requires the following configuration components t
 Upstream socket interface
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. literalinclude:: /configs/reverse_connection/responder-envoy.yaml
+.. literalinclude:: ../../../../configs/reverse_connection/responder-envoy.yaml
     :language: yaml
     :lines: 8-12
     :linenos:
@@ -211,7 +211,7 @@ The ``envoy.filters.network.reverse_tunnel`` network filter implements the rever
 protocol. It validates incoming connection requests and accepts or rejects them based on the handshake
 parameters. The filter also manages periodic ping/pong keep-alive messages to maintain tunnel health.
 
-.. literalinclude:: /configs/reverse_connection/responder-envoy.yaml
+.. literalinclude:: ../../../../configs/reverse_connection/responder-envoy.yaml
     :language: yaml
     :lines: 17-28
     :linenos:
@@ -230,7 +230,7 @@ Each data request must include a ``host_id`` that identifies the target downstre
 specified directly in request headers or computed from them. The cluster extracts the ``host_id`` using
 the configured ``host_id_format`` field and uses it to look up the appropriate reverse tunnel connection.
 
-.. literalinclude:: /configs/reverse_connection/responder-envoy.yaml
+.. literalinclude:: ../../../../configs/reverse_connection/responder-envoy.yaml
     :language: yaml
     :lines: 92-112
     :linenos:
@@ -272,7 +272,7 @@ An egress listener on the upstream Envoy accepts data requests and routes them t
 cluster. This listener typically includes header processing logic to extract or compute the ``host_id``
 that identifies the target downstream node for each request.
 
-.. literalinclude:: /configs/reverse_connection/responder-envoy.yaml
+.. literalinclude:: ../../../../configs/reverse_connection/responder-envoy.yaml
     :language: yaml
     :lines: 31-88
     :linenos:
