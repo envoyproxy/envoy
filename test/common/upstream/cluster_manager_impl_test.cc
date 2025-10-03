@@ -1520,6 +1520,77 @@ TEST_F(ClusterManagerImplTest, OriginalDstInitialization) {
   factory_.tls_.shutdownThread();
 }
 
+TEST_F(ClusterManagerImplTest, GetActiveOrWarmingCluster) {
+  // Start with a static cluster.
+  const std::string bootstrap_yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: static_cluster
+      connect_timeout: 0.250s
+      type: static
+      lb_policy: round_robin
+      load_assignment:
+        cluster_name: static_cluster
+        endpoints:
+        - lb_endpoints:
+          - endpoint:
+              address:
+                socket_address:
+                  address: 127.0.0.1
+                  port_value: 11001
+  )EOF";
+  create(parseBootstrapFromV3Yaml(bootstrap_yaml));
+
+  // Static cluster should be active.
+  EXPECT_NE(absl::nullopt, cluster_manager_->getActiveCluster("static_cluster"));
+  EXPECT_NE(absl::nullopt, cluster_manager_->getActiveOrWarmingCluster("static_cluster"));
+  EXPECT_EQ(absl::nullopt, cluster_manager_->getActiveOrWarmingCluster("non_existent_cluster"));
+
+  // Now, add a dynamic cluster. It will start in warming state.
+  const std::string warming_cluster_yaml = R"EOF(
+    name: warming_cluster
+    connect_timeout: 0.250s
+    type: EDS
+    eds_cluster_config:
+      eds_config:
+        api_config_source:
+          api_type: GRPC
+          grpc_services:
+            envoy_grpc:
+              cluster_name: static_cluster
+  )EOF";
+  auto warming_cluster_config = parseClusterFromV3Yaml(warming_cluster_yaml);
+
+  // Mock the cluster creation for the warming cluster.
+  std::shared_ptr<MockClusterMockPrioritySet> warming_cluster =
+      std::make_shared<NiceMock<MockClusterMockPrioritySet>>();
+  warming_cluster->info_->name_ = "warming_cluster";
+  std::function<void()> cluster_init_callback;
+  EXPECT_CALL(*warming_cluster, initialize(_)).WillOnce(SaveArg<0>(&cluster_init_callback));
+  EXPECT_CALL(factory_, clusterFromProto_(ProtoEq(warming_cluster_config), _, true))
+      .WillOnce(Return(std::make_pair(warming_cluster, nullptr)));
+
+  // Add the cluster.
+  EXPECT_TRUE(*cluster_manager_->addOrUpdateCluster(warming_cluster_config, "version1"));
+
+  // The cluster should be in warming, not active.
+  EXPECT_EQ(absl::nullopt, cluster_manager_->getActiveCluster("warming_cluster"));
+  OptRef<const Cluster> cluster = cluster_manager_->getActiveOrWarmingCluster("warming_cluster");
+  EXPECT_NE(absl::nullopt, cluster);
+  EXPECT_EQ("warming_cluster", cluster->info()->name());
+
+  // Finish initialization. This should move it to active.
+  cluster_init_callback();
+
+  // Now the cluster should be active.
+  cluster = cluster_manager_->getActiveCluster("warming_cluster");
+  EXPECT_NE(absl::nullopt, cluster);
+  EXPECT_EQ("warming_cluster", cluster->info()->name());
+  cluster = cluster_manager_->getActiveOrWarmingCluster("warming_cluster");
+  EXPECT_NE(absl::nullopt, cluster);
+  EXPECT_EQ("warming_cluster", cluster->info()->name());
+}
+
 TEST_F(ClusterManagerImplTest, UpstreamSocketOptionsPassedToTcpConnPool) {
   createWithBasicStaticCluster();
   NiceMock<MockLoadBalancerContext> context;

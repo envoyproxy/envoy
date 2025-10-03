@@ -26,7 +26,7 @@ ReverseTunnelAcceptor::socket(Envoy::Network::Socket::Type, Envoy::Network::Addr
                               Envoy::Network::Address::IpVersion, bool,
                               const Envoy::Network::SocketCreationOptions&) const {
 
-  ENVOY_LOG(warn, "reverse_tunnel: socket() called without address - returning nullptr");
+  ENVOY_LOG(warn, "reverse_tunnel: socket() called without address; returning nullptr");
 
   // Reverse connection sockets should always have an address.
   return nullptr;

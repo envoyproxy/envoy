@@ -1202,7 +1202,7 @@ ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
       std::move(factory_or_error.value()), std::move(*factory_list_or_error),
       std::chrono::milliseconds(
           PROTOBUF_GET_MS_OR_DEFAULT(filter_chain, transport_socket_connect_timeout, 0)),
-      filter_chain.name(), added_via_api);
+      added_via_api, filter_chain);
 
   filter_chain_res->setFilterChainFactoryContext(std::move(filter_chain_factory_context));
   return filter_chain_res;

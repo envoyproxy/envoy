@@ -35,6 +35,7 @@ extensions/filters/common/original_src @klarose @mattklein123
 # external processing filter
 /*/extensions/filters/http/ext_proc @gbrail @stevenzzzz @tyxia @mattklein123 @yanavlasov @yanjunxiang-google
 /*/extensions/filters/common/mutation_rules @gbrail @tyxia @mattklein123 @yanavlasov
+/*/extensions/http/ext_proc/processing_request_modifiers/mapped_attribute_builder @mbadov @stevenzzzz @adisuissa
 /*/extensions/http/ext_proc/response_processors/save_processing_response @pradeepcrao @botengyao @yanjunxiang-google
 /*/extensions/filters/network/ext_proc @botengyao @yanavlasov
 # jwt_authn http filter extension
@@ -86,6 +87,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 /*/extensions/udp_packet_writer/ @danzh2010 @ryantheoptimist
 # redis cluster extension
 /*/extensions/clusters/redis @msukalski @henryyyang @mattklein123
+# reverse conn cluster extension
+/*/extensions/clusters/reverse_connection @agrawroh @basundhara-c @botengyao @yanavlasov
 /*/extensions/common/redis @msukalski @henryyyang @mattklein123
 /*/extensions/health_checkers/redis @mattklein123 @UNOWNED
 /*/extensions/filters/network/redis_proxy @mattklein123 @UNOWNED
@@ -102,6 +105,8 @@ extensions/filters/common/original_src @klarose @mattklein123
 # HTTP caching extension
 /*/extensions/filters/http/cache @toddmgreer @ravenblackx @penguingao @mpwarres @capoferro
 /*/extensions/http/cache/simple_http_cache @toddmgreer @ravenblackx @penguingao @mpwarres @capoferro
+/*/extensions/filters/http/cache_v2 @toddmgreer @ravenblackx @penguingao @mpwarres @capoferro
+/*/extensions/http/cache_v2/simple_http_cache @toddmgreer @ravenblackx @penguingao @mpwarres @capoferro
 # AWS common signing components
 /*/extensions/common/aws @mattklein123 @nbaws @niax
 # adaptive concurrency limit extension.
@@ -226,6 +231,8 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/filters/http/basic_auth @zhaohuabing @wbpcode
 # HTTP API Key Auth
 /*/extensions/filters/http/api_key_auth @wbpcode @sanposhiho
+# HTTP MCP filter
+/*/extensions/filters/http/mcp @botengyao @yanavlasov
 # Original IP detection
 /*/extensions/http/original_ip_detection/custom_header @ryantheoptimist @mattklein123
 /*/extensions/http/original_ip_detection/xff @yanavlasov @mattklein123
@@ -249,6 +256,7 @@ extensions/upstreams/tcp @ggreenway @mattklein123
 /*/extensions/common/async_files @mattklein123 @ravenblackx
 /*/extensions/filters/http/file_system_buffer @mattklein123 @ravenblackx
 /*/extensions/http/cache/file_system_http_cache @ggreenway @ravenblackx
+/*/extensions/http/cache_v2/file_system_http_cache @ggreenway @ravenblackx
 # Google Cloud Platform Authentication Filter
 /*/extensions/filters/http/gcp_authn @tyxia @yanavlasov
 # DNS resolution

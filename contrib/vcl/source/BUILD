@@ -19,8 +19,6 @@ cc_library(
     hdrs = ["external/vppcom.h"],
     additional_linker_inputs = [
         "external/libsvm.a",
-        "external/libvlibmemoryclient.a",
-        "external/libvlibapi.a",
         "external/libvppcom.a",
         "external/libvppinfra.a",
     ],
@@ -29,8 +27,6 @@ cc_library(
     linkopts = [
         "-Wl,--start-group",
         "$(location external/libsvm.a)",
-        "$(location external/libvlibmemoryclient.a)",
-        "$(location external/libvlibapi.a)",
         "$(location external/libvppcom.a)",
         "$(location external/libvppinfra.a)",
         "-Wl,--end-group",
@@ -50,7 +46,7 @@ envoy_cmake(
     build_data = [requirement("ply")],
     cache_entries = {
         "CMAKE_BUILD_TYPE": "Release",
-        "VPP_API_TEST_BUILTIN": "OFF",
+        "VPP_EXTERNAL_PROJECT": "ON",
         "BUILD_SHARED_LIBS": "OFF",
         "CMAKE_ENABLE_EXPORTS": "OFF",
     },
@@ -59,9 +55,6 @@ envoy_cmake(
         "-Wno-error=array-bounds",
     ],
     default_cache_entries = {},
-    env = {
-        "PLYPATHS": "$(locations %s)" % requirement("ply"),
-    },
     exec_properties = select({
         "//bazel:engflow_rbe_x86_64": {
             "Pool": "linux_x64_large",
@@ -81,8 +74,6 @@ envoy_cmake(
         "libvppcom.a",
         "libvppinfra.a",
         "libsvm.a",
-        "libvlibapi.a",
-        "libvlibmemoryclient.a",
     ],
     postfix_script = """
         mkdir -p $$INSTALLDIR/lib/external $$INSTALLDIR/include/external \
@@ -103,8 +94,6 @@ genrule(
     name = "build_files",
     outs = [
         "external/libsvm.a",
-        "external/libvlibmemoryclient.a",
-        "external/libvlibapi.a",
         "external/libvppcom.a",
         "external/libvppinfra.a",
         "external/vppcom.h",

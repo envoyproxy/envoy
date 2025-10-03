@@ -715,8 +715,13 @@ TEST_F(TestUpstreamSocketManager, OnPingResponseInvalidData) {
         return Api::IoCallUint64Result{invalid_response.size(), Api::IoError::none()};
       });
 
+  // First invalid response should increment miss count but not immediately remove the fd.
   socket_manager_->onPingResponse(*mock_io_handle);
+  EXPECT_TRUE(verifyFDToNodeMap(123));
 
+  // Simulate two more timeouts to cross the default threshold (3).
+  socket_manager_->onPingTimeout(123);
+  socket_manager_->onPingTimeout(123);
   EXPECT_FALSE(verifyFDToNodeMap(123));
 }
 

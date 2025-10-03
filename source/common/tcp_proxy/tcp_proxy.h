@@ -242,6 +242,9 @@ public:
     const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
       return max_downstream_connection_duration_;
     }
+    const absl::optional<double>& maxDownstreamConnectionDurationJitterPercentage() const {
+      return max_downstream_connection_duration_jitter_percentage_;
+    }
     const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() const {
       return access_log_flush_interval_;
     }
@@ -270,6 +273,7 @@ public:
     bool flush_access_log_on_connected_;
     absl::optional<std::chrono::milliseconds> idle_timeout_;
     absl::optional<std::chrono::milliseconds> max_downstream_connection_duration_;
+    absl::optional<double> max_downstream_connection_duration_jitter_percentage_;
     absl::optional<std::chrono::milliseconds> access_log_flush_interval_;
     std::unique_ptr<TunnelingConfigHelper> tunneling_config_helper_;
     std::unique_ptr<OnDemandConfig> on_demand_config_;
@@ -302,6 +306,11 @@ public:
   const absl::optional<std::chrono::milliseconds>& maxDownstreamConnectionDuration() const {
     return shared_config_->maxDownstreamConnectionDuration();
   }
+  const absl::optional<double>& maxDownstreamConnectionDurationJitterPercentage() const {
+    return shared_config_->maxDownstreamConnectionDurationJitterPercentage();
+  }
+  const absl::optional<std::chrono::milliseconds>
+  calculateMaxDownstreamConnectionDurationWithJitter();
   const absl::optional<std::chrono::milliseconds>& accessLogFlushInterval() const {
     return shared_config_->accessLogFlushInterval();
   }

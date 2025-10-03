@@ -336,6 +336,10 @@ public:
   MOCK_METHOD(void, startDraining, ());
   MOCK_METHOD(absl::string_view, name, (), (const));
   MOCK_METHOD(bool, addedViaApi, (), (const));
+  MOCK_METHOD(const FilterChainInfoSharedPtr&, filterChainInfo, (), (const));
+
+  envoy::config::core::v3::Metadata metadata_{};
+  FilterChainInfoSharedPtr filter_chain_info_;
 };
 
 class MockFilterChainInfo : public FilterChainInfo {
@@ -344,8 +348,11 @@ public:
 
   // Network::FilterChainInfo
   MOCK_METHOD(absl::string_view, name, (), (const));
+  MOCK_METHOD(const envoy::config::core::v3::Metadata&, metadata, (), (const));
+  MOCK_METHOD(const Envoy::Config::TypedMetadata&, typedMetadata, (), (const));
 
   std::string filter_chain_name_{"mock"};
+  envoy::config::core::v3::Metadata metadata_{};
 };
 
 class MockFilterChainManager : public FilterChainManager {
