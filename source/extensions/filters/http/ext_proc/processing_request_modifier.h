@@ -40,8 +40,6 @@ public:
 
 class ProcessingRequestModifierFactory : public Config::TypedFactory {
 public:
-  ~ProcessingRequestModifierFactory() override = default;
-
   /**
    * Creates a new attribute builder based on the type supplied by the config.
    *
