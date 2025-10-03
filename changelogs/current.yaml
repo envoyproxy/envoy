@@ -572,5 +572,10 @@ new_features:
   change: |
     Added ``setUpstreamOverrideHost`` method to AsyncClient StreamOptions to enable direct host routing
     that bypasses load balancer selection.
+- area: outlier detection
+  change: |
+    Added :ref:`outlier_detection<envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.outlier_detection>`
+    to cluster's http protocol options to allow defining via an http matcher whether a response should be treated
+    as error or as success by outlier detection.
 
 deprecated:
