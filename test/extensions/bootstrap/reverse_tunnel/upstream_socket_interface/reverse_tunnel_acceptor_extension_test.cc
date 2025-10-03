@@ -133,9 +133,9 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetLocalRegistryAfterInitialization) 
 TEST_F(ReverseTunnelAcceptorExtensionTest, GetPerWorkerStatMapSingleThread) {
   setupThreadLocalSlot();
 
-  extension_->updatePerWorkerConnectionStats("node1", "cluster1", true);
-  extension_->updatePerWorkerConnectionStats("node2", "cluster2", true);
-  extension_->updatePerWorkerConnectionStats("node2", "cluster2", true);
+  extension_->updateConnectionStats("node1", "cluster1", true);
+  extension_->updateConnectionStats("node2", "cluster2", true);
+  extension_->updateConnectionStats("node2", "cluster2", true);
 
   auto stat_map = extension_->getPerWorkerStatMap();
 
@@ -158,9 +158,9 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetPerWorkerStatMapSingleThread) {
   EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.node.node2"], 2);
   EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.cluster.cluster2"], 2);
 
-  extension_->updatePerWorkerConnectionStats("node1", "cluster1", false);
-  extension_->updatePerWorkerConnectionStats("node2", "cluster2", false);
-  extension_->updatePerWorkerConnectionStats("node2", "cluster2", false);
+  extension_->updateConnectionStats("node1", "cluster1", false);
+  extension_->updateConnectionStats("node2", "cluster2", false);
+  extension_->updateConnectionStats("node2", "cluster2", false);
 
   stat_map = extension_->getPerWorkerStatMap();
 
@@ -208,7 +208,7 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetCrossWorkerStatMapMultiThread) {
   EXPECT_EQ(stat_map["test_scope.reverse_connections.nodes.node3"], 1);
   EXPECT_EQ(stat_map["test_scope.reverse_connections.clusters.cluster3"], 1);
 
-  extension_->updatePerWorkerConnectionStats("node1", "cluster1", false);
+  extension_->updateConnectionStats("node1", "cluster1", false);
 
   auto per_worker_stat_map = extension_->getPerWorkerStatMap();
 
@@ -228,8 +228,8 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetCrossWorkerStatMapMultiThread) {
 
   thread_local_registry_ = another_thread_local_registry_;
 
-  extension_->updatePerWorkerConnectionStats("node1", "cluster1", false);
-  extension_->updatePerWorkerConnectionStats("node3", "cluster3", false);
+  extension_->updateConnectionStats("node1", "cluster1", false);
+  extension_->updateConnectionStats("node3", "cluster3", false);
 
   auto worker1_stat_map = extension_->getPerWorkerStatMap();
 

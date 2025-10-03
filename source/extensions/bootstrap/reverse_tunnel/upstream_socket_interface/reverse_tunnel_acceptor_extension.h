@@ -148,15 +148,6 @@ public:
                              bool increment);
 
   /**
-   * Update per-worker connection stats for debugging.
-   * @param node_id the node identifier for the connection.
-   * @param cluster_id the cluster identifier for the connection.
-   * @param increment whether to increment (true) or decrement (false) the connection count.
-   */
-  void updatePerWorkerConnectionStats(const std::string& node_id, const std::string& cluster_id,
-                                      bool increment);
-
-  /**
    * Get per-worker connection stats for debugging.
    * @return map of node/cluster -> connection count for the current worker thread.
    */
@@ -184,6 +175,16 @@ private:
   ReverseTunnelAcceptor* socket_interface_;
   std::string stat_prefix_;
   uint32_t ping_failure_threshold_{3};
+
+  /**
+   * Update per-worker connection stats for debugging.
+   * This is an internal function called only from updateConnectionStats.
+   * @param node_id the node identifier for the connection.
+   * @param cluster_id the cluster identifier for the connection.
+   * @param increment whether to increment (true) or decrement (false) the connection count.
+   */
+  void updatePerWorkerConnectionStats(const std::string& node_id, const std::string& cluster_id,
+                                      bool increment);
 };
 
 } // namespace ReverseConnection

@@ -1,11 +1,15 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 
+#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
+
+// Static warning flag for reverse tunnel detailed stats activation.
+static bool reverse_tunnel_detailed_stats_warning_logged = false;
 
 // UpstreamSocketThreadLocal implementation
 UpstreamSocketThreadLocal::UpstreamSocketThreadLocal(Event::Dispatcher& dispatcher,
@@ -127,15 +131,33 @@ void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& no
                                                            const std::string& cluster_id,
                                                            bool increment) {
 
+  // Check if reverse tunnel detailed stats are enabled via runtime flag.
+  bool detailed_stats_enabled =
+      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reverse_tunnel_detailed_stats");
+
+  // If detailed stats disabled, return early - don't collect any stats. Stats collection can
+  // consume significant memory when the number of nodes/clusters is high.
+  if (!detailed_stats_enabled) {
+    return;
+  }
+
+  // Log a warning on first activation.
+  if (!reverse_tunnel_detailed_stats_warning_logged) {
+    ENVOY_LOG(warn, "REVERSE TUNNEL: Detailed per-node/cluster stats are enabled. "
+                    "This may consume significant memory with high node counts. "
+                    "Monitor memory usage and disable if experiencing issues.");
+    reverse_tunnel_detailed_stats_warning_logged = true;
+  }
+
   // Register stats with Envoy's system for automatic cross-thread aggregation
   auto& stats_store = context_.scope();
 
-  // Create/update node connection stat
+  // Create/update node connection stat.
   if (!node_id.empty()) {
     std::string node_stat_name = fmt::format("reverse_connections.nodes.{}", node_id);
     Stats::StatNameManagedStorage node_stat_name_storage(node_stat_name, stats_store.symbolTable());
     auto& node_gauge = stats_store.gaugeFromStatName(node_stat_name_storage.statName(),
-                                                     Stats::Gauge::ImportMode::Accumulate);
+                                                     Stats::Gauge::ImportMode::HiddenAccumulate);
     if (increment) {
       node_gauge.inc();
       ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: incremented node stat {} to {}",
@@ -155,7 +177,7 @@ void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& no
     Stats::StatNameManagedStorage cluster_stat_name_storage(cluster_stat_name,
                                                             stats_store.symbolTable());
     auto& cluster_gauge = stats_store.gaugeFromStatName(cluster_stat_name_storage.statName(),
-                                                        Stats::Gauge::ImportMode::Accumulate);
+                                                        Stats::Gauge::ImportMode::HiddenAccumulate);
     if (increment) {
       cluster_gauge.inc();
       ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: incremented cluster stat {} to {}",

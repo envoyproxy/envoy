@@ -53,17 +53,6 @@ public:
                              const std::string& state_suffix, bool increment);
 
   /**
-   * Update per-worker connection stats for debugging purposes.
-   * Creates worker-specific stats
-   * @param node_id the node identifier for the connection
-   * @param cluster_id the cluster identifier for the connection
-   * @param state_suffix the state suffix for the connection
-   * @param increment whether to increment (true) or decrement (false) the connection count
-   */
-  void updatePerWorkerConnectionStats(const std::string& node_id, const std::string& cluster_id,
-                                      const std::string& state_suffix, bool increment);
-
-  /**
    * Get per-worker stat map for the current dispatcher.
    * @return map of stat names to values for the current worker thread
    */
@@ -106,6 +95,18 @@ private:
       DownstreamReverseConnectionSocketInterface config_;
   ThreadLocal::TypedSlotPtr<DownstreamSocketThreadLocal> tls_slot_;
   std::string stat_prefix_; // Reverse connection stats prefix
+
+  /**
+   * Update per-worker connection stats for debugging purposes.
+   * Creates worker-specific stats. This is an internal function called only from
+   * updateConnectionStats.
+   * @param node_id the node identifier for the connection
+   * @param cluster_id the cluster identifier for the connection
+   * @param state_suffix the state suffix for the connection
+   * @param increment whether to increment (true) or decrement (false) the connection count
+   */
+  void updatePerWorkerConnectionStats(const std::string& node_id, const std::string& cluster_id,
+                                      const std::string& state_suffix, bool increment);
 };
 
 /**

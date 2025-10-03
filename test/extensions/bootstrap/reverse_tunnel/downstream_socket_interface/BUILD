@@ -37,6 +37,9 @@ envoy_cc_test(
     name = "reverse_tunnel_initiator_extension_test",
     size = "medium",
     srcs = ["reverse_tunnel_initiator_extension_test.cc"],
+    args = [
+        "--envoy_reloadable_features_reverse_tunnel_detailed_stats=true",
+    ],
     deps = [
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_extension_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_tunnel_initiator_lib",
@@ -53,6 +56,9 @@ envoy_cc_test(
     name = "reverse_connection_io_handle_test",
     size = "large",
     srcs = ["reverse_connection_io_handle_test.cc"],
+    args = [
+        "--envoy_reloadable_features_reverse_tunnel_detailed_stats=true",
+    ],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",
@@ -117,6 +123,9 @@ envoy_cc_test(
     name = "rc_connection_wrapper_test",
     size = "large",
     srcs = ["rc_connection_wrapper_test.cc"],
+    args = [
+        "--envoy_reloadable_features_reverse_tunnel_detailed_stats=true",
+    ],
     deps = [
         "//source/common/buffer:buffer_lib",
         "//source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface:reverse_connection_io_handle_lib",

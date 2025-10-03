@@ -50,6 +50,9 @@ envoy_extension_cc_test(
     name = "integration_test",
     size = "large",
     srcs = ["integration_test.cc"],
+    args = [
+        "--envoy_reloadable_features_reverse_tunnel_detailed_stats=true",
+    ],
     extension_names = [
         "envoy.filters.network.reverse_tunnel",
         "envoy.bootstrap.reverse_tunnel.upstream_socket_interface",

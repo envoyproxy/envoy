@@ -279,9 +279,9 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, GetPerWorkerStatMapSingleThread) {
   setupThreadLocalSlot();
 
   // Update per-worker stats for the current (test) thread.
-  extension_->updatePerWorkerConnectionStats("host1", "cluster1", "connecting", true);
-  extension_->updatePerWorkerConnectionStats("host2", "cluster2", "connected", true);
-  extension_->updatePerWorkerConnectionStats("host2", "cluster2", "connected", true);
+  extension_->updateConnectionStats("host1", "cluster1", "connecting", true);
+  extension_->updateConnectionStats("host2", "cluster2", "connected", true);
+  extension_->updateConnectionStats("host2", "cluster2", "connected", true);
 
   // Get the per-worker stat map.
   auto stat_map = extension_->getPerWorkerStatMap();
@@ -359,8 +359,8 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, GetCrossWorkerStatMapMultiThread) {
 
   // Test per-worker decrement operations to cover the per-worker decrement code paths.
   // First, test decrements from worker_0 context.
-  extension_->updatePerWorkerConnectionStats("host1", "cluster1", "connecting",
-                                             false); // Decrement from worker_0
+  extension_->updateConnectionStats("host1", "cluster1", "connecting",
+                                    false); // Decrement from worker_0
 
   // Get per-worker stats to verify decrements worked correctly for worker_0.
   auto per_worker_stat_map = extension_->getPerWorkerStatMap();
@@ -376,10 +376,10 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, GetCrossWorkerStatMapMultiThread) {
   thread_local_registry_ = another_thread_local_registry_;
 
   // Decrement some stats from worker_1.
-  extension_->updatePerWorkerConnectionStats("host1", "cluster1", "connecting",
-                                             false); // Decrement from worker_1
-  extension_->updatePerWorkerConnectionStats("host3", "cluster3", "failed",
-                                             false); // Decrement host3 to 0
+  extension_->updateConnectionStats("host1", "cluster1", "connecting",
+                                    false); // Decrement from worker_1
+  extension_->updateConnectionStats("host3", "cluster3", "failed",
+                                    false); // Decrement host3 to 0
 
   // Get per-worker stats from worker_1 context.
   auto worker1_stat_map = extension_->getPerWorkerStatMap();
