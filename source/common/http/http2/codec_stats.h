@@ -16,6 +16,7 @@ namespace Http2 {
 #define ALL_HTTP2_CODEC_STATS(COUNTER, GAUGE)                                                      \
   COUNTER(dropped_headers_with_underscores)                                                        \
   COUNTER(goaway_sent)                                                                             \
+  COUNTER(goaway_graceful_sent)                                                                    \
   COUNTER(header_overflow)                                                                         \
   COUNTER(headers_cb_no_stream)                                                                    \
   COUNTER(inbound_empty_frames_flood)                                                              \
