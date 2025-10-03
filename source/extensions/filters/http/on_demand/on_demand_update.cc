@@ -126,10 +126,15 @@ OnDemandFilterConfig::OnDemandFilterConfig(DecodeHeadersBehaviorPtr behavior)
 
 OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
-    Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor)
+    Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
+    Server::Configuration::ServerFactoryContext& server_context)
     : behavior_(createDecodeHeadersBehavior(getOdCdsConfig(proto_config), cm, validation_visitor)),
       allow_body_data_loss_for_per_route_config_(
-          proto_config.allow_body_data_loss_for_per_route_config()) {}
+          server_context.bootstrap().has_on_demand_config()
+              ? server_context.bootstrap()
+                    .on_demand_config()
+                    .allow_body_data_loss_for_per_route_config()
+              : false) {}
 
 OnDemandFilterConfig::OnDemandFilterConfig(
     const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,

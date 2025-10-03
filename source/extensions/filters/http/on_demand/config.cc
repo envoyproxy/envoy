@@ -14,7 +14,7 @@ Http::FilterFactoryCb OnDemandFilterFactory::createFilterFactoryFromProtoTyped(
     const std::string&, Server::Configuration::FactoryContext& context) {
   OnDemandFilterConfigSharedPtr config = std::make_shared<OnDemandFilterConfig>(
       proto_config, context.serverFactoryContext().clusterManager(),
-      context.messageValidationVisitor());
+      context.messageValidationVisitor(), context.serverFactoryContext());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<OnDemandRouteUpdate>(config));
   };

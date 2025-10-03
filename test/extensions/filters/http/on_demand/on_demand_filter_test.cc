@@ -6,6 +6,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/utility.h"
 
@@ -478,93 +479,24 @@ TEST_F(OnDemandFilterTest, PerRouteConfigLimitationWithBufferedBodyIsDocumented)
   // - This creates inconsistent behavior based on request method/body presence
 }
 
-// Test case for the new allow_body_data_loss_for_per_route_config option
-TEST_F(OnDemandFilterTest, AllowBodyDataLossForPerRouteConfigEnabled) {
-  // Create config with the new option enabled
-  envoy::extensions::filters::http::on_demand::v3::OnDemand proto_config;
-  proto_config.set_allow_body_data_loss_for_per_route_config(true);
-
-  NiceMock<Upstream::MockClusterManager> cm;
-  ProtobufMessage::StrictValidationVisitorImpl visitor;
-  auto config = std::make_shared<OnDemandFilterConfig>(proto_config, cm, visitor);
-  setupWithConfig(std::move(config));
-
-  Http::TestRequestHeaderMapImpl headers{
-      {":method", "POST"}, {":path", "/api/v1/data"}, {":authority", "api.example.com"}};
-  Buffer::OwnedImpl request_body("test data that will be lost");
-
-  // Simulate the scenario: route not initially available
-  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(nullptr));
-  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_));
-
-  // Headers processing should stop iteration
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
-
-  // Body data gets buffered
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark,
-            filter_->decodeData(request_body, true));
-
-  // With allow_body_data_loss_for_per_route_config=true, should attempt stream recreation
-  // even with body data, potentially losing the buffered body but applying per-route config
-  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).WillOnce(Return(true));
-  EXPECT_CALL(decoder_callbacks_, continueDecoding()).Times(0);
-
-  filter_->onRouteConfigUpdateCompletion(true);
-}
-
-// Test case for the new allow_body_data_loss_for_per_route_config option disabled (default)
-TEST_F(OnDemandFilterTest, AllowBodyDataLossForPerRouteConfigDisabled) {
-  // Create config with the new option disabled (default)
-  envoy::extensions::filters::http::on_demand::v3::OnDemand proto_config;
-  proto_config.set_allow_body_data_loss_for_per_route_config(false);
-
-  NiceMock<Upstream::MockClusterManager> cm;
-  ProtobufMessage::StrictValidationVisitorImpl visitor;
-  auto config = std::make_shared<OnDemandFilterConfig>(proto_config, cm, visitor);
-  setupWithConfig(std::move(config));
-
-  Http::TestRequestHeaderMapImpl headers{
-      {":method", "POST"}, {":path", "/api/v1/data"}, {":authority", "api.example.com"}};
-  Buffer::OwnedImpl request_body("test data that will be preserved");
-
-  // Simulate the scenario: route not initially available
-  EXPECT_CALL(decoder_callbacks_, route()).WillRepeatedly(Return(nullptr));
-  EXPECT_CALL(decoder_callbacks_.downstream_callbacks_, requestRouteConfigUpdate(_));
-
-  // Headers processing should stop iteration
-  EXPECT_EQ(Http::FilterHeadersStatus::StopIteration, filter_->decodeHeaders(headers, false));
-
-  // Body data gets buffered
-  EXPECT_EQ(Http::FilterDataStatus::StopIterationAndWatermark,
-            filter_->decodeData(request_body, true));
-
-  // With allow_body_data_loss_for_per_route_config=false (default), should NOT recreate stream
-  // with body data, preserving the body but not applying per-route config overrides
-  EXPECT_CALL(decoder_callbacks_, recreateStream(_)).Times(0);
-  EXPECT_CALL(decoder_callbacks_, continueDecoding());
-
-  filter_->onRouteConfigUpdateCompletion(true);
-}
-
 TEST(OnDemandConfigTest, Basic) {
   NiceMock<Upstream::MockClusterManager> cm;
   ProtobufMessage::StrictValidationVisitorImpl visitor;
   envoy::extensions::filters::http::on_demand::v3::OnDemand config;
 
-  OnDemandFilterConfig config1(config, cm, visitor);
-  EXPECT_FALSE(config1.allowBodyDataLossForPerRouteConfig()); // Default should be false
+  // Test with no bootstrap config
+  envoy::config::bootstrap::v3::Bootstrap bootstrap1;
+  NiceMock<Server::Configuration::MockServerFactoryContext> server_context1;
+  server_context1.bootstrap_ = bootstrap1;
+
+  OnDemandFilterConfig config1(config, cm, visitor, server_context1);
 
   config.mutable_odcds();
-  OnDemandFilterConfig config2(config, cm, visitor);
-  EXPECT_FALSE(config2.allowBodyDataLossForPerRouteConfig()); // Still false
-
-  config.set_allow_body_data_loss_for_per_route_config(true);
-  OnDemandFilterConfig config3(config, cm, visitor);
-  EXPECT_TRUE(config3.allowBodyDataLossForPerRouteConfig()); // Now true
+  OnDemandFilterConfig config2(config, cm, visitor, server_context1);
 
   config.mutable_odcds()->set_resources_locator("foo");
   EXPECT_THROW_WITH_MESSAGE(
-      { OnDemandFilterConfig config4(config, cm, visitor); }, EnvoyException,
+      { OnDemandFilterConfig config3(config, cm, visitor, server_context1); }, EnvoyException,
       "foo does not have a xdstp:, http: or file: scheme");
 }
 

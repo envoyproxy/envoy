@@ -40,8 +40,37 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // of the Envoy v3 configuration. See the :ref:`v3 configuration overview
 // <config_overview_bootstrap>` for more detail.
 
+// Global configuration for on-demand discovery behavior.
+message OnDemandConfig {
+  // Controls behavior for requests with body data during VH discovery.
+  //
+  // **IMPORTANT LIMITATION**: When VH discovery brings in per-route filter
+  // configuration overrides, requests with body data cannot use stream recreation
+  // because it would lose the buffered request body. This creates inconsistent
+  // behavior where:
+  //
+  // - Bodyless requests (GET, HEAD, etc.) receive per-route config overrides (YES)
+  // - Requests with body (POST, PUT, etc.) do NOT receive per-route config overrides (NO)
+  //
+  // This setting allows you to choose the behavior for requests with body data:
+  //
+  // - If ``false`` (default): Requests with body continue with original filter chain
+  //   configuration to preserve body data. Per-route overrides are NOT applied.
+  //   This is the safest option but creates inconsistent behavior.
+  //
+  // - If ``true``: Requests with body will attempt stream recreation to apply
+  //   per-route overrides, but this will LOSE the buffered request body data.
+  //   Only enable this if you understand the data loss implications.
+  //
+  // **Recommendation**: Keep this ``false`` unless you have a specific need for
+  // consistent per-route configuration behavior and can tolerate request body loss.
+  // The ideal solution is to make stream recreation work with buffered bodies,
+  // but that requires significant architectural changes.
+  bool allow_body_data_loss_for_per_route_config = 1;
+}
+
 // Bootstrap :ref:`configuration overview <config_overview_bootstrap>`.
-// [#next-free-field: 43]
+// [#next-free-field: 45]
 message Bootstrap {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -421,6 +450,10 @@ message Bootstrap {
   // Optional configuration for memory allocation manager.
   // Memory releasing is only supported for `tcmalloc allocator <https://github.com/google/tcmalloc>`_.
   MemoryAllocatorManager memory_allocator_manager = 41;
+
+  // Global configuration for on-demand discovery behavior that applies to all
+  // on-demand filters throughout the Envoy instance.
+  OnDemandConfig on_demand_config = 43;
 }
 
 // Administration interface :ref:`operations documentation

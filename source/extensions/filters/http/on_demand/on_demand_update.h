@@ -42,7 +42,8 @@ public:
   // Constructs config from extension's proto config.
   OnDemandFilterConfig(
       const envoy::extensions::filters::http::on_demand::v3::OnDemand& proto_config,
-      Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor);
+      Upstream::ClusterManager& cm, ProtobufMessage::ValidationVisitor& validation_visitor,
+      Server::Configuration::ServerFactoryContext& server_context);
   // Constructs config from extension's per-route proto config.
   OnDemandFilterConfig(
       const envoy::extensions::filters::http::on_demand::v3::PerRouteConfig& proto_config,

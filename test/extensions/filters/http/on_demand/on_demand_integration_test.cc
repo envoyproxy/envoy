@@ -344,7 +344,6 @@ public:
     name: envoy.filters.http.on_demand
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.on_demand.v3.OnDemand
-      allow_body_data_loss_for_per_route_config: true
     )EOF");
     VhdsIntegrationTest::initialize();
   }
