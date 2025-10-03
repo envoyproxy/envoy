@@ -32,10 +32,15 @@ Envoy::AccessLog::FilterPtr CELAccessLogExtensionFilterFactory::createFilter(
                          parse_status.status().ToString());
   }
 
-  return std::make_unique<CELAccessLogExtensionFilter>(
-      context.serverFactoryContext().localInfo(),
-      Extensions::Filters::Common::Expr::getBuilder(context.serverFactoryContext()),
-      parse_status.value().expr());
+  // Use the CEL configuration from the filter if available.
+  auto config_ref = cel_config.has_cel_config()
+                        ? Envoy::makeOptRef(cel_config.cel_config())
+                        : Envoy::OptRef<const envoy::config::core::v3::CelExpressionConfig>{};
+  auto builder =
+      Extensions::Filters::Common::Expr::getBuilder(context.serverFactoryContext(), config_ref);
+
+  return std::make_unique<CELAccessLogExtensionFilter>(context.serverFactoryContext().localInfo(),
+                                                       builder, parse_status.value().expr());
 #else
   throw EnvoyException("CEL is not available for use in this environment.");
 #endif
