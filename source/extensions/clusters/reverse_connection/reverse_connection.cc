@@ -10,6 +10,7 @@
 #include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 
+#include "source/common/config/utility.h"
 #include "source/common/formatter/substitution_formatter.h"
 #include "source/common/network/address_impl.h"
 #include "source/common/protobuf/protobuf.h"
@@ -63,15 +64,11 @@ RevConCluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) 
 }
 
 Upstream::HostSelectionResponse RevConCluster::checkAndCreateHost(absl::string_view host_id) {
-
   // Get the SocketManager to resolve cluster ID to node ID.
+  // The bootstrap extension is validated during cluster creation, and TLS is initialized before
+  // request handling, so socket_manager should always be available.
   auto* socket_manager = getUpstreamSocketManager();
-  if (socket_manager == nullptr) {
-    ENVOY_LOG(error,
-              "reverse_connection: cannot create host for key: {}; socket manager not found.",
-              host_id);
-    return {nullptr};
-  }
+  ASSERT(socket_manager != nullptr, "Socket manager should be initialized before request handling");
 
   // Use SocketManager to resolve the key to a node ID.
   std::string node_id = socket_manager->getNodeID(std::string(host_id));
@@ -110,12 +107,6 @@ Upstream::HostSelectionResponse RevConCluster::checkAndCreateHost(absl::string_v
       envoy::config::endpoint::v3::Endpoint::HealthCheckConfig().default_instance(),
       0 /* priority */, envoy::config::core::v3::UNKNOWN);
 
-  if (!host_result.ok()) {
-    ENVOY_LOG(error, "reverse_connection: failed to create HostImpl for {}: {}", node_id,
-              host_result.status().ToString());
-    return {nullptr};
-  }
-
   // Convert unique_ptr to shared_ptr.
   Upstream::HostSharedPtr host(std::move(host_result.value()));
   ENVOY_LOG(trace, "reverse_connection: created HostImpl {} for {}.", *host, node_id);
@@ -146,23 +137,19 @@ void RevConCluster::cleanup() {
 BootstrapReverseConnection::UpstreamSocketManager* RevConCluster::getUpstreamSocketManager() const {
   auto* upstream_interface =
       Network::socketInterface("envoy.bootstrap.reverse_tunnel.upstream_socket_interface");
-  if (upstream_interface == nullptr) {
-    ENVOY_LOG(error, "Upstream reverse socket interface not found");
-    return nullptr;
-  }
+  ASSERT(upstream_interface != nullptr,
+         "Upstream reverse socket interface should be validated during cluster creation");
 
   auto* upstream_socket_interface =
       dynamic_cast<const BootstrapReverseConnection::ReverseTunnelAcceptor*>(upstream_interface);
-  if (!upstream_socket_interface) {
-    ENVOY_LOG(error, "Failed to cast to ReverseTunnelAcceptor");
-    return nullptr;
-  }
+  ASSERT(upstream_socket_interface != nullptr,
+         "Socket interface type should be validated during cluster creation");
 
+  // TLS is initialized in onServerInitialized() which is called after cluster creation but before
+  // request handling, so it should always be available when this method is called.
   auto* tls_registry = upstream_socket_interface->getLocalRegistry();
-  if (!tls_registry) {
-    ENVOY_LOG(error, "Thread local registry not found for upstream socket interface");
-    return nullptr;
-  }
+  ASSERT(tls_registry != nullptr,
+         "TLS should be initialized by onServerInitialized() before request handling");
 
   return tls_registry->socketManager();
 }
@@ -181,10 +168,6 @@ RevConCluster::RevConCluster(
   auto formatter_or_error = Envoy::Formatter::FormatterImpl::create(
       rev_con_config.host_id_format(), /*omit_empty_values=*/false,
       Envoy::Formatter::BuiltInCommandParserFactoryHelper::commandParsers());
-  if (!formatter_or_error.ok()) {
-    creation_status = formatter_or_error.status();
-    return;
-  }
   host_id_formatter_ = std::move(*formatter_or_error);
 
   // Schedule periodic cleanup.
@@ -208,6 +191,28 @@ RevConClusterFactory::createClusterWithConfig(
   if (cluster.has_load_assignment()) {
     return absl::InvalidArgumentError(
         "Reverse Conn clusters must have no load assignment configured");
+  }
+
+  // Validate that the required bootstrap extension is configured using Envoy's standard utility.
+  const std::string extension_name = "envoy.bootstrap.reverse_tunnel.upstream_socket_interface";
+  auto* factory =
+      Config::Utility::getAndCheckFactoryByName<Server::Configuration::BootstrapExtensionFactory>(
+          extension_name, /*is_optional=*/true);
+  if (factory == nullptr) {
+    return absl::InvalidArgumentError(fmt::format(
+        "Reverse connection cluster requires the upstream reverse tunnel bootstrap extension '{}' "
+        "to be configured. Please add it to bootstrap_extensions in your bootstrap configuration.",
+        extension_name));
+  }
+
+  // Validate that the factory is a ReverseTunnelAcceptor.
+  auto* upstream_socket_interface =
+      dynamic_cast<const BootstrapReverseConnection::ReverseTunnelAcceptor*>(factory);
+  if (upstream_socket_interface == nullptr) {
+    return absl::InvalidArgumentError(
+        fmt::format("Bootstrap extension '{}' exists but is not of the expected type "
+                    "(ReverseTunnelAcceptor). This indicates a configuration error.",
+                    extension_name));
   }
 
   // Validate the host_id_format early to catch formatter errors.
