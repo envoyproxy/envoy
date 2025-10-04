@@ -81,10 +81,6 @@ public:
           UpstreamReverseConnectionSocketInterface& config)
       : Envoy::Network::SocketInterfaceExtension(sock_interface), context_(context),
         socket_interface_(&sock_interface) {
-    ENVOY_LOG(debug,
-              "ReverseTunnelAcceptorExtension: creating upstream reverse connection "
-              "socket interface with stat_prefix: {}",
-              stat_prefix_);
     stat_prefix_ = PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "reverse_tunnel_acceptor");
     // Configure ping miss threshold (minimum 1).
     const uint32_t cfg_threshold =
@@ -92,6 +88,10 @@ public:
     ping_failure_threshold_ = std::max<uint32_t>(1, cfg_threshold);
     // Configure detailed stats flag (defaults to false).
     enable_detailed_stats_ = config.enable_detailed_stats();
+    ENVOY_LOG(debug,
+              "ReverseTunnelAcceptorExtension: creating upstream reverse connection "
+              "socket interface with stat_prefix: {}",
+              stat_prefix_);
     // Ensure the socket interface has a reference to this extension early, so stats can be
     // recorded even before onServerInitialized().
     if (socket_interface_ != nullptr) {
