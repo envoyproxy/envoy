@@ -78,21 +78,3 @@ static_resources:
               socket_address:
                 address: downstream-service
                 port_value: 80
-
-admin:
-  access_log:
-  - name: envoy.access_loggers.file
-    typed_config:
-      "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
-      path: "/dev/stdout"
-  address:
-    socket_address:
-      protocol: TCP
-      address: 0.0.0.0
-      port_value: 8888
-
-layered_runtime:
-  layers:
-  - name: layer
-    static_layer:
-      re2.max_program_size.error_level: 1000
