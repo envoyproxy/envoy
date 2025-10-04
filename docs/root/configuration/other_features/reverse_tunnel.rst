@@ -19,8 +19,8 @@ handshake protocol, after which traffic can be forwarded bidirectionally. Servic
 Envoy can send requests through the tunnel to downstream services behind the initiator Envoy, effectively
 treating the normally unreachable downstream services as if they were directly accessible.
 
-.. image:: images/reverse_tunnel_arch.png
-   :width: 80%
+.. image:: images/reverse_tunnel_arch.svg
+   :width: 90%
    :align: center
 
 .. _config_reverse_tunnel_bootstrap:
