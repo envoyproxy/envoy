@@ -768,7 +768,8 @@ SplitRequestPtr RandomShardRequest::create(Router& router,
                                           TimeSource& time_source, bool delay_command_latency,
                                           const StreamInfo::StreamInfo& stream_info) {
   // Use default key (empty string) for routing since these commands aren't tied to specific keys
-  const auto route = router.upstreamPool("", stream_info);
+  std::string empty_key = "";
+  const auto route = router.upstreamPool(empty_key, stream_info);
   if (!route) {
     command_stats.error_.inc();
     callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
@@ -850,7 +851,8 @@ SplitRequestPtr ClusterScopeCmdRequest::create(Router& router,
   // are not tied to specific keys. This relies on having a catch_all_route configured and no prefix set as "".
   uint32_t shard_size = 0;
 
-  const auto route = router.upstreamPool("", stream_info);
+  std::string empty_key = "";
+  const auto route = router.upstreamPool(empty_key, stream_info);
   if ( !route ) {
     ENVOY_LOG(error, "route not found: '{}'", incoming_request->toString());
     callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
@@ -893,13 +895,7 @@ SplitRequestPtr ClusterScopeCmdRequest::create(Router& router,
     }
   }
 
-  if (delay_command_latency) {
-    std::unique_ptr<SplitRequestDelayFault> delay_fault_ptr{
-        new SplitRequestDelayFault(std::move(request_ptr), callbacks, time_source)};
-    return delay_fault_ptr;
-  } else {
-    return request_ptr;
-  }
+  return request_ptr;
 }
 
 SplitRequestPtr

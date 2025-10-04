@@ -113,7 +113,8 @@ void BaseClusterScopeResponseHandler::handleResponse(Common::Redis::RespValuePtr
   storeResponse(std::move(value), shard_index, request);
   
   // Early return if not all responses received yet
-  if (!allResponsesReceived(request)) {
+  ASSERT(num_pending_responses_ > 0);
+  if (--num_pending_responses_ > 0) {
     return;
   }
   
@@ -138,58 +139,51 @@ void BaseClusterScopeResponseHandler::storeResponse(Common::Redis::RespValuePtr&
                                                    uint32_t shard_index, 
                                                    ClusterScopeCmdRequest& request) {
   // Clean up the request handle - for ClusterScopeCmdRequest, shard_index == array index
-  if (shard_index < request.pending_requests_.size()) {
-    request.pending_requests_[shard_index].handle_ = nullptr;
-  }
+  request.clearPendingHandle(shard_index);
 
   // Resize vector if needed to accommodate the shard_index
   if (shard_index >= pending_responses_.size()) {
     pending_responses_.resize(shard_index + 1);
   }
 
-  // Track errors
+  // Track errors using handler's own state
   if (value->type() == Common::Redis::RespType::Error) {
-    request.error_count_++;
+    error_count_++;
   }
   
   // Store the response
   pending_responses_[shard_index] = std::move(value);
 }
 
-bool BaseClusterScopeResponseHandler::allResponsesReceived(ClusterScopeCmdRequest& request) {
-  ASSERT(request.num_pending_responses_ > 0);
-  return (--request.num_pending_responses_ == 0);
-}
-
 void BaseClusterScopeResponseHandler::handleErrorResponses(ClusterScopeCmdRequest& request) {
-  request.updateStats(false);  // Update stats first for any error case
+  request.updateRequestStats(false);  // Update stats first for any error case
   
   // Find and return the first error response
   for (auto& resp : pending_responses_) {
     if (resp && resp->type() == Common::Redis::RespType::Error) {
       ENVOY_LOG(debug, "Error response received: '{}'", resp->toString());
-      request.callbacks_.onResponse(std::move(resp));
+      request.sendResponse(std::move(resp));
       return;
     }
   }
   
   // Should not reach here if error_count_ > 0, but handle gracefully
   ENVOY_LOG(error, "Error count mismatch - no error response found despite error_count_ > 0");
-  request.callbacks_.onResponse(Common::Redis::Utility::makeError(fmt::format("error count mismatch")));
+  request.sendResponse(Common::Redis::Utility::makeError(fmt::format("error count mismatch")));
 }
 
 void BaseClusterScopeResponseHandler::sendErrorResponse(ClusterScopeCmdRequest& request, 
                                                        const std::string& error_message) {
   ENVOY_LOG(error, "ClusterScopeResponseHandler error: {}", error_message);
-  request.updateStats(false);
-  request.callbacks_.onResponse(Common::Redis::Utility::makeError(error_message));
+  request.updateRequestStats(false);
+  request.sendResponse(Common::Redis::Utility::makeError(error_message));
 }
 
 void BaseClusterScopeResponseHandler::sendSuccessResponse(ClusterScopeCmdRequest& request, 
                                                          Common::Redis::RespValuePtr&& response) {
   ENVOY_LOG(debug, "Success response: {}", response->toString());
-  request.updateStats(true);
-  request.callbacks_.onResponse(std::move(response));
+  request.updateRequestStats(true);
+  request.sendResponse(std::move(response));
 }
 
 // Implementation of AllshardSameResponseHandler - Specific logic for same-response validation
@@ -201,7 +195,7 @@ void AllshardSameResponseHandler::processAllResponses(ClusterScopeCmdRequest& re
   }
   
   // Handle error responses first
-  if (request.error_count_ > 0) {
+  if (error_count_ > 0) {
     handleErrorResponses(request);
     return;
   }
@@ -239,7 +233,7 @@ bool AllshardSameResponseHandler::areAllResponsesSame() const {
 // Implementation of BaseAggregateResponseHandler - Common aggregation pattern
 void BaseAggregateResponseHandler::processAllResponses(ClusterScopeCmdRequest& request) {
   // Handle error responses first
-  if (request.error_count_ > 0) {
+  if (error_count_ > 0) {
     handleErrorResponses(request);
     return;
   }

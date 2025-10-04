@@ -30,7 +30,7 @@ enum class ClusterScopeResponseHandlerType {
  * Implements the Template Method pattern where handleResponse() provides
  * the common algorithm and processAllResponses() allows customization.
  */
-class BaseClusterScopeResponseHandler {
+class BaseClusterScopeResponseHandler : public Logger::Loggable<Logger::Id::redis> {
 public:
   virtual ~BaseClusterScopeResponseHandler() = default;
 
@@ -41,24 +41,23 @@ public:
    * @param request the cluster scope request object (has all needed data)
    */
   void handleResponse(Common::Redis::RespValuePtr&& value, uint32_t shard_index,
-                     ClusterScopeCmdRequest& request) final;
+                     ClusterScopeCmdRequest& request);
 
   /**
    * Handle a failure from a shard by converting it to an error response
    * @param shard_index the shard that failed (same as request index)
    * @param request the cluster scope request object (has all needed data)
    */
-  void handleFailure(uint32_t shard_index, ClusterScopeCmdRequest& request) final;
-
-  /**
-   * Handle a failure from a shard
-   * @param shard_index the shard that failed (same as request index)
-   * @param request the cluster scope request object (has all needed data)
-   */
-  void handleFailure(uint32_t shard_index, ClusterScopeCmdRequest& request) final;
+  void handleFailure(uint32_t shard_index, ClusterScopeCmdRequest& request);
 
 protected:
-  explicit BaseClusterScopeResponseHandler(uint32_t shard_count) {
+  // Response handler owns response tracking state
+  uint32_t num_pending_responses_;
+  uint32_t error_count_{0};
+  std::vector<Common::Redis::RespValuePtr> pending_responses_;
+
+  explicit BaseClusterScopeResponseHandler(uint32_t shard_count) 
+    : num_pending_responses_(shard_count), error_count_(0) {
     pending_responses_.reserve(shard_count);
   }
 
@@ -68,13 +67,9 @@ protected:
   // Common helper methods available to all derived classes
   void storeResponse(Common::Redis::RespValuePtr&& value, uint32_t shard_index, 
                     ClusterScopeCmdRequest& request);
-  bool allResponsesReceived(ClusterScopeCmdRequest& request);
   void sendErrorResponse(ClusterScopeCmdRequest& request, const std::string& error_message);
   void sendSuccessResponse(ClusterScopeCmdRequest& request, Common::Redis::RespValuePtr&& response);
-
-  std::vector<Common::Redis::RespValuePtr> pending_responses_;
-
-private:
+  
   void handleErrorResponses(ClusterScopeCmdRequest& request);
 };
 

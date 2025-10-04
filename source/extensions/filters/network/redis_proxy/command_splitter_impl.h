@@ -358,6 +358,25 @@ public:
                                 TimeSource& time_source, bool delay_command_latency,
                                 const StreamInfo::StreamInfo& stream_info);
 
+  // Interface methods for response handlers
+  void clearPendingHandle(uint32_t shard_index) {
+    if (shard_index < pending_requests_.size()) {
+      pending_requests_[shard_index].handle_ = nullptr;
+    }
+  }
+  
+  void sendResponse(Common::Redis::RespValuePtr&& response) {
+    callbacks_.onResponse(std::move(response));
+  }
+  
+  void updateRequestStats(bool success) {
+    updateStats(success);
+  }
+  
+  size_t getTotalShardCount() const {
+    return pending_requests_.size();
+  }
+
 private:
   ClusterScopeCmdRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
               bool delay_command_latency)
@@ -390,7 +409,7 @@ private:
     }
   }
 
-  void onChildFailure(uint32_t index) override {
+  void onChildFailure(uint32_t index) {
     if (response_handler_) {
       response_handler_->handleFailure(index, *this);
     } else {
