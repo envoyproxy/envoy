@@ -10,6 +10,7 @@ bootstrap_extensions:
     "@type": >-
       type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface
     stat_prefix: "upstream_reverse_connection"
+    enable_detailed_stats: true
 
 static_resources:
   listeners:
