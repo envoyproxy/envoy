@@ -389,7 +389,7 @@ TEST_F(ReverseConnectionClusterTest, NoContext) {
     EXPECT_EQ(host, nullptr);
   }
 
-  // Test null context - should return nullptr.
+  // Test null context. It should return a nullptr.
   {
     RevConCluster::LoadBalancer lb(cluster_);
     Upstream::HostConstSharedPtr host = lb.chooseHost(nullptr).host;
@@ -453,7 +453,7 @@ TEST_F(ReverseConnectionClusterTest, MissingRequiredHeaders) {
     EXPECT_EQ(host, nullptr);
   }
 
-  // Test with empty header value - this should be skipped and continue to next header.
+  // Test with empty header value. This should be skipped and continue to next header.
   {
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection, "x-remote-node-id", "");
@@ -463,8 +463,8 @@ TEST_F(ReverseConnectionClusterTest, MissingRequiredHeaders) {
   }
 }
 
-// Test host creation failure due to thread local slot not being set.
-TEST_F(ReverseConnectionClusterTest, HostCreationWithoutSocketManager) {
+// Test that validates bootstrap extension must be set up before use.
+TEST_F(ReverseConnectionClusterTest, RequiresBootstrapExtension) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
@@ -480,23 +480,13 @@ TEST_F(ReverseConnectionClusterTest, HostCreationWithoutSocketManager) {
 
   setupFromYaml(yaml);
 
-  RevConCluster::LoadBalancer lb(cluster_);
-  // Do not set up thread local slot - no socket manager initialized.
-
-  // Test host creation when matcher would otherwise match but socket manager is not available.
-  NiceMock<Network::MockConnection> connection;
-  TestLoadBalancerContext lb_context(&connection);
-  lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
-      new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "test-uuid-123"}}};
-
-  auto result = lb.chooseHost(&lb_context);
-  // Should return nullptr when socket manager is not found.
-  EXPECT_EQ(result.host, nullptr);
+  // Verify cluster was created successfully since bootstrap extension exists.
+  EXPECT_NE(cluster_, nullptr);
 }
 
-// Test when the socket interface is not registered in the registry.
+// Test when the socket interface is not registered. In this case, cluster creation should fail.
 TEST_F(ReverseConnectionClusterTest, SocketInterfaceNotRegistered) {
-  // Temporarily remove the upstream reverse connection socket interface from the registry
+  // Temporarily remove the upstream reverse connection socket interface from the registry.
   // This will make Network::socketInterface() return nullptr for the specific name.
   auto saved_factories =
       Registry::FactoryRegistry<Server::Configuration::BootstrapExtensionFactory>::factories();
@@ -522,21 +512,65 @@ TEST_F(ReverseConnectionClusterTest, SocketInterfaceNotRegistered) {
         host_id_format: "%REQ(x-remote-node-id)%"
   )EOF";
 
-  setupFromYaml(yaml);
+  // Cluster creation should fail with a clear error message.
+  EXPECT_THROW_WITH_MESSAGE(
+      setupFromYaml(yaml, false), EnvoyException,
+      "Reverse connection cluster requires the upstream reverse tunnel bootstrap extension "
+      "'envoy.bootstrap.reverse_tunnel.upstream_socket_interface' to be configured. Please add it "
+      "to bootstrap_extensions in your bootstrap configuration.");
 
-  RevConCluster::LoadBalancer lb(cluster_);
+  // Restore the registry.
+  Registry::FactoryRegistry<Server::Configuration::BootstrapExtensionFactory>::factories() =
+      saved_factories;
+}
 
-  // Test host creation when socket interface is not registered.
-  NiceMock<Network::MockConnection> connection;
-  TestLoadBalancerContext lb_context(&connection);
-  lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
-      new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "test-uuid-123"}}};
+// Test when the socket interface is registered but is the wrong type.
+TEST_F(ReverseConnectionClusterTest, SocketInterfaceWrongType) {
+  // Create a mock bootstrap extension factory that is NOT a ReverseTunnelAcceptor.
+  class WrongTypeFactory : public Server::Configuration::BootstrapExtensionFactory {
+  public:
+    std::string name() const override {
+      return "envoy.bootstrap.reverse_tunnel.upstream_socket_interface";
+    }
 
-  auto result = lb.chooseHost(&lb_context);
-  // Should return nullptr when socket interface is not found.
-  EXPECT_EQ(result.host, nullptr);
+    Server::BootstrapExtensionPtr
+    createBootstrapExtension(const Protobuf::Message&,
+                             Server::Configuration::ServerFactoryContext&) override {
+      return nullptr;
+    }
 
-  // Restore the registry
+    ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
+  };
+
+  // Save current factories.
+  auto saved_factories =
+      Registry::FactoryRegistry<Server::Configuration::BootstrapExtensionFactory>::factories();
+
+  // Register the wrong type factory.
+  WrongTypeFactory wrong_factory;
+  Registry::FactoryRegistry<Server::Configuration::BootstrapExtensionFactory>::factories()
+      ["envoy.bootstrap.reverse_tunnel.upstream_socket_interface"] = &wrong_factory;
+
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    lb_policy: CLUSTER_PROVIDED
+    cleanup_interval: 1s
+    cluster_type:
+      name: envoy.clusters.reverse_connection
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.clusters.reverse_connection.v3.ReverseConnectionClusterConfig
+        cleanup_interval: 10s
+        host_id_format: "%REQ(x-remote-node-id)%"
+  )EOF";
+
+  // Cluster creation should fail because the factory is not a ReverseTunnelAcceptor.
+  EXPECT_THROW_WITH_MESSAGE(
+      setupFromYaml(yaml, false), EnvoyException,
+      "Bootstrap extension 'envoy.bootstrap.reverse_tunnel.upstream_socket_interface' exists but "
+      "is not of the expected type (ReverseTunnelAcceptor). This indicates a configuration error.");
+
+  // Restore the registry.
   Registry::FactoryRegistry<Server::Configuration::BootstrapExtensionFactory>::factories() =
       saved_factories;
 }
@@ -704,7 +738,7 @@ TEST_F(ReverseConnectionClusterTest, HostReuse) {
     auto result1 = lb.chooseHost(&lb_context);
     EXPECT_NE(result1.host, nullptr);
 
-    // Create second host with same UUID - should reuse the same host.
+    // Create second host with same UUID. We should reuse the same host.
     auto result2 = lb.chooseHost(&lb_context);
     EXPECT_NE(result2.host, nullptr);
     EXPECT_EQ(result1.host, result2.host);
@@ -748,7 +782,7 @@ TEST_F(ReverseConnectionClusterTest, DifferentHostsForDifferentUUIDs) {
     auto result1 = lb.chooseHost(&lb_context);
     EXPECT_NE(result1.host, nullptr);
 
-    // Create second host with different UUID - should be different host.
+    // Create second host with different UUID. We should use a different host.
     lb_context.downstream_headers_ = Http::RequestHeaderMapPtr{
         new Http::TestRequestHeaderMapImpl{{"x-remote-node-id", "test-uuid-456"}}};
     auto result2 = lb.chooseHost(&lb_context);
@@ -1009,7 +1043,7 @@ TEST_F(ReverseConnectionClusterTest, LoadBalancerNoopMethods) {
 
   RevConCluster::LoadBalancer lb(cluster_);
 
-  // Test peekAnotherHost - should return nullptr.
+  // Test peekAnotherHost. It should return a nullptr.
   {
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection);
@@ -1017,7 +1051,7 @@ TEST_F(ReverseConnectionClusterTest, LoadBalancerNoopMethods) {
     EXPECT_EQ(peeked_host, nullptr);
   }
 
-  // Test selectExistingConnection - should return nullopt.
+  // Test selectExistingConnection. It should return a nullopt.
   {
     NiceMock<Network::MockConnection> connection;
     TestLoadBalancerContext lb_context(&connection);
@@ -1029,7 +1063,7 @@ TEST_F(ReverseConnectionClusterTest, LoadBalancerNoopMethods) {
     EXPECT_FALSE(selected_connection.has_value());
   }
 
-  // Test lifetimeCallbacks - should return empty OptRef.
+  // Test lifetimeCallbacks. It should return an empty OptRef.
   {
     auto lifetime_callbacks = lb.lifetimeCallbacks();
     EXPECT_FALSE(lifetime_callbacks.has_value());
