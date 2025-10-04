@@ -38,6 +38,11 @@ protected:
     EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(*stats_scope_));
     EXPECT_CALL(context_, clusterManager()).WillRepeatedly(ReturnRef(cluster_manager_));
 
+    // Configure stat_prefix.
+    config_.set_stat_prefix("reverse_connections");
+    // Enable detailed stats for tests that need per-host/cluster stats.
+    config_.set_enable_detailed_stats(true);
+
     // Create the socket interface.
     socket_interface_ = std::make_unique<ReverseTunnelInitiator>(context_);
 
@@ -116,6 +121,11 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, InitializeWithDefaultConfig) {
       std::make_unique<ReverseTunnelInitiatorExtension>(context_, empty_config);
 
   EXPECT_NE(extension_with_default, nullptr);
+  EXPECT_EQ(extension_with_default->statPrefix(), "reverse_tunnel_initiator");
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, InitializeWithCustomStatPrefix) {
+  EXPECT_EQ(extension_->statPrefix(), "reverse_connections");
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, OnServerInitialized) {
@@ -248,6 +258,57 @@ TEST_F(ReverseTunnelInitiatorExtensionTest, UpdateConnectionStatsMultipleStates)
   EXPECT_EQ(stat_map[fmt::format("test_scope.reverse_connections.host.{}.connecting", node_id)], 1);
   EXPECT_EQ(stat_map[fmt::format("test_scope.reverse_connections.host.{}.connected", node_id)], 1);
   EXPECT_EQ(stat_map[fmt::format("test_scope.reverse_connections.host.{}.failed", node_id)], 1);
+}
+
+TEST_F(ReverseTunnelInitiatorExtensionTest, UpdateConnectionStatsAggregateStats) {
+  // Test that aggregate stats are always updated regardless of detailed stats flag.
+  // Create a separate extension with detailed stats disabled.
+  envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
+      DownstreamReverseConnectionSocketInterface aggregate_config;
+  aggregate_config.set_stat_prefix("reverse_connections");
+  aggregate_config.set_enable_detailed_stats(false);
+
+  auto aggregate_extension =
+      std::make_unique<ReverseTunnelInitiatorExtension>(context_, aggregate_config);
+
+  // Update connection stats for multiple clusters and states to test aggregation.
+  aggregate_extension->updateConnectionStats("host1", "cluster1", "connecting", true);
+  aggregate_extension->updateConnectionStats("host2", "cluster2", "connecting", true);
+  aggregate_extension->updateConnectionStats("host3", "cluster3", "connecting", true);
+  aggregate_extension->updateConnectionStats("host4", "cluster4", "connected", true);
+  aggregate_extension->updateConnectionStats("host5", "cluster5", "connected", true);
+  aggregate_extension->updateConnectionStats("host6", "cluster6", "failed", true);
+
+  // Verify aggregate stats are updated correctly.
+  auto& stats_store = aggregate_extension->getStatsScope();
+
+  // Construct StatName for aggregates properly.
+  Stats::StatNameManagedStorage connecting_name_storage(
+      "reverse_connections.connected_clusters.connecting", stats_store.symbolTable());
+  auto& connecting_aggregate = stats_store.gaugeFromStatName(connecting_name_storage.statName(),
+                                                             Stats::Gauge::ImportMode::Accumulate);
+
+  Stats::StatNameManagedStorage connected_name_storage(
+      "reverse_connections.connected_clusters.connected", stats_store.symbolTable());
+  auto& connected_aggregate = stats_store.gaugeFromStatName(connected_name_storage.statName(),
+                                                            Stats::Gauge::ImportMode::Accumulate);
+
+  Stats::StatNameManagedStorage failed_name_storage("reverse_connections.connected_clusters.failed",
+                                                    stats_store.symbolTable());
+  auto& failed_aggregate = stats_store.gaugeFromStatName(failed_name_storage.statName(),
+                                                         Stats::Gauge::ImportMode::Accumulate);
+
+  EXPECT_EQ(connecting_aggregate.value(), 3);
+  EXPECT_EQ(connected_aggregate.value(), 2);
+  EXPECT_EQ(failed_aggregate.value(), 1);
+
+  // Decrement some connections.
+  aggregate_extension->updateConnectionStats("host1", "cluster1", "connecting", false);
+  aggregate_extension->updateConnectionStats("host4", "cluster4", "connected", false);
+
+  EXPECT_EQ(connecting_aggregate.value(), 2);
+  EXPECT_EQ(connected_aggregate.value(), 1);
+  EXPECT_EQ(failed_aggregate.value(), 1);
 }
 
 TEST_F(ReverseTunnelInitiatorExtensionTest, UpdateConnectionStatsEmptyValues) {

@@ -32,12 +32,14 @@ public:
 name: envoy.bootstrap.reverse_tunnel.upstream_socket_interface
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.upstream_socket_interface.v3.UpstreamReverseConnectionSocketInterface
+  enable_detailed_stats: true
 )EOF");
 
     config_helper_.addBootstrapExtension(R"EOF(
 name: envoy.bootstrap.reverse_tunnel.downstream_socket_interface
 typed_config:
   "@type": type.googleapis.com/envoy.extensions.bootstrap.reverse_tunnel.downstream_socket_interface.v3.DownstreamReverseConnectionSocketInterface
+  enable_detailed_stats: true
 )EOF");
 
     // Call parent initialize to complete setup.

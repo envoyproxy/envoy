@@ -6,7 +6,6 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "source/common/common/logger.h"
-#include "source/common/runtime/runtime_features.h"
 #include "source/common/stats/symbol_table.h"
 
 namespace Envoy {
@@ -56,13 +55,33 @@ void ReverseTunnelInitiatorExtension::updateConnectionStats(const std::string& h
                                                             const std::string& cluster_id,
                                                             const std::string& state_suffix,
                                                             bool increment) {
-  // Check if detailed stats are enabled via runtime flag.
-  bool detailed_stats_enabled =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reverse_tunnel_detailed_stats");
+  // Obtain the stats store.
+  auto& stats_store = context_.scope();
 
-  // If detailed stats disabled, return early - don't collect any stats. Stats collection can
-  // consume significant memory when the number of hosts/clusters is high.
-  if (!detailed_stats_enabled) {
+  // Always update aggregate stats indicating the number of clusters reverse tunnels are being
+  // initiated to. Aggregate stat: <stat_prefix>.connected_clusters.<state_suffix>.
+  if (!state_suffix.empty()) {
+    std::string aggregate_stat_name =
+        fmt::format("{}.connected_clusters.{}", stat_prefix_, state_suffix);
+    Stats::StatNameManagedStorage aggregate_stat_name_storage(aggregate_stat_name,
+                                                              stats_store.symbolTable());
+    auto& aggregate_gauge = stats_store.gaugeFromStatName(aggregate_stat_name_storage.statName(),
+                                                          Stats::Gauge::ImportMode::Accumulate);
+    if (increment) {
+      aggregate_gauge.inc();
+      ENVOY_LOG(trace, "ReverseTunnelInitiatorExtension: incremented aggregate stat {} to {}",
+                aggregate_stat_name, aggregate_gauge.value());
+    } else {
+      aggregate_gauge.dec();
+      ENVOY_LOG(trace, "ReverseTunnelInitiatorExtension: decremented aggregate stat {} to {}",
+                aggregate_stat_name, aggregate_gauge.value());
+    }
+  }
+
+  // Check if detailed stats are enabled via configuration flag.
+  // If detailed stats disabled, return early - don't collect per-host/cluster stats.
+  // Stats collection can consume significant memory when the number of hosts/clusters is high.
+  if (!enable_detailed_stats_) {
     return;
   }
 
@@ -73,9 +92,6 @@ void ReverseTunnelInitiatorExtension::updateConnectionStats(const std::string& h
                     "Monitor memory usage and disable if experiencing issues.");
     reverse_tunnel_detailed_stats_warning_logged = true;
   }
-
-  // Register stats with Envoy's system for automatic cross-thread aggregation.
-  auto& stats_store = context_.scope();
 
   // Create/update host connection stat with state suffix.
   if (!host_address.empty() && !state_suffix.empty()) {

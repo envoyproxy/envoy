@@ -85,12 +85,13 @@ public:
               "ReverseTunnelAcceptorExtension: creating upstream reverse connection "
               "socket interface with stat_prefix: {}",
               stat_prefix_);
-    stat_prefix_ =
-        PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "upstream_reverse_connection");
+    stat_prefix_ = PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "reverse_tunnel_acceptor");
     // Configure ping miss threshold (minimum 1).
     const uint32_t cfg_threshold =
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, ping_failure_threshold, 3);
     ping_failure_threshold_ = std::max<uint32_t>(1, cfg_threshold);
+    // Configure detailed stats flag (defaults to false).
+    enable_detailed_stats_ = config.enable_detailed_stats();
     // Ensure the socket interface has a reference to this extension early, so stats can be
     // recorded even before onServerInitialized().
     if (socket_interface_ != nullptr) {
@@ -175,6 +176,7 @@ private:
   ReverseTunnelAcceptor* socket_interface_;
   std::string stat_prefix_;
   uint32_t ping_failure_threshold_{3};
+  bool enable_detailed_stats_{false};
 
   /**
    * Update per-worker connection stats for debugging.

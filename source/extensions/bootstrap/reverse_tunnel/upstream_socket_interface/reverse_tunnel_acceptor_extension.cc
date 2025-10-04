@@ -1,6 +1,5 @@
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/reverse_tunnel_acceptor_extension.h"
 
-#include "source/common/runtime/runtime_features.h"
 #include "source/extensions/bootstrap/reverse_tunnel/upstream_socket_interface/upstream_socket_manager.h"
 
 namespace Envoy {
@@ -70,20 +69,22 @@ ReverseTunnelAcceptorExtension::getConnectionStatsSync(std::chrono::milliseconds
   for (const auto& [stat_name, count] : connection_stats) {
     if (count > 0) {
       // Parse stat name to extract node/cluster information.
-      // Format: "<scope>.reverse_connections.nodes.<node_id>" or
-      // "<scope>.reverse_connections.clusters.<cluster_id>".
-      if (stat_name.find("reverse_connections.nodes.") != std::string::npos) {
-        // Find the position after "reverse_connections.nodes.".
-        size_t pos = stat_name.find("reverse_connections.nodes.");
+      // Format: "<scope>.<stat_prefix>.nodes.<node_id>" or
+      // "<scope>.<stat_prefix>.clusters.<cluster_id>".
+      std::string nodes_pattern = stat_prefix_ + ".nodes.";
+      std::string clusters_pattern = stat_prefix_ + ".clusters.";
+      if (stat_name.find(nodes_pattern) != std::string::npos) {
+        // Find the position after "<stat_prefix>.nodes.".
+        size_t pos = stat_name.find(nodes_pattern);
         if (pos != std::string::npos) {
-          std::string node_id = stat_name.substr(pos + strlen("reverse_connections.nodes."));
+          std::string node_id = stat_name.substr(pos + nodes_pattern.length());
           connected_nodes.push_back(node_id);
         }
-      } else if (stat_name.find("reverse_connections.clusters.") != std::string::npos) {
-        // Find the position after "reverse_connections.clusters.".
-        size_t pos = stat_name.find("reverse_connections.clusters.");
+      } else if (stat_name.find(clusters_pattern) != std::string::npos) {
+        // Find the position after "<stat_prefix>.clusters.".
+        size_t pos = stat_name.find(clusters_pattern);
         if (pos != std::string::npos) {
-          std::string cluster_id = stat_name.substr(pos + strlen("reverse_connections.clusters."));
+          std::string cluster_id = stat_name.substr(pos + clusters_pattern.length());
           accepted_connections.push_back(cluster_id);
         }
       }
@@ -102,16 +103,18 @@ absl::flat_hash_map<std::string, uint64_t> ReverseTunnelAcceptorExtension::getCr
   auto& stats_store = context_.scope();
 
   // Iterate through all gauges and filter for cross-worker stats only.
-  // Cross-worker stats have the pattern "reverse_connections.nodes.<node_id>" or
-  // "reverse_connections.clusters.<cluster_id>" (no dispatcher name in the middle).
+  // Cross-worker stats have the pattern "<stat_prefix>.nodes.<node_id>" or
+  // "<stat_prefix>.clusters.<cluster_id>" (no dispatcher name in the middle).
   Stats::IterateFn<Stats::Gauge> gauge_callback =
-      [&stats_map](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
+      [&stats_map, this](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
     const std::string& gauge_name = gauge->name();
     ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: gauge_name: {} gauge_value: {}", gauge_name,
               gauge->value());
-    if (gauge_name.find("reverse_connections.") != std::string::npos &&
-        (gauge_name.find("reverse_connections.nodes.") != std::string::npos ||
-         gauge_name.find("reverse_connections.clusters.") != std::string::npos) &&
+    std::string nodes_pattern = stat_prefix_ + ".nodes.";
+    std::string clusters_pattern = stat_prefix_ + ".clusters.";
+    if (gauge_name.find(stat_prefix_ + ".") != std::string::npos &&
+        (gauge_name.find(nodes_pattern) != std::string::npos ||
+         gauge_name.find(clusters_pattern) != std::string::npos) &&
         gauge->used()) {
       stats_map[gauge_name] = gauge->value();
     }
@@ -131,13 +134,32 @@ void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& no
                                                            const std::string& cluster_id,
                                                            bool increment) {
 
-  // Check if reverse tunnel detailed stats are enabled via runtime flag.
-  bool detailed_stats_enabled =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.reverse_tunnel_detailed_stats");
+  // Obtain the stats store.
+  auto& stats_store = context_.scope();
 
-  // If detailed stats disabled, return early - don't collect any stats. Stats collection can
-  // consume significant memory when the number of nodes/clusters is high.
-  if (!detailed_stats_enabled) {
+  // Always update aggregate indicating the number of clusters reverse tunnels have been accepted
+  // from. Aggregate stat: <stat_prefix>.accepted_clusters.
+  std::string aggregate_stat_name = fmt::format("{}.accepted_clusters", stat_prefix_);
+  Stats::StatNameManagedStorage aggregate_stat_name_storage(aggregate_stat_name,
+                                                            stats_store.symbolTable());
+  auto& aggregate_gauge = stats_store.gaugeFromStatName(aggregate_stat_name_storage.statName(),
+                                                        Stats::Gauge::ImportMode::Accumulate);
+  if (increment) {
+    aggregate_gauge.inc();
+    ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: incremented aggregate stat {} to {}",
+              aggregate_stat_name, aggregate_gauge.value());
+  } else {
+    if (aggregate_gauge.value() > 0) {
+      aggregate_gauge.dec();
+      ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented aggregate stat {} to {}",
+                aggregate_stat_name, aggregate_gauge.value());
+    }
+  }
+
+  // Check if reverse tunnel detailed stats are enabled via configuration flag.
+  // If detailed stats disabled, return early - don't collect per-node/cluster stats.
+  // Stats collection can consume significant memory when the number of nodes/clusters is high.
+  if (!enable_detailed_stats_) {
     return;
   }
 
@@ -149,12 +171,9 @@ void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& no
     reverse_tunnel_detailed_stats_warning_logged = true;
   }
 
-  // Register stats with Envoy's system for automatic cross-thread aggregation
-  auto& stats_store = context_.scope();
-
   // Create/update node connection stat.
   if (!node_id.empty()) {
-    std::string node_stat_name = fmt::format("reverse_connections.nodes.{}", node_id);
+    std::string node_stat_name = fmt::format("{}.nodes.{}", stat_prefix_, node_id);
     Stats::StatNameManagedStorage node_stat_name_storage(node_stat_name, stats_store.symbolTable());
     auto& node_gauge = stats_store.gaugeFromStatName(node_stat_name_storage.statName(),
                                                      Stats::Gauge::ImportMode::HiddenAccumulate);
@@ -173,7 +192,7 @@ void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& no
 
   // Create/update cluster connection stat.
   if (!cluster_id.empty()) {
-    std::string cluster_stat_name = fmt::format("reverse_connections.clusters.{}", cluster_id);
+    std::string cluster_stat_name = fmt::format("{}.clusters.{}", stat_prefix_, cluster_id);
     Stats::StatNameManagedStorage cluster_stat_name_storage(cluster_stat_name,
                                                             stats_store.symbolTable());
     auto& cluster_gauge = stats_store.gaugeFromStatName(cluster_stat_name_storage.statName(),
@@ -215,7 +234,7 @@ void ReverseTunnelAcceptorExtension::updatePerWorkerConnectionStats(const std::s
   // Create/update per-worker node connection stat
   if (!node_id.empty()) {
     std::string worker_node_stat_name =
-        fmt::format("reverse_connections.{}.node.{}", dispatcher_name, node_id);
+        fmt::format("{}.{}.node.{}", stat_prefix_, dispatcher_name, node_id);
     Stats::StatNameManagedStorage worker_node_stat_name_storage(worker_node_stat_name,
                                                                 stats_store.symbolTable());
     auto& worker_node_gauge = stats_store.gaugeFromStatName(
@@ -242,7 +261,7 @@ void ReverseTunnelAcceptorExtension::updatePerWorkerConnectionStats(const std::s
   // Create/update per-worker cluster connection stat
   if (!cluster_id.empty()) {
     std::string worker_cluster_stat_name =
-        fmt::format("reverse_connections.{}.cluster.{}", dispatcher_name, cluster_id);
+        fmt::format("{}.{}.cluster.{}", stat_prefix_, dispatcher_name, cluster_id);
     Stats::StatNameManagedStorage worker_cluster_stat_name_storage(worker_cluster_stat_name,
                                                                    stats_store.symbolTable());
     auto& worker_cluster_gauge = stats_store.gaugeFromStatName(
@@ -281,11 +300,11 @@ absl::flat_hash_map<std::string, uint64_t> ReverseTunnelAcceptorExtension::getPe
 
   // Iterate through all gauges and filter for the current dispatcher.
   Stats::IterateFn<Stats::Gauge> gauge_callback =
-      [&stats_map, &dispatcher_name](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
+      [&stats_map, &dispatcher_name, this](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
     const std::string& gauge_name = gauge->name();
     ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: gauge_name: {} gauge_value: {}", gauge_name,
               gauge->value());
-    if (gauge_name.find("reverse_connections.") != std::string::npos &&
+    if (gauge_name.find(stat_prefix_ + ".") != std::string::npos &&
         gauge_name.find(dispatcher_name + ".") != std::string::npos &&
         (gauge_name.find(".node.") != std::string::npos ||
          gauge_name.find(".cluster.") != std::string::npos) &&

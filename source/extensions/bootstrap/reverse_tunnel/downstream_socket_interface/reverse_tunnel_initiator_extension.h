@@ -31,10 +31,24 @@ public:
   ReverseTunnelInitiatorExtension(
       Server::Configuration::ServerFactoryContext& context,
       const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
-          DownstreamReverseConnectionSocketInterface& config);
+          DownstreamReverseConnectionSocketInterface& config)
+      : context_(context), config_(config) {
+    stat_prefix_ = PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "reverse_tunnel_initiator");
+    // Configure detailed stats flag (defaults to false).
+    enable_detailed_stats_ = config.enable_detailed_stats();
+    ENVOY_LOG(debug,
+              "ReverseTunnelInitiatorExtension: creating downstream reverse connection "
+              "socket interface with stat_prefix: {}",
+              stat_prefix_);
+  }
 
   void onServerInitialized() override;
   void onWorkerThreadInitialized() override;
+
+  /**
+   * @return reference to the stat prefix string.
+   */
+  const std::string& statPrefix() const { return stat_prefix_; }
 
   /**
    * @return pointer to the thread-local registry, or nullptr if not available.
@@ -95,6 +109,7 @@ private:
       DownstreamReverseConnectionSocketInterface config_;
   ThreadLocal::TypedSlotPtr<DownstreamSocketThreadLocal> tls_slot_;
   std::string stat_prefix_; // Reverse connection stats prefix
+  bool enable_detailed_stats_{false};
 
   /**
    * Update per-worker connection stats for debugging purposes.

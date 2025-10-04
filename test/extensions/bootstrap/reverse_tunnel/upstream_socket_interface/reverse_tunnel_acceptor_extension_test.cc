@@ -31,7 +31,9 @@ protected:
     stats_scope_ = Stats::ScopeSharedPtr(stats_store_.createScope("test_scope."));
     EXPECT_CALL(context_, threadLocal()).WillRepeatedly(ReturnRef(thread_local_));
     EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(*stats_scope_));
-    config_.set_stat_prefix("test_prefix");
+    config_.set_stat_prefix("reverse_connections");
+    // Enable detailed stats for tests that need per-node/cluster stats.
+    config_.set_enable_detailed_stats(true);
     socket_interface_ = std::make_unique<ReverseTunnelAcceptor>(context_);
     extension_ =
         std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, config_);
@@ -88,11 +90,11 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, InitializeWithDefaultStatPrefix) {
   auto extension_with_default =
       std::make_unique<ReverseTunnelAcceptorExtension>(*socket_interface_, context_, empty_config);
 
-  EXPECT_EQ(extension_with_default->statPrefix(), "upstream_reverse_connection");
+  EXPECT_EQ(extension_with_default->statPrefix(), "reverse_tunnel_acceptor");
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, InitializeWithCustomStatPrefix) {
-  EXPECT_EQ(extension_->statPrefix(), "test_prefix");
+  EXPECT_EQ(extension_->statPrefix(), "reverse_connections");
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, GetStatsScope) {
@@ -128,6 +130,39 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetLocalRegistryAfterInitialization) 
   const auto* const_socket_manager = const_registry->socketManager();
   EXPECT_NE(const_socket_manager, nullptr);
   EXPECT_EQ(const_socket_manager->getUpstreamExtension(), extension_.get());
+}
+
+TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateConnectionStatsAggregateStats) {
+  // Test that aggregate stats are always updated regardless of detailed stats flag.
+  // Create a separate extension with detailed stats disabled.
+  envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+      UpstreamReverseConnectionSocketInterface aggregate_config;
+  aggregate_config.set_stat_prefix("reverse_connections");
+  aggregate_config.set_enable_detailed_stats(false);
+
+  auto aggregate_extension = std::make_unique<ReverseTunnelAcceptorExtension>(
+      *socket_interface_, context_, aggregate_config);
+
+  // Update connection stats for multiple clusters.
+  aggregate_extension->updateConnectionStats("node1", "cluster1", true);
+  aggregate_extension->updateConnectionStats("node2", "cluster2", true);
+  aggregate_extension->updateConnectionStats("node3", "cluster3", true);
+
+  // Verify aggregate stat is updated correctly (3 total connections).
+  auto& stats_store = aggregate_extension->getStatsScope();
+
+  // Construct StatName for aggregate properly (without scope prefix, as the scope adds it).
+  Stats::StatNameManagedStorage aggregate_name_storage("reverse_connections.accepted_clusters",
+                                                       stats_store.symbolTable());
+  auto& aggregate_gauge = stats_store.gaugeFromStatName(aggregate_name_storage.statName(),
+                                                        Stats::Gauge::ImportMode::Accumulate);
+
+  EXPECT_EQ(aggregate_gauge.value(), 3);
+
+  // Decrement one connection.
+  aggregate_extension->updateConnectionStats("node1", "cluster1", false);
+
+  EXPECT_EQ(aggregate_gauge.value(), 2);
 }
 
 TEST_F(ReverseTunnelAcceptorExtensionTest, GetPerWorkerStatMapSingleThread) {
