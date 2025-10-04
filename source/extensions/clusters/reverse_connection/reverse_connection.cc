@@ -205,7 +205,7 @@ RevConClusterFactory::createClusterWithConfig(
         extension_name));
   }
 
-  // Validate that the factory is a socket interface (it implements both interfaces).
+  // Validate that the factory is a ReverseTunnelAcceptor.
   auto* upstream_socket_interface =
       dynamic_cast<const BootstrapReverseConnection::ReverseTunnelAcceptor*>(factory);
   if (upstream_socket_interface == nullptr) {
