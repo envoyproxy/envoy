@@ -31,10 +31,24 @@ public:
   ReverseTunnelInitiatorExtension(
       Server::Configuration::ServerFactoryContext& context,
       const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
-          DownstreamReverseConnectionSocketInterface& config);
+          DownstreamReverseConnectionSocketInterface& config)
+      : context_(context), config_(config) {
+    stat_prefix_ = PROTOBUF_GET_STRING_OR_DEFAULT(config, stat_prefix, "reverse_tunnel_initiator");
+    // Configure detailed stats flag (defaults to false).
+    enable_detailed_stats_ = config.enable_detailed_stats();
+    ENVOY_LOG(debug,
+              "ReverseTunnelInitiatorExtension: creating downstream reverse connection "
+              "socket interface with stat_prefix: {}",
+              stat_prefix_);
+  }
 
   void onServerInitialized() override;
   void onWorkerThreadInitialized() override;
+
+  /**
+   * @return reference to the stat prefix string.
+   */
+  const std::string& statPrefix() const { return stat_prefix_; }
 
   /**
    * @return pointer to the thread-local registry, or nullptr if not available.
@@ -51,17 +65,6 @@ public:
    */
   void updateConnectionStats(const std::string& node_id, const std::string& cluster_id,
                              const std::string& state_suffix, bool increment);
-
-  /**
-   * Update per-worker connection stats for debugging purposes.
-   * Creates worker-specific stats
-   * @param node_id the node identifier for the connection
-   * @param cluster_id the cluster identifier for the connection
-   * @param state_suffix the state suffix for the connection
-   * @param increment whether to increment (true) or decrement (false) the connection count
-   */
-  void updatePerWorkerConnectionStats(const std::string& node_id, const std::string& cluster_id,
-                                      const std::string& state_suffix, bool increment);
 
   /**
    * Get per-worker stat map for the current dispatcher.
@@ -106,6 +109,19 @@ private:
       DownstreamReverseConnectionSocketInterface config_;
   ThreadLocal::TypedSlotPtr<DownstreamSocketThreadLocal> tls_slot_;
   std::string stat_prefix_; // Reverse connection stats prefix
+  bool enable_detailed_stats_{false};
+
+  /**
+   * Update per-worker connection stats for debugging purposes.
+   * Creates worker-specific stats. This is an internal function called only from
+   * updateConnectionStats.
+   * @param node_id the node identifier for the connection
+   * @param cluster_id the cluster identifier for the connection
+   * @param state_suffix the state suffix for the connection
+   * @param increment whether to increment (true) or decrement (false) the connection count
+   */
+  void updatePerWorkerConnectionStats(const std::string& node_id, const std::string& cluster_id,
+                                      const std::string& state_suffix, bool increment);
 };
 
 /**

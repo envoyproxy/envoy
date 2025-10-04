@@ -24,4 +24,9 @@ message UpstreamReverseConnectionSocketInterface {
   // Number of consecutive ping failures before an idle reverse connection socket is marked dead.
   // Defaults to 3 if unset. Must be at least 1.
   google.protobuf.UInt32Value ping_failure_threshold = 2 [(validate.rules).uint32 = {gte: 1}];
+
+  // Enable detailed per-node and per-cluster statistics.
+  // When enabled, emits hidden statistics for individual nodes and clusters.
+  // Defaults to false.
+  bool enable_detailed_stats = 3;
 }

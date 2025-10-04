@@ -162,19 +162,6 @@ ProtobufTypes::MessagePtr ReverseTunnelInitiator::createEmptyConfigProto() {
           DownstreamReverseConnectionSocketInterface>();
 }
 
-// ReverseTunnelInitiatorExtension constructor implementation.
-ReverseTunnelInitiatorExtension::ReverseTunnelInitiatorExtension(
-    Server::Configuration::ServerFactoryContext& context,
-    const envoy::extensions::bootstrap::reverse_tunnel::downstream_socket_interface::v3::
-        DownstreamReverseConnectionSocketInterface& config)
-    : context_(context), config_(config),
-      stat_prefix_(config.stat_prefix().empty() ? "reverse_connections" : config.stat_prefix()) {
-  ENVOY_LOG(debug,
-            "Created ReverseTunnelInitiatorExtension - TLS slot will be created in "
-            "onWorkerThreadInitialized with stat_prefix: {}",
-            stat_prefix_);
-}
-
 REGISTER_FACTORY(ReverseTunnelInitiator, Server::Configuration::BootstrapExtensionFactory);
 
 } // namespace ReverseConnection

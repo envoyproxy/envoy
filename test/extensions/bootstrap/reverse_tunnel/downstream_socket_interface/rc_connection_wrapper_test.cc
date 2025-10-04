@@ -40,6 +40,10 @@ protected:
     EXPECT_CALL(context_, threadLocal()).WillRepeatedly(ReturnRef(thread_local_));
     EXPECT_CALL(context_, scope()).WillRepeatedly(ReturnRef(*stats_scope_));
     EXPECT_CALL(context_, clusterManager()).WillRepeatedly(ReturnRef(cluster_manager_));
+    // Set stat prefix to "reverse_connections" for tests.
+    config_.set_stat_prefix("reverse_connections");
+    // Enable detailed stats for tests that need per-node/cluster stats.
+    config_.set_enable_detailed_stats(true);
     extension_ = std::make_unique<ReverseTunnelInitiatorExtension>(context_, config_);
     setupThreadLocalSlot();
     io_handle_ = createTestIOHandle(createDefaultTestConfig());
