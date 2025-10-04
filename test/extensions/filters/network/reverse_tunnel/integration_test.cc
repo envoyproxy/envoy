@@ -464,9 +464,8 @@ TEST_P(ReverseTunnelFilterIntegrationTest, EndToEndReverseConnectionHandshake) {
   // Wait for reverse connections to be established.
   timeSystem().advanceTimeWait(std::chrono::milliseconds(1000));
 
-  // Test that the full flow works by checking upstream socket interface metrics.
-  test_server_->waitForGaugeGe("reverse_connections.nodes.e2e-node", 1);
-  test_server_->waitForGaugeGe("reverse_connections.clusters.e2e-cluster", 1);
+  // Test that the full flow works by checking upstream socket interface aggregate metrics.
+  test_server_->waitForGaugeGe("reverse_connections.accepted_clusters", 1);
 
   // Verify stats show successful reverse tunnel handshake.
   test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
