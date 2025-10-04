@@ -18,50 +18,7 @@ namespace {
 // "asking".
 ConnPool::DoNothingPoolCallbacks null_pool_callbacks;
 
-/**
- * Generic validation for commands with subcommand restrictions
- * @param command the command name (e.g., "cluster", "randomkey")
- * @param incoming_request the incoming request array
- * @param command_stats statistics to update on error
- * @param callbacks callbacks to send error responses
- * @return true if valid, false if invalid (error already sent)
- */
-bool validateCommandSubcommands(const std::string& command,
-                               const Common::Redis::RespValue& incoming_request,
-                               CommandStats& command_stats, SplitCallbacks& callbacks) {
-  const Common::Redis::CommandSubcommandMap& validation_map = 
-      Common::Redis::SupportedCommands::commandSubcommandValidationMap();
-  
-  // If command is not in validation map, all subcommands are allowed
-  // This handles commands like "randomkey" that don't have subcommand restrictions
-  auto it = validation_map.find(command);
-  if (it == validation_map.end()) {
-    return true; // No validation needed - all forms of the command are supported
-  }
-  
-  // Command is in validation map, so it has subcommand restrictions
-  // Ensure it has at least one subcommand argument
-  if (incoming_request.asArray().size() < 2) {
-    command_stats.error_.inc();
-    callbacks.onResponse(Common::Redis::Utility::makeError(
-        fmt::format("ERR wrong number of arguments for '{}' command", command)));
-    return false;
-  }
-  
-  // Validate the subcommand against the allowlist
-  const std::string subcommand = absl::AsciiStrToLower(incoming_request.asArray()[1].asString());
-  const auto& allowed_subcommands = it->second;
-  
-  if (allowed_subcommands.find(subcommand) == allowed_subcommands.end()) {
-    command_stats.error_.inc();
-    callbacks.onResponse(Common::Redis::Utility::makeError(
-        fmt::format("ERR {} subcommand '{}' is not supported", 
-                    command, incoming_request.asArray()[1].asString())));
-    return false;
-  }
-  
-  return true;
-}
+
 
 /**
  * Make request and maybe mirror the request based on the mirror policies of the route.
@@ -777,10 +734,15 @@ SplitRequestPtr RandomShardRequest::create(Router& router,
   }
 
   const std::string command = absl::AsciiStrToLower(incoming_request->asArray()[0].asString());
-  
-  // Validate commands with subcommand restrictions
-  if (!validateCommandSubcommands(command, *incoming_request, command_stats, callbacks)) {
-    return nullptr; // Error already sent by validation function
+  if (incoming_request->asArray().size() > 1) {
+    const std::string subcommand = absl::AsciiStrToLower(incoming_request->asArray()[1].asString());
+      // check is there is any subcommand restrictions for the command  
+    if (!Common::Redis::SupportedCommands::validateCommandSubcommands(command, subcommand)) {
+        command_stats.error_.inc();
+        callbacks.onResponse(Common::Redis::Utility::makeError(
+            fmt::format("ERR {} subcommand '{}' is not supported", command, subcommand)));
+        return nullptr;
+    }
   }
   
   uint32_t shard_size = route->upstream(command)->shardSize();
@@ -846,6 +808,16 @@ SplitRequestPtr ClusterScopeCmdRequest::create(Router& router,
                                               const StreamInfo::StreamInfo& stream_info) {
 
   const std::string command =  absl::AsciiStrToLower(incoming_request->asArray()[0].asString());
+  if (incoming_request->asArray().size() > 1) {
+    const std::string subcommand = absl::AsciiStrToLower(incoming_request->asArray()[1].asString());
+      // check is there is any subcommand restrictions for the command  
+    if (!Common::Redis::SupportedCommands::validateCommandSubcommands(command, subcommand)) {
+        command_stats.error_.inc();
+        callbacks.onResponse(Common::Redis::Utility::makeError(
+            fmt::format("ERR {} subcommand '{}' is not supported", command, subcommand)));
+        return nullptr;
+    }
+  }
 
   // Use a default key (empty string) for routing  cluster scope commands
   // are not tied to specific keys. This relies on having a catch_all_route configured and no prefix set as "".
@@ -876,9 +848,8 @@ SplitRequestPtr ClusterScopeCmdRequest::create(Router& router,
         "ERR unsupported cluster scope command or invalid arguments"));
     return nullptr;
   }
-  
-  request_ptr->num_pending_responses_ = shard_size;
-  request_ptr->pending_requests_.reserve(request_ptr->num_pending_responses_);
+
+  request_ptr->pending_requests_.reserve(shard_size);
 
   Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
   for (uint32_t shard_index = 0; shard_index < shard_size; shard_index++) {
@@ -1386,9 +1357,9 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     return nullptr;
   }
 
-  if (request->asArray().size() < 2 &&
-      Common::Redis::SupportedCommands::transactionCommands().count(command_name) == 0) {
-    // Commands other than PING, TIME and transaction commands all have at least two arguments.
+  if (request->asArray().size() < 2 && 
+      !Common::Redis::SupportedCommands::isCommandValidWithoutArgs(command_name)) {
+    // Commands that require at least one argument beyond the command name
     onInvalidRequest(callbacks);
     return nullptr;
   }

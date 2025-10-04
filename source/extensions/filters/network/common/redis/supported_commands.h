@@ -183,6 +183,36 @@ struct SupportedCommands {
     return !writeCommands().contains(command);
   }
 
+  /**
+   * @return commands that are valid without mandatory arguments beyond the command name
+   */
+  static const absl::flat_hash_set<std::string>& commandsWithoutMandatoryArgs() {
+    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>,
+        "ping",      // PING [message]
+        "time",      // TIME
+        "flushall",  // FLUSHALL [ASYNC]
+        "flushdb",   // FLUSHDB [ASYNC]
+        "randomkey", // RANDOMKEY
+        "quit",      // QUIT
+        "role",      // ROLE
+        "info"       // INFO [section]
+    );
+  }
+
+  /**
+   * @return true if the command can be executed without mandatory arguments beyond command name
+   */
+  static bool isCommandValidWithoutArgs(const std::string& command_name);
+
+  /**
+   * @brief Validates if a subcommand is allowed for the given command
+   * @param command the main command name (e.g., "cluster") - should be lowercase
+   * @param subcommand the subcommand to validate (e.g., "info") - should be lowercase
+   * @return true if subcommand is valid or no validation needed, false if invalid subcommand
+   */
+  static bool validateCommandSubcommands(const std::string& command, 
+                                        const std::string& subcommand);
+
   static bool isSupportedCommand(const std::string& command);
 };
 

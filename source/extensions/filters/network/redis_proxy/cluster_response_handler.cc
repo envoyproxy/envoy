@@ -87,18 +87,19 @@ ClusterResponseHandlerFactory::getResponseHandlerType(const std::string& command
     {"slowlog:len", ClusterScopeResponseHandlerType::aggregate_all_responses},
   };
 
-  // Create key for lookup - combine command and subcommand if present
-  std::string lookup_key = command_name;
+  // First check with subcommand to see if there is a map entry
   if (!subcommand.empty()) {
-    lookup_key += ":" + subcommand;
+      auto it = command_to_handler_map.find(command_name + ":" + subcommand);
+      if (it != command_to_handler_map.end()) {
+          return it->second;
+      }
   }
 
-  // Look up the command or command:subcommand combination
-  auto it = command_to_handler_map.find(lookup_key);
+  // Fallback to command only search for getting handler type
+  auto it = command_to_handler_map.find(command_name);
   if (it != command_to_handler_map.end()) {
-    return it->second;
+      return it->second;
   }
-  
   // Default fallback - no handler found
   return ClusterScopeResponseHandlerType::response_handler_none;
 }
