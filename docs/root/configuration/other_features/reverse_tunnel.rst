@@ -201,7 +201,7 @@ Reverse tunnel network filter
 
 The ``envoy.filters.network.reverse_tunnel`` network filter implements the reverse tunnel handshake
 protocol. It validates incoming connection requests and accepts or rejects them based on the handshake
-parameters. The filter also manages periodic ping/pong keep-alive messages to maintain tunnel health.
+parameters.
 
 .. literalinclude:: /_configs/reverse_connection/responder-envoy.yaml
     :language: yaml
