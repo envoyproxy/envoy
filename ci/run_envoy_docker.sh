@@ -49,7 +49,7 @@ elif [[ -n "$ENVOY_DOCKER_IN_DOCKER" ]]; then
     COMPOSE_SERVICE="envoy-build-dind"
 fi
 
-exec docker-compose \
+exec docker compose \
     -f "${SCRIPT_DIR}/docker-compose.yml" \
     ${ENVOY_DOCKER_PLATFORM:+-p "$ENVOY_DOCKER_PLATFORM"} \
     run \
