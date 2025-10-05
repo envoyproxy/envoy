@@ -7,6 +7,7 @@
 #include "envoy/server/filter_config.h"
 
 #include "source/common/common/logger.h"
+#include "source/common/protobuf/protobuf.h"
 #include "source/extensions/filters/http/common/pass_through_filter.h"
 
 namespace Envoy {
@@ -58,7 +59,7 @@ private:
   McpFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   bool is_json_post_request_{false};
-  std::unique_ptr<google::protobuf::Struct> metadata_;
+  std::unique_ptr<Protobuf::Struct> metadata_;
 };
 
 } // namespace Mcp
