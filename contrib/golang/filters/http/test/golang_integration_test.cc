@@ -1847,8 +1847,8 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_BadHost) {
   testUpstreamOverrideHost("403", "", "/test?upstreamOverrideHost=badhost", true);
 }
 
-// Set a unavailable host, and the host is not in the cluster, will req the valid host in the cluster
-// and return 200.
+// Set a unavailable host, and the host is not in the cluster, will req the valid host in the
+// cluster and return 200.
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_NotFound) {
   const std::string expected_host =
       GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
