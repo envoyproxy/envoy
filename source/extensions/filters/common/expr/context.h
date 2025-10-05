@@ -40,6 +40,8 @@ constexpr absl::string_view TotalSize = "total_size";
 constexpr absl::string_view Duration = "duration";
 constexpr absl::string_view Protocol = "protocol";
 constexpr absl::string_view Query = "query";
+constexpr absl::string_view BackendServiceHasEndpoints =
+    "backend_service_has_endpoints";
 
 // Symbols for traversing the response properties
 constexpr absl::string_view Response = "response";

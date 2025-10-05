@@ -56,6 +56,9 @@ TEST(Context, InvalidRequest) {
 
 TEST(Context, RequestAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
+  std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info(
+      new NiceMock<Upstream::MockClusterInfo>());
+  EXPECT_CALL(info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
   NiceMock<StreamInfo::MockStreamInfo> empty_info;
   Http::TestRequestHeaderMapImpl header_map{
       {":method", "POST"},           {":scheme", "http"},      {":path", "/meow?yes=1"},
@@ -238,6 +241,34 @@ TEST(Context, RequestAttributes) {
     RequestWrapper invalid_request(arena, &invalid_length_headers, info);
     auto value = invalid_request[CelValue::CreateStringView(Size)];
     EXPECT_FALSE(value.has_value());
+  }
+
+  {
+    cluster_info->endpoint_stats_.membership_total_.set(1);
+    auto value =
+        request[CelValue::CreateStringView(BackendServiceHasEndpoints)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsBool());
+    EXPECT_EQ(true, value.value().BoolOrDie());
+  }
+
+  {
+    cluster_info->endpoint_stats_.membership_total_.set(0);
+    auto value =
+        request[CelValue::CreateStringView(BackendServiceHasEndpoints)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsBool());
+    EXPECT_EQ(false, value.value().BoolOrDie());
+  }
+
+  {
+    EXPECT_CALL(info, upstreamClusterInfo())
+        .WillRepeatedly(Return(absl::nullopt));
+    auto value =
+        request[CelValue::CreateStringView(BackendServiceHasEndpoints)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsBool());
+    EXPECT_EQ(false, value.value().BoolOrDie());
   }
 }
 

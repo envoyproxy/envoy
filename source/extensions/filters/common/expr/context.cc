@@ -214,6 +214,18 @@ const RequestLookupValues& RequestLookupValues::get() {
              path = path.substr(query_offset + 1);
              auto fragment_offset = path.find('#');
              return CelValue::CreateStringView(path.substr(0, fragment_offset));
+          }},
+          {BackendServiceHasEndpoints,
+           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.info_.upstreamClusterInfo().value_or(nullptr) !=
+                 nullptr) {
+               return CelValue::CreateBool(wrapper.info_.upstreamClusterInfo()
+                                               .value()
+                                               .get()
+                                               ->endpointStats()
+                                               .membership_total_.value() > 0);
+             }
+             return CelValue::CreateBool(false);
            }}});
 }
 
