@@ -17,8 +17,8 @@ envoy_cc_library(
         "//envoy/http:filter_interface",
         "//envoy/server:filter_config_interface",
         "//source/common/common:logger_lib",
-        "//source/common/protobuf:utility_lib",
         "//source/common/http:headers_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
     ],
 )
