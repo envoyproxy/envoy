@@ -2,14 +2,12 @@
 
 #include "source/common/http/headers.h"
 #include "source/common/protobuf/utility.h"
+#include "source/common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Mcp {
-
-using google::protobuf::Struct;
-using google::protobuf::Value;
 
 Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                    bool end_stream) {
@@ -34,7 +32,7 @@ Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_st
     decoder_callbacks_->addDecodedData(data, true);
     std::string json = decoder_callbacks_->decodingBuffer()->toString();
     if (metadata_ == nullptr) {
-      metadata_ = std::make_unique<Struct>();
+      metadata_ = std::make_unique<Protobuf::Struct>();
     }
     bool has_unknown_fields = false;
     auto status = MessageUtil::loadFromJsonNoThrow(json, *metadata_, has_unknown_fields);
