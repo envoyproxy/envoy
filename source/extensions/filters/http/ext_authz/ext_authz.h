@@ -136,6 +136,8 @@ public:
 
   uint32_t maxRequestBytes() const { return max_request_bytes_; }
 
+  uint32_t maxDeniedResponseBodyBytes() const { return max_denied_response_body_bytes_; }
+
   bool packAsBytes() const { return pack_as_bytes_; }
 
   bool headersAsBytes() const { return encode_raw_headers_; }
@@ -245,6 +247,7 @@ private:
   const bool failure_mode_allow_header_add_;
   const bool clear_route_cache_;
   const uint32_t max_request_bytes_;
+  const uint32_t max_denied_response_body_bytes_;
   const bool pack_as_bytes_;
   const bool encode_raw_headers_;
   const Http::Code status_on_error_;

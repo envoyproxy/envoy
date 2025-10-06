@@ -1491,6 +1491,27 @@ ClusterInfoImpl::upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_
                                                                : Http::Protocol::Http11};
 }
 
+absl::optional<bool>
+ClusterInfoImpl::processHttpForOutlierDetection(Http::ResponseHeaderMap& headers) const {
+  if (http_protocol_options_->outlier_detection_http_error_matcher_.empty()) {
+    return absl::nullopt;
+  }
+
+  Extensions::Common::Matcher::Matcher::MatchStatusVector statuses;
+
+  statuses.reserve(http_protocol_options_->outlier_detection_http_error_matcher_.size());
+  statuses = Extensions::Common::Matcher::Matcher::MatchStatusVector(
+      http_protocol_options_->outlier_detection_http_error_matcher_.size());
+  http_protocol_options_->outlier_detection_http_error_matcher_[0]->onNewStream(statuses);
+
+  // Run matchers.
+  http_protocol_options_->outlier_detection_http_error_matcher_[0]->onHttpResponseHeaders(headers,
+                                                                                          statuses);
+  return absl::optional<bool>(http_protocol_options_->outlier_detection_http_error_matcher_[0]
+                                  ->matchStatus(statuses)
+                                  .matches_);
+}
+
 absl::StatusOr<bool> validateTransportSocketSupportsQuic(
     const envoy::config::core::v3::TransportSocket& transport_socket) {
   // The transport socket is valid for QUIC if it is either a QUIC transport socket,
