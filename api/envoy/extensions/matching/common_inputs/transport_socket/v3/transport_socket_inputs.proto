@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package envoy.extensions.matching.common_inputs.transport_socket.v3;
+
+import "udpa/annotations/status.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.matching.common_inputs.transport_socket.v3";
+option java_outer_classname = "TransportSocketInputsProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/matching/common_inputs/transport_socket/v3;transport_socketv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: Transport Socket Matching Inputs]
+
+// Specifies that matching should be performed by the endpoint metadata.
+// This input extracts metadata from the selected endpoint for transport socket selection.
+// The metadata is extracted using a filter and path specification similar to
+// :ref:`DynamicMetadataInput <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.DynamicMetadataInput>`.
+// [#extension: envoy.matching.inputs.transport_socket.endpoint_metadata]
+message EndpointMetadataInput {
+  // The filter name to retrieve the Struct from the endpoint metadata.
+  // Defaults to "envoy.transport_socket_match" if not specified.
+  string filter = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The path to retrieve the Value from the Struct.
+  // If empty, the entire filter metadata struct is used for matching.
+  repeated PathSegment path = 2;
+
+  // Specifies the segment in a path to retrieve value from Metadata.
+  message PathSegment {
+    oneof segment {
+      option (validate.required) = true;
+
+      // If specified, use the key to retrieve the value in a Struct.
+      string key = 1 [(validate.rules).string = {min_len: 1}];
+    }
+  }
+}
+
+// Specifies that matching should be performed by the locality metadata.
+// This input extracts metadata from the endpoint's locality for transport socket selection.
+// The metadata is extracted using a filter and path specification similar to
+// :ref:`DynamicMetadataInput <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.DynamicMetadataInput>`.
+// [#extension: envoy.matching.inputs.transport_socket.locality_metadata]
+message LocalityMetadataInput {
+  // The filter name to retrieve the Struct from the locality metadata.
+  // Defaults to "envoy.transport_socket_match" if not specified.
+  string filter = 1 [(validate.rules).string = {min_len: 1}];
+
+  // The path to retrieve the Value from the Struct.
+  // If empty, the entire filter metadata struct is used for matching.
+  repeated PathSegment path = 2;
+
+  // Specifies the segment in a path to retrieve value from Metadata.
+  message PathSegment {
+    oneof segment {
+      option (validate.required) = true;
+
+      // If specified, use the key to retrieve the value in a Struct.
+      string key = 1 [(validate.rules).string = {min_len: 1}];
+    }
+  }
+}
+
+// Configuration for the transport socket name action.
+// This action sets the name of the transport socket to use when the matcher matches.
+// [#extension: envoy.matching.action.transport_socket.name]
+message TransportSocketNameAction {
+  // The name of the transport socket to use.
+  // This name must reference a named transport socket in the cluster's transport_socket_matches.
+  string name = 1 [(validate.rules).string = {min_len: 1}];
+}

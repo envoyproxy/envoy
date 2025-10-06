@@ -813,12 +813,18 @@ message Cluster {
   // Optional matcher that selects a transport socket from
   // :ref:`transport_socket_matches <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>`.
   //
-  // This matcher uses the generic xDS matcher framework and may reference common
-  // network inputs such as destination IP, source IP, destination port, source port,
+  // This matcher uses the generic xDS matcher framework and may reference downstream
+  // connection inputs such as destination IP, source IP, destination port, source port,
   // Server Name Indication (SNI), Application-Layer Protocol Negotiation (ALPN), and
-  // dynamic metadata to select a named transport socket. This provides flexibility
-  // similar to the listener :ref:`filter_chain_matcher
+  // filter state, as well as endpoint and locality metadata to select a named transport socket.
+  // This provides flexibility similar to the listener :ref:`filter_chain_matcher
   // <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`.
+  //
+  // .. note::
+  //   All network-level inputs (IP addresses, ports, SNI, ALPN) refer to the downstream
+  //   connection attributes, not the upstream connection. For example, destination IP is the
+  //   upstream endpoint IP as seen from the downstream client's perspective, and source IP
+  //   is the downstream client's IP address.
   //
   // If this field is set, it takes precedence over legacy metadata-based selection
   // performed by :ref:`transport_socket_matches

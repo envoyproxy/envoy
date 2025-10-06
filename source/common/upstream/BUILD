@@ -432,6 +432,7 @@ envoy_cc_library(
         "//source/common/stream_info:filter_state_lib",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/matching/common_inputs/network/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/matching/common_inputs/transport_socket/v3:pkg_cc_proto",
         "@envoy_api//envoy/type/metadata/v3:pkg_cc_proto",
     ],
 )
@@ -494,6 +495,7 @@ envoy_cc_library(
         "//source/common/http/http2:codec_stats_lib",
         "//source/common/http/http3:codec_stats_lib",
         "//source/common/init:manager_lib",
+        "//source/common/matcher:matcher_lib",
         "//source/common/orca:orca_load_metrics_lib",
         "//source/common/shared_pool:shared_pool_lib",
         "//source/common/stats:deferred_creation",
@@ -507,6 +509,7 @@ envoy_cc_library(
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/matching/common_inputs/network/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/matching/common_inputs/transport_socket/v3:pkg_cc_proto",
     ],
 )
 

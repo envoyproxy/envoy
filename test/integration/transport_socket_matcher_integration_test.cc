@@ -99,26 +99,26 @@ public:
     const std::string matcher_yaml = R"EOF(
 matcher_tree:
   input:
-    name: transport_socket.data_inputs.endpoint_metadata
+    name: envoy.matching.inputs.transport_socket.endpoint_metadata
     typed_config:
-      "@type": type.googleapis.com/envoy.type.metadata.v3.MetadataKey
-      key: envoy.lb
+      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.EndpointMetadataInput
+      filter: envoy.lb
       path:
       - key: type
   exact_match_map:
     map:
       "tls":
         action:
-          name: transport-socket-name
+          name: envoy.matching.action.transport_socket.name
           typed_config:
-            "@type": type.googleapis.com/google.protobuf.StringValue
-            value: tls
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction
+            name: tls
       "raw":
         action:
-          name: transport-socket-name
+          name: envoy.matching.action.transport_socket.name
           typed_config:
-            "@type": type.googleapis.com/google.protobuf.StringValue
-            value: raw
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction
+            name: raw
 )EOF";
     TestUtility::loadFromYaml(matcher_yaml, matcher);
     *cluster.mutable_transport_socket_matcher() = matcher;
@@ -264,23 +264,23 @@ matcher_list:
   - predicate:
       single_predicate:
         input:
-          name: envoy.transport_socket.inputs.source_ip
+          name: envoy.matching.inputs.source_ip
           typed_config:
             "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
         value_match:
           prefix: "127."
     on_match:
       action:
-        name: transport-socket-name
+        name: envoy.matching.action.transport_socket.name
         typed_config:
-          "@type": type.googleapis.com/google.protobuf.StringValue
-          value: tls
+          "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction
+          name: tls
 on_no_match:
   action:
-    name: transport-socket-name
+    name: envoy.matching.action.transport_socket.name
     typed_config:
-      "@type": type.googleapis.com/google.protobuf.StringValue
-      value: raw
+      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction
+      name: raw
 )EOF";
     TestUtility::loadFromYaml(matcher_yaml, matcher);
     *cluster->mutable_transport_socket_matcher() = matcher;
@@ -338,23 +338,23 @@ TEST_F(TransportSocketMatcherIntegrationTest, XdsMatcherServerName) {
     const std::string matcher_yaml = R"EOF(
 matcher_tree:
   input:
-    name: envoy.transport_socket.inputs.server_name
+    name: envoy.matching.inputs.server_name
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ServerNameInput
   exact_match_map:
     map:
       "tls.example.com":
         action:
-          name: transport-socket-name
+          name: envoy.matching.action.transport_socket.name
           typed_config:
-            "@type": type.googleapis.com/google.protobuf.StringValue
-            value: tls
+            "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction
+            name: tls
 on_no_match:
   action:
-    name: transport-socket-name
+    name: envoy.matching.action.transport_socket.name
     typed_config:
-      "@type": type.googleapis.com/google.protobuf.StringValue
-      value: raw
+      "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction
+      name: raw
 )EOF";
     TestUtility::loadFromYaml(matcher_yaml, matcher);
     *cluster->mutable_transport_socket_matcher() = matcher;

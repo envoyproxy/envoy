@@ -7,6 +7,7 @@
 #include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/config/typed_metadata.h"
+#include "envoy/extensions/matching/common_inputs/transport_socket/v3/transport_socket_inputs.pb.h"
 #include "envoy/matcher/matcher.h"
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
@@ -28,6 +29,9 @@
 
 namespace Envoy {
 namespace Upstream {
+
+// Action factory context for transport socket name actions - using the server factory context.
+using TransportSocketActionFactoryContext = Server::Configuration::ServerFactoryContext;
 
 class TransportSocketMatcherImpl : public Logger::Loggable<Logger::Id::upstream>,
                                    public TransportSocketMatcher {
@@ -57,18 +61,6 @@ public:
 
   MatchData resolve(const envoy::config::core::v3::Metadata* endpoint_metadata,
                     const envoy::config::core::v3::Metadata* locality_metadata) const override;
-
-  /**
-   * Resolve method that accepts additional network context for comprehensive matching.
-   */
-  MatchData resolve(const envoy::config::core::v3::Metadata* endpoint_metadata,
-                    const envoy::config::core::v3::Metadata* locality_metadata,
-                    const Network::Address::Instance* local_address,
-                    const Network::Address::Instance* remote_address,
-                    const Network::ConnectionInfoProvider* connection_info = nullptr,
-                    const StreamInfo::FilterState* filter_state = nullptr,
-                    absl::string_view server_name = "",
-                    const std::vector<std::string>* application_protocols = nullptr) const;
 
   bool allMatchesSupportAlpn() const override {
     if (!default_match_.factory->supportsAlpn()) {
@@ -151,7 +143,8 @@ public:
   explicit TransportSocketNameAction(const std::string& name) : name_(name) {}
   const std::string& name() const { return name_; }
   absl::string_view typeUrl() const override {
-    return "type.googleapis.com/google.protobuf.StringValue";
+    return "type.googleapis.com/"
+           "envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction";
   }
 
 private:
@@ -161,18 +154,22 @@ private:
 /**
  * ActionFactory that creates TransportSocketNameAction from a StringValue.
  */
-class TransportSocketNameActionFactory : public Matcher::ActionFactory<TransportSocketMatchingData>,
-                                         public Logger::Loggable<Logger::Id::upstream> {
+class TransportSocketNameActionFactory
+    : public Matcher::ActionFactory<TransportSocketActionFactoryContext>,
+      public Logger::Loggable<Logger::Id::upstream> {
 public:
-  std::string name() const override { return "transport-socket-name"; }
+  std::string name() const override { return "envoy.matching.action.transport_socket.name"; }
   Matcher::ActionConstSharedPtr createAction(const Protobuf::Message& config,
-                                             TransportSocketMatchingData&,
+                                             TransportSocketActionFactoryContext&,
                                              ProtobufMessage::ValidationVisitor&) override {
-    const auto& string_config = dynamic_cast<const Protobuf::StringValue&>(config);
-    return std::make_shared<TransportSocketNameAction>(string_config.value());
+    const auto& typed_config =
+        dynamic_cast<const envoy::extensions::matching::common_inputs::transport_socket::v3::
+                         TransportSocketNameAction&>(config);
+    return std::make_shared<TransportSocketNameAction>(typed_config.name());
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Protobuf::StringValue>();
+    return std::make_unique<envoy::extensions::matching::common_inputs::transport_socket::v3::
+                                TransportSocketNameAction>();
   }
 };
 

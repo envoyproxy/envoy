@@ -234,15 +234,15 @@ TEST_F(TransportSocketInputTest, EndpointMetadataInput_StringAndNonString) {
 
 TEST_F(TransportSocketInputTest, EndpointMetadataInputFactory_WithKeyAndPath) {
   EndpointMetadataInputFactory factory;
-  envoy::type::metadata::v3::MetadataKey key;
-  key.set_key("my.filter");
-  auto* seg1 = key.add_path();
+  envoy::extensions::matching::common_inputs::transport_socket::v3::EndpointMetadataInput config;
+  config.set_filter("my.filter");
+  auto* seg1 = config.add_path();
   seg1->set_key("foo");
-  auto* seg2 = key.add_path();
+  auto* seg2 = config.add_path();
   seg2->set_key("bar");
 
   auto& visitor = ProtobufMessage::getNullValidationVisitor();
-  auto cb = factory.createDataInputFactoryCb(key, visitor);
+  auto cb = factory.createDataInputFactoryCb(config, visitor);
   auto input = cb();
 
   // Populate nested struct at my.filter: { foo: { bar: "baz" } }.
@@ -260,22 +260,24 @@ TEST_F(TransportSocketInputTest, EndpointMetadataInputFactory_WithKeyAndPath) {
 }
 
 TEST_F(TransportSocketInputTest, EndpointMetadataInputFactory_Defaults) {
-  // Empty key/path should default to filter "envoy.lb" and path ["type"].
+  // Empty filter should default to filter "envoy.transport_socket_match".
+  // Empty path means we get the entire filter metadata struct as JSON.
   EndpointMetadataInputFactory factory;
-  envoy::type::metadata::v3::MetadataKey key; // empty
+  envoy::extensions::matching::common_inputs::transport_socket::v3::EndpointMetadataInput
+      config; // empty
   auto& visitor = ProtobufMessage::getNullValidationVisitor();
-  auto cb = factory.createDataInputFactoryCb(key, visitor);
+  auto cb = factory.createDataInputFactoryCb(config, visitor);
   auto input = cb();
 
   envoy::config::core::v3::Metadata endpoint_md;
-  auto& v = Config::Metadata::mutableMetadataValue(endpoint_md, "envoy.lb", "type");
-  v.set_string_value("foo");
-
+  // With empty path, metadataValue returns the entire filter struct.
+  // If the filter doesn't exist, it returns a null Value.
   TransportSocketMatchingData data_with_md(&endpoint_md, nullptr);
   auto result = input->get(data_with_md);
   EXPECT_EQ(result.data_availability_, DataInputGetResult::DataAvailability::AllDataAvailable);
   ASSERT_TRUE(absl::holds_alternative<std::string>(result.data_));
-  EXPECT_EQ(absl::get<std::string>(result.data_), "foo");
+  // Empty metadata returns "null" when serialized.
+  EXPECT_EQ(absl::get<std::string>(result.data_), "null");
 }
 
 TEST_F(TransportSocketInputTest, LocalityMetadataInput_NoLocalityMetadata) {
@@ -312,10 +314,11 @@ TEST_F(TransportSocketInputTest, LocalityMetadataInput_StringAndNonString) {
 
 TEST_F(TransportSocketInputTest, LocalityMetadataInputFactory_Defaults) {
   LocalityMetadataInputFactory factory;
-  // The factory ignores config and uses default filter with empty path.
-  envoy::config::core::v3::SocketAddress dummy_config; // any message type accepted.
+  // Create a LocalityMetadataInput config with default filter.
+  envoy::extensions::matching::common_inputs::transport_socket::v3::LocalityMetadataInput config;
+  config.set_filter("envoy.transport_socket_match");
   auto& visitor = ProtobufMessage::getNullValidationVisitor();
-  auto cb = factory.createDataInputFactoryCb(dummy_config, visitor);
+  auto cb = factory.createDataInputFactoryCb(config, visitor);
   auto input = cb();
 
   envoy::config::core::v3::Metadata locality_md; // empty metadata.
@@ -332,12 +335,20 @@ TEST_F(TransportSocketInputTest, FactoriesCreateEmptyConfigProto) {
   EndpointMetadataInputFactory endpoint_factory;
   auto endpoint_empty = endpoint_factory.createEmptyConfigProto();
   EXPECT_NE(endpoint_empty, nullptr);
-  EXPECT_NE(dynamic_cast<envoy::type::metadata::v3::MetadataKey*>(endpoint_empty.get()), nullptr);
+  EXPECT_NE(
+      dynamic_cast<
+          envoy::extensions::matching::common_inputs::transport_socket::v3::EndpointMetadataInput*>(
+          endpoint_empty.get()),
+      nullptr);
 
   LocalityMetadataInputFactory locality_factory;
   auto locality_empty = locality_factory.createEmptyConfigProto();
   EXPECT_NE(locality_empty, nullptr);
-  EXPECT_NE(dynamic_cast<envoy::config::core::v3::SocketAddress*>(locality_empty.get()), nullptr);
+  EXPECT_NE(
+      dynamic_cast<
+          envoy::extensions::matching::common_inputs::transport_socket::v3::LocalityMetadataInput*>(
+          locality_empty.get()),
+      nullptr);
 
   // Network input factories.
   DestinationIPInputFactory dip;
