@@ -133,35 +133,15 @@ absl::flat_hash_map<std::string, uint64_t> ReverseTunnelAcceptorExtension::getCr
 void ReverseTunnelAcceptorExtension::updateConnectionStats(const std::string& node_id,
                                                            const std::string& cluster_id,
                                                            bool increment) {
-
-  // Obtain the stats store.
-  auto& stats_store = context_.scope();
-
-  // Always update aggregate indicating the number of clusters reverse tunnels have been accepted
-  // from. Aggregate stat: <stat_prefix>.accepted_clusters.
-  std::string aggregate_stat_name = fmt::format("{}.accepted_clusters", stat_prefix_);
-  Stats::StatNameManagedStorage aggregate_stat_name_storage(aggregate_stat_name,
-                                                            stats_store.symbolTable());
-  auto& aggregate_gauge = stats_store.gaugeFromStatName(aggregate_stat_name_storage.statName(),
-                                                        Stats::Gauge::ImportMode::Accumulate);
-  if (increment) {
-    aggregate_gauge.inc();
-    ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: incremented aggregate stat {} to {}",
-              aggregate_stat_name, aggregate_gauge.value());
-  } else {
-    if (aggregate_gauge.value() > 0) {
-      aggregate_gauge.dec();
-      ENVOY_LOG(trace, "ReverseTunnelAcceptorExtension: decremented aggregate stat {} to {}",
-                aggregate_stat_name, aggregate_gauge.value());
-    }
-  }
-
   // Check if reverse tunnel detailed stats are enabled via configuration flag.
-  // If detailed stats disabled, return early - don't collect per-node/cluster stats.
+  // If detailed stats disabled, don't collect any stats and return early.
   // Stats collection can consume significant memory when the number of nodes/clusters is high.
   if (!enable_detailed_stats_) {
     return;
   }
+
+  // Obtain the stats store.
+  auto& stats_store = context_.scope();
 
   // Log a warning on first activation.
   if (!reverse_tunnel_detailed_stats_warning_logged) {

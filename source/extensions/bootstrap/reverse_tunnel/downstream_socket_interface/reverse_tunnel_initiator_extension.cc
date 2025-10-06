@@ -55,35 +55,15 @@ void ReverseTunnelInitiatorExtension::updateConnectionStats(const std::string& h
                                                             const std::string& cluster_id,
                                                             const std::string& state_suffix,
                                                             bool increment) {
-  // Obtain the stats store.
-  auto& stats_store = context_.scope();
-
-  // Always update aggregate stats indicating the number of clusters reverse tunnels are being
-  // initiated to. Aggregate stat: <stat_prefix>.connected_clusters.<state_suffix>.
-  if (!state_suffix.empty()) {
-    std::string aggregate_stat_name =
-        fmt::format("{}.connected_clusters.{}", stat_prefix_, state_suffix);
-    Stats::StatNameManagedStorage aggregate_stat_name_storage(aggregate_stat_name,
-                                                              stats_store.symbolTable());
-    auto& aggregate_gauge = stats_store.gaugeFromStatName(aggregate_stat_name_storage.statName(),
-                                                          Stats::Gauge::ImportMode::Accumulate);
-    if (increment) {
-      aggregate_gauge.inc();
-      ENVOY_LOG(trace, "ReverseTunnelInitiatorExtension: incremented aggregate stat {} to {}",
-                aggregate_stat_name, aggregate_gauge.value());
-    } else {
-      aggregate_gauge.dec();
-      ENVOY_LOG(trace, "ReverseTunnelInitiatorExtension: decremented aggregate stat {} to {}",
-                aggregate_stat_name, aggregate_gauge.value());
-    }
-  }
-
   // Check if detailed stats are enabled via configuration flag.
-  // If detailed stats disabled, return early - don't collect per-host/cluster stats.
+  // If detailed stats disabled, don't collect any stats and return early.
   // Stats collection can consume significant memory when the number of hosts/clusters is high.
   if (!enable_detailed_stats_) {
     return;
   }
+
+  // Obtain the stats store.
+  auto& stats_store = context_.scope();
 
   // Log a warning on first activation.
   if (!reverse_tunnel_detailed_stats_warning_logged) {
