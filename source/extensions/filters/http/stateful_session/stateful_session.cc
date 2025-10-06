@@ -56,7 +56,7 @@ PerRouteStatefulSession::PerRouteStatefulSession(
     disabled_ = true;
     return;
   }
-  // Per-route configs don't generate stats, so pass empty prefix and scope from context.
+  // Per-route configs never generate stats. Pass empty prefix to ensure no stats are created.
   config_ = std::make_shared<StatefulSessionConfig>(config.stateful_session(), context, "",
                                                     context.scope());
 }
@@ -80,7 +80,6 @@ Http::FilterHeadersStatus StatefulSession::decodeHeaders(Http::RequestHeaderMap&
   if (auto upstream_address = session_state_->upstreamAddress(); upstream_address.has_value()) {
     decoder_callbacks_->setUpstreamOverrideHost(
         std::make_pair(upstream_address.value(), effective_config_->isStrict()));
-    markOverrideAttempted();
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -90,24 +89,34 @@ Http::FilterHeadersStatus StatefulSession::encodeHeaders(Http::ResponseHeaderMap
     return Http::FilterHeadersStatus::Continue;
   }
 
-  if (auto upstream_info = encoder_callbacks_->streamInfo().upstreamInfo();
-      upstream_info != nullptr) {
-    auto host = upstream_info->upstreamHost();
-    if (host != nullptr) {
-      const bool host_changed = session_state_->onUpdate(host->address()->asStringView(), headers);
-      if (override_attempted_ && !accounted_) {
-        // If an override was attempted, determine the outcome based on whether the host changed.
-        if (host_changed) {
-          if (!effective_config_->isStrict()) {
-            // In non-strict mode, if host changed, it means override failed and fallback occurred.
-            markFailedOpen();
-          }
-        } else {
-          // Host didn't change, meaning the override was successful.
-          markRouted();
-        }
-        accounted_ = true;
+  auto upstream_info = encoder_callbacks_->streamInfo().upstreamInfo();
+  if (upstream_info == nullptr) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  auto host = upstream_info->upstreamHost();
+
+  // Check for failed_closed: no healthy upstream in strict mode.
+  const bool has_uh_flag = encoder_callbacks_->streamInfo().hasResponseFlag(
+      StreamInfo::CoreResponseFlag::NoHealthyUpstream);
+
+  if (has_uh_flag && effective_config_->isStrict()) {
+    markFailedClosed();
+    return Http::FilterHeadersStatus::Continue;
+  }
+
+  if (host != nullptr) {
+    const bool host_changed = session_state_->onUpdate(host->address()->asStringView(), headers);
+
+    // Track stats based on whether the host changed.
+    if (host_changed) {
+      // Host changed means override failed and fallback occurred (non-strict mode).
+      if (!effective_config_->isStrict()) {
+        markFailedOpen();
       }
+    } else {
+      // Host didn't change, meaning the override was successful.
+      markRouted();
     }
   }
 

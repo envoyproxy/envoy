@@ -87,49 +87,28 @@ public:
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::ResponseHeaderMap& headers, bool) override;
 
-  // Http::StreamFilterBase
-  Http::LocalErrorStatus onLocalReply(const Http::StreamFilterBase::LocalReplyData&) override {
-    // For strict mode, if an override was attempted and a local reply was sent (e.g., 503),
-    // consider this a failed-closed selection.
-    if (override_attempted_ && effective_config_ != nullptr && effective_config_->isStrict() &&
-        !accounted_) {
-      markFailedClosed();
-      accounted_ = true;
-    }
-    return Http::LocalErrorStatus::Continue;
-  }
-
   Http::SessionStatePtr& sessionStateForTest() { return session_state_; }
 
 private:
-  void markOverrideAttempted() { override_attempted_ = true; }
   void markRouted() {
-    if (override_attempted_ && effective_config_ != nullptr) {
-      if (auto stats = effective_config_->stats(); stats.has_value()) {
-        stats->routed_.inc();
-      }
+    if (auto stats = effective_config_->stats(); stats.has_value()) {
+      stats->routed_.inc();
     }
   }
   void markFailedClosed() {
-    if (override_attempted_ && effective_config_ != nullptr) {
-      if (auto stats = effective_config_->stats(); stats.has_value()) {
-        stats->failed_closed_.inc();
-      }
+    if (auto stats = effective_config_->stats(); stats.has_value()) {
+      stats->failed_closed_.inc();
     }
   }
   void markFailedOpen() {
-    if (override_attempted_ && effective_config_ != nullptr) {
-      if (auto stats = effective_config_->stats(); stats.has_value()) {
-        stats->failed_open_.inc();
-      }
+    if (auto stats = effective_config_->stats(); stats.has_value()) {
+      stats->failed_open_.inc();
     }
   }
 
   Http::SessionStatePtr session_state_;
   StatefulSessionConfigSharedPtr config_;
-  bool override_attempted_{false};
-  bool accounted_{false};
-  // Cached route config to avoid repeated resolution and dynamic_cast issues in tests.
+  // Cached effective config resolved from route or base config.
   StatefulSessionConfig* effective_config_{nullptr};
 };
 

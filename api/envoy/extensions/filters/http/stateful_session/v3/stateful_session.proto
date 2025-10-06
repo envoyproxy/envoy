@@ -30,21 +30,13 @@ message StatefulSession {
   // found, the request will be routed according to the load balancing algorithm.
   bool strict = 2;
 
-  // Optional additional prefix to use when emitting statistics. This allows distinguishing
-  // emitted statistics between configured ``stateful_session`` filters in an HTTP filter chain. For example:
+  // Optional stat prefix. If specified, the filter will emit statistics in the
+  // ``http.<stat_prefix>.stateful_session.<stat_prefix>.`` namespace. If not specified, no statistics will be emitted.
   //
-  // .. code-block:: yaml
+  // .. note::
   //
-  //   http_filters:
-  //     - name: envoy.filters.http.stateful_session
-  //       typed_config:
-  //         "@type": type.googleapis.com/envoy.extensions.filters.http.stateful_session.v3.StatefulSession
-  //         stat_prefix: foo # This emits stateful_session.foo.routed, stateful_session.foo.failed_open, etc.
-  //     - name: envoy.filters.http.stateful_session
-  //       typed_config:
-  //         "@type": type.googleapis.com/envoy.extensions.filters.http.stateful_session.v3.StatefulSession
-  //         stat_prefix: bar # This emits stateful_session.bar.routed, stateful_session.bar.failed_open, etc.
-  //
+  //   Per-route configuration overrides do not support statistics and will not emit stats even if this field is set
+  //   in the per-route config.
   string stat_prefix = 3;
 }
 
