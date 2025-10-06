@@ -201,19 +201,7 @@ static_assert(IP_RECVDSTADDR == IP_SENDSRCADDR);
 #define ENVOY_IPV6_MTU_DISCOVER_VALUE IPV6_PMTUDISC_DO
 #endif
 
-/**
- * Interface representing a single filter chain info.
- */
-class FilterChainInfo {
-public:
-  virtual ~FilterChainInfo() = default;
-
-  /**
-   * @return the name of this filter chain.
-   */
-  virtual absl::string_view name() const PURE;
-};
-
+class FilterChainInfo;
 class ListenerInfo;
 
 using FilterChainInfoConstSharedPtr = std::shared_ptr<const FilterChainInfo>;

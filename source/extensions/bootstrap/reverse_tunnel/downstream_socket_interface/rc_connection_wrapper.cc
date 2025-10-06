@@ -30,7 +30,9 @@ RCConnectionWrapper::RCConnectionWrapper(ReverseConnectionIOHandle& parent,
 // RCConnectionWrapper destructor implementation.
 RCConnectionWrapper::~RCConnectionWrapper() {
   ENVOY_LOG(debug, "RCConnectionWrapper destructor called");
-  this->shutdown();
+  if (!shutdown_called_) {
+    this->shutdown();
+  }
 }
 
 void RCConnectionWrapper::onEvent(Network::ConnectionEvent event) {
@@ -154,7 +156,7 @@ void RCConnectionWrapper::decodeHeaders(Http::ResponseHeaderMapPtr&& headers, bo
     onHandshakeSuccess();
   } else {
     ENVOY_LOG(error, "Received non-200 HTTP response: {}", status);
-    onHandshakeFailure("HTTP handshake failed with non-200 response");
+    onHandshakeFailure(absl::StrCat("HTTP handshake failed with status ", status));
   }
 }
 
@@ -179,16 +181,24 @@ void RCConnectionWrapper::onHandshakeFailure(const std::string& message) {
 }
 
 void RCConnectionWrapper::shutdown() {
+  if (shutdown_called_) {
+    ENVOY_LOG(debug, "RCConnectionWrapper: Shutdown already called, skipping");
+    return;
+  }
+  shutdown_called_ = true;
+
   if (!connection_) {
     ENVOY_LOG(error, "RCConnectionWrapper: Connection already null, nothing to shutdown");
     return;
   }
 
-  ENVOY_LOG(debug, "RCConnectionWrapper: Shutting down connection ID: {}, state: {}",
-            connection_->id(), static_cast<int>(connection_->state()));
+  // Get connection info for logging
+  uint64_t connection_id = connection_->id();
+  Network::Connection::State state = connection_->state();
+  ENVOY_LOG(debug, "RCConnectionWrapper: Shutting down connection ID: {}, state: {}", connection_id,
+            static_cast<int>(state));
 
   // Remove connection callbacks first to prevent recursive calls during shutdown.
-  auto state = connection_->state();
   if (state != Network::Connection::State::Closed) {
     connection_->removeConnectionCallbacks(*this);
     ENVOY_LOG(debug, "Connection callbacks removed");
@@ -205,8 +215,9 @@ void RCConnectionWrapper::shutdown() {
     ENVOY_LOG(debug, "Connection already closed");
   }
 
-  // Clear the connection pointer to prevent further access.
+  // Clear the connection pointer after shutdown.
   connection_.reset();
+  ENVOY_LOG(debug, "RCConnectionWrapper: Connection cleared after shutdown");
   ENVOY_LOG(debug, "RCConnectionWrapper: Shutdown completed");
 }
 

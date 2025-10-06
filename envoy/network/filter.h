@@ -4,6 +4,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/config/extension_config_provider.h"
+#include "envoy/config/typed_metadata.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener_filter_buffer.h"
 #include "envoy/network/transport_socket.h"
@@ -583,6 +584,31 @@ using FilterConfigProviderPtr = std::unique_ptr<FilterConfigProvider<FactoryCb>>
 using NetworkFilterFactoriesList = std::vector<FilterConfigProviderPtr<FilterFactoryCb>>;
 
 /**
+ * Interface representing a single filter chain info.
+ */
+class FilterChainInfo {
+public:
+  virtual ~FilterChainInfo() = default;
+
+  /**
+   * @return the name of this filter chain.
+   */
+  virtual absl::string_view name() const PURE;
+
+  /**
+   * @return the metadata of this filter chain.
+   */
+  virtual const envoy::config::core::v3::Metadata& metadata() const PURE;
+
+  /**
+   * @return the typed metadata provided in the config for this filter chain.
+   */
+  virtual const Envoy::Config::TypedMetadata& typedMetadata() const PURE;
+};
+
+using FilterChainInfoSharedPtr = std::shared_ptr<const FilterChainInfo>;
+
+/**
  * Interface representing a single filter chain.
  */
 class FilterChain {
@@ -617,6 +643,11 @@ public:
    * @return true if this filter chain configuration was discovered by FCDS.
    */
   virtual bool addedViaApi() const PURE;
+
+  /**
+   * @return the filter chain info for this filter chain.
+   */
+  virtual const FilterChainInfoSharedPtr& filterChainInfo() const PURE;
 };
 
 using FilterChainSharedPtr = std::shared_ptr<FilterChain>;

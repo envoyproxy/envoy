@@ -32,18 +32,18 @@ absl::StatusOr<Upstream::ClusterConstOptRef> Utility::checkCluster(absl::string_
                                                                    absl::string_view cluster_name,
                                                                    Upstream::ClusterManager& cm,
                                                                    bool allow_added_via_api) {
-  const auto cluster = cm.clusters().getCluster(cluster_name);
-  if (!cluster.has_value()) {
+  const auto cluster = cm.getActiveOrWarmingCluster(std::string(cluster_name));
+  if (!cluster) {
     return absl::InvalidArgumentError(
         fmt::format("{}: unknown cluster '{}'", error_prefix, cluster_name));
   }
 
-  if (!allow_added_via_api && cluster->get().info()->addedViaApi()) {
+  if (!allow_added_via_api && cluster->info()->addedViaApi()) {
     return absl::InvalidArgumentError(fmt::format(
         "{}: invalid cluster '{}': currently only static (non-CDS) clusters are supported",
         error_prefix, cluster_name));
   }
-  return cluster;
+  return Upstream::ClusterConstOptRef(*cluster);
 }
 
 absl::Status Utility::checkLocalInfo(absl::string_view error_prefix,

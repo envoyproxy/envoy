@@ -46,6 +46,19 @@ response_rules:
     metadata_namespace: envoy.filters.http.thrift_to_metadata
     key: response_reply_type
     value: "error"
+- field_selector:
+    child:
+      id: 1
+      name: foo
+    id: 2
+    name: bar
+  on_present:
+    metadata_namespace: envoy.lb
+    key: bar
+  on_missing:
+    metadata_namespace: envoy.lb
+    key: bar
+    value: "unknown"
   )";
 
   ThriftToMetadataConfig factory;

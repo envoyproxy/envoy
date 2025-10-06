@@ -292,7 +292,8 @@ private:
  */
 class OnStreamDoneCallBack : public Filters::Common::RateLimit::RequestCallbacks {
 public:
-  OnStreamDoneCallBack(Filters::Common::RateLimit::ClientPtr client) : client_(std::move(client)) {}
+  OnStreamDoneCallBack(std::shared_ptr<Filters::Common::RateLimit::Client> client)
+      : client_(std::move(client)) {}
   ~OnStreamDoneCallBack() override = default;
 
   // RateLimit::RequestCallbacks
@@ -304,7 +305,7 @@ public:
   Filters::Common::RateLimit::Client& client() { return *client_; }
 
 private:
-  Filters::Common::RateLimit::ClientPtr client_;
+  std::shared_ptr<Filters::Common::RateLimit::Client> client_;
 };
 
 } // namespace RateLimitFilter

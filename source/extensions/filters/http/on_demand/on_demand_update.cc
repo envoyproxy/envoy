@@ -71,16 +71,29 @@ DecodeHeadersBehaviorPtr createDecodeHeadersBehavior(
                                     Upstream::OdCdsApiHandlePtr);
     }
   }
-  // TODO(adisuissa): change "if (odcds == nullptr)" to "else" (and further
-  // merge the else with the "if (odcds_config->resources_locator().empty())")
-  // once the "envoy.reloadable_features.xdstp_based_config_singleton_subscriptions"
-  // runtime flag is deprecated.
+  // TODO(adisuissa): Once the
+  // "envoy.reloadable_features.xdstp_based_config_singleton_subscriptions" runtime flag is
+  // deprecated, change "if (odcds == nullptr)" to "else" (and further merge the else with the "if
+  // (odcds_config->resources_locator().empty())").
   if (odcds == nullptr) {
     if (odcds_config->resources_locator().empty()) {
-      odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create,
-                                                        odcds_config->source(), absl::nullopt,
-                                                        validation_visitor),
-                                    Upstream::OdCdsApiHandlePtr);
+      // If the config-source is ADS, use a singleton-subscription mechanism,
+      // similar to xDS-TP based configs.
+      if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.odcds_over_ads_fix")) {
+        if (odcds_config->source().config_source_specifier_case() ==
+            envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds) {
+          odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::XdstpOdCdsApiImpl::create,
+                                                            odcds_config->source(), absl::nullopt,
+                                                            validation_visitor),
+                                        Upstream::OdCdsApiHandlePtr);
+        }
+      }
+      if (odcds == nullptr) {
+        odcds = THROW_OR_RETURN_VALUE(cm.allocateOdCdsApi(&Upstream::OdCdsApiImpl::create,
+                                                          odcds_config->source(), absl::nullopt,
+                                                          validation_visitor),
+                                      Upstream::OdCdsApiHandlePtr);
+      }
     } else {
       auto locator = THROW_OR_RETURN_VALUE(
           Config::XdsResourceIdentifier::decodeUrl(odcds_config->resources_locator()),

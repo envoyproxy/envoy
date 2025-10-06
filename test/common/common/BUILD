@@ -480,6 +480,21 @@ envoy_benchmark_test(
     benchmark_binary = "prefix_matching_benchmark",
 )
 
+envoy_cc_benchmark_binary(
+    name = "shared_pointer_speed_test",
+    srcs = ["shared_pointer_speed_test.cc"],
+    rbe_pool = "6gig",
+    deps = [
+        "//source/common/common:assert_lib",
+        "@com_github_google_benchmark//:benchmark",
+    ],
+)
+
+envoy_benchmark_test(
+    name = "shared_pointer_benchmark_test",
+    benchmark_binary = "shared_pointer_speed_test",
+)
+
 envoy_cc_test(
     name = "lock_guard_test",
     srcs = ["lock_guard_test.cc"],

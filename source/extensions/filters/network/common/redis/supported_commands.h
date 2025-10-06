@@ -34,7 +34,12 @@ struct SupportedCommands {
         "xautoclaim", "xclaim", "xdel", "xlen", "xpending", "xrange", "xrevrange", "xtrim", "zadd",
         "zcard", "zcount", "zincrby", "zlexcount", "zpopmin", "zpopmax", "zrange", "zrangebylex",
         "zrangebyscore", "zrank", "zrem", "zremrangebylex", "zremrangebyrank", "zremrangebyscore",
-        "zrevrange", "zrevrangebylex", "zrevrangebyscore", "zrevrank", "zscan", "zscore");
+        "zrevrange", "zrevrangebylex", "zrevrangebyscore", "zrevrank", "zscan", "zscore", "copy",
+        "rpoplpush", "smove", "sunion", "sdiff", "sinter", "sinterstore", "zunionstore",
+        "zinterstore", "pfmerge", "georadius", "georadiusbymember", "rename", "sort", "sort_ro",
+        "zmscore", "sdiffstore", "msetnx", "substr", "zrangestore", "zunion", "zdiff",
+        "sunionstore", "smismember", "hrandfield", "geosearchstore", "zdiffstore", "zinter",
+        "zrandmember", "bitop", "lpos", "renamenx");
   }
 
   /**
@@ -42,7 +47,7 @@ struct SupportedCommands {
    */
   static const absl::flat_hash_set<std::string>& multiKeyCommands() {
     CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "del", "mget", "mset", "touch",
-                           "unlink");
+                           "unlink", "msetnx");
   }
 
   /**
@@ -131,15 +136,17 @@ struct SupportedCommands {
    * @return commands which alters the state of redis
    */
   static const absl::flat_hash_set<std::string>& writeCommands() {
-    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "append", "bitfield", "decr", "decrby",
-                           "del", "discard", "exec", "expire", "expireat", "eval", "evalsha",
-                           "geoadd", "getdel", "hdel", "hincrby", "hincrbyfloat", "hmset", "hset",
-                           "hsetnx", "incr", "incrby", "incrbyfloat", "linsert", "lmove", "lpop",
-                           "lpush", "lpushx", "lrem", "lset", "ltrim", "mset", "multi", "persist",
-                           "pexpire", "pexpireat", "pfadd", "psetex", "restore", "rpop", "rpush",
-                           "rpushx", "sadd", "set", "setbit", "setex", "setnx", "setrange", "spop",
-                           "srem", "zadd", "zincrby", "touch", "zpopmin", "zpopmax", "zrem",
-                           "zremrangebylex", "zremrangebyrank", "zremrangebyscore", "unlink");
+    CONSTRUCT_ON_FIRST_USE(
+        absl::flat_hash_set<std::string>, "append", "bitfield", "decr", "decrby", "del", "discard",
+        "exec", "expire", "expireat", "eval", "evalsha", "geoadd", "getdel", "hdel", "hincrby",
+        "hincrbyfloat", "hmset", "hset", "hsetnx", "incr", "incrby", "incrbyfloat", "linsert",
+        "lmove", "lpop", "lpush", "lpushx", "lrem", "lset", "ltrim", "mset", "multi", "persist",
+        "pexpire", "pexpireat", "pfadd", "psetex", "restore", "rpop", "rpush", "rpushx", "sadd",
+        "set", "setbit", "setex", "setnx", "setrange", "spop", "srem", "zadd", "zincrby", "touch",
+        "zpopmin", "zpopmax", "zrem", "zremrangebylex", "zremrangebyrank", "zremrangebyscore",
+        "unlink", "copy", "rpoplpush", "smove", "sinterstore", "zunionstore", "zinterstore",
+        "pfmerge", "georadius", "georadiusbymember", "rename", "sort", "sdiffstore", "msetnx",
+        "zrangestore", "sunionstore", "geosearchstore", "zdiffstore", "bitop", "renamenx");
   }
 
   static bool isReadCommand(const std::string& command) {

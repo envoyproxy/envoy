@@ -315,6 +315,7 @@ paths:
     - source/common/protobuf/utility.cc
     - source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc
     - source/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util.cc
+    - source/extensions/http/cache_v2/file_system_http_cache/cache_file_header_proto_util.cc
     - test/common/grpc/codec_fuzz_test.cc
     - test/common/grpc/codec_test.cc
     - test/common/protobuf/utility_test.cc
@@ -323,6 +324,7 @@ paths:
     - test/extensions/filters/common/expr/context_test.cc
     - test/extensions/filters/http/common/fuzz/uber_filter.h
     - test/extensions/http/cache/file_system_http_cache/cache_file_header_proto_util_test.cc
+    - test/extensions/http/cache_v2/file_system_http_cache/cache_file_header_proto_util_test.cc
     - test/tools/router_check/router_check.cc
     - source/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper.cc
     - test/extensions/bootstrap/reverse_tunnel/downstream_socket_interface/rc_connection_wrapper_test.cc

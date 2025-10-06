@@ -17,8 +17,8 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Common configuration shared across geolocation providers.
 
 message CommonGeoipProviderConfig {
-  // The set of geolocation headers to add to request. If any of the configured headers is present
-  // in the incoming request, it will be overridden by the :ref:`Geoip filter <config_http_filters_geoip>`.
+  // The set of geolocation headers to add to the request. If any of the configured headers is present
+  // in the incoming request, it will be overridden by the :ref:`GeoIP filter <config_http_filters_geoip>`.
   // [#next-free-field: 13]
   message GeolocationHeadersToAdd {
     // If set, the header will be used to populate the country ISO code associated with the IP address.
@@ -30,7 +30,7 @@ message CommonGeoipProviderConfig {
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
     // If set, the header will be used to populate the region ISO code associated with the IP address.
-    // The least specific subdivision will be selected as region value.
+    // The least specific subdivision will be selected as the region value.
     string region = 3
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
@@ -38,35 +38,35 @@ message CommonGeoipProviderConfig {
     string asn = 4
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
-    // This field is being deprecated, use ``anon`` instead.
+    // This field is deprecated; use ``anon`` instead.
     string is_anon = 5 [
       deprecated = true,
       (validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true},
       (envoy.annotations.deprecated_at_minor_version) = "3.0"
     ];
 
-    // If set, the IP address will be checked if it belongs to any type of anonymization network (e.g. VPN, public proxy etc)
-    // and header will be populated with the check result. Header value will be set to either "true" or "false" depending on the check result.
+    // If set, the IP address will be checked if it belongs to any type of anonymization network (e.g., VPN, public proxy).
+    // The header will be populated with the check result. Header value will be set to either ``true`` or ``false`` depending on the check result.
     string anon = 12
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
-    // If set, the IP address will be checked if it belongs to a VPN and header will be populated with the check result.
-    // Header value will be set to either "true" or "false" depending on the check result.
+    // If set, the IP address will be checked if it belongs to a VPN and the header will be populated with the check result.
+    // Header value will be set to either ``true`` or ``false`` depending on the check result.
     string anon_vpn = 6
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
-    // If set, the IP address will be checked if it belongs to a hosting provider and header will be populated with the check result.
-    // Header value will be set to either "true" or "false" depending on the check result.
+    // If set, the IP address will be checked if it belongs to a hosting provider and the header will be populated with the check result.
+    // Header value will be set to either ``true`` or ``false`` depending on the check result.
     string anon_hosting = 7
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
-    // If set, the IP address will be checked if it belongs to a TOR exit node and header will be populated with the check result.
-    // Header value will be set to either "true" or "false" depending on the check result.
+    // If set, the IP address will be checked if it belongs to a TOR exit node and the header will be populated with the check result.
+    // Header value will be set to either ``true`` or ``false`` depending on the check result.
     string anon_tor = 8
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
-    // If set, the IP address will be checked if it belongs to a public proxy and header will be populated with the check result.
-    // Header value will be set to either "true" or "false" depending on the check result.
+    // If set, the IP address will be checked if it belongs to a public proxy and the header will be populated with the check result.
+    // Header value will be set to either ``true`` or ``false`` depending on the check result.
     string anon_proxy = 9
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
@@ -74,12 +74,12 @@ message CommonGeoipProviderConfig {
     string isp = 10
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
 
-    // If set, the IP address will be checked if it belongs to the ISP named iCloud Private Relay and header will be populated with the check result.
-    // Header value will be set to either "true" or "false" depending on the check result.
+    // If set, the IP address will be checked if it belongs to the ISP named iCloud Private Relay and the header will be populated with the check result.
+    // Header value will be set to either ``true`` or ``false`` depending on the check result.
     string apple_private_relay = 11
         [(validate.rules).string = {well_known_regex: HTTP_HEADER_NAME ignore_empty: true}];
   }
 
-  // Configuration for geolocation headers to add to request.
+  // Configuration for geolocation headers to add to the request.
   GeolocationHeadersToAdd geo_headers_to_add = 1 [(validate.rules).message = {required: true}];
 }

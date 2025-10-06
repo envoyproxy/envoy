@@ -42,15 +42,16 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
       respect_dns_ttl_(dns_cluster.respect_dns_ttl()),
       dns_lookup_family_(
           Envoy::DnsUtils::getDnsLookupFamilyFromEnum(dns_cluster.dns_lookup_family())) {
+  RETURN_ONLY_IF_NOT_OK_REF(creation_status);
+
   failure_backoff_strategy_ = Config::Utility::prepareDnsRefreshStrategy(
       dns_cluster, dns_refresh_rate_ms_.count(),
       context.serverFactoryContext().api().randomGenerator());
 
   std::list<ResolveTargetPtr> resolve_targets;
   const auto& locality_lb_endpoints = load_assignment_.endpoints();
+  THROW_IF_NOT_OK(validateEndpoints(locality_lb_endpoints, {}));
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
-    THROW_IF_NOT_OK(validateEndpointsForZoneAwareRouting(locality_lb_endpoint));
-
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       const auto& socket_address = lb_endpoint.endpoint().address().socket_address();
       if (!socket_address.resolver_name().empty()) {

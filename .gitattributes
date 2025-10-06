@@ -6,6 +6,5 @@
 /test/common/tls/test_data/aes_128_key binary
 /test/common/tls/test_data/ticket_key_* binary
 /test/**/*_corpus/* linguist-generated=true
-requirements.txt binary
 package.lock binary
 yarn.lock binary

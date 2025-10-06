@@ -25,8 +25,8 @@ using AsyncStreamImplPtr = std::unique_ptr<AsyncStreamImpl>;
 class AsyncClientImpl final : public RawAsyncClient {
 public:
   static absl::StatusOr<std::unique_ptr<AsyncClientImpl>>
-  create(Upstream::ClusterManager& cm, const envoy::config::core::v3::GrpcService& config,
-         TimeSource& time_source);
+  create(const envoy::config::core::v3::GrpcService& config,
+         Server::Configuration::CommonFactoryContext& context);
   ~AsyncClientImpl() override;
 
   // Grpc::AsyncClient
@@ -39,13 +39,12 @@ public:
                            const Http::AsyncClient::StreamOptions& options) override;
   absl::string_view destination() override { return remote_cluster_name_; }
 
-  const absl::optional<envoy::config::route::v3::RetryPolicy>& retryPolicy() {
-    return retry_policy_;
-  }
+  const Router::RetryPolicyConstSharedPtr& retryPolicy() { return retry_policy_; }
 
 protected:
-  AsyncClientImpl(Upstream::ClusterManager& cm, const envoy::config::core::v3::GrpcService& config,
-                  TimeSource& time_source, absl::Status& creation_status);
+  AsyncClientImpl(const envoy::config::core::v3::GrpcService& config,
+                  Server::Configuration::CommonFactoryContext& context,
+                  absl::Status& creation_status);
 
 private:
   const uint32_t max_recv_message_length_;
@@ -58,7 +57,7 @@ private:
   TimeSource& time_source_;
   Router::HeaderParserPtr metadata_parser_;
   // Default per service retry policy.
-  absl::optional<envoy::config::route::v3::RetryPolicy> retry_policy_;
+  Router::RetryPolicyConstSharedPtr retry_policy_;
 
   friend class AsyncRequestImpl;
   friend class AsyncStreamImpl;
@@ -121,6 +120,7 @@ private:
   // Deliver notification and update span when the connection closes.
   void notifyRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message);
 
+protected:
   Event::Dispatcher* dispatcher_{};
   Http::RequestMessagePtr headers_message_;
   AsyncClientImpl& parent_;
@@ -153,6 +153,7 @@ public:
   // Grpc::AsyncRequest
   void cancel() override;
   const StreamInfo::StreamInfo& streamInfo() const override;
+  void detach() override;
 
 private:
   using AsyncStreamImpl::streamInfo;

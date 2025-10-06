@@ -112,8 +112,11 @@ ExternalProcessingFilterConfig::createFilterFactoryFromProtoTyped(
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 ExternalProcessingFilterConfig::createRouteSpecificFilterConfigTyped(
     const envoy::extensions::filters::http::ext_proc::v3::ExtProcPerRoute& proto_config,
-    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<FilterConfigPerRoute>(proto_config);
+    Server::Configuration::ServerFactoryContext& server_context,
+    ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<FilterConfigPerRoute>(
+      proto_config, Envoy::Extensions::Filters::Common::Expr::getBuilder(server_context),
+      server_context);
 }
 
 // This method will only be called when the filter is in downstream.

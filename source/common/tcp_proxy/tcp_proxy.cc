@@ -134,6 +134,10 @@ Config::SharedConfig::SharedConfig(
         DurationUtil::durationToMilliseconds(config.max_downstream_connection_duration());
     max_downstream_connection_duration_ = std::chrono::milliseconds(connection_duration);
   }
+  if (config.has_max_downstream_connection_duration_jitter_percentage()) {
+    max_downstream_connection_duration_jitter_percentage_ =
+        config.max_downstream_connection_duration_jitter_percentage().value();
+  }
 
   if (config.has_access_log_options()) {
     if (config.flush_access_log_on_connected() /* deprecated */) {
@@ -260,6 +264,31 @@ RouteConstSharedPtr Config::getRouteFromEntries(Network::Connection& connection)
   }
   return WeightedClusterUtil::pickCluster(weighted_clusters_, total_cluster_weight_,
                                           random_generator_.random(), false);
+}
+
+const absl::optional<std::chrono::milliseconds>
+Config::calculateMaxDownstreamConnectionDurationWithJitter() {
+  const auto& max_downstream_connection_duration = maxDownstreamConnectionDuration();
+  if (!max_downstream_connection_duration) {
+    return max_downstream_connection_duration;
+  }
+
+  const auto& jitter_percentage = maxDownstreamConnectionDurationJitterPercentage();
+  if (!jitter_percentage) {
+    return max_downstream_connection_duration;
+  }
+
+  // Apply jitter: base_duration * (1 + random(0, jitter_factor));
+  const uint64_t max_jitter_ms = std::ceil(max_downstream_connection_duration.value().count() *
+                                           (jitter_percentage.value() / 100.0));
+
+  if (max_jitter_ms == 0) {
+    return max_downstream_connection_duration;
+  }
+
+  const uint64_t jitter_ms = randomGenerator().random() % max_jitter_ms;
+  return std::chrono::milliseconds(
+      static_cast<uint64_t>(max_downstream_connection_duration.value().count() + jitter_ms));
 }
 
 UpstreamDrainManager& Config::drainManager() {
@@ -637,10 +666,9 @@ bool Filter::maybeTunnel(Upstream::ThreadLocalCluster& cluster) {
           "envoy.restart_features.upstream_http_filters_with_tcp_proxy")) {
     // TODO(vikaschoudhary16): Initialize route_ once per cluster.
     upstream_decoder_filter_callbacks_.route_ = THROW_OR_RETURN_VALUE(
-        Http::NullRouteImpl::create(
-            cluster.info()->name(),
-            *std::unique_ptr<const Router::RetryPolicy>{new Router::RetryPolicyImpl()},
-            config_->regexEngine()),
+        Http::NullRouteImpl::create(cluster.info()->name(),
+                                    Router::RetryPolicyImpl::DefaultRetryPolicy,
+                                    config_->regexEngine()),
         std::unique_ptr<Http::NullRouteImpl>);
   }
   Upstream::HostConstSharedPtr host =
@@ -876,16 +904,41 @@ Network::FilterStatus Filter::onData(Buffer::Instance& data, bool end_stream) {
 }
 
 Network::FilterStatus Filter::onNewConnection() {
-  if (config_->maxDownstreamConnectionDuration()) {
+  const auto& max_downstream_connection_duration =
+      config_->calculateMaxDownstreamConnectionDurationWithJitter();
+  if (max_downstream_connection_duration) {
     connection_duration_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onMaxDownstreamConnectionDuration(); });
-    connection_duration_timer_->enableTimer(config_->maxDownstreamConnectionDuration().value());
+    connection_duration_timer_->enableTimer(max_downstream_connection_duration.value());
   }
 
   if (config_->accessLogFlushInterval().has_value()) {
     access_log_flush_timer_ = read_callbacks_->connection().dispatcher().createTimer(
         [this]() -> void { onAccessLogFlushInterval(); });
     resetAccessLogFlushTimer();
+  }
+
+  idle_timeout_ = config_->idleTimeout();
+  if (const auto* per_connection_idle_timeout =
+          getStreamInfo().filterState()->getDataReadOnly<StreamInfo::UInt64Accessor>(
+              PerConnectionIdleTimeoutMs);
+      per_connection_idle_timeout != nullptr) {
+    idle_timeout_ = std::chrono::milliseconds(per_connection_idle_timeout->value());
+  }
+
+  if (idle_timeout_) {
+    // The idle_timer_ can be moved to a Drainer, so related callbacks call into
+    // the UpstreamCallbacks, which has the same lifetime as the timer, and can dispatch
+    // the call to either TcpProxy or to Drainer, depending on the current state.
+    idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
+        [upstream_callbacks = upstream_callbacks_]() { upstream_callbacks->onIdleTimeout(); });
+
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.tcp_proxy_set_idle_timer_immediately_on_new_connection")) {
+      // Start the idle timer immediately so that if no response is received from the upstream,
+      // the downstream connection will time out.
+      resetIdleTimer();
+    }
   }
 
   // Set UUID for the connection. This is used for logging and tracing.
@@ -1045,20 +1098,7 @@ void Filter::onUpstreamConnection() {
                  read_callbacks_->connection(),
                  getStreamInfo().downstreamAddressProvider().requestedServerName());
 
-  idle_timeout_ = config_->idleTimeout();
-  if (const auto* per_connection_idle_timeout =
-          getStreamInfo().filterState()->getDataReadOnly<StreamInfo::UInt64Accessor>(
-              PerConnectionIdleTimeoutMs);
-      per_connection_idle_timeout != nullptr) {
-    idle_timeout_ = std::chrono::milliseconds(per_connection_idle_timeout->value());
-  }
-
   if (idle_timeout_) {
-    // The idle_timer_ can be moved to a Drainer, so related callbacks call into
-    // the UpstreamCallbacks, which has the same lifetime as the timer, and can dispatch
-    // the call to either TcpProxy or to Drainer, depending on the current state.
-    idle_timer_ = read_callbacks_->connection().dispatcher().createTimer(
-        [upstream_callbacks = upstream_callbacks_]() { upstream_callbacks->onIdleTimeout(); });
     resetIdleTimer();
     read_callbacks_->connection().addBytesSentCallback([this](uint64_t) {
       resetIdleTimer();

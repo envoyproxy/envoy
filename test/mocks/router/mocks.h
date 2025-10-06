@@ -30,6 +30,7 @@
 #include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "source/common/router/upstream_to_downstream_impl_base.h"
 #include "source/common/stats/symbol_table.h"
 
 #include "test/mocks/stats/mocks.h"
@@ -120,6 +121,10 @@ public:
 
 class TestRetryPolicy : public RetryPolicy {
 public:
+  static std::shared_ptr<TestRetryPolicy> create() { return std::make_shared<TestRetryPolicy>(); }
+  static std::shared_ptr<NiceMock<TestRetryPolicy>> createMock() {
+    return std::make_shared<NiceMock<TestRetryPolicy>>();
+  }
   TestRetryPolicy();
   ~TestRetryPolicy() override;
 
@@ -430,7 +435,7 @@ public:
   MOCK_METHOD(const Router::TlsContextMatchCriteria*, tlsContextMatchCriteria, (), (const));
   MOCK_METHOD(Upstream::ResourcePriority, priority, (), (const));
   MOCK_METHOD(const RateLimitPolicy&, rateLimitPolicy, (), (const));
-  MOCK_METHOD(const RetryPolicy&, retryPolicy, (), (const));
+  MOCK_METHOD(const RetryPolicyConstSharedPtr&, retryPolicy, (), (const));
   MOCK_METHOD(const InternalRedirectPolicy&, internalRedirectPolicy, (), (const));
   MOCK_METHOD(const PathMatcherSharedPtr&, pathMatcher, (), (const));
   MOCK_METHOD(const PathRewriterSharedPtr&, pathRewriter, (), (const));
@@ -464,7 +469,8 @@ public:
 
   std::string cluster_name_{"fake_cluster"};
   std::multimap<std::string, std::string> opaque_config_;
-  TestRetryPolicy retry_policy_;
+  std::shared_ptr<TestRetryPolicy> retry_policy_ = TestRetryPolicy::create();
+  RetryPolicyConstSharedPtr base_retry_policy_ = retry_policy_;
   testing::NiceMock<MockInternalRedirectPolicy> internal_redirect_policy_;
   PathMatcherSharedPtr path_matcher_;
   PathRewriterSharedPtr path_rewriter_;
@@ -552,7 +558,7 @@ public:
   MOCK_METHOD(const Router::TlsContextMatchCriteria*, tlsContextMatchCriteria, (), (const));
   MOCK_METHOD(Upstream::ResourcePriority, priority, (), (const));
   MOCK_METHOD(const RateLimitPolicy&, rateLimitPolicy, (), (const));
-  MOCK_METHOD(const RetryPolicy&, retryPolicy, (), (const));
+  MOCK_METHOD(const RetryPolicyConstSharedPtr&, retryPolicy, (), (const));
   MOCK_METHOD(const InternalRedirectPolicy&, internalRedirectPolicy, (), (const));
   MOCK_METHOD(const PathMatcherSharedPtr&, pathMatcher, (), (const));
   MOCK_METHOD(const PathRewriterSharedPtr&, pathRewriter, (), (const));
@@ -709,7 +715,7 @@ public:
       new NiceMock<Upstream::MockHostDescription>()};
 };
 
-class MockUpstreamToDownstream : public UpstreamToDownstream {
+class MockUpstreamToDownstream : public UpstreamToDownstreamImplBase {
 public:
   MOCK_METHOD(const Route&, route, (), (const));
   MOCK_METHOD(OptRef<const Network::Connection>, connection, (), (const));

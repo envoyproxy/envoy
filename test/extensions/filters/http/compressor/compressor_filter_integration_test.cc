@@ -1,7 +1,10 @@
 #include "envoy/event/timer.h"
+#include "envoy/extensions/compression/brotli/compressor/v3/brotli.pb.h"
+#include "envoy/extensions/compression/gzip/compressor/v3/gzip.pb.h"
 #include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 
 #include "source/common/protobuf/protobuf.h"
+#include "source/extensions/compression/brotli/decompressor/brotli_decompressor_impl.h"
 #include "source/extensions/compression/gzip/decompressor/zlib_decompressor_impl.h"
 
 #include "test/integration/http_integration.h"
@@ -416,17 +419,19 @@ TEST_P(CompressorIntegrationTest, CompressedRequestAcceptanceFullConfigTest) {
 
 // Enable filter, then disable per-route.
 TEST_P(CompressorIntegrationTest, PerRouteDisable) {
-  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& cm) {
-    auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
-    auto* route = vh->mutable_routes()->Mutable(0);
-    route->mutable_match()->set_path("/nocompress");
-    envoy::extensions::filters::http::compressor::v3::CompressorPerRoute per_route;
-    per_route.set_disabled(true);
-    Any cfg_any;
-    ASSERT_TRUE(cfg_any.PackFrom(per_route));
-    route->mutable_typed_per_filter_config()->insert(
-        MapPair<std::string, Any>("envoy.filters.http.compressor", cfg_any));
-  });
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             cm) {
+        auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+        auto* route = vh->mutable_routes()->Mutable(0);
+        route->mutable_match()->set_path("/nocompress");
+        envoy::extensions::filters::http::compressor::v3::CompressorPerRoute per_route;
+        per_route.set_disabled(true);
+        Any cfg_any;
+        ASSERT_TRUE(cfg_any.PackFrom(per_route));
+        route->mutable_typed_per_filter_config()->insert(
+            MapPair<std::string, Any>("envoy.filters.http.compressor", cfg_any));
+      });
   initializeFilter(R"EOF(
       name: envoy.filters.http.compressor
       typed_config:
@@ -456,17 +461,19 @@ TEST_P(CompressorIntegrationTest, PerRouteDisable) {
 
 // Disable filter, then enable per-route.
 TEST_P(CompressorIntegrationTest, PerRouteEnable) {
-  config_helper_.addConfigModifier([](ConfigHelper::HttpConnectionManager& cm) {
-    auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
-    auto* route = vh->mutable_routes()->Mutable(0);
-    route->mutable_match()->set_path("/compress");
-    envoy::extensions::filters::http::compressor::v3::CompressorPerRoute per_route;
-    per_route.mutable_overrides()->mutable_response_direction_config();
-    Any cfg_any;
-    ASSERT_TRUE(cfg_any.PackFrom(per_route));
-    route->mutable_typed_per_filter_config()->insert(
-        MapPair<std::string, Any>("envoy.filters.http.compressor", cfg_any));
-  });
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             cm) {
+        auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+        auto* route = vh->mutable_routes()->Mutable(0);
+        route->mutable_match()->set_path("/compress");
+        envoy::extensions::filters::http::compressor::v3::CompressorPerRoute per_route;
+        per_route.mutable_overrides()->mutable_response_direction_config();
+        Any cfg_any;
+        ASSERT_TRUE(cfg_any.PackFrom(per_route));
+        route->mutable_typed_per_filter_config()->insert(
+            MapPair<std::string, Any>("envoy.filters.http.compressor", cfg_any));
+      });
   initializeFilter(R"EOF(
       name: envoy.filters.http.compressor
       typed_config:
@@ -491,6 +498,120 @@ TEST_P(CompressorIntegrationTest, PerRouteEnable) {
                           Http::TestResponseHeaderMapImpl{{":status", "200"},
                                                           {"content-length", "40"},
                                                           {"content-type", "text/xml"}});
+}
+
+// Test per-route compressor library override with brotli.
+TEST_P(CompressorIntegrationTest, PerRouteCompressorLibraryOverride) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             cm) {
+        auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+        auto* route = vh->mutable_routes()->Mutable(0);
+        route->mutable_match()->set_path("/brotli-per-route");
+
+        envoy::extensions::filters::http::compressor::v3::CompressorPerRoute per_route;
+        // Override the compressor library to use brotli instead of gzip.
+        auto* compressor_lib = per_route.mutable_overrides()->mutable_compressor_library();
+        compressor_lib->set_name("brotli");
+        compressor_lib->mutable_typed_config()->set_type_url(
+            "type.googleapis.com/envoy.extensions.compression.brotli.compressor.v3.Brotli");
+        compressor_lib->mutable_typed_config()->set_value("{}");
+
+        Any cfg_any;
+        ASSERT_TRUE(cfg_any.PackFrom(per_route));
+        route->mutable_typed_per_filter_config()->insert(
+            MapPair<std::string, Any>("envoy.filters.http.compressor", cfg_any));
+      });
+
+  initializeFilter(R"EOF(
+      name: envoy.filters.http.compressor
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.Compressor
+        compressor_library:
+          name: gzip-default
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip
+        response_direction_config:
+          common_config:
+            enabled:
+              default_value: true
+            content_type:
+              - text/html
+              - application/json
+    )EOF");
+
+  // Request to /brotli-per-route should use brotli compression (per-route override).
+  auto response = sendRequestAndWaitForResponse(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/brotli-per-route"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept-encoding", "br, gzip"}},
+      0,
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"}, {"content-length", "40"}, {"content-type", "text/html"}},
+      40);
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  // Should be compressed with brotli (not gzip), validating the per-route override works.
+  Http::HeaderMap::GetResult content_encoding =
+      response->headers().get(Http::CustomHeaders::get().ContentEncoding);
+  ASSERT_FALSE(content_encoding.empty());
+  EXPECT_EQ("br", content_encoding[0]->value().getStringView());
+}
+
+// Test that per-route compressor library config creation works with various libraries.
+TEST_P(CompressorIntegrationTest, PerRouteCompressorLibraryConfigCreation) {
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             cm) {
+        auto* vh = cm.mutable_route_config()->mutable_virtual_hosts()->Mutable(0);
+        auto* route = vh->mutable_routes()->Mutable(0);
+        route->mutable_match()->set_path("/custom");
+
+        envoy::extensions::filters::http::compressor::v3::CompressorPerRoute per_route;
+        // Test that per-route config can be created with different compressor library.
+        auto* compressor_lib = per_route.mutable_overrides()->mutable_compressor_library();
+        compressor_lib->set_name("custom");
+        compressor_lib->mutable_typed_config()->set_type_url(
+            "type.googleapis.com/envoy.extensions.compression.gzip.compressor.v3.Gzip");
+
+        // Set some config for gzip compressor.
+        envoy::extensions::compression::gzip::compressor::v3::Gzip gzip_config;
+        gzip_config.mutable_window_bits()->set_value(12);
+        std::string serialized_config;
+        ASSERT_TRUE(gzip_config.SerializeToString(&serialized_config));
+        compressor_lib->mutable_typed_config()->set_value(serialized_config);
+
+        Any cfg_any;
+        ASSERT_TRUE(cfg_any.PackFrom(per_route));
+        route->mutable_typed_per_filter_config()->insert(
+            MapPair<std::string, Any>("envoy.filters.http.compressor", cfg_any));
+      });
+
+  initializeFilter(default_config);
+
+  // Make request and verify it works.
+  // Both should compress with gzip but different settings.
+  auto response = sendRequestAndWaitForResponse(
+      Http::TestRequestHeaderMapImpl{{":method", "GET"},
+                                     {":path", "/custom"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"accept-encoding", "gzip"}},
+      0,
+      Http::TestResponseHeaderMapImpl{
+          {":status", "200"}, {"content-length", "40"}, {"content-type", "text/html"}},
+      40);
+
+  EXPECT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+  Http::HeaderMap::GetResult content_encoding =
+      response->headers().get(Http::CustomHeaders::get().ContentEncoding);
+  ASSERT_FALSE(content_encoding.empty());
+  EXPECT_EQ(Http::CustomHeaders::get().ContentEncodingValues.Gzip,
+            content_encoding[0]->value().getStringView());
 }
 
 } // namespace Envoy

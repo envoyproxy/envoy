@@ -108,13 +108,12 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterLbSta
   recalculatePerPriorityPanic();
 
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
-      [this](uint32_t priority, const HostVector&, const HostVector&) -> absl::Status {
+      [this](uint32_t priority, const HostVector&, const HostVector&) {
         recalculatePerPriorityState(priority, priority_set_, per_priority_load_,
                                     per_priority_health_, per_priority_degraded_,
                                     total_healthy_hosts_);
         recalculatePerPriorityPanic();
         stashed_random_.clear();
-        return absl::OkStatus();
       });
 }
 
@@ -434,7 +433,7 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
   }
 
   priority_update_cb_ = priority_set_.addPriorityUpdateCb(
-      [this](uint32_t priority, const HostVector&, const HostVector&) -> absl::Status {
+      [this](uint32_t priority, const HostVector&, const HostVector&) {
         // Make sure per_priority_state_ is as large as priority_set_.hostSetsPerPriority()
         resizePerPriorityState();
         // If P=0 changes, regenerate locality routing structures. Locality based routing is
@@ -446,7 +445,6 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
         if (locality_weighted_balancing_) {
           rebuildLocalityWrrForPriority(priority);
         }
-        return absl::OkStatus();
       });
   if (local_priority_set_) {
     // Multiple priorities are unsupported for local priority sets.
@@ -455,12 +453,11 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     // the locality routing structure.
     ASSERT(local_priority_set_->hostSetsPerPriority().size() == 1);
     local_priority_set_member_update_cb_handle_ = local_priority_set_->addPriorityUpdateCb(
-        [this](uint32_t priority, const HostVector&, const HostVector&) -> absl::Status {
+        [this](uint32_t priority, const HostVector&, const HostVector&) {
           ASSERT(priority == 0);
           // If the set of local Envoys changes, regenerate routing for P=0 as it does priority
           // based routing.
           regenerateLocalityRoutingStructures();
-          return absl::OkStatus();
         });
   }
 }
@@ -936,16 +933,12 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
   // so we will need to do better at delta tracking to scale (see
   // https://github.com/envoyproxy/envoy/issues/2874).
   priority_update_cb_ = priority_set.addPriorityUpdateCb(
-      [this](uint32_t priority, const HostVector&, const HostVector&) {
-        refresh(priority);
-        return absl::OkStatus();
-      });
-  member_update_cb_ = priority_set.addMemberUpdateCb(
-      [this](const HostVector& hosts_added, const HostVector&) -> absl::Status {
+      [this](uint32_t priority, const HostVector&, const HostVector&) { refresh(priority); });
+  member_update_cb_ =
+      priority_set.addMemberUpdateCb([this](const HostVector& hosts_added, const HostVector&) {
         if (isSlowStartEnabled()) {
           recalculateHostsInSlowStart(hosts_added);
         }
-        return absl::OkStatus();
       });
 }
 

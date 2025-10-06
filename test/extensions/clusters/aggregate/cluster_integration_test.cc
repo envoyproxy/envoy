@@ -767,6 +767,8 @@ TEST_P(AggregateIntegrationTest, CircuitBreakerTestMaxPendingRequests) {
 TEST_P(AggregateIntegrationTest, CircuitBreakerMaxRetriesTest) {
   setDownstreamProtocol(Http::CodecType::HTTP2);
 
+  config_helper_.setDownstreamHttp2MaxConcurrentStreams(2048);
+  config_helper_.setUpstreamHttp2MaxConcurrentStreams(2048);
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* listener = static_resources->mutable_listeners(0);

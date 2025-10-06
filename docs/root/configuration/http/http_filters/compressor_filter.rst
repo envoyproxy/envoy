@@ -120,6 +120,27 @@ For example, to disable response compression for a particular virtual host, but 
     :lines: 14-36
     :caption: :download:`compressor-filter.yaml <_include/compressor-filter.yaml>`
 
+Additionally, the compressor library can be overridden on a per-route basis. This allows
+different routes to use different compression algorithms (e.g., gzip, brotli, zstd) while
+maintaining the same filter configuration. For example, to use brotli compression for a
+specific route while using gzip as the default:
+
+.. code-block:: yaml
+
+  routes:
+  - match:
+      prefix: "/api"
+    route:
+      cluster: service
+    typed_per_filter_config:
+      envoy.filters.http.compressor:
+        "@type": type.googleapis.com/envoy.extensions.filters.http.compressor.v3.CompressorPerRoute
+        overrides:
+          compressor_library:
+            name: brotli
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.compression.brotli.compressor.v3.Brotli
+
 Using different compressors for requests and responses
 --------------------------------------------------------
 

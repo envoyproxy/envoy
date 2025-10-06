@@ -77,7 +77,7 @@ void runOnWorkerThreadsAndWaitforCompletion(Server::Instance& server, std::funct
 
 void waitForNumTurns(std::vector<uint64_t>& turns, absl::Mutex& mu, uint32_t expected_size) {
 
-  absl::MutexLock l(&mu);
+  absl::MutexLock l(mu);
   auto check_data_in_connection_output_buffer = [&turns, &mu, expected_size]() {
     mu.AssertHeld();
     return turns.size() == expected_size;
@@ -915,7 +915,7 @@ protected:
     test_server_->waitForCounterEq("http.config_test.downstream_flow_control_resumed_reading_total",
                                    0);
     EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(1, [](const StreamTee& tee) {
-      absl::MutexLock l{&tee.mutex_};
+      absl::MutexLock l{tee.mutex_};
       EXPECT_EQ(tee.request_body_.length(), 1000);
     }));
 
@@ -969,7 +969,7 @@ protected:
     test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
                                    0);
     EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(1, [](const StreamTee& tee) {
-      absl::MutexLock l{&tee.mutex_};
+      absl::MutexLock l{tee.mutex_};
       EXPECT_EQ(tee.response_body_.length(), 1000);
     }));
 
@@ -1049,7 +1049,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInDownstreamCodec) {
   test_server_->waitForCounterEq("http.config_test.downstream_flow_control_resumed_reading_total",
                                  0);
   EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(1, [](const StreamTee& tee) {
-    absl::MutexLock l{&tee.mutex_};
+    absl::MutexLock l{tee.mutex_};
     EXPECT_EQ(tee.request_body_.length(), 1000);
   }));
 
@@ -1092,7 +1092,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanBufferInUpstreamCodec) {
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
                                  0);
   EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(1, [](const StreamTee& tee) {
-    absl::MutexLock l{&tee.mutex_};
+    absl::MutexLock l{tee.mutex_};
     EXPECT_EQ(tee.response_body_.length(), 1000);
   }));
 
@@ -1134,7 +1134,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanDeferOnStreamCloseForUpstream)
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
                                  0);
   EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(1, [](const StreamTee& tee) {
-    absl::MutexLock l{&tee.mutex_};
+    absl::MutexLock l{tee.mutex_};
     EXPECT_EQ(tee.response_body_.length(), 1000);
   }));
 
@@ -1190,7 +1190,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
                                  0);
   EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(1, [](const StreamTee& tee) {
-    absl::MutexLock l{&tee.mutex_};
+    absl::MutexLock l{tee.mutex_};
     EXPECT_EQ(tee.response_body_.length(), 9000);
   }));
 
@@ -1237,7 +1237,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest,
   test_server_->waitForCounterEq("cluster.cluster_0.upstream_flow_control_resumed_reading_total",
                                  0);
   EXPECT_TRUE(tee_filter_factory_.inspectStreamTee(1, [](const StreamTee& tee) {
-    absl::MutexLock l{&tee.mutex_};
+    absl::MutexLock l{tee.mutex_};
     EXPECT_EQ(tee.response_body_.length(), 1000);
   }));
 
@@ -1287,7 +1287,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanRoundRobinBetweenStreams) {
       [&turns, &mu](StreamTee& tee, Http::StreamDecoderFilterCallbacks* decoder_callbacks)
           ABSL_EXCLUSIVE_LOCKS_REQUIRED(tee.mutex_) -> Http::FilterDataStatus {
     (void)tee; // silence gcc unused warning (the absl annotation usage didn't mark it used.)
-    absl::MutexLock l(&mu);
+    absl::MutexLock l(mu);
     turns.push_back(decoder_callbacks->streamId());
     return Http::FilterDataStatus::Continue;
   };
@@ -1338,7 +1338,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, CanRoundRobinBetweenStreams) {
   // Check that during deferred processing we round robin between the streams.
   // Turns in the sequence 0-3 and 8-11 should match.
   {
-    absl::MutexLock l(&mu);
+    absl::MutexLock l(mu);
     for (uint32_t i = 0; i < num_requests; ++i) {
       EXPECT_EQ(turns[i], turns[i + 8]);
     }
@@ -1367,7 +1367,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, RoundRobinWithStreamsExiting) {
   auto record_turns_on_encode_and_stop_writes_on_endstream =
       [this, &turns, &mu](StreamTee& tee, Http::StreamEncoderFilterCallbacks* encoder_callbacks)
           ABSL_EXCLUSIVE_LOCKS_REQUIRED(tee.mutex_) -> Http::FilterDataStatus {
-    absl::MutexLock l(&mu);
+    absl::MutexLock l(mu);
     turns.push_back(encoder_callbacks->streamId());
 
     if (tee.encode_end_stream_) {
@@ -1411,26 +1411,26 @@ TEST_P(Http2DeferredProcessingIntegrationTest, RoundRobinWithStreamsExiting) {
   // a chance.
   waitForNumTurns(turns, mu, 5);
   {
-    absl::MutexLock l(&mu);
+    absl::MutexLock l(mu);
     // Check ordering as expected.
     EXPECT_EQ(turns[3], turns[0]);
     EXPECT_EQ(turns[4], turns[1]);
   }
   tee_filter_factory_.inspectStreamTee(tee_filter_factory_.computeClientStreamId(0),
                                        [](const StreamTee& tee) {
-                                         absl::MutexLock l{&tee.mutex_};
+                                         absl::MutexLock l{tee.mutex_};
                                          EXPECT_EQ(tee.response_body_.length(), 8000);
                                        });
 
   tee_filter_factory_.inspectStreamTee(tee_filter_factory_.computeClientStreamId(1),
                                        [](const StreamTee& tee) {
-                                         absl::MutexLock l{&tee.mutex_};
+                                         absl::MutexLock l{tee.mutex_};
                                          EXPECT_TRUE(tee.encode_end_stream_);
                                        });
 
   tee_filter_factory_.inspectStreamTee(tee_filter_factory_.computeClientStreamId(2),
                                        [](const StreamTee& tee) {
-                                         absl::MutexLock l{&tee.mutex_};
+                                         absl::MutexLock l{tee.mutex_};
                                          EXPECT_EQ(tee.response_body_.length(), 4000);
                                        });
 
@@ -1446,12 +1446,12 @@ TEST_P(Http2DeferredProcessingIntegrationTest, RoundRobinWithStreamsExiting) {
   // buffer stopping the 3rd stream from flushing its buffered data.
   tee_filter_factory_.inspectStreamTee(tee_filter_factory_.computeClientStreamId(2),
                                        [](const StreamTee& tee) {
-                                         absl::MutexLock l{&tee.mutex_};
+                                         absl::MutexLock l{tee.mutex_};
                                          EXPECT_TRUE(tee.encode_end_stream_);
                                        });
   tee_filter_factory_.inspectStreamTee(tee_filter_factory_.computeClientStreamId(0),
                                        [](const StreamTee& tee) {
-                                         absl::MutexLock l{&tee.mutex_};
+                                         absl::MutexLock l{tee.mutex_};
                                          EXPECT_EQ(tee.response_body_.length(), 8000);
                                        });
   // The 1st stream will finish.
@@ -1459,7 +1459,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, RoundRobinWithStreamsExiting) {
   waitForNumTurns(turns, mu, 7);
   tee_filter_factory_.inspectStreamTee(tee_filter_factory_.computeClientStreamId(0),
                                        [](const StreamTee& tee) {
-                                         absl::MutexLock l{&tee.mutex_};
+                                         absl::MutexLock l{tee.mutex_};
                                          EXPECT_TRUE(tee.encode_end_stream_);
                                        });
   // All responses would have drained to client.
@@ -1503,7 +1503,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, ChunkProcessesStreams) {
   auto record_on_decode =
       [this, &turns, &mu](StreamTee& tee, Http::StreamDecoderFilterCallbacks* decoder_callbacks)
           ABSL_EXCLUSIVE_LOCKS_REQUIRED(tee.mutex_) -> Http::FilterDataStatus {
-    absl::MutexLock l(&mu);
+    absl::MutexLock l(mu);
     turns.emplace_back(decoder_callbacks->streamId(), tee.request_body_.length());
 
     // Allows us to build more than chunk size in a stream, as the
@@ -1560,7 +1560,7 @@ TEST_P(Http2DeferredProcessingIntegrationTest, ChunkProcessesStreams) {
   EXPECT_TRUE(upstream_requests[2]->waitForData(*dispatcher_, 131000));
 
   {
-    absl::MutexLock l(&mu);
+    absl::MutexLock l(mu);
     // The 3rd stream should have gone multiple times to drain out the 128KiB of
     // data. Each chunk drain is 10KB.
     ASSERT_GE(turns.size(), 3);

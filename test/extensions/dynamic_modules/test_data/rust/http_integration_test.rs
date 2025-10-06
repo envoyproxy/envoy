@@ -66,6 +66,7 @@ fn new_http_filter_config_fn<EC: EnvoyHttpFilterConfig, EHF: EnvoyHttpFilter>(
         header_to_set: config_iter.next().unwrap().to_owned(),
       }))
     },
+    "inject_body" => Some(Box::new(InjectBodyHttpFilterConfig {})),
     _ => panic!("Unknown filter name: {}", name),
   }
 }
@@ -624,7 +625,6 @@ impl Drop for HttpFilterScheduler {
   }
 }
 
-
 /// This implements a fake external caching filter that simulates an asynchronous cache lookup.
 struct FakeExternalCachingFilterConfig {}
 
@@ -898,5 +898,80 @@ impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for StatsCallbacksFilter {
         1,
       )
       .unwrap();
+  }
+}
+
+// Filter that blocks request and response body processing within the filter chain and
+// instead injects request and response body within a scheduler callback.
+struct InjectBodyHttpFilterConfig {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilterConfig<EHF> for InjectBodyHttpFilterConfig {
+  fn new_http_filter(&mut self, _envoy: &mut EHF) -> Box<dyn HttpFilter<EHF>> {
+    Box::new(InjectBodyHttpFilter {})
+  }
+}
+
+const EVENT_INJECT_REQUEST_BODY: u64 = 1;
+const EVENT_INJECT_RESPONSE_BODY: u64 = 2;
+
+struct InjectBodyHttpFilter {}
+
+impl<EHF: EnvoyHttpFilter> HttpFilter<EHF> for InjectBodyHttpFilter {
+  fn on_request_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_request_headers_status {
+    // Schedule request body injection outside the filter lifecycle.
+    envoy_filter
+      .new_scheduler()
+      .commit(EVENT_INJECT_REQUEST_BODY);
+    return envoy_dynamic_module_type_on_http_filter_request_headers_status::Continue;
+  }
+
+  fn on_request_body(
+    &mut self,
+    _envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_request_body_status {
+    // Ignore downstream request body.
+    return envoy_dynamic_module_type_on_http_filter_request_body_status::StopIterationAndBuffer;
+  }
+
+  fn on_response_headers(
+    &mut self,
+    envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> abi::envoy_dynamic_module_type_on_http_filter_response_headers_status {
+    // Schedule response body injection outside the filter lifecycle.
+    envoy_filter
+      .new_scheduler()
+      .commit(EVENT_INJECT_RESPONSE_BODY);
+    abi::envoy_dynamic_module_type_on_http_filter_response_headers_status::Continue
+  }
+
+  fn on_response_body(
+    &mut self,
+    _envoy_filter: &mut EHF,
+    _end_of_stream: bool,
+  ) -> envoy_dynamic_module_type_on_http_filter_response_body_status {
+    // Ignore upstream response body.
+    return envoy_dynamic_module_type_on_http_filter_response_body_status::StopIterationAndBuffer;
+  }
+
+  fn on_scheduled(&mut self, envoy_filter: &mut EHF, event_id: u64) {
+    // Inject the request or response body based on the event type. We inject
+    // both without and with end_stream to ensure the full body is sent correctly.
+    match event_id {
+      EVENT_INJECT_REQUEST_BODY => {
+        envoy_filter.inject_request_body(b"injected_", false);
+        envoy_filter.inject_request_body(b"request_body", true);
+      },
+      EVENT_INJECT_RESPONSE_BODY => {
+        envoy_filter.inject_response_body(b"injected_", false);
+        envoy_filter.inject_response_body(b"response_body", true);
+      },
+      _ => unreachable!(),
+    }
   }
 }

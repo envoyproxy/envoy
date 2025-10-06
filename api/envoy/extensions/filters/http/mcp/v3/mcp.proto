@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.mcp.v3;
+
+import "udpa/annotations/status.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.mcp.v3";
+option java_outer_classname = "McpProto";
+option java_multiple_files = true;
+option go_package = "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/mcp/v3;mcpv3";
+option (udpa.annotations.file_status).package_version_status = ACTIVE;
+
+// [#protodoc-title: MCP]
+// MCP filter :ref:`configuration overview <config_http_filters_mcp>`.
+// [#extension: envoy.filters.http.mcp]
+
+message Mcp {
+  // TODO: Add configuration fields
+}

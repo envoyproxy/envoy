@@ -72,6 +72,15 @@ class HttpFilterStateInputFactory : public FilterStateInputBaseFactory<Http::Htt
 REGISTER_FACTORY(FilterStateInputFactory, Matcher::DataInputFactory<MatchingData>);
 REGISTER_FACTORY(HttpFilterStateInputFactory, Matcher::DataInputFactory<Http::HttpMatchingData>);
 
+class NetworkNamespaceInputFactory : public NetworkNamespaceInputBaseFactory<MatchingData> {};
+class UdpNetworkNamespaceInputFactory : public NetworkNamespaceInputBaseFactory<UdpMatchingData> {};
+class HttpNetworkNamespaceInputFactory
+    : public NetworkNamespaceInputBaseFactory<Http::HttpMatchingData> {};
+REGISTER_FACTORY(NetworkNamespaceInputFactory, Matcher::DataInputFactory<MatchingData>);
+REGISTER_FACTORY(UdpNetworkNamespaceInputFactory, Matcher::DataInputFactory<UdpMatchingData>);
+REGISTER_FACTORY(HttpNetworkNamespaceInputFactory,
+                 Matcher::DataInputFactory<Http::HttpMatchingData>);
+
 } // namespace Matching
 } // namespace Network
 } // namespace Envoy

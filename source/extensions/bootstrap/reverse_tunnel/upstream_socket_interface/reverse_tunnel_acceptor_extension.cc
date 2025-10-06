@@ -16,26 +16,31 @@ UpstreamSocketThreadLocal::UpstreamSocketThreadLocal(Event::Dispatcher& dispatch
 // ReverseTunnelAcceptorExtension implementation
 void ReverseTunnelAcceptorExtension::onServerInitialized() {
   ENVOY_LOG(debug,
-            "ReverseTunnelAcceptorExtension::onServerInitialized - creating thread local slot");
+            "ReverseTunnelAcceptorExtension::onServerInitialized: creating thread-local slot.");
 
   // Set the extension reference in the socket interface.
   if (socket_interface_) {
     socket_interface_->extension_ = this;
   }
 
-  // Create thread local slot for dispatcher and socket manager.
+  // Create thread-local slot for the dispatcher and socket manager.
   tls_slot_ = ThreadLocal::TypedSlot<UpstreamSocketThreadLocal>::makeUnique(context_.threadLocal());
 
-  // Set up the thread local dispatcher and socket manager.
+  // Set up the thread-local dispatcher and socket manager.
   tls_slot_->set([this](Event::Dispatcher& dispatcher) {
-    return std::make_shared<UpstreamSocketThreadLocal>(dispatcher, this);
+    auto tls = std::make_shared<UpstreamSocketThreadLocal>(dispatcher, this);
+    // Propagate configured miss threshold into the socket manager.
+    if (tls->socketManager()) {
+      tls->socketManager()->setMissThreshold(ping_failure_threshold_);
+    }
+    return tls;
   });
 }
 
-// Get thread local registry for the current thread
+// Get thread-local registry for the current thread.
 UpstreamSocketThreadLocal* ReverseTunnelAcceptorExtension::getLocalRegistry() const {
   if (!tls_slot_) {
-    ENVOY_LOG(error, "ReverseTunnelAcceptorExtension::getLocalRegistry() - no thread local slot");
+    ENVOY_LOG(error, "ReverseTunnelAcceptorExtension::getLocalRegistry(): no thread-local slot.");
     return nullptr;
   }
 

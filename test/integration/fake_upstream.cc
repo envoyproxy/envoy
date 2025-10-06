@@ -48,7 +48,7 @@ FakeStream::FakeStream(FakeHttpConnection& parent, Http::ResponseEncoder& encode
 }
 
 void FakeStream::decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool end_stream) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   headers_ = std::move(headers);
   if (header_validator_) {
     header_validator_->transformRequestHeaders(*headers_);
@@ -58,13 +58,13 @@ void FakeStream::decodeHeaders(Http::RequestHeaderMapSharedPtr&& headers, bool e
 
 void FakeStream::decodeData(Buffer::Instance& data, bool end_stream) {
   received_data_ = true;
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   body_.add(data);
   setEndStream(end_stream);
 }
 
 void FakeStream::decodeTrailers(Http::RequestTrailerMapPtr&& trailers) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   setEndStream(true);
   trailers_ = std::move(trailers);
 }
@@ -89,7 +89,7 @@ void FakeStream::encode1xxHeaders(const Http::ResponseHeaderMap& headers) {
       Http::createHeaderMap<Http::ResponseHeaderMapImpl>(headers));
   postToConnectionThread([this, headers_copy]() -> void {
     {
-      absl::MutexLock lock(&lock_);
+      absl::MutexLock lock(lock_);
       if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
@@ -117,7 +117,7 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
 
   postToConnectionThread([this, headers_copy = std::move(headers_copy), end_stream]() -> void {
     {
-      absl::MutexLock lock(&lock_);
+      absl::MutexLock lock(lock_);
       if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
@@ -130,7 +130,7 @@ void FakeStream::encodeHeaders(const Http::HeaderMap& headers, bool end_stream) 
 void FakeStream::encodeData(std::string data, bool end_stream) {
   postToConnectionThread([this, data, end_stream]() -> void {
     {
-      absl::MutexLock lock(&lock_);
+      absl::MutexLock lock(lock_);
       if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
@@ -144,7 +144,7 @@ void FakeStream::encodeData(std::string data, bool end_stream) {
 void FakeStream::encodeData(uint64_t size, bool end_stream) {
   postToConnectionThread([this, size, end_stream]() -> void {
     {
-      absl::MutexLock lock(&lock_);
+      absl::MutexLock lock(lock_);
       if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
@@ -159,7 +159,7 @@ void FakeStream::encodeData(Buffer::Instance& data, bool end_stream) {
   std::shared_ptr<Buffer::Instance> data_copy = std::make_shared<Buffer::OwnedImpl>(data);
   postToConnectionThread([this, data_copy, end_stream]() -> void {
     {
-      absl::MutexLock lock(&lock_);
+      absl::MutexLock lock(lock_);
       if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
@@ -174,7 +174,7 @@ void FakeStream::encodeTrailers(const Http::HeaderMap& trailers) {
       Http::createHeaderMap<Http::ResponseTrailerMapImpl>(trailers));
   postToConnectionThread([this, trailers_copy]() -> void {
     {
-      absl::MutexLock lock(&lock_);
+      absl::MutexLock lock(lock_);
       if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
@@ -187,7 +187,7 @@ void FakeStream::encodeTrailers(const Http::HeaderMap& trailers) {
 void FakeStream::encodeResetStream() {
   postToConnectionThread([this]() -> void {
     {
-      absl::MutexLock lock(&lock_);
+      absl::MutexLock lock(lock_);
       if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
@@ -204,7 +204,7 @@ void FakeStream::encodeResetStream() {
 void FakeStream::encodeMetadata(const Http::MetadataMapVector& metadata_map_vector) {
   postToConnectionThread([this, &metadata_map_vector]() -> void {
     {
-      absl::MutexLock lock(&lock_);
+      absl::MutexLock lock(lock_);
       if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
@@ -217,7 +217,7 @@ void FakeStream::encodeMetadata(const Http::MetadataMapVector& metadata_map_vect
 void FakeStream::readDisable(bool disable) {
   postToConnectionThread([this, disable]() -> void {
     {
-      absl::MutexLock lock(&lock_);
+      absl::MutexLock lock(lock_);
       if (!parent_.connected() || saw_reset_) {
         // Encoded already deleted.
         return;
@@ -228,12 +228,12 @@ void FakeStream::readDisable(bool disable) {
 }
 
 void FakeStream::onResetStream(Http::StreamResetReason, absl::string_view) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   saw_reset_ = true;
 }
 
 AssertionResult FakeStream::waitForHeadersComplete(milliseconds timeout) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   const auto reached = [this]()
                            ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return headers_ != nullptr; };
   if (!time_system_.waitFor(lock_, absl::Condition(&reached), timeout)) {
@@ -265,7 +265,7 @@ bool waitForWithDispatcherRun(Event::TestTimeSystem& time_system, absl::Mutex& l
 
 AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher, uint64_t body_length,
                                         milliseconds timeout) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   if (!waitForWithDispatcherRun(
           time_system_, lock_,
           [this, body_length]()
@@ -278,7 +278,7 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher, ui
 
 AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
                                         absl::string_view data, milliseconds timeout) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   if (!waitForWithDispatcherRun(
           time_system_, lock_,
           [this, &data]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
@@ -297,7 +297,7 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
 AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
                                         const FakeStream::ValidatorFunction& data_validator,
                                         std::chrono::milliseconds timeout) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   if (!waitForWithDispatcherRun(
           time_system_, lock_,
           [this, data_validator]()
@@ -310,7 +310,7 @@ AssertionResult FakeStream::waitForData(Event::Dispatcher& client_dispatcher,
 
 AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatcher,
                                              milliseconds timeout) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   if (!waitForWithDispatcherRun(
           time_system_, lock_,
           [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return end_stream_; }, client_dispatcher,
@@ -321,7 +321,7 @@ AssertionResult FakeStream::waitForEndStream(Event::Dispatcher& client_dispatche
 }
 
 AssertionResult FakeStream::waitForReset(milliseconds timeout) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   if (!time_system_.waitFor(lock_, absl::Condition(&saw_reset_), timeout)) {
     return AssertionFailure() << "Timed out waiting for reset.";
   }
@@ -330,7 +330,7 @@ AssertionResult FakeStream::waitForReset(milliseconds timeout) {
 
 AssertionResult FakeStream::waitForReset(Event::Dispatcher& client_dispatcher,
                                          std::chrono::milliseconds timeout) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   if (!waitForWithDispatcherRun(
           time_system_, lock_, [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return saw_reset_; },
           client_dispatcher, timeout)) {
@@ -484,7 +484,7 @@ Http::ServerHeaderValidatorPtr FakeHttpConnection::makeHeaderValidator() {
 }
 
 Http::RequestDecoder& FakeHttpConnection::newStream(Http::ResponseEncoder& encoder, bool) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   new_streams_.emplace_back(new FakeStream(*this, encoder, time_system_));
   return *new_streams_.back();
 }
@@ -538,7 +538,7 @@ void FakeHttpConnection::encodeProtocolError() {
 
 AssertionResult FakeConnectionBase::waitForDisconnect(milliseconds timeout) {
   ENVOY_LOG(trace, "FakeConnectionBase waiting for disconnect");
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   const auto reached = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
     return !shared_connection_.connectedLockHeld();
   };
@@ -555,7 +555,7 @@ AssertionResult FakeConnectionBase::waitForDisconnect(milliseconds timeout) {
 
 AssertionResult FakeConnectionBase::waitForRstDisconnect(std::chrono::milliseconds timeout) {
   ENVOY_LOG(trace, "FakeConnectionBase waiting for RST disconnect");
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   const auto reached = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
     return shared_connection_.rstDisconnected();
   };
@@ -572,7 +572,7 @@ AssertionResult FakeConnectionBase::waitForRstDisconnect(std::chrono::millisecon
 }
 
 AssertionResult FakeConnectionBase::waitForHalfClose(milliseconds timeout) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   if (!time_system_.waitFor(lock_, absl::Condition(&half_closed_), timeout)) {
     return AssertionFailure() << "Timed out waiting for half close.";
   }
@@ -580,7 +580,7 @@ AssertionResult FakeConnectionBase::waitForHalfClose(milliseconds timeout) {
 }
 
 AssertionResult FakeConnectionBase::waitForNoPost(milliseconds timeout) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   if (!time_system_.waitFor(
           lock_,
           absl::Condition(
@@ -600,7 +600,7 @@ void FakeConnectionBase::postToConnectionThread(std::function<void()> cb) {
     cb();
     {
       // Snag this lock not because it's needed but so waitForNoPost doesn't stall
-      absl::MutexLock lock(&lock_);
+      absl::MutexLock lock(lock_);
       --pending_cbs_;
     }
   });
@@ -609,7 +609,7 @@ void FakeConnectionBase::postToConnectionThread(std::function<void()> cb) {
 AssertionResult FakeHttpConnection::waitForNewStream(Event::Dispatcher& client_dispatcher,
                                                      FakeStreamPtr& stream,
                                                      std::chrono::milliseconds timeout) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   if (!waitForWithDispatcherRun(
           time_system_, lock_,
           [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return !new_streams_.empty(); },
@@ -730,7 +730,7 @@ void FakeUpstream::cleanUp() {
 
 bool FakeUpstream::createNetworkFilterChain(Network::Connection& connection,
                                             const Filter::NetworkFilterFactoriesList&) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   if (read_disable_on_new_connection_ && http_type_ != Http::CodecType::HTTP3) {
     // Disable early close detection to avoid closing the network connection before full
     // initialization is complete.
@@ -771,7 +771,7 @@ void FakeUpstream::threadRoutine() {
   dispatcher_->run(Event::Dispatcher::RunType::Block);
   handler_.reset();
   {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     new_connections_.clear();
     quic_connections_.clear();
     consumed_connections_.clear();
@@ -787,7 +787,7 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
   }
 
   {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
 
     // As noted in createNetworkFilterChain, HTTP3 FakeHttpConnections are not
     // lazily created, so HTTP3 needs a different wait path here.
@@ -818,7 +818,7 @@ AssertionResult FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_di
     }
   }
   return runOnDispatcherThreadAndWait([&]() {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     connection = std::make_unique<FakeHttpConnection>(
         *this, consumeConnection(), http_type_, time_system_, config_.max_request_headers_kb_,
         config_.max_request_headers_count_, config_.headers_with_underscores_action_);
@@ -872,7 +872,7 @@ FakeUpstream::waitForHttpConnection(Event::Dispatcher& client_dispatcher,
 ABSL_MUST_USE_RESULT
 AssertionResult FakeUpstream::assertPendingConnectionsEmpty() {
   return runOnDispatcherThreadAndWait([&]() {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     return new_connections_.empty() ? AssertionSuccess() : AssertionFailure();
   });
 }
@@ -885,7 +885,7 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
   }
 
   {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     const auto reached = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
       return !new_connections_.empty();
     };
@@ -897,7 +897,7 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
   }
 
   return runOnDispatcherThreadAndWait([&]() {
-    absl::MutexLock lock(&lock_);
+    absl::MutexLock lock(lock_);
     connection = makeRawConnection(consumeConnection(), timeSystem());
     connection->initialize();
     // Skip enableHalfClose if the connection is already disconnected.
@@ -910,7 +910,7 @@ AssertionResult FakeUpstream::waitForRawConnection(FakeRawConnectionPtr& connect
 
 void FakeUpstream::convertFromRawToHttp(FakeRawConnectionPtr& raw_connection,
                                         FakeHttpConnectionPtr& connection) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   SharedConnectionWrapper& shared_connection = raw_connection->sharedConnection();
 
   connection = std::make_unique<FakeHttpConnection>(
@@ -945,7 +945,7 @@ AssertionResult FakeUpstream::waitForUdpDatagram(Network::UdpRecvData& data_to_f
            << "Must initialize the FakeUpstream first by calling initializeServer().";
   }
 
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   const auto reached = [this]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
     return !received_datagrams_.empty();
   };
@@ -960,7 +960,7 @@ AssertionResult FakeUpstream::waitForUdpDatagram(Network::UdpRecvData& data_to_f
 }
 
 Network::FilterStatus FakeUpstream::onRecvDatagram(Network::UdpRecvData& data) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   received_datagrams_.emplace_back(std::move(data));
 
   return Network::FilterStatus::StopIteration;
@@ -1002,7 +1002,7 @@ AssertionResult FakeUpstream::rawWriteConnection(uint32_t index, const std::stri
            << "Must initialize the FakeUpstream first by calling initializeServer().";
   }
 
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   auto iter = consumed_connections_.begin();
   std::advance(iter, index);
   return (*iter)->executeOnDispatcher(
@@ -1049,7 +1049,7 @@ void FakeRawConnection::initialize() {
 
 AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* data,
                                                milliseconds timeout) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   const auto reached = [this, num_bytes]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
     return data_.size() == num_bytes;
   };
@@ -1068,7 +1068,7 @@ AssertionResult FakeRawConnection::waitForData(uint64_t num_bytes, std::string* 
 AssertionResult
 FakeRawConnection::waitForData(const std::function<bool(const std::string&)>& data_validator,
                                std::string* data, milliseconds timeout) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   const auto reached = [this, &data_validator]()
                            ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) { return data_validator(data_); };
   ENVOY_LOG(debug, "waiting for data");
@@ -1093,7 +1093,7 @@ AssertionResult FakeRawConnection::write(const std::string& data, bool end_strea
 
 Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& data,
                                                             bool end_stream) {
-  absl::MutexLock lock(&parent_.lock_);
+  absl::MutexLock lock(parent_.lock_);
   ENVOY_LOG(debug, "got {} bytes, end_stream {}", data.length(), end_stream);
   parent_.data_.append(data.toString());
   parent_.half_closed_ = end_stream;
@@ -1104,7 +1104,7 @@ Network::FilterStatus FakeRawConnection::ReadFilter::onData(Buffer::Instance& da
 ABSL_MUST_USE_RESULT
 AssertionResult FakeHttpConnection::waitForInexactRawData(absl::string_view data, std::string& out,
                                                           std::chrono::milliseconds timeout) {
-  absl::MutexLock lock(&lock_);
+  absl::MutexLock lock(lock_);
   const auto reached = [this, data, &out]() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_) {
     char peek_buf[200];
     auto result = dynamic_cast<Network::ConnectionImpl*>(&connection())

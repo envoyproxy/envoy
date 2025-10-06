@@ -59,6 +59,7 @@ envoy_cc_test(
         "//source/extensions/filters/listener/original_dst:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/listener_managers/validation_listener_manager:validation_listener_manager_lib",
+        "//source/extensions/network/dns_resolver/cares:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/server/admin:admin_filter_lib",
         "//source/server/config_validation:server_lib",

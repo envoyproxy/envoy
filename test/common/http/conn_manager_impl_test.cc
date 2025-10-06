@@ -1245,10 +1245,10 @@ TEST_F(HttpConnectionManagerImplTest, DelegatingRouteEntryAllCalls) {
                       .getApplicableRateLimit(0)
                       .empty());
 
-        EXPECT_EQ(default_route->routeEntry()->retryPolicy().numRetries(),
-                  delegating_route_foo->routeEntry()->retryPolicy().numRetries());
-        EXPECT_EQ(default_route->routeEntry()->retryPolicy().retryOn(),
-                  delegating_route_foo->routeEntry()->retryPolicy().retryOn());
+        EXPECT_EQ(default_route->routeEntry()->retryPolicy()->numRetries(),
+                  delegating_route_foo->routeEntry()->retryPolicy()->numRetries());
+        EXPECT_EQ(default_route->routeEntry()->retryPolicy()->retryOn(),
+                  delegating_route_foo->routeEntry()->retryPolicy()->retryOn());
 
         EXPECT_EQ(default_route->routeEntry()->internalRedirectPolicy().enabled(),
                   delegating_route_foo->routeEntry()->internalRedirectPolicy().enabled());

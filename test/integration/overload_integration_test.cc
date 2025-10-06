@@ -297,6 +297,35 @@ TEST_P(OverloadIntegrationTest, BypassOverloadManagerTest) {
   codec_client_->close();
 }
 
+class Http2RawFrameOverloadIntegrationTest : public BaseOverloadIntegrationTest,
+                                             public Http2RawFrameIntegrationTest,
+                                             public testing::Test {
+public:
+  Http2RawFrameOverloadIntegrationTest()
+      : Http2RawFrameIntegrationTest(Envoy::Network::Address::IpVersion::v4) {
+    setupHttp2ImplOverrides(Envoy::Http2Impl::Oghttp2);
+  }
+
+protected:
+  void initializeOverloadManager(
+      const envoy::config::overload::v3::ScaleTimersOverloadActionConfig& config) {
+    envoy::config::overload::v3::OverloadAction overload_action =
+        TestUtility::parseYaml<envoy::config::overload::v3::OverloadAction>(R"EOF(
+      name: "envoy.overload_actions.reduce_timeouts"
+      triggers:
+        - name: "envoy.resource_monitors.testonly.fake_resource_monitor"
+          scaled:
+            scaling_threshold: 0.5
+            saturation_threshold: 0.9
+    )EOF");
+    overload_action.mutable_typed_config()->PackFrom(config);
+    setupOverloadManagerConfig(overload_action);
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      *bootstrap.mutable_overload_manager() = this->overload_manager_config_;
+    });
+  }
+};
+
 class OverloadScaledTimerIntegrationTest : public OverloadIntegrationTest {
 protected:
   void initializeOverloadManager(
@@ -677,6 +706,57 @@ TEST_P(OverloadScaledTimerIntegrationTest, CloseIdleHttpStream) {
 
   EXPECT_EQ(response->headers().getStatusValue(), "504");
   EXPECT_THAT(response->body(), HasSubstr("stream timeout"));
+}
+
+TEST_F(Http2RawFrameOverloadIntegrationTest, FlushTimeoutWhenDownstreamBlocked) {
+  initializeOverloadManager(
+      TestUtility::parseYaml<envoy::config::overload::v3::ScaleTimersOverloadActionConfig>(R"EOF(
+      timer_scale_factors:
+        - timer: HTTP_DOWNSTREAM_STREAM_FLUSH
+          min_timeout: 1s
+    )EOF"));
+
+  // Create a downstream connection with an initial stream window size of 1 rather than the default
+  // 65535.
+  beginSession(Http2Frame::makeSettingsFrame(
+      Http2Frame::SettingsFlags::None,
+      {{static_cast<uint16_t>(Http2Frame::Setting::InitialWindowSize), 1}}));
+
+  // Simulate increased load so the timer is reduced to the minimum value.
+  updateResource(0.9);
+  test_server_->waitForGaugeEq("overload.envoy.overload_actions.reduce_timeouts.scale_percent",
+                               100);
+
+  // Send a headers-only request.
+  sendFrame(Http2Frame::makeRequest(1, /*host=*/"sni.lyft.com", /*path=*/"/test/long/url"));
+
+  // Respond from upstream with more data than the downstream window will allow.
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(2, true);
+
+  // Read the response headers.
+  Http2Frame response_headers = readFrame();
+  EXPECT_EQ(response_headers.streamId(), 1);
+  EXPECT_EQ(response_headers.type(), Http2Frame::Type::Headers);
+
+  // Downstream receive window is 1, so the Envoy will encode 1 byte and buffer 1 byte.
+  Http2Frame response_data = readFrame();
+  EXPECT_EQ(response_data.streamId(), 1);
+  EXPECT_EQ(response_data.type(), Http2Frame::Type::Data);
+  EXPECT_EQ(response_data.payloadSize(), 1);
+
+  // The client DOES NOT send a window update, so eventually Envoy's flush timer will fire...
+  timeSystem().advanceTimeWait(std::chrono::seconds(2));
+  test_server_->waitForCounterGe("http2.tx_flush_timeout", 1);
+
+  // ... Which will cause the stream to be reset.
+  Http2Frame reset_frame = readFrame();
+  EXPECT_EQ(reset_frame.streamId(), 1);
+  EXPECT_EQ(reset_frame.type(), Http2Frame::Type::RstStream);
+
+  tcp_client_->close();
+  test_server_->waitForGaugeEq("http.config_test.downstream_rq_active", 0);
 }
 
 TEST_P(OverloadScaledTimerIntegrationTest, TlsHandshakeTimeout) {

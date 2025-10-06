@@ -19,6 +19,9 @@
 #include "xds/data/orca/v3/orca_load_report.pb.h"
 
 namespace Envoy {
+namespace StreamInfo {
+class StreamInfo;
+} // namespace StreamInfo
 namespace Upstream {
 
 using OrcaLoadReport = xds::data::orca::v3::OrcaLoadReport;
@@ -103,8 +106,10 @@ public:
    * Please ensure that the implementation is thread-safe.
    *
    * @param report supplies the ORCA load report of this upstream host.
+   * @param stream_info supplies the downstream stream info.
    */
-  virtual absl::Status onOrcaLoadReport(const OrcaLoadReport& /*report*/) {
+  virtual absl::Status onOrcaLoadReport(const OrcaLoadReport& /*report*/,
+                                        const StreamInfo::StreamInfo& /*stream_info*/) {
     return absl::OkStatus();
   }
 };

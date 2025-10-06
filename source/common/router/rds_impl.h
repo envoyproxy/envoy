@@ -94,7 +94,7 @@ private:
 
   VhdsSubscriptionPtr vhds_subscription_;
   RouteConfigUpdatePtr config_update_info_;
-  Common::CallbackManager<> update_callback_manager_;
+  Common::CallbackManager<absl::Status> update_callback_manager_;
 
   // Access to addUpdateCallback
   friend class ScopedRdsConfigSubscription;

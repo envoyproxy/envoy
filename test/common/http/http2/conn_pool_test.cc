@@ -989,12 +989,12 @@ TEST_F(Http2ConnPoolImplTest, VerifyBufferLimits) {
   InSequence s;
   expectClientCreate(8192);
   ActiveTestRequest r1(*this, 0, false);
-  // 1 stream. HTTP/2 defaults to 536870912 streams/connection.
-  CHECK_STATE(0 /*active*/, 1 /*pending*/, 536870912 /*capacity*/);
+  // 1 stream. HTTP/2 defaults to 1024 streams/connection.
+  CHECK_STATE(0 /*active*/, 1 /*pending*/, 1024 /*capacity*/);
 
   expectClientConnect(0, r1);
   // capacity goes down by one as one stream is used.
-  CHECK_STATE(1 /*active*/, 0 /*pending*/, 536870911 /*capacity*/);
+  CHECK_STATE(1 /*active*/, 0 /*pending*/, 1023 /*capacity*/);
   EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
   EXPECT_TRUE(
       r1.callbacks_.outer_encoder_

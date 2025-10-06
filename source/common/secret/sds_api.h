@@ -71,7 +71,7 @@ protected:
   // Refresh secrets, e.g. re-resolve symlinks in secret paths.
   virtual void resolveSecret(const FileContentMap& /*files*/) {};
   virtual void validateConfig(const envoy::extensions::transport_sockets::tls::v3::Secret&) PURE;
-  Common::CallbackManager<> update_callback_manager_;
+  Common::CallbackManager<absl::Status> update_callback_manager_;
 
   // Config::SubscriptionCallbacks
   absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
@@ -229,6 +229,7 @@ private:
   CertificateValidationContextPtr resolved_certificate_validation_context_secrets_;
   // Path based certificates are inlined for future read consistency.
   Common::CallbackManager<
+      absl::Status,
       const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&>
       validation_callback_manager_;
 };
@@ -282,7 +283,7 @@ protected:
 private:
   Secret::TlsSessionTicketKeysPtr tls_session_ticket_keys_;
   Common::CallbackManager<
-      const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&>
+      absl::Status, const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&>
       validation_callback_manager_;
 };
 
@@ -333,7 +334,8 @@ protected:
 
 private:
   GenericSecretPtr generic_secret_;
-  Common::CallbackManager<const envoy::extensions::transport_sockets::tls::v3::GenericSecret&>
+  Common::CallbackManager<absl::Status,
+                          const envoy::extensions::transport_sockets::tls::v3::GenericSecret&>
       validation_callback_manager_;
 };
 

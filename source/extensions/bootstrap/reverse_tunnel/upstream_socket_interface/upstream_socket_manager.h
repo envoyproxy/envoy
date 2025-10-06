@@ -92,6 +92,19 @@ public:
   void onPingResponse(Network::IoHandle& io_handle);
 
   /**
+   * Handle ping response timeout for a specific socket.
+   * Increments miss count and marks socket dead if threshold reached.
+   * @param fd the file descriptor whose ping timed out.
+   */
+  void onPingTimeout(int fd);
+
+  /**
+   * Set the miss threshold (consecutive misses before marking a socket dead).
+   * @param threshold minimum value 1.
+   */
+  void setMissThreshold(uint32_t threshold) { miss_threshold_ = std::max<uint32_t>(1, threshold); }
+
+  /**
    * Get the upstream extension for stats integration.
    * @return pointer to the upstream extension or nullptr if not available.
    */
@@ -125,6 +138,12 @@ private:
   // File events and timers for ping functionality.
   absl::flat_hash_map<int, Event::FileEventPtr> fd_to_event_map_;
   absl::flat_hash_map<int, Event::TimerPtr> fd_to_timer_map_;
+
+  // Track consecutive ping misses per file descriptor.
+  absl::flat_hash_map<int, uint32_t> fd_to_miss_count_;
+  // Miss threshold before declaring a socket dead.
+  static constexpr uint32_t kDefaultMissThreshold = 3;
+  uint32_t miss_threshold_{kDefaultMissThreshold};
 
   Event::TimerPtr ping_timer_;
   std::chrono::seconds ping_interval_{0};

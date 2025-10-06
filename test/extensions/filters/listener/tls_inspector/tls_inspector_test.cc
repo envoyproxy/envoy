@@ -259,6 +259,7 @@ TEST_P(TlsInspectorTest, NoExtensions) {
 // maximum allowed size.
 TEST_P(TlsInspectorTest, ClientHelloTooBig) {
   envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  proto_config.set_close_connection_on_client_hello_parsing_errors(true);
   cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
   std::vector<uint8_t> client_hello = Tls::Test::generateClientHelloFromJA3Fingerprint(
       "769,47-53-5-10-49161-49162-49171-49172-50-56-19-4,0-10-11,23-24-25,0", 17000);
@@ -293,6 +294,39 @@ TEST_P(TlsInspectorTest, ClientHelloTooBig) {
   const std::vector<uint64_t> bytes_processed =
       store_.histogramValues("tls_inspector.bytes_processed", false);
   ASSERT_EQ(1, bytes_processed.size());
+}
+
+TEST_P(TlsInspectorTest, ClientHelloTooBigTreatParsingErrorAsPlainText) {
+  envoy::extensions::filters::listener::tls_inspector::v3::TlsInspector proto_config;
+  cfg_ = std::make_shared<Config>(*store_.rootScope(), proto_config);
+  std::vector<uint8_t> client_hello = Tls::Test::generateClientHelloFromJA3Fingerprint(
+      "769,47-53-5-10-49161-49162-49171-49172-50-56-19-4,0-10-11,23-24-25,0", 17000);
+  ASSERT(client_hello.size() > Config::TLS_MAX_CLIENT_HELLO);
+
+  filter_ = std::make_unique<Filter>(cfg_);
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(0);
+  EXPECT_CALL(cb_, socket()).WillRepeatedly(ReturnRef(socket_));
+  EXPECT_CALL(socket_, ioHandle()).WillRepeatedly(ReturnRef(*io_handle_));
+  EXPECT_CALL(dispatcher_,
+              createFileEvent_(_, _, Event::PlatformDefaultTriggerType,
+                               Event::FileReadyType::Read | Event::FileReadyType::Closed))
+      .WillOnce(
+          DoAll(SaveArg<1>(&file_event_callback_), ReturnNew<NiceMock<Event::MockFileEvent>>()));
+  buffer_ = std::make_unique<Network::ListenerFilterBufferImpl>(
+      *io_handle_, dispatcher_, [](bool) {}, [](Network::ListenerFilterBuffer&) {},
+      cfg_->maxClientHelloSize() == 0, cfg_->maxClientHelloSize());
+
+  filter_->onAccept(cb_);
+  mockSysCallForPeek(client_hello, true);
+  EXPECT_CALL(socket_, detectedTransportProtocol()).Times(::testing::AnyNumber());
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
+  auto state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::Continue, state);
+  EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
+  const std::vector<uint64_t> bytes_processed =
+      store_.histogramValues("tls_inspector.bytes_processed", false);
+  ASSERT_EQ(1, bytes_processed.size());
+  EXPECT_EQ(5, bytes_processed[0]);
 }
 
 // Test that the filter sets the `JA3` hash
@@ -422,6 +456,26 @@ TEST_P(TlsInspectorTest, NotSsl) {
       Filter::failureReasonClientHelloNotDetected());
   EXPECT_CALL(cb_, setDynamicMetadata(Filter::dynamicMetadataKey(), ProtoEq(expected_metadata)));
 
+  auto state = filter_->onData(*buffer_);
+  EXPECT_EQ(Network::FilterStatus::Continue, state);
+  EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());
+  const std::vector<uint64_t> bytes_processed =
+      store_.histogramValues("tls_inspector.bytes_processed", false);
+  ASSERT_EQ(1, bytes_processed.size());
+  EXPECT_EQ(5, bytes_processed[0]);
+}
+
+// Verify that a plain text connection with a single I/O read of more than
+// maximum TLS inspector buffer (currently 16Kb) is correctly detected.
+TEST_P(TlsInspectorTest, NotSslOverMaxReadBytesSingleRead) {
+  init();
+  std::vector<uint8_t> data;
+
+  // Use more than max number of bytes for a ClientHello.
+  data.resize(Config::TLS_MAX_CLIENT_HELLO + 1);
+  mockSysCallForPeek(data);
+  // trigger the event to copy the client hello message into buffer:q
+  EXPECT_TRUE(file_event_callback_(Event::FileReadyType::Read).ok());
   auto state = filter_->onData(*buffer_);
   EXPECT_EQ(Network::FilterStatus::Continue, state);
   EXPECT_EQ(1, cfg_->stats().tls_not_found_.value());

@@ -47,8 +47,8 @@ newDynamicModuleHttpPerRouteConfig(const absl::string_view per_route_config_name
     return absl::InvalidArgumentError("Failed to initialize per-route dynamic module");
   }
 
-  return std::make_shared<const DynamicModuleHttpPerRouteFilterConfig>(filter_config_envoy_ptr,
-                                                                       destroy.value());
+  return std::make_shared<const DynamicModuleHttpPerRouteFilterConfig>(
+      filter_config_envoy_ptr, destroy.value(), std::move(dynamic_module));
 }
 
 absl::StatusOr<DynamicModuleHttpFilterConfigSharedPtr> newDynamicModuleHttpFilterConfig(

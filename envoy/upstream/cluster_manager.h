@@ -350,6 +350,16 @@ public:
   virtual OptRef<const Cluster> getActiveCluster(const std::string& cluster_name) const PURE;
 
   /**
+   * Receives a cluster name and returns an active or warming cluster (if found).
+   * @param cluster_name the name of the cluster.
+   * @return OptRef<const Cluster> A reference to the cluster if found, and nullopt otherwise.
+   *
+   * NOTE: This method is only thread safe on the main thread. It should not be called elsewhere.
+   */
+  virtual OptRef<const Cluster>
+  getActiveOrWarmingCluster(const std::string& cluster_name) const PURE;
+
+  /**
    * Returns true iff the given cluster name is known in the cluster-manager
    * (either as active or as warming).
    * @param cluster_name the name of the cluster.
@@ -641,7 +651,8 @@ public:
    */
   virtual absl::StatusOr<CdsApiPtr>
   createCds(const envoy::config::core::v3::ConfigSource& cds_config,
-            const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm) PURE;
+            const xds::core::v3::ResourceLocator* cds_resources_locator, ClusterManager& cm,
+            bool support_multi_ads_sources) PURE;
 };
 
 /**

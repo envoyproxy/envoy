@@ -283,14 +283,16 @@ class DynamicModuleHttpPerRouteFilterConfig : public Router::RouteSpecificFilter
 public:
   DynamicModuleHttpPerRouteFilterConfig(
       envoy_dynamic_module_type_http_filter_config_module_ptr config,
-      OnHttpPerRouteConfigDestroyType destroy)
-      : config_(config), destroy_(destroy) {}
+      OnHttpPerRouteConfigDestroyType destroy,
+      Extensions::DynamicModules::DynamicModulePtr dynamic_module)
+      : config_(config), destroy_(destroy), dynamic_module_(std::move(dynamic_module)) {}
   ~DynamicModuleHttpPerRouteFilterConfig() override;
 
   envoy_dynamic_module_type_http_filter_config_module_ptr config_;
 
 private:
   OnHttpPerRouteConfigDestroyType destroy_;
+  Extensions::DynamicModules::DynamicModulePtr dynamic_module_;
 };
 
 using DynamicModuleHttpFilterConfigSharedPtr = std::shared_ptr<DynamicModuleHttpFilterConfig>;

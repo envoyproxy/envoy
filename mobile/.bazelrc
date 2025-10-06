@@ -203,15 +203,6 @@ test:mobile-remote-ci-linux-tsan --test_env=ENVOY_IP_TEST_VERSIONS=v4only
 #############################################################################
 # Clang environment variables (keep in sync with //third_party/rbe_configs)
 # Coverage environment variables (keep in sync with //third_party/rbe_configs)
-build:mobile-ci-linux-coverage --action_env=GCOV=/opt/llvm/bin/llvm-profdata
-build:mobile-ci-linux-coverage --test_env=GCOV=/opt/llvm/bin/llvm-profdata
-build:mobile-ci-linux-coverage --repo_env=GCOV=/opt/llvm/bin/llvm-profdata
-build:mobile-ci-linux-coverage --action_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-cov
-build:mobile-ci-linux-coverage --test_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-cov
-build:mobile-ci-linux-coverage --repo_env=BAZEL_LLVM_COV=/opt/llvm/bin/llvm-cov
-build:mobile-ci-linux-coverage --action_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
-build:mobile-ci-linux-coverage --test_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
-build:mobile-ci-linux-coverage --repo_env=BAZEL_USE_LLVM_NATIVE_COVERAGE=1
 build:mobile-ci-linux-coverage --build_tests_only
 build:mobile-ci-linux-coverage --@envoy//tools/coverage:config=@envoy_mobile//test:coverage_config
 

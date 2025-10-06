@@ -60,17 +60,15 @@ class GlobalRateLimitClientImpl : public Grpc::AsyncStreamCallbacks<
                                   public Event::DeferredDeletable,
                                   public Logger::Loggable<Logger::Id::rate_limit_quota> {
 public:
+  // Note: rlqs_client is owned directly to ensure that it does not outlive the
+  // GlobalRateLimitClientImpl (as the impl provides stream callbacks).
   GlobalRateLimitClientImpl(const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key,
                             Server::Configuration::FactoryContext& context,
                             absl::string_view domain_name,
                             std::chrono::milliseconds send_reports_interval,
                             ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_tls,
                             Envoy::Event::Dispatcher& main_dispatcher);
-  ~GlobalRateLimitClientImpl() {
-    if (stream_ != nullptr) {
-      stream_.resetStream();
-    }
-  }
+  ~GlobalRateLimitClientImpl() = default;
 
   void onReceiveMessage(RateLimitQuotaResponsePtr&& response) override;
 
@@ -163,8 +161,8 @@ private:
   // Domain from filter configuration. The same domain name throughout the
   // whole lifetime of client.
   std::string domain_name_;
-  // Client is stored as the bare object since there is no ownership transfer
-  // involved.
+  // Client is stored as the bare object since GrpcAsyncClient already takes ownership of the given
+  // raw AsyncClientPtr.
   GrpcAsyncClient async_client_;
   Grpc::AsyncStream<RateLimitQuotaUsageReports> stream_{};
 
@@ -195,7 +193,7 @@ createGlobalRateLimitClientImpl(Server::Configuration::FactoryContext& context,
                                 absl::string_view domain_name,
                                 std::chrono::milliseconds send_reports_interval,
                                 ThreadLocal::TypedSlot<ThreadLocalBucketsCache>& buckets_tls,
-                                Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key) {
+                                const Grpc::GrpcServiceConfigWithHashKey& config_with_hash_key) {
   Envoy::Event::Dispatcher& main_dispatcher = context.serverFactoryContext().mainThreadDispatcher();
   return std::make_unique<GlobalRateLimitClientImpl>(config_with_hash_key, context, domain_name,
                                                      send_reports_interval, buckets_tls,

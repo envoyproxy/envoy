@@ -43,6 +43,16 @@ INSTANTIATE_TEST_SUITE_P(Protocols, MultiplexedUpstreamIntegrationTest,
                          HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(MultiplexedUpstreamIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_response_decoder_handle",
+                                    "true");
+  testRouterRequestAndResponseWithBody(1024, 512, false);
+}
+
+// Needed for test coverage.
+TEST_P(MultiplexedUpstreamIntegrationTest,
+       RouterRequestAndResponseWithBodyNoBufferWithoutDecoderHandle) {
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.use_response_decoder_handle",
+                                    "false");
   testRouterRequestAndResponseWithBody(1024, 512, false);
 }
 

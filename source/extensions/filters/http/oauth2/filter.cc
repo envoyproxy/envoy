@@ -433,6 +433,7 @@ FilterConfig::FilterConfig(
       disable_id_token_set_cookie_(proto_config.disable_id_token_set_cookie()),
       disable_access_token_set_cookie_(proto_config.disable_access_token_set_cookie()),
       disable_refresh_token_set_cookie_(proto_config.disable_refresh_token_set_cookie()),
+      disable_token_encryption_(proto_config.disable_token_encryption()),
       bearer_token_cookie_settings_(
           (proto_config.has_cookie_configs() &&
            proto_config.cookie_configs().has_bearer_token_cookie_config())
@@ -468,7 +469,7 @@ FilterConfig::FilterConfig(
            proto_config.cookie_configs().has_code_verifier_cookie_config())
               ? CookieSettings(proto_config.cookie_configs().code_verifier_cookie_config())
               : CookieSettings()) {
-  if (!context.clusterManager().clusters().hasCluster(oauth_token_endpoint_.cluster())) {
+  if (!context.clusterManager().hasCluster(oauth_token_endpoint_.cluster())) {
     // This is not necessarily a configuration error — sometimes cluster is sent later than the
     // listener in the xDS stream.
     ENVOY_LOG(warn, "OAuth2 filter: unknown cluster '{}' in config. ",
@@ -761,6 +762,10 @@ bool OAuth2Filter::canSkipOAuth(Http::RequestHeaderMap& headers) const {
 // Decrypt the OAuth tokens and updates the OAuth tokens in the request cookies before forwarding
 // the request upstream.
 void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& headers) const {
+  if (config_->disableTokenEncryption()) {
+    return;
+  }
+
   if (!Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_encrypt_tokens")) {
     return;
   }
@@ -796,6 +801,10 @@ void OAuth2Filter::decryptAndUpdateOAuthTokenCookies(Http::RequestHeaderMap& hea
 }
 
 std::string OAuth2Filter::encryptToken(const std::string& token) const {
+  if (config_->disableTokenEncryption()) {
+    return token;
+  }
+
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.oauth2_encrypt_tokens")) {
     return encrypt(token, config_->hmacSecret(), random_);
   }

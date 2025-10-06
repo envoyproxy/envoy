@@ -29,6 +29,7 @@ envoy_cc_mock(
         "//envoy/stream_info:stream_info_interface",
         "//envoy/thread_local:thread_local_interface",
         "//envoy/upstream:cluster_manager_interface",
+        "//source/common/router:upstream_to_downstream_impl_base",
         "//test/mocks:common_lib",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:host_mocks",

@@ -62,9 +62,14 @@ if [[ -f "/etc/redhat-release" ]]; then
 fi
 
 function cleanup() {
-  # Remove build artifacts. This doesn't mess with incremental builds as these
-  # are just symlinks.
-  rm -rf "${ENVOY_SRCDIR}"/bazel-* clang.bazelrc
+    if [[ "${ENVOY_BUILD_SKIP_CLEANUP}" == "true" ]]; then
+        echo "Skipping cleanup as requested."
+        return
+    fi
+
+    # Remove build artifacts. This doesn't mess with incremental builds as these
+    # are just symlinks.
+    rm -rf "${ENVOY_SRCDIR}"/bazel-* clang.bazelrc
 }
 
 cleanup
