@@ -3212,6 +3212,7 @@ envoy_quic_cc_library(
 
 envoy_quic_cc_library(
     name = "quic_force_blockable_packet_writer_lib",
+    srcs = ["quiche/quic/core/quic_force_blockable_packet_writer.cc"],
     hdrs = ["quiche/quic/core/quic_force_blockable_packet_writer.h"],
     deps = [":quic_core_packet_writer_lib"],
 )

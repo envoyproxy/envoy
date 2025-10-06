@@ -350,7 +350,7 @@ envoy_cc_library(
 
 envoy_cc_library(
     name = "upstream_to_downstream_impl_base",
-    srcs = [
+    hdrs = [
         "upstream_to_downstream_impl_base.h",
     ],
     deps = [
