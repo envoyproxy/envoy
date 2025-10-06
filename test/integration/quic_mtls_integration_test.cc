@@ -317,27 +317,20 @@ TEST_P(QuicMtlsIntegrationTest, ClientCertificateWrongCaFailure) {
                                       "upstreamcacert.pem");
   initialize();
 
-  // Try to connect with client cert signed by different CA
-  // NOTE: Current implementation allows connection (documents current behavior)
+  // Try to connect with client cert signed by different CA.
+  // The connection should be rejected due to certificate validation failure.
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
 
-  waitForNextUpstreamRequest();
+  // Expect the connection to be rejected due to certificate validation failure.
+  // The TLS handshake should fail and close the connection.
+  EXPECT_TRUE(response->waitForReset());
 
-  // Log that connection succeeded despite wrong CA (current behavior)
-  ENVOY_LOG_MISC(info,
-                 "Client certificate with wrong CA - connection succeeded (current behavior)");
+  // Verify no upstream connection was established due to cert validation failure.
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 0);
 
-  // Check if XFCC header behavior
-  auto xfcc_headers =
-      upstream_request_->headers().get(Http::LowerCaseString("x-forwarded-client-cert"));
-  // This will show us if the certificate is being validated or just accepted
-
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("200", response->headers().getStatusValue());
-
-  codec_client_->close();
+  // Log that certificate validation properly rejected the invalid certificate.
+  ENVOY_LOG_MISC(info, "Client certificate with wrong CA was correctly rejected by validation");
 }
 
 // Test certificate chain validation with intermediate CA
@@ -623,20 +616,17 @@ TEST_P(QuicMtlsIntegrationTest, ProofVerifierWithDifferentCaConfiguration) {
                                       "upstreamcacert.pem");
   initialize();
 
-  // With current basic ProofVerifier implementation, connections succeed
-  // regardless of CA mismatch (this will be enhanced in future iterations)
+  // Client cert is signed by a different CA - should be rejected by ProofVerifier.
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
-  waitForNextUpstreamRequest();
 
-  // Document current behavior - connection succeeds with basic validation
-  EXPECT_TRUE(codec_client_->connected()) << "Connection succeeds with current implementation";
+  // Expect the TLS handshake to fail due to CA mismatch.
+  EXPECT_TRUE(response->waitForReset());
 
-  upstream_request_->encodeHeaders(default_response_headers_, true);
-  ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_EQ("200", response->headers().getStatusValue());
+  // Verify no upstream connection was established.
+  EXPECT_EQ(test_server_->counter("cluster.cluster_0.upstream_cx_total")->value(), 0);
 
-  codec_client_->close();
+  ENVOY_LOG_MISC(info, "ProofVerifier correctly rejected certificate with mismatched CA");
 
   ENVOY_LOG_MISC(info, "✅ Current ProofVerifier behavior with different CA config documented");
 }

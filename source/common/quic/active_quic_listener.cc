@@ -76,6 +76,7 @@ ActiveQuicListener::ActiveQuicListener(
   auto connection_helper = std::make_unique<EnvoyQuicConnectionHelper>(dispatcher_);
   crypto_config_->AddDefaultConfig(random, connection_helper->GetClock(),
                                    quic::QuicCryptoServerConfig::ConfigOptions());
+
   auto alarm_factory =
       std::make_unique<EnvoyQuicAlarmFactory>(dispatcher_, *connection_helper->GetClock());
   // Set the socket to report incoming ECN.
