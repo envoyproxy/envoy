@@ -40,8 +40,6 @@ constexpr absl::string_view TotalSize = "total_size";
 constexpr absl::string_view Duration = "duration";
 constexpr absl::string_view Protocol = "protocol";
 constexpr absl::string_view Query = "query";
-constexpr absl::string_view UpstreamClusterEndpoints =
-    "upstream_cluster_endpoints";
 
 // Symbols for traversing the response properties
 constexpr absl::string_view Response = "response";
@@ -89,6 +87,7 @@ constexpr absl::string_view UpstreamLocality = "locality";
 constexpr absl::string_view UpstreamTransportFailureReason = "transport_failure_reason";
 constexpr absl::string_view UpstreamRequestAttemptCount = "request_attempt_count";
 constexpr absl::string_view UpstreamConnectionPoolReadyDuration = "cx_pool_ready_duration";
+constexpr absl::string_view UpstreamNumEndpoints = "num_endpoints";
 
 // xDS configuration context properties
 constexpr absl::string_view XDS = "xds";

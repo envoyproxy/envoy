@@ -214,19 +214,7 @@ const RequestLookupValues& RequestLookupValues::get() {
              path = path.substr(query_offset + 1);
              auto fragment_offset = path.find('#');
              return CelValue::CreateStringView(path.substr(0, fragment_offset));
-          }},
-          {UpstreamClusterEndpoints,
-           [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
-             if (wrapper.info_.upstreamClusterInfo().value_or(nullptr) !=
-                 nullptr) {
-               return CelValue::CreateUint64(wrapper.info_.upstreamClusterInfo()
-                                               .value()
-                                               .get()
-                                               ->endpointStats()
-                                               .membership_total_.value());
-             }
-             return CelValue::CreateUint64(0);
-           }}});
+            }}});
 }
 
 // Response lookup implementation
@@ -412,6 +400,18 @@ const UpstreamLookupValues& UpstreamLookupValues::get() {
           {UpstreamRequestAttemptCount,
            [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
              return CelValue::CreateUint64(wrapper.info_.attemptCount().value_or(0));
+          }},
+          {UpstreamNumEndpoints,
+           [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.info_.upstreamClusterInfo().value_or(nullptr) !=
+                 nullptr) {
+               return CelValue::CreateUint64(wrapper.info_.upstreamClusterInfo()
+                                               .value()
+                                               .get()
+                                               ->endpointStats()
+                                               .membership_total_.value());
+             }
+             return CelValue::CreateUint64(0);
            }}});
 }
 
