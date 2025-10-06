@@ -75,7 +75,6 @@ ClusterResponseHandlerFactory::getResponseHandlerType(const std::string& command
     {"script", ClusterScopeResponseHandlerType::allresponses_mustbe_same},
     {"flushall", ClusterScopeResponseHandlerType::allresponses_mustbe_same},
     {"flushdb", ClusterScopeResponseHandlerType::allresponses_mustbe_same},
-    {"unwatch", ClusterScopeResponseHandlerType::allresponses_mustbe_same},
     {"config:set", ClusterScopeResponseHandlerType::allresponses_mustbe_same},
     {"config:rewrite", ClusterScopeResponseHandlerType::allresponses_mustbe_same},
     {"config:resetstat", ClusterScopeResponseHandlerType::allresponses_mustbe_same},

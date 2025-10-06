@@ -856,9 +856,9 @@ SplitRequestPtr ClusterScopeCmdRequest::create(Router& router,
     request_ptr->pending_requests_.emplace_back(*request_ptr, shard_index);
     PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
-    // Send the same request to all shards
-    pending_request.handle_ = makeFragmentedRequest(
-        route, command, "", *base_request, pending_request, callbacks.transaction());
+    // Send the same request to all shards one by one
+    pending_request.handle_ = makeFragmentedRequestToShard(
+        route, command, shard_index, *base_request, pending_request, callbacks.transaction());
 
     if (!pending_request.handle_) {
       ENVOY_LOG(error, "{}:failed to create request handle for shard index {}: '{}'", __func__, shard_index, base_request->toString());
