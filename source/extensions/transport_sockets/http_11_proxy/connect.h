@@ -44,6 +44,9 @@ private:
   void generateHeader();
   Network::IoResult writeHeader();
 
+  inline void handleProxyInfoConnect();
+  inline void handleHostMetadataConnect(std::shared_ptr<const Upstream::HostDescription> host);
+
   Network::TransportSocketOptionsConstSharedPtr options_;
   Network::TransportSocketCallbacks* callbacks_{};
   Buffer::OwnedImpl header_buffer_{};
