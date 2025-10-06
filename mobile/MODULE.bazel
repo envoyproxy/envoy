@@ -46,20 +46,20 @@ local_path_override(
 # These commit hashes are synchronized with the main MODULE.bazel to ensure consistency
 # and prevent git_override strip_prefix issues.
 
-bazel_dep(name = "envoy_examples", version = "0.0.0-dev")
-git_override(
-    module_name = "envoy_examples",
-    commit = "ff286d4049b6339cf84c912f5e06f67b0061f017",  # Synchronized with main MODULE.bazel
-    remote = "https://github.com/envoyproxy/examples.git",
-)
+# bazel_dep(name = "envoy_examples", version = "0.0.0-dev")
+# git_override(
+#     module_name = "envoy_examples",
+#     commit = "ff286d4049b6339cf84c912f5e06f67b0061f017",  # Synchronized with main MODULE.bazel
+#     remote = "https://github.com/envoyproxy/examples.git",
+# )
 
-bazel_dep(name = "envoy-example-wasmcc", version = "0.0.0-dev")
-git_override(
-    module_name = "envoy-example-wasmcc",
-    commit = "ff286d4049b6339cf84c912f5e06f67b0061f017",  # Synchronized with main MODULE.bazel
-    remote = "https://github.com/envoyproxy/examples.git",
-    strip_prefix = "wasm-cc/",
-)
+# bazel_dep(name = "envoy-example-wasmcc", version = "0.0.0-dev")
+# git_override(
+#     module_name = "envoy-example-wasmcc",
+#     commit = "ff286d4049b6339cf84c912f5e06f67b0061f017",  # Synchronized with main MODULE.bazel
+#     remote = "https://github.com/envoyproxy/examples.git",
+#     strip_prefix = "wasm-cc/",
+# )
 
 bazel_dep(name = "envoy_toolshed", version = "0.3.3")
 git_override(
@@ -70,14 +70,14 @@ git_override(
 )
 
 bazel_dep(name = "gazelle", version = "0.45.0", repo_name = "bazel_gazelle")
-bazel_dep(name = "googleapis", version = "0.0.0-20250703-f9d6fe4a", repo_name = "com_google_googleapis")
+bazel_dep(name = "googleapis", version = "0.0.0-20241220-5e258e33.bcr.1", repo_name = "com_google_googleapis")
 bazel_dep(name = "googletest", version = "1.17.0", repo_name = "com_google_googletest")
-bazel_dep(name = "googleurl", version = "0.0.0-dev", repo_name = "com_googlesource_googleurl")
-git_override(
-    module_name = "googleurl",
-    commit = "e6c272102e0554e02c1bb317edff927ee56c7d0b",
-    remote = "https://quiche.googlesource.com/googleurl",
-)
+# bazel_dep(name = "googleurl", version = "0.0.0-dev", repo_name = "com_googlesource_googleurl")
+# git_override(
+#     module_name = "googleurl",
+#     commit = "e6c272102e0554e02c1bb317edff927ee56c7d0b",
+#     remote = "https://quiche.googlesource.com/googleurl",
+# )
 
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "protobuf", version = "29.3", repo_name = "com_google_protobuf")
@@ -116,23 +116,25 @@ use_repo(
     envoy_core,
     "build_bazel_rules_apple",
     "com_google_absl",
+    "rules_proto_grpc",
 )
 
 envoy_toolchains = use_extension("@envoy//bazel/extensions:toolchains.bzl", "toolchains")
 
 # API extensions from API module
-envoy_api_deps = use_extension("@envoy_api//bazel/extensions:api_dependencies.bzl", "api_dependencies")
+envoy_api_deps = use_extension("@envoy_api//bazel/extensions:api_dependencies.bzl", "envoy_api_deps")
 
 # Envoy Mobile extensions - streamlined design following bzlmod best practices
 # This architecture mirrors the main envoy module for consistency
 
-# Mobile core extension (dependencies and repositories)
+# Mobile-specific dependencies extension
 envoy_mobile_core = use_extension("//bazel/extensions:core.bzl", "core")
 use_repo(
     envoy_mobile_core,
     "DrString",
     "SwiftLint",
     "com_github_buildbuddy_io_rules_xcodeproj",
+    "google_bazel_common",
     "kotlin_formatter",
     "robolectric",
     "rules_java",

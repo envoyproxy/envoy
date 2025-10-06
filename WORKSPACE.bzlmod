@@ -1,1 +1,16 @@
+# WORKSPACE.bzlmod - bzlmod mode supplement file
+#
+# This file is loaded when --enable_bzlmod is used, AFTER MODULE.bazel is processed.
+# It provides repository rules and configurations that cannot be expressed in MODULE.bazel.
+#
+# This approach (Option C from WORKSPACE_COMPATIBILITY_ISSUE.md) allows:
+# - MODULE.bazel to define bzlmod dependencies
+# - WORKSPACE.bzlmod to add bzlmod-specific repository rules
+# - WORKSPACE to remain pure for legacy mode
+#
+# See: https://bazel.build/external/migration#hybrid-mode
+
 workspace(name = "envoy")
+
+# bzlmod-specific repository configurations can be added here if needed
+# Currently empty as MODULE.bazel + extensions handle all dependencies

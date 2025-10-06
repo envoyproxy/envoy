@@ -95,12 +95,14 @@ def kotlin_repos():
         urls = ["https://github.com/rules-proto-grpc/rules_proto_grpc/archive/4.1.1.tar.gz"],
     )
 
-    external_http_archive(
-        name = "kotlin_formatter",
-        executable = 1,
-        sha256 = "115d4c5cb3421eae732c42c137f5db8881ff9cc1ef180a01e638283f3ccbae44",
-        urls = ["https://github.com/pinterest/ktlint/releases/download/0.37.1/ktlint"],
-    )
+    # Use http_file for kotlin_formatter since it's a single executable
+    if "kotlin_formatter" not in native.existing_rules():
+        http_file(
+            name = "kotlin_formatter",
+            executable = True,
+            sha256 = "115d4c5cb3421eae732c42c137f5db8881ff9cc1ef180a01e638283f3ccbae44",
+            urls = ["https://github.com/pinterest/ktlint/releases/download/0.37.1/ktlint"],
+        )
 
     external_http_archive(
         name = "robolectric",

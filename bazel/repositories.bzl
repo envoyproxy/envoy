@@ -4,6 +4,12 @@ load("@envoy_api//bazel:external_deps.bzl", "load_repository_locations")
 load(":repository_locations.bzl", "PROTOC_VERSIONS", "REPOSITORY_LOCATIONS_SPEC")
 load(":native_binding_wrapper.bzl", "envoy_native_bind", "envoy_native_new_local_repository")
 
+def _is_bzlmod_enabled():
+    """Check if bzlmod is enabled by checking if MODULE.bazel repositories exist."""
+    # In bzlmod mode, modules create repositories with ~ in their canonical names
+    # Check for a known bzlmod repository pattern
+    return "protobuf~" in native.existing_rules() or "_main~" in str(native.existing_rules())
+
 PPC_SKIP_TARGETS = ["envoy.string_matcher.lua", "envoy.filters.http.lua", "envoy.router.cluster_specifier_plugin.lua"]
 
 WINDOWS_SKIP_TARGETS = [
@@ -645,10 +651,13 @@ def _com_google_googletest():
 # pull in more bits of abseil as needed, and is now the preferred
 # method for pure Bazel deps.
 def _com_google_absl():
+    # Note: abseil.patch temporarily disabled for bzlmod compatibility
+    # The patch is only needed for Emscripten and Windows symbolize
+    # TODO: Create version-specific patches or conditional patch application
     external_http_archive(
         name = "com_google_absl",
-        patches = ["@envoy//bazel:abseil.patch"],
-        patch_args = ["-p1"],
+        # patches = ["@envoy//bazel:abseil.patch"],  # Disabled for bzlmod
+        # patch_args = ["-p1"],
         repo_mapping = {"@googletest": "@com_google_googletest"},
     )
 

@@ -8,7 +8,8 @@
 # This file is preserved for WORKSPACE-only builds and will be removed once
 # full bzlmod migration is complete.
 
-load("@com_google_protobuf//bazel:system_python.bzl", "system_python")
+# NOTE: system_python.bzl was removed in protobuf 30.0
+# load("@com_google_protobuf//bazel:system_python.bzl", "system_python")
 load("@envoy_toolshed//:packages.bzl", "load_packages")
 load("@rules_python//python:pip.bzl", "pip_parse")
 
@@ -37,7 +38,8 @@ def envoy_python_dependencies():
         extra_pip_args = ["--require-hashes"],
     )
 
-    system_python(
-        name = "system_python",
-        minimum_python_version = "3.7",
-    )
+    # system_python() was removed in protobuf 30.0
+    # system_python(
+    #     name = "system_python",
+    #     minimum_python_version = "3.7",
+    # )

@@ -14,19 +14,14 @@
 startup --host_jvm_args=-Xmx3g
 startup --host_jvm_args="-DBAZEL_TRACK_SOURCE_DIRECTORIES=1"
 
-
 #############################################################################
 # global
 #############################################################################
 
-
-#############################################################################
-# global
-#############################################################################
-
-# Enable bzlmod for modern dependency management (hybrid mode with WORKSPACE)
-# This allows gradual migration from WORKSPACE to MODULE.bazel
-common --enable_bzlmod
+# Enable bzlmod for modern dependency management (Bazel 8+ dual-mode support)
+# Bazel 8 provides improved MODULE.bazel/WORKSPACE isolation for smooth migration
+# Users can explicitly use --enable_bzlmod (bzlmod) or --noenable_bzlmod (WORKSPACE)
+# common --enable_bzlmod  # Commented out to allow explicit mode selection
 
 fetch --color=yes
 run --color=yes
