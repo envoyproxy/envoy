@@ -4608,7 +4608,7 @@ virtual_hosts:
     route:
       request_mirror_policies:
         - cluster: some_cluster
-          request_header_mutations:
+          request_headers_mutations:
             - append:
                 header:
                   key: x-mirror-test

@@ -5038,7 +5038,7 @@ makeShadowPolicy(std::string cluster = "", std::string cluster_header = "",
                  absl::optional<envoy::type::v3::FractionalPercent> default_value = absl::nullopt,
                  bool trace_sampled = true,
                  std::vector<envoy::config::common::mutation_rules::v3::HeaderMutation>
-                     request_header_mutations = {},
+                     request_headers_mutations = {},
                  std::string host_rewrite_literal = "") {
   envoy::config::route::v3::RouteAction::RequestMirrorPolicy policy;
   policy.set_cluster(cluster);
@@ -5052,8 +5052,8 @@ makeShadowPolicy(std::string cluster = "", std::string cluster_header = "",
   policy.mutable_trace_sampled()->set_value(trace_sampled);
 
   // Add HeaderMutation objects directly
-  for (const auto& mutation : request_header_mutations) {
-    *policy.add_request_header_mutations() = mutation;
+  for (const auto& mutation : request_headers_mutations) {
+    *policy.add_request_headers_mutations() = mutation;
   }
 
   if (!host_rewrite_literal.empty()) {

@@ -433,7 +433,7 @@ private:
   absl::optional<bool> trace_sampled_;
   const bool disable_shadow_host_suffix_append_;
   const std::string host_rewrite_literal_;
-  HeaderMutationsPtr request_header_mutations_;
+  HeaderMutationsPtr request_headers_mutations_;
 };
 
 /**
