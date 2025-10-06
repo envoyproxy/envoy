@@ -1,4 +1,4 @@
-.. _config_reverse_tunnel:
+.. _overview_reverse_tunnel:
 
 Reverse tunnels overview
 ========================

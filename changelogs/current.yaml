@@ -584,5 +584,12 @@ new_features:
     Added :ref:`outlier_detection<envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.outlier_detection>`
     to cluster's http protocol options to allow defining via an http matcher whether a response should be treated
     as error or as success by outlier detection.
+- area: reverse_tunnel
+  change: |
+    Added support for reverse tunnels that enable establishing persistent connections from downstream Envoy
+    instances to upstream Envoy instances without requiring the upstream to be directly reachable. This feature
+    is particularly useful when downstream instances are behind NATs, firewalls, or in private networks. The
+    feature is experimental and under active development, but is ready for experimental use. See
+    :ref:`reverse tunnel overview <overview_reverse_tunnel>` for details.
 
 deprecated:
