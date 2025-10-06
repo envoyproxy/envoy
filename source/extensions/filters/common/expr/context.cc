@@ -214,7 +214,7 @@ const RequestLookupValues& RequestLookupValues::get() {
              path = path.substr(query_offset + 1);
              auto fragment_offset = path.find('#');
              return CelValue::CreateStringView(path.substr(0, fragment_offset));
-            }}});
+           }}});
 }
 
 // Response lookup implementation
