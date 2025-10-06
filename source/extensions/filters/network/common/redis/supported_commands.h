@@ -69,10 +69,12 @@ struct SupportedCommands {
   }
 
   /**
-   * @return commands without keys which are sent to all redis shards and the responses are handled using special response handler according  to its response type
+   * @return commands without keys which are sent to all redis shards and the responses are handled
+   * using special response handler according  to its response type
    */
   static const absl::flat_hash_set<std::string>& ClusterScopeCommands() {
-    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "script", "flushall", "flushdb", "slowlog", "config");
+    CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>, "script", "flushall", "flushdb",
+                           "slowlog", "config");
   }
 
   /**
@@ -88,9 +90,9 @@ struct SupportedCommands {
    * If a command is in this map, only the listed subcommands are supported
    */
   static const CommandSubcommandMap& commandSubcommandValidationMap() {
-    CONSTRUCT_ON_FIRST_USE(CommandSubcommandMap, 
-      //Command name - Sub commands that are allowed
-      {{"cluster", {"info", "slots", "keyslot", "nodes"}}});
+    CONSTRUCT_ON_FIRST_USE(CommandSubcommandMap,
+                           // Command name - Sub commands that are allowed
+                           {{"cluster", {"info", "slots", "keyslot", "nodes"}}});
     // Add other commands with restricted subcommands here:
   }
 
@@ -188,14 +190,14 @@ struct SupportedCommands {
    */
   static const absl::flat_hash_set<std::string>& commandsWithoutMandatoryArgs() {
     CONSTRUCT_ON_FIRST_USE(absl::flat_hash_set<std::string>,
-        "ping",      // PING [message]
-        "time",      // TIME
-        "flushall",  // FLUSHALL [ASYNC]
-        "flushdb",   // FLUSHDB [ASYNC]
-        "randomkey", // RANDOMKEY
-        "quit",      // QUIT
-        "role",      // ROLE
-        "info"       // INFO [section]
+                           "ping",      // PING [message]
+                           "time",      // TIME
+                           "flushall",  // FLUSHALL [ASYNC]
+                           "flushdb",   // FLUSHDB [ASYNC]
+                           "randomkey", // RANDOMKEY
+                           "quit",      // QUIT
+                           "role",      // ROLE
+                           "info"       // INFO [section]
     );
   }
 
@@ -210,8 +212,7 @@ struct SupportedCommands {
    * @param subcommand the subcommand to validate (e.g., "info") - should be lowercase
    * @return true if subcommand is valid or no validation needed, false if invalid subcommand
    */
-  static bool validateCommandSubcommands(const std::string& command, 
-                                        const std::string& subcommand);
+  static bool validateCommandSubcommands(const std::string& command, const std::string& subcommand);
 
   static bool isSupportedCommand(const std::string& command);
 };

@@ -2308,10 +2308,10 @@ TEST_F(ClusterScopeConfigTest, ConfigSetAllShardsReturnSame) {
   // All shards return OK
   pool_callbacks_[0]->onResponse(okResponse());
   pool_callbacks_[1]->onResponse(okResponse());
-  
+
   time_system_.setMonotonicTime(std::chrono::milliseconds(10));
   EXPECT_CALL(store_, deliverHistogramToSinks(
-      Property(&Stats::Metric::name, "redis.foo.command.config.latency"), 10));
+                          Property(&Stats::Metric::name, "redis.foo.command.config.latency"), 10));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[2]->onResponse(okResponse());
 
@@ -2329,15 +2329,15 @@ TEST_F(ClusterScopeConfigTest, ConfigSetDifferentResponses) {
   expected_error.asString() = "all responses not same";
 
   pool_callbacks_[0]->onResponse(okResponse());
-  
+
   // Second shard returns different response
   auto different_response = std::make_unique<Common::Redis::RespValue>();
   different_response->type(Common::Redis::RespType::SimpleString);
   different_response->asString() = "DIFFERENT";
-  
+
   time_system_.setMonotonicTime(std::chrono::milliseconds(5));
   EXPECT_CALL(store_, deliverHistogramToSinks(
-      Property(&Stats::Metric::name, "redis.foo.command.config.latency"), 5));
+                          Property(&Stats::Metric::name, "redis.foo.command.config.latency"), 5));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_error)));
   pool_callbacks_[1]->onResponse(std::move(different_response));
 
@@ -2351,10 +2351,10 @@ TEST_F(ClusterScopeConfigTest, ConfigSetOneShardError) {
   EXPECT_NE(nullptr, handle_);
 
   pool_callbacks_[0]->onResponse(okResponse());
-  
+
   time_system_.setMonotonicTime(std::chrono::milliseconds(8));
   EXPECT_CALL(store_, deliverHistogramToSinks(
-      Property(&Stats::Metric::name, "redis.foo.command.config.latency"), 8));
+                          Property(&Stats::Metric::name, "redis.foo.command.config.latency"), 8));
   EXPECT_CALL(callbacks_, onResponse_(_)); // Should return the error
   pool_callbacks_[1]->onResponse(errorResponse("Configuration error"));
 
@@ -2368,10 +2368,10 @@ TEST_F(ClusterScopeConfigTest, ConfigSetShardFailure) {
   EXPECT_NE(nullptr, handle_);
 
   pool_callbacks_[0]->onResponse(okResponse());
-  
+
   time_system_.setMonotonicTime(std::chrono::milliseconds(12));
   EXPECT_CALL(store_, deliverHistogramToSinks(
-      Property(&Stats::Metric::name, "redis.foo.command.config.latency"), 12));
+                          Property(&Stats::Metric::name, "redis.foo.command.config.latency"), 12));
   EXPECT_CALL(callbacks_, onResponse_(_)); // Should return failure error
   pool_callbacks_[1]->onFailure();
 
@@ -2398,7 +2398,7 @@ TEST_F(ClusterScopeConfigTest, ConfigSetNoUpstreamForSome) {
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(6));
   EXPECT_CALL(store_, deliverHistogramToSinks(
-      Property(&Stats::Metric::name, "redis.foo.command.config.latency"), 6));
+                          Property(&Stats::Metric::name, "redis.foo.command.config.latency"), 6));
   EXPECT_CALL(callbacks_, onResponse_(_));
   pool_callbacks_[1]->onResponse(okResponse());
 
@@ -2431,7 +2431,7 @@ TEST_F(ClusterScopeConfigTest, ConfigSetMirrored) {
 
   time_system_.setMonotonicTime(std::chrono::milliseconds(7));
   EXPECT_CALL(store_, deliverHistogramToSinks(
-      Property(&Stats::Metric::name, "redis.foo.command.config.latency"), 7));
+                          Property(&Stats::Metric::name, "redis.foo.command.config.latency"), 7));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[1]->onResponse(okResponse());
   mirror_pool_callbacks_[1]->onResponse(okResponse());
@@ -2475,10 +2475,10 @@ TEST_F(ClusterScopeSlowLogLenTest, SlowLogLenIntegerSum) {
 
   pool_callbacks_[0]->onResponse(integerResponse(50));
   pool_callbacks_[1]->onResponse(integerResponse(75));
-  
+
   time_system_.setMonotonicTime(std::chrono::milliseconds(15));
   EXPECT_CALL(store_, deliverHistogramToSinks(
-      Property(&Stats::Metric::name, "redis.foo.command.slowlog.latency"), 15));
+                          Property(&Stats::Metric::name, "redis.foo.command.slowlog.latency"), 15));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[2]->onResponse(integerResponse(25));
 
@@ -2496,10 +2496,10 @@ TEST_F(ClusterScopeSlowLogLenTest, SlowLogLenWithNegativeValues) {
   expected_error.asString() = "negative value received from upstream";
 
   pool_callbacks_[0]->onResponse(integerResponse(50));
-  
+
   time_system_.setMonotonicTime(std::chrono::milliseconds(6));
   EXPECT_CALL(store_, deliverHistogramToSinks(
-      Property(&Stats::Metric::name, "redis.foo.command.slowlog.latency"), 6));
+                          Property(&Stats::Metric::name, "redis.foo.command.slowlog.latency"), 6));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_error)));
   pool_callbacks_[1]->onResponse(integerResponse(-10)); // Negative value should cause error
 
@@ -2513,10 +2513,10 @@ TEST_F(ClusterScopeSlowLogLenTest, SlowLogLenNonIntegerResponse) {
   EXPECT_NE(nullptr, handle_);
 
   pool_callbacks_[0]->onResponse(integerResponse(50));
-  
+
   time_system_.setMonotonicTime(std::chrono::milliseconds(9));
   EXPECT_CALL(store_, deliverHistogramToSinks(
-      Property(&Stats::Metric::name, "redis.foo.command.slowlog.latency"), 9));
+                          Property(&Stats::Metric::name, "redis.foo.command.slowlog.latency"), 9));
   EXPECT_CALL(callbacks_, onResponse_(_)); // Should get error response
   pool_callbacks_[1]->onResponse(stringResponse("not a number"));
 
@@ -2531,20 +2531,20 @@ TEST_F(ClusterScopeSlowLogLenTest, SlowLogLenIntegerOverflow) {
 
   // Test with very large numbers close to int64_t max
   int64_t large_value = 9223372036854775800LL; // Close to INT64_MAX
-  
+
   Common::Redis::RespValue expected_response;
   expected_response.type(Common::Redis::RespType::Integer);
   expected_response.asInteger() = large_value + 5;
 
   pool_callbacks_[0]->onResponse(integerResponse(large_value));
-  
+
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[1]->onResponse(integerResponse(5));
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.slowlog.success").value());
 }
 
-// Test cluster scope commands - SLOWLOG GET (ArrayMergeAggregateResponseHandler)  
+// Test cluster scope commands - SLOWLOG GET (ArrayMergeAggregateResponseHandler)
 class ClusterScopeSlowLogGetTest : public FragmentedRequestCommandHandlerTest {
 public:
   void setup(uint16_t shard_size, const std::list<uint64_t>& null_handle_indexes,
@@ -2594,10 +2594,10 @@ TEST_F(ClusterScopeSlowLogGetTest, SlowLogGetArrayMerge) {
   expected_response.asArray().swap(elements);
 
   pool_callbacks_[0]->onResponse(arrayResponse({"entry1", "entry2"}));
-  
+
   time_system_.setMonotonicTime(std::chrono::milliseconds(20));
   EXPECT_CALL(store_, deliverHistogramToSinks(
-      Property(&Stats::Metric::name, "redis.foo.command.slowlog.latency"), 20));
+                          Property(&Stats::Metric::name, "redis.foo.command.slowlog.latency"), 20));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[1]->onResponse(arrayResponse({"entry3", "entry4"}));
 
@@ -2615,7 +2615,7 @@ TEST_F(ClusterScopeSlowLogGetTest, SlowLogGetEmptyArrays) {
   // Empty array expected
 
   pool_callbacks_[0]->onResponse(arrayResponse({}));
-  
+
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
   pool_callbacks_[1]->onResponse(arrayResponse({}));
 
@@ -2628,11 +2628,11 @@ TEST_F(ClusterScopeSlowLogGetTest, SlowLogGetNonArrayResponse) {
   EXPECT_NE(nullptr, handle_);
 
   pool_callbacks_[0]->onResponse(arrayResponse({"entry1"}));
-  
+
   time_system_.setMonotonicTime(std::chrono::milliseconds(13));
   EXPECT_CALL(store_, deliverHistogramToSinks(
-      Property(&Stats::Metric::name, "redis.foo.command.slowlog.latency"), 13));
-  EXPECT_CALL(callbacks_, onResponse_(_)); // Should get error response
+                          Property(&Stats::Metric::name, "redis.foo.command.slowlog.latency"), 13));
+  EXPECT_CALL(callbacks_, onResponse_(_));              // Should get error response
   pool_callbacks_[1]->onResponse(integerResponse(123)); // Non-array response
 
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.slowlog.total").value());
@@ -2644,7 +2644,7 @@ TEST_F(RedisCommandSplitterImplTest, UnsupportedClusterScopeCommand) {
   Common::Redis::RespValue response;
   response.type(Common::Redis::RespType::Error);
   response.asString() = "ERR cluster subcommand 'reset' is not supported";
-  
+
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
@@ -2660,7 +2660,7 @@ TEST_F(RedisCommandSplitterImplTest, ClusterScopeCommandInvalidArgs) {
   Common::Redis::RespValue response;
   response.type(Common::Redis::RespType::Error);
   response.asString() = Response::get().InvalidRequest;
-  
+
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
@@ -2674,24 +2674,24 @@ TEST_F(RedisCommandSplitterImplTest, ClusterScopeCommandInvalidArgs) {
 // Test ClusterResponseHandlerFactory integration
 class ClusterResponseHandlerFactoryTest : public testing::Test {
 public:
-  std::unique_ptr<Common::Redis::RespValue> makeRequest(const std::string& command, 
-                                                       const std::string& subcommand = "") {
+  std::unique_ptr<Common::Redis::RespValue> makeRequest(const std::string& command,
+                                                        const std::string& subcommand = "") {
     auto request = std::make_unique<Common::Redis::RespValue>();
     request->type(Common::Redis::RespType::Array);
     std::vector<Common::Redis::RespValue> elements;
-    
+
     Common::Redis::RespValue cmd;
     cmd.type(Common::Redis::RespType::BulkString);
     cmd.asString() = command;
     elements.push_back(std::move(cmd));
-    
+
     if (!subcommand.empty()) {
       Common::Redis::RespValue subcmd;
       subcmd.type(Common::Redis::RespType::BulkString);
       subcmd.asString() = subcommand;
       elements.push_back(std::move(subcmd));
     }
-    
+
     request->asArray().swap(elements);
     return request;
   }
@@ -2700,23 +2700,16 @@ public:
 TEST_F(ClusterResponseHandlerFactoryTest, CreateAllshardSameHandlers) {
   // Test all commands that should use AllshardSameResponseHandler
   std::vector<std::pair<std::string, std::string>> same_response_commands = {
-    {"config", "set"},
-    {"config", "rewrite"},
-    {"config", "resetstat"},
-    {"flushall", ""},
-    {"flushdb", ""},
-    {"script", "flush"},
-    {"script", "kill"},
-    {"slowlog", "reset"}
-  };
+      {"config", "set"}, {"config", "rewrite"}, {"config", "resetstat"}, {"flushall", ""},
+      {"flushdb", ""},   {"script", "flush"},   {"script", "kill"},      {"slowlog", "reset"}};
 
   for (const auto& cmd_pair : same_response_commands) {
     auto handler = ClusterResponseHandlerFactory::createFromRequest(
         *makeRequest(cmd_pair.first, cmd_pair.second), 3);
-    
-    EXPECT_NE(nullptr, handler) << "Handler should be created for " << cmd_pair.first 
-                               << (cmd_pair.second.empty() ? "" : " " + cmd_pair.second);
-    
+
+    EXPECT_NE(nullptr, handler) << "Handler should be created for " << cmd_pair.first
+                                << (cmd_pair.second.empty() ? "" : " " + cmd_pair.second);
+
     // Verify it's the correct type by testing behavior
     // AllshardSameResponseHandler should be created
   }
@@ -2724,32 +2717,28 @@ TEST_F(ClusterResponseHandlerFactoryTest, CreateAllshardSameHandlers) {
 
 TEST_F(ClusterResponseHandlerFactoryTest, CreateIntegerSumHandlers) {
   // Test commands that should use IntegerSumAggregateResponseHandler
-  std::vector<std::pair<std::string, std::string>> integer_sum_commands = {
-    {"slowlog", "len"}
-  };
+  std::vector<std::pair<std::string, std::string>> integer_sum_commands = {{"slowlog", "len"}};
 
   for (const auto& cmd_pair : integer_sum_commands) {
     auto handler = ClusterResponseHandlerFactory::createFromRequest(
         *makeRequest(cmd_pair.first, cmd_pair.second), 3);
-    
-    EXPECT_NE(nullptr, handler) << "Handler should be created for " << cmd_pair.first 
-                               << " " << cmd_pair.second;
+
+    EXPECT_NE(nullptr, handler) << "Handler should be created for " << cmd_pair.first << " "
+                                << cmd_pair.second;
   }
 }
 
 TEST_F(ClusterResponseHandlerFactoryTest, CreateArrayMergeHandlers) {
   // Test commands that should use ArrayMergeAggregateResponseHandler
-  std::vector<std::pair<std::string, std::string>> array_merge_commands = {
-    {"slowlog", "get"},
-    {"config", "get"}
-  };
+  std::vector<std::pair<std::string, std::string>> array_merge_commands = {{"slowlog", "get"},
+                                                                           {"config", "get"}};
 
   for (const auto& cmd_pair : array_merge_commands) {
     auto handler = ClusterResponseHandlerFactory::createFromRequest(
         *makeRequest(cmd_pair.first, cmd_pair.second), 3);
-    
-    EXPECT_NE(nullptr, handler) << "Handler should be created for " << cmd_pair.first 
-                               << " " << cmd_pair.second;
+
+    EXPECT_NE(nullptr, handler) << "Handler should be created for " << cmd_pair.first << " "
+                                << cmd_pair.second;
   }
 }
 
@@ -2757,7 +2746,7 @@ TEST_F(ClusterResponseHandlerFactoryTest, CreateArrayMergeHandlers) {
 class ClusterScopeCommandRoutingTest : public RedisCommandSplitterImplTest {
 public:
   void testCommandRouting(const std::string& command, const std::string& subcommand,
-                         bool should_create_handler) {
+                          bool should_create_handler) {
     Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
     std::vector<std::string> cmd_args = {command};
     if (!subcommand.empty()) {
@@ -2769,7 +2758,7 @@ public:
       // For supported cluster scope commands, we expect the request to be handled
       EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
       EXPECT_CALL(*conn_pool_, shardSize_()).WillOnce(Return(2));
-      
+
       ConnPool::PoolCallbacks* pool_callback1;
       ConnPool::PoolCallbacks* pool_callback2;
       Common::Redis::Client::MockPoolRequest pool_request1;
@@ -2781,10 +2770,11 @@ public:
       EXPECT_CALL(*conn_pool_, makeRequestToShard_(1, _, _))
           .WillOnce(DoAll(WithArg<2>(SaveArgAddress(&pool_callback2)), Return(&pool_request2)));
 
-      auto handle = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
-      EXPECT_NE(nullptr, handle) << "Should create handle for " << command 
-                                << (subcommand.empty() ? "" : " " + subcommand);
-      
+      auto handle =
+          splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+      EXPECT_NE(nullptr, handle) << "Should create handle for " << command
+                                 << (subcommand.empty() ? "" : " " + subcommand);
+
       // Clean up the handle by simulating completion
       if (handle) {
         auto response1 = std::make_unique<Common::Redis::RespValue>();
@@ -2793,7 +2783,7 @@ public:
         auto response2 = std::make_unique<Common::Redis::RespValue>();
         response2->type(Common::Redis::RespType::SimpleString);
         response2->asString() = "OK";
-        
+
         EXPECT_CALL(callbacks_, onResponse_(_));
         pool_callback1->onResponse(std::move(response1));
         pool_callback2->onResponse(std::move(response2));
@@ -2802,22 +2792,21 @@ public:
       // For unsupported commands, we expect an error response
       EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
       EXPECT_CALL(callbacks_, onResponse_(_));
-      auto handle = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
-      EXPECT_EQ(nullptr, handle) << "Should NOT create handle for " << command 
-                                << (subcommand.empty() ? "" : " " + subcommand);
+      auto handle =
+          splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+      EXPECT_EQ(nullptr, handle) << "Should NOT create handle for " << command
+                                 << (subcommand.empty() ? "" : " " + subcommand);
     }
   }
 };
 
 TEST_F(ClusterScopeCommandRoutingTest, SupportedClusterScopeCommands) {
   // Test that all supported cluster scope commands are properly routed
-  std::vector<std::pair<std::string, std::string>> supported_commands = {
-    {"config", "set"},
-    {"config", "get"},
-    {"flushall", ""},
-    {"slowlog", "len"},
-    {"slowlog", "get"}
-  };
+  std::vector<std::pair<std::string, std::string>> supported_commands = {{"config", "set"},
+                                                                         {"config", "get"},
+                                                                         {"flushall", ""},
+                                                                         {"slowlog", "len"},
+                                                                         {"slowlog", "get"}};
 
   for (const auto& cmd_pair : supported_commands) {
     testCommandRouting(cmd_pair.first, cmd_pair.second, true);
@@ -2827,18 +2816,18 @@ TEST_F(ClusterScopeCommandRoutingTest, SupportedClusterScopeCommands) {
 TEST_F(ClusterScopeCommandRoutingTest, NoShardsAvailable) {
   // Test that cluster scope commands fail gracefully when no shards are available
   InSequence s;
-  
+
   Common::Redis::RespValue expected_response;
   expected_response.type(Common::Redis::RespType::Error);
   expected_response.asString() = "no upstream host";
-  
+
   Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
   makeBulkStringArray(*request, {"config", "set", "maxmemory", "100mb"});
-  
+
   EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
   EXPECT_CALL(*conn_pool_, shardSize_()).WillOnce(Return(0));
   EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_response)));
-  
+
   auto handle = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
   EXPECT_EQ(nullptr, handle);
 }

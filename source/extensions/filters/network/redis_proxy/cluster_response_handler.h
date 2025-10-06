@@ -41,7 +41,7 @@ public:
    * @param request the cluster scope request object (has all needed data)
    */
   void handleResponse(Common::Redis::RespValuePtr&& value, uint32_t shard_index,
-                     ClusterScopeCmdRequest& request);
+                      ClusterScopeCmdRequest& request);
 
   /**
    * Handle a failure from a shard by converting it to an error response
@@ -56,8 +56,8 @@ protected:
   uint32_t error_count_{0};
   std::vector<Common::Redis::RespValuePtr> pending_responses_;
 
-  explicit BaseClusterScopeResponseHandler(uint32_t shard_count) 
-    : num_pending_responses_(shard_count), error_count_(0) {
+  explicit BaseClusterScopeResponseHandler(uint32_t shard_count)
+      : num_pending_responses_(shard_count), error_count_(0) {
     pending_responses_.reserve(shard_count);
   }
 
@@ -65,11 +65,11 @@ protected:
   virtual void processAllResponses(ClusterScopeCmdRequest& request) = 0;
 
   // Common helper methods available to all derived classes
-  void storeResponse(Common::Redis::RespValuePtr&& value, uint32_t shard_index, 
-                    ClusterScopeCmdRequest& request);
+  void storeResponse(Common::Redis::RespValuePtr&& value, uint32_t shard_index,
+                     ClusterScopeCmdRequest& request);
   void sendErrorResponse(ClusterScopeCmdRequest& request, const std::string& error_message);
   void sendSuccessResponse(ClusterScopeCmdRequest& request, Common::Redis::RespValuePtr&& response);
-  
+
   void handleErrorResponses(ClusterScopeCmdRequest& request);
 };
 
@@ -79,8 +79,8 @@ protected:
  */
 class AllshardSameResponseHandler : public BaseClusterScopeResponseHandler {
 public:
-  explicit AllshardSameResponseHandler(uint32_t shard_count) 
-    : BaseClusterScopeResponseHandler(shard_count) {}
+  explicit AllshardSameResponseHandler(uint32_t shard_count)
+      : BaseClusterScopeResponseHandler(shard_count) {}
 
 protected:
   void processAllResponses(ClusterScopeCmdRequest& request) override;
@@ -94,23 +94,22 @@ private:
  */
 class BaseAggregateResponseHandler : public BaseClusterScopeResponseHandler {
 protected:
-  explicit BaseAggregateResponseHandler(uint32_t shard_count) 
-    : BaseClusterScopeResponseHandler(shard_count) {}
+  explicit BaseAggregateResponseHandler(uint32_t shard_count)
+      : BaseClusterScopeResponseHandler(shard_count) {}
 
   void processAllResponses(ClusterScopeCmdRequest& request) final;
-  
+
   // Template method for specific aggregation logic
   virtual void processAggregatedResponses(ClusterScopeCmdRequest& request) = 0;
 };
-
 
 /**
  * Handler for integer sum aggregation (PUBSUB NUMPAT, SLOWLOG LEN)
  */
 class IntegerSumAggregateResponseHandler : public BaseAggregateResponseHandler {
 public:
-  explicit IntegerSumAggregateResponseHandler(uint32_t shard_count) 
-    : BaseAggregateResponseHandler(shard_count) {}
+  explicit IntegerSumAggregateResponseHandler(uint32_t shard_count)
+      : BaseAggregateResponseHandler(shard_count) {}
 
 private:
   void processAggregatedResponses(ClusterScopeCmdRequest& request) override;
@@ -121,13 +120,12 @@ private:
  */
 class ArrayMergeAggregateResponseHandler : public BaseAggregateResponseHandler {
 public:
-  explicit ArrayMergeAggregateResponseHandler(uint32_t shard_count) 
-    : BaseAggregateResponseHandler(shard_count) {}
+  explicit ArrayMergeAggregateResponseHandler(uint32_t shard_count)
+      : BaseAggregateResponseHandler(shard_count) {}
 
 private:
   void processAggregatedResponses(ClusterScopeCmdRequest& request) override;
 };
-
 
 /**
  * Factory class for creating appropriate response handlers
@@ -141,8 +139,9 @@ public:
    * @param shard_count the number of shards for memory pre-allocation
    * @return unique pointer to the appropriate response handler
    */
-  static std::unique_ptr<BaseClusterScopeResponseHandler> 
-  createHandler(const std::string& command_name, const std::string& subcommand, uint32_t shard_count);
+  static std::unique_ptr<BaseClusterScopeResponseHandler>
+  createHandler(const std::string& command_name, const std::string& subcommand,
+                uint32_t shard_count);
 
   /**
    * Create a response handler from a Redis request
@@ -150,7 +149,7 @@ public:
    * @param shard_count the number of shards for memory pre-allocation
    * @return unique pointer to the appropriate response handler
    */
-  static std::unique_ptr<BaseClusterScopeResponseHandler> 
+  static std::unique_ptr<BaseClusterScopeResponseHandler>
   createFromRequest(const Common::Redis::RespValue& request, uint32_t shard_count);
 
 private:
@@ -161,8 +160,9 @@ private:
    * @param shard_count the number of shards for memory pre-allocation
    * @return unique pointer to the appropriate aggregate response handler
    */
-  static std::unique_ptr<BaseClusterScopeResponseHandler> 
-  createAggregateHandler(const std::string& command_name, const std::string& subcommand, uint32_t shard_count);
+  static std::unique_ptr<BaseClusterScopeResponseHandler>
+  createAggregateHandler(const std::string& command_name, const std::string& subcommand,
+                         uint32_t shard_count);
 
   /**
    * Get the response handler type for a given command and subcommand
@@ -170,8 +170,8 @@ private:
    * @param subcommand the Redis subcommand if applicable
    * @return the appropriate response handler type
    */
-  static ClusterScopeResponseHandlerType 
-  getResponseHandlerType(const std::string& command_name, const std::string& subcommand = "");
+  static ClusterScopeResponseHandlerType getResponseHandlerType(const std::string& command_name,
+                                                                const std::string& subcommand = "");
 };
 
 } // namespace CommandSplitter

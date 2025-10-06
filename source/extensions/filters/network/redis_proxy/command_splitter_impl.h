@@ -14,10 +14,10 @@
 #include "source/extensions/filters/network/common/redis/client_impl.h"
 #include "source/extensions/filters/network/common/redis/fault_impl.h"
 #include "source/extensions/filters/network/common/redis/utility.h"
+#include "source/extensions/filters/network/redis_proxy/cluster_response_handler.h"
 #include "source/extensions/filters/network/redis_proxy/command_splitter.h"
 #include "source/extensions/filters/network/redis_proxy/conn_pool_impl.h"
 #include "source/extensions/filters/network/redis_proxy/router.h"
-#include "source/extensions/filters/network/redis_proxy/cluster_response_handler.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -328,8 +328,8 @@ private:
 
 /**
  * RandomShardRequest sends the command to a single random shard. This is used for commands like
- * RANDOMKEY and CLUSTER that don't require responses from all shards, just one representative response.
- * This optimizes performance by avoiding the overhead of sending to all shards.
+ * RANDOMKEY and CLUSTER that don't require responses from all shards, just one representative
+ * response. This optimizes performance by avoiding the overhead of sending to all shards.
  */
 class RandomShardRequest : public FragmentedRequest {
 public:
@@ -339,8 +339,8 @@ public:
                                 const StreamInfo::StreamInfo& stream_info);
 
 private:
-  RandomShardRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
-              bool delay_command_latency)
+  RandomShardRequest(SplitCallbacks& callbacks, CommandStats& command_stats,
+                     TimeSource& time_source, bool delay_command_latency)
       : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
 
   // RedisProxy::CommandSplitter::FragmentedRequest
@@ -348,8 +348,9 @@ private:
 };
 
 /**
- * ClusterScopeCmdRequest sends the command to all Redis servers, and the responses are handled specifically to its type.
- * This class uses the strategy pattern with response handlers defined in cluster_response_handler.h
+ * ClusterScopeCmdRequest sends the command to all Redis servers, and the responses are handled
+ * specifically to its type. This class uses the strategy pattern with response handlers defined in
+ * cluster_response_handler.h
  */
 class ClusterScopeCmdRequest : public FragmentedRequest {
 public:
@@ -364,30 +365,27 @@ public:
       pending_requests_[shard_index].handle_ = nullptr;
     }
   }
-  
+
   void sendResponse(Common::Redis::RespValuePtr&& response) {
     callbacks_.onResponse(std::move(response));
   }
-  
-  void updateRequestStats(bool success) {
-    updateStats(success);
-  }
-  
-  size_t getTotalShardCount() const {
-    return pending_requests_.size();
-  }
+
+  void updateRequestStats(bool success) { updateStats(success); }
+
+  size_t getTotalShardCount() const { return pending_requests_.size(); }
 
 private:
-  ClusterScopeCmdRequest(SplitCallbacks& callbacks, CommandStats& command_stats, TimeSource& time_source,
-              bool delay_command_latency)
+  ClusterScopeCmdRequest(SplitCallbacks& callbacks, CommandStats& command_stats,
+                         TimeSource& time_source, bool delay_command_latency)
       : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
-  
+
   // Initialize response handler based on the incoming request
   // Returns true on success, false on failure
   bool initializeResponseHandler(const Common::Redis::RespValue& request, uint32_t shard_count) {
     response_handler_ = ClusterResponseHandlerFactory::createFromRequest(request, shard_count);
     if (!response_handler_) {
-      ENVOY_LOG(warn, "ClusterScopeCmdRequest: failed to initialize response handler for command: {}",
+      ENVOY_LOG(warn,
+                "ClusterScopeCmdRequest: failed to initialize response handler for command: {}",
                 request.asArray().empty() ? "unknown" : request.asArray()[0].asString());
       return false;
     } else {
@@ -414,7 +412,9 @@ private:
       response_handler_->handleFailure(index, *this);
     } else {
       // No handler available for this command - fallback to base class behavior
-      ENVOY_LOG(warn, "No response handler set for ClusterScopeCmdRequest on failure, using base behavior");
+      ENVOY_LOG(
+          warn,
+          "No response handler set for ClusterScopeCmdRequest on failure, using base behavior");
       FragmentedRequest::onChildFailure(index);
     }
   }

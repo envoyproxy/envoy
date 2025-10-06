@@ -58,12 +58,12 @@ envoy_cc_library(
 envoy_cc_library(
     name = "command_splitter_lib",
     srcs = [
-        "command_splitter_impl.cc",
         "cluster_response_handler.cc",
+        "command_splitter_impl.cc",
     ],
     hdrs = [
-        "command_splitter_impl.h",
         "cluster_response_handler.h",
+        "command_splitter_impl.h",
     ],
     deps = [
         ":command_splitter_interface",

@@ -1,11 +1,11 @@
 #include "source/extensions/filters/network/redis_proxy/command_splitter_impl.h"
-#include "source/extensions/filters/network/redis_proxy/cluster_response_handler.h"
 
-#include <cstdint>
 #include <chrono>
+#include <cstdint>
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/network/common/redis/supported_commands.h"
+#include "source/extensions/filters/network/redis_proxy/cluster_response_handler.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,8 +17,6 @@ namespace {
 // null_pool_callbacks is used for requests that must be filtered and not redirected such as
 // "asking".
 ConnPool::DoNothingPoolCallbacks null_pool_callbacks;
-
-
 
 /**
  * Make request and maybe mirror the request based on the mirror policies of the route.
@@ -720,10 +718,10 @@ void SelectRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_
 }
 
 SplitRequestPtr RandomShardRequest::create(Router& router,
-                                          Common::Redis::RespValuePtr&& incoming_request,
-                                          SplitCallbacks& callbacks, CommandStats& command_stats,
-                                          TimeSource& time_source, bool delay_command_latency,
-                                          const StreamInfo::StreamInfo& stream_info) {
+                                           Common::Redis::RespValuePtr&& incoming_request,
+                                           SplitCallbacks& callbacks, CommandStats& command_stats,
+                                           TimeSource& time_source, bool delay_command_latency,
+                                           const StreamInfo::StreamInfo& stream_info) {
   // Use default key (empty string) for routing since these commands aren't tied to specific keys
   std::string empty_key = "";
   const auto route = router.upstreamPool(empty_key, stream_info);
@@ -736,15 +734,15 @@ SplitRequestPtr RandomShardRequest::create(Router& router,
   const std::string command = absl::AsciiStrToLower(incoming_request->asArray()[0].asString());
   if (incoming_request->asArray().size() > 1) {
     const std::string subcommand = absl::AsciiStrToLower(incoming_request->asArray()[1].asString());
-      // check is there is any subcommand restrictions for the command  
+    // check is there is any subcommand restrictions for the command
     if (!Common::Redis::SupportedCommands::validateCommandSubcommands(command, subcommand)) {
-        command_stats.error_.inc();
-        callbacks.onResponse(Common::Redis::Utility::makeError(
-            fmt::format("ERR {} subcommand '{}' is not supported", command, subcommand)));
-        return nullptr;
+      command_stats.error_.inc();
+      callbacks.onResponse(Common::Redis::Utility::makeError(
+          fmt::format("ERR {} subcommand '{}' is not supported", command, subcommand)));
+      return nullptr;
     }
   }
-  
+
   uint32_t shard_size = route->upstream(command)->shardSize();
   if (shard_size == 0) {
     command_stats.error_.inc();
@@ -762,7 +760,8 @@ SplitRequestPtr RandomShardRequest::create(Router& router,
   // Select a random shard index using time-based pseudo-randomness
   // This provides good distribution without needing access to RandomGenerator
   auto now = std::chrono::duration_cast<std::chrono::microseconds>(
-      time_source.systemTime().time_since_epoch()).count();
+                 time_source.systemTime().time_since_epoch())
+                 .count();
   uint32_t random_shard_index = static_cast<uint32_t>(now) % shard_size;
 
   // Create single pending request with the random shard index
@@ -770,7 +769,8 @@ SplitRequestPtr RandomShardRequest::create(Router& router,
   PendingRequest& pending_request = request_ptr->pending_requests_.back();
 
   Common::Redis::RespValueSharedPtr base_request = std::move(incoming_request);
-  ENVOY_LOG(debug, "random shard request to shard index {}: {}", random_shard_index, base_request->toString());
+  ENVOY_LOG(debug, "random shard request to shard index {}: {}", random_shard_index,
+            base_request->toString());
 
   // Send request to the randomly selected shard
   pending_request.handle_ = makeFragmentedRequestToShard(
@@ -788,7 +788,7 @@ SplitRequestPtr RandomShardRequest::create(Router& router,
 }
 
 void RandomShardRequest::onChildResponse(Common::Redis::RespValuePtr&& value, uint32_t index) {
-  
+
   pending_requests_[0].handle_ = nullptr; // We only have one request at pending_requests_[0]
 
   // For random shard requests, we simply forward the response directly
@@ -796,36 +796,38 @@ void RandomShardRequest::onChildResponse(Common::Redis::RespValuePtr&& value, ui
   ASSERT(num_pending_responses_ > 0);
   // index is the shard_index that responded (can be any value 0 to shard_size-1)
   ENVOY_LOG(debug, "random shard response from shard {}: '{}'", index, value->toString());
-  
+
   updateStats(value->type() != Common::Redis::RespType::Error);
   callbacks_.onResponse(std::move(value));
 }
 
 SplitRequestPtr ClusterScopeCmdRequest::create(Router& router,
-                                              Common::Redis::RespValuePtr&& incoming_request,
-                                              SplitCallbacks& callbacks, CommandStats& command_stats,
-                                              TimeSource& time_source, bool delay_command_latency,
-                                              const StreamInfo::StreamInfo& stream_info) {
+                                               Common::Redis::RespValuePtr&& incoming_request,
+                                               SplitCallbacks& callbacks,
+                                               CommandStats& command_stats, TimeSource& time_source,
+                                               bool delay_command_latency,
+                                               const StreamInfo::StreamInfo& stream_info) {
 
-  const std::string command =  absl::AsciiStrToLower(incoming_request->asArray()[0].asString());
+  const std::string command = absl::AsciiStrToLower(incoming_request->asArray()[0].asString());
   if (incoming_request->asArray().size() > 1) {
     const std::string subcommand = absl::AsciiStrToLower(incoming_request->asArray()[1].asString());
-      // check is there is any subcommand restrictions for the command  
+    // check is there is any subcommand restrictions for the command
     if (!Common::Redis::SupportedCommands::validateCommandSubcommands(command, subcommand)) {
-        command_stats.error_.inc();
-        callbacks.onResponse(Common::Redis::Utility::makeError(
-            fmt::format("ERR {} subcommand '{}' is not supported", command, subcommand)));
-        return nullptr;
+      command_stats.error_.inc();
+      callbacks.onResponse(Common::Redis::Utility::makeError(
+          fmt::format("ERR {} subcommand '{}' is not supported", command, subcommand)));
+      return nullptr;
     }
   }
 
   // Use a default key (empty string) for routing  cluster scope commands
-  // are not tied to specific keys. This relies on having a catch_all_route configured and no prefix set as "".
+  // are not tied to specific keys. This relies on having a catch_all_route configured and no prefix
+  // set as "".
   uint32_t shard_size = 0;
 
   std::string empty_key = "";
   const auto route = router.upstreamPool(empty_key, stream_info);
-  if ( !route ) {
+  if (!route) {
     ENVOY_LOG(error, "route not found: '{}'", incoming_request->toString());
     callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
     return nullptr;
@@ -840,7 +842,7 @@ SplitRequestPtr ClusterScopeCmdRequest::create(Router& router,
 
   std::unique_ptr<ClusterScopeCmdRequest> request_ptr{
       new ClusterScopeCmdRequest(callbacks, command_stats, time_source, delay_command_latency)};
-  
+
   // Initialize the response handler based on the incoming request and shard size
   if (!request_ptr->initializeResponseHandler(*incoming_request, shard_size)) {
     command_stats.error_.inc();
@@ -861,7 +863,8 @@ SplitRequestPtr ClusterScopeCmdRequest::create(Router& router,
         route, command, shard_index, *base_request, pending_request, callbacks.transaction());
 
     if (!pending_request.handle_) {
-      ENVOY_LOG(error, "{}:failed to create request handle for shard index {}: '{}'", __func__, shard_index, base_request->toString());
+      ENVOY_LOG(error, "{}:failed to create request handle for shard index {}: '{}'", __func__,
+                shard_index, base_request->toString());
       pending_request.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
     }
   }
@@ -1357,7 +1360,7 @@ SplitRequestPtr InstanceImpl::makeRequest(Common::Redis::RespValuePtr&& request,
     return nullptr;
   }
 
-  if (request->asArray().size() < 2 && 
+  if (request->asArray().size() < 2 &&
       !Common::Redis::SupportedCommands::isCommandValidWithoutArgs(command_name)) {
     // Commands that require at least one argument beyond the command name
     onInvalidRequest(callbacks);
