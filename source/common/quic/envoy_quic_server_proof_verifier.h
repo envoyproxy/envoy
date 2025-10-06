@@ -31,18 +31,6 @@ public:
   void updateFilterChainManager(Network::FilterChainManager& filter_chain_manager);
 
 private:
-  // Get the appropriate server context for client certificate validation based on connection
-  // details.
-  Ssl::ServerContextSharedPtr
-  getServerContextForClientValidation(const quiche::QuicheSocketAddress& server_address,
-                                      const quiche::QuicheSocketAddress& client_address,
-                                      const std::string& hostname);
-
-  // Check if the server context requires client certificates for this connection.
-  bool requiresClientCertificateValidation(const quiche::QuicheSocketAddress& server_address,
-                                           const quiche::QuicheSocketAddress& client_address,
-                                           const std::string& hostname);
-
   Network::Socket& listen_socket_;
   Network::FilterChainManager* filter_chain_manager_;
   TimeSource& time_source_;
