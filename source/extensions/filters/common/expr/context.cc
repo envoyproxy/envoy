@@ -400,16 +400,14 @@ const UpstreamLookupValues& UpstreamLookupValues::get() {
           {UpstreamRequestAttemptCount,
            [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
              return CelValue::CreateUint64(wrapper.info_.attemptCount().value_or(0));
-          }},
-          {UpstreamNumEndpoints,
-           [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
-             if (wrapper.info_.upstreamClusterInfo().value_or(nullptr) !=
-                 nullptr) {
+           }},
+          {UpstreamNumEndpoints, [](const UpstreamWrapper& wrapper) -> absl::optional<CelValue> {
+             if (wrapper.info_.upstreamClusterInfo().value_or(nullptr) != nullptr) {
                return CelValue::CreateUint64(wrapper.info_.upstreamClusterInfo()
-                                               .value()
-                                               .get()
-                                               ->endpointStats()
-                                               .membership_total_.value());
+                                                 .value()
+                                                 .get()
+                                                 ->endpointStats()
+                                                 .membership_total_.value());
              }
              return {};
            }}});
