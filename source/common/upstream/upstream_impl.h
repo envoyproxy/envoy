@@ -987,6 +987,8 @@ public:
   Http::Http3::CodecStats& http3CodecStats() const override;
   Http::ClientHeaderValidatorPtr makeHeaderValidator(Http::Protocol protocol) const override;
 
+  absl::optional<bool> processHttpForOutlierDetection(Http::ResponseHeaderMap&) const override;
+
   OptRef<const envoy::config::cluster::v3::UpstreamConnectionOptions::HappyEyeballsConfig>
   happyEyeballsConfig() const override {
     if (happy_eyeballs_config_ == nullptr) {
