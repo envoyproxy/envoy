@@ -27,16 +27,16 @@ treating the normally unreachable downstream services as if they were directly a
 
 Reverse tunnels require the following extensions:
 
-1. **Downstream socket interface**: Registered as a bootstrap extension on the initiator Envoy to initiate and maintain reverse tunnels.
-2. **Upstream socket interface**: Registered as a bootstrap extension on the responder Envoy to accept and manage reverse tunnels.
-3. **Reverse tunnel network filter**: Configured on the responder Envoy to accept and validate reverse tunnel handshake requests.
-4. **Reverse connection cluster**: Configured on the responder Envoy to route data requests to downstream nodes through established reverse tunnels.
+#. **Downstream socket interface**: Registered as a bootstrap extension on the initiator Envoy to initiate and maintain reverse tunnels.
+#. **Upstream socket interface**: Registered as a bootstrap extension on the responder Envoy to accept and manage reverse tunnels.
+#. **Reverse tunnel network filter**: Configured on the responder Envoy to accept and validate reverse tunnel handshake requests.
+#. **Reverse connection cluster**: Configured on the responder Envoy to route data requests to downstream nodes through established reverse tunnels.
 
 .. _config_reverse_tunnel_configuration_files:
 
 .. _config_reverse_tunnel_initiator:
 
-Initiator configuration (Downstream Envoy)
+Initiator configuration (downstream Envoy)
 -------------------------------------------
 
 The initiator Envoy (downstream) requires the following configuration components to establish reverse tunnels:
@@ -51,6 +51,7 @@ Downstream socket interface
     :lines: 8-12
     :linenos:
     :lineno-start: 8
+    :caption: :download:`initiator-envoy.yaml </_configs/reverse_connection/initiator-envoy.yaml>`
 
 This extension enables the initiator Envoy to establish and maintain reverse tunnel connections to the responder Envoy.
 
@@ -69,6 +70,7 @@ are reachable through the reverse tunnel.
     :lines: 17-50
     :linenos:
     :lineno-start: 17
+    :caption: :download:`initiator-envoy.yaml </_configs/reverse_connection/initiator-envoy.yaml>`
 
 The special ``rc://`` address format encodes connection and identity metadata:
 
@@ -95,6 +97,7 @@ The ``downstream-service`` cluster in the example refers to the service behind t
     :lines: 69-80
     :linenos:
     :lineno-start: 69
+    :caption: :download:`initiator-envoy.yaml </_configs/reverse_connection/initiator-envoy.yaml>`
 
 Upstream cluster
 ~~~~~~~~~~~~~~~~~
@@ -108,6 +111,7 @@ This cluster can be defined statically in the bootstrap configuration or added d
     :lines: 54-65
     :linenos:
     :lineno-start: 54
+    :caption: :download:`initiator-envoy.yaml </_configs/reverse_connection/initiator-envoy.yaml>`
 
 Multiple cluster support
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -191,6 +195,7 @@ Upstream socket interface
     :lines: 8-12
     :linenos:
     :lineno-start: 8
+    :caption: :download:`responder-envoy.yaml </_configs/reverse_connection/responder-envoy.yaml>`
 
 This extension enables the responder Envoy to accept and manage incoming reverse tunnel connections from initiator Envoys.
 
@@ -208,6 +213,7 @@ parameters.
     :lines: 17-28
     :linenos:
     :lineno-start: 17
+    :caption: :download:`responder-envoy.yaml </_configs/reverse_connection/responder-envoy.yaml>`
 
 .. _config_reverse_connection_cluster:
 
@@ -227,33 +233,42 @@ the configured ``host_id_format`` field and uses it to look up the appropriate r
     :lines: 92-112
     :linenos:
     :lineno-start: 92
+    :caption: :download:`responder-envoy.yaml </_configs/reverse_connection/responder-envoy.yaml>`
 
 The reverse connection cluster configuration includes several key fields:
 
-**Load balancing policy**
-  Must be set to ``CLUSTER_PROVIDED`` to delegate load balancing to the custom cluster implementation.
+Load balancing policy
+^^^^^^^^^^^^^^^^^^^^^
 
-**Host ID format**
-  The ``host_id_format`` field uses Envoy's :ref:`formatter system <config_access_log_format_strings>` to
-  extract the target downstream node identifier from the request context. Supported formatters include:
+Must be set to ``CLUSTER_PROVIDED`` to delegate load balancing to the custom cluster implementation.
 
-  * ``%REQ(header-name)%``: Extract value from a request header.
-  * ``%DYNAMIC_METADATA(namespace:key)%``: Extract value from dynamic metadata.
-  * ``%FILTER_STATE(key)%``: Extract value from filter state.
-  * ``%DOWNSTREAM_REMOTE_ADDRESS%``: Use the downstream connection address.
-  * Plain text and combinations of the above.
+Host ID format
+^^^^^^^^^^^^^^
 
-  See the :ref:`config_reverse_connection_egress_listener` section for an example of processing headers
-  to set the ``host_id``.
+The ``host_id_format`` field uses Envoy's :ref:`formatter system <config_access_log_format_strings>` to
+extract the target downstream node identifier from the request context. Supported formatters include:
 
-**Protocol**
-  Only HTTP/2 is supported for reverse connections. This is required to support multiplexing multiple
-  data requests over a single TCP connection.
+* ``%REQ(header-name)%``: Extract value from a request header.
+* ``%DYNAMIC_METADATA(namespace:key)%``: Extract value from dynamic metadata.
+* ``%FILTER_STATE(key)%``: Extract value from filter state.
+* ``%DOWNSTREAM_REMOTE_ADDRESS%``: Use the downstream connection address.
+* Plain text and combinations of the above.
 
-**Connection reuse**
-  Once a connection is established to a specific downstream node, it is cached and reused for all subsequent
-  requests to that node. Each data request is multiplexed as a new HTTP/2 stream on the existing connection,
-  avoiding the overhead of establishing new connections.
+See the :ref:`config_reverse_connection_egress_listener` section for an example of processing headers
+to set the ``host_id``.
+
+Protocol
+^^^^^^^^
+
+Only HTTP/2 is supported for reverse connections. This is required to support multiplexing multiple
+data requests over a single TCP connection.
+
+Connection reuse
+^^^^^^^^^^^^^^^^
+
+Once a connection is established to a specific downstream node, it is cached and reused for all subsequent
+requests to that node. Each data request is multiplexed as a new HTTP/2 stream on the existing connection,
+avoiding the overhead of establishing new connections.
 
 .. _config_reverse_connection_egress_listener:
 
@@ -269,6 +284,7 @@ that identifies the target downstream node for each request.
     :lines: 31-88
     :linenos:
     :lineno-start: 31
+    :caption: :download:`responder-envoy.yaml </_configs/reverse_connection/responder-envoy.yaml>`
 
 The example above demonstrates using a :ref:`Lua filter <config_http_filters_lua>` to implement flexible
 header-based routing logic. This is one of several approaches for computing the ``host_id`` from request
@@ -279,13 +295,13 @@ tunnel connection.
 
 The header priority order is:
 
-1. **x-node-id header**: Highest priority—targets a specific downstream node.
-2. **x-cluster-id header**: Fallback—targets a cluster, allowing load balancing across nodes.
-3. **None found**: Logs an error and fails cluster matching.
+#. **x-node-id header**: Highest priority—targets a specific downstream node.
+#. **x-cluster-id header**: Fallback—targets a cluster, allowing load balancing across nodes.
+#. **None found**: Logs an error and fails cluster matching.
 
 **Example request flows:**
 
-1. **Request with node ID** (highest priority):
+#. **Request with node ID** (highest priority):
 
    .. code-block:: http
 
@@ -294,7 +310,7 @@ The header priority order is:
 
    The filter sets ``host_id = "example-node"`` and routes to that specific node.
 
-2. **Request with cluster ID** (fallback):
+#. **Request with cluster ID** (fallback):
 
    .. code-block:: http
 
