@@ -170,16 +170,8 @@ void EnvoyQuicServerSession::OnTlsHandshakeComplete() {
   quic::QuicServerSessionBase::OnTlsHandshakeComplete();
   const auto* ssl_info = dynamic_cast<const QuicSslConnectionInfo*>(ssl().get());
   if (ssl_info != nullptr) {
-    // Log certificate status for debugging.
-    bool cert_presented = ssl_info->peerCertificatePresented();
-    bool cert_validated = ssl_info->peerCertificateValidated();
-
-    ENVOY_LOG(debug, "QUIC handshake completed. certificate status: presented={}, validated={}",
-              cert_presented, cert_validated);
-
-    // NOTE: Certificate validation is handled by the QUIC proof verification process and there is
-    // no need for us to manually set validation status here as it's already set during the
-    // verification. Mark handshake as complete.
+    ENVOY_LOG(debug, "QUIC handshake completed: presented={}, validated={}",
+              ssl_info->peerCertificatePresented(), ssl_info->peerCertificateValidated());
     ssl_info->onHandshakeComplete();
   }
 
@@ -235,20 +227,11 @@ quic::QuicSSLConfig EnvoyQuicServerSession::GetSSLConfig() const {
 
     config.early_data_enabled = transport_socket_factory.earlyDataEnabled();
 
-    // Check if the transport socket factory requires client certificates
-    // and configure SSL to request them
-    bool requires_client_cert = transport_socket_factory.requiresClientCertificate();
-    ENVOY_LOG(debug, "QUIC SSL config: requires client certificate = {}", requires_client_cert);
-
-    if (requires_client_cert) {
-      ENVOY_LOG(debug, "QUIC SSL config: setting client_cert_mode to kRequire");
-      config.client_cert_mode = quic::ClientCertMode::kRequire;
-    } else {
-      ENVOY_LOG(debug, "QUIC SSL config: setting client_cert_mode to kNone");
-      config.client_cert_mode = quic::ClientCertMode::kNone;
-    }
+    // Configure client certificate mode based on transport socket factory requirements.
+    config.client_cert_mode = transport_socket_factory.requiresClientCertificate()
+                                  ? quic::ClientCertMode::kRequire
+                                  : quic::ClientCertMode::kNone;
   } else {
-    ENVOY_LOG(debug, "QUIC SSL config: no position available, using defaults");
     config.early_data_enabled = true;
     config.client_cert_mode = quic::ClientCertMode::kNone;
   }

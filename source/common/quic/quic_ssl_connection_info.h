@@ -31,79 +31,33 @@ public:
   }
 
   // Extensions::TransportSockets::Tls::ConnectionInfoImplBase
-  // QUIC-safe certificate detection that avoids BoringSSL X.509 assertion failures
+  // QUIC-safe certificate detection that avoids BoringSSL X.509 assertion failures.
   bool peerCertificatePresented() const override {
     SSL* ssl_conn = ssl();
     if (ssl_conn == nullptr) {
-      ENVOY_LOG(debug, "QuicSslConnectionInfo: No SSL connection");
       return false;
     }
 
-    // Debug: Check SSL connection state
-    int ssl_state = SSL_get_state(ssl_conn);
-    ENVOY_LOG(debug, "QuicSslConnectionInfo: SSL state = {}", ssl_state);
-
-    // Check if handshake is complete
-    bool handshake_complete = SSL_is_init_finished(ssl_conn);
-    ENVOY_LOG(debug, "QuicSslConnectionInfo: Handshake complete = {}", handshake_complete);
-
-    // Check verification mode
-    int verify_mode = SSL_get_verify_mode(ssl_conn);
-    ENVOY_LOG(debug, "QuicSslConnectionInfo: SSL verify mode = {}", verify_mode);
-
-    // For QUIC connections, use SSL_get0_peer_certificates (CRYPTO_BUFFER stack)
-    // This is the same approach used by Quiche's TlsClientHandshaker::VerifyCert
+    // For QUIC connections, use SSL_get0_peer_certificates (CRYPTO_BUFFER stack).
+    // This is the same approach used by Quiche's TlsClientHandshaker::VerifyCert.
     const STACK_OF(CRYPTO_BUFFER)* cert_stack = SSL_get0_peer_certificates(ssl_conn);
-    ENVOY_LOG(debug, "QuicSslConnectionInfo: SSL_get0_peer_certificates returned {}",
-              cert_stack ? "non-null" : "null");
-
-    if (cert_stack != nullptr) {
-      int cert_count = sk_CRYPTO_BUFFER_num(cert_stack);
-      ENVOY_LOG(debug, "QuicSslConnectionInfo: CRYPTO_BUFFER cert count = {}", cert_count);
-
-      if (cert_count > 0) {
-        // Log certificate details using Quiche's proven pattern
-        for (int i = 0; i < cert_count; i++) {
-          const CRYPTO_BUFFER* cert = sk_CRYPTO_BUFFER_value(cert_stack, i);
-          if (cert) {
-            size_t cert_len = CRYPTO_BUFFER_len(cert);
-            ENVOY_LOG(debug, "QuicSslConnectionInfo: Certificate {} length = {} bytes", i,
-                      cert_len);
-          }
-        }
-
-        ENVOY_LOG(debug, "QuicSslConnectionInfo: Found {} client certificates via CRYPTO_BUFFER",
-                  cert_count);
-        return true;
-      }
+    if (cert_stack != nullptr && sk_CRYPTO_BUFFER_num(cert_stack) > 0) {
+      return true;
     }
 
-    // Note: Cannot safely call SSL_get_client_CA_list() on QUIC SSL objects
-    // as it causes BoringSSL assertion failures. QUIC uses different certificate handling.
-
-    // For QUIC connections, we cannot safely call X.509 functions like:
-    // - SSL_get_peer_cert_chain() -> causes BoringSSL assertion failure
-    // - SSL_get_peer_certificate() -> causes BoringSSL assertion failure
-    // This is because QUIC SSL objects use different certificate handling
-
-    ENVOY_LOG(debug, "QuicSslConnectionInfo: No client certificates found via QUIC-safe methods");
     return false;
   }
 
-  // Implement QUIC-safe certificate digest extraction
   const std::string& sha256PeerCertificateDigest() const override {
     return getCachedCertificateValue<std::string>(&cached_sha256_digest_, [this]() -> std::string {
       const CRYPTO_BUFFER* cert = getPeerLeafCertificate();
       if (!cert) {
-        ENVOY_LOG(debug, "QuicSslConnectionInfo: No peer certificate for SHA256 digest");
         return EMPTY_STRING;
       }
 
       std::vector<uint8_t> computed_hash(SHA256_DIGEST_LENGTH);
       SHA256(CRYPTO_BUFFER_data(cert), CRYPTO_BUFFER_len(cert), computed_hash.data());
-      std::string digest = Hex::encode(computed_hash);
-      ENVOY_LOG(debug, "QuicSslConnectionInfo: Extracted SHA256 digest: {}", digest);
-      return digest;
+      return Hex::encode(computed_hash);
     });
   }
 
@@ -334,14 +288,9 @@ public:
 
   void onCertValidated() { cert_validated_ = true; };
 
-  // Additional methods for QUIC certificate management
   void setCertificateValidated() const { cert_validated_ = true; }
-  void onHandshakeComplete() const {
-    // Mark handshake as complete for debugging
-    ENVOY_LOG(debug, "QuicSslConnectionInfo: Handshake marked as complete");
-  }
+  void onHandshakeComplete() const {}
 
-  // Missing method implementations for complete interface compliance
   absl::Span<const std::string> sha256PeerCertificateChainDigests() const override {
     return getCachedCertificateValue<std::vector<std::string>>(
         &cached_sha256_chain_digests_, [this]() -> std::vector<std::string> {

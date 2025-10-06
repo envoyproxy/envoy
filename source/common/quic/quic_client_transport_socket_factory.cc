@@ -72,24 +72,18 @@ private:
         }
       }
 
-      // Convert to QUIC format and set it on the SSL context.
+      // Convert certificates to CRYPTO_BUFFER format required by QUIC.
       if (!chain.empty()) {
-        // NOTE: For QUIC clients, we need to set the certificate in ``CRYPTO_BUFFER`` format which
-        // is expected by the QUIC handshake.
-
-        // Convert first certificate to ``CRYPTO_BUFFER`` format.
         const std::string& cert_data = chain[0];
         bssl::UniquePtr<CRYPTO_BUFFER> cert_buffer(CRYPTO_BUFFER_new(
             reinterpret_cast<const uint8_t*>(cert_data.data()), cert_data.size(), nullptr));
 
         if (cert_buffer) {
-          // Create a ``CRYPTO_BUFFER`` stack for the certificate chain.
           const bssl::UniquePtr<STACK_OF(CRYPTO_BUFFER)> cert_chain_stack(
               sk_CRYPTO_BUFFER_new_null());
           if (cert_chain_stack &&
               bssl::PushToStack(cert_chain_stack.get(), std::move(cert_buffer))) {
 
-            // Add additional certificates if they are present.
             for (size_t i = 1; i < chain.size(); i++) {
               bssl::UniquePtr<CRYPTO_BUFFER> additional_cert(CRYPTO_BUFFER_new(
                   reinterpret_cast<const uint8_t*>(chain[i].data()), chain[i].size(), nullptr));
@@ -98,7 +92,6 @@ private:
               }
             }
 
-            // Set the certificate chain on the SSL context.
             const size_t cert_count = sk_CRYPTO_BUFFER_num(cert_chain_stack.get());
             std::vector<CRYPTO_BUFFER*> cert_array(cert_count);
             for (size_t i = 0; i < cert_count; i++) {
@@ -107,10 +100,7 @@ private:
 
             if (SSL_CTX_set_chain_and_key(quic_ssl_ctx, cert_array.data(), cert_count,
                                           SSL_CTX_get0_privatekey(first_ctx.ssl_ctx_.get()),
-                                          nullptr) == 1) {
-              ENVOY_LOG(debug, "QUIC client: successfully set client certificate chain using "
-                               "CRYPTO_BUFFER format");
-            } else {
+                                          nullptr) != 1) {
               return absl::InvalidArgumentError("failed to set QUIC client certificate chain.");
             }
           }
@@ -198,46 +188,23 @@ std::shared_ptr<quic::QuicCryptoClientConfig> QuicClientTransportSocketFactory::
         std::make_unique<Quic::EnvoyQuicProofVerifier>(std::move(context), accept_untrusted),
         std::make_unique<quic::QuicClientSessionCache>());
 
-    // Get the SSL context for QUIC client configuration
     SSL_CTX* quic_ssl_ctx = tls_config.crypto_config_->ssl_ctx();
-    ENVOY_LOG(debug, "QUIC client: configuring SSL context with client certificates");
 
     CertCompression::registerSslContext(quic_ssl_ctx);
 
-    // Configure client certificates if they are configured in the TLS context
-    // This ensures that the QUIC client can present client certificates during mTLS handshakes
+    // Configure client certificates for mTLS handshakes.
     if (clientContextConfig() && clientContextConfig()->tlsCertificates().size() > 0) {
-      ENVOY_LOG(debug, "QUIC client: found {} client certificate(s) to configure",
-                clientContextConfig()->tlsCertificates().size());
-
-      // Get the main client context to copy certificates from
       auto client_context_impl =
           std::dynamic_pointer_cast<Extensions::TransportSockets::Tls::ClientContextImpl>(
               tls_config.client_context_);
 
       if (client_context_impl != nullptr) {
-        ENVOY_LOG(debug, "QUIC client: copying client certificates to QUIC SSL context");
-
-        // For QUIC, client certificates need to be loaded in CRYPTO_BUFFER format
-        // similar to how the server side uses initializeQuicCertAndKey
-
-        ENVOY_LOG(debug, "QUIC client: loading client certificates in QUIC-compatible format");
-
-        // Initialize client certificates using QUIC-compatible format
         auto status = QuicClientCertInitializer::initializeQuicClientCertAndKey(
             quic_ssl_ctx, client_context_impl->getTlsContexts());
         if (!status.ok()) {
-          ENVOY_LOG(warn, "QUIC client: failed to initialize client certificates: {}",
-                    status.message());
-        } else {
-          ENVOY_LOG(debug, "QUIC client: successfully initialized client certificates for QUIC");
+          ENVOY_LOG(warn, "Failed to initialize QUIC client certificates: {}", status.message());
         }
-      } else {
-        ENVOY_LOG(warn,
-                  "QUIC client: could not cast to ClientContextImpl to configure certificates");
       }
-    } else {
-      ENVOY_LOG(debug, "QUIC client: no client certificates configured");
     }
   }
   // Return the latest crypto config.

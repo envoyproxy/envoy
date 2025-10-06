@@ -527,17 +527,9 @@ void DefaultCertValidator::updateDigestForSessionId(bssl::ScopedEVP_MD_CTX& md,
 
 absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
                                                               bool require_client_cert) {
-  ENVOY_LOG(debug,
-            "DefaultCertValidator::addClientValidationContext called with require_client_cert={}",
-            require_client_cert);
-
   if (config_ == nullptr || config_->caCert().empty()) {
-    ENVOY_LOG(debug, "No CA certificate configured, skipping client validation context setup");
     return absl::OkStatus();
   }
-
-  ENVOY_LOG(debug, "Setting up client validation context with CA cert from: {}",
-            config_->caCertPath());
 
   bssl::UniquePtr<BIO> bio(
       BIO_new_mem_buf(const_cast<char*>(config_->caCert().data()), config_->caCert().size()));
@@ -579,15 +571,12 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
         absl::StrCat("Failed to load trusted client CA certificates from ", config_->caCertPath()));
   }
 
-  int ca_count = sk_X509_NAME_num(list.get());
-  ENVOY_LOG(debug, "Setting client CA list with {} CAs", ca_count);
   SSL_CTX_set_client_CA_list(ctx, list.release());
 
   if (require_client_cert) {
-    ENVOY_LOG(debug, "Setting SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT");
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, nullptr);
   }
-  // Set the verify_depth
+  // Set the verify_depth.
   if (config_->maxVerifyDepth().has_value()) {
     uint32_t max_verify_depth = std::min(config_->maxVerifyDepth().value(), uint32_t{INT_MAX});
     // Older BoringSSLs behave like OpenSSL 1.0.x and exclude the leaf from the
@@ -596,7 +585,6 @@ absl::Status DefaultCertValidator::addClientValidationContext(SSL_CTX* ctx,
     // documents the older behavior, so adjust the value to match.
     max_verify_depth = max_verify_depth > 0 ? max_verify_depth - 1 : 0;
     SSL_CTX_set_verify_depth(ctx, static_cast<int>(max_verify_depth));
-    ENVOY_LOG(debug, "Set SSL context verify depth to {}", max_verify_depth);
   }
   return absl::OkStatus();
 }

@@ -64,22 +64,15 @@ ActiveQuicListener::ActiveQuicListener(
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
   random->RandBytes(random_seed_, sizeof(random_seed_));
 
-  // Create ProofVerifier for client certificate validation during handshake
   auto proof_verifier = proof_verifier_factory.createQuicServerProofVerifier(
       listen_socket_, listener_config.filterChainManager(), dispatcher.timeSource());
 
-  // Create the crypto server config with proof source (for server certs)
-  // and proof verifier (for client cert validation)
-  // Using the new QUICHE API that accepts ProofVerifier in constructor
   crypto_config_ = std::make_unique<quic::QuicCryptoServerConfig>(
       absl::string_view(reinterpret_cast<char*>(random_seed_), sizeof(random_seed_)),
       quic::QuicRandom::GetInstance(),
       proof_source_factory.createQuicProofSource(
           listen_socket_, listener_config.filterChainManager(), stats_, dispatcher.timeSource()),
-      quic::KeyExchangeSource::Default(),
-      std::move(proof_verifier)); // Pass ProofVerifier for client certificate validation
-
-  ENVOY_LOG(debug, "QUIC server: ProofVerifier integrated for client certificate enforcement");
+      quic::KeyExchangeSource::Default(), std::move(proof_verifier));
   auto connection_helper = std::make_unique<EnvoyQuicConnectionHelper>(dispatcher_);
   crypto_config_->AddDefaultConfig(random, connection_helper->GetClock(),
                                    quic::QuicCryptoServerConfig::ConfigOptions());

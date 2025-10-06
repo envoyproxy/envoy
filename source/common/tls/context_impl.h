@@ -154,7 +154,6 @@ protected:
   // potentially switch to a different CertificateContext based on certificate
   // selection.
   std::vector<Ssl::TlsContext> tls_contexts_;
-  bssl::UniquePtr<STACK_OF(X509_NAME)> client_ca_list_;
   CertValidatorPtr cert_validator_;
   Stats::Scope& scope_;
   SslStats stats_;
