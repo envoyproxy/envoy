@@ -411,7 +411,7 @@ const UpstreamLookupValues& UpstreamLookupValues::get() {
                                                ->endpointStats()
                                                .membership_total_.value());
              }
-             return CelValue::CreateUint64(0);
+             return {};
            }}});
 }
 

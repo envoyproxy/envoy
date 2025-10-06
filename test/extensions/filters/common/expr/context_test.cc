@@ -861,9 +861,7 @@ TEST(Context, ConnectionAttributes) {
     EXPECT_CALL(info, upstreamClusterInfo())
         .WillRepeatedly(Return(absl::nullopt));
     auto value = upstream[CelValue::CreateStringView(UpstreamNumEndpoints)];
-    EXPECT_TRUE(value.has_value());
-    ASSERT_TRUE(value.value().IsUint64());
-    EXPECT_EQ(0, value.value().Uint64OrDie());
+    EXPECT_FALSE(value.has_value());
   }
 }
 
