@@ -5,6 +5,7 @@
 #include "source/common/quic/envoy_quic_utils.h"
 #include "source/common/quic/quic_server_transport_socket_factory.h"
 #include "source/common/stream_info/stream_info_impl.h"
+#include "source/common/tls/server_context_impl.h"
 
 namespace Envoy {
 namespace Quic {
@@ -82,6 +83,14 @@ quic::QuicAsyncStatus EnvoyQuicServerProofVerifier::VerifyCertChain(
     return quic::QUIC_SUCCESS;
   }
 
+  // Get the server SSL context for certificate validation.
+  auto server_ssl_context = quic_transport_socket_factory->getServerSslContext();
+  if (!server_ssl_context) {
+    ENVOY_LOG(debug, "No server SSL context available for certificate validation");
+    *details = std::make_unique<CertVerifyResult>(true);
+    return quic::QUIC_SUCCESS;
+  }
+
   // Client certificates are required - validate them.
   if (certs.empty()) {
     ENVOY_LOG(warn, "Client certificate required but not provided");
@@ -125,9 +134,33 @@ quic::QuicAsyncStatus EnvoyQuicServerProofVerifier::VerifyCertChain(
     return quic::QUIC_FAILURE;
   }
 
-  // Accept well-formed certificate chains. The certificate validation is enforced by
-  // QUIC's TLS 1.3 handshake, which validates the certificate chain against the configured
-  // CA in the server SSL context.
+  // Validate the certificate chain against the configured CA.
+  auto server_context_impl =
+      std::dynamic_pointer_cast<Extensions::TransportSockets::Tls::ServerContextImpl>(
+          server_ssl_context);
+  if (!server_context_impl) {
+    ENVOY_LOG(debug, "Could not get server context for certificate validation");
+    *details = std::make_unique<CertVerifyResult>(true);
+    return quic::QUIC_SUCCESS;
+  }
+
+  // Use the cert validator to verify the certificate chain against the CA.
+  Extensions::TransportSockets::Tls::CertValidator::ExtraValidationContext validation_context;
+  validation_context.callbacks = nullptr;
+
+  Extensions::TransportSockets::Tls::ValidationResults validation_result =
+      server_context_impl->customVerifyCertChainForQuic(*cert_chain, nullptr, /*is_server=*/true,
+                                                        nullptr, validation_context, hostname);
+
+  if (validation_result.status !=
+      Extensions::TransportSockets::Tls::ValidationResults::ValidationStatus::Successful) {
+    ENVOY_LOG(warn, "Client certificate validation failed: {}",
+              validation_result.error_details.value_or("unknown error"));
+    *error_details = validation_result.error_details.value_or("Certificate validation failed");
+    *details = std::make_unique<CertVerifyResult>(false);
+    return quic::QUIC_FAILURE;
+  }
+
   ENVOY_LOG(debug, "Client certificate validation succeeded for {} certificates", certs.size());
   *details = std::make_unique<CertVerifyResult>(true);
   return quic::QUIC_SUCCESS;
