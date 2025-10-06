@@ -37,7 +37,7 @@ routing PRs, questions, etc. to the right place.
 * Kuat Yessenov ([kyessenov](https://github.com/kyessenov)) (kuat@google.com)
   * Listeners, RBAC, CEL, matching, Istio.
 * Raven Black ([ravenblackx](https://github.com/ravenblackx)) (ravenblack@dropbox.com)
-  * File filters, file I/O, unit test cleanliness.
+  * Caches, file filters, and file I/O.
 * Kateryna Nezdolii ([nezdolik](https://github.com/nezdolik)) (kateryna.nezdolii@gmail.com)
   * Load balancing, GeoIP, overload manager, security.
 * Tianyu Xia ([tyxia](https://github.com/tyxia)) (tyxia@google.com)
