@@ -206,6 +206,9 @@ bug_fixes:
 - area: release
   change: |
     Fixed the distroless image to ensure nonroot.
+- area: ext_proc
+  change: |
+    Removed unused class ImmediateMutationChecker and unused destructor ProcessingRequestModifierFactory().
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
