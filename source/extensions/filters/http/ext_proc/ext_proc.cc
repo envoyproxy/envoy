@@ -1685,7 +1685,7 @@ void Filter::onGrpcError(Grpc::Status::GrpcStatus status, const std::string& mes
   }
 }
 
-void Filter::onGrpcClose() { onGrpcCloseWithStatus(Grpc::Status::Aborted); }
+void Filter::onGrpcClose() { onGrpcCloseWithStatus(Grpc::Status::Ok); }
 
 void Filter::onGrpcCloseWithStatus(Grpc::Status::GrpcStatus status) {
   ENVOY_STREAM_LOG(debug, "Received gRPC stream close", *decoder_callbacks_);
