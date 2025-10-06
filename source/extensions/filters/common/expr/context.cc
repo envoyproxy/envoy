@@ -215,17 +215,17 @@ const RequestLookupValues& RequestLookupValues::get() {
              auto fragment_offset = path.find('#');
              return CelValue::CreateStringView(path.substr(0, fragment_offset));
           }},
-          {BackendServiceHasEndpoints,
+          {UpstreamClusterEndpoints,
            [](const RequestWrapper& wrapper) -> absl::optional<CelValue> {
              if (wrapper.info_.upstreamClusterInfo().value_or(nullptr) !=
                  nullptr) {
-               return CelValue::CreateBool(wrapper.info_.upstreamClusterInfo()
+               return CelValue::CreateUint64(wrapper.info_.upstreamClusterInfo()
                                                .value()
                                                .get()
                                                ->endpointStats()
-                                               .membership_total_.value() > 0);
+                                               .membership_total_.value());
              }
-             return CelValue::CreateBool(false);
+             return CelValue::CreateUint64(0);
            }}});
 }
 

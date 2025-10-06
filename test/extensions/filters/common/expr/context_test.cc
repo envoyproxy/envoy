@@ -245,30 +245,27 @@ TEST(Context, RequestAttributes) {
 
   {
     cluster_info->endpoint_stats_.membership_total_.set(1);
-    auto value =
-        request[CelValue::CreateStringView(BackendServiceHasEndpoints)];
+    auto value = request[CelValue::CreateStringView(UpstreamClusterEndpoints)];
     EXPECT_TRUE(value.has_value());
-    ASSERT_TRUE(value.value().IsBool());
-    EXPECT_EQ(true, value.value().BoolOrDie());
+    ASSERT_TRUE(value.value().IsUint64());
+    EXPECT_EQ(1, value.value().Uint64OrDie());
   }
 
   {
     cluster_info->endpoint_stats_.membership_total_.set(0);
-    auto value =
-        request[CelValue::CreateStringView(BackendServiceHasEndpoints)];
+    auto value = request[CelValue::CreateStringView(UpstreamClusterEndpoints)];
     EXPECT_TRUE(value.has_value());
-    ASSERT_TRUE(value.value().IsBool());
-    EXPECT_EQ(false, value.value().BoolOrDie());
+    ASSERT_TRUE(value.value().IsUint64());
+    EXPECT_EQ(0, value.value().Uint64OrDie());
   }
 
   {
     EXPECT_CALL(info, upstreamClusterInfo())
         .WillRepeatedly(Return(absl::nullopt));
-    auto value =
-        request[CelValue::CreateStringView(BackendServiceHasEndpoints)];
+    auto value = request[CelValue::CreateStringView(UpstreamClusterEndpoints)];
     EXPECT_TRUE(value.has_value());
-    ASSERT_TRUE(value.value().IsBool());
-    EXPECT_EQ(false, value.value().BoolOrDie());
+    ASSERT_TRUE(value.value().IsUint64());
+    EXPECT_EQ(0, value.value().Uint64OrDie());
   }
 }
 
