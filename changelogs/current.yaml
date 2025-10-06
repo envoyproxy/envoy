@@ -388,11 +388,8 @@ new_features:
     phase cannot work because rate limit filter does not provide the necessary context.
 - area: redis
   change: |
-    Added support for thirty-three new Redis commands including ``COPY``, ``RPOPLPUSH``, ``SMOVE``, ``SUNION``, ``SDIFF``,
-    ``SINTER``, ``SINTERSTORE``, ``ZUNIONSTORE``, ``ZINTERSTORE``, ``PFMERGE``, ``GEORADIUS``, ``GEORADIUSBYMEMBER``,
-    ``RENAME``, ``SORT``, ``SORT_RO``, ``ZMSCORE``, ``SDIFFSTORE``, ``MSETNX``, ``SUBSTR``, ``ZRANGESTORE``, ``ZUNION``,
-    ``ZDIFF``, ``SUNIONSTORE``, ``SMISMEMBER``, ``HRANDFIELD``, ``GEOSEARCHSTORE``, ``ZDIFFSTORE``, ``ZINTER``, ``ZRANDMEMBER``,
-    ``BITOP``, ``LPOS``, ``RENAMENX``.
+    Added framework for handling commands that will be sent to all redis nodes in cluster
+    and the response receicved will be handled using appropriate response handler.
 - area: observability
   change: |
     Added ``ENVOY_NOTIFICATION`` macro to track specific conditions in production environments.
