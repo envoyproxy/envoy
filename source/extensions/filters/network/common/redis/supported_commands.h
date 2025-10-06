@@ -3,10 +3,10 @@
 #include <set>
 #include <string>
 #include <vector>
-#include <unordered_map>
 
 #include "source/common/common/macros.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
 
 namespace Envoy {
@@ -16,7 +16,7 @@ namespace Common {
 namespace Redis {
 
 // Type alias for command-subcommand validation mapping
-using CommandSubcommandMap = std::unordered_map<std::string, absl::flat_hash_set<std::string>>;
+using CommandSubcommandMap = absl::flat_hash_map<std::string, absl::flat_hash_set<std::string>>;
 
 struct SupportedCommands {
   /**

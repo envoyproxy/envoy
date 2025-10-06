@@ -3,9 +3,9 @@
 
 #include "source/common/common/logger.h"
 #include "source/extensions/filters/network/common/redis/utility.h"
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/ascii.h"
 #include "fmt/format.h"
-#include <unordered_map>
 
 namespace Envoy {
 namespace Extensions {
@@ -70,7 +70,7 @@ ClusterScopeResponseHandlerType
 ClusterResponseHandlerFactory::getResponseHandlerType(const std::string& command_name, const std::string& subcommand) {
   // Based on ClusterScopeCommands: script, flushall, flushdb, slowlog, config, unwatch
   // Note: randomkey and cluster are now handled by RandomShardRequest
-  static const std::unordered_map<std::string, ClusterScopeResponseHandlerType> command_to_handler_map = {
+  static const absl::flat_hash_map<std::string, ClusterScopeResponseHandlerType> command_to_handler_map = {
     // All shards must return same response
     {"script", ClusterScopeResponseHandlerType::allresponses_mustbe_same},
     {"flushall", ClusterScopeResponseHandlerType::allresponses_mustbe_same},
@@ -262,7 +262,7 @@ void IntegerSumAggregateResponseHandler::processAggregatedResponses(ClusterScope
       return;
     }
     
-    try {
+    TRY_NEEDS_AUDIT {
       int64_t integerValue = resp->asInteger();
       if (integerValue < 0) {
         ENVOY_LOG(error, "Error: Negative integer value: {}", integerValue);
@@ -270,11 +270,13 @@ void IntegerSumAggregateResponseHandler::processAggregatedResponses(ClusterScope
         return;
       }
       sum += integerValue;
-    } catch (const std::exception& e) {
+    }
+    END_TRY
+    CATCH(const std::exception& e, {
       ENVOY_LOG(error, "Error converting integer: {}", e.what());
       sendErrorResponse(request, "invalid integer response from upstream");
       return;
-    }
+    });
   }
   
   Common::Redis::RespValuePtr response = std::make_unique<Common::Redis::RespValue>();
@@ -299,15 +301,17 @@ void ArrayMergeAggregateResponseHandler::processAggregatedResponses(ClusterScope
       return;
     }
     
-    try {
+    TRY_NEEDS_AUDIT {
       for (auto& elem : resp->asArray()) {
         response->asArray().emplace_back(std::move(elem));
       }
-    } catch (const std::exception& e) {
+    }
+    END_TRY
+    CATCH(const std::exception& e, {
       ENVOY_LOG(error, "Error merging array: {}", e.what());
       sendErrorResponse(request, "error merging array responses");
       return;
-    }
+    });
   }
   
   sendSuccessResponse(request, std::move(response));
