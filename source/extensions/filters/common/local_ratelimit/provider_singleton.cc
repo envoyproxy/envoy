@@ -25,7 +25,8 @@ createRateLimiterImpl(const envoy::type::v3::TokenBucket& token_bucket,
 
 RateLimiterProviderSingleton::RateLimiterWrapperPtr RateLimiterProviderSingleton::getRateLimiter(
     Server::Configuration::ServerFactoryContext& factory_context, absl::string_view key,
-    const envoy::config::core::v3::ConfigSource& config_source, SetRateLimiterCb callback) {
+    const envoy::config::core::v3::ConfigSource& config_source, intptr_t setter_key,
+    SetRateLimiterCb setter) {
   auto provider = factory_context.singletonManager().getTyped<RateLimiterProviderSingleton>(
       SINGLETON_MANAGER_REGISTERED_NAME(local_ratelimit_provider),
       [&factory_context, &config_source] {
@@ -47,20 +48,20 @@ RateLimiterProviderSingleton::RateLimiterWrapperPtr RateLimiterProviderSingleton
                           key));
     subscription = exist_subscription;
   }
-
-  subscription->addSetter(std::move(callback));
+  subscription->addSetter(setter_key, std::move(setter));
 
   // If the limiter is already created, return it.
   if (auto limiter = subscription->getLimiter()) {
     return std::make_unique<RateLimiterWrapper>(provider, subscription, limiter);
   }
 
-  if (!subscription->init_target_) {
+  if (!subscription->isInitTargetSet()) {
     // This is the case when the corresponding resource is removed and the
     // subscription need a new init target to wait for a new resource.
-    subscription->init_target_ =
+    auto init_target =
         std::make_unique<Init::TargetImpl>(fmt::format("RateLimitConfigCallback-{}", key), []() {});
-    factory_context.initManager().add(*subscription->init_target_);
+    factory_context.initManager().add(*init_target);
+    subscription->setInitTarget(std::move(init_target));
   }
 
   // Otherwise, return a wrapper with a null limiter. The limiter will be
@@ -117,7 +118,7 @@ void RateLimiterProviderSingleton::TokenBucketSubscription::handleAddedResource(
   token_bucket_config_hash_ = new_hash;
   auto new_limiter = createRateLimiterImpl(config, parent_.factory_context_.mainThreadDispatcher());
   limiter_ = new_limiter;
-  for (auto& setter : setters_) {
+  for (auto& [key, setter] : setters_) {
     setter(new_limiter);
   }
 
@@ -134,7 +135,7 @@ void RateLimiterProviderSingleton::TokenBucketSubscription::handleRemovedResourc
   limiter_.reset();
 
   // Reset the init target as we are now waiting for a new resource.
-  for (auto& setter : setters_) {
+  for (auto& [key, setter] : setters_) {
     setter(parent_.fallback_always_deny_limiter_);
   }
 }

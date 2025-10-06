@@ -67,6 +67,7 @@ public:
         : provider_(provider), subscription_(subscription), limiter_(limiter) {}
     LocalRateLimiterSharedPtr getLimiter() const { return limiter_; }
     void setLimiter(LocalRateLimiterSharedPtr limiter) { limiter_ = limiter; }
+    TokenBucketSubscriptionSharedPtr getSubscription() const { return subscription_; }
 
   private:
     // The `provider_` holds the ownership of this singleton by shared
@@ -89,7 +90,7 @@ public:
   static RateLimiterWrapperPtr
   getRateLimiter(Server::Configuration::ServerFactoryContext& factory_context,
                  absl::string_view key, const envoy::config::core::v3::ConfigSource& config_source,
-                 SetRateLimiterCb callback);
+                 intptr_t setter_key, SetRateLimiterCb setter);
 
   RateLimiterProviderSingleton(Server::Configuration::ServerFactoryContext& factory_context,
                                const envoy::config::core::v3::ConfigSource& config_source)
@@ -104,15 +105,17 @@ public:
 
     ~TokenBucketSubscription() override;
 
-    void addSetter(SetRateLimiterCb callback) { setters_.push_back(std::move(callback)); }
+    void addSetter(intptr_t key, SetRateLimiterCb callback) { setters_[key] = std::move(callback); }
+
+    void removeSetter(intptr_t key) { setters_.erase(key); }
 
     std::shared_ptr<LocalRateLimiterImpl> getLimiter();
 
-    std::unique_ptr<Init::TargetImpl> getInitTarget() { return std::move(init_target_); }
+    bool isInitTargetSet() { return init_target_ != nullptr; }
 
-    void handleAddedResource(const Config::DecodedResourceRef& resource);
-
-    void handleRemovedResource(absl::string_view resource_name);
+    void setInitTarget(std::unique_ptr<Init::TargetImpl> target) {
+      init_target_ = std::move(target);
+    }
 
     // Config::SubscriptionCallbacks
     absl::Status onConfigUpdate(const std::vector<Config::DecodedResourceRef>& resources,
@@ -124,11 +127,15 @@ public:
 
     void onConfigUpdateFailed(Config::ConfigUpdateFailureReason, const EnvoyException*) override {}
 
+  private:
+    void handleAddedResource(const Config::DecodedResourceRef& resource);
+    void handleRemovedResource(absl::string_view resource_name);
+
     RateLimiterProviderSingleton& parent_;
     std::unique_ptr<Init::TargetImpl> init_target_;
     std::string resource_name_;
     Config::SubscriptionPtr subscription_;
-    std::vector<SetRateLimiterCb> setters_;
+    absl::flat_hash_map<intptr_t, SetRateLimiterCb> setters_;
     absl::optional<envoy::type::v3::TokenBucket> config_;
     std::weak_ptr<LocalRateLimiterImpl> limiter_;
     size_t token_bucket_config_hash_;

@@ -15,7 +15,8 @@ ProcessRateLimitFilter::ProcessRateLimitFilter(
     Server::Configuration::ServerFactoryContext& context,
     const envoy::extensions::access_loggers::filters::process_ratelimit::v3::ProcessRateLimitFilter&
         config)
-    : cancel_cb_(std::make_shared<bool>(false)) {
+    : setter_key_(reinterpret_cast<intptr_t>(this)), cancel_cb_(std::make_shared<bool>(false)),
+      context_(context) {
   auto setter =
       [this, cancel_cb = std::shared_ptr<bool>(cancel_cb_)](
           Envoy::Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterSharedPtr limiter)
@@ -34,16 +35,23 @@ ProcessRateLimitFilter::ProcessRateLimitFilter(
   }
   rate_limiter_ = Envoy::Extensions::Filters::Common::LocalRateLimit::RateLimiterProviderSingleton::
       getRateLimiter(context, config.dynamic_config().resource_name(),
-                     config.dynamic_config().config_source(), std::move(setter));
+                     config.dynamic_config().config_source(), setter_key_, std::move(setter));
 }
 
-ProcessRateLimitFilter::~ProcessRateLimitFilter() { *cancel_cb_ = true; }
+ProcessRateLimitFilter::~ProcessRateLimitFilter() {
+  *cancel_cb_ = true;
+  context_.mainThreadDispatcher().post(
+      [subscription = rate_limiter_->getSubscription(), setter_key = setter_key_] {
+        subscription->removeSetter(setter_key);
+      });
+}
 
 bool ProcessRateLimitFilter::evaluate(const Formatter::HttpFormatterContext&,
                                       const StreamInfo::StreamInfo&) const {
   ENVOY_BUG(rate_limiter_->getLimiter() != nullptr,
             "rate_limiter_.limiter_ should be already set in init callback.");
-  auto limiter = rate_limiter_->getLimiter();
+  Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterSharedPtr limiter =
+      rate_limiter_->getLimiter();
   return limiter->requestAllowed({}).allowed;
 }
 
