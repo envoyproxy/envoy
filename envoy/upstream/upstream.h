@@ -1005,6 +1005,15 @@ public:
   virtual const envoy::config::cluster::v3::Cluster::CommonLbConfig& lbConfig() const PURE;
 
   /**
+   * @param response Http::ResponseHeaderMap response headers received from upstream
+   * @return absl::optional<bool> absl::nullopt is returned when matching did not took place.
+   *         Otherwise, the boolean value indicates the matching result. True indicates that
+   *         response should be treated as error, False as success.
+   */
+  virtual absl::optional<bool>
+  processHttpForOutlierDetection(Http::ResponseHeaderMap& response) const PURE;
+
+  /**
    * @return the service discovery type to use for resolving the cluster.
    */
   virtual envoy::config::cluster::v3::Cluster::DiscoveryType type() const PURE;
