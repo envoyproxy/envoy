@@ -1,7 +1,7 @@
 .. _config_reverse_tunnel:
 
-Reverse Tunnels
-===============
+Reverse tunnels overview
+========================
 
 .. attention::
 
