@@ -118,6 +118,12 @@ minor_behavior_changes:
   change: |
     Check the request header count & size in kb after applying mutations is <= the configured limits
     and reject the response if not.
+- area: ext_proc
+  change: |
+    Use one of a hard-coded set of error messages when a
+    :ref:`service-ext-proc-v3-headermutation <HeaderMutation> fails.
+    request-specific details allows grouping by similar messages.  Detailed
+    messages remain available in debug logs.
 
 bug_fixes:
 # *Changes expected to improve the state of the world and are unlikely to have negative effects*
