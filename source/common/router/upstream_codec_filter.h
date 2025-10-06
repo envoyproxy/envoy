@@ -13,6 +13,7 @@
 
 #include "source/common/common/logger.h"
 #include "source/common/config/well_known_names.h"
+#include "source/common/router/upstream_to_downstream_impl_base.h"
 #include "source/common/runtime/runtime_features.h"
 #include "source/extensions/filters/http/common/factory_base.h"
 
@@ -51,7 +52,7 @@ public:
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override;
 
   // This bridge connects the upstream stream to the filter manager.
-  class CodecBridge : public UpstreamToDownstream {
+  class CodecBridge : public UpstreamToDownstreamImplBase {
   public:
     CodecBridge(UpstreamCodecFilter& filter) : filter_(filter) {}
     void decode1xxHeaders(Http::ResponseHeaderMapPtr&& headers) override;

@@ -54,7 +54,7 @@ bool ComparisonFilter::compareAgainstValue(uint64_t lhs) const {
 }
 
 FilterPtr FilterFactory::fromProto(const envoy::config::accesslog::v3::AccessLogFilter& config,
-                                   Server::Configuration::FactoryContext& context) {
+                                   Server::Configuration::GenericFactoryContext& context) {
   Runtime::Loader& runtime = context.serverFactoryContext().runtime();
   Random::RandomGenerator& random = context.serverFactoryContext().api().randomGenerator();
   ProtobufMessage::ValidationVisitor& validation_visitor = context.messageValidationVisitor();
@@ -157,7 +157,7 @@ bool RuntimeFilter::evaluate(const Formatter::HttpFormatterContext&,
 
 OperatorFilter::OperatorFilter(
     const Protobuf::RepeatedPtrField<envoy::config::accesslog::v3::AccessLogFilter>& configs,
-    Server::Configuration::FactoryContext& context) {
+    Server::Configuration::GenericFactoryContext& context) {
   for (const auto& config : configs) {
     auto filter = FilterFactory::fromProto(config, context);
     if (filter != nullptr) {
@@ -167,11 +167,11 @@ OperatorFilter::OperatorFilter(
 }
 
 OrFilter::OrFilter(const envoy::config::accesslog::v3::OrFilter& config,
-                   Server::Configuration::FactoryContext& context)
+                   Server::Configuration::GenericFactoryContext& context)
     : OperatorFilter(config.filters(), context) {}
 
 AndFilter::AndFilter(const envoy::config::accesslog::v3::AndFilter& config,
-                     Server::Configuration::FactoryContext& context)
+                     Server::Configuration::GenericFactoryContext& context)
     : OperatorFilter(config.filters(), context) {}
 
 bool OrFilter::evaluate(const Formatter::HttpFormatterContext& context,
@@ -217,27 +217,27 @@ bool HeaderFilter::evaluate(const Formatter::HttpFormatterContext& context,
 }
 
 ResponseFlagFilter::ResponseFlagFilter(
-    const envoy::config::accesslog::v3::ResponseFlagFilter& config)
-    : has_configured_flags_(!config.flags().empty()) {
+    const envoy::config::accesslog::v3::ResponseFlagFilter& config) {
+  if (!config.flags().empty()) {
+    // Preallocate the vector to avoid frequent heap allocations.
+    configured_flags_.resize(StreamInfo::ResponseFlagUtils::responseFlagsVec().size(), false);
+    for (int i = 0; i < config.flags_size(); i++) {
+      auto response_flag = StreamInfo::ResponseFlagUtils::toResponseFlag(config.flags(i));
+      // The config has been validated. Therefore, every flag in the config will have a mapping.
+      ASSERT(response_flag.has_value());
 
-  // Preallocate the vector to avoid frequent heap allocations.
-  configured_flags_.resize(StreamInfo::ResponseFlagUtils::responseFlagsVec().size(), false);
-  for (int i = 0; i < config.flags_size(); i++) {
-    auto response_flag = StreamInfo::ResponseFlagUtils::toResponseFlag(config.flags(i));
-    // The config has been validated. Therefore, every flag in the config will have a mapping.
-    ASSERT(response_flag.has_value());
+      // The vector is allocated with the size of the response flags vec. Therefore, the index
+      // should always be valid.
+      ASSERT(response_flag.value().value() < configured_flags_.size());
 
-    // The vector is allocated with the size of the response flags vec. Therefore, the index
-    // should always be valid.
-    ASSERT(response_flag.value().value() < configured_flags_.size());
-
-    configured_flags_[response_flag.value().value()] = true;
+      configured_flags_[response_flag.value().value()] = true;
+    }
   }
 }
 
 bool ResponseFlagFilter::evaluate(const Formatter::HttpFormatterContext&,
                                   const StreamInfo::StreamInfo& info) const {
-  if (has_configured_flags_) {
+  if (!configured_flags_.empty()) {
     for (const auto flag : info.responseFlags()) {
       ASSERT(flag.value() < configured_flags_.size());
       if (configured_flags_[flag.value()]) {
@@ -292,7 +292,8 @@ bool LogTypeFilter::evaluate(const Formatter::HttpFormatterContext& context,
 
 MetadataFilter::MetadataFilter(const envoy::config::accesslog::v3::MetadataFilter& filter_config,
                                Server::Configuration::CommonFactoryContext& context)
-    : default_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_config, match_if_key_not_found, true)),
+    : present_matcher_(true),
+      default_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_config, match_if_key_not_found, true)),
       filter_(filter_config.matcher().filter()) {
 
   if (filter_config.has_matcher()) {
@@ -306,11 +307,6 @@ MetadataFilter::MetadataFilter(const envoy::config::accesslog::v3::MetadataFilte
     const auto& val = matcher_config.value();
     value_matcher_ = Matchers::ValueMatcher::create(val, context);
   }
-
-  // Matches if the value is present in dynamic metadata
-  auto present_val = envoy::type::matcher::v3::ValueMatcher();
-  present_val.set_present_match(true);
-  present_matcher_ = Matchers::ValueMatcher::create(present_val, context);
 }
 
 bool MetadataFilter::evaluate(const Formatter::HttpFormatterContext&,
@@ -319,7 +315,7 @@ bool MetadataFilter::evaluate(const Formatter::HttpFormatterContext&,
       Envoy::Config::Metadata::metadataValue(&info.dynamicMetadata(), filter_, path_);
   // If the key corresponds to a set value in dynamic metadata, return true if the value matches the
   // the configured 'MetadataMatcher' value and false otherwise
-  if (present_matcher_->match(value)) {
+  if (present_matcher_.match(value)) {
     return value_matcher_ && value_matcher_->match(value);
   }
 
@@ -330,7 +326,7 @@ bool MetadataFilter::evaluate(const Formatter::HttpFormatterContext&,
 
 InstanceSharedPtr
 AccessLogFactory::fromProto(const envoy::config::accesslog::v3::AccessLog& config,
-                            Server::Configuration::FactoryContext& context,
+                            Server::Configuration::GenericFactoryContext& context,
                             std::vector<Formatter::CommandParserPtr>&& command_parsers) {
   FilterPtr filter;
   if (config.has_filter()) {

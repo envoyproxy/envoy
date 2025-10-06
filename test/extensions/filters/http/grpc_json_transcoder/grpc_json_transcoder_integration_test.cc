@@ -272,6 +272,72 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, GrpcJsonTranscoderIntegrationTestWithSizeLi
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+TEST_P(GrpcJsonTranscoderIntegrationTest, EmptyMessageStreamedHttpBodyPost) {
+  HttpIntegrationTest::initialize();
+  // Can't use testTranscoding for this case because we want to send an empty data,
+  // as distinct from not sending data. The difference being
+  // decodeHeaders(end_stream=false), decodeData(emptyBuffer, end_stream=true)
+  // vs. decodeHeaders(end_stream=true)
+  Http::TestRequestHeaderMapImpl request_headers{{":method", "POST"},
+                                                 {":path", "/streamBody"},
+                                                 {":authority", "host"},
+                                                 {"content-type", "application/json"}};
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  IntegrationStreamDecoderPtr response;
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  request_encoder_ = &encoder_decoder.first;
+  response = std::move(encoder_decoder.second);
+  Buffer::OwnedImpl body; // Empty body.
+  codec_client_->sendData(*request_encoder_, body, true);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  ASSERT_TRUE(fake_upstream_connection_->waitForNewStream(*dispatcher_, upstream_request_));
+  ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
+  std::string dump;
+  Buffer::OwnedImpl request_body = upstream_request_->body();
+  for (char ch : request_body.toString()) {
+    dump += std::to_string(int(ch));
+    dump += " ";
+  }
+  Grpc::Decoder grpc_decoder;
+  std::vector<Grpc::Frame> frames;
+  ASSERT_TRUE(grpc_decoder.decode(request_body, frames).ok()) << dump;
+  ASSERT_EQ(1, frames.size());
+  bookstore::EchoBodyRequest actual_message;
+  ASSERT_TRUE(actual_message.ParseFromString(frames[0].data_->toString()));
+  bookstore::EchoBodyRequest expected_message;
+  expected_message.mutable_nested()->mutable_content()->set_content_type("application/json");
+  EXPECT_THAT(actual_message, ProtoEq(expected_message));
+  EXPECT_EQ("", request_body.toString());
+
+  Http::TestResponseHeaderMapImpl response_headers;
+  response_headers.setStatus(200);
+  response_headers.setContentType("application/grpc");
+  response_headers.addCopy(Http::LowerCaseString("trailer"), "Grpc-Status");
+  response_headers.addCopy(Http::LowerCaseString("trailer"), "Grpc-Message");
+  upstream_request_->encodeHeaders(response_headers, false);
+  {
+    Protobuf::Empty response_message;
+    auto buffer = Grpc::Common::serializeToGrpcFrame(response_message);
+    upstream_request_->encodeData(*buffer, false);
+  }
+  Http::TestResponseTrailerMapImpl response_trailers;
+  absl::Status grpc_status;
+  response_trailers.setGrpcStatus(static_cast<uint64_t>(grpc_status.code()));
+  response_trailers.setGrpcMessage(grpc_status.message());
+  upstream_request_->encodeTrailers(response_trailers);
+  EXPECT_TRUE(upstream_request_->complete());
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(response->complete());
+  // No need to validate the response details in this test, as the purpose
+  // of the test is to validate that an empty-bodied request is delivered
+  // to the upstream as a grpc frame.
+  codec_client_->close();
+  if (fake_upstream_connection_) {
+    ASSERT_TRUE(fake_upstream_connection_->close());
+    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+  }
+}
+
 TEST_P(GrpcJsonTranscoderIntegrationTest, UnaryPost) {
   HttpIntegrationTest::initialize();
   testTranscoding<bookstore::CreateShelfRequest, bookstore::Shelf>(

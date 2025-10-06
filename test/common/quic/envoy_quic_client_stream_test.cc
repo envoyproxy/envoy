@@ -8,6 +8,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/http/stream_decoder.h"
 #include "test/mocks/network/mocks.h"
+#include "test/test_common/test_runtime.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -741,14 +742,123 @@ TEST_F(EnvoyQuicClientStreamTest, EncodeTrailersOnClosedStream) {
   EXPECT_EQ(0u, quic_session_.bytesToSend());
 }
 
+TEST_F(EnvoyQuicClientStreamTest, DecoderDestroyedBeforeDecoding1xxHeader) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues({{"envoy.reloadable_features.abort_when_accessing_dead_decoder", "false"}});
+  auto stream_decoder = std::make_unique<Http::MockResponseDecoder>();
+  quic_stream_->setResponseDecoder(*stream_decoder);
+
+  auto result = quic_stream_->encodeHeaders(request_headers_, true);
+  EXPECT_TRUE(result.ok());
+
+  // Destroy the mock decoder.
+  stream_decoder.reset();
+
+  quiche::HttpHeaderBlock continue_header;
+  continue_header[":status"] = "100";
+  std::string headers = spdyHeaderToHttp3StreamPayload(continue_header);
+  quic::QuicStreamFrame frame1(stream_id_, /*fin*/ false, /*offset*/ 0, headers);
+  EXPECT_ENVOY_BUG(quic_stream_->OnStreamFrame(frame1),
+                   "response_decoder_ use after free detected");
+
+  EXPECT_CALL(stream_callbacks_,
+              onResetStream(Http::StreamResetReason::LocalRefusedStreamReset, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalRefusedStreamReset);
+}
+
+TEST_F(EnvoyQuicClientStreamTest, DecoderDestroyedBeforeDecodingHeader) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues({{"envoy.reloadable_features.abort_when_accessing_dead_decoder", "false"}});
+  auto stream_decoder = std::make_unique<Http::MockResponseDecoder>();
+  quic_stream_->setResponseDecoder(*stream_decoder);
+
+  auto result = quic_stream_->encodeHeaders(request_headers_, true);
+  EXPECT_TRUE(result.ok());
+
+  // Destroy the mock decoder.
+  stream_decoder.reset();
+
+  std::string headers = spdyHeaderToHttp3StreamPayload(spdy_response_headers_);
+  quic::QuicStreamFrame frame1(stream_id_, /*fin*/ false, /*offset*/ 0, headers);
+  EXPECT_ENVOY_BUG(quic_stream_->OnStreamFrame(frame1),
+                   "response_decoder_ use after free detected");
+
+  EXPECT_CALL(stream_callbacks_,
+              onResetStream(Http::StreamResetReason::LocalRefusedStreamReset, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalRefusedStreamReset);
+}
+
+TEST_F(EnvoyQuicClientStreamTest, DecoderDestroyedBeforeDecodingBody) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues({{"envoy.reloadable_features.abort_when_accessing_dead_decoder", "false"}});
+  auto stream_decoder = std::make_unique<Http::MockResponseDecoder>();
+  quic_stream_->setResponseDecoder(*stream_decoder);
+
+  auto result = quic_stream_->encodeHeaders(request_headers_, true);
+  EXPECT_TRUE(result.ok());
+
+  EXPECT_CALL(*stream_decoder, decodeHeaders_(_, /*end_stream=*/false));
+  std::string headers = spdyHeaderToHttp3StreamPayload(spdy_response_headers_);
+  quic::QuicStreamFrame frame1(stream_id_, /*fin*/ false, /*offset*/ 0, headers);
+  quic_stream_->OnStreamFrame(frame1);
+
+  // Destroy the mock decoder.
+  stream_decoder.reset();
+
+  std::string body = bodyToHttp3StreamPayload("body");
+  quic::QuicStreamFrame frame2(stream_id_, /*fin*/ false, headers.length(), body);
+  EXPECT_ENVOY_BUG(quic_stream_->OnStreamFrame(frame2),
+                   "response_decoder_ use after free detected");
+
+  std::string trailers = spdyHeaderToHttp3StreamPayload(spdy_trailers_);
+  quic::QuicStreamFrame frame3(stream_id_, true, (headers.length() + body.length()), trailers);
+  quic_stream_->OnStreamFrame(frame3);
+
+  EXPECT_CALL(stream_callbacks_,
+              onResetStream(Http::StreamResetReason::LocalRefusedStreamReset, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalRefusedStreamReset);
+}
+
+TEST_F(EnvoyQuicClientStreamTest, DecoderDestroyedBeforeDecodingTrailer) {
+  TestScopedRuntime runtime;
+  runtime.mergeValues({{"envoy.reloadable_features.abort_when_accessing_dead_decoder", "false"}});
+  auto stream_decoder = std::make_unique<Http::MockResponseDecoder>();
+  quic_stream_->setResponseDecoder(*stream_decoder);
+
+  auto result = quic_stream_->encodeHeaders(request_headers_, true);
+  EXPECT_TRUE(result.ok());
+
+  EXPECT_CALL(*stream_decoder, decodeHeaders_(_, /*end_stream=*/false));
+  std::string headers = spdyHeaderToHttp3StreamPayload(spdy_response_headers_);
+  quic::QuicStreamFrame frame1(stream_id_, /*fin*/ false, /*offset*/ 0, headers);
+  quic_stream_->OnStreamFrame(frame1);
+
+  EXPECT_CALL(*stream_decoder, decodeData(_, /*end_stream=*/false));
+  std::string body = bodyToHttp3StreamPayload("body");
+  quic::QuicStreamFrame frame2(stream_id_, /*fin*/ false, headers.length(), body);
+  quic_stream_->OnStreamFrame(frame2);
+
+  // Destroy the mock decoder.
+  stream_decoder.reset();
+
+  std::string trailers = spdyHeaderToHttp3StreamPayload(spdy_trailers_);
+  quic::QuicStreamFrame frame3(stream_id_, true, (headers.length() + body.length()), trailers);
+  EXPECT_ENVOY_BUG(quic_stream_->OnStreamFrame(frame3),
+                   "response_decoder_ use after free detected");
+
+  EXPECT_CALL(stream_callbacks_,
+              onResetStream(Http::StreamResetReason::LocalRefusedStreamReset, _));
+  quic_stream_->resetStream(Http::StreamResetReason::LocalRefusedStreamReset);
+}
+
 #ifdef ENVOY_ENABLE_HTTP_DATAGRAMS
 TEST_F(EnvoyQuicClientStreamTest, EncodeCapsule) {
   setUpCapsuleProtocol(false, true);
   Buffer::OwnedImpl buffer(capsule_fragment_);
-  EXPECT_CALL(*quic_connection_, SendMessage(_, _, _))
-      .WillOnce([this](quic::QuicMessageId, absl::Span<quiche::QuicheMemSlice> message, bool) {
-        EXPECT_EQ(message.data()->AsStringView(), datagram_fragment_);
-        return quic::MESSAGE_STATUS_SUCCESS;
+  EXPECT_CALL(*quic_connection_, SendDatagram(_, _, _))
+      .WillOnce([this](quic::QuicDatagramId, absl::Span<quiche::QuicheMemSlice> datagram, bool) {
+        EXPECT_EQ(datagram.data()->AsStringView(), datagram_fragment_);
+        return quic::DATAGRAM_STATUS_SUCCESS;
       });
   quic_stream_->encodeData(buffer, /*end_stream=*/true);
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
@@ -757,7 +867,7 @@ TEST_F(EnvoyQuicClientStreamTest, EncodeCapsule) {
 TEST_F(EnvoyQuicClientStreamTest, DecodeHttp3Datagram) {
   setUpCapsuleProtocol(true, false);
   EXPECT_CALL(stream_decoder_, decodeData(BufferStringEqual(capsule_fragment_), _));
-  quic_session_.OnMessageReceived(datagram_fragment_);
+  quic_session_.OnDatagramReceived(datagram_fragment_);
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
