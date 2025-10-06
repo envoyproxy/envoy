@@ -106,7 +106,8 @@ typed_config:
 
   void addReverseTunnelFilter(bool auto_close_connections = false,
                               const std::string& request_path = "/reverse_connections/request",
-                              const std::string& request_method = "GET") {
+                              const std::string& request_method = "GET",
+                              const std::string& validation_config = "") {
     const std::string filter_config =
         fmt::format(R"EOF(
         name: envoy.filters.network.reverse_tunnel
@@ -116,9 +117,10 @@ typed_config:
             seconds: 300
           auto_close_connections: {}
           request_path: "{}"
-          request_method: {}
+          request_method: {}{}
 )EOF",
-                    auto_close_connections ? "true" : "false", request_path, request_method);
+                    auto_close_connections ? "true" : "false", request_path, request_method,
+                    validation_config.empty() ? "" : "\n" + validation_config);
 
     config_helper_.addConfigModifier(
         [filter_config](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
@@ -478,6 +480,715 @@ TEST_P(ReverseTunnelFilterIntegrationTest, EndToEndReverseConnectionHandshake) {
   // Wait for listeners to be stopped, which triggers ReverseConnectionIOHandle cleanup.
   test_server_->waitForCounterEq("listener_manager.listener_stopped",
                                  2); // 2 listeners in this test
+}
+
+// Test validation with static expected values.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithStaticValuesSuccess) {
+  const std::string validation_config = R"(
+          validation:
+            node_id_format: "test-node"
+            cluster_id_format: "test-cluster"
+            emit_dynamic_metadata: true)";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  std::string http_request = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "test-node", "test-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(http_request));
+  tcp_client->waitForData("HTTP/1.1 200 OK");
+  tcp_client->close();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+}
+
+// Test validation with static expected values.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithStaticValuesFailure) {
+  const std::string validation_config = R"(
+          validation:
+            node_id_format: "expected-node"
+            cluster_id_format: "expected-cluster")";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  std::string http_request = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "wrong-node", "wrong-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(http_request));
+  tcp_client->waitForData("HTTP/1.1 403 Forbidden");
+  tcp_client->waitForDisconnect();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+}
+
+// Test validation with only node_id validation.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationOnlyNodeId) {
+  const std::string validation_config = R"(
+          validation:
+            node_id_format: "expected-node")";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  // Success: node_id matches, cluster_id ignored.
+  std::string http_request_pass = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "expected-node", "any-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client1 = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client1->write(http_request_pass));
+  tcp_client1->waitForData("HTTP/1.1 200 OK");
+  tcp_client1->close();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+
+  // Failure: node_id doesn't match.
+  std::string http_request_fail = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "wrong-node", "any-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client2->write(http_request_fail));
+  tcp_client2->waitForData("HTTP/1.1 403 Forbidden");
+  tcp_client2->waitForDisconnect();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+}
+
+// Test validation with only cluster_id validation.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationOnlyClusterId) {
+  const std::string validation_config = R"(
+          validation:
+            cluster_id_format: "expected-cluster")";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  // Success: cluster_id matches, node_id ignored.
+  std::string http_request_pass = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "any-node", "expected-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client1 = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client1->write(http_request_pass));
+  tcp_client1->waitForData("HTTP/1.1 200 OK");
+  tcp_client1->close();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+
+  // Failure: cluster_id doesn't match.
+  std::string http_request_fail = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "any-node", "wrong-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client2->write(http_request_fail));
+  tcp_client2->waitForData("HTTP/1.1 403 Forbidden");
+  tcp_client2->waitForDisconnect();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+}
+
+// Test validation with empty format strings. In this case validation is skipped.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithEmptyFormatters) {
+  const std::string validation_config = R"(
+          validation:
+            node_id_format: ""
+            cluster_id_format: "")";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  // Should succeed since no validation is configured.
+  std::string http_request = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "any-node", "any-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(http_request));
+  tcp_client->waitForData("HTTP/1.1 200 OK");
+  tcp_client->close();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+}
+
+// Test validation with dynamic metadata emission.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithDynamicMetadataEmission) {
+  const std::string validation_config = R"(
+          validation:
+            node_id_format: "test-node"
+            cluster_id_format: "test-cluster"
+            emit_dynamic_metadata: true
+            dynamic_metadata_namespace: "envoy.test.reverse_tunnel")";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  std::string http_request = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "test-node", "test-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(http_request));
+  tcp_client->waitForData("HTTP/1.1 200 OK");
+  tcp_client->close();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+}
+
+// Test validation with multiple formatters in format string.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithComplexFormatString) {
+  const std::string validation_config = R"(
+          validation:
+            node_id_format: "prefix-%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%-suffix"
+            emit_dynamic_metadata: false)";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  // This should fail since node_id won't match the complex format string.
+  std::string http_request = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "simple-node", "test-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(http_request));
+  tcp_client->waitForData("HTTP/1.1 403 Forbidden");
+  tcp_client->waitForDisconnect();
+
+  // Ensure the validation_failed counter is updated.
+  test_server_->waitForCounterExists("reverse_tunnel.handshake.validation_failed");
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+}
+
+// Test validation passes when formatter returns empty and actual value is empty.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithBothValuesMatching) {
+  const std::string validation_config = R"(
+          validation:
+            node_id_format: "match-node"
+            cluster_id_format: "match-cluster")";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  std::string http_request = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "match-node", "match-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(http_request));
+  tcp_client->waitForData("HTTP/1.1 200 OK");
+  tcp_client->close();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+}
+
+// Test validation with FILTER_STATE formatter.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithFilterStateSuccess) {
+  // Set up filter state with expected values.
+  addSetFilterStateFilter("", "", ""); // Clear defaults.
+
+  // Add filter state for expected values that the validator will check against.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    const std::string set_filter_state = R"EOF(
+name: envoy.filters.network.set_filter_state
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
+  on_new_connection:
+  - object_key: expected_node_id
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "validated-node"
+  - object_key: expected_cluster_id
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "validated-cluster"
+)EOF";
+
+    envoy::config::listener::v3::Filter filter;
+    TestUtility::loadFromYaml(set_filter_state, filter);
+    ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+
+    if (listener->filter_chains_size() == 0) {
+      listener->add_filter_chains();
+    } else {
+      listener->mutable_filter_chains(0)->clear_filters();
+    }
+
+    listener->mutable_filter_chains(0)->add_filters()->Swap(&filter);
+  });
+
+  // Configure validation to use FILTER_STATE formatters with PLAIN specifier to get raw strings.
+  const std::string validation_config = R"(
+          validation:
+            node_id_format: "%FILTER_STATE(expected_node_id:PLAIN)%"
+            cluster_id_format: "%FILTER_STATE(expected_cluster_id:PLAIN)%")";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  // Send request with headers matching filter state values.
+  std::string http_request = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "validated-node", "validated-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(http_request));
+  tcp_client->waitForData("HTTP/1.1 200 OK");
+  tcp_client->close();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+}
+
+// Test validation with FILTER_STATE formatter.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithFilterStateFailure) {
+  // Set up filter state with expected values.
+  addSetFilterStateFilter("", "", ""); // Clear defaults.
+
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    const std::string set_filter_state = R"EOF(
+name: envoy.filters.network.set_filter_state
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
+  on_new_connection:
+  - object_key: expected_node_id
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "validated-node"
+  - object_key: expected_cluster_id
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "validated-cluster"
+)EOF";
+
+    envoy::config::listener::v3::Filter filter;
+    TestUtility::loadFromYaml(set_filter_state, filter);
+    ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+
+    if (listener->filter_chains_size() == 0) {
+      listener->add_filter_chains();
+    } else {
+      listener->mutable_filter_chains(0)->clear_filters();
+    }
+
+    listener->mutable_filter_chains(0)->add_filters()->Swap(&filter);
+  });
+
+  // Configure validation to use FILTER_STATE formatters with PLAIN specifier to get raw strings.
+  const std::string validation_config = R"(
+          validation:
+            node_id_format: "%FILTER_STATE(expected_node_id:PLAIN)%"
+            cluster_id_format: "%FILTER_STATE(expected_cluster_id:PLAIN)%")";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  // Send request with headers NOT matching filter state values.
+  std::string http_request = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "wrong-node", "wrong-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(http_request));
+  tcp_client->waitForData("HTTP/1.1 403 Forbidden");
+  tcp_client->waitForDisconnect();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+}
+
+// Helper network filter to set dynamic metadata for testing.
+class MetadataSetterFilter : public Network::ReadFilter {
+public:
+  explicit MetadataSetterFilter(const std::string& namespace_key,
+                                const std::map<std::string, std::string>& metadata_values)
+      : namespace_key_(namespace_key), metadata_values_(metadata_values) {}
+
+  Network::FilterStatus onData(Buffer::Instance&, bool) override {
+    return Network::FilterStatus::Continue;
+  }
+
+  Network::FilterStatus onNewConnection() override {
+    // Set dynamic metadata.
+    if (!metadata_values_.empty()) {
+      Protobuf::Struct metadata_struct;
+      auto& fields = *metadata_struct.mutable_fields();
+
+      for (const auto& [key, value] : metadata_values_) {
+        fields[key].set_string_value(value);
+      }
+
+      read_callbacks_->connection().streamInfo().setDynamicMetadata(namespace_key_,
+                                                                    metadata_struct);
+    }
+
+    return Network::FilterStatus::Continue;
+  }
+
+  void initializeReadFilterCallbacks(Network::ReadFilterCallbacks& callbacks) override {
+    read_callbacks_ = &callbacks;
+  }
+
+private:
+  Network::ReadFilterCallbacks* read_callbacks_{};
+  const std::string namespace_key_;
+  const std::map<std::string, std::string> metadata_values_;
+};
+
+// Config factory for MetadataSetterFilter.
+class MetadataSetterFilterConfig : public Server::Configuration::NamedNetworkFilterConfigFactory {
+public:
+  std::string name() const override { return "envoy.test.metadata_setter"; }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return std::make_unique<Protobuf::Struct>();
+  }
+
+  absl::StatusOr<Network::FilterFactoryCb>
+  createFilterFactoryFromProto(const Protobuf::Message& proto,
+                               Server::Configuration::FactoryContext&) override {
+    const auto& config = dynamic_cast<const Protobuf::Struct&>(proto);
+
+    // Extract namespace and metadata from config.
+    std::string namespace_key = "envoy.test.reverse_tunnel";
+    std::map<std::string, std::string> metadata_values;
+
+    if (config.fields().contains("namespace")) {
+      namespace_key = config.fields().at("namespace").string_value();
+    }
+
+    if (config.fields().contains("metadata")) {
+      const auto& metadata_struct = config.fields().at("metadata").struct_value();
+      for (const auto& [key, value] : metadata_struct.fields()) {
+        metadata_values[key] = value.string_value();
+      }
+    }
+
+    return [namespace_key, metadata_values](Network::FilterManager& filter_manager) {
+      filter_manager.addReadFilter(
+          std::make_shared<MetadataSetterFilter>(namespace_key, metadata_values));
+    };
+  }
+};
+
+// Register the metadata setter filter factory.
+static Registry::RegisterFactory<MetadataSetterFilterConfig,
+                                 Server::Configuration::NamedNetworkFilterConfigFactory>
+    register_metadata_setter_;
+
+// Test validation with DYNAMIC_METADATA formatter.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithDynamicMetadataSuccess) {
+  // Add metadata setter filter to populate dynamic metadata.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Create the Protobuf::Struct config programmatically.
+    Protobuf::Struct filter_config;
+    (*filter_config.mutable_fields())["namespace"].set_string_value("envoy.test.reverse_tunnel");
+
+    auto* metadata_struct = (*filter_config.mutable_fields())["metadata"].mutable_struct_value();
+    (*metadata_struct->mutable_fields())["expected_node_id"].set_string_value(
+        "meta-validated-node");
+    (*metadata_struct->mutable_fields())["expected_cluster_id"].set_string_value(
+        "meta-validated-cluster");
+
+    envoy::config::listener::v3::Filter filter;
+    filter.set_name("envoy.test.metadata_setter");
+    filter.mutable_typed_config()->PackFrom(filter_config);
+
+    ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+
+    if (listener->filter_chains_size() == 0) {
+      listener->add_filter_chains();
+    } else {
+      listener->mutable_filter_chains(0)->clear_filters();
+    }
+
+    listener->mutable_filter_chains(0)->add_filters()->Swap(&filter);
+  });
+
+  // Configure validation to use DYNAMIC_METADATA formatters.
+  const std::string validation_config = R"(
+          validation:
+            node_id_format: "%DYNAMIC_METADATA(envoy.test.reverse_tunnel:expected_node_id)%"
+            cluster_id_format: "%DYNAMIC_METADATA(envoy.test.reverse_tunnel:expected_cluster_id)%")";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  // Send request with headers matching dynamic metadata values.
+  std::string http_request =
+      createHttpRequestWithRtHeaders("GET", "/reverse_connections/request", "meta-validated-node",
+                                     "meta-validated-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(http_request));
+  tcp_client->waitForData("HTTP/1.1 200 OK");
+  tcp_client->close();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+}
+
+// Test validation with DYNAMIC_METADATA formatter.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithDynamicMetadataFailure) {
+  // Add metadata setter filter to populate dynamic metadata.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Create the Protobuf::Struct config programmatically.
+    Protobuf::Struct filter_config;
+    (*filter_config.mutable_fields())["namespace"].set_string_value("envoy.test.reverse_tunnel");
+
+    auto* metadata_struct = (*filter_config.mutable_fields())["metadata"].mutable_struct_value();
+    (*metadata_struct->mutable_fields())["expected_node_id"].set_string_value(
+        "meta-validated-node");
+    (*metadata_struct->mutable_fields())["expected_cluster_id"].set_string_value(
+        "meta-validated-cluster");
+
+    envoy::config::listener::v3::Filter filter;
+    filter.set_name("envoy.test.metadata_setter");
+    filter.mutable_typed_config()->PackFrom(filter_config);
+
+    ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+
+    if (listener->filter_chains_size() == 0) {
+      listener->add_filter_chains();
+    } else {
+      listener->mutable_filter_chains(0)->clear_filters();
+    }
+
+    listener->mutable_filter_chains(0)->add_filters()->Swap(&filter);
+  });
+
+  // Configure validation to use DYNAMIC_METADATA formatters.
+  const std::string validation_config = R"(
+          validation:
+            node_id_format: "%DYNAMIC_METADATA(envoy.test.reverse_tunnel:expected_node_id)%"
+            cluster_id_format: "%DYNAMIC_METADATA(envoy.test.reverse_tunnel:expected_cluster_id)%")";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  // Send request with headers NOT matching dynamic metadata values.
+  std::string http_request = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "wrong-node", "wrong-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(http_request));
+  tcp_client->waitForData("HTTP/1.1 403 Forbidden");
+  tcp_client->waitForDisconnect();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+}
+
+// Test validation with mixed FILTER_STATE and DYNAMIC_METADATA formatters.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithMixedFormattersSuccess) {
+  // Set up filter state for node_id.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    const std::string set_filter_state = R"EOF(
+name: envoy.filters.network.set_filter_state
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
+  on_new_connection:
+  - object_key: expected_node_id
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "fs-node"
+)EOF";
+
+    envoy::config::listener::v3::Filter filter;
+    TestUtility::loadFromYaml(set_filter_state, filter);
+    ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+
+    if (listener->filter_chains_size() == 0) {
+      listener->add_filter_chains();
+    } else {
+      listener->mutable_filter_chains(0)->clear_filters();
+    }
+
+    listener->mutable_filter_chains(0)->add_filters()->Swap(&filter);
+  });
+
+  // Add metadata setter filter for cluster_id.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Create the Protobuf::Struct config programmatically.
+    Protobuf::Struct filter_config;
+    (*filter_config.mutable_fields())["namespace"].set_string_value("envoy.test.reverse_tunnel");
+
+    auto* metadata_struct = (*filter_config.mutable_fields())["metadata"].mutable_struct_value();
+    (*metadata_struct->mutable_fields())["expected_cluster_id"].set_string_value("dm-cluster");
+
+    envoy::config::listener::v3::Filter filter;
+    filter.set_name("envoy.test.metadata_setter");
+    filter.mutable_typed_config()->PackFrom(filter_config);
+
+    ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    ASSERT_GT(listener->filter_chains_size(), 0);
+
+    listener->mutable_filter_chains(0)->add_filters()->Swap(&filter);
+  });
+
+  // Configure validation to use both FILTER_STATE and DYNAMIC_METADATA formatters.
+  const std::string validation_config = R"(
+          validation:
+            node_id_format: "%FILTER_STATE(expected_node_id:PLAIN)%"
+            cluster_id_format: "%DYNAMIC_METADATA(envoy.test.reverse_tunnel:expected_cluster_id)%")";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  // Send request with headers matching both filter state and dynamic metadata values.
+  std::string http_request = createHttpRequestWithRtHeaders("GET", "/reverse_connections/request",
+                                                            "fs-node", "dm-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(http_request));
+  tcp_client->waitForData("HTTP/1.1 200 OK");
+  tcp_client->close();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.accepted", 1);
+}
+
+// Test validation with mixed formatters.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithMixedFormattersNodeFailure) {
+  // Set up filter state for node_id.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    const std::string set_filter_state = R"EOF(
+name: envoy.filters.network.set_filter_state
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
+  on_new_connection:
+  - object_key: expected_node_id
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "fs-node"
+)EOF";
+
+    envoy::config::listener::v3::Filter filter;
+    TestUtility::loadFromYaml(set_filter_state, filter);
+    ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+
+    if (listener->filter_chains_size() == 0) {
+      listener->add_filter_chains();
+    } else {
+      listener->mutable_filter_chains(0)->clear_filters();
+    }
+
+    listener->mutable_filter_chains(0)->add_filters()->Swap(&filter);
+  });
+
+  // Add metadata setter filter for cluster_id.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Create the Protobuf::Struct config programmatically.
+    Protobuf::Struct filter_config;
+    (*filter_config.mutable_fields())["namespace"].set_string_value("envoy.test.reverse_tunnel");
+
+    auto* metadata_struct = (*filter_config.mutable_fields())["metadata"].mutable_struct_value();
+    (*metadata_struct->mutable_fields())["expected_cluster_id"].set_string_value("dm-cluster");
+
+    envoy::config::listener::v3::Filter filter;
+    filter.set_name("envoy.test.metadata_setter");
+    filter.mutable_typed_config()->PackFrom(filter_config);
+
+    ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    ASSERT_GT(listener->filter_chains_size(), 0);
+
+    listener->mutable_filter_chains(0)->add_filters()->Swap(&filter);
+  });
+
+  // Configure validation to use both FILTER_STATE and DYNAMIC_METADATA formatters.
+  const std::string validation_config = R"(
+          validation:
+            node_id_format: "%FILTER_STATE(expected_node_id:PLAIN)%"
+            cluster_id_format: "%DYNAMIC_METADATA(envoy.test.reverse_tunnel:expected_cluster_id)%")";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  // Send request with wrong node_id but correct cluster_id. It should fail.
+  std::string http_request = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "wrong-node", "dm-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(http_request));
+  tcp_client->waitForData("HTTP/1.1 403 Forbidden");
+  tcp_client->waitForDisconnect();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
+}
+
+// Test validation with mixed formatters.
+TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithMixedFormattersClusterFailure) {
+  // Set up filter state for node_id.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    const std::string set_filter_state = R"EOF(
+name: envoy.filters.network.set_filter_state
+typed_config:
+  "@type": type.googleapis.com/envoy.extensions.filters.network.set_filter_state.v3.Config
+  on_new_connection:
+  - object_key: expected_node_id
+    factory_key: envoy.string
+    format_string:
+      text_format_source:
+        inline_string: "fs-node"
+)EOF";
+
+    envoy::config::listener::v3::Filter filter;
+    TestUtility::loadFromYaml(set_filter_state, filter);
+    ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+
+    if (listener->filter_chains_size() == 0) {
+      listener->add_filter_chains();
+    } else {
+      listener->mutable_filter_chains(0)->clear_filters();
+    }
+
+    listener->mutable_filter_chains(0)->add_filters()->Swap(&filter);
+  });
+
+  // Add metadata setter filter for cluster_id.
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    // Create the Protobuf::Struct config programmatically.
+    Protobuf::Struct filter_config;
+    (*filter_config.mutable_fields())["namespace"].set_string_value("envoy.test.reverse_tunnel");
+
+    auto* metadata_struct = (*filter_config.mutable_fields())["metadata"].mutable_struct_value();
+    (*metadata_struct->mutable_fields())["expected_cluster_id"].set_string_value("dm-cluster");
+
+    envoy::config::listener::v3::Filter filter;
+    filter.set_name("envoy.test.metadata_setter");
+    filter.mutable_typed_config()->PackFrom(filter_config);
+
+    ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    ASSERT_GT(listener->filter_chains_size(), 0);
+
+    listener->mutable_filter_chains(0)->add_filters()->Swap(&filter);
+  });
+
+  // Configure validation to use both FILTER_STATE and DYNAMIC_METADATA formatters.
+  const std::string validation_config = R"(
+          validation:
+            node_id_format: "%FILTER_STATE(expected_node_id:PLAIN)%"
+            cluster_id_format: "%DYNAMIC_METADATA(envoy.test.reverse_tunnel:expected_cluster_id)%")";
+
+  addReverseTunnelFilter(false, "/reverse_connections/request", "GET", validation_config);
+  initialize();
+
+  // Send request with correct node_id but wrong cluster_id. It should fail.
+  std::string http_request = createHttpRequestWithRtHeaders(
+      "GET", "/reverse_connections/request", "fs-node", "wrong-cluster", "test-tenant");
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(tcp_client->write(http_request));
+  tcp_client->waitForData("HTTP/1.1 403 Forbidden");
+  tcp_client->waitForDisconnect();
+
+  test_server_->waitForCounterGe("reverse_tunnel.handshake.validation_failed", 1);
 }
 
 } // namespace
