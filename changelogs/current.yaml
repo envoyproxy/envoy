@@ -581,8 +581,8 @@ new_features:
     that bypasses load balancer selection.
 - area: router
   change: |
-    Added support for :ref:`request_header_mutations
-    <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.request_header_mutations>` to enable header
+    Added support for :ref:`request_headers_mutations
+    <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.request_headers_mutations>` to enable header
     manipulation for mirror requests.
     Added support for :ref:`host_rewrite_literal
     <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.host_rewrite_literal>` in
