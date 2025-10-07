@@ -992,5 +992,73 @@ TEST_P(ProxyProtocolTLVsIntegrationTest, TestV2ProxyProtocolPassWithTcpProxyTLVs
   ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
 
+// Test dynamic TLV value populated via format_string in upstream transport socket.
+TEST_P(ProxyProtocolTcpIntegrationTest, TestV2DynamicTLVFromFormatString) {
+  // Configure the upstream transport socket to add a TLV with a dynamic format string.
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+    auto* transport_socket =
+        bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
+    transport_socket->set_name("envoy.transport_sockets.upstream_proxy_protocol");
+
+    envoy::config::core::v3::TransportSocket inner_socket;
+    envoy::extensions::transport_sockets::raw_buffer::v3::RawBuffer raw_buffer;
+    inner_socket.set_name("raw");
+    inner_socket.mutable_typed_config()->PackFrom(raw_buffer);
+
+    envoy::config::core::v3::ProxyProtocolConfig proxy_protocol;
+    proxy_protocol.set_version(envoy::config::core::v3::ProxyProtocolConfig::V2);
+
+    // Add a dynamic TLV using a format string that evaluates to a constant string.
+    // This validates the dynamic evaluation path without relying on specific StreamInfo fields.
+    auto* dynamic_tlv = proxy_protocol.add_added_tlvs();
+    dynamic_tlv->set_type(0xF2);
+    dynamic_tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string(
+        "dynamic_value");
+
+    envoy::extensions::transport_sockets::proxy_protocol::v3::ProxyProtocolUpstreamTransport
+        proxy_proto_transport;
+    proxy_proto_transport.mutable_transport_socket()->MergeFrom(inner_socket);
+    proxy_proto_transport.mutable_config()->MergeFrom(proxy_protocol);
+    transport_socket->mutable_typed_config()->PackFrom(proxy_proto_transport);
+  });
+
+  BaseIntegrationTest::initialize();
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_));
+
+  std::string observed_data;
+  ASSERT_TRUE(tcp_client->write("data"));
+
+  // Wait for the full PROXY protocol header (including TLV) and the data to arrive.
+  // PROXY v2 structure: 16-byte fixed header + addresses + TLVs.
+  // For IPv4: 16-byte header + 12-byte addresses + 16-byte TLV + 4-byte "data" = 48 total.
+  // For IPv6: 16-byte header + 36-byte addresses + 16-byte TLV + 4-byte "data" = 72 total.
+  if (GetParam() == Envoy::Network::Address::IpVersion::v4) {
+    ASSERT_TRUE(fake_upstream_connection_->waitForData(48, &observed_data));
+    // Verify TLV starting at offset 28 for IPv4 (16-byte fixed header + 12-byte addresses).
+    const size_t tlv_offset = 28;
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[tlv_offset]), 0xF2);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[tlv_offset + 1]), 0x00);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[tlv_offset + 2]), 0x0D);
+    EXPECT_EQ(observed_data.substr(tlv_offset + 3, 13), "dynamic_value");
+    // Verify the actual data comes after the PROXY header + TLV.
+    EXPECT_EQ(observed_data.substr(44), "data");
+  } else {
+    ASSERT_TRUE(fake_upstream_connection_->waitForData(72, &observed_data));
+    // Verify TLV starting at offset 52 for IPv6 (16-byte fixed header + 36-byte addresses).
+    const size_t tlv_offset = 52;
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[tlv_offset]), 0xF2);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[tlv_offset + 1]), 0x00);
+    EXPECT_EQ(static_cast<uint8_t>(observed_data[tlv_offset + 2]), 0x0D);
+    EXPECT_EQ(observed_data.substr(tlv_offset + 3, 13), "dynamic_value");
+    // Verify the actual data comes after the PROXY header + TLV.
+    EXPECT_EQ(observed_data.substr(68), "data");
+  }
+
+  tcp_client->close();
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
+}
+
 } // namespace
 } // namespace Envoy

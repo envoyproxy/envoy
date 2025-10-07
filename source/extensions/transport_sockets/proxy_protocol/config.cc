@@ -27,14 +27,40 @@ UpstreamProxyProtocolSocketConfigFactory::createTransportSocketFactory(
   auto factory_or_error =
       inner_config_factory.createTransportSocketFactory(*inner_factory_config, context);
   RETURN_IF_NOT_OK_REF(factory_or_error.status());
+  // Precompute pass-through configuration.
+  const auto& cfg = outer_config.config();
+  const bool pass_all_tlvs = cfg.has_pass_through_tlvs() &&
+                             cfg.pass_through_tlvs().match_type() ==
+                                 envoy::config::core::v3::ProxyProtocolPassThroughTLVs::INCLUDE_ALL;
+  absl::flat_hash_set<uint8_t> pass_through_tlvs;
+  if (cfg.has_pass_through_tlvs() &&
+      cfg.pass_through_tlvs().match_type() ==
+          envoy::config::core::v3::ProxyProtocolPassThroughTLVs::INCLUDE) {
+    for (const auto& tlv_type : cfg.pass_through_tlvs().tlv_type()) {
+      pass_through_tlvs.insert(0xFF & tlv_type);
+    }
+  }
+
+  // Parse TLVs using status-based API.
+  std::vector<const envoy::config::core::v3::TlvEntry*> tlv_ptrs;
+  std::vector<Envoy::Network::ProxyProtocolTLV> static_tlvs;
+  std::vector<ProxyProtocol::TlvFormatter> dynamic_tlvs;
+  tlv_ptrs.reserve(cfg.added_tlvs().size());
+  for (const auto& tlv : cfg.added_tlvs()) {
+    tlv_ptrs.push_back(&tlv);
+  }
+  auto status = ProxyProtocol::UpstreamProxyProtocolSocketFactory::parseTLVs(
+      tlv_ptrs, context, static_tlvs, dynamic_tlvs);
+  RETURN_IF_NOT_OK_REF(status);
+
   return std::make_unique<UpstreamProxyProtocolSocketFactory>(
-      std::move(factory_or_error.value()), outer_config.config(), context.statsScope());
+      std::move(factory_or_error.value()), cfg.version(), context.statsScope(), pass_all_tlvs,
+      std::move(pass_through_tlvs), std::move(static_tlvs), std::move(dynamic_tlvs));
 }
 
 ProtobufTypes::MessagePtr UpstreamProxyProtocolSocketConfigFactory::createEmptyConfigProto() {
   return std::make_unique<
       envoy::extensions::transport_sockets::proxy_protocol::v3::ProxyProtocolUpstreamTransport>();
-  ;
 }
 
 REGISTER_FACTORY(UpstreamProxyProtocolSocketConfigFactory,
