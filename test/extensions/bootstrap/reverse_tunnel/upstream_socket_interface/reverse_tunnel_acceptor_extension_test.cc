@@ -172,6 +172,50 @@ TEST_F(ReverseTunnelAcceptorExtensionTest, GetPerWorkerStatMapSingleThread) {
   EXPECT_EQ(stat_map["test_scope.reverse_connections.worker_0.cluster.cluster2"], 0);
 }
 
+TEST_F(ReverseTunnelAcceptorExtensionTest, UpdateConnectionStatsWithDetailedStatsDisabled) {
+  // Create an extension with detailed stats disabled.
+  envoy::extensions::bootstrap::reverse_tunnel::upstream_socket_interface::v3::
+      UpstreamReverseConnectionSocketInterface no_stats_config;
+  no_stats_config.set_stat_prefix("reverse_connections");
+  no_stats_config.set_enable_detailed_stats(false);
+
+  auto no_stats_extension = std::make_unique<ReverseTunnelAcceptorExtension>(
+      *socket_interface_, context_, no_stats_config);
+
+  // Update connection stats - should not create any stats.
+  no_stats_extension->updateConnectionStats("node1", "cluster1", true);
+  no_stats_extension->updateConnectionStats("node2", "cluster2", true);
+  no_stats_extension->updateConnectionStats("node3", "cluster3", true);
+
+  // Verify no stats were created by checking cross-worker stat map.
+  auto cross_worker_stat_map = no_stats_extension->getCrossWorkerStatMap();
+  EXPECT_TRUE(cross_worker_stat_map.empty());
+
+  // Verify no per-worker stats were created by checking per-worker stat map.
+  auto per_worker_stat_map = no_stats_extension->getPerWorkerStatMap();
+  EXPECT_TRUE(per_worker_stat_map.empty());
+
+  // Verify that the stats store doesn't have any gauges with our stat prefix
+  // (except potentially the aggregate that we removed).
+  auto& stats_store = no_stats_extension->getStatsScope();
+  bool found_detailed_stats = false;
+  Stats::IterateFn<Stats::Gauge> gauge_callback =
+      [&found_detailed_stats](const Stats::RefcountPtr<Stats::Gauge>& gauge) -> bool {
+    const std::string& gauge_name = gauge->name();
+    // Check if any detailed stats were created (nodes. or clusters. or worker_).
+    if ((gauge_name.find(".nodes.") != std::string::npos ||
+         gauge_name.find(".clusters.") != std::string::npos ||
+         gauge_name.find(".worker_") != std::string::npos) &&
+        gauge->used()) {
+      found_detailed_stats = true;
+      return false; // Stop iteration
+    }
+    return true;
+  };
+  stats_store.iterate(gauge_callback);
+  EXPECT_FALSE(found_detailed_stats);
+}
+
 TEST_F(ReverseTunnelAcceptorExtensionTest, GetCrossWorkerStatMapMultiThread) {
   setupThreadLocalSlot();
   setupAnotherThreadLocalSlot();
