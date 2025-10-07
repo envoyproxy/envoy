@@ -18,7 +18,7 @@ message Mcp {
   // TODO: Add configuration fields
 }
 
-// Per-route configuration for MCP filter
+// McpOverride for MCP filter
 message McpOverride {
   // TODO: Add configuration fields
 }
