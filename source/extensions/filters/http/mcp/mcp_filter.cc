@@ -15,7 +15,6 @@ bool McpFilter::isDisabled() const {
       Http::Utility::resolveMostSpecificPerFilterConfig<McpPerRouteConfig>(decoder_callbacks_);
 
   if (route_config && route_config->disabled()) {
-    ENVOY_LOG(debug, "MCP filter disabled by per-route configuration");
     return true;
   }
 
