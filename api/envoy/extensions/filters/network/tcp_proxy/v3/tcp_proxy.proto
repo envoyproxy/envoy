@@ -76,7 +76,7 @@ message TcpProxy {
     // The hostname to send in the synthesized CONNECT headers to the upstream proxy.
     // This field evaluates command operators if present; otherwise, the value is used as-is.
     //
-    // For example:
+    // For example, dynamically set the hostname using downstream SNI:
     //
     // .. code-block:: yaml
     //
