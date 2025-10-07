@@ -1626,8 +1626,12 @@ TEST_P(ExtProcIntegrationTestUpstream, GetAndRespondImmediately_Upstream) {
   initializeConfig();
   HttpIntegrationTest::initialize();
   auto response = sendDownstreamRequest([](Http::RequestHeaderMap& headers) {
-    // Setting this header to ensure that Envoy does not retry the request
-    // in case of a 5xx immediate response from the upstream.
+    // We want to ensure that the immediate response from an upstream ext_proc filter won't trigger
+    // a retry, which is a requirement of the upstream filter implementations.
+    //
+    // Setting this header normally triggers a retry on 5xx from the upstream servers.
+    // If the immediate response from an upstream ext_proc filter triggers a retry, the test will
+    // fail.
     headers.addCopy(Http::LowerCaseString("x-envoy-retry-on"), "5xx");
   });
 
