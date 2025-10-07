@@ -27,6 +27,7 @@ RateLimiterProviderSingleton::RateLimiterWrapperPtr RateLimiterProviderSingleton
     Server::Configuration::ServerFactoryContext& factory_context, absl::string_view key,
     const envoy::config::core::v3::ConfigSource& config_source, intptr_t setter_key,
     SetRateLimiterCb setter) {
+  ASSERT_IS_MAIN_OR_TEST_THREAD();
   auto provider = factory_context.singletonManager().getTyped<RateLimiterProviderSingleton>(
       SINGLETON_MANAGER_REGISTERED_NAME(local_ratelimit_provider),
       [&factory_context, &config_source] {
@@ -52,7 +53,8 @@ RateLimiterProviderSingleton::RateLimiterWrapperPtr RateLimiterProviderSingleton
 
   // If the limiter is already created, return it.
   if (auto limiter = subscription->getLimiter()) {
-    return std::make_unique<RateLimiterWrapper>(provider, subscription, limiter);
+    return std::make_unique<RateLimiterWrapper>(factory_context.threadLocal(), provider,
+                                                subscription, limiter);
   }
 
   if (!subscription->isInitTargetSet()) {
@@ -66,7 +68,8 @@ RateLimiterProviderSingleton::RateLimiterWrapperPtr RateLimiterProviderSingleton
 
   // Otherwise, return a wrapper with a null limiter. The limiter will be
   // set when the config is received.
-  return std::make_unique<RateLimiterWrapper>(provider, subscription, nullptr);
+  return std::make_unique<RateLimiterWrapper>(factory_context.threadLocal(), provider, subscription,
+                                              nullptr);
 }
 
 std::shared_ptr<LocalRateLimiterImpl>

@@ -25,7 +25,7 @@ public:
 
 private:
   const intptr_t setter_key_;
-  std::shared_ptr<bool> cancel_cb_;
+  std::shared_ptr<std::atomic<bool>> cancel_cb_;
   Server::Configuration::ServerFactoryContext& context_;
   mutable Envoy::Extensions::Filters::Common::LocalRateLimit::RateLimiterProviderSingleton::
       RateLimiterWrapperPtr rate_limiter_;

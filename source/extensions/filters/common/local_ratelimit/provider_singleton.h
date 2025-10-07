@@ -59,14 +59,30 @@ class RateLimiterProviderSingleton : public Singleton::Instance {
 public:
   class TokenBucketSubscription;
   using TokenBucketSubscriptionSharedPtr = std::shared_ptr<TokenBucketSubscription>;
+  struct ThreadLocalLimiter : public Envoy::ThreadLocal::ThreadLocalObject {
+    ThreadLocalLimiter(LocalRateLimiterSharedPtr limiter) : limiter(limiter) {}
+    LocalRateLimiterSharedPtr limiter = nullptr;
+  };
+
   class RateLimiterWrapper {
   public:
-    RateLimiterWrapper(RateLimiterProviderSingletonSharedPtr provider,
+    RateLimiterWrapper(ThreadLocal::Instance& tls, RateLimiterProviderSingletonSharedPtr provider,
                        TokenBucketSubscriptionSharedPtr subscription,
                        std::shared_ptr<LocalRateLimiterImpl> limiter)
-        : provider_(provider), subscription_(subscription), limiter_(limiter) {}
-    LocalRateLimiterSharedPtr getLimiter() const { return limiter_; }
-    void setLimiter(LocalRateLimiterSharedPtr limiter) { limiter_ = limiter; }
+        : provider_(provider), subscription_(subscription), limiter_slot_(tls) {
+      limiter_slot_.set([l = limiter](Envoy::Event::Dispatcher&) {
+        return std::make_shared<ThreadLocalLimiter>(l);
+      });
+    }
+
+    LocalRateLimiterSharedPtr getLimiter() const { return limiter_slot_.get()->limiter; }
+
+    void setLimiter(LocalRateLimiterSharedPtr limiter) {
+      limiter_slot_.runOnAllThreads([limiter](OptRef<ThreadLocalLimiter> thread_local_limiter) {
+        thread_local_limiter->limiter = limiter;
+      });
+    }
+
     TokenBucketSubscriptionSharedPtr getSubscription() const { return subscription_; }
 
   private:
@@ -79,10 +95,15 @@ public:
     // bucket resource by shared pointer.
     TokenBucketSubscriptionSharedPtr subscription_;
 
-    // The `limiter_` holds the ownership of the rate limiter(with the
+    // The `limiter_slot_` holds the ownership of the rate limiter(with the
     // underlying token bucket) by shared pointer. Access loggers using the same
     // `resource_name` of token bucket will share the same rate limiter.
-    LocalRateLimiterSharedPtr limiter_;
+    //
+    // The `limiter_slot_` is thread-safe and can be accessed by multiple
+    // threads. It protects the `limiter` from being read and updated
+    // concurrently when listeners are active and there are new TokenBucket
+    // resources coming.
+    Envoy::ThreadLocal::TypedSlot<ThreadLocalLimiter> limiter_slot_;
   };
   using RateLimiterWrapperPtr = std::unique_ptr<RateLimiterWrapper>;
 

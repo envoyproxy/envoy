@@ -15,13 +15,13 @@ ProcessRateLimitFilter::ProcessRateLimitFilter(
     Server::Configuration::ServerFactoryContext& context,
     const envoy::extensions::access_loggers::filters::process_ratelimit::v3::ProcessRateLimitFilter&
         config)
-    : setter_key_(reinterpret_cast<intptr_t>(this)), cancel_cb_(std::make_shared<bool>(false)),
-      context_(context) {
+    : setter_key_(reinterpret_cast<intptr_t>(this)),
+      cancel_cb_(std::make_shared<std::atomic<bool>>(false)), context_(context) {
   auto setter =
-      [this, cancel_cb = std::shared_ptr<bool>(cancel_cb_)](
+      [this, cancel_cb = cancel_cb_](
           Envoy::Extensions::Filters::Common::LocalRateLimit::LocalRateLimiterSharedPtr limiter)
       -> void {
-    if (*cancel_cb) {
+    if (cancel_cb->load()) {
       return;
     }
     ENVOY_BUG(limiter != nullptr, "limiter shouldn't be null if the `limiter` is set from "
@@ -39,10 +39,14 @@ ProcessRateLimitFilter::ProcessRateLimitFilter(
 }
 
 ProcessRateLimitFilter::~ProcessRateLimitFilter() {
-  *cancel_cb_ = true;
+  // The destructor can be called in any thread.
+  // The `cancel_cb_` is set to true to prevent the `limiter` from being set in
+  // the `setter` from the main thread.
+  cancel_cb_->store(true);
   context_.mainThreadDispatcher().post(
-      [subscription = rate_limiter_->getSubscription(), setter_key = setter_key_] {
-        subscription->removeSetter(setter_key);
+      [limiter = std::move(rate_limiter_), setter_key = setter_key_] {
+        // remove the setter for this filter.
+        limiter->getSubscription()->removeSetter(setter_key);
       });
 }
 
