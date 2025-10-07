@@ -275,7 +275,7 @@ message TcpProxy {
   // Additional access log options for the TCP proxy.
   TcpAccessLogOptions access_log_options = 17;
 
-  // If set, the specified PROXY protocol TLVs (Type-Length-Value) are added to the PROXY protocol state
+  // If set, the specified ``PROXY`` protocol TLVs (Type-Length-Value) are added to the ``PROXY`` protocol state
   // created by the TCP proxy filter. These TLVs are sent in the PROXY protocol v2 header to the upstream.
   //
   // This field only takes effect when the TCP proxy filter is creating new PROXY protocol state and an
