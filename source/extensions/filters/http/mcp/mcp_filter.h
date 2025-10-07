@@ -32,9 +32,9 @@ public:
 /**
  * Per-route configuration for the MCP filter.
  */
-class McpPerRouteConfig : public Router::RouteSpecificFilterConfig {
+class McpOverrideConfig : public Router::RouteSpecificFilterConfig {
 public:
-  McpPerRouteConfig() = default;
+  McpOverrideConfig() = default;
 };
 
 using McpFilterConfigSharedPtr = std::shared_ptr<McpFilterConfig>;

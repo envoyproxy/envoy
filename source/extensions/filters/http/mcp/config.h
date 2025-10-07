@@ -16,7 +16,7 @@ namespace Mcp {
  */
 class McpFilterConfigFactory
     : public Common::FactoryBase<envoy::extensions::filters::http::mcp::v3::Mcp,
-                                 envoy::extensions::filters::http::mcp::v3::McpPerRoute> {
+                                 envoy::extensions::filters::http::mcp::v3::McpOverride> {
 public:
   McpFilterConfigFactory() : FactoryBase("envoy.filters.http.mcp") {}
 
@@ -27,7 +27,7 @@ private:
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(
-      const envoy::extensions::filters::http::mcp::v3::McpPerRoute&,
+      const envoy::extensions::filters::http::mcp::v3::McpOverride&,
       Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor& validator) override;
 };

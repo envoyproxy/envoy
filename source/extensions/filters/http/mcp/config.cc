@@ -22,9 +22,9 @@ Http::FilterFactoryCb McpFilterConfigFactory::createFilterFactoryFromProtoTyped(
 
 absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
 McpFilterConfigFactory::createRouteSpecificFilterConfigTyped(
-    const envoy::extensions::filters::http::mcp::v3::McpPerRoute&,
+    const envoy::extensions::filters::http::mcp::v3::McpOverride&,
     Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
-  return std::make_shared<const McpPerRouteConfig>();
+  return std::make_shared<const McpOverrideConfig>();
 }
 
 /**
