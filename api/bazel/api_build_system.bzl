@@ -4,6 +4,7 @@ load("@com_github_grpc_grpc//bazel:python_rules.bzl", _py_proto_library = "py_pr
 load("@com_google_protobuf//bazel:proto_library.bzl", "proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
 load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
+load("@rules_java//java:defs.bzl", "java_proto_library")
 load(
     "//bazel:external_proto_deps.bzl",
     "EXTERNAL_PROTO_CC_BAZEL_DEP_MAP",
@@ -114,7 +115,7 @@ def api_cc_py_proto_library(
     )
 
     if java:
-        native.java_proto_library(
+        java_proto_library(
             name = name + _JAVA_PROTO_SUFFIX,
             visibility = ["//visibility:public"],
             deps = [relative_name],
