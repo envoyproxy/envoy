@@ -297,6 +297,11 @@ message HttpBody {
   // stream was already sent, then this field will be true to indicate an
   // end-of-stream with *no* message (as opposed to an empty message).
   bool end_of_stream_without_message = 3;
+
+  // This field is used in ``GRPC`` body send mode to indicate whether
+  // the message is compressed. This will never be set to true by gRPC
+  // but may be set to true by a proxy like Envoy.
+  bool grpc_message_compressed = 4;
 }
 
 // This message is sent to the external server when the HTTP request and
@@ -464,6 +469,11 @@ message StreamedBodyResponse {
   // stream was already sent, then this field will be true to indicate an
   // end-of-stream with *no* message (as opposed to an empty message).
   bool end_of_stream_without_message = 3;
+
+  // This field is used in ``GRPC`` body send mode to indicate whether
+  // the message is compressed. This will never be set to true by gRPC
+  // but may be set to true by a proxy like Envoy.
+  bool grpc_message_compressed = 4;
 }
 
 // This message specifies the body mutation the server sends to the data plane.
