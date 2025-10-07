@@ -214,27 +214,6 @@ std::function<std::unique_ptr<ProcessingRequestModifier>()> createProcessingRequ
   };
 }
 
-// Changes to headers are normally tested against the MutationRules supplied
-// with configuration. When writing an immediate response message, however,
-// we want to support a more liberal set of rules so that filters can create
-// custom error messages, and we want to prevent the MutationRules in the
-// configuration from making that impossible. This is a fixed, permissive
-// set of rules for that purpose.
-class ImmediateMutationChecker {
-public:
-  ImmediateMutationChecker(Regex::Engine& regex_engine) {
-    HeaderMutationRules rules;
-    rules.mutable_allow_all_routing()->set_value(true);
-    rules.mutable_allow_envoy()->set_value(true);
-    rule_checker_ = std::make_unique<Checker>(rules, regex_engine);
-  }
-
-  const Checker& checker() const { return *rule_checker_; }
-
-private:
-  std::unique_ptr<Checker> rule_checker_;
-};
-
 ProcessingMode allDisabledMode() {
   ProcessingMode pm;
   pm.set_request_header_mode(ProcessingMode::SKIP);
@@ -282,7 +261,6 @@ FilterConfig::FilterConfig(const ExternalProcessor& config,
                               config.allowed_override_modes().end()),
       expression_manager_(builder, context.localInfo(), config.request_attributes(),
                           config.response_attributes()),
-      immediate_mutation_checker_(context.regexEngine()),
       processing_request_modifier_factory_cb_(
           createProcessingRequestModifierCb(config, builder, context)),
       on_processing_response_factory_cb_(
