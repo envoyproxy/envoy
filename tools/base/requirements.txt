@@ -466,10 +466,10 @@ coloredlogs==15.0.1 \
     #   aio-run-runner
 cryptography==46.0.1 \
     --hash=sha256:0dfb7c88d4462a0cfdd0d87a3c245a7bc3feb59de101f6ff88194f740f72eda6 \
+    --hash=sha256:1cd6d50c1a8b79af1a6f703709d8973845f677c8e97b1268f5ff323d38ce8475 \
     --hash=sha256:757af4f6341ce7a1e47c326ca2a81f41d236070217e5fbbad61bbfe299d55d28 \
     --hash=sha256:e22801b61613ebdebf7deb18b507919e107547a1d39a3b57f5f855032dd7cfb8 \
-    --hash=sha256:f7a24ea78de345cfa7f6a8d3bde8b242c7fac27f2bd78fa23474ca38dfaeeab9 \
-    --hash=sha256:1cd6d50c1a8b79af1a6f703709d8973845f677c8e97b1268f5ff323d38ce8475
+    --hash=sha256:f7a24ea78de345cfa7f6a8d3bde8b242c7fac27f2bd78fa23474ca38dfaeeab9
     # via
     #   -r requirements.in
     #   aioquic
@@ -1339,9 +1339,9 @@ six==1.16.0 \
     # via
     #   python-dateutil
     #   sphinxcontrib-httpdomain
-slack-sdk==3.36.0 \
-    --hash=sha256:6c96887d7175fc1b0b2777b73bb65f39b5b8bee9bd8acfec071d64014f9e2d10 \
-    --hash=sha256:8586022bdbdf9f8f8d32f394540436c53b1e7c8da9d21e1eab4560ba70cfcffa
+slack-sdk==3.37.0 \
+    --hash=sha256:242d6cffbd9e843af807487ff04853189b812081aeaa22f90a8f159f20220ed9 \
+    --hash=sha256:e108a0836eafda74d8a95e76c12c2bcb010e645d504d8497451e4c7ebb229c87
     # via -r requirements.in
 smmap==5.0.1 \
     --hash=sha256:dceeb6c0028fdb6734471eb07c0cd2aae706ccaecab45965ee83f11c8d3b1f62 \
