@@ -119,7 +119,8 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
                              StreamInfo::FilterState::LifeSpan::FilterChain)),
       tracing_config_(Tracing::EgressConfig::get()), local_reply_(*parent.local_reply_),
       account_(options.account_), buffer_limit_(options.buffer_limit_), send_xff_(options.send_xff),
-      send_internal_(options.send_internal) {
+      send_internal_(options.send_internal),
+      upstream_override_host_(options.upstream_override_host_) {
   auto retry_policy = createRetryPolicy(options, parent.factory_context_, creation_status);
 
   // A field initialization may set the creation-status as unsuccessful.
@@ -131,9 +132,11 @@ AsyncStreamImpl::AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCal
   const Router::MetadataMatchCriteria* metadata_matching_criteria = nullptr;
   if (options.parent_context.stream_info != nullptr) {
     stream_info_.setParentStreamInfo(*options.parent_context.stream_info);
-    const auto route = options.parent_context.stream_info->route();
-    if (route != nullptr) {
-      const auto* route_entry = route->routeEntry();
+    // Keep the parent root to ensure the metadata_matching_criteria will not become
+    // dangling pointer once the parent downstream request is gone.
+    parent_route_ = options.parent_context.stream_info->route();
+    if (parent_route_ != nullptr) {
+      const auto* route_entry = parent_route_->routeEntry();
       if (route_entry != nullptr) {
         metadata_matching_criteria = route_entry->metadataMatchCriteria();
       }

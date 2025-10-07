@@ -522,6 +522,9 @@ TEST(Context, ConnectionFallbackAttributes) {
 
 TEST(Context, ConnectionAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
+  std::shared_ptr<NiceMock<Upstream::MockClusterInfo>> cluster_info(
+      new NiceMock<Upstream::MockClusterInfo>());
+  EXPECT_CALL(info, upstreamClusterInfo()).WillRepeatedly(Return(cluster_info));
   std::shared_ptr<NiceMock<Envoy::Upstream::MockHostDescription>> upstream_host(
       new NiceMock<Envoy::Upstream::MockHostDescription>());
   auto downstream_ssl_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
@@ -836,6 +839,28 @@ TEST(Context, ConnectionAttributes) {
     ASSERT_TRUE(value.value().IsMessage());
     EXPECT_TRUE(Protobuf::util::MessageDifferencer::Equals(*value.value().MessageOrDie(),
                                                            upstream_locality));
+  }
+
+  {
+    cluster_info->endpoint_stats_.membership_total_.set(1);
+    auto value = upstream[CelValue::CreateStringView(UpstreamNumEndpoints)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsUint64());
+    EXPECT_EQ(1, value.value().Uint64OrDie());
+  }
+
+  {
+    cluster_info->endpoint_stats_.membership_total_.set(0);
+    auto value = upstream[CelValue::CreateStringView(UpstreamNumEndpoints)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsUint64());
+    EXPECT_EQ(0, value.value().Uint64OrDie());
+  }
+
+  {
+    EXPECT_CALL(info, upstreamClusterInfo()).WillRepeatedly(Return(absl::nullopt));
+    auto value = upstream[CelValue::CreateStringView(UpstreamNumEndpoints)];
+    EXPECT_FALSE(value.has_value());
   }
 }
 

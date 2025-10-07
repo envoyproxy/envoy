@@ -10,6 +10,7 @@
 #include "envoy/http/metadata_interface.h"
 
 #include "source/common/common/dump_state_utils.h"
+#include "source/common/http/response_decoder_impl_base.h"
 
 #include "test/test_common/utility.h"
 
@@ -21,7 +22,8 @@ namespace Envoy {
 /**
  * Stream decoder wrapper used during integration testing.
  */
-class IntegrationStreamDecoder : public Http::ResponseDecoder, public Http::StreamCallbacks {
+class IntegrationStreamDecoder : public Http::ResponseDecoderImplBase,
+                                 public Http::StreamCallbacks {
 public:
   IntegrationStreamDecoder(Event::Dispatcher& dispatcher);
   ~IntegrationStreamDecoder() override;

@@ -198,6 +198,23 @@ public:
                                        StreamInfo::StreamInfo& stream_info) PURE;
 };
 
+class ResponseDecoder;
+
+/**
+ * A handle to a ResponseDecoder. This handle can be used to check if the underlying decoder is
+ * still valid and to get a reference to it.
+ */
+class ResponseDecoderHandle {
+public:
+  virtual ~ResponseDecoderHandle() = default;
+
+  /**
+   * @return a reference to the underlying decoder if it is still valid.
+   */
+  virtual OptRef<ResponseDecoder> get() PURE;
+};
+using ResponseDecoderHandlePtr = std::unique_ptr<ResponseDecoderHandle>;
+
 /**
  * Decodes an HTTP stream. These are callbacks fired into a sink. This interface contains methods
  * common to both the request and response path.
@@ -304,9 +321,16 @@ public:
    * @param os the ostream to dump state to
    * @param indent_level the depth, for pretty-printing.
    *
+
    * This function is called on Envoy fatal errors so should avoid memory allocation.
    */
   virtual void dumpState(std::ostream& os, int indent_level = 0) const PURE;
+
+  /**
+   * @return A handle to the response decoder. Caller can check the response decoder's liveness via
+   * the handle.
+   */
+  virtual ResponseDecoderHandlePtr createResponseDecoderHandle() PURE;
 };
 
 /**

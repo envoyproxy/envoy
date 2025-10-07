@@ -210,8 +210,8 @@ TimeoutData FilterUtility::finalTimeout(const RouteEntry& route,
       timeout.global_timeout_ = route.timeout();
     }
   }
-  timeout.per_try_timeout_ = route.retryPolicy().perTryTimeout();
-  timeout.per_try_idle_timeout_ = route.retryPolicy().perTryIdleTimeout();
+  timeout.per_try_timeout_ = route.retryPolicy()->perTryTimeout();
+  timeout.per_try_idle_timeout_ = route.retryPolicy()->perTryIdleTimeout();
 
   uint64_t header_timeout;
 
@@ -790,7 +790,7 @@ bool Filter::continueDecodeHeaders(Upstream::ThreadLocalCluster* cluster,
   ASSERT(headers.Scheme());
 
   retry_state_ = createRetryState(
-      route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_, route_stats_context_,
+      *route_entry_->retryPolicy(), headers, *cluster_, request_vcluster_, route_stats_context_,
       config_->factory_context_, callbacks_->dispatcher(), route_entry_->priority());
 
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
@@ -1152,6 +1152,25 @@ absl::optional<absl::string_view> Filter::getShadowCluster(const ShadowPolicy& p
   }
 }
 
+void Filter::setupRouteTimeoutForWebsocketUpgrade() {
+  // Set up the route timeout early for websocket upgrades, since the upstream request
+  // will be paused waiting for the upgrade response and we need the timeout active.
+  if (!response_timeout_ && timeout_.global_timeout_.count() > 0) {
+    Event::Dispatcher& dispatcher = callbacks_->dispatcher();
+    response_timeout_ = dispatcher.createTimer([this]() -> void { onResponseTimeout(); });
+    response_timeout_->enableTimer(timeout_.global_timeout_);
+  }
+}
+
+void Filter::disableRouteTimeoutForWebsocketUpgrade() {
+  // Disable the route timeout after websocket upgrade completes successfully
+  // to prevent timeout from firing after the upgrade is done.
+  if (response_timeout_) {
+    response_timeout_->disableTimer();
+    response_timeout_.reset();
+  }
+}
+
 void Filter::onRequestComplete() {
   // This should be called exactly once, when the downstream request has been received in full.
   ASSERT(!downstream_end_stream_);
@@ -1163,7 +1182,7 @@ void Filter::onRequestComplete() {
   if (!upstream_requests_.empty()) {
     // Even if we got an immediate reset, we could still shadow, but that is a riskier change and
     // seems unnecessary right now.
-    if (timeout_.global_timeout_.count() > 0) {
+    if (timeout_.global_timeout_.count() > 0 && !response_timeout_) {
       response_timeout_ = dispatcher.createTimer([this]() -> void { onResponseTimeout(); });
       response_timeout_->enableTimer(timeout_.global_timeout_);
     }
@@ -1661,20 +1680,43 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   // handle the case when an error grpc-status is sent as a trailer.
   absl::optional<Grpc::Status::GrpcStatus> grpc_status;
   uint64_t grpc_to_http_status = 0;
+  uint64_t response_code_for_outlier_detection = response_code;
   if (grpc_request_) {
     grpc_status = Grpc::Common::getGrpcStatus(*headers);
     if (grpc_status.has_value()) {
       grpc_to_http_status = Grpc::Utility::grpcToHttpStatus(grpc_status.value());
+      response_code_for_outlier_detection = grpc_to_http_status;
+    }
+  } else {
+    // Check cluster's http_protocol_options if different code should be reported to
+    // outlier detector.
+    absl::optional<bool> matched = cluster_->processHttpForOutlierDetection(*headers);
+    if (matched.has_value()) {
+      // Outlier detector distinguishes only two values:
+      // Anything >= 500 is error.
+      // Anything < 500 is success.
+      if (!matched.value()) {
+        // Matcher returned non-match.
+        // report success to outlier detector.
+        response_code_for_outlier_detection = 200;
+      } else {
+        // Matcher returned match (treat the response as error).
+        // If the original status code was error (>= 500), then report the
+        // original status code to the outlier detector.
+        if (response_code < 500) {
+          response_code_for_outlier_detection = 500;
+        }
+      }
     }
   }
 
-  maybeProcessOrcaLoadReport(*headers, upstream_request);
-
-  const uint64_t put_result_code = grpc_status.has_value() ? grpc_to_http_status : response_code;
   upstream_request.upstreamHost()->outlierDetector().putResult(
-      put_result_code >= 500 ? Upstream::Outlier::Result::ExtOriginRequestFailed
-                             : Upstream::Outlier::Result::ExtOriginRequestSuccess,
-      put_result_code);
+      response_code_for_outlier_detection >= 500
+          ? Upstream::Outlier::Result::ExtOriginRequestFailed
+          : Upstream::Outlier::Result::ExtOriginRequestSuccess,
+      response_code_for_outlier_detection);
+
+  maybeProcessOrcaLoadReport(*headers, upstream_request);
 
   if (headers->EnvoyImmediateHealthCheckFail() != nullptr) {
     upstream_request.upstreamHost()->healthChecker().setUnhealthy(
@@ -2098,7 +2140,7 @@ bool Filter::convertRequestHeadersForInternalRedirect(
 }
 
 void Filter::runRetryOptionsPredicates(UpstreamRequest& retriable_request) {
-  for (const auto& options_predicate : route_entry_->retryPolicy().retryOptionsPredicates()) {
+  for (const auto& options_predicate : route_entry_->retryPolicy()->retryOptionsPredicates()) {
     const Upstream::RetryOptionsPredicate::UpdateOptionsParameters parameters{
         retriable_request.streamInfo(), upstreamSocketOptions()};
     auto ret = options_predicate->updateOptions(parameters);
@@ -2321,7 +2363,8 @@ void Filter::maybeProcessOrcaLoadReport(const Envoy::Http::HeaderMap& headers_or
   if (host_lb_policy_data.has_value()) {
     ENVOY_LOG(trace, "orca_load_report for {} report = {}", upstream_host->address()->asString(),
               (*orca_load_report).DebugString());
-    const absl::Status status = host_lb_policy_data->onOrcaLoadReport(*orca_load_report);
+    const absl::Status status =
+        host_lb_policy_data->onOrcaLoadReport(*orca_load_report, callbacks_->streamInfo());
     if (!status.ok()) {
       ENVOY_STREAM_LOG(error, "Failed to invoke OrcaLoadReportCallbacks: {}", *callbacks_,
                        status.message());
