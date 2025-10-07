@@ -27,3 +27,13 @@ envoy_cc_test(
         "@envoy_api//envoy/extensions/filters/http/mcp/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "config_test",
+    srcs = ["config_test.cc"],
+    deps = [
+        "//source/extensions/filters/http/mcp:config",
+        "//test/mocks/server:factory_context_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)
