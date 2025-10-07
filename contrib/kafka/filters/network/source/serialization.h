@@ -1229,6 +1229,49 @@ template <> inline uint32_t EncodingContext::computeSize(const Uuid&) const {
   return 2 * sizeof(uint64_t);
 }
 
+// Specializations for primitive types that don't have compact encoding
+// These must be declared before the generic template
+
+/**
+ * Template overload for int8_t.
+ * This data type is not compacted, so we just point to non-compact implementation.
+ */
+template <> inline uint32_t EncodingContext::computeCompactSize(const int8_t& arg) const {
+  return computeSize(arg);
+}
+
+/**
+ * Template overload for int16_t.
+ * This data type is not compacted, so we just point to non-compact implementation.
+ */
+template <> inline uint32_t EncodingContext::computeCompactSize(const int16_t& arg) const {
+  return computeSize(arg);
+}
+
+/**
+ * Template overload for uint16_t.
+ * This data type is not compacted, so we just point to non-compact implementation.
+ */
+template <> inline uint32_t EncodingContext::computeCompactSize(const uint16_t& arg) const {
+  return computeSize(arg);
+}
+
+/**
+ * Template overload for bool.
+ * This data type is not compacted, so we just point to non-compact implementation.
+ */
+template <> inline uint32_t EncodingContext::computeCompactSize(const bool& arg) const {
+  return computeSize(arg);
+}
+
+/**
+ * Template overload for double.
+ * This data type is not compacted, so we just point to non-compact implementation.
+ */
+template <> inline uint32_t EncodingContext::computeCompactSize(const double& arg) const {
+  return computeSize(arg);
+}
+
 /**
  * For non-primitive types, call `computeCompactSize` on them, to delegate the work to the entity
  * itself. The entity may use the information in context to decide which fields are included etc.
@@ -1531,6 +1574,45 @@ inline uint32_t EncodingContext::encodeCompact(const int32_t& arg, Buffer::Insta
  */
 template <>
 inline uint32_t EncodingContext::encodeCompact(const int64_t& arg, Buffer::Instance& dst) {
+  return encode(arg, dst);
+}
+
+/**
+ * int8_t is not encoded in compact fashion, so we just delegate to normal implementation.
+ */
+template <>
+inline uint32_t EncodingContext::encodeCompact(const int8_t& arg, Buffer::Instance& dst) {
+  return encode(arg, dst);
+}
+
+/**
+ * int16_t is not encoded in compact fashion, so we just delegate to normal implementation.
+ */
+template <>
+inline uint32_t EncodingContext::encodeCompact(const int16_t& arg, Buffer::Instance& dst) {
+  return encode(arg, dst);
+}
+
+/**
+ * uint16_t is not encoded in compact fashion, so we just delegate to normal implementation.
+ */
+template <>
+inline uint32_t EncodingContext::encodeCompact(const uint16_t& arg, Buffer::Instance& dst) {
+  return encode(arg, dst);
+}
+
+/**
+ * bool is not encoded in compact fashion, so we just delegate to normal implementation.
+ */
+template <> inline uint32_t EncodingContext::encodeCompact(const bool& arg, Buffer::Instance& dst) {
+  return encode(arg, dst);
+}
+
+/**
+ * double is not encoded in compact fashion, so we just delegate to normal implementation.
+ */
+template <>
+inline uint32_t EncodingContext::encodeCompact(const double& arg, Buffer::Instance& dst) {
   return encode(arg, dst);
 }
 
