@@ -183,8 +183,8 @@ jobs:
       uses: envoyproxy/toolshed/gh-actions/docker/shas@actions-v0.3.25
       with:
         images: |
-           sha: envoyproxy/envoy-build-ubuntu:${{ steps.build-tools.outputs.tag }}
-           mobile-sha: envoyproxy/envoy-build-ubuntu:mobile-${{ steps.build-tools.outputs.tag }}
+           sha: docker.io/envoyproxy/envoy-build-ubuntu:${{ steps.build-tools.outputs.tag }}
+           mobile-sha: docker.io/envoyproxy/envoy-build-ubuntu:mobile-${{ steps.build-tools.outputs.tag }}
            gcr-sha: gcr.io/envoy-ci/envoy-build:${{ steps.build-tools.outputs.tag }}
 
     - run: |
