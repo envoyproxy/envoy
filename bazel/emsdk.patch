@@ -83,7 +83,7 @@ index a989450..4f1c213 100644
 --- a/bazel/emscripten_toolchain/BUILD.bazel
 +++ b/bazel/emscripten_toolchain/BUILD.bazel
 @@ -1,3 +1,4 @@
-+load("@python3_12//:defs.bzl", "py_binary")
++load("@python_3_12//:defs.bzl", "py_binary")
  load(":toolchain.bzl", "emscripten_cc_toolchain_config_rule")
  
  package(default_visibility = ["//visibility:public"])
@@ -91,7 +91,7 @@ index a989450..4f1c213 100644
          "env.sh",
          "env.bat",
          "@nodejs//:node_files",
-+        "@python3_12//:files",
++        "@python_3_12//:files",
      ],
  )
  
@@ -479,7 +479,7 @@ index c8cec07..9559cd1 100644
          "nodejs_bin": attr.label(mandatory = True, allow_single_file = True),
 -        "script_extension": attr.string(mandatory = True, values = ["sh", "bat"]),
 +        "is_windows": attr.bool(mandatory = True),
-+        "_python_interpreter": attr.label(cfg = "exec", default = Label("@python3_12//:files")),
++        "_python_interpreter": attr.label(cfg = "exec", default = Label("@python_3_12//:files")),
      },
      provides = [CcToolchainConfigInfo],
  )

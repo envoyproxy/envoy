@@ -1,7 +1,4 @@
 # This should match the schema defined in external_deps.bzl.
-
-PROTOBUF_VERSION = "29.3"
-
 REPOSITORY_LOCATIONS_SPEC = dict(
     bazel_skylib = dict(
         project_name = "bazel-skylib",
@@ -63,24 +60,6 @@ REPOSITORY_LOCATIONS_SPEC = dict(
         use_category = ["api"],
         license = "Apache-2.0",
         license_url = "https://github.com/cncf/xds/blob/{version}/LICENSE",
-    ),
-    com_google_protobuf = dict(
-        project_name = "Protocol Buffers",
-        project_desc = "Language-neutral, platform-neutral extensible mechanism for serializing structured data",
-        project_url = "https://developers.google.com/protocol-buffers",
-        version = PROTOBUF_VERSION,
-        # When upgrading the protobuf library, please re-run
-        # test/common/json:gen_excluded_unicodes to recompute the ranges
-        # excluded from differential fuzzing that are populated in
-        # test/common/json/json_sanitizer_test_util.cc.
-        sha256 = "008a11cc56f9b96679b4c285fd05f46d317d685be3ab524b2a310be0fbad987e",
-        strip_prefix = "protobuf-{version}",
-        urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v{version}/protobuf-{version}.tar.gz"],
-        use_category = ["dataplane_core", "controlplane"],
-        release_date = "2025-01-08",
-        cpe = "cpe:2.3:a:google:protobuf:*",
-        license = "Protocol Buffers",
-        license_url = "https://github.com/protocolbuffers/protobuf/blob/v{version}/LICENSE",
     ),
     com_github_openzipkin_zipkinapi = dict(
         project_name = "Zipkin API",

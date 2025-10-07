@@ -61,12 +61,6 @@ def api_dependencies(bzlmod = False):
     external_http_archive(
         name = "dev_cel",
     )
-    external_http_archive(
-        name = "envoy_toolshed",
-    )
-    external_http_archive(
-        name = "com_google_protobuf",
-    )
 
 PROMETHEUSMETRICS_BUILD_CONTENT = """
 load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")

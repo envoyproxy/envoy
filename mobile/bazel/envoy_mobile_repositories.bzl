@@ -62,8 +62,8 @@ def swift_repos():
 def kotlin_repos():
     external_http_archive(
         name = "rules_java",
-        sha256 = "c0ee60f8757f140c157fc2c7af703d819514de6e025ebf70386d38bdd85fce83",
-        url = "https://github.com/bazelbuild/rules_java/releases/download/7.12.3/rules_java-7.12.3.tar.gz",
+        sha256 = "bbe7d94360cc9ed4607ec5fd94995fd1ec41e84257020b6f09e64055281ecb12",
+        url = "https://github.com/bazelbuild/rules_java/releases/download/8.14.0/rules_java-8.14.0.tar.gz",
         patch_args = ["-p1"],
         patches = ["@envoy//bazel:rules_java.patch"],
     )
