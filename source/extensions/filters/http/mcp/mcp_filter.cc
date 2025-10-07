@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/mcp/mcp_filter.h"
 
 #include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 
@@ -9,8 +10,25 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Mcp {
 
+bool McpFilter::isDisabled() const {
+  const auto* route_config =
+      Http::Utility::resolveMostSpecificPerFilterConfig<McpPerRouteConfig>(decoder_callbacks_);
+
+  if (route_config && route_config->disabled()) {
+    ENVOY_LOG(debug, "MCP filter disabled by per-route configuration");
+    return true;
+  }
+
+  return false;
+}
+
 Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& headers,
                                                    bool end_stream) {
+  // Check if filter is disabled for this route
+  if (isDisabled()) {
+    return Http::FilterHeadersStatus::Continue;
+  }
+
   if (headers.getMethodValue() == Http::Headers::get().MethodValues.Post &&
       headers.getContentTypeValue() == Http::Headers::get().ContentTypeValues.Json) {
     is_json_post_request_ = true;
@@ -24,6 +42,10 @@ Http::FilterHeadersStatus McpFilter::decodeHeaders(Http::RequestHeaderMap& heade
 }
 
 Http::FilterDataStatus McpFilter::decodeData(Buffer::Instance& data, bool end_stream) {
+  if (isDisabled()) {
+    return Http::FilterDataStatus::Continue;
+  }
+
   if (!is_json_post_request_) {
     return Http::FilterDataStatus::Continue;
   }

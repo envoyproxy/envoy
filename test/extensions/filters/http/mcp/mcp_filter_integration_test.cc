@@ -1,3 +1,5 @@
+#include "envoy/extensions/filters/http/mcp/v3/mcp.pb.h"
+
 #include "test/integration/http_integration.h"
 
 namespace Envoy {
@@ -121,6 +123,94 @@ TEST_P(McpFilterIntegrationTest, WrongContentTypePostRequestIgnored) {
 
   ASSERT_TRUE(response->waitForEndStream());
   EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+TEST_P(McpFilterIntegrationTest, PerRouteDisabled) {
+  // Configure MCP filter
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.mcp
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+  )EOF");
+
+  // Configure route with MCP filter disabled
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
+
+        // Set up per-route config to disable MCP filter
+        auto* typed_per_filter_config = route->mutable_typed_per_filter_config();
+        envoy::extensions::filters::http::mcp::v3::McpPerRoute per_route_config;
+        per_route_config.set_disabled(true);
+        (*typed_per_filter_config)["envoy.filters.http.mcp"].PackFrom(per_route_config);
+      });
+
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send invalid MCP request - should pass through because filter is disabled
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      R"({"invalid": "not-jsonrpc"})"); // This would normally be rejected
+
+  waitForNextUpstreamRequest();
+
+  // Should pass through without validation
+  EXPECT_EQ(R"({"invalid": "not-jsonrpc"})", upstream_request_->body().toString());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ("200", response->headers().getStatusValue());
+}
+
+// Test virtual host level per-route config
+TEST_P(McpFilterIntegrationTest, PerRouteVirtualHostLevel) {
+  config_helper_.prependFilter(R"EOF(
+    name: envoy.filters.http.mcp
+    typed_config:
+      "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
+  )EOF");
+
+  // Configure per-route config at virtual host level
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
+
+        // Set per-route config at virtual host level to disable MCP
+        envoy::extensions::filters::http::mcp::v3::McpPerRoute vhost_per_route;
+        vhost_per_route.set_disabled(true);
+        (*virtual_host->mutable_typed_per_filter_config())["envoy.filters.http.mcp"].PackFrom(
+            vhost_per_route);
+      });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  // Send invalid MCP request - should pass through because filter is disabled at vhost level
+  auto response = codec_client_->makeRequestWithBody(
+      Http::TestRequestHeaderMapImpl{{":method", "POST"},
+                                     {":path", "/any/path"},
+                                     {":scheme", "http"},
+                                     {":authority", "host"},
+                                     {"content-type", "application/json"}},
+      R"({"not": "valid-jsonrpc"})");
+
+  waitForNextUpstreamRequest();
+  EXPECT_EQ(R"({"not": "valid-jsonrpc"})", upstream_request_->body().toString());
+
+  upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
+
+  ASSERT_TRUE(response->waitForEndStream());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 

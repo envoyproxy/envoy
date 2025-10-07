@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/extensions/filters/http/mcp/v3/mcp.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"
 
@@ -26,6 +27,20 @@ constexpr absl::string_view FilterName = "mcp_proxy";
 class McpFilterConfig {
 public:
   McpFilterConfig() = default;
+};
+
+/**
+ * Per-route configuration for the MCP filter.
+ */
+class McpPerRouteConfig : public Router::RouteSpecificFilterConfig {
+public:
+  explicit McpPerRouteConfig(const envoy::extensions::filters::http::mcp::v3::McpPerRoute& config)
+      : disabled_(config.disabled()) {}
+
+  bool disabled() const { return disabled_; }
+
+private:
+  bool disabled_;
 };
 
 using McpFilterConfigSharedPtr = std::shared_ptr<McpFilterConfig>;
@@ -56,6 +71,7 @@ public:
 
 private:
   void finalizeDynamicMetadata();
+  bool isDisabled() const;
   McpFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   bool is_json_post_request_{false};

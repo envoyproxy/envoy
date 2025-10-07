@@ -20,6 +20,13 @@ Http::FilterFactoryCb McpFilterConfigFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
+absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
+McpFilterConfigFactory::createRouteSpecificFilterConfigTyped(
+    const envoy::extensions::filters::http::mcp::v3::McpPerRoute& proto_config,
+    Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
+  return std::make_shared<const McpPerRouteConfig>(proto_config);
+}
+
 /**
  * Static registration for the MCP filter. @see RegisterFactory.
  */

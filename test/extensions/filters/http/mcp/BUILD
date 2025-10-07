@@ -24,5 +24,6 @@ envoy_cc_test(
     deps = [
         "//source/extensions/filters/http/mcp:config",
         "//test/integration:http_integration_lib",
+        "@envoy_api//envoy/extensions/filters/http/mcp/v3:pkg_cc_proto",
     ],
 )
