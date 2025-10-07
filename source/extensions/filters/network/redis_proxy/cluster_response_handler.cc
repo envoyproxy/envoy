@@ -156,7 +156,7 @@ void BaseClusterScopeResponseHandler::storeResponse(Common::Redis::RespValuePtr&
   }
 
   // Track errors using handler's own state
-  if (value->type() == Common::Redis::RespType::Error) {
+  if (value && value->type() == Common::Redis::RespType::Error) {
     error_count_++;
   }
 
