@@ -532,6 +532,12 @@ new_features:
   change: |
     Added a new Logging ABI that allows modules to emit logs in the standard Envoy logging stream under ``dynamic_modules`` ID.
     In the Rust SDK, they are available as ``envoy_log_info``, etc.
+- area: tcp_proxy
+  change: |
+    Added support for dynamic TLV values in PROXY protocol using :ref:`format_string
+    <envoy_v3_api_field_config.core.v3.TlvEntry.format_string>` field. This allows TLV values to be
+    populated dynamically from stream information using format strings (e.g., ``%DYNAMIC_METADATA(...)%``,
+    ``%FILTER_STATE(...)%``, ``%DOWNSTREAM_REMOTE_ADDRESS%``).
 - area: http
   change: |
     Added ``upstream_rq_per_cx`` histogram to track requests per connection for monitoring connection reuse efficiency.
@@ -584,6 +590,13 @@ new_features:
     Added :ref:`outlier_detection<envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.outlier_detection>`
     to cluster's http protocol options to allow defining via an http matcher whether a response should be treated
     as error or as success by outlier detection.
+- area: reverse_tunnel
+  change: |
+    Added support for reverse tunnels that enable establishing persistent connections from downstream Envoy
+    instances to upstream Envoy instances without requiring the upstream to be directly reachable. This feature
+    is particularly useful when downstream instances are behind NATs, firewalls, or in private networks. The
+    feature is experimental and under active development, but is ready for experimental use. See
+    :ref:`reverse tunnel overview <overview_reverse_tunnel>` for details.
 - area: admin
   change: |
     Added ``/memory/tcmalloc`` admin endpoint that provides TCMalloc memory statistics.
