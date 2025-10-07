@@ -89,34 +89,32 @@ Http::FilterHeadersStatus StatefulSession::encodeHeaders(Http::ResponseHeaderMap
     return Http::FilterHeadersStatus::Continue;
   }
 
-  auto upstream_info = encoder_callbacks_->streamInfo().upstreamInfo();
-  if (upstream_info == nullptr) {
-    return Http::FilterHeadersStatus::Continue;
-  }
+  if (auto upstream_info = encoder_callbacks_->streamInfo().upstreamInfo();
+      upstream_info != nullptr) {
+    auto host = upstream_info->upstreamHost();
 
-  auto host = upstream_info->upstreamHost();
+    if (host != nullptr) {
+      const bool host_changed = session_state_->onUpdate(host->address()->asStringView(), headers);
 
-  // Check for failed_closed: no healthy upstream in strict mode.
-  const bool has_uh_flag = encoder_callbacks_->streamInfo().hasResponseFlag(
-      StreamInfo::CoreResponseFlag::NoHealthyUpstream);
-
-  if (has_uh_flag && effective_config_->isStrict()) {
-    markFailedClosed();
-    return Http::FilterHeadersStatus::Continue;
-  }
-
-  if (host != nullptr) {
-    const bool host_changed = session_state_->onUpdate(host->address()->asStringView(), headers);
-
-    // Track stats based on whether the host changed.
-    if (host_changed) {
-      // Host changed means override failed and fallback occurred (non-strict mode).
-      if (!effective_config_->isStrict()) {
-        markFailedOpen();
+      // Track stats based on whether the host changed.
+      if (host_changed) {
+        // Host changed means override failed and fallback occurred (non-strict mode).
+        if (!effective_config_->isStrict()) {
+          markFailedOpen();
+        }
+      } else {
+        // Host didn't change, meaning the override was successful.
+        markRouted();
       }
-    } else {
-      // Host didn't change, meaning the override was successful.
-      markRouted();
+    }
+  } else {
+    // No upstream info. We should check for failed_closed or no healthy upstream
+    // in the strict mode.
+    const bool has_uh_flag = encoder_callbacks_->streamInfo().hasResponseFlag(
+        StreamInfo::CoreResponseFlag::NoHealthyUpstream);
+
+    if (has_uh_flag && effective_config_->isStrict()) {
+      markFailedClosed();
     }
   }
 

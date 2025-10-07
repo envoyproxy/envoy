@@ -328,7 +328,8 @@ stat_prefix: "test"
 
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 
-  // Simulate no healthy upstream (503) in strict mode.
+  // Simulate no healthy upstream (503) in strict mode, upstream_info is nullptr.
+  encoder_callbacks_.stream_info_.setUpstreamInfo(nullptr);
   encoder_callbacks_.stream_info_.setResponseFlag(StreamInfo::CoreResponseFlag::NoHealthyUpstream);
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
 
