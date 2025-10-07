@@ -92,7 +92,7 @@ message TcpProxy {
     //
     string hostname = 1 [(validate.rules).string = {min_len: 1}];
 
-    // Use the POST method instead of the CONNECT method to tunnel the TCP stream.
+    // Use the ``POST`` method instead of the ``CONNECT`` method to tunnel the TCP stream.
     // The ``protocol: bytestream`` header is not set for HTTP/2 to comply with the specification.
     //
     // The upstream proxy is expected to interpret the POST payload as raw TCP.
