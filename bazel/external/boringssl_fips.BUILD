@@ -6,12 +6,6 @@ licenses(["notice"])  # Apache 2
 # BoringSSL build as described in the Security Policy for BoringCrypto module "update stream":
 # https://boringssl.googlesource.com/boringssl/+/refs/heads/main/crypto/fipsmodule/FIPS.md#update-stream
 
-FIPS_GO_VERSION = "go1.24.4"
-
-FIPS_NINJA_VERSION = "1.13.1"
-
-FIPS_CMAKE_VERSION = "cmake version 4.1.2"
-
 SUPPORTED_ARCHES = {
     "x86_64": "amd64",
     "aarch64": "arm64",
@@ -77,9 +71,6 @@ genrule(
     cmd = select(boringssl_fips_build_command(
         SUPPORTED_ARCHES,
         STDLIBS,
-        FIPS_GO_VERSION,
-        FIPS_NINJA_VERSION,
-        FIPS_CMAKE_VERSION,
     )),
     exec_properties = select({
         "@envoy//bazel:engflow_rbe_x86_64": {

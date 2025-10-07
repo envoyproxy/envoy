@@ -532,6 +532,12 @@ new_features:
   change: |
     Added a new Logging ABI that allows modules to emit logs in the standard Envoy logging stream under ``dynamic_modules`` ID.
     In the Rust SDK, they are available as ``envoy_log_info``, etc.
+- area: tcp_proxy
+  change: |
+    Added support for dynamic TLV values in PROXY protocol using :ref:`format_string
+    <envoy_v3_api_field_config.core.v3.TlvEntry.format_string>` field. This allows TLV values to be
+    populated dynamically from stream information using format strings (e.g., ``%DYNAMIC_METADATA(...)%``,
+    ``%FILTER_STATE(...)%``, ``%DOWNSTREAM_REMOTE_ADDRESS%``).
 - area: http
   change: |
     Added ``upstream_rq_per_cx`` histogram to track requests per connection for monitoring connection reuse efficiency.
