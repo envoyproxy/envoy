@@ -63,6 +63,7 @@ TEST_P(AdminInstanceTest, Memory) {
                                   Property(&envoy::admin::v3::Memory::total_thread_cache, Ge(0))));
 }
 
+#if defined(TCMALLOC)
 TEST_P(AdminInstanceTest, MemoryTcmalloc) {
   Http::TestResponseHeaderMapImpl header_map;
   Buffer::OwnedImpl response;
@@ -70,6 +71,7 @@ TEST_P(AdminInstanceTest, MemoryTcmalloc) {
   const std::string output = response.toString();
   EXPECT_THAT(output, HasSubstr("Bytes in use by application"));
 }
+#endif
 
 TEST_P(AdminInstanceTest, GetReadyRequest) {
   NiceMock<Init::MockManager> initManager;
