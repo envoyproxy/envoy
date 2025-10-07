@@ -141,6 +141,7 @@ The following attributes are available once the upstream connection is establish
    :widths: 1, 1, 4
 
    upstream.address, string, Upstream connection remote address
+   upstream.num_endpoints, uint64, the number of endpoints of the upstream cluster.
    upstream.port, int, Upstream connection remote port
    upstream.tls_version, string, TLS version of the upstream TLS connection
    upstream.subject_local_certificate, string, The subject field of the local certificate in the upstream TLS connection
