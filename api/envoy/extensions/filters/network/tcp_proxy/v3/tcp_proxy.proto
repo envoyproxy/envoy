@@ -237,7 +237,7 @@ message TcpProxy {
 
   // The maximum duration of a connection. The duration is defined as the period since a connection was
   // established. If not set, there is no maximum duration. When ``max_downstream_connection_duration`` is
-  // reached, the connection is closed. The duration must be at least 1ms.
+  // reached, the connection is closed. The duration must be at least ``1ms``.
   google.protobuf.Duration max_downstream_connection_duration = 13
       [(validate.rules).duration = {gte {nanos: 1000000}}];
 
