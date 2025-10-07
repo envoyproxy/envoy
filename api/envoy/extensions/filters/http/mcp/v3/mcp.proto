@@ -21,6 +21,5 @@ message Mcp {
 
 // Per-route configuration for MCP filter
 message McpPerRoute {
-  // Disable the MCP filter for this particular vhost or route.
-  bool disabled = 1 [(validate.rules).bool = {const: true}];
+  // TODO: Add configuration fields
 }

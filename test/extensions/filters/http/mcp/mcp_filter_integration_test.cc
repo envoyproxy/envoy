@@ -126,29 +126,33 @@ TEST_P(McpFilterIntegrationTest, WrongContentTypePostRequestIgnored) {
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
+// Test that the filter can be disabled per-route using FilterConfig wrapper
 TEST_P(McpFilterIntegrationTest, PerRouteDisabled) {
-  // Configure MCP filter
   config_helper_.prependFilter(R"EOF(
     name: envoy.filters.http.mcp
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
   )EOF");
 
-  // Configure route with MCP filter disabled
+  // Configure route with MCP filter disabled using FilterConfig wrapper
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
         auto* route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->mutable_routes(0);
 
-        // Set up per-route config to disable MCP filter
-        auto* typed_per_filter_config = route->mutable_typed_per_filter_config();
-        envoy::extensions::filters::http::mcp::v3::McpPerRoute per_route_config;
-        per_route_config.set_disabled(true);
-        (*typed_per_filter_config)["envoy.filters.http.mcp"].PackFrom(per_route_config);
+        // Create FilterConfig wrapper with disabled=true
+        envoy::config::route::v3::FilterConfig filter_config;
+        filter_config.set_disabled(true);
+
+        // Set the config to McpPerRoute (even though we're disabling)
+        envoy::extensions::filters::http::mcp::v3::McpPerRoute mcp_per_route;
+        filter_config.mutable_config()->PackFrom(mcp_per_route);
+
+        (*route->mutable_typed_per_filter_config())["envoy.filters.http.mcp"].PackFrom(
+            filter_config);
       });
 
   initialize();
-
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
   // Send invalid MCP request - should pass through because filter is disabled
@@ -158,17 +162,14 @@ TEST_P(McpFilterIntegrationTest, PerRouteDisabled) {
                                      {":scheme", "http"},
                                      {":authority", "host"},
                                      {"content-type", "application/json"}},
-      R"({"invalid": "not-jsonrpc"})"); // This would normally be rejected
+      R"({"invalid": "not-jsonrpc"})");
 
   waitForNextUpstreamRequest();
-
-  // Should pass through without validation
   EXPECT_EQ(R"({"invalid": "not-jsonrpc"})", upstream_request_->body().toString());
 
   upstream_request_->encodeHeaders(Http::TestResponseHeaderMapImpl{{":status", "200"}}, true);
 
   ASSERT_TRUE(response->waitForEndStream());
-  EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ("200", response->headers().getStatusValue());
 }
 
@@ -180,26 +181,27 @@ TEST_P(McpFilterIntegrationTest, PerRouteVirtualHostLevel) {
       "@type": type.googleapis.com/envoy.extensions.filters.http.mcp.v3.Mcp
   )EOF");
 
-  // Configure per-route config at virtual host level
+  // Disable MCP at virtual host level
   config_helper_.addConfigModifier(
       [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
              hcm) {
         auto* virtual_host = hcm.mutable_route_config()->mutable_virtual_hosts(0);
 
-        // Set per-route config at virtual host level to disable MCP
-        envoy::extensions::filters::http::mcp::v3::McpPerRoute vhost_per_route;
-        vhost_per_route.set_disabled(true);
+        envoy::config::route::v3::FilterConfig vhost_filter_config;
+        vhost_filter_config.set_disabled(true);
+        envoy::extensions::filters::http::mcp::v3::McpPerRoute vhost_mcp_per_route;
+        vhost_filter_config.mutable_config()->PackFrom(vhost_mcp_per_route);
         (*virtual_host->mutable_typed_per_filter_config())["envoy.filters.http.mcp"].PackFrom(
-            vhost_per_route);
+            vhost_filter_config);
       });
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
 
-  // Send invalid MCP request - should pass through because filter is disabled at vhost level
+  // Invalid MCP request should pass through - filter disabled at vhost level
   auto response = codec_client_->makeRequestWithBody(
       Http::TestRequestHeaderMapImpl{{":method", "POST"},
-                                     {":path", "/any/path"},
+                                     {":path", "/any"},
                                      {":scheme", "http"},
                                      {":authority", "host"},
                                      {"content-type", "application/json"}},

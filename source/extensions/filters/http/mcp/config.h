@@ -27,7 +27,7 @@ private:
 
   absl::StatusOr<Router::RouteSpecificFilterConfigConstSharedPtr>
   createRouteSpecificFilterConfigTyped(
-      const envoy::extensions::filters::http::mcp::v3::McpPerRoute& proto_config,
+      const envoy::extensions::filters::http::mcp::v3::McpPerRoute&,
       Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor& validator) override;
 };

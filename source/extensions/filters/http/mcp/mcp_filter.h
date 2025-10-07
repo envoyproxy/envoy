@@ -34,13 +34,7 @@ public:
  */
 class McpPerRouteConfig : public Router::RouteSpecificFilterConfig {
 public:
-  explicit McpPerRouteConfig(const envoy::extensions::filters::http::mcp::v3::McpPerRoute& config)
-      : disabled_(config.disabled()) {}
-
-  bool disabled() const { return disabled_; }
-
-private:
-  bool disabled_;
+  McpPerRouteConfig() = default;
 };
 
 using McpFilterConfigSharedPtr = std::shared_ptr<McpFilterConfig>;
@@ -71,7 +65,6 @@ public:
 
 private:
   void finalizeDynamicMetadata();
-  bool isDisabled() const;
   McpFilterConfigSharedPtr config_;
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   bool is_json_post_request_{false};
