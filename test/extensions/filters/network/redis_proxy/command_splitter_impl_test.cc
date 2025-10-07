@@ -2273,6 +2273,57 @@ TEST_F(RoleHandlerTest, RoleNoArgs) {
 
 INSTANTIATE_TEST_SUITE_P(RoleHandlerTest, RoleHandlerTest, testing::Values("role"));
 
+// ===== RANDOM SHARD COMMAND TESTS =====
+
+// Test random shard commands - these route to a single random shard
+class RandomShardRequestTest : public FragmentedRequestCommandHandlerTest {
+public:
+  void setup(std::vector<std::string> request_strings,
+             const std::list<uint64_t>& null_handle_indexes = {}, bool mirrored = false) {
+    makeRequestToShard(1, request_strings, null_handle_indexes, mirrored);
+  }
+
+  Common::Redis::RespValuePtr response() {
+    Common::Redis::RespValuePtr response = std::make_unique<Common::Redis::RespValue>();
+    response->type(Common::Redis::RespType::BulkString);
+    response->asString() = "test_response";
+    return response;
+  }
+};
+
+TEST_F(RandomShardRequestTest, RandomKey) {
+  InSequence s;
+
+  setup({"randomkey"});
+  EXPECT_NE(nullptr, handle_);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "redis.foo.command.randomkey.latency"), 10));
+  EXPECT_CALL(callbacks_, onResponse_(_));
+  pool_callbacks_[0]->onResponse(response());
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.randomkey.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.randomkey.success").value());
+}
+
+TEST_F(RandomShardRequestTest, ClusterNodes) {
+  InSequence s;
+
+  setup({"cluster", "nodes"});
+  EXPECT_NE(nullptr, handle_);
+
+  time_system_.setMonotonicTime(std::chrono::milliseconds(10));
+  EXPECT_CALL(store_, deliverHistogramToSinks(
+                          Property(&Stats::Metric::name, "redis.foo.command.cluster.latency"), 10));
+  EXPECT_CALL(callbacks_, onResponse_(_));
+  pool_callbacks_[0]->onResponse(response());
+
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.cluster.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.cluster.success").value());
+}
+
 // ===== CLUSTER SCOPE COMMAND TESTS =====
 
 // Test cluster scope commands - CONFIG SET (AllshardSameResponseHandler)
@@ -2656,6 +2707,21 @@ TEST_F(RedisCommandSplitterImplTest, UnsupportedClusterScopeCommand) {
 }
 
 // Test edge cases
+TEST_F(RedisCommandSplitterImplTest, ClusterCommandWithoutSubcommand) {
+  InSequence s;
+
+  Common::Redis::RespValue response;
+  response.type(Common::Redis::RespType::Error);
+  response.asString() = "invalid request";
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&response)));
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"cluster"}); // Missing subcommand
+  EXPECT_EQ(nullptr,
+            splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_));
+}
+
 TEST_F(RedisCommandSplitterImplTest, ClusterScopeCommandInvalidArgs) {
   Common::Redis::RespValue response;
   response.type(Common::Redis::RespType::Error);
