@@ -1625,12 +1625,20 @@ INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, ExtProcIntegrat
 TEST_P(ExtProcIntegrationTestUpstream, GetAndRespondImmediately_Upstream) {
   initializeConfig();
   HttpIntegrationTest::initialize();
-  auto response = sendDownstreamRequest(absl::nullopt);
+  auto response = sendDownstreamRequest([](Http::RequestHeaderMap& headers) {
+    // Setting this header to ensure that Envoy does not retry the request
+    // in case of a 5xx immediate response from the upstream.
+    headers.addCopy(Http::LowerCaseString("x-envoy-retry-on"), "5xx");
+  });
 
-  processAndRespondImmediately(*grpc_upstreams_[0], true, [](ImmediateResponse& immediate) {
-    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::Unauthorized);
-    immediate.set_body("{\"reason\": \"Not authorized\"}");
-    immediate.set_details("Failed because you are not authorized");
+  bool called = false;
+  processAndRespondImmediately(*grpc_upstreams_[0], true, [&called](ImmediateResponse& immediate) {
+    // Ensure that this lambda is called only once, meaning retry is not attempted.
+    EXPECT_FALSE(called);
+    called = true;
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
+    immediate.set_body("{\"reason\": \"Internal Server Error\"}");
+    immediate.set_details("Failed because of Internal Server Error");
     auto* hdr1 = immediate.mutable_headers()->add_set_headers();
     hdr1->mutable_append()->set_value(false);
     hdr1->mutable_header()->set_key("x-failure-reason");
@@ -1645,10 +1653,10 @@ TEST_P(ExtProcIntegrationTestUpstream, GetAndRespondImmediately_Upstream) {
   // since side stream codec had not yet observed server trailers.
   EXPECT_TRUE(processor_stream_->waitForReset());
 
-  verifyDownstreamResponse(*response, 401);
+  verifyDownstreamResponse(*response, 500);
   EXPECT_THAT(response->headers(), ContainsHeader("x-failure-reason", "testing"));
   EXPECT_THAT(response->headers(), ContainsHeader("content-type", "application/json"));
-  EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
+  EXPECT_EQ("{\"reason\": \"Internal Server Error\"}", response->body());
 }
 
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyGracefulClose) {
