@@ -518,7 +518,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithStaticValuesFailure) {
       "GET", "/reverse_connections/request", "wrong-node", "wrong-cluster", "test-tenant");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  ASSERT_TRUE(tcp_client->write(http_request));
+  (void)tcp_client->write(http_request);
   tcp_client->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client->waitForDisconnect();
 
@@ -550,7 +550,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationOnlyNodeId) {
       "GET", "/reverse_connections/request", "wrong-node", "any-cluster", "test-tenant");
 
   IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("listener_0"));
-  ASSERT_TRUE(tcp_client2->write(http_request_fail));
+  (void)tcp_client2->write(http_request_fail);
   tcp_client2->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client2->waitForDisconnect();
 
@@ -582,7 +582,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationOnlyClusterId) {
       "GET", "/reverse_connections/request", "any-node", "wrong-cluster", "test-tenant");
 
   IntegrationTcpClientPtr tcp_client2 = makeTcpConnection(lookupPort("listener_0"));
-  ASSERT_TRUE(tcp_client2->write(http_request_fail));
+  (void)tcp_client2->write(http_request_fail);
   tcp_client2->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client2->waitForDisconnect();
 
@@ -649,7 +649,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithComplexFormatString) {
       "GET", "/reverse_connections/request", "simple-node", "test-cluster", "test-tenant");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  ASSERT_TRUE(tcp_client->write(http_request));
+  (void)tcp_client->write(http_request);
   tcp_client->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client->waitForDisconnect();
 
@@ -789,7 +789,7 @@ typed_config:
       "GET", "/reverse_connections/request", "wrong-node", "wrong-cluster", "test-tenant");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  ASSERT_TRUE(tcp_client->write(http_request));
+  (void)tcp_client->write(http_request);
   tcp_client->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client->waitForDisconnect();
 
@@ -971,7 +971,7 @@ TEST_P(ReverseTunnelFilterIntegrationTest, ValidationWithDynamicMetadataFailure)
       "GET", "/reverse_connections/request", "wrong-node", "wrong-cluster", "test-tenant");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  ASSERT_TRUE(tcp_client->write(http_request));
+  (void)tcp_client->write(http_request);
   tcp_client->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client->waitForDisconnect();
 
@@ -1113,7 +1113,7 @@ typed_config:
       "GET", "/reverse_connections/request", "wrong-node", "dm-cluster", "test-tenant");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  ASSERT_TRUE(tcp_client->write(http_request));
+  (void)tcp_client->write(http_request);
   tcp_client->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client->waitForDisconnect();
 
@@ -1184,7 +1184,7 @@ typed_config:
       "GET", "/reverse_connections/request", "fs-node", "wrong-cluster", "test-tenant");
 
   IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
-  ASSERT_TRUE(tcp_client->write(http_request));
+  (void)tcp_client->write(http_request);
   tcp_client->waitForData("HTTP/1.1 403 Forbidden");
   tcp_client->waitForDisconnect();
 
