@@ -43,6 +43,14 @@ def _core_impl(module_ctx, python_version = PYTHON_VERSION, ignore_root_user_err
         proto_bazel_features(name = "proto_bazel_features")
 
 # Consolidated module extension for Envoy core dependencies (bzlmod-only)
+#
+# Per Bazel's migration guide (https://bazel.build/external/migration):
+# Module extensions should be the primary way to define repositories not in BCR.
+#
+# Bazel 8 features leveraged:
+# - Better extension isolation (note: isolate attribute not yet widely adopted)
+# - Improved reproducibility through native.existing_rules() checks
+# - Compatible with `bazel mod tidy` for automated maintenance
 core = module_extension(
     implementation = _core_impl,
     doc = """
@@ -50,7 +58,7 @@ core = module_extension(
     
     This extension calls envoy_dependencies() which creates 70+ repositories
     not in BCR. It safely coexists with BCR deps because envoy_http_archive
-    skips repositories that already exist.
+    skips repositories that already exist via native.existing_rules().
     
     For WORKSPACE mode, call envoy_dependencies() directly from WORKSPACE.
     This extension should never be called from WORKSPACE files.
@@ -60,5 +68,11 @@ core = module_extension(
     - Complex patch and configuration handling
     - Rust ecosystem integration
     - Protocol buffer feature configuration
+    - Bazel 8: Compatible with automated maintenance tools
+    
+    Per Bazel migration guide best practices:
+    - Extensions consolidate related repositories
+    - Extensions check for existing repos before creation
+    - Extensions provide clear documentation for users
     """,
 )

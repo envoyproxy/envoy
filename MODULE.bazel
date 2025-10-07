@@ -238,7 +238,12 @@ buf.toolchains(
 use_repo(buf, "rules_buf_toolchains")
 
 # Consolidated Envoy extensions - reduced from 5 to 2 extensions for better maintainability
-# This follows bzlmod best practices as documented in BZLMOD_RECOMMENDATIONS.md
+# This follows bzlmod best practices as documented in BZLMOD_MIGRATION_GUIDE.md
+#
+# Per Bazel's migration guide (https://bazel.build/external/migration):
+# - Use module extensions for non-BCR dependencies
+# - Consolidate related extensions for better maintainability
+# - Leverage Bazel 8's improved isolation and automation features
 
 # Core dependencies extension (consolidates dependencies + dependencies_extra)
 envoy_core = use_extension("//bazel/extensions:core.bzl", "core")

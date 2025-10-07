@@ -1,21 +1,20 @@
 # Envoy Bzlmod Migration Status
 
-## Current Status: ✅ bzlmod Mode Functional, WORKSPACE Mode Deprecated
+## Current Status: ✅ bzlmod Mode Production-Ready
 
 **Last Updated:** 2025-01-10
 
 ### Quick Start
 
-Envoy now uses bzlmod (MODULE.bazel) for dependency management with Bazel 7.6.1+.
+Envoy uses bzlmod (MODULE.bazel) for dependency management with Bazel 8.4.2+.
+
+**WORKSPACE mode is deprecated and will be removed.**
 
 ```bash
-# ✅ bzlmod mode (default in Bazel 7.6.1+)
+# ✅ bzlmod mode (required)
 bazel build --enable_bzlmod @envoy_api//...
 bazel build --enable_bzlmod //source/...
 bazel query --enable_bzlmod "@envoy_mobile//..."
-
-# ❌ WORKSPACE mode (deprecated, not maintained)
-# DO NOT USE: bazel build --noenable_bzlmod //...
 ```
 
 ## Module Functionality Status
@@ -37,9 +36,9 @@ bazel query --enable_bzlmod "@envoy_mobile//..."
 - **Query:** `bazel query --enable_bzlmod "@envoy_mobile//library/..."`
 - **Note:** Some Android/iOS toolchain targets may need additional configuration
 
-## Testing Both Modes (During Migration)
+## Testing bzlmod Mode
 
-### Testing bzlmod Mode (Recommended)
+**Note:** Build validation is performed in CI/CD pipelines, not local scripts.
 
 ```bash
 # Test core modules
@@ -181,20 +180,22 @@ module(name = "my_project", version = "1.0.0")
 bazel_dep(name = "envoy", version = "X.Y.Z")
 ```
 
-## Documentation References
+## Additional Resources
 
-- [MODULE.bazel](./MODULE.bazel) - Main module definition
-- [BZLMOD_MIGRATION.md](./BZLMOD_MIGRATION.md) - Detailed migration documentation
-- [BZLMOD_RECOMMENDATIONS.md](./BZLMOD_RECOMMENDATIONS.md) - Best practices and recommendations
+- **BZLMOD_MIGRATION_GUIDE.md** - Complete guide with architecture and troubleshooting
+- **BAZEL8_UPGRADE.md** - Bazel 8 upgrade details
+- **EXTENSION_REFACTORING.md** - Technical extension architecture
+- **BZLMOD_CI_CD.md** - CI/CD validation setup and troubleshooting
 - [Bazel bzlmod documentation](https://bazel.build/external/migration)
 
 ## Support and Questions
 
 For questions about bzlmod migration:
-1. Check existing [documentation](./BZLMOD_MIGRATION.md)
-2. Review [Bazel bzlmod guide](https://bazel.build/external/migration)
-3. File issues with `[bzlmod]` prefix
+1. Check [BZLMOD_MIGRATION_GUIDE.md](./BZLMOD_MIGRATION_GUIDE.md) for comprehensive guidance
+2. Check [BZLMOD_CI_CD.md](./BZLMOD_CI_CD.md) for CI/CD validation details
+3. Review [Bazel bzlmod guide](https://bazel.build/external/migration)
+4. File issues with `[bzlmod]` prefix
 
 ---
 
-**Note:** This migration is production-ready for bzlmod mode. WORKSPACE mode support is not maintained and will be removed in a future release.
+**Note:** This migration is production-ready for bzlmod mode. WORKSPACE mode is deprecated and will be removed. Build validation is performed in CI/CD pipelines (see BZLMOD_CI_CD.md).

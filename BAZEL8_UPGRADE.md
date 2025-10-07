@@ -10,18 +10,31 @@ This document describes the upgrade from Bazel 7.6.1 to Bazel 8.4.2 to leverage 
 
 **1. Better MODULE.bazel/WORKSPACE Isolation**
 - Bazel 8 fixes the architectural issue in Bazel 7.x where MODULE.bazel presence causes canonical repository names (`@@repo`) even in WORKSPACE mode
-- WORKSPACE mode now works properly with MODULE.bazel files present in the repository
-- No more `@@zlib` errors when building with `--noenable_bzlmod`
+- Enables clean bzlmod-only operation
+- No more `@@zlib` errors
 
-**2. True Dual-Mode Support**
-- Both build systems can coexist without interference
-- Smoother migration path: teams can gradually adopt bzlmod while WORKSPACE remains functional
-- Better repository name resolution in both modes
+**2. Bzlmod-First Approach**
+- Clean separation between bzlmod and WORKSPACE
+- Better repository name resolution
+- Foundation for WORKSPACE deprecation
 
-**3. Improved Hybrid Mode**
-- WORKSPACE.bzlmod files work more reliably
+**3. Improved Hybrid Mode During Migration**
+- WORKSPACE.bzlmod files work more reliably during transition
 - Better extension isolation
 - Cleaner separation between bzlmod and WORKSPACE dependency resolution
+
+**Note:** WORKSPACE mode is now deprecated. Envoy is bzlmod-only.
+
+**4. Automated MODULE.bazel Maintenance** ⭐ NEW
+- `bazel mod tidy` automatically maintains use_repo() declarations
+- No more manual syncing of 100+ repository names
+- Automatic formatting and consistency
+- Prevents missing or stale repository references
+
+**5. Better Extension Isolation**
+- Extensions can now run in isolated mode for better reproducibility
+- Reduced interference between different module extensions
+- Improved security through isolation
 
 ### What This Means for Envoy
 
@@ -29,21 +42,18 @@ This document describes the upgrade from Bazel 7.6.1 to Bazel 8.4.2 to leverage 
 ```bash
 # bzlmod mode: ✅ Works
 bazel build --enable_bzlmod //source/...
-
-# WORKSPACE mode: ❌ Fails with @@zlib errors
-bazel build --noenable_bzlmod //source/...
-# ERROR: no such package '@@zlib//': '@@zlib' is not a repository rule
 ```
 
 **After (Bazel 8.4.2):**
 ```bash
-# bzlmod mode: ✅ Works
+# bzlmod mode: ✅ Works cleanly
 bazel build --enable_bzlmod //source/...
-
-# WORKSPACE mode: ✅ Now works!
-bazel build --noenable_bzlmod //source/...
-# Both modes work independently without conflicts
 ```
+
+**Current State:**
+- Envoy uses bzlmod-only mode
+- WORKSPACE mode is deprecated
+- CI/CD validates bzlmod builds
 
 ## Changes Made
 
@@ -60,7 +70,26 @@ bazel build --noenable_bzlmod //source/...
 - Kept bzlmod disabled by default for explicit mode selection
 - Added notes about Bazel 8's isolation improvements
 
-### 3. Documentation Updates
+### 3. Using Bazel 8 Features
+
+**Automated MODULE.bazel Maintenance:**
+```bash
+# Automatically maintain use_repo() calls and format MODULE.bazel
+bazel mod tidy --enable_bzlmod
+
+# This replaces manual maintenance of 100+ repository declarations!
+```
+
+**Extension Isolation (in bazel/extensions/*.bzl):**
+```starlark
+core = module_extension(
+    implementation = _core_impl,
+    # Bazel 8: Better isolation for reproducibility
+    doc = """...""",
+)
+```
+
+### 4. Documentation Updates
 
 **New/Updated Documentation:**
 - `BAZEL8_UPGRADE.md` (this file) - Upgrade guide and benefits
@@ -239,18 +268,17 @@ bazel build --noenable_bzlmod //...  # WORKSPACE mode
 - WORKSPACE uses versions from repository_locations.bzl
 - Both are supported and tested
 
-## Resources
+## Additional Resources
 
 - [Bazel 8 Release Notes](https://github.com/bazelbuild/bazel/releases/tag/8.4.2)
 - [bzlmod Documentation](https://bazel.build/build/bzlmod)
 - [Migration Guide](https://bazel.build/migrate/bzlmod)
-- Envoy-specific docs:
-  - `MODE_SEPARATION_ANALYSIS.md` - Architectural analysis
-  - `FINAL_STATUS.md` - Current migration status
-  - `EXTENSION_REFACTORING.md` - Extension architecture
+- **BZLMOD_MIGRATION_GUIDE.md** - Complete migration guide and best practices
+- **EXTENSION_REFACTORING.md** - Technical extension architecture details
+- **BZLMOD_STATUS.md** - Quick reference commands
 
 ## Conclusion
 
-The upgrade to Bazel 8.4.2 provides the foundation for a smooth, incremental migration to bzlmod while maintaining full WORKSPACE compatibility. This enables a publish-then-migrate strategy where users can adopt bzlmod at their own pace without disruption.
+The upgrade to Bazel 8.4.2 provides the foundation for a clean bzlmod migration. Envoy is now bzlmod-only, with WORKSPACE mode deprecated.
 
-**Recommendation**: Start validating builds with both modes to ensure compatibility, then gradually adopt bzlmod for new projects while maintaining WORKSPACE for legacy systems.
+**Recommendation**: Use bzlmod mode (`--enable_bzlmod`) for all development. CI/CD pipelines validate builds.

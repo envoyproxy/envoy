@@ -110,21 +110,12 @@ All extension files now include:
 4. **Working Solution**: All three modules (@envoy_api, @envoy, @envoy_mobile) now functional
 5. **Future-Proof**: Clean architecture for completing bzlmod migration
 
-## Files Modified
+## Additional Resources
 
-- `bazel/extensions/core.bzl` - Restored `envoy_dependencies()` call with documentation
-- `bazel/extensions/toolchains.bzl` - Added bzlmod-only documentation
-- `api/bazel/extensions/api_dependencies.bzl` - Added bzlmod-only documentation
-- `mobile/bazel/extensions/core.bzl` - Added bzlmod-only documentation
-- `mobile/bazel/extensions/toolchains.bzl` - Added bzlmod-only documentation
-
-## Next Steps
-
-1. ✅ Validation complete - all modules working
-2. Update WORKSPACE files to add comments clarifying they don't use extensions
-3. Consider adding bzlmod detection guards in extensions (future enhancement)
-4. Complete migration of remaining WORKSPACE-only setups to bzlmod
+- **BZLMOD_MIGRATION_GUIDE.md** - Complete guide with quick start and migration strategy
+- **BAZEL8_UPGRADE.md** - Bazel 8 upgrade details and benefits
+- **BZLMOD_STATUS.md** - Quick reference validation commands
 
 ## Conclusion
 
-The refactoring successfully achieved the goal of clear mode separation while maintaining functionality. The key was understanding that the existing repository creation functions already have built-in duplicate detection, making it safe to call them from bzlmod extensions without conflicts.
+The refactoring successfully achieved clear mode separation while maintaining functionality. The key was understanding that the existing repository creation functions already have built-in duplicate detection, making it safe to call them from bzlmod extensions without conflicts.
