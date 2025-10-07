@@ -332,7 +332,7 @@ ConnectivityGrid::ConnectivityGrid(
   std::chrono::milliseconds rtt =
       std::chrono::duration_cast<std::chrono::milliseconds>(alternate_protocols_->getSrtt(origin_));
   if (rtt.count() != 0) {
-    next_attempt_duration_ = std::chrono::milliseconds(rtt.count() * 2);
+    next_attempt_duration_ = std::chrono::milliseconds(rtt.count() * 1.5);
   }
 }
 
