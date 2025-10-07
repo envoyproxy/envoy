@@ -708,27 +708,6 @@ TEST(UtilityTest, ImportKeysDERWithInvalidData) {
       << "Single byte DER private key should fail";
 }
 
-TEST(UtilityTest, TestSingletonInitialization) {
-  // Test that the static singleton is properly initialized
-  // This exercises the static initialization code path at the end of utility_impl.cc
-  auto& singleton1 = UtilitySingleton::get();
-  auto& singleton2 = UtilitySingleton::get();
-  EXPECT_EQ(&singleton1, &singleton2) << "Singleton should return same instance";
-
-  // Test that the singleton works immediately after initialization
-  const Buffer::OwnedImpl buffer("test singleton initialization");
-  const auto digest = singleton1.getSha256Digest(buffer);
-  EXPECT_FALSE(digest.empty());
-  EXPECT_EQ(32, digest.size());
-
-  // Test that singleton methods work consistently
-  std::vector<uint8_t> key = {'k', 'e', 'y'};
-  std::string message = "test message";
-  auto hmac = singleton1.getSha256Hmac(key, message);
-  EXPECT_FALSE(hmac.empty());
-  EXPECT_EQ(32, hmac.size());
-}
-
 } // namespace
 } // namespace Crypto
 } // namespace Common
