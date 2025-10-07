@@ -642,7 +642,14 @@ case $CI_TARGET in
 
     format)
         setup_clang_toolchain
-        "${ENVOY_SRCDIR}/ci/format_pre.sh"
+
+        bazel build --config=ci --config=remote-envoy-engflow //:check_cpus
+
+        cat bazel-bin/cpu_info.txt
+
+        exit 1
+
+        # "${ENVOY_SRCDIR}/ci/format_pre.sh"
         ;;
 
     fuzz)

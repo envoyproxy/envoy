@@ -78,3 +78,46 @@ package_group(
 exports_files([
     "rustfmt.toml",
 ])
+
+genrule(
+    name = "check_cpus",
+    outs = ["cpu_info.txt"],
+    cmd = """
+    set -e
+    echo "=== CPU INFO INSIDE CONTAINER ===" > $@
+    echo "Host-visible CPU count (nproc): $$(nproc)" >> $@
+    echo "Python os.cpu_count(): $$(python3 -c 'import os; print(os.cpu_count())')" >> $@
+    echo "" >> $@
+
+    # Detect cgroup v1 and v2
+    if [ -f /sys/fs/cgroup/cpu/cpu.cfs_quota_us ]; then
+        echo "Detected cgroup v1" >> $@
+        quota=$$(cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us)
+        period=$$(cat /sys/fs/cgroup/cpu/cpu.cfs_period_us)
+        echo "cpu.cfs_quota_us = $$quota" >> $@
+        echo "cpu.cfs_period_us = $$period" >> $@
+        if [ "$$quota" -gt 0 ]; then
+            effective=$$((quota / period))
+            echo "Effective container CPU count (integer) = $$effective" >> $@
+        else
+            echo "No CPU limit set (quota = -1)" >> $@
+        fi
+    elif [ -f /sys/fs/cgroup/cpu.max ]; then
+        echo "Detected cgroup v2" >> $@
+        read quota period < /sys/fs/cgroup/cpu.max
+        echo "cpu.max = $$quota $$period" >> $@
+        if [ "$$quota" != "max" ]; then
+            effective=$$((quota / period))
+            echo "Effective container CPU count (integer) = $$effective" >> $@
+        else
+            echo "No CPU limit set (quota = max)" >> $@
+        fi
+    else
+        echo "Could not detect cgroup info" >> $@
+    fi
+
+    echo "" >> $@
+    echo "=== /proc/cpuinfo (summary) ===" >> $@
+    grep -c ^processor /proc/cpuinfo >> $@
+    """,
+)
