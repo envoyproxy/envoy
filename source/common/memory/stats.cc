@@ -43,6 +43,11 @@ uint64_t Stats::totalCurrentlyReserved() {
 #endif
 }
 
+uint64_t Stats::totalCurrentlyFree() {
+  return totalPageHeapFree() + transferCacheFree() + centralCacheFree() + threadCacheFree() +
+         shardedTransferCacheFree();
+}
+
 uint64_t Stats::totalThreadCacheBytes() {
 #if defined(TCMALLOC)
   return tcmalloc::MallocExtension::GetNumericProperty("tcmalloc.current_total_thread_cache_bytes")
@@ -90,6 +95,51 @@ uint64_t Stats::totalPhysicalBytes() {
   MallocExtension::instance()->GetNumericProperty("generic.total_physical_bytes", &value);
   return value;
 #else
+  return 0;
+#endif
+}
+
+uint64_t Stats::transferCacheFree() {
+#if defined(TCMALLOC)
+  return tcmalloc::MallocExtension::GetProperties()["tcmalloc.transfer_cache_free"].value;
+#elif defined(GPERFTOOLS_TCMALLOC)
+  size_t value = 0;
+  MallocExtension::instance()->GetNumericProperty("tcmalloc.transfer_cache_free_bytes", &value);
+  return value;
+#else
+  return 0;
+#endif
+}
+
+uint64_t Stats::centralCacheFree() {
+#if defined(TCMALLOC)
+  return tcmalloc::MallocExtension::GetProperties()["tcmalloc.central_cache_free"].value;
+#elif defined(GPERFTOOLS_TCMALLOC)
+  size_t value = 0;
+  MallocExtension::instance()->GetNumericProperty("tcmalloc.central_cache_free_bytes", &value);
+  return value;
+#else
+  return 0;
+#endif
+}
+
+uint64_t Stats::threadCacheFree() {
+#if defined(TCMALLOC)
+  return tcmalloc::MallocExtension::GetProperties()["tcmalloc.thread_cache_free"].value;
+#elif defined(GPERFTOOLS_TCMALLOC)
+  size_t value = 0;
+  MallocExtension::instance()->GetNumericProperty("tcmalloc.thread_cache_free_bytes", &value);
+  return value;
+#else
+  return 0;
+#endif
+}
+
+uint64_t Stats::shardedTransferCacheFree() {
+#if defined(TCMALLOC)
+  return tcmalloc::MallocExtension::GetProperties()["tcmalloc.sharded_transfer_cache_free"].value;
+#else
+  // Not implemented in gperftools tcmalloc.
   return 0;
 #endif
 }

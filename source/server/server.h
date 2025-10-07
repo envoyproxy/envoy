@@ -85,6 +85,7 @@ struct ServerCompilationSettingsStats {
   GAUGE(live, NeverImport)                                                                         \
   GAUGE(memory_allocated, Accumulate)                                                              \
   GAUGE(memory_heap_size, Accumulate)                                                              \
+  GAUGE(memory_heap_free, Accumulate)                                                              \
   GAUGE(memory_physical_size, Accumulate)                                                          \
   GAUGE(parent_connections, Accumulate)                                                            \
   GAUGE(state, NeverImport)                                                                        \

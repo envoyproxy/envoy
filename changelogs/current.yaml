@@ -206,6 +206,13 @@ bug_fixes:
 - area: release
   change: |
     Fixed the distroless image to ensure nonroot.
+- area: overload management
+  change: |
+    The fixed heap resource monitor now subtracts TCMalloc cache free lists from its memory pressure calculation,
+    so reported pressure is lower and more accurate. This can prevent unnecessary load shedding when there is enough free memory.
+- area: stats
+  change: |
+    The ``memory_heap_size`` metric now excludes memory returned to the OS.
 
 removed_config_or_runtime:
 # *Normally occurs at the end of the* :ref:`deprecation period <deprecated>`
@@ -597,5 +604,8 @@ new_features:
     is particularly useful when downstream instances are behind NATs, firewalls, or in private networks. The
     feature is experimental and under active development, but is ready for experimental use. See
     :ref:`reverse tunnel overview <overview_reverse_tunnel>` for details.
+- area: stats
+  change: |
+    Added a new metric ``memory_heap_free`` to report the total free memory available in the TCMalloc heap.
 
 deprecated:

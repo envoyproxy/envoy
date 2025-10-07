@@ -4,6 +4,7 @@
 # are allowed for any otherwise correctly spelled word.
 
 addrlen
+gperftools
 itr
 STREQ
 htonl
@@ -1320,6 +1321,7 @@ servercert
 setenv
 setsockopt
 sfixed
+sharded
 sidestream
 sig
 sigaction

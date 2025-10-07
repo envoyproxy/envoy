@@ -265,7 +265,9 @@ void InstanceBase::updateServerStats() {
   server_stats_->uptime_.set(time(nullptr) - original_start_time_);
   server_stats_->memory_allocated_.set(Memory::Stats::totalCurrentlyAllocated() +
                                        parent_stats.parent_memory_allocated_);
-  server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved());
+  server_stats_->memory_heap_size_.set(Memory::Stats::totalCurrentlyReserved() -
+                                       Memory::Stats::totalPageHeapUnmapped());
+  server_stats_->memory_heap_free_.set(Memory::Stats::totalCurrentlyFree());
   server_stats_->memory_physical_size_.set(Memory::Stats::totalPhysicalBytes());
   if (!options().hotRestartDisabled()) {
     server_stats_->parent_connections_.set(parent_stats.parent_connections_);

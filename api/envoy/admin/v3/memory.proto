@@ -16,7 +16,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // Proto representation of the internal memory consumption of an Envoy instance. These represent
 // values extracted from an internal TCMalloc instance. For more information, see the section of the
 // docs entitled ["Generic Tcmalloc Status"](https://gperftools.github.io/gperftools/tcmalloc.html).
-// [#next-free-field: 7]
+// [#next-free-field: 11]
 message Memory {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.Memory";
 
@@ -45,4 +45,20 @@ message Memory {
   // The number of bytes of the physical memory usage by the allocator. This is an alias for
   // ``generic.total_physical_bytes``.
   uint64 total_physical_bytes = 6;
+
+  // The number of bytes in the transfer cache free list.
+  // This is an alias for ``tcmalloc.transfer_cache_free``.
+  uint64 transfer_cache_free = 7;
+
+  // The number of bytes in the central cache free list.
+  // This is an alias for ``tcmalloc.central_cache_free``.
+  uint64 central_cache_free = 8;
+
+  // The number of bytes in the thread cache free list.
+  // This is an alias for ``tcmalloc.thread_cache_free``.
+  uint64 thread_cache_free = 9;
+
+  // The number of bytes in the sharded transfer cache free list.
+  // This is an alias for ``tcmalloc.sharded_transfer_cache_free``.
+  uint64 sharded_transfer_cache_free = 10;
 }

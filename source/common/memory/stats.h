@@ -37,6 +37,12 @@ public:
   static uint64_t totalCurrentlyReserved();
 
   /**
+   * @return uint64_t the total amount of free bytes available in the heap, including all CMalloc
+   * caches.
+   */
+  static uint64_t totalCurrentlyFree();
+
+  /**
    * @return uint64_t the amount of memory used by the TCMalloc thread caches (for small objects).
    */
   static uint64_t totalThreadCacheBytes();
@@ -59,6 +65,26 @@ public:
    * @return uint64_t estimate of total bytes of the physical memory usage by the allocator
    */
   static uint64_t totalPhysicalBytes();
+
+  /**
+   * @return uint64_t the amount of free bytes available in TCMalloc thread caches.
+   */
+  static uint64_t transferCacheFree();
+
+  /**
+   * @return uint64_t the amount of free bytes available in TCMalloc central caches.
+   */
+  static uint64_t centralCacheFree();
+
+  /**
+   * @return uint64_t the amount of free bytes available in TCMalloc thread caches.
+   */
+  static uint64_t threadCacheFree();
+
+  /**
+   * @return uint64_t the amount of free bytes available in TCMalloc sharded transfer caches.
+   */
+  static uint64_t shardedTransferCacheFree();
 
   /**
    * Log detailed stats about current memory allocation. Intended for debugging purposes.

@@ -50,6 +50,10 @@ Http::Code ServerInfoHandler::handlerMemory(Http::ResponseHeaderMap& response_he
   memory.set_pageheap_unmapped(Memory::Stats::totalPageHeapUnmapped());
   memory.set_pageheap_free(Memory::Stats::totalPageHeapFree());
   memory.set_total_physical_bytes(Memory::Stats::totalPhysicalBytes());
+  memory.set_transfer_cache_free(Memory::Stats::transferCacheFree());
+  memory.set_central_cache_free(Memory::Stats::centralCacheFree());
+  memory.set_thread_cache_free(Memory::Stats::threadCacheFree());
+  memory.set_sharded_transfer_cache_free(Memory::Stats::shardedTransferCacheFree());
   response.add(MessageUtil::getJsonStringFromMessageOrError(memory, true, true)); // pretty-print
   return Http::Code::OK;
 }

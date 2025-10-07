@@ -14,7 +14,7 @@ uint64_t MemoryStatsReader::reservedHeapBytes() { return Memory::Stats::totalCur
 
 uint64_t MemoryStatsReader::unmappedHeapBytes() { return Memory::Stats::totalPageHeapUnmapped(); }
 
-uint64_t MemoryStatsReader::freeMappedHeapBytes() { return Memory::Stats::totalPageHeapFree(); }
+uint64_t MemoryStatsReader::freeMappedHeapBytes() { return Memory::Stats::totalCurrentlyFree(); }
 
 FixedHeapMonitor::FixedHeapMonitor(
     const envoy::extensions::resource_monitors::fixed_heap::v3::FixedHeapConfig& config,

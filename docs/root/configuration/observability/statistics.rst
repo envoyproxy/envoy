@@ -18,6 +18,7 @@ Server related statistics are rooted at *server.* with following statistics:
   concurrency, Gauge, Number of worker threads
   memory_allocated, Gauge, Current amount of allocated memory in bytes. Total of both new and old Envoy processes on hot restart.
   memory_heap_size, Gauge, Current reserved heap size in bytes. New Envoy process heap size on hot restart.
+  memory_heap_free, Gauge, Current free heap size in bytes.
   memory_physical_size, Gauge, Current estimate of total bytes of the physical memory. New Envoy process physical memory size on hot restart.
   live, Gauge, "1 if the server is not currently draining, 0 otherwise"
   state, Gauge, Current :ref:`State <envoy_v3_api_field_admin.v3.ServerInfo.state>` of the Server.

@@ -18,6 +18,12 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // The fixed heap resource monitor reports the Envoy process memory pressure, computed as a
 // fraction of currently reserved heap memory divided by a statically configured maximum
 // specified in the FixedHeapConfig.
+//
+// Memory pressure is calculated using the following formula.
+// The `memory_heap_size` and `memory_heap_free` statistics are documented in
+// :ref:`server statistics <server_statistics>`.
+//
+// :math:`pressure = \frac{memory\_heap\_size - memory\_heap\_free}{max\_heap\_size\_bytes}`
 message FixedHeapConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.resource_monitor.fixed_heap.v2alpha.FixedHeapConfig";
