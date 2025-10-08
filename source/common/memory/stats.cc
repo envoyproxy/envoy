@@ -117,7 +117,7 @@ std::string Stats::dumpStats() {
   buffer.resize(strlen(buffer.c_str()));
   return buffer;
 #else
-  return "";
+  return "Envoy was not built with tcmalloc.";
 #endif
 }
 

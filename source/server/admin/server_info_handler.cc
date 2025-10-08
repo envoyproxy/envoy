@@ -58,7 +58,11 @@ Http::Code ServerInfoHandler::handleMemoryTcmallocStats(Http::ResponseHeaderMap&
                                                         Buffer::Instance& response, AdminStream&) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Text);
   response.add(Memory::Stats::dumpStats());
+#if defined(TCMALLOC) || defined(GPERFTOOLS_TCMALLOC)
   return Http::Code::OK;
+#else
+  return Http::Code::NotImplemented;
+#endif
 }
 
 Http::Code ServerInfoHandler::handlerReady(Http::ResponseHeaderMap&, Buffer::Instance& response,
