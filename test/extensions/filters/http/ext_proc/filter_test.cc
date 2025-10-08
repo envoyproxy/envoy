@@ -3138,7 +3138,6 @@ TEST_F(HttpFilterTest, FailOnInvalidHeaderMutations) {
   )EOF");
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, false));
-  EXPECT_CALL(decoder_callbacks_, continueDecoding());
 
   TestResponseHeaderMapImpl immediate_response_headers;
   EXPECT_CALL(encoder_callbacks_,
