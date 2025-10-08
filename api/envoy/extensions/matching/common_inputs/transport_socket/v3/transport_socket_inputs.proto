@@ -17,14 +17,29 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // This input extracts metadata from the selected endpoint for transport socket selection.
 // The metadata is extracted using a filter and path specification similar to
 // :ref:`DynamicMetadataInput <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.DynamicMetadataInput>`.
+//
+// Example: Extract a metadata value for transport socket matching.
+//
+// .. code-block:: yaml
+//
+//   typed_config:
+//     "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.EndpointMetadataInput
+//     filter: "envoy.transport_socket_match"
+//     path:
+//       - key: "socket_type"
+//
+// This configuration extracts the value at path ``["envoy.transport_socket_match"]["socket_type"]``
+// from the endpoint metadata for use in transport socket selection.
+//
 // [#extension: envoy.matching.inputs.transport_socket.endpoint_metadata]
 message EndpointMetadataInput {
   // The filter name to retrieve the Struct from the endpoint metadata.
-  // Defaults to "envoy.transport_socket_match" if not specified.
-  string filter = 1 [(validate.rules).string = {min_len: 1}];
+  // If not specified or empty, defaults to ``envoy.transport_socket_match``.
+  string filter = 1;
 
   // The path to retrieve the Value from the Struct.
   // If empty, the entire filter metadata struct is used for matching.
+  // Each path segment specifies a key to traverse in nested metadata structures.
   repeated PathSegment path = 2;
 
   // Specifies the segment in a path to retrieve value from Metadata.
@@ -42,14 +57,29 @@ message EndpointMetadataInput {
 // This input extracts metadata from the endpoint's locality for transport socket selection.
 // The metadata is extracted using a filter and path specification similar to
 // :ref:`DynamicMetadataInput <envoy_v3_api_msg_extensions.matching.common_inputs.network.v3.DynamicMetadataInput>`.
+//
+// Example: Extract a metadata value from locality for transport socket matching.
+//
+// .. code-block:: yaml
+//
+//   typed_config:
+//     "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.LocalityMetadataInput
+//     filter: "envoy.transport_socket_match"
+//     path:
+//       - key: "region"
+//
+// This configuration extracts the value at path ``["envoy.transport_socket_match"]["region"]``
+// from the locality metadata for use in transport socket selection.
+//
 // [#extension: envoy.matching.inputs.transport_socket.locality_metadata]
 message LocalityMetadataInput {
   // The filter name to retrieve the Struct from the locality metadata.
-  // Defaults to "envoy.transport_socket_match" if not specified.
-  string filter = 1 [(validate.rules).string = {min_len: 1}];
+  // If not specified or empty, defaults to ``envoy.transport_socket_match``.
+  string filter = 1;
 
   // The path to retrieve the Value from the Struct.
   // If empty, the entire filter metadata struct is used for matching.
+  // Each path segment specifies a key to traverse in nested metadata structures.
   repeated PathSegment path = 2;
 
   // Specifies the segment in a path to retrieve value from Metadata.

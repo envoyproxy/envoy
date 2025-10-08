@@ -814,17 +814,25 @@ message Cluster {
   // :ref:`transport_socket_matches <envoy_v3_api_field_config.cluster.v3.Cluster.transport_socket_matches>`.
   //
   // This matcher uses the generic xDS matcher framework and may reference downstream
-  // connection inputs such as destination IP, source IP, destination port, source port,
-  // Server Name Indication (SNI), Application-Layer Protocol Negotiation (ALPN), and
-  // filter state, as well as endpoint and locality metadata to select a named transport socket.
+  // connection attributes and endpoint metadata to select a named transport socket.
   // This provides flexibility similar to the listener :ref:`filter_chain_matcher
   // <envoy_v3_api_field_config.listener.v3.Listener.filter_chain_matcher>`.
   //
   // .. note::
-  //   All network-level inputs (IP addresses, ports, SNI, ALPN) refer to the downstream
-  //   connection attributes, not the upstream connection. For example, destination IP is the
-  //   upstream endpoint IP as seen from the downstream client's perspective, and source IP
-  //   is the downstream client's IP address.
+  //   All network-level inputs (destination IP, source IP, destination port, source port,
+  //   SNI, ALPN) refer to the **downstream connection** attributes, not the upstream connection.
+  //   For example:
+  //
+  //   * ``destination_ip``: The IP address of the upstream endpoint as seen by Envoy
+  //     (the local address of the connection on Envoy's side).
+  //   * ``source_ip``: The IP address of the downstream client.
+  //   * ``destination_port``: The port on which Envoy received the request.
+  //   * ``source_port``: The port used by the downstream client.
+  //   * ``server_name``: The SNI presented by the downstream client.
+  //   * ``application_protocols``: The ALPN protocols negotiated with the downstream client.
+  //
+  //   Additionally, endpoint-specific metadata inputs (endpoint_metadata, locality_metadata)
+  //   extract values from the selected upstream endpoint's metadata for transport socket selection.
   //
   // If this field is set, it takes precedence over legacy metadata-based selection
   // performed by :ref:`transport_socket_matches

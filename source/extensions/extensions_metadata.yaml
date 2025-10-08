@@ -1721,9 +1721,65 @@ envoy.matching.inputs.transport_protocol:
   status: stable
   type_urls:
   - envoy.extensions.matching.common_inputs.network.v3.TransportProtocolInput
+envoy.matching.inputs.transport_socket.endpoint_metadata:
+  categories:
+  - envoy.matching.inputs
+  security_posture: unknown
+  status: stable
+  type_urls:
+  - envoy.extensions.matching.common_inputs.transport_socket.v3.EndpointMetadataInput
+envoy.matching.inputs.transport_socket.locality_metadata:
+  categories:
+  - envoy.matching.inputs
+  security_posture: unknown
+  status: stable
+  type_urls:
+  - envoy.extensions.matching.common_inputs.transport_socket.v3.LocalityMetadataInput
+envoy.matching.inputs.transport_socket.destination_ip:
+  categories:
+  - envoy.matching.inputs
+  security_posture: unknown
+  status: stable
+  type_urls:
+  - envoy.extensions.matching.common_inputs.network.v3.DestinationIPInput
+envoy.matching.inputs.transport_socket.source_ip:
+  categories:
+  - envoy.matching.inputs
+  security_posture: unknown
+  status: stable
+  type_urls:
+  - envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
+envoy.matching.inputs.transport_socket.destination_port:
+  categories:
+  - envoy.matching.inputs
+  security_posture: unknown
+  status: stable
+  type_urls:
+  - envoy.extensions.matching.common_inputs.network.v3.DestinationPortInput
+envoy.matching.inputs.transport_socket.source_port:
+  categories:
+  - envoy.matching.inputs
+  security_posture: unknown
+  status: stable
+  type_urls:
+  - envoy.extensions.matching.common_inputs.network.v3.SourcePortInput
+envoy.matching.inputs.transport_socket.server_name:
+  categories:
+  - envoy.matching.inputs
+  security_posture: unknown
+  status: stable
+  type_urls:
+  - envoy.extensions.matching.common_inputs.network.v3.ServerNameInput
 envoy.matching.inputs.application_protocol:
   categories:
   - envoy.matching.network.input
+  security_posture: unknown
+  status: stable
+  type_urls:
+  - envoy.extensions.matching.common_inputs.network.v3.ApplicationProtocolInput
+envoy.matching.inputs.application_protocols:
+  categories:
+  - envoy.matching.inputs
   security_posture: unknown
   status: stable
   type_urls:
@@ -1882,6 +1938,13 @@ envoy.matching.actions.format_string:
   status: stable
   type_urls:
   - envoy.config.core.v3.SubstitutionFormatString
+envoy.matching.action.transport_socket.name:
+  categories:
+  - envoy.matching.action
+  security_posture: unknown
+  status: stable
+  type_urls:
+  - envoy.extensions.matching.common_inputs.transport_socket.v3.TransportSocketNameAction
 envoy.http.custom_response.redirect_policy:
   categories:
   - envoy.http.custom_response

@@ -266,7 +266,7 @@ transport_socket:
   TestUtility::loadFromYaml(R"EOF(
 matcher_tree:
   input:
-    name: envoy.matching.inputs.transport_socket.endpoint_metadata
+    name: envoy.matching.inputs.transport_socket.transport_socket.endpoint_metadata
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.EndpointMetadataInput
       filter: envoy.lb
@@ -348,7 +348,7 @@ transport_socket:
   TestUtility::loadFromYaml(R"EOF(
 matcher_tree:
   input:
-    name: envoy.transport_socket.inputs.server_name
+    name: envoy.matching.inputs.transport_socket.server_name
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ServerNameInput
   exact_match_map:
@@ -417,7 +417,7 @@ transport_socket:
   TestUtility::loadFromYaml(R"EOF(
 matcher_tree:
   input:
-    name: envoy.transport_socket.inputs.source_ip
+    name: envoy.matching.inputs.transport_socket.source_ip
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
   prefix_match_map:
@@ -650,7 +650,7 @@ transport_socket:
   TestUtility::loadFromYaml(R"EOF(
 matcher_tree:
   input:
-    name: envoy.transport_socket.inputs.server_name
+    name: envoy.matching.inputs.transport_socket.server_name
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ServerNameInput
   exact_match_map:
@@ -716,7 +716,7 @@ transport_socket:
   TestUtility::loadFromYaml(R"EOF(
 matcher_tree:
   input:
-    name: envoy.transport_socket.inputs.source_ip
+    name: envoy.matching.inputs.transport_socket.source_ip
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.SourceIPInput
   prefix_match_map:
@@ -851,7 +851,7 @@ transport_socket:
   TestUtility::loadFromYaml(R"EOF(
 matcher_tree:
   input:
-    name: envoy.transport_socket.inputs.server_name
+    name: envoy.matching.inputs.transport_socket.server_name
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ServerNameInput
   exact_match_map:
@@ -894,7 +894,7 @@ transport_socket:
   TestUtility::loadFromYaml(R"EOF(
 matcher_tree:
   input:
-    name: envoy.transport_socket.inputs.server_name
+    name: envoy.matching.inputs.transport_socket.server_name
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.network.v3.ServerNameInput
   exact_match_map:

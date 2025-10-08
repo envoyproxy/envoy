@@ -133,10 +133,12 @@ public:
   std::string category() const override { return "envoy.matching.inputs"; }
 };
 
-// Network-related data inputs following standard Envoy patterns.
+// Transport socket specific network inputs.
+// These are separate from the standard network inputs because they operate on
+// TransportSocketMatchingData instead of Network::Matching::MatchingData.
 
 /**
- * Data input for destination IP address.
+ * Data input for destination IP address from transport socket matching context.
  */
 class DestinationIPInput : public Matcher::DataInput<TransportSocketMatchingData> {
 public:
@@ -154,11 +156,13 @@ public:
 };
 
 /**
- * Factory for creating destination IP data inputs.
+ * Factory for creating destination IP data inputs for transport socket matching.
  */
 class DestinationIPInputFactory : public Matcher::DataInputFactory<TransportSocketMatchingData> {
 public:
-  std::string name() const override { return "envoy.matching.inputs.destination_ip"; }
+  std::string name() const override {
+    return "envoy.matching.inputs.transport_socket.destination_ip";
+  }
 
   Matcher::DataInputFactoryCb<TransportSocketMatchingData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
@@ -174,7 +178,7 @@ public:
 };
 
 /**
- * Data input for source IP address.
+ * Data input for source IP address from transport socket matching context.
  */
 class SourceIPInput : public Matcher::DataInput<TransportSocketMatchingData> {
 public:
@@ -192,11 +196,11 @@ public:
 };
 
 /**
- * Factory for creating source IP data inputs.
+ * Factory for creating source IP data inputs for transport socket matching.
  */
 class SourceIPInputFactory : public Matcher::DataInputFactory<TransportSocketMatchingData> {
 public:
-  std::string name() const override { return "envoy.matching.inputs.source_ip"; }
+  std::string name() const override { return "envoy.matching.inputs.transport_socket.source_ip"; }
 
   Matcher::DataInputFactoryCb<TransportSocketMatchingData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
@@ -212,7 +216,7 @@ public:
 };
 
 /**
- * Data input for destination port.
+ * Data input for destination port from transport socket matching context.
  */
 class DestinationPortInput : public Matcher::DataInput<TransportSocketMatchingData> {
 public:
@@ -230,11 +234,13 @@ public:
 };
 
 /**
- * Factory for creating destination port data inputs.
+ * Factory for creating destination port data inputs for transport socket matching.
  */
 class DestinationPortInputFactory : public Matcher::DataInputFactory<TransportSocketMatchingData> {
 public:
-  std::string name() const override { return "envoy.matching.inputs.destination_port"; }
+  std::string name() const override {
+    return "envoy.matching.inputs.transport_socket.destination_port";
+  }
 
   Matcher::DataInputFactoryCb<TransportSocketMatchingData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
@@ -250,7 +256,7 @@ public:
 };
 
 /**
- * Data input for source port.
+ * Data input for source port from transport socket matching context.
  */
 class SourcePortInput : public Matcher::DataInput<TransportSocketMatchingData> {
 public:
@@ -268,11 +274,11 @@ public:
 };
 
 /**
- * Factory for creating source port data inputs.
+ * Factory for creating source port data inputs for transport socket matching.
  */
 class SourcePortInputFactory : public Matcher::DataInputFactory<TransportSocketMatchingData> {
 public:
-  std::string name() const override { return "envoy.matching.inputs.source_port"; }
+  std::string name() const override { return "envoy.matching.inputs.transport_socket.source_port"; }
 
   Matcher::DataInputFactoryCb<TransportSocketMatchingData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
@@ -288,7 +294,7 @@ public:
 };
 
 /**
- * Data input for server name indication (SNI).
+ * Data input for server name indication (SNI) from transport socket matching context.
  */
 class ServerNameInput : public Matcher::DataInput<TransportSocketMatchingData> {
 public:
@@ -313,11 +319,11 @@ public:
 };
 
 /**
- * Factory for creating server name data inputs.
+ * Factory for creating server name data inputs for transport socket matching.
  */
 class ServerNameInputFactory : public Matcher::DataInputFactory<TransportSocketMatchingData> {
 public:
-  std::string name() const override { return "envoy.matching.inputs.server_name"; }
+  std::string name() const override { return "envoy.matching.inputs.transport_socket.server_name"; }
 
   Matcher::DataInputFactoryCb<TransportSocketMatchingData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
@@ -334,6 +340,7 @@ public:
 
 /**
  * Data input for application protocols (ALPN).
+ * This is transport-socket-specific since it reads from the TransportSocketMatchingData.
  */
 class ApplicationProtocolInput : public Matcher::DataInput<TransportSocketMatchingData> {
 public:
