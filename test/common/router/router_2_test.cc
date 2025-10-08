@@ -34,8 +34,8 @@ TEST_F(RouterTestSuppressEnvoyHeaders, Http1Upstream) {
       .WillOnce(Invoke([this](Http::RequestHeaderMap& headers,
                               const Formatter::HttpFormatterContext& context,
                               const StreamInfo::StreamInfo&, bool) {
-        EXPECT_EQ(&context.requestHeaders(), &headers);
-        EXPECT_EQ(&context.activeSpan(), &callbacks_.active_span_);
+        EXPECT_EQ(context.requestHeaders().ptr(), &headers);
+        EXPECT_EQ(context.activeSpan().ptr(), &callbacks_.active_span_);
       }));
 
   router_->decodeHeaders(headers, true);
