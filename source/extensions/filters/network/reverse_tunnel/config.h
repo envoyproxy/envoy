@@ -15,15 +15,16 @@ namespace ReverseTunnel {
  * Config registration for the reverse tunnel network filter.
  */
 class ReverseTunnelFilterConfigFactory
-    : public Common::FactoryBase<
+    : public Common::ExceptionFreeFactoryBase<
           envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel> {
 public:
   // Always mark the reverse tunnel filter as terminal filter.
   ReverseTunnelFilterConfigFactory()
-      : FactoryBase(NetworkFilterNames::get().ReverseTunnel, true /* isTerminalFilter */) {}
+      : ExceptionFreeFactoryBase(NetworkFilterNames::get().ReverseTunnel,
+                                 true /* isTerminalFilter */) {}
 
 private:
-  Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
+  absl::StatusOr<Network::FilterFactoryCb> createFilterFactoryFromProtoTyped(
       const envoy::extensions::filters::network::reverse_tunnel::v3::ReverseTunnel& proto_config,
       Server::Configuration::FactoryContext& context) override;
 };
