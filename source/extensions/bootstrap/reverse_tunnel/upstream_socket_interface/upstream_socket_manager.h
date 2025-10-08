@@ -117,6 +117,15 @@ public:
    */
   std::string getNodeID(const std::string& key);
 
+  /**
+   * Pick the least loaded socket manager across all worker threads for a given node.
+   * @param node_id the node ID to find the least loaded manager for.
+   * @param cluster_id the cluster ID for logging purposes.
+   * @return reference to the least loaded socket manager.
+   */
+  UpstreamSocketManager& pickLeastLoadedSocketManager(const std::string& node_id,
+                                                      const std::string& cluster_id);
+
 private:
   // Thread local dispatcher instance.
   Event::Dispatcher& dispatcher_;
@@ -150,6 +159,15 @@ private:
 
   // Upstream extension for stats integration.
   ReverseTunnelAcceptorExtension* extension_;
+
+  // Map of node IDs to the number of total accepted reverse connecitons
+  // for the node. This is used to rebalance a request to accept reverse
+  // connections to a different worker thread.
+  absl::flat_hash_map<std::string, int> node_to_conn_count_map_;
+
+  // Global list of all socket managers across threads for rebalancing
+  static std::vector<UpstreamSocketManager*> socket_managers_;
+  static absl::Mutex socket_manager_lock;
 };
 
 } // namespace ReverseConnection

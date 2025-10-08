@@ -15,26 +15,71 @@ namespace Extensions {
 namespace Bootstrap {
 namespace ReverseConnection {
 
+std::vector<UpstreamSocketManager*> UpstreamSocketManager::socket_managers_{};
+absl::Mutex UpstreamSocketManager::socket_manager_lock{};
+
+
 // UpstreamSocketManager implementation
 UpstreamSocketManager::UpstreamSocketManager(Event::Dispatcher& dispatcher,
                                              ReverseTunnelAcceptorExtension* extension)
     : dispatcher_(dispatcher), random_generator_(std::make_unique<Random::RandomGeneratorImpl>()),
       extension_(extension) {
-  ENVOY_LOG(debug, "reverse_tunnel: creating socket manager with stats integration.");
+  ENVOY_LOG(debug, "UpstreamSocketManager: creating socket manager with stats integration.");
   ping_timer_ = dispatcher_.createTimer([this]() { pingConnections(); });
 }
+
+UpstreamSocketManager& UpstreamSocketManager::pickLeastLoadedSocketManager(
+    const std::string& node_id, const std::string& cluster_id) {
+  absl::WriterMutexLock wlock(&UpstreamSocketManager::socket_manager_lock);
+
+  // Assume that this worker is the best candidate for sending the reverse
+  // connection socket.
+  UpstreamSocketManager* target_socket_manager = this;
+  const std::string source_worker = this->dispatcher_.name();
+
+  // Contains the value that we assume to be the minimum value so far.
+  int min_node_count = target_socket_manager->node_to_conn_count_map_[node_id];
+
+  // Iterate over UpstreamSocketManager instances of all threads to check
+  // if any of them have a lower number of accepted reverse tunnels for
+  // the node 'node_id'.
+  for (UpstreamSocketManager* socket_manager : socket_managers_) {
+    int node_count = socket_manager->node_to_conn_count_map_[node_id];
+
+    if (node_count < min_node_count) {
+      target_socket_manager = socket_manager;
+      min_node_count = node_count;
+    }
+  }
+
+  const std::string dest_worker = target_socket_manager->dispatcher_.name();
+
+  // Increment the reverse connection count of the chosen handler.
+  if (source_worker != dest_worker) {
+    ENVOY_LOG(info,
+              "UpstreamSocketManager: Rebalancing socket from worker {} to worker {} with min "
+              "count {} for node {} cluster {}",
+              source_worker, dest_worker, target_socket_manager->node_to_conn_count_map_[node_id], 
+              node_id, cluster_id);
+  }
+  target_socket_manager->node_to_conn_count_map_[node_id]++;
+  ENVOY_LOG(debug, "UpstreamSocketManager: Incremented count for node {}: {}", node_id,
+            target_socket_manager->node_to_conn_count_map_[node_id]);
+  return *target_socket_manager;
+}
+
 
 void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
                                                 const std::string& cluster_id,
                                                 Network::ConnectionSocketPtr socket,
-                                                const std::chrono::seconds& ping_interval, bool) {
-  ENVOY_LOG(debug, "reverse_tunnel: adding connection for node: {}, cluster: {}.", node_id,
+                                                const std::chrono::seconds& ping_interval, bool rebalanced) {
+  ENVOY_LOG(debug, "UpstreamSocketManager: adding connection for node: {}, cluster: {}.", node_id,
             cluster_id);
 
   // Both node_id and cluster_id are mandatory for consistent state management and stats tracking.
   if (node_id.empty() || cluster_id.empty()) {
     ENVOY_LOG(error,
-              "reverse_tunnel: node_id or cluster_id cannot be empty. node: '{}', cluster: '{}'.",
+              "UpstreamSocketManager: node_id or cluster_id cannot be empty. node: '{}', cluster: '{}'.",
               node_id, cluster_id);
     return;
   }
@@ -42,11 +87,11 @@ void UpstreamSocketManager::addConnectionSocket(const std::string& node_id,
   const int fd = socket->ioHandle().fdDoNotUse();
   const std::string& connectionKey = socket->connectionInfoProvider().localAddress()->asString();
 
-  ENVOY_LOG(debug, "reverse_tunnel: adding socket with FD: {} for node: {}, cluster: {}.", fd,
+  ENVOY_LOG(debug, "UpstreamSocketManager: adding socket with FD: {} for node: {}, cluster: {}.", fd,
             node_id, cluster_id);
 
   // Store node -> cluster mapping.
-  ENVOY_LOG(trace, "reverse_tunnel: adding mapping node {} -> cluster {}.", node_id, cluster_id);
+  ENVOY_LOG(trace, "UpstreamSocketManager: adding mapping node {} -> cluster {}.", node_id, cluster_id);
   if (node_to_cluster_map_.find(node_id) == node_to_cluster_map_.end()) {
     node_to_cluster_map_[node_id] = cluster_id;
     cluster_to_node_map_[cluster_id].push_back(node_id);
