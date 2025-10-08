@@ -50,7 +50,7 @@ ClusterResponseHandlerFactory::createAggregateHandler(const std::string& command
     return std::make_unique<ArrayMergeAggregateResponseHandler>(shard_count);
   }
 
-  // This should never be reached - all commands mapped to aggregate_all_responses 
+  // This should never be reached - all commands mapped to aggregate_all_responses
   // should be handled above
   ASSERT(false, fmt::format("Unhandled aggregate command: {}:{}", command_name, subcommand));
   return nullptr; // Unreachable, but needed for compilation
@@ -182,7 +182,8 @@ void BaseClusterScopeResponseHandler::sendSuccessResponse(ClusterScopeCmdRequest
 // Implementation of AllshardSameResponseHandler - Specific logic for same-response validation
 void AllshardSameResponseHandler::processAllResponses(ClusterScopeCmdRequest& request) {
 
-  ASSERT(!pending_responses_.empty()); // Empty responses should never happen for cluster scope commands
+  ASSERT(!pending_responses_
+              .empty()); // Empty responses should never happen for cluster scope commands
 
   // Handle error responses first
   if (error_count_ > 0) {
