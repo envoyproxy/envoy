@@ -1,0 +1,8 @@
+# WORKSPACE.bzlmod - bzlmod mode supplement file for envoy_mobile
+#
+# This file is loaded when --enable_bzlmod is used, AFTER MODULE.bazel is processed.
+# See parent WORKSPACE.bzlmod for architecture explanation.
+
+workspace(name = "envoy_mobile")
+
+# bzlmod-specific repository configurations for mobile can be added here if needed

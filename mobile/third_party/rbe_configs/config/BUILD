@@ -17,7 +17,6 @@
 
 package(default_visibility = ["//visibility:public"])
 
-
 toolchain(
     name = "cc-toolchain",
     exec_compatible_with = [
@@ -35,7 +34,6 @@ toolchain(
 
 platform(
     name = "platform",
-    parents = ["@local_config_platform//:host"],
     constraint_values = [
         "@platforms//os:linux",
         "@platforms//cpu:x86_64",
@@ -46,11 +44,11 @@ platform(
         "OSFamily": "Linux",
         "Pool": "linux",
     },
+    parents = ["@local_config_platform//:host"],
 )
 
 platform(
     name = "platform-asan",
-    parents = ["@local_config_platform//:host"],
     constraint_values = [
         "@platforms//os:linux",
         "@platforms//cpu:x86_64",
@@ -64,4 +62,5 @@ platform(
         # docker container fail tests on teardown (example: https://github.com/envoyproxy/envoy-mobile/runs/3443649963)
         "dockerAddCapabilities": "SYS_PTRACE",
     },
+    parents = ["@local_config_platform//:host"],
 )

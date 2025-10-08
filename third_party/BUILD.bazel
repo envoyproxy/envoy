@@ -1,0 +1,196 @@
+# Compatibility layer for migrating from WORKSPACE bind() to bzlmod
+# This provides //third_party:foo aliases for legacy //external:foo references
+# TODO: Remove this compatibility layer once all references are migrated to direct @repo//:target usage
+
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+
+package(default_visibility = ["//visibility:public"])
+
+# Core SSL/TLS dependencies
+alias(
+    name = "ssl",
+    actual = "@envoy//bazel:boringssl",
+)
+
+alias(
+    name = "crypto",
+    actual = "@envoy//bazel:boringcrypto",
+)
+
+alias(
+    name = "libssl",
+    actual = ":ssl",  # Redirect to the ssl alias to avoid circular dependency
+)
+
+alias(
+    name = "libcrypto",
+    actual = ":crypto",  # Redirect to the crypto alias to avoid circular dependency
+)
+
+# HTTP/JSON transcoding
+alias(
+    name = "path_matcher",
+    actual = "@grpc_httpjson_transcoding//src:path_matcher",
+)
+
+alias(
+    name = "grpc_transcoding",
+    actual = "@grpc_httpjson_transcoding//src:transcoding",
+)
+
+# Compression libraries
+alias(
+    name = "zlib",
+    actual = "@envoy//bazel/foreign_cc:zlib",
+)
+
+alias(
+    name = "madler_zlib",
+    actual = "@envoy//bazel/foreign_cc:zlib",
+)
+
+# HTTP/2 support
+alias(
+    name = "nghttp2",
+    actual = "@envoy//bazel/foreign_cc:nghttp2",
+)
+
+# Abseil container types
+alias(
+    name = "abseil_flat_hash_map",
+    actual = "@com_google_absl//absl/container:flat_hash_map",
+)
+
+alias(
+    name = "abseil_flat_hash_set",
+    actual = "@com_google_absl//absl/container:flat_hash_set",
+)
+
+alias(
+    name = "abseil_strings",
+    actual = "@com_google_absl//absl/strings:strings",
+)
+
+alias(
+    name = "abseil_time",
+    actual = "@com_google_absl//absl/time:time",
+)
+
+# Protocol Buffers
+alias(
+    name = "protobuf",
+    actual = "@com_google_protobuf//:protobuf",
+)
+
+alias(
+    name = "protobuf_clib",
+    actual = "@com_google_protobuf//:protoc_lib",
+)
+
+alias(
+    name = "protocol_compiler",
+    actual = "@com_google_protobuf//:protoc",
+)
+
+alias(
+    name = "protobuf_headers",
+    actual = "@com_google_protobuf//:protobuf_headers",
+)
+
+# UPB (Protocol Buffers C implementation)
+alias(
+    name = "upb_base_lib",
+    actual = "@com_google_protobuf//upb:base",
+)
+
+alias(
+    name = "upb_mem_lib",
+    actual = "@com_google_protobuf//upb:mem",
+)
+
+alias(
+    name = "upb_message_lib",
+    actual = "@com_google_protobuf//upb:message",
+)
+
+alias(
+    name = "upb_json_lib",
+    actual = "@com_google_protobuf//upb:json",
+)
+
+alias(
+    name = "upb_textformat_lib",
+    actual = "@com_google_protobuf//upb:text",
+)
+
+alias(
+    name = "upb_reflection",
+    actual = "@com_google_protobuf//upb:reflection",
+)
+
+# gRPC
+alias(
+    name = "grpc",
+    actual = "@com_github_grpc_grpc//:grpc++",
+)
+
+alias(
+    name = "grpc_health_proto",
+    actual = "@envoy//bazel:grpc_health_proto",
+)
+
+alias(
+    name = "grpc_alts_fake_handshaker_server",
+    actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:fake_handshaker_lib",
+)
+
+alias(
+    name = "grpc_alts_handshaker_proto",
+    actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:handshaker_proto",
+)
+
+alias(
+    name = "grpc_alts_transport_security_common_proto",
+    actual = "@com_github_grpc_grpc//test/core/tsi/alts/fake_handshaker:transport_security_common_proto",
+)
+
+# Regular expressions
+alias(
+    name = "re2",
+    actual = "@com_googlesource_code_re2//:re2",
+)
+
+# DNS resolution
+alias(
+    name = "cares",
+    actual = "@envoy//bazel/foreign_cc:ares",
+)
+
+# JavaScript engine
+alias(
+    name = "wee8",
+    actual = "@v8//:wee8",
+)
+
+# WebAssembly runtimes
+alias(
+    name = "wamr",
+    actual = "@envoy//bazel/foreign_cc:wamr",
+)
+
+alias(
+    name = "wasmtime",
+    actual = "@com_github_wasmtime//:wasmtime_lib",
+)
+
+# Python headers (environment-specific)
+alias(
+    name = "python_headers",
+    actual = "//bazel:python_headers",
+)
+
+# Bazel tools
+alias(
+    name = "bazel_runfiles",
+    actual = "@bazel_tools//tools/cpp/runfiles",
+)
