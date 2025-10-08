@@ -329,8 +329,7 @@ ConnectivityGrid::ConnectivityGrid(
   // HTTP/3.
   ASSERT(connectivity_options.protocols_.size() == 3);
   ASSERT(alternate_protocols);
-  std::chrono::milliseconds rtt =
-      std::chrono::duration_cast<std::chrono::milliseconds>(alternate_protocols_->getSrtt(origin_));
+  std::chrono::microseconds rtt = alternate_protocols_->getSrtt(origin_);
   if (rtt.count() != 0) {
     next_attempt_duration_ = std::chrono::duration_cast<std::chrono::milliseconds>(rtt * 1.5);
   }
