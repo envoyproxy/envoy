@@ -120,9 +120,9 @@ minor_behavior_changes:
     and reject the response if not.
 - area: ext_proc
   change: |
-    Use one of a hard-coded set of error messages when a
-    :ref:`service-ext-proc-v3-headermutation <HeaderMutation> fails.
-    request-specific details allows grouping by similar messages.  Detailed
+    Use one of a hard-coded set of error messages when a :ref:`HeaderMutation
+    <envoy_v3_api_msg_service.ext_proc.v3.HeaderMutation>` fails. Removing
+    request-specific details allows grouping by similar failure types. Detailed
     messages remain available in debug logs.
 
 bug_fixes:
