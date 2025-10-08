@@ -1,6 +1,7 @@
 #include "source/extensions/filters/http/mcp/mcp_filter.h"
 
 #include "source/common/http/headers.h"
+#include "source/common/http/utility.h"
 #include "source/common/protobuf/protobuf.h"
 #include "source/common/protobuf/utility.h"
 
