@@ -40,6 +40,7 @@ struct GrpcInitializeConfigOpts {
   uint64_t timeout_ms = 300'000; // 5 minutes.
   bool validate_mutations = false;
   bool retry_5xx = false;
+  uint32_t max_denied_response_body_bytes = 0;
   // In some tests a request is never sent. If a request is never sent, stats are not set. In those
   // tests, we need to be able to override this to false.
   absl::optional<bool> expect_stats_override;
@@ -134,6 +135,7 @@ public:
       proto_config_.set_failure_mode_allow_header_add(opts.failure_mode_allow);
       proto_config_.set_validate_mutations(opts.validate_mutations);
       proto_config_.set_encode_raw_headers(encodeRawHeaders());
+      proto_config_.set_max_denied_response_body_bytes(opts.max_denied_response_body_bytes);
 
       if (emitFilterStateStats()) {
         proto_config_.set_emit_filter_state_stats(true);
@@ -1255,6 +1257,37 @@ TEST_P(ExtAuthzGrpcIntegrationTest, TimeoutFailClosed) {
   cleanup();
 }
 
+// Test that a DENIED response with a body from the authorization service is truncated if the body
+// size is larger than max_denied_response_body_bytes.
+TEST_P(ExtAuthzGrpcIntegrationTest, DeniedResponseWithBodyTruncation) {
+  GrpcInitializeConfigOpts opts;
+  opts.max_denied_response_body_bytes = 10;
+  ext_authz_grpc_status_ = LoggingTestFilterConfig::PERMISSION_DENIED;
+  initializeConfig(opts);
+
+  setDownstreamProtocol(Http::CodecType::HTTP1);
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecType::HTTP1));
+
+  ext_authz_request_->startGrpcStream();
+  envoy::service::auth::v3::CheckResponse check_response;
+  check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::PermissionDenied);
+  check_response.mutable_denied_response()->set_body(
+      "this-is-a-long-body-that-should-be-truncated");
+  ext_authz_request_->sendGrpcMessage(check_response);
+  ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("403", response_->headers().getStatusValue());
+  EXPECT_EQ("this-is-a-", response_->body()); // Truncated to 10 bytes
+
+  cleanup();
+}
+
 TEST_P(ExtAuthzGrpcIntegrationTest, Retry) {
   if (clientType() == Grpc::ClientType::GoogleGrpc) {
     GTEST_SKIP() << "Retry is only supported for Envoy gRPC";
@@ -1914,6 +1947,56 @@ TEST_P(ExtAuthzGrpcIntegrationTest, GoogleAsyncClientCreation) {
               test_server_->counter("grpc.ext_authz_cluster.google_grpc_client_creation")->value());
   }
 
+  cleanup();
+}
+
+// Verifies that the downstream request fails when the ext_authz response
+// would cause the request headers to exceed their limit.
+TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamRequestFailsOnHeaderLimit) {
+  // Set a low header limit on the HttpConnectionManager. The default request sent by
+  // initiateClientConnection() has 15 headers. The ext_authz response can add one header before
+  // violating this limit.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) {
+        hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(16);
+      });
+
+  initializeConfig();
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP2));
+  sendExtAuthzResponse({{"header16", "value"}, {"header17", "value"}}, {}, {}, {}, {}, {}, {}, {});
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("500", response_->headers().getStatusValue());
+  cleanup();
+}
+
+// Verifies that the downstream request fails when the ext_authz response
+// would cause the request headers to exceed their size limit.
+TEST_P(ExtAuthzGrpcIntegrationTest, DownstreamRequestFailsOnHeaderSizeLimit) {
+  // Set a low header size limit on the HttpConnectionManager.
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_max_request_headers_kb()->set_value(2); });
+
+  initializeConfig();
+  setDownstreamProtocol(Http::CodecType::HTTP2);
+  HttpIntegrationTest::initialize();
+
+  initiateClientConnection(0);
+
+  waitForExtAuthzRequest(expectedCheckRequest(Http::CodecClient::Type::HTTP2));
+  sendExtAuthzResponse({{"big-header", std::string(2 * 1024, 'a')}}, {}, {}, {}, {}, {}, {}, {});
+
+  ASSERT_TRUE(response_->waitForEndStream());
+  EXPECT_TRUE(response_->complete());
+  EXPECT_EQ("500", response_->headers().getStatusValue());
   cleanup();
 }
 

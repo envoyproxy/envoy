@@ -475,12 +475,8 @@ case $CI_TARGET in
         "${ENVOY_SRCDIR}/tools/check_repositories.sh"
         echo "check dependencies..."
         # Using todays date as an action_env expires the NIST cache daily, which is the update frequency
-        TODAY_DATE=$(date -u -I"date")
-        export TODAY_DATE
         # TODO(phlax): Re-enable cve tests
         bazel run "${BAZEL_BUILD_OPTIONS[@]}" //tools/dependency:check \
-              --//tools/dependency:preload_cve_data \
-              --action_env=TODAY_DATE \
               -- -v warn \
                  -c release_dates releases
         # Run dependabot tests

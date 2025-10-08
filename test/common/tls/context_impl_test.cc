@@ -928,6 +928,31 @@ public:
   }
 };
 
+// If no require_client_certificate is configured but a validation context IS configured, warn
+// against using an insecure default.
+TEST_F(SslContextImplTest, NoRequireClientCertWithValidationContext_InsecureDefault) {
+  envoy::extensions::transport_sockets::tls::v3::DownstreamTlsContext tls_context;
+  const std::string tls_context_yaml = R"EOF(
+  common_tls_context:
+    tls_certificates:
+    - certificate_chain:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_cert.pem"
+      private_key:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/selfsigned_key.pem"
+    validation_context:
+      trusted_ca:
+        filename: "{{ test_rundir }}/test/common/tls/test_data/ca_cert.pem"
+  )EOF";
+  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_context_yaml), tls_context);
+  EXPECT_CALL(factory_context_.server_context_.runtime_loader_.snapshot_,
+              deprecatedFeatureEnabled(_, _))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(factory_context_.server_context_.runtime_loader_, countDeprecatedFeatureUse());
+  auto server_context_config =
+      *ServerContextConfigImpl::create(tls_context, factory_context_, false);
+  EXPECT_NO_THROW(loadConfig(*server_context_config));
+}
+
 TEST_F(SslServerContextImplTicketTest, TicketKeySuccess) {
   // Both keys are valid; no error should be thrown
   const std::string yaml = R"EOF(

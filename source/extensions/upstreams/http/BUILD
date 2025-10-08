@@ -22,6 +22,7 @@ envoy_cc_extension(
         "//source/common/http:utility_lib",
         "//source/common/http/http1:settings_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/extensions/common/matcher:matcher_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/extensions/http/header_validators/envoy_default/v3:pkg_cc_proto",
