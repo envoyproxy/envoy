@@ -1841,6 +1841,10 @@ void Filter::onGrpcClose() { onGrpcCloseWithStatus(Grpc::Status::Aborted); }
 void Filter::onGrpcCloseWithStatus(Grpc::Status::GrpcStatus status) {
   ENVOY_STREAM_LOG(debug, "Received gRPC stream close", *decoder_callbacks_);
 
+  if (processing_complete_) {
+    return;
+  }
+
   processing_complete_ = true;
   stats_.streams_closed_.inc();
   // Successful close. We can ignore the stream for the rest of our request
