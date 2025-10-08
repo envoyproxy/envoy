@@ -448,7 +448,8 @@ TEST_P(ExtProcIntegrationTest, NoneToFullDuplexMoreDataAfterModeOverride) {
 }
 
 TEST_P(ExtProcIntegrationTest, ServerWaitforEnvoyHalfCloseThenCloseStream) {
-  proto_config_.mutable_processing_mode()->set_request_body_mode(ProcessingMode::FULL_DUPLEX_STREAMED);
+  proto_config_.mutable_processing_mode()->set_request_body_mode(
+      ProcessingMode::FULL_DUPLEX_STREAMED);
   proto_config_.mutable_processing_mode()->set_request_trailer_mode(ProcessingMode::SEND);
   proto_config_.mutable_processing_mode()->set_response_header_mode(ProcessingMode::SKIP);
   initializeConfig();
@@ -460,15 +461,16 @@ TEST_P(ExtProcIntegrationTest, ServerWaitforEnvoyHalfCloseThenCloseStream) {
                                  EXPECT_FALSE(headers.end_of_stream());
                                  return true;
                                });
-  processRequestBodyMessage(*grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& resp) {
-    EXPECT_TRUE(body.end_of_stream());
-    EXPECT_EQ(body.body().size(), 3);
-    auto* streamed_response =
-        resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
-    streamed_response->set_body("bar");
-    streamed_response->set_end_of_stream(true);
-    return true;
-  });
+  processRequestBodyMessage(
+      *grpc_upstreams_[0], false, [](const HttpBody& body, BodyResponse& resp) {
+        EXPECT_TRUE(body.end_of_stream());
+        EXPECT_EQ(body.body().size(), 3);
+        auto* streamed_response =
+            resp.mutable_response()->mutable_body_mutation()->mutable_streamed_response();
+        streamed_response->set_body("bar");
+        streamed_response->set_end_of_stream(true);
+        return true;
+      });
 
   // Envoy half closes the stream.
   EXPECT_TRUE(processor_stream_->waitForReset());
