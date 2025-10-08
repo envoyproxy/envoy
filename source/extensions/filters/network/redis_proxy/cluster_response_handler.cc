@@ -50,8 +50,10 @@ ClusterResponseHandlerFactory::createAggregateHandler(const std::string& command
     return std::make_unique<ArrayMergeAggregateResponseHandler>(shard_count);
   }
 
-  // Default fallback - return null for unsupported commands
-  return nullptr;
+  // This should never be reached - all commands mapped to aggregate_all_responses 
+  // should be handled above
+  ASSERT(false, fmt::format("Unhandled aggregate command: {}:{}", command_name, subcommand));
+  return nullptr; // Unreachable, but needed for compilation
 }
 
 std::unique_ptr<BaseClusterScopeResponseHandler>
@@ -130,20 +132,6 @@ void BaseClusterScopeResponseHandler::handleResponse(Common::Redis::RespValuePtr
   processAllResponses(request);
 }
 
-void BaseClusterScopeResponseHandler::handleFailure(uint32_t shard_index,
-                                                    ClusterScopeCmdRequest& request) {
-  ENVOY_LOG(debug, "BaseClusterScopeResponseHandler: failure received for shard index: '{}'",
-            shard_index);
-
-  // Create an error response for the upstream failure using standard error message
-  Common::Redis::RespValuePtr error_response =
-      Common::Redis::Utility::makeError(Response::get().UpstreamFailure);
-
-  // Route the error response through the normal response handling flow
-  // This ensures consistent error handling logic and stats tracking
-  handleResponse(std::move(error_response), shard_index, request);
-}
-
 void BaseClusterScopeResponseHandler::storeResponse(Common::Redis::RespValuePtr&& value,
                                                     uint32_t shard_index,
                                                     ClusterScopeCmdRequest& request) {
@@ -175,10 +163,6 @@ void BaseClusterScopeResponseHandler::handleErrorResponses(ClusterScopeCmdReques
       return;
     }
   }
-
-  // Should not reach here if error_count_ > 0, but handle gracefully
-  ENVOY_LOG(error, "Error count mismatch - no error response found despite error_count_ > 0");
-  request.sendResponse(Common::Redis::Utility::makeError(fmt::format("error count mismatch")));
 }
 
 void BaseClusterScopeResponseHandler::sendErrorResponse(ClusterScopeCmdRequest& request,
@@ -197,11 +181,8 @@ void BaseClusterScopeResponseHandler::sendSuccessResponse(ClusterScopeCmdRequest
 
 // Implementation of AllshardSameResponseHandler - Specific logic for same-response validation
 void AllshardSameResponseHandler::processAllResponses(ClusterScopeCmdRequest& request) {
-  // Check for empty responses (should not happen but safety first)
-  if (pending_responses_.empty()) {
-    sendErrorResponse(request, "no responses received from any shard");
-    return;
-  }
+
+  ASSERT(!pending_responses_.empty()); // Empty responses should never happen for cluster scope commands
 
   // Handle error responses first
   if (error_count_ > 0) {
@@ -226,9 +207,7 @@ void AllshardSameResponseHandler::processAllResponses(ClusterScopeCmdRequest& re
 }
 
 bool AllshardSameResponseHandler::areAllResponsesSame() const {
-  if (pending_responses_.empty()) {
-    return false; // Empty responses should be treated as an error condition
-  }
+  ASSERT(!pending_responses_.empty()); // Empty responses should never happen
 
   const Common::Redis::RespValue* first_response = pending_responses_.front().get();
   for (const auto& response : pending_responses_) {
@@ -247,11 +226,8 @@ void BaseAggregateResponseHandler::processAllResponses(ClusterScopeCmdRequest& r
     return;
   }
 
-  // Check for empty responses
-  if (pending_responses_.empty()) {
-    sendErrorResponse(request, "no responses received from any shard");
-    return;
-  }
+  // Validate that we have responses - this should always be true for cluster scope commands
+  ASSERT(!pending_responses_.empty());
 
   // Process aggregated responses - specific logic per handler type
   processAggregatedResponses(request);

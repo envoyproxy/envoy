@@ -409,18 +409,6 @@ private:
     }
   }
 
-  void onChildFailure(uint32_t index) {
-    if (response_handler_) {
-      response_handler_->handleFailure(index, *this);
-    } else {
-      // No handler available for this command - fallback to base class behavior
-      ENVOY_LOG(
-          warn,
-          "No response handler set for ClusterScopeCmdRequest on failure, using base behavior");
-      FragmentedRequest::onChildFailure(index);
-    }
-  }
-
   std::unique_ptr<BaseClusterScopeResponseHandler> response_handler_;
 };
 

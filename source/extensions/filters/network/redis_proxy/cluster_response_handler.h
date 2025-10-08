@@ -43,13 +43,6 @@ public:
   void handleResponse(Common::Redis::RespValuePtr&& value, uint32_t shard_index,
                       ClusterScopeCmdRequest& request);
 
-  /**
-   * Handle a failure from a shard by converting it to an error response
-   * @param shard_index the shard that failed (same as request index)
-   * @param request the cluster scope request object (has all needed data)
-   */
-  void handleFailure(uint32_t shard_index, ClusterScopeCmdRequest& request);
-
 protected:
   // Response handler owns response tracking state
   uint32_t num_pending_responses_;

@@ -2685,6 +2685,30 @@ TEST_F(ClusterScopeConfigTest, ConfigSetFirstResponseNull) {
   EXPECT_EQ(1UL, store_.counter("redis.foo.command.config.error").value());
 }
 
+TEST_F(ClusterScopeConfigTest, UnsupportedClusterScopeCommandNoHandler) {
+  // Test a cluster scope command that doesn't have a response handler
+  // This should trigger the initializeResponseHandler() failure path
+  
+  // Set up mock to return non-zero shard size so we don't hit the early exit
+  EXPECT_CALL(*conn_pool_, shardSize_()).WillOnce(Return(2));
+  
+  Common::Redis::RespValue expected_error;
+  expected_error.type(Common::Redis::RespType::Error);
+  expected_error.asString() = "ERR unsupported cluster scope command or invalid arguments";
+
+  EXPECT_CALL(callbacks_, connectionAllowed()).WillOnce(Return(true));
+  EXPECT_CALL(callbacks_, onResponse_(PointeesEq(&expected_error)));
+  
+  Common::Redis::RespValuePtr request{new Common::Redis::RespValue()};
+  makeBulkStringArray(*request, {"config", "unsupported"}); // config with unsupported subcommand
+  
+  handle_ = splitter_.makeRequest(std::move(request), callbacks_, dispatcher_, stream_info_);
+  EXPECT_EQ(nullptr, handle_);
+  
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.config.total").value());
+  EXPECT_EQ(1UL, store_.counter("redis.foo.command.config.error").value());
+}
+
 // Test cluster scope commands - SLOWLOG LEN (IntegerSumAggregateResponseHandler)
 class ClusterScopeSlowLogLenTest : public FragmentedRequestCommandHandlerTest {
 public:
