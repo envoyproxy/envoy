@@ -1594,8 +1594,7 @@ bool isLastBodyResponse(ProcessorState& state,
 } // namespace
 
 bool Filter::noExternalProcessInEncoding() const {
-  return (!encoding_state_.sendHeaders() &&
-      encoding_state_.bodyMode() == ProcessingMode::NONE &&
+  return (!encoding_state_.sendHeaders() && encoding_state_.bodyMode() == ProcessingMode::NONE &&
           !encoding_state_.sendTrailers());
 }
 
@@ -1607,15 +1606,13 @@ void Filter::closeGrpcStreamIfLastRespReceived(
   switch (response->response_case()) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
     if ((decoding_state_.hasNoBody() ||
-        (decoding_state_.bodyMode() == ProcessingMode::NONE &&
-        !decoding_state_.sendTrailers())) &&
+         (decoding_state_.bodyMode() == ProcessingMode::NONE && !decoding_state_.sendTrailers())) &&
         noExternalProcessInEncoding()) {
       last_response = true;
     }
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
-    if (isLastBodyResponse(decoding_state_, *response) &&
-        noExternalProcessInEncoding()) {
+    if (isLastBodyResponse(decoding_state_, *response) && noExternalProcessInEncoding()) {
       last_response = true;
     }
     break;
@@ -1626,8 +1623,7 @@ void Filter::closeGrpcStreamIfLastRespReceived(
     break;
   case ProcessingResponse::ResponseCase::kResponseHeaders:
     if (encoding_state_.hasNoBody() ||
-        (encoding_state_.bodyMode() == ProcessingMode::NONE
-        && !encoding_state_.sendTrailers())) {
+        (encoding_state_.bodyMode() == ProcessingMode::NONE && !encoding_state_.sendTrailers())) {
       last_response = true;
     }
     break;
@@ -1648,7 +1644,8 @@ void Filter::closeGrpcStreamIfLastRespReceived(
   }
 
   if (last_response) {
-    ENVOY_STREAM_LOG(debug, "Closing gRPC stream after receiving last response", *decoder_callbacks_);
+    ENVOY_STREAM_LOG(debug, "Closing gRPC stream after receiving last response",
+                     *decoder_callbacks_);
     closeStreamMaybeGraceful();
   }
 }

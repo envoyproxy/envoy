@@ -5005,8 +5005,7 @@ TEST_F(HttpFilterTest, CloseStreamOnRequestHeaders) {
 
   EXPECT_EQ(FilterHeadersStatus::StopIteration, filter_->decodeHeaders(request_headers_, true));
   // The next response should be the last, so expect the stream to be closed.
-  processRequestHeaders(
-      true, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse&) {});
+  processRequestHeaders(true, [](const HttpHeaders&, ProcessingResponse&, HeadersResponse&) {});
   EXPECT_EQ(1, config_->stats().stream_msgs_sent_.value());
   EXPECT_EQ(1, config_->stats().stream_msgs_received_.value());
   EXPECT_EQ(1, config_->stats().streams_closed_.value());
