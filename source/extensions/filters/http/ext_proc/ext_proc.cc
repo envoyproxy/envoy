@@ -716,6 +716,7 @@ void Filter::deferredCloseStream() {
 }
 
 void Filter::closeStreamMaybeGraceful() {
+  processing_complete_ = true;
   if (config_->gracefulGrpcClose()) {
     halfCloseAndWaitForRemoteClose();
   } else {
