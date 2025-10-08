@@ -715,6 +715,15 @@ void Filter::deferredCloseStream() {
   config_->threadLocalStreamManager().deferredErase(stream_, filter_callbacks_->dispatcher());
 }
 
+void Filter::closeStreamMaybeGraceful() {
+  if (config_->gracefulGrpcClose()) {
+    halfCloseAndWaitForRemoteClose();
+  } else {
+    // Perform immediate close on the stream otherwise.
+    closeStream();
+  }
+}
+
 void Filter::onDestroy() {
   ENVOY_STREAM_LOG(debug, "onDestroy", *decoder_callbacks_);
   // Make doubly-sure we no longer use the stream, as
@@ -742,12 +751,7 @@ void Filter::onDestroy() {
     // Second, perform stream deferred closure.
     deferredCloseStream();
   } else {
-    if (config_->gracefulGrpcClose()) {
-      halfCloseAndWaitForRemoteClose();
-    } else {
-      // Perform immediate close on the stream otherwise.
-      closeStream();
-    }
+    closeStreamMaybeGraceful();
   }
 }
 
@@ -1237,6 +1241,12 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
   // local reply.
   mergePerRouteConfig();
 
+  // If there is no external processing configured in the encoding path,
+  // closing the gRPC stream if it is still open.
+  if (noExternalProcessInEncoding()) {
+    closeStreamMaybeGraceful();
+  }
+
   if (encoding_state_.sendHeaders() && config_->observabilityMode()) {
     return sendHeadersInObservabilityMode(headers, encoding_state_, end_stream);
   }
@@ -1547,7 +1557,101 @@ ProcessingMode effectiveModeOverride(const ProcessingMode& target_override,
   return mode_override;
 }
 
+bool isLastBodyResponse(ProcessorState& state,
+                        const envoy::service::ext_proc::v3::ProcessingResponse& response) {
+  switch (state.bodyMode()) {
+  case ProcessingMode::BUFFERED:
+  case ProcessingMode::BUFFERED_PARTIAL:
+    // TODO: - skip stream closing optimization for BUFFERED and BUFFERED_PARTIAL for now.
+    break;
+  case ProcessingMode::STREAMED:
+    if (!state.chunkQueue().empty()) {
+      return state.chunkQueue().queue().front()->end_stream;
+    }
+    break;
+  case ProcessingMode::FULL_DUPLEX_STREAMED: {
+    const envoy::service::ext_proc::v3::BodyResponse* body_response = nullptr;
+    if (response.has_request_body()) {
+      body_response = &response.request_body();
+    } else if (response.has_response_body()) {
+      body_response = &response.response_body();
+    }
+    if (body_response != nullptr && body_response->has_response()) {
+      const auto& common_response = body_response->response();
+      if (common_response.has_body_mutation() &&
+          common_response.body_mutation().has_streamed_response()) {
+        return common_response.body_mutation().streamed_response().end_of_stream();
+      }
+    }
+    break;
+  }
+  default:
+    break;
+  }
+  return false;
+}
+
 } // namespace
+
+bool Filter::noExternalProcessInEncoding() const {
+  return (!encoding_state_.sendHeaders() &&
+      encoding_state_.bodyMode() == ProcessingMode::NONE &&
+          !encoding_state_.sendTrailers());
+}
+
+// Close the gRPC stream if the last ProcessingResponse is received.
+void Filter::closeGrpcStreamIfLastRespReceived(
+    const std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>& response) {
+  bool last_response = false;
+
+  switch (response->response_case()) {
+  case ProcessingResponse::ResponseCase::kRequestHeaders:
+    if ((decoding_state_.hasNoBody() ||
+        (decoding_state_.bodyMode() == ProcessingMode::NONE &&
+        !decoding_state_.sendTrailers())) &&
+        noExternalProcessInEncoding()) {
+      last_response = true;
+    }
+    break;
+  case ProcessingResponse::ResponseCase::kRequestBody:
+    if (isLastBodyResponse(decoding_state_, *response) &&
+        noExternalProcessInEncoding()) {
+      last_response = true;
+    }
+    break;
+  case ProcessingResponse::ResponseCase::kRequestTrailers:
+    if (noExternalProcessInEncoding()) {
+      last_response = true;
+    }
+    break;
+  case ProcessingResponse::ResponseCase::kResponseHeaders:
+    if (encoding_state_.hasNoBody() ||
+        (encoding_state_.bodyMode() == ProcessingMode::NONE
+        && !encoding_state_.sendTrailers())) {
+      last_response = true;
+    }
+    break;
+  case ProcessingResponse::ResponseCase::kResponseBody:
+    if (isLastBodyResponse(encoding_state_, *response)) {
+      last_response = true;
+    }
+    break;
+  case ProcessingResponse::ResponseCase::kResponseTrailers:
+    last_response = true;
+    break;
+  case ProcessingResponse::ResponseCase::kImmediateResponse:
+    // Immediate response currently may close the stream immediately.
+    // Leave it as it is for now.
+    break;
+  default:
+    break;
+  }
+
+  if (last_response) {
+    ENVOY_STREAM_LOG(debug, "Closing gRPC stream after receiving last response", *decoder_callbacks_);
+    closeStreamMaybeGraceful();
+  }
+}
 
 void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
@@ -1616,6 +1720,10 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
 
   ENVOY_STREAM_LOG(debug, "Received {} response", *decoder_callbacks_,
                    responseCaseToString(response->response_case()));
+
+  // Close the gRPC stream if this is the last response message.
+  closeGrpcStreamIfLastRespReceived(response);
+
   absl::Status processing_status;
   switch (response->response_case()) {
   case ProcessingResponse::ResponseCase::kRequestHeaders:
@@ -1656,11 +1764,7 @@ void Filter::onReceiveMessage(std::unique_ptr<ProcessingResponse>&& r) {
       ENVOY_STREAM_LOG(debug, "Sending immediate response", *decoder_callbacks_);
       processing_complete_ = true;
       onFinishProcessorCalls(Grpc::Status::Ok);
-      if (config_->gracefulGrpcClose()) {
-        halfCloseAndWaitForRemoteClose();
-      } else {
-        closeStream();
-      }
+      closeStreamMaybeGraceful();
       if (on_processing_response_) {
         on_processing_response_->afterReceivingImmediateResponse(
             response->immediate_response(), absl::OkStatus(), decoder_callbacks_->streamInfo());
