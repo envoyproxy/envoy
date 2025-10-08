@@ -1680,20 +1680,43 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::ResponseHeaderMapPt
   // handle the case when an error grpc-status is sent as a trailer.
   absl::optional<Grpc::Status::GrpcStatus> grpc_status;
   uint64_t grpc_to_http_status = 0;
+  uint64_t response_code_for_outlier_detection = response_code;
   if (grpc_request_) {
     grpc_status = Grpc::Common::getGrpcStatus(*headers);
     if (grpc_status.has_value()) {
       grpc_to_http_status = Grpc::Utility::grpcToHttpStatus(grpc_status.value());
+      response_code_for_outlier_detection = grpc_to_http_status;
+    }
+  } else {
+    // Check cluster's http_protocol_options if different code should be reported to
+    // outlier detector.
+    absl::optional<bool> matched = cluster_->processHttpForOutlierDetection(*headers);
+    if (matched.has_value()) {
+      // Outlier detector distinguishes only two values:
+      // Anything >= 500 is error.
+      // Anything < 500 is success.
+      if (!matched.value()) {
+        // Matcher returned non-match.
+        // report success to outlier detector.
+        response_code_for_outlier_detection = 200;
+      } else {
+        // Matcher returned match (treat the response as error).
+        // If the original status code was error (>= 500), then report the
+        // original status code to the outlier detector.
+        if (response_code < 500) {
+          response_code_for_outlier_detection = 500;
+        }
+      }
     }
   }
 
-  maybeProcessOrcaLoadReport(*headers, upstream_request);
-
-  const uint64_t put_result_code = grpc_status.has_value() ? grpc_to_http_status : response_code;
   upstream_request.upstreamHost()->outlierDetector().putResult(
-      put_result_code >= 500 ? Upstream::Outlier::Result::ExtOriginRequestFailed
-                             : Upstream::Outlier::Result::ExtOriginRequestSuccess,
-      put_result_code);
+      response_code_for_outlier_detection >= 500
+          ? Upstream::Outlier::Result::ExtOriginRequestFailed
+          : Upstream::Outlier::Result::ExtOriginRequestSuccess,
+      response_code_for_outlier_detection);
+
+  maybeProcessOrcaLoadReport(*headers, upstream_request);
 
   if (headers->EnvoyImmediateHealthCheckFail() != nullptr) {
     upstream_request.upstreamHost()->healthChecker().setUnhealthy(
