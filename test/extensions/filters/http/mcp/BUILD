@@ -31,6 +31,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
+    rbe_pool = "6gig",
     deps = [
         "//source/extensions/filters/http/mcp:config",
         "//test/mocks/server:factory_context_mocks",
