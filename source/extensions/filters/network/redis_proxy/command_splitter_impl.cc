@@ -722,16 +722,10 @@ SplitRequestPtr RandomShardRequest::create(Router& router,
                                            SplitCallbacks& callbacks, CommandStats& command_stats,
                                            TimeSource& time_source, bool delay_command_latency,
                                            const StreamInfo::StreamInfo& stream_info) {
-  // Use default key (empty string) for routing since these commands aren't tied to specific keys
-  std::string empty_key = "";
-  const auto route = router.upstreamPool(empty_key, stream_info);
-  if (!route) {
-    command_stats.error_.inc();
-    callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
-    return nullptr;
-  }
-
+  // Extract command first since we need it for routing
   const std::string command = absl::AsciiStrToLower(incoming_request->asArray()[0].asString());
+
+  // First validate subcommands before any routing checks
   if (incoming_request->asArray().size() > 1) {
     const std::string subcommand = absl::AsciiStrToLower(incoming_request->asArray()[1].asString());
     // check is there is any subcommand restrictions for the command
@@ -743,7 +737,10 @@ SplitRequestPtr RandomShardRequest::create(Router& router,
     }
   }
 
-  uint32_t shard_size = route->upstream(command)->shardSize();
+  // Use default key (empty string) for routing since these commands aren't tied to specific keys
+  std::string empty_key = "";
+  const auto route = router.upstreamPool(empty_key, stream_info);
+  uint32_t shard_size = route ? route->upstream(command)->shardSize() : 0;
   if (shard_size == 0) {
     command_stats.error_.inc();
     callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
@@ -827,11 +824,6 @@ SplitRequestPtr ClusterScopeCmdRequest::create(Router& router,
 
   std::string empty_key = "";
   const auto route = router.upstreamPool(empty_key, stream_info);
-  if (!route) {
-    ENVOY_LOG(error, "route not found: '{}'", incoming_request->toString());
-    callbacks.onResponse(Common::Redis::Utility::makeError(Response::get().NoUpstreamHost));
-    return nullptr;
-  }
 
   shard_size = route ? route->upstream(command)->shardSize() : 0;
   if (shard_size == 0) {

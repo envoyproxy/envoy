@@ -375,6 +375,8 @@ public:
   size_t getTotalShardCount() const { return pending_requests_.size(); }
 
 private:
+  friend class ClusterScopeConfigTest;
+
   ClusterScopeCmdRequest(SplitCallbacks& callbacks, CommandStats& command_stats,
                          TimeSource& time_source, bool delay_command_latency)
       : FragmentedRequest(callbacks, command_stats, time_source, delay_command_latency) {}
