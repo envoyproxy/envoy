@@ -74,9 +74,12 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
       runtime_(context.runtime()) {}
 
 Network::FilterStatus RoleBasedAccessControlFilter::onNewConnection() {
-  has_connection_established_ = true;
-
   // Stop reading until authorization completes to prevent upstream connection establishment.
+  // Note: readDisable() operates at the network filter level and does not affect the transport
+  // socket layer. Transport sockets (e.g., TLS) can still complete their handshakes independently
+  // and will raise the Connected event when ready. The filter will then run authorization in
+  // onEvent(Connected) and re-enable reading if the connection is allowed. For transport sockets
+  // that don't raise a Connected event (e.g., raw TCP), authorization falls back to onData().
   if (config_->enforceOnTransportReady()) {
     authorization_pending_ = true;
     callbacks_->connection().readDisable(true);
@@ -213,10 +216,8 @@ void RoleBasedAccessControlFilter::onEvent(Network::ConnectionEvent event) {
       event == Network::ConnectionEvent::LocalClose) {
     resetTimerState();
   } else if (event == Network::ConnectionEvent::Connected) {
-    // Run authorization when transport is ready if onNewConnection was called
-    // and authorization is still pending.
-    if (config_->enforceOnTransportReady() && has_connection_established_ &&
-        authorization_pending_) {
+    // Run authorization when transport is ready if authorization is still pending.
+    if (config_->enforceOnTransportReady() && authorization_pending_) {
       authorization_pending_ = false;
       if (runAuthorization()) {
         callbacks_->connection().readDisable(false);

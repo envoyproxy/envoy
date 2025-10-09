@@ -121,7 +121,6 @@ private:
   void resetTimerState();
   Event::TimerPtr delay_timer_{nullptr};
   bool is_delay_denied_{false};
-  bool has_connection_established_{false};
   bool authorization_pending_{false};
 };
 
