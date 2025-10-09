@@ -5,8 +5,6 @@
 #include "source/common/common/logger.h"
 #include "source/common/quic/quic_network_connectivity_observer.h"
 
-using NetworkHandle = int64_t;
-
 namespace Envoy {
 namespace Quic {
 

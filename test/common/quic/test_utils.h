@@ -387,6 +387,27 @@ public:
       observer->onNetworkMadeDefault(network);
     }
   }
+
+  void onNetworkDisconnected(NetworkHandle network) {
+    std::list<Quic::QuicNetworkConnectivityObserver*> existing_observers;
+    for (Quic::QuicNetworkConnectivityObserver* observer : registeredQuicObservers()) {
+      existing_observers.push_back(observer);
+    }
+    for (auto* observer : existing_observers) {
+      observer->onNetworkDisconnected(network);
+    }
+  }
+
+  void onNetworkConnected(NetworkHandle network) {
+    std::list<Quic::QuicNetworkConnectivityObserver*> existing_observers;
+    for (Quic::QuicNetworkConnectivityObserver* observer : registeredQuicObservers()) {
+      existing_observers.push_back(observer);
+    }
+    for (auto* observer : existing_observers) {
+      observer->onNetworkConnected(network);
+    }
+  }
+
   using Quic::EnvoyQuicNetworkObserverRegistry::registeredQuicObservers;
 };
 

@@ -2,9 +2,10 @@
 
 #include <memory>
 
+namespace Envoy {
+
 using NetworkHandle = int64_t;
 
-namespace Envoy {
 namespace Quic {
 
 // An interface to get network change notifications from the underlying platform.
