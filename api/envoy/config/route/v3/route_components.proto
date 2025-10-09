@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.route.v3;
 
+import "envoy/config/common/mutation_rules/v3/mutation_rules.proto";
 import "envoy/config/core/v3/base.proto";
 import "envoy/config/core/v3/extension.proto";
 import "envoy/config/core/v3/proxy_protocol.proto";
@@ -838,7 +839,7 @@ message RouteAction {
   // .. note::
   //
   //   Shadowing doesn't support Http CONNECT and upgrades.
-  // [#next-free-field: 7]
+  // [#next-free-field: 9]
   message RequestMirrorPolicy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteAction.RequestMirrorPolicy";
@@ -890,6 +891,20 @@ message RouteAction {
 
     // Disables appending the ``-shadow`` suffix to the shadowed ``Host`` header. Defaults to ``false``.
     bool disable_shadow_host_suffix_append = 6;
+
+    // Specifies a list of header mutations that should be applied to each mirrored request.
+    // Header mutations are applied in the order they are specified. For more information, including
+    // details on header value syntax, see the documentation on :ref:`custom request headers
+    // <config_http_conn_man_headers_custom_request_headers>`.
+    repeated common.mutation_rules.v3.HeaderMutation request_headers_mutations = 7
+        [(validate.rules).repeated = {max_items: 1000}];
+
+    // Indicates that during mirroring, the host header will be swapped with this value.
+    // :ref:`disable_shadow_host_suffix_append
+    // <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.disable_shadow_host_suffix_append>`
+    // is implicitly enabled if this field is set.
+    string host_rewrite_literal = 8
+        [(validate.rules).string = {well_known_regex: HTTP_HEADER_VALUE strict: false}];
   }
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer
