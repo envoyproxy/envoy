@@ -13,8 +13,6 @@
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
 
-SETUP_LOG_RECORDER;
-
 #if defined(ENVOY_CONFIG_COVERAGE)
 #define DISABLE_UNDER_COVERAGE return
 #else

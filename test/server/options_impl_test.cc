@@ -32,8 +32,6 @@
 #include "gtest/gtest.h"
 #include "spdlog/spdlog.h"
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace {
 

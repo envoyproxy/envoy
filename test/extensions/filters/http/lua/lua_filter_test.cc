@@ -34,8 +34,6 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::StrEq;
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {

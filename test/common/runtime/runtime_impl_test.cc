@@ -40,8 +40,6 @@ using testing::MockFunction;
 using testing::NiceMock;
 using testing::Return;
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Runtime {
 namespace {

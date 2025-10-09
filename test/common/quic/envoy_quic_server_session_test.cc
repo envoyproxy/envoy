@@ -42,8 +42,6 @@ using testing::AnyNumber;
 using testing::Invoke;
 using testing::Return;
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Quic {
 

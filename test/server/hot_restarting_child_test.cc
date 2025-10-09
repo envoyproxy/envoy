@@ -22,8 +22,6 @@ using testing::ReturnRef;
 using testing::SaveArg;
 using testing::WhenDynamicCastTo;
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Server {
 namespace {

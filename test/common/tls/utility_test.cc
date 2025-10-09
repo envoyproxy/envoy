@@ -19,8 +19,6 @@
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {

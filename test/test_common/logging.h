@@ -40,17 +40,7 @@ private:
   FineGrainLogLevelMap previous_fine_grain_levels_;
 };
 
-class LogEnvironment;
-
-/** RAII to register a log expectation. */
-class LogExpectation {
-public:
-  LogExpectation(LogEnvironment* log_env,
-                 absl::AnyInvocable<void(Logger::Logger::Levels, const std::string&)> on_log);
-  ~LogExpectation();
-  LogEnvironment* log_env_;
-  absl::AnyInvocable<void(Logger::Logger::Levels, const std::string&)> on_log_;
-};
+class LogExpectation;
 
 /**
  * Records log messages in a vector<string>, forwarding them to the previous
@@ -86,34 +76,42 @@ private:
   absl::flat_hash_set<LogExpectation*> expectations_ ABSL_GUARDED_BY(exp_mtx_);
 };
 
-class LogEnvironment : public ::testing::Environment {
+/** RAII to register a log expectation. */
+class LogExpectation {
 public:
-  void SetUp() override {
-    Envoy::Logger::DelegatingLogSinkSharedPtr sink_ptr = Envoy::Logger::Registry::getSink();
-    log_recorder_ = std::make_unique<Envoy::LogRecordingSink>(sink_ptr);
-  }
-
-  void TearDown() override { log_recorder_.reset(); }
-
-  std::unique_ptr<LogRecordingSink> log_recorder_;
+  LogExpectation(LogRecordingSink& sink,
+                 absl::AnyInvocable<void(Logger::Logger::Levels, const std::string&)> on_log);
+  ~LogExpectation();
+  LogRecordingSink& sink_;
+  absl::AnyInvocable<void(Logger::Logger::Levels, const std::string&)> on_log_;
 };
 
-#define LOG_RECORDER_NAME log_env
+// Initializes the global log environment and must be called prior to execution of Envoy code.
+inline LogRecordingSink& GetLogSink() {
+  class LogEnvironment : public ::testing::Environment {
+  public:
+    void SetUp() override {
+      Envoy::Logger::DelegatingLogSinkSharedPtr sink_ptr = Envoy::Logger::Registry::getSink();
+      log_recorder_ = std::make_unique<Envoy::LogRecordingSink>(sink_ptr);
+    }
 
-#define SETUP_LOG_RECORDER                                                                         \
-  ::Envoy::LogEnvironment* const LOG_RECORDER_NAME = static_cast<::Envoy::LogEnvironment*>(        \
-      ::testing::AddGlobalTestEnvironment(new ::Envoy::LogEnvironment));
+    void TearDown() override { log_recorder_.reset(); }
+
+    std::unique_ptr<LogRecordingSink> log_recorder_;
+  };
+  static LogEnvironment* log_env =
+      static_cast<LogEnvironment*>(::testing::AddGlobalTestEnvironment(new LogEnvironment));
+  return *log_env->log_recorder_;
+}
 
 class StartStopRecording {
 public:
-  explicit StartStopRecording(LogEnvironment* log_env) : log_env_(log_env) {
-    log_env->log_recorder_->start();
-  }
-  const std::vector<std::string> messages() const { return log_env_->log_recorder_->messages(); }
-  ~StartStopRecording() { log_env_->log_recorder_->stop(); }
+  explicit StartStopRecording(LogRecordingSink& sink) : sink_(sink) { sink_.start(); }
+  const std::vector<std::string> messages() const { return sink_.messages(); }
+  ~StartStopRecording() { sink_.stop(); }
 
 private:
-  LogEnvironment* log_env_;
+  LogRecordingSink& sink_;
 };
 
 using StringPair = std::pair<std::string, std::string>;
@@ -149,7 +147,7 @@ using ExpectedLogMessages = std::vector<StringPair>;
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
     Envoy::Logger::DelegatingLogSinkSharedPtr sink_ptr = Envoy::Logger::Registry::getSink();       \
     sink_ptr->setShouldEscape(escaped);                                                            \
-    ::Envoy::StartStopRecording recording(LOG_RECORDER_NAME);                                      \
+    Envoy::StartStopRecording recording(Envoy::GetLogSink());                                      \
     stmt;                                                                                          \
     auto messages = recording.messages();                                                          \
     if (messages.empty()) {                                                                        \
@@ -189,7 +187,7 @@ using ExpectedLogMessages = std::vector<StringPair>;
 #define EXPECT_LOG_NOT_CONTAINS(loglevel, substr, stmt)                                            \
   do {                                                                                             \
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
-    ::Envoy::StartStopRecording recording(LOG_RECORDER_NAME);                                      \
+    Envoy::StartStopRecording recording(Envoy::GetLogSink());                                      \
     stmt;                                                                                          \
     auto messages = recording.messages();                                                          \
     for (const std::string& message : messages) {                                                  \
@@ -220,7 +218,7 @@ using ExpectedLogMessages = std::vector<StringPair>;
 #define EXPECT_LOG_CONTAINS_N_TIMES(loglevel, substr, expected_occurrences, stmt)                  \
   do {                                                                                             \
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
-    ::Envoy::StartStopRecording recording(LOG_RECORDER_NAME);                                      \
+    Envoy::StartStopRecording recording(Envoy::GetLogSink());                                      \
     stmt;                                                                                          \
     auto messages = recording.messages();                                                          \
     uint64_t actual_occurrences = 0;                                                               \
@@ -244,8 +242,7 @@ using ExpectedLogMessages = std::vector<StringPair>;
 #define EXPECT_NO_LOGS(stmt)                                                                       \
   do {                                                                                             \
     Envoy::LogLevelSetter save_levels(spdlog::level::trace);                                       \
-    Envoy::LogRecordingSink log_recorder(Envoy::Logger::Registry::getSink());                      \
-    ::Envoy::StartStopRecording recording(LOG_RECORDER_NAME);                                      \
+    Envoy::StartStopRecording recording(Envoy::GetLogSink());                                      \
     stmt;                                                                                          \
     auto logs = recording.messages();                                                              \
     ASSERT_EQ(0, logs.size()) << " Logs:\n   " << absl::StrJoin(logs, "   ");                      \
@@ -259,7 +256,7 @@ using ExpectedLogMessages = std::vector<StringPair>;
     Envoy::Logger::DelegatingLogSinkSharedPtr sink_ptr = Envoy::Logger::Registry::getSink();       \
     std::string loglevel = loglevel_raw;                                                           \
     std::string substr = substr_raw;                                                               \
-    ::Envoy::StartStopRecording recording(LOG_RECORDER_NAME);                                      \
+    Envoy::StartStopRecording recording(Envoy::GetLogSink());                                      \
     stmt;                                                                                          \
     while (true) {                                                                                 \
       auto messages = recording.messages();                                                        \

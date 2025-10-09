@@ -17,8 +17,6 @@ using testing::Return;
 using testing::ReturnRef;
 using testing::StrictMock;
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Network {
 

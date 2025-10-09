@@ -21,8 +21,6 @@ using testing::AtLeast;
 using testing::Return;
 using testing::ReturnNull;
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {

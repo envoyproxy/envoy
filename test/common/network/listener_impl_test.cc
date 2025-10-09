@@ -24,8 +24,6 @@ using testing::_;
 using testing::Invoke;
 using testing::Return;
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Network {
 namespace {

@@ -45,8 +45,6 @@ using testing::Return;
 using testing::StrictMock;
 using testing::WhenDynamicCastTo;
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {

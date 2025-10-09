@@ -19,8 +19,6 @@ using testing::NiceMock;
 using testing::Return;
 using testing::SaveArg;
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Config {
 namespace {

@@ -49,8 +49,6 @@ using testing::NiceMock;
 using testing::Return;
 using testing::StartsWith;
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Http {
 namespace Http2 {

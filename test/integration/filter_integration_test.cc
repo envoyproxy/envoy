@@ -1,7 +1,5 @@
 #include "test/integration/http_protocol_integration.h"
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace {
 

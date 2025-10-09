@@ -26,8 +26,6 @@ using testing::_;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Http {
 namespace {

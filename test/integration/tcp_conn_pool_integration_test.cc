@@ -8,8 +8,6 @@
 #include "test/test_common/registry.h"
 #include "test/test_common/utility.h"
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace {
 

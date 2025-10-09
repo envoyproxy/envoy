@@ -6,8 +6,6 @@
 #include "absl/base/attributes.h"
 #include "gtest/gtest.h"
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 
 static ABSL_ATTRIBUTE_NOINLINE void releaseAssertInAFunction() { RELEASE_ASSERT(0, ""); }

@@ -15,8 +15,6 @@
 
 #include "gtest/gtest.h"
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {

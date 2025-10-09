@@ -59,8 +59,6 @@ using testing::Sequence;
 using testing::StartsWith;
 using testing::StrictMock;
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Network {
 namespace {

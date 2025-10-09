@@ -34,8 +34,6 @@
 #include "xds/type/matcher/v3/cel.pb.h"
 #include "xds/type/matcher/v3/http_inputs.pb.h"
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {

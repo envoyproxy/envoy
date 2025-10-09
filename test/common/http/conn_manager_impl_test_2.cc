@@ -14,8 +14,6 @@ using testing::Ref;
 using testing::Return;
 using testing::ReturnRef;
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Http {
 

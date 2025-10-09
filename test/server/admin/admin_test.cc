@@ -30,8 +30,6 @@
 
 using testing::StartsWith;
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Server {
 

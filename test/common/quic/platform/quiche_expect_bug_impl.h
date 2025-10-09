@@ -11,8 +11,6 @@
 
 #include "quiche/common/platform/api/quiche_logging.h"
 
-SETUP_LOG_RECORDER;
-
 #define EXPECT_QUICHE_BUG_IMPL(statement, regex) EXPECT_ENVOY_BUG(statement, regex)
 
 #define EXPECT_QUICHE_PEER_BUG_IMPL(statement, regex) EXPECT_LOG_CONTAINS("error", regex, statement)

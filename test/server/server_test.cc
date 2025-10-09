@@ -55,8 +55,6 @@ using testing::Return;
 using testing::SaveArg;
 using testing::StrictMock;
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Server {
 namespace {

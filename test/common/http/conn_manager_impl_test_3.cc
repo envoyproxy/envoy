@@ -6,8 +6,6 @@
 #include "test/server/utility.h"
 #include "test/test_common/test_runtime.h"
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Http {
 

@@ -25,8 +25,6 @@
 #include "quiche/quic/test_tools/quic_connection_peer.h"
 #include "quiche/quic/test_tools/quic_session_peer.h"
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Quic {
 

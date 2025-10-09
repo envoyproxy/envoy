@@ -6,8 +6,6 @@
 
 #include "gmock/gmock.h"
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Singleton {
 namespace {

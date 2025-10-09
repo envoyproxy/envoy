@@ -41,8 +41,6 @@
 
 using namespace std::chrono_literals;
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 
 using ::testing::HasSubstr;

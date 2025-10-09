@@ -17,8 +17,6 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Upstream {
 namespace {

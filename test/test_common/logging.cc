@@ -35,12 +35,12 @@ LogLevelSetter::~LogLevelSetter() {
 }
 
 LogExpectation::LogExpectation(
-    LogEnvironment* log_env,
+    LogRecordingSink& sink,
     absl::AnyInvocable<void(Logger::Logger::Levels, const std::string&)> on_log)
-    : log_env_(log_env), on_log_(std::move(on_log)) {
-  log_env_->log_recorder_->addExpectation(this);
+    : sink_(sink), on_log_(std::move(on_log)) {
+  sink_.addExpectation(this);
 }
-LogExpectation::~LogExpectation() { log_env_->log_recorder_->removeExpectation(this); }
+LogExpectation::~LogExpectation() { sink_.removeExpectation(this); }
 
 LogRecordingSink::LogRecordingSink(Logger::DelegatingLogSinkSharedPtr log_sink)
     : Logger::SinkDelegate(log_sink) {

@@ -45,8 +45,6 @@ using testing::ReturnRef;
 using testing::SaveArg;
 using testing::Throw;
 
-SETUP_LOG_RECORDER;
-
 namespace Envoy {
 namespace Extensions {
 namespace UdpFilters {
