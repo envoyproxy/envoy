@@ -1577,6 +1577,92 @@ TEST_P(ExtProcIntegrationTest, GetAndRespondImmediately) {
   EXPECT_EQ("{\"reason\": \"Not authorized\"}", response->body());
 }
 
+// Same as ExtProcIntegrationTest but with the helper function to configure ext_proc
+// as an upstream filter shared in this integration test file.
+class ExtProcIntegrationTestUpstream : public ExtProcIntegrationTest {
+public:
+  void initializeConfig() {
+    ConfigOptions config_option = {};
+    config_option.downstream_filter = false;
+    ExtProcIntegrationTest::initializeConfig(config_option);
+
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      auto* static_resources = bootstrap.mutable_static_resources();
+      // Retrieve cluster_0.
+      auto* cluster = static_resources->mutable_clusters(0);
+      ConfigHelper::HttpProtocolOptions old_protocol_options;
+      if (cluster->typed_extension_protocol_options().contains(
+              "envoy.extensions.upstreams.http.v3.HttpProtocolOptions")) {
+        old_protocol_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
+            (*cluster->mutable_typed_extension_protocol_options())
+                ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
+      }
+      if (old_protocol_options.http_filters().empty()) {
+        auto* http_filter = old_protocol_options.add_http_filters();
+        http_filter->set_name("envoy.filters.http.upstream_codec");
+        http_filter->mutable_typed_config()->PackFrom(
+            envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::
+                default_instance());
+      }
+      auto* ext_proc_filter = old_protocol_options.add_http_filters();
+      ext_proc_filter->set_name("envoy.filters.http.ext_proc");
+      ext_proc_filter->mutable_typed_config()->PackFrom(proto_config_);
+      for (int i = old_protocol_options.http_filters_size() - 1; i > 0; --i) {
+        old_protocol_options.mutable_http_filters()->SwapElements(i, i - 1);
+      }
+      (*cluster->mutable_typed_extension_protocol_options())
+          ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
+              .PackFrom(old_protocol_options);
+    });
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientTypeDeferredProcessing, ExtProcIntegrationTestUpstream,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
+
+// This is almost the same as GetAndRespondImmediately but the filter is
+// configured as an upstream filter.
+TEST_P(ExtProcIntegrationTestUpstream, GetAndRespondImmediately_Upstream) {
+  initializeConfig();
+  HttpIntegrationTest::initialize();
+  auto response = sendDownstreamRequest([](Http::RequestHeaderMap& headers) {
+    // We want to ensure that the immediate response from an upstream ext_proc filter won't trigger
+    // a retry, which is a requirement of the upstream filter implementations.
+    //
+    // Setting this header normally triggers a retry on 5xx from the upstream servers.
+    // If the immediate response from an upstream ext_proc filter triggers a retry, the test will
+    // fail.
+    headers.addCopy(Http::LowerCaseString("x-envoy-retry-on"), "5xx");
+  });
+
+  bool called = false;
+  processAndRespondImmediately(*grpc_upstreams_[0], true, [&called](ImmediateResponse& immediate) {
+    // Ensure that this lambda is called only once, meaning retry is not attempted.
+    EXPECT_FALSE(called);
+    called = true;
+    immediate.mutable_status()->set_code(envoy::type::v3::StatusCode::InternalServerError);
+    immediate.set_body("{\"reason\": \"Internal Server Error\"}");
+    immediate.set_details("Failed because of Internal Server Error");
+    auto* hdr1 = immediate.mutable_headers()->add_set_headers();
+    hdr1->mutable_append()->set_value(false);
+    hdr1->mutable_header()->set_key("x-failure-reason");
+    hdr1->mutable_header()->set_raw_value("testing");
+    auto* hdr2 = immediate.mutable_headers()->add_set_headers();
+    hdr2->mutable_append()->set_value(false);
+    hdr2->mutable_header()->set_key("content-type");
+    hdr2->mutable_header()->set_raw_value("application/json");
+  });
+
+  // ext_proc will immediately close side stream in this case, which causes it to be reset,
+  // since side stream codec had not yet observed server trailers.
+  EXPECT_TRUE(processor_stream_->waitForReset());
+
+  verifyDownstreamResponse(*response, 500);
+  EXPECT_THAT(response->headers(), ContainsHeader("x-failure-reason", "testing"));
+  EXPECT_THAT(response->headers(), ContainsHeader("content-type", "application/json"));
+  EXPECT_EQ("{\"reason\": \"Internal Server Error\"}", response->body());
+}
+
 TEST_P(ExtProcIntegrationTest, GetAndRespondImmediatelyGracefulClose) {
   scoped_runtime_.mergeValues({{"envoy.reloadable_features.ext_proc_graceful_grpc_close", "true"}});
   // Make remote close timeout long, so that test times out and fails if it is hit.
@@ -3750,39 +3836,8 @@ TEST_P(ExtProcIntegrationTest, MappedAttributeBuilderOverrides) {
 }
 #endif
 
-TEST_P(ExtProcIntegrationTest, GetAndSetHeadersUpstream) {
-  ConfigOptions config_option = {};
-  config_option.downstream_filter = false;
-
-  initializeConfig(config_option);
-  // Add ext_proc as upstream filter.
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
-    auto* static_resources = bootstrap.mutable_static_resources();
-    // Retrieve cluster_0.
-    auto* cluster = static_resources->mutable_clusters(0);
-    ConfigHelper::HttpProtocolOptions old_protocol_options;
-    if (cluster->typed_extension_protocol_options().contains(
-            "envoy.extensions.upstreams.http.v3.HttpProtocolOptions")) {
-      old_protocol_options = MessageUtil::anyConvert<ConfigHelper::HttpProtocolOptions>(
-          (*cluster->mutable_typed_extension_protocol_options())
-              ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]);
-    }
-    if (old_protocol_options.http_filters().empty()) {
-      auto* upstream_codec = old_protocol_options.add_http_filters();
-      upstream_codec->set_name("envoy.filters.http.upstream_codec");
-      upstream_codec->mutable_typed_config()->PackFrom(
-          envoy::extensions::filters::http::upstream_codec::v3::UpstreamCodec::default_instance());
-    }
-    auto* ext_proc_filter = old_protocol_options.add_http_filters();
-    ext_proc_filter->set_name("envoy.filters.http.ext_proc");
-    ext_proc_filter->mutable_typed_config()->PackFrom(proto_config_);
-    for (int i = old_protocol_options.http_filters_size() - 1; i > 0; --i) {
-      old_protocol_options.mutable_http_filters()->SwapElements(i, i - 1);
-    }
-    (*cluster->mutable_typed_extension_protocol_options())
-        ["envoy.extensions.upstreams.http.v3.HttpProtocolOptions"]
-            .PackFrom(old_protocol_options);
-  });
+TEST_P(ExtProcIntegrationTestUpstream, GetAndSetHeadersUpstream) {
+  initializeConfig();
   HttpIntegrationTest::initialize();
 
   auto response = sendDownstreamRequest(
