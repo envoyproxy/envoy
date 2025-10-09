@@ -132,8 +132,6 @@ FALSE_RUNTIME_GUARD(envoy_reloadable_features_dns_cache_filter_unusable_ip_versi
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_drain_pools_on_network_change);
 // TODO(fredyw): evaluate and either make this a config knob or remove.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_no_tcp_delay);
-// TODO(danzh): flip to true after some internal testing.
-FALSE_RUNTIME_GUARD(envoy_reloadable_features_quic_upstream_connection_handle_network_change);
 // Adding runtime flag to use balsa_parser for http_inspector.
 FALSE_RUNTIME_GUARD(envoy_reloadable_features_http_inspector_use_balsa_parser);
 // TODO(danzh) re-enable it when the issue of preferring TCP over v6 rather than QUIC over v4 is
