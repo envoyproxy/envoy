@@ -267,12 +267,12 @@ TEST(QuicLbTest, InvalidConfig) {
       "'server_id' length (7) and 'nonce_length_bytes' (12) combined must be 18 bytes or less.");
 }
 
-// Validate that the server ID is present in plaintext when `unsafe_unencrypted_testing_mode`
+// Validate that the server ID is present in plaintext when `unencrypted_mode`
 // is enabled.
 TEST(QuicLbTest, Unencrypted) {
   uint8_t id_data[] = {0xab, 0xcd, 0xef, 0x12, 0x34, 0x56};
   envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config cfg;
-  cfg.set_unsafe_unencrypted_testing_mode(true);
+  cfg.set_unencrypted_mode(true);
   cfg.mutable_server_id()->set_inline_bytes(id_data, sizeof(id_data));
   cfg.set_nonce_length_bytes(10);
   cfg.mutable_encryption_parameters()->set_name(kSecretName);
@@ -302,7 +302,7 @@ TEST(QuicLbTest, Base64ServerId) {
   constexpr absl::string_view id_data = "testtest";
 
   envoy::extensions::quic::connection_id_generator::quic_lb::v3::Config cfg;
-  cfg.set_unsafe_unencrypted_testing_mode(true);
+  cfg.set_unencrypted_mode(true);
   cfg.mutable_server_id()->set_inline_string(id_data_base64);
   cfg.set_server_id_base64_encoded(true);
   cfg.set_expected_server_id_length(id_data.length());
