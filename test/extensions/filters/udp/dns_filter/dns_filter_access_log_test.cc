@@ -710,7 +710,6 @@ TEST(DnsFilterCommandParserTest, CaseSensitiveCommands) {
   EXPECT_EQ(parser->parse("QUERYNAME", "", absl::nullopt), nullptr);
 }
 
-
 } // namespace
 } // namespace DnsFilter
 } // namespace UdpFilters
