@@ -4,6 +4,7 @@
 
 #include "source/common/http/http3_status_tracker_impl.h"
 #include "source/common/http/mixed_conn_pool.h"
+#include "source/common/runtime/runtime_features.h"
 
 #include "quiche/quic/core/http/spdy_utils.h"
 #include "quiche/quic/core/quic_versions.h"
@@ -330,7 +331,9 @@ ConnectivityGrid::ConnectivityGrid(
   ASSERT(connectivity_options.protocols_.size() == 3);
   ASSERT(alternate_protocols);
   std::chrono::milliseconds rtt =
-      std::chrono::duration_cast<std::chrono::milliseconds>(alternate_protocols_->getSrtt(origin_));
+      std::chrono::duration_cast<std::chrono::milliseconds>(alternate_protocols_->getSrtt(
+          origin_, Runtime::runtimeFeatureEnabled(
+                       "envoy.reloadable_features.use_canonical_suffix_for_srtt")));
   if (rtt.count() != 0) {
     next_attempt_duration_ = std::chrono::milliseconds(rtt.count() * 2);
   }
