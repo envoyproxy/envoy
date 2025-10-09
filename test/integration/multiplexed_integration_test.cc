@@ -3558,12 +3558,14 @@ TEST_P(SocketSwappableMultiplexedIntegrationTest, BackedUpUpstreamConnectionClos
   test_server_->waitForGaugeGe("cluster.cluster_0.upstream_cx_tx_bytes_buffered", 0);
 }
 
-TEST_P(MultiplexedIntegrationTest, ResetPropogation) {
+TEST_P(MultiplexedIntegrationTest, LegacyResetPropogation) {
   if (upstreamProtocol() == Http::CodecType::HTTP1) {
     setUpstreamProtocol(Http::CodecType::HTTP2);
   }
   ASSERT(downstreamProtocol() != Http::CodecType::HTTP1);
+  config_helper_.addRuntimeOverride("envoy.reloadable_features.reset_with_error", "false");
   std::vector<Http::StreamResetReason> reasons = {StreamResetReason::RemoteResetNoError,
+                                                  StreamResetReason::Overflow,
                                                   StreamResetReason::ProtocolError};
 
   initialize();
@@ -3574,12 +3576,13 @@ TEST_P(MultiplexedIntegrationTest, ResetPropogation) {
     upstream_request_->encodeHeaders(default_response_headers_, false);
     upstream_request_->encodeResetStream(reason);
     ASSERT_TRUE(response->waitForReset());
-    EXPECT_EQ(reason, response->resetReason())
+    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason())
         << "Expected code " << static_cast<int>(reason) << " "
         << " got " << static_cast<int>(response->resetReason()) << "\n";
   }
 }
-TEST_P(MultiplexedIntegrationTest, LegacyResetPropogation) {
+
+TEST_P(MultiplexedIntegrationTest, ResetPropogation) {
   if (downstreamProtocol() == Http::CodecType::HTTP1) {
     setDownstreamProtocol(Http::CodecType::HTTP2);
   }

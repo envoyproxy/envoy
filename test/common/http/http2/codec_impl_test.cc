@@ -2893,7 +2893,7 @@ TEST_P(Http2CodecImplTest, HeaderNameWithUnderscoreAreRejected) {
 
   EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _));
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.http2_propagate_reset_events")) {
-    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset());
+    EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset()).Times(AtLeast(1));
   } else {
     EXPECT_CALL(server_codec_event_callbacks_, onCodecLowLevelReset()).Times(0);
   }
