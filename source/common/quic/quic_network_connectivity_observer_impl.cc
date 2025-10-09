@@ -18,5 +18,9 @@ void QuicNetworkConnectivityObserverImpl::onNetworkConnected(NetworkHandle /*net
   (void)session_;
 }
 
+void QuicNetworkConnectivityObserverImpl::onNetworkDisconnected(NetworkHandle /*network*/) {
+  (void)session_;
+}
+
 } // namespace Quic
 } // namespace Envoy

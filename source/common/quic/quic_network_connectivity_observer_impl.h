@@ -24,6 +24,7 @@ public:
   // QuicNetworkConnectivityObserver
   void onNetworkMadeDefault(NetworkHandle network) override;
   void onNetworkConnected(NetworkHandle network) override;
+  void onNetworkDisconnected(NetworkHandle network) override;
 
 private:
   EnvoyQuicClientSession& session_;
