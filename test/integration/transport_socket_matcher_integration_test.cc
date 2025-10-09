@@ -99,7 +99,7 @@ public:
     const std::string matcher_yaml = R"EOF(
 matcher_tree:
   input:
-    name: envoy.matching.inputs.transport_socket.endpoint_metadata
+    name: envoy.matching.inputs.endpoint_metadata
     typed_config:
       "@type": type.googleapis.com/envoy.extensions.matching.common_inputs.transport_socket.v3.EndpointMetadataInput
       filter: envoy.lb

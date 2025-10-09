@@ -31,7 +31,7 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 // This configuration extracts the value at path ``["envoy.transport_socket_match"]["socket_type"]``
 // from the endpoint metadata for use in transport socket selection.
 //
-// [#extension: envoy.matching.inputs.transport_socket.endpoint_metadata]
+// [#extension: envoy.matching.inputs.endpoint_metadata]
 message EndpointMetadataInput {
   // The filter name to retrieve the Struct from the endpoint metadata.
   // If not specified or empty, defaults to ``envoy.transport_socket_match``.
@@ -71,7 +71,7 @@ message EndpointMetadataInput {
 // This configuration extracts the value at path ``["envoy.transport_socket_match"]["region"]``
 // from the locality metadata for use in transport socket selection.
 //
-// [#extension: envoy.matching.inputs.transport_socket.locality_metadata]
+// [#extension: envoy.matching.inputs.locality_metadata]
 message LocalityMetadataInput {
   // The filter name to retrieve the Struct from the locality metadata.
   // If not specified or empty, defaults to ``envoy.transport_socket_match``.

@@ -133,6 +133,7 @@ categories:
 - envoy.matching.action
 - envoy.matching.http.input
 - envoy.matching.http.custom_matchers
+- envoy.matching.inputs
 - envoy.matching.network.input
 - envoy.matching.network.custom_matchers
 - envoy.string_matcher

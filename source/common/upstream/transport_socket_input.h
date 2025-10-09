@@ -102,9 +102,7 @@ private:
  */
 class EndpointMetadataInputFactory : public Matcher::DataInputFactory<TransportSocketMatchingData> {
 public:
-  std::string name() const override {
-    return "envoy.matching.inputs.transport_socket.endpoint_metadata";
-  }
+  std::string name() const override { return "envoy.matching.inputs.endpoint_metadata"; }
 
   Matcher::DataInputFactoryCb<TransportSocketMatchingData>
   createDataInputFactoryCb(const Protobuf::Message& config,
@@ -120,9 +118,7 @@ public:
  */
 class LocalityMetadataInputFactory : public Matcher::DataInputFactory<TransportSocketMatchingData> {
 public:
-  std::string name() const override {
-    return "envoy.matching.inputs.transport_socket.locality_metadata";
-  }
+  std::string name() const override { return "envoy.matching.inputs.locality_metadata"; }
 
   Matcher::DataInputFactoryCb<TransportSocketMatchingData>
   createDataInputFactoryCb(const Protobuf::Message& config,
@@ -160,9 +156,7 @@ public:
  */
 class DestinationIPInputFactory : public Matcher::DataInputFactory<TransportSocketMatchingData> {
 public:
-  std::string name() const override {
-    return "envoy.matching.inputs.transport_socket.destination_ip";
-  }
+  std::string name() const override { return "envoy.matching.inputs.destination_ip"; }
 
   Matcher::DataInputFactoryCb<TransportSocketMatchingData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
@@ -174,7 +168,7 @@ public:
         envoy::extensions::matching::common_inputs::network::v3::DestinationIPInput>();
   }
 
-  std::string category() const override { return "envoy.matching.inputs"; }
+  std::string category() const override { return "envoy.matching.network.input"; }
 };
 
 /**
@@ -200,7 +194,7 @@ public:
  */
 class SourceIPInputFactory : public Matcher::DataInputFactory<TransportSocketMatchingData> {
 public:
-  std::string name() const override { return "envoy.matching.inputs.transport_socket.source_ip"; }
+  std::string name() const override { return "envoy.matching.inputs.source_ip"; }
 
   Matcher::DataInputFactoryCb<TransportSocketMatchingData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
@@ -212,7 +206,7 @@ public:
         envoy::extensions::matching::common_inputs::network::v3::SourceIPInput>();
   }
 
-  std::string category() const override { return "envoy.matching.inputs"; }
+  std::string category() const override { return "envoy.matching.network.input"; }
 };
 
 /**
@@ -238,9 +232,7 @@ public:
  */
 class DestinationPortInputFactory : public Matcher::DataInputFactory<TransportSocketMatchingData> {
 public:
-  std::string name() const override {
-    return "envoy.matching.inputs.transport_socket.destination_port";
-  }
+  std::string name() const override { return "envoy.matching.inputs.destination_port"; }
 
   Matcher::DataInputFactoryCb<TransportSocketMatchingData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
@@ -252,7 +244,7 @@ public:
         envoy::extensions::matching::common_inputs::network::v3::DestinationPortInput>();
   }
 
-  std::string category() const override { return "envoy.matching.inputs"; }
+  std::string category() const override { return "envoy.matching.network.input"; }
 };
 
 /**
@@ -278,7 +270,7 @@ public:
  */
 class SourcePortInputFactory : public Matcher::DataInputFactory<TransportSocketMatchingData> {
 public:
-  std::string name() const override { return "envoy.matching.inputs.transport_socket.source_port"; }
+  std::string name() const override { return "envoy.matching.inputs.source_port"; }
 
   Matcher::DataInputFactoryCb<TransportSocketMatchingData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
@@ -290,7 +282,7 @@ public:
         envoy::extensions::matching::common_inputs::network::v3::SourcePortInput>();
   }
 
-  std::string category() const override { return "envoy.matching.inputs"; }
+  std::string category() const override { return "envoy.matching.network.input"; }
 };
 
 /**
@@ -323,7 +315,7 @@ public:
  */
 class ServerNameInputFactory : public Matcher::DataInputFactory<TransportSocketMatchingData> {
 public:
-  std::string name() const override { return "envoy.matching.inputs.transport_socket.server_name"; }
+  std::string name() const override { return "envoy.matching.inputs.server_name"; }
 
   Matcher::DataInputFactoryCb<TransportSocketMatchingData>
   createDataInputFactoryCb(const Protobuf::Message&, ProtobufMessage::ValidationVisitor&) override {
@@ -335,7 +327,7 @@ public:
         envoy::extensions::matching::common_inputs::network::v3::ServerNameInput>();
   }
 
-  std::string category() const override { return "envoy.matching.inputs"; }
+  std::string category() const override { return "envoy.matching.network.input"; }
 };
 
 /**
@@ -371,7 +363,7 @@ public:
         envoy::extensions::matching::common_inputs::network::v3::ApplicationProtocolInput>();
   }
 
-  std::string category() const override { return "envoy.matching.inputs"; }
+  std::string category() const override { return "envoy.matching.network.input"; }
 };
 
 } // namespace Upstream
