@@ -265,22 +265,11 @@ server_config:
   ASSERT_EQ(test_access_log_->logCount(), 1);
 
   // Verify DNS custom command formatters extracted correct information
-  ASSERT_TRUE(test_access_log_->queryName().has_value());
   EXPECT_EQ(test_access_log_->queryName().value(), "www.example.com");
-
-  ASSERT_TRUE(test_access_log_->queryType().has_value());
   EXPECT_EQ(test_access_log_->queryType().value(), "1"); // DNS_RECORD_TYPE_A
-
-  ASSERT_TRUE(test_access_log_->queryClass().has_value());
   EXPECT_EQ(test_access_log_->queryClass().value(), "1"); // DNS_RECORD_CLASS_IN
-
-  ASSERT_TRUE(test_access_log_->answerCount().has_value());
   EXPECT_EQ(test_access_log_->answerCount().value(), "2");
-
-  ASSERT_TRUE(test_access_log_->responseCode().has_value());
   EXPECT_EQ(test_access_log_->responseCode().value(), "0"); // DNS_RESPONSE_CODE_NO_ERROR
-
-  ASSERT_TRUE(test_access_log_->parseStatus().has_value());
   EXPECT_EQ(test_access_log_->parseStatus().value(), "true");
 }
 
@@ -308,12 +297,7 @@ server_config:
 
   ASSERT_EQ(test_access_log_->logCount(), 1);
 
-  // Verify QUERY_TYPE formatter returns quad-A record
-  ASSERT_TRUE(test_access_log_->queryType().has_value());
   EXPECT_EQ(test_access_log_->queryType().value(), "28"); // quad-A record type
-
-  // Verify ANSWER_COUNT formatter returns 1
-  ASSERT_TRUE(test_access_log_->answerCount().has_value());
   EXPECT_EQ(test_access_log_->answerCount().value(), "1");
 }
 
@@ -341,16 +325,9 @@ server_config:
 
   ASSERT_EQ(test_access_log_->logCount(), 1);
 
-  // Verify QUERY_NAME formatter captured the non-existent domain
-  ASSERT_TRUE(test_access_log_->queryName().has_value());
+
   EXPECT_EQ(test_access_log_->queryName().value(), "nonexistent.example.com");
-
-  // Verify RESPONSE_CODE formatter shows NAME_ERROR
-  ASSERT_TRUE(test_access_log_->responseCode().has_value());
   EXPECT_EQ(test_access_log_->responseCode().value(), "3"); // DNS_RESPONSE_CODE_NAME_ERROR
-
-  // Verify ANSWER_COUNT formatter shows 0 answers
-  ASSERT_TRUE(test_access_log_->answerCount().has_value());
   EXPECT_EQ(test_access_log_->answerCount().value(), "0");
 }
 
@@ -424,10 +401,7 @@ server_config:
 
   ASSERT_EQ(test_access_log_->logCount(), 1);
 
-  // Verify remote (client) address
   EXPECT_EQ(test_access_log_->lastRemoteAddress(), client_address);
-
-  // Verify local (listener) address
   EXPECT_EQ(test_access_log_->lastLocalAddress(), "127.0.0.1:53");
 }
 
@@ -457,14 +431,8 @@ server_config:
   EXPECT_FALSE(test_access_log_->queryType().has_value());
   EXPECT_FALSE(test_access_log_->queryClass().has_value());
 
-  // But other formatters should still return values
-  ASSERT_TRUE(test_access_log_->answerCount().has_value());
   EXPECT_EQ(test_access_log_->answerCount().value(), "0");
-
-  ASSERT_TRUE(test_access_log_->parseStatus().has_value());
   EXPECT_EQ(test_access_log_->parseStatus().value(), "false");
-
-  ASSERT_TRUE(test_access_log_->responseCode().has_value());
 }
 
 // Test custom DNS command parser formatters
@@ -486,7 +454,6 @@ TEST(DnsFilterCommandParserTest, QueryNameFormatter) {
 
   // Test format string
   auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
-  ASSERT_TRUE(result.has_value());
   EXPECT_EQ(result.value(), "example.com");
 
   // Test format value
@@ -509,7 +476,6 @@ TEST(DnsFilterCommandParserTest, QueryTypeFormatter) {
   stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
 
   auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
-  ASSERT_TRUE(result.has_value());
   EXPECT_EQ(result.value(), "1"); // A record type
 
   auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
@@ -531,7 +497,6 @@ TEST(DnsFilterCommandParserTest, AnswerCountFormatter) {
   stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
 
   auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
-  ASSERT_TRUE(result.has_value());
   EXPECT_EQ(result.value(), "5");
 }
 
@@ -551,7 +516,6 @@ TEST(DnsFilterCommandParserTest, ResponseCodeFormatter) {
   stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
 
   auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
-  ASSERT_TRUE(result.has_value());
   EXPECT_EQ(result.value(), "0"); // NO_ERROR
 }
 
@@ -570,7 +534,6 @@ TEST(DnsFilterCommandParserTest, ParseStatusFormatter) {
   stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
 
   auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
-  ASSERT_TRUE(result.has_value());
   EXPECT_EQ(result.value(), "true");
 
   auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
@@ -613,7 +576,6 @@ TEST(DnsFilterCommandParserTest, QueryClassFormatter) {
   stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
 
   auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
-  ASSERT_TRUE(result.has_value());
   EXPECT_EQ(result.value(), "1"); // IN class
 
   auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
@@ -635,7 +597,6 @@ TEST(DnsFilterCommandParserTest, ZeroAnswerCount) {
   stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
 
   auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
-  ASSERT_TRUE(result.has_value());
   EXPECT_EQ(result.value(), "0");
 
   auto value = formatter->formatValueWithContext(Formatter::Context(), stream_info);
