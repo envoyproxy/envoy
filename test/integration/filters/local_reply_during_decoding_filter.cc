@@ -17,7 +17,9 @@ public:
 
   void setDecoderFilterCallbacks(Http::StreamDecoderFilterCallbacks& callbacks) override {
     decoder_callbacks_ = &callbacks;
-    decoder_callbacks_->upstreamCallbacks()->addUpstreamCallbacks(*this);
+    if (auto cb = decoder_callbacks_->upstreamCallbacks(); cb) {
+      cb->addUpstreamCallbacks(*this);
+    }
   }
 
   void onUpstreamConnectionEstablished() override {
