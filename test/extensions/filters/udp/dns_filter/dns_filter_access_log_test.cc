@@ -36,32 +36,32 @@ Api::IoCallUint64Result makeNoError(uint64_t rc) {
   return Api::IoCallUint64Result(rc, Api::IoErrorPtr(nullptr, [](Api::IoError*) {}));
 }
 
-// Test access logger that captures metadata in memory
+// Test access logger that captures filter state in memory
 class TestAccessLog : public AccessLog::Instance {
 public:
   void log(const Formatter::HttpFormatterContext&,
            const StreamInfo::StreamInfo& stream_info) override {
     log_count_++;
-    last_metadata_ = stream_info.dynamicMetadata();
+    last_filter_state_ = stream_info.filterState();
     last_remote_address_ = stream_info.downstreamAddressProvider().remoteAddress()->asString();
     last_local_address_ = stream_info.downstreamAddressProvider().localAddress()->asString();
   }
 
   size_t logCount() const { return log_count_; }
-  const envoy::config::core::v3::Metadata& lastMetadata() const { return last_metadata_; }
+  const StreamInfo::FilterState* lastFilterState() const { return last_filter_state_; }
   const std::string& lastRemoteAddress() const { return last_remote_address_; }
   const std::string& lastLocalAddress() const { return last_local_address_; }
 
   void reset() {
     log_count_ = 0;
-    last_metadata_.Clear();
+    last_filter_state_ = nullptr;
     last_remote_address_.clear();
     last_local_address_.clear();
   }
 
 private:
   size_t log_count_ = 0;
-  envoy::config::core::v3::Metadata last_metadata_;
+  const StreamInfo::FilterState* last_filter_state_ = nullptr;
   std::string last_remote_address_;
   std::string last_local_address_;
 };
@@ -178,8 +178,8 @@ server_config:
   sendQueryFromClient("127.0.0.1:1000", query);
 }
 
-// Test that access log is called with correct metadata
-TEST_F(DnsFilterAccessLogTest, AccessLogCalledWithCorrectMetadata) {
+// Test that access log is called with correct filter state
+TEST_F(DnsFilterAccessLogTest, AccessLogCalledWithCorrectFilterState) {
   const std::string config_yaml = R"EOF(
 stat_prefix: "my_prefix"
 server_config:
@@ -204,28 +204,23 @@ server_config:
   // Verify access log was called
   ASSERT_EQ(test_access_log_->logCount(), 1);
 
-  // Verify dynamic metadata contains DNS information
-  const auto& metadata = test_access_log_->lastMetadata();
-  ASSERT_TRUE(metadata.filter_metadata().contains(DnsFilterName));
+  // Verify filter state contains DNS query context
+  const auto* filter_state = test_access_log_->lastFilterState();
+  ASSERT_NE(filter_state, nullptr);
 
-  const auto& dns_metadata = metadata.filter_metadata().at(DnsFilterName);
-  ASSERT_TRUE(dns_metadata.fields().contains("query_name"));
-  EXPECT_EQ(dns_metadata.fields().at("query_name").string_value(), "www.example.com");
+  const auto* dns_context = filter_state->getDataReadOnly<DnsQueryContext>(DnsQueryContext::key());
+  ASSERT_NE(dns_context, nullptr);
 
-  ASSERT_TRUE(dns_metadata.fields().contains("query_type"));
-  EXPECT_EQ(dns_metadata.fields().at("query_type").number_value(), DNS_RECORD_TYPE_A);
+  // Verify field access support
+  EXPECT_TRUE(dns_context->hasFieldSupport());
 
-  ASSERT_TRUE(dns_metadata.fields().contains("query_class"));
-  EXPECT_EQ(dns_metadata.fields().at("query_class").number_value(), DNS_RECORD_CLASS_IN);
-
-  ASSERT_TRUE(dns_metadata.fields().contains("answer_count"));
-  EXPECT_EQ(dns_metadata.fields().at("answer_count").number_value(), 2);
-
-  ASSERT_TRUE(dns_metadata.fields().contains("response_code"));
-  EXPECT_EQ(dns_metadata.fields().at("response_code").number_value(), DNS_RESPONSE_CODE_NO_ERROR);
-
-  ASSERT_TRUE(dns_metadata.fields().contains("parse_status"));
-  EXPECT_TRUE(dns_metadata.fields().at("parse_status").bool_value());
+  // Verify all fields
+  EXPECT_EQ(absl::get<absl::string_view>(dns_context->getField("query_name")), "www.example.com");
+  EXPECT_EQ(absl::get<int64_t>(dns_context->getField("query_type")), DNS_RECORD_TYPE_A);
+  EXPECT_EQ(absl::get<int64_t>(dns_context->getField("query_class")), DNS_RECORD_CLASS_IN);
+  EXPECT_EQ(absl::get<int64_t>(dns_context->getField("answer_count")), 2);
+  EXPECT_EQ(absl::get<int64_t>(dns_context->getField("response_code")), DNS_RESPONSE_CODE_NO_ERROR);
+  EXPECT_EQ(absl::get<int64_t>(dns_context->getField("parse_status")), 1); // true = 1
 }
 
 // Test access logging with AAAA query
@@ -251,11 +246,13 @@ server_config:
   sendQueryFromClient("192.168.1.100:54321", query);
 
   ASSERT_EQ(test_access_log_->logCount(), 1);
-  const auto& metadata = test_access_log_->lastMetadata();
-  const auto& dns_metadata = metadata.filter_metadata().at(DnsFilterName);
 
-  EXPECT_EQ(dns_metadata.fields().at("query_type").number_value(), DNS_RECORD_TYPE_AAAA);
-  EXPECT_EQ(dns_metadata.fields().at("answer_count").number_value(), 1);
+  const auto* filter_state = test_access_log_->lastFilterState();
+  const auto* dns_context = filter_state->getDataReadOnly<DnsQueryContext>(DnsQueryContext::key());
+  ASSERT_NE(dns_context, nullptr);
+
+  EXPECT_EQ(absl::get<int64_t>(dns_context->getField("query_type")), DNS_RECORD_TYPE_AAAA);
+  EXPECT_EQ(absl::get<int64_t>(dns_context->getField("answer_count")), 1);
 }
 
 // Test access logging for NXDOMAIN (query for non-existent domain)
@@ -281,12 +278,14 @@ server_config:
   sendQueryFromClient("192.168.1.100:54321", query);
 
   ASSERT_EQ(test_access_log_->logCount(), 1);
-  const auto& metadata = test_access_log_->lastMetadata();
-  const auto& dns_metadata = metadata.filter_metadata().at(DnsFilterName);
 
-  EXPECT_EQ(dns_metadata.fields().at("query_name").string_value(), "nonexistent.example.com");
-  EXPECT_EQ(dns_metadata.fields().at("response_code").number_value(), DNS_RESPONSE_CODE_NAME_ERROR);
-  EXPECT_EQ(dns_metadata.fields().at("answer_count").number_value(), 0);
+  const auto* filter_state = test_access_log_->lastFilterState();
+  const auto* dns_context = filter_state->getDataReadOnly<DnsQueryContext>(DnsQueryContext::key());
+  ASSERT_NE(dns_context, nullptr);
+
+  EXPECT_EQ(absl::get<absl::string_view>(dns_context->getField("query_name")), "nonexistent.example.com");
+  EXPECT_EQ(absl::get<int64_t>(dns_context->getField("response_code")), DNS_RESPONSE_CODE_NAME_ERROR);
+  EXPECT_EQ(absl::get<int64_t>(dns_context->getField("answer_count")), 0);
 }
 
 // Test that multiple access loggers all get called
@@ -386,22 +385,20 @@ server_config:
   sendQueryFromClient("192.168.1.100:54321", "");
 
   ASSERT_EQ(test_access_log_->logCount(), 1);
-  const auto& metadata = test_access_log_->lastMetadata();
-  const auto& dns_metadata = metadata.filter_metadata().at(DnsFilterName);
 
-  // When queries are empty, query fields should not be present
-  EXPECT_FALSE(dns_metadata.fields().contains("query_name"));
-  EXPECT_FALSE(dns_metadata.fields().contains("query_type"));
-  EXPECT_FALSE(dns_metadata.fields().contains("query_class"));
+  const auto* filter_state = test_access_log_->lastFilterState();
+  const auto* dns_context = filter_state->getDataReadOnly<DnsQueryContext>(DnsQueryContext::key());
+  ASSERT_NE(dns_context, nullptr);
 
-  // But other fields should still be present
-  EXPECT_TRUE(dns_metadata.fields().contains("answer_count"));
-  EXPECT_EQ(dns_metadata.fields().at("answer_count").number_value(), 0);
+  // When queries are empty, query fields should return monostate
+  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(dns_context->getField("query_name")));
+  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(dns_context->getField("query_type")));
+  EXPECT_TRUE(absl::holds_alternative<absl::monostate>(dns_context->getField("query_class")));
 
-  EXPECT_TRUE(dns_metadata.fields().contains("parse_status"));
-  EXPECT_FALSE(dns_metadata.fields().at("parse_status").bool_value());
-
-  EXPECT_TRUE(dns_metadata.fields().contains("response_code"));
+  // But other fields should still be accessible
+  EXPECT_EQ(absl::get<int64_t>(dns_context->getField("answer_count")), 0);
+  EXPECT_EQ(absl::get<int64_t>(dns_context->getField("parse_status")), 0); // false = 0
+  EXPECT_TRUE(absl::holds_alternative<int64_t>(dns_context->getField("response_code")));
 }
 
 } // namespace

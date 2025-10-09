@@ -6,6 +6,7 @@
 #include "envoy/network/address.h"
 #include "envoy/network/dns.h"
 #include "envoy/network/listener.h"
+#include "envoy/stream_info/filter_state.h"
 
 #include "source/common/buffer/buffer_impl.h"
 #include "source/common/common/empty_string.h"
@@ -184,7 +185,7 @@ PACKED_STRUCT(struct DnsHeader {
 /**
  * DnsQueryContext contains all the data necessary for responding to a query from a given client.
  */
-class DnsQueryContext {
+class DnsQueryContext : public StreamInfo::FilterState::Object {
 public:
   DnsQueryContext(Network::Address::InstanceConstSharedPtr local,
                   Network::Address::InstanceConstSharedPtr peer, DnsParserCounters& counters,
@@ -213,6 +214,34 @@ public:
    * @return uint16_t the response code flag value from a parsed dns object
    */
   uint16_t getQueryResponseCode() { return static_cast<uint16_t>(header_.flags.rcode); }
+
+  // StreamInfo::FilterState::Object
+  bool hasFieldSupport() const override { return true; }
+
+  FieldType getField(absl::string_view field_name) const override {
+    if (!queries_.empty()) {
+      const auto& query = queries_[0];
+      if (field_name == "query_name") {
+        return absl::string_view(query->name_);
+      } else if (field_name == "query_type") {
+        return static_cast<int64_t>(query->type_);
+      } else if (field_name == "query_class") {
+        return static_cast<int64_t>(query->class_);
+      }
+    }
+    if (field_name == "answer_count") {
+      return static_cast<int64_t>(answers_.size());
+    } else if (field_name == "response_code") {
+      return static_cast<int64_t>(response_code_);
+    } else if (field_name == "parse_status") {
+      return static_cast<int64_t>(parse_status_ ? 1 : 0);
+    }
+    return absl::monostate{};
+  }
+
+  static const std::string& key() {
+    CONSTRUCT_ON_FIRST_USE(std::string, "envoy.filters.udp.dns_filter.query_context");
+  }
 };
 
 using DnsQueryContextPtr = std::unique_ptr<DnsQueryContext>;

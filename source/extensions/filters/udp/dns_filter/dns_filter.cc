@@ -328,10 +328,13 @@ void DnsFilter::sendDnsResponse(DnsQueryContextPtr query_context) {
   config_->stats().downstream_tx_responses_.inc();
   config_->stats().downstream_tx_bytes_.recordValue(response.length());
 
-  // Log the DNS query
-  logQuery(query_context);
+  // Convert unique_ptr to shared_ptr for filter state
+  std::shared_ptr<DnsQueryContext> shared_context = std::move(query_context);
 
-  Network::UdpSendData response_data{query_context->local_->ip(), *(query_context->peer_),
+  // Log the DNS query
+  logQuery(shared_context);
+
+  Network::UdpSendData response_data{shared_context->local_->ip(), *(shared_context->peer_),
                                      response};
   listener_.send(response_data);
 }
@@ -643,7 +646,7 @@ Network::FilterStatus DnsFilter::onReceiveError(Api::IoError::IoErrorCode error_
   return Network::FilterStatus::StopIteration;
 }
 
-void DnsFilter::logQuery(const DnsQueryContextPtr& context) {
+void DnsFilter::logQuery(const std::shared_ptr<DnsQueryContext>& context) {
   if (config_->accessLogs().empty()) {
     return;
   }
@@ -656,24 +659,10 @@ void DnsFilter::logQuery(const DnsQueryContextPtr& context) {
   StreamInfo::StreamInfoImpl stream_info(listener_.dispatcher().timeSource(), connection_info,
                                          StreamInfo::FilterState::LifeSpan::Connection);
 
-  // Add DNS-specific information to dynamic metadata
-  Protobuf::Struct dns_metadata;
-  auto* fields = dns_metadata.mutable_fields();
-
-  // Add query information
-  if (!context->queries_.empty()) {
-    const auto& query = context->queries_[0];
-    (*fields)["query_name"] = ValueUtil::stringValue(std::string(query->name_));
-    (*fields)["query_type"] = ValueUtil::numberValue(query->type_);
-    (*fields)["query_class"] = ValueUtil::numberValue(query->class_);
-  }
-
-  // Add response information
-  (*fields)["answer_count"] = ValueUtil::numberValue(context->answers_.size());
-  (*fields)["response_code"] = ValueUtil::numberValue(context->response_code_);
-  (*fields)["parse_status"] = ValueUtil::boolValue(context->parse_status_);
-
-  stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
+  // Set the DNS query context in the filter state
+  stream_info.filterState()->setData(DnsQueryContext::key(), context,
+                                     StreamInfo::FilterState::StateType::ReadOnly,
+                                     StreamInfo::FilterState::LifeSpan::FilterChain);
 
   // Log to all configured access loggers
   for (const auto& access_log : config_->accessLogs()) {

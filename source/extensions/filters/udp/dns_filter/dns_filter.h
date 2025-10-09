@@ -382,7 +382,7 @@ private:
    *
    * @param context object containing the query context
    */
-  void logQuery(const DnsQueryContextPtr& context);
+  void logQuery(const std::shared_ptr<DnsQueryContext>& context);
 
   const DnsFilterEnvoyConfigSharedPtr config_;
   Network::UdpListener& listener_;
