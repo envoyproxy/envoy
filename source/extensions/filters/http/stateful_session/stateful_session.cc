@@ -86,6 +86,11 @@ Http::FilterHeadersStatus StatefulSession::decodeHeaders(Http::RequestHeaderMap&
 
 Http::FilterHeadersStatus StatefulSession::encodeHeaders(Http::ResponseHeaderMap& headers, bool) {
   if (session_state_ == nullptr) {
+    // Track requests that had no session state.
+    if (auto upstream_info = encoder_callbacks_->streamInfo().upstreamInfo();
+        upstream_info != nullptr && upstream_info->upstreamHost() != nullptr) {
+      markNoSession();
+    }
     return Http::FilterHeadersStatus::Continue;
   }
 
