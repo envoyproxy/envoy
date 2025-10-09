@@ -42,7 +42,7 @@ public:
   void log(const Formatter::HttpFormatterContext&,
            const StreamInfo::StreamInfo& stream_info) override {
     log_count_++;
-    last_filter_state_ = stream_info.filterState();
+    last_filter_state_ = &stream_info.filterState();
     last_remote_address_ = stream_info.downstreamAddressProvider().remoteAddress()->asString();
     last_local_address_ = stream_info.downstreamAddressProvider().localAddress()->asString();
   }
