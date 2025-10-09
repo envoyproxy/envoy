@@ -5,6 +5,16 @@ licenses(["notice"])  # Apache 2
 envoy_mobile_package()
 
 envoy_cc_library(
+    name = "envoy_mobile_quic_network_observer_registry_factory_lib",
+    srcs = ["envoy_mobile_quic_network_observer_registry_factory.cc"],
+    hdrs = ["envoy_mobile_quic_network_observer_registry_factory.h"],
+    repository = "@envoy",
+    deps = [
+        "@envoy//source/common/quic:envoy_quic_network_observer_registry_factory_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "connectivity_manager_lib",
     srcs = [
         "connectivity_manager.cc",
@@ -14,6 +24,7 @@ envoy_cc_library(
     ],
     repository = "@envoy",
     deps = [
+        ":envoy_mobile_quic_network_observer_registry_factory_lib",
         ":network_type_socket_option_lib",
         ":network_types_lib",
         ":proxy_settings_lib",
