@@ -58,7 +58,10 @@ public:
   formatWithContext(const Formatter::Context&,
                     const StreamInfo::StreamInfo& stream_info) const override {
     const auto num = field_extractor_(stream_info);
-    return num.has_value() ? absl::StrCat(static_cast<uint64_t>(num.value())) : absl::nullopt;
+    if (!num.has_value()) {
+      return absl::nullopt;
+    }
+    return absl::StrCat(static_cast<uint64_t>(num.value()));
   }
 
   Protobuf::Value formatValueWithContext(const Formatter::Context&,
@@ -86,7 +89,10 @@ public:
   formatWithContext(const Formatter::Context&,
                     const StreamInfo::StreamInfo& stream_info) const override {
     const auto val = field_extractor_(stream_info);
-    return val.has_value() ? (val.value() ? "true" : "false") : absl::nullopt;
+    if (!val.has_value()) {
+      return absl::nullopt;
+    }
+    return val.value() ? "true" : "false";
   }
 
   Protobuf::Value formatValueWithContext(const Formatter::Context&,
