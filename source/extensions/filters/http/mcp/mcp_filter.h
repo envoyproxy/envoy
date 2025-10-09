@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/extensions/filters/http/mcp/v3/mcp.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/server/filter_config.h"
 
@@ -26,6 +27,14 @@ constexpr absl::string_view FilterName = "mcp_proxy";
 class McpFilterConfig {
 public:
   McpFilterConfig() = default;
+};
+
+/**
+ * Per-route configuration for the MCP filter.
+ */
+class McpOverrideConfig : public Router::RouteSpecificFilterConfig {
+public:
+  McpOverrideConfig() = default;
 };
 
 using McpFilterConfigSharedPtr = std::shared_ptr<McpFilterConfig>;

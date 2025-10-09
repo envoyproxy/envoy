@@ -920,7 +920,8 @@ TEST_F(ConnectivityGridTest, SrttMatters) {
 
   // This timer will be returned and armed based on prior rtt.
   Event::MockTimer* failover_timer = new StrictMock<MockTimer>(&dispatcher_);
-  EXPECT_CALL(*failover_timer, enableTimer(std::chrono::milliseconds(4), nullptr));
+  // 1.5 * 2ms = 3ms
+  EXPECT_CALL(*failover_timer, enableTimer(std::chrono::milliseconds(3), nullptr));
   EXPECT_CALL(*failover_timer, enabled()).WillRepeatedly(Return(false));
 
   auto cancel = grid_->newStream(decoder_, callbacks_,
@@ -1752,7 +1753,7 @@ TEST_F(ConnectivityGridTest, RealGrid) {
   EXPECT_EQ("HTTP/1 HTTP/2 ALPN", pool2->protocolDescription());
 }
 
-TEST_F(ConnectivityGridTest, ConnectionCloseDuringAysnConnect) {
+TEST_F(ConnectivityGridTest, ConnectionCloseDuringAsyncConnect) {
   initialize();
   EXPECT_CALL(*cluster_, connectTimeout()).WillRepeatedly(Return(std::chrono::seconds(10)));
 

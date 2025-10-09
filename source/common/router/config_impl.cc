@@ -300,16 +300,21 @@ absl::Status validateMirrorClusterSpecifier(
 }
 
 absl::StatusOr<std::shared_ptr<ShadowPolicyImpl>>
-ShadowPolicyImpl::create(const RequestMirrorPolicy& config) {
+ShadowPolicyImpl::create(const RequestMirrorPolicy& config,
+                         Server::Configuration::CommonFactoryContext& factory_context) {
   absl::Status creation_status = absl::OkStatus();
-  auto ret = std::shared_ptr<ShadowPolicyImpl>(new ShadowPolicyImpl(config, creation_status));
+  auto ret = std::shared_ptr<ShadowPolicyImpl>(
+      new ShadowPolicyImpl(config, factory_context, creation_status));
   RETURN_IF_NOT_OK(creation_status);
   return ret;
 }
 
-ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config, absl::Status& creation_status)
+ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config,
+                                   Server::Configuration::CommonFactoryContext& factory_context,
+                                   absl::Status& creation_status)
     : cluster_(config.cluster()), cluster_header_(config.cluster_header()),
-      disable_shadow_host_suffix_append_(config.disable_shadow_host_suffix_append()) {
+      disable_shadow_host_suffix_append_(config.disable_shadow_host_suffix_append()),
+      host_rewrite_literal_(config.host_rewrite_literal()) {
   SET_AND_RETURN_IF_NOT_OK(validateMirrorClusterSpecifier(config), creation_status);
 
   if (config.has_runtime_fraction()) {
@@ -326,6 +331,21 @@ ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config, absl::Stat
   // disabled.
   trace_sampled_ = config.has_trace_sampled() ? absl::optional<bool>(config.trace_sampled().value())
                                               : absl::nullopt;
+
+  // Create HeaderMutations directly from HeaderMutation rules
+  if (!config.request_headers_mutations().empty()) {
+    auto mutations_or_error =
+        Http::HeaderMutations::create(config.request_headers_mutations(), factory_context);
+    SET_AND_RETURN_IF_NOT_OK(mutations_or_error.status(), creation_status);
+    request_headers_mutations_ = std::move(mutations_or_error.value());
+  }
+}
+
+const Http::HeaderEvaluator& ShadowPolicyImpl::headerEvaluator() const {
+  if (request_headers_mutations_) {
+    return *request_headers_mutations_;
+  }
+  return HeaderParser::defaultParser();
 }
 
 DecoratorImpl::DecoratorImpl(const envoy::config::route::v3::Decorator& decorator)
@@ -498,7 +518,7 @@ RouteEntryImplBase::RouteEntryImplBase(const CommonVirtualHostSharedPtr& vhost,
 
   shadow_policies_.reserve(route.route().request_mirror_policies().size());
   for (const auto& mirror_policy_config : route.route().request_mirror_policies()) {
-    auto policy_or_error = ShadowPolicyImpl::create(mirror_policy_config);
+    auto policy_or_error = ShadowPolicyImpl::create(mirror_policy_config, factory_context);
     SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
     shadow_policies_.push_back(std::move(policy_or_error.value()));
   }
@@ -1477,7 +1497,7 @@ CommonVirtualHostImpl::CommonVirtualHostImpl(
 
   shadow_policies_.reserve(virtual_host.request_mirror_policies().size());
   for (const auto& mirror_policy_config : virtual_host.request_mirror_policies()) {
-    auto policy_or_error = ShadowPolicyImpl::create(mirror_policy_config);
+    auto policy_or_error = ShadowPolicyImpl::create(mirror_policy_config, factory_context);
     SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
     shadow_policies_.push_back(std::move(policy_or_error.value()));
   }
@@ -1911,7 +1931,7 @@ CommonConfigImpl::CommonConfigImpl(const envoy::config::route::v3::RouteConfigur
   if (!config.request_mirror_policies().empty()) {
     shadow_policies_.reserve(config.request_mirror_policies().size());
     for (const auto& mirror_policy_config : config.request_mirror_policies()) {
-      auto policy_or_error = ShadowPolicyImpl::create(mirror_policy_config);
+      auto policy_or_error = ShadowPolicyImpl::create(mirror_policy_config, factory_context);
       SET_AND_RETURN_IF_NOT_OK(policy_or_error.status(), creation_status);
       shadow_policies_.push_back(std::move(policy_or_error.value()));
     }
