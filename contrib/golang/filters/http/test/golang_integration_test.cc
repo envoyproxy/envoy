@@ -1847,7 +1847,7 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_BadHost) {
   testUpstreamOverrideHost("403", "", "/test?upstreamOverrideHost=badhost", true);
 }
 
-// Set a unavailable host, and the host is not in the cluster, will req the valid host in the
+// Set an unavailable host, and the host is not in the cluster, will req the valid host in the
 // cluster and return 200.
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_NotFound) {
   const std::string expected_host =
@@ -1857,7 +1857,7 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_NotFound) {
   testUpstreamOverrideHost("200", expected_host, "/test?upstreamOverrideHost=" + url_host, false);
 }
 
-// Set a unavailable host, and the host is in the cluster, but not available(can not connect to the
+// Set an unavailable host, and the host is in the cluster, but not available(can not connect to the
 // host), will req the unavailable hoat and return 503.
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Unavaliable) {
   const std::string expected_host =
@@ -1870,7 +1870,7 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Unavaliable) {
                            add_endpoint);
 }
 
-// Set a unavailable host, and the host is in the cluster, but not available(can not connect to the
+// Set an unavailable host, and the host is in the cluster, but not available(can not connect to the
 // host), and with retry. when first request with unavailable host failed 503, the second request
 // will retry with the valid host, then the second request will succeed and finally return 200.
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Unavaliable_Retry) {
@@ -1884,8 +1884,8 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Unavaliable_Re
                            add_endpoint, true);
 }
 
-// Set a unavailable host with strict mode, and the host is in the cluster, will req the unavailable
-// host and return 503.
+// Set an unavailable host with strict mode, and the host is in the cluster, will req the
+// unavailable host and return 503.
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict) {
   const std::string expected_host =
       GetParam() == Network::Address::IpVersion::v4 ? "127.0.0.1" : "[::1]";
@@ -1899,7 +1899,7 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict) {
       false, add_endpoint);
 }
 
-// Set a unavailable host with strict mode, and the host is not in the cluster, will req the
+// Set an unavailable host with strict mode, and the host is not in the cluster, will req the
 // unavailable host and return 503.
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_NotFound) {
   const std::string expected_host =
@@ -1912,7 +1912,7 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_NotFoun
       false);
 }
 
-// Set a unavailable host with strict mode and retry, and the host is in the cluster.
+// Set an unavailable host with strict mode and retry, and the host is in the cluster.
 // when first request with unavailable host failed 503, the second request will retry with the valid
 // host, then the second request will succeed and finally return 200.
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_Retry) {
@@ -1928,7 +1928,7 @@ TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_Retry) 
                            false, add_endpoint, true);
 }
 
-// Set a unavailable host with strict mode and retry, and the host is not in the cluster, will req
+// Set an unavailable host with strict mode and retry, and the host is not in the cluster, will req
 // the unavailable host and return 503.
 TEST_P(GolangIntegrationTest, SetUpstreamOverrideHost_InvalidHost_Strict_NotFound_Retry) {
   const std::string expected_host =
