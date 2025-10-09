@@ -247,7 +247,7 @@ private:
   bool isTransferEncodingAllowed(Http::RequestOrResponseHeaderMap& headers) const;
 
   void sanitizeEtagHeader(Http::ResponseHeaderMap& headers);
-  std::string getEnvoyCompressionStatusHeaderValue(
+  std::string createEnvoyCompressionStatusHeaderValue(
       absl::string_view encoding_type, absl::string_view status_to_set,
       absl::optional<absl::string_view> original_length = std::nullopt);
   void insertEnvoyCompressionStatusHeader(

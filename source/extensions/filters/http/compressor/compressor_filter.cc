@@ -778,35 +778,25 @@ bool CompressorFilter::isTransferEncodingAllowed(Http::RequestOrResponseHeaderMa
   return true;
 }
 
-std::string CompressorFilter::getEnvoyCompressionStatusHeaderValue(
+std::string CompressorFilter::createEnvoyCompressionStatusHeaderValue(
     absl::string_view encoding_type, absl::string_view status_to_set,
     absl::optional<absl::string_view> original_length) {
-  std::string status_value = std::string(encoding_type);
-  absl::StrAppend(&status_value, ";", status_to_set);
-  if (status_to_set == Http::Headers::get().EnvoyCompressionStatusValues.Compressed &&
-      original_length.has_value()) {
-    absl::StrAppend(&status_value, Http::Headers::get().EnvoyCompressionStatusValues.Separator,
-                    Http::Headers::get().EnvoyCompressionStatusValues.OriginalLengthPrefix,
-                    *original_length);
+  const auto& constants = Http::Headers::get().EnvoyCompressionStatusValues;
+  if (status_to_set == constants.Compressed && original_length.has_value()) {
+    std::string original_length_part =
+        absl::StrCat(constants.OriginalLengthPrefix, *original_length);
+    return absl::StrJoin({encoding_type, status_to_set, original_length_part}, constants.Separator);
   }
-  return status_value;
+  return absl::StrJoin({encoding_type, status_to_set}, constants.Separator);
 }
 
 void CompressorFilter::insertEnvoyCompressionStatusHeader(
     Http::ResponseHeaderMap& headers, absl::string_view encoding_type,
     absl::string_view status_to_set, absl::optional<absl::string_view> original_length) {
   std::string status_value =
-      getEnvoyCompressionStatusHeaderValue(encoding_type, status_to_set, original_length);
-  const Http::HeaderEntry* compression_status =
-      headers.getInline(compression_status_handle.handle());
-  if (compression_status != nullptr) {
-    std::string new_header;
-    absl::StrAppend(&new_header, compression_status->value().getStringView(),
-                    Http::Headers::get().EnvoyCompressionStatusValues.ValueSeparator, status_value);
-    headers.setInline(compression_status_handle.handle(), new_header);
-  } else {
-    headers.setInline(compression_status_handle.handle(), status_value);
-  }
+      createEnvoyCompressionStatusHeaderValue(encoding_type, status_to_set, original_length);
+  headers.appendInline(compression_status_handle.handle(), status_value,
+                       Http::Headers::get().EnvoyCompressionStatusValues.ValueSeparator);
 }
 
 void CompressorFilter::insertVaryHeader(Http::ResponseHeaderMap& headers) {

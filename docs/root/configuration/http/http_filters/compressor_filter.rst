@@ -112,7 +112,7 @@ Compression Status Header
 
 To aid upstream caches and clients in understanding why a response was or was not compressed, the Compressor filter can add a response header ``x-envoy-compression-status``. This header provides visibility into the filter's decision-making process, which is particularly useful for cache invalidation strategies when compression settings or request/response characteristics change.
 
-To enable this feature, the runtime flag ``envoy.reloadable_features.compressor_add_status_header`` must be set to ``true``.
+To enable this feature, the ``status_header_enabled`` configuration option within ``ResponseDirectionConfig`` must be set to ``true``.
 
 The header value follows the format: ``<encoder-type>;<status>[;<additional-params>]``. Where:
 
@@ -133,8 +133,8 @@ Possible status values:
 
 Behavior Notes:
 
-- When the `envoy.reloadable_features.compressor_add_status_header` flag is enabled, the order of internal checks within the filter is adjusted to ensure the most accurate reason for skipping compression is reported.
-- The conditions are evaluated in a specific order. The first condition that causes compression to be skipped is the one reported in the `x-envoy-compression-status` header. Subsequent checks are not performed for that filter instance. For example, if a response has both a disallowed content type and a content length below the threshold, only the reason that is checked first will be reported.
+- When the ``status_header_enabled`` configuration option is enabled, the order of internal checks within the filter is adjusted to ensure the most accurate reason for skipping compression is reported.
+- The conditions are evaluated in a specific order. The first condition that causes compression to be skipped is the one reported in the ``x-envoy-compression-status`` header. Subsequent checks are not performed for that filter instance. For example, if a response has both a disallowed content type and a content length below the threshold, only the reason that is checked first will be reported.
 
 Per-Route Configuration
 -----------------------
