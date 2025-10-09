@@ -1244,7 +1244,7 @@ FilterHeadersStatus Filter::encodeHeaders(ResponseHeaderMap& headers, bool end_s
 
   // If there is no external processing configured in the encoding path,
   // closing the gRPC stream if it is still open.
-  if (noExternalProcessInEncoding()) {
+  if (encoding_state_.noExternalProcess()) {
     closeStreamMaybeGraceful();
   }
 
@@ -1594,11 +1594,6 @@ bool isLastBodyResponse(ProcessorState& state,
 
 } // namespace
 
-bool Filter::noExternalProcessInEncoding() const {
-  return (!encoding_state_.sendHeaders() && encoding_state_.bodyMode() == ProcessingMode::NONE &&
-          !encoding_state_.sendTrailers());
-}
-
 // Close the gRPC stream if the last ProcessingResponse is received.
 void Filter::closeGrpcStreamIfLastRespReceived(
     const std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>& response) {
@@ -1608,17 +1603,17 @@ void Filter::closeGrpcStreamIfLastRespReceived(
   case ProcessingResponse::ResponseCase::kRequestHeaders:
     if ((decoding_state_.hasNoBody() ||
          (decoding_state_.bodyMode() == ProcessingMode::NONE && !decoding_state_.sendTrailers())) &&
-        noExternalProcessInEncoding()) {
+        encoding_state_.noExternalProcess()) {
       last_response = true;
     }
     break;
   case ProcessingResponse::ResponseCase::kRequestBody:
-    if (isLastBodyResponse(decoding_state_, *response) && noExternalProcessInEncoding()) {
+    if (isLastBodyResponse(decoding_state_, *response) && encoding_state_.noExternalProcess()) {
       last_response = true;
     }
     break;
   case ProcessingResponse::ResponseCase::kRequestTrailers:
-    if (noExternalProcessInEncoding()) {
+    if (encoding_state_.noExternalProcess()) {
       last_response = true;
     }
     break;

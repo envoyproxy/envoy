@@ -620,9 +620,6 @@ private:
   // Gracefully close the gRPC stream based on configuration.
   void closeStreamMaybeGraceful();
 
-  // Check whether external processing is configured in the encoding path.
-  bool noExternalProcessInEncoding() const;
-
   // Close the gRPC stream if the last ProcessingResponse is received.
   void closeGrpcStreamIfLastRespReceived(
       const std::unique_ptr<envoy::service::ext_proc::v3::ProcessingResponse>& response);

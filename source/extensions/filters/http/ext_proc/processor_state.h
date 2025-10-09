@@ -595,6 +595,12 @@ public:
     return mgr.evaluateResponseAttributes(activation);
   }
 
+  // Check whether external processing is configured in the encoding path.
+  bool noExternalProcess() const {
+    return (!send_headers_ && !send_trailers_ &&
+            body_mode_ == envoy::extensions::filters::http::ext_proc::v3::ProcessingMode::NONE);
+  }
+
 private:
   void setProcessingModeInternal(
       const envoy::extensions::filters::http::ext_proc::v3::ProcessingMode& mode);
