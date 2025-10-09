@@ -5785,9 +5785,9 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidTrailerStreamError) {
   codec_client_->close();
   ASSERT_TRUE(response->reset());
 #ifdef ENVOY_ENABLE_UHV
-    EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
+  EXPECT_EQ(Http::StreamResetReason::RemoteReset, response->resetReason());
 #else
-    EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
+  EXPECT_EQ(Http::StreamResetReason::ProtocolError, response->resetReason());
 #endif
   if (!use_universal_header_validator_) {
     // TODO(#24620) UHV does not include the DPE prefix in the downstream protocol error reasons
