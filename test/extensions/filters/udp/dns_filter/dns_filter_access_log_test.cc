@@ -670,7 +670,7 @@ TEST(DnsFilterCommandParserTest, FormatValueNumberType) {
   EXPECT_EQ(value.string_value(), "28");
 }
 
-TEST(DnsFilterCommandParserTest, FormatValueStringType) {
+TEST(DnsFilterCommandParserTest, FormatValueBoolAsString) {
   auto parser = createDnsFilterCommandParser();
   auto formatter = parser->parse("PARSE_STATUS", "", absl::nullopt);
   ASSERT_NE(formatter, nullptr);
