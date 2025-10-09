@@ -308,9 +308,9 @@ server_config:
 
   ASSERT_EQ(test_access_log_->logCount(), 1);
 
-  // Verify QUERY_TYPE formatter returns AAAA
+  // Verify QUERY_TYPE formatter returns quad-A record
   ASSERT_TRUE(test_access_log_->queryType().has_value());
-  EXPECT_EQ(test_access_log_->queryType().value(), "28"); // DNS_RECORD_TYPE_AAAA
+  EXPECT_EQ(test_access_log_->queryType().value(), "28"); //quad-A record type
 
   // Verify ANSWER_COUNT formatter returns 1
   ASSERT_TRUE(test_access_log_->answerCount().has_value());
@@ -552,7 +552,7 @@ TEST(DnsFilterCommandParserTest, ResponseCodeFormatter) {
 
   auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
   ASSERT_TRUE(result.has_value());
-  EXPECT_EQ(result.value(), "0"); // NOERROR
+  EXPECT_EQ(result.value(), "0"); // NO_ERROR
 }
 
 TEST(DnsFilterCommandParserTest, ParseStatusFormatter) {
