@@ -74,6 +74,7 @@ const static bool should_log = true;
   FUNCTION(local_rate_limit)                                                                       \
   FUNCTION(main)                                                                                   \
   FUNCTION(matcher)                                                                                \
+  FUNCTION(mcp)                                                                                    \
   FUNCTION(misc)                                                                                   \
   FUNCTION(mongo)                                                                                  \
   FUNCTION(multi_connection)                                                                       \

@@ -237,7 +237,7 @@ TEST_P(QuicNetworkConnectionTest, Srtt) {
   Http::MockHttpServerPropertiesCache rtt_cache;
   PersistentQuicInfoImpl info{dispatcher_, 45};
 
-  EXPECT_CALL(rtt_cache, getSrtt).WillOnce(Return(std::chrono::microseconds(5)));
+  EXPECT_CALL(rtt_cache, getSrtt(_, false)).WillOnce(Return(std::chrono::microseconds(5)));
 
   std::unique_ptr<Network::ClientConnection> client_connection = createQuicNetworkConnection(
       info, crypto_config_,

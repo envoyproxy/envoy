@@ -22,6 +22,7 @@
 #include "source/common/network/upstream_socket_options_filter_state.h"
 #include "source/common/network/win32_redirect_records_option_impl.h"
 #include "source/common/router/metadatamatchcriteria_impl.h"
+#include "source/common/router/string_accessor_impl.h"
 #include "source/common/stream_info/bool_accessor_impl.h"
 #include "source/common/stream_info/uint64_accessor_impl.h"
 #include "source/common/tcp_proxy/tcp_proxy.h"
@@ -2172,7 +2173,7 @@ TEST_P(TcpProxyTest, MaxDownstreamConnectionDurationWithJitterPercentage) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
 }
 
-// Test that the proxy protocol TLV is set.
+// Test that the proxy protocol TLV with static value is set.
 TEST_P(TcpProxyTest, SetTLV) {
   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
   auto* tlv = config.add_proxy_protocol_tlvs();
@@ -2200,6 +2201,214 @@ TEST_P(TcpProxyTest, SetTLV) {
   ASSERT_EQ(1, upstream_tlvs.size());
   EXPECT_EQ(0xF1, upstream_tlvs[0].type);
   EXPECT_EQ("tst", std::string(upstream_tlvs[0].value.begin(), upstream_tlvs[0].value.end()));
+}
+
+// Test that the proxy protocol TLV with dynamic format string is evaluated correctly.
+TEST_P(TcpProxyTest, SetDynamicTLVWithMetadata) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv = config.add_proxy_protocol_tlvs();
+  tlv->set_type(0xF2);
+  tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string(
+      "%DYNAMIC_METADATA(envoy.test:key)%");
+
+  // Set dynamic metadata on the connection streamInfo directly.
+  filter_callbacks_.connection_.stream_info_.metadata_.mutable_filter_metadata()->insert(
+      {"envoy.test", Protobuf::Struct()});
+  auto& test_struct = (*filter_callbacks_.connection_.stream_info_.metadata_
+                            .mutable_filter_metadata())["envoy.test"];
+  (*test_struct.mutable_fields())["key"].set_string_value("test_value");
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  // Verify the downstream TLV is set with the formatted value.
+  auto& downstream_info = filter_callbacks_.connection_.streamInfo();
+  auto header =
+      downstream_info.filterState()->getDataReadOnly<Envoy::Network::ProxyProtocolFilterState>(
+          Envoy::Network::ProxyProtocolFilterState::key());
+  ASSERT_TRUE(header != nullptr);
+  auto& tlvs = header->value().tlv_vector_;
+  ASSERT_EQ(1, tlvs.size());
+  EXPECT_EQ(0xF2, tlvs[0].type);
+
+  // The formatter outputs "test_value" directly as bytes.
+  EXPECT_EQ("test_value", std::string(tlvs[0].value.begin(), tlvs[0].value.end()));
+
+  // Verify the upstream TLV is set.
+  const auto upstream_header = filter_->upstreamTransportSocketOptions()->proxyProtocolOptions();
+  ASSERT_TRUE(upstream_header.has_value());
+  const auto& upstream_tlvs = upstream_header->tlv_vector_;
+  ASSERT_EQ(1, upstream_tlvs.size());
+  EXPECT_EQ(0xF2, upstream_tlvs[0].type);
+  EXPECT_EQ("test_value",
+            std::string(upstream_tlvs[0].value.begin(), upstream_tlvs[0].value.end()));
+}
+
+// Test that the proxy protocol TLV with dynamic format string for downstream address works.
+TEST_P(TcpProxyTest, SetDynamicTLVWithDownstreamAddress) {
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setLocalAddress(
+      *Network::Utility::resolveUrl("tcp://1.1.1.2:20000"));
+  filter_callbacks_.connection_.stream_info_.downstream_connection_info_provider_->setRemoteAddress(
+      *Network::Utility::resolveUrl("tcp://1.1.1.1:40000"));
+
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv = config.add_proxy_protocol_tlvs();
+  tlv->set_type(0xF3);
+  tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string(
+      "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%");
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  // Verify the downstream TLV is set with the formatted value.
+  auto& downstream_info = filter_callbacks_.connection_.streamInfo();
+  auto header =
+      downstream_info.filterState()->getDataReadOnly<Envoy::Network::ProxyProtocolFilterState>(
+          Envoy::Network::ProxyProtocolFilterState::key());
+  ASSERT_TRUE(header != nullptr);
+  auto& tlvs = header->value().tlv_vector_;
+  ASSERT_EQ(1, tlvs.size());
+  EXPECT_EQ(0xF3, tlvs[0].type);
+
+  // The formatter outputs "1.1.1.1" directly as bytes.
+  EXPECT_EQ("1.1.1.1", std::string(tlvs[0].value.begin(), tlvs[0].value.end()));
+}
+
+// Test that both static and dynamic TLVs can be combined.
+TEST_P(TcpProxyTest, SetMixedStaticAndDynamicTLVs) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+
+  // Add a static TLV.
+  auto* static_tlv = config.add_proxy_protocol_tlvs();
+  static_tlv->set_type(0xF1);
+  static_tlv->set_value("static_value");
+
+  // Add a dynamic TLV.
+  auto* dynamic_tlv = config.add_proxy_protocol_tlvs();
+  dynamic_tlv->set_type(0xF2);
+  dynamic_tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string(
+      "dynamic_value");
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  // Verify both TLVs are set.
+  auto& downstream_info = filter_callbacks_.connection_.streamInfo();
+  auto header =
+      downstream_info.filterState()->getDataReadOnly<Envoy::Network::ProxyProtocolFilterState>(
+          Envoy::Network::ProxyProtocolFilterState::key());
+  ASSERT_TRUE(header != nullptr);
+  auto& tlvs = header->value().tlv_vector_;
+  ASSERT_EQ(2, tlvs.size());
+
+  // Static TLV is first.
+  EXPECT_EQ(0xF1, tlvs[0].type);
+  EXPECT_EQ("static_value", std::string(tlvs[0].value.begin(), tlvs[0].value.end()));
+
+  // Dynamic TLV is second with formatted value.
+  EXPECT_EQ(0xF2, tlvs[1].type);
+  EXPECT_EQ("dynamic_value", std::string(tlvs[1].value.begin(), tlvs[1].value.end()));
+}
+
+// Test that setting both value and format_string throws an error.
+TEST_P(TcpProxyTest, SetTLVWithBothValueAndFormatStringFails) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv = config.add_proxy_protocol_tlvs();
+  tlv->set_type(0xF1);
+  tlv->set_value("test");
+  tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string("test");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      configure(config), EnvoyException,
+      "Invalid TLV configuration: only one of 'value' or 'format_string' may be set.");
+}
+
+// Test that setting neither value nor format_string throws an error.
+TEST_P(TcpProxyTest, SetTLVWithNeitherValueNorFormatStringFails) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv = config.add_proxy_protocol_tlvs();
+  tlv->set_type(0xF1);
+
+  EXPECT_THROW_WITH_MESSAGE(
+      configure(config), EnvoyException,
+      "Invalid TLV configuration: one of 'value' or 'format_string' must be set.");
+}
+
+// Test that an invalid format string throws an error.
+TEST_P(TcpProxyTest, SetTLVWithInvalidFormatStringFails) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv = config.add_proxy_protocol_tlvs();
+  tlv->set_type(0xF1);
+  tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string(
+      "%INVALID_COMMAND%");
+
+  EXPECT_THROW_WITH_REGEX(configure(config), EnvoyException,
+                          "Failed to parse TLV format string:.*");
+}
+
+// Test that the proxy protocol TLV can use filter state values.
+TEST_P(TcpProxyTest, SetDynamicTLVWithFilterState) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv = config.add_proxy_protocol_tlvs();
+  tlv->set_type(0xF4);
+  tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string(
+      "%FILTER_STATE(test.key:PLAIN)%");
+
+  // Set filter state on the connection streamInfo.
+  filter_callbacks_.connection_.stream_info_.filter_state_->setData(
+      "test.key", std::make_unique<Router::StringAccessorImpl>("filter_state_value"),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::Connection);
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  // Verify the downstream TLV is set with the filter state value.
+  auto& downstream_info = filter_callbacks_.connection_.streamInfo();
+  auto header =
+      downstream_info.filterState()->getDataReadOnly<Envoy::Network::ProxyProtocolFilterState>(
+          Envoy::Network::ProxyProtocolFilterState::key());
+  ASSERT_TRUE(header != nullptr);
+  auto& tlvs = header->value().tlv_vector_;
+  ASSERT_EQ(1, tlvs.size());
+  EXPECT_EQ(0xF4, tlvs[0].type);
+  EXPECT_EQ("filter_state_value", std::string(tlvs[0].value.begin(), tlvs[0].value.end()));
+
+  // Verify the upstream TLV is set.
+  const auto upstream_header = filter_->upstreamTransportSocketOptions()->proxyProtocolOptions();
+  ASSERT_TRUE(upstream_header.has_value());
+  const auto& upstream_tlvs = upstream_header->tlv_vector_;
+  ASSERT_EQ(1, upstream_tlvs.size());
+  EXPECT_EQ(0xF4, upstream_tlvs[0].type);
+  EXPECT_EQ("filter_state_value",
+            std::string(upstream_tlvs[0].value.begin(), upstream_tlvs[0].value.end()));
+}
+
+// Test that START_TIME formatter works correctly.
+TEST_P(TcpProxyTest, SetDynamicTLVWithStartTime) {
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config = defaultConfig();
+  auto* tlv = config.add_proxy_protocol_tlvs();
+  tlv->set_type(0xF5);
+  tlv->mutable_format_string()->mutable_text_format_source()->set_inline_string("%START_TIME%");
+
+  setup(1, config);
+  raiseEventUpstreamConnected(0);
+
+  // Verify the TLV is set with a timestamp value.
+  auto& downstream_info = filter_callbacks_.connection_.streamInfo();
+  auto header =
+      downstream_info.filterState()->getDataReadOnly<Envoy::Network::ProxyProtocolFilterState>(
+          Envoy::Network::ProxyProtocolFilterState::key());
+  ASSERT_TRUE(header != nullptr);
+  auto& tlvs = header->value().tlv_vector_;
+  ASSERT_EQ(1, tlvs.size());
+  EXPECT_EQ(0xF5, tlvs[0].type);
+
+  // The value should be a timestamp string (we just verify it's not empty).
+  const std::string timestamp_value(tlvs[0].value.begin(), tlvs[0].value.end());
+  EXPECT_FALSE(timestamp_value.empty());
+  // Should contain date-like characters.
+  EXPECT_TRUE(timestamp_value.find("-") != std::string::npos ||
+              timestamp_value.find(":") != std::string::npos);
 }
 
 INSTANTIATE_TEST_SUITE_P(WithOrWithoutUpstream, TcpProxyTest, ::testing::Bool());

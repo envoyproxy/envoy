@@ -550,6 +550,14 @@ envoy.filters.http.lua:
   type_urls:
   - envoy.extensions.filters.http.lua.v3.Lua
   - envoy.extensions.filters.http.lua.v3.LuaPerRoute
+envoy.filters.http.mcp:
+  categories:
+  - envoy.filters.http
+  security_posture: unknown
+  status: alpha
+  type_urls:
+  - envoy.extensions.filters.http.mcp.v3.Mcp
+  - envoy.extensions.filters.http.mcp.v3.McpOverride
 envoy.filters.http.oauth2:
   categories:
   - envoy.filters.http
