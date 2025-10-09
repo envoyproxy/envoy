@@ -593,6 +593,15 @@ new_features:
   change: |
     Added ``setUpstreamOverrideHost`` method to AsyncClient StreamOptions to enable direct host routing
     that bypasses load balancer selection.
+- area: router
+  change: |
+    Added support for :ref:`request_headers_mutations
+    <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.request_headers_mutations>` to enable header
+    manipulation for mirror requests.
+    Added support for :ref:`host_rewrite_literal
+    <envoy_v3_api_field_config.route.v3.RouteAction.RequestMirrorPolicy.host_rewrite_literal>` in
+    :ref:`request_mirror_policies <envoy_v3_api_field_config.route.v3.RouteAction.request_mirror_policies>` to enable
+    host header rewrite for mirror requests.
 - area: outlier detection
   change: |
     Added :ref:`outlier_detection<envoy_v3_api_field_extensions.upstreams.http.v3.HttpProtocolOptions.outlier_detection>`
