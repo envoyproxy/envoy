@@ -125,8 +125,9 @@ void RateLimiterProviderSingleton::TokenBucketSubscription::handleAddedResource(
     setter(new_limiter);
   }
 
-  // Mark ready only once.
-  init_target_->ready();
+  if (init_target_) {
+    init_target_->ready();
+  }
 }
 
 void RateLimiterProviderSingleton::TokenBucketSubscription::handleRemovedResource(
@@ -136,6 +137,7 @@ void RateLimiterProviderSingleton::TokenBucketSubscription::handleRemovedResourc
   config_.reset();
   token_bucket_config_hash_ = 0;
   limiter_.reset();
+  init_target_ = nullptr;
 
   // Reset the init target as we are now waiting for a new resource.
   for (auto& [key, setter] : setters_) {

@@ -350,6 +350,58 @@ fill_interval:
   expectWritesAndLog(log2, /*expect_write_times=*/3, /*log_call_times=*/4);
 }
 
+TEST_F(AccessLogImplTestWithRateLimitFilter,
+       RemoveResourceAndGetTokenBucketBeforeNewResourceAdded) {
+  AccessLog::InstanceSharedPtr log1 = AccessLog::AccessLogFactory::fromProto(
+      parseAccessLogFromV3Yaml(default_access_log_), context_);
+  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
+  ASSERT_EQ(subscriptions_.size(), 1);
+  ASSERT_EQ(callbackss_.size(), 1);
+
+  // 1. Add the resource
+  EXPECT_CALL(init_watcher_, ready());
+  auto decoded_resources = TestUtility::decodeResources<envoy::type::v3::TokenBucket>(
+      {{"token_bucket_name", token_bucket_resource_}});
+  EXPECT_TRUE(callbackss_["token_bucket_name"]->onConfigUpdate(decoded_resources.refvec_, "").ok());
+  expectWritesAndLog(log1, /*expect_write_times=*/1, /*log_call_times=*/2);
+
+  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(1)));
+
+  // 2. Remove the token bucket.
+  Protobuf::RepeatedPtrField<std::string> removed_resources;
+  removed_resources.Add("token_bucket_name");
+  EXPECT_TRUE(callbackss_["token_bucket_name"]->onConfigUpdate({}, removed_resources, "").ok());
+  // The rate limiter should always deny.
+  expectWritesAndLog(log1, /*expect_write_times=*/0, /*log_call_times=*/1);
+
+  // A new log instance should also pick up the re-added config.
+  EXPECT_CALL(init_watcher_, ready()).Times(0);
+  AccessLog::InstanceSharedPtr log2 = AccessLog::AccessLogFactory::fromProto(
+      parseAccessLogFromV3Yaml(default_access_log_), context_);
+  context_.server_factory_context_.init_manager_.initialize(init_watcher_);
+
+  // 3. Add the resource back.
+  EXPECT_CALL(init_watcher_, ready());
+  auto new_token_bucket = TestUtility::parseYaml<envoy::type::v3::TokenBucket>(R"EOF(
+max_tokens: 3
+tokens_per_fill: 3
+fill_interval:
+  seconds: 3
+)EOF");
+
+  decoded_resources = TestUtility::decodeResources<envoy::type::v3::TokenBucket>(
+      {{"token_bucket_name", new_token_bucket}});
+  EXPECT_TRUE(
+      callbackss_["token_bucket_name"]->onConfigUpdate(decoded_resources.refvec_, {}, "").ok());
+  // The rate limiter should be working with the new config.
+  expectWritesAndLog(log1, /*expect_write_times=*/3, /*log_call_times=*/4);
+  // It shares the same token bucket, so it's rate limited.
+  expectWritesAndLog(log2, /*expect_write_times=*/0, /*log_call_times=*/1);
+
+  time_system_->setMonotonicTime(MonotonicTime(std::chrono::seconds(4)));
+  expectWritesAndLog(log2, /*expect_write_times=*/3, /*log_call_times=*/4);
+}
+
 } // namespace
 } // namespace ProcessRateLimit
 } // namespace Filters
