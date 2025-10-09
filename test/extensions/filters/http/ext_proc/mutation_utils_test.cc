@@ -243,7 +243,7 @@ TEST_F(MutationUtilsTest, TestSetHeaderWithInvalidCharacter) {
   EXPECT_CALL(rejections, inc());
   EXPECT_THAT(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections),
               HasStatus(absl::StatusCode::kInvalidArgument,
-                        "header_mutation_set_contains_invalid_character_in_key"));
+                        "header_mutation_set_contains_invalid_character"));
 
   mutation.Clear();
   s = mutation.add_set_headers();
@@ -254,7 +254,7 @@ TEST_F(MutationUtilsTest, TestSetHeaderWithInvalidCharacter) {
   EXPECT_CALL(rejections, inc());
   EXPECT_THAT(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections),
               HasStatus(absl::StatusCode::kInvalidArgument,
-                        "header_mutation_set_contains_invalid_character_in_value"));
+                        "header_mutation_set_contains_invalid_character"));
 }
 
 TEST_F(MutationUtilsTest, TestSetHeaderWithContentLength) {
@@ -299,7 +299,7 @@ TEST_F(MutationUtilsTest, TestRemoveHeaderWithInvalidCharacter) {
   EXPECT_CALL(rejections, inc());
   EXPECT_THAT(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections),
               HasStatus(absl::StatusCode::kInvalidArgument,
-                        "header_mutation_remove_contains_invalid_character_in_key"));
+                        "header_mutation_remove_contains_invalid_character"));
 }
 
 // Ensure that we actually replace the body
@@ -482,7 +482,8 @@ TEST_F(MutationUtilsTest, TestHeaderMutationSetOperationExceedsMaxCount) {
 
   EXPECT_CALL(rejections, inc());
   EXPECT_THAT(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections),
-              HasStatus(absl::StatusCode::kInvalidArgument, "header_mutation_set_count_exceeded"));
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "header_mutation_operation_count_exceeds_limit"));
   EXPECT_TRUE(headers.empty());
 }
 
@@ -512,9 +513,11 @@ TEST_F(MutationUtilsTest, TestHeaderMutationSetResultExceedsMaxCount) {
   s->mutable_header()->set_key("h6");
   s->mutable_header()->set_raw_value("v6");
   EXPECT_CALL(rejections, inc());
-  EXPECT_THAT(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections),
-              HasStatus(absl::StatusCode::kInvalidArgument, "header_mutation_count_exceeded"));
+  EXPECT_THAT(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections),
+      HasStatus(absl::StatusCode::kInvalidArgument, "header_mutation_result_exceeds_limit"));
   // Surprise: While we return an error, the headers actually DO get mutated.
+  // (Filter must detect the error status and discard the mutation.)
   EXPECT_EQ(headers.size(), 6);
 }
 
@@ -532,9 +535,9 @@ TEST_F(MutationUtilsTest, TestHeaderMutationRemoveOperationExceedsMaxCount) {
   Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
   Envoy::Stats::MockCounter rejections;
   EXPECT_CALL(rejections, inc());
-  EXPECT_THAT(
-      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections),
-      HasStatus(absl::StatusCode::kInvalidArgument, "header_mutation_remove_count_exceeded"));
+  EXPECT_THAT(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections),
+              HasStatus(absl::StatusCode::kInvalidArgument,
+                        "header_mutation_operation_count_exceeds_limit"));
   EXPECT_EQ(headers.size(), 2);
 }
 
@@ -563,9 +566,11 @@ TEST_F(MutationUtilsTest, TestHeaderMutationExceedsMaxKb) {
   s->mutable_header()->set_key("header3");
   s->mutable_header()->set_raw_value("c");
   EXPECT_CALL(rejections, inc());
-  EXPECT_THAT(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections),
-              HasStatus(absl::StatusCode::kInvalidArgument, "header_mutation_bytes_exceeded"));
+  EXPECT_THAT(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections),
+      HasStatus(absl::StatusCode::kInvalidArgument, "header_mutation_result_exceeds_limit"));
   // Surprise: While we return an error, the headers actually DO get mutated.
+  // (Filter must detect the error status and discard the mutation.)
   EXPECT_EQ(headers.byteSize(), 1025);
 }
 
@@ -583,9 +588,11 @@ TEST_F(MutationUtilsTest, TestHeaderMutationRemoveResultExceedsMaxCount) {
   Checker checker(HeaderMutationRules::default_instance(), regex_engine_);
   Envoy::Stats::MockCounter rejections;
   EXPECT_CALL(rejections, inc());
-  EXPECT_THAT(MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections),
-              HasStatus(absl::StatusCode::kInvalidArgument, "header_mutation_count_exceeded"));
+  EXPECT_THAT(
+      MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections),
+      HasStatus(absl::StatusCode::kInvalidArgument, "header_mutation_result_exceeds_limit"));
   // Surprise: h3 was removed despite the error!
+  // (Filter must detect the error status and discard the mutation.)
   EXPECT_EQ(headers.size(), 2);
 }
 
@@ -609,7 +616,7 @@ TEST_F(MutationUtilsTest, TestHeaderMutationExceedsMaxCountAndSize) {
   EXPECT_CALL(rejections, inc());
   EXPECT_THAT(
       MutationUtils::applyHeaderMutations(mutation, headers, false, checker, rejections),
-      HasStatus(absl::StatusCode::kInvalidArgument, "header_mutation_bytes_and_count_exceeded"));
+      HasStatus(absl::StatusCode::kInvalidArgument, "header_mutation_result_exceeds_limit"));
   EXPECT_EQ(headers.size(), 2);
 }
 
