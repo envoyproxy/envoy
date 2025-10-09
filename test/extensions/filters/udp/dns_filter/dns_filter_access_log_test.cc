@@ -470,10 +470,9 @@ TEST(DnsFilterCommandParserTest, QueryNameFormatter) {
   ASSERT_NE(formatter, nullptr);
 
   // Create StreamInfo with DNS metadata
+  Event::SimulatedTimeSystem test_time;
   auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
-  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http11,
-                                         Network::Test::getCanonicalLoopbackAddress(Network::Address::IpVersion::v4)->ip()->timeSource(),
-                                         connection_info,
+  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
                                          StreamInfo::FilterState::LifeSpan::Connection);
 
   // Add DNS metadata
@@ -496,10 +495,9 @@ TEST(DnsFilterCommandParserTest, QueryTypeFormatter) {
   auto formatter = parser->parse("QUERY_TYPE", "", absl::nullopt);
   ASSERT_NE(formatter, nullptr);
 
+  Event::SimulatedTimeSystem test_time;
   auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
-  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http11,
-                                         Network::Test::getCanonicalLoopbackAddress(Network::Address::IpVersion::v4)->ip()->timeSource(),
-                                         connection_info,
+  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
                                          StreamInfo::FilterState::LifeSpan::Connection);
 
   Protobuf::Struct dns_metadata;
@@ -519,10 +517,9 @@ TEST(DnsFilterCommandParserTest, AnswerCountFormatter) {
   auto formatter = parser->parse("ANSWER_COUNT", "", absl::nullopt);
   ASSERT_NE(formatter, nullptr);
 
+  Event::SimulatedTimeSystem test_time;
   auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
-  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http11,
-                                         Network::Test::getCanonicalLoopbackAddress(Network::Address::IpVersion::v4)->ip()->timeSource(),
-                                         connection_info,
+  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
                                          StreamInfo::FilterState::LifeSpan::Connection);
 
   Protobuf::Struct dns_metadata;
@@ -539,10 +536,9 @@ TEST(DnsFilterCommandParserTest, ResponseCodeFormatter) {
   auto formatter = parser->parse("RESPONSE_CODE", "", absl::nullopt);
   ASSERT_NE(formatter, nullptr);
 
+  Event::SimulatedTimeSystem test_time;
   auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
-  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http11,
-                                         Network::Test::getCanonicalLoopbackAddress(Network::Address::IpVersion::v4)->ip()->timeSource(),
-                                         connection_info,
+  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
                                          StreamInfo::FilterState::LifeSpan::Connection);
 
   Protobuf::Struct dns_metadata;
@@ -559,10 +555,9 @@ TEST(DnsFilterCommandParserTest, ParseStatusFormatter) {
   auto formatter = parser->parse("PARSE_STATUS", "", absl::nullopt);
   ASSERT_NE(formatter, nullptr);
 
+  Event::SimulatedTimeSystem test_time;
   auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
-  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http11,
-                                         Network::Test::getCanonicalLoopbackAddress(Network::Address::IpVersion::v4)->ip()->timeSource(),
-                                         connection_info,
+  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
                                          StreamInfo::FilterState::LifeSpan::Connection);
 
   Protobuf::Struct dns_metadata;
@@ -583,10 +578,9 @@ TEST(DnsFilterCommandParserTest, MissingMetadata) {
   ASSERT_NE(formatter, nullptr);
 
   // StreamInfo without DNS metadata
+  Event::SimulatedTimeSystem test_time;
   auto connection_info = std::make_shared<Network::ConnectionInfoSetterImpl>(nullptr, nullptr);
-  StreamInfo::StreamInfoImpl stream_info(Http::Protocol::Http11,
-                                         Network::Test::getCanonicalLoopbackAddress(Network::Address::IpVersion::v4)->ip()->timeSource(),
-                                         connection_info,
+  StreamInfo::StreamInfoImpl stream_info(test_time, connection_info,
                                          StreamInfo::FilterState::LifeSpan::Connection);
 
   auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
