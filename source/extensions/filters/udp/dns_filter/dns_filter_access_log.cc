@@ -20,8 +20,7 @@ constexpr absl::string_view DnsFilterMetadataNamespace = "envoy.filters.udp.dns_
  */
 class DnsStringFormatterProvider : public Formatter::FormatterProvider {
 public:
-  using FieldExtractor =
-      std::function<absl::optional<std::string>(const StreamInfo::StreamInfo&)>;
+  using FieldExtractor = std::function<absl::optional<std::string>(const StreamInfo::StreamInfo&)>;
 
   DnsStringFormatterProvider(FieldExtractor field_extractor)
       : field_extractor_(std::move(field_extractor)) {}
@@ -179,8 +178,8 @@ absl::optional<bool> getDnsMetadataBool(const StreamInfo::StreamInfo& stream_inf
  */
 class DnsFilterCommandParser : public Formatter::CommandParser {
 public:
-  using ProviderFunc = std::function<Formatter::FormatterProviderPtr(absl::string_view,
-                                                                      absl::optional<size_t>)>;
+  using ProviderFunc =
+      std::function<Formatter::FormatterProviderPtr(absl::string_view, absl::optional<size_t>)>;
   using ProviderFuncTable = absl::flat_hash_map<std::string, ProviderFunc>;
 
   // CommandParser

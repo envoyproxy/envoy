@@ -58,10 +58,14 @@ public:
     // Use custom formatters to extract DNS information
     last_query_name_ = query_name_formatter_->formatWithContext(Formatter::Context(), stream_info);
     last_query_type_ = query_type_formatter_->formatWithContext(Formatter::Context(), stream_info);
-    last_query_class_ = query_class_formatter_->formatWithContext(Formatter::Context(), stream_info);
-    last_answer_count_ = answer_count_formatter_->formatWithContext(Formatter::Context(), stream_info);
-    last_response_code_ = response_code_formatter_->formatWithContext(Formatter::Context(), stream_info);
-    last_parse_status_ = parse_status_formatter_->formatWithContext(Formatter::Context(), stream_info);
+    last_query_class_ =
+        query_class_formatter_->formatWithContext(Formatter::Context(), stream_info);
+    last_answer_count_ =
+        answer_count_formatter_->formatWithContext(Formatter::Context(), stream_info);
+    last_response_code_ =
+        response_code_formatter_->formatWithContext(Formatter::Context(), stream_info);
+    last_parse_status_ =
+        parse_status_formatter_->formatWithContext(Formatter::Context(), stream_info);
 
     // Also store metadata for backward compatibility with existing tests
     last_metadata_ = stream_info.dynamicMetadata();
@@ -542,7 +546,8 @@ TEST(DnsFilterCommandParserTest, ResponseCodeFormatter) {
                                          StreamInfo::FilterState::LifeSpan::Connection);
 
   Protobuf::Struct dns_metadata;
-  (*dns_metadata.mutable_fields())["response_code"] = ValueUtil::numberValue(DNS_RESPONSE_CODE_NO_ERROR);
+  (*dns_metadata.mutable_fields())["response_code"] =
+      ValueUtil::numberValue(DNS_RESPONSE_CODE_NO_ERROR);
   stream_info.setDynamicMetadata(std::string(DnsFilterName), dns_metadata);
 
   auto result = formatter->formatWithContext(Formatter::Context(), stream_info);
